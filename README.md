@@ -5,7 +5,14 @@ Product spec: [`docs/SPEC.md`](docs/SPEC.md).
 
 ## What's in this build
 
-- **Modes:** Classic, Blind (stats hidden, +50% rewards), Daily (same spins for everyone, first try ranked, resets at midnight US Eastern), and 1 vs 1 snake draft against a Rookie, Pro or Legend bot.
+- **Modes:** Classic, Blind (stats hidden, +50% rewards), Daily (same spins for everyone, first try ranked, resets at midnight US Eastern), and Head to Head.
+- **Head to Head, live against real players:**
+  - Quick Match finds whoever else is searching. After 30 seconds with no one around, the AI (Rookie, Pro or Legend) steps in, or you can play it right away.
+  - Play a Friend: make a 4-letter code and send it, or share an invite link (`?room=CODE`).
+  - Both players draft from the same five team-decades, taking turns going first, with a 25-second shot clock. Run out of time and the best fit is picked for you.
+  - If the other player leaves or their phone drops for 20 seconds, the AI finishes their draft and you win by forfeit. A 10-second blip (a notification, a quick app switch) changes nothing.
+- **Online without accounts or a server:** everything goes over five public [Nostr](https://nostr.com) relays at once, so one going down changes nothing. Each phone signs its messages with its own key, so nobody can post as you.
+- **Your name:** asked for the first time the app opens (with a dice for random names). It shows on the boards and to your opponents.
 - **Draft:**
   - Slot-machine reels and a no-repeat team-decade rule.
   - 1 free team respin and 1 free decade respin; extra respins cost 25 coins.
@@ -17,7 +24,12 @@ Product spec: [`docs/SPEC.md`](docs/SPEC.md).
   - Tap any series to scout the opponent: their five most-played players with per-game stats, your chance in each home and road game, and your odds to win the series.
   - The round you're on shows the opponent's five right on its card.
 - **Results:** grade and tier, playoff outcome, your playoff run (every opponent, with the team that knocked you out marked, tap to scout), category breakdown, rewards, XP and levels, your global rank, a share card image and share text.
-- **Ranks:** a global leaderboard (today's Daily, plus Classic and Blind by week and all time) and your own best runs. See [`supabase/README.md`](supabase/README.md).
+- **Ranks:** global leaderboards for today's Daily, Classic and Blind (this week and all time) and Head to Head wins, plus your own best runs.
+  - Each player keeps their best entry per board. Every entry carries its lineup, and every phone recomputes the record from the player data and drops anything that doesn't add up (Daily lineups must come from that day's teams).
+  - Duplicate names get a short tag (`#a1b2`) so you can tell players apart.
+- **Coming back every day:** a daily chest that grows for 7 days in a row, three daily missions (easy, medium, hard) with a bonus for finishing all three, and a streak flame on the home screen.
+- **Rarity:** about the best 0.5% of player lines are Legendary, the next tiers Epic and Rare. Rows and cards show it, drafting one sets off a full-screen moment, and the reels flash when a team has a Legendary player.
+- **Big moments:** a match-found VS screen, a running win-streak flame and 10-win milestones during the season, Playoffs Clinched at 50 wins, New Personal Best, Mission Complete, and a live player count.
 - **Other pages:** Daily, Boosters store (earned coins only), Profile and history, Settings (sound, vibration, booster hints, reset), How to play.
 - **Sound and saving:** synthesized sound effects, vibration on Android, and haptic ticks on iPhone (iOS 18+). Progress is saved in the browser (localStorage).
 - **Fits every phone:** the 390px-wide layout scales to the screen width (an iPhone 15 Pro Max gets it 10% larger), and the height adapts, with tighter spacing on shorter screens.
@@ -57,7 +69,7 @@ The build writes `sw.js` and `version.json` next to the page; the version is the
 
 `vercel.json` still works for Vercel: import the repository with the default settings.
 
-**Global leaderboard:** follow [`supabase/README.md`](supabase/README.md) (a free Supabase project and two repository variables).
+The leaderboard and Head to Head need no setup. For testing on the real relays without touching the real boards, add `?ns=test` (any lowercase name) to the URL. `?relay=ws://localhost:7777` points the app at a local relay instead.
 
 ## Data
 
@@ -99,11 +111,12 @@ Two notes on the source data:
 | `src/engine/` | Pure game logic with no UI: `data` (player database), `rating` (score, balance, win curve, grades), `draft` (rules reducer, respins, bot, boosters), `season`, `playoffs`, `economy` |
 | `src/engine/*.test.ts` | Rule tests, plus `sim.test.ts`, which prints win and title distributions for random, best-available and smart drafting |
 | `src/stage.tsx` | Fits the 390px-wide frame to the screen, reads the safe-area insets, and picks a height class (`fit-compact`, `fit-tight`, `fit-normal`, `fit-roomy`) |
-| `src/ui/` | React screens: `Draft`, `Season` (reveal, playoffs, champion screen), `Scout` (opponent scouting sheet), `Results`, `Leaderboard` (global board, name sheet), `Pages` (home, tabs, settings, how to play) |
+| `src/ui/` | React screens: `Welcome` (first-launch name), `Search` (matchmaking), `Draft`, `Season` (reveal, playoffs, champion screen), `Scout` (opponent scouting sheet), `Results`, `Leaderboard` (global board, name sheet), `Rewards` (daily chest, missions), `Pages` (home, tabs, settings, how to play) |
 | `src/ui/motion.tsx`, `src/ui/Hero.tsx` | View transitions, count-ups and sparks; the animated arena behind the home scoreboard |
-| `src/lib/` | `profile` (saved progress), `sound` (Web Audio + vibration), `share` (share text and card image), `leaderboard` (Supabase client), `update` (service worker and auto-update) |
+| `src/lib/` | `profile` (saved progress), `sound` (Web Audio + vibration), `share` (share text and card image), `names` (name rules and random names), `update` (service worker and auto-update) |
+| `src/net/` | `nostr` (relay pool, keys, signing), `leaderboard` (entries, checks, ranking), `match` (presence, matchmaking, the live match channel) |
+| `src/engine/online.ts`, `rarity.ts`, `missions.ts` | Head-to-head rules (shared cell order, redraws, shot-clock pick), rarity tiers, daily missions and the reward streak |
 | `pwa/sw.js` | Service worker template; `vite.config.ts` fills in the version and file list |
-| `supabase/leaderboard.sql` | Leaderboard tables and the three functions the game calls |
 
 ## Tuning (all in `src/engine`)
 

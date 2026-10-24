@@ -19,9 +19,12 @@ import {
   whyUnavailable,
 } from '../engine/draft';
 import { BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, levelInfo } from '../engine/economy';
+import { bestPickFor, onlineOrder, redrawCell, SHOT_CLOCK } from '../engine/online';
+import { bestRarity, RARITY_NAMES, type Rarity, rarityOf } from '../engine/rarity';
 import { rateTeam } from '../engine/rating';
 import { type Booster, BOOSTERS, type BotLevel, type Mode, type Player, type Slot, SLOTS } from '../engine/types';
-import { sfx } from '../lib/sound';
+import { sfx, vibrate } from '../lib/sound';
+import type { OnlinePick } from '../net/match';
 import { frameY, useLayout } from '../stage';
 import { CoinChip, Confirm, Fit, initials, lastName, seasonLabel, shortEra } from './common';
 import { Back, Crown, Down, Lock, Refresh } from './icons';
@@ -47,6 +50,21 @@ const ERA_MS = 1550;
 /** pause between the reels stopping and the player list sliding up */
 const OPEN_DELAY = 360;
 
+/** A head-to-head draft against a real player. */
+export interface OnlineProps {
+  seed: string;
+  host: boolean;
+  oppName: string;
+  /** the other player's picks so far */
+  oppPicks: OnlinePick[];
+  /** nothing heard from them for a while, or they left: the AI picks for them */
+  oppGone: boolean;
+  onPick: (p: OnlinePick) => void;
+  onLineup: (l: Partial<Record<Slot, string>>) => void;
+  /** we started picking for them */
+  onTakeover: () => void;
+}
+
 export interface DraftProps {
   mode: Mode;
   botLevel: BotLevel;
@@ -63,6 +81,7 @@ export interface DraftProps {
   onExit: () => void;
   onComplete: (s: DraftState) => void;
   onCoachDone: () => void;
+  online?: OnlineProps;
 }
 
 interface ReelState {
@@ -137,11 +156,11 @@ function nameFit(n: string): string {
   return n.length >= 15 ? ' xnarrow' : n.length >= 12 ? ' narrow' : '';
 }
 
-/** What the bot did, for the toast. A pick from its own redraw names the team-decade it drew. */
-function botLine(pick: BotPick, roundCell: string, lead: string): string {
+/** What the bot (or the other player) did, for the toast. A pick from their own redraw names the team-decade drawn. */
+function botLine(pick: BotPick, roundCell: string, lead: string, who = 'the AI'): string {
   if (pick.cellId === roundCell) return lead + pick.player.name + ' for ' + pick.slot + '.';
   const c = CELL_BY_ID[pick.cellId];
-  return 'Nobody here fit the bot, so it drew the ' + c.era + ' ' + c.name + ' and took ' + pick.player.name + '.';
+  return 'Nobody here fit ' + who + ', so they drew the ' + c.era + ' ' + c.name + ' and took ' + pick.player.name + '.';
 }
 
 /** Card tops for the five spots, fitted to the court's height. */
@@ -193,9 +212,13 @@ function CourtLines({ h, ys, ch }: { h: number; ys: Record<Slot, number>; ch: nu
 }
 
 export function Draft(props: DraftProps) {
-  const { mode, botLevel, dailyKey } = props;
+  const { mode, botLevel, dailyKey, online } = props;
   const layout = useLayout();
-  const [s, dispatch] = useReducer(draftReducer, undefined, () => newDraft(mode, botLevel, dailyKey, props.botFirst));
+  const [s, dispatch] = useReducer(draftReducer, undefined, () => {
+    if (!online) return newDraft(mode, botLevel, dailyKey, props.botFirst);
+    // the host picks first in rounds 1, 3 and 5; the AI that covers a dropped player plays like Pro
+    return { ...newDraft('1v1', 'pro', null, !online.host), order: onlineOrder(online.seed) };
+  });
   const sRef = useRef(s);
   sRef.current = s;
   const [team, setTeam] = useState<ReelState>({ items: ['?', ''], key: 0, moving: false, landed: 0 });
@@ -206,11 +229,15 @@ export function Draft(props: DraftProps) {
   const [swapFrom, setSwapFrom] = useState<Slot | null>(null);
   const [bursts, setBursts] = useState<{ id: number; slot: Slot; color: string }[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>('val');
-  const [coach, setCoach] = useState(props.firstRun ? 0 : -1);
+  const [coach, setCoach] = useState(props.firstRun && !online ? 0 : -1);
   const [buy, setBuy] = useState<Booster | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [botBusy, setBotBusy] = useState(false);
   const [courtH, setCourtH] = useState(300);
+  /** the big moment when you draft an Epic or Legendary player */
+  const [pull, setPull] = useState<{ id: number; rarity: Rarity; name: string } | null>(null);
+  /** the reels landed on a team with a Legendary player */
+  const [spot, setSpot] = useState(0);
   const timers = useRef<number[]>([]);
   const usedSeen = useRef(0);
   const burstId = useRef(0);
@@ -255,6 +282,7 @@ export function Draft(props: DraftProps) {
   useEffect(() => {
     if (!s.cellId || !s.youDone) return;
     if (mode === '1v1' && !s.botDone) {
+      if (online) return; // the other player answers over the network (effect below)
       setBotBusy(true);
       const cellId = s.cellId;
       later(() => {
@@ -265,7 +293,7 @@ export function Draft(props: DraftProps) {
         const pick = botChoose(st, cellId, mine, Math.random);
         if (pick) {
           dispatch({ type: 'bot', playerId: pick.player.id, slot: pick.slot, cellId: pick.cellId });
-          props.onToast(botLine(pick, cellId, 'Bot took '));
+          props.onToast(botLine(pick, cellId, 'AI took '));
           sfx.select();
         }
         dispatch({ type: 'endCell' });
@@ -285,6 +313,144 @@ export function Draft(props: DraftProps) {
     const t = window.setTimeout(() => setWave(false), 1400);
     return () => clearTimeout(t);
   }, [complete]);
+
+  /** Place a player; in head to head, also tell the other phone. */
+  const placePick = (playerId: string, slot: Slot) => {
+    const st = sRef.current;
+    const base = currentCell(st)?.players.find((x) => x.id === playerId);
+    const placed = base ? effectivePlayer(st, base) : null;
+    const rar = placed ? rarityOf(placed) : 'common';
+    if (placed && (rar === 'legendary' || rar === 'epic')) {
+      const id = Date.now();
+      setPull({ id, rarity: rar, name: placed.name });
+      later(() => setPull((x) => (x && x.id === id ? null : x)), rar === 'legendary' ? 1700 : 1200);
+      if (rar === 'legendary') {
+        sfx.title();
+        vibrate([30, 40, 30, 40, 60]);
+      } else sfx.seriesWin();
+    }
+    dispatch({ type: 'place', playerId, slot });
+    if (online && st.cellId) online.onPick({ r: st.cellsDone, cell: st.cellId, id: playerId, slot });
+  };
+
+  // ---------- head to head ----------
+  const autoSpun = useRef(-1);
+  const autoAfterLand = useRef(false);
+  const takeoverSaid = useRef(false);
+  const aiRound = useRef(-1);
+  const myTurn = !!online && !!s.cellId && !spinning && !s.youDone && (s.botDone || !botPicksFirst(s));
+  const theirTurn = !!online && !!s.cellId && !spinning && !s.botDone && !isDraftComplete(s) && (botPicksFirst(s) || s.youDone);
+  const [clock, setClock] = useState(SHOT_CLOCK);
+
+  // each round's reels spin by themselves: both phones land on the same team-decade
+  useEffect(() => {
+    if (!online || s.cellId || isDraftComplete(s) || spinning || autoSpun.current === s.cellsDone) return;
+    autoSpun.current = s.cellsDone;
+    later(() => spin('spin'), s.cellsDone === 0 ? 900 : 650);
+  }, [s.cellId, s.cellsDone, spinning]);
+
+  // the other player's pick for this round: apply it when it's their turn
+  useEffect(() => {
+    if (!online || !s.cellId || spinning || s.botDone || isDraftComplete(s)) return;
+    if (!botPicksFirst(s) && !s.youDone) return;
+    const r = s.cellsDone;
+    const roundCell = s.order![r];
+    const pick = online.oppPicks.find((x) => x.r === r);
+    const wasFirst = botPicksFirst(s);
+    if (pick) {
+      const a = { type: 'bot' as const, playerId: pick.id, slot: pick.slot, cellId: pick.cell };
+      const next = draftReducer(s, a);
+      if (next !== s) {
+        dispatch(a);
+        const placed = SLOTS.map((k) => next.botLineup[k]).find((x) => x && x.id === pick.id)!;
+        const slot = SLOTS.find((k) => next.botLineup[k] === placed)!;
+        props.onToast(botLine({ slot, player: placed, cellId: pick.cell }, roundCell, online.oppName + ' took ', online.oppName));
+        sfx.select();
+        if (wasFirst) later(openDrawer, 300);
+        return;
+      }
+    }
+    if ((!online.oppGone && !pick) || aiRound.current === r) return;
+    aiRound.current = r;
+    // they're gone (or sent a pick that can't be placed): the AI picks for them
+    if (!takeoverSaid.current) {
+      takeoverSaid.current = true;
+      online.onTakeover();
+      props.onToast(online.oppName + ' lost connection. The AI is finishing their draft.');
+    }
+    const mine = Object.values(s.lineup)
+      .filter(Boolean)
+      .map((p) => (p as Player).id);
+    const ai = botChoose(s, roundCell, wasFirst ? [] : mine, Math.random);
+    setBotBusy(true);
+    later(() => {
+      if (ai) {
+        dispatch({ type: 'bot', playerId: ai.player.id, slot: ai.slot, cellId: ai.cellId });
+        props.onToast(botLine(ai, roundCell, 'AI for ' + online.oppName + ': ', 'the AI'));
+        sfx.select();
+      } else if (s.youDone) dispatch({ type: 'endCell' });
+      setBotBusy(false);
+      if (wasFirst) later(openDrawer, 300);
+    }, 700);
+  }, [online?.oppPicks, online?.oppGone, s.cellId, s.youDone, s.botDone, spinning]);
+
+  // tell the other phone where your players stand after a swap
+  useEffect(() => {
+    if (!online) return;
+    const l: Partial<Record<Slot, string>> = {};
+    for (const k of SLOTS) if (s.lineup[k]) l[k] = s.lineup[k]!.id;
+    online.onLineup(l);
+  }, [s.lineup]);
+
+  // time's up: your choice if you made one, otherwise the pick that helps your team most
+  const autoPick = () => {
+    const st = sRef.current;
+    if (!st.cellId || st.youDone) return;
+    const chosen = selected ? currentCell(st)?.players.find((p) => p.id === selected) : null;
+    const slots = chosen ? eligibleSlots(st, chosen) : [];
+    if (chosen && slots.length && !whyUnavailable(st, chosen)) {
+      placePick(chosen.id, slots[0]);
+      burst(slots[0], chosen.c2);
+      props.onToast('Time! ' + chosen.name + ' goes to ' + slots[0] + '.');
+    } else {
+      const best = bestPickFor(st, st.cellId, st.taken);
+      if (!best) {
+        autoAfterLand.current = true;
+        spin('nofit');
+        return;
+      }
+      placePick(best.player.id, best.slot);
+      burst(best.slot, best.player.c2);
+      props.onToast('Time! You got ' + best.player.name + ' at ' + best.slot + '.');
+    }
+    sfx.place();
+    setSelected(null);
+    setDrawer(false);
+  };
+  const autoPickRef = useRef(autoPick);
+  autoPickRef.current = autoPick;
+
+  // the shot clock: yours, or a countdown while the other player picks
+  const turnKey = online ? s.cellsDone + ':' + s.cellId + ':' + (myTurn ? 'me' : theirTurn ? 'them' : '-') : '';
+  useEffect(() => {
+    if (!online || (!myTurn && !theirTurn)) return;
+    const t0 = Date.now();
+    let lastTick = -1;
+    setClock(SHOT_CLOCK);
+    const t = window.setInterval(() => {
+      const left = Math.max(0, SHOT_CLOCK - Math.floor((Date.now() - t0) / 1000));
+      setClock(left);
+      if (myTurn && left <= 5 && left > 0 && left !== lastTick) {
+        lastTick = left;
+        sfx.tick();
+      }
+      if (left === 0) {
+        clearInterval(t);
+        if (myTurn) autoPickRef.current();
+      }
+    }, 200);
+    return () => clearInterval(t);
+  }, [turnKey]);
 
   const spin = (kind: SpinKind) => {
     const st = sRef.current;
@@ -307,7 +473,12 @@ export function Draft(props: DraftProps) {
         dispatch({ type: 'respin', kind, paid: true });
       } else dispatch({ type: 'respin', kind, paid: false });
     }
-    const nx = nextCell(st, kind, Math.random);
+    let nx = nextCell(st, kind, Math.random);
+    if (online && kind === 'nofit') {
+      // your own redraw, from your half of the match order (never a round cell)
+      const own = redrawCell(st, st.order!, online.host);
+      if (own) nx = { cellId: own, ptr: st.ptr };
+    }
     const target = CELL_BY_ID[nx.cellId];
     const spinTeam = kind !== 'era' || !cur || cur.abbr !== target.abbr;
     const spinEra = kind !== 'team' || !cur || cur.era !== target.era;
@@ -338,18 +509,29 @@ export function Draft(props: DraftProps) {
         setEra((r) => ({ ...r, moving: false, landed: r.landed + 1 }));
         sfx.stop();
       }
+      if (!blind && bestRarity(target.players) === 'legendary') {
+        setSpot(Date.now());
+        later(() => sfx.coin(), 120);
+      }
       // after a no-fit respin the bot keeps the pick it already made this round
       const landing = { type: 'land' as const, cellId: nx.cellId, ptr: nx.ptr, keepBot: kind === 'nofit' };
       dispatch(landing);
       setSpinning(false);
       const after = draftReducer(sRef.current, landing);
-      if (botPicksFirst(after)) {
+      if (online) {
+        // open the list when it's your pick; otherwise wait for the other player
+        if (!botPicksFirst(after)) later(openDrawer, OPEN_DELAY);
+        if (autoAfterLand.current) {
+          autoAfterLand.current = false;
+          later(() => autoPickRef.current(), 450);
+        }
+      } else if (botPicksFirst(after)) {
         setBotBusy(true);
         later(() => {
           const pick = botChoose(sRef.current, nx.cellId, [], Math.random);
           if (pick) {
             dispatch({ type: 'bot', playerId: pick.player.id, slot: pick.slot, cellId: pick.cellId });
-            props.onToast(botLine(pick, nx.cellId, 'Bot picks first this round: '));
+            props.onToast(botLine(pick, nx.cellId, 'AI picks first this round: '));
             sfx.select();
           }
           setBotBusy(false);
@@ -392,7 +574,7 @@ export function Draft(props: DraftProps) {
       props.onToast(
         p.name +
           ': ' +
-          (why === 'taken' ? 'taken by the bot.' : why === 'dup' ? 'already on your team.' : s.armed === 'trade' ? "can't replace anyone on your team." : 'no open spot for his positions.')
+          (why === 'taken' ? 'taken by ' + (online ? online.oppName : 'the AI') + '.' : why === 'dup' ? 'already on your team.' : s.armed === 'trade' ? "can't replace anyone on your team." : 'no open spot for his positions.')
       );
       sfx.nope();
       return;
@@ -419,7 +601,7 @@ export function Draft(props: DraftProps) {
       }
       const replaced = s.armed === 'trade' ? s.lineup[k] : null;
       const stillDouble = s.armed === 'double' && s.picksLeft === 2 && filled < 4;
-      dispatch({ type: 'place', playerId: selectedP.id, slot: k });
+      placePick(selectedP.id, k);
       sfx.place();
       burst(k, selectedP.c2);
       setSelected(null);
@@ -556,7 +738,7 @@ export function Draft(props: DraftProps) {
             const show = up ?? p;
             const tag =
               why === 'taken'
-                ? 'TAKEN BY THE BOT'
+                ? 'TAKEN BY ' + (online ? online.oppName.toUpperCase() : 'THE AI')
                 : why === 'dup'
                   ? 'ALREADY ON YOUR TEAM'
                   : why === 'nofit'
@@ -569,17 +751,21 @@ export function Draft(props: DraftProps) {
                         ? 'PRIME: ' + up.primedFrom!.abbr + ' ' + up.primedFrom!.era
                         : '';
             const off = !!why || (s.armed === 'prime' && !up);
+            const rar = blind ? 'common' : rarityOf(show);
             const statCls = (key: SortKey) => (up ? 'up' : sortKey === key ? 'hot' : '');
             return (
               <button
                 key={base.id}
-                className={'row' + (off ? ' off' : '') + (selected === base.id ? ' sel' : '') + (up && !why ? ' primeable' : '')}
+                className={'row r-' + rar + (off ? ' off' : '') + (selected === base.id ? ' sel' : '') + (up && !why ? ' primeable' : '')}
                 style={{ animationDelay: Math.min(i, 9) * 26 + 'ms' }}
                 aria-disabled={off}
                 onClick={() => pickRow(base)}
               >
                 <span className="who">
-                  <b>{p.name}</b>
+                  <b>
+                    {p.name}
+                    {rar !== 'common' && <i className={'rar ' + rar}>{RARITY_NAMES[rar].toUpperCase()}</i>}
+                  </b>
                   <span>
                     {p.pos.join(' • ')} · {p.g} G{p.seasons > 1 ? ' · ' + p.seasons + ' seasons' : ''}
                     {p.est && !blind ? ' · est.' : ''}
@@ -612,9 +798,11 @@ export function Draft(props: DraftProps) {
   // bottom action
   const noFit = noOneFits(s);
   let action = { label: 'SPIN', cls: 'big shine', off: false, run: () => spin('spin') };
-  if (spinning) action = { label: 'SPINNING…', cls: 'big busy', off: true, run: () => {} };
+  if (online && !cell && !complete && !spinning) action = { label: 'NEXT ROUND…', cls: 'big busy', off: true, run: () => {} };
+  else if (spinning) action = { label: 'SPINNING…', cls: 'big busy', off: true, run: () => {} };
   else if (complete) action = { label: mode === '1v1' ? 'SEE THE MATCHUP' : 'PLAY THE SEASON', cls: 'big gold shine', off: false, run: () => props.onComplete(s) };
-  else if (botBusy) action = { label: 'BOT IS PICKING…', cls: 'big busy', off: true, run: () => {} };
+  else if (botBusy) action = { label: online ? 'AI IS PICKING FOR ' + online.oppName.toUpperCase() + '…' : 'AI IS PICKING…', cls: 'big busy', off: true, run: () => {} };
+  else if (theirTurn) action = { label: online!.oppName.toUpperCase() + ' IS PICKING…', cls: 'big busy', off: true, run: () => {} };
   else if (cell && !s.youDone) {
     if (noFit) action = { label: 'NO ONE FITS · FREE RESPIN', cls: 'big small', off: false, run: () => spin('nofit') };
     else if (selectedP) action = { label: 'TAP A GLOWING SPOT', cls: 'big', off: true, run: () => props.onToast('Tap one of the glowing spots on the court.') };
@@ -668,12 +856,12 @@ export function Draft(props: DraftProps) {
   return (
     <div className="screen draft">
       <div className="draft-head">
-        <button className="icon-btn" onClick={() => (filled ? setLeaving(true) : props.onExit())} aria-label="Leave draft">
+        <button className="icon-btn" onClick={() => (filled || online ? setLeaving(true) : props.onExit())} aria-label="Leave draft">
           <Back size={18} />
         </button>
         <div className="round">
           <span>
-            ROUND {roundNo} / 5 · {MODE_NAMES[mode]}
+            ROUND {roundNo} / 5 · {online ? 'VS ' + online.oppName.toUpperCase() : MODE_NAMES[mode]}
           </span>
           <div className="segs">
             {[0, 1, 2, 3, 4].map((i) => (
@@ -685,10 +873,15 @@ export function Draft(props: DraftProps) {
       </div>
 
       <div className="reels">
+        {spot > 0 && (
+          <span className="spotted" key={spot} aria-live="polite">
+            LEGEND IN THIS TEAM
+          </span>
+        )}
         <Reel label="TEAM" caption={cellReady ? cell!.name : null} reel={team} ms={TEAM_MS} tint={cellReady ? cell!.c1 : null} />
         <Reel label="DECADE" caption={cellReady ? seasonLabel(cell!.from) + ' to ' + seasonLabel(cell!.to) : null} era reel={era} ms={ERA_MS} tint={cellReady ? '#F5B83D' : null} />
       </div>
-      <div className="respins">
+      <div className="respins" hidden={!!online}>
         <button className={'respin' + (s.freeTeam ? ' free' : '')} aria-disabled={respinOff} onClick={() => spin('team')} aria-label="Respin team">
           <Refresh size={15} /> TEAM · {s.freeTeam ? 'FREE' : RESPIN_PRICE}
         </button>
@@ -744,7 +937,7 @@ export function Draft(props: DraftProps) {
         {cards.map(({ k, p }, i) => {
           const glow = !!selectedP && targets.includes(k);
           const moverOk = !!swapFrom && swapFrom !== k && canMove(s.lineup, swapFrom, k);
-          const cls = ['pcard'];
+          const cls = ['pcard', 'rar-' + (blind ? 'common' : rarityOf(p))];
           if (swapFrom === k) cls.push('picked');
           if (moverOk) cls.push('target');
           if (glow) cls.push('trade');
@@ -787,9 +980,18 @@ export function Draft(props: DraftProps) {
       <div className="spacer" />
       {boostersOn && tray}
       {primeHints && <div className="prime-hint">Good moment for a Prime: someone here has a much better decade elsewhere.</div>}
+      {online && (myTurn || theirTurn) && (
+        <div className={'shotclock' + (myTurn ? ' mine' : ' theirs') + (myTurn && clock <= 5 ? ' hurry' : '')} role="timer" aria-label={(myTurn ? 'Your pick: ' : online.oppName + ' is picking: ') + clock + ' seconds'}>
+          <span>{myTurn ? 'YOUR PICK' : online.oppName.toUpperCase() + ' IS PICKING'}</span>
+          <span className="track">
+            <i style={{ transform: 'scaleX(' + clock / SHOT_CLOCK + ')' }} />
+          </span>
+          <b className="num">{clock}</b>
+        </div>
+      )}
       {mode === '1v1' && (
-        <div className="botstrip" aria-label="Bot lineup">
-          <span>BOT · {botLevel.toUpperCase()}</span>
+        <div className={'botstrip' + (online ? ' live' : '')} aria-label={online ? online.oppName + "'s lineup" : 'AI lineup'}>
+          <span>{online ? online.oppName.toUpperCase() + (online.oppGone ? ' · AI' : '') : 'AI · ' + botLevel.toUpperCase()}</span>
           {SLOTS.map((k) => {
             const p = s.botLineup[k];
             return (
@@ -843,6 +1045,14 @@ export function Draft(props: DraftProps) {
         )}
       </div>
 
+      {pull && (
+        <div className={'pull ' + pull.rarity} key={pull.id} aria-live="assertive">
+          <span className="pull-rays" aria-hidden="true" />
+          <b className="disp">{RARITY_NAMES[pull.rarity].toUpperCase()}!</b>
+          <strong>{pull.name}</strong>
+        </div>
+      )}
+
       {coach >= 0 && !spinning && ((coach === 0 && !cell && filled === 0) || (coach === 1 && drawer && cell) || (coach === 2 && selectedP)) && (
         <div className={'coach c' + coach + (coach === 0 && boostersOn ? ' above-tray' : '')} key={coach}>
           <span>
@@ -886,8 +1096,8 @@ export function Draft(props: DraftProps) {
       )}
       {leaving && (
         <Confirm
-          title="Leave this draft?"
-          body="Your picks so far will be lost."
+          title={online ? 'Leave the match?' : 'Leave this draft?'}
+          body={online ? 'Leaving counts as a loss on your head-to-head record.' : 'Your picks so far will be lost.'}
           yes="LEAVE"
           no="KEEP DRAFTING"
           onNo={() => setLeaving(false)}

@@ -1,7 +1,8 @@
-import type { Booster, BotLevel, Mode } from '../engine/types';
+import type { Booster, BotLevel, Mode, Slot } from '../engine/types';
+import type { EntryContent } from '../net/leaderboard';
 
 export interface RunRecord {
-  /** Unique id, so a leaderboard post can be retried safely. Older records have none. */
+  /** Unique id. Older records have none. */
   id?: string;
   at: string;
   mode: Mode;
@@ -17,13 +18,29 @@ export interface RunRecord {
   title: boolean;
   perfect: boolean;
   lineup: { slot: string; name: string; abbr: string; era: string; primed?: boolean }[];
+  /** The lineup by player id (and the Prime cell when primed): what a leaderboard entry carries */
+  ids?: { s: Slot; id: string; pr?: string }[];
   vs?: { won: boolean | null; botWins: number; botLevel: BotLevel };
+  /** Head to head against a real player */
+  online?: { opp: string; forfeit?: 'them' | 'you' };
 }
 
 export interface Settings {
   sound: boolean;
   haptics: boolean;
   hints: boolean;
+}
+
+/** Head-to-head record against real players: all time, and this week (`week` is its key). */
+export interface H2HStats {
+  w: number;
+  l: number;
+  streak: number;
+  best: number;
+  week: string;
+  ww: number;
+  wl: number;
+  wstreak: number;
 }
 
 export interface Profile {
@@ -37,13 +54,18 @@ export interface Profile {
   botLevel: BotLevel;
   history: RunRecord[];
   daily: { key: string; record: RunRecord } | null;
-  stats: { games: number; titles: number; perfect: number; undefeated: number; vsWins: number };
-  /** Anonymous id for the global leaderboard; never shown to other players */
-  device: string;
-  /** Leaderboard name; null until the player picks one, and nothing is posted before that */
+  stats: { games: number; titles: number; perfect: number; undefeated: number; vsWins: number; legends: number; h2hGames: number };
+  /** Leaderboard and head-to-head name; asked for on the first launch of the web app */
   name: string | null;
-  /** Run ids already sent to the leaderboard (newest first) */
-  posted: string[];
+  /** This player's leaderboard entries (their best per board) and the ones still to send */
+  lb: { entries: Record<string, EntryContent>; dirty: string[] };
+  h2h: H2HStats;
+  /** Days in a row with a game played; `last` is the Eastern date of the latest */
+  streak: { count: number; last: string | null; best: number };
+  /** Eastern date the daily reward was last opened */
+  rewardDay: string | null;
+  /** Today's missions: progress and claimed, by position in the day's list */
+  missions: { day: string; progress: number[]; claimed: boolean[] } | null;
 }
 
 /** A random v4 UUID. */
@@ -65,6 +87,10 @@ export function newId(): string {
 
 const KEY = 'perfect-season:profile:v1';
 
+export function freshH2H(): H2HStats {
+  return { w: 0, l: 0, streak: 0, best: 0, week: '', ww: 0, wl: 0, wstreak: 0 };
+}
+
 export function freshProfile(): Profile {
   return {
     v: 1,
@@ -77,10 +103,13 @@ export function freshProfile(): Profile {
     botLevel: 'pro',
     history: [],
     daily: null,
-    stats: { games: 0, titles: 0, perfect: 0, undefeated: 0, vsWins: 0 },
-    device: newId(),
+    stats: { games: 0, titles: 0, perfect: 0, undefeated: 0, vsWins: 0, legends: 0, h2hGames: 0 },
     name: null,
-    posted: [],
+    lb: { entries: {}, dirty: [] },
+    h2h: freshH2H(),
+    streak: { count: 0, last: null, best: 0 },
+    rewardDay: null,
+    missions: null,
   };
 }
 
@@ -91,7 +120,16 @@ export function loadProfile(): Profile {
     const p = JSON.parse(raw) as Profile;
     if (p.v !== 1) return freshProfile();
     const base = freshProfile();
-    return { ...base, ...p, device: p.device || base.device, posted: p.posted ?? [], settings: { ...base.settings, ...p.settings }, inventory: { ...base.inventory, ...p.inventory }, stats: { ...base.stats, ...p.stats } };
+    return {
+      ...base,
+      ...p,
+      settings: { ...base.settings, ...p.settings },
+      inventory: { ...base.inventory, ...p.inventory },
+      stats: { ...base.stats, ...p.stats },
+      lb: p.lb && p.lb.entries ? { entries: p.lb.entries, dirty: Array.isArray(p.lb.dirty) ? p.lb.dirty : [] } : base.lb,
+      h2h: { ...base.h2h, ...p.h2h },
+      streak: { ...base.streak, ...p.streak },
+    };
   } catch {
     return freshProfile();
   }

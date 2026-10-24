@@ -12,6 +12,7 @@ import { CoinChip, Confetti, Sheet } from './common';
 import { Back, Coin, Share, Trophy } from './icons';
 import { CountUp, reducedMotion } from './motion';
 import { type LbStatus, LbLine } from './Leaderboard';
+import { NET_ON } from '../net/nostr';
 import { Scout, teamBar } from './Scout';
 
 export interface ResultInfo {
@@ -25,6 +26,10 @@ export interface ResultInfo {
   dailyNo: number | null;
   /** The playoff bracket when the team made it; undefined for 1 vs 1 and lottery seasons. */
   bracket?: Series[];
+  /** Beat your best record in this mode */
+  newBest?: boolean;
+  /** Missions this game completed */
+  missionsDone?: string[];
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
@@ -114,7 +119,6 @@ export function Results({
   xp,
   coins,
   lb,
-  onJoin,
   onAgain,
   onHome,
   onToast,
@@ -124,7 +128,6 @@ export function Results({
   coins: number;
   /** Global leaderboard status of this run; null when it doesn't go on a board */
   lb: LbStatus | null;
-  onJoin: () => void;
   onAgain: () => void;
   onHome: () => void;
   onToast: (t: string) => void;
@@ -150,7 +153,7 @@ export function Results({
       );
     return () => ts.forEach(clearTimeout);
   }, []);
-  const tag = r.mode === 'daily' && info.dailyNo ? 'DAILY #' + info.dailyNo + (r.ranked ? ' · RANKED' : ' · PRACTICE') : MODE_TAG[r.mode];
+  const tag = r.mode === 'daily' && info.dailyNo ? 'DAILY #' + info.dailyNo + (r.ranked ? ' · RANKED' : ' · PRACTICE') : r.online ? 'HEAD TO HEAD' : r.mode === '1v1' && NET_ON ? 'VS THE AI' : MODE_TAG[r.mode];
   const confetti = r.vs ? (r.vs.won ? 1.4 : 0) : r.perfect ? 1.4 : r.title ? 0.8 : g.letter.startsWith('S') || g.letter.startsWith('A') ? 1.2 : g.letter === 'B' ? 0.6 : 0;
   const vs = info.bot;
   const vsTitle = r.vs ? (r.vs.won === true ? 'YOU WON!' : r.vs.won === false ? 'YOU LOST' : 'DRAW') : '';
@@ -168,11 +171,19 @@ export function Results({
       </div>
       <div className="results-body">
         {r.perfect && <div className="perfect disp">PERFECT SEASON · 98–0</div>}
+        {info.newBest && !r.perfect && (
+          <div className="newbest disp" role="status">
+            <span>NEW PERSONAL BEST</span>
+          </div>
+        )}
         {vs && r.vs ? (
           <>
             <div className="vs-head" ref={headRef}>
-              <span className="eyebrow wide">1 vs 1 · snake draft</span>
+              <span className="eyebrow wide">
+                {r.online ? (r.online.forfeit === 'them' ? 'Head to head · ' + r.online.opp + ' left' : 'Head to head · live') : '1 vs 1 · snake draft'}
+              </span>
               <span className={'disp vs-title stamp-in ' + (r.vs.won ? 'win' : r.vs.won === false ? 'loss' : '')}>{vsTitle}</span>
+              {lb && <LbLine lb={lb} />}
             </div>
             <div className="vs">
               <div className="rise-in">
@@ -185,8 +196,8 @@ export function Results({
                 <small>Rating {rating.rating.toFixed(1)}</small>
               </div>
               <div className="bot rise-in" style={{ animationDelay: '90ms' }}>
-                <span className="eyebrow" style={{ color: 'var(--rival-soft)' }}>
-                  Bot · {r.vs.botLevel}
+                <span className="eyebrow vs-name" style={{ color: 'var(--rival-soft)' }}>
+                  {r.online ? r.online.opp : 'AI · ' + r.vs.botLevel}
                 </span>
                 <span className="disp num">
                   <CountUp value={r.vs.botWins} from={0} ms={900} />–<CountUp value={82 - r.vs.botWins} from={0} ms={900} />
@@ -218,7 +229,7 @@ export function Results({
               {r.title && <Trophy size={18} color="#F5B83D" />}
               <span>{r.playoff}</span>
             </div>
-            {lb && <LbLine lb={lb} mode={r.mode} onJoin={onJoin} />}
+            {lb && <LbLine lb={lb} />}
           </div>
         )}
 
@@ -266,7 +277,7 @@ export function Results({
         {vs && (
           <div className="roster">
             <span className="eyebrow" style={{ color: 'var(--rival-soft)' }}>
-              Bot lineup
+              {r.online ? r.online.opp + '’s lineup' : 'AI lineup'}
             </span>
             {SLOTS.map((k) => {
               const p = vs.lineup[k];
@@ -283,6 +294,16 @@ export function Results({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {info.missionsDone && info.missionsDone.length > 0 && (
+          <div className="missiondone rise-in" style={{ animationDelay: '380ms' }} role="status">
+            <span className="eyebrow">Mission complete</span>
+            {info.missionsDone.map((m) => (
+              <strong key={m}>{m}</strong>
+            ))}
+            <small>Claim the reward from Missions on the home screen.</small>
           </div>
         )}
 
@@ -311,7 +332,7 @@ export function Results({
           <span>SHARE</span>
         </button>
         <button className="big small shine" onClick={onAgain}>
-          <span>DRAFT AGAIN</span>
+          <span>{r.mode === '1v1' && NET_ON ? 'FIND A MATCH' : 'DRAFT AGAIN'}</span>
         </button>
       </div>
       {gained > 0 && <CoinFlight from={headRef} to={chipRef} n={Math.min(12, 4 + Math.round(gained / 15))} />}

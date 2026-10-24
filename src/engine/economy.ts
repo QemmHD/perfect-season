@@ -21,6 +21,8 @@ export interface RewardInput {
   vsWon: boolean | null;
   botLevel: BotLevel;
   rankedDaily: boolean;
+  /** head to head against a real player: their name (pays like beating Legend) */
+  vsName?: string;
 }
 
 export interface Rewards {
@@ -45,9 +47,10 @@ export function rewardsFor(r: RewardInput): Rewards {
     lines.push('Championship: +25');
   }
   if (r.vsWon) {
-    coins += BOT_WIN_COINS[r.botLevel];
-    xp += 20;
-    lines.push('Beat the ' + r.botLevel + ' bot: +' + BOT_WIN_COINS[r.botLevel]);
+    const c = r.vsName ? BOT_WIN_COINS.legend : BOT_WIN_COINS[r.botLevel];
+    coins += c;
+    xp += r.vsName ? 30 : 20;
+    lines.push((r.vsName ? 'Beat ' + r.vsName : 'Beat the ' + r.botLevel + ' bot') + ': +' + c);
   }
   if (r.rankedDaily) {
     coins += 25;

@@ -90,3 +90,27 @@ export const Coin = ({ size = 18 }: { size?: number }) => (
     <circle cx="12" cy="12" r="6" fill="none" stroke="#9A6A06" strokeWidth="2" />
   </svg>
 );
+export const Flame = (p: P) => (
+  <S {...p} stroke={2.1}>
+    <path d="M12 22c4 0 7-2.8 7-7 0-4.5-3.5-7.5-5-11-1 3-3 4.5-4 6-1-1-1.5-2.5-1.5-3.5C6.5 8.5 5 11.5 5 15c0 4.2 3 7 7 7z" />
+    <path d="M12 22c1.7 0 3-1.3 3-3.2 0-2-1.4-3.2-2.2-4.8-.6 1.5-1.8 2.3-2.4 3.2-.6.8-1 1.4-1 2.1 0 1.6 1.2 2.7 2.6 2.7z" />
+  </S>
+);
+export const Target = (p: P) => (
+  <S {...p} stroke={2.2}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+  </S>
+);
+export const Check = (p: P) => (
+  <S {...p} stroke={3}>
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </S>
+);
+export const Swords = (p: P) => (
+  <S {...p} stroke={2.2}>
+    <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2" />
+    <path d="M9.5 6.5L13 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2" />
+  </S>
+);

@@ -1,25 +1,32 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DATA_SOURCE, LATEST_SEASON } from './engine/data';
-import type { DraftState } from './engine/draft';
+import { assignSlots, type DraftState } from './engine/draft';
 import { BOOSTER_PRICES, LEVEL_UP_COINS, levelInfo, rewardsFor, unlockedAt } from './engine/economy';
+import { ALL_MISSIONS_BONUS, advance, type GameEvent, missionsFor, nextStreak, rewardFor } from './engine/missions';
 import { buildBracket, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
+import { rarityOf } from './engine/rarity';
 import { gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
-import { type Booster, type BotLevel, type Mode, SLOTS } from './engine/types';
-import { GLOBAL_ON, postable, postRun, type PostResult } from './lib/leaderboard';
-import { freshProfile, loadProfile, newId, type Profile, type RunRecord, saveProfile } from './lib/profile';
+import { type Booster, type BotLevel, type Mode, type Player, type Slot, SLOTS } from './engine/types';
+import { freshProfile, type H2HStats, loadProfile, newId, type Profile, type RunRecord, saveProfile } from './lib/profile';
 import { setFeedback, sfx } from './lib/sound';
 import { applyUpdate, justUpdated, newerVersionLive } from './lib/update';
-import { Toast, TopBar } from './ui/common';
+import { type BoardKind, boardTag, fetchBoard, prune, publishEntry, renamed, type Span, weekKey, withH2H, withRun } from './net/leaderboard';
+import { cleanRoomCode, type Found, MatchConn, type OnlineCount, type OnlinePick, onCounts, setPresence, startPresence } from './net/match';
+import { NET_ON } from './net/nostr';
+import { Sheet, Toast, TopBar } from './ui/common';
 import { Transition } from './ui/motion';
-import { Draft } from './ui/Draft';
+import { Draft, type OnlineProps } from './ui/Draft';
 import { type LbStatus, NameSheet } from './ui/Leaderboard';
 import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, type Tab, Tabs } from './ui/Pages';
 import { type ResultInfo, Results } from './ui/Results';
+import { DailyReward, MissionsSheet } from './ui/Rewards';
+import { Search } from './ui/Search';
 import { Playoffs, Reveal } from './ui/Season';
+import { Welcome } from './ui/Welcome';
 
-type Screen = 'tab' | 'draft' | 'reveal' | 'playoffs' | 'results';
+type Screen = 'tab' | 'search' | 'draft' | 'reveal' | 'playoffs' | 'results';
 
 interface Run {
   id: number;
@@ -29,13 +36,25 @@ interface Run {
   botFirst: boolean;
   dailyKey: string | null;
   ranked: boolean;
+  /** head to head against a real player */
+  online?: { found: Found };
   draft?: DraftState;
   season?: Season;
   bracket?: Series[];
   result?: ResultInfo;
 }
 
+/** What we know about the other player in a live match. */
+interface OppView {
+  picks: OnlinePick[];
+  lineup: Partial<Record<Slot, string>>;
+  gone: boolean;
+  left: boolean;
+  tookOver: boolean;
+}
+
 const MODE_LABEL: Record<Mode, string> = { classic: 'Classic', blind: 'Blind', daily: 'Daily', '1v1': '1 vs 1' };
+const NO_PICKS: OnlinePick[] = [];
 
 function playoffLine(bracket: Series[]): { text: string; title: boolean; perfect: boolean } {
   const out = playoffOutcome(bracket);
@@ -48,20 +67,40 @@ function playoffLine(bracket: Series[]): { text: string; title: boolean; perfect
   return { text: 'Lost in the ' + ROUND_NAMES[lost.round] + ' ' + w + '–' + l + ' to the ' + lost.opp.year + ' ' + lost.opp.team, title: false, perfect: false };
 }
 
+/** A head-to-head result against a real player, all-time and this week. */
+function addH2H(h: H2HStats, won: boolean, week: string): H2HStats {
+  const b = h.week === week ? h : { ...h, week, ww: 0, wl: 0, wstreak: 0 };
+  if (won) return { ...b, w: b.w + 1, streak: b.streak + 1, best: Math.max(b.best, b.streak + 1), ww: b.ww + 1, wstreak: b.wstreak + 1 };
+  return { ...b, l: b.l + 1, streak: 0, wl: b.wl + 1, wstreak: 0 };
+}
+
+/** The room code in an invite link (?room=K7QM). */
+function roomFromUrl(): string | null {
+  try {
+    const c = cleanRoomCode(new URLSearchParams(location.search).get('room') ?? '');
+    return c.length === 4 ? c : null;
+  } catch {
+    return null;
+  }
+}
+
 export function App() {
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
   const [tab, setTab] = useState<Tab>('home');
   const [screen, setScreen] = useState<Screen>('tab');
   const [run, setRun] = useState<Run | null>(null);
-  const [modal, setModal] = useState<'settings' | 'howto' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
   const runCounter = useRef(0);
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
 
   const todayKey = easternDateKey();
   const dailyNo = dailyNumber(todayKey);
   const dailyDone = !!profile.daily && profile.daily.key === todayKey;
+  const needsName = NET_ON && !profile.name;
 
   useEffect(() => saveProfile(profile), [profile]);
   useEffect(() => {
@@ -75,72 +114,83 @@ export function App() {
   const showToast = (text: string) => {
     toastT.current.forEach(clearTimeout);
     setToast({ text, id: ++toastN.current, out: false });
-    toastT.current = [window.setTimeout(() => setToast((t) => t && { ...t, out: true }), 2500), window.setTimeout(() => setToast(null), 2750)];
+    toastT.current = [window.setTimeout(() => setToast((t) => t && { ...t, out: true }), 2600), window.setTimeout(() => setToast(null), 2850)];
   };
 
   const update = (fn: (p: Profile) => Profile) => setProfile((p) => fn(p));
 
-  // Global leaderboard: post finished runs once the player has picked a name. History is the
-  // queue: anything not yet sent goes up oldest first, and a run that fails to send is retried
-  // when the app comes back online or to the front.
-  const [nameSheet, setNameSheet] = useState(false);
-  const [posts, setPosts] = useState<Record<string, PostResult | 'sending'>>({});
-  const profileRef = useRef(profile);
-  profileRef.current = profile;
+  // ---------- online: presence and the leaderboard ----------
+
+  const [online, setOnline] = useState<OnlineCount | null>(null);
+  useEffect(() => {
+    if (!NET_ON || !profile.name) return;
+    startPresence(profile.name);
+    return onCounts(setOnline);
+  }, [profile.name]);
+
+  // closed boards (past days and weeks) drop out of your entries
+  useEffect(() => update((p) => ({ ...p, lb: prune(p.lb, todayKey) })), []);
+
+  /** Send every entry that changed. Each one stays queued until a relay takes it. */
   const flushing = useRef(false);
-  const flush = async () => {
+  const flushLb = async () => {
     const p = profileRef.current;
-    if (!GLOBAL_ON || !p.name || flushing.current) return;
-    const todo = p.history.filter((r) => postable(r) && !p.posted.includes(r.id!)).slice(0, 10).reverse();
-    if (!todo.length) return;
+    if (!NET_ON || !p.name || flushing.current || !p.lb.dirty.length) return;
     flushing.current = true;
-    const done: string[] = [];
-    let badName = false;
-    for (const r of todo) {
-      const id = r.id!;
-      setPosts((m) => ({ ...m, [id]: 'sending' }));
-      try {
-        const res = await postRun(p.device, p.name, r);
-        setPosts((m) => ({ ...m, [id]: res }));
-        if (res.ok || res.error !== 'busy') done.push(id);
-        if (res.error === 'name') badName = true;
-        if (res.error === 'busy' || res.error === 'name') break;
-      } catch {
-        setPosts((m) => {
-          const n = { ...m };
-          delete n[id];
-          return n;
-        });
-        break;
+    const sent: [string, unknown][] = [];
+    for (const d of p.lb.dirty) {
+      const c = p.lb.entries[d];
+      if (!c) {
+        sent.push([d, undefined]);
+        continue;
       }
+      if (await publishEntry(d, c)) sent.push([d, c]);
+      else break;
     }
     flushing.current = false;
-    if (done.length || badName)
-      update((q) => ({ ...q, posted: [...done.filter((d) => !q.posted.includes(d)).reverse(), ...q.posted].slice(0, 120), name: badName ? null : q.name }));
+    if (sent.length)
+      // only clear an entry that didn't change again while it was being sent
+      update((q) => ({ ...q, lb: { ...q.lb, dirty: q.lb.dirty.filter((d) => !sent.some(([sd, sc]) => sd === d && q.lb.entries[d] === sc)) } }));
   };
   useEffect(() => {
-    void flush();
-  }, [profile.name, profile.history[0]?.id]);
+    void flushLb();
+  }, [profile.lb.dirty.join('|'), profile.name]);
   useEffect(() => {
-    const again = () => document.visibilityState === 'visible' && void flush();
+    const again = () => document.visibilityState === 'visible' && void flushLb();
     window.addEventListener('online', again);
     document.addEventListener('visibilitychange', again);
+    const t = window.setInterval(again, 30000);
     return () => {
       window.removeEventListener('online', again);
       document.removeEventListener('visibilitychange', again);
+      clearInterval(t);
     };
   }, []);
-  const lbStatus = (r: RunRecord): LbStatus | null => {
-    if (!GLOBAL_ON || !postable(r)) return null;
-    if (!profile.name) return { kind: 'join' };
-    const st = posts[r.id!];
-    if (st === 'sending') return { kind: 'sending' };
-    if (st) return { kind: 'done', res: st };
-    return profile.posted.includes(r.id!) ? { kind: 'done', res: { ok: true } } : { kind: 'queued' };
-  };
+
+  // your place on the board a finished game went to, for the Results screen
+  const [lbView, setLbView] = useState<Record<string, LbStatus>>({});
+  const [pendingRank, setPendingRank] = useState<{ rid: string; d: string; kind: BoardKind; span: Span; day: string; label: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!pendingRank) return;
+    const pr = pendingRank;
+    if (profile.lb.dirty.includes(pr.d)) {
+      // still sending: say so, and after a while that it's queued for later
+      const t = window.setTimeout(() => setLbView((m) => ({ ...m, [pr.rid]: { kind: 'queued' } })), Math.max(0, 9000 - (Date.now() - pr.at)));
+      return () => clearTimeout(t);
+    }
+    setPendingRank(null);
+    fetchBoard(pr.kind, pr.span, pr.day)
+      .then((rows) => {
+        const me = rows.find((r) => r.me);
+        setLbView((m) => ({ ...m, [pr.rid]: me ? { kind: 'ranked', rank: me.rank, of: rows.length, label: pr.label } : { kind: 'note', text: 'Posted to the leaderboard.' } }));
+      })
+      .catch(() => setLbView((m) => ({ ...m, [pr.rid]: { kind: 'queued' } })));
+  }, [pendingRank, profile.lb.dirty.join('|')]);
+
+  // ---------- updates ----------
 
   // A newer deploy is live (checked whenever the app comes to the front): switch to it the
-  // next time the player is on a menu, never in the middle of a draft or a playoff run.
+  // next time the player is on a menu, never in the middle of a game.
   const [updateReady, setUpdateReady] = useState(false);
   useEffect(() => {
     if (justUpdated()) showToast('Updated to the latest version.');
@@ -155,10 +205,37 @@ export function App() {
     return () => document.removeEventListener('visibilitychange', check);
   }, []);
   useEffect(() => {
-    if (updateReady && screen === 'tab' && !modal && !nameSheet) applyUpdate();
-  }, [updateReady, screen, modal, nameSheet]);
+    if (updateReady && screen === 'tab' && !modal && !needsName) applyUpdate();
+  }, [updateReady, screen, modal, needsName]);
 
-  const startRun = (mode: Mode = profile.mode) => {
+  // ---------- daily reward and missions ----------
+
+  const rewardShown = useRef(false);
+  useEffect(() => {
+    if (needsName || screen !== 'tab' || modal || rewardShown.current || profile.rewardDay === todayKey) return;
+    rewardShown.current = true;
+    const t = window.setTimeout(() => setModal('reward'), 700);
+    return () => clearTimeout(t);
+  }, [needsName, screen, modal, profile.rewardDay]);
+
+  const missionState = profile.missions && profile.missions.day === todayKey ? profile.missions : { day: todayKey, progress: [0, 0, 0], claimed: [false, false, false] };
+  const missionList = missionsFor(todayKey);
+  const missionsDone = missionList.filter((m, i) => missionState.progress[i] >= m.goal).length;
+  const missionsClaimable = missionList.some((m, i) => missionState.progress[i] >= m.goal && !missionState.claimed[i]);
+
+  const claimMission = (i: number) => {
+    const m = missionList[i];
+    if (missionState.progress[i] < m.goal || missionState.claimed[i]) return;
+    const claimed = missionState.claimed.map((c, j) => c || j === i);
+    const bonus = claimed.every(Boolean) ? ALL_MISSIONS_BONUS : 0;
+    update((p) => ({ ...p, coins: p.coins + m.coins + bonus, xp: p.xp + m.xp, missions: { ...missionState, claimed } }));
+    sfx.coin();
+    showToast('+' + (m.coins + bonus) + ' coins · +' + m.xp + ' XP' + (bonus ? ' · all three done!' : ''));
+  };
+
+  // ---------- starting games ----------
+
+  const startDraft = (mode: Mode) => {
     sfx.click();
     const dailyKey = mode === 'daily' ? todayKey : null;
     runCounter.current += 1;
@@ -168,11 +245,84 @@ export function App() {
     setScreen('draft');
     if (mode === '1v1')
       showToast(
-        (botFirst ? (level === 'legend' ? 'The Legend bot always picks first.' : 'Coin flip: the bot picks first.') : level === 'pro' ? 'Coin flip: you pick first.' : 'You pick first.') +
+        (botFirst ? (level === 'legend' ? 'The Legend AI always picks first.' : 'Coin flip: the AI picks first.') : level === 'pro' ? 'Coin flip: you pick first.' : 'You pick first.') +
           ' Each round you both pick from the same team and decade, and you take turns going first.'
       );
     else if (mode === 'daily') showToast(dailyDone ? 'Practice run: today’s spins again, not ranked.' : 'Daily #' + dailyNo + ': everyone gets these same spins today.');
   };
+
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const startRun = (mode: Mode = profile.mode) => {
+    if (mode === '1v1' && NET_ON) {
+      sfx.click();
+      setRoomCode(null);
+      setScreen('search');
+      return;
+    }
+    startDraft(mode);
+  };
+
+  // an invite link opens straight into the friend's room
+  const [linkRoom, setLinkRoom] = useState<string | null>(roomFromUrl);
+  useEffect(() => {
+    if (!linkRoom || needsName || screen !== 'tab') return;
+    try {
+      const u = new URL(location.href);
+      u.searchParams.delete('room');
+      history.replaceState(null, '', u.pathname + u.search + u.hash);
+    } catch {
+      // ignore
+    }
+    setRoomCode(linkRoom);
+    setLinkRoom(null);
+    setScreen('search');
+  }, [linkRoom, needsName, screen]);
+
+  // ---------- a live match ----------
+
+  const matchRef = useRef<MatchConn | null>(null);
+  const [opp, setOpp] = useState<OppView | null>(null);
+  /** we let the AI finish the other player's draft (they left or lost connection) */
+  const droppedRef = useRef(false);
+  const [kicked, setKicked] = useState(false);
+
+  const onFound = (f: Found) => {
+    matchRef.current?.close(false);
+    droppedRef.current = false;
+    setOpp({ picks: [], lineup: {}, gone: false, left: false, tookOver: false });
+    const conn = new MatchConn(f, (theirs, gone) => {
+      setOpp((prev) => {
+        const next: OppView = { picks: theirs.picks, lineup: theirs.lineup, gone, left: theirs.left, tookOver: theirs.tookOver };
+        if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
+        return next;
+      });
+    });
+    matchRef.current = conn;
+    conn.start();
+    runCounter.current += 1;
+    setRun({ id: runCounter.current, mode: '1v1', botLevel: 'pro', botFirst: !f.host, dailyKey: null, ranked: false, online: { found: f } });
+    setScreen('draft');
+  };
+
+  const endMatch = (leaving: boolean, lingerMs = 0) => {
+    matchRef.current?.close(leaving, lingerMs);
+    matchRef.current = null;
+    setPresence('menu');
+  };
+
+  /** A head-to-head loss without a finished draft: you left, or got dropped. */
+  const recordForfeit = (oppName: string) => {
+    update((p) => {
+      const h2h = addH2H(p.h2h, false, weekKey(todayKey));
+      return { ...p, h2h, stats: { ...p.stats, h2hGames: p.stats.h2hGames + 1 }, lb: p.name ? withH2H(p.lb, p.name, { w: h2h.w, l: h2h.l, streak: h2h.streak }, { w: h2h.ww, l: h2h.wl, streak: h2h.wstreak }, todayKey) : p.lb };
+    });
+    showToast('Match against ' + oppName + ' counts as a loss.');
+  };
+
+  // the other phone gave up on you (you were gone too long) while you were still drafting
+  useEffect(() => {
+    if (screen === 'draft' && run?.online && opp?.tookOver && !droppedRef.current) setKicked(true);
+  }, [opp?.tookOver, screen]);
 
   const spend = (n: number) => {
     if (profile.coins < n) return false;
@@ -180,13 +330,20 @@ export function App() {
     return true;
   };
 
+  // ---------- finishing a game ----------
+
   const finish = (r: Run, season: TeamRating, bracket: Series[] | null, bot: { lineup: DraftState['botLineup']; rating: TeamRating } | null) => {
     const draft = r.draft!;
+    const p0 = profileRef.current;
     const po = bracket ? playoffLine(bracket) : null;
-    const vsWon = bot ? (season.rating > bot.rating.rating ? true : season.rating < bot.rating.rating ? false : null) : null;
+    const oppName = r.online?.found.opp.name;
+    const forfeit = r.online && droppedRef.current ? ('them' as const) : undefined;
+    const byRating = bot ? (season.rating > bot.rating.rating ? true : season.rating < bot.rating.rating ? false : null) : null;
+    const vsWon = forfeit ? true : byRating;
     const g = gradeFor(season.wins);
     const out = bracket ? playoffOutcome(bracket) : null;
-    const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked });
+    const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked, vsName: oppName });
+    const players = SLOTS.map((s) => draft.lineup[s]!) as Player[];
     const record: RunRecord = {
       id: newId(),
       at: new Date().toISOString(),
@@ -198,11 +355,17 @@ export function App() {
       grade: g.letter,
       tier: g.tier,
       playoff: bot
-        ? vsWon
-          ? 'Beat the ' + r.botLevel + ' bot in 1 vs 1'
-          : vsWon === false
-            ? 'Lost to the ' + r.botLevel + ' bot in 1 vs 1'
-            : 'Tied the ' + r.botLevel + ' bot'
+        ? oppName
+          ? vsWon
+            ? 'Beat ' + oppName + ' head to head' + (forfeit ? ' (they left)' : '')
+            : vsWon === false
+              ? 'Lost to ' + oppName + ' head to head'
+              : 'Tied ' + oppName + ' head to head'
+          : vsWon
+            ? 'Beat the ' + r.botLevel + ' AI in 1 vs 1'
+            : vsWon === false
+              ? 'Lost to the ' + r.botLevel + ' AI in 1 vs 1'
+              : 'Tied the ' + r.botLevel + ' AI'
         : po
           ? po.text
           : 'Missed the playoffs: ' + PLAYOFF_MIN_WINS + ' wins get you in',
@@ -213,19 +376,49 @@ export function App() {
         const p = draft.lineup[s]!;
         return { slot: s, name: p.name, abbr: p.abbr, era: p.era, primed: !!p.primedFrom };
       }),
+      ids: SLOTS.map((s) => {
+        const p = draft.lineup[s]!;
+        return p.primedFrom ? { s, id: p.id, pr: p.primedFrom.cellId } : { s, id: p.id };
+      }),
       vs: bot ? { won: vsWon, botWins: bot.rating.wins, botLevel: r.botLevel } : undefined,
+      online: oppName ? { opp: oppName, forfeit } : undefined,
     };
-    const before = levelInfo(profile.xp).level;
-    const after = levelInfo(profile.xp + rewards.xp).level;
+    const legends = players.filter((p) => rarityOf(p) === 'legendary').length;
+    const event: GameEvent = { mode: r.mode, wins: season.wins, series: record.series ?? 0, title: record.title, sweeps: out ? out.sweeps : 0, balance: season.balance, legends, vsWon: bot ? vsWon : null, online: !!oppName };
+    const prevBest = p0.history.filter((h) => h.mode === r.mode && r.mode !== '1v1').reduce((m, h) => Math.max(m, h.wins), -1);
+    const newBest = prevBest >= 0 && season.wins > prevBest;
+    const ms = p0.missions && p0.missions.day === todayKey ? p0.missions : { day: todayKey, progress: [0, 0, 0], claimed: [false, false, false] };
+    const adv = advance(todayKey, ms.progress, event);
+    const missionsDone = adv.completed.map((i) => missionsFor(todayKey)[i].text);
+    const before = levelInfo(p0.xp).level;
+    const after = levelInfo(p0.xp + rewards.xp).level;
     const levelUps: number[] = [];
     const unlocked: Booster[] = [];
     for (let l = before + 1; l <= after; l++) {
       levelUps.push(l);
       unlocked.push(...unlockedAt(l));
     }
+
+    // the board this game is ranked on
+    const week = weekKey(todayKey);
+    let rank: { d: string; kind: BoardKind; span: Span; label: string } | null = null;
+    if (NET_ON && p0.name) {
+      if (r.mode === 'daily' && r.ranked && r.dailyKey) rank = { d: boardTag('daily', 'all', r.dailyKey), kind: 'daily', span: 'all', label: 'Daily #' + dailyNumber(r.dailyKey) };
+      else if (r.mode === 'classic' || r.mode === 'blind') rank = { d: boardTag(r.mode, 'week', todayKey), kind: r.mode, span: 'week', label: (r.mode === 'blind' ? 'Blind' : 'Classic') + ' this week' };
+      else if (oppName && vsWon !== null) rank = { d: boardTag('h2h', 'week', todayKey), kind: 'h2h', span: 'week', label: 'Head to Head this week' };
+    }
+
     update((p) => {
       const inv = { ...p.inventory };
       for (const b of unlocked) inv[b] += 1;
+      const msNow = p.missions && p.missions.day === todayKey ? p.missions : { day: todayKey, progress: [0, 0, 0], claimed: [false, false, false] };
+      let lb = p.lb;
+      let h2h = p.h2h;
+      if (p.name && (r.mode === 'classic' || r.mode === 'blind' || r.mode === 'daily')) lb = withRun(lb, p.name, record, todayKey).lb;
+      if (oppName && vsWon !== null) {
+        h2h = addH2H(h2h, vsWon, week);
+        if (p.name) lb = withH2H(lb, p.name, { w: h2h.w, l: h2h.l, streak: h2h.streak }, { w: h2h.ww, l: h2h.wl, streak: h2h.wstreak }, todayKey);
+      }
       return {
         ...p,
         coins: p.coins + rewards.coins + LEVEL_UP_COINS * levelUps.length,
@@ -235,15 +428,47 @@ export function App() {
         history: [record, ...p.history].slice(0, 60),
         daily: r.ranked && r.dailyKey ? { key: r.dailyKey, record } : p.daily,
         stats: {
+          ...p.stats,
           games: p.stats.games + 1,
           titles: p.stats.titles + (record.title ? 1 : 0),
           perfect: p.stats.perfect + (record.perfect ? 1 : 0),
           undefeated: p.stats.undefeated + (season.wins === 82 ? 1 : 0),
           vsWins: p.stats.vsWins + (vsWon ? 1 : 0),
+          legends: p.stats.legends + legends,
+          h2hGames: p.stats.h2hGames + (oppName ? 1 : 0),
         },
+        missions: { ...msNow, progress: advance(todayKey, msNow.progress, event).progress },
+        lb,
+        h2h,
       };
     });
-    const result: ResultInfo = { record, rating: season, lineup: draft.lineup, bot: bot ?? undefined, rewards, levelUps, unlocked, dailyNo: r.dailyKey ? dailyNumber(r.dailyKey) : null, bracket: bracket ?? undefined };
+
+    if (r.online) endMatch(false, 30000);
+    if (rank) {
+      setLbView((m) => ({ ...m, [record.id!]: { kind: 'sending' } }));
+      setPendingRank({ rid: record.id!, ...rank, day: r.mode === 'daily' && r.dailyKey ? r.dailyKey : todayKey, at: Date.now() });
+    } else if (NET_ON && r.mode === 'daily' && !r.ranked) setLbView((m) => ({ ...m, [record.id!]: { kind: 'note', text: 'Practice run: only your first Daily is ranked.' } }));
+    missionsDone.forEach((_, i) => window.setTimeout(() => sfx.levelUp(), 1600 + i * 400));
+
+    // show the other player's lineup the way they arranged it
+    let botLineup = bot?.lineup;
+    if (bot && r.online && opp) {
+      const seated = assignSlots(SLOTS.map((s) => bot.lineup[s]).filter(Boolean) as Player[], opp.lineup);
+      if (seated) botLineup = seated;
+    }
+    const result: ResultInfo = {
+      record,
+      rating: season,
+      lineup: draft.lineup,
+      bot: bot ? { lineup: botLineup!, rating: bot.rating } : undefined,
+      rewards,
+      levelUps,
+      unlocked,
+      dailyNo: r.dailyKey ? dailyNumber(r.dailyKey) : null,
+      bracket: bracket ?? undefined,
+      newBest,
+      missionsDone,
+    };
     setRun({ ...r, result });
     setScreen('results');
   };
@@ -281,10 +506,19 @@ export function App() {
     setScreen('tab');
   };
 
-  // tab pages share one shell: top bar, page views that cross-fade, and the tab bar
+  const leaveDraft = () => {
+    if (run?.online && matchRef.current) {
+      endMatch(true);
+      recordForfeit(run.online.found.opp.name);
+    }
+    goTab('home');
+  };
+
+  // ---------- screens ----------
+
   let page: React.ReactNode;
   if (tab === 'daily') page = <DailyPage profile={profile} dailyNo={dailyNo} dailyKey={todayKey} onPlay={() => startRun('daily')} />;
-  else if (tab === 'ranks') page = <RanksPage profile={profile} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setNameSheet(true))} />;
+  else if (tab === 'ranks') page = <RanksPage profile={profile} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setModal('name'))} />;
   else if (tab === 'boosters')
     page = (
       <BoostersPage
@@ -301,7 +535,7 @@ export function App() {
         }}
       />
     );
-  else if (tab === 'profile') page = <ProfilePage profile={profile} />;
+  else if (tab === 'profile') page = <ProfilePage profile={profile} onName={NET_ON ? () => (sfx.click(), setModal('name')) : undefined} />;
   else
     page = (
       <HomePage
@@ -318,13 +552,64 @@ export function App() {
         }}
         onPlay={() => startRun()}
         onToast={showToast}
+        streak={profile.streak.last === todayKey || profile.streak.last === null ? profile.streak.count : nextStreak(profile.streak, todayKey).count - 1}
+        online={NET_ON ? online : null}
+        missions={{ done: missionsDone, claimable: missionsClaimable }}
+        onMissions={() => (sfx.click(), setModal('missions'))}
+        onStreak={() => {
+          sfx.click();
+          const c = profile.streak.last === todayKey ? profile.streak.count : 0;
+          showToast(c > 1 ? c + ' days in a row. Come back tomorrow for a ' + rewardFor(c + 1).coins + '-coin chest.' : 'Open the app every day: the daily chest grows for 7 days.');
+        }}
       />
     );
+
+  const onlineProps: OnlineProps | undefined =
+    run?.online && screen === 'draft'
+      ? {
+          seed: run.online.found.seed,
+          host: run.online.found.host,
+          oppName: run.online.found.opp.name,
+          oppPicks: opp?.picks ?? NO_PICKS,
+          oppGone: !!opp && (opp.gone || opp.left),
+          onPick: (p) => matchRef.current?.update((s) => ({ ...s, picks: s.picks.filter((x) => x.r !== p.r).concat([p]) })),
+          onLineup: (l) => matchRef.current?.update((s) => ({ ...s, lineup: l })),
+          onTakeover: () => {
+            droppedRef.current = true;
+            matchRef.current?.update((s) => ({ ...s, tookOver: true }));
+          },
+        }
+      : undefined;
 
   let body: React.ReactNode;
   let viewId = 'shell';
   let enter = 'fade';
-  if (screen === 'draft' && run) {
+  if (needsName) {
+    viewId = 'welcome';
+    body = (
+      <Welcome
+        onDone={(name) => {
+          update((p) => ({ ...p, name, lb: renamed(p.lb, name, todayKey) }));
+          showToast('Welcome, ' + name + '!');
+        }}
+      />
+    );
+  } else if (screen === 'search') {
+    viewId = 'search';
+    enter = 'up';
+    body = (
+      <Search
+        name={profile.name ?? 'Player'}
+        level={levelInfo(profile.xp).level}
+        botLevel={profile.botLevel}
+        room={roomCode}
+        onMatch={onFound}
+        onAI={() => startDraft('1v1')}
+        onBack={() => goTab('home')}
+        onToast={showToast}
+      />
+    );
+  } else if (screen === 'draft' && run) {
     viewId = 'draft:' + run.id;
     enter = 'up';
     body = (
@@ -342,9 +627,10 @@ export function App() {
         onSpend={spend}
         onBooster={(b, d) => update((p) => ({ ...p, inventory: { ...p.inventory, [b]: Math.max(0, p.inventory[b] + d) } }))}
         onToast={showToast}
-        onExit={() => goTab('home')}
+        onExit={leaveDraft}
         onComplete={onDraftComplete}
         onCoachDone={() => update((p) => ({ ...p, firstRun: false }))}
+        online={onlineProps}
       />
     );
   } else if (screen === 'reveal' && run?.season && run.draft) {
@@ -363,8 +649,7 @@ export function App() {
         info={run.result}
         xp={profile.xp}
         coins={profile.coins}
-        lb={lbStatus(run.result.record)}
-        onJoin={() => (sfx.click(), setNameSheet(true))}
+        lb={lbView[run.result.record.id!] ?? null}
         onAgain={() => startRun(run.mode)}
         onHome={() => goTab('home')}
         onToast={showToast}
@@ -399,24 +684,61 @@ export function App() {
           onClose={() => setModal(null)}
           onChange={(k, v) => update((p) => ({ ...p, settings: { ...p.settings, [k]: v } }))}
           onReset={() => {
-            // keep the leaderboard identity, so a reset doesn't leave a stranger's name on the board
-            setProfile({ ...freshProfile(), device: profile.device, name: profile.name, posted: profile.posted });
+            // keep your name, and your entries on the boards stay yours
+            setProfile({ ...freshProfile(), name: profile.name, lb: profile.lb, h2h: profile.h2h, streak: profile.streak, rewardDay: profile.rewardDay });
             setModal(null);
             showToast('Progress erased.');
           }}
         />
       )}
       {modal === 'howto' && <HowToSheet onClose={() => setModal(null)} />}
-      {nameSheet && (
+      {modal === 'name' && (
         <NameSheet
           profile={profile}
-          onClose={() => setNameSheet(false)}
+          onClose={() => setModal(null)}
           onSaved={(name) => {
-            setNameSheet(false);
-            update((p) => ({ ...p, name }));
-            showToast(profile.name ? 'Name changed to ' + name + '.' : 'You’re on the leaderboard as ' + name + '.');
+            setModal(null);
+            update((p) => ({ ...p, name, lb: renamed(p.lb, name, todayKey) }));
+            if (NET_ON) startPresence(name);
+            showToast('Your name is now ' + name + '.');
           }}
         />
+      )}
+      {modal === 'missions' && <MissionsSheet profile={profile} day={todayKey} onClaim={claimMission} onClose={() => setModal(null)} />}
+      {modal === 'reward' && (
+        <DailyReward
+          streakDay={nextStreak(profile.streak, todayKey).count}
+          onClaim={() =>
+            update((p) => {
+              if (p.rewardDay === todayKey) return p;
+              const st = nextStreak(p.streak, todayKey);
+              const rw = rewardFor(st.count);
+              return { ...p, streak: st, rewardDay: todayKey, coins: p.coins + rw.coins, xp: p.xp + rw.xp };
+            })
+          }
+          onClose={() => setModal(null)}
+        />
+      )}
+      {kicked && (
+        <Sheet label="Connection lost" kind="center" onClose={() => {}}>
+          {() => (
+            <>
+              <h2 className="disp">Connection lost</h2>
+              <p>{'You were away too long, so ' + (run?.online?.found.opp.name ?? 'your opponent') + '’s phone finished the match without you. It counts as a loss.'}</p>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setKicked(false);
+                  endMatch(false);
+                  recordForfeit(run?.online?.found.opp.name ?? 'your opponent');
+                  goTab('home');
+                }}
+              >
+                OK
+              </button>
+            </>
+          )}
+        </Sheet>
       )}
       {toast && <Toast key={toast.id} text={toast.text} out={toast.out} />}
     </>

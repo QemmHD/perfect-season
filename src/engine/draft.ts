@@ -266,17 +266,54 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
     case 'bot': {
       const fromCell = a.cellId ?? s.cellId;
       const p = fromCell ? CELL_BY_ID[fromCell]?.players.find((x) => x.id === a.playerId) : undefined;
-      if (!p || s.botLineup[a.slot] || !p.pos.includes(a.slot)) return s;
+      const held = SLOTS.map((k) => s.botLineup[k]).filter(Boolean) as Player[];
+      if (!p || held.length >= 5 || held.some((x) => x.pid === p.pid)) return s;
+      let botLineup: Lineup;
+      if (!s.botLineup[a.slot] && p.pos.includes(a.slot)) botLineup = { ...s.botLineup, [a.slot]: p };
+      else {
+        // the other player moved people around on their phone: find seats that work
+        const seated = assignSlots(held.concat([p]), { ...Object.fromEntries(SLOTS.filter((k) => s.botLineup[k]).map((k) => [k, s.botLineup[k]!.id])), [a.slot]: p.id });
+        if (!seated) return s;
+        botLineup = seated;
+      }
       const ownRedraw = fromCell !== s.cellId;
       // a redrawn team-decade counts as used, so neither of you sees it again
       const used = ownRedraw && fromCell ? s.used.concat([fromCell]) : s.used;
-      return { ...s, used, botLineup: { ...s.botLineup, [a.slot]: p }, taken: ownRedraw ? s.taken : s.taken.concat([p.id]), botDone: true };
+      return { ...s, used, botLineup, taken: ownRedraw ? s.taken : s.taken.concat([p.id]), botDone: true };
     }
     case 'endCell': {
       if (!s.cellId) return s;
       return { ...s, used: s.used.concat([s.cellId]), cellId: null, cellsDone: s.cellsDone + 1, picksLeft: 0, armed: null, primed: {}, taken: [] };
     }
   }
+}
+
+/**
+ * Seat players at positions they played, keeping `prefer` where it works. Null when no
+ * arrangement fits. (Team rating doesn't depend on who plays where, only on who's on the team.)
+ */
+export function assignSlots(players: Player[], prefer: Partial<Record<Slot, string>> = {}): Lineup | null {
+  const out = emptyLineup();
+  const rest: Player[] = [];
+  for (const p of players) {
+    const want = SLOTS.find((k) => prefer[k] === p.id);
+    if (want && !out[want] && p.pos.includes(want)) out[want] = p;
+    else rest.push(p);
+  }
+  const place = (i: number): boolean => {
+    if (i >= rest.length) return true;
+    for (const k of SLOT_PREFERENCE) {
+      if (out[k] || !rest[i].pos.includes(k)) continue;
+      out[k] = rest[i];
+      if (place(i + 1)) return true;
+      out[k] = null;
+    }
+    return false;
+  };
+  if (place(0)) return out;
+  // the preferred seats themselves block a fit: try again from scratch
+  if (Object.keys(prefer).length) return assignSlots(players, {});
+  return null;
 }
 
 export function canMove(l: Lineup, from: Slot, to: Slot): boolean {

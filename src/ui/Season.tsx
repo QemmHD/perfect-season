@@ -5,6 +5,7 @@ import type { Season } from '../engine/season';
 import { type Lineup, SLOTS } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { Confetti, Fit, TeamChips } from './common';
+import { Flame } from './icons';
 import { reducedMotion } from './motion';
 import { oppNames, Scout, teamBar } from './Scout';
 
@@ -29,6 +30,8 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
   const done = tick >= 82;
   const timer = useRef<number | null>(null);
   const delays = useMemo(() => revealDelays(season.seq), [season]);
+  /** milestone pops: every 10 wins, and the 50th win that clinches a playoff spot */
+  const [pop, setPop] = useState<{ id: number; text: string; clinch: boolean } | null>(null);
 
   useEffect(() => {
     if (reducedMotion()) {
@@ -36,10 +39,21 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
       return;
     }
     let i = 0;
+    let wins = 0;
     const step = () => {
       i++;
       setTick(i);
       const won = season.seq[i - 1] === 1;
+      if (won) {
+        wins++;
+        if (wins === PLAYOFF_MIN_WINS) {
+          setPop({ id: i, text: 'PLAYOFFS CLINCHED', clinch: true });
+          sfx.seriesWin();
+        } else if (wins % 10 === 0) {
+          setPop({ id: i, text: wins + ' WINS', clinch: false });
+          sfx.coin();
+        }
+      }
       if (delays[i - 1] >= SLOW) (won ? sfx.gameWin : sfx.gameLoss)();
       else (won ? sfx.tickerWin : sfx.tickerLoss)();
       if (i >= 82) return;
@@ -79,6 +93,11 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
       <span className="eyebrow wide">Regular season · {label}</span>
       <TeamChips players={SLOTS.map((s) => lineup[s])} stagger />
       <div className={'board' + (slowBeat ? ' tense' : '') + (unbeaten ? ' gold' : '')} aria-live="polite" aria-label={'Record ' + w + ' and ' + l}>
+        {!done && streak >= 3 && (
+          <span className={'winstreak' + (streak >= 10 ? ' hot' : '')} key={'s' + streak} aria-hidden="true">
+            <Flame size={14} /> {streak} STRAIGHT
+          </span>
+        )}
         <div className="side">
           <b className={'disp num w' + (slowBeat ? ' beat' : '')} key={slowBeat ? 'w' + w : 'w'}>
             {w}
@@ -93,6 +112,11 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
           <span>LOSSES</span>
         </div>
       </div>
+      {pop && !done && (
+        <span className={'milestone' + (pop.clinch ? ' clinch' : '')} key={pop.id} aria-hidden="true">
+          {pop.text}
+        </span>
+      )}
       <span className="eyebrow gameno">
         {done ? 'Final record' : tick === 0 ? 'Tip-off' : 'Game ' + tick + ' of 82' + (streak >= 5 ? ' · ' + streak + ' straight wins' : '')}
       </span>

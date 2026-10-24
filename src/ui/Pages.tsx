@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { BOOSTER_HELP, BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, levelInfo } from '../engine/economy';
 import { gradeFor } from '../engine/rating';
 import { type Booster, BOOSTERS, type BotLevel, type Mode } from '../engine/types';
-import { GLOBAL_ON } from '../lib/leaderboard';
 import { bestRuns, type Profile, type RunRecord } from '../lib/profile';
 import { sfx } from '../lib/sound';
 import { APP_VERSION } from '../lib/update';
+import type { OnlineCount } from '../net/match';
+import { NET_ON } from '../net/nostr';
 import { Fit, lastName, Sheet } from './common';
 import { ArenaHero } from './Hero';
 import { GlobalBoard } from './Leaderboard';
-import { Bolt, Calendar, Crown, Home as HomeIcon, Lock, Ranks as RanksIcon, User } from './icons';
+import { StreakChip } from './Rewards';
+import { Bolt, Calendar, Crown, Home as HomeIcon, Lock, Ranks as RanksIcon, Target, User } from './icons';
 
 export type Tab = 'home' | 'daily' | 'ranks' | 'boosters' | 'profile';
 export const TAB_ORDER: Tab[] = ['home', 'daily', 'ranks', 'boosters', 'profile'];
@@ -39,7 +41,7 @@ const MODES: { key: Mode; title: string; sub: string }[] = [
   { key: 'classic', title: 'Classic', sub: 'Stats visible' },
   { key: 'blind', title: 'Blind', sub: 'Stats hidden · +50% rewards' },
   { key: 'daily', title: 'Daily', sub: 'Same spins for everyone' },
-  { key: '1v1', title: '1 vs 1', sub: 'Snake draft vs a bot' },
+  { key: '1v1', title: NET_ON ? 'Head to Head' : '1 vs 1', sub: NET_ON ? 'Live vs real players' : 'Snake draft vs the AI' },
 ];
 
 /** The logo letters fly in once per visit, not on every tab switch. */
@@ -53,13 +55,19 @@ export function HomePage(props: {
   onBot: (b: BotLevel) => void;
   onPlay: () => void;
   onToast: (t: string) => void;
+  streak: number;
+  online: OnlineCount | null;
+  missions: { done: number; claimable: boolean };
+  onMissions: () => void;
+  onStreak: () => void;
 }) {
   const [intro] = useState(() => !introPlayed);
   useEffect(() => {
     introPlayed = true;
   }, []);
   const p = props.profile;
-  const playLabel = p.mode === 'daily' ? (props.dailyDone ? 'PRACTICE DAILY' : 'PLAY DAILY #' + props.dailyNo) : p.mode === '1v1' ? 'FIND A MATCH' : 'PLAY';
+  const playLabel = p.mode === 'daily' ? (props.dailyDone ? 'PRACTICE DAILY' : 'PLAY DAILY #' + props.dailyNo) : p.mode === '1v1' ? (NET_ON ? 'FIND A MATCH' : 'PLAY THE BOT') : 'PLAY';
+  const live = props.online && props.online.online > 1;
   const letters = (word: string, offset: number) =>
     word.split('').map((ch, i) => (
       <i key={i} style={{ animationDelay: offset + i * 45 + 'ms' }}>
@@ -94,19 +102,26 @@ export function HomePage(props: {
         </div>
       </ArenaHero>
       <p className="tagline">Spin a team and a decade. Draft five legends. Go perfect.</p>
-      <div className="sports">
-        <button className="chip on">NBA</button>
-        <button className="chip" onClick={() => props.onToast('NFL and soccer come after the NBA launch.')}>
-          NFL · SOON
-        </button>
-        <button className="chip" onClick={() => props.onToast('NFL and soccer come after the NBA launch.')}>
-          SOCCER · SOON
+      <div className="statstrip">
+        <StreakChip count={props.streak} onClick={props.onStreak} />
+        {props.online && (
+          <span className="statchip online" aria-label={props.online.online + ' players online'}>
+            <i className="livedot" aria-hidden="true" />
+            <b className="num">{props.online.online}</b> online
+            {props.online.searching > 0 && <em> · {props.online.searching} in queue</em>}
+          </span>
+        )}
+        <button className={'statchip quests' + (props.missions.claimable ? ' ready' : '')} onClick={props.onMissions} aria-label={'Missions: ' + props.missions.done + ' of 3 done'}>
+          <Target size={16} />
+          <b className="num">{props.missions.done}/3</b>
+          {props.missions.claimable && <i className="dot" aria-hidden="true" />}
         </button>
       </div>
       <div className="modes" role="group" aria-label="Game mode">
         {MODES.map((m) => (
           <button key={m.key} className="mode" aria-pressed={p.mode === m.key} onClick={() => props.onMode(m.key)}>
             <span className="disp">{m.key === 'daily' ? 'Daily #' + props.dailyNo : m.title}</span>
+            {m.key === '1v1' && live && <span className="livebadge">LIVE</span>}
             <small className={m.key === 'daily' && props.dailyDone ? 'done' : ''}>{m.key === 'daily' && props.dailyDone ? 'Done today · practice only' : m.sub}</small>
           </button>
         ))}
@@ -114,7 +129,7 @@ export function HomePage(props: {
       <div className="under" key={p.mode}>
         {p.mode === '1v1' ? (
           <>
-            <span className="eyebrow">Bot</span>
+            <span className="eyebrow">{NET_ON ? 'AI if no one’s on' : 'AI'}</span>
             {(['rookie', 'pro', 'legend'] as BotLevel[]).map((b) => (
               <button key={b} className={'chip rival' + (p.botLevel === b ? ' on' : '')} aria-pressed={p.botLevel === b} onClick={() => props.onBot(b)}>
                 {b.toUpperCase()}
@@ -150,11 +165,11 @@ function HistRow({ r, i = 0 }: { r: RunRecord; i?: number }) {
         <strong className="num">
           {r.wins}–{82 - r.wins}
           {r.title ? ' · Champions' : ''}
-          {r.vs ? (r.vs.won ? ' · beat bot' : r.vs.won === false ? ' · lost to bot' : ' · tied') : ''}
+          {r.vs ? (r.vs.won ? ' · beat ' + (r.online ? r.online.opp : 'AI') : r.vs.won === false ? ' · lost to ' + (r.online ? r.online.opp : 'AI') : ' · tied') : ''}
         </strong>
         <small>{r.lineup.map((x) => lastName(x.name)).join(' · ')}</small>
       </div>
-      <small className="mode-tag">{r.mode === '1v1' ? '1v1' : r.mode}</small>
+      <small className="mode-tag">{r.mode === '1v1' ? (r.online ? 'H2H' : 'vs AI') : r.mode}</small>
     </div>
   );
 }
@@ -214,7 +229,7 @@ export function DailyPage(props: { profile: Profile; dailyNo: number; dailyKey: 
 let ranksView: 'global' | 'yours' = 'global';
 
 export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: number; onName: () => void }) {
-  const [view, setView] = useState<'global' | 'yours'>(GLOBAL_ON ? ranksView : 'yours');
+  const [view, setView] = useState<'global' | 'yours'>(NET_ON ? ranksView : 'yours');
   const [mode, setMode] = useState<Mode | 'all'>('all');
   const runs = bestRuns(props.profile.history, mode);
   const pickView = (v: 'global' | 'yours') => {
@@ -227,8 +242,8 @@ export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: 
     <div className="page-view">
       <div className="page">
         <div className="ranks-head">
-          <h1 className="disp">{GLOBAL_ON ? 'Ranks' : 'Your best'}</h1>
-          {GLOBAL_ON && (
+          <h1 className="disp">{NET_ON ? 'Ranks' : 'Your best'}</h1>
+          {NET_ON && (
             <span className="seg" role="group" aria-label="Leaderboard">
               {(['global', 'yours'] as const).map((v) => (
                 <button key={v} className={view === v ? 'on' : ''} aria-pressed={view === v} onClick={() => pickView(v)}>
@@ -297,7 +312,7 @@ export function BoostersPage(props: { profile: Profile; onBuy: (b: Booster) => v
   );
 }
 
-export function ProfilePage(props: { profile: Profile }) {
+export function ProfilePage(props: { profile: Profile; onName?: () => void }) {
   const p = props.profile;
   const lv = levelInfo(p.xp);
   const best = bestRuns(p.history, 'all', 1)[0];
@@ -307,11 +322,25 @@ export function ProfilePage(props: { profile: Profile }) {
     ['Titles', p.stats.titles],
     ['82–0 seasons', p.stats.undefeated],
     ['Perfect seasons', p.stats.perfect],
-    ['1v1 wins', p.stats.vsWins],
+    ['Legends drafted', p.stats.legends],
   ];
+  if (NET_ON) stats.push(['Head to head', p.h2h.w + '–' + p.h2h.l], ['Best H2H streak', p.h2h.best], ['Best day streak', p.streak.best]);
+  else stats.push(['1v1 wins', p.stats.vsWins]);
   return (
     <div className="page-view">
       <div className="page">
+        {p.name && (
+          <div className="namebar">
+            <span>
+              <b>{p.name}</b>
+            </span>
+            {props.onName && (
+              <button className="chip" onClick={props.onName}>
+                EDIT NAME
+              </button>
+            )}
+          </div>
+        )}
         <h1 className="disp">Level {lv.level}</h1>
         <span className="bar thick">
           <i style={{ width: Math.round((lv.into / lv.need) * 100) + '%' }} />
@@ -329,7 +358,7 @@ export function ProfilePage(props: { profile: Profile }) {
         </div>
         <span className="eyebrow">Recent drafts</span>
         {p.history.length ? p.history.slice(0, 20).map((r, i) => <HistRow key={i} r={r} i={i} />) : <div className="empty">No drafts yet. Your history shows up here.</div>}
-        <p className="note">Progress is saved on this device. Accounts will let you keep it everywhere.</p>
+        <p className="note">Progress is saved on this phone. The home-screen app and Safari keep separate progress.</p>
       </div>
     </div>
   );
@@ -401,11 +430,25 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
           <p>
             Then the <b>82-game season</b> plays out. Win 50 or more to make the playoffs: four best-of-7 series against real all-time great teams, each game a little more likely to go to the better team, with home court to the better record. Tap any series to scout the other team’s five and your odds. Go 82–0, then 16–0, for a <b>Perfect Season</b>.
           </p>
+          {NET_ON ? (
+            <>
+              <p>
+                <b>Head to Head:</b> you and a real player draft from the same team and decade each round, taking turns going first, with 25 seconds a pick. The better team wins. If no one is searching after 30 seconds, you play the AI instead. To play a friend, make a code and send it.
+              </p>
+              <p>
+                <b>Ranks:</b> your best Classic, Blind and first Daily run, plus your head-to-head wins, go on the global leaderboards automatically.
+              </p>
+            </>
+          ) : (
+            <p>
+              <b>1 vs 1:</b> you and the AI pick from the same team and decade each round and take turns going first. You always start against Rookie, a coin flip decides against Pro, and Legend always starts.
+            </p>
+          )}
           <p>
-            <b>1 vs 1:</b> you and the bot pick from the same team and decade each round and take turns going first. You always start against Rookie, a coin flip decides against Pro, and Legend always starts.
+            <b>Rarity:</b> the best player lines are Rare, Epic or Legendary (about 1 in 200). Draft a Legendary for the big moment.
           </p>
           <p>
-            <b>Ranks:</b> pick a name to put your Classic, Blind and first Daily runs on the global leaderboard. No account needed.
+            <b>Every day:</b> open the daily chest (it grows for 7 days in a row) and finish three missions for coins and XP.
           </p>
           <p>
             <b>Boosters</b> (from level 2): Double Pick takes two players from one team, Trade swaps a teammate for someone better, Prime upgrades a player to his best-ever decade.
