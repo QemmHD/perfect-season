@@ -3982,7 +3982,7 @@ button.statchip:active {
 }
 .livebadge {
   position: absolute;
-  top: 8px;
+  top: -9px;
   right: 10px;
   padding: 2px 6px;
   border-radius: 6px;
@@ -4946,4 +4946,36 @@ button.friendcard:active {
     opacity: 0;
     transform: translate(-50%, -40px) scale(1);
   }
+}
+
+/* ---------- live counters ---------- */
+.statchip.online b.num {
+  display: inline-block;
+  min-width: 0.6em;
+  text-align: center;
+}
+.statchip.online b.tick {
+  animation: tick-pop 0.5s var(--ease-spring);
+  color: #3be37a;
+}
+@keyframes tick-pop {
+  30% {
+    transform: scale(1.45);
+  }
+}
+.statchip.online em b {
+  color: var(--soft);
+}
+.queue-now {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #3be37a;
+  animation: fade-in 0.3s ease both;
+}
+.mode small.queue-now {
+  color: #3be37a;
+}
+.search-text small {
+  animation: fade-in 0.3s ease both;
 }

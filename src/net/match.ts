@@ -32,34 +32,65 @@ export interface OnlineCount {
 
 type Status = 'menu' | 'queue' | 'match';
 
+/** Each open app says it's here this often; after three missed beats it no longer counts. */
+const BEAT_MS = 10000;
+const ONLINE_MS = 32000;
+/** Searchers announce themselves every 2 seconds. */
+const QUEUE_MS = 6000;
+
 let presenceStarted = false;
 let myStatus: Status = 'menu';
 let myName = '';
+let lastBeat = 0;
+/** when a hello last actually reached a relay */
+let lastHello = 0;
+let answer: number | null = null;
+let lastEmitted = '';
 const seenOnline = new Map<string, number>();
 const seenSearching = new Map<string, number>();
 const countListeners = new Set<(c: OnlineCount) => void>();
 
 function counts(): OnlineCount {
   const t = Date.now();
+  const me = myPubkey();
   let online = 1;
   let searching = myStatus === 'queue' ? 1 : 0;
-  const me = myPubkey();
-  for (const [k, at] of seenOnline) if (k !== me && t - at < 75000) online++;
-  for (const [k, at] of seenSearching) if (k !== me && t - at < 8000) searching++;
+  for (const [k, at] of seenOnline) {
+    if (t - at > ONLINE_MS) seenOnline.delete(k);
+    else if (k !== me) online++;
+  }
+  for (const [k, at] of seenSearching) {
+    if (t - at > QUEUE_MS) seenSearching.delete(k);
+    else if (k !== me) searching++;
+  }
   return { online, searching };
 }
 
-function emitCounts(): void {
+/** Tell the screens, when a number changed (checked every second). */
+function emitCounts(force = false): void {
   const c = counts();
+  const key = c.online + ':' + c.searching;
+  if (!force && key === lastEmitted) return;
+  lastEmitted = key;
   countListeners.forEach((f) => f(c));
 }
 
-function beat(): void {
+/** "I'm here." With hello, everyone else answers right away, so a fresh count is right in a second or two. */
+function beat(hello = false): void {
   if (!myName || document.visibilityState !== 'visible') return;
-  void pool.publish(sign(KIND_PRESENCE, [['t', ONLINE_TAG]], JSON.stringify({ name: myName, st: myStatus })));
+  lastBeat = Date.now();
+  // a hello sent with no relay connected reached no one: it goes again when one connects
+  if (hello && pool.connected() > 0) lastHello = lastBeat;
+  void pool.publish(sign(KIND_PRESENCE, [['t', ONLINE_TAG]], JSON.stringify(hello ? { name: myName, st: myStatus, hello: true } : { name: myName, st: myStatus })));
 }
 
-/** Announce this player every 25s while the app is open, and count everyone else. */
+/** Leaving (app to the background, or closed): others stop counting us at once. */
+function goodbye(): void {
+  if (!myName) return;
+  void pool.publish(sign(KIND_PRESENCE, [['t', ONLINE_TAG]], JSON.stringify({ name: myName, st: 'off' })));
+}
+
+/** Count everyone with the app open and everyone searching, live, and say we're here every 10 seconds. */
 export function startPresence(name: string): void {
   myName = name;
   if (!NET_ON || presenceStarted) {
@@ -67,26 +98,52 @@ export function startPresence(name: string): void {
     return;
   }
   presenceStarted = true;
-  pool.subscribe([{ kinds: [KIND_PRESENCE], '#t': [ONLINE_TAG], since: now() - 90 }], (e) => {
+  const me = myPubkey();
+  pool.subscribe([{ kinds: [KIND_PRESENCE], '#t': [ONLINE_TAG], since: now() - 30 }], (e) => {
+    if (e.pubkey === me) return;
+    const c = parse(e) ?? {};
+    if (c.st === 'off') {
+      seenOnline.delete(e.pubkey);
+      seenSearching.delete(e.pubkey);
+      emitCounts();
+      return;
+    }
     seenOnline.set(e.pubkey, Date.now());
+    if (c.st !== 'queue') seenSearching.delete(e.pubkey);
+    // someone just opened the app: answer soon, spread out so not everyone answers at once
+    if (c.hello === true && answer === null && Date.now() - lastBeat > 3000) {
+      answer = window.setTimeout(() => {
+        answer = null;
+        beat();
+      }, 300 + Math.random() * 1500);
+    }
     emitCounts();
   });
   pool.subscribe([{ kinds: [KIND_QUEUE], '#t': ['ps1-queue-' + NET_V], since: now() - 10 }], (e) => {
+    if (e.pubkey === me) return;
     seenSearching.set(e.pubkey, Date.now());
     seenOnline.set(e.pubkey, Date.now());
     emitCounts();
   });
-  beat();
-  window.setInterval(beat, 25000);
-  window.setInterval(emitCounts, 5000);
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && beat());
+  // the first hello can go out before any relay is connected: say it again once one is
+  let connected = 0;
+  pool.onStatus(() => {
+    const n = pool.connected();
+    if (n > connected && Date.now() - lastHello > 1500) beat(true);
+    connected = n;
+  });
+  beat(true);
+  window.setInterval(() => beat(), BEAT_MS);
+  window.setInterval(() => emitCounts(), 1000);
+  document.addEventListener('visibilitychange', () => (document.visibilityState === 'visible' ? beat(true) : goodbye()));
+  window.addEventListener('pagehide', goodbye);
 }
 
 export function setPresence(st: Status): void {
   if (myStatus === st) return;
   myStatus = st;
   beat();
-  emitCounts();
+  emitCounts(true);
 }
 
 export function onCounts(fn: (c: OnlineCount) => void): () => void {

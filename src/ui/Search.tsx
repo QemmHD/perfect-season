@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { BotLevel } from '../engine/types';
 import { copyText } from '../lib/share';
 import { sfx } from '../lib/sound';
-import { cleanRoomCode, type Found, Matchmaker, newRoomCode, setPresence } from '../net/match';
+import { cleanRoomCode, type Found, Matchmaker, newRoomCode, onCounts, setPresence } from '../net/match';
 import { Fit, initials } from './common';
 import { Back, Share } from './icons';
 import { Sparks } from './motion';
@@ -34,7 +34,6 @@ export function Search(props: {
   const [joinCode, setJoinCode] = useState('');
   const [t0, setT0] = useState(Date.now());
   const [now, setNow] = useState(Date.now());
-  const [others, setOthers] = useState(0);
   const [found, setFound] = useState<Found | null>(null);
   const [aiSoon, setAiSoon] = useState(false);
   const done = useRef(false);
@@ -47,11 +46,14 @@ export function Search(props: {
     return () => clearInterval(t);
   }, []);
 
+  // everyone else in the public queue right now, live
+  const [queued, setQueued] = useState(0);
+  useEffect(() => onCounts((c) => setQueued(Math.max(0, c.searching - (tab === 'quick' && !found && !aiSoon ? 1 : 0)))), [tab, found, aiSoon]);
+
   // search in the queue, or in the chosen room
   useEffect(() => {
     if (!searching) return;
     setT0(Date.now());
-    setOthers(0);
     setPresence('queue');
     const mm = new Matchmaker(
       { name: props.name, level: props.level, room: tab === 'friend' && room ? room.code : undefined },
@@ -59,8 +61,7 @@ export function Search(props: {
         if (done.current) return;
         done.current = true;
         setFound(f);
-      },
-      setOthers
+      }
     );
     mm.start();
     mmRef.current = mm;
@@ -159,7 +160,7 @@ export function Search(props: {
             {tab === 'quick' ? (
               <>
                 <strong>Searching for a real player…</strong>
-                <small>{others > 0 ? others + (others === 1 ? ' other player is' : ' other players are') + ' searching' : 'Waiting for someone to join the queue'}</small>
+                <small key={queued}>{queued > 0 ? queued + (queued === 1 ? ' other player is' : ' other players are') + ' searching right now' : 'No one else is searching yet'}</small>
               </>
             ) : room!.hosting ? (
               <>

@@ -9,6 +9,7 @@ import type { OnlineCount } from '../net/match';
 import { NET_ON } from '../net/nostr';
 import { Fit, lastName, Sheet } from './common';
 import { ArenaHero } from './Hero';
+import { usePulse } from './motion';
 import { GlobalBoard } from './Leaderboard';
 import { StreakChip } from './Rewards';
 import { Bolt, Calendar, Crown, Home as HomeIcon, Lock, Ranks as RanksIcon, Target, User } from './icons';
@@ -34,6 +35,22 @@ export function Tabs({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
         </button>
       ))}
     </nav>
+  );
+}
+
+/** Players with the app open and players searching for a match, live: each number pops when it changes. */
+function LiveCount({ online, queue }: { online: number; queue: number }) {
+  const a = usePulse(online, 500);
+  const b = usePulse(queue, 500);
+  return (
+    <span className="statchip online" role="status" aria-label={online + ' players online, ' + queue + ' in the head-to-head queue'}>
+      <i className="livedot" aria-hidden="true" />
+      <b className={'num' + (a ? ' tick' : '')}>{online}</b> online
+      <em>
+        {' · '}
+        <b className={'num' + (b ? ' tick' : '')}>{queue}</b> in queue
+      </em>
+    </span>
   );
 }
 
@@ -104,13 +121,7 @@ export function HomePage(props: {
       <p className="tagline">Spin a team and a decade. Draft five legends. Go perfect.</p>
       <div className="statstrip">
         <StreakChip count={props.streak} onClick={props.onStreak} />
-        {props.online && (
-          <span className="statchip online" aria-label={props.online.online + ' players online'}>
-            <i className="livedot" aria-hidden="true" />
-            <b className="num">{props.online.online}</b> online
-            {props.online.searching > 0 && <em> · {props.online.searching} in queue</em>}
-          </span>
-        )}
+        {props.online && <LiveCount online={props.online.online} queue={props.online.searching} />}
         <button className={'statchip quests' + (props.missions.claimable ? ' ready' : '')} onClick={props.onMissions} aria-label={'Missions: ' + props.missions.done + ' of 3 done'}>
           <Target size={16} />
           <b className="num">{props.missions.done}/3</b>
@@ -122,14 +133,20 @@ export function HomePage(props: {
           <button key={m.key} className="mode" aria-pressed={p.mode === m.key} onClick={() => props.onMode(m.key)}>
             <span className="disp">{m.key === 'daily' ? 'Daily #' + props.dailyNo : m.title}</span>
             {m.key === '1v1' && live && <span className="livebadge">LIVE</span>}
-            <small className={m.key === 'daily' && props.dailyDone ? 'done' : ''}>{m.key === 'daily' && props.dailyDone ? 'Done today · practice only' : m.sub}</small>
+            {m.key === '1v1' && props.online && props.online.searching > 0 ? (
+              <small className="queue-now" key={props.online.searching}>
+                {props.online.searching} in queue right now
+              </small>
+            ) : (
+              <small className={m.key === 'daily' && props.dailyDone ? 'done' : ''}>{m.key === 'daily' && props.dailyDone ? 'Done today · practice only' : m.sub}</small>
+            )}
           </button>
         ))}
       </div>
       <div className="under" key={p.mode}>
         {p.mode === '1v1' ? (
           <>
-            <span className="eyebrow">{NET_ON ? 'AI if no one’s on' : 'AI'}</span>
+            <span className="eyebrow">{NET_ON ? 'AI backup' : 'AI'}</span>
             {(['rookie', 'pro', 'legend'] as BotLevel[]).map((b) => (
               <button key={b} className={'chip rival' + (p.botLevel === b ? ' on' : '')} aria-pressed={p.botLevel === b} onClick={() => props.onBot(b)}>
                 {b.toUpperCase()}
