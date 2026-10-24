@@ -1,7 +1,7 @@
 # Perfect Season (NBA)
 
 Spin a random NBA team and decade, draft five players who played for them, and try to go 82-0, then 16-0 in the playoffs.
-Product spec: [`../research/perfect-season/SPEC.md`](../research/perfect-season/SPEC.md).
+Product spec: [`docs/SPEC.md`](docs/SPEC.md).
 
 ## What's in this build
 
@@ -44,7 +44,7 @@ node scripts/make-icons.mjs      # re-render icons and iPhone launch images into
 
 ### Deploying
 
-`vercel.json` builds the static site (`npm run build` → `dist/`). When importing the repository on Vercel, set the project's root directory to `perfect-season`.
+`vercel.json` builds the static site (`npm run build` → `dist/`). Import this repository on Vercel with the default settings.
 
 ## Data
 
