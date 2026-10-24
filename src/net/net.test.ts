@@ -135,7 +135,7 @@ describe('leaderboard entries', () => {
     expect(nameProblem('Grapes')).not.toBeNull(); // "rape" inside: blocked on purpose, err on the safe side
     expect(nameProblem('A'.repeat(17))).not.toBeNull();
     expect(cleanRoomCode(' k7q-m ')).toBe('K7QM');
-    expect(NET_V).toMatch(/^ps1-[0-9a-z]+$/);
+    expect(NET_V).toMatch(/^ps1-[0-9a-z]+-1$/);
   });
 });
 
@@ -216,5 +216,34 @@ describe('missions, streaks and rarity', () => {
     expect(legends.length).toBeGreaterThan(30);
     expect(legends.some((p) => p.name === 'Michael Jordan')).toBe(true);
     expect(legends.some((p) => p.name === 'Wilt Chamberlain')).toBe(true);
+  });
+});
+
+describe('hostile or stale network data', () => {
+  it('ignores ids that look like object built-ins instead of crashing', () => {
+    expect(CELL_BY_ID['constructor']).toBeUndefined();
+    expect(CELL_BY_ID['toString']).toBeUndefined();
+    const ids = realLineup();
+    expect(() => readEntry(entry({ v: 1, name: 'x', wins: 1, series: 0, title: false, perfect: false, rating: 1, lineup: [{ s: 'PG', id: 'constructor:1' }, ...ids.slice(1)] }), 'classic', '2026-10-24')).not.toThrow();
+    expect(readEntry(entry({ v: 1, name: 'x', wins: 1, series: 0, title: false, perfect: false, rating: 1, lineup: [{ s: 'PG', id: '__proto__:1' }, ...ids.slice(1)] }), 'classic', '2026-10-24')).toBeNull();
+    const s: DraftState = { ...newDraft('1v1', 'pro', null, false), cellId: CELLS[0].id };
+    expect(draftReducer(s, { type: 'bot', playerId: 'x', slot: 'PG', cellId: 'toString' })).toBe(s);
+  });
+
+  it('takes one pick per round from the other player, even if two arrive', () => {
+    const cell = CELLS[5];
+    const [a, b] = cell.players.filter((p) => p.pos.length > 0);
+    let s: DraftState = { ...newDraft('1v1', 'pro', null, false), cellId: cell.id };
+    s = draftReducer(s, { type: 'bot', playerId: a.id, slot: a.pos[0], cellId: cell.id });
+    expect(draftReducer(s, { type: 'bot', playerId: b.id, slot: b.pos[0], cellId: cell.id })).toBe(s);
+  });
+
+  it('replaces an entry scored with older player data', () => {
+    const day = '2026-10-24';
+    const first = withRun({ entries: {}, dirty: [] }, 'Me', record({ series: 4, title: true }), day);
+    const stale: LbState = { entries: Object.fromEntries(Object.entries(first.lb.entries).map(([d, c]) => [d, { ...c, dv: 'old' }])), dirty: [] };
+    const worse = record({ series: 0 });
+    expect(withRun(stale, 'Me', worse, day).improved.length).toBe(2);
+    expect(withRun({ ...first.lb, dirty: [] }, 'Me', worse, day).improved).toEqual([]);
   });
 });

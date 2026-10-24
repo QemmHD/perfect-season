@@ -4,6 +4,7 @@
 import { CELL_BY_ID, primeVersion } from '../engine/data';
 import { dailyOrder } from '../engine/draft';
 import { rateTeam } from '../engine/rating';
+import { DATA_V } from '../engine/version';
 import { type Player, type Slot, SLOTS } from '../engine/types';
 import { displayName } from '../lib/names';
 import type { RunRecord } from '../lib/profile';
@@ -48,6 +49,8 @@ interface RunContent extends RunScore {
   name: string;
   mode: 'classic' | 'blind' | 'daily';
   lineup: { s: Slot; id: string; pr?: string }[];
+  /** the player data the run was scored with (DATA_V) */
+  dv?: string;
 }
 
 export interface H2HRecord {
@@ -65,7 +68,7 @@ export type EntryContent = RunContent | H2HContent;
 
 export function runContent(name: string, r: RunRecord): RunContent | null {
   if (!r.ids || r.ids.length !== 5 || (r.mode !== 'classic' && r.mode !== 'blind' && r.mode !== 'daily')) return null;
-  return { v: 1, name, mode: r.mode, wins: r.wins, series: r.series ?? (r.title ? 4 : 0), title: r.title, perfect: r.perfect, rating: r.rating, lineup: r.ids };
+  return { v: 1, name, mode: r.mode, wins: r.wins, series: r.series ?? (r.title ? 4 : 0), title: r.title, perfect: r.perfect, rating: r.rating, lineup: r.ids, dv: DATA_V };
 }
 
 /** Better run first: wins, then playoff rounds, then a perfect run, then team rating. */
@@ -86,7 +89,8 @@ export function rebuildLineup(lineup: unknown, day: string | null): Player[] | n
   if (!Array.isArray(lineup) || lineup.length !== 5) return null;
   const slots = new Set<string>();
   const pids = new Set<string>();
-  const order = day ? new Set(dailyOrder(day).slice(0, 40)) : null;
+  // each respin uses up a cell in the day's order, so allow for plenty of them
+  const order = day ? new Set(dailyOrder(day).slice(0, 120)) : null;
   const out: Player[] = [];
   for (const x of lineup as { s?: unknown; id?: unknown; pr?: unknown }[]) {
     const base = findPlayer(x?.id);
@@ -192,7 +196,14 @@ export async function fetchBoard(kind: BoardKind, span: Span, day: string): Prom
     if (!old || old.created_at < e.created_at) newest.set(e.pubkey, e);
   }
   const rows = Array.from(newest.values())
-    .map((e) => readEntry(e, kind, day))
+    .map((e) => {
+      // anything a stranger can post is untrusted: one bad entry must not break the board
+      try {
+        return readEntry(e, kind, day);
+      } catch {
+        return null;
+      }
+    })
     .filter((x): x is Omit<BoardRow, 'rank' | 'me'> => !!x);
   const ranked = rankRows(rows, myPubkey());
   cache.set(d, ranked);
@@ -231,7 +242,9 @@ export function withRun(lb: LbState, name: string, r: RunRecord, day: string): {
   const improved: string[] = [];
   let out = lb;
   for (const d of runBoards(r, day)) {
-    const old = out.entries[d] as RunContent | undefined;
+    const stored = out.entries[d] as RunContent | undefined;
+    // an entry scored with older player data no longer checks out on other phones: replace it
+    const old = stored && stored.dv === DATA_V ? stored : undefined;
     // the Daily counts your first ranked run only
     if (old && (r.mode === 'daily' || compareRuns(c, old) >= 0)) continue;
     out = mark(out, d, c);

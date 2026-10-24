@@ -267,7 +267,8 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
       const fromCell = a.cellId ?? s.cellId;
       const p = fromCell ? CELL_BY_ID[fromCell]?.players.find((x) => x.id === a.playerId) : undefined;
       const held = SLOTS.map((k) => s.botLineup[k]).filter(Boolean) as Player[];
-      if (!p || held.length >= 5 || held.some((x) => x.pid === p.pid)) return s;
+      // one pick per round: a late duplicate (the AI and a real pick racing) is ignored
+      if (!p || s.botDone || held.length >= 5 || held.some((x) => x.pid === p.pid)) return s;
       let botLineup: Lineup;
       if (!s.botLineup[a.slot] && p.pos.includes(a.slot)) botLineup = { ...s.botLineup, [a.slot]: p };
       else {

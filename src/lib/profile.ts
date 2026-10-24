@@ -66,6 +66,8 @@ export interface Profile {
   rewardDay: string | null;
   /** Today's missions: progress and claimed, by position in the day's list */
   missions: { day: string; progress: number[]; claimed: boolean[] } | null;
+  /** A head-to-head match in progress; still set on launch means the app was closed mid-match */
+  activeMatch: { id: string; opp: string } | null;
 }
 
 /** A random v4 UUID. */
@@ -110,6 +112,7 @@ export function freshProfile(): Profile {
     streak: { count: 0, last: null, best: 0 },
     rewardDay: null,
     missions: null,
+    activeMatch: null,
   };
 }
 

@@ -131,6 +131,15 @@ export function App() {
   // closed boards (past days and weeks) drop out of your entries
   useEffect(() => update((p) => ({ ...p, lb: prune(p.lb, todayKey) })), []);
 
+  // the app was closed in the middle of a match last time: that match was lost
+  useEffect(() => {
+    const m = profileRef.current.activeMatch;
+    if (m) {
+      recordForfeit(m.opp);
+      window.setTimeout(() => showToast('You left the match against ' + m.opp + ', so it counts as a loss.'), 900);
+    }
+  }, []);
+
   /** Send every entry that changed. Each one stays queued until a relay takes it. */
   const flushing = useRef(false);
   const flushLb = async () => {
@@ -204,19 +213,26 @@ export function App() {
     document.addEventListener('visibilitychange', check);
     return () => document.removeEventListener('visibilitychange', check);
   }, []);
+  /** a finished match keeps sending its last state until then; a reload would cut that short */
+  const lingerUntil = useRef(0);
   useEffect(() => {
-    if (updateReady && screen === 'tab' && !modal && !needsName) applyUpdate();
+    if (!(updateReady && screen === 'tab' && !modal && !needsName)) return;
+    const t = window.setTimeout(applyUpdate, Math.max(0, lingerUntil.current - Date.now()));
+    return () => clearTimeout(t);
   }, [updateReady, screen, modal, needsName]);
 
   // ---------- daily reward and missions ----------
 
-  const rewardShown = useRef(false);
+  /** the day the chest was last offered this session (once a day, even if the app stays open) */
+  const rewardShown = useRef<string | null>(null);
   useEffect(() => {
-    if (needsName || screen !== 'tab' || modal || rewardShown.current || profile.rewardDay === todayKey) return;
-    rewardShown.current = true;
-    const t = window.setTimeout(() => setModal('reward'), 700);
+    if (needsName || screen !== 'tab' || modal || rewardShown.current === todayKey || profile.rewardDay === todayKey) return;
+    const t = window.setTimeout(() => {
+      rewardShown.current = todayKey;
+      setModal('reward');
+    }, 700);
     return () => clearTimeout(t);
-  }, [needsName, screen, modal, profile.rewardDay]);
+  }, [needsName, screen, modal, profile.rewardDay, todayKey]);
 
   const missionState = profile.missions && profile.missions.day === todayKey ? profile.missions : { day: todayKey, progress: [0, 0, 0], claimed: [false, false, false] };
   const missionList = missionsFor(todayKey);
@@ -282,6 +298,8 @@ export function App() {
 
   const matchRef = useRef<MatchConn | null>(null);
   const [opp, setOpp] = useState<OppView | null>(null);
+  const oppRef = useRef(opp);
+  oppRef.current = opp;
   /** we let the AI finish the other player's draft (they left or lost connection) */
   const droppedRef = useRef(false);
   const [kicked, setKicked] = useState(false);
@@ -290,7 +308,9 @@ export function App() {
     matchRef.current?.close(false);
     droppedRef.current = false;
     setOpp({ picks: [], lineup: {}, gone: false, left: false, tookOver: false });
-    const conn = new MatchConn(f, (theirs, gone) => {
+    const conn: MatchConn = new MatchConn(f, (theirs, gone) => {
+      // only the current match talks to the screen
+      if (matchRef.current !== conn) return;
       setOpp((prev) => {
         const next: OppView = { picks: theirs.picks, lineup: theirs.lineup, gone, left: theirs.left, tookOver: theirs.tookOver };
         if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
@@ -302,11 +322,22 @@ export function App() {
     runCounter.current += 1;
     setRun({ id: runCounter.current, mode: '1v1', botLevel: 'pro', botFirst: !f.host, dailyKey: null, ranked: false, online: { found: f } });
     setScreen('draft');
+    // saved, so quitting the app mid-match still counts as a loss next time it opens
+    update((p) => ({ ...p, activeMatch: { id: f.matchId, opp: f.opp.name } }));
+    // they never showed up (their phone missed the start): no result, back to the queue
+    window.setTimeout(() => {
+      if (matchRef.current !== conn || conn.heard()) return;
+      endMatch(false);
+      update((p) => ({ ...p, activeMatch: null }));
+      showToast(f.opp.name + ' didn’t connect. Back to the queue.');
+      setScreen('search');
+    }, 12000);
   };
 
   const endMatch = (leaving: boolean, lingerMs = 0) => {
     matchRef.current?.close(leaving, lingerMs);
     matchRef.current = null;
+    if (lingerMs) lingerUntil.current = Date.now() + lingerMs;
     setPresence('menu');
   };
 
@@ -314,14 +345,18 @@ export function App() {
   const recordForfeit = (oppName: string) => {
     update((p) => {
       const h2h = addH2H(p.h2h, false, weekKey(todayKey));
-      return { ...p, h2h, stats: { ...p.stats, h2hGames: p.stats.h2hGames + 1 }, lb: p.name ? withH2H(p.lb, p.name, { w: h2h.w, l: h2h.l, streak: h2h.streak }, { w: h2h.ww, l: h2h.wl, streak: h2h.wstreak }, todayKey) : p.lb };
+      return { ...p, activeMatch: null, h2h, stats: { ...p.stats, h2hGames: p.stats.h2hGames + 1 }, lb: p.name ? withH2H(p.lb, p.name, { w: h2h.w, l: h2h.l, streak: h2h.streak }, { w: h2h.ww, l: h2h.wl, streak: h2h.wstreak }, todayKey) : p.lb };
     });
     showToast('Match against ' + oppName + ' counts as a loss.');
   };
 
-  // the other phone gave up on you (you were gone too long) while you were still drafting
+  // the other phone gave up on you (you were gone too long) while you were still drafting:
+  // stop the match here at once, so this phone can't answer with a takeover of its own
   useEffect(() => {
-    if (screen === 'draft' && run?.online && opp?.tookOver && !droppedRef.current) setKicked(true);
+    if (screen === 'draft' && run?.online && opp?.tookOver && !droppedRef.current) {
+      endMatch(false);
+      setKicked(true);
+    }
   }, [opp?.tookOver, screen]);
 
   const spend = (n: number) => {
@@ -337,9 +372,11 @@ export function App() {
     const p0 = profileRef.current;
     const po = bracket ? playoffLine(bracket) : null;
     const oppName = r.online?.found.opp.name;
-    const forfeit = r.online && droppedRef.current ? ('them' as const) : undefined;
+    // both phones lost each other and let the AI finish: nobody gets the result
+    const noContest = !!r.online && droppedRef.current && !!opp?.tookOver;
+    const forfeit = r.online && droppedRef.current && !noContest ? ('them' as const) : undefined;
     const byRating = bot ? (season.rating > bot.rating.rating ? true : season.rating < bot.rating.rating ? false : null) : null;
-    const vsWon = forfeit ? true : byRating;
+    const vsWon = noContest ? null : forfeit ? true : byRating;
     const g = gradeFor(season.wins);
     const out = bracket ? playoffOutcome(bracket) : null;
     const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked, vsName: oppName });
@@ -356,7 +393,9 @@ export function App() {
       tier: g.tier,
       playoff: bot
         ? oppName
-          ? vsWon
+          ? noContest
+            ? 'No contest: you and ' + oppName + ' both lost connection'
+            : vsWon
             ? 'Beat ' + oppName + ' head to head' + (forfeit ? ' (they left)' : '')
             : vsWon === false
               ? 'Lost to ' + oppName + ' head to head'
@@ -440,6 +479,7 @@ export function App() {
         missions: { ...msNow, progress: advance(todayKey, msNow.progress, event).progress },
         lb,
         h2h,
+        activeMatch: null,
       };
     });
 
@@ -506,10 +546,17 @@ export function App() {
     setScreen('tab');
   };
 
-  const leaveDraft = () => {
+  const leaveDraft = (done?: DraftState) => {
     if (run?.online && matchRef.current) {
+      // both teams are already picked: the result stands, so show it
+      if (done) {
+        onDraftComplete(done);
+        return;
+      }
+      const theyLeft = droppedRef.current || !!opp?.left || !!opp?.gone;
       endMatch(true);
-      recordForfeit(run.online.found.opp.name);
+      if (theyLeft) update((p) => ({ ...p, activeMatch: null }));
+      else recordForfeit(run.online.found.opp.name);
     }
     goTab('home');
   };
@@ -572,9 +619,12 @@ export function App() {
           oppName: run.online.found.opp.name,
           oppPicks: opp?.picks ?? NO_PICKS,
           oppGone: !!opp && (opp.gone || opp.left),
+          halted: !!opp?.tookOver && !droppedRef.current,
           onPick: (p) => matchRef.current?.update((s) => ({ ...s, picks: s.picks.filter((x) => x.r !== p.r).concat([p]) })),
           onLineup: (l) => matchRef.current?.update((s) => ({ ...s, lineup: l })),
           onTakeover: () => {
+            // they already took over for us: the match is theirs to finish, not ours
+            if (oppRef.current?.tookOver) return;
             droppedRef.current = true;
             matchRef.current?.update((s) => ({ ...s, tookOver: true }));
           },

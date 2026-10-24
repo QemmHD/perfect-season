@@ -38,6 +38,7 @@ export function Search(props: {
   const [found, setFound] = useState<Found | null>(null);
   const [aiSoon, setAiSoon] = useState(false);
   const done = useRef(false);
+  const mmRef = useRef<Matchmaker | null>(null);
   const elapsed = Math.floor((now - t0) / 1000);
   const searching = !found && !aiSoon && (tab === 'quick' || !!room);
 
@@ -62,7 +63,11 @@ export function Search(props: {
       setOthers
     );
     mm.start();
-    return () => mm.stop();
+    mmRef.current = mm;
+    return () => {
+      mm.stop();
+      mmRef.current = null;
+    };
   }, [tab, room?.code, searching]);
 
   useEffect(
@@ -81,9 +86,9 @@ export function Search(props: {
     return () => clearTimeout(t);
   }, [found]);
 
-  // nobody came: the AI steps in
+  // nobody came: the AI steps in (not in the middle of pairing up with someone)
   useEffect(() => {
-    if (tab !== 'quick' || found || aiSoon || elapsed < AI_AFTER) return;
+    if (tab !== 'quick' || found || aiSoon || elapsed < AI_AFTER || mmRef.current?.pending()) return;
     goAI();
   }, [elapsed, tab]);
 

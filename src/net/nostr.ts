@@ -226,6 +226,7 @@ class Pool {
     this.started = true;
     this.relays = relayUrls().map((u) => new Relay(u, this));
     this.relays.forEach((r) => r.connect());
+    window.setInterval(() => this.check(), 5000);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') this.wake();
     });
@@ -252,6 +253,30 @@ class Pool {
 
   connected(): number {
     return this.relays.filter((r) => r.open).length;
+  }
+
+  /** Every 5s while in front: ping each open relay, and replace one that stayed silent for 25s
+      (a network switch can leave a socket that looks open but delivers nothing). */
+  private check(): void {
+    if (document.visibilityState !== 'visible') return;
+    const t = Date.now();
+    for (const r of this.relays) {
+      if (!r.open || !r.ws) continue;
+      if (t - r.lastSeen > 25000) {
+        r.kill();
+        r.wake();
+        continue;
+      }
+      r.send(['REQ', 'ping', { ids: ['0'.repeat(64)] }]);
+      r.send(['CLOSE', 'ping']);
+    }
+  }
+
+  /** Some relay answered in the last 12 seconds. When none has, silence from the other player
+      says more about our own connection than about them. */
+  healthy(): boolean {
+    const t = Date.now();
+    return this.relays.some((r) => r.open && t - r.lastSeen < 12000);
   }
 
   /** Relays that are open or still connecting: the ones worth waiting for. */
@@ -296,6 +321,8 @@ class Pool {
       const e = m[2] as Event;
       if (!s || !e || typeof e.id !== 'string' || s.seen.has(e.id)) return;
       if (!trusted(e)) return;
+      // long-lived subscriptions (presence, the queue) would otherwise grow forever
+      if (s.seen.size > 3000) s.seen.clear();
       s.seen.add(e.id);
       s.onEvent(e, r.url);
     } else if (m[0] === 'EOSE') {

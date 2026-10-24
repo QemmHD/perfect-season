@@ -69,7 +69,8 @@ export const CELLS: Cell[] = data.teams.map((t) => ({
   }),
 }));
 
-export const CELL_BY_ID: Record<string, Cell> = Object.fromEntries(CELLS.map((c) => [c.id, c]));
+/** Cells by id. No prototype, so ids that arrive over the network ("constructor", "toString") find nothing. */
+export const CELL_BY_ID: Record<string, Cell> = Object.assign(Object.create(null) as Record<string, Cell>, Object.fromEntries(CELLS.map((c) => [c.id, c])));
 export const ERAS = ['1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s'];
 export const TEAM_ABBRS = Array.from(new Set(CELLS.map((c) => c.abbr))).sort();
 export const PLAYOFF_TEAMS: PlayoffTeam[] = data.playoff.map((t) => ({

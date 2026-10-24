@@ -59,6 +59,8 @@ export interface OnlineProps {
   oppPicks: OnlinePick[];
   /** nothing heard from them for a while, or they left: the AI picks for them */
   oppGone: boolean;
+  /** they took over for us: the match is over on this phone, do nothing more */
+  halted: boolean;
   onPick: (p: OnlinePick) => void;
   onLineup: (l: Partial<Record<Slot, string>>) => void;
   /** we started picking for them */
@@ -78,7 +80,8 @@ export interface DraftProps {
   onSpend: (coins: number) => boolean;
   onBooster: (b: Booster, delta: number) => void;
   onToast: (text: string) => void;
-  onExit: () => void;
+  /** leaving; carries the draft when it was already complete, so its result still counts */
+  onExit: (done?: DraftState) => void;
   onComplete: (s: DraftState) => void;
   onCoachDone: () => void;
   online?: OnlineProps;
@@ -344,14 +347,14 @@ export function Draft(props: DraftProps) {
 
   // each round's reels spin by themselves: both phones land on the same team-decade
   useEffect(() => {
-    if (!online || s.cellId || isDraftComplete(s) || spinning || autoSpun.current === s.cellsDone) return;
+    if (!online || online.halted || s.cellId || isDraftComplete(s) || spinning || autoSpun.current === s.cellsDone) return;
     autoSpun.current = s.cellsDone;
     later(() => spin('spin'), s.cellsDone === 0 ? 900 : 650);
   }, [s.cellId, s.cellsDone, spinning]);
 
   // the other player's pick for this round: apply it when it's their turn
   useEffect(() => {
-    if (!online || !s.cellId || spinning || s.botDone || isDraftComplete(s)) return;
+    if (!online || online.halted || !s.cellId || spinning || s.botDone || isDraftComplete(s)) return;
     if (!botPicksFirst(s) && !s.youDone) return;
     const r = s.cellsDone;
     const roundCell = s.order![r];
@@ -359,7 +362,15 @@ export function Draft(props: DraftProps) {
     const wasFirst = botPicksFirst(s);
     if (pick) {
       const a = { type: 'bot' as const, playerId: pick.id, slot: pick.slot, cellId: pick.cell };
-      const next = draftReducer(s, a);
+      let next = s;
+      try {
+        // the other phone can't take a player you hold, or draft from another round's team-decade
+        const mine = Object.values(s.lineup).some((x) => x && x.id === pick.id);
+        const otherRound = pick.cell !== roundCell && s.order!.slice(0, 5).includes(pick.cell);
+        if (!mine && !otherRound) next = draftReducer(s, a);
+      } catch {
+        next = s;
+      }
       if (next !== s) {
         dispatch(a);
         const placed = SLOTS.map((k) => next.botLineup[k]).find((x) => x && x.id === pick.id)!;
@@ -384,7 +395,8 @@ export function Draft(props: DraftProps) {
     const ai = botChoose(s, roundCell, wasFirst ? [] : mine, Math.random);
     setBotBusy(true);
     later(() => {
-      if (ai) {
+      // their real pick may have arrived in the meantime: then it stands
+      if (ai && !sRef.current.botDone) {
         dispatch({ type: 'bot', playerId: ai.player.id, slot: ai.slot, cellId: ai.cellId });
         props.onToast(botLine(ai, roundCell, 'AI for ' + online.oppName + ': ', 'the AI'));
         sfx.select();
@@ -405,7 +417,7 @@ export function Draft(props: DraftProps) {
   // time's up: your choice if you made one, otherwise the pick that helps your team most
   const autoPick = () => {
     const st = sRef.current;
-    if (!st.cellId || st.youDone) return;
+    if (!st.cellId || st.youDone || online?.halted) return;
     const chosen = selected ? currentCell(st)?.players.find((p) => p.id === selected) : null;
     const slots = chosen ? eligibleSlots(st, chosen) : [];
     if (chosen && slots.length && !whyUnavailable(st, chosen)) {
@@ -546,8 +558,15 @@ export function Draft(props: DraftProps) {
   const selectedP = selectedBase ? effectivePlayer(s, selectedBase) : null;
   const targets = selectedP ? eligibleSlots(s, selectedP) : [];
 
+  const notYourTurn = () => {
+    if (!online || myTurn) return false;
+    props.onToast(online.oppName + ' picks first this round.');
+    sfx.nope();
+    return true;
+  };
+
   const pickRow = (p: Player) => {
-    if (s.youDone || botBusy) return;
+    if (s.youDone || botBusy || notYourTurn()) return;
     if (s.armed === 'prime') {
       const up = primeVersion(p);
       if (!up) {
@@ -641,10 +660,10 @@ export function Draft(props: DraftProps) {
       return;
     }
     if (cell && !s.youDone) {
-      openDrawer();
+      if (!notYourTurn()) openDrawer();
       return;
     }
-    props.onToast('Spin to get a team and a decade.');
+    props.onToast(online ? 'The next team-decade is on its way.' : 'Spin to get a team and a decade.');
   };
 
   const tapBooster = (b: Booster) => {
@@ -1103,7 +1122,8 @@ export function Draft(props: DraftProps) {
           onNo={() => setLeaving(false)}
           onYes={() => {
             setLeaving(false);
-            props.onExit();
+            const st = sRef.current;
+            props.onExit(isDraftComplete(st) ? st : undefined);
           }}
         />
       )}
