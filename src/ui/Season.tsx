@@ -6,6 +6,7 @@ import { type Lineup, SLOTS } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { Confetti, Fit, TeamChips } from './common';
 import { reducedMotion } from './motion';
+import { oppNames, Scout, teamBar } from './Scout';
 
 /** Delay before each game of the 82-game reveal: quick through the middle,
     slower at the end, and one beat per game when an unbeaten season gets close. */
@@ -158,6 +159,7 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
   const [shown, setShown] = useState(0);
   const [running, setRunning] = useState(false);
   const [champ, setChamp] = useState(false);
+  const [scout, setScout] = useState<number | null>(null);
   const timer = useRef<number | null>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   useEffect(
@@ -264,10 +266,20 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
             status = 'UP NEXT';
             tone = 'gold';
           } else dim = true;
+          const next = (isCur && !finished) || (i === idx + 1 && curDone && cur.won);
+          const open = () => {
+            sfx.click();
+            setScout(i);
+          };
           return (
             <div
               key={i}
               ref={(el) => (cardRefs.current[i] = el)}
+              role="button"
+              tabIndex={0}
+              aria-label={'Scout the ' + b.opp.year + ' ' + b.opp.team + ', ' + ROUND_NAMES[i] + ', ' + status.toLowerCase()}
+              onClick={open}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open())}
               className={'series' + (isCur && !finished ? ' cur' : '') + (dim ? ' dim' : '') + (finished ? (b.won ? ' won' : ' lost') : '') + (isCur && running ? ' live' : '')}
             >
               <div className="hd">
@@ -277,7 +289,7 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
                 </b>
               </div>
               <div className="opp">
-                <i style={{ background: b.opp.c1 }} />
+                <i style={{ background: teamBar(b.opp) }} />
                 <div>
                   <strong>
                     {b.opp.year} {b.opp.team}
@@ -288,7 +300,14 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
                     {i === 3 ? ' · Finals boss' : ''}
                   </small>
                 </div>
+                <span className="scout-go" aria-hidden="true">
+                  SCOUT
+                  <svg width="7" height="11" viewBox="0 0 7 11">
+                    <path d="M1.5 1.5 5.5 5.5 1.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
               </div>
+              {next && <div className="five">{oppNames(b)}</div>}
               <div className="games" aria-label={'Games: ' + w + ' wins, ' + l + ' losses'}>
                 {[0, 1, 2, 3, 4, 5, 6].map((j) => (
                   <span key={j} className={j < g.length ? (g[j] === 1 ? 'w' : 'l') : j < 4 || !finished ? '' : 'na'}>
@@ -306,6 +325,9 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
           <Fit text={label} />
         </button>
       </div>
+      {scout !== null && (
+        <Scout series={bracket[scout]} gamesShown={scout < idx ? bracket[scout].games.length : scout === idx ? shown : 0} ours={season} onClose={() => setScout(null)} />
+      )}
       {champ && out.title && <Champions season={season} bracket={bracket} onGo={onDone} />}
     </div>
   );

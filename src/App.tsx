@@ -160,7 +160,7 @@ export function App() {
         },
       };
     });
-    const result: ResultInfo = { record, rating: season, lineup: draft.lineup, bot: bot ?? undefined, rewards, levelUps, unlocked, dailyNo: r.dailyKey ? dailyNumber(r.dailyKey) : null };
+    const result: ResultInfo = { record, rating: season, lineup: draft.lineup, bot: bot ?? undefined, rewards, levelUps, unlocked, dailyNo: r.dailyKey ? dailyNumber(r.dailyKey) : null, bracket: bracket ?? undefined };
     setRun({ ...r, result });
     setScreen('results');
   };

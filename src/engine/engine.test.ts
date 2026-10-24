@@ -1,7 +1,7 @@
-import { CELLS, CELL_BY_ID, primeVersion } from './data';
+import { CELLS, CELL_BY_ID, PLAYOFF_TEAMS, primeVersion } from './data';
 import { botChoose, botPicksFirst, canMove, dailyOrder, draftReducer, eligibleSlots, isDraftComplete, newDraft, nextCell, whyUnavailable } from './draft';
 import { levelInfo, rewardsFor } from './economy';
-import { buildBracket, playoffOutcome, PLAYOFF_MIN_WINS, simSeries } from './playoffs';
+import { buildBracket, matchupOdds, playoffOutcome, PLAYOFF_MIN_WINS, seriesWinChance, simSeries } from './playoffs';
 import { gradeFor, lineValue, rateTeam, ratingForWins, WIN_CURVE, winsFromRating } from './rating';
 import { rng } from './rng';
 import { dailyNumber, playSeason } from './season';
@@ -9,6 +9,7 @@ import { SLOTS } from './types';
 import { autoDraft } from './sim.test';
 
 const find = (cellId: string, name: string) => CELL_BY_ID[cellId].players.find((p) => p.name === name)!;
+const BULLS = PLAYOFF_TEAMS.find((t) => t.year === '1995-96' && t.team === 'Chicago Bulls')!;
 
 describe('data', () => {
   it('builds real decade lines', () => {
@@ -191,7 +192,7 @@ describe('season and playoffs', () => {
   });
   it('a series ends at 4 wins', () => {
     for (let i = 0; i < 200; i++) {
-      const g = simSeries(90, 60, { year: '1995-96', team: 'Chicago Bulls', abbr: 'CHI', w: 72, l: 10, w82: 72, c1: '#000', star: '' }, rng(i));
+      const g = simSeries(90, 60, BULLS, rng(i));
       const w = g.filter((x) => x === 1).length;
       expect(Math.max(w, g.length - w)).toBe(4);
       expect(g.length).toBeLessThanOrEqual(7);
@@ -312,5 +313,28 @@ describe('game logic', () => {
     expect(botPicksFirst(draftReducer(newDraft('1v1', 'rookie', null, false), { type: 'land', cellId: 'CHI-1990', ptr: 0 }))).toBe(false);
     // classic drafts never have a bot pick
     expect(botPicksFirst(draftReducer(newDraft('classic', 'pro', null, true), { type: 'land', cellId: 'CHI-1990', ptr: 0 }))).toBe(false);
+  });
+});
+
+describe('playoff opponents', () => {
+  it("lists each great team's five players by minutes", () => {
+    expect(BULLS.w).toBe(72);
+    expect(BULLS.five.map((p) => p.name)).toContain('Michael Jordan');
+    const jordan = BULLS.five.find((p) => p.name === 'Michael Jordan')!;
+    expect([jordan.pts, jordan.g]).toEqual([30.4, 82]);
+    for (const t of PLAYOFF_TEAMS) expect(t.five.length).toBe(5);
+  });
+  it('series odds match a simulation of the same matchup', () => {
+    const ours = ratingForWins(66);
+    const exact = seriesWinChance(ours, 66, BULLS);
+    let won = 0;
+    const N = 20000;
+    for (let i = 0; i < N; i++) {
+      const g = simSeries(ours, 66, BULLS, rng(i));
+      if (g.filter((x) => x === 1).length === 4) won++;
+    }
+    expect(Math.abs(won / N - exact)).toBeLessThan(0.015);
+    const { home, road } = matchupOdds(ours, BULLS);
+    expect(home).toBeGreaterThan(road);
   });
 });

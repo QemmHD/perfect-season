@@ -15,11 +15,12 @@ interface RawTeam {
   to: number;
   players: RawPlayer[];
 }
+type RawOpp = [string, string, number, number, number, number, number, number, number];
 interface RawData {
   source: string;
   built: number;
   teams: RawTeam[];
-  playoff: PlayoffTeam[];
+  playoff: (Omit<PlayoffTeam, 'five'> & { five: RawOpp[] })[];
 }
 
 const data = raw as unknown as RawData;
@@ -71,7 +72,10 @@ export const CELLS: Cell[] = data.teams.map((t) => ({
 export const CELL_BY_ID: Record<string, Cell> = Object.fromEntries(CELLS.map((c) => [c.id, c]));
 export const ERAS = ['1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s'];
 export const TEAM_ABBRS = Array.from(new Set(CELLS.map((c) => c.abbr))).sort();
-export const PLAYOFF_TEAMS: PlayoffTeam[] = data.playoff;
+export const PLAYOFF_TEAMS: PlayoffTeam[] = data.playoff.map((t) => ({
+  ...t,
+  five: t.five.map(([name, pos, pts, reb, ast, stl, blk, g, est]) => ({ name, pos: pos as Slot | '?', pts, reb, ast, stl, blk, g, est: est === 1 })),
+}));
 
 /** The player's best team-decade line, as a copy that keeps his current cell identity. */
 export function primeVersion(p: Player): Player | null {

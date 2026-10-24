@@ -35,17 +35,46 @@ export function gameWinChance(ourRating: number, oppRating: number): number {
   return 1 / (1 + Math.exp(-(ourRating - oppRating) / SERIES_K));
 }
 
+/** Your chance in one game against a playoff team, at home and on the road. */
+export function matchupOdds(ourRating: number, opp: PlayoffTeam): { home: number; road: number } {
+  const p = gameWinChance(ourRating, ratingForWins(opp.w82));
+  const clamp = (x: number) => Math.min(0.97, Math.max(0.03, x));
+  return { home: clamp(p + HOME_EDGE), road: clamp(p - HOME_EDGE) };
+}
+
+/** Your games at home in a best-of-7 (2-2-1-1-1): games 1, 2, 5 and 7 when you have the better record. */
+function homeGame(g: number, highSeed: boolean): boolean {
+  const highHome = g === 0 || g === 1 || g === 4 || g === 6;
+  return highSeed ? highHome : !highHome;
+}
+
+/** Exact chance of winning the series, from the per-game odds and the home pattern. */
+export function seriesWinChance(ourRating: number, ourWins: number, opp: PlayoffTeam): number {
+  const { home, road } = matchupOdds(ourRating, opp);
+  const highSeed = ourWins >= opp.w82;
+  const memo = new Map<string, number>();
+  const go = (a: number, b: number): number => {
+    if (a === 4) return 1;
+    if (b === 4) return 0;
+    const key = a + ':' + b;
+    const hit = memo.get(key);
+    if (hit !== undefined) return hit;
+    const p = homeGame(a + b, highSeed) ? home : road;
+    const v = p * go(a + 1, b) + (1 - p) * go(a, b + 1);
+    memo.set(key, v);
+    return v;
+  };
+  return go(0, 0);
+}
+
 export function simSeries(ourRating: number, ourWins: number, opp: PlayoffTeam, rand: Rand): number[] {
-  const oppRating = ratingForWins(opp.w82);
-  const p = gameWinChance(ourRating, oppRating);
+  const { home, road } = matchupOdds(ourRating, opp);
   const highSeed = ourWins >= opp.w82;
   const games: number[] = [];
   let a = 0;
   let b = 0;
   for (let g = 0; a < 4 && b < 4; g++) {
-    const highHome = g === 0 || g === 1 || g === 4 || g === 6;
-    const ourHome = highSeed ? highHome : !highHome;
-    const pg = Math.min(0.97, Math.max(0.03, p + (ourHome ? HOME_EDGE : -HOME_EDGE)));
+    const pg = homeGame(g, highSeed) ? home : road;
     if (rand() < pg) {
       games.push(1);
       a++;

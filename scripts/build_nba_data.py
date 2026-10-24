@@ -224,7 +224,7 @@ def main():
         rows.append({
             "season": season, "pid": r["player_id"], "name": r["player"], "team": r["team"], "pos": r["pos"],
             "g": g, "pts": num(r["pts"]) or 0.0, "reb": num(r["trb"]) or 0.0, "ast": num(r["ast"]) or 0.0,
-            "stl": num(r["stl"]), "blk": num(r["blk"]),
+            "stl": num(r["stl"]), "blk": num(r["blk"]), "mp": num(r["mp"]) or 0.0,
         })
 
     # era rating: each season against its own league, on the all-seasons average scale
@@ -385,6 +385,9 @@ def main():
 
     # playoff opponents: great real teams, normalised to 82 games
     playoff = []
+    roster = defaultdict(list)
+    for r in rows:
+        roster[(r["season"], r["team"])].append(r)
     season_best = {}
     for r in rows:
         if r["g"] < 30:
@@ -405,9 +408,15 @@ def main():
             continue
         disp, c1, c2 = IDENTITY[abbr]
         star = season_best.get((season, abbr), (0, ""))[1]
+        # their starting five: the five who played the most minutes that season, with that season's real per-game line
+        five = []
+        for r in sorted(roster[(season, abbr)], key=lambda x: -x["mp"])[:5]:
+            g = r["g"]
+            pos = (norm_positions(r["pos"]) or ["?"])[0]
+            five.append([r["name"], pos, round(r["pts"] / g, 1), round(r["reb"] / g, 1), round(r["ast"] / g, 1), round(r["stl"] / g, 1), round(r["blk"] / g, 1), int(g), 1 if r["est"] else 0])
         playoff.append({
             "year": str(season - 1) + "-" + str(season)[2:], "team": t["name"], "abbr": disp, "w": t["w"], "l": t["l"],
-            "w82": w82, "c1": c1, "star": star,
+            "w82": w82, "c1": c1, "c2": c2, "star": star, "five": five,
         })
     playoff.sort(key=lambda x: (-x["w82"], x["year"]))
 

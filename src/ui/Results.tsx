@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BOOSTER_NAMES, LEVEL_UP_COINS, levelInfo, type Rewards } from '../engine/economy';
+import { playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
 import { CATEGORY_LABELS, gradeFor, type TeamRating } from '../engine/rating';
 import type { Booster, Lineup, Player } from '../engine/types';
 import { SLOTS } from '../engine/types';
@@ -10,6 +11,7 @@ import { frameRect, useLayout } from '../stage';
 import { CoinChip, Confetti, Sheet } from './common';
 import { Back, Coin, Share, Trophy } from './icons';
 import { CountUp, reducedMotion } from './motion';
+import { Scout, teamBar } from './Scout';
 
 export interface ResultInfo {
   record: RunRecord;
@@ -20,6 +22,8 @@ export interface ResultInfo {
   levelUps: number[];
   unlocked: Booster[];
   dailyNo: number | null;
+  /** The playoff bracket when the team made it; undefined for 1 vs 1 and lottery seasons. */
+  bracket?: Series[];
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
@@ -109,6 +113,7 @@ export function Results({ info, xp, coins, onAgain, onHome, onToast }: { info: R
   const g = gradeFor(r.wins);
   const lv = levelInfo(xp);
   const [share, setShare] = useState(false);
+  const [scout, setScout] = useState<Series | null>(null);
   const [levelPop, setLevelPop] = useState(false);
   const [grow, setGrow] = useState(false);
   const gained = info.rewards.coins + LEVEL_UP_COINS * info.levelUps.length;
@@ -213,6 +218,8 @@ export function Results({ info, xp, coins, onAgain, onHome, onToast }: { info: R
           </span>
         </div>
 
+        {info.bracket && <PlayoffRun bracket={info.bracket} onScout={setScout} />}
+
         <div className="roster">
           {SLOTS.map((k, i) => {
             const p = info.lineup[k] as Player;
@@ -289,6 +296,7 @@ export function Results({ info, xp, coins, onAgain, onHome, onToast }: { info: R
       {gained > 0 && <CoinFlight from={headRef} to={chipRef} n={Math.min(12, 4 + Math.round(gained / 15))} />}
       {confetti > 0 && <Confetti density={confetti} />}
       {share && <ShareSheet info={info} onClose={() => setShare(false)} onToast={onToast} />}
+      {scout && <Scout series={scout} gamesShown={scout.games.length} ours={rating} onClose={() => setScout(null)} />}
       {levelPop && (
         <Sheet label="Level up" kind="center" onClose={() => setLevelPop(false)}>
           {(close) => (
@@ -309,6 +317,35 @@ export function Results({ info, xp, coins, onAgain, onHome, onToast }: { info: R
           )}
         </Sheet>
       )}
+    </div>
+  );
+}
+
+/** Every series you played, who knocked you out, and a tap to scout each opponent. */
+function PlayoffRun({ bracket, onScout }: { bracket: Series[]; onScout: (s: Series) => void }) {
+  const played = bracket.filter((b) => b.played);
+  const out = playoffOutcome(bracket);
+  return (
+    <div className="card po-run rise-in" style={{ animationDelay: '260ms' }}>
+      <span className="eyebrow">Playoff run · tap a team to scout</span>
+      {played.map((b) => {
+        const [w, l] = seriesScore(b.games);
+        const ko = out.lostTo === b;
+        return (
+          <button key={b.round} className={'po-row' + (ko ? ' ko' : '')} onClick={() => (sfx.click(), onScout(b))}>
+            <i style={{ background: teamBar(b.opp) }} aria-hidden="true" />
+            <span>
+              <small>{ko ? 'Knocked out in the ' + ROUND_NAMES[b.round] : ROUND_NAMES[b.round]}</small>
+              <strong>
+                {b.opp.year} {b.opp.team}
+              </strong>
+            </span>
+            <b className={'num ' + (b.won ? 'w' : 'l')}>
+              {b.won ? 'W' : 'L'} {w}–{l}
+            </b>
+          </button>
+        );
+      })}
     </div>
   );
 }

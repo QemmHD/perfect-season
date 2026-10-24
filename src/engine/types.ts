@@ -55,6 +55,15 @@ export interface Cell {
   players: Player[];
 }
 
+/** One of a playoff team's five players by minutes, with that season's real per-game line. */
+export interface OppPlayer extends Line {
+  name: string;
+  pos: Slot | '?';
+  g: number;
+  /** steals and blocks estimated (before 1973-74) */
+  est: boolean;
+}
+
 export interface PlayoffTeam {
   year: string;
   team: string;
@@ -63,7 +72,9 @@ export interface PlayoffTeam {
   l: number;
   w82: number;
   c1: string;
+  c2: string;
   star: string;
+  five: OppPlayer[];
 }
 
 export type Lineup = Record<Slot, Player | null>;
