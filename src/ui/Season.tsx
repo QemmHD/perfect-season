@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
+import { PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
 import { gradeFor } from '../engine/rating';
 import type { Season } from '../engine/season';
 import { type Lineup, SLOTS } from '../engine/types';
@@ -71,6 +71,7 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
     setTick(82);
   };
   const unbeaten = done && season.wins === 82;
+  const madeIt = season.wins >= PLAYOFF_MIN_WINS;
 
   return (
     <div className="screen reveal">
@@ -127,13 +128,16 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
               Team rating <b className="num">{season.rating.toFixed(1)}</b>
             </span>
           </div>
+          <span className={'qualify rise-in' + (madeIt ? ' in' : '')} style={{ animationDelay: '640ms' }}>
+            {madeIt ? 'Made the playoffs' : 'Missed the playoffs · ' + PLAYOFF_MIN_WINS + ' wins get you in'}
+          </span>
         </div>
       )}
       {done && g.letter.startsWith('S') && <Confetti density={1.2} />}
       <div className="spacer" />
       <div className="actionbar">
-        <button className={done ? 'big gold shine' : 'big ghost'} onClick={done ? onDone : skip}>
-          <Fit text={done ? 'START THE PLAYOFFS' : 'SKIP'} />
+        <button className={done ? (madeIt ? 'big gold shine' : 'big shine') : 'big ghost'} onClick={done ? onDone : skip}>
+          <Fit text={done ? (madeIt ? 'START THE PLAYOFFS' : 'SEE RESULTS') : 'SKIP'} />
         </button>
       </div>
     </div>

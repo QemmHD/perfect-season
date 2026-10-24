@@ -55,6 +55,10 @@ node scripts/make-icons.mjs      # re-render icons and iPhone launch images into
 - A cell is a franchise-decade with the franchise's name in that decade, e.g. `GSW-1960` = San Francisco Warriors.
 - A season counts toward the decade it ends in.
 - Player lines are games-weighted per-game averages over all of that player's seasons with that franchise in that decade. Every player who appeared counts, even for one game; the drawer shows games played.
+- **What the game scores:** each line also has a rated version (`r` in the engine). Each season's stats are measured against that season's league average per team-game, on the 1960–2026 average scale. A 1959–60 team grabbed 73.5 rebounds a game and a 2004–05 team 41.9, so raw numbers would make the early decades a jackpot.
+  - Rated this way, real teams' top-5 players predict their actual records better: correlation 0.48, against 0.39 for raw stats across 1960–2026.
+  - A short stint is blended with the player's career rate as if he'd played 10 more games at it.
+  - The drawer always shows the real stats.
 - Steals and blocks before 1973-74 are estimated by regression and flagged.
 - **Positions** are career positions: each season's listed position, weighted by games. Positions with at least 12% of a player's games are kept, up to three (LeBron SF/PF, Magic PG/SG, Jordan SG/SF, Ewing C). The few 1960s and 1970s players with no listed position get the nearest one by their rebound and assist profile.
 - **Namesakes:** when two players share a name (Patrick Ewing and his son), the one with the longer career keeps the plain name. The other gets the years he spent with that team, e.g. "Patrick Ewing (2010–11)".
@@ -90,6 +94,9 @@ Two notes on the source data:
 
 | Constant | Value | Effect |
 |---|---|---|
-| `WIN_CURVE` (rating.ts) | anchors from (32, 30) to (117, 82) | Random picks ≈ 30 wins, best available ≈ 58, 82-0 in about 0.1–0.2% of unboosted drafts |
-| `SERIES_K`, `ROUND_POOLS` (playoffs.ts) | 16; 50–55 / 55–59 / 59–63 / 64+ | Title odds: 62 wins ≈ 11%, 70 wins ≈ 47%, 82-0 ≈ 91%. 16-0 after 82-0 ≈ 5% |
+| Rated lines (`build_nba_data.py`) | each season against its own league; `SHRINK_GAMES = 10` | Every decade's best players score about the same (within 8%). A one-game cameo counts near the player's career rate |
+| `BENCHMARK` (rating.ts) | 125 / 51 / 31 / 16 | The "near-perfect lineup": about the 97th percentile of skilled drafts in points, rebounds, assists and defense |
+| `WIN_CURVE` (rating.ts) | quantile anchors, (23.5, 18) to (109.1, 82) | Random picks: median 30 wins. Best available: 52 / 57 / 64 at the 10th / 50th / 90th percentile. 82-0 in about 0.2% of unboosted drafts |
+| `SERIES_K`, `ROUND_POOLS`, `PLAYOFF_MIN_WINS` (playoffs.ts) | 12; 50–55 / 55–59 / 59–63 / 64+; 50 | 50 wins make the playoffs. Title odds: 62 wins ≈ 12%, 70 wins ≈ 45%, 82-0 ≈ 88%. 16-0 after 82-0 ≈ 4% |
+| Bot levels (draft.ts, App.tsx) | Rookie / Pro / Legend | Against a player who takes the best available: you win about 94% / 68% / 39%. You start against Rookie, a coin flip decides Pro, Legend always starts |
 | `economy.ts` | rewards, prices, level curve | See SPEC §7 |

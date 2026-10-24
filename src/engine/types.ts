@@ -33,6 +33,10 @@ export interface Player extends Line {
   teamName: string;
   c1: string;
   c2: string;
+  /** what the game scores: per-game stats measured against the player's own era,
+      with short stints blended toward his career rate (the stats above are the real ones shown) */
+  r: Line;
+  /** weighted value of `r` */
   val: number;
   /** set when the Prime booster upgraded this pick */
   primedFrom?: { cellId: string; abbr: string; era: string };

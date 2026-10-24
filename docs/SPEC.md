@@ -78,9 +78,17 @@ Research on the game we're learning from is in the 82-0 teardown, [`research/82-
 
 ---
 
-## 3. Rating model (v1 proposal)
+## 3. Rating model
 
-**Inputs:** for each of the five players, per-game PTS, REB, AST, STL, BLK averaged over their games for that team in that decade. Missing pre-1973-74 STL/BLK are **estimated**: a regression on the player's other stats and position, scaled down slightly, which matches what 82-0 does (it adds about +0.7 for bench players up to +3 for stars, not zero).
+**Inputs:** for each of the five players, per-game PTS, REB, AST, STL, BLK averaged over their games for that team in that decade. The list shows these real numbers. The score uses a **rated** version of the same line:
+
+- **Era:** each season's stats are divided by that season's league average per team-game and put on the 1960–2026 average scale.
+  - Early-1960s teams saw about 1.7× the rebounds of any team since the mid-1970s. Raw stats made 1960s spins a jackpot and gave Wilt a value 50% above any modern star.
+  - Tested on every real team-season since 1960, rating each team's top 5 by minutes: rated stats predict the actual win% with r = 0.48, against 0.39 for raw stats. Every decade's best players now score within 8% of each other.
+- **Small samples:** a stint is blended with the player's career rate as if he had played 10 more games at it. A one-game cameo (Edy Tavares, 6 blocks in his only Cavs game) no longer rates like a full season; a 300-game stint moves by about 3%.
+- Missing pre-1973-74 STL/BLK are **estimated** from the player's rated points, rebounds, assists and position, and flagged "est.".
+
+The stat weights stay as measured from 82-0. A least-squares fit on real teams improves the correlation only from 0.48 to 0.50, so they are kept for familiarity.
 
 **Step 1. Base strength:** a weighted team total. We start from 82-0's measured weights, which give rebounds and defense their real value:
 
@@ -88,7 +96,7 @@ Research on the game we're learning from is in the 82-0 teardown, [`research/82-
 base = 0.33·PTS + 0.67·REB + 0.64·AST + 1.20·STL + 1.13·BLK      (team totals)
 ```
 
-**Step 2. Balance against a benchmark ("near-perfect team").** Each category is scored against a benchmark total (starting point: PTS 125, REB 55, AST 32, STL 9, BLK 7, to be calibrated from the data):
+**Step 2. Balance against a benchmark ("near-perfect team").** Each category is scored against a benchmark total: PTS 125, REB 51, AST 31, and defense (1.2·STL + 1.13·BLK) 16. That is about the 97th percentile of skilled drafts in each category:
 
 ```
 ratio_k   = team_total_k / benchmark_k            (one per category)
@@ -100,9 +108,16 @@ A lopsided team (huge scoring, no rim protection) loses up to 15%. This is the "
 
 **Step 3. Regular-season wins:** a power curve that flattens near the top:
 
-> **Tuned in the build** (`src/engine/rating.ts`, `sim.test.ts`): a piecewise-linear curve through anchor points replaced the formula below.
-> - Measured on 3,000 simulated drafts each: random picks give a median of 30 wins, best available 58, smart drafting with respins 59, and 82-0 happens in about 0.1–0.2% of unboosted drafts.
-> - Playoffs use `SERIES_K = 16` and opponent pools of 50–55 / 55–59 / 59–63 / 64+ wins. Title odds are about 11% at 62 wins, 47% at 70 and 91% at 82-0.
+> **Tuned in the build** (`src/engine/rating.ts`, `sim.test.ts`): a piecewise-linear curve replaced the formula below. Its anchors are quantiles of simulated drafts:
+> - Random picks: 18 / 30 / 36 wins at the 10th / 50th / 90th percentile.
+> - Best available: 52 / 57 / 64.
+> - The top 1% of skilled drafts: 75+. The top ~0.15%: 82-0.
+>
+> **Playoffs:**
+> - A team needs **50 wins** (the C · Playoff Team grade) to get in. Below that it is in the lottery.
+> - Opponent pools are 50–55 / 55–59 / 59–63 / 64+ wins, and each game is a logistic on the rating gap with `SERIES_K = 12`, plus 4% for the home team.
+> - Title odds are about 12% at 62 wins, 45% at 70 and 88% at 82-0. An 82-0 team sweeps all four rounds about 4% of the time.
+> - These match a back-of-envelope check on series odds against those opponents.
 
 ```
 wins = clamp(round(0.332 × rating^1.15), 0, 82)        (82-0's measured curve; used in the mockup)
@@ -153,7 +168,12 @@ On top of the grade there's a **Champion** badge if you win the title, and **PER
 | **Classic** | Stats visible. Counts toward the Classic board. |
 | **Blind** | Stats hidden; the server sends **no stats**, so it can't be cheated. Alphabetical list with the sort control disabled. **+50% coins and XP.** Its own board. |
 | **Daily** | Seeded by date: everyone gets the same 5 spins in the same order (respins also seeded). The first attempt is ranked and shareable ("Perfect Season #142: 71-11, lost in the Finals 3-4"). Replays are practice and unranked. Daily board, with a streak counter. |
-| **1v1 vs bot** | One shared spin per round; snake order (A-B, B-A, …), with a coin flip for first pick. Both pick from the same team-decade, so you can take the player the bot wants. 20-second turn timer with auto-pick. Bot levels: **Rookie** (random top-50% pick), **Pro** (usually the best by base value), **Legend** (best pick plus smart slot planning). Higher levels pay more. Later: "challenge a friend" async links. **Bots are always labelled as bots**; 82-0 got complaints for passing bots off as people. |
+| **1v1 vs bot** | One shared spin per round; snake order (A-B, B-A, …), with a coin flip for first pick. Both pick from the same team-decade, so you can take the player the bot wants. 20-second turn timer with auto-pick. Bot levels:
+  - **Rookie:** one of the three best on paper. You always pick first.
+  - **Pro:** the best fit for its team, balance included, now and then the next best. A coin flip decides who starts.
+  - **Legend:** the best fit; when it picks first it also takes away the player who would help you most. It always starts.
+  - Against a player who simply takes the best available, you win about 94% / 68% / 39%.
+  - Like you, the bot only places players at positions they played. When nobody in the round's team fits, it gets a free redraw of its own. Higher levels pay more. Later: "challenge a friend" async links. **Bots are always labelled as bots**; 82-0 got complaints for passing bots off as people. |
 
 ---
 

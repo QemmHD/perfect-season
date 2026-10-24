@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { DATA_SOURCE, LATEST_SEASON } from './engine/data';
 import type { DraftState } from './engine/draft';
 import { BOOSTER_PRICES, LEVEL_UP_COINS, levelInfo, rewardsFor, unlockedAt } from './engine/economy';
-import { buildBracket, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
+import { buildBracket, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
 import { gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
@@ -22,6 +22,8 @@ interface Run {
   id: number;
   mode: Mode;
   botLevel: BotLevel;
+  /** 1v1: the bot has the first pick (always for Legend, a coin flip for Pro, never for Rookie) */
+  botFirst: boolean;
   dailyKey: string | null;
   ranked: boolean;
   draft?: DraftState;
@@ -79,9 +81,15 @@ export function App() {
     sfx.click();
     const dailyKey = mode === 'daily' ? todayKey : null;
     runCounter.current += 1;
-    setRun({ id: runCounter.current, mode, botLevel: profile.botLevel, dailyKey, ranked: mode === 'daily' && !dailyDone });
+    const level = profile.botLevel;
+    const botFirst = mode === '1v1' && (level === 'legend' || (level === 'pro' && Math.random() < 0.5));
+    setRun({ id: runCounter.current, mode, botLevel: level, botFirst, dailyKey, ranked: mode === 'daily' && !dailyDone });
     setScreen('draft');
-    if (mode === '1v1') showToast('You pick first. Each round you both pick from the same team and decade.');
+    if (mode === '1v1')
+      showToast(
+        (botFirst ? (level === 'legend' ? 'The Legend bot always picks first.' : 'Coin flip: the bot picks first.') : level === 'pro' ? 'Coin flip: you pick first.' : 'You pick first.') +
+          ' Each round you both pick from the same team and decade, and you take turns going first.'
+      );
     else if (mode === 'daily') showToast(dailyDone ? 'Practice run: today’s spins again, not ranked.' : 'Daily #' + dailyNo + ': everyone gets these same spins today.');
   };
 
@@ -107,7 +115,15 @@ export function App() {
       rating: Math.round(season.rating * 10) / 10,
       grade: g.letter,
       tier: g.tier,
-      playoff: bot ? (vsWon ? 'Beat the ' + r.botLevel + ' bot in 1 vs 1' : vsWon === false ? 'Lost to the ' + r.botLevel + ' bot in 1 vs 1' : 'Tied the ' + r.botLevel + ' bot') : po!.text,
+      playoff: bot
+        ? vsWon
+          ? 'Beat the ' + r.botLevel + ' bot in 1 vs 1'
+          : vsWon === false
+            ? 'Lost to the ' + r.botLevel + ' bot in 1 vs 1'
+            : 'Tied the ' + r.botLevel + ' bot'
+        : po
+          ? po.text
+          : 'Missed the playoffs: ' + PLAYOFF_MIN_WINS + ' wins get you in',
       title: !!po?.title,
       perfect: !!po?.perfect && season.wins === 82,
       lineup: SLOTS.map((s) => {
@@ -166,6 +182,10 @@ export function App() {
 
   const onRevealDone = () => {
     if (!run?.season || !run.draft) return;
+    if (run.season.wins < PLAYOFF_MIN_WINS) {
+      finish(run, run.season, null, null);
+      return;
+    }
     const rand = run.dailyKey ? rng(hashString('playoffs:' + run.dailyKey + ':' + lineupKey(run.draft.lineup))) : Math.random;
     setRun({ ...run, bracket: buildBracket(run.season, rand) });
     setScreen('playoffs');
@@ -229,6 +249,7 @@ export function App() {
         key={run.id}
         mode={run.mode}
         botLevel={run.botLevel}
+        botFirst={run.botFirst}
         dailyKey={run.dailyKey}
         coins={profile.coins}
         xp={profile.xp}

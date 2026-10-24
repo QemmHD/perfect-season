@@ -15,8 +15,20 @@ Rules (see research/perfect-season/SPEC.md §11):
     dominant name in that decade (most seasons; ties go to the later name)
   - stats are sum(totals) / sum(games) over every season of that player
     with that franchise in that decade; traded-season "2TM"/"TOT" rows skipped
-  - steals/blocks before 1973-74 are estimated from a regression on the
-    player's other per-game stats and position, and flagged
+  - each player line carries two versions of the same five stats:
+      shown:  the real per-game averages, as on Basketball-Reference
+      rated:  what the game scores, which differs in two ways
+        * era: every season's stats are measured against that season's
+          league (per team-game averages) and put on the 1960-2026
+          average scale. A 1960s team saw ~1.7x the rebounds of a 2000s
+          team, so raw numbers would make the early decades a jackpot;
+          rated this way, real teams' top fives predict their records
+          better (r 0.48 vs 0.39) and no decade is favored
+        * small samples: a stint is blended with the player's career
+          rate as if he had played SHRINK_GAMES more games at it, so a
+          one-game cameo isn't valued like a full season
+  - steals/blocks before 1973-74 weren't recorded; they are estimated from
+    the player's era-rated points, rebounds, assists and position, and flagged
   - positions: each season's listed position(s) weighted by games across
     the player's NBA career; positions with 12%+ of his games are kept, up
     to 3 (LeBron SF/PF, Magic PG/SG, Jordan SG). The few players with no
@@ -24,7 +36,7 @@ Rules (see research/perfect-season/SPEC.md §11):
   - when different players share a name (Patrick Ewing and his son), the one
     with the longest career keeps the plain name and the others get the
     years they spent with that team, e.g. "Patrick Ewing (2010–11)"
-  - prime = the player's best cell (20+ games) by rating value
+  - prime = the player's best cell (20+ games) by rated value
 
 Usage: python3 scripts/build_nba_data.py [raw_dir]
 """
@@ -39,11 +51,13 @@ from collections import defaultdict
 import numpy as np
 
 BASE = "https://raw.githubusercontent.com/sumitrodatta/bball-reference-datasets/master/Data/"
-FILES = {"totals": "Player Totals.csv", "teams": "Team Summaries.csv"}
+FILES = {"totals": "Player Totals.csv", "teams": "Team Summaries.csv", "team_totals": "Team Totals.csv"}
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "src", "data", "nba.json")
 FIRST_SEASON = 1960
 STL_BLK_FIRST = 1974
+SHRINK_GAMES = 10
+STATS = ("pts", "reb", "ast", "stl", "blk")
 POS_SHARE = 0.12
 POS_MAX = 3
 SLOT_ORDER = ["PG", "SG", "SF", "PF", "C"]
@@ -146,21 +160,41 @@ def norm_positions(pos):
     return out
 
 
+def league_averages(path):
+    """Per team-game league averages by season (steals and blocks from 1973-74)."""
+    tot = defaultdict(lambda: defaultdict(float))
+    for r in csv.DictReader(open(path, encoding="utf-8")):
+        if r["lg"] != "NBA" or r["abbreviation"] in ("", "NA"):
+            continue
+        season = int(r["season"])
+        g = num(r["g"]) or 0
+        for k, col in (("pts", "pts"), ("reb", "trb"), ("ast", "ast"), ("stl", "stl"), ("blk", "blk")):
+            v = num(r[col])
+            if v is not None and g:
+                tot[season][k] += v
+                tot[season]["g_" + k] += g
+    return {s: {k: t[k] / t["g_" + k] for k in STATS if t.get("g_" + k)} for s, t in tot.items()}
+
+
 def fit_estimators(rows):
-    """Least-squares models for per-game steals and blocks from 1974-1985 seasons."""
-    xs_s, ys_s, xs_b, ys_b = [], [], [], []
+    """Least-squares models for era-rated per-game steals and blocks, from 1974-1985 seasons."""
+    xs, ys_s, ys_b = [], [], []
     for r in rows:
         if not (STL_BLK_FIRST <= r["season"] <= 1985) or r["g"] < 20:
             continue
         g = r["g"]
-        ppg, rpg, apg = r["pts"] / g, r["reb"] / g, r["ast"] / g
-        grp = pos_group(r["pos"])
-        feats = [1.0, ppg, rpg, apg, 1.0 if grp == 0 else 0.0, 1.0 if grp == 2 else 0.0]
-        xs_s.append(feats); ys_s.append(r["stl"] / g)
-        xs_b.append(feats); ys_b.append(r["blk"] / g)
-    ws = np.linalg.lstsq(np.array(xs_s), np.array(ys_s), rcond=None)[0]
-    wb = np.linalg.lstsq(np.array(xs_b), np.array(ys_b), rcond=None)[0]
+        xs.append(features(r))
+        ys_s.append(r["adj"]["stl"] / g)
+        ys_b.append(r["adj"]["blk"] / g)
+    ws = np.linalg.lstsq(np.array(xs), np.array(ys_s), rcond=None)[0]
+    wb = np.linalg.lstsq(np.array(xs), np.array(ys_b), rcond=None)[0]
     return ws, wb
+
+
+def features(r):
+    g = r["g"]
+    grp = pos_group(r["pos"])
+    return [1.0, r["adj"]["pts"] / g, r["adj"]["reb"] / g, r["adj"]["ast"] / g, 1.0 if grp == 0 else 0.0, 1.0 if grp == 2 else 0.0]
 
 
 def main():
@@ -193,18 +227,35 @@ def main():
             "stl": num(r["stl"]), "blk": num(r["blk"]),
         })
 
+    # era rating: each season against its own league, on the all-seasons average scale
+    league = league_averages(paths["team_totals"])
+    scale = {k: float(np.mean([v[k] for s, v in league.items() if s >= FIRST_SEASON and k in v])) for k in STATS}
+    for r in rows:
+        lg = league[r["season"]]
+        r["adj"] = {k: (r[k] * scale[k] / lg[k] if r[k] is not None and k in lg else None) for k in STATS}
+
     ws, wb = fit_estimators(rows)
     for r in rows:
         r["est"] = False
         if r["stl"] is None or r["blk"] is None:
             g = r["g"]
-            grp = pos_group(r["pos"])
-            feats = np.array([1.0, r["pts"] / g, r["reb"] / g, r["ast"] / g, 1.0 if grp == 0 else 0.0, 1.0 if grp == 2 else 0.0])
-            if r["stl"] is None:
-                r["stl"] = max(0.0, float(feats @ ws)) * g
-            if r["blk"] is None:
-                r["blk"] = max(0.0, float(feats @ wb)) * g
+            feats = np.array(features(r))
+            for k, wk in (("stl", ws), ("blk", wb)):
+                if r[k] is None:
+                    # not recorded: the estimate is already on the rated scale, and is also what we show
+                    r[k] = r["adj"][k] = max(0.0, float(feats @ wk)) * g
             r["est"] = True
+
+    # career rates on the rated scale, the anchor for short stints
+    career_rate = {}
+    sums = defaultdict(lambda: defaultdict(float))
+    for r in rows:
+        c = sums[r["pid"]]
+        c["g"] += r["g"]
+        for k in STATS:
+            c[k] += r["adj"][k]
+    for pid, c in sums.items():
+        career_rate[pid] = {k: c[k] / c["g"] for k in STATS}
 
     # career positions, weighted by games
     def profile(c):
@@ -257,16 +308,23 @@ def main():
     for r in rows:
         fr = FRANCHISE[r["team"]]
         key = (r["pid"], fr, r["season"] // 10 * 10)
-        a = agg.setdefault(key, {"name": r["name"], "g": 0.0, "pts": 0.0, "reb": 0.0, "ast": 0.0, "stl": 0.0, "blk": 0.0, "seasons": set(), "est": False})
+        a = agg.setdefault(key, {"name": r["name"], "pid": r["pid"], "g": 0.0, "pts": 0.0, "reb": 0.0, "ast": 0.0, "stl": 0.0, "blk": 0.0, "adj": defaultdict(float), "seasons": set(), "est": False})
         a["g"] += r["g"]
-        for k in ("pts", "reb", "ast", "stl", "blk"):
+        for k in STATS:
             a[k] += r[k]
+            a["adj"][k] += r["adj"][k]
         a["seasons"].add(r["season"])
         a["est"] = a["est"] or r["est"]
 
     def line(a):
         g = a["g"]
-        return {k: a[k] / g for k in ("pts", "reb", "ast", "stl", "blk")}
+        return {k: a[k] / g for k in STATS}
+
+    def rated(a):
+        """Era-rated per-game line, blended with the career rate for short stints."""
+        g = a["g"]
+        c = career_rate[a["pid"]]
+        return {k: (a["adj"][k] + SHRINK_GAMES * c[k]) / (g + SHRINK_GAMES) for k in STATS}
 
     def value(s):
         return sum(s[k] * W[k] for k in W)
@@ -276,8 +334,7 @@ def main():
     for (pid, fr, dec), a in agg.items():
         if a["g"] < 20:
             continue
-        s = line(a)
-        v = value(s)
+        v = value(rated(a))
         if pid not in prime or v > prime[pid][0]:
             prime[pid] = (v, fr, dec)
 
@@ -301,6 +358,7 @@ def main():
         plist = []
         for pid, a in cells[(fr, dec)]:
             s = line(a)
+            rt = rated(a)
             pos = positions_for(pid)
             pr = prime.get(pid)
             pr_ref = None
@@ -311,8 +369,9 @@ def main():
                 a["name"], "/".join(pos), round(s["pts"], 1), round(s["reb"], 1), round(s["ast"], 1),
                 round(s["stl"], 1), round(s["blk"], 1), int(a["g"]), len(seas), seas[0], seas[-1],
                 1 if a["est"] else 0, pr_ref, pid,
+                round(rt["pts"], 1), round(rt["reb"], 1), round(rt["ast"], 1), round(rt["stl"], 1), round(rt["blk"], 1),
             ])
-        plist.sort(key=lambda p: -(p[2] * W["pts"] + p[3] * W["reb"] + p[4] * W["ast"] + p[5] * W["stl"] + p[6] * W["blk"]))
+        plist.sort(key=lambda p: -(p[14] * W["pts"] + p[15] * W["reb"] + p[16] * W["ast"] + p[17] * W["stl"] + p[18] * W["blk"]))
         # same name, different players: all but the best-known get their years with this team
         for p in plist:
             if p[13] in namesakes:
@@ -331,7 +390,7 @@ def main():
         if r["g"] < 30:
             continue
         g = r["g"]
-        v = value({k: r[k] / g for k in W})
+        v = value({k: r["adj"][k] / g for k in W})
         key = (r["season"], r["team"])
         if key not in season_best or v > season_best[key][0]:
             season_best[key] = (v, r["name"])
@@ -355,7 +414,8 @@ def main():
     out = {
         "source": "Basketball-Reference via github.com/sumitrodatta/bball-reference-datasets",
         "built": max(r["season"] for r in rows),
-        "fields": ["name", "pos", "pts", "reb", "ast", "stl", "blk", "g", "seasons", "from", "to", "est", "prime", "pid"],
+        "fields": ["name", "pos", "pts", "reb", "ast", "stl", "blk", "g", "seasons", "from", "to", "est", "prime", "pid", "r_pts", "r_reb", "r_ast", "r_stl", "r_blk"],
+        "scale": {k: round(scale[k], 2) for k in STATS},
         "teams": teams,
         "playoff": playoff,
     }

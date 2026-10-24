@@ -197,7 +197,7 @@ export function Results({ info, xp, coins, onAgain, onHome, onToast }: { info: R
         )}
 
         <div className="card rise-in" style={{ animationDelay: '200ms' }}>
-          <span className="eyebrow">Team vs a near-perfect lineup</span>
+          <span className="eyebrow">Team vs a near-perfect lineup · era-adjusted</span>
           {rating.ratios.map((x, i) => (
             <div className="catrow" key={i}>
               <span>{CATEGORY_LABELS[i]}</span>

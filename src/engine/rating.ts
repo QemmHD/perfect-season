@@ -3,27 +3,31 @@ import type { Line, Player } from './types';
 /** Stat weights per game, measured from 82-0 (see research/82-0/README.md §2.5). */
 export const W: Line = { pts: 0.33, reb: 0.67, ast: 0.64, stl: 1.2, blk: 1.13 };
 
-/** Team totals of a "near-perfect" lineup, used for the balance check and the breakdown bars. */
-export const BENCHMARK = { pts: 125, reb: 55, ast: 32, def: 9 * W.stl + 7 * W.blk };
+/**
+ * Team totals of a "near-perfect" lineup (era-rated), used for the balance check and the
+ * breakdown bars: about the 97th percentile of skilled drafts in each category.
+ */
+export const BENCHMARK = { pts: 125, reb: 51, ast: 31, def: 16 };
 
 export const CATEGORY_LABELS = ['Scoring', 'Rebounding', 'Playmaking', 'Defense'];
 
 /**
- * Win curve as [rating, wins] anchors, linear in between. Tuned on simulated drafts
- * (src/engine/sim.test.ts): random picks ≈ 30 wins, best-available ≈ 58,
- * the top ~0.1% of unboosted drafts reach 82-0.
+ * Win curve as [rating, wins] anchors, linear in between. Each anchor is a quantile of
+ * simulated drafts (src/engine/sim.test.ts), so the curve says how good a team is compared
+ * with how people actually draft: random picks have a median of 30 wins, picking the best
+ * available player has 10th/50th/90th percentiles of 52/57/64 wins, the top 1% of
+ * skilled drafts win 75+, and the top ~0.15% go 82-0.
  */
 export const WIN_CURVE: [number, number][] = [
   [0, 0],
-  [20, 18],
-  [32, 30],
-  [60, 44],
-  [81, 52],
-  [89, 58],
-  [97.5, 65],
-  [103, 70],
-  [110, 76],
-  [117, 82],
+  [23.5, 18],
+  [33.6, 30],
+  [46.5, 36],
+  [81.8, 52],
+  [89.1, 57],
+  [97.1, 64],
+  [104.7, 75],
+  [109.1, 82],
 ];
 export const BALANCE_FLOOR = 0.85;
 
@@ -61,15 +65,16 @@ export function ratingForWins(wins: number): number {
   return interpolate(Math.min(82, Math.max(0, wins)), 1);
 }
 
+/** Scores a lineup from its players' rated lines (era-adjusted, see Player.r). */
 export function rateTeam(players: (Player | null | undefined)[]): TeamRating {
   const totals: Line = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0 };
   for (const p of players) {
     if (!p) continue;
-    totals.pts += p.pts;
-    totals.reb += p.reb;
-    totals.ast += p.ast;
-    totals.stl += p.stl;
-    totals.blk += p.blk;
+    totals.pts += p.r.pts;
+    totals.reb += p.r.reb;
+    totals.ast += p.r.ast;
+    totals.stl += p.r.stl;
+    totals.blk += p.r.blk;
   }
   const base = lineValue(totals);
   const ratios: [number, number, number, number] = [

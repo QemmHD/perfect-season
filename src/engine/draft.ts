@@ -1,4 +1,5 @@
 import { CELLS, CELL_BY_ID, primeVersion } from './data';
+import { rateTeam } from './rating';
 import { type Rand, hashString, pickOne, rng, shuffle } from './rng';
 import { type Booster, type BotLevel, type Cell, type Lineup, type Mode, type Player, type Slot, SLOTS, emptyLineup } from './types';
 
@@ -7,6 +8,8 @@ export const SLOT_PREFERENCE: Slot[] = ['C', 'PG', 'PF', 'SG', 'SF'];
 export interface DraftState {
   mode: Mode;
   botLevel: BotLevel;
+  /** 1v1: the bot has the first pick of round 1 (a coin flip per match), then you alternate */
+  botFirst: boolean;
   /** daily: shared cell order for everyone that day */
   order: string[] | null;
   ptr: number;
@@ -30,10 +33,11 @@ export interface DraftState {
   boostersUsed: Booster[];
 }
 
-export function newDraft(mode: Mode, botLevel: BotLevel, dailyKey: string | null): DraftState {
+export function newDraft(mode: Mode, botLevel: BotLevel, dailyKey: string | null, botFirst = false): DraftState {
   return {
     mode,
     botLevel,
+    botFirst: mode === '1v1' && botFirst,
     order: mode === 'daily' && dailyKey ? dailyOrder(dailyKey) : null,
     ptr: 0,
     lineup: emptyLineup(),
@@ -70,7 +74,8 @@ export function currentCell(s: DraftState): Cell | null {
 }
 
 export function botPicksFirst(s: DraftState): boolean {
-  return s.mode === '1v1' && s.cellsDone % 2 === 1;
+  // botDone is already true when the bot picked this round before you got a no-fit respin
+  return s.mode === '1v1' && s.cellsDone % 2 === (s.botFirst ? 0 : 1) && !s.botDone;
 }
 
 export function isDraftComplete(s: DraftState): boolean {
@@ -135,48 +140,90 @@ export function nextCell(s: DraftState, kind: SpinKind, rand: Rand): { cellId: s
   return { cellId: cell.id, ptr: s.ptr };
 }
 
-/** Bot's choice from a cell for its open slots. */
-export function botChoose(s: DraftState, cellId: string, excludeIds: string[], rand: Rand): { slot: Slot; player: Player } | null {
+export interface BotPick {
+  slot: Slot;
+  player: Player;
+  /** the cell he came from: the round's cell, or the bot's own redraw when nobody there fit */
+  cellId: string;
+}
+
+/** Bot's choice for its open slots, by its level. */
+function botPickFrom(s: DraftState, cellId: string, excludeIds: string[], rand: Rand): BotPick | null {
   const cell = CELL_BY_ID[cellId];
   const open = openSlots(s.botLineup);
-  if (!open.length) return null;
   const held = new Set(Object.values(s.botLineup).filter(Boolean).map((p) => (p as Player).pid));
-  const all = cell.players.filter((p) => !excludeIds.includes(p.id) && !held.has(p.pid)).sort((a, b) => b.val - a.val);
-  let cands = all.filter((p) => p.pos.some((x) => open.includes(x)));
-  let anySlot = false;
-  if (!cands.length) {
-    cands = all;
-    anySlot = true;
-  }
+  const cands = cell.players.filter((p) => !excludeIds.includes(p.id) && !held.has(p.pid) && p.pos.some((x) => open.includes(x))).sort((a, b) => b.val - a.val);
   if (!cands.length) return null;
+  const mine = SLOTS.map((k) => s.botLineup[k]);
+  const gain = (p: Player) => rateTeam(mine.concat([p])).rating;
+  const top = cands.slice(0, 8).sort((a, b) => gain(b) - gain(a));
   let player: Player;
   if (s.botLevel === 'rookie') {
-    player = cands[Math.floor(rand() * Math.max(1, Math.ceil(cands.length * 0.5)))];
+    // one of the three best on paper, by raw value
+    player = cands[Math.floor(rand() * Math.min(3, cands.length))];
   } else if (s.botLevel === 'pro') {
-    player = cands.length > 1 && rand() < 0.3 ? cands[1] : cands[0];
+    // the best fit for its team, balance included; now and then the next best
+    player = top.length > 1 && rand() < 0.25 ? top[1] : top[0];
   } else {
-    // Legend: best value, preferring players for the scarcest open slot
-    player = cands[0];
+    // Legend: the best fit for its team; when it picks first in a round it also weighs
+    // how much each player would have helped you, and takes him away
+    const deny = cellId === s.cellId && !s.youDone ? (p: Player) => yourBestGain(s, cellId, p.id) : () => 0;
+    const base = yourBestGain(s, cellId, null);
+    player = top.reduce((best, p) => (gain(p) + 0.6 * (base - deny(p)) > gain(best) + 0.6 * (base - deny(best)) ? p : best), top[0]);
   }
-  const slot = anySlot ? open[0] : SLOT_PREFERENCE.find((x) => open.includes(x) && player.pos.includes(x))!;
-  return { slot, player };
+  const slot = SLOT_PREFERENCE.find((x) => open.includes(x) && player.pos.includes(x))!;
+  return { slot, player, cellId };
+}
+
+/** How much the best available player in a cell would raise your team score, without `skipId`. */
+function yourBestGain(s: DraftState, cellId: string, skipId: string | null): number {
+  const open = openSlots(s.lineup);
+  if (!open.length) return 0;
+  const yours = SLOTS.map((k) => s.lineup[k]);
+  const now = rateTeam(yours).rating;
+  const held = new Set(yours.filter(Boolean).map((p) => (p as Player).pid));
+  let best = 0;
+  for (const p of CELL_BY_ID[cellId].players.slice(0, 12)) {
+    if (p.id === skipId || held.has(p.pid) || !p.pos.some((x) => open.includes(x))) continue;
+    best = Math.max(best, rateTeam(yours.concat([p])).rating - now);
+  }
+  return best;
+}
+
+/**
+ * The bot's pick for this round. Like you, it can only place players at positions
+ * they played; when nobody in the round's team fits its open spots, it gets a free
+ * redraw of its own (an unused team-decade), just as you get a free respin.
+ */
+export function botChoose(s: DraftState, cellId: string, excludeIds: string[], rand: Rand): BotPick | null {
+  if (!openSlots(s.botLineup).length) return null;
+  const here = botPickFrom(s, cellId, excludeIds, rand);
+  if (here) return here;
+  const blocked = new Set(s.used.concat([cellId]));
+  for (const c of shuffle(CELLS.filter((x) => !blocked.has(x.id)), rand)) {
+    const pick = botPickFrom(s, c.id, [], rand);
+    if (pick) return pick;
+  }
+  return null;
 }
 
 export type DraftAction =
-  | { type: 'land'; cellId: string; ptr: number }
+  | { type: 'land'; cellId: string; ptr: number; keepBot?: boolean }
   | { type: 'respin'; kind: 'team' | 'era' | 'nofit'; paid: boolean }
   | { type: 'arm'; booster: Booster | null }
   | { type: 'prime'; playerId: string }
   | { type: 'place'; playerId: string; slot: Slot }
   | { type: 'move'; from: Slot; to: Slot }
-  | { type: 'bot'; playerId: string; slot: Slot }
+  | { type: 'bot'; playerId: string; slot: Slot; cellId?: string }
   | { type: 'endCell' };
 
 export function draftReducer(s: DraftState, a: DraftAction): DraftState {
   switch (a.type) {
     case 'land': {
       const used = s.cellId ? s.used.concat([s.cellId]) : s.used;
-      return { ...s, used, cellId: a.cellId, ptr: a.ptr, picksLeft: 1, youDone: false, botDone: s.mode !== '1v1', taken: [], armed: null, primed: {} };
+      // keepBot: a no-fit respin in 1v1 after the bot already picked this round
+      const botDone = s.mode !== '1v1' || (!!a.keepBot && s.botDone);
+      return { ...s, used, cellId: a.cellId, ptr: a.ptr, picksLeft: 1, youDone: false, botDone, taken: [], armed: null, primed: {} };
     }
     case 'respin': {
       if (a.kind === 'team' && !a.paid) return { ...s, freeTeam: Math.max(0, s.freeTeam - 1) };
@@ -217,10 +264,13 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
       return { ...s, lineup: { ...s.lineup, [a.to]: mover, [a.from]: other } };
     }
     case 'bot': {
-      const cell = currentCell(s);
-      const p = cell?.players.find((x) => x.id === a.playerId);
-      if (!p || s.botLineup[a.slot]) return s;
-      return { ...s, botLineup: { ...s.botLineup, [a.slot]: p }, taken: s.taken.concat([p.id]), botDone: true };
+      const fromCell = a.cellId ?? s.cellId;
+      const p = fromCell ? CELL_BY_ID[fromCell]?.players.find((x) => x.id === a.playerId) : undefined;
+      if (!p || s.botLineup[a.slot] || !p.pos.includes(a.slot)) return s;
+      const ownRedraw = fromCell !== s.cellId;
+      // a redrawn team-decade counts as used, so neither of you sees it again
+      const used = ownRedraw && fromCell ? s.used.concat([fromCell]) : s.used;
+      return { ...s, used, botLineup: { ...s.botLineup, [a.slot]: p }, taken: ownRedraw ? s.taken : s.taken.concat([p.id]), botDone: true };
     }
     case 'endCell': {
       if (!s.cellId) return s;

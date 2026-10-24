@@ -1,5 +1,5 @@
 import { CELLS, CELL_BY_ID } from './data';
-import { botChoose, draftReducer, eligibleSlots, isDraftComplete, newDraft, nextCell, noOneFits, whyUnavailable, SLOT_PREFERENCE, type DraftState } from './draft';
+import { botChoose, botPicksFirst, draftReducer, eligibleSlots, isDraftComplete, newDraft, nextCell, noOneFits, whyUnavailable, SLOT_PREFERENCE, type DraftState } from './draft';
 import { buildBracket, playoffOutcome } from './playoffs';
 import { rng } from './rng';
 import { playSeason } from './season';
@@ -7,23 +7,27 @@ import type { BotLevel, Mode } from './types';
 
 type Strategy = 'random' | 'best' | 'smart';
 
-export function autoDraft(strategy: Strategy, seed: number, mode: Mode = 'classic', bot: BotLevel = 'pro', useRespins = false): DraftState {
+export function autoDraft(strategy: Strategy, seed: number, mode: Mode = 'classic', bot: BotLevel = 'pro', useRespins = false, botFirst = false): DraftState {
   const rand = rng(seed);
-  let s = newDraft(mode, bot, mode === 'daily' ? '2026-10-24' : null);
+  let s = newDraft(mode, bot, mode === 'daily' ? '2026-10-24' : null, botFirst);
   let guard = 0;
   while (!isDraftComplete(s) && guard++ < 60) {
     if (!s.cellId) {
       const nx = nextCell(s, 'spin', rand);
       s = draftReducer(s, { type: 'land', ...nx });
-      if (mode === '1v1' && s.cellsDone % 2 === 1) {
+      if (botPicksFirst(s)) {
         const b = botChoose(s, s.cellId!, [], rand);
-        if (b) s = draftReducer(s, { type: 'bot', playerId: b.player.id, slot: b.slot });
+        if (b) s = draftReducer(s, { type: 'bot', playerId: b.player.id, slot: b.slot, cellId: b.cellId });
       }
       continue;
     }
     if (noOneFits(s)) {
       const nx = nextCell(s, 'nofit', rand);
-      s = draftReducer(s, { type: 'land', ...nx });
+      s = draftReducer(s, { type: 'land', ...nx, keepBot: true });
+      if (mode === '1v1' && botPicksFirst(s)) {
+        const b = botChoose(s, s.cellId!, [], rand);
+        if (b) s = draftReducer(s, { type: 'bot', playerId: b.player.id, slot: b.slot, cellId: b.cellId });
+      }
       continue;
     }
     const cell = CELL_BY_ID[s.cellId];
@@ -48,7 +52,7 @@ export function autoDraft(strategy: Strategy, seed: number, mode: Mode = 'classi
     if (mode === '1v1' && !s.botDone) {
       const mine = Object.values(s.lineup).filter(Boolean).map((p) => p!.id);
       const b = botChoose(s, s.cellId, mine, rand);
-      if (b) s = draftReducer(s, { type: 'bot', playerId: b.player.id, slot: b.slot });
+      if (b) s = draftReducer(s, { type: 'bot', playerId: b.player.id, slot: b.slot, cellId: b.cellId });
       else s = { ...s, botDone: true };
       continue;
     }

@@ -2352,6 +2352,16 @@ button:focus-visible {
 .pill b {
   color: var(--text);
 }
+.qualify {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.qualify.in {
+  color: var(--teal);
+}
 .fit-compact .pill {
   padding: 6px 10px;
   font-size: 12px;

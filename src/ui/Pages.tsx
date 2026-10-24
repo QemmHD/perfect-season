@@ -361,10 +361,16 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
             Each player brings his per-game points, rebounds, assists, steals and blocks from his years with that team in that decade. Your team is scored against a near-perfect lineup, and a weak category drags the whole team down.
           </p>
           <p>
+            <b>Every era counts the same.</b> The list shows real stats, but your team is scored on how each player compared with the league in his own seasons. Games in the 1960s were faster, with far more rebounds to grab, so 25 rebounds then is worth less than 25 today. A player who appeared in only a few games for a team is valued closer to his usual level, not his best night.
+          </p>
+          <p>
             You get <b>1 free team respin and 1 free decade respin</b> per draft. Tap two players on the court to swap their spots.
           </p>
           <p>
-            Then the <b>82-game season</b> plays out, followed by four best-of-7 series against real all-time great teams. Go 82–0, then 16–0, for a <b>Perfect Season</b>.
+            Then the <b>82-game season</b> plays out. Win 50 or more to make the playoffs: four best-of-7 series against real all-time great teams, each game a little more likely to go to the better team. Go 82–0, then 16–0, for a <b>Perfect Season</b>.
+          </p>
+          <p>
+            <b>1 vs 1:</b> you and the bot pick from the same team and decade each round and take turns going first. You always start against Rookie, a coin flip decides against Pro, and Legend always starts.
           </p>
           <p>
             <b>Boosters</b> (from level 2): Double Pick takes two players from one team, Trade swaps a teammate for someone better, Prime upgrades a player to his best-ever decade.

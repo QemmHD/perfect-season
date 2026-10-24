@@ -11,8 +11,14 @@ export const ROUND_POOLS: [number, number][] = [
   [59, 63],
   [64, 82],
 ];
-/** Spread of the per-game win chance; higher = more upsets */
-export const SERIES_K = 16;
+/**
+ * Spread of the per-game win chance, in rating points; higher = more upsets. At 12 a typical
+ * 62-win team wins the title about 12% of the time, a 70-win team 45%, an 82-0 team 88%, and an
+ * 82-0 team sweeps all four rounds about 4% of the time (src/engine/engine.test.ts checks this).
+ */
+export const SERIES_K = 12;
+/** Fewest wins that make the playoffs: the "C · Playoff Team" grade. Below it a team is in the lottery. */
+export const PLAYOFF_MIN_WINS = 50;
 export const HOME_EDGE = 0.04;
 
 export interface Series {

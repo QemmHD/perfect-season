@@ -13,6 +13,7 @@ import {
   newDraft,
   nextCell,
   noOneFits,
+  type BotPick,
   type DraftState,
   type SpinKind,
   whyUnavailable,
@@ -49,6 +50,7 @@ const OPEN_DELAY = 360;
 export interface DraftProps {
   mode: Mode;
   botLevel: BotLevel;
+  botFirst: boolean;
   dailyKey: string | null;
   coins: number;
   xp: number;
@@ -135,6 +137,13 @@ function nameFit(n: string): string {
   return n.length >= 15 ? ' xnarrow' : n.length >= 12 ? ' narrow' : '';
 }
 
+/** What the bot did, for the toast. A pick from its own redraw names the team-decade it drew. */
+function botLine(pick: BotPick, roundCell: string, lead: string): string {
+  if (pick.cellId === roundCell) return lead + pick.player.name + ' for ' + pick.slot + '.';
+  const c = CELL_BY_ID[pick.cellId];
+  return 'Nobody here fit the bot, so it drew the ' + c.era + ' ' + c.name + ' and took ' + pick.player.name + '.';
+}
+
 /** Card tops for the five spots, fitted to the court's height. */
 function courtLayout(h: number, ch: number): Record<Slot, number> {
   const pad = 8;
@@ -186,7 +195,7 @@ function CourtLines({ h, ys, ch }: { h: number; ys: Record<Slot, number>; ch: nu
 export function Draft(props: DraftProps) {
   const { mode, botLevel, dailyKey } = props;
   const layout = useLayout();
-  const [s, dispatch] = useReducer(draftReducer, undefined, () => newDraft(mode, botLevel, dailyKey));
+  const [s, dispatch] = useReducer(draftReducer, undefined, () => newDraft(mode, botLevel, dailyKey, props.botFirst));
   const sRef = useRef(s);
   sRef.current = s;
   const [team, setTeam] = useState<ReelState>({ items: ['?', ''], key: 0, moving: false, landed: 0 });
@@ -255,8 +264,8 @@ export function Draft(props: DraftProps) {
           .map((p) => (p as Player).id);
         const pick = botChoose(st, cellId, mine, Math.random);
         if (pick) {
-          dispatch({ type: 'bot', playerId: pick.player.id, slot: pick.slot });
-          props.onToast('Bot took ' + pick.player.name + ' for ' + pick.slot + '.');
+          dispatch({ type: 'bot', playerId: pick.player.id, slot: pick.slot, cellId: pick.cellId });
+          props.onToast(botLine(pick, cellId, 'Bot took '));
           sfx.select();
         }
         dispatch({ type: 'endCell' });
@@ -329,16 +338,18 @@ export function Draft(props: DraftProps) {
         setEra((r) => ({ ...r, moving: false, landed: r.landed + 1 }));
         sfx.stop();
       }
-      dispatch({ type: 'land', cellId: nx.cellId, ptr: nx.ptr });
+      // after a no-fit respin the bot keeps the pick it already made this round
+      const landing = { type: 'land' as const, cellId: nx.cellId, ptr: nx.ptr, keepBot: kind === 'nofit' };
+      dispatch(landing);
       setSpinning(false);
-      const after = draftReducer(sRef.current, { type: 'land', cellId: nx.cellId, ptr: nx.ptr });
+      const after = draftReducer(sRef.current, landing);
       if (botPicksFirst(after)) {
         setBotBusy(true);
         later(() => {
           const pick = botChoose(sRef.current, nx.cellId, [], Math.random);
           if (pick) {
-            dispatch({ type: 'bot', playerId: pick.player.id, slot: pick.slot });
-            props.onToast('Bot picks first this round: ' + pick.player.name + '.');
+            dispatch({ type: 'bot', playerId: pick.player.id, slot: pick.slot, cellId: pick.cellId });
+            props.onToast(botLine(pick, nx.cellId, 'Bot picks first this round: '));
             sfx.select();
           }
           setBotBusy(false);

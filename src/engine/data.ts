@@ -2,7 +2,7 @@ import raw from '../data/nba.json';
 import type { Cell, Player, PlayoffTeam, Slot } from './types';
 import { lineValue } from './rating';
 
-type RawPlayer = [string, string, number, number, number, number, number, number, number, number, number, number, string | null, string];
+type RawPlayer = [string, string, number, number, number, number, number, number, number, number, number, number, string | null, string, number, number, number, number, number];
 interface RawTeam {
   id: string;
   fr: string;
@@ -60,9 +60,10 @@ export const CELLS: Cell[] = data.teams.map((t) => ({
       teamName: t.name,
       c1: t.c1,
       c2: t.c2,
+      r: { pts: p[14], reb: p[15], ast: p[16], stl: p[17], blk: p[18] },
       val: 0,
     };
-    player.val = lineValue(player);
+    player.val = lineValue(player.r);
     return player;
   }),
 }));
@@ -87,6 +88,7 @@ export function primeVersion(p: Player): Player | null {
     stl: best.stl,
     blk: best.blk,
     est: best.est,
+    r: best.r,
     val: best.val,
     primedFrom: { cellId: cell.id, abbr: cell.abbr, era: cell.era },
   };
