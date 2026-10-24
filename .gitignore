@@ -4,3 +4,4 @@ dist-artifact/
 .cache/
 *.log
 __pycache__
+*.local

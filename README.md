@@ -13,9 +13,12 @@ Product spec: [`docs/SPEC.md`](docs/SPEC.md).
   - Sort by any stat; swap players between spots they can both play.
   - Live category bars and guided tips on the first draft.
 - **Boosters** (unlock at levels 2, 3 and 4): Double Pick, Trade and Prime. One of each per draft, not allowed in Daily or 1v1.
-- **Season and playoffs:** an 82-game ticker reveal, then four best-of-7 series against real historical teams with 53 or more wins (normalized to 82 games), ending with a Finals boss.
-- **Results:** grade and tier, playoff outcome, category breakdown, rewards, XP and levels, a share card image and share text.
-- **Other pages:** Daily, Ranks (your best runs), Boosters store (earned coins only), Profile and history, Settings (sound, vibration, booster hints, reset), How to play.
+- **Season and playoffs:** an 82-game ticker reveal, then (with 50 or more wins) four best-of-7 series against real historical teams, ending with a Finals boss.
+  - Tap any series to scout the opponent: their five most-played players with per-game stats, your chance in each home and road game, and your odds to win the series.
+  - The round you're on shows the opponent's five right on its card.
+- **Results:** grade and tier, playoff outcome, your playoff run (every opponent, with the team that knocked you out marked, tap to scout), category breakdown, rewards, XP and levels, your global rank, a share card image and share text.
+- **Ranks:** a global leaderboard (today's Daily, plus Classic and Blind by week and all time) and your own best runs. See [`supabase/README.md`](supabase/README.md).
+- **Other pages:** Daily, Boosters store (earned coins only), Profile and history, Settings (sound, vibration, booster hints, reset), How to play.
 - **Sound and saving:** synthesized sound effects, vibration on Android, and haptic ticks on iPhone (iOS 18+). Progress is saved in the browser (localStorage).
 - **Fits every phone:** the 390px-wide layout scales to the screen width (an iPhone 15 Pro Max gets it 10% larger), and the height adapts, with tighter spacing on shorter screens.
   - Content stays clear of the Dynamic Island, the status bar and the home indicator, while backgrounds run edge to edge.
@@ -28,6 +31,8 @@ Product spec: [`docs/SPEC.md`](docs/SPEC.md).
   - Playoff games flip in, and a title brings a champion screen. Results count up and a level-up popup appears.
   - Animations are reduced when the phone asks for reduced motion.
 - **Installable:** add it to the home screen for a full-screen app with its own icon and launch screen (manifest, Apple meta tags and launch images in `public/`).
+  - It updates itself. Every launch loads the newest deploy, and an app resumed from the background checks for one and switches over on the next menu screen, never mid-draft. Settings shows the version.
+  - It works offline: a service worker (`pwa/sw.js`) keeps the game and its fonts on the phone.
 
 ## Run it
 
@@ -35,7 +40,7 @@ Product spec: [`docs/SPEC.md`](docs/SPEC.md).
 npm install
 npm run dev          # local dev server
 npm test             # engine rules + calibration simulation
-npm run build        # static site in dist/ (e.g. for Vercel)
+npm run build        # static site in dist/ (GitHub Pages, Vercel)
 node scripts/make-artifact.mjs   # single page in dist-artifact/perfect-season.html
 node scripts/make-icons.mjs      # re-render icons and iPhone launch images into public/ (needs Playwright)
 ```
@@ -44,7 +49,15 @@ node scripts/make-icons.mjs      # re-render icons and iPhone launch images into
 
 ### Deploying
 
-`vercel.json` builds the static site (`npm run build` → `dist/`). Import this repository on Vercel with the default settings.
+**GitHub Pages** (live at https://qemmhd.github.io/perfect-season/): `.github/workflows/pages.yml` tests, builds and publishes on every push to `main`. One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+To install it on an iPhone, open the link in Safari, tap **Share → Add to Home Screen**. Each push to `main` reaches installed copies on their next launch.
+
+The build writes `sw.js` and `version.json` next to the page; the version is the build time and commit (`20261024.2105-9d52b2b`).
+
+`vercel.json` still works for Vercel: import the repository with the default settings.
+
+**Global leaderboard:** follow [`supabase/README.md`](supabase/README.md) (a free Supabase project and two repository variables).
 
 ## Data
 
@@ -86,9 +99,11 @@ Two notes on the source data:
 | `src/engine/` | Pure game logic with no UI: `data` (player database), `rating` (score, balance, win curve, grades), `draft` (rules reducer, respins, bot, boosters), `season`, `playoffs`, `economy` |
 | `src/engine/*.test.ts` | Rule tests, plus `sim.test.ts`, which prints win and title distributions for random, best-available and smart drafting |
 | `src/stage.tsx` | Fits the 390px-wide frame to the screen, reads the safe-area insets, and picks a height class (`fit-compact`, `fit-tight`, `fit-normal`, `fit-roomy`) |
-| `src/ui/` | React screens: `Draft`, `Season` (reveal, playoffs, champion screen), `Results`, `Pages` (home, tabs, settings, how to play) |
+| `src/ui/` | React screens: `Draft`, `Season` (reveal, playoffs, champion screen), `Scout` (opponent scouting sheet), `Results`, `Leaderboard` (global board, name sheet), `Pages` (home, tabs, settings, how to play) |
 | `src/ui/motion.tsx`, `src/ui/Hero.tsx` | View transitions, count-ups and sparks; the animated arena behind the home scoreboard |
-| `src/lib/` | `profile` (saved progress), `sound` (Web Audio + vibration), `share` (share text and card image) |
+| `src/lib/` | `profile` (saved progress), `sound` (Web Audio + vibration), `share` (share text and card image), `leaderboard` (Supabase client), `update` (service worker and auto-update) |
+| `pwa/sw.js` | Service worker template; `vite.config.ts` fills in the version and file list |
+| `supabase/leaderboard.sql` | Leaderboard tables and the three functions the game calls |
 
 ## Tuning (all in `src/engine`)
 

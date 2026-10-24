@@ -7,11 +7,14 @@ import { gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
 import { type Booster, type BotLevel, type Mode, SLOTS } from './engine/types';
-import { freshProfile, loadProfile, type Profile, type RunRecord, saveProfile } from './lib/profile';
+import { GLOBAL_ON, postable, postRun, type PostResult } from './lib/leaderboard';
+import { freshProfile, loadProfile, newId, type Profile, type RunRecord, saveProfile } from './lib/profile';
 import { setFeedback, sfx } from './lib/sound';
+import { applyUpdate, justUpdated, newerVersionLive } from './lib/update';
 import { Toast, TopBar } from './ui/common';
 import { Transition } from './ui/motion';
 import { Draft } from './ui/Draft';
+import { type LbStatus, NameSheet } from './ui/Leaderboard';
 import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, type Tab, Tabs } from './ui/Pages';
 import { type ResultInfo, Results } from './ui/Results';
 import { Playoffs, Reveal } from './ui/Season';
@@ -77,6 +80,84 @@ export function App() {
 
   const update = (fn: (p: Profile) => Profile) => setProfile((p) => fn(p));
 
+  // Global leaderboard: post finished runs once the player has picked a name. History is the
+  // queue: anything not yet sent goes up oldest first, and a run that fails to send is retried
+  // when the app comes back online or to the front.
+  const [nameSheet, setNameSheet] = useState(false);
+  const [posts, setPosts] = useState<Record<string, PostResult | 'sending'>>({});
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
+  const flushing = useRef(false);
+  const flush = async () => {
+    const p = profileRef.current;
+    if (!GLOBAL_ON || !p.name || flushing.current) return;
+    const todo = p.history.filter((r) => postable(r) && !p.posted.includes(r.id!)).slice(0, 10).reverse();
+    if (!todo.length) return;
+    flushing.current = true;
+    const done: string[] = [];
+    let badName = false;
+    for (const r of todo) {
+      const id = r.id!;
+      setPosts((m) => ({ ...m, [id]: 'sending' }));
+      try {
+        const res = await postRun(p.device, p.name, r);
+        setPosts((m) => ({ ...m, [id]: res }));
+        if (res.ok || res.error !== 'busy') done.push(id);
+        if (res.error === 'name') badName = true;
+        if (res.error === 'busy' || res.error === 'name') break;
+      } catch {
+        setPosts((m) => {
+          const n = { ...m };
+          delete n[id];
+          return n;
+        });
+        break;
+      }
+    }
+    flushing.current = false;
+    if (done.length || badName)
+      update((q) => ({ ...q, posted: [...done.filter((d) => !q.posted.includes(d)).reverse(), ...q.posted].slice(0, 120), name: badName ? null : q.name }));
+  };
+  useEffect(() => {
+    void flush();
+  }, [profile.name, profile.history[0]?.id]);
+  useEffect(() => {
+    const again = () => document.visibilityState === 'visible' && void flush();
+    window.addEventListener('online', again);
+    document.addEventListener('visibilitychange', again);
+    return () => {
+      window.removeEventListener('online', again);
+      document.removeEventListener('visibilitychange', again);
+    };
+  }, []);
+  const lbStatus = (r: RunRecord): LbStatus | null => {
+    if (!GLOBAL_ON || !postable(r)) return null;
+    if (!profile.name) return { kind: 'join' };
+    const st = posts[r.id!];
+    if (st === 'sending') return { kind: 'sending' };
+    if (st) return { kind: 'done', res: st };
+    return profile.posted.includes(r.id!) ? { kind: 'done', res: { ok: true } } : { kind: 'queued' };
+  };
+
+  // A newer deploy is live (checked whenever the app comes to the front): switch to it the
+  // next time the player is on a menu, never in the middle of a draft or a playoff run.
+  const [updateReady, setUpdateReady] = useState(false);
+  useEffect(() => {
+    if (justUpdated()) showToast('Updated to the latest version.');
+    let last = 0;
+    const check = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 10000) return;
+      last = Date.now();
+      void newerVersionLive().then((v) => v && setUpdateReady(true));
+    };
+    check();
+    document.addEventListener('visibilitychange', check);
+    return () => document.removeEventListener('visibilitychange', check);
+  }, []);
+  useEffect(() => {
+    if (updateReady && screen === 'tab' && !modal && !nameSheet) applyUpdate();
+  }, [updateReady, screen, modal, nameSheet]);
+
   const startRun = (mode: Mode = profile.mode) => {
     sfx.click();
     const dailyKey = mode === 'daily' ? todayKey : null;
@@ -107,6 +188,7 @@ export function App() {
     const out = bracket ? playoffOutcome(bracket) : null;
     const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked });
     const record: RunRecord = {
+      id: newId(),
       at: new Date().toISOString(),
       mode: r.mode,
       dailyKey: r.dailyKey ?? undefined,
@@ -124,6 +206,7 @@ export function App() {
         : po
           ? po.text
           : 'Missed the playoffs: ' + PLAYOFF_MIN_WINS + ' wins get you in',
+      series: out ? out.seriesWon : 0,
       title: !!po?.title,
       perfect: !!po?.perfect && season.wins === 82,
       lineup: SLOTS.map((s) => {
@@ -201,7 +284,7 @@ export function App() {
   // tab pages share one shell: top bar, page views that cross-fade, and the tab bar
   let page: React.ReactNode;
   if (tab === 'daily') page = <DailyPage profile={profile} dailyNo={dailyNo} dailyKey={todayKey} onPlay={() => startRun('daily')} />;
-  else if (tab === 'ranks') page = <RanksPage profile={profile} />;
+  else if (tab === 'ranks') page = <RanksPage profile={profile} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setNameSheet(true))} />;
   else if (tab === 'boosters')
     page = (
       <BoostersPage
@@ -275,7 +358,18 @@ export function App() {
   } else if (screen === 'results' && run?.result) {
     viewId = 'results:' + run.id;
     enter = 'zoom';
-    body = <Results info={run.result} xp={profile.xp} coins={profile.coins} onAgain={() => startRun(run.mode)} onHome={() => goTab('home')} onToast={showToast} />;
+    body = (
+      <Results
+        info={run.result}
+        xp={profile.xp}
+        coins={profile.coins}
+        lb={lbStatus(run.result.record)}
+        onJoin={() => (sfx.click(), setNameSheet(true))}
+        onAgain={() => startRun(run.mode)}
+        onHome={() => goTab('home')}
+        onToast={showToast}
+      />
+    );
   } else {
     body = (
       <div className="shell">
@@ -305,13 +399,25 @@ export function App() {
           onClose={() => setModal(null)}
           onChange={(k, v) => update((p) => ({ ...p, settings: { ...p.settings, [k]: v } }))}
           onReset={() => {
-            setProfile(freshProfile());
+            // keep the leaderboard identity, so a reset doesn't leave a stranger's name on the board
+            setProfile({ ...freshProfile(), device: profile.device, name: profile.name, posted: profile.posted });
             setModal(null);
             showToast('Progress erased.');
           }}
         />
       )}
       {modal === 'howto' && <HowToSheet onClose={() => setModal(null)} />}
+      {nameSheet && (
+        <NameSheet
+          profile={profile}
+          onClose={() => setNameSheet(false)}
+          onSaved={(name) => {
+            setNameSheet(false);
+            update((p) => ({ ...p, name }));
+            showToast(profile.name ? 'Name changed to ' + name + '.' : 'You’re on the leaderboard as ' + name + '.');
+          }}
+        />
+      )}
       {toast && <Toast key={toast.id} text={toast.text} out={toast.out} />}
     </>
   );

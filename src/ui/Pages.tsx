@@ -2,9 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { BOOSTER_HELP, BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, levelInfo } from '../engine/economy';
 import { gradeFor } from '../engine/rating';
 import { type Booster, BOOSTERS, type BotLevel, type Mode } from '../engine/types';
+import { GLOBAL_ON } from '../lib/leaderboard';
 import { bestRuns, type Profile, type RunRecord } from '../lib/profile';
+import { sfx } from '../lib/sound';
+import { APP_VERSION } from '../lib/update';
 import { Fit, lastName, Sheet } from './common';
 import { ArenaHero } from './Hero';
+import { GlobalBoard } from './Leaderboard';
 import { Bolt, Calendar, Crown, Home as HomeIcon, Lock, Ranks as RanksIcon, User } from './icons';
 
 export type Tab = 'home' | 'daily' | 'ranks' | 'boosters' | 'profile';
@@ -206,24 +210,51 @@ export function DailyPage(props: { profile: Profile; dailyNo: number; dailyKey: 
   );
 }
 
-export function RanksPage(props: { profile: Profile }) {
+/** Which Ranks view was open last, for this session. */
+let ranksView: 'global' | 'yours' = 'global';
+
+export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: number; onName: () => void }) {
+  const [view, setView] = useState<'global' | 'yours'>(GLOBAL_ON ? ranksView : 'yours');
   const [mode, setMode] = useState<Mode | 'all'>('all');
   const runs = bestRuns(props.profile.history, mode);
+  const pickView = (v: 'global' | 'yours') => {
+    if (v === view) return;
+    sfx.click();
+    ranksView = v;
+    setView(v);
+  };
   return (
     <div className="page-view">
       <div className="page">
-        <h1 className="disp">Your best</h1>
-        <div className="chiprow">
-          {(['all', 'classic', 'blind', 'daily', '1v1'] as const).map((m) => (
-            <button key={m} className={'chip' + (mode === m ? ' on' : '')} aria-pressed={mode === m} onClick={() => setMode(m)}>
-              {m === 'all' ? 'ALL' : m === '1v1' ? '1 VS 1' : m.toUpperCase()}
-            </button>
-          ))}
+        <div className="ranks-head">
+          <h1 className="disp">{GLOBAL_ON ? 'Ranks' : 'Your best'}</h1>
+          {GLOBAL_ON && (
+            <span className="seg" role="group" aria-label="Leaderboard">
+              {(['global', 'yours'] as const).map((v) => (
+                <button key={v} className={view === v ? 'on' : ''} aria-pressed={view === v} onClick={() => pickView(v)}>
+                  {v === 'global' ? 'GLOBAL' : 'YOURS'}
+                </button>
+              ))}
+            </span>
+          )}
         </div>
-        <div className="list" key={mode}>
-          {runs.length ? runs.map((r, i) => <HistRow key={i} r={r} i={i} />) : <div className="empty">Finish a draft to put a team on your board.</div>}
-        </div>
-        <p className="note">Ranked by regular-season wins, then titles, then team rating. Global leaderboards come with accounts.</p>
+        {view === 'global' ? (
+          <GlobalBoard profile={props.profile} dailyKey={props.dailyKey} dailyNo={props.dailyNo} onName={props.onName} />
+        ) : (
+          <>
+            <div className="chiprow">
+              {(['all', 'classic', 'blind', 'daily', '1v1'] as const).map((m) => (
+                <button key={m} className={'chip' + (mode === m ? ' on' : '')} aria-pressed={mode === m} onClick={() => setMode(m)}>
+                  {m === 'all' ? 'ALL' : m === '1v1' ? '1 VS 1' : m.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div className="list" key={mode}>
+              {runs.length ? runs.map((r, i) => <HistRow key={i} r={r} i={i} />) : <div className="empty">Finish a draft to put a team on your board.</div>}
+            </div>
+            <p className="note">Your best on this device, ranked by regular-season wins, then titles, then team rating.</p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -339,6 +370,7 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
           <p className="note">
             Every NBA player from 1959–60 through {props.latest - 1}–{String(props.latest).slice(2)}, from {props.source}. Steals and blocks before 1973–74 weren’t recorded and are estimated.
           </p>
+          <p className="note num">Version {APP_VERSION}</p>
           <button className="btn primary" onClick={() => close()}>
             DONE
           </button>
@@ -367,10 +399,13 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
             You get <b>1 free team respin and 1 free decade respin</b> per draft. Tap two players on the court to swap their spots.
           </p>
           <p>
-            Then the <b>82-game season</b> plays out. Win 50 or more to make the playoffs: four best-of-7 series against real all-time great teams, each game a little more likely to go to the better team. Go 82–0, then 16–0, for a <b>Perfect Season</b>.
+            Then the <b>82-game season</b> plays out. Win 50 or more to make the playoffs: four best-of-7 series against real all-time great teams, each game a little more likely to go to the better team, with home court to the better record. Tap any series to scout the other team’s five and your odds. Go 82–0, then 16–0, for a <b>Perfect Season</b>.
           </p>
           <p>
             <b>1 vs 1:</b> you and the bot pick from the same team and decade each round and take turns going first. You always start against Rookie, a coin flip decides against Pro, and Legend always starts.
+          </p>
+          <p>
+            <b>Ranks:</b> pick a name to put your Classic, Blind and first Daily runs on the global leaderboard. No account needed.
           </p>
           <p>
             <b>Boosters</b> (from level 2): Double Pick takes two players from one team, Trade swaps a teammate for someone better, Prime upgrades a player to his best-ever decade.

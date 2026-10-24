@@ -11,6 +11,7 @@ import { frameRect, useLayout } from '../stage';
 import { CoinChip, Confetti, Sheet } from './common';
 import { Back, Coin, Share, Trophy } from './icons';
 import { CountUp, reducedMotion } from './motion';
+import { type LbStatus, LbLine } from './Leaderboard';
 import { Scout, teamBar } from './Scout';
 
 export interface ResultInfo {
@@ -108,7 +109,26 @@ function CoinFlight({ from, to, n }: { from: React.RefObject<HTMLElement>; to: R
   );
 }
 
-export function Results({ info, xp, coins, onAgain, onHome, onToast }: { info: ResultInfo; xp: number; coins: number; onAgain: () => void; onHome: () => void; onToast: (t: string) => void }) {
+export function Results({
+  info,
+  xp,
+  coins,
+  lb,
+  onJoin,
+  onAgain,
+  onHome,
+  onToast,
+}: {
+  info: ResultInfo;
+  xp: number;
+  coins: number;
+  /** Global leaderboard status of this run; null when it doesn't go on a board */
+  lb: LbStatus | null;
+  onJoin: () => void;
+  onAgain: () => void;
+  onHome: () => void;
+  onToast: (t: string) => void;
+}) {
   const { record: r, rating } = info;
   const g = gradeFor(r.wins);
   const lv = levelInfo(xp);
@@ -198,6 +218,7 @@ export function Results({ info, xp, coins, onAgain, onHome, onToast }: { info: R
               {r.title && <Trophy size={18} color="#F5B83D" />}
               <span>{r.playoff}</span>
             </div>
+            {lb && <LbLine lb={lb} mode={r.mode} onJoin={onJoin} />}
           </div>
         )}
 

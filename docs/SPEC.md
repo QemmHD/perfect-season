@@ -20,7 +20,7 @@ Research on the game we're learning from is in the 82-0 teardown, [`research/82-
 | Language | English only, with all text in one strings file for later translation |
 | Accounts | Guest by default; optional sign-in (Google / email) to save progress and appear on boards |
 | Backend | **Supabase** (Postgres + auth + edge functions), free tier |
-| Hosting | Vercel, free tier |
+| Hosting | GitHub Pages (free), installed from Safari to the home screen; updates itself on each deploy. Vercel also works |
 | Analytics | Privacy-friendly (Vercel Analytics or PostHog), no ad trackers |
 | Money | **Earned coins only.** No real-money store, no ads |
 | Coin rate | Generous: about one booster every 2–3 games |
@@ -216,6 +216,7 @@ A typical C–B game with one series win earns about 40–50 coins. That's an ex
 - Ranking: **best single result** (regular-season wins, then playoff result, then rating as tie-breaks).
 - Only **ranked runs** count. Ranked runs are **server-authoritative**: spins are rolled in a Supabase edge function, picks are validated, and the score is computed on the server. Practice runs can be fully client-side.
 - Guests can see boards; signing in puts them on the board.
+- **Built so far (no accounts yet):** a player picks a name, and a random device id stands in for an account. Classic, Blind and the first Daily run go up from the phone through three Supabase functions that check every result for consistency and rate-limit posting (`supabase/leaderboard.sql`). Moving the ranked runs to the server, as above, is the next step to make the boards cheat-proof.
 
 ---
 

@@ -96,7 +96,7 @@ export function TeamChips({ players, stagger }: { players: (Player | null)[]; st
  * Modal sheet. `bottom` slides up from the bottom edge like an iOS sheet;
  * `center` pops in like an alert. Both animate out before `onClose` runs.
  */
-export function Sheet({ label, kind = 'bottom', onClose, children }: { label: string; kind?: 'bottom' | 'center'; onClose: () => void; children: (close: (after?: () => void) => void) => React.ReactNode }) {
+export function Sheet({ label, kind = 'bottom', onClose, children }: { label: string; kind?: 'bottom' | 'center' | 'top'; onClose: () => void; children: (close: (after?: () => void) => void) => React.ReactNode }) {
   const [closing, setClosing] = useState(false);
   const done = useRef(false);
   const close = (after?: () => void) => {
