@@ -92,7 +92,8 @@ export function sortValue(p: Player, key: SortKey): number {
     const s = p.s;
     // a defense has no yards or touchdowns of its own: it sorts last
     if (isDefense(p)) return -1;
-    if (key === 'yds') return (s.passYds ?? 0) + (s.rushYds ?? 0) + (s.recYds ?? 0);
+    // the yards columns the row shows: a passer's passing and rushing, everyone else's rushing and receiving
+    if (key === 'yds') return statCols(p).reduce((sum, c) => sum + (c.key.endsWith('Yds') ? c.value : 0), 0);
     // a passer's, a back's runs, a receiver's catches: the one TD a row shows
     if (key === 'td') return (p.pos[0] === 'QB' ? s.passTd : p.pos[0] === 'RB' ? s.rushTd : s.recTd) ?? 0;
   }

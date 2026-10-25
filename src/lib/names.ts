@@ -1,4 +1,5 @@
 // Player names for the leaderboard and head-to-head: the rules, and a few random suggestions.
+import { NFL } from '../engine/sport';
 
 /** Why a name can't be used, or null when it's fine. */
 export function nameProblem(name: string): string | null {
@@ -20,9 +21,14 @@ export function displayName(name: unknown): string {
   return typeof name === 'string' && !nameProblem(name) ? name.trim() : 'Player';
 }
 
-const FIRST = ['Clutch', 'Splash', 'Swish', 'Dunk', 'Fadeaway', 'Hoop', 'Buzzer', 'Triple', 'Fast', 'Ice', 'Showtime', 'Rim', 'Glass', 'Downtown', 'Posterize', 'Alley', 'Crossover', 'Baseline', 'Paint', 'Sixth'];
-const SECOND = ['King', 'Cobra', 'Wizard', 'Legend', 'Machine', 'Hawk', 'Dragon', 'Mamba', 'Shooter', 'Boss', 'Phantom', 'Rocket', 'Titan', 'Ghost', 'Maestro', 'Jet', 'Vandal', 'Ace', 'Comet', 'Bandit'];
+const FIRST = NFL
+  ? ['Clutch', 'Blitz', 'Gridiron', 'Endzone', 'Hailmary', 'Redzone', 'Shotgun', 'Pylon', 'Audible', 'Pocket', 'Fourth', 'Fast', 'Ice', 'Primetime', 'Twominute', 'Goalline', 'Spiral', 'Sack', 'Turf', 'Kickoff']
+  : ['Clutch', 'Splash', 'Swish', 'Dunk', 'Fadeaway', 'Hoop', 'Buzzer', 'Triple', 'Fast', 'Ice', 'Showtime', 'Rim', 'Glass', 'Downtown', 'Posterize', 'Alley', 'Crossover', 'Baseline', 'Paint', 'Sixth'];
+const SECOND = NFL
+  ? ['King', 'Cobra', 'Wizard', 'Legend', 'Machine', 'Hawk', 'Dragon', 'Gunslinger', 'Boss', 'Phantom', 'Rocket', 'Titan', 'Ghost', 'Maestro', 'Jet', 'Bulldozer', 'Ace', 'Comet', 'Bandit', 'Express']
+  : ['King', 'Cobra', 'Wizard', 'Legend', 'Machine', 'Hawk', 'Dragon', 'Mamba', 'Shooter', 'Boss', 'Phantom', 'Rocket', 'Titan', 'Ghost', 'Maestro', 'Jet', 'Vandal', 'Ace', 'Comet', 'Bandit'];
 
+/** A suggestion in the sport's own slang. */
 export function randomName(): string {
   const a = FIRST[Math.floor(Math.random() * FIRST.length)];
   const b = SECOND[Math.floor(Math.random() * SECOND.length)];

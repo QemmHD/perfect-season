@@ -40,7 +40,7 @@ const NFL_W: Line = { pass: 1, rush: 1, recv: 1, def: 1 };
  * About the 97th percentile of skilled drafts in passing, rushing, receiving and defense, and in
  * rushing plus receiving together (src/engine/sim.test.ts, CALIB=1).
  */
-const NFL_BENCHMARK = { pass: 23.2, rush: 38.3, recv: 70.6, def: 23.5, skill: 89.6 };
+const NFL_BENCHMARK = { pass: 23.2, rush: 38.3, recv: 70.7, def: 23.5, skill: 89.7 };
 
 /**
  * Win curve for a 17-game season, from simulated drafts like basketball's: random picks have
@@ -49,16 +49,16 @@ const NFL_BENCHMARK = { pass: 23.2, rush: 38.3, recv: 70.6, def: 23.5, skill: 89
  */
 const NFL_CURVE: [number, number][] = [
   [0, 0],
-  [50.9, 4],
-  [63.8, 6],
+  [51.1, 4],
+  [64, 6],
   [76.9, 8],
-  [99, 11],
+  [99.1, 11],
   [107.7, 12],
-  [117.4, 13],
-  [126.2, 16],
-  [132.9, 16.5],
-  // 16.5 rounds up, so 132.9 is already 17-0; a real 17-win team is rated where 17-0 starts
-  [133, 17],
+  [117.6, 13],
+  [126.5, 16],
+  [133, 16.5],
+  // 16.5 rounds up, so 133 is already 17-0; a real 17-win team is rated where 17-0 starts
+  [133.1, 17],
 ];
 
 export const W: Line = NFL ? NFL_W : NBA_W;

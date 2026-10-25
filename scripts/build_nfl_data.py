@@ -271,6 +271,11 @@ def main():
             keep += sorted((a for a in lst if a["pos"] == pos), key=lambda a: -a["val"])[:cap]
         kept[(fr, dec)] = keep
 
+    def stored(a):
+        """The value as the app reads it: the three rated parts, each rounded on its own."""
+        total = sum(max(0.0, x) for x in a["parts"]) or 1.0
+        return [round(a["val"] * max(0.0, x) / total, 2) for x in a["parts"]]
+
     # prime line per player, among the lines that are listed
     prime = {}
     for (fr, dec), lst in kept.items():
@@ -278,7 +283,7 @@ def main():
             if a["g"] < 8:
                 continue
             if a["pid"] not in prime or a["val"] > prime[a["pid"]][0]:
-                prime[a["pid"]] = (a["val"], fr, dec)
+                prime[a["pid"]] = (a["val"], fr, dec, round(sum(stored(a)), 2))
 
     # dominant identity per cell
     def cell_identity(fr, dec):
@@ -313,10 +318,9 @@ def main():
             g = a["g"]
             seas = sorted(a["seasons"])
             pr = prime.get(a["pid"])
+            shown = stored(a)
             # a short stint can rate above his prime: then there's nothing to upgrade to
-            pr_ref = pr[1] + "-" + str(pr[2]) if pr and (pr[1], pr[2]) != (fr, dec) and round(pr[0], 2) > round(a["val"], 2) + 0.01 else None
-            total = sum(max(0.0, x) for x in a["parts"]) or 1.0
-            share = [max(0.0, x) / total for x in a["parts"]]
+            pr_ref = pr[1] + "-" + str(pr[2]) if pr and (pr[1], pr[2]) != (fr, dec) and pr[3] >= round(sum(shown), 2) + 0.01 else None
             nm = a["name"]
             if a["pid"] in namesakes:
                 nm += " (" + str(seas[0]) + ("–" + str(seas[-1])[2:] if seas[-1] != seas[0] else "") + ")"
@@ -324,7 +328,7 @@ def main():
             plist.append([
                 nm, a["pos"], int(g), len(seas), seas[0], seas[-1], pr_ref, a["pid"],
                 *[round(raw[k] / g, 2 if k in ("pass_td", "int", "rush_td", "rec_td") else 1) for k in SHOWN],
-                round(a["val"] * share[0], 2), round(a["val"] * share[1], 2), round(a["val"] * share[2], 2), 0,
+                *shown, 0,
             ])
         d = defense[(fr, dec)]
         plist.append([

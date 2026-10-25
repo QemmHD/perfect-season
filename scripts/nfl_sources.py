@@ -6,6 +6,7 @@ Sources (all public, fetched into raw_dir on first use):
   wk/<year>.csv       nflverse weekly player stats, 1999-2025 (each game a player recorded a stat in)
   rs/<year>.csv       nflverse season rosters, 1999-2025 (each player's position that season)
   rw/<year>.csv       nflverse weekly rosters, 2002-2025 (who was active for each game)
+  games.csv           also tells which weeks each team played (the weekly rosters list byes too)
   players.csv         nflverse player register (names, birth dates, ids back to the 1920s)
   nfl_games.csv       FiveThirtyEight's NFL game results, 1920-2020
   games.csv           nflverse schedules and scores, 1999-
@@ -29,16 +30,16 @@ GAMES_538 = "https://raw.githubusercontent.com/fivethirtyeight/nfl-elo-game/mast
 
 STATS = ("pass_yds", "pass_td", "int", "rush_yds", "rush_td", "rec", "rec_yds", "rec_td")
 
-# PFR season-table team codes (1970-1998) -> franchise, by season
+# PFR season-table team codes -> franchise, by season
 def pfr_franchise(code, season):
     if code == "BAL":
         return "IND" if season <= 1983 else "BAL"
     if code == "STL":
         return "ARI" if season <= 1987 else "LAR"
     if code == "HOU":
-        return "TEN"
+        return "TEN" if season <= 1998 else "HOU"  # the Oilers, then (from 2002) the Texans
     return {
-        "BOS": "NE", "NWE": "NE", "GNB": "GB", "KAN": "KC", "NOR": "NO", "OAK": "LV", "RAI": "LV",
+        "BOS": "NE", "NWE": "NE", "GNB": "GB", "KAN": "KC", "NOR": "NO", "OAK": "LV", "RAI": "LV", "LVR": "LV",
         "RAM": "LAR", "PHO": "ARI", "SDG": "LAC", "SFO": "SF", "TAM": "TB",
     }.get(code, code)
 
@@ -234,9 +235,12 @@ def pfr_rows(raw_dir, reg, years):
             name = d["Player"].strip().rstrip("*+").strip()
             pos = norm_pos(d["Pos"])
             pid = reg.find(name, y, num(d["Age"]), pos)
+            fr = None if xtm else pfr_franchise(tm, y)
+            if fr is not None and fr not in FRANCHISES:
+                raise ValueError("unknown PFR team " + tm + " in " + str(y))
             out.append({
                 "season": y, "pid": pid or ("pfr:" + name_key(name) + ":" + str(y - int(num(d["Age"])))), "name": name,
-                "fr": None if xtm else pfr_franchise(tm, y), "xtm": xtm, "pos": pos, "g": num(d["G"]), "gs": num(d["GS"]),
+                "fr": fr, "xtm": xtm, "pos": pos, "g": num(d["G"]), "gs": num(d["GS"]),
                 "pass_att": num(d["PassingAtt"]), "pass_yds": num(d["PassingYds"]), "pass_td": num(d["PassingTD"]), "int": num(d["Int"]),
                 "rush_att": num(d["RushingAtt"]), "rush_yds": num(d["RushingYds"]), "rush_td": num(d["RushingTD"]),
                 "rec": num(d["Rec"]), "rec_yds": num(d["ReceivingYds"]), "rec_td": num(d["ReceivingTD"]),
@@ -289,31 +293,45 @@ def season_rosters(raw_dir):
     return out
 
 
+def roster_counts(y):
+    """Whether the weekly rosters' active count can stand in for games played that season. It
+    matches PFR's games played for 88-94% of backs, receivers and tight ends in 2002-2015 and
+    2020-2021, and is never lower; in 2016-2019 the files don't mark game-day inactives."""
+    return ROSTER_FIRST <= y <= 2015 or y >= 2020
+
+
 def active_games(raw_dir):
-    """Regular-season games each player was active for, per team (weekly rosters, 2002-):
-    (player id, season, franchise) -> games. For backs, receivers and tight ends it matches
-    PFR's games played; a quarterback is active for many games he doesn't play."""
+    """Regular-season games each player was active for, per team (weekly rosters):
+    (player id, season, franchise) -> games. Only weeks his team played (byes are listed too),
+    and not when he was a game-day inactive. A quarterback is active for many games he doesn't play."""
+    played = set()
+    for r in csv.DictReader(open(os.path.join(raw_dir, "games.csv"), encoding="utf-8")):
+        if r["game_type"] == "REG" and r["home_score"] != "":
+            for t in (r["home_team"], r["away_team"]):
+                played.add((int(r["season"]), int(r["week"]), VERSE.get(t, t)))
     n = defaultdict(int)
     for y in range(ROSTER_FIRST, LAST_SEASON + 1):
+        if not roster_counts(y):
+            continue
         for r in csv.DictReader(open(os.path.join(raw_dir, "rw", str(y) + ".csv"), encoding="utf-8")):
-            if r["game_type"] == "REG" and r["status"] == "ACT" and r["gsis_id"]:
-                n[(r["gsis_id"], y, ROSTER_CODES.get(r["team"], r["team"]))] += 1
+            if r["game_type"] != "REG" or r["status"] != "ACT" or not r["gsis_id"] or r["status_description_abbr"].startswith("I"):
+                continue
+            fr = ROSTER_CODES.get(r["team"], r["team"])
+            if (y, int(r["week"]), fr) in played:
+                n[(r["gsis_id"], y, fr)] += 1
     return n
 
 
 def verse_rows(raw_dir, reg):
     """1999-2025, per player, season and team. Stats are nflverse's weekly rows, which only exist
     for games a player recorded a stat in, so games played come from elsewhere: a season with one
-    team through 2021 is PFR's season row (games, starts and totals, as for 1970-1998); otherwise
-    a back's, receiver's or tight end's games are the ones he was active for. Positions are the
-    season roster's."""
+    team through 2021 is PFR's season row (games, starts and totals, as for 1970-1998); a traded
+    season through 2021 shares PFR's combined games out over its stints; otherwise a back's,
+    receiver's or tight end's games are the ones the weekly rosters have him active for, where
+    they can tell (roster_counts). Positions are the season roster's."""
     rosters = season_rosters(raw_dir)
     active = active_games(raw_dir)
-    pfr = {}
-    for r in pfr_rows(raw_dir, reg, range(SPLIT, PFR_LAST + 1)):
-        if r["fr"] and not r["pid"].startswith("pfr:"):
-            key = (r["pid"], r["season"])
-            pfr[key] = None if key in pfr else r  # two PFR rows on one id: trust neither
+    pfr_all = pfr_rows(raw_dir, reg, range(SPLIT, PFR_LAST + 1))
     agg = {}
     for y in range(SPLIT, LAST_SEASON + 1):
         rows = [r for r in csv.DictReader(open(os.path.join(raw_dir, "wk", str(y) + ".csv"), encoding="utf-8")) if r["season_type"] == "REG" and r["team"]]
@@ -349,19 +367,58 @@ def verse_rows(raw_dir, reg):
             a["rec"] += num(r["receptions"])
             a["rec_yds"] += num(r["receiving_yards"])
             a["rec_td"] += num(r["receiving_tds"])
-    teams = defaultdict(int)
+    pfr = match_pfr(pfr_all, agg)
+    stints = defaultdict(list)
     for a in agg.values():
-        teams[(a["pid"], a["season"])] += 1
-    for a in agg.values():
-        key = (a["pid"], a["season"])
-        a["pos"] = rosters.get(key, (None,))[0] or a["pos"]
+        stints[(a["pid"], a["season"])].append(a)
+    for key, lst in stints.items():
         p = pfr.get(key)
-        if p and teams[key] == 1 and p["fr"] == a["fr"]:
+        for a in lst:
+            a["pos"] = rosters.get(key, (None,))[0] or a["pos"]
+        if p and not p["xtm"] and len(lst) == 1 and p["fr"] == lst[0]["fr"]:
+            # the season as Pro-Football-Reference has it, like 1970-1998: every game played, every game's stats
             for k in ("g", "gs", "pass_att", "rush_att") + STATS:
-                a[k] = p[k]
-        elif a["pos"] != "QB":
-            a["g"] = max(a["g"], active.get((a["pid"], a["season"], a["fr"]), 0))
+                lst[0][k] = p[k]
+            continue
+        # the games he recorded a stat in, or (backs, receivers, tight ends) the ones he was active for
+        for a in lst:
+            a["stat_g"] = a["g"]
+            if a["pos"] != "QB":
+                a["g"] = max(a["g"], active.get((a["pid"], a["season"], a["fr"]), 0))
+        if p and p["xtm"] and len(lst) > 1:
+            # a traded season: PFR's combined games played, shared out over the stints
+            extra = sum(a["g"] for a in lst) - p["g"]
+            for a in sorted(lst, key=lambda a: a["stat_g"] - a["g"]):
+                cut = min(max(0.0, extra), a["g"] - a["stat_g"])
+                a["g"] -= cut
+                extra -= cut
+        for a in lst:
+            del a["stat_g"]
     return list(agg.values())
+
+
+def match_pfr(pfr_all, agg):
+    """PFR's season rows by (nflverse id, season). The register finds most players by name; a
+    name it can't place (Ben Watson for Benjamin Watson) is found by team, season and yards.
+    An id with two PFR rows that season is trusted for neither."""
+    out = {}
+    for r in pfr_all:
+        if not r["pid"].startswith("pfr:"):
+            key = (r["pid"], r["season"])
+            out[key] = None if key in out else r
+    by_team = defaultdict(list)
+    for a in agg.values():
+        by_team[(a["season"], a["fr"])].append(a)
+    yards = lambda x: (x["pass_yds"], x["rush_yds"], x["rec_yds"])
+    for r in pfr_all:
+        if not r["pid"].startswith("pfr:") or not r["fr"] or sum(yards(r)) < 50:
+            continue
+        last = name_key(r["name"]).split()[-1:]
+        cands = [a for a in by_team[(r["season"], r["fr"])] if (a["pid"], a["season"]) not in out
+                 and name_key(a["name"]).split()[-1:] == last and all(abs(u - v) <= max(5, 0.03 * u) for u, v in zip(yards(r), yards(a)))]
+        if len(cands) == 1:
+            out[(cands[0]["pid"], r["season"])] = r
+    return out
 
 
 def team_games(raw_dir):
