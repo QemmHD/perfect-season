@@ -439,14 +439,22 @@ function card(g: CanvasRenderingContext2D, p: Player, slot: Slot, w: number, h: 
   g.fill();
   g.fillStyle = era === 'vintage' ? '#2b2116' : '#fff';
   g.fillText(slot, bx + 7 * s, by + 13 * s);
-  g.textAlign = 'right';
   g.font = disp(16 * s);
   g.shadowColor = 'rgba(0,0,0,0.7)';
   g.shadowBlur = 3 * s;
   g.shadowOffsetY = 1 * s;
   g.fillStyle = '#ffe29a';
-  // right-aligned in the part of the card the next one doesn't cover
-  g.fillText(p.val.toFixed(0), bx + Math.min(bw, shown - pad) - 4 * s, by + 17 * s);
+  // right-aligned in the part of the card the next one doesn't cover; under the spot's badge when
+  // that part is too narrow for both
+  const val = p.val.toFixed(0);
+  const right = bx + Math.min(bw, shown - pad) - 4 * s;
+  if (right - g.measureText(val).width < bx + 3 * s + sw + 3 * s) {
+    g.textAlign = 'left';
+    g.fillText(val, bx + 4 * s, by + 33 * s);
+  } else {
+    g.textAlign = 'right';
+    g.fillText(val, right, by + 17 * s);
+  }
   g.shadowColor = 'transparent';
   g.textAlign = 'left';
 
