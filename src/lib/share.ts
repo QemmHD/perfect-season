@@ -2,12 +2,18 @@ import { GAMES } from '../engine/rating';
 import { NFL } from '../engine/sport';
 import type { RunRecord } from './profile';
 
+const PICK_EMOJI: Record<string, string> = { b: '🟩', g: '🟩', o: '🟨', r: '🟧', m: '🟥' };
+
 export function shareText(r: RunRecord, dailyNo: number | null): string {
   const game = NFL ? 'Perfect Season NFL' : 'Perfect Season';
   const head = r.mode === 'daily' && dailyNo ? game + ' Daily #' + dailyNo : game;
   const rec = r.wins + '–' + (GAMES - r.wins);
   const names = r.lineup.map((p) => lastName(p.name)).join(' · ');
-  return head + ' · ' + rec + ' · ' + r.grade + ' ' + r.tier + '\n' + r.playoff + '\n' + names + '\nCan you go perfect?';
+  // the picks, Wordle style: no spoilers for a Daily someone hasn't played
+  const d = r.draft;
+  const grid = d ? '\nDraft ' + d.letter + ' ' + [...d.picks].map((c) => PICK_EMOJI[c] ?? '⬜').join('') + (d.par !== undefined ? ' · ' + d.par + '% of par' : '') : '';
+  const who = r.mode === 'daily' ? '' : '\n' + names;
+  return head + ' · ' + rec + ' · ' + r.grade + ' ' + r.tier + '\n' + r.playoff + grid + who + '\nCan you go perfect?';
 }
 
 /** Surnames of more than one word that the particle rule can't tell from a middle name. */

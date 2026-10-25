@@ -35,6 +35,24 @@ export interface DraftState {
   /** primed versions of players in the current cell */
   primed: Record<string, Player>;
   boostersUsed: Booster[];
+  /** every pick you made, as it was made: for the report card after the draft */
+  log: PickLog[];
+}
+
+/** One pick: where it came from and what else could have gone there at that moment. */
+export interface PickLog {
+  round: number;
+  cellId: string;
+  /** the player as placed (primed when the Prime booster was used on him) */
+  player: Player;
+  slot: Slot;
+  /** the spots it could have gone to: open ones, or with Trade the filled ones */
+  open: Slot[];
+  /** players the AI or the other player had already taken from this team */
+  taken: string[];
+  trade: boolean;
+  /** the lineup just before the pick */
+  before: Lineup;
 }
 
 export function newDraft(mode: Mode, botLevel: BotLevel, dailyKey: string | null, botFirst = false): DraftState {
@@ -58,6 +76,7 @@ export function newDraft(mode: Mode, botLevel: BotLevel, dailyKey: string | null
     armed: null,
     primed: {},
     boostersUsed: [],
+    log: [],
   };
 }
 
@@ -257,10 +276,11 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
       const trading = s.armed === 'trade';
       if (trading ? !s.lineup[a.slot] : !!s.lineup[a.slot]) return s;
       const lineup = { ...s.lineup, [a.slot]: p };
+      const entry: PickLog = { round: s.cellsDone, cellId: cell.id, player: p, slot: a.slot, open: trading ? SLOTS.filter((x) => s.lineup[x]) : openSlots(s.lineup), taken: s.taken, trade: trading, before: s.lineup };
       const boostersUsed = trading ? s.boostersUsed.concat(['trade']) : s.armed === 'double' && s.picksLeft === 2 ? s.boostersUsed.concat(['double']) : s.boostersUsed;
       const picksLeft = s.picksLeft - 1;
       const done = picksLeft <= 0 || filledCount(lineup) === ROUNDS;
-      return { ...s, lineup, picksLeft: Math.max(0, picksLeft), youDone: done, armed: done ? null : s.armed === 'trade' ? null : s.armed, boostersUsed };
+      return { ...s, lineup, picksLeft: Math.max(0, picksLeft), youDone: done, armed: done ? null : s.armed === 'trade' ? null : s.armed, boostersUsed, log: (s.log ?? []).concat([entry]) };
     }
     case 'move': {
       const mover = s.lineup[a.from];

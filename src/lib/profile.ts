@@ -24,6 +24,9 @@ export interface RunRecord {
   vs?: { won: boolean | null; botWins: number; botLevel: BotLevel };
   /** Head to head against a real player */
   online?: { opp: string; forfeit?: 'them' | 'you' };
+  /** the draft report: each pick's grade (b best, g great, o good, r reach, m miss), the draft's
+      score against the best team your spins could make, and (Daily) against the day's par */
+  draft?: { picks: string; score: number; letter: string; left: number; par?: number };
 }
 
 export interface Settings {

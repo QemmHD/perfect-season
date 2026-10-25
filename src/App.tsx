@@ -5,6 +5,7 @@ import { BOOSTER_PRICES, LEVEL_UP_COINS, levelInfo, rewardsFor, unlockedAt } fro
 import { ALL_MISSIONS_BONUS, advance, type GameEvent, missionsFor, nextStreak, rewardFor } from './engine/missions';
 import { buildBracket, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
 import { rarityOf } from './engine/rarity';
+import { dailyPar, reviewDraft } from './engine/review';
 import { GAMES, gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
 import { clearSportParam, NFL, type SportId, switchSport } from './engine/sport';
@@ -426,6 +427,9 @@ export function App() {
     const out = bracket ? playoffOutcome(bracket) : null;
     const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked, vsName: oppName });
     const players = SLOTS.map((s) => draft.lineup[s]!) as Player[];
+    // the draft looked back on, and (Daily) the day's par
+    const review = draft.log?.length ? reviewDraft(draft.log, draft.lineup) : undefined;
+    const par = r.mode === 'daily' && r.dailyKey ? dailyPar(r.dailyKey) : undefined;
     const record: RunRecord = {
       id: newId(),
       at: new Date().toISOString(),
@@ -466,6 +470,15 @@ export function App() {
       }),
       vs: bot ? { won: vsWon, botWins: bot.rating.wins, botLevel: r.botLevel } : undefined,
       online: oppName ? { opp: oppName, forfeit } : undefined,
+      draft: review
+        ? {
+            picks: review.picks.map((p) => (p.grade === 'good' ? 'o' : p.grade.charAt(0))).join(''),
+            score: Math.round(review.score),
+            letter: review.letter,
+            left: review.winsLeft,
+            par: par && par.rating.rating > 0 ? Math.round((100 * review.yours.rating) / par.rating.rating) : undefined,
+          }
+        : undefined,
     };
     const legends = players.filter((p) => rarityOf(p) === 'legendary').length;
     const margin = bracket ? Math.max(0, ...bracket.filter((b) => b.played && b.won && b.scores).map((b) => b.scores![0][0] - b.scores![0][1])) : 0;
@@ -554,6 +567,8 @@ export function App() {
       bracket: bracket ?? undefined,
       newBest,
       missionsDone,
+      review,
+      par,
     };
     setRun({ ...r, result });
     setScreen('results');
@@ -739,7 +754,7 @@ export function App() {
   } else if (screen === 'playoffs' && run?.season && run.bracket) {
     viewId = 'playoffs:' + run.id;
     enter = 'up';
-    body = <Playoffs season={run.season} bracket={run.bracket} onDone={() => finish(run, run.season!, run.bracket!, null)} />;
+    body = <Playoffs season={run.season} bracket={run.bracket} lineup={run.draft!.lineup} ourName={profile.name ?? 'You'} onDone={() => finish(run, run.season!, run.bracket!, null)} />;
   } else if (screen === 'results' && run?.result) {
     viewId = 'results:' + run.id;
     enter = 'zoom';

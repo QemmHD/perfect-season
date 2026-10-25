@@ -28,10 +28,11 @@ import { type Booster, BOOSTERS, type BotLevel, type Mode, type Player, type Slo
 import { sfx, vibrate } from '../lib/sound';
 import type { OnlinePick } from '../net/match';
 import { frameY, useLayout } from '../stage';
-import { CoinChip, Confirm, Fit, initials, seasonLabel, shortEra } from './common';
+import { CoinChip, Confirm, Fit, initials, seasonLabel } from './common';
 import { Back, Crown, Down, Lock, Refresh } from './icons';
 import { CountUp, reducedMotion, Sparks } from './motion';
 import { cardName, FLOOR, hotFor, isDefense, posLabel, type SortKey, SORTS, sortValue, statCols } from './sportui';
+import { CardSheet, TradingCard } from './Card';
 
 /** Card left edges: the basketball court's five spots, or football's two rows of three (receivers up front, the backfield and the defense behind). */
 const COURT_X: Record<Slot, number> = NFL ? { WR: 20, TE: 153, FLEX: 286, RB: 20, QB: 153, DEF: 286 } : { C: 70, PF: 236, SF: 26, SG: 280, PG: 153 };
@@ -146,11 +147,6 @@ function Reel({ label, caption, era, reel, ms, tint }: { label: string; caption:
       </div>
     </div>
   );
-}
-
-/** Long last names are set narrower so they fit the card instead of being cut. */
-function nameFit(n: string): string {
-  return n.length >= 15 ? ' xnarrow' : n.length >= 12 ? ' narrow' : '';
 }
 
 /** What the bot (or the other player) did, for the toast. A pick from their own redraw names the team-decade drawn. */
@@ -288,7 +284,15 @@ export function Draft(props: DraftProps) {
   const [botBusy, setBotBusy] = useState(false);
   const [courtH, setCourtH] = useState(300);
   /** the big moment when you draft an Epic or Legendary player */
-  const [pull, setPull] = useState<{ id: number; rarity: Rarity; name: string } | null>(null);
+  const [pull, setPull] = useState<{ id: number; rarity: Rarity; player: Player; slot: Slot } | null>(null);
+  /** a card held down: the inspect view */
+  const [inspect, setInspect] = useState<{ p: Player; slot: Slot } | null>(null);
+  const pressT = useRef<number | null>(null);
+  const pressed = useRef(false);
+  const unpress = () => {
+    if (pressT.current) clearTimeout(pressT.current);
+    pressT.current = null;
+  };
   /** the reels landed on a team with a Legendary player */
   const [spot, setSpot] = useState(0);
   const timers = useRef<number[]>([]);
@@ -375,8 +379,8 @@ export function Draft(props: DraftProps) {
     const rar = placed ? rarityOf(placed) : 'common';
     if (placed && (rar === 'legendary' || rar === 'epic')) {
       const id = Date.now();
-      setPull({ id, rarity: rar, name: placed.name });
-      later(() => setPull((x) => (x && x.id === id ? null : x)), rar === 'legendary' ? 1700 : 1200);
+      setPull({ id, rarity: rar, player: placed, slot });
+      later(() => setPull((x) => (x && x.id === id ? null : x)), rar === 'legendary' ? 2500 : 1800);
       if (rar === 'legendary') {
         sfx.title();
         vibrate([30, 40, 30, 40, 60]);
@@ -989,7 +993,7 @@ export function Draft(props: DraftProps) {
           return (
             <button
               key={k}
-              className={'slot-empty' + (glow || moverOk ? ' glow' : '')}
+              className={'slot-empty' + (glow || moverOk ? ' glow' : '') + (s.lineup[k] ? ' filled' : '')}
               style={{ left: COURT_X[k], top: ys[k], height: ch }}
               onClick={() => tapSlot(k)}
               aria-label={k + ': empty' + (glow ? ', tap to place' : '')}
@@ -1015,7 +1019,27 @@ export function Draft(props: DraftProps) {
               key={p.id}
               className={cls.join(' ')}
               style={{ translate: COURT_X[k] + 'px ' + ys[k] + 'px', height: ch, '--c1': p.c1, '--c2': p.c2, '--i': i } as React.CSSProperties}
-              onClick={() => tapSlot(k)}
+              onPointerDown={() => {
+                unpress();
+                pressT.current = window.setTimeout(() => {
+                  pressed.current = true;
+                  vibrate(15);
+                  sfx.whoosh();
+                  setInspect({ p, slot: k });
+                }, 460);
+              }}
+              onPointerUp={unpress}
+              onPointerLeave={unpress}
+              onPointerCancel={unpress}
+              onContextMenu={(e) => e.preventDefault()}
+              onClick={() => {
+                // a long press opened the card: the tap that ends it isn't a move
+                if (pressed.current) {
+                  pressed.current = false;
+                  return;
+                }
+                tapSlot(k);
+              }}
               aria-label={k + ': ' + p.name + '. Tap to move.'}
             >
               {p.primedFrom && (
@@ -1024,15 +1048,7 @@ export function Draft(props: DraftProps) {
                 </span>
               )}
               <span className="pcard-in">
-                <span className="top">
-                  <span>{k}</span>
-                  {!blind && <b className="num">{p.val.toFixed(0)}</b>}
-                </span>
-                <span className="ini">{isDefense(p) ? 'D' : initials(p.name)}</span>
-                <span className={'nm' + nameFit(cardName(p))}>{cardName(p)}</span>
-                <span className="sub">
-                  {p.abbr} {shortEra(p.era)}
-                </span>
+                <TradingCard p={p} slot={k} blind={blind} />
               </span>
             </button>
           );
@@ -1114,11 +1130,24 @@ export function Draft(props: DraftProps) {
         )}
       </div>
 
+      {inspect && <CardSheet p={inspect.p} slot={inspect.slot} blind={blind} onClose={() => setInspect(null)} />}
+
       {pull && (
         <div className={'pull ' + pull.rarity} key={pull.id} aria-live="assertive">
           <span className="pull-rays" aria-hidden="true" />
           <b className="disp">{RARITY_NAMES[pull.rarity].toUpperCase()}!</b>
-          <strong>{pull.name}</strong>
+          <span className="pull-card" aria-label={pull.player.name}>
+            <span className="flip">
+              <span className="back" aria-hidden="true">
+                <i className="disp">PS</i>
+              </span>
+              <span className="front">
+                <span className="bigcard s2">
+                  <TradingCard p={pull.player} slot={pull.slot} tilt={false} />
+                </span>
+              </span>
+            </span>
+          </span>
         </div>
       )}
 

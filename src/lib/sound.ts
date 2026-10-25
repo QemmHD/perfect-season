@@ -174,6 +174,28 @@ export const sfx = {
     vibrate(24);
   },
   whoosh: () => noise(0.22, { gain: 0.05, freq: 1800 }),
+  /** the game is on: a referee's whistle */
+  whistle: () => {
+    tone(2900, 0.28, { type: 'sine', gain: 0.05 });
+    tone(2960, 0.28, { type: 'sine', gain: 0.04 });
+  },
+  /** we scored: a quick rising sting and the crowd */
+  scoreUs: (big = false) => {
+    tone(784, 0.08, { type: 'triangle', gain: 0.07 });
+    tone(1175, 0.12, { type: 'triangle', gain: 0.07, at: 0.06 });
+    noise(big ? 0.9 : 0.45, { gain: big ? 0.07 : 0.04, freq: 900 });
+    if (big) vibrate([18, 40, 18]);
+  },
+  /** they scored: a low thud */
+  scoreThem: () => tone(150, 0.16, { type: 'sine', gain: 0.18, slide: 0.7 }),
+  /** the final buzzer, or the clock running out */
+  buzzer: () => tone(196, 0.55, { type: 'square', gain: 0.045 }),
+  /** a stadium on its feet */
+  roar: () => {
+    noise(1.6, { gain: 0.09, freq: 700 });
+    noise(1.2, { gain: 0.05, freq: 1600, at: 0.1 });
+    vibrate([30, 50, 30, 50, 60]);
+  },
   title: () => {
     [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone(f, 0.22, { type: 'triangle', gain: 0.12, at: i * 0.11 }));
     vibrate([40, 60, 40, 60, 120]);

@@ -60,13 +60,13 @@ export function matchupOdds(ourRating: number, opp: PlayoffTeam): { home: number
 }
 
 /** Basketball: your games at home in a best-of-7 (2-2-1-1-1), games 1, 2, 5 and 7 when you have the better record. */
-function homeGame(g: number, highSeed: boolean): boolean {
+export function homeGame(g: number, highSeed: boolean): boolean {
   const highHome = g === 0 || g === 1 || g === 4 || g === 6;
   return highSeed ? highHome : !highHome;
 }
 
 /** The chance of each game, in order (football: one game, at the better record's stadium or neutral). */
-function gameOdds(ourRating: number, ourWins: number, opp: PlayoffTeam, round: number, g: number): number {
+export function gameOdds(ourRating: number, ourWins: number, opp: PlayoffTeam, round: number, g: number): number {
   const odds = matchupOdds(ourRating, opp);
   const highSeed = ourWins >= opp.wFull;
   if (NFL) return NEUTRAL_FINAL && round === 3 ? odds.neutral : highSeed ? odds.home : odds.road;

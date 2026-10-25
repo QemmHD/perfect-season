@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { BOOSTER_NAMES, LEVEL_UP_COINS, levelInfo, type Rewards } from '../engine/economy';
 import { playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
 import { CATEGORY_LABELS, GAMES, gradeFor, type TeamRating } from '../engine/rating';
+import { type DraftReview, GRADE_LABEL } from '../engine/review';
 import { NFL } from '../engine/sport';
 import type { Booster, Lineup, Player } from '../engine/types';
 import { SLOTS } from '../engine/types';
@@ -9,11 +10,12 @@ import type { RunRecord } from '../lib/profile';
 import { copyText, drawCard, nativeShare, shareText } from '../lib/share';
 import { sfx } from '../lib/sound';
 import { frameRect, useLayout } from '../stage';
-import { CoinChip, Confetti, Sheet } from './common';
+import { CoinChip, Confetti, lastName, Sheet, shortEra } from './common';
 import { Back, Coin, Share, Trophy } from './icons';
 import { CountUp, reducedMotion } from './motion';
 import { type LbStatus, LbLine } from './Leaderboard';
 import { NET_ON } from '../net/nostr';
+import { CardSheet, TradingCard } from './Card';
 import { Scout, teamBar } from './Scout';
 import { record } from './sportui';
 
@@ -32,6 +34,10 @@ export interface ResultInfo {
   newBest?: boolean;
   /** Missions this game completed */
   missionsDone?: string[];
+  /** the draft, looked back on */
+  review?: DraftReview;
+  /** Daily: the best team from the day's spins */
+  par?: { lineup: Lineup; rating: TeamRating; wins: number };
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
@@ -140,6 +146,7 @@ export function Results({
   const [share, setShare] = useState(false);
   const [scout, setScout] = useState<Series | null>(null);
   const [levelPop, setLevelPop] = useState(false);
+  const [inspect, setInspect] = useState<{ p: Player; slot: string } | null>(null);
   const [grow, setGrow] = useState(false);
   const gained = info.rewards.coins + LEVEL_UP_COINS * info.levelUps.length;
   const chipRef = useRef<HTMLSpanElement>(null);
@@ -252,29 +259,21 @@ export function Results({
           </span>
         </div>
 
+        {info.review && <ReportCard review={info.review} par={info.par} blind={r.mode === 'blind'} />}
+
         {info.bracket && <PlayoffRun bracket={info.bracket} onScout={setScout} />}
 
-        <div className="roster">
+        <div className="hand" aria-label="Your team">
           {SLOTS.map((k, i) => {
             const p = info.lineup[k] as Player;
             return (
-              <div key={k} className="rosterrow rise-in" style={{ background: 'linear-gradient(90deg, ' + p.c1 + ' 0%, #0A1F2A 78%)', borderColor: p.c2, animationDelay: 320 + i * 60 + 'ms' }}>
-                <span className="disp">{k}</span>
-                <div>
-                  <strong>
-                    {p.name}
-                    {p.primedFrom ? ' ★' : ''}
-                  </strong>
-                  <small>
-                    {p.teamName} · {p.era}
-                    {p.primedFrom ? ' · primed to ' + p.primedFrom.abbr + ' ' + p.primedFrom.era : ''}
-                  </small>
-                </div>
-                <b className="num">{p.val.toFixed(1)}</b>
-              </div>
+              <button key={k} className="hand-card rise-in" style={{ animationDelay: 320 + i * 70 + 'ms' }} onClick={() => (sfx.click(), setInspect({ p, slot: k }))} aria-label={k + ': ' + p.name + '. Tap to look closer.'}>
+                <TradingCard p={p} slot={k} tilt={false} />
+              </button>
             );
           })}
         </div>
+        <span className="hand-hint">Tap a card to look closer</span>
 
         {vs && (
           <div className="roster">
@@ -341,6 +340,7 @@ export function Results({
       {confetti > 0 && <Confetti density={confetti} />}
       {share && <ShareSheet info={info} onClose={() => setShare(false)} onToast={onToast} />}
       {scout && <Scout series={scout} gamesShown={scout.games.length} ours={rating} onClose={() => setScout(null)} />}
+      {inspect && <CardSheet p={inspect.p} slot={inspect.slot} blind={false} onClose={() => setInspect(null)} />}
       {levelPop && (
         <Sheet label="Level up" kind="center" onClose={() => setLevelPop(false)}>
           {(close) => (
@@ -437,5 +437,62 @@ function ShareSheet({ info, onClose, onToast }: { info: ResultInfo; onClose: () 
         </>
       )}
     </Sheet>
+  );
+}
+
+/**
+ * The draft, looked back on: a letter for the whole draft, every pick against the best one there
+ * was, and the best team the same spins could have made.
+ */
+function ReportCard({ review, par, blind }: { review: DraftReview; par?: { rating: TeamRating; wins: number; lineup: Lineup }; blind: boolean }) {
+  const best = review.best;
+  const flawless = review.winsLeft === 0 && review.score >= 99.5;
+  const parPct = par && par.rating.rating > 0 ? Math.round((100 * review.yours.rating) / par.rating.rating) : null;
+  return (
+    <div className="card report rise-in" style={{ animationDelay: '260ms' }}>
+      <div className="rep-head">
+        <div>
+          <span className="eyebrow">Draft report{blind ? ' · stats revealed' : ''}</span>
+          <small>{Math.round(review.score)}% of the best team your spins could make</small>
+        </div>
+        <b className={'disp rep-letter l-' + review.letter.charAt(0).toLowerCase()}>{review.letter}</b>
+      </div>
+      <ol className="rep-picks">
+        {review.picks.map((p, i) => (
+          <li key={i} className={'g-' + p.grade + ' rise-in'} style={{ animationDelay: 420 + i * 120 + 'ms' }}>
+            <span className="rd num">R{p.round + 1}</span>
+            <div className="who">
+              <strong>
+                {p.pick.name}
+                {p.pick.primedFrom ? ' ★' : ''}
+              </strong>
+              <small>
+                {p.trade ? 'Trade · ' : ''}
+                {p.slot} · {p.pick.abbr} {shortEra(p.pick.era)}
+                {p.best && p.grade !== 'best' ? ' · best: ' + lastName(p.best.name) + ' (+' + (p.bestGain - p.gain).toFixed(1) + ')' : ''}
+              </small>
+            </div>
+            <span className="chip">{GRADE_LABEL[p.grade]}</span>
+          </li>
+        ))}
+      </ol>
+      <div className={'rep-best' + (flawless ? ' flawless' : '')}>
+        <div className="rep-row">
+          <span className="eyebrow">{flawless ? 'Flawless draft' : 'Best team from your spins'}</span>
+          <b className="disp num">{record(best.rating.wins)}</b>
+        </div>
+        <small>{SLOTS.map((k) => (best.lineup[k] ? lastName(best.lineup[k]!.name) : '—')).join(' · ')}</small>
+        <span className="verdict-line">
+          {flawless ? 'You drafted the best team these spins allowed.' : review.winsLeft > 0 ? 'You left ' + review.winsLeft + ' win' + (review.winsLeft === 1 ? '' : 's') + ' on the table.' : 'Same record as the best team: nothing left on the table.'}
+        </span>
+      </div>
+      {par && parPct !== null && (
+        <div className="rep-par">
+          <span className="eyebrow">Today's par</span>
+          <b className="num">{record(par.wins)}</b>
+          <span className={'pct num' + (parPct >= 100 ? ' over' : '')}>{parPct}% of par</span>
+        </div>
+      )}
+    </div>
   );
 }

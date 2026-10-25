@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { isPerfect, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
+import { castGame } from '../engine/broadcast';
+import { gameOdds, homeGame, isPerfect, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
 import { GAMES, gradeFor } from '../engine/rating';
-import type { GameScore, Season } from '../engine/season';
+import { type GameScore, lineupKey, type Season } from '../engine/season';
 import { NFL } from '../engine/sport';
 import { type Lineup, SLOTS } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { Confetti, Fit, TeamChips } from './common';
+import { type CastGame, GameCast } from './GameCast';
 import { Flame } from './icons';
 import { reducedMotion } from './motion';
 import { oppNames, Scout, teamBar } from './Scout';
@@ -220,18 +222,10 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
   );
 }
 
-/** Pause before each playoff game; closeout games and Game 7s take longer, and a football game is one long beat. */
-function gameDelay(games: number[], n: number): number {
-  if (NFL) return 1150;
-  if (n === 0) return 320;
-  const [w, l] = seriesScore(games.slice(0, n));
-  if (w === 3 && l === 3) return 1100;
-  if (w === 3 || l === 3) return 720;
-  return 500;
-}
-
-export function Playoffs({ season, bracket, onDone }: { season: Season; bracket: Series[]; onDone: () => void }) {
+export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season: Season; bracket: Series[]; lineup: Lineup; ourName: string; onDone: () => void }) {
   const [idx, setIdx] = useState(0);
+  /** the round being watched live */
+  const [watching, setWatching] = useState<number | null>(null);
   const [shown, setShown] = useState(0);
   const [running, setRunning] = useState(false);
   const [champ, setChamp] = useState(false);
@@ -251,34 +245,49 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
   const curDone = shown >= cur.games.length;
   const out = playoffOutcome(bracket);
 
+  // every game of every round, told as it happens (the results are already decided)
+  const casts = useMemo(
+    () =>
+      bracket.map((ser, round): CastGame[] => {
+        const highSeed = season.wins >= ser.opp.wFull;
+        const key = lineupKey(lineup);
+        return ser.games.map((won, j) => ({
+          cast: castGame({
+            lineup,
+            opp: ser.opp,
+            won: won === 1,
+            score: NFL && ser.scores ? ser.scores[j] : null,
+            pre: gameOdds(season.rating, season.wins, ser.opp, round, j),
+            seed: key + ':' + round + ':' + j + ':' + ser.opp.year + ser.opp.team,
+          }),
+          n: j + 1,
+          where: NFL ? (round === 3 ? 'NEUTRAL' : highSeed ? 'HOME' : 'AWAY') : homeGame(j, highSeed) ? 'HOME' : 'AWAY',
+          decider: NFL || j === ser.games.length - 1,
+        }));
+      }),
+    [bracket, lineup]
+  );
+
   const play = (round: number) => {
-    const ser = bracket[round];
     setRunning(true);
     setShown(0);
-    let n = 0;
-    const step = () => {
-      n++;
-      const g = ser.games[n - 1];
-      if (g === 1) sfx.gameWin();
-      else sfx.gameLoss();
-      setShown(n);
-      if (n >= ser.games.length) {
-        timer.current = null;
-        setRunning(false);
-        if (ser.won) {
-          if (round === 3) {
-            sfx.title();
-            timer.current = window.setTimeout(() => setChamp(true), 650);
-          } else sfx.seriesWin();
-        } else sfx.seriesLoss();
-        return;
-      }
-      const d = gameDelay(ser.games, n);
-      if (d > 1000) sfx.heartbeat();
-      timer.current = window.setTimeout(step, d);
-    };
-    if (NFL) sfx.heartbeat();
-    timer.current = window.setTimeout(step, gameDelay(ser.games, 0));
+    setWatching(round);
+  };
+
+  /** the round is over: show it on the bracket */
+  const watched = () => {
+    const round = watching;
+    if (round === null) return;
+    const ser = bracket[round];
+    setWatching(null);
+    setShown(ser.games.length);
+    setRunning(false);
+    if (ser.won) {
+      if (round === 3) {
+        sfx.title();
+        timer.current = window.setTimeout(() => setChamp(true), 650);
+      } else sfx.seriesWin();
+    } else sfx.seriesLoss();
   };
 
   const action = () => {
@@ -415,6 +424,7 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
       {scout !== null && (
         <Scout series={bracket[scout]} gamesShown={scout < idx ? bracket[scout].games.length : scout === idx ? shown : 0} ours={season} onClose={() => setScout(null)} />
       )}
+      {watching !== null && <GameCast games={casts[watching]} round={ROUND_NAMES[watching]} opp={bracket[watching].opp} ourName={ourName} onDone={watched} />}
       {champ && out.title && <Champions season={season} bracket={bracket} onGo={onDone} />}
     </div>
   );
