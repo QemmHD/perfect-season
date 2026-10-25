@@ -6,6 +6,7 @@ import { ALL_MISSIONS_BONUS, advance, type GameEvent, missionsFor, nextStreak, r
 import { buildBracket, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
 import { rarityOf } from './engine/rarity';
 import { dailyPar, reviewDraft } from './engine/review';
+import { collect, SET_REWARD } from './engine/collection';
 import { GAMES, gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
 import { clearSportParam, NFL, type SportId, switchSport } from './engine/sport';
@@ -25,6 +26,7 @@ import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, 
 import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
 import { type Room, Search } from './ui/Search';
+import { Binder } from './ui/Binder';
 import { Playoffs, Reveal } from './ui/Season';
 import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
@@ -97,7 +99,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [screen, setScreen] = useState<Screen>('tab');
   const [run, setRun] = useState<Run | null>(null);
-  const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
@@ -427,6 +429,9 @@ export function App() {
     const out = bracket ? playoffOutcome(bracket) : null;
     const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked, vsName: oppName });
     const players = SLOTS.map((s) => draft.lineup[s]!) as Player[];
+    // the cards go into the binder: new ones, and team-decade sets they finish
+    const binder = collect(p0.collection ?? {}, players);
+    const setCoins = SET_REWARD * binder.sets.length;
     // the draft looked back on, and (Daily) the day's par
     const review = draft.log?.length ? reviewDraft(draft.log, draft.lineup) : undefined;
     const par = r.mode === 'daily' && r.dailyKey ? dailyPar(r.dailyKey) : undefined;
@@ -519,7 +524,8 @@ export function App() {
       }
       return {
         ...p,
-        coins: p.coins + rewards.coins + LEVEL_UP_COINS * levelUps.length,
+        collection: collect(p.collection ?? {}, players).next,
+        coins: p.coins + rewards.coins + LEVEL_UP_COINS * levelUps.length + setCoins,
         xp: p.xp + rewards.xp,
         inventory: inv,
         firstRun: false,
@@ -569,6 +575,8 @@ export function App() {
       missionsDone,
       review,
       par,
+      fresh: binder.fresh,
+      sets: binder.sets,
     };
     setRun({ ...r, result });
     setScreen('results');
@@ -643,7 +651,7 @@ export function App() {
         }}
       />
     );
-  else if (tab === 'profile') page = <ProfilePage profile={profile} onName={NET_ON ? () => (sfx.click(), setModal('name')) : undefined} />;
+  else if (tab === 'profile') page = <ProfilePage profile={profile} onName={NET_ON ? () => (sfx.click(), setModal('name')) : undefined} onBinder={() => (sfx.click(), setModal('binder'))} />;
   else
     page = (
       <HomePage
@@ -807,6 +815,7 @@ export function App() {
         />
       )}
       {modal === 'howto' && <HowToSheet onClose={() => setModal(null)} />}
+      {modal === 'binder' && <Binder collection={profile.collection ?? {}} onClose={() => setModal(null)} />}
       {modal === 'name' && (
         <NameSheet
           profile={profile}

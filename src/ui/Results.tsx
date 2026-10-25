@@ -3,6 +3,8 @@ import { BOOSTER_NAMES, LEVEL_UP_COINS, levelInfo, type Rewards } from '../engin
 import { playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
 import { CATEGORY_LABELS, GAMES, gradeFor, type TeamRating } from '../engine/rating';
 import { type DraftReview, GRADE_LABEL } from '../engine/review';
+import { SET_REWARD } from '../engine/collection';
+import { CELL_BY_ID } from '../engine/data';
 import { NFL } from '../engine/sport';
 import type { Booster, Lineup, Player } from '../engine/types';
 import { SLOTS } from '../engine/types';
@@ -38,6 +40,9 @@ export interface ResultInfo {
   review?: DraftReview;
   /** Daily: the best team from the day's spins */
   par?: { lineup: Lineup; rating: TeamRating; wins: number };
+  /** cards new to the binder, and team-decade sets this draft finished */
+  fresh?: string[];
+  sets?: string[];
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
@@ -148,7 +153,7 @@ export function Results({
   const [levelPop, setLevelPop] = useState(false);
   const [inspect, setInspect] = useState<{ p: Player; slot: string } | null>(null);
   const [grow, setGrow] = useState(false);
-  const gained = info.rewards.coins + LEVEL_UP_COINS * info.levelUps.length;
+  const gained = info.rewards.coins + LEVEL_UP_COINS * info.levelUps.length + SET_REWARD * (info.sets?.length ?? 0);
   const chipRef = useRef<HTMLSpanElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -267,13 +272,26 @@ export function Results({
           {SLOTS.map((k, i) => {
             const p = info.lineup[k] as Player;
             return (
-              <button key={k} className="hand-card rise-in" style={{ animationDelay: 320 + i * 70 + 'ms' }} onClick={() => (sfx.click(), setInspect({ p, slot: k }))} aria-label={k + ': ' + p.name + '. Tap to look closer.'}>
+              <button key={k} className="hand-card rise-in" style={{ animationDelay: 320 + i * 70 + 'ms' }} onClick={() => (sfx.click(), setInspect({ p, slot: k }))} aria-label={k + ': ' + p.name + (info.fresh?.includes(p.id) ? ', new to your binder' : '') + '. Tap to look closer.'}>
                 <TradingCard p={p} slot={k} tilt={false} />
+                {info.fresh?.includes(p.id) && <span className="newtag">NEW</span>}
               </button>
             );
           })}
         </div>
-        <span className="hand-hint">Tap a card to look closer</span>
+        <span className="hand-hint">
+          Tap a card to look closer
+          {info.fresh?.length ? ' · ' + info.fresh.length + ' new to your binder' : ''}
+        </span>
+        {info.sets?.map((id, i) => (
+          <div key={id} className="setdone rise-in" style={{ animationDelay: 700 + i * 120 + 'ms' }} role="status">
+            <span className="eyebrow">Set complete</span>
+            <strong>
+              {CELL_BY_ID[id]?.era} {CELL_BY_ID[id]?.name}
+            </strong>
+            <b className="num">+{SET_REWARD} coins</b>
+          </div>
+        ))}
 
         {vs && (
           <div className="roster">

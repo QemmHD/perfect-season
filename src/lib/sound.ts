@@ -174,6 +174,8 @@ export const sfx = {
     vibrate(24);
   },
   whoosh: () => noise(0.22, { gain: 0.05, freq: 1800 }),
+  /** a value adding onto the team rating: each one a step higher */
+  count: (i: number) => tone(523 * Math.pow(2, i / 6), 0.09, { type: 'triangle', gain: 0.07 }),
   /** the game is on: a referee's whistle */
   whistle: () => {
     tone(2900, 0.28, { type: 'sine', gain: 0.05 });

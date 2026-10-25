@@ -401,3 +401,58 @@ function stars(input: { lineup: Lineup; opp: PlayoffTeam }, us: number, them: nu
   // the winner's star first
   return us > them ? out : out.reverse();
 }
+
+// ---------- the regular season's headlines ----------
+
+export interface Headline {
+  /** the game (0-based) it belongs to */
+  i: number;
+  text: string;
+}
+
+/**
+ * A few games of the season worth a headline, credited to your players: football's routs,
+ * thrillers, shutouts and snapped streaks; basketball's big scoring nights and long streaks.
+ * Seeded by the season, spaced out so each gets its moment.
+ */
+export function seasonHeadlines(lineup: Lineup, seq: number[], scores: { us: number; them: number; opp: string; home: boolean }[] | undefined, seed: string): Headline[] {
+  const rand = rng(hashString('headlines:' + seed));
+  const ps = SLOTS.map((k) => lineup[k]).filter(Boolean) as Player[];
+  const scorers = ps.filter((p) => p.pos[0] !== 'DEF');
+  const def = ps.find((p) => p.pos[0] === 'DEF');
+  if (!scorers.length) return [];
+  const who = () => short(weighted(scorers, (p) => p.val * p.val, rand).name);
+  const cands: Headline[] = [];
+  let streak = 0;
+  seq.forEach((x, i) => {
+    const g = scores?.[i];
+    const at = g ? (g.home ? 'vs ' : 'at ') + g.opp : '';
+    if (x === 1) {
+      streak++;
+      if (NFL && g) {
+        const m = g.us - g.them;
+        if (g.them === 0 && def) cands.push({ i, text: short(def.name) + ' pitch a shutout, ' + g.us + '–0 ' + at });
+        else if (m >= 21) cands.push({ i, text: who() + ' runs wild in a ' + g.us + '–' + g.them + ' rout ' + at });
+        else if (m <= 3) cands.push({ i, text: who() + ' seals a ' + g.us + '–' + g.them + ' thriller ' + at });
+      } else if (!NFL) {
+        if (streak === 10 || streak === 20 || streak === 30) cands.push({ i, text: streak + ' straight wins: ' + who() + ' leads the way' });
+        else if (rand() < 0.1) {
+          const p = weighted(scorers, (q) => (q.s.pts ?? 10) ** 2, rand);
+          const big = (p.s.ast ?? 0) >= 6 || (p.s.reb ?? 0) >= 9;
+          if (big && rand() < 0.4)
+            cands.push({ i, text: short(p.name) + ' triple-double: ' + Math.max(10, Math.round((p.s.pts ?? 12) * 1.15)) + '-' + Math.max(10, Math.round((p.s.reb ?? 6) * 1.4)) + '-' + Math.max(10, Math.round((p.s.ast ?? 5) * 1.5)) });
+          else cands.push({ i, text: short(p.name) + ' drops ' + Math.round((p.s.pts ?? 12) * (1.55 + rand() * 0.55)) + ' in a win' });
+        }
+      }
+    } else {
+      if (streak >= (NFL ? 5 : 12)) cands.push({ i, text: streak + '-game win streak snapped' + (at ? ' ' + at : '') });
+      streak = 0;
+    }
+  });
+  // spaced out, a handful a season
+  // basketball's ticker runs fast: a headline needs a quarter of the season to itself
+  const gap = NFL ? 3 : 22;
+  const out: Headline[] = [];
+  for (const c of cands) if (!out.length || c.i - out[out.length - 1].i >= gap) out.push(c);
+  return out.slice(0, NFL ? 5 : 4);
+}

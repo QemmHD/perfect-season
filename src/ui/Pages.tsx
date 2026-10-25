@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { summarize } from '../engine/collection';
 import { BOOSTER_HELP, BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, levelInfo } from '../engine/economy';
 import { ROUNDS } from '../engine/draft';
 import { gradeFor } from '../engine/rating';
@@ -358,10 +359,11 @@ export function BoostersPage(props: { profile: Profile; onBuy: (b: Booster) => v
   );
 }
 
-export function ProfilePage(props: { profile: Profile; onName?: () => void }) {
+export function ProfilePage(props: { profile: Profile; onName?: () => void; onBinder: () => void }) {
   const p = props.profile;
   const lv = levelInfo(p.xp);
   const best = bestRuns(p.history, 'all', 1)[0];
+  const bsum = useMemo(() => summarize(p.collection ?? {}), [p.collection]);
   const stats: [string, string | number][] = [
     ['Drafts', p.stats.games],
     ['Best record', best ? record(best.wins) : '—'],
@@ -402,6 +404,22 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void }) {
             </div>
           ))}
         </div>
+        <button className="binder-card rise-in" onClick={props.onBinder}>
+          <span className="stack" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="txt">
+            <b className="disp">BINDER</b>
+            <small>
+              {bsum.cards} card{bsum.cards === 1 ? '' : 's'} · {bsum.sets} set{bsum.sets === 1 ? '' : 's'} complete
+            </small>
+          </span>
+          <span className="go" aria-hidden="true">
+            ›
+          </span>
+        </button>
         <span className="eyebrow">Recent drafts</span>
         {p.history.length ? p.history.slice(0, 20).map((r, i) => <HistRow key={i} r={r} i={i} />) : <div className="empty">No drafts yet. Your history shows up here.</div>}
         <p className="note">Progress is saved on this phone. The home-screen app and Safari keep separate progress.</p>

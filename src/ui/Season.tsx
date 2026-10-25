@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { castGame } from '../engine/broadcast';
+import { castGame, seasonHeadlines } from '../engine/broadcast';
 import { gameOdds, homeGame, isPerfect, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
-import { GAMES, gradeFor } from '../engine/rating';
+import { BALANCE_FLOOR, GAMES, gradeFor } from '../engine/rating';
 import { type GameScore, lineupKey, type Season } from '../engine/season';
 import { NFL } from '../engine/sport';
-import { type Lineup, SLOTS } from '../engine/types';
+import { type Lineup, type Player, SLOTS } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { Confetti, Fit, TeamChips } from './common';
 import { type CastGame, GameCast } from './GameCast';
 import { Flame } from './icons';
-import { reducedMotion } from './motion';
+import { CountUp, reducedMotion } from './motion';
 import { oppNames, Scout, teamBar } from './Scout';
-import { CHAMPS, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
+import { cardName, CHAMPS, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
 
 /** Delay before each game of the reveal: quick through the middle, slower at the end, and
     one beat per game when an unbeaten season gets close. Football's 17 games each get a moment. */
@@ -72,7 +72,33 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
   /** milestone pops: every 10 wins, and the 50th win that clinches a playoff spot */
   const [pop, setPop] = useState<{ id: number; text: string; clinch: boolean } | null>(null);
 
+  // first the team rating, built player by player, then the balance it gets
+  const players = useMemo(() => SLOTS.map((k) => lineup[k]).filter(Boolean) as Player[], [lineup]);
+  const n = players.length;
+  const [build, setBuild] = useState(() => (reducedMotion() ? n + 1 : 0));
+  const built = build > n;
   useEffect(() => {
+    if (built) return;
+    const t = window.setTimeout(
+      () => {
+        const next = build + 1;
+        setBuild(next);
+        if (next <= n) sfx.count(next);
+        else sfx.stamp();
+      },
+      build === 0 ? 450 : build === n ? 560 : 340
+    );
+    return () => clearTimeout(t);
+  }, [build]);
+  const mult = BALANCE_FLOOR + (1 - BALANCE_FLOOR) * season.balance;
+  const running = build <= n ? players.slice(0, build).reduce((a, p) => a + p.val, 0) : season.rating;
+
+  // a few games get a headline, credited to your players
+  const headlines = useMemo(() => seasonHeadlines(lineup, season.seq, season.scores, lineupKey(lineup)), [season, lineup]);
+  const [hl, setHl] = useState<{ text: string; until: number } | null>(null);
+
+  useEffect(() => {
+    if (!built) return;
     if (reducedMotion()) {
       setTick(GAMES);
       return;
@@ -91,17 +117,19 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
           (m.clinch ? sfx.seriesWin : sfx.coin)();
         }
       }
+      const h = headlines.find((x) => x.i === i - 1);
+      if (h) setHl({ text: h.text, until: Date.now() + (NFL ? 1300 : 1500) });
       if (NFL || delays[i - 1] >= SLOW) (won ? sfx.gameWin : sfx.gameLoss)();
       else (won ? sfx.tickerWin : sfx.tickerLoss)();
       if (i >= GAMES) return;
       if (delays[i] >= SLOW) sfx.heartbeat();
       timer.current = window.setTimeout(step, delays[i]);
     };
-    timer.current = window.setTimeout(step, 420);
+    timer.current = window.setTimeout(step, 750);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [season]);
+  }, [season, built]);
 
   const g = gradeFor(season.wins);
   useEffect(() => {
@@ -120,15 +148,29 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
   const skip = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
+    setBuild(n + 1);
     setTick(GAMES);
   };
+  const showBuild = tick === 0 && !done;
+  const headline = hl && !done && Date.now() < hl.until ? hl.text : null;
   const unbeaten = done && season.wins === GAMES;
   const madeIt = season.wins >= PLAYOFF_MIN_WINS;
 
   return (
     <div className="screen reveal">
       <span className="eyebrow wide">Regular season · {label}</span>
-      <TeamChips players={SLOTS.map((s) => lineup[s])} stagger />
+      <TeamChips players={SLOTS.map((s) => lineup[s])} stagger lit={showBuild ? build - 1 : -1} on={showBuild ? build : 99} />
+      {showBuild ? (
+        <div className={'board build' + (built ? ' done' : '')} aria-live="polite" aria-label={'Team rating ' + running.toFixed(1)}>
+          <span className="lbl">TEAM RATING</span>
+          <b className="disp num">
+            <CountUp value={running} from={0} ms={300} format={(v) => v.toFixed(1)} />
+          </b>
+          <span className={'add' + (built ? ' mult' : '')} key={build}>
+            {build === 0 ? 'Your starters…' : build <= n ? '+' + players[build - 1].val.toFixed(1) + ' ' + cardName(players[build - 1]) : '× ' + mult.toFixed(2) + ' balance'}
+          </span>
+        </div>
+      ) : (
       <div className={'board' + (slowBeat ? ' tense' : '') + (unbeaten ? ' gold' : '')} aria-live="polite" aria-label={'Record ' + w + ' and ' + l}>
         {!done && streak >= 3 && (
           <span className={'winstreak' + (streak >= 10 ? ' hot' : '')} key={'s' + streak} aria-hidden="true">
@@ -149,14 +191,21 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
           <span>LOSSES</span>
         </div>
       </div>
+      )}
       {pop && !done && (
         <span className={'milestone' + (pop.clinch ? ' clinch' : '')} key={pop.id} aria-hidden="true">
           {pop.text}
         </span>
       )}
-      <span className="eyebrow gameno">
-        {done ? 'Final record' : tick === 0 ? (NFL ? 'Kickoff' : 'Tip-off') : (NFL ? 'Week ' : 'Game ') + tick + ' of ' + GAMES + (streak >= 5 ? ' · ' + streak + ' straight wins' : '')}
-      </span>
+      {headline ? (
+        <span className="eyebrow gameno headline" key={headline}>
+          {headline}
+        </span>
+      ) : (
+        <span className="eyebrow gameno">
+          {done ? 'Final record' : tick === 0 ? (NFL ? 'Kickoff' : 'Tip-off') : (NFL ? 'Week ' : 'Game ') + tick + ' of ' + GAMES + (streak >= 5 ? ' · ' + streak + ' straight wins' : '')}
+        </span>
+      )}
       {NFL && season.scores ? (
         <Schedule scores={season.scores} tick={tick} />
       ) : (

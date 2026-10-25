@@ -63,6 +63,8 @@ export interface Profile {
   name: string | null;
   /** This player's leaderboard entries (their best per board) and the ones still to send */
   lb: { entries: Record<string, EntryContent>; dirty: string[] };
+  /** the binder: every card drafted (card id -> times), this sport's */
+  collection: Record<string, number>;
   h2h: H2HStats;
   /** Days in a row with a game played; `last` is the Eastern date of the latest */
   streak: { count: number; last: string | null; best: number };
@@ -117,6 +119,7 @@ export function freshProfile(): Profile {
     stats: { games: 0, titles: 0, perfect: 0, undefeated: 0, vsWins: 0, legends: 0, h2hGames: 0 },
     name: null,
     lb: { entries: {}, dirty: [] },
+    collection: {},
     h2h: freshH2H(),
     streak: { count: 0, last: null, best: 0 },
     rewardDay: null,
@@ -161,6 +164,7 @@ function loadFrom(p: Profile | null): Profile {
       stats: { ...base.stats, ...p.stats },
       lb: p.lb && p.lb.entries ? { entries: p.lb.entries, dirty: Array.isArray(p.lb.dirty) ? p.lb.dirty : [] } : base.lb,
       h2h: { ...base.h2h, ...p.h2h },
+      collection: p.collection && typeof p.collection === 'object' ? p.collection : {},
       streak: { ...base.streak, ...p.streak },
     };
   } catch {
