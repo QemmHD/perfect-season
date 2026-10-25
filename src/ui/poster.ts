@@ -544,16 +544,8 @@ function pattern(g: CanvasRenderingContext2D, era: Era, p: Player, x: number, y:
 
 function plate(g: CanvasRenderingContext2D, era: Era, p: Player, x: number, y: number, w: number, h: number) {
   if (era === 'vintage') g.fillStyle = '#efe3c4';
-  else if (era === 'retro') {
-    const gr = g.createLinearGradient(x, y, x + w, y);
-    gr.addColorStop(0, p.c1);
-    gr.addColorStop(0.6, p.c1);
-    gr.addColorStop(0.6, p.c2);
-    gr.addColorStop(0.74, p.c2);
-    gr.addColorStop(0.74, p.c1);
-    gr.addColorStop(1, p.c1);
-    g.fillStyle = gr;
-  } else if (era === 'chrome') {
+  else if (era === 'retro') g.fillStyle = p.c1;
+  else if (era === 'chrome') {
     const gr = g.createLinearGradient(x, y, x, y + h);
     gr.addColorStop(0, '#1a2328');
     gr.addColorStop(1, '#070b0e');
@@ -561,6 +553,13 @@ function plate(g: CanvasRenderingContext2D, era: Era, p: Player, x: number, y: n
   } else if (era === 'diecut') g.fillStyle = 'rgba(0,0,0,0.78)';
   else g.fillStyle = 'rgba(2,8,12,0.62)';
   g.fillRect(x, y, w, h);
+  if (era === 'retro') {
+    // the two-tone band above the name, as on the card in the app
+    g.fillStyle = p.c2;
+    g.fillRect(x, y, w, h * 0.1);
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    g.fillRect(x, y + h * 0.1, w, h * 0.035);
+  }
   if (era === 'chrome' || era === 'diecut') {
     g.fillStyle = era === 'chrome' ? 'rgba(255,255,255,0.35)' : p.c2;
     g.fillRect(x, y, w, era === 'chrome' ? 1.5 : 4);

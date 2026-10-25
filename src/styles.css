@@ -6015,7 +6015,8 @@ button.friendcard:active {
   opacity: 0.9;
 }
 .era-retro .tc-plate {
-  background: linear-gradient(100deg, var(--c1) 0 60%, var(--c2) 60% 74%, var(--c1) 74%);
+  /* the decade's two-tone band, above the name rather than through it */
+  background: linear-gradient(180deg, var(--c2) 0 3px, rgba(0, 0, 0, 0.35) 3px 4px, var(--c1) 4px);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 .tcard.era-chrome {
