@@ -57,6 +57,12 @@ export function drawPoster(info: ResultInfo): string | null {
     g.fillStyle = TEAL;
     g.font = disp(58);
     g.fillText('PERFECT SEASON', 64, 118);
+    // where to play, under the name (any address fits here)
+    condensed(false);
+    g.fillStyle = hexA(TEAL, 0.75);
+    g.font = body(26, 700);
+    fitText(g, where(), 64, 162, W - 128);
+    condensed(true);
     const tag = (NFL ? 'NFL · ' : 'NBA · ') + (daily && info.dailyNo ? 'DAILY #' + info.dailyNo : r.mode === '1v1' ? (r.online ? 'HEAD TO HEAD' : '1 VS 1') : r.mode.toUpperCase());
     pill(g, tag, W - 64, 86, 'right');
 
@@ -131,11 +137,8 @@ export function drawPoster(info: ResultInfo): string | null {
     g.fillRect(0, H - 84, W, 84);
     g.fillStyle = INK;
     g.font = body(30, 800);
-    g.fillText(NFL ? 'Can you go 17–0 and win the Super Bowl?' : 'Can you go 82–0, then 16–0?', 64, H - 32);
-    g.fillStyle = TEAL;
-    g.font = body(26, 700);
-    g.textAlign = 'right';
-    g.fillText(where(), W - 64, H - 32);
+    g.textAlign = 'center';
+    g.fillText(NFL ? 'Can you go 17–0 and win the Super Bowl?' : 'Can you go 82–0, then 16–0?', W / 2, H - 32);
     g.textAlign = 'left';
     return c.toDataURL('image/png');
   } catch {
