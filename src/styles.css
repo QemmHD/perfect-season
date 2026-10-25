@@ -39,6 +39,20 @@ body {
   height: 100%;
   background: var(--bg);
 }
+/* iOS 26 sizes a home-screen app's viewport short by the status bar height while the page is
+   shorter than the screen (WebKit bug 301108): the frame then stops ~59pt above the bottom and
+   nothing paints below it. A page at least as tall as the screen gets the full viewport. The cap
+   keeps apps installed with an opaque status bar (top inset 0) from scrolling. */
+@media (display-mode: standalone) {
+  html {
+    min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px)));
+  }
+  /* the page must be able to scroll for iOS to hand over the full height (a drag does it); the
+     game itself never scrolls: #root is fixed and .viewport clips */
+  body {
+    overflow: visible;
+  }
+}
 html {
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
@@ -742,7 +756,7 @@ button:focus-visible {
 }
 .fit-compact .hero {
   margin-top: 8px;
-  min-height: 96px;
+  min-height: 88px;
 }
 .hero canvas {
   position: absolute;
@@ -810,6 +824,8 @@ button:focus-visible {
 .sports .chip {
   height: 28px;
 }
+/* the NBA / NFL switch takes the tagline's place on shorter screens */
+.fit-tight .tagline,
 .fit-compact .tagline,
 .fit-compact .sports {
   display: none;
@@ -5048,7 +5064,7 @@ button.friendcard:active {
   margin-top: 4px;
 }
 .fit-compact .sportswitch button {
-  height: 26px;
+  height: 24px;
 }
 .sportfade {
   position: fixed;

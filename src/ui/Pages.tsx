@@ -7,6 +7,7 @@ import { type Booster, BOOSTERS, type BotLevel, type Mode } from '../engine/type
 import { bestRuns, type Profile, type RunRecord } from '../lib/profile';
 import { sfx } from '../lib/sound';
 import { APP_VERSION } from '../lib/update';
+import { viewportInfo } from '../stage';
 import type { OnlineCount } from '../net/match';
 import { NET_ON } from '../net/nostr';
 import { Fit, lastName, Sheet } from './common';
@@ -145,7 +146,7 @@ export function HomePage(props: {
           </div>
         </div>
       </ArenaHero>
-      <p className="tagline">Spin a team and a decade. Draft {SPELLED[ROUNDS]} legends. Go perfect.</p>
+      <p className="tagline">Spin a team and decade, draft {SPELLED[ROUNDS]} legends, go perfect.</p>
       <div className="statstrip">
         <StreakChip count={props.streak} onClick={props.onStreak} />
         {props.online && <LiveCount online={props.online.online} queue={props.online.searching} />}
@@ -445,7 +446,9 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
               ? 'Every NFL quarterback, running back, receiver and tight end from 1970 through ' + props.latest + ', and every team’s defense by points allowed, from ' + props.source + '.'
               : 'Every NBA player from 1959–60 through ' + (props.latest - 1) + '–' + String(props.latest).slice(2) + ', from ' + props.source + '. Steals and blocks before 1973–74 weren’t recorded and are estimated.'}
           </p>
-          <p className="note num">Version {APP_VERSION}</p>
+          <p className="note num">
+            Version {APP_VERSION} · {viewportInfo()}
+          </p>
           <button className="btn primary" onClick={() => close()}>
             DONE
           </button>

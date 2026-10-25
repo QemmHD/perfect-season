@@ -36,6 +36,14 @@
         height: 100%;
         background: #04121a;
       }
+      /* iOS 26 home-screen apps get a viewport one status bar short while the page is shorter than
+         the screen (WebKit bug 301108); a page as tall as the screen gets the full viewport. Here so it
+         applies from the first frame; the same rule is in styles.css */
+      @media (display-mode: standalone) {
+        html {
+          min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px)));
+        }
+      }
     </style>
   </head>
   <body>

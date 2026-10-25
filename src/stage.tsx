@@ -115,6 +115,54 @@ function measure(root: HTMLElement, probe: HTMLElement | null): Box {
   return { k, h, sat, sab, content, fit: framed ? fitFor(h) : fitFor(content), framed, rot, transform };
 }
 
+const standaloneIOS = () => (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+/**
+ * The screen height of an iPhone home-screen app held upright, drawn under a see-through status
+ * bar (top inset 20+), filling the screen's width: the height its page should get. 0 otherwise
+ * (Safari tabs, Android, iPad windows, sideways, opaque status bar).
+ */
+function fullScreenHeight(topInset: number): number {
+  if (!standaloneIOS() || innerWidth > innerHeight || topInset < 20) return 0;
+  const short = Math.min(screen.width, screen.height);
+  const tall = Math.max(screen.width, screen.height);
+  return short <= 600 && Math.abs(innerWidth - short) <= 1 ? tall : 0;
+}
+
+/**
+ * The screen's height the page isn't getting, in points: iOS 26 can leave a home-screen app's
+ * viewport one status bar short (WebKit bug 301108). 0 when it's fine.
+ */
+function shortfall(topInset: number, rootH: number): number {
+  const tall = fullScreenHeight(topInset);
+  // the smallest reading: iOS 27 has been seen with innerHeight right but the document short
+  const got = Math.min(innerHeight, document.documentElement.clientHeight || innerHeight, rootH || innerHeight);
+  const gap = tall ? tall - got : 0;
+  // only a status-bar-sized gap: a keyboard is far taller
+  return gap >= 20 && Math.abs(gap - topInset) <= 4 ? gap : 0;
+}
+
+/**
+ * Keep the page exactly screen-tall in that case. A page shorter than the screen is what makes
+ * iOS shorten the viewport; the CSS rule in styles.css does the same, but leans on 100lvh, which
+ * some iOS releases report short as well. Exactly the screen's height never scrolls once the
+ * viewport is right. Cleared everywhere else (a sideways phone must not get a portrait-tall page).
+ */
+function fitDocument(topInset: number): void {
+  const tall = fullScreenHeight(topInset);
+  const want = tall ? tall + 'px' : '';
+  const html = document.documentElement;
+  if (html.style.minHeight !== want) html.style.minHeight = want;
+}
+
+/** What the page and the screen report, for Settings (and for a bug report from a real phone). */
+export function viewportInfo(): string {
+  const doc = document.documentElement.clientHeight;
+  const app = document.getElementById('root')?.clientHeight ?? 0;
+  const sc = Math.min(screen.width, screen.height) + '×' + Math.max(screen.width, screen.height);
+  return 'view ' + Math.round(innerWidth) + '×' + Math.round(innerHeight) + (doc !== innerHeight || app !== innerHeight ? ' (' + doc + '/' + app + ')' : '') + ' · screen ' + sc + (standaloneIOS() ? ' · home screen' : '');
+}
+
 /** An element's box in frame px, whatever the frame's scale and rotation. */
 export function frameRect(el: Element): { x: number; y: number; w: number; h: number } {
   const stage = el.closest('.stage');
@@ -150,6 +198,7 @@ export function Stage({ children }: { children: React.ReactNode }) {
     const root = rootRef.current!;
     let raf = 0;
     const apply = () => {
+      fitDocument(readInsets(probeRef.current)[0]);
       const next = measure(root, probeRef.current);
       setBox((old) => (old && old.transform === next.transform && old.h === next.h && old.sat === next.sat && old.sab === next.sab ? old : next));
     };
@@ -161,20 +210,72 @@ export function Stage({ children }: { children: React.ReactNode }) {
     const onRotate = () => {
       apply();
       window.setTimeout(apply, 350);
+      window.setTimeout(apply, 800);
+    };
+    // iOS settles sizes over a moment: measure again a few times after anything that moves them
+    const settle = () => [0, 150, 400, 1000].forEach((ms) => window.setTimeout(update, ms));
+    // The page-height rules (styles.css, fitDocument) normally get a home-screen app its whole
+    // screen. If iOS still leaves the viewport a status bar short, first a tiny scroll, which is
+    // what a drag does by hand, then a forced re-layout of the app. Once per launch and per return.
+    let healed = false;
+    const short = () => shortfall(readInsets(probeRef.current)[0], root.clientHeight);
+    const heal = () => {
+      if (healed || document.visibilityState !== 'visible') return;
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+      if (!short()) return;
+      healed = true;
+      window.scrollTo(0, 1);
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        settle();
+        window.setTimeout(() => {
+          const app = document.getElementById('root');
+          if (!short() || !app) return;
+          app.style.display = 'none';
+          void app.offsetHeight;
+          app.style.display = '';
+          settle();
+        }, 250);
+      });
+    };
+    // after the keyboard closes iOS can leave the page scrolled, or the viewport short again
+    const onBlur = () =>
+      window.setTimeout(() => {
+        if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+        healed = false;
+        heal();
+        settle();
+      }, 140);
+    const onShow = () => {
+      if (document.visibilityState !== 'visible') return;
+      healed = false;
+      settle();
+      window.setTimeout(heal, 400);
     };
     apply();
+    const healT = window.setTimeout(heal, 600);
     const ro = new ResizeObserver(update);
     ro.observe(root);
+    // the probe's padding is the safe-area insets: it changes size when they arrive late
+    if (probeRef.current) ro.observe(probeRef.current, { box: 'border-box' });
     window.addEventListener('resize', update);
     window.addEventListener('orientationchange', onRotate);
     screen.orientation?.addEventListener?.('change', onRotate);
     window.visualViewport?.addEventListener('resize', update);
+    window.addEventListener('pageshow', onShow);
+    document.addEventListener('visibilitychange', onShow);
+    document.addEventListener('focusout', onBlur);
     return () => {
       ro.disconnect();
+      clearTimeout(healT);
       window.removeEventListener('resize', update);
       window.removeEventListener('orientationchange', onRotate);
       screen.orientation?.removeEventListener?.('change', onRotate);
       window.visualViewport?.removeEventListener('resize', update);
+      window.removeEventListener('pageshow', onShow);
+      document.removeEventListener('visibilitychange', onShow);
+      document.removeEventListener('focusout', onBlur);
       cancelAnimationFrame(raf);
     };
   }, []);
