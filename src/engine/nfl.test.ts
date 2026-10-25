@@ -100,6 +100,13 @@ describe.skipIf(!NFL)('football rules', () => {
     expect(whyUnavailable(s, d80)).toBe(null);
     s = draftReducer(s, { type: 'place', playerId: d80.id, slot: 'DEF' });
     expect(s.lineup.DEF?.id).toBe(d80.id);
+    // never for the very line already on the team (picked earlier this turn with Double)
+    let u = newDraft('classic', 'pro', null);
+    u = draftReducer(u, { type: 'land', cellId: 'CHI-1980', ptr: 0 });
+    u = draftReducer(u, { type: 'arm', booster: 'double' });
+    u = draftReducer(u, { type: 'place', playerId: d80.id, slot: 'DEF' });
+    u = draftReducer(u, { type: 'arm', booster: 'trade' });
+    expect(whyUnavailable(u, d80)).toBe('dup');
     // a back held at RB could take FLEX in a trade and be on the team twice
     const p70 = find('CHI-1970', 'Walter Payton');
     const p80 = find('CHI-1980', 'Walter Payton');
