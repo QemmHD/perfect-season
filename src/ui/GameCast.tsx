@@ -57,6 +57,8 @@ export function GameCast({
   seriesBefore?: [number, number];
   onDone: () => void;
 }) {
+  // a basketball playoff round is a series; a single game (head to head) isn't
+  const series = !NFL && games.length > 1;
   const reduced = reducedMotion();
   const [gi, setGi] = useState(0);
   const [p, setP] = useState(0);
@@ -225,12 +227,10 @@ export function GameCast({
       <div className="cast-head">
         <span className="eyebrow">
           {round}
-          {!NFL ? ' · Game ' + g.n : ''}
+          {series ? ' · Game ' + g.n : ''}
         </span>
-        <span className="cast-opp">
-          vs {opp.year} {opp.team}
-        </span>
-        {!NFL && (
+        <span className="cast-opp">vs {opp.year ? opp.year + ' ' + opp.team : opp.team}</span>
+        {series && (
           <span className="cast-series num" aria-label={'Series ' + sw + ' to ' + sl}>
             SERIES {sw}–{sl}
           </span>
@@ -353,7 +353,7 @@ export function GameCast({
               {fast ? '4× FAST' : '1× SPEED'}
             </button>
             <button className="btn ghost" onClick={skip}>
-              {NFL ? 'SKIP TO FINAL' : 'SKIP SERIES'}
+              {series ? 'SKIP SERIES' : 'SKIP TO FINAL'}
             </button>
           </>
         ) : (

@@ -2,6 +2,8 @@
 // Pure presentation. The engine has already decided who won (and, in football, the final score);
 // this only writes a game that agrees with it, seeded so the same game always tells the same way.
 import { type Rand, hashString, rng } from './rng';
+import type { TeamRating } from './rating';
+import { expectedScores, gameScore } from './season';
 import { NFL } from './sport';
 import type { Lineup, OppPlayer, Player, PlayoffTeam } from './types';
 import { SLOTS } from './types';
@@ -188,8 +190,13 @@ interface Cast {
   scorers: { name: string; w: number; pos: string; three: number }[];
 }
 
+/** The lineup's players in a fixed order (by id), whatever spots they sit in: two phones seat a team differently. */
+function playersOf(lineup: Lineup): Player[] {
+  return (SLOTS.map((k) => lineup[k]).filter(Boolean) as Player[]).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
 function ourCast(lineup: Lineup): Cast {
-  const ps = SLOTS.map((k) => lineup[k]).filter(Boolean) as Player[];
+  const ps = playersOf(lineup);
   if (!NFL) return { backs: [], catchers: [], scorers: ps.map((p) => ({ name: p.name, w: p.s.pts ?? 10, pos: p.pos[0], three: /G/.test(p.pos[0]) ? 0.45 : p.pos[0] === 'SF' ? 0.35 : 0.15 })) };
   const qb = ps.find((p) => p.pos[0] === 'QB');
   const def = ps.find((p) => p.pos[0] === 'DEF');
@@ -229,10 +236,10 @@ interface Credit {
   passTd: number;
 }
 
-function footballText(side: Side, v: number, c: Cast, rand: Rand, credit: (name: string, f: Partial<Credit>) => void): { text: string; big: boolean } {
+function footballText(side: Side, v: number, c: Cast, rand: Rand, credit: (name: string, f: Partial<Credit>) => void, label: string | null): { text: string; big: boolean } {
   if (v === 3) {
     const d = 22 + Math.floor(rand() * 32);
-    return { text: (side === 'us' ? 'Field goal' : 'Their field goal') + ' from ' + d + ' yards', big: false };
+    return { text: (label ? label + ' field goal' : 'Field goal') + ' from ' + d + ' yards', big: false };
   }
   if (v === 2) return { text: side === 'us' && c.defense ? short(c.defense) + ' sack in the end zone: safety' : 'Safety', big: true };
   const tail = v === 8 ? ', and the two-point try is good' : v === 6 ? ' (the extra point is no good)' : '';
@@ -254,7 +261,7 @@ function footballText(side: Side, v: number, c: Cast, rand: Rand, credit: (name:
   const back = c.backs.length ? weighted(c.backs, (x) => x.w, rand) : null;
   const d = yards(rand, 60);
   if (back) credit(back.name, { td: 1, yds: d });
-  const who = back ? short(back.name) : side === 'us' ? 'Your offense' : 'They';
+  const who = back ? short(back.name) : (label ?? (side === 'us' ? 'Your offense' : 'They'));
   const t = d >= 20 ? who + ' breaks loose: ' + d + '-yard touchdown run' : who + ' punches it in from ' + d + (d === 1 ? ' yard' : ' yards');
   return { text: t + tail, big: true };
 }
@@ -279,7 +286,7 @@ function basketballText(v: number, c: Cast, rand: Rand, credit: (name: string, p
  * Tell one game. `us` and `them` are the final score (football: the engine's; basketball: pass
  * null and one is made up from the result). `pre` is our pregame chance to win.
  */
-export function castGame(input: { lineup: Lineup; opp: PlayoffTeam; won: boolean; score?: [number, number] | null; pre: number; seed: string }): GameCast {
+export function castGame(input: { lineup: Lineup; opp: PlayoffTeam; won: boolean; score?: [number, number] | null; pre: number; seed: string; ourTeam?: string }): GameCast {
   const rand = rng(hashString('cast:' + input.seed));
   const [us, them] = input.score ?? basketballScore(input.won, input.pre, rand);
   const ours = ourCast(input.lineup);
@@ -337,7 +344,9 @@ export function castGame(input: { lineup: Lineup; opp: PlayoffTeam; won: boolean
     const { period, clock } = clockOf(p.t);
     periods[period - 1][p.side === 'us' ? 0 : 1] += p.v;
     const c = p.side === 'us' ? ours : theirs;
-    const said = NFL ? footballText(p.side, p.v, c, rand, credit(p.side)) : basketballText(p.v, c, rand, (name, pts) => credit(p.side)(name, { td: pts }));
+    // who a side is, for plays without a player: your field goals stay yours, theirs get their name
+    const label = p.side === 'us' ? (input.ourTeam ?? null) : input.opp.abbr;
+    const said = NFL ? footballText(p.side, p.v, c, rand, credit(p.side), label) : basketballText(p.v, c, rand, (name, pts) => credit(p.side)(name, { td: pts }));
     const w = winProb(a - b, p.t, input.pre);
     events.push({ t: p.t, period, clock, side: p.side, pts: p.v, us: a, them: b, text: said.text, big: said.big || i === clutchAt, clutch: i === clutchAt || undefined, wp: w });
     wp.push([p.t, w]);
@@ -358,7 +367,7 @@ export function castGame(input: { lineup: Lineup; opp: PlayoffTeam; won: boolean
       }
       if (runPts >= 9 && !told && !e.clutch) {
         e.big = true;
-        e.text = (e.side === 'us' ? 'Your team' : input.opp.team.split(' ').pop()) + ' on a ' + runPts + '-0 run. ' + e.text;
+        e.text = (e.side === 'us' ? (input.ourTeam ?? 'Your team') : input.opp.team.split(' ').pop()) + ' on a ' + runPts + '-0 run. ' + e.text;
         told = true;
       }
     }
@@ -400,6 +409,38 @@ function stars(input: { lineup: Lineup; opp: PlayoffTeam }, us: number, them: nu
   }
   // the winner's star first
   return us > them ? out : out.reverse();
+}
+
+/** The same game from the other bench: what a head-to-head guest sees of the host's telling. */
+export function mirrorCast(g: GameCast): GameCast {
+  const flip = (s: Side | null): Side | null => (s === 'us' ? 'them' : s === 'them' ? 'us' : null);
+  return {
+    us: g.them,
+    them: g.us,
+    won: !g.won,
+    periods: g.periods.map(([a, b]) => [b, a]),
+    events: g.events.map((e) => ({ ...e, side: flip(e.side), us: e.them, them: e.us, wp: 1 - e.wp })),
+    wp: g.wp.map(([t, w]) => [t, 1 - w]),
+    stars: g.stars.map((s) => ({ ...s, side: flip(s.side) as Side })),
+  };
+}
+
+/** A drafted lineup as the other side of a game: its players, the way a playoff team's are kept. */
+export function asOpponent(lineup: Lineup, name: string, abbr: string, colors: [string, string]): PlayoffTeam {
+  const ps = playersOf(lineup);
+  return {
+    year: '',
+    team: name,
+    abbr,
+    w: 0,
+    l: 0,
+    t: 0,
+    wFull: 0,
+    c1: colors[0],
+    c2: colors[1],
+    star: '',
+    five: ps.filter((p) => p.pos[0] !== 'DEF').map((p) => ({ name: p.name, pos: p.pos[0], g: p.g, s: p.s, est: p.est })),
+  };
 }
 
 // ---------- the regular season's headlines ----------
@@ -455,4 +496,11 @@ export function seasonHeadlines(lineup: Lineup, seq: number[], scores: { us: num
   const out: Headline[] = [];
   for (const c of cands) if (!out.length || c.i - out[out.length - 1].i >= gap) out.push(c);
   return out.slice(0, NFL ? 5 : 4);
+}
+
+/** A head-to-head game's football score: each side's scoring against the other's defense. */
+export function matchScore(won: boolean, a: TeamRating, b: TeamRating, seed: string): [number, number] {
+  const ea = expectedScores(a);
+  const eb = expectedScores(b);
+  return gameScore(won, (ea.pf + eb.pa) / 2, (eb.pf + ea.pa) / 2, rng(hashString('score:' + seed)));
 }

@@ -3,10 +3,11 @@ import { DATA_SOURCE, LATEST_SEASON } from './engine/data';
 import { assignSlots, type DraftState } from './engine/draft';
 import { BOOSTER_PRICES, LEVEL_UP_COINS, levelInfo, rewardsFor, unlockedAt } from './engine/economy';
 import { ALL_MISSIONS_BONUS, advance, type GameEvent, missionsFor, nextStreak, rewardFor } from './engine/missions';
-import { buildBracket, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
+import { buildBracket, gameWinChance, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
 import { rarityOf } from './engine/rarity';
 import { dailyPar, reviewDraft } from './engine/review';
 import { collect, SET_REWARD } from './engine/collection';
+import { asOpponent, castGame, matchScore, mirrorCast } from './engine/broadcast';
 import { GAMES, gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
 import { clearSportParam, NFL, type SportId, switchSport } from './engine/sport';
@@ -27,6 +28,7 @@ import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
 import { type Room, Search } from './ui/Search';
 import { Binder } from './ui/Binder';
+import { GameCast } from './ui/GameCast';
 import { Playoffs, Reveal } from './ui/Season';
 import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
@@ -60,6 +62,8 @@ interface OppView {
 
 const MODE_LABEL: Record<Mode, string> = { classic: 'Classic', blind: 'Blind', daily: 'Daily', '1v1': '1 vs 1' };
 const NO_PICKS: OnlinePick[] = [];
+/** the other side's colors in a head-to-head game: the rival purple */
+const RIVAL: [string, string] = ['#9B7BFF', '#5B3FD1'];
 
 /** A round's score: the series, or in football the game. */
 function roundScore(s: Series): [number, number] {
@@ -99,6 +103,8 @@ export function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [screen, setScreen] = useState<Screen>('tab');
   const [run, setRun] = useState<Run | null>(null);
+  /** the run whose head-to-head game has been watched */
+  const [watched, setWatched] = useState<number | null>(null);
   const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
@@ -429,6 +435,20 @@ export function App() {
     const out = bracket ? playoffOutcome(bracket) : null;
     const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked, vsName: oppName });
     const players = SLOTS.map((s) => draft.lineup[s]!) as Player[];
+    // a head-to-head is played out as a game, the same one on both phones: told from the host's
+    // bench (seeded by the match), and turned around on the guest's
+    let showdown: ResultInfo['showdown'];
+    if (bot && byRating !== null && !noContest && !forfeit) {
+      const host = r.online ? r.online.found.host : true;
+      const me = p0.name ?? 'You';
+      const them = oppName ?? 'AI ' + r.botLevel.toUpperCase();
+      const abbr = (n: string) => n.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 4) || 'OPP';
+      const [la, lb, ra, rb, na, nb] = host ? [draft.lineup, bot.lineup, season, bot.rating, me, them] : [bot.lineup, draft.lineup, bot.rating, season, them, me];
+      const aWins = ra.rating > rb.rating;
+      const seed = 'h2h:' + (r.online ? r.online.found.matchId : r.id + ':' + lineupKey(draft.lineup));
+      const told = castGame({ lineup: la, opp: asOpponent(lb, nb, abbr(nb), RIVAL), won: aWins, score: NFL ? matchScore(aWins, ra, rb, seed) : null, pre: gameWinChance(ra.rating, rb.rating), seed, ourTeam: na });
+      showdown = { cast: host ? told : mirrorCast(told), opp: asOpponent(bot.lineup, them, abbr(them), RIVAL) };
+    }
     // the cards go into the binder: new ones, and team-decade sets they finish
     const binder = collect(p0.collection ?? {}, players);
     const setCoins = SET_REWARD * binder.sets.length;
@@ -577,6 +597,7 @@ export function App() {
       par,
       fresh: binder.fresh,
       sets: binder.sets,
+      showdown,
     };
     setRun({ ...r, result });
     setScreen('results');
@@ -763,6 +784,16 @@ export function App() {
     viewId = 'playoffs:' + run.id;
     enter = 'up';
     body = <Playoffs season={run.season} bracket={run.bracket} lineup={run.draft!.lineup} ourName={profile.name ?? 'You'} onDone={() => finish(run, run.season!, run.bracket!, null)} />;
+  } else if (screen === 'results' && run?.result?.showdown && watched !== run.id) {
+    // the head-to-head game first (the result is already saved)
+    const sd = run.result.showdown;
+    viewId = 'showdown:' + run.id;
+    enter = 'zoom';
+    body = (
+      <div className="screen showdown">
+        <GameCast games={[{ cast: sd.cast, n: 1, where: 'NEUTRAL', decider: true }]} round="Head to Head" opp={sd.opp} ourName={profile.name ?? 'You'} onDone={() => setWatched(run.id)} />
+      </div>
+    );
   } else if (screen === 'results' && run?.result) {
     viewId = 'results:' + run.id;
     enter = 'zoom';

@@ -6,7 +6,8 @@ import { type DraftReview, GRADE_LABEL } from '../engine/review';
 import { SET_REWARD } from '../engine/collection';
 import { CELL_BY_ID } from '../engine/data';
 import { NFL } from '../engine/sport';
-import type { Booster, Lineup, Player } from '../engine/types';
+import type { Booster, Lineup, Player, PlayoffTeam } from '../engine/types';
+import type { GameCast as GameCastData } from '../engine/broadcast';
 import { SLOTS } from '../engine/types';
 import type { RunRecord } from '../lib/profile';
 import { copyText, drawCard, nativeShare, shareText } from '../lib/share';
@@ -43,6 +44,8 @@ export interface ResultInfo {
   /** cards new to the binder, and team-decade sets this draft finished */
   fresh?: string[];
   sets?: string[];
+  /** a head-to-head played out as a game, before the results */
+  showdown?: { cast: GameCastData; opp: PlayoffTeam };
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
