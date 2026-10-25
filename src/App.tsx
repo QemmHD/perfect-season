@@ -13,7 +13,7 @@ import { GAMES, gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
 import { clearSportParam, NFL, type SportId, switchSport } from './engine/sport';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
-import { type Booster, type BotLevel, type Mode, type Player, type Slot, SLOTS } from './engine/types';
+import { type Booster, type BotLevel, type Mode, type Player, type PlayoffTeam, type Slot, SLOTS } from './engine/types';
 import { freshProfile, type H2HStats, loadProfile, newId, type Profile, readOtherLb, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
 import { setFeedback, sfx, vibrate } from './lib/sound';
 import { applyUpdate, justUpdated, newerVersionLive } from './lib/update';
@@ -122,6 +122,8 @@ export function App() {
   const week = weekKey(todayKey);
   const ladder = React.useMemo(() => gauntletLadder(week), [week]);
   const gauntletBest = profile.gauntlet.week === week ? profile.gauntlet.best : 0;
+  /** the climb on screen: its run, and the week, ladder and best it started with */
+  const [gauntletAt, setGauntletAt] = useState<{ runId: number; week: string; ladder: PlayoffTeam[]; best: number } | null>(null);
   const needsName = NET_ON && !profile.name;
 
   useEffect(() => saveProfile(profile), [profile]);
@@ -811,36 +813,43 @@ export function App() {
         coins={profile.coins}
         lb={lbView[run.result.record.id!] ?? null}
         gauntlet={{ ladder, first: rungChance(run.result.rating.rating, ladder[0]), chance: clearChance(run.result.rating.rating, ladder), best: gauntletBest }}
-        onGauntlet={() => (sfx.click(), setScreen('gauntlet'))}
+        onGauntlet={() => {
+          sfx.click();
+          // the climb keeps the week it started in, even past midnight on Sunday
+          setGauntletAt({ runId: run.id, week, ladder, best: gauntletBest });
+          setScreen('gauntlet');
+        }}
         onAgain={() => startRun(run.mode)}
         onHome={() => goTab('home')}
         onToast={showToast}
       />
     );
-  } else if (screen === 'gauntlet' && run?.result) {
+  } else if (screen === 'gauntlet' && run?.result && gauntletAt?.runId === run.id) {
     viewId = 'gauntlet:' + run.id;
     enter = 'up';
     const res = run.result;
+    const gw = gauntletAt.week;
     body = (
       <Gauntlet
         lineup={res.lineup}
         team={res.rating}
-        ladder={ladder}
-        seed={run.id + ':' + lineupKey(res.lineup)}
-        week={week}
+        ladder={gauntletAt.ladder}
+        // the run's saved id: unique, so replaying the same lineup is a new climb
+        seed={res.record.id + ':' + lineupKey(res.lineup)}
+        week={gw}
         ourName={profile.name ?? 'You'}
         coins={profile.coins}
-        best={gauntletBest}
+        best={gauntletAt.best}
         onGame={(g, i, all) =>
           update((p) => {
             // a new week starts a new best
-            const cur = p.gauntlet.week === week ? p.gauntlet : { ...p.gauntlet, week, best: 0 };
+            const cur = p.gauntlet.week === gw ? p.gauntlet : { ...p.gauntlet, week: gw, best: 0 };
             const up = rungsWon(all.slice(0, i + 1));
             const top = g.won && g.rung === GAUNTLET_SIZE - 1;
             return {
               ...p,
               coins: p.coins + (g.won ? RUNG_COINS[g.rung] + (top ? CLEAR_COINS : 0) : 0),
-              gauntlet: { week, best: Math.max(cur.best, up), allBest: Math.max(cur.allBest, up), clears: cur.clears + (top ? 1 : 0) },
+              gauntlet: { week: gw, best: Math.max(cur.best, up), allBest: Math.max(cur.allBest, up), clears: cur.clears + (top ? 1 : 0) },
             };
           })
         }

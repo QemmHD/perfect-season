@@ -153,12 +153,29 @@ export function GameCast({
     window.setTimeout(() => (cast.won ? sfx.roar() : sfx.gameLoss()), 250);
     // the crowd goes up for a win; after the last game it files out
     crowd.swell(cast.won === (g.where !== 'AWAY') ? 1 : 0.2);
-    if (gi === games.length - 1) window.setTimeout(() => crowd.stop(2.5), 1800);
+    if (gi === games.length - 1) filesOut.current = window.setTimeout(() => crowd.stop(2.5), 1800);
     else crowd.level(0.15);
   }, [p >= 1, phase]);
 
-  // leaving the game takes the crowd with it
-  useEffect(() => () => crowd.stop(0.4), []);
+  // leaving the game takes the crowd with it (and the next game's crowd is its own)
+  const filesOut = useRef(0);
+  useEffect(
+    () => () => {
+      clearTimeout(filesOut.current);
+      crowd.stop(0.4);
+    },
+    []
+  );
+  // the dialog takes focus, so a screen reader starts here
+  useEffect(() => rootRef.current?.focus({ preventScroll: true }), []);
+  // the final whistle's button lands where SKIP was: it arms a moment later, so the second tap of
+  // a double tap on SKIP isn't a CONTINUE
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (phase !== 'final') return setArmed(false);
+    const t = window.setTimeout(() => setArmed(true), 400);
+    return () => clearTimeout(t);
+  }, [phase]);
 
   // basketball: on to the next game of the series
   useEffect(() => {
@@ -243,7 +260,7 @@ export function GameCast({
   const theirStar = cast.stars.find((s) => s.side === 'them');
 
   return (
-    <div className="cast" ref={rootRef} role="dialog" aria-modal="true" aria-label={round + ' against the ' + opp.year + ' ' + opp.team}>
+    <div className="cast" ref={rootRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={round + ' against ' + (opp.year ? 'the ' + opp.year + ' ' + opp.team : opp.team)}>
       <div className="cast-head">
         <span className="eyebrow">
           {round}
@@ -377,7 +394,12 @@ export function GameCast({
             </button>
           </>
         ) : (
-          <button className={'big' + (cast.won ? ' gold shine' : '')} onClick={() => (sfx.click(), setPhase('done'), onDone())}>
+          <button className={'big' + (cast.won ? ' gold shine' : '') + (armed ? '' : ' arming')} aria-disabled={!armed} onClick={() => {
+            if (!armed) return;
+            sfx.click();
+            setPhase('done');
+            onDone();
+          }}>
             <Fit text="CONTINUE" />
           </button>
         )}

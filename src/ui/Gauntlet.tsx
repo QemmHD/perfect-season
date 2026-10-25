@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { castGame } from '../engine/broadcast';
 import { climb, clearChance, CLEAR_COINS, coinsFor, GAUNTLET_SIZE, type GauntletGame, LIVES, RUNG_COINS, rungsWon } from '../engine/gauntlet';
 import type { TeamRating } from '../engine/rating';
@@ -51,13 +51,10 @@ export function Gauntlet({
   onHome: () => void;
   onToast: (t: string) => void;
 }) {
-  const games = useMemo(() => climb(team, ladder, seed), [team, ladder, seed]);
-  const casts = useMemo(
-    () =>
-      games.map((g, i) =>
-        castGame({ lineup, opp: g.opp, won: g.won, score: g.score, pre: g.chance, seed: 'gauntlet:' + seed + ':' + i + ':' + g.opp.year + g.opp.team })
-      ),
-    [games, lineup, seed]
+  // decided once, when the climb starts: nothing that changes later (the clock, the profile) moves it
+  const [games] = useState(() => climb(team, ladder, seed));
+  const [casts] = useState(() =>
+    games.map((g, i) => castGame({ lineup, opp: g.opp, won: g.won, score: g.score, pre: g.chance, seed: 'gauntlet:' + seed + ':' + i + ':' + g.opp.year + g.opp.team }))
   );
   // how many games have been watched, and which one is on
   const [seen, setSeen] = useState(0);
@@ -75,12 +72,26 @@ export function Gauntlet({
   // the chance of reaching the top from here, with the lives left
   const odds = done ? (cleared ? 1 : 0) : clearChance(team.rating, ladder.slice(next!.rung), lives);
   const towerRef = useRef<HTMLDivElement>(null);
+  const goRef = useRef<HTMLButtonElement>(null);
+  // back from a game, the next one's button arms a moment later: the second tap of a double tap
+  // on CONTINUE lands here, and it isn't a tip-off
+  const [armed, setArmed] = useState(true);
+  useEffect(() => {
+    if (live || armed) return;
+    const t = window.setTimeout(() => setArmed(true), 450);
+    return () => clearTimeout(t);
+  }, [live, armed]);
 
   // keep the rung you're on in view
   useEffect(() => {
     const el = towerRef.current?.querySelector('.rung.here, .rung.just');
     el?.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
   }, [seen, live]);
+
+  // on the tower, the next game's button has focus
+  useEffect(() => {
+    if (!live) goRef.current?.focus({ preventScroll: true });
+  }, [live]);
 
   // back on the tower after a game: how it went
   useEffect(() => {
@@ -91,6 +102,7 @@ export function Gauntlet({
   }, [seen, live]);
 
   const play = () => {
+    if (!armed) return;
     sfx.click();
     setLive(true);
   };
@@ -99,6 +111,8 @@ export function Gauntlet({
     const g = games[i];
     onGame(g, i, games);
     if (g.won) setEarned((e) => e + RUNG_COINS[g.rung] + (g.rung === GAUNTLET_SIZE - 1 ? CLEAR_COINS : 0));
+    // disarmed in the same update that shows the tower, before a second tap can arrive
+    setArmed(false);
     setSeen(i + 1);
     setLive(false);
   };
@@ -151,7 +165,7 @@ export function Gauntlet({
         <h1 className="disp">THE GAUNTLET</h1>
         <span className="g-sub">Eight of the greatest teams ever · {LIVES} lives · a loss means a rematch</span>
         <div className="g-stats">
-          <span className="g-lives" aria-label={lives + ' lives left'}>
+          <span className="g-lives" role="img" aria-label={lives + (lives === 1 ? ' life' : ' lives') + ' left'}>
             {Array.from({ length: LIVES }, (_, k) => (
               <i key={k} className={k < lives ? 'on' : k === lives && last && !last.won && !live ? 'off broke' : 'off'} aria-hidden="true" />
             ))}
@@ -246,7 +260,7 @@ export function Gauntlet({
       <div className="foot">
         {done ? (
           <>
-            <button className="big ghost small" onClick={share}>
+            <button ref={goRef} className="big ghost small" onClick={share}>
               <span>SHARE</span>
             </button>
             <button className="big small shine" onClick={onAgain}>
@@ -254,7 +268,12 @@ export function Gauntlet({
             </button>
           </>
         ) : (
-          <button className={'big' + (next!.rung === GAUNTLET_SIZE - 1 ? ' gold' : '') + ' shine'} onClick={play}>
+          <button
+            ref={goRef}
+            className={'big' + (next!.rung === GAUNTLET_SIZE - 1 ? ' gold' : '') + ' shine' + (armed ? '' : ' arming')}
+            aria-disabled={!armed}
+            onClick={play}
+          >
             <span>
               {last && !last.won ? 'REMATCH' : label} · {next!.opp.year.length > 4 ? next!.opp.year.slice(2) : next!.opp.year} {next!.opp.abbr}
               {lives === 1 ? ' · LAST LIFE' : ''}

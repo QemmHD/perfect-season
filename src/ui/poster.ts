@@ -48,7 +48,8 @@ export function drawPoster(info: ResultInfo): string | null {
       if ('fontStretch' in gg) gg.fontStretch = on ? 'condensed' : 'normal';
     };
 
-    backdrop(g, star?.c1 ?? '#0f3a44', r.title || r.perfect);
+    // a Daily's glow is the game's own color: a team's would hint at the day's spins
+    backdrop(g, daily ? '#19E3C9' : (star?.c1 ?? '#0f3a44'), r.title || r.perfect);
 
     // header
     condensed(true);
@@ -444,7 +445,8 @@ function card(g: CanvasRenderingContext2D, p: Player, slot: Slot, w: number, h: 
   g.shadowBlur = 3 * s;
   g.shadowOffsetY = 1 * s;
   g.fillStyle = '#ffe29a';
-  g.fillText(p.val.toFixed(0), bx + bw - 4 * s, by + 17 * s);
+  // right-aligned in the part of the card the next one doesn't cover
+  g.fillText(p.val.toFixed(0), bx + Math.min(bw, shown - pad) - 4 * s, by + 17 * s);
   g.shadowColor = 'transparent';
   g.textAlign = 'left';
 

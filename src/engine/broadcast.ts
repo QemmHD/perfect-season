@@ -367,7 +367,9 @@ export function castGame(input: { lineup: Lineup; opp: PlayoffTeam; won: boolean
       }
       if (runPts >= 9 && !told && !e.clutch) {
         e.big = true;
-        e.text = (e.side === 'us' ? (input.ourTeam ?? 'Your team') : input.opp.team.split(' ').pop()) + ' on a ' + runPts + '-0 run. ' + e.text;
+        // a historic team goes by its nickname ("Bulls"); a head-to-head rival by its whole name
+        const them = input.opp.year ? input.opp.team.split(' ').pop() : input.opp.team;
+        e.text = (e.side === 'us' ? (input.ourTeam ?? 'Your team') : them) + ' on a ' + runPts + '-0 run. ' + e.text;
         told = true;
       }
     }

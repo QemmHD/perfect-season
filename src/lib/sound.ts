@@ -11,6 +11,14 @@ export function setFeedback(sound: boolean, haptics: boolean) {
   if (!sound) crowd.stop();
 }
 
+// a hidden page (another app, a locked phone) goes quiet, and picks up where it was when it's back
+if (typeof document !== 'undefined')
+  document.addEventListener('visibilitychange', () => {
+    if (!ctx) return;
+    if (document.hidden) void ctx.suspend().catch(() => {});
+    else if (soundOn) void ctx.resume().catch(() => {});
+  });
+
 function ac(): AudioContext | null {
   if (!soundOn) return null;
   try {

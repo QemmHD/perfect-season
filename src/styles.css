@@ -5247,6 +5247,8 @@ button.friendcard:active {
   padding: calc(var(--sat) + 10px) 14px var(--sab) 14px;
   box-sizing: border-box;
   overflow: hidden;
+  /* clip, not just hide: nothing (a focus, a scroll-into-view) can slide the game sideways */
+  overflow: clip;
   background:
     radial-gradient(120% 50% at 50% 0%, rgba(25, 227, 201, 0.1) 0%, rgba(25, 227, 201, 0) 60%),
     radial-gradient(90% 40% at 50% 100%, rgba(245, 184, 61, 0.07) 0%, rgba(245, 184, 61, 0) 70%),
@@ -7095,4 +7097,11 @@ button.friendcard:active {
 .statchip.gauntlet-chip.cleared {
   border-color: rgba(245, 184, 61, 0.6);
   background: linear-gradient(180deg, rgba(245, 184, 61, 0.2), var(--panel-2));
+}
+.view.arriving {
+  pointer-events: none;
+}
+/* a button that arms a moment after it appears: no dimming for that moment */
+.big.arming[aria-disabled='true'] {
+  filter: none;
 }

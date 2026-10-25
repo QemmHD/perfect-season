@@ -16,9 +16,13 @@ export function Transition({ id, enter, children, exitMs = 220 }: { id: string; 
   const cur = useRef<{ id: string; node: React.ReactNode }>({ id, node: children });
   const prev = useRef<{ id: string; node: React.ReactNode } | null>(null);
   const [, force] = useState(0);
+  // the view that just arrived ignores taps for a moment: the second tap of a double tap on the
+  // last screen's button would land on whatever sits there on this one
+  const arriving = useRef<string | null>(null);
   if (cur.current.id !== id) {
     prev.current = cur.current;
     cur.current = { id, node: children };
+    arriving.current = id;
   } else cur.current.node = children;
   useEffect(() => {
     if (!prev.current) return;
@@ -26,7 +30,15 @@ export function Transition({ id, enter, children, exitMs = 220 }: { id: string; 
       prev.current = null;
       force((n) => n + 1);
     }, exitMs);
-    return () => clearTimeout(t);
+    const u = window.setTimeout(() => {
+      arriving.current = null;
+      force((n) => n + 1);
+    }, 380);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(u);
+      arriving.current = null;
+    };
   }, [id]);
   return (
     <>
@@ -35,7 +47,7 @@ export function Transition({ id, enter, children, exitMs = 220 }: { id: string; 
           {prev.current.node}
         </div>
       )}
-      <div key={id} className={'view in-' + enter}>
+      <div key={id} className={'view in-' + enter + (arriving.current === id ? ' arriving' : '')}>
         {children}
       </div>
     </>
