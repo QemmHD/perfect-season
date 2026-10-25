@@ -65,6 +65,8 @@ export interface Profile {
   lb: { entries: Record<string, EntryContent>; dirty: string[] };
   /** the binder: every card drafted (card id -> times), this sport's */
   collection: Record<string, number>;
+  /** the Legends Gauntlet: best climb this week (`week` is its key) and of all time, and clears */
+  gauntlet: { week: string; best: number; allBest: number; clears: number };
   h2h: H2HStats;
   /** Days in a row with a game played; `last` is the Eastern date of the latest */
   streak: { count: number; last: string | null; best: number };
@@ -120,6 +122,7 @@ export function freshProfile(): Profile {
     name: null,
     lb: { entries: {}, dirty: [] },
     collection: {},
+    gauntlet: { week: '', best: 0, allBest: 0, clears: 0 },
     h2h: freshH2H(),
     streak: { count: 0, last: null, best: 0 },
     rewardDay: null,
@@ -165,6 +168,7 @@ function loadFrom(p: Profile | null): Profile {
       lb: p.lb && p.lb.entries ? { entries: p.lb.entries, dirty: Array.isArray(p.lb.dirty) ? p.lb.dirty : [] } : base.lb,
       h2h: { ...base.h2h, ...p.h2h },
       collection: p.collection && typeof p.collection === 'object' ? p.collection : {},
+      gauntlet: { ...base.gauntlet, ...p.gauntlet },
       streak: { ...base.streak, ...p.streak },
     };
   } catch {

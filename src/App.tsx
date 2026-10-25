@@ -8,6 +8,7 @@ import { rarityOf } from './engine/rarity';
 import { dailyPar, reviewDraft } from './engine/review';
 import { collect, SET_REWARD } from './engine/collection';
 import { asOpponent, castGame, matchScore, mirrorCast } from './engine/broadcast';
+import { CLEAR_COINS, clearChance, GAUNTLET_SIZE, gauntletLadder, RUNG_COINS, rungChance, rungsWon } from './engine/gauntlet';
 import { GAMES, gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
 import { clearSportParam, NFL, type SportId, switchSport } from './engine/sport';
@@ -29,11 +30,12 @@ import { DailyReward, MissionsSheet } from './ui/Rewards';
 import { type Room, Search } from './ui/Search';
 import { Binder } from './ui/Binder';
 import { GameCast } from './ui/GameCast';
+import { Gauntlet } from './ui/Gauntlet';
 import { Playoffs, Reveal } from './ui/Season';
 import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
 
-type Screen = 'tab' | 'search' | 'draft' | 'reveal' | 'playoffs' | 'results';
+type Screen = 'tab' | 'search' | 'draft' | 'reveal' | 'playoffs' | 'results' | 'gauntlet';
 
 interface Run {
   id: number;
@@ -116,6 +118,10 @@ export function App() {
   const todayKey = easternDateKey();
   const dailyNo = dailyNumber(todayKey);
   const dailyDone = !!profile.daily && profile.daily.key === todayKey;
+  // the Legends Gauntlet: this week's ladder, the same for everyone
+  const week = weekKey(todayKey);
+  const ladder = React.useMemo(() => gauntletLadder(week), [week]);
+  const gauntletBest = profile.gauntlet.week === week ? profile.gauntlet.best : 0;
   const needsName = NET_ON && !profile.name;
 
   useEffect(() => saveProfile(profile), [profile]);
@@ -803,9 +809,42 @@ export function App() {
         xp={profile.xp}
         coins={profile.coins}
         lb={lbView[run.result.record.id!] ?? null}
+        gauntlet={{ ladder, first: rungChance(run.result.rating.rating, ladder[0]), chance: clearChance(run.result.rating.rating, ladder), best: gauntletBest }}
+        onGauntlet={() => (sfx.click(), setScreen('gauntlet'))}
         onAgain={() => startRun(run.mode)}
         onHome={() => goTab('home')}
         onToast={showToast}
+      />
+    );
+  } else if (screen === 'gauntlet' && run?.result) {
+    viewId = 'gauntlet:' + run.id;
+    enter = 'up';
+    const res = run.result;
+    body = (
+      <Gauntlet
+        lineup={res.lineup}
+        team={res.rating}
+        ladder={ladder}
+        seed={run.id + ':' + lineupKey(res.lineup)}
+        week={week}
+        ourName={profile.name ?? 'You'}
+        coins={profile.coins}
+        best={gauntletBest}
+        onGame={(g, i, all) =>
+          update((p) => {
+            // a new week starts a new best
+            const cur = p.gauntlet.week === week ? p.gauntlet : { ...p.gauntlet, week, best: 0 };
+            const up = rungsWon(all.slice(0, i + 1));
+            const top = g.won && g.rung === GAUNTLET_SIZE - 1;
+            return {
+              ...p,
+              coins: p.coins + (g.won ? RUNG_COINS[g.rung] + (top ? CLEAR_COINS : 0) : 0),
+              gauntlet: { week, best: Math.max(cur.best, up), allBest: Math.max(cur.allBest, up), clears: cur.clears + (top ? 1 : 0) },
+            };
+          })
+        }
+        onAgain={() => startRun(run.mode)}
+        onHome={() => goTab('home')}
       />
     );
   } else {

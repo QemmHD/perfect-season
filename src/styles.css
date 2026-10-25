@@ -6694,3 +6694,396 @@ button.friendcard:active {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ---------- the Legends Gauntlet ---------- */
+.g-card {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 12px 14px;
+  border-radius: 16px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(245, 184, 61, 0.18) 0%, rgba(245, 184, 61, 0) 60%),
+    linear-gradient(160deg, #10303a 0%, #071820 100%);
+  border: 1px solid rgba(245, 184, 61, 0.45);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.g-card .eyebrow {
+  color: var(--gold);
+}
+.g-card strong {
+  font-size: 22px;
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 75%;
+  line-height: 1;
+}
+.g-card small {
+  color: var(--soft);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.g-pips {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 46px;
+}
+.g-pips i {
+  flex: 1;
+  border-radius: 4px 4px 2px 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.g-pips i:last-child {
+  box-shadow:
+    inset 0 0 0 1.5px var(--gold),
+    0 0 12px rgba(245, 184, 61, 0.5);
+}
+.g-card .big {
+  margin-top: 4px;
+}
+
+.gauntlet {
+  background:
+    radial-gradient(90% 40% at 50% 0%, rgba(245, 184, 61, 0.16) 0%, rgba(245, 184, 61, 0) 70%),
+    linear-gradient(180deg, #071c24 0%, var(--bg) 55%);
+}
+.g-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 16px 10px 16px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.g-head h1 {
+  margin: 0;
+  font-size: 34px;
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 70%;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  background: linear-gradient(180deg, #ffe7a8 0%, var(--gold) 55%, #b9791a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 10px rgba(245, 184, 61, 0.35));
+}
+.g-sub {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sub);
+}
+.g-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.g-stats > span:not(.g-lives) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.g-stats b {
+  font-size: 17px;
+  color: var(--text);
+  letter-spacing: 0;
+}
+.g-lives {
+  display: flex;
+  gap: 4px;
+}
+.g-lives i {
+  width: 18px;
+  height: 16px;
+  background: var(--red);
+  /* a heart */
+  clip-path: path('M9 15.5 L2.2 8.6 C0.3 6.6 0.4 3.6 2.4 1.9 C4.3 0.3 7.1 0.7 9 2.8 C10.9 0.7 13.7 0.3 15.6 1.9 C17.6 3.6 17.7 6.6 15.8 8.6 Z');
+  filter: drop-shadow(0 0 6px rgba(255, 122, 122, 0.6));
+  transition: opacity 0.3s;
+}
+.g-lives i.off {
+  background: var(--line-2);
+  filter: none;
+}
+.g-lives i.broke {
+  animation: heart-break 0.9s var(--ease-out);
+}
+@keyframes heart-break {
+  0% {
+    transform: scale(1.5);
+    background: var(--red);
+  }
+  35% {
+    transform: scale(0.8) rotate(-12deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.tower {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 16px 12px 16px;
+  position: relative;
+}
+.tower::before {
+  /* the spine the rungs hang on */
+  content: '';
+  position: absolute;
+  left: 37px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(245, 184, 61, 0.6), rgba(25, 227, 201, 0.25));
+}
+.rung {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--c1) 38%, transparent) 0%, rgba(10, 31, 42, 0.92) 46%),
+    var(--panel);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+  transition:
+    opacity 0.4s,
+    transform 0.4s var(--ease-out);
+}
+.rung::after {
+  /* the team's colors down the edge */
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: 4px 0 0 4px;
+  background: linear-gradient(180deg, var(--c1), var(--c2));
+}
+.r-no {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  border: 2px solid var(--line-2);
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 900;
+  color: var(--sub);
+}
+.r-team {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.r-team strong {
+  font-size: 14.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.r-team small {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.r-state {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-right: 4px;
+  color: var(--sub);
+}
+.r-state b {
+  font-size: 15px;
+  font-weight: 900;
+}
+.r-state b.w {
+  color: var(--teal);
+}
+.r-state b.l {
+  color: var(--red);
+}
+.r-state b.chance {
+  font-family: var(--display);
+  font-size: 20px;
+  font-style: italic;
+  color: var(--text);
+}
+.r-state small {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.rung.locked {
+  opacity: 0.55;
+}
+.rung.won .r-no {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: var(--teal-ink);
+}
+.rung.here {
+  opacity: 1;
+  border-color: var(--teal);
+  box-shadow:
+    0 0 0 1px var(--teal),
+    0 0 22px var(--teal-glow);
+  transform: scale(1.02);
+}
+.rung.here .r-no {
+  border-color: var(--teal);
+  color: var(--text);
+  animation: rung-pulse 1.6s ease-in-out infinite;
+}
+@keyframes rung-pulse {
+  50% {
+    box-shadow: 0 0 0 6px rgba(25, 227, 201, 0.18);
+  }
+}
+.rung.fell {
+  opacity: 1;
+  border-color: var(--red);
+  box-shadow: 0 0 18px rgba(255, 122, 122, 0.3);
+}
+.rung.fell .r-no {
+  border-color: var(--red);
+  color: var(--red);
+}
+.rung.just.won {
+  animation: rung-won 0.9s var(--ease-spring);
+}
+@keyframes rung-won {
+  0% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 2px var(--teal), 0 0 40px var(--teal-glow);
+  }
+  100% {
+    transform: none;
+  }
+}
+.rung.boss {
+  min-height: 70px;
+  border-color: rgba(245, 184, 61, 0.6);
+  background:
+    radial-gradient(80% 140% at 0% 50%, rgba(245, 184, 61, 0.22) 0%, rgba(245, 184, 61, 0) 70%),
+    linear-gradient(90deg, color-mix(in srgb, var(--c1) 40%, transparent) 0%, rgba(10, 31, 42, 0.92) 50%),
+    var(--panel);
+}
+.rung.boss .r-no {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.rung.boss .r-team strong {
+  font-size: 16px;
+}
+.rung.boss.won {
+  box-shadow:
+    0 0 0 1.5px var(--gold),
+    0 0 30px rgba(245, 184, 61, 0.55);
+}
+.rung.boss.won .r-no {
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+.tower-base {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px dashed var(--line-2);
+  background: var(--bg-2);
+  flex-shrink: 0;
+}
+.tower-base span {
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 900;
+  color: var(--teal);
+}
+.tower-base small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sub);
+}
+.g-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 20px 0 20px;
+  text-align: center;
+  flex-shrink: 0;
+  animation: rise 0.5s var(--ease-out) both;
+}
+.g-stamp {
+  padding: 4px 14px;
+  border: 3px solid var(--sub);
+  border-radius: 10px;
+  font-size: 24px;
+  font-style: italic;
+  font-weight: 900;
+  color: var(--soft);
+  transform: rotate(-3deg);
+}
+.g-end.cleared .g-stamp {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 24px rgba(245, 184, 61, 0.45);
+}
+.g-end small {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rung.here .r-no,
+  .rung.just.won,
+  .g-lives i.broke {
+    animation: none;
+  }
+}

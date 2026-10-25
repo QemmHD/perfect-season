@@ -116,7 +116,7 @@ export function pickOpponents(rand: Rand, pool: PlayoffTeam[] = PLAYOFF_TEAMS): 
 }
 
 /** Football: a playoff game's score, from both teams' scoring and defense. */
-function playoffScore(won: boolean, season: TeamRating & { pf?: number; pa?: number }, opp: PlayoffTeam, rand: Rand): [number, number] {
+export function playoffScore(won: boolean, season: TeamRating & { pf?: number; pa?: number }, opp: PlayoffTeam, rand: Rand): [number, number] {
   const ourPf = season.pf ?? LEAGUE_PPG;
   const ourPa = season.pa ?? LEAGUE_PPG;
   return gameScore(won, (ourPf + (opp.pa ?? LEAGUE_PPG)) / 2, ((opp.pf ?? LEAGUE_PPG) + ourPa) / 2, rand);

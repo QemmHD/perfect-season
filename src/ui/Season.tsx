@@ -370,9 +370,11 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
     [0, 0]
   );
 
+  // while a game is on, the screen under it can't be reached (React 18 has no inert prop)
+  const under = (watching !== null ? { inert: '' } : {}) as React.HTMLAttributes<HTMLDivElement>;
   return (
     <div className="screen playoffs">
-      <div className="po-head">
+      <div className="po-head" {...under}>
         <span className="disp po-title">PLAYOFFS</span>
         <span className="po-sub">
           {NFL
@@ -383,7 +385,7 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
           {pw}–{pl}
         </span>
       </div>
-      <div className="series-list">
+      <div className="series-list" {...under}>
         {bracket.map((b, i) => {
           const isCur = i === idx;
           const n = i < idx ? b.games.length : isCur ? shown : 0;
@@ -468,7 +470,7 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
         })}
       </div>
       <div className="spacer" />
-      <div className="actionbar">
+      <div className="actionbar" {...under}>
         <button className={label === 'SEE RESULTS' ? 'big gold shine' : 'big' + (running ? ' busy' : '')} aria-disabled={running} onClick={action}>
           <Fit text={label} />
         </button>

@@ -12,6 +12,7 @@ import { SLOTS } from '../engine/types';
 import type { RunRecord } from '../lib/profile';
 import { copyText, nativeShare, shareText } from '../lib/share';
 import { drawPoster } from './poster';
+import { pct } from './Gauntlet';
 import { sfx } from '../lib/sound';
 import { frameRect, useLayout } from '../stage';
 import { CoinChip, Confetti, lastName, Sheet, shortEra } from './common';
@@ -136,6 +137,8 @@ export function Results({
   xp,
   coins,
   lb,
+  gauntlet,
+  onGauntlet,
   onAgain,
   onHome,
   onToast,
@@ -145,6 +148,9 @@ export function Results({
   coins: number;
   /** Global leaderboard status of this run; null when it doesn't go on a board */
   lb: LbStatus | null;
+  /** this week's Legends Gauntlet, for this team to take on */
+  gauntlet?: { ladder: PlayoffTeam[]; first: number; chance: number; best: number };
+  onGauntlet?: () => void;
   onAgain: () => void;
   onHome: () => void;
   onToast: (t: string) => void;
@@ -297,6 +303,8 @@ export function Results({
           </div>
         ))}
 
+        {gauntlet && onGauntlet && <GauntletCard {...gauntlet} onGo={onGauntlet} />}
+
         {vs && (
           <div className="roster">
             <span className="eyebrow" style={{ color: 'var(--rival-soft)' }}>
@@ -412,6 +420,29 @@ function PlayoffRun({ bracket, onScout }: { bracket: Series[]; onScout: (s: Seri
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** The way into the Legends Gauntlet: this week's eight, and your odds of climbing them all. */
+function GauntletCard({ ladder, first, chance, best, onGo }: { ladder: PlayoffTeam[]; first: number; chance: number; best: number; onGo: () => void }) {
+  const boss = ladder[ladder.length - 1];
+  return (
+    <div className="g-card rise-in" style={{ animationDelay: '360ms' }}>
+      <span className="eyebrow">Legends Gauntlet · this week</span>
+      <strong className="disp">THIS TEAM VS THE GREATEST EVER</strong>
+      <div className="g-pips" aria-hidden="true">
+        {ladder.map((t, i) => (
+          <i key={t.year + t.team} style={{ background: 'linear-gradient(180deg, ' + t.c1 + ', ' + t.c2 + ')', height: 16 + i * 4 + 'px' }} />
+        ))}
+      </div>
+      <small>
+        Eight legends, weakest first, up to the {boss.year} {boss.team}. Three lives: a loss means a rematch. Your odds: {pct(first)} in the first game, {pct(chance)} to beat them all.
+        {best ? ' Your best this week: ' + best + ' of 8.' : ''}
+      </small>
+      <button className="big small gold shine" onClick={onGo}>
+        <span>TAKE ON THE LEGENDS</span>
+      </button>
     </div>
   );
 }
