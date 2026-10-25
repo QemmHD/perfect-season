@@ -1,7 +1,10 @@
 // The draft report: grades and the best team from the same spins (npm test runs both sports).
 import { autoDraft } from './autodraft';
+import { CELLS } from './data';
+import { draftReducer, eligibleSlots, newDraft, whyUnavailable } from './draft';
 import { bestFromCells, dailyPar, draftLetter, gradeOf, reviewDraft } from './review';
 import { rateTeam } from './rating';
+import { NFL } from './sport';
 import { SLOTS } from './types';
 
 describe('draft report', () => {
@@ -42,5 +45,31 @@ describe('draft report', () => {
     expect(a.rating.rating).toBe(b.rating.rating);
     expect(a.wins).toBeGreaterThan(0);
     expect(bestFromCells([]).rating.rating).toBe(rateTeam([]).rating);
+  });
+  it('never suggests a pick the draft would refuse', () => {
+    // a Trade armed while holding a player whose far better team-decade just came up: in
+    // basketball he can't be held twice, so the review mustn't hold him up as the better pick
+    let found: { a: (typeof CELLS)[number]; b: (typeof CELLS)[number]; pid: string; gap: number } | null = null;
+    for (const a of CELLS)
+      for (const p of a.players)
+        for (const b of CELLS) {
+          const q = b.id !== a.id && b.players.find((x) => x.pid === p.pid);
+          if (q && q.val - p.val > (found?.gap ?? 12)) found = { a, b, pid: p.pid, gap: q.val - p.val };
+        }
+    expect(found).not.toBeNull();
+    const { a, b, pid } = found!;
+    const p = a.players.find((x) => x.pid === pid)!;
+    let s = newDraft('classic', 'pro', null);
+    s = draftReducer(s, { type: 'land', cellId: a.id, ptr: 0 });
+    s = draftReducer(s, { type: 'place', playerId: p.id, slot: p.pos[0] });
+    s = draftReducer(s, { type: 'endCell' });
+    s = draftReducer(s, { type: 'land', cellId: b.id, ptr: 0 });
+    s = draftReducer(s, { type: 'arm', booster: 'trade' });
+    const q = b.players.find((x) => x.pid === pid)!;
+    expect(whyUnavailable(s, q) === null).toBe(NFL);
+    const other = b.players.find((x) => x.pid !== pid && whyUnavailable(s, x) === null && eligibleSlots(s, x).length)!;
+    s = draftReducer(s, { type: 'place', playerId: other.id, slot: eligibleSlots(s, other)[0] });
+    const best = reviewDraft(s.log, s.lineup).picks[1].best;
+    if (!NFL) expect(best?.pid).not.toBe(pid);
   });
 });

@@ -293,6 +293,7 @@ export function Draft(props: DraftProps) {
     if (pressT.current) clearTimeout(pressT.current);
     pressT.current = null;
   };
+  useEffect(() => unpress, []);
   /** the reels landed on a team with a Legendary player */
   const [spot, setSpot] = useState(0);
   const timers = useRef<number[]>([]);
@@ -377,7 +378,8 @@ export function Draft(props: DraftProps) {
     const base = currentCell(st)?.players.find((x) => x.id === playerId);
     const placed = base ? effectivePlayer(st, base) : null;
     const rar = placed ? rarityOf(placed) : 'common';
-    if (placed && (rar === 'legendary' || rar === 'epic')) {
+    // Blind hides rarity until the season is played: no pull to give it away
+    if (!blind && placed && (rar === 'legendary' || rar === 'epic')) {
       const id = Date.now();
       setPull({ id, rarity: rar, player: placed, slot });
       later(() => setPull((x) => (x && x.id === id ? null : x)), rar === 'legendary' ? 2500 : 1800);
@@ -1021,6 +1023,8 @@ export function Draft(props: DraftProps) {
               style={{ translate: COURT_X[k] + 'px ' + ys[k] + 'px', height: ch, '--c1': p.c1, '--c2': p.c2, '--i': i } as React.CSSProperties}
               onPointerDown={() => {
                 unpress();
+                // a press whose release never reached the card (the sheet covered it) is over
+                pressed.current = false;
                 pressT.current = window.setTimeout(() => {
                   pressed.current = true;
                   vibrate(15);
@@ -1130,7 +1134,17 @@ export function Draft(props: DraftProps) {
         )}
       </div>
 
-      {inspect && <CardSheet p={inspect.p} slot={inspect.slot} blind={blind} onClose={() => setInspect(null)} />}
+      {inspect && (
+        <CardSheet
+          p={inspect.p}
+          slot={inspect.slot}
+          blind={blind}
+          onClose={() => {
+            pressed.current = false;
+            setInspect(null);
+          }}
+        />
+      )}
 
       {pull && (
         <div className={'pull ' + pull.rarity} key={pull.id} aria-live="assertive">

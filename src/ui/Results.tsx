@@ -486,7 +486,7 @@ function ReportCard({ review, par, blind }: { review: DraftReview; par?: { ratin
                 {p.best && p.grade !== 'best' ? ' · best: ' + lastName(p.best.name) + ' (+' + (p.bestGain - p.gain).toFixed(1) + ')' : ''}
               </small>
             </div>
-            <span className="chip">{GRADE_LABEL[p.grade]}</span>
+            <span className="rep-chip">{GRADE_LABEL[p.grade]}</span>
           </li>
         ))}
       </ol>

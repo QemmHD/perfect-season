@@ -8,6 +8,7 @@ let hapticsOn = true;
 export function setFeedback(sound: boolean, haptics: boolean) {
   soundOn = sound;
   hapticsOn = haptics;
+  if (!sound) crowd.stop();
 }
 
 function ac(): AudioContext | null {
@@ -201,5 +202,108 @@ export const sfx = {
   title: () => {
     [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone(f, 0.22, { type: 'triangle', gain: 0.12, at: i * 0.11 }));
     vibrate([40, 60, 40, 60, 120]);
+  },
+};
+
+/* The crowd under a live game: a loop of shaped noise (voices are mostly 300 Hz to 3 kHz) with a
+   slow murmur in its level. The game sets how loud it sits; a play makes it swell and settle. */
+let crowdNodes: { src: AudioBufferSourceNode; out: GainNode; lfo: OscillatorNode } | null = null;
+let crowdLevel = 0.3;
+const CROWD_MAX = 0.11;
+
+export const crowd = {
+  start(level = 0.3) {
+    const c = ac();
+    if (!c) return;
+    crowdLevel = level;
+    if (crowdNodes) {
+      crowd.level(level);
+      return;
+    }
+    try {
+      const len = c.sampleRate * 3;
+      const buf = c.createBuffer(2, len, c.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        // pink-ish noise (Paul Kellet's filter), so it rumbles rather than hisses
+        const d = buf.getChannelData(ch);
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < len; i++) {
+          const w = Math.random() * 2 - 1;
+          b0 = 0.99765 * b0 + w * 0.099046;
+          b1 = 0.963 * b1 + w * 0.2965164;
+          b2 = 0.57 * b2 + w * 1.0526913;
+          d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.18;
+        }
+        // fade the loop's seam
+        for (let i = 0; i < 2000; i++) {
+          const k = i / 2000;
+          d[i] *= k;
+          d[len - 1 - i] *= k;
+        }
+      }
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const lo = c.createBiquadFilter();
+      lo.type = 'bandpass';
+      lo.frequency.value = 520;
+      lo.Q.value = 0.7;
+      const hi = c.createBiquadFilter();
+      hi.type = 'bandpass';
+      hi.frequency.value = 1700;
+      hi.Q.value = 0.9;
+      const hiGain = c.createGain();
+      hiGain.gain.value = 0.45;
+      const murmur = c.createGain();
+      murmur.gain.value = 1;
+      const lfo = c.createOscillator();
+      lfo.frequency.value = 0.23;
+      const depth = c.createGain();
+      depth.gain.value = 0.22;
+      lfo.connect(depth).connect(murmur.gain);
+      const out = c.createGain();
+      out.gain.value = 0.0001;
+      src.connect(lo).connect(murmur);
+      src.connect(hi).connect(hiGain).connect(murmur);
+      murmur.connect(out).connect(c.destination);
+      src.start();
+      lfo.start();
+      out.gain.exponentialRampToValueAtTime(Math.max(0.0002, level * CROWD_MAX), c.currentTime + 1.2);
+      crowdNodes = { src, out, lfo };
+    } catch {
+      crowdNodes = null;
+    }
+  },
+  /** how loud the crowd sits, 0-1: louder late in a close game */
+  level(x: number) {
+    crowdLevel = Math.max(0, Math.min(1, x));
+    if (!crowdNodes || !ctx) return;
+    const g = crowdNodes.out.gain;
+    g.cancelScheduledValues(ctx.currentTime);
+    g.setTargetAtTime(Math.max(0.0002, crowdLevel * CROWD_MAX), ctx.currentTime, 0.5);
+  },
+  /** a play: the crowd jumps up, then settles back */
+  swell(x = 1) {
+    if (!crowdNodes || !ctx) return;
+    const g = crowdNodes.out.gain;
+    const t = ctx.currentTime;
+    const peak = Math.max(crowdLevel, Math.min(1.6, crowdLevel + x)) * CROWD_MAX;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(peak, t, 0.06);
+    g.setTargetAtTime(Math.max(0.0002, crowdLevel * CROWD_MAX), t + 0.5 + x * 0.6, 0.7);
+  },
+  stop(fade = 0.8) {
+    const n = crowdNodes;
+    crowdNodes = null;
+    if (!n || !ctx) return;
+    const t = ctx.currentTime;
+    try {
+      n.out.gain.cancelScheduledValues(t);
+      n.out.gain.setTargetAtTime(0.0001, t, fade / 3);
+      n.src.stop(t + fade + 0.2);
+      n.lfo.stop(t + fade + 0.2);
+    } catch {
+      // already stopped
+    }
   },
 };

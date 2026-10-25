@@ -97,8 +97,10 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
   const headlines = useMemo(() => seasonHeadlines(lineup, season.seq, season.scores, lineupKey(lineup)), [season, lineup]);
   const [hl, setHl] = useState<{ text: string; until: number } | null>(null);
 
+  // SKIP ends the reveal for good: the ticker mustn't start again once the build is done
+  const skipped = useRef(false);
   useEffect(() => {
-    if (!built) return;
+    if (!built || skipped.current) return;
     if (reducedMotion()) {
       setTick(GAMES);
       return;
@@ -146,6 +148,7 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
   for (let i = shown.length - 1; i >= 0 && shown[i] === 1; i--) streak++;
   const slowBeat = tick > 0 && tick < GAMES && delays[tick - 1] >= SLOW;
   const skip = () => {
+    skipped.current = true;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     setBuild(n + 1);

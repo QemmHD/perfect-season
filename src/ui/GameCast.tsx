@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CastEvent, GameCast as Cast } from '../engine/broadcast';
 import { NFL } from '../engine/sport';
 import type { PlayoffTeam } from '../engine/types';
-import { sfx } from '../lib/sound';
+import { crowd, sfx } from '../lib/sound';
 import { Fit } from './common';
 import { reducedMotion } from './motion';
 
@@ -81,6 +81,8 @@ export function GameCast({
     seen.current = 0;
     setP(0);
     sfx.whistle();
+    crowd.start(0.3);
+    let heard = 0.3;
     const total = reduced ? 1200 : !NFL && g.decider ? DECIDER_MS : GAME_MS;
     let last = performance.now();
     let pos = 0;
@@ -99,6 +101,12 @@ export function GameCast({
       if (slow && now - beat > 1300) {
         beat = now;
         sfx.heartbeat();
+      }
+      // the crowd: on edge late in a close game, quiet in a blowout
+      const want = close ? 0.3 + Math.max(0, pos - 0.7) * 2.2 : Math.abs(lead) > (NFL ? 21 : 18) ? 0.16 : 0.26;
+      if (Math.abs(want - heard) > 0.06) {
+        heard = want;
+        crowd.level(want);
       }
       setP(pos);
       if (pos >= 1) return;
@@ -120,6 +128,10 @@ export function GameCast({
       const ours = scoring.some((e) => e.side === 'us');
       // basketball scores constantly: only the big plays get a sound
       if (NFL || headline) ours ? sfx.scoreUs(!!headline?.clutch || (NFL && scoring.some((e) => e.pts >= 6))) : sfx.scoreThem();
+      // whose crowd it is decides who gets the roar
+      const big = !!headline?.clutch || scoring.some((e) => e.pts >= 6) || !!headline?.big;
+      const home = g.where === 'HOME' ? ours : g.where === 'AWAY' ? !ours : true;
+      if (NFL || big) crowd.swell((big ? 0.9 : 0.45) * (home ? 1 : 0.35));
     }
     if (headline && (NFL ? headline.pts >= 6 || headline.clutch : headline.clutch)) {
       const text = headline.clutch ? (headline.side === 'us' ? (NFL ? 'GAME-WINNER!' : 'BUZZER-BEATER!') : 'DAGGER') : headline.pts >= 6 ? 'TOUCHDOWN' : headline.pts === 2 ? 'SAFETY' : 'SCORE';
@@ -139,7 +151,14 @@ export function GameCast({
     sfx.buzzer();
     setPhase('final');
     window.setTimeout(() => (cast.won ? sfx.roar() : sfx.gameLoss()), 250);
+    // the crowd goes up for a win; after the last game it files out
+    crowd.swell(cast.won === (g.where !== 'AWAY') ? 1 : 0.2);
+    if (gi === games.length - 1) window.setTimeout(() => crowd.stop(2.5), 1800);
+    else crowd.level(0.15);
   }, [p >= 1, phase]);
+
+  // leaving the game takes the crowd with it
+  useEffect(() => () => crowd.stop(0.4), []);
 
   // basketball: on to the next game of the series
   useEffect(() => {
@@ -167,6 +186,7 @@ export function GameCast({
     setFlash(null);
     sfx.buzzer();
     if (games[games.length - 1].cast.won) window.setTimeout(() => sfx.roar(), 250);
+    crowd.stop(1.5);
   };
 
   const lastE: CastEvent | undefined = visible[visible.length - 1];
