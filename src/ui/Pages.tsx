@@ -105,6 +105,8 @@ export function HomePage(props: {
   onMissions: () => void;
   onStreak: () => void;
   onSport: (s: SportId) => void;
+  /** this week's Legends Gauntlet: your best climb, and who waits at the top */
+  gauntlet: { best: number; boss: string };
 }) {
   const [intro] = useState(() => !introPlayed);
   useEffect(() => {
@@ -156,6 +158,22 @@ export function HomePage(props: {
           <Target size={16} />
           <b className="num">{props.missions.done}/3</b>
           {props.missions.claimable && <i className="dot" aria-hidden="true" />}
+        </button>
+        <button
+          className={'statchip gauntlet-chip' + (props.gauntlet.best >= 8 ? ' cleared' : '')}
+          onClick={() =>
+            props.onToast(
+              'Legends Gauntlet: after any run, take your team up this week’s eight, all the way to the ' +
+                props.gauntlet.boss +
+                '. Your best this week: ' +
+                props.gauntlet.best +
+                ' of 8.'
+            )
+          }
+          aria-label={'Legends Gauntlet: your best this week is ' + props.gauntlet.best + ' of 8'}
+        >
+          <Crown size={15} />
+          <b className="num">{props.gauntlet.best}/8</b>
         </button>
       </div>
       <div className="modes" role="group" aria-label="Game mode">

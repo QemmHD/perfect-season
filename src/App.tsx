@@ -682,6 +682,7 @@ export function App() {
   else
     page = (
       <HomePage
+        gauntlet={{ best: gauntletBest, boss: ladder[ladder.length - 1].year + ' ' + ladder[ladder.length - 1].team }}
         profile={profile}
         dailyNo={dailyNo}
         dailyDone={dailyDone}
