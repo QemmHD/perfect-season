@@ -29,6 +29,8 @@ function parse(e: Event): Record<string, unknown> | null {
 
 export interface OnlineCount {
   online: number;
+  /** of those, in this sport: the players a match can be with */
+  here: number;
   searching: number;
 }
 
@@ -49,6 +51,7 @@ let lastHello = 0;
 let answer: number | null = null;
 let lastEmitted = '';
 const seenOnline = new Map<string, number>();
+const seenHere = new Map<string, number>();
 const seenSearching = new Map<string, number>();
 const countListeners = new Set<(c: OnlineCount) => void>();
 
@@ -56,22 +59,27 @@ function counts(): OnlineCount {
   const t = Date.now();
   const me = myPubkey();
   let online = 1;
+  let here = 1;
   let searching = myStatus === 'queue' ? 1 : 0;
   for (const [k, at] of seenOnline) {
     if (t - at > ONLINE_MS) seenOnline.delete(k);
     else if (k !== me) online++;
   }
+  for (const [k, at] of seenHere) {
+    if (t - at > ONLINE_MS) seenHere.delete(k);
+    else if (k !== me) here++;
+  }
   for (const [k, at] of seenSearching) {
     if (t - at > QUEUE_MS) seenSearching.delete(k);
     else if (k !== me) searching++;
   }
-  return { online, searching };
+  return { online, here, searching };
 }
 
 /** Tell the screens, when a number changed (checked every second). */
 function emitCounts(force = false): void {
   const c = counts();
-  const key = c.online + ':' + c.searching;
+  const key = c.online + ':' + c.here + ':' + c.searching;
   if (!force && key === lastEmitted) return;
   lastEmitted = key;
   countListeners.forEach((f) => f(c));
@@ -83,7 +91,8 @@ function beat(hello = false): void {
   lastBeat = Date.now();
   // a hello sent with no relay connected reached no one: it goes again when one connects
   if (hello && pool.connected() > 0) lastHello = lastBeat;
-  void pool.publish(sign(KIND_PRESENCE, [['t', ONLINE_TAG]], JSON.stringify(hello ? { name: myName, st: myStatus, hello: true } : { name: myName, st: myStatus })));
+  const c = { name: myName, st: myStatus, sp: SPORT };
+  void pool.publish(sign(KIND_PRESENCE, [['t', ONLINE_TAG]], JSON.stringify(hello ? { ...c, hello: true } : c)));
 }
 
 /** Leaving (app to the background, or closed): others stop counting us at once. */
@@ -106,11 +115,15 @@ export function startPresence(name: string): void {
     const c = parse(e) ?? {};
     if (c.st === 'off') {
       seenOnline.delete(e.pubkey);
+      seenHere.delete(e.pubkey);
       seenSearching.delete(e.pubkey);
       emitCounts();
       return;
     }
     seenOnline.set(e.pubkey, Date.now());
+    // apps from before football don't say their sport: basketball
+    if ((c.sp ?? 'nba') === SPORT) seenHere.set(e.pubkey, Date.now());
+    else seenHere.delete(e.pubkey);
     if (c.st !== 'queue') seenSearching.delete(e.pubkey);
     // someone just opened the app: answer soon, spread out so not everyone answers at once
     if (c.hello === true && answer === null && Date.now() - lastBeat > 3000) {
@@ -125,6 +138,7 @@ export function startPresence(name: string): void {
     if (e.pubkey === me) return;
     seenSearching.set(e.pubkey, Date.now());
     seenOnline.set(e.pubkey, Date.now());
+    seenHere.set(e.pubkey, Date.now());
     emitCounts();
   });
   // the first hello can go out before any relay is connected: say it again once one is

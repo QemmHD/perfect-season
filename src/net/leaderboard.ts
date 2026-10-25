@@ -265,7 +265,8 @@ export function withH2H(lb: LbState, name: string, all: H2HRecord, week: H2HReco
 
 /** Drop entries for past days and weeks (those boards are closed). */
 export function prune(lb: LbState, day: string): LbState {
-  const keep = (d: string) => d.endsWith('/all') || d.endsWith('/w/' + weekKey(day)) || d === boardTag('daily', 'all', day);
+  // by the end of the tag, so it works on either sport's entries
+  const keep = (d: string) => d.endsWith('/all') || d.endsWith('/w/' + weekKey(day)) || d.endsWith('/daily/' + day);
   const entries = Object.fromEntries(Object.entries(lb.entries).filter(([d]) => keep(d)));
   return { entries, dirty: lb.dirty.filter((d) => d in entries) };
 }

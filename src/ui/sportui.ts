@@ -2,6 +2,7 @@
 import { GAMES } from '../engine/rating';
 import { NFL } from '../engine/sport';
 import type { Line, OppPlayer, Player } from '../engine/types';
+import { lastName } from '../lib/share';
 
 /** "82–0" / "17–0" */
 export const PERFECT_RECORD = GAMES + '–0';
@@ -63,7 +64,10 @@ export function oppCols(p: OppPlayer): StatCol[] {
 }
 
 export type SortKey = string;
-/** Ways to sort a team's list. Football sorts by total yards and touchdowns, whatever the position. */
+/**
+ * Ways to sort a team's list. Football, whatever the position: total yards (every yards column a
+ * row shows lights up) and the touchdowns in the row's TD column.
+ */
 export const SORTS: [SortKey, string][] = NFL
   ? [
       ['val', 'VALUE'],
@@ -89,7 +93,8 @@ export function sortValue(p: Player, key: SortKey): number {
     // a defense has no yards or touchdowns of its own: it sorts last
     if (isDefense(p)) return -1;
     if (key === 'yds') return (s.passYds ?? 0) + (s.rushYds ?? 0) + (s.recYds ?? 0);
-    if (key === 'td') return (s.passTd ?? 0) + (s.rushTd ?? 0) + (s.recTd ?? 0);
+    // a passer's, a back's runs, a receiver's catches: the one TD a row shows
+    if (key === 'td') return (p.pos[0] === 'QB' ? s.passTd : p.pos[0] === 'RB' ? s.rushTd : s.recTd) ?? 0;
   }
   return p.s[key] ?? 0;
 }
@@ -98,17 +103,12 @@ export function sortValue(p: Player, key: SortKey): number {
 export function hotFor(key: SortKey, col: StatCol, p: { pos: string[] }): boolean {
   if (!NFL) return col.key === key;
   if (p.pos[0] === 'DEF') return false;
-  if (key === 'yds') return col.key === 'passYds' || col.key === 'recYds' || (col.key === 'rushYds' && p.pos[0] === 'RB');
+  if (key === 'yds') return col.key === 'passYds' || col.key === 'recYds' || col.key === 'rushYds';
   if (key === 'td') return col.key === 'passTd' || col.key === 'rushTd' || col.key === 'recTd';
   return false;
 }
 
 /** The short name on a lineup card: the last name (with its St. or Van), or a defense's team name. */
 export function cardName(p: Player): string {
-  if (isDefense(p)) return p.name.replace(/ Defense$/, '');
-  const parts = p.name.replace(/\s*\([^)]*\)\s*$/, '').split(' ');
-  let i = parts.length - 1;
-  if (/^(Jr\.?|Sr\.?|II|III|IV)$/.test(parts[i]) && i > 1) i--;
-  const before = parts[i - 1];
-  return i > 1 && /^(St\.|Van|van|Vander|De|Del|La|Le|Du|Da|Di|Mac)$/.test(before) ? before + ' ' + parts[i] : parts[i];
+  return isDefense(p) ? p.name.replace(/ Defense$/, '') : lastName(p.name);
 }

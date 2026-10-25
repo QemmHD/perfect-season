@@ -47,11 +47,6 @@ body {
   html {
     min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px)));
   }
-  /* the page must be able to scroll for iOS to hand over the full height (a drag does it); the
-     game itself never scrolls: #root is fixed and .viewport clips */
-  body {
-    overflow: visible;
-  }
 }
 html {
   touch-action: manipulation;
@@ -71,6 +66,14 @@ body {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+}
+/* In a home-screen app the page must be able to scroll for iOS to hand over the full height (a
+   drag does it). It only can while the viewport is short: the page is then a status bar taller.
+   The game itself never scrolls: #root is fixed and .viewport clips. After the body rule, to win. */
+@media (display-mode: standalone) {
+  body {
+    overflow: visible;
+  }
 }
 #root {
   position: fixed;
@@ -3787,7 +3790,8 @@ button:focus-visible {
 }
 .lbline i {
   display: inline-block;
-  width: 24px;
+  min-width: 24px;
+  margin-right: 4px;
   font-style: normal;
   font-weight: 800;
   color: var(--teal);
@@ -5092,6 +5096,12 @@ button.friendcard:active {
   font-size: 40px;
   letter-spacing: 1px;
 }
+.sportfade small {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sub);
+  animation: fade-in 0.3s 0.6s ease both;
+}
 @keyframes sportfade-in {
   from {
     opacity: 0;
@@ -5144,8 +5154,19 @@ button.friendcard:active {
   color: #fff;
   animation: dot-in 0.36s var(--ease-spring) both;
 }
-.fit-compact .sched span {
+.fit-tight .sched span {
   height: 32px;
+}
+.fit-compact .sched {
+  gap: 4px;
+  margin-top: 10px;
+}
+.fit-compact .sched span {
+  height: 28px;
+}
+.fit-compact .unbeaten {
+  padding: 4px 14px;
+  font-size: 20px;
 }
 
 /* a football playoff round is one game: its score fills the row */
@@ -5196,4 +5217,21 @@ button.friendcard:active {
 }
 .mismatch b {
   color: var(--text);
+}
+/* short screens: a smaller radar and no clock while the notice shows, so the buttons stay on screen */
+.fit-compact .radar-wrap.noted,
+.fit-tight .radar-wrap.noted {
+  gap: 10px;
+  margin-top: 12px;
+}
+.fit-compact .radar-wrap.noted .radar,
+.fit-tight .radar-wrap.noted .radar {
+  width: 120px;
+  height: 120px;
+}
+.fit-compact .radar-wrap.noted .search-clock {
+  display: none;
+}
+.fit-compact .radar-wrap.noted .mismatch {
+  margin-top: 4px;
 }

@@ -303,7 +303,7 @@ Rating weights, benchmark, curve constants, grade cut-offs, coin and XP tables, 
 | Lineup | **QB, RB, WR, TE, FLEX, DEF**: six rounds. FLEX takes any back, receiver or tight end. DEF is the team's defense for that decade, one per cell |
 | Eras | 1970s–2020s (from the 1970 merger) |
 | Cells | Franchise-decades with historical names (Baltimore Colts, Houston Oilers, Los Angeles Raiders, St. Louis Rams); Washington is "Washington" before 2020 |
-| Data | PFR season tables 1970–98 (fantasydatapros), nflverse weekly stats 1999–2025, FiveThirtyEight and nflverse scores. See `scripts/build_nfl_data.py` |
+| Data | PFR season tables 1970–2021 (fantasydatapros; all of a season to 1998, games and totals of one-team seasons to 2021), nflverse weekly stats and rosters 1999–2025, FiveThirtyEight and nflverse scores. See `scripts/build_nfl_data.py` |
 | Value | Era-rated adjusted yards per game (yards + 20 a TD − 45 an INT), each position mapped by quantile onto basketball's value scale; defenses by points saved against the league |
 | Rating | Passing, rushing, receiving and defense bars; balance compares passing, run and catch together, and defense |
 | Season | 17 games, each with a score that agrees with the result; 10 wins make the playoffs |

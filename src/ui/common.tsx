@@ -18,13 +18,7 @@ export function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-export function lastName(name: string): string {
-  // a football defense goes by its team: "Bears D"
-  if (/ Defense$/.test(name)) return name.replace(/ Defense$/, ' D');
-  const parts = baseName(name).split(' ');
-  const last = parts[parts.length - 1];
-  return /^(Jr\.?|Sr\.?|II|III|IV)$/.test(last) && parts.length > 2 ? parts[parts.length - 2] : last;
-}
+export { lastName } from '../lib/share';
 
 export function shortEra(era: string): string {
   return '’' + era.slice(2);

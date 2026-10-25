@@ -160,7 +160,8 @@ export function viewportInfo(): string {
   const doc = document.documentElement.clientHeight;
   const app = document.getElementById('root')?.clientHeight ?? 0;
   const sc = Math.min(screen.width, screen.height) + '×' + Math.max(screen.width, screen.height);
-  return 'view ' + Math.round(innerWidth) + '×' + Math.round(innerHeight) + (doc !== innerHeight || app !== innerHeight ? ' (' + doc + '/' + app + ')' : '') + ' · screen ' + sc + (standaloneIOS() ? ' · home screen' : '');
+  const [t, , b] = readInsets(document.querySelector<HTMLElement>('.inset-probe'));
+  return 'view ' + Math.round(innerWidth) + '×' + Math.round(innerHeight) + (doc !== innerHeight || app !== innerHeight ? ' (' + doc + '/' + app + ')' : '') + ' · screen ' + sc + ' · safe ' + Math.round(t) + '/' + Math.round(b) + (standaloneIOS() ? ' · home screen' : '');
 }
 
 /** An element's box in frame px, whatever the frame's scale and rotation. */
@@ -216,8 +217,10 @@ export function Stage({ children }: { children: React.ReactNode }) {
     const settle = () => [0, 150, 400, 1000].forEach((ms) => window.setTimeout(update, ms));
     // The page-height rules (styles.css, fitDocument) normally get a home-screen app its whole
     // screen. If iOS still leaves the viewport a status bar short, first a tiny scroll, which is
-    // what a drag does by hand, then a forced re-layout of the app. Once per launch and per return.
+    // what a drag does by hand, then a forced re-layout of the app. The scroll once per launch and
+    // per return; the re-layout, which restarts animations and list scrolls, once per launch.
     let healed = false;
+    let relaid = false;
     const short = () => shortfall(readInsets(probeRef.current)[0], root.clientHeight);
     const heal = () => {
       if (healed || document.visibilityState !== 'visible') return;
@@ -231,7 +234,8 @@ export function Stage({ children }: { children: React.ReactNode }) {
         settle();
         window.setTimeout(() => {
           const app = document.getElementById('root');
-          if (!short() || !app) return;
+          if (relaid || !short() || !app) return;
+          relaid = true;
           app.style.display = 'none';
           void app.offsetHeight;
           app.style.display = '';

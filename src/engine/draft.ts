@@ -97,10 +97,10 @@ export type Unavailable = 'taken' | 'dup' | 'nofit' | null;
 
 export function whyUnavailable(s: DraftState, p: Player): Unavailable {
   if (s.taken.includes(p.id)) return 'taken';
-  if (Object.values(s.lineup).some((x) => x && x.pid === p.pid)) {
-    // Trade lets you replace a slot, but you still can't hold the same person twice
-    return 'dup';
-  }
+  const held = SLOTS.filter((k) => s.lineup[k]?.pid === p.pid);
+  // Trade lets you replace a slot, but you still can't hold the same person twice. A football
+  // trade that can only replace him (a defense for the same franchise's from another decade) is fine.
+  if (held.length && !(NFL && s.armed === 'trade' && eligibleSlots(s, p).every((k) => held.includes(k)))) return 'dup';
   const targets = s.armed === 'trade' ? SLOTS.filter((x) => s.lineup[x]) : openSlots(s.lineup);
   if (!p.pos.some((x) => targets.includes(x))) return 'nofit';
   return null;

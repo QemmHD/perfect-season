@@ -58,6 +58,8 @@ describe.skipIf(!NFL)('football data', () => {
     const up = primeVersion(favre)!;
     expect(up.val).toBeGreaterThan(favre.val);
     expect(up.cellId).toBe('GB-2000');
+    // every Prime points to a team-decade that lists him, with a better line
+    for (const c of CELLS) for (const p of c.players) if (p.primeRef) expect(primeVersion(p), p.name + ' ' + c.id).not.toBeNull();
   });
   it('lists real playoff teams with their key players', () => {
     const bears = PLAYOFF_TEAMS.find((t) => t.year === '1985' && t.team === 'Chicago Bears')!;
@@ -83,6 +85,33 @@ describe.skipIf(!NFL)('football rules', () => {
     const d = find('CHI-1980', 'Bears Defense');
     expect(d.pos).toEqual(['DEF']);
     expect(whyUnavailable(s, d)).toBe(null);
+  });
+  it("trades a defense for the same franchise's from another decade, but never holds anyone twice", () => {
+    const d70 = find('CHI-1970', 'Bears Defense');
+    const d80 = find('CHI-1980', 'Bears Defense');
+    const qb = find('SF-1980', 'Joe Montana');
+    let s = newDraft('classic', 'pro', null);
+    s = draftReducer(s, { type: 'land', cellId: 'CHI-1970', ptr: 0 });
+    s = draftReducer(s, { type: 'place', playerId: d70.id, slot: 'DEF' });
+    s = draftReducer(s, { type: 'endCell' });
+    s = draftReducer(s, { type: 'land', cellId: 'CHI-1980', ptr: 0 });
+    expect(whyUnavailable(s, d80)).toBe('dup');
+    s = draftReducer(s, { type: 'arm', booster: 'trade' });
+    expect(whyUnavailable(s, d80)).toBe(null);
+    s = draftReducer(s, { type: 'place', playerId: d80.id, slot: 'DEF' });
+    expect(s.lineup.DEF?.id).toBe(d80.id);
+    // a back held at RB could take FLEX in a trade and be on the team twice
+    const p70 = find('CHI-1970', 'Walter Payton');
+    const p80 = find('CHI-1980', 'Walter Payton');
+    let t = newDraft('classic', 'pro', null);
+    for (const [cell, p, slot] of [['CHI-1970', p70, 'RB'], ['SF-1980', qb, 'QB'], ['SF-1980', find('SF-1980', 'Jerry Rice'), 'FLEX']] as const) {
+      t = draftReducer(t, { type: 'land', cellId: cell, ptr: 0 });
+      t = draftReducer(t, { type: 'place', playerId: p.id, slot });
+      t = draftReducer(t, { type: 'endCell' });
+    }
+    t = draftReducer(t, { type: 'land', cellId: 'CHI-1980', ptr: 0 });
+    t = draftReducer(t, { type: 'arm', booster: 'trade' });
+    expect(whyUnavailable(t, p80)).toBe('dup');
   });
   it('seats any legal team', () => {
     const team: Player[] = [find('SF-1980', 'Joe Montana'), find('SF-1980', 'Jerry Rice'), find('CHI-1980', 'Walter Payton'), find('NE-2010', 'Rob Gronkowski'), find('KC-2020', 'Tyreek Hill'), find('PIT-1970', 'Steelers Defense')];
@@ -135,7 +164,11 @@ describe.skipIf(!NFL)('football rules', () => {
   it('a 17-0 team usually, but not always, wins it all', () => {
     let titles = 0;
     const N = 3000;
-    const season = { ...rateTeam([]), rating: ratingForWins(17) + 2, wins: 17, pf: 32, pa: 14 };
+    // the lowest rating that goes 17-0: no 17-win playoff team is rated above it
+    const lowest = WIN_CURVE.find(([, w]) => w === 16.5)![0];
+    expect(winsFromRating(lowest)).toBe(17);
+    expect(ratingForWins(17)).toBeLessThan(lowest + 0.5);
+    const season = { ...rateTeam([]), rating: lowest, wins: 17, pf: 32, pa: 14 };
     for (let i = 0; i < N; i++) {
       const b = buildBracket(season, rng(100 + i));
       const out = playoffOutcome(b);
@@ -147,8 +180,8 @@ describe.skipIf(!NFL)('football rules', () => {
       if (out.title) expect(isPerfect(17, out)).toBe(true);
     }
     const p = titles / N;
-    expect(p).toBeGreaterThan(0.35);
-    expect(p).toBeLessThan(0.75);
+    expect(p).toBeGreaterThan(0.55);
+    expect(p).toBeLessThan(0.72);
   });
   it('rates an empty team at zero and a full team in range', () => {
     expect(rateTeam(Object.values(emptyLineup())).wins).toBe(0);

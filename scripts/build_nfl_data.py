@@ -1,7 +1,7 @@
 """Build the NFL player database for Perfect Season.
 
-Sources: see scripts/nfl_sources.py (Pro-Football-Reference season tables 1970-1998,
-nflverse weekly stats 1999-2025, FiveThirtyEight and nflverse game scores).
+Sources: see scripts/nfl_sources.py (Pro-Football-Reference season tables 1970-2021,
+nflverse weekly stats and rosters 1999-2025, FiveThirtyEight and nflverse game scores).
 
 Output: src/data/nfl.json with
   teams:   franchise-decade cells. Each holds its quarterbacks, running backs, receivers
@@ -14,9 +14,10 @@ Rules:
     decade it is played in (the 1985 season -> 1980s)
   - a cell is (franchise, decade), labelled with the franchise's dominant name that decade
     (most seasons; ties go to the later name): the 1980s Raiders are the Los Angeles Raiders
-  - stats are sum(totals) / sum(games) over every season of that player with that franchise
-    in that decade. A traded player's split season before 1999 has no team in the source
-    (PFR lists it as 2TM) and is left out; from 1999 every game counts for its own team
+  - stats are sum(totals) / sum(games played) over every season of that player with that
+    franchise in that decade. A traded player's split season before 1999 has no team in the
+    source (PFR lists it as 2TM) and is left out of the cells (it still counts in the league's
+    totals and the player's career rate); from 1999 every game counts for its own team
   - each line carries the real per-game stats (shown) and what the game scores (rated):
       * era: every stat is measured against that season's league (per team-game) and put on
         the 1970-2025 average scale, so 1970s passing and 2010s rushing aren't penalised
@@ -29,15 +30,18 @@ Rules:
         quantile, onto the value distribution of the NBA game's rotation players (top 11 of
         each team-decade), using that position's top players in each cell. So a 95th
         percentile tight end is worth what a 95th percentile quarterback is, and rarity tiers
-        mean the same thing in both sports
+        mean the same thing in both sports. Above the 98th percentile the map goes by yards,
+        not rank, so two near-equal lines at the top are worth near the same
   - defense: the team's points allowed per game in those seasons, era-rated the same way,
     valued as points saved against the league average and mapped onto the same scale
-  - positions: the player's most-played position over his career (FB counts as RB). The
-    few PFR rows with no position get the one from his other seasons, or the nearest by stats
+  - positions: the player's most-played position over his career (FB counts as RB; from
+    1999 each season's roster position). The few PFR rows with no position get the one from
+    his other seasons, or the nearest by stats
   - lists: QBs with 4+ starts and 100+ attempts, RBs with 6+ games and 40+ touches,
     WRs and TEs with 6+ games and 15+ catches; at most POS_CAP of each per cell
   - same name, different players: all but the one with the most games get their years
-  - prime = the player's best cell (8+ games) by value; a defense's is its franchise's best decade
+  - prime = the player's best listed line (8+ games) by value; a defense's is its franchise's best decade
+  - a defense goes by its team's name that decade (the 1980s Oilers, not the Titans)
 
 Usage: python3 scripts/build_nfl_data.py [raw_dir]
 """
@@ -63,7 +67,8 @@ POS_POOL = {"QB": 2, "RB": 3, "WR": 4, "TE": 2}
 TARGET = [(0, 5.19), (0.02, 8.59), (0.05, 10.05), (0.1, 10.91), (0.2, 11.83), (0.3, 12.54), (0.4, 13.18), (0.5, 13.69), (0.6, 14.41),
           (0.7, 15.37), (0.8, 16.46), (0.9, 18.18), (0.95, 19.81), (0.98, 22.07), (0.99, 23.32), (0.995, 24.41), (1, 30.33)]
 SHOWN = ("pass_yds", "pass_td", "int", "rush_yds", "rush_td", "rec", "rec_yds", "rec_td")
-NICK = {}  # franchise -> nickname, from its latest name
+# a defense is called by its team's nickname; Washington's by the city, whatever the decade
+NICK_OVERRIDE = {"WAS": "Washington"}
 
 
 def target_at(q):
@@ -73,13 +78,23 @@ def target_at(q):
     return TARGET[-1][1]
 
 
+TAIL = 0.98
+
+
 class QuantileMap:
-    """Monotone map from a raw score to the shared value scale, fitted on a reference pool."""
+    """Monotone map from a raw score to the shared value scale, fitted on a reference pool.
+
+    By rank up to the pool's 98th percentile. Above it by raw score, at the yards-to-value rate
+    of the 90th-98th percentile band, up to the scale's top: by rank alone the pool's best would
+    always get the scale's maximum and the runner-up the next quantile, however close they are."""
 
     def __init__(self, pool):
         self.xs = sorted(pool)
         n = len(self.xs)
         self.ys = [target_at(i / (n - 1)) for i in range(n)]
+        self.t = int(TAIL * (n - 1))
+        lo = int(0.9 * (n - 1))
+        self.rate = (self.ys[self.t] - self.ys[lo]) / max(1e-9, self.xs[self.t] - self.xs[lo])
 
     def __call__(self, x):
         xs, ys = self.xs, self.ys
@@ -88,8 +103,8 @@ class QuantileMap:
             k = max(1, len(xs) // 5)
             slope = (ys[k] - ys[0]) / max(1e-9, xs[k] - xs[0])
             return max(0.5, ys[0] - (xs[0] - x) * slope)
-        if x >= xs[-1]:
-            return ys[-1]
+        if x >= xs[self.t]:
+            return min(TARGET[-1][1], ys[self.t] + (x - xs[self.t]) * self.rate)
         i = bisect_left(xs, x)
         x0, x1, y0, y1 = xs[i - 1], xs[i], ys[i - 1], ys[i]
         return y0 + (x - x0) / (x1 - x0) * (y1 - y0) if x1 > x0 else y1
@@ -99,7 +114,7 @@ def main():
     raw_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", ".cache", "nfl")
     S.fetch(raw_dir)
     reg = S.Register(os.path.join(raw_dir, "players.csv"))
-    rows = S.pfr_rows(raw_dir, reg) + S.verse_rows(raw_dir)
+    rows = S.pfr_rows(raw_dir, reg, range(S.FIRST_SEASON, S.SPLIT)) + S.verse_rows(raw_dir, reg)
     games = S.team_games(raw_dir)
     ts = S.team_seasons(games)
 
@@ -114,8 +129,12 @@ def main():
             return "QB"
         return "RB" if r["rush_att"] >= r["rec"] else "WR"
 
+    # a traded player's combined season before 1999: real league yards, but no team
+    xtm = [r for r in rows if r.get("xtm")]
     kept = []
     for r in rows:
+        if r.get("xtm"):
+            continue
         c = pos_games.get(r["pid"])
         if c:
             r["cpos"] = c.most_common(1)[0][0]
@@ -135,7 +154,7 @@ def main():
         team_g[s] += t["g"]
         pts[s] += t["pf"]
     league = defaultdict(lambda: defaultdict(float))
-    for r in rows:
+    for r in rows + xtm:
         for k in S.STATS:
             league[r["season"]][k] += r[k]
     for s in league:
@@ -144,7 +163,7 @@ def main():
         league[s]["pts"] = pts[s] / team_g[s]
     seasons = sorted(league)
     scale = {k: sum(league[s][k] for s in seasons) / len(seasons) for k in list(S.STATS) + ["pts"]}
-    for r in rows:
+    for r in rows + xtm:
         lg = league[r["season"]]
         r["adj"] = {k: r[k] * scale[k] / lg[k] for k in S.STATS}
 
@@ -158,7 +177,7 @@ def main():
 
     # career rates on the rated scale, the anchor for short stints
     career = defaultdict(lambda: defaultdict(float))
-    for r in rows:
+    for r in rows + xtm:
         c = career[r["pid"]]
         c["g"] += r["g"]
         for k in S.STATS:
@@ -244,9 +263,17 @@ def main():
         if fr not in best_def or d["val"] > defense[best_def[fr]]["val"]:
             best_def[fr] = (fr, dec)
 
-    # prime line per player
-    prime = {}
+    # each cell's listed players: the best at each position, up to its cap
+    kept = {}
     for (fr, dec), lst in cells.items():
+        keep = []
+        for pos, cap in POS_CAP.items():
+            keep += sorted((a for a in lst if a["pos"] == pos), key=lambda a: -a["val"])[:cap]
+        kept[(fr, dec)] = keep
+
+    # prime line per player, among the lines that are listed
+    prime = {}
+    for (fr, dec), lst in kept.items():
         for a in lst:
             if a["g"] < 8:
                 continue
@@ -265,10 +292,6 @@ def main():
         allss = sorted(x for v in ss.values() for x in v)
         return S.identity(fr, s), allss[0], allss[-1]
 
-    for fr in S.FRANCHISES:
-        NICK[fr] = S.identity(fr, S.LAST_SEASON)[1].split()[-1]
-    NICK["WAS"] = "Washington"
-
     # same name, different players
     by_name = defaultdict(set)
     games_of = Counter()
@@ -284,16 +307,14 @@ def main():
     teams = []
     for (fr, dec) in sorted(cells):
         (disp, name, c1, c2), first, last = cell_identity(fr, dec)
-        lst = cells[(fr, dec)]
-        keep = []
-        for pos, cap in POS_CAP.items():
-            keep += sorted((a for a in lst if a["pos"] == pos), key=lambda a: -a["val"])[:cap]
+        keep = kept[(fr, dec)]
         plist = []
         for a in keep:
             g = a["g"]
             seas = sorted(a["seasons"])
             pr = prime.get(a["pid"])
-            pr_ref = pr[1] + "-" + str(pr[2]) if pr and (pr[1], pr[2]) != (fr, dec) else None
+            # a short stint can rate above his prime: then there's nothing to upgrade to
+            pr_ref = pr[1] + "-" + str(pr[2]) if pr and (pr[1], pr[2]) != (fr, dec) and round(pr[0], 2) > round(a["val"], 2) + 0.01 else None
             total = sum(max(0.0, x) for x in a["parts"]) or 1.0
             share = [max(0.0, x) / total for x in a["parts"]]
             nm = a["name"]
@@ -307,7 +328,7 @@ def main():
             ])
         d = defense[(fr, dec)]
         plist.append([
-            NICK[fr] + " Defense", "DEF", int(d["g"]), len(d["seasons"]), d["seasons"][0], d["seasons"][-1],
+            NICK_OVERRIDE.get(fr, name.split()[-1]) + " Defense", "DEF", int(d["g"]), len(d["seasons"]), d["seasons"][0], d["seasons"][-1],
             best_def[fr][0] + "-" + str(best_def[fr][1]) if best_def[fr] != (fr, dec) else None, "D-" + fr,
             round(d["pa"], 1), round(d["lg"], 1), d["top5"], d["best"], 0, 0, 0, 0,
             0, 0, 0, round(d["val"], 2),

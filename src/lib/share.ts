@@ -10,11 +10,14 @@ export function shareText(r: RunRecord, dailyNo: number | null): string {
   return head + ' · ' + rec + ' · ' + r.grade + ' ' + r.tier + '\n' + r.playoff + '\n' + names + '\nCan you go perfect?';
 }
 
+/** A player's short name: the last name with its St. or Van and without Jr. A football defense goes by its team: "Bears D". */
 export function lastName(n: string): string {
-  // a football defense goes by its team: "Bears D"
   if (/ Defense$/.test(n)) return n.replace(/ Defense$/, ' D');
   const parts = n.replace(/\s*\([^)]*\)\s*$/, '').split(' ');
-  return parts[parts.length - 1];
+  let i = parts.length - 1;
+  if (/^(Jr\.?|Sr\.?|II|III|IV)$/.test(parts[i]) && i > 1) i--;
+  const before = parts[i - 1];
+  return i > 1 && /^(St\.|Van|van|Vander|De|Del|La|Le|Du|Da|Di|Mac)$/.test(before) ? before + ' ' + parts[i] : parts[i];
 }
 
 /** Draws the share image (1080x1350) and returns it as a PNG data URL. */

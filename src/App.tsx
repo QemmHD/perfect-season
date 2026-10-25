@@ -10,7 +10,7 @@ import { hashString, rng } from './engine/rng';
 import { clearSportParam, NFL, type SportId, switchSport } from './engine/sport';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
 import { type Booster, type BotLevel, type Mode, type Player, type Slot, SLOTS } from './engine/types';
-import { freshProfile, type H2HStats, loadProfile, newId, type Profile, resetOtherSport, type RunRecord, saveProfile } from './lib/profile';
+import { freshProfile, type H2HStats, loadProfile, newId, type Profile, readOtherLb, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
 import { setFeedback, sfx, vibrate } from './lib/sound';
 import { applyUpdate, justUpdated, newerVersionLive } from './lib/update';
 import { type BoardKind, boardTag, fetchBoard, prune, publishEntry, renamed, type Span, weekKey, withH2H, withRun } from './net/leaderboard';
@@ -23,7 +23,7 @@ import { type LbStatus, NameSheet } from './ui/Leaderboard';
 import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, type Tab, Tabs } from './ui/Pages';
 import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
-import { Search } from './ui/Search';
+import { type Room, Search } from './ui/Search';
 import { Playoffs, Reveal } from './ui/Season';
 import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
@@ -136,16 +136,15 @@ export function App() {
   }, [profile.name]);
 
   // closed boards (past days and weeks) drop out of your entries; a name changed while playing
-  // the other sport goes onto this sport's boards too
-  useEffect(
-    () =>
-      update((p) => {
-        const lb = prune(p.lb, todayKey);
-        const stale = !!p.name && Object.values(lb.entries).some((c) => c.name !== p.name);
-        return { ...p, lb: stale ? renamed(lb, p.name!, todayKey) : lb };
-      }),
-    []
-  );
+  // the other sport goes onto this sport's boards too (and the other way round)
+  useEffect(() => {
+    const tidy = (lb: Profile['lb'], name: string | null) => {
+      const live = prune(lb, todayKey);
+      return name && Object.values(live.entries).some((c) => c.name !== name) ? renamed(live, name, todayKey) : live;
+    };
+    update((p) => ({ ...p, lb: tidy(p.lb, p.name) }));
+    updateOtherLb((lb) => tidy(lb, profileRef.current.name));
+  }, []);
 
   // the app was closed in the middle of a match last time: that match was lost
   useEffect(() => {
@@ -156,26 +155,32 @@ export function App() {
     }
   }, []);
 
-  /** Send every entry that changed. Each one stays queued until a relay takes it. */
+  /** Send every entry that changed, this sport's and then the other's. Each one stays queued until a relay takes it. */
   const flushing = useRef(false);
   const flushLb = async () => {
     const p = profileRef.current;
-    if (!NET_ON || !p.name || flushing.current || !p.lb.dirty.length) return;
+    const other = readOtherLb();
+    if (!NET_ON || !p.name || flushing.current || (!p.lb.dirty.length && !other?.dirty.length)) return;
     flushing.current = true;
-    const sent: [string, unknown][] = [];
-    for (const d of p.lb.dirty) {
-      const c = p.lb.entries[d];
-      if (!c) {
-        sent.push([d, undefined]);
-        continue;
+    const send = async (lb: Profile['lb']) => {
+      const sent: [string, unknown][] = [];
+      for (const d of lb.dirty) {
+        const c = lb.entries[d];
+        if (c && !(await publishEntry(d, c))) return { sent, ok: false };
+        sent.push([d, c]);
       }
-      if (await publishEntry(d, c)) sent.push([d, c]);
-      else break;
-    }
+      return { sent, ok: true };
+    };
+    const ours = await send(p.lb);
+    const theirs = ours.ok && other?.dirty.length ? await send(other) : null;
     flushing.current = false;
-    if (sent.length)
+    if (ours.sent.length)
       // only clear an entry that didn't change again while it was being sent
-      update((q) => ({ ...q, lb: { ...q.lb, dirty: q.lb.dirty.filter((d) => !sent.some(([sd, sc]) => sd === d && q.lb.entries[d] === sc)) } }));
+      update((q) => ({ ...q, lb: { ...q.lb, dirty: q.lb.dirty.filter((d) => !ours.sent.some(([sd, sc]) => sd === d && q.lb.entries[d] === sc)) } }));
+    if (theirs?.sent.length) {
+      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+      updateOtherLb((lb) => ({ ...lb, dirty: lb.dirty.filter((d) => !theirs.sent.some(([sd, sc]) => sd === d && same(lb.entries[d], sc))) }));
+    }
   };
   useEffect(() => {
     void flushLb();
@@ -268,16 +273,21 @@ export function App() {
   // ---------- the other sport ----------
 
   /** Switching sports reloads the app into it, after a short fade. */
-  const [sportTo, setSportTo] = useState<SportId | null>(null);
+  const [sportTo, setSportTo] = useState<{ to: SportId; late: boolean } | null>(null);
   const goSport = (to: SportId) => {
     if (sportTo || screen !== 'tab') return;
     sfx.click();
     vibrate(12);
-    setSportTo(to);
+    // a match that just ended is still sending its last state: a reload would cut that short
+    const wait = Math.max(420, lingerUntil.current - Date.now());
+    setSportTo({ to, late: wait > 1000 });
     saveProfile(profileRef.current);
-    window.setTimeout(() => switchSport(to), 420);
+    window.setTimeout(() => {
+      saveProfile(profileRef.current);
+      switchSport(to);
+    }, wait);
     // a reload the browser refused leaves the game as it was
-    window.setTimeout(() => setSportTo(null), 6000);
+    window.setTimeout(() => setSportTo(null), wait + 6000);
   };
 
   // ---------- starting games ----------
@@ -298,11 +308,14 @@ export function App() {
     else if (mode === 'daily') showToast(dailyDone ? 'Practice run: today’s spins again, not ranked.' : 'Daily #' + dailyNo + ': everyone gets these same spins today.');
   };
 
-  const [roomCode, setRoomCode] = useState<string | null>(null);
+  /** the friend room Search is in, so a match that doesn't connect goes back to it */
+  const [room, setRoom] = useState<Room>(null);
+  const roomRef = useRef(room);
+  roomRef.current = room;
   const startRun = (mode: Mode = profile.mode) => {
     if (mode === '1v1' && NET_ON) {
       sfx.click();
-      setRoomCode(null);
+      setRoom(null);
       setScreen('search');
       return;
     }
@@ -321,7 +334,7 @@ export function App() {
     } catch {
       // ignore
     }
-    setRoomCode(linkRoom);
+    setRoom({ code: linkRoom, hosting: false });
     setLinkRoom(null);
     setScreen('search');
   }, [linkRoom, needsName, screen]);
@@ -356,12 +369,12 @@ export function App() {
     setScreen('draft');
     // saved, so quitting the app mid-match still counts as a loss next time it opens
     update((p) => ({ ...p, activeMatch: { id: f.matchId, opp: f.opp.name } }));
-    // they never showed up (their phone missed the start): no result, back to the queue
+    // they never showed up (their phone missed the start): no result, back to the queue or the room
     window.setTimeout(() => {
       if (matchRef.current !== conn || conn.heard()) return;
       endMatch(false);
       update((p) => ({ ...p, activeMatch: null }));
-      showToast(f.opp.name + ' didn’t connect. Back to the queue.');
+      showToast(f.opp.name + ' didn’t connect. Back to ' + (roomRef.current ? 'your room ' + roomRef.current.code : 'the queue') + '.');
       setScreen('search');
     }, 12000);
   };
@@ -674,6 +687,7 @@ export function App() {
       <Welcome
         onDone={(name) => {
           update((p) => ({ ...p, name, lb: renamed(p.lb, name, todayKey) }));
+          updateOtherLb((lb) => renamed(lb, name, todayKey));
           showToast('Welcome, ' + name + '!');
         }}
       />
@@ -686,7 +700,8 @@ export function App() {
         name={profile.name ?? 'Player'}
         level={levelInfo(profile.xp).level}
         botLevel={profile.botLevel}
-        room={roomCode}
+        room={room}
+        onRoom={setRoom}
         onMatch={onFound}
         onAI={() => startDraft('1v1')}
         onBack={() => goTab('home')}
@@ -784,6 +799,7 @@ export function App() {
           onSaved={(name) => {
             setModal(null);
             update((p) => ({ ...p, name, lb: renamed(p.lb, name, todayKey) }));
+            updateOtherLb((lb) => renamed(lb, name, todayKey));
             if (NET_ON) startPresence(name);
             showToast('Your name is now ' + name + '.');
           }}
@@ -827,9 +843,10 @@ export function App() {
       )}
       {toast && <Toast key={toast.id} text={toast.text} out={toast.out} />}
       {sportTo && (
-        <div className={'sportfade ' + sportTo} role="status" aria-label={'Switching to ' + (sportTo === 'nfl' ? 'NFL' : 'NBA')}>
-          <span className="ball">{sportTo === 'nfl' ? <Football size={64} /> : <Hoop size={64} />}</span>
-          <b className="disp">{sportTo === 'nfl' ? 'NFL' : 'NBA'}</b>
+        <div className={'sportfade ' + sportTo.to} role="status" aria-label={'Switching to ' + (sportTo.to === 'nfl' ? 'NFL' : 'NBA')}>
+          <span className="ball">{sportTo.to === 'nfl' ? <Football size={64} /> : <Hoop size={64} />}</span>
+          <b className="disp">{sportTo.to === 'nfl' ? 'NFL' : 'NBA'}</b>
+          {sportTo.late && <small>Sending your match’s last picks first…</small>}
         </div>
       )}
     </>

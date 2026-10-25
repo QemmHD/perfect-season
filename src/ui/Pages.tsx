@@ -111,7 +111,8 @@ export function HomePage(props: {
   }, []);
   const p = props.profile;
   const playLabel = p.mode === 'daily' ? (props.dailyDone ? 'PRACTICE DAILY' : 'PLAY DAILY #' + props.dailyNo) : p.mode === '1v1' ? (NET_ON ? 'FIND A MATCH' : 'PLAY THE BOT') : 'PLAY';
-  const live = props.online && props.online.online > 1;
+  // someone to play: another player with this sport open
+  const live = props.online && props.online.here > 1;
   const letters = (word: string, offset: number) =>
     word.split('').map((ch, i) => (
       <i key={i} style={{ animationDelay: offset + i * 45 + 'ms' }}>

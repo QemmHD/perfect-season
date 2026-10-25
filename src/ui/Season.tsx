@@ -201,9 +201,12 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
               Team rating <b className="num">{season.rating.toFixed(1)}</b>
             </span>
           </div>
-          <span className={'qualify rise-in' + (madeIt ? ' in' : '')} style={{ animationDelay: '640ms' }}>
-            {madeIt ? 'Made the playoffs' : 'Missed the playoffs · ' + PLAYOFF_MIN_WINS + ' wins get you in'}
-          </span>
+          {/* an unbeaten season's banner already says it, and the screen needs the room */}
+          {!unbeaten && (
+            <span className={'qualify rise-in' + (madeIt ? ' in' : '')} style={{ animationDelay: '640ms' }}>
+              {madeIt ? 'Made the playoffs' : 'Missed the playoffs · ' + PLAYOFF_MIN_WINS + ' wins get you in'}
+            </span>
+          )}
         </div>
       )}
       {done && g.letter.startsWith('S') && <Confetti density={1.2} />}

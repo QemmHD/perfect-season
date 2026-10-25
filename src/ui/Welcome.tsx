@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { NFL } from '../engine/sport';
 import { nameProblem, randomName } from '../lib/names';
 import { sfx } from '../lib/sound';
 import { Fit } from './common';
@@ -62,7 +63,7 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
       </div>
       <ul className="welcome-perks rise-in" style={{ animationDelay: '650ms' }}>
         <li>
-          <b>Draft</b> five players from random NBA teams and decades
+          <b>Draft</b> {NFL ? 'six' : 'five'} players from random {NFL ? 'NFL' : 'NBA'} teams and decades
         </li>
         <li>
           <b>Climb</b> the daily, weekly and all-time leaderboards

@@ -199,6 +199,25 @@ export function resetOtherSport(): void {
   }
 }
 
+/**
+ * The other sport's leaderboard entries. Its queued results and name changes go out from either
+ * sport, so they don't wait (and expire) until that sport is opened again.
+ */
+export function readOtherLb(): Profile['lb'] | null {
+  const other = read(NFL ? KEY : NFL_KEY);
+  return other ? loadFrom(other).lb : null;
+}
+
+export function updateOtherLb(fn: (lb: Profile['lb']) => Profile['lb']): void {
+  try {
+    const key = NFL ? KEY : NFL_KEY;
+    const other = read(key);
+    if (other) localStorage.setItem(key, JSON.stringify({ ...other, lb: fn(loadFrom(other).lb) }));
+  } catch {
+    // storage blocked
+  }
+}
+
 /** Best results first: wins, then rating. */
 export function bestRuns(history: RunRecord[], mode: Mode | 'all', n = 10): RunRecord[] {
   return history

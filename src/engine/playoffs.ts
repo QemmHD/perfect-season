@@ -25,11 +25,11 @@ export const SERIES_WINS = NFL ? 1 : 4;
 /**
  * Spread of the per-game win chance, in rating points; higher = more upsets. Basketball, at 12:
  * a typical 62-win team wins the title about 12% of the time, a 70-win team 45%, an 82-0 team 88%,
- * and an 82-0 team sweeps all four rounds about 4% of the time. Football, at 13: one game a
- * round: a 14-win team wins it all about 27% of the time and a 17-0 team about 70%
+ * and an 82-0 team sweeps all four rounds about 4% of the time. Football, at 10: one game a
+ * round: a 14-win team wins it all about 28% of the time and a 17-0 team 64-73%
  * (src/engine/engine.test.ts and nfl.test.ts check these).
  */
-export const SERIES_K = NFL ? 13 : 12;
+export const SERIES_K = NFL ? 10 : 12;
 /** Fewest wins that make the playoffs: the "C · Playoff Team" grade. Below it a team is in the lottery. */
 export const PLAYOFF_MIN_WINS = NFL ? 10 : 50;
 export const HOME_EDGE = NFL ? 0.06 : 0.04;

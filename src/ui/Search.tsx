@@ -15,7 +15,7 @@ export const AI_AFTER = 30;
 const clock = (s: number) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
 type Tab = 'quick' | 'friend';
-type Room = { code: string; hosting: boolean } | null;
+export type Room = { code: string; hosting: boolean } | null;
 
 /**
  * Finding a head-to-head opponent: the public queue (the AI steps in after 30 seconds),
@@ -25,24 +25,30 @@ export function Search(props: {
   name: string;
   level: number;
   botLevel: BotLevel;
-  room: string | null;
+  /** the room to be in (a link, or the one a match that didn't connect came from) */
+  room: Room;
+  /** where this screen is now: the app puts you back there if a match doesn't connect */
+  onRoom: (r: Room) => void;
   onMatch: (f: Found) => void;
   onAI: () => void;
   onBack: () => void;
   onToast: (t: string) => void;
 }) {
   const [tab, setTab] = useState<Tab>(props.room ? 'friend' : 'quick');
-  const [room, setRoom] = useState<Room>(props.room ? { code: props.room, hosting: false } : null);
+  const [room, setRoom] = useState<Room>(props.room);
   const [joinCode, setJoinCode] = useState('');
   const [t0, setT0] = useState(Date.now());
   const [now, setNow] = useState(Date.now());
   const [found, setFound] = useState<Found | null>(null);
   const [aiSoon, setAiSoon] = useState(false);
   /** a friend with the same code on the other sport, or another version of the app */
-  const [mismatch, setMismatch] = useState<RoomMismatch | null>(null);
+  const [mismatch, setMismatch] = useState<(RoomMismatch & { at: number }) | null>(null);
   const done = useRef(false);
   const mmRef = useRef<Matchmaker | null>(null);
+  useEffect(() => props.onRoom(room), [room?.code, room?.hosting]);
   const elapsed = Math.floor((now - t0) / 1000);
+  // the friend's phone says it's there every 2 seconds: gone once it stops (they left or switched)
+  const mm = tab === 'friend' && mismatch && now - mismatch.at < 6000 ? mismatch : null;
   const searching = !found && !aiSoon && (tab === 'quick' || !!room);
 
   useEffect(() => {
@@ -68,7 +74,7 @@ export function Search(props: {
         setFound(f);
       },
       undefined,
-      (m) => setMismatch((old) => (old && old.name === m.name && old.sport === m.sport ? old : m))
+      (m) => setMismatch({ ...m, at: Date.now() })
     );
     mm.start();
     mmRef.current = mm;
@@ -155,7 +161,7 @@ export function Search(props: {
       </span>
 
       {tab === 'quick' || room ? (
-        <div className="radar-wrap">
+        <div className={'radar-wrap' + (mm ? ' noted' : '')}>
           <div className="radar" aria-hidden="true">
             <i />
             <i />
@@ -183,30 +189,30 @@ export function Search(props: {
             )}
             <b className="disp num search-clock">{clock(elapsed)}</b>
           </div>
-          {tab === 'friend' && mismatch && (
+          {mm && (
             <div className="mismatch rise-in" role="alert">
-              {mismatch.sameSport ? (
+              {mm.sameSport ? (
                 <span>
-                  <b>{mismatch.name}</b> has another version of the game. Close and reopen the app on both phones to update, then try again.
+                  <b>{mm.name}</b> has another version of the game. Close and reopen the app on both phones to update, then try again.
                 </span>
               ) : room!.hosting ? (
                 // the one who joined switches, so the two of them never swap past each other
                 <span>
-                  <b>{mismatch.name}</b> joined from {mismatch.sport === 'nfl' ? 'NFL' : 'NBA'}. Their phone is offering to switch to {SPORT === 'nfl' ? 'NFL' : 'NBA'}.
+                  <b>{mm.name}</b> joined from {mm.sport === 'nfl' ? 'NFL' : 'NBA'}. Their phone is offering to switch to {SPORT === 'nfl' ? 'NFL' : 'NBA'}.
                 </span>
               ) : (
                 <>
                   <span>
-                    <b>{mismatch.name}</b> is in this room playing {mismatch.sport === 'nfl' ? 'NFL' : 'NBA'}.
+                    <b>{mm.name}</b> is in this room playing {mm.sport === 'nfl' ? 'NFL' : 'NBA'}.
                   </span>
                   <button
                     className="btn gold"
                     onClick={() => {
                       sfx.click();
-                      switchSport(mismatch.sport, room!.code);
+                      switchSport(mm.sport, room!.code);
                     }}
                   >
-                    SWITCH TO {mismatch.sport === 'nfl' ? 'NFL' : 'NBA'}
+                    SWITCH TO {mm.sport === 'nfl' ? 'NFL' : 'NBA'}
                   </button>
                 </>
               )}
