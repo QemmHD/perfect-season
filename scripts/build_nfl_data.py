@@ -114,7 +114,7 @@ def main():
     raw_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", ".cache", "nfl")
     S.fetch(raw_dir)
     reg = S.Register(os.path.join(raw_dir, "players.csv"))
-    rows = S.pfr_rows(raw_dir, reg, range(S.FIRST_SEASON, S.SPLIT)) + S.verse_rows(raw_dir, reg)
+    rows = S.player_rows(raw_dir, reg)
     games = S.team_games(raw_dir)
     ts = S.team_seasons(games)
 

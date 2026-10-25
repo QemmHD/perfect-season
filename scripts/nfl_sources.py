@@ -295,31 +295,39 @@ def season_rosters(raw_dir):
 
 def roster_counts(y):
     """Whether the weekly rosters' active count can stand in for games played that season. It
-    matches PFR's games played for 88-94% of backs, receivers and tight ends in 2002-2015 and
-    2020-2021, and is never lower; in 2016-2019 the files don't mark game-day inactives."""
+    matches PFR's games played for about 90% of backs, receivers and tight ends in 2002-2015 and
+    2020-2021 and is almost never lower; in 2016-2019 the files don't mark game-day inactives."""
     return ROSTER_FIRST <= y <= 2015 or y >= 2020
 
 
-def active_games(raw_dir):
-    """Regular-season games each player was active for, per team (weekly rosters):
-    (player id, season, franchise) -> games. Only weeks his team played (byes are listed too),
-    and not when he was a game-day inactive. A quarterback is active for many games he doesn't play."""
+def roster_games(raw_dir):
+    """From the weekly rosters, per (player id, season, franchise): the games he was active for,
+    and the games his team played while he was on its roster. Only weeks the team played (byes
+    are listed too), each week once (some files repeat rows). Active: in 2002-2015 the per-game
+    flag is status_description_abbr (A01 active, I01 inactive) and status is the season's
+    transaction status; from 2020 status is per game (ACT, INA). A quarterback is active for
+    many games he doesn't play."""
     played = set()
     for r in csv.DictReader(open(os.path.join(raw_dir, "games.csv"), encoding="utf-8")):
         if r["game_type"] == "REG" and r["home_score"] != "":
             for t in (r["home_team"], r["away_team"]):
                 played.add((int(r["season"]), int(r["week"]), VERSE.get(t, t)))
-    n = defaultdict(int)
+    active = defaultdict(set)
+    rostered = defaultdict(set)
     for y in range(ROSTER_FIRST, LAST_SEASON + 1):
-        if not roster_counts(y):
-            continue
         for r in csv.DictReader(open(os.path.join(raw_dir, "rw", str(y) + ".csv"), encoding="utf-8")):
-            if r["game_type"] != "REG" or r["status"] != "ACT" or not r["gsis_id"] or r["status_description_abbr"].startswith("I"):
+            if r["game_type"] != "REG" or not r["gsis_id"]:
                 continue
             fr = ROSTER_CODES.get(r["team"], r["team"])
-            if (y, int(r["week"]), fr) in played:
-                n[(r["gsis_id"], y, fr)] += 1
-    return n
+            week = int(r["week"])
+            if (y, week, fr) not in played:
+                continue
+            key = (r["gsis_id"], y, fr)
+            rostered[key].add(week)
+            flag = r["status_description_abbr"]
+            if roster_counts(y) and (flag.startswith("A") if y <= 2015 else r["status"] == "ACT" and not flag.startswith("I")):
+                active[key].add(week)
+    return {k: len(v) for k, v in active.items()}, {k: len(v) for k, v in rostered.items()}
 
 
 def verse_rows(raw_dir, reg):
@@ -330,7 +338,7 @@ def verse_rows(raw_dir, reg):
     receiver's or tight end's games are the ones the weekly rosters have him active for, where
     they can tell (roster_counts). Positions are the season roster's."""
     rosters = season_rosters(raw_dir)
-    active = active_games(raw_dir)
+    active, rostered = roster_games(raw_dir)
     pfr_all = pfr_rows(raw_dir, reg, range(SPLIT, PFR_LAST + 1))
     agg = {}
     for y in range(SPLIT, LAST_SEASON + 1):
@@ -367,7 +375,7 @@ def verse_rows(raw_dir, reg):
             a["rec"] += num(r["receptions"])
             a["rec_yds"] += num(r["receiving_yards"])
             a["rec_td"] += num(r["receiving_tds"])
-    pfr = match_pfr(pfr_all, agg)
+    pfr, links = match_pfr(pfr_all, agg)
     stints = defaultdict(list)
     for a in agg.values():
         stints[(a["pid"], a["season"])].append(a)
@@ -386,39 +394,133 @@ def verse_rows(raw_dir, reg):
             if a["pos"] != "QB":
                 a["g"] = max(a["g"], active.get((a["pid"], a["season"], a["fr"]), 0))
         if p and p["xtm"] and len(lst) > 1:
-            # a traded season: PFR's combined games played, shared out over the stints
-            extra = sum(a["g"] for a in lst) - p["g"]
-            for a in sorted(lst, key=lambda a: a["stat_g"] - a["g"]):
-                cut = min(max(0.0, extra), a["g"] - a["stat_g"])
-                a["g"] -= cut
-                extra -= cut
+            share_traded(lst, p["g"], rostered)
         for a in lst:
             del a["stat_g"]
-    return list(agg.values())
+    return list(agg.values()), links
+
+
+def share_traded(stints, games, rostered):
+    """A traded season: PFR's combined games played, shared out over the stints. Too many: the
+    games beyond his stat games go first. Too few: each stint takes up to the games its team
+    played while he was on its roster (weekly rosters, 2002-), or before that in proportion to
+    his stat games."""
+    extra = sum(a["g"] for a in stints) - games
+    if extra > 0:
+        for a in sorted(stints, key=lambda a: a["stat_g"] - a["g"]):
+            cut = min(extra, a["g"] - a["stat_g"])
+            a["g"] -= cut
+            extra -= cut
+        return
+    need = -extra
+    if not need:
+        return
+    if stints[0]["season"] >= ROSTER_FIRST:
+        room = {id(a): max(0, rostered.get((a["pid"], a["season"], a["fr"]), 0) - a["g"]) for a in stints}
+        for a in sorted(stints, key=lambda a: -room[id(a)]):
+            add = min(need, room[id(a)])
+            a["g"] += add
+            need -= add
+        return
+    total = sum(a["stat_g"] for a in stints) or 1
+    adds = [need * a["stat_g"] / total for a in stints]
+    whole = [int(x) for x in adds]
+    for i in sorted(range(len(stints)), key=lambda i: whole[i] - adds[i])[: int(need - sum(whole))]:
+        whole[i] += 1
+    for a, w in zip(stints, whole):
+        a["g"] += w
 
 
 def match_pfr(pfr_all, agg):
-    """PFR's season rows by (nflverse id, season). The register finds most players by name; a
-    name it can't place (Ben Watson for Benjamin Watson) is found by team, season and yards.
+    """PFR's season rows by (nflverse id, season), and the stand-in ids it placed (stand-in ->
+    nflverse id, for the same player's earlier PFR seasons). The register finds most players by
+    name. A row it can't place (Ben Watson for Benjamin Watson), or places on a namesake who
+    wasn't on that team that season, is found by team, season, last name and yards; failing
+    that (a changed name: Robby Anderson is Robbie Chosen) by team, season and the same yards.
     An id with two PFR rows that season is trusted for neither."""
     out = {}
-    for r in pfr_all:
-        if not r["pid"].startswith("pfr:"):
-            key = (r["pid"], r["season"])
-            out[key] = None if key in out else r
+    stints = {(a["pid"], a["season"], a["fr"]) for a in agg.values()}
     by_team = defaultdict(list)
     for a in agg.values():
         by_team[(a["season"], a["fr"])].append(a)
-    yards = lambda x: (x["pass_yds"], x["rush_yds"], x["rec_yds"])
+    lost = []
     for r in pfr_all:
-        if not r["pid"].startswith("pfr:") or not r["fr"] or sum(yards(r)) < 50:
-            continue
+        if r["pid"].startswith("pfr:") or (r["fr"] and (r["pid"], r["season"], r["fr"]) not in stints):
+            if r["fr"]:
+                lost.append(r)
+            if r["pid"].startswith("pfr:"):
+                continue
+        key = (r["pid"], r["season"])
+        out[key] = None if key in out else r
+    yards = lambda x: (x["pass_yds"], x["rush_yds"], x["rec_yds"])
+
+    def close(r, a, tol):
+        return all(abs(u - v) <= tol(u) for u, v in zip(yards(r), yards(a)))
+
+    links = {}
+    for r in lost:
+        free = [a for a in by_team[(r["season"], r["fr"])] if (a["pid"], a["season"]) not in out or out[(a["pid"], a["season"])] is r]
         last = name_key(r["name"]).split()[-1:]
-        cands = [a for a in by_team[(r["season"], r["fr"])] if (a["pid"], a["season"]) not in out
-                 and name_key(a["name"]).split()[-1:] == last and all(abs(u - v) <= max(5, 0.03 * u) for u, v in zip(yards(r), yards(a)))]
+        big = sum(yards(r)) >= 50
+        cands = [a for a in free if name_key(a["name"]).split()[-1:] == last and close(r, a, (lambda u: max(5, 0.03 * u)) if big else (lambda u: 1))]
+        if not cands and sum(yards(r)) >= 100:
+            cands = [a for a in free if close(r, a, lambda u: 2)]
+        if len(cands) != 1:
+            continue
+        a = cands[0]
+        if out.get((r["pid"], r["season"])) is r:
+            del out[(r["pid"], r["season"])]  # the register's namesake
+        out[(a["pid"], r["season"])] = r
+        if r["pid"].startswith("pfr:"):
+            links[":".join(r["pid"].split(":")[:3])] = a["pid"]
+    return out, links
+
+
+def player_rows(raw_dir, reg):
+    """Every player-season row, 1970-2025: PFR's to 1998 and nflverse's from 1999, with a career
+    that crosses 1999 under one id."""
+    early = pfr_rows(raw_dir, reg, range(FIRST_SEASON, SPLIT))
+    late, links = verse_rows(raw_dir, reg)
+    link_careers(early, late, links, reg)
+    return early + late
+
+
+def link_careers(early, late, links, reg):
+    """PFR rows before 1999 that the register couldn't place have stand-in ids, while the same
+    player's nflverse seasons have his real one: a stand-in matched from 1999 on takes that id
+    for every season (Rocket Ismail is Raghib Ismail). A stand-in whose last season is 1997 or
+    1998 also takes the id of the one player with his last name, birth year (within a year) and
+    team in the next season (Patrick Johnson's 1998 Ravens are Pat Johnson's), unless that player
+    already has a season of his own before 1999."""
+    for r in early:
+        base = ":".join(r["pid"].split(":")[:3])
+        if r["pid"].startswith("pfr:") and base in links:
+            r["pid"] = links[base]
+    seasons = defaultdict(set)
+    for r in early:
+        seasons[r["pid"]].add(r["season"])
+    mine = defaultdict(list)
+    for r in early:
+        if r["pid"].startswith("pfr:") and r["fr"]:
+            mine[r["pid"]].append(r)
+    by_team = defaultdict(set)
+    for a in late:
+        by_team[(a["season"], a["fr"])].add((a["pid"], a["name"]))
+    for pid, rows in mine.items():
+        last = max(rows, key=lambda r: r["season"])
+        if last["season"] < SPLIT - 2:
+            continue
+        born = int(pid.split(":")[2]) if pid.split(":")[2].isdigit() else None
+        surname = name_key(last["name"]).split()[-1:]
+        cands = set()
+        for nid, name in by_team[(last["season"] + 1, last["fr"])]:
+            p = reg.by_id.get(nid)
+            if name_key(name).split()[-1:] == surname and p and born and p["born"] and abs(p["born"] - born) <= 1 and not seasons.get(nid):
+                cands.add(nid)
         if len(cands) == 1:
-            out[(cands[0]["pid"], r["season"])] = r
-    return out
+            nid = cands.pop()
+            for r in rows:
+                r["pid"] = nid
 
 
 def team_games(raw_dir):
