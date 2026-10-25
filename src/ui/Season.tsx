@@ -1,33 +1,70 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
-import { gradeFor } from '../engine/rating';
-import type { Season } from '../engine/season';
+import { isPerfect, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
+import { GAMES, gradeFor } from '../engine/rating';
+import type { GameScore, Season } from '../engine/season';
+import { NFL } from '../engine/sport';
 import { type Lineup, SLOTS } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { Confetti, Fit, TeamChips } from './common';
 import { Flame } from './icons';
 import { reducedMotion } from './motion';
 import { oppNames, Scout, teamBar } from './Scout';
+import { CHAMPS, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
 
-/** Delay before each game of the 82-game reveal: quick through the middle,
-    slower at the end, and one beat per game when an unbeaten season gets close. */
+/** Delay before each game of the reveal: quick through the middle, slower at the end, and
+    one beat per game when an unbeaten season gets close. Football's 17 games each get a moment. */
 function revealDelays(seq: number[]): number[] {
   const out: number[] = [];
   let unbeaten = true;
-  for (let i = 0; i < 82; i++) {
-    let d = i < 8 ? 92 - i * 8 : 30;
-    if (i >= 72) d = 42 + (i - 72) * 9;
-    if (unbeaten && i >= 75) d = 280 + (i - 75) * 45;
+  for (let i = 0; i < GAMES; i++) {
+    let d: number;
+    if (NFL) {
+      d = i < 3 ? 300 - i * 30 : 190;
+      if (i >= 13) d = 230 + (i - 13) * 30;
+      if (unbeaten && i >= 13) d = 420 + (i - 13) * 90;
+    } else {
+      d = i < 8 ? 92 - i * 8 : 30;
+      if (i >= 72) d = 42 + (i - 72) * 9;
+      if (unbeaten && i >= 75) d = 280 + (i - 75) * 45;
+    }
     out.push(d);
     if (seq[i] === 0) unbeaten = false;
   }
   return out;
 }
-const SLOW = 200;
+
+/** A milestone to pop after a win: the win that clinches the playoffs, and round numbers on the way. */
+function milestone(wins: number): { text: string; clinch: boolean } | null {
+  if (wins === PLAYOFF_MIN_WINS) return { text: 'PLAYOFFS CLINCHED', clinch: true };
+  if (NFL ? wins % 5 === 0 : wins % 10 === 0) return { text: wins + ' WINS', clinch: false };
+  return null;
+}
+
+/** Football's season, game by game: result, score and opponent. */
+function Schedule({ scores, tick }: { scores: GameScore[]; tick: number }) {
+  return (
+    <div className="sched" aria-hidden="true">
+      {scores.map((g, i) => {
+        const shown = i < tick;
+        const won = g.us > g.them;
+        return (
+          <span key={i} className={shown ? (won ? 'w' : 'l') : ''}>
+            <i>
+              {g.home ? 'vs' : '@'} {g.opp}
+            </i>
+            <b className="num">{shown ? (won ? 'W ' : 'L ') + g.us + '–' + g.them : 'WK ' + (i + 1)}</b>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+/** A game slow enough to get a beat of its own: the close of an unbeaten season (football's every game is a beat, so only that finish). */
+const SLOW = NFL ? 420 : 200;
 
 export function Reveal({ season, lineup, label, onDone }: { season: Season; lineup: Lineup; label: string; onDone: () => void }) {
   const [tick, setTick] = useState(0);
-  const done = tick >= 82;
+  const done = tick >= GAMES;
   const timer = useRef<number | null>(null);
   const delays = useMemo(() => revealDelays(season.seq), [season]);
   /** milestone pops: every 10 wins, and the 50th win that clinches a playoff spot */
@@ -35,7 +72,7 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
 
   useEffect(() => {
     if (reducedMotion()) {
-      setTick(82);
+      setTick(GAMES);
       return;
     }
     let i = 0;
@@ -46,17 +83,15 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
       const won = season.seq[i - 1] === 1;
       if (won) {
         wins++;
-        if (wins === PLAYOFF_MIN_WINS) {
-          setPop({ id: i, text: 'PLAYOFFS CLINCHED', clinch: true });
-          sfx.seriesWin();
-        } else if (wins % 10 === 0) {
-          setPop({ id: i, text: wins + ' WINS', clinch: false });
-          sfx.coin();
+        const m = milestone(wins);
+        if (m) {
+          setPop({ id: i, ...m });
+          (m.clinch ? sfx.seriesWin : sfx.coin)();
         }
       }
-      if (delays[i - 1] >= SLOW) (won ? sfx.gameWin : sfx.gameLoss)();
+      if (NFL || delays[i - 1] >= SLOW) (won ? sfx.gameWin : sfx.gameLoss)();
       else (won ? sfx.tickerWin : sfx.tickerLoss)();
-      if (i >= 82) return;
+      if (i >= GAMES) return;
       if (delays[i] >= SLOW) sfx.heartbeat();
       timer.current = window.setTimeout(step, delays[i]);
     };
@@ -79,13 +114,13 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
   const l = shown.length - w;
   let streak = 0;
   for (let i = shown.length - 1; i >= 0 && shown[i] === 1; i--) streak++;
-  const slowBeat = tick > 0 && tick < 82 && delays[tick - 1] >= SLOW;
+  const slowBeat = tick > 0 && tick < GAMES && delays[tick - 1] >= SLOW;
   const skip = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    setTick(82);
+    setTick(GAMES);
   };
-  const unbeaten = done && season.wins === 82;
+  const unbeaten = done && season.wins === GAMES;
   const madeIt = season.wins >= PLAYOFF_MIN_WINS;
 
   return (
@@ -118,16 +153,20 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
         </span>
       )}
       <span className="eyebrow gameno">
-        {done ? 'Final record' : tick === 0 ? 'Tip-off' : 'Game ' + tick + ' of 82' + (streak >= 5 ? ' · ' + streak + ' straight wins' : '')}
+        {done ? 'Final record' : tick === 0 ? (NFL ? 'Kickoff' : 'Tip-off') : (NFL ? 'Week ' : 'Game ') + tick + ' of ' + GAMES + (streak >= 5 ? ' · ' + streak + ' straight wins' : '')}
       </span>
-      <div className="dots" aria-hidden="true">
-        {season.seq.map((x, i) => (
-          <i key={i} className={i < tick ? (x === 1 ? 'w' : 'l') : ''} />
-        ))}
-      </div>
+      {NFL && season.scores ? (
+        <Schedule scores={season.scores} tick={tick} />
+      ) : (
+        <div className="dots" aria-hidden="true">
+          {season.seq.map((x, i) => (
+            <i key={i} className={i < tick ? (x === 1 ? 'w' : 'l') : ''} />
+          ))}
+        </div>
+      )}
       {done && (
         <div className="verdict">
-          {unbeaten && <div className="unbeaten disp">UNDEFEATED · 82–0</div>}
+          {unbeaten && <div className="unbeaten disp">UNDEFEATED · {PERFECT_RECORD}</div>}
           <div className="gradeline">
             <span className="stampwrap">
               <i className="shock" style={{ borderColor: g.color }} />
@@ -143,12 +182,21 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
             <span className="pill rise-in" style={{ animationDelay: '380ms' }}>
               Longest win streak <b className="num">{season.longestWin}</b>
             </span>
-            <span className="pill rise-in" style={{ animationDelay: '460ms' }}>
-              First half{' '}
-              <b className="num">
-                {season.firstHalfWins}–{41 - season.firstHalfWins}
-              </b>
-            </span>
+            {NFL ? (
+              <span className="pill rise-in" style={{ animationDelay: '460ms' }}>
+                Points a game{' '}
+                <b className="num">
+                  {(season.pf ?? 0).toFixed(1)}–{(season.pa ?? 0).toFixed(1)}
+                </b>
+              </span>
+            ) : (
+              <span className="pill rise-in" style={{ animationDelay: '460ms' }}>
+                First half{' '}
+                <b className="num">
+                  {season.firstHalfWins}–{41 - season.firstHalfWins}
+                </b>
+              </span>
+            )}
             <span className="pill rise-in" style={{ animationDelay: '540ms' }}>
               Team rating <b className="num">{season.rating.toFixed(1)}</b>
             </span>
@@ -169,8 +217,9 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
   );
 }
 
-/** Pause before each playoff game; closeout games and Game 7s take longer. */
+/** Pause before each playoff game; closeout games and Game 7s take longer, and a football game is one long beat. */
 function gameDelay(games: number[], n: number): number {
+  if (NFL) return 1150;
   if (n === 0) return 320;
   const [w, l] = seriesScore(games.slice(0, n));
   if (w === 3 && l === 3) return 1100;
@@ -225,6 +274,7 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
       if (d > 1000) sfx.heartbeat();
       timer.current = window.setTimeout(step, d);
     };
+    if (NFL) sfx.heartbeat();
     timer.current = window.setTimeout(step, gameDelay(ser.games, 0));
   };
 
@@ -261,7 +311,9 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
       <div className="po-head">
         <span className="disp po-title">PLAYOFFS</span>
         <span className="po-sub">
-          Your {season.wins}–{82 - season.wins} team vs the all-time greats. Go 16–0 for a Perfect Season.
+          {NFL
+            ? 'Your ' + record(season.wins) + ' team vs the all-time greats. One game a round: win four for the Super Bowl.'
+            : 'Your ' + record(season.wins) + ' team vs the all-time greats. Go 16–0 for a Perfect Season.'}
         </span>
         <span className="po-rec num" aria-label={'Playoff record ' + pw + ' and ' + pl}>
           {pw}–{pl}
@@ -277,11 +329,12 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
           let status = 'LOCKED';
           let tone = 'sub';
           let dim = false;
+          const sc = NFL && b.scores && n > 0 ? b.scores[0] : null;
           if (finished) {
-            status = (b.won ? 'WON ' : 'LOST ') + w + '–' + l;
+            status = (b.won ? 'WON ' : 'LOST ') + (sc ? sc[0] + '–' + sc[1] : w + '–' + l);
             tone = b.won ? 'teal' : 'red';
           } else if (isCur) {
-            status = n === 0 ? 'UP NEXT' : 'LIVE · ' + w + '–' + l;
+            status = n === 0 ? (NFL && running ? 'LIVE' : 'UP NEXT') : 'LIVE · ' + w + '–' + l;
             tone = 'gold';
           } else if (curDone && !cur.won) {
             status = 'ELIMINATED';
@@ -320,8 +373,9 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
                   </strong>
                   <small>
                     {b.opp.w}–{b.opp.l}
+                    {b.opp.t ? '–' + b.opp.t : ''}
                     {b.opp.star ? ' · led by ' + b.opp.star : ''}
-                    {i === 3 ? ' · Finals boss' : ''}
+                    {i === 3 ? ' · Final boss' : ''}
                   </small>
                 </div>
                 <span className="scout-go" aria-hidden="true">
@@ -332,13 +386,19 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
                 </span>
               </div>
               {next && <div className="five">{oppNames(b)}</div>}
-              <div className="games" aria-label={'Games: ' + w + ' wins, ' + l + ' losses'}>
-                {[0, 1, 2, 3, 4, 5, 6].map((j) => (
-                  <span key={j} className={j < g.length ? (g[j] === 1 ? 'w' : 'l') : j < 4 || !finished ? '' : 'na'}>
-                    {j < g.length ? (g[j] === 1 ? 'W' : 'L') : ''}
-                  </span>
-                ))}
-              </div>
+              {NFL ? (
+                <div className={'games one' + (isCur && running ? ' live' : '')} aria-label={sc ? (b.won ? 'Won ' : 'Lost ') + sc[0] + ' to ' + sc[1] : 'Not played'}>
+                  <span className={sc ? (b.won ? 'w' : 'l') : ''}>{sc ? (b.won ? 'W ' : 'L ') + sc[0] + '–' + sc[1] : isCur && running ? 'IN PROGRESS' : i === 3 ? 'NEUTRAL SITE' : season.wins >= b.opp.wFull ? 'AT HOME' : 'ON THE ROAD'}</span>
+                </div>
+              ) : (
+                <div className="games" aria-label={'Games: ' + w + ' wins, ' + l + ' losses'}>
+                  {[0, 1, 2, 3, 4, 5, 6].map((j) => (
+                    <span key={j} className={j < g.length ? (g[j] === 1 ? 'w' : 'l') : j < 4 || !finished ? '' : 'na'}>
+                      {j < g.length ? (g[j] === 1 ? 'W' : 'L') : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -359,8 +419,8 @@ export function Playoffs({ season, bracket, onDone }: { season: Season; bracket:
 
 function Champions({ season, bracket, onGo }: { season: Season; bracket: Series[]; onGo: () => void }) {
   const out = playoffOutcome(bracket);
-  const perfect = out.sweeps === 4 && season.wins === 82;
-  const [w, l] = seriesScore(out.finals.games);
+  const perfect = isPerfect(season.wins, out);
+  const [w, l] = NFL && out.finals.scores ? out.finals.scores[0] : seriesScore(out.finals.games);
   const total = bracket.reduce((acc, b) => {
     const [a, c] = seriesScore(b.games);
     return [acc[0] + a, acc[1] + c];
@@ -369,17 +429,15 @@ function Champions({ season, bracket, onGo }: { season: Season; bracket: Series[
     <div className={'champ' + (perfect ? ' perfect' : '')} role="dialog" aria-modal="true" aria-label={perfect ? 'Perfect Season' : 'Champions'}>
       <div className="rays" aria-hidden="true" />
       <div className="champ-body">
-        <TrophyArt />
-        <span className="eyebrow champ-eyebrow">{perfect ? '82–0 · 16–0' : 'NBA champions'}</span>
-        <h1 className="disp champ-title">{perfect ? 'PERFECT SEASON' : 'CHAMPIONS'}</h1>
+        {NFL ? <LombardiArt /> : <TrophyArt />}
+        <span className="eyebrow champ-eyebrow">{perfect ? PERFECT_RECORD + ' · ' + PERFECT_PLAYOFFS : CHAMPS}</span>
+        <h1 className="disp champ-title">{perfect ? 'PERFECT SEASON' : NFL ? 'SUPER BOWL CHAMPS' : 'CHAMPIONS'}</h1>
         <p className="champ-line">
-          Beat the {out.finals.opp.year} {out.finals.opp.team} {w}–{l} in the Finals
+          Beat the {out.finals.opp.year} {out.finals.opp.team} {w}–{l} in the {NFL ? 'Super Bowl' : 'Finals'}
         </p>
         <div className="champ-stats">
           <span>
-            <b className="disp num">
-              {season.wins}–{82 - season.wins}
-            </b>
+            <b className="disp num">{record(season.wins)}</b>
             Regular season
           </span>
           <span>
@@ -397,6 +455,37 @@ function Champions({ season, bracket, onGo }: { season: Season; bracket: Series[
       </div>
       <Confetti density={perfect ? 3 : 2} colors={['#F5B83D', '#FFD36B', '#FFFFFF', '#19E3C9', '#FFE9A8']} />
     </div>
+  );
+}
+
+/** The Lombardi Trophy: a football in kicking position on a tapered stand. */
+function LombardiArt() {
+  return (
+    <svg className="trophy-art" width="132" height="168" viewBox="0 0 132 168" aria-hidden="true">
+      <defs>
+        <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#8E9AA3" />
+          <stop offset="0.35" stopColor="#FFFFFF" />
+          <stop offset="0.6" stopColor="#D3DBE0" />
+          <stop offset="1" stopColor="#7C8891" />
+        </linearGradient>
+        <radialGradient id="lg2" cx="38%" cy="34%" r="75%">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="0.55" stopColor="#D8E0E5" />
+          <stop offset="1" stopColor="#7C8891" />
+        </radialGradient>
+      </defs>
+      <g transform="rotate(-28 66 34)">
+        <ellipse cx="66" cy="34" rx="34" ry="20" fill="url(#lg2)" />
+        <path d="M40 34 H92" stroke="#6E7A83" strokeOpacity="0.6" strokeWidth="1.6" />
+        <path d="M54 28 V40 M60 27 V41 M66 26.5 V41.5 M72 27 V41 M78 28 V40" stroke="#6E7A83" strokeOpacity="0.75" strokeWidth="2" strokeLinecap="round" />
+      </g>
+      <path d="M58 56 L74 56 L71 66 L61 66 Z" fill="url(#lg1)" />
+      <path d="M61 66 H71 L84 140 H48 Z" fill="url(#lg1)" />
+      <path d="M64 70 L56 136" stroke="#FFFFFF" strokeOpacity="0.7" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M44 140 H88 L92 160 H40 Z" fill="url(#lg1)" />
+      <rect x="40" y="156" width="52" height="8" rx="2" fill="#5E6A73" />
+    </svg>
   );
 }
 

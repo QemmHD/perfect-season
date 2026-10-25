@@ -4,12 +4,13 @@
 import { CELLS } from './data';
 import { BENCHMARK, W, WIN_CURVE } from './rating';
 import { hashString } from './rng';
+import { NFL } from './sport';
 
 /** Bump when the rating formula changes in a way the constants below don't show. */
 const RULES = 1;
 
 export const DATA_V: string = (() => {
-  let h = hashString(JSON.stringify([W, BENCHMARK, WIN_CURVE, RULES]));
+  let h = hashString(JSON.stringify(NFL ? ['nfl', W, BENCHMARK, WIN_CURVE, RULES] : [W, BENCHMARK, WIN_CURVE, RULES]));
   for (const c of CELLS) for (const p of c.players) h = Math.imul(h ^ hashString(p.id + ':' + Math.round(p.val * 100) + ':' + p.pos.join('')), 16777619) >>> 0;
   return h.toString(36);
 })();

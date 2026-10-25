@@ -5,6 +5,9 @@ import { sfx } from '../lib/sound';
 import { type BoardKind, type BoardRow, cachedBoard, fetchBoard, type Span } from '../net/leaderboard';
 import { lastName, Sheet, shortEra } from './common';
 import { Ranks as RanksIcon, Refresh, Trophy } from './icons';
+import { PLAYOFF_MIN_WINS } from '../engine/playoffs';
+import { NFL } from '../engine/sport';
+import { record } from './sportui';
 
 /** The name field with a dice button for a random name, shared by the welcome screen and the name sheet. */
 export function NameField({ value, onChange, error, autoFocus }: { value: string; onChange: (v: string) => void; error: string | null; autoFocus?: boolean }) {
@@ -125,9 +128,9 @@ function outcome(r: BoardRow): string {
   if (r.h2h) return r.h2h.w + ' W · ' + r.h2h.l + ' L' + (r.h2h.streak >= 2 ? ' · ' + r.h2h.streak + ' in a row' : '');
   const x = r.run!;
   if (x.perfect) return 'Perfect Season';
-  if (x.title) return 'Champions';
-  if (x.series) return 'Won ' + x.series + ' playoff round' + (x.series > 1 ? 's' : '');
-  return x.wins >= 50 ? 'Out in the first round' : 'Missed the playoffs';
+  if (x.title) return NFL ? 'Super Bowl champions' : 'Champions';
+  if (x.series) return 'Won ' + x.series + (NFL ? ' playoff game' : ' playoff round') + (x.series > 1 ? 's' : '');
+  return x.wins >= PLAYOFF_MIN_WINS ? (NFL ? 'Out in the Wild Card round' : 'Out in the first round') : 'Missed the playoffs';
 }
 
 const KINDS: [BoardKind, string][] = [
@@ -181,7 +184,7 @@ export function GlobalBoard({ profile, dailyKey, dailyNo, onName }: { profile: P
         </strong>
         <small>{outcome(r)}</small>
       </span>
-      <b className={'disp num' + (r.run?.perfect ? ' perfect' : r.run?.title ? ' title' : '')}>{r.h2h ? r.h2h.w + '–' + r.h2h.l : r.run!.wins + '–' + (82 - r.run!.wins)}</b>
+      <b className={'disp num' + (r.run?.perfect ? ' perfect' : r.run?.title ? ' title' : '')}>{r.h2h ? r.h2h.w + '–' + r.h2h.l : record(r.run!.wins)}</b>
       {open === i && r.run && (
         <span className="lbline">
           {r.run.lineup.map((p) => (
@@ -274,6 +277,7 @@ export function GlobalBoard({ profile, dailyKey, dailyNo, onName }: { profile: P
       </div>
       <p className="note">
         {state === 'error' && rows ? 'Offline: showing the last copy. ' : ''}
+        {NFL ? 'NFL boards. Basketball has its own. ' : ''}
         {kind === 'h2h'
           ? 'Matches against real players: most wins, then win rate.'
           : 'Each player’s best ' + (kind === 'daily' ? 'result' : 'season') + ', ranked by wins, then playoff rounds, then team rating. Every lineup is checked against the player data.' + (kind === 'daily' ? ' Only your first Daily run counts.' : '')}

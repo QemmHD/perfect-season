@@ -1,3 +1,4 @@
+import { NFL } from '../engine/sport';
 import type { Booster, BotLevel, Mode, Slot } from '../engine/types';
 import type { EntryContent } from '../net/leaderboard';
 
@@ -87,7 +88,12 @@ export function newId(): string {
   return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
 }
 
+/** Basketball's profile, which also holds everything the two sports share. */
 const KEY = 'perfect-season:profile:v1';
+/** Football's own part: its drafts, records, boards, missions and matches. */
+const NFL_KEY = 'perfect-season:profile:nfl:v1';
+/** One player across both sports: the same name, wallet, level, boosters, settings and daily chest. */
+const SHARED = ['coins', 'xp', 'inventory', 'settings', 'name', 'streak', 'rewardDay', 'botLevel'] as const;
 
 export function freshH2H(): H2HStats {
   return { w: 0, l: 0, streak: 0, best: 0, week: '', ww: 0, wl: 0, wstreak: 0 };
@@ -116,12 +122,33 @@ export function freshProfile(): Profile {
   };
 }
 
-export function loadProfile(): Profile {
+function read(key: string): Profile | null {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return freshProfile();
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
     const p = JSON.parse(raw) as Profile;
-    if (p.v !== 1) return freshProfile();
+    return p && p.v === 1 ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+function pick(p: Profile, keys: readonly string[], keep: boolean): Partial<Profile> {
+  return Object.fromEntries(Object.entries(p).filter(([k]) => keys.includes(k) === keep)) as Partial<Profile>;
+}
+
+export function loadProfile(): Profile {
+  if (!NFL) return loadFrom(read(KEY));
+  // football: its own part, with the shared part from the basketball profile
+  const own = read(NFL_KEY);
+  const shared = read(KEY);
+  const merged = { ...(own ?? freshProfile()), ...(shared ? pick(shared, SHARED, true) : {}), v: 1 } as Profile;
+  return loadFrom(own || shared ? merged : null);
+}
+
+function loadFrom(p: Profile | null): Profile {
+  try {
+    if (!p) return freshProfile();
     const base = freshProfile();
     return {
       ...base,
@@ -140,9 +167,35 @@ export function loadProfile(): Profile {
 
 export function saveProfile(p: Profile): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(p));
+    if (!NFL) {
+      localStorage.setItem(KEY, JSON.stringify(p));
+      return;
+    }
+    // the shared part goes back into the basketball profile, without touching basketball's own
+    const base = read(KEY) ?? freshProfile();
+    localStorage.setItem(KEY, JSON.stringify({ ...base, ...pick(p, SHARED, true) }));
+    localStorage.setItem(NFL_KEY, JSON.stringify({ ...pick(p, SHARED, false), v: 1 }));
   } catch {
     // storage blocked (private window, previews): the game still works for this session
+  }
+}
+
+/**
+ * Reset the other sport's progress too (Settings → Reset progress erases both). Its name,
+ * leaderboard entries and head-to-head record stay, like this sport's: those are public.
+ */
+export function resetOtherSport(): void {
+  try {
+    const key = NFL ? KEY : NFL_KEY;
+    const other = read(key);
+    if (!other) return;
+    const kept: Partial<Profile> = { lb: other.lb, h2h: other.h2h };
+    const fresh = freshProfile();
+    // basketball's profile also carries the shared part, which this sport has just reset itself
+    const next = NFL ? { ...fresh, ...pick(other, SHARED, true), ...kept } : { ...pick(fresh, SHARED, false), ...kept, v: 1 };
+    localStorage.setItem(key, JSON.stringify(next));
+  } catch {
+    // storage blocked
   }
 }
 

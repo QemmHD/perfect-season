@@ -6,17 +6,18 @@ import { gradeFor, lineValue, rateTeam, ratingForWins, WIN_CURVE, winsFromRating
 import { rng } from './rng';
 import { dailyNumber, playSeason } from './season';
 import { SLOTS } from './types';
-import { autoDraft } from './sim.test';
+import { autoDraft } from './autodraft';
+import { NFL } from './sport';
 
 const find = (cellId: string, name: string) => CELL_BY_ID[cellId].players.find((p) => p.name === name)!;
 const BULLS = PLAYOFF_TEAMS.find((t) => t.year === '1995-96' && t.team === 'Chicago Bulls')!;
 
-describe('data', () => {
+describe.skipIf(NFL)('data', () => {
   it('builds real decade lines', () => {
     const ewing = find('NYK-1990', 'Patrick Ewing');
-    expect([ewing.pts, ewing.reb, ewing.ast, ewing.stl, ewing.blk]).toEqual([24.1, 11, 2.2, 0.9, 2.7]);
+    expect([ewing.s.pts, ewing.s.reb, ewing.s.ast, ewing.s.stl, ewing.s.blk]).toEqual([24.1, 11, 2.2, 0.9, 2.7]);
     const wilt = find('GSW-1960', 'Wilt Chamberlain');
-    expect([wilt.pts, wilt.reb]).toEqual([41.5, 25.1]);
+    expect([wilt.s.pts, wilt.s.reb]).toEqual([41.5, 25.1]);
     expect(wilt.est).toBe(true);
     expect(CELL_BY_ID['GSW-1960'].name).toBe('San Francisco Warriors');
     expect(CELL_BY_ID['OKC-2000'].name).toBe('Seattle SuperSonics');
@@ -56,7 +57,7 @@ describe('data', () => {
   });
 });
 
-describe('rating', () => {
+describe.skipIf(NFL)('rating', () => {
   it('curve is monotone and invertible', () => {
     let prev = -1;
     for (let r = 0; r <= 130; r += 0.5) {
@@ -80,7 +81,7 @@ describe('rating', () => {
   });
 });
 
-describe('draft rules', () => {
+describe.skipIf(NFL)('draft rules', () => {
   it('lands, places and ends a cell', () => {
     let s = newDraft('classic', 'pro', null);
     s = draftReducer(s, { type: 'land', cellId: 'NYK-1990', ptr: 0 });
@@ -184,7 +185,7 @@ describe('draft rules', () => {
   });
 });
 
-describe('season and playoffs', () => {
+describe.skipIf(NFL)('season and playoffs', () => {
   it('same lineup gives the same season', () => {
     const s = autoDraft('best', 3);
     expect(playSeason(s.lineup)).toEqual(playSeason(s.lineup));
@@ -207,7 +208,7 @@ describe('season and playoffs', () => {
   });
 });
 
-describe('economy', () => {
+describe.skipIf(NFL)('economy', () => {
   it('levels', () => {
     expect(levelInfo(0)).toEqual({ level: 1, into: 0, need: 70 });
     expect(levelInfo(70).level).toBe(2);
@@ -223,7 +224,7 @@ describe('economy', () => {
   });
 });
 
-describe('game logic', () => {
+describe.skipIf(NFL)('game logic', () => {
   it('rates players against their own era, so no decade is a jackpot', () => {
     const byEra: Record<string, number[]> = {};
     for (const c of CELLS) {
@@ -235,17 +236,17 @@ describe('game logic', () => {
     for (const m of means) expect(Math.abs(m / all - 1)).toBeLessThan(0.08);
     // the shown stats stay the real ones
     const wilt = find('GSW-1960', 'Wilt Chamberlain');
-    expect(wilt.pts).toBe(41.5);
-    expect(wilt.r.reb).toBeLessThan(wilt.reb);
+    expect(wilt.s.pts).toBe(41.5);
+    expect(wilt.r.reb).toBeLessThan(wilt.s.reb);
   });
   it('does not value a one-game cameo like a full season', () => {
     const tavares = find('CLE-2010', 'Edy Tavares');
     expect(tavares.g).toBe(1);
-    expect(tavares.val).toBeLessThan(lineValue(tavares) / 2);
+    expect(tavares.val).toBeLessThan(lineValue(tavares.s) / 2);
     // long stints are barely touched
     const jordan = find('CHI-1990', 'Michael Jordan');
     expect(Math.abs(jordan.val - lineValue(jordan.r))).toBeLessThan(0.01);
-    expect(Math.abs(jordan.r.pts - jordan.pts)).toBeLessThan(2);
+    expect(Math.abs(jordan.r.pts - jordan.s.pts)).toBeLessThan(2);
   });
   it('win curve rises steadily from 0 to 82', () => {
     for (let i = 1; i < WIN_CURVE.length; i++) {
@@ -316,12 +317,12 @@ describe('game logic', () => {
   });
 });
 
-describe('playoff opponents', () => {
+describe.skipIf(NFL)('playoff opponents', () => {
   it("lists each great team's five players by minutes", () => {
     expect(BULLS.w).toBe(72);
     expect(BULLS.five.map((p) => p.name)).toContain('Michael Jordan');
     const jordan = BULLS.five.find((p) => p.name === 'Michael Jordan')!;
-    expect([jordan.pts, jordan.g]).toEqual([30.4, 82]);
+    expect([jordan.s.pts, jordan.g]).toEqual([30.4, 82]);
     for (const t of PLAYOFF_TEAMS) expect(t.five.length).toBe(5);
   });
   it('series odds match a simulation of the same matchup', () => {

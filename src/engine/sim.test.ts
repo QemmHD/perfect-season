@@ -1,65 +1,11 @@
-import { CELLS, CELL_BY_ID } from './data';
-import { botChoose, botPicksFirst, draftReducer, eligibleSlots, isDraftComplete, newDraft, nextCell, noOneFits, whyUnavailable, SLOT_PREFERENCE, type DraftState } from './draft';
-import { buildBracket, playoffOutcome } from './playoffs';
+import { CELLS } from './data';
+import { autoDraft, type Strategy } from './autodraft';
+import { buildBracket, isPerfect, playoffOutcome } from './playoffs';
+import { GAMES, rateTeam, W } from './rating';
 import { rng } from './rng';
 import { playSeason } from './season';
-import type { BotLevel, Mode } from './types';
-
-type Strategy = 'random' | 'best' | 'smart';
-
-export function autoDraft(strategy: Strategy, seed: number, mode: Mode = 'classic', bot: BotLevel = 'pro', useRespins = false, botFirst = false): DraftState {
-  const rand = rng(seed);
-  let s = newDraft(mode, bot, mode === 'daily' ? '2026-10-24' : null, botFirst);
-  let guard = 0;
-  while (!isDraftComplete(s) && guard++ < 60) {
-    if (!s.cellId) {
-      const nx = nextCell(s, 'spin', rand);
-      s = draftReducer(s, { type: 'land', ...nx });
-      if (botPicksFirst(s)) {
-        const b = botChoose(s, s.cellId!, [], rand);
-        if (b) s = draftReducer(s, { type: 'bot', playerId: b.player.id, slot: b.slot, cellId: b.cellId });
-      }
-      continue;
-    }
-    if (noOneFits(s)) {
-      const nx = nextCell(s, 'nofit', rand);
-      s = draftReducer(s, { type: 'land', ...nx, keepBot: true });
-      if (mode === '1v1' && botPicksFirst(s)) {
-        const b = botChoose(s, s.cellId!, [], rand);
-        if (b) s = draftReducer(s, { type: 'bot', playerId: b.player.id, slot: b.slot, cellId: b.cellId });
-      }
-      continue;
-    }
-    const cell = CELL_BY_ID[s.cellId];
-    const ok = cell.players.filter((p) => whyUnavailable(s, p) === null);
-    if (useRespins && strategy !== 'random') {
-      const bestVal = Math.max(...ok.map((p) => p.val));
-      if (bestVal < 16 && (s.freeTeam > 0 || s.freeEra > 0)) {
-        const kind = s.freeTeam > 0 ? 'team' : 'era';
-        s = draftReducer(s, { type: 'respin', kind, paid: false });
-        const nx = nextCell(s, kind, rand);
-        s = draftReducer(s, { type: 'land', ...nx });
-        continue;
-      }
-    }
-    if (!s.youDone) {
-      const pick = strategy === 'random' ? ok[Math.floor(rand() * ok.length)] : ok.sort((a, b) => b.val - a.val)[0];
-      const slots = eligibleSlots(s, pick);
-      const slot = SLOT_PREFERENCE.find((x) => slots.includes(x))!;
-      s = draftReducer(s, { type: 'place', playerId: pick.id, slot });
-      continue;
-    }
-    if (mode === '1v1' && !s.botDone) {
-      const mine = Object.values(s.lineup).filter(Boolean).map((p) => p!.id);
-      const b = botChoose(s, s.cellId, mine, rand);
-      if (b) s = draftReducer(s, { type: 'bot', playerId: b.player.id, slot: b.slot, cellId: b.cellId });
-      else s = { ...s, botDone: true };
-      continue;
-    }
-    s = draftReducer(s, { type: 'endCell' });
-  }
-  return s;
-}
+import { SPORT } from './sport';
+import { SLOTS } from './types';
 
 function pct(n: number, d: number) {
   return Math.round((n / d) * 1000) / 10 + '%';
@@ -79,13 +25,47 @@ describe('calibration', () => {
         wins.push(season.wins);
         const out = playoffOutcome(buildBracket(season, rng(5000 + i)));
         if (out.title) titles++;
-        if (season.wins === 82) undefeated++;
-        if (season.wins === 82 && out.title && out.sweeps === 4) perfect++;
+        if (season.wins === GAMES) undefeated++;
+        if (isPerfect(season.wins, out)) perfect++;
       }
       wins.sort((a, b) => a - b);
       const q = (f: number) => wins[Math.floor(f * (wins.length - 1))];
-      console.log(strat, 'p10', q(0.1), 'p50', q(0.5), 'p90', q(0.9), 'max', q(1), '82-0', pct(undefeated, N), 'titles', pct(titles, N), 'perfect', pct(perfect, N));
+      console.log(SPORT, strat, 'p10', q(0.1), 'p50', q(0.5), 'p90', q(0.9), 'max', q(1), 'undefeated', pct(undefeated, N), 'titles', pct(titles, N), 'perfect', pct(perfect, N));
     }
     expect(CELLS.length).toBeGreaterThan(150);
+  });
+  // CALIB=1: the quantiles the benchmark and the win curve are set from
+  it.runIf(!!(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CALIB)('prints rating and category quantiles', () => {
+    const N = 6000;
+    for (const strat of ['random', 'best', 'smart'] as Strategy[]) {
+      const ratings: number[] = [];
+      const cats: number[][] = [[], [], [], []];
+      for (let i = 0; i < N; i++) {
+        const s = autoDraft(strat, 20000 + i, 'classic', 'pro', strat === 'smart');
+        const r = rateTeam(SLOTS.map((k) => s.lineup[k]));
+        ratings.push(r.rating);
+        Object.keys(W).forEach((k, j) => j < 4 && cats[j].push(r.totals[k]));
+        (cats[4] ??= []).push((r.totals.rush ?? 0) + (r.totals.recv ?? 0));
+      }
+      ratings.sort((a, b) => a - b);
+      const q = (a: number[], f: number) => Math.round(a[Math.floor(f * (a.length - 1))] * 10) / 10;
+      cats.forEach((c) => c.sort((a, b) => a - b));
+      console.log(
+        SPORT,
+        strat,
+        'rating p10/50/90',
+        q(ratings, 0.1),
+        q(ratings, 0.5),
+        q(ratings, 0.9),
+        'p99',
+        q(ratings, 0.99),
+        'p99.85',
+        q(ratings, 0.9985),
+        'max',
+        q(ratings, 1),
+        'cats p97',
+        cats.map((c) => q(c, 0.97))
+      );
+    }
   });
 });

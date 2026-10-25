@@ -2005,6 +2005,13 @@ button:focus-visible {
 .stats b.up {
   color: var(--gold);
 }
+/* football rows show four stats; a defense's labels run long */
+.stats.n4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.stats.def i {
+  letter-spacing: 0;
+}
 .drawer-tray {
   border-top: 1px solid var(--line);
   padding-bottom: 10px;
@@ -4978,4 +4985,199 @@ button.friendcard:active {
 }
 .search-text small {
   animation: fade-in 0.3s ease both;
+}
+
+/* ---------- two sports ---------- */
+.sportswitch {
+  position: relative;
+  display: flex;
+  align-self: center;
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.sportswitch .ind {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: var(--panel-3);
+  box-shadow: inset 0 0 0 1px rgba(25, 227, 201, 0.35);
+  transition: transform 0.35s var(--ease-spring);
+}
+.sportswitch.nfl .ind {
+  transform: translateX(100%);
+  box-shadow: inset 0 0 0 1px rgba(245, 184, 61, 0.45);
+}
+.sportswitch button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 92px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  transition: color 0.2s;
+}
+.sportswitch button[aria-pressed='true'] {
+  color: var(--text);
+}
+.sportswitch.nba button[aria-pressed='true'] svg {
+  color: var(--teal);
+}
+.sportswitch.nfl button[aria-pressed='true'] svg {
+  color: var(--gold);
+}
+.sportswitch button:active {
+  transform: scale(0.95);
+}
+.fit-tight .sportswitch,
+.fit-compact .sportswitch {
+  margin-top: 4px;
+}
+.fit-compact .sportswitch button {
+  height: 26px;
+}
+.sportfade {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: radial-gradient(circle 140px at 50% 46%, rgba(25, 227, 201, 0.14), rgba(25, 227, 201, 0)), var(--bg);
+  animation: sportfade-in 0.3s ease both;
+}
+.sportfade.nfl {
+  background: radial-gradient(circle 140px at 50% 46%, rgba(245, 184, 61, 0.14), rgba(245, 184, 61, 0)), var(--bg);
+}
+.sportfade .ball {
+  color: var(--teal);
+  animation: splash-spin 0.9s var(--ease-out) both;
+}
+.sportfade.nfl .ball {
+  color: var(--gold);
+}
+.sportfade b {
+  font-size: 40px;
+  letter-spacing: 1px;
+}
+@keyframes sportfade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* football's season: every game's score */
+.sched {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  width: 100%;
+  margin-top: 14px;
+}
+.sched span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 38px;
+  border-radius: 7px;
+  background: #0d2731;
+  border: 1px solid #16343f;
+  color: var(--sub);
+  min-width: 0;
+}
+.sched i {
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.sched b {
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.sched span.w {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: var(--teal-ink);
+  animation: dot-in 0.36s var(--ease-spring) both;
+}
+.sched span.l {
+  background: #c8475b;
+  border-color: #c8475b;
+  color: #fff;
+  animation: dot-in 0.36s var(--ease-spring) both;
+}
+.fit-compact .sched span {
+  height: 32px;
+}
+
+/* a football playoff round is one game: its score fills the row */
+.games.one span {
+  height: 24px;
+  letter-spacing: 0.6px;
+}
+.games.one.live span {
+  border-color: var(--gold);
+  color: var(--gold);
+  animation: live-pulse 1s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.scout-five.nfl .scout-row {
+  grid-template-columns: minmax(0, 1fr) repeat(3, 46px);
+}
+.scout-five.nfl .scout-row i {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+.scout-five.nfl .scout-row i small {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--sub);
+}
+/* a friend with the same room code on the other sport or app version */
+.mismatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 20px 0 20px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(245, 184, 61, 0.1);
+  border: 1px solid rgba(245, 184, 61, 0.45);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--soft);
+}
+.mismatch b {
+  color: var(--text);
 }

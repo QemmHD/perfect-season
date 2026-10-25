@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { NFL } from './engine/sport';
 import { registerServiceWorker } from './lib/update';
 import { Stage } from './stage';
 import './styles.css';
@@ -22,10 +23,17 @@ function fontsReady(): Promise<void> {
 function Splash({ leaving }: { leaving: boolean }) {
   return (
     <div className={'splash' + (leaving ? ' out' : '')} aria-hidden="true">
-      <svg width="96" height="96" viewBox="0 0 96 96">
-        <circle className="ball" cx="48" cy="48" r="38" />
-        <path className="seam" d="M10 48 H86 M48 10 V86 M21 21 Q48 48 21 75 M75 21 Q48 48 75 75" />
-      </svg>
+      {NFL ? (
+        <svg width="96" height="96" viewBox="0 0 96 96">
+          <path className="ball" d="M14 82 C8 62 14 38 30 26 S68 8 82 14 C88 34 82 58 66 70 S28 88 14 82 Z" />
+          <path className="seam" d="M34 62 L62 34 M41 48 L48 55 M48 41 L55 48 M55 34 L62 41 M34 55 L41 62" />
+        </svg>
+      ) : (
+        <svg width="96" height="96" viewBox="0 0 96 96">
+          <circle className="ball" cx="48" cy="48" r="38" />
+          <path className="seam" d="M10 48 H86 M48 10 V86 M21 21 Q48 48 21 75 M75 21 Q48 48 75 75" />
+        </svg>
+      )}
     </div>
   );
 }

@@ -5,12 +5,13 @@ import { BOOSTER_PRICES, LEVEL_UP_COINS, levelInfo, rewardsFor, unlockedAt } fro
 import { ALL_MISSIONS_BONUS, advance, type GameEvent, missionsFor, nextStreak, rewardFor } from './engine/missions';
 import { buildBracket, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
 import { rarityOf } from './engine/rarity';
-import { gradeFor, rateTeam, type TeamRating } from './engine/rating';
+import { GAMES, gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
+import { clearSportParam, NFL, type SportId, switchSport } from './engine/sport';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
 import { type Booster, type BotLevel, type Mode, type Player, type Slot, SLOTS } from './engine/types';
-import { freshProfile, type H2HStats, loadProfile, newId, type Profile, type RunRecord, saveProfile } from './lib/profile';
-import { setFeedback, sfx } from './lib/sound';
+import { freshProfile, type H2HStats, loadProfile, newId, type Profile, resetOtherSport, type RunRecord, saveProfile } from './lib/profile';
+import { setFeedback, sfx, vibrate } from './lib/sound';
 import { applyUpdate, justUpdated, newerVersionLive } from './lib/update';
 import { type BoardKind, boardTag, fetchBoard, prune, publishEntry, renamed, type Span, weekKey, withH2H, withRun } from './net/leaderboard';
 import { cleanRoomCode, type Found, MatchConn, type OnlineCount, type OnlinePick, onCounts, setPresence, startPresence } from './net/match';
@@ -24,6 +25,7 @@ import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
 import { Search } from './ui/Search';
 import { Playoffs, Reveal } from './ui/Season';
+import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
 
 type Screen = 'tab' | 'search' | 'draft' | 'reveal' | 'playoffs' | 'results';
@@ -56,14 +58,19 @@ interface OppView {
 const MODE_LABEL: Record<Mode, string> = { classic: 'Classic', blind: 'Blind', daily: 'Daily', '1v1': '1 vs 1' };
 const NO_PICKS: OnlinePick[] = [];
 
+/** A round's score: the series, or in football the game. */
+function roundScore(s: Series): [number, number] {
+  return NFL && s.scores ? s.scores[0] : seriesScore(s.games);
+}
+
 function playoffLine(bracket: Series[]): { text: string; title: boolean; perfect: boolean } {
   const out = playoffOutcome(bracket);
   if (out.title) {
-    const [w, l] = seriesScore(out.finals.games);
-    return { text: 'Champions: beat the ' + out.finals.opp.year + ' ' + out.finals.opp.team + ' ' + w + '–' + l + ' in the Finals', title: true, perfect: out.sweeps === 4 };
+    const [w, l] = roundScore(out.finals);
+    return { text: (NFL ? 'Super Bowl champions' : 'Champions') + ': beat the ' + out.finals.opp.year + ' ' + out.finals.opp.team + ' ' + w + '–' + l + (NFL ? ' in the Super Bowl' : ' in the Finals'), title: true, perfect: out.sweeps === 4 };
   }
   const lost = out.lostTo!;
-  const [w, l] = seriesScore(lost.games);
+  const [w, l] = roundScore(lost);
   return { text: 'Lost in the ' + ROUND_NAMES[lost.round] + ' ' + w + '–' + l + ' to the ' + lost.opp.year + ' ' + lost.opp.team, title: false, perfect: false };
 }
 
@@ -128,8 +135,17 @@ export function App() {
     return onCounts(setOnline);
   }, [profile.name]);
 
-  // closed boards (past days and weeks) drop out of your entries
-  useEffect(() => update((p) => ({ ...p, lb: prune(p.lb, todayKey) })), []);
+  // closed boards (past days and weeks) drop out of your entries; a name changed while playing
+  // the other sport goes onto this sport's boards too
+  useEffect(
+    () =>
+      update((p) => {
+        const lb = prune(p.lb, todayKey);
+        const stale = !!p.name && Object.values(lb.entries).some((c) => c.name !== p.name);
+        return { ...p, lb: stale ? renamed(lb, p.name!, todayKey) : lb };
+      }),
+    []
+  );
 
   // the app was closed in the middle of a match last time: that match was lost
   useEffect(() => {
@@ -249,6 +265,21 @@ export function App() {
     showToast('+' + (m.coins + bonus) + ' coins · +' + m.xp + ' XP' + (bonus ? ' · all three done!' : ''));
   };
 
+  // ---------- the other sport ----------
+
+  /** Switching sports reloads the app into it, after a short fade. */
+  const [sportTo, setSportTo] = useState<SportId | null>(null);
+  const goSport = (to: SportId) => {
+    if (sportTo || screen !== 'tab') return;
+    sfx.click();
+    vibrate(12);
+    setSportTo(to);
+    saveProfile(profileRef.current);
+    window.setTimeout(() => switchSport(to), 420);
+    // a reload the browser refused leaves the game as it was
+    window.setTimeout(() => setSportTo(null), 6000);
+  };
+
   // ---------- starting games ----------
 
   const startDraft = (mode: Mode) => {
@@ -278,7 +309,8 @@ export function App() {
     startDraft(mode);
   };
 
-  // an invite link opens straight into the friend's room
+  // an invite link opens straight into the friend's room (in their sport: ?sport= picked it already)
+  useEffect(clearSportParam, []);
   const [linkRoom, setLinkRoom] = useState<string | null>(roomFromUrl);
   useEffect(() => {
     if (!linkRoom || needsName || screen !== 'tab') return;
@@ -410,7 +442,7 @@ export function App() {
           : 'Missed the playoffs: ' + PLAYOFF_MIN_WINS + ' wins get you in',
       series: out ? out.seriesWon : 0,
       title: !!po?.title,
-      perfect: !!po?.perfect && season.wins === 82,
+      perfect: !!po?.perfect && season.wins === GAMES,
       lineup: SLOTS.map((s) => {
         const p = draft.lineup[s]!;
         return { slot: s, name: p.name, abbr: p.abbr, era: p.era, primed: !!p.primedFrom };
@@ -423,7 +455,8 @@ export function App() {
       online: oppName ? { opp: oppName, forfeit } : undefined,
     };
     const legends = players.filter((p) => rarityOf(p) === 'legendary').length;
-    const event: GameEvent = { mode: r.mode, wins: season.wins, series: record.series ?? 0, title: record.title, sweeps: out ? out.sweeps : 0, balance: season.balance, legends, vsWon: bot ? vsWon : null, online: !!oppName };
+    const margin = bracket ? Math.max(0, ...bracket.filter((b) => b.played && b.won && b.scores).map((b) => b.scores![0][0] - b.scores![0][1])) : 0;
+    const event: GameEvent = { mode: r.mode, wins: season.wins, series: record.series ?? 0, title: record.title, sweeps: out ? out.sweeps : 0, balance: season.balance, legends, vsWon: bot ? vsWon : null, online: !!oppName, margin };
     const prevBest = p0.history.filter((h) => h.mode === r.mode && r.mode !== '1v1').reduce((m, h) => Math.max(m, h.wins), -1);
     const newBest = prevBest >= 0 && season.wins > prevBest;
     const ms = p0.missions && p0.missions.day === todayKey ? p0.missions : { day: todayKey, progress: [0, 0, 0], claimed: [false, false, false] };
@@ -471,7 +504,7 @@ export function App() {
           games: p.stats.games + 1,
           titles: p.stats.titles + (record.title ? 1 : 0),
           perfect: p.stats.perfect + (record.perfect ? 1 : 0),
-          undefeated: p.stats.undefeated + (season.wins === 82 ? 1 : 0),
+          undefeated: p.stats.undefeated + (season.wins === GAMES ? 1 : 0),
           vsWins: p.stats.vsWins + (vsWon ? 1 : 0),
           legends: p.stats.legends + legends,
           h2hGames: p.stats.h2hGames + (oppName ? 1 : 0),
@@ -608,6 +641,7 @@ export function App() {
           const c = profile.streak.last === todayKey ? profile.streak.count : 0;
           showToast(c > 1 ? c + ' days in a row. Come back tomorrow for a ' + rewardFor(c + 1).coins + '-coin chest.' : 'Open the app every day: the daily chest grows for 7 days.');
         }}
+        onSport={goSport}
       />
     );
 
@@ -734,8 +768,9 @@ export function App() {
           onClose={() => setModal(null)}
           onChange={(k, v) => update((p) => ({ ...p, settings: { ...p.settings, [k]: v } }))}
           onReset={() => {
-            // keep your name, and your entries on the boards stay yours
+            // keep your name, and your entries on the boards stay yours (in both sports)
             setProfile({ ...freshProfile(), name: profile.name, lb: profile.lb, h2h: profile.h2h, streak: profile.streak, rewardDay: profile.rewardDay });
+            resetOtherSport();
             setModal(null);
             showToast('Progress erased.');
           }}
@@ -791,6 +826,12 @@ export function App() {
         </Sheet>
       )}
       {toast && <Toast key={toast.id} text={toast.text} out={toast.out} />}
+      {sportTo && (
+        <div className={'sportfade ' + sportTo} role="status" aria-label={'Switching to ' + (sportTo === 'nfl' ? 'NFL' : 'NBA')}>
+          <span className="ball">{sportTo === 'nfl' ? <Football size={64} /> : <Hoop size={64} />}</span>
+          <b className="disp">{sportTo === 'nfl' ? 'NFL' : 'NBA'}</b>
+        </div>
+      )}
     </>
   );
 }

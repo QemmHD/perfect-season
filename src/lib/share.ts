@@ -1,13 +1,18 @@
+import { GAMES } from '../engine/rating';
+import { NFL } from '../engine/sport';
 import type { RunRecord } from './profile';
 
 export function shareText(r: RunRecord, dailyNo: number | null): string {
-  const head = r.mode === 'daily' && dailyNo ? 'Perfect Season Daily #' + dailyNo : 'Perfect Season';
-  const rec = r.wins + '–' + (82 - r.wins);
+  const game = NFL ? 'Perfect Season NFL' : 'Perfect Season';
+  const head = r.mode === 'daily' && dailyNo ? game + ' Daily #' + dailyNo : game;
+  const rec = r.wins + '–' + (GAMES - r.wins);
   const names = r.lineup.map((p) => lastName(p.name)).join(' · ');
   return head + ' · ' + rec + ' · ' + r.grade + ' ' + r.tier + '\n' + r.playoff + '\n' + names + '\nCan you go perfect?';
 }
 
 export function lastName(n: string): string {
+  // a football defense goes by its team: "Bears D"
+  if (/ Defense$/.test(n)) return n.replace(/ Defense$/, ' D');
   const parts = n.replace(/\s*\([^)]*\)\s*$/, '').split(' ');
   return parts[parts.length - 1];
 }
@@ -41,11 +46,11 @@ export function drawCard(r: RunRecord, colors: Record<string, string>, dailyNo: 
     g.fillText('PERFECT SEASON', 72, 130);
     g.fillStyle = '#8FA6B2';
     g.font = "700 34px 'Archivo', sans-serif";
-    const tag = r.mode === 'daily' && dailyNo ? 'DAILY #' + dailyNo : r.mode === '1v1' ? '1 VS 1' : r.mode.toUpperCase();
+    const tag = (NFL ? 'NFL · ' : '') + (r.mode === 'daily' && dailyNo ? 'DAILY #' + dailyNo : r.mode === '1v1' ? '1 VS 1' : r.mode.toUpperCase());
     g.fillText(tag, 72, 186);
     g.fillStyle = '#F2F6F7';
     g.font = disp(300);
-    g.fillText(r.wins + '–' + (82 - r.wins), 60, 480);
+    g.fillText(r.wins + '–' + (GAMES - r.wins), 60, 480);
     g.fillStyle = gradeColor(r.grade);
     g.font = disp(80);
     g.fillText(r.grade + '  ' + r.tier.toUpperCase(), 72, 590);
@@ -53,27 +58,29 @@ export function drawCard(r: RunRecord, colors: Record<string, string>, dailyNo: 
     g.font = "700 38px 'Archivo', sans-serif";
     wrap(g, r.playoff, 72, 660, W - 144, 48);
     let y = 740;
+    // five rows for basketball; football's six are a little shorter so the footer still fits
+    const rowH = r.lineup.length > 5 ? 78 : 90;
     for (const p of r.lineup) {
       g.fillStyle = colors[p.abbr + p.era] ?? '#0A1F2A';
-      roundRect(g, 72, y, W - 144, 90, 18);
+      roundRect(g, 72, y, W - 144, rowH, 18);
       g.fill();
       g.fillStyle = 'rgba(4,18,26,0.35)';
-      roundRect(g, 72, y, W - 144, 90, 18);
+      roundRect(g, 72, y, W - 144, rowH, 18);
       g.fill();
       g.fillStyle = '#FFFFFF';
-      g.font = disp(50);
-      g.fillText(p.slot, 100, y + 64);
+      g.font = disp(rowH > 80 ? 50 : 44);
+      g.fillText(p.slot, 100, y + rowH * 0.71);
       g.font = "800 40px 'Archivo', sans-serif";
-      g.fillText(p.name + (p.primed ? ' ★' : ''), 210, y + 62);
+      g.fillText(p.name + (p.primed ? ' ★' : ''), rowH > 80 ? 210 : 250, y + rowH * 0.69);
       g.font = "700 30px 'Archivo', sans-serif";
       g.textAlign = 'right';
-      g.fillText(p.abbr + ' ’' + p.era.slice(2), W - 100, y + 60);
+      g.fillText(p.abbr + ' ’' + p.era.slice(2), W - 100, y + rowH * 0.67);
       g.textAlign = 'left';
-      y += 100;
+      y += rowH + 10;
     }
     g.fillStyle = '#8FA6B2';
     g.font = "700 30px 'Archivo', sans-serif";
-    g.fillText('Can you go 82–0, then 16–0?', 72, H - 40);
+    g.fillText(NFL ? 'Can you go 17–0, then win the Super Bowl?' : 'Can you go 82–0, then 16–0?', 72, H - 40);
     return c.toDataURL('image/png');
   } catch {
     return null;

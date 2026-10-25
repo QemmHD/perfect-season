@@ -1,7 +1,7 @@
 {
   "name": "Perfect Season",
   "short_name": "Perfect Season",
-  "description": "Spin a random NBA team and decade, draft five players, and try to go 82–0, then 16–0.",
+  "description": "Spin a random NBA or NFL team and decade, draft a lineup of legends, and go for a perfect season: 82–0 and 16–0, or 17–0 and the Super Bowl.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,9 +1,13 @@
 import { CELLS, CELL_BY_ID, primeVersion } from './data';
 import { rateTeam } from './rating';
 import { type Rand, hashString, pickOne, rng, shuffle } from './rng';
+import { NFL } from './sport';
 import { type Booster, type BotLevel, type Cell, type Lineup, type Mode, type Player, type Slot, SLOTS, emptyLineup } from './types';
 
-export const SLOT_PREFERENCE: Slot[] = ['C', 'PG', 'PF', 'SG', 'SF'];
+/** Where a player goes first when he can play more than one spot (the FLEX fills last). */
+export const SLOT_PREFERENCE: Slot[] = NFL ? ['QB', 'DEF', 'TE', 'RB', 'WR', 'FLEX'] : ['C', 'PG', 'PF', 'SG', 'SF'];
+/** Spots in a lineup, and so rounds in a draft. */
+export const ROUNDS = SLOTS.length;
 
 export interface DraftState {
   mode: Mode;
@@ -79,8 +83,8 @@ export function botPicksFirst(s: DraftState): boolean {
 }
 
 export function isDraftComplete(s: DraftState): boolean {
-  if (filledCount(s.lineup) < 5) return false;
-  if (s.mode === '1v1') return filledCount(s.botLineup) === 5 && s.cellId === null;
+  if (filledCount(s.lineup) < ROUNDS) return false;
+  if (s.mode === '1v1') return filledCount(s.botLineup) === ROUNDS && s.cellId === null;
   return s.cellId === null;
 }
 
@@ -253,7 +257,7 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
       const lineup = { ...s.lineup, [a.slot]: p };
       const boostersUsed = trading ? s.boostersUsed.concat(['trade']) : s.armed === 'double' && s.picksLeft === 2 ? s.boostersUsed.concat(['double']) : s.boostersUsed;
       const picksLeft = s.picksLeft - 1;
-      const done = picksLeft <= 0 || filledCount(lineup) === 5;
+      const done = picksLeft <= 0 || filledCount(lineup) === ROUNDS;
       return { ...s, lineup, picksLeft: Math.max(0, picksLeft), youDone: done, armed: done ? null : s.armed === 'trade' ? null : s.armed, boostersUsed };
     }
     case 'move': {
@@ -268,7 +272,7 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
       const p = fromCell ? CELL_BY_ID[fromCell]?.players.find((x) => x.id === a.playerId) : undefined;
       const held = SLOTS.map((k) => s.botLineup[k]).filter(Boolean) as Player[];
       // one pick per round: a late duplicate (the AI and a real pick racing) is ignored
-      if (!p || s.botDone || held.length >= 5 || held.some((x) => x.pid === p.pid)) return s;
+      if (!p || s.botDone || held.length >= ROUNDS || held.some((x) => x.pid === p.pid)) return s;
       let botLineup: Lineup;
       if (!s.botLineup[a.slot] && p.pos.includes(a.slot)) botLineup = { ...s.botLineup, [a.slot]: p };
       else {

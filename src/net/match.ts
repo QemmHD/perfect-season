@@ -1,5 +1,6 @@
 // Head-to-head over Nostr: who's online, the matchmaking queue (or a private room), and the
 // live channel two players draft through.
+import { NFL, SPORT, type SportId } from '../engine/sport';
 import { DATA_V } from '../engine/version';
 import type { Slot } from '../engine/types';
 import { displayName } from '../lib/names';
@@ -9,8 +10,9 @@ import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_Q
 const DRAFT_RULES = 1;
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = 'ps1-' + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
+/** Everyone with the app open, whichever sport: the online count is the whole app's. */
 const ONLINE_TAG = 'ps1-online' + NS_SUFFIX;
-const STORE_NS = 'perfect-season/v1' + NS_SUFFIX + '/match/';
+const STORE_NS = (NFL ? 'perfect-season/nfl/v1' : 'perfect-season/v1') + NS_SUFFIX + '/match/';
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -163,9 +165,16 @@ export interface Opponent {
 export interface Found {
   matchId: string;
   seed: string;
-  /** the host picks first in rounds 1, 3 and 5 */
+  /** the host picks first in the odd rounds: 1, 3 and 5 */
   host: boolean;
   opp: Opponent;
+}
+
+/** A friend in your room on the other sport (switch to theirs), or on an older or newer app (update). */
+export interface RoomMismatch {
+  name: string;
+  sport: SportId;
+  sameSport: boolean;
 }
 
 type MMState = { kind: 'idle' } | { kind: 'inviting'; to: string; matchId: string; seed: string; until: number } | { kind: 'accepted'; from: string; matchId: string; seed: string; until: number } | { kind: 'done' };
@@ -201,13 +210,17 @@ export class Matchmaker {
   private loops: number[] = [];
   private stopped = false;
   private tag: string;
+  /** a room's lobby, the same whatever sport or version: it tells a friend on the wrong one */
+  private lobby: string | null;
 
   constructor(
     private readonly info: { name: string; level: number; room?: string },
     private readonly onFound: (f: Found) => void,
-    private readonly onSeen?: (n: number) => void
+    private readonly onSeen?: (n: number) => void,
+    private readonly onMismatch?: (m: RoomMismatch) => void
   ) {
     this.tag = info.room ? 'ps1-room-' + NET_V + '-' + info.room : 'ps1-queue-' + NET_V;
+    this.lobby = info.room ? 'ps1-lobby-' + info.room + NS_SUFFIX : null;
   }
 
   start(): void {
@@ -217,6 +230,7 @@ export class Matchmaker {
       pool.subscribe([{ kinds: [KIND_QUEUE], '#t': [this.tag], since: now() - 10 }], (e) => this.onQueue(e)),
       pool.subscribe([{ kinds: [KIND_HANDSHAKE], '#p': [this.me], since: now() - 10 }], (e) => this.onHandshake(e))
     );
+    if (this.lobby) this.subs.push(pool.subscribe([{ kinds: [KIND_QUEUE], '#t': [this.lobby], since: now() - 10 }], (e) => this.onLobby(e)));
     this.announce();
     this.loops.push(
       window.setInterval(() => this.announce(), 2000),
@@ -236,6 +250,17 @@ export class Matchmaker {
   private announce(): void {
     if (this.stopped || this.state.kind === 'done') return;
     void pool.publish(sign(KIND_QUEUE, [['t', this.tag]], JSON.stringify({ name: this.info.name, lvl: this.info.level })));
+    if (this.lobby) void pool.publish(sign(KIND_QUEUE, [['t', this.lobby]], JSON.stringify({ name: this.info.name, sport: SPORT, v: NET_V })));
+  }
+
+  /** Someone in the same room code but another sport or app version: they can never pair with us as is. */
+  private onLobby(e: Event): void {
+    if (e.pubkey === this.me || tagValue(e, 't') !== this.lobby) return;
+    const c = parse(e);
+    if (!c || typeof c.v !== 'string' || c.v === NET_V) return;
+    const sport: SportId | null = c.sport === 'nba' || c.sport === 'nfl' ? c.sport : null;
+    if (!sport) return;
+    this.onMismatch?.({ name: displayName(c.name), sport, sameSport: sport === SPORT });
   }
 
   private send(to: string, body: Record<string, unknown>): void {
@@ -334,7 +359,7 @@ export class Matchmaker {
 // ---------- the match channel ----------
 
 export interface OnlinePick {
-  /** round, 0–4 */
+  /** round, from 0 */
   r: number;
   /** the cell he came from: the round's, or the picker's own redraw when nobody there fit */
   cell: string;

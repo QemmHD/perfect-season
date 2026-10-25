@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
+import { NFL } from '../engine/sport';
 import { useLayout } from '../stage';
 import { reducedMotion } from './motion';
 
 /** The arena behind the home screen's scoreboard: sweeping spotlights,
-    a crowd with camera flashes, and the court in perspective. Drawn on canvas. */
+    a crowd with camera flashes, and the court (or the football field) in perspective. Drawn on canvas. */
 export function ArenaHero({ children }: { children: React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLCanvasElement>(null);
@@ -40,7 +41,7 @@ export function ArenaHero({ children }: { children: React.ReactNode }) {
       bg.addColorStop(1, '#05141b');
       b.fillStyle = bg;
       b.fillRect(0, 0, W, H);
-      // court floor in perspective
+      // court floor (or football field) in perspective
       b.beginPath();
       b.moveTo(W * 0.3, H * 0.74);
       b.lineTo(W * 0.7, H * 0.74);
@@ -48,16 +49,43 @@ export function ArenaHero({ children }: { children: React.ReactNode }) {
       b.lineTo(W * 0.02, H + 2);
       b.closePath();
       const fl = b.createLinearGradient(0, H * 0.74, 0, H);
-      fl.addColorStop(0, 'rgba(25,227,201,0.10)');
-      fl.addColorStop(1, 'rgba(25,227,201,0.02)');
+      fl.addColorStop(0, NFL ? 'rgba(46,204,113,0.13)' : 'rgba(25,227,201,0.10)');
+      fl.addColorStop(1, NFL ? 'rgba(46,204,113,0.03)' : 'rgba(25,227,201,0.02)');
       b.fillStyle = fl;
       b.fill();
-      b.strokeStyle = 'rgba(25,227,201,0.30)';
+      b.strokeStyle = NFL ? 'rgba(242,246,247,0.32)' : 'rgba(25,227,201,0.30)';
       b.lineWidth = 1.2;
       b.stroke();
-      b.beginPath();
-      b.ellipse(W / 2, H * 0.88, W * 0.11, H * 0.05, 0, 0, Math.PI * 2);
-      b.stroke();
+      if (NFL) {
+        // yard lines, closer together toward the far end zone, and the goalposts
+        for (let i = 1; i < 6; i++) {
+          const f = Math.pow(i / 6, 1.6);
+          const y = H * 0.74 + f * (H * 0.26);
+          const half = W * (0.2 + f * 0.48);
+          b.beginPath();
+          b.moveTo(W / 2 - half, y);
+          b.lineTo(W / 2 + half, y);
+          b.strokeStyle = 'rgba(242,246,247,' + (0.12 + f * 0.16) + ')';
+          b.stroke();
+        }
+        b.strokeStyle = 'rgba(245,184,61,0.6)';
+        b.lineWidth = 2;
+        b.beginPath();
+        b.moveTo(W / 2, H * 0.74);
+        b.lineTo(W / 2, H * 0.68);
+        b.moveTo(W / 2 - W * 0.05, H * 0.68);
+        b.lineTo(W / 2 + W * 0.05, H * 0.68);
+        b.moveTo(W / 2 - W * 0.05, H * 0.68);
+        b.lineTo(W / 2 - W * 0.05, H * 0.56);
+        b.moveTo(W / 2 + W * 0.05, H * 0.68);
+        b.lineTo(W / 2 + W * 0.05, H * 0.56);
+        b.stroke();
+        b.lineWidth = 1.2;
+      } else {
+        b.beginPath();
+        b.ellipse(W / 2, H * 0.88, W * 0.11, H * 0.05, 0, 0, Math.PI * 2);
+        b.stroke();
+      }
       // tiers of seats curving around the floor
       seats = [];
       for (let row = 0; row < 7; row++) {

@@ -4,6 +4,7 @@ import {
   botChoose,
   botPicksFirst,
   canMove,
+  ROUNDS,
   currentCell,
   draftReducer,
   effectivePlayer,
@@ -22,29 +23,22 @@ import { BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, leve
 import { bestPickFor, onlineOrder, redrawCell, SHOT_CLOCK } from '../engine/online';
 import { bestRarity, RARITY_NAMES, type Rarity, rarityOf } from '../engine/rarity';
 import { rateTeam } from '../engine/rating';
+import { NFL } from '../engine/sport';
 import { type Booster, BOOSTERS, type BotLevel, type Mode, type Player, type Slot, SLOTS } from '../engine/types';
 import { sfx, vibrate } from '../lib/sound';
 import type { OnlinePick } from '../net/match';
 import { frameY, useLayout } from '../stage';
-import { CoinChip, Confirm, Fit, initials, lastName, seasonLabel, shortEra } from './common';
+import { CoinChip, Confirm, Fit, initials, seasonLabel, shortEra } from './common';
 import { Back, Crown, Down, Lock, Refresh } from './icons';
 import { CountUp, reducedMotion, Sparks } from './motion';
+import { cardName, FLOOR, hotFor, isDefense, posLabel, type SortKey, SORTS, sortValue, statCols } from './sportui';
 
-const COURT_X: Record<Slot, number> = { C: 70, PF: 236, SF: 26, SG: 280, PG: 153 };
-const COURT_ORDER: Slot[] = ['C', 'PF', 'SF', 'SG', 'PG'];
+/** Card left edges: the basketball court's five spots, or football's two rows of three (receivers up front, the backfield and the defense behind). */
+const COURT_X: Record<Slot, number> = NFL ? { WR: 20, TE: 153, FLEX: 286, RB: 20, QB: 153, DEF: 286 } : { C: 70, PF: 236, SF: 26, SG: 280, PG: 153 };
+const COURT_ORDER: Slot[] = NFL ? ['WR', 'TE', 'FLEX', 'RB', 'QB', 'DEF'] : ['C', 'PF', 'SF', 'SG', 'PG'];
 const CARD_W = 84;
-const BAR_LABELS = ['SCORING', 'BOARDS', 'PASSING', 'DEFENSE'];
+const BAR_LABELS = NFL ? ['PASSING', 'RUSHING', 'RECEIVING', 'DEFENSE'] : ['SCORING', 'BOARDS', 'PASSING', 'DEFENSE'];
 const MODE_NAMES: Record<Mode, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
-type SortKey = 'val' | 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | 'g';
-const SORTS: [SortKey, string][] = [
-  ['val', 'VALUE'],
-  ['pts', 'PTS'],
-  ['reb', 'REB'],
-  ['ast', 'AST'],
-  ['stl', 'STL'],
-  ['blk', 'BLK'],
-  ['g', 'GAMES'],
-];
 const TEAM_MS = 1150;
 const ERA_MS = 1550;
 /** pause between the reels stopping and the player list sliding up */
@@ -166,8 +160,16 @@ function botLine(pick: BotPick, roundCell: string, lead: string, who = 'the AI')
   return 'Nobody here fit ' + who + ', so they drew the ' + c.era + ' ' + c.name + ' and took ' + pick.player.name + '.';
 }
 
-/** Card tops for the five spots, fitted to the court's height. */
+/** Card tops for the spots, fitted to the court's (or field's) height. */
 function courtLayout(h: number, ch: number): Record<Slot, number> {
+  if (NFL) {
+    const pad = 8;
+    const gap = 16;
+    const slack = Math.max(0, h - (pad + ch + gap + ch + pad));
+    const y1 = pad + slack * 0.42;
+    const y2 = y1 + ch + gap + slack * 0.22;
+    return { WR: y1, TE: y1, FLEX: y1, RB: y2, QB: y2, DEF: y2 };
+  }
   const pad = 8;
   const gap = 10;
   const slack = Math.max(0, h - (pad + ch + gap + ch + pad));
@@ -210,6 +212,54 @@ function CourtLines({ h, ys, ch }: { h: number; ys: Record<Slot, number>; ch: nu
       </g>
       <line x1="165" y1="16" x2="225" y2="16" stroke="#F2F6F7" strokeOpacity="0.55" strokeWidth="3" strokeLinecap="round" />
       <circle cx="195" cy="28" r="10" fill="none" stroke="#F5B83D" strokeWidth="2.5" />
+    </svg>
+  );
+}
+
+/** A football field under the six cards: yard lines, hash marks, the line of scrimmage between
+    the receivers and the backfield, and the first-down line ahead of them. */
+function FieldLines({ h, ys, ch }: { h: number; ys: Record<Slot, number>; ch: number }) {
+  const los = ys.RB - (ys.RB - (ys.WR + ch)) / 2;
+  const first = Math.max(6, ys.WR - 6);
+  const step = 46;
+  const lines: number[] = [];
+  for (let y = los % step; y < h; y += step) lines.push(y);
+  return (
+    <svg className="court-lines field" width="390" height={h} viewBox={'0 0 390 ' + h} aria-hidden="true">
+      <defs>
+        <linearGradient id="turf" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0B2A22" />
+          <stop offset="100%" stopColor="#061A16" />
+        </linearGradient>
+        <radialGradient id="spot" cx="50%" cy="0%" r="75%">
+          <stop offset="0%" stopColor="#19E3C9" stopOpacity="0.14" />
+          <stop offset="60%" stopColor="#19E3C9" stopOpacity="0.03" />
+          <stop offset="100%" stopColor="#19E3C9" stopOpacity="0" />
+        </radialGradient>
+        <pattern id="mow" width="390" height={step * 2} patternUnits="userSpaceOnUse" y={los % (step * 2)}>
+          <rect width="390" height={step} fill="#ffffff" fillOpacity="0.018" />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="390" height={h} fill="url(#turf)" />
+      <rect x="0" y="0" width="390" height={h} fill="url(#mow)" />
+      <rect x="0" y="0" width="390" height={h} fill="url(#spot)" />
+      <g stroke="#F2F6F7" strokeOpacity="0.16" strokeWidth="1.5">
+        {lines.map((y) => (
+          <line key={y} x1="10" y1={y} x2="380" y2={y} />
+        ))}
+        {lines.map((y) =>
+          [0.2, 0.4, 0.6, 0.8].map((f) => (
+            <g key={y + ':' + f}>
+              <line x1="140" y1={y + step * f} x2="150" y2={y + step * f} />
+              <line x1="240" y1={y + step * f} x2="250" y2={y + step * f} />
+            </g>
+          ))
+        )}
+        <line x1="10" y1="0" x2="10" y2={h} strokeOpacity="0.3" />
+        <line x1="380" y1="0" x2="380" y2={h} strokeOpacity="0.3" />
+      </g>
+      <line x1="10" y1={los} x2="380" y2={los} stroke="#4FA3FF" strokeOpacity="0.55" strokeWidth="2.5" />
+      <line x1="10" y1={first} x2="380" y2={first} stroke="#F5B83D" strokeOpacity="0.5" strokeWidth="2.5" />
     </svg>
   );
 }
@@ -366,7 +416,7 @@ export function Draft(props: DraftProps) {
       try {
         // the other phone can't take a player you hold, or draft from another round's team-decade
         const mine = Object.values(s.lineup).some((x) => x && x.id === pick.id);
-        const otherRound = pick.cell !== roundCell && s.order!.slice(0, 5).includes(pick.cell);
+        const otherRound = pick.cell !== roundCell && s.order!.slice(0, ROUNDS).includes(pick.cell);
         if (!mine && !otherRound) next = draftReducer(s, a);
       } catch {
         next = s;
@@ -580,7 +630,7 @@ export function Draft(props: DraftProps) {
       }
       dispatch({ type: 'prime', playerId: p.id });
       sfx.levelUp();
-      props.onToast(p.name + ' primed: now his ' + up.primedFrom!.abbr + ' ' + up.primedFrom!.era + ' line.');
+      props.onToast(p.name + ' primed: now ' + (isDefense(p) ? 'its ' : 'his ') + up.primedFrom!.abbr + ' ' + up.primedFrom!.era + ' line.');
       const why = whyUnavailable({ ...s, armed: null }, up);
       if (why === null) {
         setSelected(p.id);
@@ -593,7 +643,7 @@ export function Draft(props: DraftProps) {
       props.onToast(
         p.name +
           ': ' +
-          (why === 'taken' ? 'taken by ' + (online ? online.oppName : 'the AI') + '.' : why === 'dup' ? 'already on your team.' : s.armed === 'trade' ? "can't replace anyone on your team." : 'no open spot for his positions.')
+          (why === 'taken' ? 'taken by ' + (online ? online.oppName : 'the AI') + '.' : why === 'dup' ? 'already on your team.' : s.armed === 'trade' ? "can't replace anyone on your team." : isDefense(p) ? 'your DEF spot is filled.' : 'no open spot for his positions.')
       );
       sfx.nope();
       return;
@@ -619,7 +669,7 @@ export function Draft(props: DraftProps) {
         return;
       }
       const replaced = s.armed === 'trade' ? s.lineup[k] : null;
-      const stillDouble = s.armed === 'double' && s.picksLeft === 2 && filled < 4;
+      const stillDouble = s.armed === 'double' && s.picksLeft === 2 && filled < ROUNDS - 1;
       placePick(selectedP.id, k);
       sfx.place();
       burst(k, selectedP.c2);
@@ -645,7 +695,7 @@ export function Draft(props: DraftProps) {
         const mover = s.lineup[swapFrom]!;
         dispatch({ type: 'move', from: swapFrom, to: k });
         sfx.place();
-        props.onToast(here ? 'Swapped ' + lastName(mover.name) + ' and ' + lastName(here.name) + '.' : lastName(mover.name) + ' moved to ' + k + '.');
+        props.onToast(here ? 'Swapped ' + cardName(mover) + ' and ' + cardName(here) + '.' : cardName(mover) + ' moved to ' + k + '.');
       } else {
         props.onToast("Those two can't swap spots.");
         sfx.nope();
@@ -656,7 +706,7 @@ export function Draft(props: DraftProps) {
     if (here) {
       setSwapFrom(k);
       sfx.select();
-      props.onToast('Tap a spot to move ' + lastName(here.name) + ', or tap him again to cancel.');
+      props.onToast('Tap a spot to move ' + cardName(here) + ', or tap ' + (isDefense(here) ? 'it' : 'him') + ' again to cancel.');
       return;
     }
     if (cell && !s.youDone) {
@@ -686,7 +736,7 @@ export function Draft(props: DraftProps) {
       props.onToast('Spin first, then use ' + BOOSTER_NAMES[b] + ' on that team.');
       return;
     }
-    if (b === 'double' && 5 - filled < 2) {
+    if (b === 'double' && ROUNDS - filled < 2) {
       props.onToast('Double Pick needs two open spots.');
       return;
     }
@@ -741,7 +791,7 @@ export function Draft(props: DraftProps) {
     if (!cell) return [];
     const list = cell.players.slice();
     if (blind) list.sort((a, b) => a.name.localeCompare(b.name));
-    else list.sort((a, b) => (sortKey === 'val' ? b.val - a.val : (b[sortKey] as number) - (a[sortKey] as number)));
+    else list.sort((a, b) => sortValue(b, sortKey) - sortValue(a, sortKey));
     return list;
   }, [cell, blind, sortKey]);
 
@@ -771,7 +821,7 @@ export function Draft(props: DraftProps) {
                         : '';
             const off = !!why || (s.armed === 'prime' && !up);
             const rar = blind ? 'common' : rarityOf(show);
-            const statCls = (key: SortKey) => (up ? 'up' : sortKey === key ? 'hot' : '');
+            const cols = statCols(show);
             return (
               <button
                 key={base.id}
@@ -786,16 +836,16 @@ export function Draft(props: DraftProps) {
                     {rar !== 'common' && <i className={'rar ' + rar}>{RARITY_NAMES[rar].toUpperCase()}</i>}
                   </b>
                   <span>
-                    {p.pos.join(' • ')} · {p.g} G{p.seasons > 1 ? ' · ' + p.seasons + ' seasons' : ''}
+                    {posLabel(p)} · {p.g} G{p.seasons > 1 ? ' · ' + p.seasons + ' seasons' : ''}
                     {p.est && !blind ? ' · est.' : ''}
                   </span>
                   {tag && <em>{tag}</em>}
                 </span>
-                <span className="stats">
-                  {(['pts', 'reb', 'ast', 'stl', 'blk'] as const).map((key) => (
-                    <span key={key}>
-                      <i>{key.toUpperCase()}</i>
-                      <b className={blind ? '' : statCls(key)}>{blind ? '?' : show[key].toFixed(1)}</b>
+                <span className={'stats' + (NFL ? ' n' + cols.length + (isDefense(p) ? ' def' : '') : '')}>
+                  {cols.map((c) => (
+                    <span key={c.key}>
+                      <i>{c.label}</i>
+                      <b className={blind ? '' : up ? 'up' : hotFor(sortKey, c, p) ? 'hot' : ''}>{blind ? '?' : c.text}</b>
                     </span>
                   ))}
                 </span>
@@ -824,12 +874,12 @@ export function Draft(props: DraftProps) {
   else if (theirTurn) action = { label: online!.oppName.toUpperCase() + ' IS PICKING…', cls: 'big busy', off: true, run: () => {} };
   else if (cell && !s.youDone) {
     if (noFit) action = { label: 'NO ONE FITS · FREE RESPIN', cls: 'big small', off: false, run: () => spin('nofit') };
-    else if (selectedP) action = { label: 'TAP A GLOWING SPOT', cls: 'big', off: true, run: () => props.onToast('Tap one of the glowing spots on the court.') };
+    else if (selectedP) action = { label: 'TAP A GLOWING SPOT', cls: 'big', off: true, run: () => props.onToast('Tap one of the glowing spots on the ' + FLOOR + '.') };
     else action = { label: drawer ? 'PICK A PLAYER' : 'SHOW PLAYERS', cls: 'big ghost', off: false, run: openDrawer };
   } else if (cell && s.youDone) action = { label: 'NEXT ROUND…', cls: 'big busy', off: true, run: () => {} };
 
   const respinOff = spinning || !cell || s.youDone || botBusy || (mode === '1v1' && s.taken.length > 0);
-  const roundNo = Math.min(5, filled + 1);
+  const roundNo = Math.min(ROUNDS, filled + 1);
 
   const armedText: Record<Booster, string> = {
     double: 'DOUBLE PICK: choose ' + s.picksLeft + ' more from this team',
@@ -880,10 +930,10 @@ export function Draft(props: DraftProps) {
         </button>
         <div className="round">
           <span>
-            ROUND {roundNo} / 5 · {online ? 'VS ' + online.oppName.toUpperCase() : MODE_NAMES[mode]}
+            ROUND {roundNo} / {ROUNDS} · {online ? 'VS ' + online.oppName.toUpperCase() : MODE_NAMES[mode]}
           </span>
           <div className="segs">
-            {[0, 1, 2, 3, 4].map((i) => (
+            {SLOTS.map((_, i) => (
               <i key={i} className={i < filled ? 'on' : ''} />
             ))}
           </div>
@@ -932,7 +982,7 @@ export function Draft(props: DraftProps) {
       )}
 
       <div className={'court' + (wave ? ' wave' : '')} ref={courtRef}>
-        <CourtLines h={courtH} ys={ys} ch={ch} />
+        {NFL ? <FieldLines h={courtH} ys={ys} ch={ch} /> : <CourtLines h={courtH} ys={ys} ch={ch} />}
         {COURT_ORDER.map((k) => {
           const glow = !!selectedP && targets.includes(k) && !s.lineup[k];
           const moverOk = !!swapFrom && swapFrom !== k && !s.lineup[k] && canMove(s.lineup, swapFrom, k);
@@ -978,8 +1028,8 @@ export function Draft(props: DraftProps) {
                   <span>{k}</span>
                   {!blind && <b className="num">{p.val.toFixed(0)}</b>}
                 </span>
-                <span className="ini">{initials(p.name)}</span>
-                <span className={'nm' + nameFit(lastName(p.name))}>{lastName(p.name)}</span>
+                <span className="ini">{isDefense(p) ? 'D' : initials(p.name)}</span>
+                <span className={'nm' + nameFit(cardName(p))}>{cardName(p)}</span>
                 <span className="sub">
                   {p.abbr} {shortEra(p.era)}
                 </span>
@@ -1015,7 +1065,7 @@ export function Draft(props: DraftProps) {
             const p = s.botLineup[k];
             return (
               <span key={k + (p ? p.id : '')} className={'botchip' + (p ? ' on' : '')} style={p ? { background: p.c1, borderColor: p.c2 } : undefined} title={p ? p.name : k}>
-                {p ? initials(p.name) : k}
+                {p ? (isDefense(p) ? p.abbr : initials(p.name)) : k}
               </span>
             );
           })}
@@ -1075,7 +1125,7 @@ export function Draft(props: DraftProps) {
       {coach >= 0 && !spinning && ((coach === 0 && !cell && filled === 0) || (coach === 1 && drawer && cell) || (coach === 2 && selectedP)) && (
         <div className={'coach c' + coach + (coach === 0 && boostersOn ? ' above-tray' : '')} key={coach}>
           <span>
-            {coach === 0 ? 'Tap SPIN to roll a random team and decade.' : coach === 1 ? 'Pick any player. Faded players don’t fit an open spot.' : 'Now tap a glowing spot on the court to place him.'}
+            {coach === 0 ? 'Tap SPIN to roll a random team and decade.' : coach === 1 ? 'Pick any player. Faded players don’t fit an open spot.' : 'Now tap a glowing spot on the ' + FLOOR + ' to place ' + (selectedP && isDefense(selectedP) ? 'it.' : 'him.')}
           </span>
           <button
             onClick={() => {

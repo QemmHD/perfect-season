@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { levelInfo } from '../engine/economy';
 import type { Player } from '../engine/types';
+import { isDefense } from './sportui';
 import { useLayout } from '../stage';
 import { Coin, Gear, Help } from './icons';
 import { CountUp, reducedMotion, usePulse } from './motion';
@@ -18,6 +19,8 @@ export function initials(name: string): string {
 }
 
 export function lastName(name: string): string {
+  // a football defense goes by its team: "Bears D"
+  if (/ Defense$/.test(name)) return name.replace(/ Defense$/, ' D');
   const parts = baseName(name).split(' ');
   const last = parts[parts.length - 1];
   return /^(Jr\.?|Sr\.?|II|III|IV)$/.test(last) && parts.length > 2 ? parts[parts.length - 2] : last;
@@ -27,9 +30,7 @@ export function shortEra(era: string): string {
   return '’' + era.slice(2);
 }
 
-export function seasonLabel(endYear: number): string {
-  return endYear - 1 + '–' + String(endYear).slice(2);
-}
+export { seasonLabel } from './sportui';
 
 /** Coin balance. Counts to the new value and bumps whenever it changes. */
 export function CoinChip({ coins, from, delay = 450 }: { coins: number; from?: number; delay?: number }) {
@@ -85,7 +86,7 @@ export function TeamChips({ players, stagger }: { players: (Player | null)[]; st
     <div className="teamchips">
       {players.filter(Boolean).map((p, i) => (
         <span key={p!.id} className={'teamchip' + (stagger ? ' rise-in' : '')} style={{ background: p!.c1, borderColor: p!.c2, animationDelay: i * 70 + 'ms' }}>
-          {initials(p!.name)}
+          {isDefense(p!) ? p!.abbr : initials(p!.name)}
         </span>
       ))}
     </div>

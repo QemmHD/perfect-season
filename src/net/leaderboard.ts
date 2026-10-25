@@ -2,15 +2,18 @@
 // signed with their key, on every relay. Reading a board means fetching every entry for it,
 // checking each one against the player data, and ranking them here on the phone.
 import { CELL_BY_ID, primeVersion } from '../engine/data';
-import { dailyOrder } from '../engine/draft';
-import { rateTeam } from '../engine/rating';
+import { dailyOrder, ROUNDS } from '../engine/draft';
+import { PLAYOFF_MIN_WINS } from '../engine/playoffs';
+import { GAMES, rateTeam } from '../engine/rating';
+import { NFL } from '../engine/sport';
 import { DATA_V } from '../engine/version';
 import { type Player, type Slot, SLOTS } from '../engine/types';
 import { displayName } from '../lib/names';
 import type { RunRecord } from '../lib/profile';
 import { type Event, KIND_APP, myPubkey, NET_ON, NS_SUFFIX, pool, query, sign, tagValue } from './nostr';
 
-const NS = 'perfect-season/v1' + NS_SUFFIX;
+/** Each sport keeps its own boards (basketball's are where they always were). */
+const NS = (NFL ? 'perfect-season/nfl/v1' : 'perfect-season/v1') + NS_SUFFIX;
 
 export type BoardKind = 'daily' | 'classic' | 'blind' | 'h2h';
 export type Span = 'week' | 'all';
@@ -67,7 +70,7 @@ interface H2HContent extends H2HRecord {
 export type EntryContent = RunContent | H2HContent;
 
 export function runContent(name: string, r: RunRecord): RunContent | null {
-  if (!r.ids || r.ids.length !== 5 || (r.mode !== 'classic' && r.mode !== 'blind' && r.mode !== 'daily')) return null;
+  if (!r.ids || r.ids.length !== ROUNDS || (r.mode !== 'classic' && r.mode !== 'blind' && r.mode !== 'daily')) return null;
   return { v: 1, name, mode: r.mode, wins: r.wins, series: r.series ?? (r.title ? 4 : 0), title: r.title, perfect: r.perfect, rating: r.rating, lineup: r.ids, dv: DATA_V };
 }
 
@@ -86,7 +89,7 @@ function findPlayer(id: unknown): Player | null {
 
 /** The lineup an entry claims, rebuilt from the player data, or null when it doesn't hold up. */
 export function rebuildLineup(lineup: unknown, day: string | null): Player[] | null {
-  if (!Array.isArray(lineup) || lineup.length !== 5) return null;
+  if (!Array.isArray(lineup) || lineup.length !== ROUNDS) return null;
   const slots = new Set<string>();
   const pids = new Set<string>();
   // each respin uses up a cell in the day's order, so allow for plenty of them
@@ -143,9 +146,9 @@ export function readEntry(e: Event, kind: BoardKind, day: string): Omit<BoardRow
   const wins = c.wins;
   // the record must be the one the lineup actually earns
   if (wins !== rating.wins || !Number.isInteger(series) || (series as number) < 0 || (series as number) > 4) return null;
-  if ((series as number) > 0 && rating.wins < 50) return null;
+  if ((series as number) > 0 && rating.wins < PLAYOFF_MIN_WINS) return null;
   const title = series === 4;
-  if (c.title !== title || (c.perfect === true && !(title && rating.wins === 82))) return null;
+  if (c.title !== title || (c.perfect === true && !(title && rating.wins === GAMES))) return null;
   const slots = (c.lineup as { s: Slot }[]).map((x) => x.s);
   return {
     ...base,

@@ -4,11 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "data": "python3 scripts/build_nba_data.py",
+    "data": "python3 scripts/build_nba_data.py && python3 scripts/build_nfl_data.py",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173",
-    "test": "vitest run",
+    "test": "vitest run && PS_SPORT=nfl vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

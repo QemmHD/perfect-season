@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { BotLevel } from '../engine/types';
 import { copyText } from '../lib/share';
 import { sfx } from '../lib/sound';
-import { cleanRoomCode, type Found, Matchmaker, newRoomCode, onCounts, setPresence } from '../net/match';
+import { ROUNDS } from '../engine/draft';
+import { NFL, SPORT, switchSport } from '../engine/sport';
+import { cleanRoomCode, type Found, Matchmaker, newRoomCode, onCounts, type RoomMismatch, setPresence } from '../net/match';
 import { Fit, initials } from './common';
 import { Back, Share } from './icons';
 import { Sparks } from './motion';
@@ -36,6 +38,8 @@ export function Search(props: {
   const [now, setNow] = useState(Date.now());
   const [found, setFound] = useState<Found | null>(null);
   const [aiSoon, setAiSoon] = useState(false);
+  /** a friend with the same code on the other sport, or another version of the app */
+  const [mismatch, setMismatch] = useState<RoomMismatch | null>(null);
   const done = useRef(false);
   const mmRef = useRef<Matchmaker | null>(null);
   const elapsed = Math.floor((now - t0) / 1000);
@@ -55,13 +59,16 @@ export function Search(props: {
     if (!searching) return;
     setT0(Date.now());
     setPresence('queue');
+    setMismatch(null);
     const mm = new Matchmaker(
       { name: props.name, level: props.level, room: tab === 'friend' && room ? room.code : undefined },
       (f) => {
         if (done.current) return;
         done.current = true;
         setFound(f);
-      }
+      },
+      undefined,
+      (m) => setMismatch((old) => (old && old.name === m.name && old.sport === m.sport ? old : m))
     );
     mm.start();
     mmRef.current = mm;
@@ -111,7 +118,7 @@ export function Search(props: {
 
   const invite = async () => {
     if (!room) return;
-    const url = location.origin + location.pathname + '?room=' + room.code;
+    const url = location.origin + location.pathname + '?room=' + room.code + '&sport=' + SPORT;
     const text = 'Play me in Perfect Season. Code ' + room.code + ': ' + url;
     try {
       if (navigator.share) {
@@ -134,7 +141,7 @@ export function Search(props: {
           <Back size={18} />
         </button>
         <div className="round">
-          <span>HEAD TO HEAD</span>
+          <span>{NFL ? 'NFL · HEAD TO HEAD' : 'HEAD TO HEAD'}</span>
         </div>
         <span className="icon-btn" aria-hidden="true" style={{ visibility: 'hidden' }} />
       </div>
@@ -176,6 +183,35 @@ export function Search(props: {
             )}
             <b className="disp num search-clock">{clock(elapsed)}</b>
           </div>
+          {tab === 'friend' && mismatch && (
+            <div className="mismatch rise-in" role="alert">
+              {mismatch.sameSport ? (
+                <span>
+                  <b>{mismatch.name}</b> has another version of the game. Close and reopen the app on both phones to update, then try again.
+                </span>
+              ) : room!.hosting ? (
+                // the one who joined switches, so the two of them never swap past each other
+                <span>
+                  <b>{mismatch.name}</b> joined from {mismatch.sport === 'nfl' ? 'NFL' : 'NBA'}. Their phone is offering to switch to {SPORT === 'nfl' ? 'NFL' : 'NBA'}.
+                </span>
+              ) : (
+                <>
+                  <span>
+                    <b>{mismatch.name}</b> is in this room playing {mismatch.sport === 'nfl' ? 'NFL' : 'NBA'}.
+                  </span>
+                  <button
+                    className="btn gold"
+                    onClick={() => {
+                      sfx.click();
+                      switchSport(mismatch.sport, room!.code);
+                    }}
+                  >
+                    SWITCH TO {mismatch.sport === 'nfl' ? 'NFL' : 'NBA'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
           {tab === 'quick' && (
             <div className="ai-meter">
               <span className="track">
@@ -279,7 +315,7 @@ export function Search(props: {
               <small>Level {found.opp.level}</small>
             </div>
           </div>
-          <small className="vs-note">{found.host ? 'You pick first in rounds 1, 3 and 5.' : 'You pick first in rounds 2 and 4.'} 25 seconds a pick.</small>
+          <small className="vs-note">{found.host ? 'You pick first in rounds 1, 3 and 5.' : ROUNDS === 6 ? 'You pick first in rounds 2, 4 and 6.' : 'You pick first in rounds 2 and 4.'} 25 seconds a pick.</small>
           <span className="vs-burst" aria-hidden="true">
             <Sparks color="#F5B83D" />
           </span>

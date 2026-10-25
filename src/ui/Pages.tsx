@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { BOOSTER_HELP, BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, levelInfo } from '../engine/economy';
+import { ROUNDS } from '../engine/draft';
 import { gradeFor } from '../engine/rating';
+import { NFL, type SportId } from '../engine/sport';
 import { type Booster, BOOSTERS, type BotLevel, type Mode } from '../engine/types';
 import { bestRuns, type Profile, type RunRecord } from '../lib/profile';
 import { sfx } from '../lib/sound';
@@ -12,7 +14,30 @@ import { ArenaHero } from './Hero';
 import { usePulse } from './motion';
 import { GlobalBoard } from './Leaderboard';
 import { StreakChip } from './Rewards';
-import { Bolt, Calendar, Crown, Home as HomeIcon, Lock, Ranks as RanksIcon, Target, User } from './icons';
+import { Bolt, Calendar, Crown, Football, Home as HomeIcon, Hoop, Lock, Ranks as RanksIcon, Target, User } from './icons';
+import { PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
+
+const SPELLED = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
+
+/** Basketball or football: the other one reloads the app into that sport. */
+function SportSwitch({ onSport }: { onSport: (s: SportId) => void }) {
+  const items: [SportId, string, React.ReactNode][] = [
+    ['nba', 'NBA', <Hoop size={16} />],
+    ['nfl', 'NFL', <Football size={16} />],
+  ];
+  const cur: SportId = NFL ? 'nfl' : 'nba';
+  return (
+    <div className={'sportswitch ' + cur} role="group" aria-label="Sport">
+      <span className="ind" aria-hidden="true" />
+      {items.map(([k, label, icon]) => (
+        <button key={k} aria-pressed={cur === k} onClick={() => cur !== k && onSport(k)}>
+          {icon}
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export type Tab = 'home' | 'daily' | 'ranks' | 'boosters' | 'profile';
 export const TAB_ORDER: Tab[] = ['home', 'daily', 'ranks', 'boosters', 'profile'];
@@ -77,6 +102,7 @@ export function HomePage(props: {
   missions: { done: number; claimable: boolean };
   onMissions: () => void;
   onStreak: () => void;
+  onSport: (s: SportId) => void;
 }) {
   const [intro] = useState(() => !introPlayed);
   useEffect(() => {
@@ -101,24 +127,25 @@ export function HomePage(props: {
           {letters('SEASON', 300)}
         </span>
       </h1>
+      <SportSwitch onSport={props.onSport} />
       <ArenaHero>
         <div className="jumbo">
           <div className="rec">
             <b className="disp" style={{ color: 'var(--teal)' }}>
-              82–0
+              {PERFECT_RECORD}
             </b>
             <span className="eyebrow">Regular season</span>
           </div>
           <span className="disp plus">+</span>
           <div className="rec">
             <b className="disp" style={{ color: 'var(--gold)' }}>
-              16–0
+              {PERFECT_PLAYOFFS}
             </b>
             <span className="eyebrow">Playoffs</span>
           </div>
         </div>
       </ArenaHero>
-      <p className="tagline">Spin a team and a decade. Draft five legends. Go perfect.</p>
+      <p className="tagline">Spin a team and a decade. Draft {SPELLED[ROUNDS]} legends. Go perfect.</p>
       <div className="statstrip">
         <StreakChip count={props.streak} onClick={props.onStreak} />
         {props.online && <LiveCount online={props.online.online} queue={props.online.searching} />}
@@ -180,8 +207,8 @@ function HistRow({ r, i = 0 }: { r: RunRecord; i?: number }) {
       </span>
       <div>
         <strong className="num">
-          {r.wins}–{82 - r.wins}
-          {r.title ? ' · Champions' : ''}
+          {record(r.wins)}
+          {r.title ? (NFL ? ' · Super Bowl' : ' · Champions') : ''}
           {r.vs ? (r.vs.won ? ' · beat ' + (r.online ? r.online.opp : 'AI') : r.vs.won === false ? ' · lost to ' + (r.online ? r.online.opp : 'AI') : ' · tied') : ''}
         </strong>
         <small>{r.lineup.map((x) => lastName(x.name)).join(' · ')}</small>
@@ -216,7 +243,7 @@ export function DailyPage(props: { profile: Profile; dailyNo: number; dailyKey: 
     <div className="page-view">
       <div className="page">
         <h1 className="disp">Daily #{props.dailyNo}</h1>
-        <p className="lead">Everyone gets the same five spins today, in the same order. Your first try counts and you can share it. After that you can replay it for practice.</p>
+        <p className="lead">Everyone gets the same {SPELLED[ROUNDS]} spins today, in the same order. Your first try counts and you can share it. After that you can replay it for practice.</p>
         {left && (
           <div className="countdown">
             <span className="eyebrow">Next Daily in</span>
@@ -259,7 +286,7 @@ export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: 
     <div className="page-view">
       <div className="page">
         <div className="ranks-head">
-          <h1 className="disp">{NET_ON ? 'Ranks' : 'Your best'}</h1>
+          <h1 className="disp">{NET_ON ? (NFL ? 'NFL Ranks' : 'Ranks') : 'Your best'}</h1>
           {NET_ON && (
             <span className="seg" role="group" aria-label="Leaderboard">
               {(['global', 'yours'] as const).map((v) => (
@@ -335,9 +362,9 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void }) {
   const best = bestRuns(p.history, 'all', 1)[0];
   const stats: [string, string | number][] = [
     ['Drafts', p.stats.games],
-    ['Best record', best ? best.wins + '–' + (82 - best.wins) : '—'],
-    ['Titles', p.stats.titles],
-    ['82–0 seasons', p.stats.undefeated],
+    ['Best record', best ? record(best.wins) : '—'],
+    [NFL ? 'Super Bowls' : 'Titles', p.stats.titles],
+    [PERFECT_RECORD + ' seasons', p.stats.undefeated],
     ['Perfect seasons', p.stats.perfect],
     ['Legends drafted', p.stats.legends],
   ];
@@ -414,7 +441,9 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
             </button>
           )}
           <p className="note">
-            Every NBA player from 1959–60 through {props.latest - 1}–{String(props.latest).slice(2)}, from {props.source}. Steals and blocks before 1973–74 weren’t recorded and are estimated.
+            {NFL
+              ? 'Every NFL quarterback, running back, receiver and tight end from 1970 through ' + props.latest + ', and every team’s defense by points allowed, from ' + props.source + '.'
+              : 'Every NBA player from 1959–60 through ' + (props.latest - 1) + '–' + String(props.latest).slice(2) + ', from ' + props.source + '. Steals and blocks before 1973–74 weren’t recorded and are estimated.'}
           </p>
           <p className="note num">Version {APP_VERSION}</p>
           <button className="btn primary" onClick={() => close()}>
@@ -432,21 +461,43 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
       {(close) => (
         <>
           <h2 className="disp">How to play</h2>
-          <p>
-            <b>Spin</b> for a random NBA team and decade. Pick any player who played for them then, and place him at a position he actually played. Five rounds fill PG, SG, SF, PF and C.
-          </p>
-          <p>
-            Each player brings his per-game points, rebounds, assists, steals and blocks from his years with that team in that decade. Your team is scored against a near-perfect lineup, and a weak category drags the whole team down.
-          </p>
-          <p>
-            <b>Every era counts the same.</b> The list shows real stats, but your team is scored on how each player compared with the league in his own seasons. Games in the 1960s were faster, with far more rebounds to grab, so 25 rebounds then is worth less than 25 today. A player who appeared in only a few games for a team is valued closer to his usual level, not his best night.
-          </p>
-          <p>
-            You get <b>1 free team respin and 1 free decade respin</b> per draft. Tap two players on the court to swap their spots.
-          </p>
-          <p>
-            Then the <b>82-game season</b> plays out. Win 50 or more to make the playoffs: four best-of-7 series against real all-time great teams, each game a little more likely to go to the better team, with home court to the better record. Tap any series to scout the other team’s five and your odds. Go 82–0, then 16–0, for a <b>Perfect Season</b>.
-          </p>
+          {NFL ? (
+            <>
+              <p>
+                <b>Spin</b> for a random NFL team and decade. Pick anyone who played for them then: a quarterback, running back, receiver or tight end, or the team’s defense. Six rounds fill QB, RB, WR, TE, FLEX (any back, receiver or tight end) and DEF.
+              </p>
+              <p>
+                Players bring their per-game yards and touchdowns from their years with that team in that decade; a defense brings the points it allowed. Your team is scored on passing, rushing, receiving and defense against a near-perfect lineup, and a weak spot drags the whole team down.
+              </p>
+              <p>
+                <b>Every era counts the same.</b> The list shows real stats, but each player is scored against the league in his own seasons: 250 passing yards a game meant more in 1977 than it does now. Positions are scored on one scale, so an all-time tight end is worth as much as an all-time quarterback.
+              </p>
+              <p>
+                You get <b>1 free team respin and 1 free decade respin</b> per draft. Tap two players on the field to swap their spots.
+              </p>
+              <p>
+                Then the <b>17-game season</b> plays out, every score on the schedule. Win 10 or more to make the playoffs: four one-game rounds against real playoff teams, the better record at home and the Super Bowl on neutral ground. Tap any round to scout the other team. Go 17–0, then win all four, for a <b>Perfect Season</b>.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                <b>Spin</b> for a random NBA team and decade. Pick any player who played for them then, and place him at a position he actually played. Five rounds fill PG, SG, SF, PF and C.
+              </p>
+              <p>
+                Each player brings his per-game points, rebounds, assists, steals and blocks from his years with that team in that decade. Your team is scored against a near-perfect lineup, and a weak category drags the whole team down.
+              </p>
+              <p>
+                <b>Every era counts the same.</b> The list shows real stats, but your team is scored on how each player compared with the league in his own seasons. Games in the 1960s were faster, with far more rebounds to grab, so 25 rebounds then is worth less than 25 today. A player who appeared in only a few games for a team is valued closer to his usual level, not his best night.
+              </p>
+              <p>
+                You get <b>1 free team respin and 1 free decade respin</b> per draft. Tap two players on the court to swap their spots.
+              </p>
+              <p>
+                Then the <b>82-game season</b> plays out. Win 50 or more to make the playoffs: four best-of-7 series against real all-time great teams, each game a little more likely to go to the better team, with home court to the better record. Tap any series to scout the other team’s five and your odds. Go 82–0, then 16–0, for a <b>Perfect Season</b>.
+              </p>
+            </>
+          )}
           {NET_ON ? (
             <>
               <p>
@@ -462,7 +513,7 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
             </p>
           )}
           <p>
-            <b>Rarity:</b> the best player lines are Rare, Epic or Legendary (about 1 in 200). Draft a Legendary for the big moment.
+            <b>Rarity:</b> the best player lines are Rare, Epic or Legendary{NFL ? '' : ' (about 1 in 200)'}. Draft a Legendary for the big moment.
           </p>
           <p>
             <b>Every day:</b> open the daily chest (it grows for 7 days in a row) and finish three missions for coins and XP.

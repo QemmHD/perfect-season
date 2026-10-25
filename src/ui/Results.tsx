@@ -1,7 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BOOSTER_NAMES, LEVEL_UP_COINS, levelInfo, type Rewards } from '../engine/economy';
 import { playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
-import { CATEGORY_LABELS, gradeFor, type TeamRating } from '../engine/rating';
+import { CATEGORY_LABELS, GAMES, gradeFor, type TeamRating } from '../engine/rating';
+import { NFL } from '../engine/sport';
 import type { Booster, Lineup, Player } from '../engine/types';
 import { SLOTS } from '../engine/types';
 import type { RunRecord } from '../lib/profile';
@@ -14,6 +15,7 @@ import { CountUp, reducedMotion } from './motion';
 import { type LbStatus, LbLine } from './Leaderboard';
 import { NET_ON } from '../net/nostr';
 import { Scout, teamBar } from './Scout';
+import { record } from './sportui';
 
 export interface ResultInfo {
   record: RunRecord;
@@ -170,7 +172,7 @@ export function Results({
         </span>
       </div>
       <div className="results-body">
-        {r.perfect && <div className="perfect disp">PERFECT SEASON · 98–0</div>}
+        {r.perfect && <div className="perfect disp">PERFECT SEASON · {GAMES + (NFL ? 4 : 16)}–0</div>}
         {info.newBest && !r.perfect && (
           <div className="newbest disp" role="status">
             <span>NEW PERSONAL BEST</span>
@@ -191,7 +193,7 @@ export function Results({
                   You
                 </span>
                 <span className="disp num">
-                  <CountUp value={r.wins} from={0} ms={900} />–<CountUp value={82 - r.wins} from={0} ms={900} />
+                  <CountUp value={r.wins} from={0} ms={900} />–<CountUp value={GAMES - r.wins} from={0} ms={900} />
                 </span>
                 <small>Rating {rating.rating.toFixed(1)}</small>
               </div>
@@ -200,7 +202,7 @@ export function Results({
                   {r.online ? r.online.opp : 'AI · ' + r.vs.botLevel}
                 </span>
                 <span className="disp num">
-                  <CountUp value={r.vs.botWins} from={0} ms={900} />–<CountUp value={82 - r.vs.botWins} from={0} ms={900} />
+                  <CountUp value={r.vs.botWins} from={0} ms={900} />–<CountUp value={GAMES - r.vs.botWins} from={0} ms={900} />
                 </span>
                 <small>Rating {vs.rating.rating.toFixed(1)}</small>
               </div>
@@ -214,7 +216,7 @@ export function Results({
               </b>
               <span className="disp">–</span>
               <b className="disp num">
-                <CountUp value={82 - r.wins} from={0} ms={900} />
+                <CountUp value={GAMES - r.wins} from={0} ms={900} />
               </b>
             </div>
             <div className="gradeline small">
@@ -371,7 +373,7 @@ function PlayoffRun({ bracket, onScout }: { bracket: Series[]; onScout: (s: Seri
     <div className="card po-run rise-in" style={{ animationDelay: '260ms' }}>
       <span className="eyebrow">Playoff run · tap a team to scout</span>
       {played.map((b) => {
-        const [w, l] = seriesScore(b.games);
+        const [w, l] = NFL && b.scores ? b.scores[0] : seriesScore(b.games);
         const ko = out.lostTo === b;
         return (
           <button key={b.round} className={'po-row' + (ko ? ' ko' : '')} onClick={() => (sfx.click(), onScout(b))}>
@@ -419,7 +421,7 @@ function ShareSheet({ info, onClose, onToast }: { info: ResultInfo; onClose: () 
     <Sheet label="Share your result" onClose={onClose}>
       {(close) => (
         <>
-          {img ? <img className="sharecard" src={img} style={{ maxHeight: cardMax }} alt={'Share card: ' + info.record.wins + '–' + (82 - info.record.wins)} /> : null}
+          {img ? <img className="sharecard" src={img} style={{ maxHeight: cardMax }} alt={'Share card: ' + record(info.record.wins)} /> : null}
           <div className="sharetext">{text}</div>
           <div className="btnrow">
             <button className="btn" onClick={() => close()}>

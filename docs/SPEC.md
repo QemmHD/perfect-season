@@ -1,6 +1,6 @@
 # Perfect Season: product spec (v0.1)
 
-A multi-sport "spin a random team and decade, draft legends, chase a perfect season" game. NBA first.
+A multi-sport "spin a random team and decade, draft legends, chase a perfect season" game. NBA first, NFL second (§16).
 This spec records every decision made so far, with starting numbers for the systems. Every number is a **starting value**, tunable from the admin config (§13).
 Research on the game we're learning from is in the 82-0 teardown, [`research/82-0/README.md` in random-stuff-](https://github.com/qemmhd/random-stuff-/blob/perfect-season-app/research/82-0/README.md).
 
@@ -13,7 +13,7 @@ Research on the game we're learning from is in the 82-0 teardown, [`research/82-
 | Topic | Decision |
 |---|---|
 | Name | **Perfect Season** (checked: no existing draft game found; perfectseason.gg looked unused, but confirm at a registrar before buying) |
-| Sports | Multi-sport engine, **NBA first** |
+| Sports | Multi-sport engine, **NBA first**, then **NFL** (built: §16). One app with an NBA / NFL switch on the home screen |
 | Platform | Mobile-first website (portrait), no install |
 | Visual style | Glossy video-game look (dark arena, glows, bold italic type, slot reels, court with jerseys) in our own **electric teal + gold** |
 | Sound | Full sound and haptics, with toggles in settings |
@@ -292,4 +292,23 @@ Rating weights, benchmark, curve constants, grade cut-offs, coin and XP tables, 
 3. **Online:** Supabase accounts, Daily challenge, leaderboards, ranked server-side runs.
 4. **Progression:** coins, XP and levels, boosters, nudges, profile and history.
 5. **1v1 vs bot**, then friend challenge links.
-6. **Next sport.**
+6. **Next sport:** NFL, built (§16). Soccer after that.
+
+---
+
+## 16. NFL
+
+| Topic | Decision |
+|---|---|
+| Lineup | **QB, RB, WR, TE, FLEX, DEF**: six rounds. FLEX takes any back, receiver or tight end. DEF is the team's defense for that decade, one per cell |
+| Eras | 1970s–2020s (from the 1970 merger) |
+| Cells | Franchise-decades with historical names (Baltimore Colts, Houston Oilers, Los Angeles Raiders, St. Louis Rams); Washington is "Washington" before 2020 |
+| Data | PFR season tables 1970–98 (fantasydatapros), nflverse weekly stats 1999–2025, FiveThirtyEight and nflverse scores. See `scripts/build_nfl_data.py` |
+| Value | Era-rated adjusted yards per game (yards + 20 a TD − 45 an INT), each position mapped by quantile onto basketball's value scale; defenses by points saved against the league |
+| Rating | Passing, rushing, receiving and defense bars; balance compares passing, run and catch together, and defense |
+| Season | 17 games, each with a score that agrees with the result; 10 wins make the playoffs |
+| Playoffs | Four one-game rounds (Wild Card → Super Bowl) against real playoff teams since 1970; home field to the better record; the Super Bowl is neutral |
+| Perfect season | **17–0, then 4–0** in the playoffs |
+| Grades | Same tiers by wins: S+ 17, S 16, A+ 15, A 14, B 12, C 10, D 7 (Bubble Team), F |
+| Profile | Name, coins, XP and level, boosters, settings and the daily chest are shared; drafts, records, missions, boards and matches are per sport |
+| Online | Separate leaderboards and Head to Head queue; one online count for the whole app; invite links carry the sport |
