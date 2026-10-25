@@ -371,6 +371,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
     [PERFECT_RECORD + ' seasons', p.stats.undefeated],
     ['Perfect seasons', p.stats.perfect],
     ['Legends drafted', p.stats.legends],
+    [p.gauntlet?.clears ? 'Gauntlet · ' + p.gauntlet.clears + ' clear' + (p.gauntlet.clears > 1 ? 's' : '') : 'Gauntlet best', (p.gauntlet?.allBest ?? 0) + '/8'],
   ];
   if (NET_ON) stats.push(['Head to head', p.h2h.w + '–' + p.h2h.l], ['Best H2H streak', p.h2h.best], ['Best day streak', p.streak.best]);
   else stats.push(['1v1 wins', p.stats.vsWins]);
@@ -536,6 +537,12 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
           )}
           <p>
             <b>Rarity:</b> the best player lines are Rare, Epic or Legendary{NFL ? '' : ' (about 1 in 200)'}. Draft a Legendary for the big moment.
+          </p>
+          <p>
+            <b>After the season:</b> the draft report grades every pick against the best one there was. Then take the same team into the <b>Legends Gauntlet</b>: eight of the greatest teams ever, one live game at a time, with three lives. A new eight every week.
+          </p>
+          <p>
+            <b>Binder:</b> every player you draft is a card you keep. Finish a team-decade’s set (its {NFL ? 'defense and five best players' : 'five best players'}) for coins. Press and hold a card on the {NFL ? 'field' : 'court'} to look closer.
           </p>
           <p>
             <b>Every day:</b> open the daily chest (it grows for 7 days in a row) and finish three missions for coins and XP.
