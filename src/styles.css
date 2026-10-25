@@ -746,7 +746,8 @@ button:focus-visible {
   position: relative;
   margin: 12px 16px 0 16px;
   flex: 3 1 0;
-  min-height: 108px;
+  /* it gives way first when the screen is short (a sideways Pro Max: about 740 frame px of content) */
+  min-height: 96px;
   max-height: 196px;
   border-radius: 18px;
   border: 1px solid var(--line);
