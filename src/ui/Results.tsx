@@ -10,7 +10,8 @@ import type { Booster, Lineup, Player, PlayoffTeam } from '../engine/types';
 import type { GameCast as GameCastData } from '../engine/broadcast';
 import { SLOTS } from '../engine/types';
 import type { RunRecord } from '../lib/profile';
-import { copyText, drawCard, nativeShare, shareText } from '../lib/share';
+import { copyText, nativeShare, shareText } from '../lib/share';
+import { drawPoster } from './poster';
 import { sfx } from '../lib/sound';
 import { frameRect, useLayout } from '../stage';
 import { CoinChip, Confetti, lastName, Sheet, shortEra } from './common';
@@ -417,15 +418,7 @@ function PlayoffRun({ bracket, onScout }: { bracket: Series[]; onScout: (s: Seri
 
 function ShareSheet({ info, onClose, onToast }: { info: ResultInfo; onClose: () => void; onToast: (t: string) => void }) {
   const text = shareText(info.record, info.dailyNo);
-  const colors = useMemo(() => {
-    const out: Record<string, string> = {};
-    for (const k of SLOTS) {
-      const p = info.lineup[k];
-      if (p) out[p.abbr + p.era] = p.c1;
-    }
-    return out;
-  }, [info]);
-  const img = useMemo(() => drawCard(info.record, colors, info.dailyNo), [info, colors]);
+  const img = useMemo(() => drawPoster(info), [info]);
   // keep the buttons on screen: the card gets whatever height the text and buttons leave
   const { content } = useLayout();
   const cardMax = Math.max(170, Math.round(content - 310));
