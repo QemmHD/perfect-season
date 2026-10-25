@@ -4,6 +4,7 @@ import { climb, clearChance, CLEAR_COINS, coinsFor, GAUNTLET_SIZE, type Gauntlet
 import type { TeamRating } from '../engine/rating';
 import { NFL } from '../engine/sport';
 import type { Lineup, PlayoffTeam } from '../engine/types';
+import { copyText, nativeShare } from '../lib/share';
 import { sfx } from '../lib/sound';
 import { CoinChip, Confirm } from './common';
 import { GameCast } from './GameCast';
@@ -32,6 +33,7 @@ export function Gauntlet({
   onGame,
   onAgain,
   onHome,
+  onToast,
 }: {
   lineup: Lineup;
   team: TeamRating & { pf?: number; pa?: number };
@@ -47,6 +49,7 @@ export function Gauntlet({
   onGame: (g: GauntletGame, index: number, all: GauntletGame[]) => void;
   onAgain: () => void;
   onHome: () => void;
+  onToast: (t: string) => void;
 }) {
   const games = useMemo(() => climb(team, ladder, seed), [team, ladder, seed]);
   const casts = useMemo(
@@ -98,6 +101,19 @@ export function Gauntlet({
     if (g.won) setEarned((e) => e + RUNG_COINS[g.rung] + (g.rung === GAUNTLET_SIZE - 1 ? CLEAR_COINS : 0));
     setSeen(i + 1);
     setLive(false);
+  };
+
+  const share = async () => {
+    sfx.click();
+    const boss = ladder[ladder.length - 1];
+    const text =
+      'Perfect Season ' + (NFL ? 'NFL ' : '') + 'Gauntlet · Week ' + week.split('-W')[1] + '\n' +
+      (cleared ? 'Beat all 8 legends' : won + ' of 8 legends beaten') + ' · ' + '❤️'.repeat(lives) + '🖤'.repeat(LIVES - lives) + '\n' +
+      games.map((g) => (g.won ? '🟩' : '🟥')).join('') + '\n' +
+      'Can you beat the ' + boss.year + ' ' + boss.team + '?';
+    if (await nativeShare(text, null)) return;
+    if (await copyText(text)) onToast('Copied. Paste it anywhere.');
+    else onToast('Sharing is blocked here.');
   };
 
   if (live && next) {
@@ -230,8 +246,8 @@ export function Gauntlet({
       <div className="foot">
         {done ? (
           <>
-            <button className="big ghost small" onClick={onHome}>
-              <span>HOME</span>
+            <button className="big ghost small" onClick={share}>
+              <span>SHARE</span>
             </button>
             <button className="big small shine" onClick={onAgain}>
               <span>DRAFT AGAIN</span>

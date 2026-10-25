@@ -845,6 +845,7 @@ export function App() {
         }
         onAgain={() => startRun(run.mode)}
         onHome={() => goTab('home')}
+        onToast={showToast}
       />
     );
   } else {
