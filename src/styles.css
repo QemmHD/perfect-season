@@ -7105,3 +7105,410 @@ button.friendcard:active {
 .big.arming[aria-disabled='true'] {
   filter: none;
 }
+
+/* ---------- arcade football ---------- */
+.fgame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: clip;
+  background: #20512a;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.fg-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.fg-hud {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: calc(var(--sat) + 6px);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: rgba(4, 18, 26, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.fg-score {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.fg-score.them {
+  align-items: flex-end;
+}
+.fg-score i {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: var(--sub);
+}
+.fg-score b {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 70%;
+  font-size: 30px;
+}
+.fg-score.us b {
+  color: var(--teal);
+}
+.fg-score.them b {
+  color: var(--rival-soft);
+}
+.fg-score small {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--sub);
+}
+.fg-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.fg-mid b {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+}
+.fg-mid small {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+}
+.fg-ends {
+  position: absolute;
+  top: calc(var(--sat) + 72px);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  pointer-events: none;
+}
+.fg-ends i {
+  min-width: 26px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(4, 18, 26, 0.7);
+  color: var(--sub);
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+.fg-ends i.now {
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--teal);
+}
+.fg-ends i.e-TD {
+  background: var(--teal);
+  color: var(--teal-ink);
+}
+.fg-ends i.e-FG {
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+.fg-ends i.e-INT,
+.fg-ends i.e-DOWNS,
+.fg-ends i.e-MISS {
+  background: rgba(255, 122, 122, 0.85);
+  color: #2a0a0a;
+}
+.fg-pop {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  padding: 8px 18px;
+  border-radius: 12px;
+  background: rgba(4, 18, 26, 0.85);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 72%;
+  font-size: 26px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fg-pop 0.35s var(--ease-spring) both;
+}
+.fg-pop.good {
+  color: var(--teal);
+}
+.fg-pop.bad {
+  color: var(--red);
+}
+.fg-pop.big {
+  font-size: 44px;
+  color: var(--gold);
+  background: none;
+  text-shadow:
+    0 3px 0 #000,
+    0 0 24px rgba(245, 184, 61, 0.7);
+}
+@keyframes fg-pop {
+  from {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0;
+  }
+}
+.fg-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab) + 26px);
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(4, 18, 26, 0.8);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.fg-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--sub);
+  font-weight: 800;
+}
+.fg-call {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(var(--sab) + 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(4, 18, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.fg-4th {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+.fg-play {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fg-play .btn {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 40px;
+  padding: 0;
+  font-size: 20px;
+}
+.fg-play span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.fg-play small {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: var(--sub);
+}
+.fg-play b {
+  font-size: 17px;
+  font-weight: 900;
+}
+.fg-btns {
+  display: flex;
+  gap: 8px;
+}
+.fg-btns .big {
+  flex: 1;
+  height: 56px;
+}
+.fg-kick {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(var(--sab) + 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(245, 184, 61, 0.5);
+  background: rgba(4, 18, 26, 0.9);
+  color: var(--text);
+  text-align: center;
+}
+.fg-kick .eyebrow {
+  color: var(--gold);
+}
+.fg-meter {
+  position: relative;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #6b2633, #3a1c22 30%, #3a1c22 70%, #6b2633);
+  overflow: hidden;
+}
+.fg-meter .win {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(25, 227, 201, 0.55);
+  box-shadow: inset 0 0 0 2px var(--teal);
+}
+.fg-meter .needle {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 4px;
+  margin-left: -2px;
+  background: #fff;
+  box-shadow: 0 0 10px #fff;
+}
+.fg-final {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 26px;
+  border-radius: 18px;
+  background: rgba(4, 18, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  text-align: center;
+}
+.fg-final b {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 64px;
+  line-height: 1;
+  color: var(--teal);
+}
+.fg-final small {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--soft);
+}
+.fg-final .fg-wait {
+  color: var(--rival-soft);
+}
+
+/* ---------- head to head, played out ---------- */
+.screen.arcade {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.arc-kick {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: calc(var(--sat) + 16px) 18px calc(var(--sab) + 16px) 18px;
+  background:
+    radial-gradient(100% 50% at 50% 0%, rgba(25, 227, 201, 0.14) 0%, rgba(25, 227, 201, 0) 70%),
+    var(--bg);
+  text-align: center;
+}
+.arc-kick h1 {
+  margin: 0;
+  font-size: 30px;
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 72%;
+  line-height: 1;
+}
+.arc-kick p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.arc-kick .arc-wait {
+  color: var(--rival-soft);
+  font-weight: 800;
+}
+.arc-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.arc-roster span {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.arc-roster b {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--teal);
+}
+.arc-roster i {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arc-roster small {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--sub);
+}
+.arc-how {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sub);
+}
+.arc-btns {
+  display: flex;
+  gap: 10px;
+}
+.arc-btns .big {
+  flex: 1;
+}
+.arc-tie {
+  text-align: center;
+  color: var(--soft);
+}

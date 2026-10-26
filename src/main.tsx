@@ -6,6 +6,10 @@ import { registerServiceWorker } from './lib/update';
 import { Stage } from './stage';
 import './styles.css';
 
+// the arcade games' test bench (?arcade), loaded only when asked for
+const Lab = React.lazy(() => import('./game/Lab'));
+const LAB = new URLSearchParams(location.search).has('arcade');
+
 // iOS Safari only shows :active press states when the page listens for touches
 document.addEventListener('touchstart', () => {}, { passive: true });
 // no pinch-zoom, like a native app (iOS ignores user-scalable=no, so stop its gesture events)
@@ -55,7 +59,7 @@ function Root() {
   }, [ready]);
   return (
     <Stage>
-      {ready && <App />}
+      {ready && (LAB ? <React.Suspense fallback={null}><Lab /></React.Suspense> : <App />)}
       {splash && <Splash leaving={ready} />}
     </Stage>
   );

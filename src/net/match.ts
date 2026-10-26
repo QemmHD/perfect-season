@@ -6,8 +6,9 @@ import type { Slot } from '../engine/types';
 import { displayName } from '../lib/names';
 import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_QUEUE, myPubkey, NET_ON, NS_SUFFIX, pool, query, sign, tagValue } from './nostr';
 
-/** Bump when the draft rules change, so only players on the same rules get paired. */
-const DRAFT_RULES = 1;
+/** Bump when the draft rules change, so only players on the same rules get paired. 2: the
+    match is played out (the arcade game), and each side's score goes over the match channel. */
+const DRAFT_RULES = 2;
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = 'ps1-' + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
 /** Everyone with the app open, whichever sport: the online count is the whole app's. */
@@ -389,6 +390,27 @@ export interface MatchState {
   left: boolean;
   /** this player's phone gave up on the other one and let the AI finish their draft */
   tookOver: boolean;
+  /** the game after the draft: this player's score so far, drives done, and how each ended */
+  arcade?: ArcadeState | null;
+}
+
+export interface ArcadeState {
+  score: number;
+  drive: number;
+  done: boolean;
+  ends: string[];
+}
+
+/** An arcade state from the wire, checked: numbers in range, short strings. */
+function arcadeOf(x: unknown): ArcadeState | null {
+  if (!x || typeof x !== 'object') return null;
+  const a = x as Record<string, unknown>;
+  const n = (v: unknown, max: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max ? Math.floor(v) : null);
+  const score = n(a.score, 999);
+  const drive = n(a.drive, 99);
+  if (score === null || drive === null) return null;
+  const ends = Array.isArray(a.ends) ? a.ends.filter((e): e is string => typeof e === 'string' && e.length <= 8).slice(0, 40) : [];
+  return { score, drive, done: a.done === true, ends };
 }
 
 /**
@@ -500,7 +522,14 @@ export class MatchConn {
       return;
     }
     const picks = (c.picks as OnlinePick[]).filter((p) => p && Number.isInteger(p.r) && typeof p.cell === 'string' && typeof p.id === 'string' && typeof p.slot === 'string');
-    this.theirs = { seq: c.seq as number, picks, lineup: (c.lineup && typeof c.lineup === 'object' ? c.lineup : {}) as MatchState['lineup'], left: c.left === true, tookOver: c.tookOver === true };
+    this.theirs = {
+      seq: c.seq as number,
+      picks,
+      lineup: (c.lineup && typeof c.lineup === 'object' ? c.lineup : {}) as MatchState['lineup'],
+      left: c.left === true,
+      tookOver: c.tookOver === true,
+      arcade: arcadeOf(c.arcade),
+    };
     this.report();
   }
 

@@ -48,6 +48,8 @@ export interface ResultInfo {
   sets?: string[];
   /** a head-to-head played out as a game, before the results */
   showdown?: { cast: GameCastData; opp: PlayoffTeam };
+  /** a head-to-head played on the field: each side's points, and whether a tie went to the better team */
+  arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tiebreak: boolean };
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
@@ -205,6 +207,7 @@ export function Results({
             <div className="vs-head" ref={headRef}>
               <span className="eyebrow wide">
                 {r.online ? (r.online.forfeit === 'them' ? 'Head to head · ' + r.online.opp + ' left' : 'Head to head · live') : '1 vs 1 · snake draft'}
+                {info.arcade ? (info.arcade.how === 'sim' ? ' · simmed' : ' · played') : ''}
               </span>
               <span className={'disp vs-title stamp-in ' + (r.vs.won ? 'win' : r.vs.won === false ? 'loss' : '')}>{vsTitle}</span>
               {lb && <LbLine lb={lb} />}
@@ -214,21 +217,35 @@ export function Results({
                 <span className="eyebrow" style={{ color: 'var(--teal)' }}>
                   You
                 </span>
-                <span className="disp num">
-                  <CountUp value={r.wins} from={0} ms={900} />–<CountUp value={GAMES - r.wins} from={0} ms={900} />
-                </span>
+                {info.arcade ? (
+                  <span className="disp num">
+                    <CountUp value={info.arcade.us} from={0} ms={900} />
+                  </span>
+                ) : (
+                  <span className="disp num">
+                    <CountUp value={r.wins} from={0} ms={900} />–<CountUp value={GAMES - r.wins} from={0} ms={900} />
+                  </span>
+                )}
                 <small>Rating {rating.rating.toFixed(1)}</small>
               </div>
               <div className="bot rise-in" style={{ animationDelay: '90ms' }}>
                 <span className="eyebrow vs-name" style={{ color: 'var(--rival-soft)' }}>
                   {r.online ? r.online.opp : 'AI · ' + r.vs.botLevel}
                 </span>
-                <span className="disp num">
-                  <CountUp value={r.vs.botWins} from={0} ms={900} />–<CountUp value={GAMES - r.vs.botWins} from={0} ms={900} />
-                </span>
+                {info.arcade ? (
+                  <span className="disp num">
+                    <CountUp value={info.arcade.them} from={0} ms={900} />
+                  </span>
+                ) : (
+                  <span className="disp num">
+                    <CountUp value={r.vs.botWins} from={0} ms={900} />–<CountUp value={GAMES - r.vs.botWins} from={0} ms={900} />
+                  </span>
+                )}
                 <small>Rating {vs.rating.rating.toFixed(1)}</small>
               </div>
             </div>
+            {info.arcade?.tiebreak && <span className="note arc-tie">Tied on points: the better team (by rating) takes it.</span>}
+            {info.arcade?.takenOver && <span className="note arc-tie">{r.online?.opp ?? 'They'} went quiet; the AI finished their drives.</span>}
           </>
         ) : (
           <div className="headline" ref={headRef}>

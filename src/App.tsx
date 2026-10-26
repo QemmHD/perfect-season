@@ -18,7 +18,7 @@ import { freshProfile, type H2HStats, loadProfile, newId, type Profile, readOthe
 import { setFeedback, sfx, vibrate } from './lib/sound';
 import { applyUpdate, justUpdated, newerVersionLive } from './lib/update';
 import { type BoardKind, boardTag, fetchBoard, prune, publishEntry, renamed, type Span, weekKey, withH2H, withRun } from './net/leaderboard';
-import { cleanRoomCode, type Found, MatchConn, type OnlineCount, type OnlinePick, onCounts, setPresence, startPresence } from './net/match';
+import { type ArcadeState, cleanRoomCode, type Found, MatchConn, type OnlineCount, type OnlinePick, onCounts, setPresence, startPresence } from './net/match';
 import { NET_ON } from './net/nostr';
 import { Sheet, Toast, TopBar } from './ui/common';
 import { Transition } from './ui/motion';
@@ -31,11 +31,15 @@ import { type Room, Search } from './ui/Search';
 import { Binder } from './ui/Binder';
 import { GameCast } from './ui/GameCast';
 import { Gauntlet } from './ui/Gauntlet';
+import { Arcade, arcadeAvailable } from './game/Arcade';
+
+/** tests: ?autoplay lets the autopilot play the arcade game */
+const AUTOPLAY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('autoplay');
 import { Playoffs, Reveal } from './ui/Season';
 import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
 
-type Screen = 'tab' | 'search' | 'draft' | 'reveal' | 'playoffs' | 'results' | 'gauntlet';
+type Screen = 'tab' | 'search' | 'draft' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet';
 
 interface Run {
   id: number;
@@ -60,6 +64,8 @@ interface OppView {
   gone: boolean;
   left: boolean;
   tookOver: boolean;
+  /** their game after the draft, as last heard */
+  arcade: ArcadeState | null;
 }
 
 const MODE_LABEL: Record<Mode, string> = { classic: 'Classic', blind: 'Blind', daily: 'Daily', '1v1': '1 vs 1' };
@@ -369,12 +375,12 @@ export function App() {
   const onFound = (f: Found) => {
     matchRef.current?.close(false);
     droppedRef.current = false;
-    setOpp({ picks: [], lineup: {}, gone: false, left: false, tookOver: false });
+    setOpp({ picks: [], lineup: {}, gone: false, left: false, tookOver: false, arcade: null });
     const conn: MatchConn = new MatchConn(f, (theirs, gone) => {
       // only the current match talks to the screen
       if (matchRef.current !== conn) return;
       setOpp((prev) => {
-        const next: OppView = { picks: theirs.picks, lineup: theirs.lineup, gone, left: theirs.left, tookOver: theirs.tookOver };
+        const next: OppView = { picks: theirs.picks, lineup: theirs.lineup, gone, left: theirs.left, tookOver: theirs.tookOver, arcade: theirs.arcade ?? null };
         if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
         return next;
       });
@@ -429,7 +435,13 @@ export function App() {
 
   // ---------- finishing a game ----------
 
-  const finish = (r: Run, season: TeamRating, bracket: Series[] | null, bot: { lineup: DraftState['botLineup']; rating: TeamRating } | null) => {
+  const finish = (
+    r: Run,
+    season: TeamRating,
+    bracket: Series[] | null,
+    bot: { lineup: DraftState['botLineup']; rating: TeamRating } | null,
+    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean }
+  ) => {
     const draft = r.draft!;
     const p0 = profileRef.current;
     const po = bracket ? playoffLine(bracket) : null;
@@ -438,7 +450,9 @@ export function App() {
     const noContest = !!r.online && droppedRef.current && !!opp?.tookOver;
     const forfeit = r.online && droppedRef.current && !noContest ? ('them' as const) : undefined;
     const byRating = bot ? (season.rating > bot.rating.rating ? true : season.rating < bot.rating.rating ? false : null) : null;
-    const vsWon = noContest ? null : forfeit ? true : byRating;
+    // a played game: the score decides, a tie goes to the better team
+    const byGame = arcade ? (arcade.us > arcade.them ? true : arcade.us < arcade.them ? false : byRating) : null;
+    const vsWon = noContest ? null : forfeit ? true : arcade ? byGame : byRating;
     const g = gradeFor(season.wins);
     const out = bracket ? playoffOutcome(bracket) : null;
     const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked, vsName: oppName });
@@ -446,7 +460,7 @@ export function App() {
     // a head-to-head is played out as a game, the same one on both phones: told from the host's
     // bench (seeded by the match), and turned around on the guest's
     let showdown: ResultInfo['showdown'];
-    if (bot && byRating !== null && !noContest && !forfeit) {
+    if (bot && byRating !== null && !noContest && !forfeit && !arcade) {
       const host = r.online ? r.online.found.host : true;
       const me = p0.name ?? 'You';
       const them = oppName ?? 'AI ' + r.botLevel.toUpperCase();
@@ -606,6 +620,7 @@ export function App() {
       fresh: binder.fresh,
       sets: binder.sets,
       showdown,
+      arcade: arcade ? { ...arcade, tiebreak: arcade.us === arcade.them } : undefined,
     };
     setRun({ ...r, result });
     setScreen('results');
@@ -615,6 +630,12 @@ export function App() {
     if (!run) return;
     const r = { ...run, draft };
     if (r.mode === '1v1') {
+      // played out on the field, unless the other player already dropped out of the draft
+      if (arcadeAvailable() && !droppedRef.current) {
+        setRun(r);
+        setScreen('arcade');
+        return;
+      }
       const season = playSeason(draft.lineup);
       const botRating = rateTeam(SLOTS.map((s) => draft.botLineup[s]));
       setRun(r);
@@ -784,6 +805,32 @@ export function App() {
         onCoachDone={() => update((p) => ({ ...p, firstRun: false }))}
         online={onlineProps}
       />
+    );
+  } else if (screen === 'arcade' && run?.draft) {
+    const r = run;
+    const d = run.draft;
+    viewId = 'arcade:' + run.id;
+    enter = 'zoom';
+    body = (
+      <div className="screen arcade">
+        <Arcade
+          lineup={d.lineup}
+          rivalLineup={d.botLineup}
+          rivalName={r.online ? r.online.found.opp.name : 'AI ' + r.botLevel.toUpperCase()}
+          seed={'arc:' + (r.online ? r.online.found.matchId : r.id + ':' + lineupKey(d.lineup))}
+          online={!!r.online}
+          botLevel={r.botLevel}
+          rivalLive={opp?.arcade ?? null}
+          rivalGone={!!r.online && (!!opp?.gone || !!opp?.left)}
+          autoplay={AUTOPLAY}
+          onProgress={(p) => matchRef.current?.update((s) => ({ ...s, arcade: p }))}
+          onFinish={(us, them, how, takenOver) => {
+            const season = playSeason(d.lineup);
+            const botRating = rateTeam(SLOTS.map((s) => d.botLineup[s]));
+            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver });
+          }}
+        />
+      </div>
     );
   } else if (screen === 'reveal' && run?.season && run.draft) {
     viewId = 'reveal:' + run.id;
