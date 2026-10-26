@@ -7512,3 +7512,133 @@ button.friendcard:active {
   text-align: center;
   color: var(--soft);
 }
+
+/* ---------- arcade basketball ---------- */
+.hgame {
+  background: #0d1c22;
+}
+.hp-clock {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 22px !important;
+  line-height: 1;
+}
+.hp-clock.low {
+  color: var(--red) !important;
+}
+.hp-ends i {
+  min-width: 18px;
+  padding: 2px 4px;
+}
+.hp-ends i.m-2 {
+  background: var(--teal);
+  color: var(--teal-ink);
+}
+.hp-ends i.m-3 {
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+.hp-ends i.m-X {
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--soft);
+}
+.hp-ends i.m-TO {
+  background: rgba(255, 122, 122, 0.85);
+  color: #2a0a0a;
+}
+.hp-pop {
+  top: 46%;
+}
+.hp-hint {
+  bottom: calc(var(--sab) + 180px);
+  white-space: normal;
+  text-align: center;
+  max-width: 86%;
+}
+.hp-pad {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--sab) + 14px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 18px;
+  pointer-events: none;
+}
+.hp-stick {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 70%);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  touch-action: none;
+  pointer-events: auto;
+}
+.hp-stick i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #3fe9d4, #0f9e8c);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.hp-btns {
+  position: relative;
+  width: 168px;
+  height: 150px;
+  pointer-events: none;
+}
+.hp-btns button {
+  position: absolute;
+  border-radius: 50%;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  touch-action: none;
+  pointer-events: auto;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.hp-shoot {
+  right: 0;
+  bottom: 0;
+  width: 104px;
+  height: 104px;
+  font-size: 22px;
+  color: var(--gold-ink);
+  background: radial-gradient(circle at 40% 35%, #ffd97a, #e9a21f);
+  box-shadow:
+    0 6px 0 #9b6a10,
+    0 10px 20px rgba(0, 0, 0, 0.45);
+}
+.hp-shoot:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 #9b6a10,
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+.hp-pass {
+  left: 0;
+  top: 0;
+  width: 74px;
+  height: 74px;
+  font-size: 16px;
+  color: var(--teal-ink);
+  background: radial-gradient(circle at 40% 35%, #6ff0de, #10bfa8);
+  box-shadow:
+    0 5px 0 #0a7d6e,
+    0 8px 16px rgba(0, 0, 0, 0.45);
+}
+.hp-pass:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 2px 0 #0a7d6e,
+    0 5px 12px rgba(0, 0, 0, 0.45);
+}

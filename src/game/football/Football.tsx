@@ -8,21 +8,9 @@ import { squadOf } from './model';
 import { CONCEPT_NAMES, juke, type Play, type Pt, snap, step, throwTo } from './play';
 import { type Camera, cameraTarget, draw, toScreen, toWorld } from './render';
 import { autoplay, decide, pilot } from './autopilot';
+import type { Progress, RivalLive } from '../progress';
 
-export interface Progress {
-  score: number;
-  /** drives finished */
-  drive: number;
-  done: boolean;
-  ends: DriveEnd[];
-}
-
-export interface RivalLive {
-  name: string;
-  score: number;
-  drive: number;
-  done: boolean;
-}
+export type { Progress, RivalLive };
 
 type Ui = 'loading' | 'pre' | 'fourth' | 'kick' | 'live' | 'after' | 'final';
 

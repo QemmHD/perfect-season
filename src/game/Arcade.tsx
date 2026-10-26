@@ -7,17 +7,25 @@ import { NFL } from '../engine/sport';
 import type { BotLevel, Lineup, Player } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { type Attrs, loadAttrs } from './attrs';
-import { aiDrives, Football, type Progress, type RivalLive } from './football/Football';
-import { type DriveEnd, DRIVES } from './football/drive';
-
-const DRIVE_ENDS: Record<DriveEnd, true> = { TD: true, FG: true, MISS: true, INT: true, DOWNS: true };
+import { aiDrives, Football } from './football/Football';
+import type { RivalLive } from './progress';
+import { DRIVES } from './football/drive';
 import { squadOf } from './football/model';
+import { POSSESSIONS } from './hoops/game';
+import { aiPossessions, Hoops } from './hoops/Hoops';
+import { fiveOf } from './hoops/model';
+
+import type { Progress } from './progress';
 
 export type { Progress };
 
-const POINTS: Record<string, number> = { TD: 7, FG: 3 };
+/** what each way a drive or possession can end is worth, and the ones the wire may carry */
+const POINTS: Record<string, number> = NFL ? { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0 } : { '2': 2, '3': 3, X: 0, TO: 0 };
+/** drives or possessions each */
+const TOTAL = NFL ? DRIVES : POSSESSIONS;
+const UNIT = NFL ? 'drive' : 'possession';
 
-/** points scored in the first `n` drives */
+/** points scored in the first `n` drives or possessions */
 function pointsThrough(p: Progress, n: number) {
   return p.ends.slice(0, n).reduce((a, e) => a + (POINTS[e] ?? 0), 0);
 }
@@ -26,7 +34,7 @@ function pointsThrough(p: Progress, n: number) {
 export const AI_SKILL: Record<BotLevel, number> = { rookie: 0.45, pro: 0.68, legend: 0.88 };
 
 export function arcadeAvailable(): boolean {
-  return NFL;
+  return true;
 }
 
 export function Arcade({
@@ -67,13 +75,14 @@ export function Arcade({
     };
   }, []);
   const rivalLive: Progress | null = useMemo(
-    () => (wire ? { ...wire, ends: wire.ends.filter((e): e is DriveEnd => e in DRIVE_ENDS) } : null),
+    () => (wire ? { ...wire, ends: wire.ends.filter((e) => e in POINTS) } : null),
     [wire?.score, wire?.drive, wire?.done, wire?.ends.join()]
   );
   const rivalDef = (rivalLineup.DEF as Player | null) ?? null;
-  const myDef = (lineup.DEF as Player | null) ?? null;
-  // the AI's drives, played up front (its offense against your defense)
-  const ai = useMemo(() => (!online && attrs ? aiDrives(rivalLineup, myDef, seed, AI_SKILL[botLevel], attrs) : null), [attrs]);
+  // the AI's side, played up front (its offense against your defense)
+  const aiPlay = (off: Lineup, def: Lineup, s: string, skill: number, a: (p: Player) => Attrs | null): Progress =>
+    NFL ? aiDrives(off, (def.DEF as Player | null) ?? null, s, skill, a) : aiPossessions(off, def, s, skill, a);
+  const ai = useMemo(() => (!online && attrs ? aiPlay(rivalLineup, lineup, seed, AI_SKILL[botLevel], attrs) : null), [attrs]);
   // the other phone went quiet: the AI finishes its drives from where it was
   const [takeover, setTakeover] = useState<Progress | null>(null);
   const goneSince = useRef<number | null>(null);
@@ -86,9 +95,9 @@ export function Arcade({
     goneSince.current ??= Date.now();
     const t = window.setTimeout(() => {
       const known = rivalLive ?? { score: 0, drive: 0, done: false, ends: [] };
-      const sim = aiDrives(rivalLineup, myDef, seed + ':takeover', AI_SKILL.pro, attrs);
+      const sim = aiPlay(rivalLineup, lineup, seed + ':takeover', AI_SKILL.pro, attrs);
       const ends = known.ends.concat(sim.ends.slice(known.ends.length));
-      setTakeover({ score: pointsThrough({ ...sim, ends }, DRIVES), drive: DRIVES, done: true, ends });
+      setTakeover({ score: pointsThrough({ ...sim, ends }, TOTAL), drive: TOTAL, done: true, ends });
     }, Math.max(0, 25000 - (Date.now() - goneSince.current)));
     return () => clearTimeout(t);
   }, [rivalGone, attrs, rivalLive?.done]);
@@ -100,9 +109,9 @@ export function Arcade({
       return r ? { name: rivalName, score: r.score, drive: r.drive, done: r.done } : { name: rivalName, score: 0, drive: 0, done: false };
     }
     if (!ai) return null;
-    // the AI's drives come in as you finish yours, all of them once you're done
-    const n = mine?.done ? DRIVES : (mine?.drive ?? 0);
-    return { name: rivalName, score: pointsThrough(ai, n), drive: n, done: n >= DRIVES };
+    // the AI's come in as you finish yours, all of them once you're done
+    const n = mine?.done ? TOTAL : (mine?.drive ?? 0);
+    return { name: rivalName, score: pointsThrough(ai, n), drive: n, done: n >= TOTAL };
   }, [online, rivalLive, takeover, ai, mine]);
 
   const them: Progress | null = online ? (takeover ?? (rivalLive?.done ? rivalLive : null)) : ai;
@@ -124,11 +133,48 @@ export function Arcade({
     if (!attrs) return;
     sfx.click();
     how.current = 'sim';
-    const p = aiDrives(lineup, rivalDef, seed + ':sim', 0.6, attrs);
-    progress(p);
+    progress(aiPlay(lineup, rivalLineup, seed + ':sim', 0.6, attrs));
     setStage('play');
   };
 
+  if (stage === 'kickoff' && !NFL) {
+    const five = attrs ? fiveOf(lineup, attrs) : null;
+    const r = (x: number) => Math.round(x * 99);
+    return (
+      <div className="arc-kick">
+        <span className="eyebrow">Head to head · tip-off</span>
+        <h1 className="disp">YOUR FIVE VS {rivalName.toUpperCase()}’S FIVE</h1>
+        <p>
+          {TOTAL} possessions each on offense, {rivalName} guarding you with the five they drafted, while they play theirs against yours. Most points wins; a tie goes to the better team.
+        </p>
+        {five && (
+          <div className="arc-roster">
+            {five.map((a) => (
+              <span key={a.spot}>
+                <b>{a.spot}</b>
+                <i>{a.name}</i>
+                <small className="num">
+                  3PT {r(a.three)} · FIN {r(a.finish)} · PAS {r(a.pass)}
+                </small>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="arc-how">
+          <span>Stick: move · PASS to the man you point at (or the open one)</span>
+          <span>Hold SHOOT and let go at the top of the jump · near the rim it’s a layup, or a dunk</span>
+        </div>
+        <div className="arc-btns">
+          <button className="big ghost small" onClick={sim} disabled={!attrs}>
+            <span>SIM IT</span>
+          </button>
+          <button className="big shine" onClick={() => (sfx.whistle(), setStage('play'))} disabled={!attrs}>
+            <span>PLAY</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (stage === 'kickoff') {
     const sq = attrs ? squadOf(lineup, rivalDef, attrs) : null;
     return (
@@ -136,7 +182,7 @@ export function Arcade({
         <span className="eyebrow">Head to head · kickoff</span>
         <h1 className="disp">YOUR OFFENSE VS {(rivalDef?.teamName ?? rivalName).toUpperCase()}</h1>
         <p>
-          {DRIVES} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
+          {TOTAL} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
         </p>
         {sq && (
           <div className="arc-roster">
@@ -169,12 +215,13 @@ export function Arcade({
   if (how.current === 'sim' && mine) {
     return (
       <div className="arc-kick">
-        <span className="eyebrow">Your drives, simmed</span>
+        <span className="eyebrow">Your {UNIT}s, simmed</span>
         <h1 className="disp num">{mine.score}</h1>
         <p>{mine.ends.join(' · ')}</p>
-        <p className="arc-wait">{shown && !shown.done ? 'Waiting for ' + rivalName + ': drive ' + Math.min(shown.drive + 1, DRIVES) + ' of ' + DRIVES + ' · ' + shown.score + ' pts' : 'Final whistle…'}</p>
+        <p className="arc-wait">{shown && !shown.done ? 'Waiting for ' + rivalName + ': ' + UNIT + ' ' + Math.min(shown.drive + 1, TOTAL) + ' of ' + TOTAL + ' · ' + shown.score + ' pts' : 'Final whistle…'}</p>
       </div>
     );
   }
+  if (!NFL) return <Hoops lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
   return <Football lineup={lineup} rivalDef={rivalDef} rivalName={rivalName} seed={seed} rival={shown} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
 }

@@ -160,3 +160,114 @@ export function footballSprite(k: Kit, back: boolean, frame: number): HTMLCanvas
   }
   return c;
 }
+
+/** 3x5 capitals, for the initials on a basketball jersey */
+const LETTERS: Record<string, string[]> = {
+  A: ['010', '101', '111', '101', '101'],
+  B: ['110', '101', '110', '101', '110'],
+  C: ['011', '100', '100', '100', '011'],
+  D: ['110', '101', '101', '101', '110'],
+  E: ['111', '100', '110', '100', '111'],
+  F: ['111', '100', '110', '100', '100'],
+  G: ['011', '100', '101', '101', '011'],
+  H: ['101', '101', '111', '101', '101'],
+  I: ['111', '010', '010', '010', '111'],
+  J: ['001', '001', '001', '101', '010'],
+  K: ['101', '101', '110', '101', '101'],
+  L: ['100', '100', '100', '100', '111'],
+  M: ['101', '111', '111', '101', '101'],
+  N: ['110', '101', '101', '101', '101'],
+  O: ['010', '101', '101', '101', '010'],
+  P: ['110', '101', '110', '100', '100'],
+  Q: ['010', '101', '101', '110', '011'],
+  R: ['110', '101', '110', '101', '101'],
+  S: ['011', '100', '010', '001', '110'],
+  T: ['111', '010', '010', '010', '010'],
+  U: ['101', '101', '101', '101', '111'],
+  V: ['101', '101', '101', '101', '010'],
+  W: ['101', '101', '111', '111', '101'],
+  X: ['101', '101', '010', '101', '101'],
+  Y: ['101', '101', '010', '010', '010'],
+  Z: ['111', '001', '010', '100', '111'],
+};
+
+export interface HoopKit {
+  c1: string;
+  c2: string;
+  /** inches */
+  ht: number;
+  /** pounds */
+  wt: number;
+  initials: string;
+}
+
+/**
+ * A basketball player: tank top, shorts, a headband in the trim color. Seen from behind (`back`,
+ * your five going at the rim) or the front (the defense). `pose`: 0/1 the stride, 2 arms up (a
+ * shot, a contest).
+ */
+function hooper(k: HoopKit, back: boolean, pose: number): Grid {
+  const H = Math.round(Math.max(22, Math.min(31, k.ht / 2.85)));
+  const torsoW = Math.round(Math.max(6, Math.min(10, 6 + (k.wt - 170) / 30)));
+  const W = torsoW + 6;
+  const g = grid(W, H + (pose === 2 ? 0 : 0));
+  const cx = Math.floor(W / 2);
+  const left = cx - Math.floor(torsoW / 2);
+  // head and headband
+  rect(g, cx - 2, 0, 4, 4, SKIN);
+  rect(g, cx - 2, 0, 4, 1, k.c2);
+  if (!back) rect(g, cx - 1, 2, 2, 1, SKIN_SHADE);
+  rect(g, cx - 1, 4, 2, 1, SKIN_SHADE);
+  // the jersey: tank top with trim
+  const torsoH = Math.round(H * 0.32);
+  const top = 5;
+  rect(g, left, top, torsoW, torsoH, k.c1);
+  rect(g, left, top, torsoW, 1, k.c2);
+  rect(g, left, top, 1, torsoH, shade(k.c1, 0.85));
+  rect(g, left + torsoW - 1, top, 1, torsoH, shade(k.c1, 0.85));
+  const ink = contrast(k.c1) === '#141414' ? shade(k.c2, 0.55) : '#ffffff';
+  const letters = k.initials.slice(0, 2);
+  if (torsoW >= 7 && letters) {
+    let x = cx - Math.floor((letters.length * 4 - 1) / 2);
+    for (const ch of letters) {
+      LETTERS[ch]?.forEach((row, j) => [...row].forEach((bit, i) => bit === '1' && rect(g, x + i, top + 2 + j, 1, 1, ink)));
+      x += 4;
+    }
+  }
+  // arms: down at his sides, or up for a shot
+  if (pose === 2) {
+    rect(g, left - 1, 0, 1, top + 2, SKIN);
+    rect(g, left + torsoW, 0, 1, top + 2, SKIN);
+  } else {
+    rect(g, left - 1, top + 1, 1, torsoH + 2, SKIN);
+    rect(g, left + torsoW, top + 1, 1, torsoH + 2, SKIN);
+  }
+  // shorts, with a stripe down the side
+  const sTop = top + torsoH;
+  rect(g, left, sTop, torsoW, 4, k.c1);
+  rect(g, left, sTop, 1, 4, k.c2);
+  rect(g, left + torsoW - 1, sTop, 1, 4, k.c2);
+  // legs, socks, shoes
+  const lTop = sTop + 4;
+  const legH = H - lTop - 3;
+  const l1 = cx - 2;
+  const l2 = cx + 1;
+  const up = pose === 1 ? 1 : 0;
+  rect(g, l1, lTop, 1, legH - up, SKIN);
+  rect(g, l2, lTop, 1, legH - (1 - up) + (pose === 2 ? 0 : 0), SKIN);
+  rect(g, l1, lTop + legH - up, 1, 2, '#f4f4f4');
+  rect(g, l2, lTop + legH - (1 - up), 1, 2, '#f4f4f4');
+  rect(g, l1 - 1, lTop + legH - up + 2, 2, 1, '#151515');
+  rect(g, l2, lTop + legH - (1 - up) + 2, 2, 1, '#151515');
+  return g;
+}
+
+export function hoopSprite(k: HoopKit, back: boolean, pose: number): HTMLCanvasElement {
+  const key = ['h', k.c1, k.c2, k.ht, Math.round(k.wt / 10), k.initials, back ? 1 : 0, pose].join('|');
+  let c = cache.get(key);
+  if (!c) {
+    c = toCanvas(hooper(k, back, pose));
+    cache.set(key, c);
+  }
+  return c;
+}

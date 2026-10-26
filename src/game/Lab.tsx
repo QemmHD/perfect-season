@@ -5,6 +5,7 @@ import { CELLS } from '../engine/data';
 import { NFL } from '../engine/sport';
 import type { Lineup, Player } from '../engine/types';
 import { Football, type Progress } from './football/Football';
+import { Hoops } from './hoops/Hoops';
 import { rankOf } from './football/model';
 
 function sample(level: number): { lineup: Lineup; def: Player } {
@@ -19,12 +20,37 @@ function sample(level: number): { lineup: Lineup; def: Player } {
   return { lineup: { QB: at('QB', level), RB: at('RB', level), WR: at('WR', level), TE: at('TE', level), FLEX: at('WR', level - 0.04), DEF: at('DEF', level) } as Lineup, def: at('DEF', 0.5) };
 }
 
+function hoopFive(level: number): Lineup {
+  const all = CELLS.flatMap((c) => c.players).sort((a, b) => a.val - b.val);
+  const out: Record<string, Player> = {};
+  for (const s of ['PG', 'SG', 'SF', 'PF', 'C']) {
+    const list = all.filter((p) => p.pos.includes(s));
+    out[s] = list[Math.min(list.length - 1, Math.floor(level * (list.length - 1)))];
+  }
+  return out as Lineup;
+}
+
 export default function Lab() {
   const q = new URLSearchParams(location.search);
   const level = Number(q.get('level') ?? 0.85);
   const s = useMemo(() => sample(level), [level]);
   const [prog, setProg] = useState<Progress | null>(null);
-  if (!NFL) return <div className="screen" style={{ display: 'grid', placeItems: 'center' }}>Basketball is next. Add ?sport=nfl for football.</div>;
+  if (!NFL)
+    return (
+      <div className="screen" style={{ paddingTop: 0, paddingBottom: 0 }}>
+        <Hoops
+          lineup={hoopFive(level)}
+          rivalLineup={hoopFive(Number(q.get('rival') ?? 0.7))}
+          rivalName="Rival"
+          seed={q.get('seed') ?? 'lab'}
+          rival={{ name: 'Rival', score: 9, drive: 4, done: false }}
+          autoplayHook={q.has('auto')}
+          onProgress={setProg}
+          onDone={setProg}
+        />
+        <span hidden data-progress={JSON.stringify(prog)} />
+      </div>
+    );
   return (
     <div className="screen" style={{ paddingTop: 0, paddingBottom: 0 }}>
       <Football
