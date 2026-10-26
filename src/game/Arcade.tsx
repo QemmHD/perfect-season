@@ -125,8 +125,9 @@ export function Arcade({
     setTakeover(finishedFrom(known, k, aiPlay(rivalLineup, lineup, seed + ':takeover', AI_SKILL.pro, attrs)));
     onTakeover(k);
   };
-  // the deadline for a rival who's connected but not playing, once you're done
-  const stallAt = online && doneAt !== null ? Math.max(doneAt, lastMove) + STALL_MS : null;
+  // the deadline for a rival who's connected but not playing, once you're done (one who hasn't
+  // kicked off yet gets longer: they may be reading the rules)
+  const stallAt = online && doneAt !== null ? Math.max(doneAt, lastMove) + (rivalLive ? STALL_MS : 2 * STALL_MS) : null;
   const cantTake = !online || !attrs || !!takeover || !!rivalLive?.done || tookMe !== null;
   useEffect(() => {
     if (cantTake) return;
@@ -216,6 +217,11 @@ export function Arcade({
           <span>Stick: move · PASS to the man you point at (or the open one)</span>
           <span>Hold SHOOT and let go at the top of the jump · near the rim it’s a layup, or a dunk</span>
         </div>
+        {online && rivalLive?.done && (
+          <p className="arc-wait">
+            {rivalName} has finished with {rivalLive.score}: {NFL ? 'kick' : 'tip'} off, they’re waiting.
+          </p>
+        )}
         <div className="arc-btns">
           <button className="big ghost small" onClick={sim} disabled={!attrs}>
             <span>SIM IT</span>
@@ -253,6 +259,11 @@ export function Arcade({
           <span>Pass: hold and drag to aim, let go to throw</span>
           <span>Run: drag to steer, tap to juke</span>
         </div>
+        {online && rivalLive?.done && (
+          <p className="arc-wait">
+            {rivalName} has finished with {rivalLive.score}: {NFL ? 'kick' : 'tip'} off, they’re waiting.
+          </p>
+        )}
         <div className="arc-btns">
           <button className="big ghost small" onClick={sim} disabled={!attrs}>
             <span>SIM MY DRIVES</span>
