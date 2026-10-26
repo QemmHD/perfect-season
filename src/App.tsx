@@ -66,6 +66,8 @@ interface OppView {
   tookOver: boolean;
   /** their game after the draft, as last heard */
   arcade: ArcadeState | null;
+  /** their phone gave up on ours in that game and let the AI finish our drives from this one on */
+  arcadeTook: number | null;
 }
 
 const MODE_LABEL: Record<Mode, string> = { classic: 'Classic', blind: 'Blind', daily: 'Daily', '1v1': '1 vs 1' };
@@ -375,12 +377,12 @@ export function App() {
   const onFound = (f: Found) => {
     matchRef.current?.close(false);
     droppedRef.current = false;
-    setOpp({ picks: [], lineup: {}, gone: false, left: false, tookOver: false, arcade: null });
+    setOpp({ picks: [], lineup: {}, gone: false, left: false, tookOver: false, arcade: null, arcadeTook: null });
     const conn: MatchConn = new MatchConn(f, (theirs, gone) => {
       // only the current match talks to the screen
       if (matchRef.current !== conn) return;
       setOpp((prev) => {
-        const next: OppView = { picks: theirs.picks, lineup: theirs.lineup, gone, left: theirs.left, tookOver: theirs.tookOver, arcade: theirs.arcade ?? null };
+        const next: OppView = { picks: theirs.picks, lineup: theirs.lineup, gone, left: theirs.left, tookOver: theirs.tookOver, arcade: theirs.arcade ?? null, arcadeTook: theirs.arcadeTook ?? null };
         if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
         return next;
       });
@@ -419,9 +421,10 @@ export function App() {
   };
 
   // the other phone gave up on you (you were gone too long) while you were still drafting:
-  // stop the match here at once, so this phone can't answer with a takeover of its own
+  // stop the match here at once, so this phone can't answer with a takeover of its own. It can
+  // land just after this phone finished the draft too (its last pick never reached them).
   useEffect(() => {
-    if (screen === 'draft' && run?.online && opp?.tookOver && !droppedRef.current) {
+    if ((screen === 'draft' || screen === 'arcade') && run?.online && opp?.tookOver && !droppedRef.current) {
       endMatch(false);
       setKicked(true);
     }
@@ -440,7 +443,7 @@ export function App() {
     season: TeamRating,
     bracket: Series[] | null,
     bot: { lineup: DraftState['botLineup']; rating: TeamRating } | null,
-    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean }
+    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean }
   ) => {
     const draft = r.draft!;
     const p0 = profileRef.current;
@@ -822,12 +825,14 @@ export function App() {
           botLevel={r.botLevel}
           rivalLive={opp?.arcade ?? null}
           rivalGone={!!r.online && (!!opp?.gone || !!opp?.left)}
+          tookMe={r.online ? (opp?.arcadeTook ?? null) : null}
           autoplay={AUTOPLAY}
           onProgress={(p) => matchRef.current?.update((s) => ({ ...s, arcade: p }))}
-          onFinish={(us, them, how, takenOver) => {
+          onTakeover={(k) => matchRef.current?.update((s) => ({ ...s, arcadeTook: k }))}
+          onFinish={(us, them, how, took) => {
             const season = playSeason(d.lineup);
             const botRating = rateTeam(SLOTS.map((s) => d.botLineup[s]));
-            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver });
+            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us });
           }}
         />
       </div>

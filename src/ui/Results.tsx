@@ -49,7 +49,7 @@ export interface ResultInfo {
   /** a head-to-head played out as a game, before the results */
   showdown?: { cast: GameCastData; opp: PlayoffTeam };
   /** a head-to-head played on the field: each side's points, and whether a tie went to the better team */
-  arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tiebreak: boolean };
+  arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; tiebreak: boolean };
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
@@ -245,7 +245,8 @@ export function Results({
               </div>
             </div>
             {info.arcade?.tiebreak && <span className="note arc-tie">Tied on points: the better team (by rating) takes it.</span>}
-            {info.arcade?.takenOver && <span className="note arc-tie">{r.online?.opp ?? 'They'} went quiet; the AI finished their drives.</span>}
+            {info.arcade?.takenOver && <span className="note arc-tie">{r.online?.opp ?? 'They'} stopped playing; the AI finished their {NFL ? 'drives' : 'possessions'}.</span>}
+            {info.arcade?.tookMe && <span className="note arc-tie">You were away too long; the AI finished your {NFL ? 'drives' : 'possessions'}.</span>}
           </>
         ) : (
           <div className="headline" ref={headRef}>

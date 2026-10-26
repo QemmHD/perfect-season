@@ -5,6 +5,8 @@ export interface Progress {
   drive: number;
   done: boolean;
   ends: string[];
+  /** plays run (or possessions, in basketball): moves on while the drive's still going */
+  plays?: number;
 }
 
 /** the rival as the scoreboard shows them */
@@ -13,4 +15,6 @@ export interface RivalLive {
   score: number;
   drive: number;
   done: boolean;
+  /** online, once you're done: when the AI finishes for them if they don't run another play */
+  deadline?: number | null;
 }

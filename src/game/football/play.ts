@@ -345,6 +345,11 @@ function move(b: Body, dt: number) {
 
 function endPlay(p: Play, kind: EndKind, at: Pt, text: string) {
   if (p.end) return;
+  // brought down (or out) once he's across the line: the ball broke the plane, it's six
+  if ((kind === 'tackle' || kind === 'out') && at.y >= 100) {
+    kind = 'td';
+    text = 'TOUCHDOWN';
+  }
   const y = kind === 'td' ? 100 : at.y;
   p.end = { kind, x: at.x, y, gain: Math.round((y - p.los) * 10) / 10, text };
   p.phase = 'dead';

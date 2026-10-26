@@ -264,10 +264,12 @@ export function drawHoops(ctx: CanvasRenderingContext2D, v: View, p: Poss, look:
     const my = s.y - mh;
     ctx.fillStyle = 'rgba(4,18,26,0.85)';
     ctx.fillRect(mx, my, v.z * 1.1, mh);
+    // the perfect band: wider for a shooter
     const perfectAt = my + mh - (APEX / (APEX * 1.6)) * mh;
+    const band = Math.max(4, ((2 * p.window) / (APEX * 1.6)) * mh);
     ctx.fillStyle = 'rgba(25,227,201,0.95)';
-    ctx.fillRect(mx - 3, perfectAt - 3, v.z * 1.1 + 6, 6);
-    ctx.fillStyle = k * APEX * 1.6 > APEX + 0.06 ? '#ff6b6b' : '#ffe29a';
+    ctx.fillRect(mx - 3, perfectAt - band / 2, v.z * 1.1 + 6, band);
+    ctx.fillStyle = held > APEX + p.window ? '#ff6b6b' : '#ffe29a';
     ctx.fillRect(mx + 2, my + mh - mh * k, v.z * 1.1 - 4, mh * k);
   }
 }

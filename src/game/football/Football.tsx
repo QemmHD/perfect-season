@@ -9,6 +9,7 @@ import { CONCEPT_NAMES, juke, type Play, type Pt, snap, step, throwTo } from './
 import { type Camera, cameraTarget, draw, toScreen, toWorld } from './render';
 import { autoplay, decide, pilot } from './autopilot';
 import type { Progress, RivalLive } from '../progress';
+import { WaitLine } from '../Wait';
 
 export type { Progress, RivalLive };
 
@@ -75,7 +76,7 @@ export function Football({
     window.setTimeout(() => setPop((p) => (p && p.id === id ? null : p)), ms);
   };
 
-  const progress = (g: Game): Progress => ({ score: g.score, drive: g.drive, done: g.over, ends: g.ends.slice() });
+  const progress = (g: Game): Progress => ({ score: g.score, drive: g.drive, done: g.over, ends: g.ends.slice(), plays: plays.current });
 
   // a fresh play on the line, routes showing
   const lineUpNext = (g: Game) => {
@@ -332,13 +333,19 @@ export function Football({
       steerRef.current = null;
     }
   };
+  // the system took the touch (a call, a swipe from the edge): nothing's thrown, the aim's off
+  const onCancel = () => {
+    downAt.current = null;
+    aimRef.current = null;
+    steerRef.current = null;
+  };
 
   const g = game;
   const p = playRef.current;
   const fgOk = g ? fgInRange(g) : false;
   return (
     <div className="fgame" ref={wrapRef}>
-      <canvas ref={canvasRef} className="fg-canvas" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
+      <canvas ref={canvasRef} className="fg-canvas" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel} />
       <div className="fg-hud">
         <span className="fg-score us">
           <i>YOU</i>
@@ -417,7 +424,7 @@ export function Football({
           <span className="eyebrow">Your drives</span>
           <b className="num">{g.score}</b>
           <small>{g.ends.map((e) => END_TEXT[e]).join(' · ')}</small>
-          {rival && !rival.done && <small className="fg-wait">Waiting for {rival.name}: drive {Math.min(rival.drive + 1, drives)} of {drives}</small>}
+          {rival && !rival.done && <WaitLine rival={rival} unit="drive" total={drives} />}
         </div>
       )}
     </div>

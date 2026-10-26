@@ -392,6 +392,9 @@ export interface MatchState {
   tookOver: boolean;
   /** the game after the draft: this player's score so far, drives done, and how each ended */
   arcade?: ArcadeState | null;
+  /** this player's phone gave up on the other one in the game after the draft and let the AI
+   * finish their drives, from this one on (the other phone then counts its score the same way) */
+  arcadeTook?: number | null;
 }
 
 export interface ArcadeState {
@@ -399,6 +402,8 @@ export interface ArcadeState {
   drive: number;
   done: boolean;
   ends: string[];
+  /** plays run so far: shows the other phone this one is still playing, mid-drive */
+  plays?: number;
 }
 
 /** An arcade state from the wire, checked: numbers in range, short strings. */
@@ -410,7 +415,11 @@ function arcadeOf(x: unknown): ArcadeState | null {
   const drive = n(a.drive, 99);
   if (score === null || drive === null) return null;
   const ends = Array.isArray(a.ends) ? a.ends.filter((e): e is string => typeof e === 'string' && e.length <= 8).slice(0, 40) : [];
-  return { score, drive, done: a.done === true, ends };
+  return { score, drive, done: a.done === true, ends, plays: n(a.plays, 99999) ?? 0 };
+}
+
+function tookOf(x: unknown): number | null {
+  return typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 99 ? x : null;
 }
 
 /**
@@ -481,7 +490,10 @@ export class MatchConn {
     const before = this.mine;
     this.mine = { ...fn(this.mine), seq: this.mine.seq + 1 };
     this.send();
-    if ((this.mine.tookOver && !before.tookOver) || (this.mine.left && !before.left)) this.persist();
+    // the moments a phone that's away must still learn about later: stored as well as sent
+    const tookArcade = this.mine.arcadeTook != null && before.arcadeTook == null;
+    const doneArcade = !!this.mine.arcade?.done && !before.arcade?.done;
+    if ((this.mine.tookOver && !before.tookOver) || (this.mine.left && !before.left) || tookArcade || doneArcade) this.persist();
   }
 
   private report(): void {
@@ -529,6 +541,7 @@ export class MatchConn {
       left: c.left === true,
       tookOver: c.tookOver === true,
       arcade: arcadeOf(c.arcade),
+      arcadeTook: tookOf(c.arcadeTook),
     };
     this.report();
   }

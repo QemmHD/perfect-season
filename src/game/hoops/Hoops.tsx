@@ -4,6 +4,7 @@ import { crowd, sfx, vibrate } from '../../lib/sound';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
 import type { Progress, RivalLive } from '../progress';
+import { WaitLine } from '../Wait';
 import { hoopDecide, hoopPilot, hoopsAutoplay } from './autopilot';
 import { afterPoss, type HoopGame, newHoopGame, POSSESSIONS, type PossMark, startPoss } from './game';
 import { fiveOf } from './model';
@@ -66,7 +67,7 @@ export function Hoops({
     setPop({ id, text, tone });
     window.setTimeout(() => setPop((p) => (p && p.id === id ? null : p)), ms);
   };
-  const progress = (g: HoopGame): Progress => ({ score: g.score, drive: g.done, done: g.over, ends: g.marks.slice() });
+  const progress = (g: HoopGame): Progress => ({ score: g.score, drive: g.done, done: g.over, ends: g.marks.slice(), plays: g.done });
 
   const next = (g: HoopGame) => {
     possRef.current = startPoss(g);
@@ -297,7 +298,7 @@ export function Hoops({
           <span className="eyebrow">Your possessions</span>
           <b className="num">{g.score}</b>
           <small>{g.marks.map((m) => MARK_TEXT[m]).join(' ')}</small>
-          {rival && !rival.done && <small className="fg-wait">Waiting for {rival.name}: possession {Math.min(rival.drive + 1, possessions)} of {possessions}</small>}
+          {rival && !rival.done && <WaitLine rival={rival} unit="possession" total={possessions} />}
         </div>
       )}
     </div>

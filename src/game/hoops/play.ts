@@ -76,6 +76,8 @@ export interface Poss {
   ball: Ball | null;
   /** the handler is in the air on a jump shot since then */
   jumpAt: number | null;
+  /** how wide the perfect release is on this shot, seconds either side of the top: a shooter's is wider */
+  window: number;
   /** a drive to the rim: layup or dunk on the way */
   attack: boolean;
   end: PossEnd | null;
@@ -132,7 +134,7 @@ export function setUp(ours: Baller[], theirs: Baller[], rand: Rand): Poss {
     const toRim = norm({ x: RIM.x - man.x, y: RIM.y - man.y });
     bodies.push(body(5 + i, 'D', a, { x: man.x + toRim.x * 4, y: man.y + toRim.y * 4 }, man.id));
   });
-  return { t: 0, clock: SHOT_CLOCK, bodies, handler: bodies[0], ball: null, jumpAt: null, attack: false, end: null, events: [], rand, release: null, passes: 0, shots: [] };
+  return { t: 0, clock: SHOT_CLOCK, bodies, handler: bodies[0], ball: null, jumpAt: null, window: 0.045, attack: false, end: null, events: [], rand, release: null, passes: 0, shots: [] };
 }
 
 function norm(v: Pt): Pt {
@@ -232,6 +234,12 @@ export function passTarget(p: Poss, dir: Pt | null): Body | null {
 }
 
 /** Go up for a jump shot (or, close to the rim, a layup or a dunk). */
+/** How good he is at the shot he's taking from here (0-1). */
+function shotSkill(h: Body, d: number): number {
+  const a = h.a;
+  return isThree(h) ? a.three : d > 15 ? a.mid : (a.mid + a.finish) / 2;
+}
+
 export function rise(p: Poss) {
   const h = p.handler;
   if (!h || p.ball || p.end || p.jumpAt !== null) return;
@@ -242,6 +250,7 @@ export function rise(p: Poss) {
     return;
   }
   p.jumpAt = p.t;
+  p.window = lerp(0.028, 0.066, shotSkill(h, d));
   h.vz = 13.5;
   h.z = 0.01;
   h.vx *= 0.3;
@@ -266,9 +275,9 @@ export function release(p: Poss) {
   const held = p.t - p.jumpAt;
   const off = held - APEX;
   p.release = clamp(off / 0.18, -1, 1);
-  const perfect = Math.abs(off) < 0.045;
-  // a good release (within a tenth of the top) costs little; a bad one is a brick
-  const timing = perfect ? 1.18 : lerp(1.04, 0.45, (Math.abs(off) - 0.045) / 0.22);
+  const perfect = Math.abs(off) < p.window;
+  // a good release (just off the top) costs little; a bad one is a brick
+  const timing = perfect ? 1.18 : lerp(1.04, 0.45, (Math.abs(off) - p.window) / 0.22);
   const d = dist(h, RIM);
   const three = isThree(h);
   const a = h.a;
@@ -288,7 +297,8 @@ export function release(p: Poss) {
     loose(p, h, false, 'BLOCKED BY ' + cd.a.tag);
     return;
   }
-  if (perfect && cr >= 4) make = Math.max(make, 0.8);
+  // a perfect release with room: a shooter's is all but automatic, a big man's still a hope
+  if (perfect && cr >= 4) make = Math.max(make, lerp(0.5, 0.86, shotSkill(h, d)));
   const made = r() < make;
   p.shots.push({ kind: three ? 'three' : d > 15 ? 'long' : 'short', d, room: cr, p: make, make: made });
   shootBall(p, h, made, three ? 3 : 2, false);
