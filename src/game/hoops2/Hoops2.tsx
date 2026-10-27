@@ -41,6 +41,9 @@ export function kitsFor(c1: string, c2: string): { home: Kit; away: Kit } {
 export function Hoops2({
   lineup,
   rivalLineup,
+  five,
+  rivalFive,
+  bench,
   rivalName,
   seed,
   possessions = POSSESSIONS,
@@ -52,8 +55,13 @@ export function Hoops2({
   onProgress,
   onDone,
 }: {
-  lineup: Lineup;
-  rivalLineup: Lineup;
+  /** the drafted lineups; or the teams themselves (Ultimate Team), `five` and `rivalFive` */
+  lineup?: Lineup;
+  rivalLineup?: Lineup;
+  five?: Hooper[];
+  rivalFive?: Hooper[];
+  /** subs for tired starters */
+  bench?: Hooper[];
   rivalName: string;
   seed: string;
   possessions?: number;
@@ -76,7 +84,7 @@ export function Hoops2({
       live = false;
     };
   }, []);
-  const game = useMemo<HoopsGame | null>(() => (attrs ? newHoopsGame(fiveOf(lineup, attrs), fiveOf(rivalLineup, attrs), seed, possessions) : null), [attrs]);
+  const game = useMemo<HoopsGame | null>(() => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench) : null), [attrs]);
   const renderer = useMemo(() => new HoopsRenderer(court, [ourKit, theirKit]), []);
   const possRef = useRef<Possession | null>(null);
   const stickRef = useRef<{ x: number; y: number } | null>(null);
@@ -412,7 +420,12 @@ export function Hoops2({
 
 /** The AI's possessions, played by the autopilot against your five. */
 export function aiPossessions2(rivalLineup: Lineup, yourLineup: Lineup, seed: string, skill: number, attrs: (p: Player) => Attrs | null, possessions = POSSESSIONS): Progress {
-  const g = newHoopsGame(fiveOf(rivalLineup, attrs), fiveOf(yourLineup, attrs), 'ai:' + seed, possessions);
+  return aiPossessionsOf(fiveOf(rivalLineup, attrs), fiveOf(yourLineup, attrs), seed, skill, possessions);
+}
+
+/** The same from the teams themselves (Ultimate Team): one five on offense, with its bench, against the other. */
+export function aiPossessionsOf(offense: Hooper[], defense: Hooper[], seed: string, skill: number, possessions = POSSESSIONS, bench: Hooper[] = []): Progress {
+  const g = newHoopsGame(offense, defense, 'ai:' + seed, possessions, bench);
   autoplay(g, skill, 'ai:' + seed);
   return { score: g.score, drive: g.done, done: true, ends: g.marks.slice(), plays: g.done };
 }

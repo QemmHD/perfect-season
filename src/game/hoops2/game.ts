@@ -26,10 +26,40 @@ export interface HoopsGame {
   /** points by player */
   box: number[];
   over: boolean;
+  /** Ultimate Team: the bench, and how fresh each man on it is; a tired starter comes off for one */
+  bench: Hooper[];
+  benchEnergy: number[];
 }
 
-export function newHoopsGame(ours: Hooper[], theirs: Hooper[], seed: string, total = POSSESSIONS): HoopsGame {
-  return { ours, theirs, seed, total, done: 0, score: 0, marks: [], energy: ours.map(() => 1), streak: ours.map(() => 0), fire: -1, box: ours.map(() => 0), over: false };
+/** a starter this tired comes off, when someone on the bench is fresh */
+export const SUB_AT = 0.65;
+const FRESH = 0.85;
+
+export function newHoopsGame(ours: Hooper[], theirs: Hooper[], seed: string, total = POSSESSIONS, bench: Hooper[] = []): HoopsGame {
+  return { ours: ours.slice(), theirs, seed, total, done: 0, score: 0, marks: [], energy: ours.map(() => 1), streak: ours.map(() => 0), fire: -1, box: ours.map(() => 0), over: false, bench: bench.slice(), benchEnergy: bench.map(() => 1) };
+}
+
+/**
+ * Subs: a starter under SUB_AT comes off for the best rested man on the bench (one at his position
+ * first), who takes his spot on the floor. The bench gets its legs back while it sits.
+ */
+function substitute(g: HoopsGame): void {
+  for (let j = 0; j < g.bench.length; j++) g.benchEnergy[j] = Math.min(1, g.benchEnergy[j] + 0.05);
+  for (let i = 0; i < g.ours.length; i++) {
+    if (g.energy[i] >= SUB_AT || i === g.fire) continue;
+    let best = -1;
+    for (let j = 0; j < g.bench.length; j++) {
+      if (g.benchEnergy[j] < FRESH) continue;
+      const fits = (k: number) => (g.bench[k].pos === g.ours[i].pos ? 1 : 0);
+      if (best < 0 || fits(j) > fits(best) || (fits(j) === fits(best) && g.bench[j].ovr > g.bench[best].ovr)) best = j;
+    }
+    if (best < 0) continue;
+    const off = g.ours[i];
+    g.ours[i] = { ...g.bench[best], pos: off.pos };
+    g.bench[best] = off;
+    [g.energy[i], g.benchEnergy[best]] = [g.benchEnergy[best], g.energy[i]];
+    g.streak[i] = 0;
+  }
 }
 
 export function startPossession(g: HoopsGame): Possession {
@@ -69,7 +99,11 @@ export function afterPossession(g: HoopsGame, p: Possession): Mark {
     g.energy[i] = Math.max(0.55, g.energy[i] - drain);
   }
   g.done++;
-  if (g.done === g.total / 2) for (let i = 0; i < 5; i++) g.energy[i] = Math.min(1, g.energy[i] + 0.3);
+  if (g.done === g.total / 2) {
+    for (let i = 0; i < 5; i++) g.energy[i] = Math.min(1, g.energy[i] + 0.3);
+    for (let j = 0; j < g.bench.length; j++) g.benchEnergy[j] = Math.min(1, g.benchEnergy[j] + 0.3);
+  }
+  if (g.bench.length) substitute(g);
   if (g.done >= g.total) g.over = true;
   return mark;
 }

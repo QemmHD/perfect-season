@@ -259,9 +259,7 @@ export default function UltimateTeam(props: {
             onToast((mode === 'ai' ? 'Squad battles vs the AI' : 'Online head to head') + ' arrive in the next update. Build your squad meanwhile!');
             return;
           }
-          // TODO(match step): credit the result (coins, awardXp) in `done`
-          const cards = Object.fromEntries(Object.entries(lineup).filter(([, rc]) => !!rc)) as Record<string, RatedCard>;
-          play({ sport: SPORT, mode, cards, uids: ut.squad, rating, done: () => {} });
+          play({ id: Date.now(), mode, rung: mode === 'ai' ? ut.battles.cleared : undefined });
         }}
       />
     );

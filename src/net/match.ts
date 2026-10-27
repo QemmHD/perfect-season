@@ -178,6 +178,21 @@ export interface Opponent {
   pubkey: string;
   name: string;
   level: number;
+  /** Ultimate Team: their squad's overall */
+  ovr?: number;
+}
+
+/**
+ * Ultimate Team head to head pairs squads within this many points of overall: 3 at first, 2 wider
+ * every 10 seconds of searching, 10 at most.
+ */
+export function squadWindow(searchingMs: number): number {
+  return Math.min(10, 3 + 2 * Math.floor(Math.max(0, searchingMs) / 10000));
+}
+
+/** Two squads close enough to pair, for a search this long. */
+export function squadsFit(mine: number, theirs: number | undefined, searchingMs: number): boolean {
+  return typeof theirs === 'number' && Number.isFinite(theirs) && Math.abs(mine - theirs) <= squadWindow(searchingMs);
 }
 
 export interface Found {
@@ -231,18 +246,35 @@ export class Matchmaker {
   /** a room's lobby, the same whatever sport or version: it tells a friend on the wrong one */
   private lobby: string | null;
 
+  private since = Date.now();
+
+  /**
+   * `queue` is a queue of its own (Ultimate Team's, which never pairs with the draft's); with
+   * `ovr` (a squad's overall) only squads within squadWindow() pair.
+   */
   constructor(
-    private readonly info: { name: string; level: number; room?: string },
+    private readonly info: { name: string; level: number; room?: string; queue?: string; ovr?: number },
     private readonly onFound: (f: Found) => void,
     private readonly onSeen?: (n: number) => void,
     private readonly onMismatch?: (m: RoomMismatch) => void
   ) {
-    this.tag = info.room ? 'ps1-room-' + NET_V + '-' + info.room : 'ps1-queue-' + NET_V;
+    this.tag = info.room ? 'ps1-room-' + NET_V + '-' + info.room : 'ps1-queue-' + NET_V + (info.queue ? '-' + info.queue : '');
     this.lobby = info.room ? 'ps1-lobby-' + info.room + NS_SUFFIX : null;
+  }
+
+  /** a searcher this one may pair with (any, unless squads are matched by overall) */
+  private fits(ovr: number | undefined): boolean {
+    return this.info.ovr === undefined || squadsFit(this.info.ovr, ovr, Date.now() - this.since);
+  }
+
+  /** what this player tells the queue and the other side of a handshake about himself */
+  private about(): Record<string, unknown> {
+    return this.info.ovr === undefined ? { name: this.info.name, lvl: this.info.level } : { name: this.info.name, lvl: this.info.level, ovr: this.info.ovr };
   }
 
   start(): void {
     if (!NET_ON) return;
+    this.since = Date.now();
     pool.start();
     this.subs.push(
       pool.subscribe([{ kinds: [KIND_QUEUE], '#t': [this.tag], since: now() - 10 }], (e) => this.onQueue(e)),
@@ -267,7 +299,7 @@ export class Matchmaker {
 
   private announce(): void {
     if (this.stopped || this.state.kind === 'done') return;
-    void pool.publish(sign(KIND_QUEUE, [['t', this.tag]], JSON.stringify({ name: this.info.name, lvl: this.info.level })));
+    void pool.publish(sign(KIND_QUEUE, [['t', this.tag]], JSON.stringify(this.about())));
     if (this.lobby) void pool.publish(sign(KIND_QUEUE, [['t', this.lobby]], JSON.stringify({ name: this.info.name, sport: SPORT, v: NET_V })));
   }
 
@@ -289,7 +321,7 @@ export class Matchmaker {
     if (e.pubkey === this.me || tagValue(e, 't') !== this.tag) return;
     const c = parse(e);
     if (!c) return;
-    this.searchers.set(e.pubkey, { pubkey: e.pubkey, name: displayName(c.name), level: Number.isInteger(c.lvl) ? (c.lvl as number) : 1, seen: Date.now() });
+    this.searchers.set(e.pubkey, { pubkey: e.pubkey, name: displayName(c.name), level: Number.isInteger(c.lvl) ? (c.lvl as number) : 1, ovr: typeof c.ovr === 'number' ? c.ovr : undefined, seen: Date.now() });
     this.onSeen?.(this.fresh().length);
   }
 
@@ -307,7 +339,7 @@ export class Matchmaker {
       this.state = { kind: 'idle' };
     }
     if (this.state.kind !== 'idle') return;
-    const options = this.fresh().filter((s) => (this.tried.get(s.pubkey) ?? 0) < t);
+    const options = this.fresh().filter((s) => (this.tried.get(s.pubkey) ?? 0) < t && this.fits(s.ovr));
     if (!options.length) return;
     // invite the player waiting longest; a small random wait keeps two players from colliding
     if (Math.random() < 0.5) return;
@@ -315,7 +347,7 @@ export class Matchmaker {
     const matchId = randId();
     const seed = randId();
     this.state = { kind: 'inviting', to: target.pubkey, matchId, seed, until: t + 4500 };
-    this.send(target.pubkey, { type: 'invite', match: matchId, seed, name: this.info.name, lvl: this.info.level });
+    this.send(target.pubkey, { type: 'invite', match: matchId, seed, ...this.about() });
   }
 
   private onHandshake(e: Event): void {
@@ -327,12 +359,13 @@ export class Matchmaker {
     const t = Date.now();
     const name = displayName(c.name);
     const level = Number.isInteger(c.lvl) ? (c.lvl as number) : 1;
+    const ovr = typeof c.ovr === 'number' ? c.ovr : undefined;
     if (c.type === 'invite' && typeof c.seed === 'string') {
       const mutual = st.kind === 'inviting' && st.to === from;
-      if (st.kind === 'idle' || (mutual && this.me > from)) {
+      if ((st.kind === 'idle' || (mutual && this.me > from)) && this.fits(ovr)) {
         this.state = { kind: 'accepted', from, matchId: c.match, seed: c.seed, until: t + 6000 };
-        this.searchers.set(from, { pubkey: from, name, level, seen: t });
-        this.send(from, { type: 'accept', match: c.match, name: this.info.name, lvl: this.info.level });
+        this.searchers.set(from, { pubkey: from, name, level, ovr, seen: t });
+        this.send(from, { type: 'accept', match: c.match, ...this.about() });
         this.listenForStart(from, c.match);
       } else if (!mutual) this.send(from, { type: 'decline', match: c.match });
     } else if (c.type === 'accept' && st.kind === 'inviting' && st.to === from && st.matchId === c.match) {
@@ -340,7 +373,7 @@ export class Matchmaker {
       // say go a few times: a lost go would leave the other player waiting
       for (const ms of [0, 400, 1200]) window.setTimeout(() => this.send(from, { type: 'go', match: c.match }), ms);
       const opp = this.searchers.get(from);
-      this.finish({ matchId: c.match, seed: st.seed, host: true, opp: { pubkey: from, name: opp?.name ?? name, level: opp?.level ?? level } });
+      this.finish({ matchId: c.match, seed: st.seed, host: true, opp: { pubkey: from, name: opp?.name ?? name, level: opp?.level ?? level, ovr: opp?.ovr ?? ovr } });
     } else if (c.type === 'go' && st.kind === 'accepted' && st.from === from && st.matchId === c.match) {
       this.started(from, c.match);
     } else if (c.type === 'decline' && st.kind === 'inviting' && st.to === from && st.matchId === c.match) {
@@ -360,7 +393,7 @@ export class Matchmaker {
     if (st.kind !== 'accepted' || st.from !== from || st.matchId !== matchId) return;
     this.state = { kind: 'done' };
     const opp = this.searchers.get(from)!;
-    this.finish({ matchId, seed: st.seed, host: false, opp: { pubkey: from, name: opp.name, level: opp.level } });
+    this.finish({ matchId, seed: st.seed, host: false, opp: { pubkey: from, name: opp.name, level: opp.level, ovr: opp.ovr } });
   }
 
   /** In the middle of a handshake: don't hand this player to the AI right now. */
@@ -406,6 +439,8 @@ export interface MatchState {
   voteSaw?: Seen | null;
   /** this player's favorite team in this sport: the colors his side wears */
   fav?: string | null;
+  /** Ultimate Team: this player's squad ([slot, card id, level]) and its overall */
+  ut?: { squad: [string, string, number][]; ovr: number } | null;
 }
 
 export interface ArcadeState {
@@ -433,6 +468,17 @@ function arcadeOf(x: unknown): ArcadeState | null {
 function voteFields(c: Record<string, unknown>): Pick<MatchState, 'vote' | 'voteAt' | 'voteSaw'> {
   const w = voteWireOf(c);
   return { vote: w.vote, voteAt: w.at, voteSaw: w.saw };
+}
+
+/** A squad from the wire, checked for shape (Ultimate Team checks the cards against its pool). */
+function utOf(x: unknown): MatchState['ut'] {
+  if (!x || typeof x !== 'object') return null;
+  const u = x as Record<string, unknown>;
+  if (!Array.isArray(u.squad) || typeof u.ovr !== 'number' || !Number.isFinite(u.ovr)) return null;
+  const squad = u.squad
+    .filter((e): e is [string, string, number] => Array.isArray(e) && e.length === 3 && typeof e[0] === 'string' && e[0].length <= 4 && typeof e[1] === 'string' && e[1].length <= 80 && Number.isInteger(e[2]))
+    .slice(0, 30);
+  return { squad, ovr: u.ovr };
 }
 
 function tookOf(x: unknown): number | null {
@@ -561,6 +607,7 @@ export class MatchConn {
       arcadeTook: tookOf(c.arcadeTook),
       ...voteFields(c),
       fav: teamOf(SPORT, c.fav)?.abbr ?? null,
+      ut: utOf(c.ut),
     };
     this.report();
   }

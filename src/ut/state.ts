@@ -25,10 +25,14 @@ export interface UtState {
   packs: PendingPack[];
   /** what was quick-sold, for the hub */
   sold: { cards: number; coins: number };
+  /** Squad Battles: rungs cleared this week (`week` is its key), the best week, and games played */
+  battles: { week: string; cleared: number; best: number };
+  /** results of played matches: vs the AI and online head to head */
+  record: { w: number; l: number; h2hW: number; h2hL: number };
 }
 
 export function freshUt(): UtState {
-  return { v: 1, owned: [], squad: {}, packsOpened: 0, starterClaimed: false, sbc: { done: {} }, packs: [], sold: { cards: 0, coins: 0 } };
+  return { v: 1, owned: [], squad: {}, packsOpened: 0, starterClaimed: false, sbc: { done: {} }, packs: [], sold: { cards: 0, coins: 0 }, battles: { week: '', cleared: 0, best: 0 }, record: { w: 0, l: 0, h2hW: 0, h2hL: 0 } };
 }
 
 const num = (x: unknown, d: number): number => (typeof x === 'number' && Number.isFinite(x) ? x : d);
@@ -58,6 +62,9 @@ export function migrateUt(raw: unknown): UtState {
   if (sbc && sbc.done && typeof sbc.done === 'object') for (const [k, v] of Object.entries(sbc.done as Record<string, unknown>)) if (typeof v === 'number') done[k] = v;
   const packs: PendingPack[] = Array.isArray(r.packs) ? (r.packs as PendingPack[]).filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string').map((p) => ({ id: p.id, kind: p.kind, at: num(p.at, 0) })) : [];
   const sold = r.sold as { cards?: unknown; coins?: unknown } | undefined;
+  const bt = r.battles as { week?: unknown; cleared?: unknown; best?: unknown } | undefined;
+  const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL', unknown>> | undefined;
+  const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
   return {
     v: 1,
     owned,
@@ -67,6 +74,8 @@ export function migrateUt(raw: unknown): UtState {
     sbc: { done },
     packs,
     sold: { cards: num(sold?.cards, 0), coins: num(sold?.coins, 0) },
+    battles: { week: typeof bt?.week === 'string' ? bt.week : '', cleared: Math.min(8, count(bt?.cleared)), best: Math.min(8, count(bt?.best)) },
+    record: { w: count(rec?.w), l: count(rec?.l), h2hW: count(rec?.h2hW), h2hL: count(rec?.h2hL) },
   };
 }
 

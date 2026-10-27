@@ -7,13 +7,15 @@ import { NFL } from '../engine/sport';
 import type { BotLevel, Lineup, Player } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { type Attrs, loadAttrs } from './attrs';
-import { aiDrives2, Football2 } from './football2/Football2';
+import { aiDrives2, aiDrivesOf, Football2 } from './football2/Football2';
 import type { RivalLive } from './progress';
 import { WaitLine } from './Wait';
 import { DRIVES } from './football2/drive';
 import { offenseOf } from './football2/squad';
 import { POSSESSIONS } from './hoops2/game';
-import { aiPossessions2, fiveOf, Hoops2 } from './hoops2/Hoops2';
+import { aiPossessions2, aiPossessionsOf, fiveOf, Hoops2 } from './hoops2/Hoops2';
+import type { Defense, Offense } from './football2/types';
+import type { Hooper } from './hoops2/types';
 import { type BasketballKit, type FootballKit, type Kits, kitsFor } from './uniforms';
 
 import type { Progress } from './progress';
@@ -52,9 +54,25 @@ export function arcadeAvailable(): boolean {
   return true;
 }
 
+/**
+ * Both sides' teams, built already (Ultimate Team squads) instead of drafted lineups: basketball's
+ * fives (and benches), football's offenses and defenses.
+ */
+export interface ArcadeTeams {
+  five?: Hooper[];
+  bench?: Hooper[];
+  rivalFive?: Hooper[];
+  rivalBench?: Hooper[];
+  offense?: Offense;
+  defense?: Defense;
+  rivalOffense?: Offense;
+  rivalDefense?: Defense;
+}
+
 export function Arcade({
   lineup,
   rivalLineup,
+  teams,
   rivalName,
   seed,
   online,
@@ -68,8 +86,10 @@ export function Arcade({
   onTakeover,
   onFinish,
 }: {
-  lineup: Lineup;
-  rivalLineup: Lineup;
+  /** the two drafted lineups; or `teams`, built already */
+  lineup?: Lineup;
+  rivalLineup?: Lineup;
+  teams?: ArcadeTeams;
   rivalName: string;
   seed: string;
   online: boolean;
@@ -104,11 +124,18 @@ export function Arcade({
     const ends = wire.ends.filter((e) => owns(e)).slice(0, TOTAL);
     return { score: pointsThrough({ score: 0, drive: 0, done: false, ends }, TOTAL), drive: ends.length, done: wire.done && ends.length >= TOTAL, ends, plays: wire.plays ?? 0 };
   }, [wire?.done, wire?.plays, wire?.ends.join()]);
-  const rivalDef = (rivalLineup.DEF as Player | null) ?? null;
-  // the AI's side, played up front (its offense against your defense)
-  const aiPlay = (off: Lineup, def: Lineup, s: string, skill: number, a: (p: Player) => Attrs | null): Progress =>
-    NFL ? aiDrives2(off, def, s, skill, a) : aiPossessions2(off, def, s, skill, a);
-  const ai = useMemo(() => (!online && attrs ? aiPlay(rivalLineup, lineup, seed, AI_SKILL[botLevel], attrs) : null), [attrs]);
+  const rivalDef = (rivalLineup?.DEF as Player | null) ?? null;
+  // one side's offense played by the autopilot against the other's defense: the rival's (`rival`), or yours
+  const aiPlay = (rival: boolean, s: string, skill: number, a: (p: Player) => Attrs | null): Progress => {
+    if (teams) {
+      const t = teams;
+      if (NFL) return rival ? aiDrivesOf(t.rivalOffense!, t.defense!, s, skill) : aiDrivesOf(t.offense!, t.rivalDefense!, s, skill);
+      return rival ? aiPossessionsOf(t.rivalFive!, t.five!, s, skill, POSSESSIONS, t.rivalBench) : aiPossessionsOf(t.five!, t.rivalFive!, s, skill, POSSESSIONS, t.bench);
+    }
+    const [off, def] = rival ? [rivalLineup!, lineup!] : [lineup!, rivalLineup!];
+    return NFL ? aiDrives2(off, def, s, skill, a) : aiPossessions2(off, def, s, skill, a);
+  };
+  const ai = useMemo(() => (!online && attrs ? aiPlay(true, seed, AI_SKILL[botLevel], attrs) : null), [attrs]);
 
   // Online, the AI can finish the other side's drives: when that phone goes quiet, or when you're
   // done and it stops playing. Both phones work it out the same way (same seed, same drives played
@@ -125,7 +152,7 @@ export function Arcade({
     if (!attrs) return;
     const known = rivalLive ?? { score: 0, drive: 0, done: false, ends: [] };
     const k = known.ends.length;
-    setTakeover(finishedFrom(known, k, aiPlay(rivalLineup, lineup, seed + ':takeover', AI_SKILL.pro, attrs)));
+    setTakeover(finishedFrom(known, k, aiPlay(true, seed + ':takeover', AI_SKILL.pro, attrs)));
     onTakeover(k);
   };
   // the deadline for a rival who's connected but not playing, once you're done (one who hasn't
@@ -152,7 +179,7 @@ export function Arcade({
   const taken: Progress | null = useMemo(() => {
     if (tookMe === null || !attrs) return null;
     const played = mine ?? { score: 0, drive: 0, done: false, ends: [] };
-    return finishedFrom(played, Math.min(tookMe, played.ends.length), aiPlay(lineup, rivalLineup, seed + ':takeover', AI_SKILL.pro, attrs));
+    return finishedFrom(played, Math.min(tookMe, played.ends.length), aiPlay(false, seed + ':takeover', AI_SKILL.pro, attrs));
   }, [tookMe, attrs]);
 
   // what the screen shows of the rival
@@ -189,18 +216,18 @@ export function Arcade({
     if (!attrs) return;
     sfx.click();
     how.current = 'sim';
-    progress(aiPlay(lineup, rivalLineup, seed + ':sim', 0.6, attrs));
+    progress(aiPlay(false, seed + ':sim', 0.6, attrs));
     setStage('play');
   };
 
   if (stage === 'kickoff' && !NFL) {
-    const five = attrs ? fiveOf(lineup, attrs) : null;
+    const five = teams?.five ?? (attrs ? fiveOf(lineup!, attrs) : null);
     return (
       <div className="arc-kick">
         <span className="eyebrow">Head to head · tip-off</span>
         <h1 className="disp">YOUR FIVE VS {rivalName.toUpperCase()}’S FIVE</h1>
         <p>
-          {TOTAL} possessions each on offense, {rivalName} guarding you with the five they drafted, while they play theirs against yours. Most points wins; a tie goes to the better team.
+          {TOTAL} possessions each on offense, {rivalName} guarding you with {teams ? 'their five' : 'the five they drafted'}, while they play theirs against yours. Most points wins; a tie goes to the better team.
         </p>
         {five && (
           <div className="arc-roster">
@@ -236,7 +263,7 @@ export function Arcade({
     );
   }
   if (stage === 'kickoff') {
-    const off = attrs ? offenseOf(lineup, attrs, seed) : null;
+    const off = teams?.offense ?? (attrs ? offenseOf(lineup!, attrs, seed) : null);
     return (
       <div className="arc-kick">
         <span className="eyebrow">Head to head · kickoff</span>
@@ -301,8 +328,8 @@ export function Arcade({
   }
   if (!NFL) {
     const k = kits ?? kitsFor(null, null, 'nba');
-    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
   }
   const k = kits ?? kitsFor(null, null, 'nfl');
-  return <Football2 lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
 }

@@ -2,33 +2,26 @@
 // by squad overall: docs/ULTIMATE-TEAM.md "Playing") are the next step; this is the contract the UT
 // screens call and what a finished match hands back.
 //
-// TODO(match step): App.tsx passes `onPlaySquad` to <UltimateTeam>; it starts the arcade game with
-// `request.cards` (basketball: `toHooper()` from rate.ts turns each into the game's player; the
-// bench subs in on fatigue), and when the game ends calls `request.done(result)`. The UT screen
-// then credits the coins and the cards' XP (state.ts `awardXp`) and shows the result.
+// App.tsx gives <UltimateTeam> an `onPlaySquad` that opens the match screen (src/ut/Match.tsx) with
+// the request; that screen finds the opponent, builds both teams (teams.ts), runs the vote and the
+// arcade game, then credits coins and XP and shows the result.
 import type { Profile } from '../lib/profile';
-import type { SquadRating } from './squad';
 import { awardXp } from './state';
-import type { RatedCard, UtSport } from './types';
 
 export interface UtMatchRequest {
-  sport: UtSport;
-  /** vs an AI squad (a ladder rung), or online head to head */
+  /** unique per match started */
+  id: number;
+  /** vs an AI squad (a Squad Battles rung), or online head to head */
   mode: 'ai' | 'online';
-  /** the squad by slot id (PG, B1, QB, WR2, ...), rated at each card's level */
-  cards: Record<string, RatedCard>;
-  /** the owned cards' uids by slot, for the XP afterwards */
-  uids: Record<string, string>;
-  rating: SquadRating;
-  /** the match is over: the screen credits it */
-  done: (result: UtMatchResult) => void;
+  /** Squad Battles: the rung of this week's ladder */
+  rung?: number;
 }
 
 export interface UtMatchResult {
   won: boolean;
   us: number;
   them: number;
-  /** the uids of the cards that played (the whole squad, usually) */
+  /** the uids of the cards that played (the whole squad) */
   played: string[];
 }
 

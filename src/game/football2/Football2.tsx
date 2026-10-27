@@ -17,7 +17,7 @@ import { afterPlay, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type
 import { CONCEPT_NAMES, FIELD_W, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
-import type { Play, Pt } from './types';
+import type { Defense, Offense, Play, Pt } from './types';
 
 type Ui = 'loading' | 'pre' | 'fourth' | 'live' | 'after' | 'kick' | 'final';
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
@@ -38,6 +38,8 @@ export function fbKitsFor(c1: string, c2: string): { home: FbKit; away: FbKit } 
 export function Football2({
   lineup,
   rivalLineup,
+  offense,
+  rivalDefense,
   rivalName,
   seed,
   drives = DRIVES,
@@ -49,9 +51,12 @@ export function Football2({
   onProgress,
   onDone,
 }: {
-  lineup: Lineup;
+  lineup?: Lineup;
   /** the rival's draft: their defense lines up against you */
-  rivalLineup: Lineup;
+  rivalLineup?: Lineup;
+  /** or the teams themselves (Ultimate Team): your offense and the rival's defense */
+  offense?: Offense;
+  rivalDefense?: Defense;
   rivalName: string;
   seed: string;
   drives?: number;
@@ -75,7 +80,7 @@ export function Football2({
       live = false;
     };
   }, []);
-  const game = useMemo<Game | null>(() => (attrs ? newGame(offenseOf(lineup, attrs, seed), defenseOf(rivalLineup, attrs, 'def:' + seed), seed, drives) : null), [attrs]);
+  const game = useMemo<Game | null>(() => (attrs ? newGame(offense ?? offenseOf(lineup!, attrs, seed), rivalDefense ?? defenseOf(rivalLineup!, attrs, 'def:' + seed), seed, drives) : null), [attrs]);
   const renderer = useMemo(() => new FootballRenderer(field, [ourKit, theirKit]), []);
   const playRef = useRef<Play | null>(null);
   const pilotRef = useRef(pilot(0.75, seed));
@@ -646,7 +651,12 @@ function fieldGoalUnit(g: Game): Play {
 
 /** The AI's drives, played by the autopilot against your defense. */
 export function aiDrives2(rivalLineup: Lineup, yourLineup: Lineup, seed: string, skill: number, attrs: (p: Player) => Attrs | null, drives = DRIVES): Progress {
-  const g = newGame(offenseOf(rivalLineup, attrs, 'ai:' + seed), defenseOf(yourLineup, attrs, 'aidef:' + seed), 'ai:' + seed, drives);
+  return aiDrivesOf(offenseOf(rivalLineup, attrs, 'ai:' + seed), defenseOf(yourLineup, attrs, 'aidef:' + seed), seed, skill, drives);
+}
+
+/** The same from the teams themselves (Ultimate Team): one side's offense against the other's defense. */
+export function aiDrivesOf(offense: Offense, defense: Defense, seed: string, skill: number, drives = DRIVES): Progress {
+  const g = newGame(offense, defense, 'ai:' + seed, drives);
   autoplay(g, skill, 'ai:' + seed);
   return { score: g.score, drive: g.drive, done: true, ends: g.ends.slice(), plays: g.plays };
 }
