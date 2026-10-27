@@ -275,7 +275,10 @@ describe('a finished match', () => {
       expect(avg(by[i], 'ovr')).toBeGreaterThan(avg(by[i - 1], 'ovr') + 1.5);
       expect(avg(by[i], 'skill')).toBeGreaterThan(avg(by[i - 1], 'skill'));
       expect(LEVEL[LEVELS[i]].pay).toBeGreaterThan(LEVEL[LEVELS[i - 1]].pay);
+      // and its defense plays better (the games' defIQ: Pro is the standard)
+      expect(LEVEL[LEVELS[i]].def).toBeGreaterThan(LEVEL[LEVELS[i - 1]].def);
     }
+    expect(LEVEL.pro.def).toBe(0);
     // the first Pro ladder of a week is the one there always was
     expect(JSON.stringify(ladderFor(pool, WEEK, 0, 'pro'))).toBe(JSON.stringify(ladder));
   });

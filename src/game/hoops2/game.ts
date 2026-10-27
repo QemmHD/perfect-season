@@ -29,14 +29,16 @@ export interface HoopsGame {
   /** Ultimate Team: the bench, and how fresh each man on it is; a tired starter comes off for one */
   bench: Hooper[];
   benchEnergy: number[];
+  /** how well the other side defends beyond its ratings (Squad Battles' difficulty; 0 standard) */
+  defIQ: number;
 }
 
 /** a starter this tired comes off, when someone on the bench is fresh */
 export const SUB_AT = 0.65;
 const FRESH = 0.85;
 
-export function newHoopsGame(ours: Hooper[], theirs: Hooper[], seed: string, total = POSSESSIONS, bench: Hooper[] = []): HoopsGame {
-  return { ours: ours.slice(), theirs, seed, total, done: 0, score: 0, marks: [], energy: ours.map(() => 1), streak: ours.map(() => 0), fire: -1, box: ours.map(() => 0), over: false, bench: bench.slice(), benchEnergy: bench.map(() => 1) };
+export function newHoopsGame(ours: Hooper[], theirs: Hooper[], seed: string, total = POSSESSIONS, bench: Hooper[] = [], defIQ = 0): HoopsGame {
+  return { ours: ours.slice(), theirs, seed, total, done: 0, score: 0, marks: [], energy: ours.map(() => 1), streak: ours.map(() => 0), fire: -1, box: ours.map(() => 0), over: false, bench: bench.slice(), benchEnergy: bench.map(() => 1), defIQ };
 }
 
 /**
@@ -63,7 +65,7 @@ function substitute(g: HoopsGame): void {
 }
 
 export function startPossession(g: HoopsGame): Possession {
-  const p = newPossession(g.ours, g.theirs, g.energy, rng(hashString('h2:' + g.seed + ':' + g.done)));
+  const p = newPossession(g.ours, g.theirs, g.energy, rng(hashString('h2:' + g.seed + ':' + g.done)), g.defIQ);
   p.fire = g.fire;
   return p;
 }

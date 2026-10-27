@@ -98,7 +98,7 @@ function act(b: Body, a: Act, t: number) {
  * Line up a play at the line of scrimmage `los`, the ball at `x` (back to the near hash after a
  * play ends wide). The defense calls man (Cover 1) or zone (Cover 3).
  */
-export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept, run: RunPlay, los: number, x: number, rand: () => number): Play {
+export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept, run: RunPlay, los: number, x: number, rand: () => number, defIQ = 0): Play {
   const bx = clamp(x, HASH_L, HASH_R);
   const bodies: Body[] = [];
   let id = 0;
@@ -158,7 +158,8 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     d.mark = blk.id;
     const move = Math.max(d.p.a.PMV ?? 55, d.p.a.FMV ?? 55);
     const edge = (move - (blk.p.a.PBK ?? 60)) / 100;
-    d.winAt = Math.max(1.5, WIN_AT - edge * 3 + gauss(rand) * 0.45 + (i === 1 || i === 2 ? 0.25 : 0));
+    // (a smarter defense gets home a little sooner)
+    d.winAt = Math.max(1.5, WIN_AT - edge * 3 + gauss(rand) * 0.45 + (i === 1 || i === 2 ? 0.25 : 0) - 0.2 * defIQ);
   });
   const play: Play = {
     t: 0,
@@ -188,6 +189,7 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     stamina: 1,
     used: {},
     hole: bx + HOLE[run],
+    defIQ,
   };
   // routes (drawn before the snap so the player can read the play)
   const routes = CONCEPT_ROUTES[concept];
@@ -224,11 +226,11 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     TE.route = [];
     TE.job = 'block';
     for (const lb of [lbW, lbM, lbS]) {
-      lb.misread = rand() < lerp(0.3, 0.06, rt(lb.p.a.PRC));
-      lb.readUntil = lerp(0.9, 0.45, rt(lb.p.a.PRC)) + rand() * 0.3 + (lb.misread ? 0.45 : 0);
+      lb.misread = rand() < lerp(0.3, 0.06, rt(lb.p.a.PRC)) * (1 - 0.5 * defIQ);
+      lb.readUntil = (lerp(0.9, 0.45, rt(lb.p.a.PRC)) + rand() * 0.3) * (1 - 0.2 * defIQ) + (lb.misread ? 0.45 : 0);
     }
     // the secondary plays the pass until it sees the handoff for what it is
-    for (const db of [cb1, cb2, fs, ss]) db.readUntil = 0.45 + lerp(0.7, 0.25, rt(db.p.a.PRC)) + rand() * 0.25;
+    for (const db of [cb1, cb2, fs, ss]) db.readUntil = (0.45 + lerp(0.7, 0.25, rt(db.p.a.PRC)) + rand() * 0.25) * (1 - 0.2 * defIQ);
   }
   return play;
 }
@@ -343,7 +345,7 @@ export function throwTo(p: Play, to: Pt): boolean {
     if (near < 15 && b.job !== 'rush') {
       // a sharp defender breaks on the ball sooner
       const read = rt(b.p.a.PRC, 45, 99) * 0.5 + rt(b.p.a.ZCV ?? b.p.a.MCV, 45, 99) * 0.5;
-      b.breakAt = p.t + lerp(0.6, 0.22, read) + r() * 0.15 + near * 0.015;
+      b.breakAt = p.t + lerp(0.6, 0.22, read) * (1 - 0.2 * p.defIQ) + r() * 0.15 + near * 0.015;
     }
   }
   return true;
@@ -436,7 +438,7 @@ export function step(p: Play, dt: number, steer: number | null) {
     b.trail.push({ x: b.x, y: b.y });
     if (b.trail.length > 40) b.trail.shift();
   }
-  const lagOf = (b: Body) => Math.round(lerp(18, 4, rt(b.p.a.PRC, 45, 99) * 0.4 + rt(b.p.a.MCV ?? b.p.a.ZCV, 45, 99) * 0.6) * (60 * dt));
+  const lagOf = (b: Body) => Math.round(lerp(18, 4, rt(b.p.a.PRC, 45, 99) * 0.4 + rt(b.p.a.MCV ?? b.p.a.ZCV, 45, 99) * 0.6) * (1 - 0.25 * p.defIQ) * (60 * dt));
   const seen = (b: Body, by: Body): Pt => b.trail[Math.max(0, b.trail.length - 1 - lagOf(by))] ?? b;
   const seenVel = (b: Body, by: Body): Pt => {
     const i = Math.max(1, b.trail.length - 1 - lagOf(by));
@@ -698,12 +700,12 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
       const deep = at.y - p.los;
       const cover = rt(b.p.a.MCV, 45, 99);
       const burn = clamp((speedOf(m.p) - speedOf(b.p)) / 2.5, -0.5, 1);
-      const cushion = lerp(2.8, 1.2, cover) + (deep > 12 ? lerp(1.4, 0.5, cover) + burn * 0.8 : 0);
+      const cushion = Math.max(0.8, lerp(2.8, 1.2, cover) - 0.3 * p.defIQ) + (deep > 12 ? lerp(1.4, 0.5, cover) + burn * 0.8 : 0);
       let ty = Math.max(at.y + cushion, p.los + 0.5);
       // lined up off him: while he comes up the field the defender keeps his depth and backpedals,
       // never coming downhill into his man; when the route breaks, he drives on it
       if (m.vy > 2.5 && b.y > ty) ty = Math.min(b.y, at.y + cushion + 7);
-      steerTo(b, at.x + m.vx * 0.22, ty, sp, dt, lerp(12, 19, cover));
+      steerTo(b, at.x + m.vx * 0.22, ty, sp, dt, lerp(12, 19, cover) + 2 * p.defIQ);
     }
     act(b, 'backpedal', t);
     move(b, dt);
@@ -713,7 +715,7 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
     // drop to the landmark, then sit on the nearest receiver who comes into the zone; a deep third
     // carries the deepest man in his third as far as he goes (nobody gets behind him)
     const z = b.zone;
-    const read = rt(b.p.a.ZCV, 45, 99);
+    const read = clamp(rt(b.p.a.ZCV, 45, 99) + 0.15 * p.defIQ, 0, 1);
     const deep = z.y - p.los >= 15;
     const mine = p.bodies.filter((o) => o.side === 'O' && !isLine(o) && o !== qb && (deep ? Math.abs(o.x - z.x) < 10 && o.y > z.y - 9 : dist(o, z) < 9));
     const threat = deep ? mine.sort((a1, a2) => a2.y - a1.y)[0] : mine.sort((a1, a2) => dist(a1, z) - dist(a2, z))[0];
@@ -752,7 +754,7 @@ function tackle(p: Play, d: Body, c: Body) {
   const help = p.bodies.some((o) => o !== d && o.side === 'D' && p.t >= o.stunUntil && p.t >= o.heldUntil && dist(o, c) < 1.6);
   const tak = rt(d.p.a.TAK, 40, 99);
   const btk = rt(c.p.a.BTK, 40, 99);
-  let pt = 0.76 + 0.2 * tak - 0.26 * btk + (help ? 0.16 : 0);
+  let pt = 0.76 + 0.2 * tak - 0.26 * btk + (help ? 0.16 : 0) + 0.03 * p.defIQ;
   if (m) {
     // the move against this tackler: a juke against his pursuit, a spin, a stiff arm or a truck against his tackling
     const v = m.kind === 'juke' ? c.p.a.JKM : m.kind === 'spin' ? c.p.a.SPM : m.kind === 'stiff' ? c.p.a.SFA : c.p.a.TRK;

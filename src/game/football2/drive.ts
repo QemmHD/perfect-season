@@ -23,6 +23,8 @@ export interface Game {
   def: Defense;
   seed: string;
   drives: number;
+  /** how well the defense plays beyond its ratings (Squad Battles' difficulty; 0 standard) */
+  defIQ: number;
   drive: number;
   playNo: number;
   down: number;
@@ -49,8 +51,8 @@ export const FIRE_AT = 3;
 
 const RUNS: RunPlay[] = ['inside', 'outside', 'power'];
 
-export function newGame(off: Offense, def: Defense, seed: string, drives = DRIVES): Game {
-  const g: Game = { off, def, seed, drives, drive: 0, playNo: 0, down: 1, toGo: 10, ballOn: START, ballX: 26.67, score: 0, ends: [], over: false, concept: 'slants', conceptNo: 0, run: 'inside', plays: 0, streak: 0, fire: false, clock: drives <= 1 ? CLOCK : null };
+export function newGame(off: Offense, def: Defense, seed: string, drives = DRIVES, defIQ = 0): Game {
+  const g: Game = { off, def, seed, drives, drive: 0, playNo: 0, down: 1, toGo: 10, ballOn: START, ballX: 26.67, score: 0, ends: [], over: false, concept: 'slants', conceptNo: 0, run: 'inside', plays: 0, streak: 0, fire: false, clock: drives <= 1 ? CLOCK : null, defIQ };
   g.concept = conceptFor(g, 0);
   g.run = runFor(g);
   return g;
@@ -101,7 +103,7 @@ export function startChoice(g: Game, c: PlayChoice): Play {
 
 export function startPlay(g: Game, call: Call): Play {
   const r = rng(hashString('play:' + g.seed + ':' + g.drive + ':' + g.playNo));
-  const p = lineUp(g.off, g.def, call, g.concept, g.run, g.ballOn, g.ballX, r);
+  const p = lineUp(g.off, g.def, call, g.concept, g.run, g.ballOn, g.ballX, r, g.defIQ);
   p.fire = g.fire;
   return p;
 }

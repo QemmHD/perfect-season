@@ -165,6 +165,11 @@ export interface Possession {
   /** a finish at the rim under way (gather, then up) */
   finish: { kind: ShotKind; t0: number; tUp: number; target: number | null } | null;
   end: PossEnd | null;
+  /**
+   * How well the defense plays, beyond its ratings (Squad Battles' difficulty): 0 the standard, up
+   * to 1 (reads sooner, stays closer, recovers and helps faster, jumps more passes), below 0 looser.
+   */
+  defIQ: number;
   events: string[];
   rand: () => number;
   /** the last shot: for the HUD (contest grade, release, result) */

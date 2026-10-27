@@ -78,6 +78,7 @@ export function Arcade({
   online,
   botLevel,
   aiSkill,
+  aiDefense = 0,
   rivalLive: wire,
   rivalGone,
   tookMe,
@@ -97,6 +98,8 @@ export function Arcade({
   botLevel: BotLevel;
   /** against the AI: how sharp it plays (0-1), in place of its level's */
   aiSkill?: number;
+  /** against the AI: how well its defense plays beyond its ratings (Squad Battles' difficulty; 0 standard) */
+  aiDefense?: number;
   /** online: the other phone's progress, as last heard (from the wire: checked here) */
   rivalLive: { score: number; drive: number; done: boolean; ends: string[]; plays?: number } | null;
   /** online: the other phone has gone quiet (or left) */
@@ -333,8 +336,8 @@ export function Arcade({
   }
   if (!NFL) {
     const k = kits ?? kitsFor(null, null, 'nba');
-    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={online ? 0 : aiDefense} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
   }
   const k = kits ?? kitsFor(null, null, 'nfl');
-  return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={online ? 0 : aiDefense} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
 }

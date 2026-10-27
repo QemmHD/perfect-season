@@ -58,7 +58,7 @@ function body(idx: number, side: 'O' | 'D', p: Hooper, at: Pt, mark: number, ene
  * A new possession: the point guard (or whoever is first) brings it over the top, the others in
  * their spots, each guarded by the defender at the same index.
  */
-export function newPossession(ours: Hooper[], theirs: Hooper[], energy: number[], rand: () => number): Possession {
+export function newPossession(ours: Hooper[], theirs: Hooper[], energy: number[], rand: () => number, defIQ = 0): Possession {
   const bodies: Body[] = [];
   ours.forEach((p, i) => {
     const s = SPOTS[p.pos] ?? DRIFT[i];
@@ -75,7 +75,7 @@ export function newPossession(ours: Hooper[], theirs: Hooper[], energy: number[]
     bodies.push(b);
   });
   const scheme = schemeFor(ours, rand);
-  return { t: 0, clock: SHOT_CLOCK, bodies, handler: 0, ball: null, meter: null, finish: null, end: null, events: ['scheme:' + scheme], rand, lastShot: null, passes: 0, fire: -1, target: null, scheme, trapper: null, trapped: false, sprinting: false };
+  return { t: 0, clock: SHOT_CLOCK, bodies, handler: 0, ball: null, meter: null, finish: null, end: null, defIQ, events: ['scheme:' + scheme], rand, lastShot: null, passes: 0, fire: -1, target: null, scheme, trapper: null, trapped: false, sprinting: false };
 }
 
 /**
@@ -559,7 +559,7 @@ export function crossover(p: Possession, dir: number) {
   const def = p.bodies.find((d) => d.side === 'D' && d.mark === h.idx);
   if (!def || dist(def, h) > 6) return;
   const edge = (h.p.hnd - def.p.prd) / 100;
-  const shake = clamp(0.12 + edge * 0.7 + (has(h.p, 'ankle-breaker') ? 0.1 : 0) - (has(def.p, 'clamps') ? 0.1 : 0), 0.04, 0.5);
+  const shake = clamp(0.12 + edge * 0.7 + (has(h.p, 'ankle-breaker') ? 0.1 : 0) - (has(def.p, 'clamps') ? 0.1 : 0) - 0.1 * p.defIQ, 0.04, 0.5);
   if (r() < shake) {
     const dropped = has(h.p, 'ankle-breaker') && r() < 0.22;
     def.stunUntil = p.t + (dropped ? 1.9 : 0.85);
@@ -582,7 +582,7 @@ function shakeMan(p: Possession, h: Body, bonus: number) {
   if (!def || dist(def, h) > 6) return;
   const r = p.rand;
   const edge = (h.p.hnd - def.p.prd) / 100;
-  const shake = clamp(0.1 + bonus + edge * 0.7 + (has(h.p, 'ankle-breaker') ? 0.1 : 0) - (has(def.p, 'clamps') ? 0.1 : 0), 0.04, 0.55);
+  const shake = clamp(0.1 + bonus + edge * 0.7 + (has(h.p, 'ankle-breaker') ? 0.1 : 0) - (has(def.p, 'clamps') ? 0.1 : 0) - 0.1 * p.defIQ, 0.04, 0.55);
   if (r() < shake) {
     const dropped = has(h.p, 'ankle-breaker') && r() < 0.22;
     def.stunUntil = p.t + (dropped ? 1.9 : 0.85);
@@ -778,11 +778,11 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
         ball.tried ??= [];
         for (const d of p.bodies) {
           if (d.side !== 'D' || t < d.stunUntil || ball.tried.includes(d.idx)) continue;
-          if (dist(d, at) < (ball.kind === 'lob' ? 1.1 : 1.4)) {
+          if (dist(d, at) < (ball.kind === 'lob' ? 1.1 : 1.4) + 0.25 * p.defIQ) {
             ball.tried.push(d.idx);
             const passer = p.bodies.find((b) => b.side === 'O' && b.act === 'pass');
             const dimer = passer && has(passer.p, 'dimer') ? 0.6 : 1;
-            if (r() < (0.03 + 0.16 * rate(d.p.stl, 40, 99)) * dimer * (ball.kind === 'lob' ? 0.5 : 1)) {
+            if (r() < (0.03 + 0.16 * rate(d.p.stl, 40, 99)) * dimer * (ball.kind === 'lob' ? 0.5 : 1) * (1 + 0.6 * p.defIQ)) {
               end(p, 'int', 0, 'PICKED OFF BY ' + d.p.tag, ball.who);
               return;
             }
@@ -869,8 +869,10 @@ function defend(p: Possession, b: Body, handler: Body | null, ballAt: Pt, inside
   const t = p.t;
   const r = p.rand;
   const man = p.bodies[b.mark];
+  // how well this defense plays (the difficulty): sooner reads, tighter gaps, quicker recoveries
+  const iq = p.defIQ;
   // a weaker defender reads late
-  const lag = Math.round(lerp(14, 4, rate(b.p.prd, 40, 99)) * (60 * dt));
+  const lag = Math.round(lerp(14, 4, rate(b.p.prd, 40, 99)) * (1 - 0.35 * iq) * (60 * dt));
   const seen = man.trail[Math.max(0, man.trail.length - 1 - lag)] ?? man;
   const onBall = man === handler;
   const trapping = p.trapper === b.idx && !!handler;
@@ -894,12 +896,12 @@ function defend(p: Possession, b: Body, handler: Body | null, ballAt: Pt, inside
     const toRim = unit({ cx: RIM.cx - seen.cx, cz: RIM.cz - seen.cz });
     // the cushion: a sagging defense plays off a man who can't shoot and packs the paint
     const sagOff = p.scheme === 'sag' ? (onBall ? (man.p.thr < 72 ? 2.2 : 0.8) : 2.4) : 0;
-    const gap = (onBall ? lerp(4.4, 2.5, rate(b.p.prd, 40, 99)) : 4.5 + Math.min(4.5, dist(seen, ballAt) * 0.13)) + sagOff;
+    const gap = Math.max(1.8, (onBall ? lerp(4.4, 2.5, rate(b.p.prd, 40, 99)) - 0.8 * iq : 4.5 + Math.min(4.5, dist(seen, ballAt) * 0.13) - iq) + sagOff);
     const sag = onBall ? { cx: 0, cz: 0 } : unit({ cx: ballAt.cx - seen.cx, cz: ballAt.cz - seen.cz });
     target = { cx: seen.cx + toRim.cx * gap + sag.cx * 1.3, cz: seen.cz + toRim.cz * gap + sag.cz * 1.3 };
   }
   const closing = p.meter && handler && closest(p, handler).d === b;
-  steer(b, target.cx, target.cz, topSpeed(b, false) * (closing ? 1.15 : onBall ? 1 : 0.94) * (beaten ? 0.78 : 1), dt);
+  steer(b, target.cx, target.cz, topSpeed(b, false) * (closing ? 1.15 + 0.15 * iq : onBall ? 1 : 0.94) * (beaten ? 0.78 + 0.1 * iq : 1) * (1 + 0.05 * iq), dt);
   move(b, dt);
   if (b.act === 'contest' || b.act === 'block' || b.act === 'stumble') {
     if (t - b.actAt > 0.75 && b.h === 0) act(b, 'defend', t);
@@ -907,7 +909,7 @@ function defend(p: Possession, b: Body, handler: Body | null, ballAt: Pt, inside
   b.face = Math.atan2(ballAt.cz - b.cz, ballAt.cx - b.cx);
   // reaching in on the dribble: a thief against a loose handle
   if ((onBall || trapping) && handler && !p.meter && !p.finish && !p.ball && dist(b, handler) < 2.6) {
-    const chance = dt * (trapping ? 0.2 : 0.13) * rate(b.p.stl, 30, 99) * (1.15 - rate(handler.p.hnd, 30, 99));
+    const chance = dt * (trapping ? 0.2 : 0.13) * rate(b.p.stl, 30, 99) * (1.15 - rate(handler.p.hnd, 30, 99)) * (1 + 0.6 * iq);
     if (r() < chance) end(p, 'steal', 0, 'STRIPPED BY ' + b.p.tag, handler.idx);
   }
 }
@@ -943,7 +945,8 @@ function helpDefender(p: Possession, h: Body): Body | null {
       best = d;
     }
   }
-  return score < 12 ? best : null;
+  // a smarter defense comes over from further
+  return score < 12 + 2 * p.defIQ ? best : null;
 }
 
 function nearestDrift(b: Body): Pt {

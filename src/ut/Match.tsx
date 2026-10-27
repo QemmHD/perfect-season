@@ -68,7 +68,7 @@ interface Setup {
   /** the AI: a ladder rung (i from 0), or the squad that stepped in for a no-show (i = -1) */
   rung: Rung | null;
   /** Squad Battles: the difficulty's name and what it pays (times the coins) */
-  level?: { name: string; pay: number };
+  level?: { name: string; pay: number; def: number };
 }
 
 interface OppView {
@@ -209,7 +209,7 @@ export default function UtMatch(props: {
       setStage('error');
       return;
     }
-    setSetup({ seed: 'ut:' + SPORT + ':' + week + ':' + (bt.round ?? 0) + ':' + level + ':' + rung.i + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, level: { name: LEVEL_NAME[level], pay: LEVEL[level].pay } });
+    setSetup({ seed: 'ut:' + SPORT + ':' + week + ':' + (bt.round ?? 0) + ':' + level + ':' + rung.i + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, level: { name: LEVEL_NAME[level], pay: LEVEL[level].pay, def: LEVEL[level].def } });
     setStage('vs');
   }, [pool, me, stage]);
 
@@ -359,6 +359,7 @@ export default function UtMatch(props: {
           online={!!setup.online}
           botLevel="pro"
           aiSkill={aiSkill}
+          aiDefense={setup.online ? 0 : (setup.level?.def ?? 0)}
           rivalLive={setup.online ? (opp?.arcade ?? null) : null}
           rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
           tookMe={setup.online ? (opp?.arcadeTook ?? null) : null}

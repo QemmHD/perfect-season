@@ -64,6 +64,7 @@ export function Hoops2({
   rivalName,
   seed,
   possessions = POSSESSIONS,
+  defIQ = 0,
   rival,
   ourKit,
   theirKit,
@@ -83,6 +84,8 @@ export function Hoops2({
   rivalName: string;
   seed: string;
   possessions?: number;
+  /** how well the rival defends beyond its ratings (Squad Battles' difficulty; 0 standard) */
+  defIQ?: number;
   rival: RivalLive | null;
   ourKit: Kit;
   theirKit: Kit;
@@ -104,7 +107,7 @@ export function Hoops2({
       live = false;
     };
   }, []);
-  const game = useMemo<HoopsGame | null>(() => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench) : null), [attrs]);
+  const game = useMemo<HoopsGame | null>(() => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench, defIQ) : null), [attrs]);
   const renderer = useMemo(() => new HoopsRenderer(court, [ourKit, theirKit]), []);
   useEffect(() => () => renderer.dispose(), []);
   const possRef = useRef<Possession | null>(null);
@@ -651,8 +654,8 @@ export function aiPossessions2(rivalLineup: Lineup, yourLineup: Lineup, seed: st
 }
 
 /** The same from the teams themselves (Ultimate Team): one five on offense, with its bench, against the other. */
-export function aiPossessionsOf(offense: Hooper[], defense: Hooper[], seed: string, skill: number, possessions = POSSESSIONS, bench: Hooper[] = []): Progress {
-  const g = newHoopsGame(offense, defense, 'ai:' + seed, possessions, bench);
+export function aiPossessionsOf(offense: Hooper[], defense: Hooper[], seed: string, skill: number, possessions = POSSESSIONS, bench: Hooper[] = [], defIQ = 0): Progress {
+  const g = newHoopsGame(offense, defense, 'ai:' + seed, possessions, bench, defIQ);
   autoplay(g, skill, 'ai:' + seed);
   return { score: g.score, drive: g.done, done: true, ends: g.marks.slice(), plays: g.done };
 }

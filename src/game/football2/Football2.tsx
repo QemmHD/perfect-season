@@ -77,6 +77,7 @@ export function Football2({
   rivalName,
   seed,
   drives = DRIVES,
+  defIQ = 0,
   rival,
   ourKit,
   theirKit,
@@ -95,6 +96,8 @@ export function Football2({
   rivalName: string;
   seed: string;
   drives?: number;
+  /** how well the rival defends beyond its ratings (Squad Battles' difficulty; 0 standard) */
+  defIQ?: number;
   rival: RivalLive | null;
   ourKit: FbKit;
   theirKit: FbKit;
@@ -117,7 +120,7 @@ export function Football2({
       live = false;
     };
   }, []);
-  const game = useMemo<Game | null>(() => (attrs ? newGame(offense ?? offenseOf(lineup!, attrs, seed), rivalDefense ?? defenseOf(rivalLineup!, attrs, 'def:' + seed), seed, drives) : null), [attrs]);
+  const game = useMemo<Game | null>(() => (attrs ? newGame(offense ?? offenseOf(lineup!, attrs, seed), rivalDefense ?? defenseOf(rivalLineup!, attrs, 'def:' + seed), seed, drives, defIQ) : null), [attrs]);
   const renderer = useMemo(() => new FootballRenderer(field, [ourKit, theirKit]), []);
   useEffect(() => () => renderer.dispose(), []);
   const playRef = useRef<Play | null>(null);
@@ -930,8 +933,8 @@ export function aiDrives2(rivalLineup: Lineup, yourLineup: Lineup, seed: string,
 }
 
 /** The same from the teams themselves (Ultimate Team): one side's offense against the other's defense. */
-export function aiDrivesOf(offense: Offense, defense: Defense, seed: string, skill: number, drives = DRIVES): Progress {
-  const g = newGame(offense, defense, 'ai:' + seed, drives);
+export function aiDrivesOf(offense: Offense, defense: Defense, seed: string, skill: number, drives = DRIVES, defIQ = 0): Progress {
+  const g = newGame(offense, defense, 'ai:' + seed, drives, defIQ);
   autoplay(g, skill, 'ai:' + seed);
   return { score: g.score, drive: g.drive, done: true, ends: wireEnds(g), plays: g.plays };
 }

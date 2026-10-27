@@ -97,12 +97,12 @@ export function Battles(props: {
       </div>
       <p className="utb-level-note">
         {level === 'rookie'
-          ? 'Weaker squads and a slower AI. Pays less.'
+          ? 'Weaker squads, a slower AI and a looser defense. Pays less.'
           : level === 'pro'
             ? 'The standard ladder.'
             : level === 'allstar'
-              ? 'Better squads and a sharper AI. Gold and Premium packs on the way up.'
-              : 'All-time squads and the best AI. Four packs up the ladder, two of them Premium.'}{' '}
+              ? 'Better squads, a sharper AI and a tighter defense. Gold and Premium packs on the way up.'
+              : 'All-time squads, the best AI and a lockdown defense. Four packs up the ladder, two of them Premium.'}{' '}
         Changing it starts its ladder from the bottom.
       </p>
 

@@ -137,6 +137,12 @@ export interface Play {
   used: Partial<Record<Move, number>>;
   /** across the field, the hole a run is blocked for */
   hole: number;
+  /**
+   * How well the defense plays, beyond its ratings (Squad Battles' difficulty): 0 the standard, up
+   * to 1 (reads and breaks on the ball sooner, covers tighter, gets home faster, misreads runs less),
+   * below 0 looser.
+   */
+  defIQ: number;
   slowUntil: number;
   /** pressure on the quarterback right now (0-1), for the HUD and the throw */
   pressure: number;

@@ -101,7 +101,9 @@ always agree.
 
 - **Vs AI challenges (Squad Battles):** ladders of 8 themed AI squads of increasing overall.
   Example: rung 1 the '70s Nuggets, the top an all-time team. Beat all eight and the next ladder
-  comes up. Four difficulties move every squad's overall and the AI's play, and what it pays:
+  comes up. Four difficulties move every squad's overall, the AI's play on offense, how well its
+  defense plays (reads, closeouts, help, steals; in football coverage, the rush and run fits), and
+  what it pays:
   Rookie (weaker, x0.6 coins, Bronze and Silver packs), Pro (the standard, Silver and Gold),
   All-Star (better, x1.5, Gold and Premium), Legend (all-time squads, x2.2, four packs, two of
   them Premium). Changing difficulty starts that ladder from the bottom. Games pay, rung packs
