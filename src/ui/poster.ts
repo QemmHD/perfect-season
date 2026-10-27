@@ -10,7 +10,7 @@ import { type Player, type Slot, SLOTS } from '../engine/types';
 import type { ResultInfo } from './Results';
 import { eraOf, type Era } from './Card';
 import { initials } from './common';
-import { cardName, isDefense } from './sportui';
+import { cardName } from './sportui';
 
 const W = 1080;
 const H = 1350;
@@ -25,7 +25,6 @@ const GRADE_COLOR: Record<PickGrade, string> = { best: '#19e3c9', great: '#6fe8b
 const JERSEY = {
   nfl: ['M30 10 Q50 20 70 10 L92 22 L98 48 L80 52 L78 40 L78 94 H22 L22 40 L20 52 L2 48 L8 22 Z', 'M30 10 Q50 26 70 10', 'M86 30 L95 40 M14 30 L5 40'],
   nba: ['M30 6 L38 6 Q50 24 62 6 L70 6 Q72 22 84 30 L84 96 H16 L16 30 Q28 22 30 6 Z', 'M38 6 Q50 24 62 6 M30 6 Q28 22 16 30 M70 6 Q72 22 84 30'],
-  def: ['M50 6 L86 18 V48 C86 72 70 86 50 95 C30 86 14 72 14 48 V18 Z', 'M50 16 L76 25 V48 C76 66 65 77 50 84 C35 77 24 66 24 48 V25 Z'],
 };
 
 const disp = (size: number, weight = 900) => 'italic ' + weight + ' ' + size + "px 'Archivo', 'Arial Narrow', sans-serif";
@@ -306,9 +305,10 @@ function stamp(g: CanvasRenderingContext2D, text: string, x: number, y: number) 
 function hand(g: CanvasRenderingContext2D, players: { slot: Slot; p: Player }[], daily: boolean, info: ResultInfo) {
   const n = players.length;
   if (!n) return;
-  const cw = n > 5 ? 206 : 238;
+  const cw = n > 6 ? 196 : n > 5 ? 206 : 238;
   const ch = Math.round(cw * 1.405);
-  const step = n > 5 ? 152 : 184;
+  // football's eight fan out tighter, edge to edge
+  const step = n > 6 ? Math.floor((W - 72 - cw) / (n - 1)) : n > 5 ? 152 : 184;
   const mid = (n - 1) / 2;
   const cy = 880;
   const grades: Partial<Record<Slot, PickGrade>> = {};
@@ -378,8 +378,7 @@ function card(g: CanvasRenderingContext2D, p: Player, slot: Slot, w: number, h: 
   const artH = bh - plateH;
   pattern(g, era, p, bx, by, bw, artH, s);
 
-  // the jersey (or a defense's shield)
-  const def = isDefense(p);
+  // the jersey
   const jw = bw * 0.74;
   const jx = bx + (bw - jw) / 2;
   const jy = by + artH - jw * 0.9;
@@ -389,26 +388,26 @@ function card(g: CanvasRenderingContext2D, p: Player, slot: Slot, w: number, h: 
   g.shadowColor = 'rgba(0,0,0,0.5)';
   g.shadowBlur = 8;
   g.shadowOffsetY = 5;
-  const paths = def ? JERSEY.def : NFL ? JERSEY.nfl : JERSEY.nba;
+  const paths = NFL ? JERSEY.nfl : JERSEY.nba;
   g.fillStyle = era === 'vintage' ? mix(p.c1, '#8a6b45', 0.15) : p.c1;
   g.fill(new Path2D(paths[0]));
   g.shadowColor = 'transparent';
-  g.strokeStyle = def ? p.c2 : 'rgba(0,0,0,0.35)';
-  g.lineWidth = def ? 5 : 1.5;
+  g.strokeStyle = 'rgba(0,0,0,0.35)';
+  g.lineWidth = 1.5;
   g.lineJoin = 'round';
   g.stroke(new Path2D(paths[0]));
-  g.strokeStyle = def ? 'rgba(255,255,255,0.28)' : p.c2;
-  g.lineWidth = def ? 2 : 5;
+  g.strokeStyle = p.c2;
+  g.lineWidth = 5;
   if (paths[1]) g.stroke(new Path2D(paths[1]));
   if (paths[2]) g.stroke(new Path2D(paths[2]));
   g.textAlign = 'center';
-  g.font = disp(def ? 28 : 34);
-  const num = def ? p.abbr.slice(0, 3) : initials(p.name);
+  g.font = disp(34);
+  const num = initials(p.name);
   g.lineWidth = 3.2;
   g.strokeStyle = p.c2;
-  g.strokeText(num, 50, def ? 60 : 74);
+  g.strokeText(num, 50, 74);
   g.fillStyle = '#fff';
-  g.fillText(num, 50, def ? 60 : 74);
+  g.fillText(num, 50, 74);
   g.restore();
 
   // the name plate

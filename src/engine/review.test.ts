@@ -53,7 +53,8 @@ describe('draft report', () => {
     for (const a of CELLS)
       for (const p of a.players)
         for (const b of CELLS) {
-          const q = b.id !== a.id && b.players.find((x) => x.pid === p.pid);
+          // at the same spot (a linebacker who became a lineman can't trade for himself)
+          const q = b.id !== a.id && b.players.find((x) => x.pid === p.pid && x.pos[0] === p.pos[0]);
           if (q && q.val - p.val > (found?.gap ?? 12)) found = { a, b, pid: p.pid, gap: q.val - p.val };
         }
     expect(found).not.toBeNull();

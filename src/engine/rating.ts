@@ -33,14 +33,17 @@ const NBA_CURVE: [number, number][] = [
 
 // ---------- football ----------
 
-/** Football values are already in one currency (see scripts/build_nfl_data.py): each part counts once. */
+/**
+ * Football values are already in one currency (see scripts/build_nfl_data.py): each part counts
+ * once. Defense is the three defenders' values together (DL, LB and DB).
+ */
 const NFL_W: Line = { pass: 1, rush: 1, recv: 1, def: 1 };
 
 /**
  * About the 97th percentile of skilled drafts in passing, rushing, receiving and defense, and in
  * rushing plus receiving together (src/engine/sim.test.ts, CALIB=1).
  */
-const NFL_BENCHMARK = { pass: 23.2, rush: 38.3, recv: 70.7, def: 23.5, skill: 89.7 };
+const NFL_BENCHMARK = { pass: 23.2, rush: 39.6, recv: 72.3, def: 68.6, skill: 92.5 };
 
 /**
  * Win curve for a 17-game season, from simulated drafts like basketball's: random picks have
@@ -49,16 +52,16 @@ const NFL_BENCHMARK = { pass: 23.2, rush: 38.3, recv: 70.7, def: 23.5, skill: 89
  */
 const NFL_CURVE: [number, number][] = [
   [0, 0],
-  [51.1, 4],
-  [64, 6],
-  [76.9, 8],
-  [99.1, 11],
-  [107.7, 12],
-  [117.6, 13],
-  [126.5, 16],
-  [133, 16.5],
-  // 16.5 rounds up, so 133 is already 17-0; a real 17-win team is rated where 17-0 starts
-  [133.1, 17],
+  [70.8, 4],
+  [85.2, 6],
+  [99.9, 8],
+  [143.5, 11],
+  [153.8, 12],
+  [164.8, 13],
+  [174.4, 16],
+  [179.4, 16.5],
+  // 16.5 rounds up, so 179.4 is already 17-0; a real 17-win team is rated where 17-0 starts
+  [179.5, 17],
 ];
 
 export const W: Line = NFL ? NFL_W : NBA_W;
@@ -129,6 +132,11 @@ export function rateTeam(players: (Player | null | undefined)[]): TeamRating {
     if (!p) continue;
     for (const k in W) totals[k] += p.r[k] ?? 0;
   }
+  return rateTotals(totals);
+}
+
+/** Scores a lineup from its rated lines added up, as rateTeam does (the result keeps `totals`). */
+export function rateTotals(totals: Line): TeamRating {
   const base = lineValue(totals);
   const ratios = ratiosOf(totals);
   const capped = balanceParts(totals, ratios).map((r) => Math.min(r, 1.25));

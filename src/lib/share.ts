@@ -19,9 +19,8 @@ export function shareText(r: RunRecord, dailyNo: number | null): string {
 /** Surnames of more than one word that the particle rule can't tell from a middle name. */
 const SURNAMES = ['Randle El', 'Mbah a Moute', 'Bon Salle', 'van Breda Kolff', 'World Peace'];
 
-/** A player's short name: the last name with its St. or Van and without Jr. A football defense goes by its team: "Bears D". */
+/** A player's short name: the last name with its St. or Van and without Jr. */
 export function lastName(n: string): string {
-  if (/ Defense$/.test(n)) return n.replace(/ Defense$/, ' D');
   const base = n.replace(/\s*\([^)]*\)\s*$/, '');
   const known = SURNAMES.find((x) => base.endsWith(' ' + x));
   if (known) return known;

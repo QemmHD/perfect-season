@@ -1,5 +1,5 @@
 // The game told as it happens must agree with the result: run for both sports (npm test).
-import { castGame, footballPlays, winProb } from './broadcast';
+import { asOpponent, castGame, footballPlays, winProb } from './broadcast';
 import { CELLS, PLAYOFF_TEAMS } from './data';
 import { NFL } from './sport';
 import { emptyLineup, SLOTS } from './types';
@@ -71,5 +71,26 @@ describe('broadcast', () => {
       expect(castGame({ lineup: l, opp, won, score, pre: 0.3 + (i % 7) / 10, seed: 'test:' + i }).events.map((e) => e.text)).toEqual(g.events.map((e) => e.text));
     }
     expect(clutch).toBeGreaterThan(5);
+  });
+  it.runIf(NFL)('names the defenders who make the plays, on both sides', () => {
+    const l = lineup();
+    const ours = ['DL', 'LB', 'DB'].map((k) => l[k]!.name.split(' ').pop()!);
+    const bears = PLAYOFF_TEAMS.find((t) => t.year === '1985' && t.team === 'Chicago Bears')!;
+    const theirs = bears.def!.map((p) => p.name.split(' ').pop()!);
+    const texts: string[] = [];
+    for (let i = 0; i < 300; i++) {
+      const won = i % 2 === 0;
+      const g = castGame({ lineup: l, opp: bears, won, score: won ? [20, 17] : [17, 20], pre: 0.5, seed: 'd:' + i });
+      texts.push(...g.events.map((e) => e.text));
+    }
+    const all = texts.join(' | ');
+    expect(ours.some((n) => all.includes(n + ' sack'))).toBe(true);
+    expect(theirs.some((n) => all.includes(n + ' sack') || all.includes(n + ' breaks up'))).toBe(true);
+    expect(all).toMatch(/pick-six|to the house|falls on it/);
+    // a drafted lineup as a head-to-head rival brings its defenders along
+    const rival = asOpponent(l, 'Rival', 'RIV', ['#000', '#fff']);
+    expect(rival.def!.map((p) => p.pos)).toEqual(['DL', 'LB', 'DB']);
+    expect(rival.def!.length).toBe(3);
+    expect(rival.five.some((p) => ['DL', 'LB', 'DB'].includes(p.pos))).toBe(false);
   });
 });

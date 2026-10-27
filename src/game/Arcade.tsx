@@ -104,7 +104,6 @@ export function Arcade({
     const ends = wire.ends.filter((e) => owns(e)).slice(0, TOTAL);
     return { score: pointsThrough({ score: 0, drive: 0, done: false, ends }, TOTAL), drive: ends.length, done: wire.done && ends.length >= TOTAL, ends, plays: wire.plays ?? 0 };
   }, [wire?.done, wire?.plays, wire?.ends.join()]);
-  const rivalDef = (rivalLineup.DEF as Player | null) ?? null;
   // the AI's side, played up front (its offense against your defense)
   const aiPlay = (off: Lineup, def: Lineup, s: string, skill: number, a: (p: Player) => Attrs | null): Progress =>
     NFL ? aiDrives2(off, def, s, skill, a) : aiPossessions2(off, def, s, skill, a);
@@ -240,7 +239,7 @@ export function Arcade({
     return (
       <div className="arc-kick">
         <span className="eyebrow">Head to head · kickoff</span>
-        <h1 className="disp">YOUR OFFENSE VS {(rivalDef?.teamName ?? rivalName).toUpperCase()}</h1>
+        <h1 className="disp">YOUR OFFENSE VS {rivalName.toUpperCase()}</h1>
         <p>
           {TOTAL} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
         </p>

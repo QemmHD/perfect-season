@@ -2,9 +2,9 @@
 // team the same spins could have made. Hindsight only; nothing here changes a result.
 import { CELL_BY_ID } from './data';
 import { dailyOrder, type PickLog } from './draft';
-import { rateTeam, type TeamRating, winsFromRating } from './rating';
+import { rateTeam, rateTotals, type TeamRating, W, winsFromRating } from './rating';
 import { NFL } from './sport';
-import { type Lineup, type Player, type Slot, SLOTS, emptyLineup } from './types';
+import { type Line, type Lineup, type Player, type Slot, SLOTS, emptyLineup } from './types';
 
 export type PickGrade = 'best' | 'great' | 'good' | 'reach' | 'miss';
 
@@ -76,44 +76,75 @@ function reviewPick(e: PickLog): PickReview {
   return { round: e.round, cellId: e.cellId, slot: e.slot, pick: e.player, gain, best, bestSlot, bestGain, grade: gradeOf(bestGain - gain), trade: e.trade };
 }
 
-function permutations<T>(xs: T[]): T[][] {
-  if (xs.length <= 1) return [xs.slice()];
-  const out: T[][] = [];
-  const seen = new Set<T>();
-  xs.forEach((x, i) => {
-    if (seen.has(x)) return; // the same team twice (Double Pick): its orders are the same
-    seen.add(x);
-    for (const rest of permutations(xs.slice(0, i).concat(xs.slice(i + 1)))) out.push([x, ...rest]);
-  });
-  return out;
-}
-
 /**
  * The best team that one pick from each of these teams (a team listed twice gives two) could
  * make: every way of giving the teams to the spots, each spot taking that team's best player
- * who can play it.
+ * who can play it. (Football's eight spots make 40,320 ways: walked as a tree, leaving out the
+ * branches that can't beat the best so far even with every remaining spot at its best and no
+ * balance penalty, since a rating is never more than its players' values added up.)
  */
 export function bestFromCells(cellIds: string[]): { lineup: Lineup; rating: TeamRating } {
-  const ranked: Record<string, Player[]> = {};
-  for (const id of new Set(cellIds)) ranked[id] = (CELL_BY_ID[id]?.players ?? []).slice().sort((a, b) => b.val - a.val);
+  const ids = cellIds.slice(0, SLOTS.length);
+  // each team's players who can play each spot, best first
+  const cand: Record<string, Player[][]> = {};
+  for (const id of new Set(ids)) {
+    const ranked = (CELL_BY_ID[id]?.players ?? []).slice().sort((a, b) => b.val - a.val);
+    cand[id] = SLOTS.map((k) => ranked.filter((x) => x.pos.includes(k)));
+  }
   let bestL = emptyLineup();
   let bestR = rateTeam([]);
-  for (const order of permutations(cellIds.slice(0, SLOTS.length))) {
-    const l = emptyLineup();
-    const used = new Set<string>();
-    SLOTS.forEach((k, i) => {
-      const p = order[i] ? ranked[order[i]].find((x) => x.pos.includes(k) && !used.has(x.pid)) : undefined;
-      if (p) {
-        l[k] = p;
-        used.add(p.pid);
-      }
-    });
-    const r = rateTeam(SLOTS.map((k) => l[k]));
-    if (r.rating > bestR.rating) {
-      bestR = r;
-      bestL = l;
+  const team: (Player | null)[] = SLOTS.map(() => null);
+  const totals: Line = rateTeam([]).totals;
+  const keys = Object.keys(W);
+  const used = new Set<string>();
+  const left = ids.slice();
+  let value = 0;
+  /** the most the spots from i on could still add */
+  const ceiling = (i: number) => {
+    let c = 0;
+    for (let k = i; k < Math.min(SLOTS.length, i + left.length); k++) {
+      let m = 0;
+      for (const id of left) m = Math.max(m, cand[id][k][0]?.val ?? 0);
+      c += m;
     }
-  }
+    return c;
+  };
+  const walk = (i: number) => {
+    if (bestR.rating > 0 && value + ceiling(i) <= bestR.rating - 1e-9) return;
+    if (i === SLOTS.length || !left.length) {
+      const r = rateTotals(totals);
+      // the same players seated another way rate the same: the first seating found stands
+      if (r.rating > bestR.rating + 1e-9) {
+        bestR = { ...r, totals: { ...totals } };
+        bestL = Object.fromEntries(SLOTS.map((k, j) => [k, team[j]]));
+      }
+      return;
+    }
+    const tried = new Set<string>();
+    for (let j = 0; j < left.length; j++) {
+      const id = left[j];
+      // the same team twice (Double Pick): its orders are the same
+      if (tried.has(id)) continue;
+      tried.add(id);
+      left.splice(j, 1);
+      const p = cand[id][i].find((x) => !used.has(x.pid)) ?? null;
+      team[i] = p;
+      if (p) {
+        used.add(p.pid);
+        value += p.val;
+        for (const k of keys) totals[k] += p.r[k] ?? 0;
+      }
+      walk(i + 1);
+      if (p) {
+        used.delete(p.pid);
+        value -= p.val;
+        for (const k of keys) totals[k] -= p.r[k] ?? 0;
+      }
+      team[i] = null;
+      left.splice(j, 0, id);
+    }
+  };
+  walk(0);
   return { lineup: bestL, rating: bestR };
 }
 

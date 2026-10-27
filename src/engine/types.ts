@@ -1,8 +1,13 @@
 import { NFL } from './sport';
 
-/** A spot in the lineup. Basketball: PG, SG, SF, PF, C. Football: QB, RB, WR, TE, FLEX, DEF. */
+/**
+ * A spot in the lineup. Basketball: PG, SG, SF, PF, C. Football: QB, RB, WR, TE, FLEX on offense,
+ * and three defenders: DL (a lineman), LB (a linebacker), DB (a corner or a safety).
+ */
 export type Slot = string;
-export const SLOTS: Slot[] = NFL ? ['QB', 'RB', 'WR', 'TE', 'FLEX', 'DEF'] : ['PG', 'SG', 'SF', 'PF', 'C'];
+export const SLOTS: Slot[] = NFL ? ['QB', 'RB', 'WR', 'TE', 'FLEX', 'DL', 'LB', 'DB'] : ['PG', 'SG', 'SF', 'PF', 'C'];
+/** Football's defensive spots: each takes one real defender. */
+export const DEF_SLOTS: Slot[] = NFL ? ['DL', 'LB', 'DB'] : [];
 
 export type Mode = 'classic' | 'blind' | 'daily' | '1v1';
 export type BotLevel = 'rookie' | 'pro' | 'legend';
@@ -10,9 +15,10 @@ export type Booster = 'double' | 'trade' | 'prime';
 export const BOOSTERS: Booster[] = ['double', 'trade', 'prime'];
 
 /**
- * A stat line, per game. Basketball: pts, reb, ast, stl, blk. Football players: passYds, passTd,
- * int, rushYds, rushTd, rec, recYds, recTd; a football defense: pa (points allowed), lg (the
- * league's average those seasons), top5 (seasons in the top five), best (best league rank).
+ * A stat line. Basketball, per game: pts, reb, ast, stl, blk. Football's offense, per game: passYds,
+ * passTd, int, rushYds, rushTd, rec, recYds, recTd. A football defender, per season: sacks, tkl,
+ * int, pd (passes defended), ff (forced fumbles), -1 when no source has it; and pb, ap: his Pro Bowl
+ * and first-team All-Pro seasons in the line.
  */
 export type Line = Record<string, number>;
 
@@ -23,11 +29,14 @@ export interface Player {
   name: string;
   /** the spots he can fill (a football running back: RB and FLEX) */
   pos: Slot[];
+  /** football defenders: the position he played, finer than the spot (DE, DT, OLB, CB, FS...) */
+  role?: string;
   g: number;
   seasons: number;
   from: number;
   to: number;
-  /** steals/blocks partly estimated (pre-1973-74 seasons) */
+  /** basketball: steals/blocks partly estimated (pre-1973-74 seasons); football: games partly
+      estimated from rosters (defenders before 1999) */
   est: boolean;
   primeRef: string | null;
   cellId: string;
@@ -40,7 +49,7 @@ export interface Player {
   s: Line;
   /** what the game scores: per-game stats measured against the player's own era,
       with short stints blended toward his career rate. Basketball keeps the stat names;
-      football splits the player's value into pass, rush, recv and def */
+      football splits the player's value into pass, rush, recv and def (a defender's is all def) */
   r: Line;
   /** weighted value of `r` */
   val: number;
@@ -87,6 +96,9 @@ export interface PlayoffTeam {
   star: string;
   /** basketball: the five who played the most minutes; football: QB, RB and the top two receivers */
   five: OppPlayer[];
+  /** football: the season's best defender at DL, LB and DB (their `s`: sacks, tkl, int that season,
+      -1 not known, and hon: 2 first-team All-Pro, 1 Pro Bowl or second team) */
+  def?: OppPlayer[];
   /** football: real points for and against per game, and whether they won it all */
   pf?: number;
   pa?: number;
