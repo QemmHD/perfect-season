@@ -155,6 +155,12 @@ export class FootballRenderer {
   /** each player's drawing last frame, and how many new drawings this frame may still make */
   private last = new Map<string, Sprite>();
   private budget = 0;
+  /** turf kicked up and confetti: field position and height, speed, life left, color, size */
+  private bits: { x: number; y: number; h: number; vx: number; vy: number; vh: number; life: number; color: string; size: number }[] = [];
+  /** what each player was doing last frame, to see a tackle or a move start */
+  private acts = new Map<number, string>();
+  private playSeen: Play | null = null;
+  private lastNow = 0;
   private lens!: Lens;
 
   constructor(
@@ -218,8 +224,14 @@ export class FootballRenderer {
     const pre = p.phase === 'pre' || p.phase === 'drop';
     let y = at.y + (pre ? (this.mode === 'side' ? 9 : 1) : this.mode === 'side' ? 3 : -1);
     if (aim && p.phase === 'drop') y = Math.max(y, (p.qb.y + aim.y) / 2 + (this.mode === 'side' ? 2 : -6));
-    // sideways the camera follows across too; upright it stays near the middle so both sides show
-    const x = this.mode === 'side' ? Math.max(20, Math.min(FIELD_W - 20, at.x)) : FIELD_W / 2 + (Math.max(8, Math.min(FIELD_W - 8, at.x)) - FIELD_W / 2) * 0.55;
+    // sideways the camera follows across too; upright it stays near the middle before the throw so
+    // both sides show, then rides with the ball
+    const x =
+      this.mode === 'side'
+        ? Math.max(20, Math.min(FIELD_W - 20, at.x))
+        : pre
+          ? FIELD_W / 2 + (Math.max(8, Math.min(FIELD_W - 8, at.x)) - FIELD_W / 2) * 0.55
+          : Math.max(12, Math.min(FIELD_W - 12, at.x));
     return { x, y };
   }
 
@@ -325,6 +337,68 @@ export class FootballRenderer {
       ctx.lineTo(b.x, b.y);
     }
     ctx.stroke();
+  }
+
+  /** A burst at a field spot: turf off a cut or a tackle, confetti for a touchdown. */
+  private burst(x: number, y: number, n: number, kind: 'turf' | 'confetti') {
+    const turf = ['#3c7a2c', '#58993c', '#6b4a2a', '#8a6a3c'];
+    const conf = [this.kits[0].jersey, this.kits[0].trim, '#ffffff', '#ffd23a'];
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = kind === 'turf' ? 1.5 + Math.random() * 2.5 : 2 + Math.random() * 5;
+      this.bits.push({
+        x: x + (kind === 'confetti' ? (Math.random() - 0.5) * 3 : 0),
+        y: y + (kind === 'confetti' ? (Math.random() - 0.5) * 3 : 0),
+        h: kind === 'turf' ? 0.1 : 2.5 + Math.random() * 1.5,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        vh: kind === 'turf' ? 2 + Math.random() * 3 : 4 + Math.random() * 6,
+        life: kind === 'turf' ? 0.45 + Math.random() * 0.25 : 1.4 + Math.random() * 0.8,
+        color: (kind === 'turf' ? turf : conf)[Math.floor(Math.random() * 4)],
+        size: kind === 'turf' ? 0.16 : 0.22,
+      });
+    }
+    if (this.bits.length > 400) this.bits.splice(0, this.bits.length - 400);
+  }
+
+  /** Watch the players for the moments worth a burst, move the bits along and draw them. */
+  private particles(ctx: CanvasRenderingContext2D, p: Play) {
+    const now = performance.now() / 1000;
+    const dt = this.lastNow ? Math.min(0.05, now - this.lastNow) : 0;
+    this.lastNow = now;
+    if (this.playSeen !== p) {
+      this.playSeen = p;
+      this.acts.clear();
+      for (const b of p.bodies) this.acts.set(b.id, b.act);
+    }
+    for (const b of p.bodies) {
+      const was = this.acts.get(b.id);
+      if (was !== b.act) {
+        if (b.act === 'down') this.burst(b.x, b.y, 12, 'turf');
+        else if (b.act === 'juke' || b.act === 'spin' || b.act === 'truck' || b.act === 'tackle') this.burst(b.x, b.y, 7, 'turf');
+        else if (b.act === 'celebrate') this.burst(b.x, b.y, 70, 'confetti');
+        this.acts.set(b.id, b.act);
+      }
+    }
+    const L = this.lens;
+    this.bits = this.bits.filter((q) => (q.life -= dt) > 0);
+    for (const q of this.bits) {
+      const conf = q.size > 0.2;
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      q.h = Math.max(0, q.h + q.vh * dt);
+      // confetti flutters down; turf drops
+      q.vh -= (conf ? 3.2 : 14) * dt;
+      if (conf) {
+        q.vh = Math.max(q.vh, -1.6);
+        q.vx *= 0.98;
+        q.vy *= 0.98;
+      }
+      const a = L.at(q.x, q.y, q.h);
+      const d = Math.max(1, Math.round(a.s * q.size));
+      ctx.fillStyle = q.color;
+      ctx.fillRect(Math.round(a.x - d / 2), Math.round(a.y - d / 2), d, conf && Math.floor(now * 10 + q.x) % 2 ? Math.max(1, d - 1) : d);
+    }
   }
 
   draw(ctx: CanvasRenderingContext2D, p: Play, ballOn: number, o: FbOverlay) {
@@ -475,6 +549,7 @@ export class FootballRenderer {
       ctx.ellipse(Math.round(land.x), Math.round(land.y), r, Math.max(2, Math.round(r * Math.sin(L.pitch(o.aim.y)))), 0, 0, Math.PI * 2);
       ctx.stroke();
     }
+    this.particles(ctx, p);
     // names: the receivers before the snap, the man with the ball after
     const tag = (b: Body, color: string) => {
       const h = heads[b.id];
