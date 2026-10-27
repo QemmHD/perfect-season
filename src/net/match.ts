@@ -32,6 +32,29 @@ function parse(e: Event): Record<string, unknown> | null {
 
 // ---------- who's online ----------
 
+/** A head-to-head record (this sport, all time), as players tell each other. */
+export interface Rec {
+  w: number;
+  l: number;
+}
+
+/** A record off the wire ([wins, losses]), or nothing when it doesn't hold up. */
+export function recOf(x: unknown): Rec | undefined {
+  if (!Array.isArray(x) || x.length !== 2) return undefined;
+  const [w, l] = x;
+  return Number.isInteger(w) && Number.isInteger(l) && w >= 0 && l >= 0 && w + l <= 100000 ? { w, l } : undefined;
+}
+
+/** Someone with the app open: who, which sport, what they're doing, and their record in it. */
+export interface OnlinePlayer {
+  pubkey: string;
+  name: string;
+  sport: SportId;
+  st: Status;
+  rec?: Rec;
+  me: boolean;
+}
+
 export interface OnlineCount {
   online: number;
   /** of those, in this sport: the players a match can be with */
@@ -39,7 +62,7 @@ export interface OnlineCount {
   searching: number;
 }
 
-type Status = 'menu' | 'queue' | 'match';
+export type Status = 'menu' | 'queue' | 'match';
 
 /** Each open app says it's here this often; after three missed beats it no longer counts. */
 const BEAT_MS = 10000;
@@ -50,6 +73,7 @@ const QUEUE_MS = 6000;
 let presenceStarted = false;
 let myStatus: Status = 'menu';
 let myName = '';
+let myRec: Rec | undefined;
 let lastBeat = 0;
 /** when a hello last actually reached a relay */
 let lastHello = 0;
@@ -59,6 +83,47 @@ const seenOnline = new Map<string, number>();
 const seenHere = new Map<string, number>();
 const seenSearching = new Map<string, number>();
 const countListeners = new Set<(c: OnlineCount) => void>();
+/** everyone else online, by key: what they last said */
+const roster = new Map<string, Omit<OnlinePlayer, 'me' | 'pubkey'> & { at: number }>();
+const rosterListeners = new Set<(r: OnlinePlayer[]) => void>();
+let lastRoster = '';
+
+/** Who's online now, you first, then the ones looking for a match, the menus, and those in one. */
+export function rosterNow(): OnlinePlayer[] {
+  const t = Date.now();
+  const order: Record<Status, number> = { queue: 0, menu: 1, match: 2 };
+  const out: OnlinePlayer[] = [];
+  for (const [k, v] of roster) {
+    if (t - v.at > ONLINE_MS) roster.delete(k);
+    else out.push({ pubkey: k, name: v.name, sport: v.sport, st: v.st, rec: v.rec, me: false });
+  }
+  out.sort((a, b) => order[a.st] - order[b.st] || a.name.localeCompare(b.name));
+  if (myName) out.unshift({ pubkey: myPubkey(), name: myName, sport: SPORT, st: myStatus, rec: myRec, me: true });
+  return out;
+}
+
+function emitRoster(force = false): void {
+  if (!rosterListeners.size) return;
+  const r = rosterNow();
+  const key = JSON.stringify(r);
+  if (!force && key === lastRoster) return;
+  lastRoster = key;
+  rosterListeners.forEach((f) => f(r));
+}
+
+/** The list of who's online, live (checked every second). */
+export function onRoster(fn: (r: OnlinePlayer[]) => void): () => void {
+  rosterListeners.add(fn);
+  fn(rosterNow());
+  return () => rosterListeners.delete(fn);
+}
+
+/** This player's head-to-head record, told to everyone with the next beat. */
+export function setMyRecord(rec: Rec): void {
+  if (myRec && myRec.w === rec.w && myRec.l === rec.l) return;
+  myRec = rec;
+  beat();
+}
 
 function counts(): OnlineCount {
   const t = Date.now();
@@ -96,7 +161,7 @@ function beat(hello = false): void {
   lastBeat = Date.now();
   // a hello sent with no relay connected reached no one: it goes again when one connects
   if (hello && pool.connected() > 0) lastHello = lastBeat;
-  const c = { name: myName, st: myStatus, sp: SPORT };
+  const c = { name: myName, st: myStatus, sp: SPORT, ...(myRec ? { rec: [myRec.w, myRec.l] } : {}) };
   void pool.publish(sign(KIND_PRESENCE, [['t', ONLINE_TAG]], JSON.stringify(hello ? { ...c, hello: true } : c)));
 }
 
@@ -122,10 +187,14 @@ export function startPresence(name: string): void {
       seenOnline.delete(e.pubkey);
       seenHere.delete(e.pubkey);
       seenSearching.delete(e.pubkey);
+      roster.delete(e.pubkey);
       emitCounts();
+      emitRoster();
       return;
     }
     seenOnline.set(e.pubkey, Date.now());
+    const st: Status = c.st === 'queue' || c.st === 'match' ? c.st : 'menu';
+    roster.set(e.pubkey, { name: displayName(c.name), sport: c.sp === 'nfl' ? 'nfl' : 'nba', st, rec: recOf(c.rec), at: Date.now() });
     // apps from before football don't say their sport: basketball
     if ((c.sp ?? 'nba') === SPORT) seenHere.set(e.pubkey, Date.now());
     else seenHere.delete(e.pubkey);
@@ -144,6 +213,9 @@ export function startPresence(name: string): void {
     seenSearching.set(e.pubkey, Date.now());
     seenOnline.set(e.pubkey, Date.now());
     seenHere.set(e.pubkey, Date.now());
+    const c = parse(e) ?? {};
+    const was = roster.get(e.pubkey);
+    roster.set(e.pubkey, { name: was?.name ?? displayName(c.name), sport: SPORT, st: 'queue', rec: recOf(c.rec) ?? was?.rec, at: Date.now() });
     emitCounts();
   });
   // the first hello can go out before any relay is connected: say it again once one is
@@ -155,7 +227,10 @@ export function startPresence(name: string): void {
   });
   beat(true);
   window.setInterval(() => beat(), BEAT_MS);
-  window.setInterval(() => emitCounts(), 1000);
+  window.setInterval(() => {
+    emitCounts();
+    emitRoster();
+  }, 1000);
   document.addEventListener('visibilitychange', () => (document.visibilityState === 'visible' ? beat(true) : goodbye()));
   window.addEventListener('pagehide', goodbye);
 }
@@ -165,6 +240,7 @@ export function setPresence(st: Status): void {
   myStatus = st;
   beat();
   emitCounts(true);
+  emitRoster(true);
 }
 
 export function onCounts(fn: (c: OnlineCount) => void): () => void {
@@ -181,6 +257,8 @@ export interface Opponent {
   level: number;
   /** Ultimate Team: their squad's overall */
   ovr?: number;
+  /** their head-to-head record, when their app says it */
+  rec?: Rec;
 }
 
 /**
@@ -254,7 +332,7 @@ export class Matchmaker {
    * `ovr` (a squad's overall) only squads within squadWindow() pair.
    */
   constructor(
-    private readonly info: { name: string; level: number; room?: string; queue?: string; ovr?: number },
+    private readonly info: { name: string; level: number; room?: string; queue?: string; ovr?: number; rec?: Rec },
     private readonly onFound: (f: Found) => void,
     private readonly onSeen?: (n: number) => void,
     private readonly onMismatch?: (m: RoomMismatch) => void
@@ -270,7 +348,8 @@ export class Matchmaker {
 
   /** what this player tells the queue and the other side of a handshake about himself */
   private about(): Record<string, unknown> {
-    return this.info.ovr === undefined ? { name: this.info.name, lvl: this.info.level } : { name: this.info.name, lvl: this.info.level, ovr: this.info.ovr };
+    const rec = this.info.rec ? { rec: [this.info.rec.w, this.info.rec.l] } : {};
+    return this.info.ovr === undefined ? { name: this.info.name, lvl: this.info.level, ...rec } : { name: this.info.name, lvl: this.info.level, ovr: this.info.ovr, ...rec };
   }
 
   start(): void {
@@ -322,7 +401,7 @@ export class Matchmaker {
     if (e.pubkey === this.me || tagValue(e, 't') !== this.tag) return;
     const c = parse(e);
     if (!c) return;
-    this.searchers.set(e.pubkey, { pubkey: e.pubkey, name: displayName(c.name), level: Number.isInteger(c.lvl) ? (c.lvl as number) : 1, ovr: typeof c.ovr === 'number' ? c.ovr : undefined, seen: Date.now() });
+    this.searchers.set(e.pubkey, { pubkey: e.pubkey, name: displayName(c.name), level: Number.isInteger(c.lvl) ? (c.lvl as number) : 1, ovr: typeof c.ovr === 'number' ? c.ovr : undefined, rec: recOf(c.rec), seen: Date.now() });
     this.onSeen?.(this.fresh().length);
   }
 
@@ -361,11 +440,12 @@ export class Matchmaker {
     const name = displayName(c.name);
     const level = Number.isInteger(c.lvl) ? (c.lvl as number) : 1;
     const ovr = typeof c.ovr === 'number' ? c.ovr : undefined;
+    const rec = recOf(c.rec);
     if (c.type === 'invite' && typeof c.seed === 'string') {
       const mutual = st.kind === 'inviting' && st.to === from;
       if ((st.kind === 'idle' || (mutual && this.me > from)) && this.fits(ovr)) {
         this.state = { kind: 'accepted', from, matchId: c.match, seed: c.seed, until: t + 6000 };
-        this.searchers.set(from, { pubkey: from, name, level, ovr, seen: t });
+        this.searchers.set(from, { pubkey: from, name, level, ovr, rec, seen: t });
         this.send(from, { type: 'accept', match: c.match, ...this.about() });
         this.listenForStart(from, c.match);
       } else if (!mutual) this.send(from, { type: 'decline', match: c.match });
@@ -374,7 +454,7 @@ export class Matchmaker {
       // say go a few times: a lost go would leave the other player waiting
       for (const ms of [0, 400, 1200]) window.setTimeout(() => this.send(from, { type: 'go', match: c.match }), ms);
       const opp = this.searchers.get(from);
-      this.finish({ matchId: c.match, seed: st.seed, host: true, opp: { pubkey: from, name: opp?.name ?? name, level: opp?.level ?? level, ovr: opp?.ovr ?? ovr } });
+      this.finish({ matchId: c.match, seed: st.seed, host: true, opp: { pubkey: from, name: opp?.name ?? name, level: opp?.level ?? level, ovr: opp?.ovr ?? ovr, rec: opp?.rec ?? rec } });
     } else if (c.type === 'go' && st.kind === 'accepted' && st.from === from && st.matchId === c.match) {
       this.started(from, c.match);
     } else if (c.type === 'decline' && st.kind === 'inviting' && st.to === from && st.matchId === c.match) {
@@ -394,7 +474,7 @@ export class Matchmaker {
     if (st.kind !== 'accepted' || st.from !== from || st.matchId !== matchId) return;
     this.state = { kind: 'done' };
     const opp = this.searchers.get(from)!;
-    this.finish({ matchId, seed: st.seed, host: false, opp: { pubkey: from, name: opp.name, level: opp.level, ovr: opp.ovr } });
+    this.finish({ matchId, seed: st.seed, host: false, opp: { pubkey: from, name: opp.name, level: opp.level, ovr: opp.ovr, rec: opp.rec } });
   }
 
   /** In the middle of a handshake: don't hand this player to the AI right now. */

@@ -14,17 +14,17 @@ import { hashString, rng } from './engine/rng';
 import { clearSportParam, NFL, SPORT, type SportId, switchSport } from './engine/sport';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
 import { type Booster, type BotLevel, type Mode, type Player, type PlayoffTeam, type Slot, SLOTS } from './engine/types';
-import { freshProfile, type H2HStats, loadProfile, newId, type Profile, readOtherLb, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
+import { addVs, freshProfile, type H2HStats, loadProfile, newId, type Profile, readOtherLb, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
 import { setFeedback, sfx, vibrate } from './lib/sound';
 import { applyUpdate, justUpdated, newerVersionLive, reloadForMissingFiles } from './lib/update';
 import { type BoardKind, boardTag, fetchBoard, prune, publishEntry, renamed, type Span, weekKey, withH2H, withRun } from './net/leaderboard';
-import { type ArcadeState, cleanRoomCode, type Found, MatchConn, type OnlineCount, type OnlinePick, onCounts, setPresence, startPresence } from './net/match';
+import { type ArcadeState, cleanRoomCode, type Found, MatchConn, type OnlineCount, type OnlinePick, onCounts, setMyRecord, setPresence, startPresence } from './net/match';
 import { NET_ON } from './net/nostr';
 import { Sheet, Toast, TopBar } from './ui/common';
 import { Transition } from './ui/motion';
 import { Draft, type OnlineProps } from './ui/Draft';
-import { type LbStatus, NameSheet } from './ui/Leaderboard';
-import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, type Tab, Tabs } from './ui/Pages';
+import { type LbStatus, NameSheet, openBoardNext, openOnlineNext } from './ui/Leaderboard';
+import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, showGlobalRanks, type Tab, Tabs } from './ui/Pages';
 import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
 import { type Room, Search } from './ui/Search';
@@ -199,6 +199,10 @@ export function App() {
     startPresence(profile.name);
     return onCounts(setOnline);
   }, [profile.name]);
+  // your head-to-head record goes out with your presence (the who's-online list shows it)
+  useEffect(() => {
+    if (NET_ON) setMyRecord({ w: profile.h2h.w, l: profile.h2h.l });
+  }, [profile.h2h.w, profile.h2h.l]);
 
   // closed boards (past days and weeks) drop out of your entries; a name changed while playing
   // the other sport goes onto this sport's boards too (and the other way round)
@@ -215,7 +219,7 @@ export function App() {
   useEffect(() => {
     const m = profileRef.current.activeMatch;
     if (m) {
-      recordForfeit(m.opp);
+      recordForfeit(m.opp, m.key);
       window.setTimeout(() => showToast('You left the match against ' + m.opp + ', so it counts as a loss.'), 900);
     }
   }, []);
@@ -452,7 +456,7 @@ export function App() {
     setRun({ id: runCounter.current, mode: '1v1', botLevel: 'pro', botFirst: !f.host, dailyKey: null, ranked: false, online: { found: f } });
     setScreen('draft');
     // saved, so quitting the app mid-match still counts as a loss next time it opens
-    update((p) => ({ ...p, activeMatch: { id: f.matchId, opp: f.opp.name } }));
+    update((p) => ({ ...p, activeMatch: { id: f.matchId, opp: f.opp.name, key: f.opp.pubkey } }));
     // they never showed up (their phone missed the start): no result, back to the queue or the room
     window.setTimeout(() => {
       if (matchRef.current !== conn || conn.heard()) return;
@@ -471,10 +475,10 @@ export function App() {
   };
 
   /** A head-to-head loss without a finished draft: you left, or got dropped. */
-  const recordForfeit = (oppName: string) => {
+  const recordForfeit = (oppName: string, oppKey?: string) => {
     update((p) => {
       const h2h = addH2H(p.h2h, false, weekKey(todayKey));
-      return { ...p, activeMatch: null, h2h, stats: { ...p.stats, h2hGames: p.stats.h2hGames + 1 }, lb: p.name ? withH2H(p.lb, p.name, { w: h2h.w, l: h2h.l, streak: h2h.streak }, { w: h2h.ww, l: h2h.wl, streak: h2h.wstreak }, todayKey) : p.lb };
+      return { ...p, activeMatch: null, h2h, vs: oppKey ? addVs(p.vs, oppKey, oppName, false) : p.vs, stats: { ...p.stats, h2hGames: p.stats.h2hGames + 1 }, lb: p.name ? withH2H(p.lb, p.name, { w: h2h.w, l: h2h.l, streak: h2h.streak }, { w: h2h.ww, l: h2h.wl, streak: h2h.wstreak }, todayKey) : p.lb };
     });
     showToast('Match against ' + oppName + ' counts as a loss.');
   };
@@ -508,6 +512,7 @@ export function App() {
     const p0 = profileRef.current;
     const po = bracket ? playoffLine(bracket) : null;
     const oppName = r.online?.found.opp.name;
+    const oppKey = r.online?.found.opp.pubkey;
     // both phones lost each other and let the AI finish: nobody gets the result
     const noContest = !!r.online && droppedRef.current && !!opp?.tookOver;
     const forfeit = r.online && droppedRef.current && !noContest ? ('them' as const) : undefined;
@@ -621,9 +626,11 @@ export function App() {
       const msNow = p.missions && p.missions.day === todayKey ? p.missions : { day: todayKey, progress: [0, 0, 0], claimed: [false, false, false] };
       let lb = p.lb;
       let h2h = p.h2h;
+      let vs = p.vs;
       if (p.name && (r.mode === 'classic' || r.mode === 'blind' || r.mode === 'daily')) lb = withRun(lb, p.name, record, todayKey).lb;
       if (oppName && vsWon !== null) {
         h2h = addH2H(h2h, vsWon, week);
+        if (oppKey) vs = addVs(vs, oppKey, oppName, vsWon);
         if (p.name) lb = withH2H(lb, p.name, { w: h2h.w, l: h2h.l, streak: h2h.streak }, { w: h2h.ww, l: h2h.wl, streak: h2h.wstreak }, todayKey);
       }
       return {
@@ -648,6 +655,7 @@ export function App() {
         missions: { ...msNow, progress: advance(todayKey, msNow.progress, event).progress },
         lb,
         h2h,
+        vs,
         activeMatch: null,
       };
     });
@@ -744,7 +752,7 @@ export function App() {
       const theyLeft = droppedRef.current || !!opp?.left || !!opp?.gone;
       endMatch(true);
       if (theyLeft) update((p) => ({ ...p, activeMatch: null }));
-      else recordForfeit(run.online.found.opp.name);
+      else recordForfeit(run.online.found.opp.name, run.online.found.opp.pubkey);
     }
     goTab('home');
   };
@@ -802,6 +810,12 @@ export function App() {
         onToast={showToast}
         streak={profile.streak.last === todayKey || profile.streak.last === null ? profile.streak.count : nextStreak(profile.streak, todayKey).count - 1}
         online={NET_ON ? online : null}
+        onOnline={() => {
+          sfx.click();
+          openOnlineNext();
+          showGlobalRanks();
+          goTab('ranks');
+        }}
         missions={{ done: missionsDone, claimable: missionsClaimable }}
         onMissions={() => (sfx.click(), setModal('missions'))}
         onStreak={() => {
@@ -880,6 +894,8 @@ export function App() {
       <Search
         name={profile.name ?? 'Player'}
         level={levelInfo(profile.xp).level}
+        rec={{ w: profile.h2h.w, l: profile.h2h.l }}
+        vs={profile.vs ?? {}}
         botLevel={profile.botLevel}
         room={room}
         onRoom={setRoom}
@@ -887,6 +903,12 @@ export function App() {
         onAI={() => startDraft('1v1')}
         onBack={() => goTab('home')}
         onToast={showToast}
+        onBoard={(on) => {
+          if (on) openOnlineNext();
+          else openBoardNext('h2h');
+          showGlobalRanks();
+          goTab('ranks');
+        }}
       />
     );
   } else if (screen === 'draft' && run) {
@@ -1115,7 +1137,7 @@ export function App() {
                 onClick={() => {
                   setKicked(false);
                   endMatch(false);
-                  recordForfeit(run?.online?.found.opp.name ?? 'your opponent');
+                  recordForfeit(run?.online?.found.opp.name ?? 'your opponent', run?.online?.found.opp.pubkey);
                   goTab('home');
                 }}
               >

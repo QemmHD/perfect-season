@@ -76,7 +76,9 @@ export interface Profile {
   /** Today's missions: progress and claimed, by position in the day's list */
   missions: { day: string; progress: number[]; claimed: boolean[] } | null;
   /** A head-to-head match in progress; still set on launch means the app was closed mid-match */
-  activeMatch: { id: string; opp: string } | null;
+  activeMatch: { id: string; opp: string; key?: string } | null;
+  /** your record against each real opponent you've played (this sport), by their key */
+  vs?: Record<string, VsRecord>;
   /** Ultimate Team: this sport's club, squad, packs and challenges (src/ut/state.ts) */
   ut: UtState;
 }
@@ -104,6 +106,20 @@ const KEY = 'perfect-season:profile:v1';
 const NFL_KEY = 'perfect-season:profile:nfl:v1';
 /** One player across both sports: the same name, wallet, level, boosters, settings and daily chest. */
 const SHARED = ['coins', 'xp', 'inventory', 'settings', 'name', 'streak', 'rewardDay', 'botLevel'] as const;
+
+export interface VsRecord {
+  name: string;
+  w: number;
+  l: number;
+}
+
+/** A result against one opponent added to the records against each (the most recent 300 kept). */
+export function addVs(vs: Record<string, VsRecord> | undefined, key: string, name: string, won: boolean): Record<string, VsRecord> {
+  const was = vs?.[key] ?? { name, w: 0, l: 0 };
+  const rest = Object.entries(vs ?? {}).filter(([k]) => k !== key);
+  const next = { name, w: was.w + (won ? 1 : 0), l: was.l + (won ? 0 : 1) };
+  return Object.fromEntries([...rest.slice(-299), [key, next]]);
+}
 
 export function freshH2H(): H2HStats {
   return { w: 0, l: 0, streak: 0, best: 0, week: '', ww: 0, wl: 0, wstreak: 0 };

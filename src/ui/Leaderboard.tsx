@@ -3,6 +3,7 @@ import { nameProblem, randomName } from '../lib/names';
 import type { Profile } from '../lib/profile';
 import { sfx } from '../lib/sound';
 import { type BoardKind, type BoardRow, cachedBoard, fetchBoard, type Span } from '../net/leaderboard';
+import { onRoster, type OnlinePlayer, rosterNow, type Status } from '../net/match';
 import { lastName, Sheet, shortEra } from './common';
 import { Ranks as RanksIcon, Refresh, Trophy } from './icons';
 import { PLAYOFF_MIN_WINS } from '../engine/playoffs';
@@ -122,7 +123,48 @@ export function LbLine({ lb }: { lb: LbStatus }) {
 }
 
 /** Remember the board the player last looked at, for this session. */
-const last: { kind: BoardKind; span: Span } = { kind: 'daily', span: 'week' };
+const last: { kind: BoardKind; span: Span; online: boolean } = { kind: 'daily', span: 'week', online: false };
+
+/** Open the Ranks page on who's online (the home screen's online count), or on a board (the
+ * head-to-head screen's link to its board), next time it shows. */
+export function openOnlineNext() {
+  last.online = true;
+}
+export function openBoardNext(kind: BoardKind) {
+  last.online = false;
+  last.kind = kind;
+  last.span = 'all';
+}
+
+const STATUS_TEXT: Record<Status, string> = { queue: 'Looking for a match', match: 'In a match', menu: 'Online' };
+
+/** Everyone with the app open right now, live: what they're doing, which sport, their head-to-head record. */
+function OnlineList() {
+  const [list, setList] = useState<OnlinePlayer[]>(() => rosterNow());
+  useEffect(() => onRoster(setList), []);
+  return (
+    <div className="list lblist online-list">
+      {list.length === 0 ? (
+        <div className="empty">Connecting…</div>
+      ) : (
+        list.map((o, i) => (
+          <div key={o.pubkey} className={'lbrow rise-in' + (o.me ? ' me' : '')} style={{ animationDelay: Math.min(i, 10) * 30 + 'ms' }}>
+            <span className={'onl-dot st-' + o.st} aria-hidden="true" />
+            <span className="lbmain">
+              <strong>
+                {o.name}
+                {o.me && <i className="you">YOU</i>}
+                <em className={'tag sport ' + o.sport}>{o.sport.toUpperCase()}</em>
+              </strong>
+              <small>{STATUS_TEXT[o.st]}</small>
+            </span>
+            <b className="disp num">{o.rec && o.rec.w + o.rec.l ? o.rec.w + '–' + o.rec.l : '–'}</b>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
 
 function outcome(r: BoardRow): string {
   if (r.h2h) return r.h2h.w + ' W · ' + r.h2h.l + ' L' + (r.h2h.streak >= 2 ? ' · ' + r.h2h.streak + ' in a row' : '');
@@ -142,6 +184,7 @@ const KINDS: [BoardKind, string][] = [
 
 export function GlobalBoard({ profile, dailyKey, dailyNo, onName }: { profile: Profile; dailyKey: string; dailyNo: number; onName: () => void }) {
   const [kind, setKind] = useState<BoardKind>(last.kind);
+  const [online, setOnline] = useState(last.online);
   const [span, setSpan] = useState<Span>(last.span);
   const [rows, setRows] = useState<BoardRow[] | undefined>(() => cachedBoard(kind, span, dailyKey));
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
@@ -167,6 +210,9 @@ export function GlobalBoard({ profile, dailyKey, dailyNo, onName }: { profile: P
       live = false;
     };
   }, [kind, span, dailyKey, refresh, tick]);
+  useEffect(() => {
+    last.online = online;
+  }, [online]);
 
   const top = rows ? rows.slice(0, 100) : [];
   const meBelow = rows ? rows.slice(100).find((r) => r.me) : undefined;
@@ -213,18 +259,37 @@ export function GlobalBoard({ profile, dailyKey, dailyNo, onName }: { profile: P
         {KINDS.map(([k, label]) => (
           <button
             key={k}
-            className={'chip' + (kind === k ? ' on' : '')}
-            aria-pressed={kind === k}
+            className={'chip' + (kind === k && !online ? ' on' : '')}
+            aria-pressed={kind === k && !online}
             onClick={() => {
-              if (k === kind) return;
+              if (k === kind && !online) return;
               sfx.click();
+              setOnline(false);
               setKind(k);
             }}
           >
             {k === 'daily' ? 'DAILY #' + dailyNo : label}
           </button>
         ))}
+        <button
+          className={'chip online' + (online ? ' on' : '')}
+          aria-pressed={online}
+          onClick={() => {
+            if (online) return;
+            sfx.click();
+            setOnline(true);
+          }}
+        >
+          <i className="livedot" aria-hidden="true" /> ONLINE
+        </button>
       </div>
+      {online ? (
+        <>
+          <OnlineList />
+          <p className="note">Everyone with the app open right now, in both sports. Records are head to head against real players, all time.</p>
+        </>
+      ) : (
+        <>
       {kind !== 'daily' && (
         <span className="spantoggle" role="group" aria-label="Time span">
           {(['week', 'all'] as const).map((s) => (
@@ -282,6 +347,8 @@ export function GlobalBoard({ profile, dailyKey, dailyNo, onName }: { profile: P
           ? 'Matches against real players: most wins, then win rate.'
           : 'Each player’s best ' + (kind === 'daily' ? 'result' : 'season') + ', ranked by wins, then playoff rounds, then team rating. Every lineup is checked against the player data.' + (kind === 'daily' ? ' Only your first Daily run counts.' : '')}
       </p>
+        </>
+      )}
     </>
   );
 }

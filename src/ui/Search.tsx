@@ -4,7 +4,8 @@ import { copyText } from '../lib/share';
 import { sfx } from '../lib/sound';
 import { ROUNDS } from '../engine/draft';
 import { NFL, SPORT, switchSport } from '../engine/sport';
-import { cleanRoomCode, type Found, Matchmaker, newRoomCode, onCounts, type RoomMismatch, setPresence } from '../net/match';
+import type { VsRecord } from '../lib/profile';
+import { cleanRoomCode, type Found, Matchmaker, newRoomCode, onCounts, type Rec, type RoomMismatch, setPresence } from '../net/match';
 import { Fit, initials } from './common';
 import { Back, Share } from './icons';
 import { Sparks } from './motion';
@@ -15,6 +16,18 @@ export const AI_AFTER = 30;
 const clock = (s: number) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
 type Tab = 'quick' | 'friend';
+
+/** A head-to-head record as the splash shows it: "14–6 H2H", or "No H2H games yet". */
+export function recText(r: Rec): string {
+  return r.w + r.l ? r.w + '–' + r.l + ' H2H' : 'No H2H games yet';
+}
+
+/** Your series with this opponent: "You lead Sam 3–1", "First meeting". */
+export function seriesText(v: VsRecord | undefined, name: string): string {
+  if (!v || v.w + v.l === 0) return 'First meeting';
+  const score = Math.max(v.w, v.l) + '–' + Math.min(v.w, v.l);
+  return v.w > v.l ? 'You lead ' + name + ' ' + score : v.w < v.l ? name + ' leads you ' + score : 'Tied with ' + name + ' ' + score;
+}
 export type Room = { code: string; hosting: boolean } | null;
 
 /**
@@ -31,6 +44,9 @@ function firstPicks(from: number): string {
 export function Search(props: {
   name: string;
   level: number;
+  /** your head-to-head record, and your record against each opponent you've played */
+  rec: Rec;
+  vs: Record<string, VsRecord>;
   botLevel: BotLevel;
   /** the room to be in (a link, or the one a match that didn't connect came from) */
   room: Room;
@@ -40,6 +56,8 @@ export function Search(props: {
   onAI: () => void;
   onBack: () => void;
   onToast: (t: string) => void;
+  /** the head-to-head leaderboard, and who's online */
+  onBoard: (online: boolean) => void;
 }) {
   const [tab, setTab] = useState<Tab>(props.room ? 'friend' : 'quick');
   const [room, setRoom] = useState<Room>(props.room);
@@ -53,7 +71,7 @@ export function Search(props: {
   const done = useRef(false);
   const mmRef = useRef<Matchmaker | null>(null);
   useEffect(() => props.onRoom(room), [room?.code, room?.hosting]);
-  const elapsed = Math.floor((now - t0) / 1000);
+  const elapsed = Math.max(0, Math.floor((now - t0) / 1000));
   // the friend's phone says it's there every 2 seconds: gone once it stops (they left or switched)
   const mm = tab === 'friend' && mismatch && now - mismatch.at < 6000 ? mismatch : null;
   const searching = !found && !aiSoon && (tab === 'quick' || !!room);
@@ -74,7 +92,7 @@ export function Search(props: {
     setPresence('queue');
     setMismatch(null);
     const mm = new Matchmaker(
-      { name: props.name, level: props.level, room: tab === 'friend' && room ? room.code : undefined },
+      { name: props.name, level: props.level, room: tab === 'friend' && room ? room.code : undefined, rec: props.rec },
       (f) => {
         if (done.current) return;
         done.current = true;
@@ -166,6 +184,17 @@ export function Search(props: {
           PLAY A FRIEND
         </button>
       </span>
+      <div className="h2h-links">
+        <span className="h2h-rec">
+          You <b>{recText(props.rec)}</b>
+        </span>
+        <button className="chip" onClick={() => (sfx.click(), props.onBoard(false))}>
+          LEADERBOARD
+        </button>
+        <button className="chip" onClick={() => (sfx.click(), props.onBoard(true))}>
+          <i className="livedot" aria-hidden="true" /> WHO’S ONLINE
+        </button>
+      </div>
 
       {tab === 'quick' || room ? (
         <div className={'radar-wrap' + (mm ? ' noted' : '')}>
@@ -320,14 +349,17 @@ export function Search(props: {
               <b className="disp">{initials(props.name)}</b>
               <strong>{props.name}</strong>
               <small>Level {props.level}</small>
+              <small className="vs-rec">{recText(props.rec)}</small>
             </div>
             <span className="disp vs-x">VS</span>
             <div className="vs-b">
               <b className="disp">{initials(found.opp.name)}</b>
               <strong>{found.opp.name}</strong>
               <small>Level {found.opp.level}</small>
+              {found.opp.rec && <small className="vs-rec">{recText(found.opp.rec)}</small>}
             </div>
           </div>
+          <span className="vs-series">{seriesText(props.vs[found.opp.pubkey], found.opp.name)}</span>
           <small className="vs-note">You pick first in rounds {firstPicks(found.host ? 1 : 2)}. 25 seconds a pick.</small>
           <span className="vs-burst" aria-hidden="true">
             <Sparks color="#F5B83D" />

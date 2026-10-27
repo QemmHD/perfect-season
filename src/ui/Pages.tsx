@@ -67,18 +67,18 @@ export function Tabs({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
 }
 
 /** Players with the app open and players searching for a match, live: each number pops when it changes. */
-function LiveCount({ online, queue }: { online: number; queue: number }) {
+function LiveCount({ online, queue, onClick }: { online: number; queue: number; onClick?: () => void }) {
   const a = usePulse(online, 500);
   const b = usePulse(queue, 500);
   return (
-    <span className="statchip online" role="status" aria-label={online + ' players online, ' + queue + ' in the head-to-head queue'}>
+    <button className="statchip online" onClick={onClick} aria-label={online + ' players online, ' + queue + ' in the head-to-head queue: see who'}>
       <i className="livedot" aria-hidden="true" />
       <b className={'num' + (a ? ' tick' : '')}>{online}</b> online
       <em>
         {' · '}
         <b className={'num' + (b ? ' tick' : '')}>{queue}</b> in queue
       </em>
-    </span>
+    </button>
   );
 }
 
@@ -102,6 +102,8 @@ export function HomePage(props: {
   onToast: (t: string) => void;
   streak: number;
   online: OnlineCount | null;
+  /** the online count tapped: who's online */
+  onOnline: () => void;
   missions: { done: number; claimable: boolean };
   onMissions: () => void;
   onStreak: () => void;
@@ -158,7 +160,7 @@ export function HomePage(props: {
       <p className="tagline">Spin a team and decade, draft {SPELLED[ROUNDS]} legends, go perfect.</p>
       <div className="statstrip">
         <StreakChip count={props.streak} onClick={props.onStreak} />
-        {props.online && <LiveCount online={props.online.online} queue={props.online.searching} />}
+        {props.online && <LiveCount online={props.online.online} queue={props.online.searching} onClick={props.onOnline} />}
         <button className={'statchip quests' + (props.missions.claimable ? ' ready' : '')} onClick={props.onMissions} aria-label={'Missions: ' + props.missions.done + ' of 3 done'}>
           <Target size={16} />
           <b className="num">{props.missions.done}/3</b>
@@ -314,6 +316,10 @@ export function DailyPage(props: { profile: Profile; dailyNo: number; dailyKey: 
 
 /** Which Ranks view was open last, for this session. */
 let ranksView: 'global' | 'yours' = 'global';
+/** Show the global boards next time Ranks opens (a link to a board, or to who's online). */
+export function showGlobalRanks() {
+  ranksView = 'global';
+}
 
 export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: number; onName: () => void }) {
   const [view, setView] = useState<'global' | 'yours'>(NET_ON ? ranksView : 'yours');

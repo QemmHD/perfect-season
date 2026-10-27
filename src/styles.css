@@ -4457,6 +4457,26 @@ button.friendcard:active {
   text-align: center;
   animation: fade-in 0.4s ease 0.9s both;
 }
+/* each side's head-to-head record, and your series with this opponent */
+.vs-a small.vs-rec,
+.vs-b small.vs-rec {
+  color: var(--gold);
+  font-weight: 800;
+}
+.vs-series {
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(245, 184, 61, 0.14);
+  border: 1px solid rgba(245, 184, 61, 0.35);
+  color: var(--gold);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.4px;
+  text-align: center;
+  animation: fade-in 0.4s ease 0.7s both;
+}
 .vs-burst {
   position: absolute;
   left: 50%;
@@ -11068,4 +11088,63 @@ button.friendcard:active {
   50% {
     opacity: 0.2;
   }
+}
+
+/* ---------- head to head: your record, the links to the board and to who's online ---------- */
+.h2h-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px auto 0;
+}
+.h2h-rec {
+  font-size: 13px;
+  color: var(--soft);
+}
+.h2h-rec b {
+  color: var(--gold);
+  font-weight: 800;
+}
+.chip .livedot,
+.chip.online .livedot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  vertical-align: 1px;
+}
+
+/* who's online: a status dot where the rank goes */
+.online-list .onl-dot {
+  justify-self: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #3be37a;
+}
+.online-list .onl-dot.st-queue {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(245, 184, 61, 0.22);
+}
+.online-list .onl-dot.st-match {
+  background: #a78bfa;
+}
+.online-list .tag.sport {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--soft);
+}
+.online-list .tag.sport.nfl {
+  color: #9fd3ff;
+}
+.online-list .tag.sport.nba {
+  color: #ffb98a;
 }
