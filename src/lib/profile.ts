@@ -81,6 +81,8 @@ export interface Profile {
   vs?: Record<string, VsRecord>;
   /** Ultimate Team: this sport's club, squad, packs and challenges (src/ut/state.ts) */
   ut: UtState;
+  /** one-time gifts already collected (by id), shared by both sports */
+  gifts?: string[];
 }
 
 /** A random v4 UUID. */
@@ -105,7 +107,7 @@ const KEY = 'perfect-season:profile:v1';
 /** Football's own part: its drafts, records, boards, missions and matches. */
 const NFL_KEY = 'perfect-season:profile:nfl:v1';
 /** One player across both sports: the same name, wallet, level, boosters, settings and daily chest. */
-const SHARED = ['coins', 'xp', 'inventory', 'settings', 'name', 'streak', 'rewardDay', 'botLevel'] as const;
+const SHARED = ['coins', 'xp', 'inventory', 'settings', 'name', 'streak', 'rewardDay', 'botLevel', 'gifts'] as const;
 
 export interface VsRecord {
   name: string;

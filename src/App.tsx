@@ -41,7 +41,7 @@ import { Vote } from './ui/Vote';
 /** tests: ?autoplay lets the autopilot play the arcade game */
 const AUTOPLAY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('autoplay');
 import { Playoffs, Reveal } from './ui/Season';
-import { Football, Hoop } from './ui/icons';
+import { Coin, Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
 import type { UtMatchRequest } from './ut/play';
 
@@ -130,6 +130,9 @@ function playoffLine(bracket: Series[]): { text: string; title: boolean; perfect
 }
 
 /** A head-to-head result against a real player, all-time and this week. */
+/** A thank-you to everyone testing the game: these coins once, for players already here and new ones. */
+const TESTER_GIFT = { id: 'testers-2026-10', coins: 9000 };
+
 function addH2H(h: H2HStats, won: boolean, week: string): H2HStats {
   const b = h.week === week ? h : { ...h, week, ww: 0, wl: 0, wstreak: 0 };
   if (won) return { ...b, w: b.w + 1, streak: b.streak + 1, best: Math.max(b.best, b.streak + 1), ww: b.ww + 1, wstreak: b.wstreak + 1 };
@@ -155,7 +158,7 @@ export function App() {
   const [utReq, setUtReq] = useState<UtMatchRequest | null>(null);
   /** the run whose head-to-head game has been watched */
   const [watched, setWatched] = useState<number | null>(null);
-  const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
@@ -326,6 +329,17 @@ export function App() {
     }, 450);
     return () => clearTimeout(t);
   }, [needsName, screen, modal]);
+
+  // ---------- the testers' gift: once, for everyone who has the app (and everyone who joins) ----------
+
+  const giftPending = !(profile.gifts ?? []).includes(TESTER_GIFT.id);
+  useEffect(() => {
+    if (needsName || screen !== 'tab' || modal || !giftPending) return;
+    const t = window.setTimeout(() => setModal('gift'), 400);
+    return () => clearTimeout(t);
+  }, [needsName, screen, modal, giftPending]);
+  const collectGift = () =>
+    update((p) => ((p.gifts ?? []).includes(TESTER_GIFT.id) ? p : { ...p, coins: p.coins + TESTER_GIFT.coins, gifts: [...(p.gifts ?? []), TESTER_GIFT.id] }));
 
   // ---------- daily reward and missions ----------
 
@@ -1112,6 +1126,31 @@ export function App() {
         />
       )}
       {modal === 'missions' && <MissionsSheet profile={profile} day={todayKey} onClaim={claimMission} onClose={() => setModal(null)} />}
+      {modal === 'gift' && (
+        <Sheet label="Thank you for testing" kind="center" onClose={() => (collectGift(), setModal(null))}>
+          {(close) => (
+            <div className="gift">
+              <span className="eyebrow wide">Thank you for testing</span>
+              <h2 className="disp">{TESTER_GIFT.coins.toLocaleString('en-US')} COINS</h2>
+              <span className="gift-coin" aria-hidden="true">
+                <Coin size={44} />
+              </span>
+              <p>You’re one of the first to play Perfect Season, and it’s better for every bug you found and every idea you sent. Here’s {TESTER_GIFT.coins.toLocaleString('en-US')} coins on us: open some packs in Ultimate Team.</p>
+              <button
+                className="btn gold"
+                onClick={() => {
+                  sfx.coin();
+                  vibrate([20, 30, 20]);
+                  collectGift();
+                  close(() => setModal(null));
+                }}
+              >
+                COLLECT
+              </button>
+            </div>
+          )}
+        </Sheet>
+      )}
       {modal === 'reward' && (
         <DailyReward
           streakDay={nextStreak(profile.streak, todayKey).count}
