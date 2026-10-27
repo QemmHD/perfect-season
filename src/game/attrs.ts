@@ -38,6 +38,19 @@ export interface Attrs {
   ypr?: number | null;
   tgt?: number | null;
   cr?: number | null;
+  // football defenders (DL, LB, DB), per game over the seasons whose source kept the stat:
+  // nflverse's weekly stats from 1999, before that the player's Wikipedia career table (where it
+  // has the column), so a line before the 1990s mostly has none
+  /** sacks */
+  sck?: number | null;
+  /** interceptions */
+  ints?: number | null;
+  /** tackles (from 2020 the credited assists run higher) */
+  tkl?: number | null;
+  /** passes defended (rarely before 1999) */
+  pd?: number | null;
+  /** forced fumbles */
+  ff?: number | null;
 }
 
 interface AttrsFile {

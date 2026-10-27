@@ -38,8 +38,10 @@ Basketball (Basketball-Reference via github.com/sumitrodatta/bball-reference-dat
   ends in), NBA only, 1959-60 on; a traded season's combined 2TM/3TM row is left out and each team's
   own row counts for that team, exactly as in build_nba_data.py.
 
-Football (Pro-Football-Reference via github.com/fantasydatapros/data to 1998, nflverse from 1999):
-  ht, wt   height (in) and weight (lb), nflverse player register
+Football (Pro-Football-Reference via github.com/fantasydatapros/data to 1998, nflverse from 1999;
+defenders from .cache/nfl_players_more.json, scripts/nfl_more_sources.py):
+  ht, wt   height (in) and weight (lb), nflverse player register (a defender the register doesn't
+           have: his latest listed on a roster)
   num      the jersey number he wore most for that team in that decade: from 1999 the nflverse
            rosters (weekly rosters from 2002, counting the weeks he wore each number; season
            rosters 1999-2001). Before 1999 there are no per-season numbers (nflverse's pre-1999
@@ -58,11 +60,21 @@ Football (Pro-Football-Reference via github.com/fantasydatapros/data to 1998, nf
            null under 20 targets). Targets go with the receptions they're measured against: PFR's
            where the season's totals are PFR's (a one-team season through 2021), otherwise the
            weekly stats', which have none in 2003-2008 (so a traded season then has none)
-  DEF      dsk (sacks per game) and dto (takeaways per game: interceptions plus fumbles lost),
-           counted off the offenses the team faced in the weekly stats, 1999 on, over the team's
-           games in the cell's seasons; no pre-1999 source, so null for cells before the 2000s
+  DL, LB,  sck, ints, tkl, pd, ff: sacks, interceptions, tackles, passes defended and forced
+  DB       fumbles per game, over the seasons whose source kept that stat (nflverse's weekly stats
+           from 1999; before, the player's Wikipedia career table, where it has the column) and
+           counted his games. num as above from 1999; before, each season's number from that
+           year's Pro Bowl roster (his Pro Bowl seasons), else the nflverse season roster's (full
+           from 1996; earlier only where it differs from the register's, so it isn't a copy of
+           his last number), else the register's where it is shown to be his with this team (the
+           rule above, on his seasons in nfl_players_more.json), else his Wikipedia infobox's when
+           it lists one number and no source shows him in another (the articles
+           nfl_more_sources.py cached), else the number a source shows him in both the season
+           before and the season after, when it's the same, else the one number every source
+           shows him in, when that's with this team or with two teams or more
   The line's rows come from nfl_sources.py itself (same ids, same games, same traded-season
-  handling); only completions, sacks, targets and defensive stats are added alongside.
+  handling); only completions, sacks and targets are added alongside. A defender's are the seasons
+  nfl_defenders.py builds his draft line from (its load_records), so games and seasons match.
 
 Shared rules:
   - per-game values are totals over the line's games; percentages are 0-1, rounded to 3 decimals
@@ -80,6 +92,7 @@ Usage: python3 scripts/build_game_attrs.py [--cache DIR] [--nba-raw DIR] [--nfl-
   --nba-raw  build_nba_data.py's cache; its Player_Totals.csv is the very file nba.json was built
              from (default .cache/raw; downloaded into --cache if it isn't there)
   --nfl-raw  build_nfl_data.py's cache (default .cache/nfl; nfl_sources.py fills in anything missing)
+  --nfl-more the defenders' player-seasons (default nfl_players_more.json beside --nfl-raw)
 """
 
 import argparse
@@ -99,6 +112,8 @@ from collections import Counter, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import nfl_defenders as D  # noqa: E402
+import nfl_more_sources as M  # noqa: E402
 import nfl_sources as S  # noqa: E402
 
 DATA = os.path.join(HERE, "..", "src", "data")
@@ -122,7 +137,11 @@ STATS_FIRST = 1997
 MATCHED_MIN = 0.97  # a number source that matches less of Basketball-Reference than this has changed shape
 
 NBA_FIELDS = ["ht", "wt", "mpg", "fg2", "fg3", "a3", "ft", "fta", "orb", "drb", "tov", "dunk", "rim", "num"]
-NFL_FIELDS = ["ht", "wt", "num", "cmp", "ypa", "att", "intr", "sk", "ry", "ypc", "car", "rec", "ypr", "tgt", "cr", "dsk", "dto"]
+NFL_FIELDS = ["ht", "wt", "num", "cmp", "ypa", "att", "intr", "sk", "ry", "ypc", "car", "rec", "ypr", "tgt", "cr", "sck", "ints", "tkl", "pd", "ff"]
+# a defender's per-game splits: field -> the stat in nfl_players_more.json
+DEF_SPLITS = {"sck": "sacks", "ints": "int", "tkl": "tkl", "pd": "pd", "ff": "ff"}
+DEF_ROSTER_FULL = 1996  # nflverse's season rosters carry every player's own number from here
+DEFENDERS = ("DL", "LB", "DB")
 
 
 def num(x):
@@ -589,7 +608,7 @@ def pfr_rows(raw, reg, years):
 
 def verse_rows(raw, reg):
     """nfl_sources.verse_rows, step for step, also keeping each stint's completions, sacks and
-    targets, and each team-season's defensive sacks and takeaways (all from the weekly stats).
+    targets (all from the weekly stats).
 
     Completions and sacks always come from the weekly stats (PFR's tables from 1992 have neither),
     over the weekly attempts. Targets go with the receptions they're measured against: where the
@@ -599,7 +618,6 @@ def verse_rows(raw, reg):
     active, rostered = S.roster_games(raw)
     pfr_all = pfr_rows(raw, reg, range(S.SPLIT, S.PFR_LAST + 1))
     agg = {}
-    defense = defaultdict(lambda: defaultdict(float))
     league = defaultdict(lambda: defaultdict(float))
     for y in range(S.SPLIT, S.LAST_SEASON + 1):
         rows = [r for r in csv.DictReader(open(os.path.join(raw, "wk", str(y) + ".csv"), encoding="utf-8")) if r["season_type"] == "REG" and r["team"]]
@@ -610,14 +628,8 @@ def verse_rows(raw, reg):
             fr = S.VERSE.get(r["team"], r["team"])
             opp = S.VERSE.get(r["opponent_team"], r["opponent_team"])
             on = rosters.get((r["player_id"], y), (None, set()))[1]
-            vs = opp
             if len(labels[r["game_id"]]) == 1 and opp in on and fr not in on:
-                fr, vs = opp, fr
-            # the defense's sacks and takeaways, counted off the offense it faced (the defenders' own
-            # sack credits miss a sack or two a season that went to no one)
-            d = defense[(y, vs)]
-            d["sk"] += S.num(r["sacks_suffered"])
-            d["to"] += S.num(r["passing_interceptions"]) + S.num(r["fumbles_lost_total"])
+                fr = opp
             key = (r["player_id"], y, fr)
             a = agg.get(key)
             if a is None:
@@ -675,7 +687,7 @@ def verse_rows(raw, reg):
             S.share_traded(lst, p["g"], rostered)
         for a in lst:
             del a["stat_g"]
-    return list(agg.values()), links, defense
+    return list(agg.values()), links
 
 
 def jersey_numbers(raw):
@@ -727,12 +739,12 @@ def register_franchise(code, last_season):
     return fr if fr in S.FRANCHISES else None
 
 
-def build_nfl(nfl_raw):
+def build_nfl(nfl_raw, more_path):
     S.fetch(nfl_raw)
     reg = S.Register(os.path.join(nfl_raw, "players.csv"))
     people = {r["gsis_id"]: r for r in csv.DictReader(open(os.path.join(nfl_raw, "players.csv"), encoding="utf-8"))}
     early = pfr_rows(nfl_raw, reg, range(S.FIRST_SEASON, S.SPLIT))
-    late, links, defense = verse_rows(nfl_raw, reg)
+    late, links = verse_rows(nfl_raw, reg)
     S.link_careers(early, late, links, reg)
     rows = early + late
     numbers = jersey_numbers(nfl_raw)
@@ -808,6 +820,117 @@ def build_nfl(nfl_raw):
                 seasons.append((r["season"], r["g"], worn))
         return most_worn(seasons, a["sum"]["g"])
 
+    # defenders: the seasons nfl_defenders.py makes each draft line from
+    drecs, dby_pid = D.load_records({k: t["g"] for k, t in ts.items()}, more_path)
+    dlines = defaultdict(list)
+    for r in drecs:
+        dlines[(r["id"], r["team"], r["season"] // 10 * 10)].append(r)
+
+    def jersey_ok(n, season):
+        return isinstance(n, int) and (1 <= n <= 99 or (n == 0 and season >= NUMBER_ZERO_FIRST))
+
+    def defender_size(pid):
+        """The register's height and weight, else his latest listed on a roster."""
+        person = people.get(pid)
+        ht = num(person["height"]) if person else None
+        wt = num(person["weight"]) if person else None
+        for r in sorted(dby_pid.get(pid, []), key=lambda r: -r["season"]):
+            ht = ht or r.get("height")
+            wt = wt or r.get("weight")
+        return rnd(ht, 0) if ht else None, rnd(wt, 0) if wt else None
+
+    def defender_register_number(pid, fr, first):
+        """register_number, on his seasons in nfl_players_more.json."""
+        p = people.get(pid)
+        n = num(p["jersey_number"]) if p else None
+        if not n or n < 1 or n > 99:
+            return None
+        n = int(n)
+        later = sorted({(r["season"], r["team"]) for r in dby_pid.get(pid, []) if r["season"] >= first})
+        for s, f in later:
+            if f != fr:
+                return None
+            if s >= S.SPLIT:
+                worn = numbers.get((pid, s, fr))
+                return n if worn and worn.most_common(1)[0][0] == n else None
+        return n if later and register_franchise(p["latest_team"], later[-1][0]) == fr else None
+
+    def season_number(r):
+        """What a source says he wore that season with that team: Counter of number -> weight."""
+        pid, s, fr, j, src = r["id"], r["season"], r["team"], r.get("jersey"), r.get("jersey_src")
+        worn = numbers.get((pid, s, fr)) if s >= S.SPLIT else None
+        if worn or not jersey_ok(j, s):
+            return worn
+        person = people.get(pid)
+        listed = num(person["jersey_number"]) if person else None
+        if src == "pro_bowl_page" or (src == "roster" and (s >= DEF_ROSTER_FULL or j != listed)):
+            return Counter({j: 1})
+        return None
+
+    # every number a source shows each defender wearing, any season, any team, and the teams
+    shown_numbers = defaultdict(set)
+    shown_teams = defaultdict(set)
+    shown_seasons = defaultdict(list)  # pid -> [(season, number worn most)]
+    for r in drecs:
+        worn = season_number(r)
+        if worn:
+            shown_numbers[r["id"]] |= set(worn)
+            shown_teams[r["id"]].add(r["team"])
+            shown_seasons[r["id"]].append((r["season"], worn.most_common(1)[0][0]))
+    for v in shown_seasons.values():
+        v.sort()
+
+    def bracketed(pid, season):
+        """The number he's shown in both the season before and the season after this one that a
+        source covers, when it's the same (Deion Sanders' 21 in 1993 and 1995: his 1994)."""
+        v = shown_seasons.get(pid, [])
+        before = [n for s, n in v if s < season]
+        after = [n for s, n in v if s > season]
+        return before[-1] if before and after and before[-1] == after[0] else None
+
+    def only_number(pid, fr):
+        """The one number every source shows him in, when that's with this team or he carried it
+        from team to team (Deion Sanders' 21 in Atlanta and Dallas: his 1994 49ers have none)."""
+        nums = shown_numbers.get(pid, set())
+        if len(nums) == 1 and (fr in shown_teams[pid] or len(shown_teams[pid]) >= 2):
+            return next(iter(nums))
+        return None
+
+    infobox = {}
+
+    def infobox_number(pid):
+        """The number in his Wikipedia infobox, when it lists only one and no source shows him in
+        another (the article is in nfl_more_sources.py's cache: no download here)."""
+        if pid not in infobox:
+            infobox[pid] = None
+            title = next((r["wiki_title"] for r in dby_pid.get(pid, []) if r.get("wiki_title")), None)
+            path = M.wiki_file(os.path.join(nfl_raw, "more"), title) if title else None
+            if path and os.path.exists(path):
+                m = re.search(r"^\s*\|\s*number\s*=(.*)$", open(path, encoding="utf-8").read(), re.M)
+                found = set(int(x) for x in re.findall(r"\b\d{1,2}\b", M.TAGS.sub("", m.group(1)))) if m else set()
+                if len(found) == 1 and shown_numbers[pid] <= found:
+                    infobox[pid] = found.pop()
+        return infobox[pid]
+
+    def defender_number(pid, fr, rs, games):
+        """Most worn for the line: each season's number from a source that shows it, else (before
+        1999) the register's where it's shown to be his with this team, else his infobox's, else
+        the one he's shown in on both sides of the season, else the one number the sources show
+        him in."""
+        first = min(r["season"] for r in rs)
+        reg_n = defender_register_number(pid, fr, first) if first < S.SPLIT else None
+        seasons = []
+        for r in rs:
+            worn = season_number(r)
+            if not worn and r["season"] < S.SPLIT:
+                n = reg_n if reg_n is not None else infobox_number(pid)
+                n = n if n is not None else bracketed(pid, r["season"])
+                n = n if n is not None else only_number(pid, fr)
+                worn = Counter({n: 1}) if n is not None else None
+            if worn:
+                seasons.append((r["season"], r["games"], worn))
+        return most_worn(seasons, games)
+
     lines = {}
     bad = []
     for t in main["teams"]:
@@ -816,18 +939,25 @@ def build_nfl(nfl_raw):
             pid, pos = p[7], p[1]
             lid = t["id"] + ":" + pid
             out = dict.fromkeys(NFL_FIELDS)
-            if pos == "DEF":
-                # the team's seasons in the cell, as build_nfl_data.py takes them
-                fr = t["fr"]
-                ss = [s for s in range(dec, dec + 10) if (s, fr) in ts]
-                g = sum(ts[(s, fr)]["g"] for s in ss)
-                if (int(g), len(ss), ss[0], ss[-1]) != tuple(p[2:6]):
-                    bad.append((lid, (int(g), len(ss), ss[0], ss[-1]), p[2:6]))
-                wk = [s for s in ss if s >= S.SPLIT]
-                g_wk = sum(ts[(s, fr)]["g"] for s in wk)
-                if covered(g_wk, g):
-                    out["dsk"] = ratio(sum(defense[(s, fr)]["sk"] for s in wk), g_wk, 2)
-                    out["dto"] = ratio(sum(defense[(s, fr)]["to"] for s in wk), g_wk, 2)
+            if pos in DEFENDERS:
+                rs = dlines.get((pid, t["fr"], dec))
+                if not rs:
+                    bad.append((lid, "missing"))
+                    lines[lid] = out
+                    continue
+                g = sum(r["games"] for r in rs)
+                seas = sorted({r["season"] for r in rs})
+                if [int(round(g)), len(seas), seas[0], seas[-1]] != p[2:6]:
+                    bad.append((lid, [int(round(g)), len(seas), seas[0], seas[-1]], p[2:6]))
+                size = defender_size(pid)
+                out["ht"], out["wt"] = size
+                out["num"] = defender_number(pid, t["fr"], rs, g)
+                for field, k in DEF_SPLITS.items():
+                    # the seasons that kept the stat, and counted his games
+                    kept = [r for r in rs if k in r["known"] and r.get("g")]
+                    g_k = sum(r["g"] for r in kept)
+                    if covered(g_k, g):
+                        out[field] = ratio(sum((r.get("defense") or {}).get(k, 0) for r in kept), g_k, 2)
                 lines[lid] = out
                 continue
             a = agg.get((pid, t["fr"], dec))
@@ -873,12 +1003,13 @@ def main():
     ap.add_argument("--cache", default=os.path.join(HERE, "..", ".cache", "attrs"))
     ap.add_argument("--nba-raw", default=os.path.join(HERE, "..", ".cache", "raw"))
     ap.add_argument("--nfl-raw", default=os.path.join(HERE, "..", ".cache", "nfl"))
+    ap.add_argument("--nfl-more", default=None)
     args = ap.parse_args()
 
     nba, bad = build_nba(args.cache, args.nba_raw)
     if bad:
         sys.exit("nba: %d lines don't match nba.json, e.g. %s" % (len(bad), bad[:5]))
-    nfl, bad = build_nfl(args.nfl_raw)
+    nfl, bad = build_nfl(args.nfl_raw, args.nfl_more or os.path.join(args.nfl_raw, "..", "nfl_players_more.json"))
     if bad:
         sys.exit("nfl: %d lines don't match nfl.json, e.g. %s" % (len(bad), bad[:5]))
     # both checked before either is written

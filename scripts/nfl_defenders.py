@@ -164,14 +164,14 @@ class Additive:
         return self.mu + sum(self.eff[f].get(x[f], 0.0) for f in self.feats if x[f] is not None)
 
 
-def build(team_games, int_rate, int_scale, qmap_cls, cells, more_path=MORE):
-    """team_games: (season, fr) -> regular-season games; int_rate: season -> league interceptions per
-    team-game; int_scale: the 1970-2025 average; qmap_cls: build_nfl_data.QuantileMap; cells: the
-    (fr, decade) keys that exist. Returns (lines by cell, playoff defenders by (season, fr))."""
+def load_records(team_games, more_path=MORE):
+    """The defenders' player-seasons, each with what the lines are made from: `tg` (his team's
+    games), `w` (the share of the season he played, as a weight), `games` (played, or estimated
+    from the roster when no source counts them: `games_est`), his career (`car_len`, `exp`,
+    `hon_other`, `draft_b`, `start_b`) and `known`, the stats the season's source kept. Shared with
+    build_game_attrs.py, so its lines are the very seasons the draft's are. Returns (records,
+    records by player id)."""
     recs = [r for r in json.load(open(more_path, encoding="utf-8"))["players"] if r["group"] in GROUP_SLOT]
-    teams_in = Counter()
-    for (s, fr) in team_games:
-        teams_in[s] += 1
 
     # ---- who played: a season's weight, and games shown
     for r in recs:
@@ -231,6 +231,17 @@ def build(team_games, int_rate, int_scale, qmap_cls, cells, more_path=MORE):
                 r["known"] = {k for k in STAT_KEYS if k in cols and (k in ("sacks", "int") or k in d)}
             else:
                 r["known"] = set()
+    return recs, by_pid
+
+
+def build(team_games, int_rate, int_scale, qmap_cls, cells, more_path=MORE):
+    """team_games: (season, fr) -> regular-season games; int_rate: season -> league interceptions per
+    team-game; int_scale: the 1970-2025 average; qmap_cls: build_nfl_data.QuantileMap; cells: the
+    (fr, decade) keys that exist. Returns (lines by cell, playoff defenders by (season, fr))."""
+    recs, by_pid = load_records(team_games, more_path)
+    teams_in = Counter()
+    for (s, fr) in team_games:
+        teams_in[s] += 1
 
     # ---- production grades, 1999 on: rank within season and group, per team
     modern = defaultdict(list)
