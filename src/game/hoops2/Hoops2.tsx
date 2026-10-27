@@ -10,15 +10,26 @@ import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
 import type { CourtTheme } from '../pixel/court';
 import type { Progress, RivalLive } from '../progress';
+import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
 import { aimPass, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
 import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
-import type { Hooper, Possession, Pt } from './types';
+import type { Body, Hooper, Possession, Pt } from './types';
 
 const DT = 1 / 60;
+
+/** What a replay needs to redraw a moment of a possession. */
+interface Snap {
+  bodies: Body[];
+  ball: Possession['ball'];
+  handler: number | null;
+  fire: number;
+  lastShot: Possession['lastShot'];
+}
+const snapOf = (p: Possession): Snap => ({ bodies: p.bodies.map((b) => ({ ...b, trail: [] })), ball: p.ball ? { ...p.ball } : null, handler: p.handler, fire: p.fire, lastShot: p.lastShot });
 const MARK_TEXT: Record<Mark, string> = { '2': '2', '3': '3', A: '3', X: '–', TO: 'TO' };
 
 /** The five from a drafted lineup, rated. */
@@ -98,6 +109,11 @@ export function Hoops2({
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const [hint, setHint] = useState<string | null>('Stick: move · flick ← → crossover · flick ↓ step-back · flick ↑ spin · hold SHOOT, let go in the green');
   const [wide, setWide] = useState(false);
+  // instant replay: the last seconds of play, the highlight to show, the replay running
+  const rec = useRef(new Recorder<Snap>(5));
+  const highlight = useRef<{ t: number; cx: number; cz: number } | null>(null);
+  const replayRef = useRef<Replay<Snap> | null>(null);
+  const [replaying, setReplaying] = useState(false);
 
   const say = (text: string, tone: 'good' | 'bad' | 'big' | 'plain' | 'green', ms = 1200) => {
     const id = ++popId.current;
@@ -169,12 +185,25 @@ export function Hoops2({
         }
       } else if (e.startsWith('finish:')) {
         const [, kind, res] = e.split(':');
+        if (p.lastShot?.and1) slowUntil.current = Math.max(slowUntil.current, performance.now() + 700);
         if (res === 'make' && (kind === 'dunk' || kind === 'contact' || kind === 'standdunk' || kind === 'oop')) {
           vibrate([25, 40, 25]);
           shake(kind === 'contact' ? 5 : 3);
           if (kind === 'contact') fx.flash = 0.7;
         }
+      } else if (e.startsWith('posterized:') || e.startsWith('ankles:') || e.startsWith('blocked:')) {
+        // a highlight: worth a replay once the possession's over
+        const b = p.bodies[Number(e.slice(e.indexOf(':') + 1))];
+        if (b && (!highlight.current || e.startsWith('posterized:'))) highlight.current = { t: p.t, cx: b.cx, cz: b.cz };
+      }
+      if (e.startsWith('posterized:')) {
+        // the posterizer: the crowd comes out of its seats, the hit in slow motion
+        slowUntil.current = Math.max(slowUntil.current, performance.now() + 1100);
+        crowd.swell(1);
+        fx.crowd = 1;
+        shake(6);
       } else if (e.startsWith('ankles:')) {
+        slowUntil.current = Math.max(slowUntil.current, performance.now() + 650);
         sfx.stamp();
         crowd.swell(0.9);
         fx.crowd = 1;
@@ -183,6 +212,8 @@ export function Hoops2({
         sfx.select();
         say('SHOOK HIM', 'good', 700);
       } else if (e.startsWith('blocked:')) {
+        slowUntil.current = Math.max(slowUntil.current, performance.now() + 500);
+        crowd.swell(0.8);
         sfx.stamp();
         vibrate(30);
         shake(3);
@@ -230,14 +261,38 @@ export function Hoops2({
     if (wasFire >= 0 && game.fire < 0) window.setTimeout(() => say('FIRE PUT OUT', 'plain', 900), 1000);
     onProgress(progress(game));
     setBetween(true);
-    window.setTimeout(() => {
+    const proceed = () => {
       if (game.over) {
         onDone(progress(game));
         setTick((n) => n + 1);
         return;
       }
       next(game);
-    }, e.kind === 'make' ? 1600 : 1250);
+    };
+    const hl = highlight.current;
+    highlight.current = null;
+    if (hl && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) window.setTimeout(() => startReplay(hl, proceed), e.kind === 'make' ? 1300 : 1000);
+    else window.setTimeout(proceed, e.kind === 'make' ? 1600 : 1250);
+  };
+
+  /** Play the highlight again, slower, from closer; then on with the game. */
+  const startReplay = (hl: { t: number; cx: number; cz: number }, done: () => void) => {
+    const frames = rec.current.clip(hl.t - REPLAY_BEFORE, hl.t + REPLAY_AFTER);
+    if (frames.length < 10) {
+      done();
+      return;
+    }
+    replayRef.current = { frames, t0: frames[0].t, t1: frames[frames.length - 1].t, start: performance.now(), speed: REPLAY_SPEED, focus: { a: hl.cx, b: hl.cz }, done };
+    renderer.replay = { cx: hl.cx, cz: hl.cz };
+    setReplaying(true);
+  };
+  const endReplay = () => {
+    const r = replayRef.current;
+    if (!r) return;
+    replayRef.current = null;
+    renderer.replay = null;
+    setReplaying(false);
+    r.done();
   };
 
   // the loop: fixed steps for the game, a draw every frame
@@ -268,7 +323,28 @@ export function Hoops2({
       last = now;
       // the posterizer in slow motion
       acc += now < slowUntil.current ? elapsed * 0.35 : elapsed;
-      if (p) {
+      if (p && p.end) {
+        // after the play: a posterized man still falls, the net still swings, the shooter lands
+        const vis = now < slowUntil.current ? elapsed * 0.35 : elapsed;
+        p.t += vis;
+        for (const b of p.bodies) {
+          if (b.h > 0 || b.vh > 0) {
+            b.h = Math.max(0, b.h + b.vh * vis);
+            b.vh = b.h > 0 ? b.vh - 34 * vis : 0;
+            if (b.h === 0 && b.bumped) {
+              b.bumped = false;
+              b.act = 'stumble';
+              b.actAt = p.t;
+            }
+          }
+          if (Math.abs(b.vx) + Math.abs(b.vz) < 0.05) continue;
+          b.cx += b.vx * vis;
+          b.cz += b.vz * vis;
+          b.vx *= Math.pow(0.05, vis);
+          b.vz *= Math.pow(0.05, vis);
+        }
+        acc = 0;
+      } else if (p) {
         while (acc >= DT) {
           acc -= DT;
           if (p.end) break;
@@ -282,12 +358,19 @@ export function Hoops2({
           }
         }
       }
+      if (p && !replayRef.current) rec.current.push(p.t, snapOf(p));
       fx.swish = Math.max(0, fx.swish - elapsed * 1.3);
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.crowd = Math.max(0, fx.crowd - elapsed * 0.45);
       fx.flash = Math.max(0, fx.flash - elapsed * 2.2);
       const ctx = canvas.getContext('2d')!;
-      if (p) renderer.draw(ctx, p, real, fx);
+      const r = replayRef.current;
+      if (r && p) {
+        const rt = replayTime(r, now);
+        const snap = rt === null ? null : frameAt(r.frames, rt);
+        if (rt === null || !snap) endReplay();
+        else renderer.draw(ctx, { ...p, t: rt, bodies: snap.bodies, ball: snap.ball, handler: snap.handler, fire: snap.fire, lastShot: snap.lastShot, meter: null, finish: null, target: null }, real, fx);
+      } else if (p) renderer.draw(ctx, p, real, fx);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
@@ -435,6 +518,13 @@ export function Hoops2({
         </div>
       )}
       {hint && <div className="hg2-hint">{hint}</div>}
+      {replaying && (
+        <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
+          <i />
+          REPLAY
+          <small>TAP TO SKIP</small>
+        </button>
+      )}
       {!attrs && <div className="fg-loading">Taking the floor…</div>}
       {g && !g.over && !autoplayHook && <div className="hg2-swipe" onPointerDown={swipeDown} onPointerMove={swipeMove} onPointerUp={swipeUp} onPointerCancel={swipeUp} aria-hidden="true" />}
       {g && !g.over && !autoplayHook && (

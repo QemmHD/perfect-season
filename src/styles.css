@@ -10881,3 +10881,68 @@ button.friendcard:active {
   inset: 0;
   touch-action: none;
 }
+/* instant replay: a cinematic letterbox, a red-dot REPLAY tag, tap anywhere to skip */
+.replay-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: calc(var(--sat) + 64px) 0 0 calc(var(--sal) + 16px);
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 0 #000;
+  touch-action: manipulation;
+  animation: replay-in 0.25s ease-out both;
+}
+.replay-banner::before,
+.replay-banner::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7%;
+  background: #000;
+  pointer-events: none;
+}
+.replay-banner::before {
+  top: 0;
+}
+.replay-banner::after {
+  bottom: 0;
+}
+.replay-banner i {
+  width: 12px;
+  height: 12px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #ff3b3b;
+  box-shadow: 0 0 10px #ff3b3b;
+  animation: replay-dot 1s steps(2) infinite;
+}
+.replay-banner small {
+  align-self: center;
+  margin-left: 6px;
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 1.5px;
+  opacity: 0.75;
+}
+@keyframes replay-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes replay-dot {
+  50% {
+    opacity: 0.2;
+  }
+}

@@ -114,6 +114,11 @@ function move(b: Body, dt: number) {
     if (b.h <= 0) {
       b.h = 0;
       b.vh = 0;
+      if (b.bumped) {
+        // the and-one: he absorbed the contact and lands off balance
+        b.bumped = false;
+        b.act = 'stumble';
+      }
     }
   }
 }
@@ -314,6 +319,8 @@ function shoot(p: Possession, b: Body, kind: ShotKind, greened: boolean, off: nu
   const blockP = contest === 'smothered' && kind !== 'layup' ? clamp(0.04 + (cd.p.blk - 60) / 250 + (cd.p.ht - b.p.ht) / 120, 0.02, 0.22) : 0;
   if (r() < blockP && cr < 3.5) {
     act(cd, 'block', p.t);
+    // swatted: he comes down off balance
+    b.bumped = true;
     loose(p, b, false);
     p.lastShot = { kind, contest, greened, off: clamp(off / 0.25, -1, 1), make: false, p: pm, and1: false };
     p.events.push('blocked:' + cd.idx);
@@ -344,6 +351,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
     act(cd, 'block', p.t);
     cd.vh = 13;
     cd.h = 0.01;
+    b.bumped = true;
     loose(p, b, false);
     p.lastShot = { kind, contest, greened: false, off: 0, make: false, p: 0, and1: false };
     p.events.push('blocked:' + cd.idx);
@@ -368,10 +376,15 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   p.lastShot = { kind, contest, greened, off: 0, make, p: pm, and1 };
   const dunk = kind !== 'layup';
   p.ball = { kind: 'shot', from: { cx: b.cx, cz: b.cz, h: b.h + 8.6 }, to: { cx: RIM.cx, cz: RIM.cz, h: RIM_H }, t0: p.t, t1: p.t + (dunk ? 0.16 : 0.34), arc: dunk ? 0 : 1.5, who: b.idx, make, points: 2 + (and1 ? 1 : 0), shot: kind };
+  if (and1) b.bumped = true;
   if (kind === 'contact' && make && cd) {
-    // posterized: he goes down
-    cd.stunUntil = p.t + 1.4;
-    act(cd, 'stumble', p.t);
+    // posterized: knocked back and down under the rim, then he picks himself up
+    const away = unit({ cx: cd.cx - b.cx, cz: cd.cz - b.cz });
+    cd.vx = away.cx * 9;
+    cd.vz = away.cz * 9;
+    cd.stunUntil = p.t + 1.9;
+    act(cd, 'fall', p.t);
+    p.events.push('posterized:' + cd.idx);
   }
   p.handler = null;
   p.meter = null;

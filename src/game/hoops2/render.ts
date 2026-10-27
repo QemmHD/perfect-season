@@ -149,6 +149,9 @@ export class HoopsRenderer {
   private budget = 0;
   private looks = new Map<string, Look>();
   private focus = { x: 0, y: 14 };
+  /** an instant replay: the spot to look at, and the camera pushed in a little */
+  replay: { cx: number; cz: number } | null = null;
+  private zoomK = 1;
   /** the last shot meter, kept a moment after the release to show how it went */
   private meterShown: { idx: number; t0: number; top: number; green: number; until: number; frac: number; greened: boolean | null } | null = null;
 
@@ -175,8 +178,8 @@ export class HoopsRenderer {
     // the man with the ball two thirds down, the rim around a third, the stands and the arena's dark
     // roof behind it
     return this.W > this.H
-      ? pcam(this.W, this.H, fx, fy, { row: 0.74, s: this.H / 38, horizon: -0.25, pitch: 0.5, fov: 0.55 })
-      : pcam(this.W, this.H, fx, fy, { row: 0.68, s: this.W / 30, horizon: 0.1, pitch: 0.45, fov: 0.6 });
+      ? pcam(this.W, this.H, fx, fy, { row: 0.74, s: (this.H / 38) * this.zoomK, horizon: -0.25, pitch: 0.5, fov: 0.55 })
+      : pcam(this.W, this.H, fx, fy, { row: 0.68, s: (this.W / 30) * this.zoomK, horizon: 0.1, pitch: 0.45, fov: 0.6 });
   }
 
   /** A court point (along cx, across cz, height h, feet) on screen, and the pixels a foot there. */
@@ -353,10 +356,12 @@ export class HoopsRenderer {
     ctx.imageSmoothingEnabled = false;
     // the camera drifts across with the ball and a little up and down the floor with it
     const bp = ballPos(p);
-    const wantX = Math.max(-10, Math.min(10, bp.cz * 0.6));
-    const wantY = Math.max(13, Math.min(30, bp.cx));
-    this.focus.x += (wantX - this.focus.x) * 0.07;
-    this.focus.y += (wantY - this.focus.y) * 0.05;
+    const rp = this.replay;
+    const wantX = rp ? Math.max(-12, Math.min(12, rp.cz * 0.9)) : Math.max(-10, Math.min(10, bp.cz * 0.6));
+    const wantY = rp ? Math.max(14, Math.min(34, rp.cx - 4)) : Math.max(13, Math.min(30, bp.cx));
+    this.focus.x += (wantX - this.focus.x) * (rp ? 0.12 : 0.07);
+    this.focus.y += (wantY - this.focus.y) * (rp ? 0.1 : 0.05);
+    this.zoomK += ((rp ? 1.35 : 1) - this.zoomK) * 0.08;
     this.pc = this.camAt(this.focus.x, this.focus.y);
     const sx = fx.shake ? Math.round((Math.random() - 0.5) * fx.shake * 2) : 0;
     const sy = fx.shake ? Math.round((Math.random() - 0.5) * fx.shake * 2) : 0;

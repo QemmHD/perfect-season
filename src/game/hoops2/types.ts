@@ -93,6 +93,8 @@ export interface Body {
   cutUntil: number;
   /** lost his man (a crossover, a screen) until then */
   stunUntil: number;
+  /** bumped in the air (an and-one): he stumbles when he lands */
+  bumped?: boolean;
   /** 0-1, drains as he plays */
   energy: number;
   trail: Pt[];
