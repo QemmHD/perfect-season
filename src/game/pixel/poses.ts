@@ -202,3 +202,77 @@ export function crossover(phase: number): Pose {
 export function standDunk(phase: number): Pose {
   return dunk(phase, 'two');
 }
+
+// ---------- football ----------
+
+/** Set at the line: a lineman's three-point stance, a skill player's two-point. */
+export function stance(three: boolean): Pose {
+  if (three)
+    return { lean: 1.05, crouch: 0.16, lift: 0, spread: 0.18, hipL: 1.0, kneeL: 1.5, hipR: 0.6, kneeR: 1.3, shL: 1.25, elL: 0.1, shR: 0.4, elR: 0.6, abL: 0.15, abR: 0.2, nod: 0.5 };
+  return { lean: 0.35, crouch: 0.08, lift: 0, spread: 0.12, hipL: 0.5, kneeL: 0.8, hipR: 0.2, kneeR: 0.6, shL: 0.5, elL: 0.9, shR: 0.4, elR: 1.0, abL: 0.25, abR: 0.25, nod: 0.3 };
+}
+
+/** Blocking: low, hands out into the man in front. */
+export function block(phase: number): Pose {
+  const s = Math.sin(phase * TAU) * 0.08;
+  return { lean: 0.45, crouch: 0.1, lift: 0, spread: 0.2, hipL: 0.55 + s, kneeL: 0.9, hipR: 0.2 - s, kneeR: 0.7, shL: 1.45, elL: 0.35, shR: 1.4, elR: 0.4, abL: 0.25, abR: 0.25 };
+}
+
+/** The throw: the ball cocked back by the ear, then the arm comes over the top (0-1). */
+export function throwBall(phase: number): Pose {
+  const t = clamp(phase);
+  const cock: Pose = { lean: -0.1, crouch: 0.03, lift: 0, hipL: 0.45, kneeL: 0.3, hipR: -0.3, kneeR: 0.4, shL: 1.3, elL: 0.6, shR: 2.6, elR: 1.9, abL: 0.2, abR: 0.5, twist: -0.4 };
+  const release: Pose = { lean: 0.3, crouch: 0.05, lift: 0, hipL: 0.5, kneeL: 0.5, hipR: -0.4, kneeR: 0.3, shL: 0.4, elL: 0.9, shR: 2.4, elR: 0.1, abL: 0.2, abR: 0.15, twist: 0.4 };
+  const finish: Pose = { ...release, shR: 1.2, elR: 0.4, lean: 0.4 };
+  if (t < 0.45) return blend(STAND, cock, ease(t / 0.45));
+  if (t < 0.7) return blend(cock, release, ease((t - 0.45) / 0.25));
+  return blend(release, finish, ease((t - 0.7) / 0.3));
+}
+
+/** Running with the ball tucked under his left arm. */
+export function carry(phase: number, speed = 1): Pose {
+  return { ...run(phase, speed), shL: 0.35, elL: 1.85, abL: 0.05 };
+}
+
+/** The stiff arm: the free arm locked straight out at the tackler. */
+export function stiffArm(phase: number): Pose {
+  return { ...carry(phase, 0.9), shR: 1.55, elR: 0.05, abR: 0.25, lean: 0.25 };
+}
+
+/** Lowering the shoulder: bent low into contact. */
+export function truck(phase: number): Pose {
+  return { ...carry(phase, 0.9), lean: 0.75, crouch: 0.08, shR: 0.9, elR: 1.6, nod: -0.3 };
+}
+
+/** A spin: the shoulders whip around. */
+export function spin(phase: number): Pose {
+  const t = clamp(phase);
+  return { ...carry(t * 2, 0.8), twist: Math.sin(t * Math.PI * 2) * 1.2, side: Math.sin(t * Math.PI) * 0.2 };
+}
+
+/** Diving at the ball carrier (0-1). */
+export function dive(phase: number): Pose {
+  const t = clamp(phase);
+  const flat: Pose = { lean: 1.35, crouch: 0.3, lift: 0.04, spread: 0.1, hipL: -0.4, kneeL: 0.4, hipR: -0.2, kneeR: 0.3, shL: 1.6, elL: 0.3, shR: 1.6, elR: 0.3, abL: 0.25, abR: 0.25, nod: 0.6 };
+  return blend({ ...STAND, lean: 0.5 }, flat, ease(t));
+}
+
+/** Down on the turf. */
+export function grounded(): Pose {
+  return { lean: 1.45, crouch: 0.42, lift: 0, spread: 0.15, hipL: -0.6, kneeL: 0.3, hipR: -0.5, kneeR: 0.4, shL: 1.8, elL: 0.6, shR: 1.4, elR: 0.9, abL: 0.6, abR: 0.5, nod: 0.5 };
+}
+
+/** Backpedaling in coverage. */
+export function backpedal(phase: number): Pose {
+  const s = Math.sin(phase * TAU);
+  return { lean: 0.32, crouch: 0.07, lift: 0, spread: 0.1, hipL: 0.25 + 0.3 * s, kneeL: 0.8, hipR: 0.25 - 0.3 * s, kneeR: 0.8, shL: 0.5 - 0.4 * s, elL: 1.2, shR: 0.5 + 0.4 * s, elR: 1.2, abL: 0.3, abR: 0.3 };
+}
+
+/** The kick: plant and swing through (0-1). */
+export function kickLeg(phase: number): Pose {
+  const t = clamp(phase);
+  const plant: Pose = { lean: 0.1, crouch: 0.04, lift: 0, hipL: 0.1, kneeL: 0.3, hipR: -0.7, kneeR: 1.3, shL: 0.6, elL: 0.4, shR: -0.4, elR: 0.3, abL: 0.7, abR: 0.5 };
+  const swing: Pose = { lean: -0.2, crouch: 0.02, lift: 0, hipL: 0.05, kneeL: 0.2, hipR: 1.6, kneeR: 0.1, shL: 1.0, elL: 0.3, shR: -0.6, elR: 0.3, abL: 0.9, abR: 0.6 };
+  if (t < 0.5) return blend(STAND, plant, ease(t / 0.5));
+  return blend(plant, swing, ease((t - 0.5) / 0.5));
+}

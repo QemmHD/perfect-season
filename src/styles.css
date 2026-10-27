@@ -7983,3 +7983,280 @@ button.friendcard:active {
 .hg2-final {
   z-index: 3;
 }
+
+/* ---------- arcade football v2: pixel field, play call, slingshot, run moves ---------- */
+.hg2-pop small {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-style: normal;
+  font-stretch: 100%;
+  letter-spacing: 1px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: none;
+}
+.fb2 {
+  background: #10160f;
+}
+.fb2 .hg2-bug .mid b {
+  font-size: 14px;
+}
+.fb2 .hg2-bug .mid small {
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+.fb2 .hg2-marks i {
+  width: 30px;
+  font-size: 9px;
+}
+.fb2 .hg2-marks i.now {
+  color: var(--gold);
+}
+.fb2 .hg2-marks i.e-TD {
+  background: var(--gold);
+  color: var(--gold-ink);
+  border-color: transparent;
+}
+.fb2 .hg2-marks i.e-FG {
+  background: var(--teal);
+  color: var(--teal-ink);
+  border-color: transparent;
+}
+.fb2 .hg2-marks i.e-INT,
+.fb2 .hg2-marks i.e-FUM {
+  background: #5a1420;
+  color: #ff9a9a;
+}
+.fb2 .hg2-hint {
+  bottom: calc(var(--sab) + 196px);
+}
+.fb2.wide .hg2-hint {
+  bottom: auto;
+  top: calc(var(--sat) + 72px);
+}
+.fb2-call {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab) + 12px);
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px - var(--sal) - var(--sar)));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(6, 12, 10, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: fb2-up 0.28s var(--ease-spring) both;
+}
+@keyframes fb2-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 18px);
+  }
+}
+.fb2-4th {
+  text-align: center;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+.fb2-play {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fb2-reroll {
+  flex: 0 0 42px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 900;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.fb2-reroll:disabled {
+  opacity: 0.35;
+}
+.fb2-play span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.fb2-play small {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fb2-play b {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 19px;
+  font-weight: 900;
+}
+.fb2-btns {
+  display: flex;
+  gap: 8px;
+}
+.fb2-go {
+  flex: 1;
+  height: 54px;
+  border-radius: 14px;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 19px;
+  letter-spacing: 0.5px;
+  touch-action: manipulation;
+}
+.fb2-go:active {
+  transform: translateY(3px);
+}
+.fb2-go.pass {
+  color: var(--teal-ink);
+  background: linear-gradient(180deg, #6ff0de, #10bfa8);
+  box-shadow: 0 4px 0 #0a7d6e;
+}
+.fb2-go.run {
+  color: #fff;
+  background: linear-gradient(180deg, #8a7cff, #5442d6);
+  box-shadow: 0 4px 0 #352a96;
+}
+.fb2-go.kick {
+  color: var(--gold-ink);
+  background: linear-gradient(180deg, #ffd97a, #e9a21f);
+  box-shadow: 0 4px 0 #9b6a10;
+}
+.fb2-go.punt {
+  flex: 0.7;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+}
+.fb2-moves {
+  position: absolute;
+  right: calc(var(--sar) + 14px);
+  bottom: calc(var(--sab) + 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.fb2-mv {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 15px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.fb2-mv:active {
+  transform: translateY(3px);
+}
+.fb2-mv.juke {
+  color: var(--teal-ink);
+  background: radial-gradient(circle at 40% 35%, #6ff0de, #10bfa8);
+  box-shadow:
+    0 5px 0 #0a7d6e,
+    0 8px 16px rgba(0, 0, 0, 0.45);
+}
+.fb2-mv.spin {
+  color: #fff;
+  background: radial-gradient(circle at 40% 35%, #8a7cff, #5442d6);
+  box-shadow:
+    0 5px 0 #352a96,
+    0 8px 16px rgba(0, 0, 0, 0.45);
+}
+.fb2-mv.power,
+.fb2-mv.scramble {
+  width: 86px;
+  height: 86px;
+  font-size: 16px;
+  color: var(--gold-ink);
+  background: radial-gradient(circle at 40% 35%, #ffd97a, #e9a21f);
+  box-shadow:
+    0 6px 0 #9b6a10,
+    0 10px 20px rgba(0, 0, 0, 0.45);
+}
+.fb2-mv.scramble {
+  width: 76px;
+  height: 76px;
+  font-size: 14px;
+  opacity: 0.92;
+}
+.fb2.wide .fb2-mv {
+  width: 58px;
+  height: 58px;
+  font-size: 12px;
+}
+.fb2.wide .fb2-mv.power,
+.fb2.wide .fb2-mv.scramble {
+  width: 68px;
+  height: 68px;
+  font-size: 13px;
+}
+.fb2.wide .fb2-moves {
+  flex-direction: row-reverse;
+  align-items: flex-end;
+}
+.fb2-float {
+  position: fixed;
+  width: 104px;
+  height: 104px;
+  margin: -52px 0 0 -52px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03) 70%);
+  pointer-events: none;
+}
+.fb2-float i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #3fe9d4, #0f9e8c);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.fb2-kick {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab) + 12px);
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px - var(--sal) - var(--sar)));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(245, 184, 61, 0.5);
+  background: rgba(6, 12, 10, 0.9);
+  color: #fff;
+  text-align: center;
+  touch-action: manipulation;
+}
+.fb2-kick .eyebrow {
+  color: var(--gold);
+}
+.fb2 .hg2-bug .mid {
+  white-space: nowrap;
+}

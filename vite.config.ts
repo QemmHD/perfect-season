@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => {
     base: './',
     plugins: [react({ jsxRuntime: 'classic' }), ...(artifact ? [viteSingleFile()] : [pwa(version)])],
     define: { __APP_VERSION__: JSON.stringify(version) },
-    test: { globals: true, environment: 'node' },
+    test: { globals: true, environment: 'node', exclude: ['**/node_modules/**', '.claude/**', 'dist/**'] },
     // icons and launch images are for the installed web app, not the single-page artifact
     publicDir: artifact ? false : 'public',
     build: artifact

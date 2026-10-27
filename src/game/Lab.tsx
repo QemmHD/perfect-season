@@ -4,7 +4,8 @@ import React, { useMemo, useState } from 'react';
 import { CELLS } from '../engine/data';
 import { NFL } from '../engine/sport';
 import type { Lineup, Player } from '../engine/types';
-import { Football, type Progress } from './football/Football';
+import type { Progress } from './progress';
+import { fbKitsFor, Football2 } from './football2/Football2';
 import { Hoops2, kitsFor } from './hoops2/Hoops2';
 import { rankOf } from './football/model';
 
@@ -56,12 +57,15 @@ export default function Lab() {
     );
   return (
     <div className="screen" style={{ paddingTop: 0, paddingBottom: 0 }}>
-      <Football
+      <Football2
         lineup={s.lineup}
-        rivalDef={s.def}
+        rivalLineup={sample(Number(q.get('rival') ?? 0.6)).lineup}
         rivalName="Rival"
         seed={q.get('seed') ?? 'lab'}
         rival={{ name: 'Rival', score: 7, drive: 1, done: false }}
+        ourKit={fbKitsFor('#203731', '#ffb612').home}
+        theirKit={fbKitsFor('#aa0000', '#b3995d').away}
+        field={{ homeC1: '#203731', homeC2: '#ffb612', homeName: 'Packers', awayC1: '#aa0000', awayC2: '#b3995d', awayName: '49ers' }}
         autoplayHook={q.has('auto')}
         onProgress={setProg}
         onDone={setProg}
