@@ -366,10 +366,10 @@ export function Football2({
       acc += now < slowUntil.current ? elapsed * 0.4 : elapsed;
       if (p && kickAnim.current) {
         p.t += elapsed;
-        // the ball stops at the stands
+        // the ball disappears into the stands (left in the air it would read as a man by the posts)
         if (p.ball && p.t > p.ball.t0) {
           const k = (p.t - p.ball.t0) / (p.ball.t1 - p.ball.t0);
-          if (p.ball.from.y + (p.ball.to.y - p.ball.from.y) * k > 117) p.ball.t1 = p.t;
+          if (k >= 1 || p.ball.from.y + (p.ball.to.y - p.ball.from.y) * k > 117) p.ball = null;
         }
         acc = 0;
       } else if (p && p.phase !== 'pre' && !p.end) {
