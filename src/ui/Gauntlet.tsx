@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { castGame } from '../engine/broadcast';
-import { climb, clearChance, CLEAR_COINS, coinsFor, GAUNTLET_SIZE, type GauntletGame, LIVES, RUNG_COINS, rungsWon } from '../engine/gauntlet';
+import { climb, clearChance, CLEAR_COINS, coinsFor, defensiveStar, GAUNTLET_SIZE, type GauntletGame, LIVES, RUNG_COINS, rungsWon } from '../engine/gauntlet';
 import type { TeamRating } from '../engine/rating';
 import { NFL } from '../engine/sport';
 import type { Lineup, PlayoffTeam } from '../engine/types';
@@ -211,6 +211,7 @@ export function Gauntlet({
                   <small>
                     {opp.w}–{opp.l}
                     {opp.t ? '–' + opp.t : ''} · {opp.star}
+                    {NFL && defensiveStar(opp) ? ' & ' + defensiveStar(opp) : ''}
                     {boss ? ' · THE GREATEST' : ''}
                   </small>
                 </span>

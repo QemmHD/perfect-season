@@ -31,13 +31,20 @@ import { frameY, useLayout } from '../stage';
 import { CoinChip, Confirm, Fit, initials, seasonLabel } from './common';
 import { Back, Crown, Down, Lock, Refresh } from './icons';
 import { CountUp, reducedMotion, Sparks } from './motion';
-import { cardName, FLOOR, hotFor, isDefense, posLabel, type SortKey, SORTS, sortValue, statCols } from './sportui';
+import { cardName, FLOOR, hotFor, isDefender, roleLabel, type SortKey, SORTS, sortValue, statCols } from './sportui';
 import { CardSheet, TradingCard } from './Card';
 
-/** Card left edges: the basketball court's five spots, or football's two rows of three (receivers up front, the backfield and the defense behind). */
-const COURT_X: Record<Slot, number> = NFL ? { WR: 20, TE: 153, FLEX: 286, RB: 20, QB: 153, DEF: 286 } : { C: 70, PF: 236, SF: 26, SG: 280, PG: 153 };
-const COURT_ORDER: Slot[] = NFL ? ['WR', 'TE', 'FLEX', 'RB', 'QB', 'DEF'] : ['C', 'PF', 'SF', 'SG', 'PG'];
+/** Card left edges on the basketball court's five spots. */
+const COURT_X: Record<Slot, number> = { C: 70, PF: 236, SF: 26, SG: 280, PG: 153 };
+/**
+ * Football's field, top to bottom: the defense across the line of scrimmage (DL, LB, DB), the
+ * receivers (WR, TE, FLEX), and the backfield (QB, RB). Card centers across the 390 frame.
+ */
+const FIELD_CX: Record<Slot, number> = { DL: 62, LB: 195, DB: 328, WR: 62, TE: 195, FLEX: 328, QB: 128.5, RB: 261.5 };
+const COURT_ORDER: Slot[] = NFL ? ['DL', 'LB', 'DB', 'WR', 'TE', 'FLEX', 'QB', 'RB'] : ['C', 'PF', 'SF', 'SG', 'PG'];
 const CARD_W = 84;
+/** a football card's height before it's scaled down to fit three rows on a short field */
+const FIELD_CH = 104;
 const BAR_LABELS = NFL ? ['PASSING', 'RUSHING', 'RECEIVING', 'DEFENSE'] : ['SCORING', 'BOARDS', 'PASSING', 'DEFENSE'];
 const MODE_NAMES: Record<Mode, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
 const TEAM_MS = 1150;
@@ -156,15 +163,38 @@ function botLine(pick: BotPick, roundCell: string, lead: string, who = 'the AI')
   return 'Nobody here fit ' + who + ', so they drew the ' + c.era + ' ' + c.name + ' and took ' + pick.player.name + '.';
 }
 
-/** Card tops for the spots, fitted to the court's (or field's) height. */
-function courtLayout(h: number, ch: number): Record<Slot, number> {
+interface CourtLayout {
+  /** each spot's card box, left and top (football: the box before its scale) */
+  x: Record<Slot, number>;
+  y: Record<Slot, number>;
+  /** football: how much the cards are scaled down to fit the field (1 = full size) */
+  k: number;
+  /** football: the line of scrimmage and the first-down line */
+  los: number;
+  first: number;
+}
+
+/** The spots' cards, fitted to the court's (or field's) height. */
+function courtLayout(h: number, ch: number): CourtLayout {
   if (NFL) {
+    // three rows: full size when they fit, else scaled down together (each card about its center)
     const pad = 8;
-    const gap = 16;
-    const slack = Math.max(0, h - (pad + ch + gap + ch + pad));
-    const y1 = pad + slack * 0.42;
-    const y2 = y1 + ch + gap + slack * 0.22;
-    return { WR: y1, TE: y1, FLEX: y1, RB: y2, QB: y2, DEF: y2 };
+    const los = 18;
+    const gap = 10;
+    const k = Math.max(0.5, Math.min(1, (h - 2 * pad - los - gap) / (3 * ch)));
+    const vh = ch * k;
+    const slack = Math.max(0, h - (2 * pad + los + gap + 3 * vh));
+    const yD = pad + slack * 0.3;
+    const y1 = yD + vh + los + slack * 0.4;
+    const y2 = y1 + vh + gap + slack * 0.12;
+    const top: Record<Slot, number> = { DL: yD, LB: yD, DB: yD, WR: y1, TE: y1, FLEX: y1, QB: y2, RB: y2 };
+    const x: Record<Slot, number> = {};
+    const y: Record<Slot, number> = {};
+    for (const s of COURT_ORDER) {
+      x[s] = FIELD_CX[s] - CARD_W / 2;
+      y[s] = top[s] - (ch * (1 - k)) / 2;
+    }
+    return { x, y, k, los: yD + vh + los / 2, first: Math.max(4, yD - 6) };
   }
   const pad = 8;
   const gap = 10;
@@ -174,7 +204,7 @@ function courtLayout(h: number, ch: number): Record<Slot, number> {
   const y1 = pad + s * 0.565 + e * 0.35;
   const y2 = y1 + ch + gap + e * 0.15;
   const y3 = y2 + s * 0.435 + e * 0.1;
-  return { C: y1, PF: y1, SF: y2, SG: y2, PG: y3 };
+  return { x: COURT_X, y: { C: y1, PF: y1, SF: y2, SG: y2, PG: y3 }, k: 1, los: 0, first: 0 };
 }
 
 function CourtLines({ h, ys, ch }: { h: number; ys: Record<Slot, number>; ch: number }) {
@@ -212,11 +242,9 @@ function CourtLines({ h, ys, ch }: { h: number; ys: Record<Slot, number>; ch: nu
   );
 }
 
-/** A football field under the six cards: yard lines, hash marks, the line of scrimmage between
-    the receivers and the backfield, and the first-down line ahead of them. */
-function FieldLines({ h, ys, ch }: { h: number; ys: Record<Slot, number>; ch: number }) {
-  const los = ys.RB - (ys.RB - (ys.WR + ch)) / 2;
-  const first = Math.max(6, ys.WR - 6);
+/** A football field under the eight cards: yard lines, hash marks, the line of scrimmage between
+    the defense and the offense, and the first-down line beyond the defense. */
+function FieldLines({ h, los, first }: { h: number; los: number; first: number }) {
   const step = 46;
   const lines: number[] = [];
   for (let y = los % step; y < h; y += step) lines.push(y);
@@ -636,7 +664,7 @@ export function Draft(props: DraftProps) {
       }
       dispatch({ type: 'prime', playerId: p.id });
       sfx.levelUp();
-      props.onToast(p.name + ' primed: now ' + (isDefense(p) ? 'its ' : 'his ') + up.primedFrom!.abbr + ' ' + up.primedFrom!.era + ' line.');
+      props.onToast(p.name + ' primed: now his ' + up.primedFrom!.abbr + ' ' + up.primedFrom!.era + ' line.');
       const why = whyUnavailable({ ...s, armed: null }, up);
       if (why === null) {
         setSelected(p.id);
@@ -649,7 +677,7 @@ export function Draft(props: DraftProps) {
       props.onToast(
         p.name +
           ': ' +
-          (why === 'taken' ? 'taken by ' + (online ? online.oppName : 'the AI') + '.' : why === 'dup' ? 'already on your team.' : s.armed === 'trade' ? "can't replace anyone on your team." : isDefense(p) ? 'your DEF spot is filled.' : 'no open spot for his positions.')
+          (why === 'taken' ? 'taken by ' + (online ? online.oppName : 'the AI') + '.' : why === 'dup' ? 'already on your team.' : s.armed === 'trade' ? "can't replace anyone on your team." : isDefender(p) ? 'your ' + p.pos[0] + ' spot is filled.' : 'no open spot for his positions.')
       );
       sfx.nope();
       return;
@@ -712,7 +740,7 @@ export function Draft(props: DraftProps) {
     if (here) {
       setSwapFrom(k);
       sfx.select();
-      props.onToast('Tap a spot to move ' + cardName(here) + ', or tap ' + (isDefense(here) ? 'it' : 'him') + ' again to cancel.');
+      props.onToast('Tap a spot to move ' + cardName(here) + ', or tap him again to cancel.');
       return;
     }
     if (cell && !s.youDone) {
@@ -842,12 +870,13 @@ export function Draft(props: DraftProps) {
                     {rar !== 'common' && <i className={'rar ' + rar}>{RARITY_NAMES[rar].toUpperCase()}</i>}
                   </b>
                   <span>
-                    {posLabel(p)} · {p.g} G{p.seasons > 1 ? ' · ' + p.seasons + ' seasons' : ''}
-                    {p.est && !blind ? ' · est.' : ''}
+                    {roleLabel(p)} · {NFL && p.est ? '~' : ''}
+                    {p.g} G{p.seasons > 1 ? ' · ' + p.seasons + ' seasons' : ''}
+                    {!NFL && p.est && !blind ? ' · est.' : ''}
                   </span>
                   {tag && <em>{tag}</em>}
                 </span>
-                <span className={'stats' + (NFL ? ' n' + cols.length + (isDefense(p) ? ' def' : '') : '')}>
+                <span className={'stats' + (NFL ? ' n' + cols.length + (isDefender(p) ? ' def' : '') : '')}>
                   {cols.map((c) => (
                     <span key={c.key}>
                       <i>{c.label}</i>
@@ -923,8 +952,10 @@ export function Draft(props: DraftProps) {
       </div>
     ) : null;
 
-  const ch = courtH < 250 ? 96 : 104;
-  const ys = courtLayout(courtH, ch);
+  const ch = NFL ? FIELD_CH : courtH < 250 ? 96 : 104;
+  const lay = courtLayout(courtH, ch);
+  const ys = lay.y;
+  const xs = lay.x;
   const cards = COURT_ORDER.map((k) => ({ k, p: s.lineup[k] })).filter((x) => x.p) as { k: Slot; p: Player }[];
   const cellReady = !!cell && !spinning;
 
@@ -938,7 +969,7 @@ export function Draft(props: DraftProps) {
           <span>
             ROUND {roundNo} / {ROUNDS} · {online ? 'VS ' + online.oppName.toUpperCase() : MODE_NAMES[mode]}
           </span>
-          <div className="segs">
+          <div className={'segs' + (ROUNDS > 6 ? ' many' : '')}>
             {SLOTS.map((_, i) => (
               <i key={i} className={i < filled ? 'on' : ''} />
             ))}
@@ -988,7 +1019,7 @@ export function Draft(props: DraftProps) {
       )}
 
       <div className={'court' + (wave ? ' wave' : '')} ref={courtRef}>
-        {NFL ? <FieldLines h={courtH} ys={ys} ch={ch} /> : <CourtLines h={courtH} ys={ys} ch={ch} />}
+        {NFL ? <FieldLines h={courtH} los={lay.los} first={lay.first} /> : <CourtLines h={courtH} ys={ys} ch={ch} />}
         {COURT_ORDER.map((k) => {
           const glow = !!selectedP && targets.includes(k) && !s.lineup[k];
           const moverOk = !!swapFrom && swapFrom !== k && !s.lineup[k] && canMove(s.lineup, swapFrom, k);
@@ -996,7 +1027,7 @@ export function Draft(props: DraftProps) {
             <button
               key={k}
               className={'slot-empty' + (glow || moverOk ? ' glow' : '') + (s.lineup[k] ? ' filled' : '')}
-              style={{ left: COURT_X[k], top: ys[k], height: ch }}
+              style={{ left: xs[k], top: ys[k], height: ch, ...(lay.k < 1 ? { scale: String(lay.k) } : {}) }}
               onClick={() => tapSlot(k)}
               aria-label={k + ': empty' + (glow ? ', tap to place' : '')}
               aria-hidden={!!s.lineup[k]}
@@ -1020,7 +1051,7 @@ export function Draft(props: DraftProps) {
             <button
               key={p.id}
               className={cls.join(' ')}
-              style={{ translate: COURT_X[k] + 'px ' + ys[k] + 'px', height: ch, '--c1': p.c1, '--c2': p.c2, '--i': i } as React.CSSProperties}
+              style={{ translate: xs[k] + 'px ' + ys[k] + 'px', height: ch, ...(lay.k < 1 ? { scale: String(lay.k) } : {}), '--c1': p.c1, '--c2': p.c2, '--i': i } as React.CSSProperties}
               onPointerDown={() => {
                 unpress();
                 // a press whose release never reached the card (the sheet covered it) is over
@@ -1058,7 +1089,7 @@ export function Draft(props: DraftProps) {
           );
         })}
         {bursts.map((b) => (
-          <span key={b.id} className="burst" style={{ left: COURT_X[b.slot] + CARD_W / 2, top: ys[b.slot] + ch / 2, '--bc': b.color } as React.CSSProperties} aria-hidden="true">
+          <span key={b.id} className="burst" style={{ left: xs[b.slot] + CARD_W / 2, top: ys[b.slot] + ch / 2, '--bc': b.color } as React.CSSProperties} aria-hidden="true">
             <i className="ring" />
             <Sparks color={b.color} />
           </span>
@@ -1085,7 +1116,7 @@ export function Draft(props: DraftProps) {
             const p = s.botLineup[k];
             return (
               <span key={k + (p ? p.id : '')} className={'botchip' + (p ? ' on' : '')} style={p ? { background: p.c1, borderColor: p.c2 } : undefined} title={p ? p.name : k}>
-                {p ? (isDefense(p) ? p.abbr : initials(p.name)) : k}
+                {p ? initials(p.name) : k}
               </span>
             );
           })}
@@ -1168,7 +1199,7 @@ export function Draft(props: DraftProps) {
       {coach >= 0 && !spinning && ((coach === 0 && !cell && filled === 0) || (coach === 1 && drawer && cell) || (coach === 2 && selectedP)) && (
         <div className={'coach c' + coach + (coach === 0 && boostersOn ? ' above-tray' : '')} key={coach}>
           <span>
-            {coach === 0 ? 'Tap SPIN to roll a random team and decade.' : coach === 1 ? 'Pick any player. Faded players don’t fit an open spot.' : 'Now tap a glowing spot on the ' + FLOOR + ' to place ' + (selectedP && isDefense(selectedP) ? 'it.' : 'him.')}
+            {coach === 0 ? 'Tap SPIN to roll a random team and decade.' : coach === 1 ? 'Pick any player. Faded players don’t fit an open spot.' : 'Now tap a glowing spot on the ' + FLOOR + ' to place him.'}
           </span>
           <button
             onClick={() => {

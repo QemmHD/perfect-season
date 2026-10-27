@@ -7,8 +7,9 @@ import { displayName } from '../lib/names';
 import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_QUEUE, myPubkey, NET_ON, NS_SUFFIX, pool, query, sign, tagValue } from './nostr';
 
 /** Bump when the draft rules change, so only players on the same rules get paired. 2: the
-    match is played out (the arcade game), and each side's score goes over the match channel. */
-const DRAFT_RULES = 2;
+    match is played out (the arcade game), and each side's score goes over the match channel.
+    3: football drafts eight, a DL, a LB and a DB in place of a team defense. */
+const DRAFT_RULES = 3;
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = 'ps1-' + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
 /** Everyone with the app open, whichever sport: the online count is the whole app's. */

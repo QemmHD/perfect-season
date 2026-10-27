@@ -63,7 +63,7 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
       </div>
       <ul className="welcome-perks rise-in" style={{ animationDelay: '650ms' }}>
         <li>
-          <b>Draft</b> {NFL ? 'six' : 'five'} players from random {NFL ? 'NFL' : 'NBA'} teams and decades
+          <b>Draft</b> {NFL ? 'eight' : 'five'} players from random {NFL ? 'NFL' : 'NBA'} teams and decades
         </li>
         <li>
           <b>Climb</b> the daily, weekly and all-time leaderboards

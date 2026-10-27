@@ -68,6 +68,17 @@ export interface GauntletGame {
   score: [number, number] | null;
 }
 
+/**
+ * Football: a legend team's defensive star, for the ladder next to its offensive one. Its best
+ * honored defender that season (first-team All-Pro over Pro Bowl), or none. Every legend team
+ * brings its season's best DL, LB and DB to the game (PlayoffTeam.def), who make its defensive
+ * plays in the telling.
+ */
+export function defensiveStar(t: PlayoffTeam): string | null {
+  const best = (t.def ?? []).filter((p) => (p.s.hon ?? 0) > 0).sort((a, b) => (b.s.hon ?? 0) - (a.s.hon ?? 0))[0];
+  return best ? best.name : null;
+}
+
 /** Your chance against a legend on neutral ground. */
 export function rungChance(rating: number, opp: PlayoffTeam): number {
   return Math.min(0.97, Math.max(0.03, gameWinChance(rating, ratingForWins(opp.wFull))));

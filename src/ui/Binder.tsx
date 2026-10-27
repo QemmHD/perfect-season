@@ -54,7 +54,7 @@ export function Binder({ collection, onClose }: { collection: Collection; onClos
               </span>
             ))}
           </div>
-          <p className="note">Every player you draft goes in. Finish a team-decade's core set, its {NFL ? 'defense and five best players' : 'five best players'}, for {SET_REWARD} coins.</p>
+          <p className="note">Every player you draft goes in. Finish a team-decade's core set, its {NFL ? 'five best on offense and its best DL, LB and DB' : 'five best players'}, for {SET_REWARD} coins.</p>
           <div className="binder-list">
             {all.map((f) => {
               const isOpen = open === f.fr;

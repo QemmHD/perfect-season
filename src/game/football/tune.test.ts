@@ -10,10 +10,11 @@ import { snap, step } from './play';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const run = NFL && (globalThis as any).process?.env?.TUNE ? it : it.skip;
 
-function lineupAt(level: number): { lineup: Lineup; def: Player } {
+function lineupAt(level: number): { lineup: Lineup; def: Player[] } {
   const by = (pos: string) => CELLS.flatMap((c) => c.players).filter((p) => p.pos[0] === pos).sort((a, b) => rankOf(a) - rankOf(b));
   const at = (pos: string, l: number) => { const list = by(pos); return list[Math.min(list.length - 1, Math.floor(l * (list.length - 1)))]; };
-  return { lineup: { QB: at('QB', level), RB: at('RB', level), WR: at('WR', level), TE: at('TE', level), FLEX: at('WR', Math.max(0, level - 0.05)), DEF: at('DEF', level) } as Lineup, def: at('DEF', level) };
+  const def = ['DL', 'LB', 'DB'].map((k) => at(k, level));
+  return { lineup: { QB: at('QB', level), RB: at('RB', level), WR: at('WR', level), TE: at('TE', level), FLEX: at('WR', Math.max(0, level - 0.05)), DL: def[0], LB: def[1], DB: def[2] } as Lineup, def };
 }
 
 run('football numbers', () => {

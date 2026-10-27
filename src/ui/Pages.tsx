@@ -19,7 +19,7 @@ import { StreakChip } from './Rewards';
 import { Bolt, Calendar, Crown, Football, Home as HomeIcon, Hoop, Lock, Ranks as RanksIcon, Target, User } from './icons';
 import { PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
 
-const SPELLED = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
+const SPELLED = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
 
 /** Basketball or football: the other one reloads the app into that sport. */
 function SportSwitch({ onSport }: { onSport: (s: SportId) => void }) {
@@ -481,7 +481,7 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
           )}
           <p className="note">
             {NFL
-              ? 'Every NFL quarterback, running back, receiver and tight end from 1970 through ' + props.latest + ', and every team’s defense by points allowed, from ' + props.source + '.'
+              ? 'Every NFL quarterback, running back, receiver and tight end from 1970 through ' + props.latest + ', and every team’s best defensive linemen, linebackers and defensive backs, from ' + props.source + '. Defenders’ stats run from 1999, and before that where a career table kept them; an earlier defender is judged by his All-Pro and Pro Bowl years, his career and those stats.'
               : 'Every NBA player from 1959–60 through ' + (props.latest - 1) + '–' + String(props.latest).slice(2) + ', from ' + props.source + '. Steals and blocks before 1973–74 weren’t recorded and are estimated.'}
           </p>
           <p className="note num">
@@ -505,13 +505,13 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
           {NFL ? (
             <>
               <p>
-                <b>Spin</b> for a random NFL team and decade. Pick anyone who played for them then: a quarterback, running back, receiver or tight end, or the team’s defense. Six rounds fill QB, RB, WR, TE, FLEX (any back, receiver or tight end) and DEF.
+                <b>Spin</b> for a random NFL team and decade. Pick anyone who played for them then: a quarterback, running back, receiver or tight end, or a defender. Eight rounds fill QB, RB, WR, TE, FLEX (any back, receiver or tight end) and the defense: DL (a lineman), LB (a linebacker) and DB (a corner or a safety).
               </p>
               <p>
-                Players bring their per-game yards and touchdowns from their years with that team in that decade; a defense brings the points it allowed. Your team is scored on passing, rushing, receiving and defense against a near-perfect lineup, and a weak spot drags the whole team down.
+                Players bring their per-game yards and touchdowns from their years with that team in that decade; defenders their sacks, tackles and interceptions a season, Pro Bowls and All-Pro years. Your team is scored on passing, rushing, receiving and defense against a near-perfect lineup, and a weak spot drags the whole team down.
               </p>
               <p>
-                <b>Every era counts the same.</b> The list shows real stats, but each player is scored against the league in his own seasons: 250 passing yards a game meant more in 1977 than it does now. Positions are scored on one scale, so an all-time tight end is worth as much as an all-time quarterback.
+                <b>Every era counts the same.</b> The list shows real stats, but each player is scored against the league in his own seasons: 250 passing yards a game meant more in 1977 than it does now, and a defender is ranked among the defenders of his own seasons. Positions are scored on one scale, so an all-time tight end or linebacker is worth as much as an all-time quarterback.
               </p>
               <p>
                 You get <b>1 free team respin and 1 free decade respin</b> per draft. Tap two players on the field to swap their spots.
@@ -560,7 +560,7 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
             <b>After the season:</b> the draft report grades every pick against the best one there was. Then take the same team into the <b>Legends Gauntlet</b>: eight of the greatest teams ever, one live game at a time, with three lives. A new eight every week.
           </p>
           <p>
-            <b>Binder:</b> every player you draft is a card you keep. Finish a team-decade’s set (its {NFL ? 'defense and five best players' : 'five best players'}) for coins. Press and hold a card on the {NFL ? 'field' : 'court'} to look closer.
+            <b>Binder:</b> every player you draft is a card you keep. Finish a team-decade’s set (its {NFL ? 'five best on offense and best DL, LB and DB' : 'five best players'}) for coins. Press and hold a card on the {NFL ? 'field' : 'court'} to look closer.
           </p>
           <p>
             <b>Every day:</b> open the daily chest (it grows for 7 days in a row) and finish three missions for coins and XP.

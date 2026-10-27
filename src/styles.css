@@ -1117,6 +1117,13 @@ button:focus-visible {
   background: var(--line);
   overflow: hidden;
 }
+/* football's eight rounds fit the same width as six */
+.segs.many {
+  gap: 4px;
+}
+.segs.many i {
+  width: 23px;
+}
 .segs i::after {
   content: '';
   position: absolute;
@@ -2025,12 +2032,14 @@ button:focus-visible {
 .stats b.up {
   color: var(--gold);
 }
-/* football rows show four stats; a defense's labels run long */
+/* football rows show four stats; a defender's labels run long (PRO BOWL, ALL-PRO) */
 .stats.n4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .stats.def i {
   letter-spacing: 0;
+  white-space: nowrap;
+  font-size: 8.5px;
 }
 .drawer-tray {
   border-top: 1px solid var(--line);
@@ -5199,6 +5208,16 @@ button.friendcard:active {
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--sub);
+}
+/* a defender's honor that season, beside his name */
+.scout-row .honor {
+  flex-shrink: 0;
+  margin-left: -2px;
+  font-style: normal;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--gold);
 }
 /* a friend with the same room code on the other sport or app version */
 .mismatch {

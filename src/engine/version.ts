@@ -6,8 +6,11 @@ import { BENCHMARK, W, WIN_CURVE } from './rating';
 import { hashString } from './rng';
 import { NFL } from './sport';
 
-/** Bump when the rating formula changes in a way the constants below don't show. */
-const RULES = 1;
+/**
+ * Bump when the rating formula changes in a way the constants below don't show. Football 2: three
+ * real defenders (DL, LB, DB) in place of a team defense.
+ */
+const RULES = NFL ? 2 : 1;
 
 export const DATA_V: string = (() => {
   let h = hashString(JSON.stringify(NFL ? ['nfl', W, BENCHMARK, WIN_CURVE, RULES] : [W, BENCHMARK, WIN_CURVE, RULES]));

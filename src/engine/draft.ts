@@ -5,7 +5,7 @@ import { NFL } from './sport';
 import { type Booster, type BotLevel, type Cell, type Lineup, type Mode, type Player, type Slot, SLOTS, emptyLineup } from './types';
 
 /** Where a player goes first when he can play more than one spot (the FLEX fills last). */
-export const SLOT_PREFERENCE: Slot[] = NFL ? ['QB', 'DEF', 'TE', 'RB', 'WR', 'FLEX'] : ['C', 'PG', 'PF', 'SG', 'SF'];
+export const SLOT_PREFERENCE: Slot[] = NFL ? ['QB', 'DL', 'LB', 'DB', 'TE', 'RB', 'WR', 'FLEX'] : ['C', 'PG', 'PF', 'SG', 'SF'];
 /** Spots in a lineup, and so rounds in a draft. */
 export const ROUNDS = SLOTS.length;
 
@@ -118,8 +118,8 @@ export function whyUnavailable(s: DraftState, p: Player): Unavailable {
   if (s.taken.includes(p.id)) return 'taken';
   const held = SLOTS.filter((k) => s.lineup[k]?.pid === p.pid);
   // Trade lets you replace a slot, but you still can't hold the same person twice. A football
-  // trade that can only replace him with another decade's line of his (a defense for the same
-  // franchise's from another decade) is fine.
+  // trade that can only replace him with another decade's line of his (Reggie White's 1990s
+  // Packers for his 1980s Eagles) is fine.
   const upgrade = NFL && s.armed === 'trade' && held.every((k) => s.lineup[k]!.id !== p.id) && eligibleSlots(s, p).every((k) => held.includes(k));
   if (held.length && !upgrade) return 'dup';
   const targets = s.armed === 'trade' ? SLOTS.filter((x) => s.lineup[x]) : openSlots(s.lineup);

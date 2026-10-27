@@ -8,7 +8,7 @@ import { Football, type Progress } from './football/Football';
 import { Hoops2, kitsFor } from './hoops2/Hoops2';
 import { rankOf } from './football/model';
 
-function sample(level: number): { lineup: Lineup; def: Player } {
+function sample(level: number): { lineup: Lineup; def: Player[] } {
   const by = (pos: string) =>
     CELLS.flatMap((c) => c.players)
       .filter((p) => p.pos[0] === pos)
@@ -17,7 +17,8 @@ function sample(level: number): { lineup: Lineup; def: Player } {
     const list = by(pos);
     return list[Math.min(list.length - 1, Math.floor(l * (list.length - 1)))];
   };
-  return { lineup: { QB: at('QB', level), RB: at('RB', level), WR: at('WR', level), TE: at('TE', level), FLEX: at('WR', level - 0.04), DEF: at('DEF', level) } as Lineup, def: at('DEF', 0.5) };
+  const lineup = { QB: at('QB', level), RB: at('RB', level), WR: at('WR', level), TE: at('TE', level), FLEX: at('WR', level - 0.04), DL: at('DL', level), LB: at('LB', level), DB: at('DB', level) } as Lineup;
+  return { lineup, def: ['DL', 'LB', 'DB'].map((k) => at(k, 0.5)) };
 }
 
 function hoopFive(level: number): Lineup {
@@ -58,7 +59,7 @@ export default function Lab() {
     <div className="screen" style={{ paddingTop: 0, paddingBottom: 0 }}>
       <Football
         lineup={s.lineup}
-        rivalDef={s.def}
+        rivalDefense={s.def}
         rivalName="Rival"
         seed={q.get('seed') ?? 'lab'}
         rival={{ name: 'Rival', score: 7, drive: 1, done: false }}

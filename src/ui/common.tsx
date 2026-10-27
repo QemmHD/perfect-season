@@ -1,7 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { levelInfo } from '../engine/economy';
 import type { Player } from '../engine/types';
-import { isDefense } from './sportui';
 import { useLayout } from '../stage';
 import { Coin, Gear, Help } from './icons';
 import { CountUp, reducedMotion, usePulse } from './motion';
@@ -80,7 +79,7 @@ export function TeamChips({ players, stagger, lit = -1, on = 99 }: { players: (P
     <div className="teamchips">
       {players.filter(Boolean).map((p, i) => (
         <span key={p!.id} className={'teamchip' + (stagger ? ' rise-in' : '') + (i === lit ? ' lit' : '') + (i >= on ? ' unlit' : '')} style={{ background: p!.c1, borderColor: p!.c2, animationDelay: i * 70 + 'ms' }}>
-          {isDefense(p!) ? p!.abbr : initials(p!.name)}
+          {initials(p!.name)}
         </span>
       ))}
     </div>

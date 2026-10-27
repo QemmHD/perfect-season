@@ -11,7 +11,7 @@ import { aiDrives, Football } from './football/Football';
 import type { RivalLive } from './progress';
 import { WaitLine } from './Wait';
 import { DRIVES } from './football/drive';
-import { squadOf } from './football/model';
+import { defendersOf, squadOf } from './football/model';
 import { POSSESSIONS } from './hoops/game';
 import { aiPossessions, Hoops } from './hoops/Hoops';
 import { fiveOf } from './hoops/model';
@@ -101,10 +101,10 @@ export function Arcade({
     const ends = wire.ends.filter((e) => owns(e)).slice(0, TOTAL);
     return { score: pointsThrough({ score: 0, drive: 0, done: false, ends }, TOTAL), drive: ends.length, done: wire.done && ends.length >= TOTAL, ends, plays: wire.plays ?? 0 };
   }, [wire?.done, wire?.plays, wire?.ends.join()]);
-  const rivalDef = (rivalLineup.DEF as Player | null) ?? null;
+  const rivalDefense = useMemo(() => defendersOf(rivalLineup), [rivalLineup]);
   // the AI's side, played up front (its offense against your defense)
   const aiPlay = (off: Lineup, def: Lineup, s: string, skill: number, a: (p: Player) => Attrs | null): Progress =>
-    NFL ? aiDrives(off, (def.DEF as Player | null) ?? null, s, skill, a) : aiPossessions(off, def, s, skill, a);
+    NFL ? aiDrives(off, defendersOf(def), s, skill, a) : aiPossessions(off, def, s, skill, a);
   const ai = useMemo(() => (!online && attrs ? aiPlay(rivalLineup, lineup, seed, AI_SKILL[botLevel], attrs) : null), [attrs]);
 
   // Online, the AI can finish the other side's drives: when that phone goes quiet, or when you're
@@ -234,11 +234,11 @@ export function Arcade({
     );
   }
   if (stage === 'kickoff') {
-    const sq = attrs ? squadOf(lineup, rivalDef, attrs) : null;
+    const sq = attrs ? squadOf(lineup, rivalDefense, attrs) : null;
     return (
       <div className="arc-kick">
         <span className="eyebrow">Head to head · kickoff</span>
-        <h1 className="disp">YOUR OFFENSE VS {(rivalDef?.teamName ?? rivalName).toUpperCase()}</h1>
+        <h1 className="disp">YOUR OFFENSE VS {rivalName.toUpperCase()}</h1>
         <p>
           {TOTAL} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
         </p>
@@ -298,5 +298,5 @@ export function Arcade({
     );
   }
   if (!NFL) return <Hoops lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
-  return <Football lineup={lineup} rivalDef={rivalDef} rivalName={rivalName} seed={seed} rival={shown} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  return <Football lineup={lineup} rivalDefense={rivalDefense} rivalName={rivalName} seed={seed} rival={shown} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
 }

@@ -27,9 +27,10 @@ interface NbaData {
   playoff: { year: string; team: string; abbr: string; w: number; l: number; w82: number; c1: string; c2: string; star: string; five: NbaOpp[] }[];
 }
 
-// football: see scripts/build_nfl_data.py
-type NflPlayer = [string, string, number, number, number, number, string | null, string, number, number, number, number, number, number, number, number, number, number, number, number];
+// football: see scripts/build_nfl_data.py (a defender's row has his role last)
+type NflPlayer = [string, string, number, number, number, number, string | null, string, number, number, number, number, number, number, number, number, number, number, number, number, string?];
 type NflOpp = [string, string, number, number, number, number, number, number, number, number, number];
+type NflDefOpp = [string, string, number, number, number, number, number];
 interface NflData {
   source: string;
   built: number;
@@ -49,13 +50,16 @@ interface NflData {
     pa: number;
     champ: boolean;
     five: NflOpp[];
+    def: NflDefOpp[];
   }[];
 }
 
 const NFL_STATS = ['passYds', 'passTd', 'int', 'rushYds', 'rushTd', 'rec', 'recYds', 'recTd'] as const;
-const NFL_DEF = ['pa', 'lg', 'top5', 'best'] as const;
-/** Where each football position can play: anyone who runs or catches can be the FLEX. */
-const NFL_SPOTS: Record<string, Slot[]> = { QB: ['QB'], RB: ['RB', 'FLEX'], WR: ['WR', 'FLEX'], TE: ['TE', 'FLEX'], DEF: ['DEF'] };
+/** a defender's shown stats: per season (-1 not known), then Pro Bowls and All-Pro seasons */
+const NFL_DEF = ['sacks', 'tkl', 'int', 'pd', 'ff', 'pb', 'ap'] as const;
+/** Where each football position can play: anyone who runs or catches can be the FLEX; a defender plays his own spot. */
+const NFL_SPOTS: Record<string, Slot[]> = { QB: ['QB'], RB: ['RB', 'FLEX'], WR: ['WR', 'FLEX'], TE: ['TE', 'FLEX'], DL: ['DL'], LB: ['LB'], DB: ['DB'] };
+const NFL_DEFENDERS = new Set(['DL', 'LB', 'DB']);
 
 function cellBase(t: RawTeam<unknown>) {
   return { cellId: t.id, abbr: t.abbr, era: t.era, teamName: t.name, c1: t.c1, c2: t.c2 };
@@ -83,7 +87,7 @@ function nbaPlayer(t: RawTeam<NbaPlayer>, p: NbaPlayer): Player {
 }
 
 function nflPlayer(t: RawTeam<NflPlayer>, p: NflPlayer): Player {
-  const def = p[1] === 'DEF';
+  const def = NFL_DEFENDERS.has(p[1]);
   const s: Line = {};
   const shown = p.slice(8, 16) as number[];
   if (def) NFL_DEF.forEach((k, i) => (s[k] = shown[i]));
@@ -97,13 +101,15 @@ function nflPlayer(t: RawTeam<NflPlayer>, p: NflPlayer): Player {
     seasons: p[3],
     from: p[4],
     to: p[5],
-    est: false,
+    // a defender's games before 1999 are partly counted from rosters
+    est: def && shown[7] === 1,
     primeRef: p[6],
     ...cellBase(t),
     s,
     r: { pass: p[16], rush: p[17], recv: p[18], def: p[19] },
     val: 0,
   };
+  if (def && p[20]) player.role = p[20];
   player.val = lineValue(player.r);
   return player;
 }
@@ -112,6 +118,10 @@ function nflOpp([name, pos, g, ...line]: NflOpp): OppPlayer {
   const s: Line = {};
   NFL_STATS.forEach((k, i) => (s[k] = line[i]));
   return { name, pos, g, s, est: false };
+}
+
+function nflDefOpp([name, pos, g, sacks, tkl, int, hon]: NflDefOpp): OppPlayer {
+  return { name, pos, g, s: { sacks, tkl, int, hon }, est: false };
 }
 
 const nba = nbaRaw as unknown as NbaData;
@@ -129,7 +139,7 @@ export const CELL_BY_ID: Record<string, Cell> = Object.assign(Object.create(null
 export const ERAS = NFL ? ['1970s', '1980s', '1990s', '2000s', '2010s', '2020s'] : ['1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s'];
 export const TEAM_ABBRS = Array.from(new Set(CELLS.map((c) => c.abbr))).sort();
 export const PLAYOFF_TEAMS: PlayoffTeam[] = NFL
-  ? nfl.playoff.map(({ w17, five, ...t }) => ({ ...t, wFull: w17, five: five.map(nflOpp) }))
+  ? nfl.playoff.map(({ w17, five, def, ...t }) => ({ ...t, wFull: w17, five: five.map(nflOpp), def: def.map(nflDefOpp) }))
   : nba.playoff.map(({ w82, five, ...t }) => ({
       ...t,
       t: 0,
