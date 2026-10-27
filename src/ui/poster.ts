@@ -305,9 +305,10 @@ function stamp(g: CanvasRenderingContext2D, text: string, x: number, y: number) 
 function hand(g: CanvasRenderingContext2D, players: { slot: Slot; p: Player }[], daily: boolean, info: ResultInfo) {
   const n = players.length;
   if (!n) return;
-  const cw = n > 5 ? 206 : 238;
+  const cw = n > 6 ? 196 : n > 5 ? 206 : 238;
   const ch = Math.round(cw * 1.405);
-  const step = n > 5 ? 152 : 184;
+  // football's eight fan out tighter, edge to edge
+  const step = n > 6 ? Math.floor((W - 72 - cw) / (n - 1)) : n > 5 ? 152 : 184;
   const mid = (n - 1) / 2;
   const cy = 880;
   const grades: Partial<Record<Slot, PickGrade>> = {};
