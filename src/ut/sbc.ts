@@ -1,6 +1,7 @@
 // Squad Building Challenges: trade in cards that meet a challenge's requirements for a pack, coins
 // or a special card. Six daily and four weekly, the same for everyone, picked from the date the
-// way the Daily is, and three upgrades (cards in for a better pack) that can be done twice a day.
+// way the Daily is; three upgrades (cards in for a better pack) that can be done twice a day; and
+// repeatables (five cards in for a better card) that can be done as often as you like.
 // See docs/ULTIMATE-TEAM.md.
 import { hashString, pickOne, rng, type Rand, shuffle, trueRand } from '../engine/rng';
 import { openPack, packRand, quickSellValue } from './packs';
@@ -38,7 +39,7 @@ export interface Sbc {
   /** unique: the day or week it belongs to and its place in the list */
   id: string;
   kind: 'daily' | 'weekly' | 'upgrade';
-  /** an upgrade: how many more times it can be done today (counting this one) */
+  /** an upgrade: how many more times it can be done today (counting this one); none: repeatable */
   left?: number;
   title: string;
   blurb: string;
@@ -74,7 +75,7 @@ export function reqText(r: Req): string {
 export function rewardText(w: Reward, sport: UtSport, packName: (s: UtSport, k: string) => string): string {
   const parts: string[] = [];
   if (w.pack) parts.push(packName(sport, w.pack));
-  if (w.card) parts.push(w.card.tier === 'promo' ? 'a Hot Season card' : (String(w.card.minOvr ?? 75).startsWith('8') ? 'an ' : 'a ') + (w.card.minOvr ?? 75) + '+ Gold card');
+  if (w.card) parts.push(w.card.tier === 'promo' ? 'a Hot Season card' : w.card.minOvr ? (String(w.card.minOvr).startsWith('8') ? 'an ' : 'a ') + w.card.minOvr + '+ Gold card' : 'a Gold card');
   if (w.coins) parts.push(w.coins.toLocaleString('en-US') + ' coins');
   return parts.join(' + ');
 }
@@ -254,7 +255,6 @@ const HARD: Template[] = [
     nba(c)
       ? { title: 'A Full Five', blurb: 'A real lineup, and a good one.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'gold', coins: 300 } }
       : { title: 'Skill Set', blurb: 'A whole offense around the quarterback.', size: 5, reqs: [{ k: 'positions', pos: ['QB', 'RB', 'WR', 'WR', 'TE'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'gold', coins: 300 } },
-  (c) => ({ title: 'Golden Hour', blurb: 'Three golds for a better one.', size: 3, reqs: [{ k: 'tier', tier: 'gold', n: 3 }], reward: { card: { tier: 'gold', minOvr: sc(c, 84) } } }),
   (c) => {
     const f = pickOne(c.frs, c.rand);
     return { title: f.name + ' Legacy', blurb: 'Three from one franchise, all good ones.', size: 3, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 3 }, { k: 'minOvr', ovr: sc(c, 68) }], reward: { card: { tier: 'gold', minOvr: sc(c, 78), fr: f.fr } } };
@@ -293,12 +293,16 @@ const WEEKLY: Template[] = [
   () => ({ title: 'Hot Season Hunt', blurb: 'Six cards: five golds, three teammates.', size: 6, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'sameFr', n: 3 }], reward: { card: { tier: 'promo' } } }),
 ];
 
-/** Upgrades: cards in for a better pack, open every day, twice each. */
+/** Upgrades (cards in for a better pack: twice a day each) and repeatables (five cards in for a
+ * better card: as often as you like). */
 export const UPGRADE_TIMES = 2;
-const UPGRADES: Template[] = [
-  () => ({ title: 'Bronze Upgrade', blurb: 'Any five cards for a Silver pack.', size: 5, reqs: [{ k: 'tier', tier: 'bronze', n: 5 }], reward: { pack: 'silver' } }),
-  () => ({ title: 'Silver Upgrade', blurb: 'Five silvers (or better) for a Gold pack.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { pack: 'gold' } }),
-  (c) => ({ title: 'Gold Upgrade', blurb: 'Five good golds for a Premium pack.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium' } }),
+const UPGRADES: [Template, number][] = [
+  [() => ({ title: 'Bronze Upgrade', blurb: 'Any five cards for a Silver pack.', size: 5, reqs: [{ k: 'tier', tier: 'bronze', n: 5 }], reward: { pack: 'silver' } }), UPGRADE_TIMES],
+  [() => ({ title: 'Silver Upgrade', blurb: 'Five silvers (or better) for a Gold pack.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { pack: 'gold' } }), UPGRADE_TIMES],
+  [(c) => ({ title: 'Gold Upgrade', blurb: 'Five good golds for a Premium pack.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium' } }), UPGRADE_TIMES],
+  [() => ({ title: 'Silver to Gold', blurb: 'Five silvers for a gold.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { card: { tier: 'gold' } } }), Infinity],
+  [(c) => ({ title: 'Golden Hour', blurb: 'Five golds for a better one.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }], reward: { card: { tier: 'gold', minOvr: sc(c, 84) } } }), Infinity],
+  [(c) => ({ title: 'Elite Pull', blurb: 'Five strong golds for a star.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 80) }], reward: { card: { tier: 'gold', minOvr: sc(c, 88) } } }), Infinity],
 ];
 
 /**
@@ -323,10 +327,10 @@ export function sbcsFor(pool: Pool, day: string, done: Record<string, unknown> =
     .slice(0, 4)
     .map((t, i) => ({ ...t(w), id: 'w:' + week + ':' + i, kind: 'weekly' as const }));
   const u = context(pool, 'ut-sbc:' + sport + ':upgrades');
-  const upgrades = UPGRADES.map((t, i) => {
+  const upgrades = UPGRADES.map(([t, times], i) => {
     let n = 0;
-    while (n < UPGRADE_TIMES - 1 && done['u:' + day + ':' + i + ':' + n]) n++;
-    return { ...t(u), id: 'u:' + day + ':' + i + ':' + n, kind: 'upgrade' as const, left: UPGRADE_TIMES - n };
+    while (n < times - 1 && done['u:' + day + ':' + i + ':' + n]) n++;
+    return { ...t(u), id: 'u:' + day + ':' + i + ':' + n, kind: 'upgrade' as const, ...(Number.isFinite(times) ? { left: times - n } : {}) };
   });
   return [...dailies, ...weekly, ...upgrades];
 }

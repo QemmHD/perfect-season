@@ -39,7 +39,7 @@ function SbcCard({ s, done, onOpen }: { s: Sbc; done: boolean; onOpen: () => voi
           </i>
         ) : (
           <i className="ut-sbc-size">
-            {s.size} cards{s.left ? ' · ' + s.left + ' left today' : ''}
+            {s.size} cards{s.kind === 'upgrade' ? (s.left ? ' · ' + s.left + ' left today' : ' · repeatable') : ''}
           </i>
         )}
       </span>
@@ -104,7 +104,7 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
       </div>
       {upgrades.length > 0 && (
         <div className="ut-sbc-group">
-          <span className="eyebrow">Upgrades · twice a day each</span>
+          <span className="eyebrow">Upgrades and repeatables</span>
           {upgrades.map((s) => (
             <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
           ))}
@@ -139,7 +139,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
         {(close) => (
           <div className="ut-sbcsheet">
             <div className="ut-sbcsheet-head">
-              <span className="eyebrow">{s.kind === 'daily' ? 'Daily challenge' : s.kind === 'weekly' ? 'Weekly challenge' : 'Upgrade · ' + (s.left ?? 1) + ' left today'}</span>
+              <span className="eyebrow">{s.kind === 'daily' ? 'Daily challenge' : s.kind === 'weekly' ? 'Weekly challenge' : s.left ? 'Upgrade · ' + s.left + ' left today' : 'Repeatable · as often as you like'}</span>
               <h2 className="disp">{s.title}</h2>
               <small>Reward: {rewardText(s.reward, SPORT, packName)}</small>
             </div>

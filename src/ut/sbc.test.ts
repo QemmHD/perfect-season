@@ -61,13 +61,13 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     pool = await getPool();
   });
 
-  it('are six daily, four weekly and three upgrades, the same for everyone on a day', () => {
+  it('are six daily, four weekly, and the upgrades and repeatables, the same for everyone on a day', () => {
     const a = sbcsFor(pool, '2026-10-27');
     expect(a.filter((s) => s.kind === 'daily')).toHaveLength(6);
     expect(a.filter((s) => s.kind === 'weekly')).toHaveLength(4);
-    expect(a.filter((s) => s.kind === 'upgrade')).toHaveLength(3);
+    expect(a.filter((s) => s.kind === 'upgrade')).toHaveLength(6);
     expect(sbcsFor(pool, '2026-10-27')).toEqual(a);
-    expect(new Set(a.map((s) => s.id)).size).toBe(13);
+    expect(new Set(a.map((s) => s.id)).size).toBe(16);
     // no challenge twice in a day's or a week's list
     expect(new Set(a.filter((s) => s.kind === 'daily').map((s) => s.title)).size).toBe(6);
     expect(new Set(a.filter((s) => s.kind === 'weekly').map((s) => s.title)).size).toBe(4);
@@ -93,6 +93,26 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     expect(after.id).toBe(second.id);
     // a new day starts over
     expect(sbcsFor(pool, '2026-10-28', { [first.id]: 1, [second.id]: 1 }).filter((s) => s.kind === 'upgrade')[0].left).toBe(2);
+  });
+
+  it('a repeatable takes five golds for a better gold, as often as you like', () => {
+    const day = '2026-10-27';
+    const gh = (done: Record<string, number>) => sbcsFor(pool, day, done).find((s) => s.title === 'Golden Hour')!;
+    let s = gh({});
+    expect(s.size).toBe(5);
+    expect(s.reqs).toContainEqual({ k: 'tier', tier: 'gold', n: 5 });
+    expect(s.left).toBeUndefined();
+    const done: Record<string, number> = {};
+    const ids = new Set<string>();
+    for (let i = 0; i < 12; i++) {
+      ids.add(s.id);
+      done[s.id] = 1;
+      s = gh(done);
+      expect(done[s.id]).toBeUndefined();
+    }
+    expect(ids.size).toBe(12);
+    expect(rewardText(s.reward, SPORT, () => 'Pack')).toMatch(/Gold card/);
+    expect(rewardText({ card: { tier: 'gold' } }, SPORT, () => 'Pack')).toBe('a Gold card');
   });
 
   it('every challenge can be met by some cards in the pool, and pays something', () => {

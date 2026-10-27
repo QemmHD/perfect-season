@@ -234,7 +234,8 @@ export default function UltimateTeam(props: {
   };
 
   const detailCard = detail ? byUid.get(detail) ?? null : null;
-  const todo = sbcs.filter((s) => !ut.sbc.done[s.id]).length;
+  // (the upgrades and repeatables are always there: they don't count toward what's left to do)
+  const todo = sbcs.filter((s) => s.kind !== 'upgrade' && !ut.sbc.done[s.id]).length;
 
   let body: React.ReactNode;
   if (failed)

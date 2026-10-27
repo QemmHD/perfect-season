@@ -83,9 +83,11 @@ always agree.
   - "a five with team overall 80"
   - "any 1990s lineup"
 - A rotating set: 6 daily (two easy, two medium, two hard) and 4 weekly, deterministic from the
-  date (like the Daily), from a pool of 30 challenges. Plus three upgrades open every day, twice
+  date (like the Daily), from a pool of 29 challenges. Plus three upgrades open every day, twice
   each: any five cards for a Silver pack, five silvers for a Gold pack, five good golds for a
-  Premium pack.
+  Premium pack. And three repeatables, as often as you like: five silvers for a Gold card, five
+  golds for an 84+ Gold card (Golden Hour), five golds with a team overall of 80+ for an 88+ Gold
+  card (Elite Pull). Reward cards are drawn at random from every card that fits.
 
 ## Playing
 
