@@ -47,3 +47,30 @@ Decisions from the owner's answers (2026-10-27). Everything ships in one release
 - Quick-sell for coins, squad building challenges, team chemistry (same team / era / decade).
 - Squads: **NBA 5 starters + 5 bench** (bench subs in on fatigue). **NFL full 11 + 11 and a K**:
   QB, RB, WR x3, TE, OL x5; DL x4, LB x3, CB x2, S x2.
+
+## Round 2 decisions (asked after seeing the first builds)
+- **Motion:** real motion capture drives the pixel players (free CMU Graphics Lab recordings:
+  jump shot, layup, runs, cuts, falls, throws), retargeted to each player's height and build.
+  Keeps the HD pixel art, team uniforms, numbers and heights. No hand-keyed robot poses.
+- **Contact reactions, basketball (all):** posterizer (defender knocked down, slow-mo), blocked
+  shot (shooter swatted, blocker's flex), ankle breaker (defender drops), and-one bump (shooter
+  absorbs contact, still finishes).
+- **Contact reactions, football:** big hit (runner driven back or flipped, slow-mo, shake),
+  truck / stiff arm (tackler on his back), juke whiff (defender dives at air). Not diving plays.
+- **Basketball camera:** behind the basket with perspective, the same upright and sideways
+  (sideways shows more of the floor across). **Fine pixels in both games** (one art pixel per
+  screen point), like the football.
+- **Dunks:** automatic by ratings: attack the rim and hold SHOOT; layup, dunk or contact dunk from
+  the dunk ratings, vertical, size and the defender in the way.
+- **Shot meter:** the vertical bar beside the shooter, with the green window.
+- **Football play call:** pick one of three play cards each down (routes drawn), then snap.
+- **Moves by swipe, both sports:** football: steer by dragging, swipe left/right juke, up spin,
+  double-tap truck (no move buttons). Basketball: stick to move, swipe left/right crossover, swipe
+  back step-back, circle spin; SHOOT and PASS stay buttons.
+- **Assets:** free only (CC0 / free-for-commercial-use with attribution where required).
+- **Sound:** real recorded sounds (crowd, squeaks, swish, rim, whistle, pads, horn). No announcer.
+- **Replays:** an automatic 2-3 s slow-motion replay after highlights, closer camera, REPLAY banner,
+  tap to skip.
+- **Who's open (football):** live open/tight/covered rings on receivers only in a player's first
+  games, then off.
+- **Tutorial:** tips only (hint banners in the first games), no guided practice.
