@@ -31,12 +31,18 @@ export interface Game {
   run: RunPlay;
   /** plays run, for the activity the rival's phone sees */
   plays: number;
+  /** completions in a row, and whether that has the quarterback On Fire */
+  streak: number;
+  fire: boolean;
 }
+
+/** completions in a row that put the quarterback On Fire */
+export const FIRE_AT = 3;
 
 const RUNS: RunPlay[] = ['inside', 'outside', 'power'];
 
 export function newGame(off: Offense, def: Defense, seed: string, drives = DRIVES): Game {
-  const g: Game = { off, def, seed, drives, drive: 0, playNo: 0, down: 1, toGo: 10, ballOn: START, ballX: 26.67, score: 0, ends: [], over: false, concept: 'slants', conceptNo: 0, run: 'inside', plays: 0 };
+  const g: Game = { off, def, seed, drives, drive: 0, playNo: 0, down: 1, toGo: 10, ballOn: START, ballX: 26.67, score: 0, ends: [], over: false, concept: 'slants', conceptNo: 0, run: 'inside', plays: 0, streak: 0, fire: false };
   g.concept = conceptFor(g, 0);
   g.run = runFor(g);
   return g;
@@ -87,7 +93,9 @@ export function startChoice(g: Game, c: PlayChoice): Play {
 
 export function startPlay(g: Game, call: Call): Play {
   const r = rng(hashString('play:' + g.seed + ':' + g.drive + ':' + g.playNo));
-  return lineUp(g.off, g.def, call, g.concept, g.run, g.ballOn, g.ballX, r);
+  const p = lineUp(g.off, g.def, call, g.concept, g.run, g.ballOn, g.ballX, r);
+  p.fire = g.fire;
+  return p;
 }
 
 export function fgDistance(g: Game) {
@@ -116,6 +124,8 @@ export interface After {
   points: number;
   driveOver: DriveEnd | null;
   fourth: boolean;
+  /** the quarterback just caught fire, or the fire just went out */
+  fire: 'lit' | 'out' | null;
 }
 
 function endDrive(g: Game, e: DriveEnd) {
@@ -130,6 +140,16 @@ function endDrive(g: Game, e: DriveEnd) {
 
 /** Apply a finished play to the drive. */
 export function afterPlay(g: Game, end: PlayEnd): After {
+  // On Fire: three completions in a row; an incompletion, a sack or a pick puts it out
+  const was = g.fire;
+  if (end.caught) {
+    g.streak++;
+    if (g.streak >= FIRE_AT) g.fire = true;
+  } else if (end.kind === 'incomplete' || end.kind === 'sack' || end.kind === 'int') {
+    g.streak = 0;
+    g.fire = false;
+  }
+  const fire = !was && g.fire ? 'lit' : was && !g.fire ? 'out' : null;
   g.playNo++;
   g.plays++;
   g.conceptNo = 0;
@@ -138,15 +158,15 @@ export function afterPlay(g: Game, end: PlayEnd): After {
   if (end.kind === 'td') {
     g.score += 7;
     endDrive(g, 'TD');
-    return { text: 'TOUCHDOWN', firstDown: false, points: 7, driveOver: 'TD', fourth: false };
+    return { text: 'TOUCHDOWN', firstDown: false, points: 7, driveOver: 'TD', fourth: false, fire };
   }
   if (end.kind === 'int') {
     endDrive(g, 'INT');
-    return { text: end.text, firstDown: false, points: 0, driveOver: 'INT', fourth: false };
+    return { text: end.text, firstDown: false, points: 0, driveOver: 'INT', fourth: false, fire };
   }
   if (end.kind === 'fumble') {
     endDrive(g, 'FUM');
-    return { text: end.text, firstDown: false, points: 0, driveOver: 'FUM', fourth: false };
+    return { text: end.text, firstDown: false, points: 0, driveOver: 'FUM', fourth: false, fire };
   }
   // the line to gain is fixed before the snap; at or past the goal line it's goal to go (only a
   // touchdown moves the chains)
@@ -155,7 +175,7 @@ export function afterPlay(g: Game, end: PlayEnd): After {
   if (end.kind !== 'incomplete' && end.y <= 0) {
     // brought down in his own end zone: a safety ends the drive
     endDrive(g, 'SAF');
-    return { text: 'SAFETY', firstDown: false, points: 0, driveOver: 'SAF', fourth: false };
+    return { text: 'SAFETY', firstDown: false, points: 0, driveOver: 'SAF', fourth: false, fire };
   }
   if (end.kind !== 'incomplete') {
     g.ballOn = Math.max(1, Math.min(99, end.y));
@@ -164,15 +184,15 @@ export function afterPlay(g: Game, end: PlayEnd): After {
   if (!goalToGo && end.kind !== 'incomplete' && end.y >= line) {
     g.down = 1;
     g.toGo = Math.min(10, 100 - g.ballOn);
-    return { text: 'FIRST DOWN', firstDown: true, points: 0, driveOver: null, fourth: false };
+    return { text: 'FIRST DOWN', firstDown: true, points: 0, driveOver: null, fourth: false, fire };
   }
   g.toGo = goalToGo ? 100 - g.ballOn : Math.max(0.3, line - g.ballOn);
   if (g.down === 4) {
     endDrive(g, 'DOWNS');
-    return { text: 'TURNOVER ON DOWNS', firstDown: false, points: 0, driveOver: 'DOWNS', fourth: false };
+    return { text: 'TURNOVER ON DOWNS', firstDown: false, points: 0, driveOver: 'DOWNS', fourth: false, fire };
   }
   g.down++;
-  return { text: end.text, firstDown: false, points: 0, driveOver: null, fourth: g.down === 4 };
+  return { text: end.text, firstDown: false, points: 0, driveOver: null, fourth: g.down === 4, fire };
 }
 
 /** A field goal try: `aim` is how far from center the meter stopped (0 dead center to 1 the edge). */
@@ -182,7 +202,7 @@ export function kick(g: Game, aim: number): After {
   g.plays++;
   if (good) g.score += 3;
   endDrive(g, good ? 'FG' : 'MISS');
-  return { text: good ? 'FIELD GOAL IS GOOD' : 'NO GOOD', firstDown: false, points: good ? 3 : 0, driveOver: good ? 'FG' : 'MISS', fourth: false };
+  return { text: good ? 'FIELD GOAL IS GOOD' : 'NO GOOD', firstDown: false, points: good ? 3 : 0, driveOver: good ? 'FG' : 'MISS', fourth: false, fire: null };
 }
 
 /** Punt it away on fourth down: the drive's over, no points. */
@@ -190,7 +210,7 @@ export function punt(g: Game): After {
   g.playNo++;
   g.plays++;
   endDrive(g, 'PUNT');
-  return { text: 'PUNT', firstDown: false, points: 0, driveOver: 'PUNT', fourth: false };
+  return { text: 'PUNT', firstDown: false, points: 0, driveOver: 'PUNT', fourth: false, fire: null };
 }
 
 export function downText(g: Game) {

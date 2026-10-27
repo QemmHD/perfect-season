@@ -8,7 +8,7 @@ import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoin
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import * as P from '../pixel/poses';
 import type { Joints, Pose } from '../pixel/rig';
-import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, projectRoute, speedOf } from './engine';
+import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf } from './engine';
 import type { Body, Play, Pt } from './types';
 
 export interface FbKit {
@@ -292,8 +292,8 @@ export class FootballRenderer {
   /** each player's drawing last frame, and how many new drawings this frame may still make */
   private last = new Map<string, Sprite>();
   private budget = 0;
-  /** turf kicked up and confetti: field position and height, speed, life left, color, size */
-  private bits: { x: number; y: number; h: number; vx: number; vy: number; vh: number; life: number; color: string; size: number }[] = [];
+  /** turf kicked up, confetti and the On Fire flames: field position and height, speed, life left, color, size */
+  private bits: { x: number; y: number; h: number; vx: number; vy: number; vh: number; life: number; color: string; size: number; rise?: boolean }[] = [];
   /** what each player was doing last frame, to see a tackle or a move start */
   private acts = new Map<number, string>();
   private playSeen: Play | null = null;
@@ -548,6 +548,12 @@ export class FootballRenderer {
         this.acts.set(b.id, b.act);
       }
     }
+    // On Fire: flames lick up off the quarterback while he has it
+    if (p.fire && p.carrier === p.qb && (p.phase === 'pre' || p.phase === 'drop') && dt > 0) {
+      const fire = ['#fff1a0', '#ffd23a', '#ff9a2a', '#ff5a1f'];
+      for (let i = 0; i < 2; i++)
+        this.bits.push({ x: p.qb.x + (Math.random() - 0.5) * 1.1, y: p.qb.y + (Math.random() - 0.5) * 0.6, h: Math.random() * 1.2, vx: 0, vy: 0, vh: 2.2 + Math.random() * 1.8, life: 0.3 + Math.random() * 0.25, color: fire[Math.floor(Math.random() * 4)], size: 0.15, rise: true });
+    }
     const L = this.lens;
     this.bits = this.bits.filter((q) => (q.life -= dt) > 0);
     for (const q of this.bits) {
@@ -555,8 +561,8 @@ export class FootballRenderer {
       q.x += q.vx * dt;
       q.y += q.vy * dt;
       q.h = Math.max(0, q.h + q.vh * dt);
-      // confetti flutters down; turf drops
-      q.vh -= (conf ? 3.2 : 14) * dt;
+      // confetti flutters down; turf drops; flames rise
+      if (!q.rise) q.vh -= (conf ? 3.2 : 14) * dt;
       if (conf) {
         q.vh = Math.max(q.vh, -1.6);
         q.vx *= 0.98;
@@ -659,12 +665,13 @@ export class FootballRenderer {
         ctx.stroke();
       }
     }
-    // the man with the ball, ringed so the eye finds him
+    // the man with the ball, ringed so the eye finds him (red, pulsing, as the rush closes on the passer)
     const lead = p.carrier && p.phase !== 'pre' ? p.carrier : null;
     if (lead) {
       const f = L.at(lead.x, lead.y);
-      const rx = Math.max(4, Math.round(f.s * 0.62));
-      ctx.strokeStyle = 'rgba(255,224,138,0.85)';
+      const heat = lead === p.qb && p.phase === 'drop' ? p.pressure : 0;
+      const rx = Math.max(4, Math.round(f.s * (0.62 + heat * (0.18 + 0.08 * Math.sin(p.t * 22)))));
+      ctx.strokeStyle = heat > 0.05 ? 'rgba(255,' + Math.round(224 - 170 * heat) + ',' + Math.round(138 - 100 * heat) + ',0.95)' : 'rgba(255,224,138,0.85)';
       ctx.lineWidth = Math.max(1, Math.round(f.s * 0.08));
       ctx.beginPath();
       ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(2, Math.round(rx * Math.sin(L.pitch(lead.y)) * 0.85)), 0, 0, Math.PI * 2);
@@ -697,25 +704,30 @@ export class FootballRenderer {
       const a = L.at(bn.x, bn.y, bn.h);
       football(ctx, a.x, a.y, a.s, p.t);
     } else if (hand) football(ctx, hand.x, hand.y, hand.s, 0);
-    // the slingshot: the arc, where it lands and who it's going to
+    // the slingshot: the arc (as much of it as he can see: an accurate passer all of it, a weaker one
+    // or one with a rusher in his face only its start), where it lands and who it's going to
     if (o.aim && p.qb) {
       const from = p.qb;
       const len = Math.hypot(o.aim.x - from.x, o.aim.y - from.y);
-      const peak = Math.min(10, 1.4 + len * 0.18);
+      const peak = peakOf(len);
+      const seen = sight(p, len);
       const n = Math.max(10, Math.round(len / 1.1));
-      // the arc: bold dots with a dark edge, smaller as they go away
+      // the arc: bold dots with a dark edge, smaller as they go away, fading out where his sight ends
       for (let i = 1; i < n; i++) {
         if (i % 2) continue;
         const k = i / n;
+        if (k > seen) break;
         const q = L.at(from.x + (o.aim.x - from.x) * k, from.y + (o.aim.y - from.y) * k, 1.8 + 4 * peak * k * (1 - k));
         const d = Math.max(3, Math.round(q.s * 0.3));
+        ctx.globalAlpha = seen < 1 ? Math.max(0.15, Math.min(1, (seen - k) / 0.14)) : 1;
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.fillRect(Math.round(q.x - d / 2) - 1, Math.round(q.y - d / 2) - 1, d + 2, d + 2);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = p.fire ? '#ffc04a' : '#ffffff';
         ctx.fillRect(Math.round(q.x - d / 2), Math.round(q.y - d / 2), d, d);
       }
-      const to = this.receiverFor(p, o.aim);
-      if (to) {
+      ctx.globalAlpha = 1;
+      const to = seen >= 1 ? this.receiverFor(p, o.aim) : null;
+      if (seen >= 1 && to) {
         const g = L.at(to.at.x, to.at.y);
         const rr = Math.max(4, Math.round(g.s * 0.55));
         ctx.strokeStyle = 'rgba(255,224,138,0.95)';
@@ -726,13 +738,15 @@ export class FootballRenderer {
         const h = heads[to.b.id];
         if (h) label(ctx, to.b.p.tag, h.x, h.y - 14, '#ffe08a', this.W);
       }
-      const land = L.at(o.aim.x, o.aim.y);
-      const r = Math.max(9, Math.round(land.s * 1.1));
-      ctx.strokeStyle = to ? '#3ef0a0' : '#ffffff';
-      ctx.lineWidth = Math.max(2, Math.round(land.s * 0.16));
-      ctx.beginPath();
-      ctx.ellipse(Math.round(land.x), Math.round(land.y), r, Math.max(2, Math.round(r * Math.sin(L.pitch(o.aim.y)))), 0, 0, Math.PI * 2);
-      ctx.stroke();
+      if (seen >= 1) {
+        const land = L.at(o.aim.x, o.aim.y);
+        const r = Math.max(9, Math.round(land.s * 1.1));
+        ctx.strokeStyle = to ? '#3ef0a0' : '#ffffff';
+        ctx.lineWidth = Math.max(2, Math.round(land.s * 0.16));
+        ctx.beginPath();
+        ctx.ellipse(Math.round(land.x), Math.round(land.y), r, Math.max(2, Math.round(r * Math.sin(L.pitch(o.aim.y)))), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
     this.particles(ctx, p);
     // names: the receivers before the snap, the man with the ball after

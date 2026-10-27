@@ -94,6 +94,8 @@ export interface PlayEnd {
   y: number;
   gain: number;
   text: string;
+  /** a completed pass (the On Fire streak counts these) */
+  caught: boolean;
 }
 
 export interface Play {
@@ -121,6 +123,8 @@ export interface Play {
   events: string[];
   catcher: Body | null;
   caughtAt: Pt | null;
-  /** the throw's landing spot as aimed (before it sailed), for the HUD */
+  /** where the throw lands (the slingshot's aim), for the HUD */
   aim: Pt | null;
+  /** the quarterback is On Fire: he sees the whole arc and throws it quicker */
+  fire: boolean;
 }

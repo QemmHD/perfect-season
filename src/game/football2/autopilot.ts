@@ -2,7 +2,7 @@
 // tests. It reads who's open and throws him the ball in stride, picks the lane with room on a run,
 // uses the runner's best move against a tackler, kicks in range and punts when it must.
 import { hashString, rng } from '../../engine/rng';
-import { dist, FIELD_W, flightTime, isLine, maxThrow, moveWithBall, projectRoute, snap, step, throwTo } from './engine';
+import { dist, FIELD_W, flightTime, isLine, maxThrow, moveWithBall, projectRoute, sight, snap, step, throwTo } from './engine';
 import { afterPlay, fgDistance, fgInRange, type Game, kick, kickWindow, punt, startPlay } from './drive';
 import type { Body, Play, Pt } from './types';
 
@@ -10,10 +10,14 @@ export interface Pilot {
   skill: number;
   rand: () => number;
   readAt: number;
+  /** the play he's on, how much pressure he feels before he hurries it, and when he felt it */
+  play: Play | null;
+  feel: number;
+  felt: number;
 }
 
 export function pilot(skill: number, seed: string): Pilot {
-  return { skill, rand: rng(hashString('fpilot:' + seed)), readAt: 0 };
+  return { skill, rand: rng(hashString('fpilot:' + seed)), readAt: 0, play: null, feel: 1, felt: Infinity };
 }
 
 const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
@@ -49,23 +53,50 @@ function lead(p: Play, b: Body): { at: Pt; open: number } {
 }
 
 /** One step of decisions. Returns where the runner steers, if anyone's running. */
-export function decide(p: Play, _g: Game, pl: Pilot): number | null {
+export function decide(p: Play, g: Game, pl: Pilot): number | null {
   if (p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) {
+    if (pl.play !== p) {
+      // a new play: a calm passer feels the rush sooner
+      pl.play = p;
+      pl.feel = 0.45 + pl.rand() * 0.3 + (1 - pl.skill) * 0.3;
+      pl.felt = Infinity;
+    }
+    if (p.pressure > pl.feel && pl.felt === Infinity) pl.felt = p.t;
     if (!pl.readAt) pl.readAt = 0.85 + (1 - pl.skill) * 0.6 + pl.rand() * 0.4;
     if (p.t < pl.readAt) return null;
     const options = p.bodies
       .filter((b) => b.side === 'O' && b !== p.qb && !isLine(b))
       .map((b) => ({ b, ...lead(p, b) }))
       .filter((o) => dist(p.qb, o.at) <= maxThrow(p) && o.at.y > p.los - 3);
-    const need = 3.1 - pl.skill * 1.1;
-    const open = options.filter((o) => o.open >= need).sort((a, b) => b.at.y - a.at.y + (b.open - a.open) * 2);
-    const hurried = p.pressure > 0.55;
-    const choice = open[0] ?? (hurried ? options.sort((a, b) => b.open - a.open)[0] : undefined);
+    const need = 2.9 - pl.skill * 0.5;
+    // deep and open is best, less so where he can't see the end of the arc
+    const worth = (o: { at: Pt; open: number }) => {
+      const len = dist(p.qb, o.at);
+      return o.at.y + o.open * 2 - (1 - sight(p, len)) * len * 0.6;
+    };
+    // his progression: first he looks for the sticks or a shot down the field, and the longer he
+    // holds it the shorter he'll take (a better passer is more patient)
+    const patience = 2.2 + 0.5 * pl.skill;
+    const k = Math.max(0, Math.min(1, (p.t - pl.readAt) / Math.max(0.3, patience - pl.readAt)));
+    const want = (1 - k) * Math.max(g.toGo + 1, 8);
+    // a deep ball wants more room (the lob hangs, and the defense breaks on it)
+    const room = (o: { at: Pt }) => need + Math.max(0, dist(p.qb, o.at) - 20) * 0.03;
+    const open = options.filter((o) => o.open >= room(o) && o.at.y - p.los >= want).sort((a, b) => worth(b) - worth(a));
+    // he gets rid of it a beat after he feels the rush (if he's still standing)
+    const hurried = p.t - pl.felt >= 0.3 - 0.2 * pl.skill;
+    const bail = hurried ? options.sort((a, b) => b.open - a.open)[0] : undefined;
+    const choice = open[0] ?? (bail && bail.open >= 1.4 ? bail : undefined);
     if (choice) {
-      const noise = (1 - pl.skill) * 1.6;
-      throwTo(p, { x: choice.at.x + gauss(pl.rand) * noise, y: choice.at.y + gauss(pl.rand) * noise });
+      // a little off by his skill, and a guess along the line where he can't see the arc land
+      const len = Math.max(1, dist(p.qb, choice.at));
+      const hidden = (1 - sight(p, len)) * len;
+      const along = gauss(pl.rand) * ((1 - pl.skill) * 1.0 + hidden * (0.2 - 0.12 * pl.skill));
+      const across = gauss(pl.rand) * ((1 - pl.skill) * 0.8 + hidden * 0.03);
+      const ux = (choice.at.x - p.qb.x) / len;
+      const uy = (choice.at.y - p.qb.y) / len;
+      throwTo(p, { x: choice.at.x + ux * along - uy * across, y: choice.at.y + uy * along + ux * across });
       pl.readAt = 0;
-    } else if (hurried && p.pressure > 0.85) {
+    } else if (hurried) {
       // nobody's open and he's about to be hit: throw it away
       throwTo(p, { x: p.qb.x < FIELD_W / 2 ? -3 : FIELD_W + 3, y: p.los + 6 });
       pl.readAt = 0;

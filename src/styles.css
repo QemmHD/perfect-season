@@ -7866,6 +7866,67 @@ button.friendcard:active {
 .hg2.wide .hg2-look {
   top: calc(var(--sat) + 64px);
 }
+/* football: the quarterback's On Fire, where basketball shows the defense's look */
+.fb2-fire {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat) + 70px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #c2300f, #ff7a1a 55%, #ffc23a);
+  box-shadow: 0 0 14px rgba(255, 110, 30, 0.55);
+  font-family: var(--display);
+  font-stretch: 75%;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.8px;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(90, 20, 0, 0.6);
+  white-space: nowrap;
+  pointer-events: none;
+  animation:
+    fire-in 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both,
+    fire-glow 0.9s ease-in-out 0.45s infinite alternate;
+}
+.fb2-fire small {
+  font-family: var(--body, inherit);
+  font-style: normal;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0;
+  color: #fff3d6;
+}
+.hg2.wide .fb2-fire {
+  top: calc(var(--sat) + 64px);
+}
+@keyframes fire-in {
+  from {
+    transform: translateX(-50%) scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes fire-glow {
+  from {
+    box-shadow: 0 0 10px rgba(255, 110, 30, 0.45);
+  }
+  to {
+    box-shadow: 0 0 20px rgba(255, 150, 40, 0.8);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb2-fire {
+    animation: none;
+  }
+}
 .hg2-marks {
   position: absolute;
   left: 50%;
@@ -8151,11 +8212,13 @@ button.friendcard:active {
   color: #ff9a9a;
 }
 .fb2 .hg2-hint {
+  top: auto;
   bottom: calc(var(--sab) + 196px);
 }
 .fb2.wide .hg2-hint {
   bottom: auto;
-  top: calc(var(--sat) + 72px);
+  /* under the drive marks and the On Fire chip */
+  top: calc(var(--sat) + 98px);
 }
 .fb2-call {
   position: absolute;

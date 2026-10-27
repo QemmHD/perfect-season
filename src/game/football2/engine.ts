@@ -2,11 +2,12 @@
 // seconds; x across the field (0 to 53.3), y the yard line from your goal (the far end zone is
 // 100 to 110). Your offense attacks up the field; the rival's defenders guard it with their ratings.
 //
-// Nothing is decided up front: the pass rush is each lineman's moves against his blocker, coverage
-// is a corner's man coverage (or a zone defender's read) against a receiver's routes and release, a
-// throw's accuracy is the passer's at that distance (worse with a rusher in his face), a catch is
-// the receiver's hands against the defender's, and a tackle is the tackler against the runner's
-// moves, all rolled when they happen.
+// Nothing is decided up front: the pass rush is each lineman's moves against his blocker (the pocket
+// closes as they walk their men back), coverage is a corner's man coverage (or a zone defender's
+// read) against a receiver's routes and release, a catch is the receiver's hands against the
+// defender's, and a tackle is the tackler against the runner's moves, all rolled when they happen.
+// A throw goes exactly where it's aimed: the passer's accuracy is how much of the arc he sees
+// (Retro Bowl's rule), less with a rusher in his face. Short throws are bullets, long ones lobs.
 import type { Act, Body, Call, Concept, Defense, FbPlayer, Job, Offense, Play, PlayEnd, Pt, RunPlay } from './types';
 
 export const FIELD_W = 53.33;
@@ -150,7 +151,7 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     d.mark = blk.id;
     const move = Math.max(d.p.a.PMV ?? 55, d.p.a.FMV ?? 55);
     const edge = (move - (blk.p.a.PBK ?? 60)) / 100;
-    d.winAt = Math.max(1.1, 2.4 - edge * 3 + gauss(rand) * 0.45 + (i === 1 || i === 2 ? 0.25 : 0));
+    d.winAt = Math.max(1.5, WIN_AT - edge * 3 + gauss(rand) * 0.45 + (i === 1 || i === 2 ? 0.25 : 0));
   });
   const play: Play = {
     t: 0,
@@ -176,6 +177,7 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     catcher: null,
     caughtAt: null,
     aim: null,
+    fire: false,
   };
   // routes (drawn before the snap so the player can read the play)
   const routes = CONCEPT_ROUTES[concept];
@@ -240,46 +242,70 @@ export function maxThrow(p: Play) {
   return lerp(40, 64, rt(p.qb.p.a.THP, 55, 99));
 }
 
-/** The ball's speed in the air (yards a second): a strong arm gets it there sooner. */
+/** when an even pass rusher beats his man, on average (seconds after the snap) */
+export const WIN_AT = 2.9;
+/** how close (yards in front of the quarterback) the pocket has closed when a rusher wins */
+const POCKET = 4.2;
+
+/** The ball's speed in the air (yards a second): a strong arm gets it there sooner, On Fire sooner still. */
 function throwSpeed(p: Play) {
-  return lerp(17, 26, rt(p.qb.p.a.THP, 55, 99));
+  return lerp(17, 26, rt(p.qb.p.a.THP, 55, 99)) * (p.fire ? 1.12 : 1);
+}
+
+/** 0 for a bullet (short and flat), 1 for a lob (long and high), blended between. */
+export function loft(len: number) {
+  return clamp((len - 12) / 18, 0, 1);
 }
 
 /** The flight time for a throw of this length (for the slingshot's arc and the AI's lead). */
 export function flightTime(p: Play, len: number) {
-  return Math.max(0.45, len / throwSpeed(p) + len * 0.006);
+  return Math.max(0.3, len / (throwSpeed(p) * lerp(1.3, 0.92, loft(len))) + len * 0.006);
+}
+
+/** How high the ball rides over its line (yards, at the middle): a bullet barely rises, a lob hangs. */
+export function peakOf(len: number) {
+  return lerp(0.35 + len * 0.06, Math.min(11, 2 + len * 0.2), loft(len));
+}
+
+/** The passer's accuracy (0-1) at this distance, his short, medium and deep accuracy blended. */
+function accAt(qb: FbPlayer, len: number) {
+  const s = rt(qb.a.SAC, 50, 99);
+  const m = rt(qb.a.MAC, 50, 99);
+  const d = rt(qb.a.DAC, 50, 99);
+  return len <= 6 ? s : len <= 18 ? lerp(s, m, (len - 6) / 12) : len <= 34 ? lerp(m, d, (len - 18) / 16) : d;
 }
 
 /**
- * The quarterback throws to a spot (the slingshot's aim). It sails off line by his accuracy at that
- * distance (short, medium, deep), much more with a rusher in his face (unless he's poised under
- * pressure). Whoever can get there goes for it.
+ * How much of the slingshot's arc the quarterback sees (0-1 of a throw this long): an accurate passer
+ * sees it all the way to where it lands; a weaker one only its start (the rest is his guess), and
+ * less with a rusher in his face unless he's poised under pressure. On Fire he sees all of it.
+ */
+export function sight(p: Play, len: number) {
+  if (p.fire) return 1;
+  const a = p.qb.p.a;
+  const calm = 1 - p.pressure * (1 - 0.6 * rt(a.TUP, 50, 99));
+  const yards = lerp(8, 56, Math.pow(accAt(p.qb.p, len), 1.1)) * lerp(0.45, 1, calm);
+  return clamp(yards / Math.max(1, len), 0.18, 1);
+}
+
+/**
+ * The quarterback throws to a spot (the slingshot's aim), as far as his arm reaches: it lands there.
+ * Whoever can get there goes for it.
  */
 export function throwTo(p: Play, to: Pt): boolean {
   if (p.phase !== 'drop' || p.call !== 'pass' || p.carrier !== p.qb || p.t < 0.3) return false;
   const qb = p.qb;
   const r = p.rand;
-  const dx = to.x - qb.x;
-  const dy = to.y - qb.y;
-  let d = Math.hypot(dx, dy);
-  const ang0 = Math.atan2(dy, dx);
-  d = Math.min(d, maxThrow(p));
-  const a = qb.p.a;
-  const accR = d < 12 ? a.SAC : d < 24 ? a.MAC : a.DAC;
-  const acc = rt(accR, 50, 99);
-  const pressure = p.pressure * (1 - 0.6 * rt(a.TUP, 50, 99));
-  const sdAng = (lerp(4.4, 0.9, acc) * (1 + pressure * 1.6) * Math.PI) / 180;
-  const sdLen = d * lerp(0.07, 0.022, acc) * (1 + pressure);
-  const ang = ang0 + gauss(r) * sdAng;
-  const len = Math.max(1.5, d + gauss(r) * sdLen);
+  const ang = Math.atan2(to.y - qb.y, to.x - qb.x);
+  const len = Math.max(1.5, Math.min(Math.hypot(to.x - qb.x, to.y - qb.y), maxThrow(p)));
   const land = { x: qb.x + Math.cos(ang) * len, y: qb.y + Math.sin(ang) * len };
   const flight = flightTime(p, len);
-  p.aim = { x: qb.x + Math.cos(ang0) * d, y: qb.y + Math.sin(ang0) * d };
-  p.ball = { from: { x: qb.x, y: qb.y + 0.3 }, to: land, t0: p.t, t1: p.t + flight, peak: Math.min(10, 1.4 + len * 0.18) };
+  p.aim = land;
+  p.ball = { from: { x: qb.x, y: qb.y + 0.3 }, to: land, t0: p.t, t1: p.t + flight, peak: peakOf(len) };
   p.carrier = null;
   p.phase = 'air';
   act(qb, 'throw', p.t);
-  p.events.push(pressure > 0.3 ? 'throw-pressure' : 'throw');
+  p.events.push(p.pressure > 0.3 ? 'throw-pressure' : 'throw');
   // who goes for it: of the receivers who can get there in time, the one whose route takes him closest
   const eligible = p.bodies.filter((b) => b.side === 'O' && b !== qb && !isLine(b) && dist(b, land) / speedOf(b.p) <= flight + 0.45);
   const target = eligible.sort((x, y) => dist(projectRoute(x, flight), land) - dist(projectRoute(y, flight), land))[0];
@@ -293,7 +319,7 @@ export function throwTo(p: Play, to: Pt): boolean {
     if (near < 15 && b.job !== 'rush') {
       // a sharp defender breaks on the ball sooner
       const read = rt(b.p.a.PRC, 45, 99) * 0.5 + rt(b.p.a.ZCV ?? b.p.a.MCV, 45, 99) * 0.5;
-      b.breakAt = p.t + lerp(0.55, 0.16, read) + r() * 0.15 + near * 0.012;
+      b.breakAt = p.t + lerp(0.6, 0.22, read) + r() * 0.15 + near * 0.015;
     }
   }
   return true;
@@ -352,7 +378,7 @@ function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string) {
     text = 'TOUCHDOWN';
   }
   const y = kind === 'td' ? 100 : at.y;
-  p.end = { kind, x: at.x, y, gain: Math.round((y - p.los) * 10) / 10, text };
+  p.end = { kind, x: at.x, y, gain: Math.round((y - p.los) * 10) / 10, text, caught: !!p.catcher && kind !== 'int' };
   p.phase = 'dead';
   p.events.push(kind === 'tackle' ? 'tackle' : kind);
 }
@@ -479,7 +505,10 @@ function offense(p: Play, b: Body, dt: number) {
         }
       }
       const passPro = p.call === 'pass' && p.phase !== 'run';
-      if (passPro && line) steerTo(b, b.x + clamp(target.x - b.x, -0.4, 0.4), Math.max(p.los - 2.8, b.y - 0.02), 1.5, dt);
+      // in pass protection he gives ground to his man, staying between him and the quarterback
+      const man = passPro && line ? p.bodies.find((d) => d.mark === b.id && d.job === 'rush' && t < d.winAt) : undefined;
+      if (man) steerTo(b, man.x + clamp(qb.x - man.x, -0.3, 0.3), man.y - 0.95, 2.4, dt);
+      else if (passPro && line) steerTo(b, b.x + clamp(target.x - b.x, -0.4, 0.4), Math.max(p.los - 2.8, b.y - 0.02), 1.5, dt);
       else steerTo(b, target.x, target.y - 0.6, speedOf(b.p) * 0.8, dt);
     } else steerTo(b, b.x, b.y + 1, 3, dt);
     act(b, 'block', t);
@@ -533,17 +562,19 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
     return;
   }
   if (p.phase === 'air' && p.ball && t >= b.breakAt) {
-    steerTo(b, p.ball.to.x, p.ball.to.y, sp * 1.05, dt, 22);
+    steerTo(b, p.ball.to.x, p.ball.to.y, sp, dt, 22);
     act(b, 'run', t);
     move(b, dt);
     return;
   }
   if (b.job === 'rush') {
-    // the pocket holds until he beats his man; on a run he's tied up by the block
+    // the pocket closes: he walks his man back toward the quarterback until he beats him, then he's
+    // free; on a run he's tied up by the block
     const tx = p.carrier === qb ? qb.x : b.x;
     const ty = p.carrier === qb ? qb.y : b.y;
     const free = p.call === 'pass' ? t >= b.winAt : !held;
     if (free) steerTo(b, tx, ty, speedOf(b.p), dt);
+    else if (p.call === 'pass' && p.carrier === qb) steerTo(b, b.x + clamp(tx - b.x, -0.3, 0.3), lerp(p.los + 0.6, qb.y + POCKET, clamp(t / b.winAt, 0, 1)), 1.8, dt);
     else steerTo(b, b.x + clamp(tx - b.x, -0.3, 0.3), Math.max(p.los - 1.4, b.y - 0.4), 0.7, dt);
     act(b, free ? 'rush' : 'block', t);
     move(b, dt);
@@ -562,20 +593,28 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
       const cover = rt(b.p.a.MCV, 45, 99);
       const burn = clamp((speedOf(m.p) - speedOf(b.p)) / 2.5, -0.5, 1);
       const cushion = lerp(2.8, 1.2, cover) + (deep > 12 ? lerp(1.4, 0.5, cover) + burn * 0.8 : 0);
-      steerTo(b, at.x + m.vx * 0.22, Math.max(at.y + cushion, p.los + 0.5), sp, dt, lerp(12, 19, cover));
+      let ty = Math.max(at.y + cushion, p.los + 0.5);
+      // lined up off him: while he comes up the field the defender keeps his depth and backpedals,
+      // never coming downhill into his man; when the route breaks, he drives on it
+      if (m.vy > 2.5 && b.y > ty) ty = Math.min(b.y, at.y + cushion + 7);
+      steerTo(b, at.x + m.vx * 0.22, ty, sp, dt, lerp(12, 19, cover));
     }
     act(b, 'backpedal', t);
     move(b, dt);
     return;
   }
   if (b.job === 'zone' && b.zone) {
-    // drop to the landmark, then sit on the nearest receiver who comes into the zone
+    // drop to the landmark, then sit on the nearest receiver who comes into the zone; a deep third
+    // carries the deepest man in his third as far as he goes (nobody gets behind him)
     const z = b.zone;
-    const threat = p.bodies.filter((o) => o.side === 'O' && !isLine(o) && o !== qb && dist(o, z) < 9).sort((a1, a2) => dist(a1, z) - dist(a2, z))[0];
     const read = rt(b.p.a.ZCV, 45, 99);
+    const deep = z.y - p.los >= 15;
+    const mine = p.bodies.filter((o) => o.side === 'O' && !isLine(o) && o !== qb && (deep ? Math.abs(o.x - z.x) < 10 && o.y > z.y - 9 : dist(o, z) < 9));
+    const threat = deep ? mine.sort((a1, a2) => a2.y - a1.y)[0] : mine.sort((a1, a2) => dist(a1, z) - dist(a2, z))[0];
     if (threat && t > 0.6) {
       const at = seen(threat, b);
-      steerTo(b, (at.x + z.x) / 2 + (at.x - z.x) * read * 0.4, Math.max(at.y + lerp(2.5, 1.2, read), p.los + 1), sp, dt);
+      if (deep) steerTo(b, lerp(z.x, at.x, 0.5 + 0.4 * read), Math.max(at.y + lerp(2.6, 1.4, read), z.y - 2), sp, dt);
+      else steerTo(b, (at.x + z.x) / 2 + (at.x - z.x) * read * 0.4, Math.max(at.y + lerp(2.5, 1.2, read), p.los + 1), sp, dt);
     } else steerTo(b, z.x, z.y, sp * 0.85, dt);
     act(b, 'backpedal', t);
     move(b, dt);
@@ -676,11 +715,11 @@ function arrive(p: Play) {
     let pi = 0;
     if (def && rd <= dReach) {
       // contested: the receiver's catch in traffic against the defender's coverage and hands
-      const edge = clamp((rd - ro + 0.6) / 1.4, 0, 1);
+      const edge = clamp((rd - ro + 0.5) / 1.2, 0, 1);
       const cit = rt(off.p.a.CIT, 45, 99);
       const db = rt(def.p.a.MCV ?? def.p.a.ZCV, 45, 99);
-      pc = lerp(0.22, 0.75, edge) * (0.7 + 0.35 * cit) - 0.1 * db;
-      pi = rd < ro ? 0.07 + 0.15 * rt(def.p.a.CTH, 40, 99) : 0.02 + 0.05 * rt(def.p.a.CTH, 40, 99);
+      pc = lerp(0.25, 0.85, edge) * (0.75 + 0.3 * cit) - 0.08 * db;
+      pi = rd < ro - 0.2 ? 0.05 + 0.15 * rt(def.p.a.CTH, 40, 99) : 0.01 + 0.03 * rt(def.p.a.CTH, 40, 99);
     }
     const roll = r();
     if (roll < pi) {

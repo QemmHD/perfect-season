@@ -11,6 +11,9 @@ import { defenseOf, offenseOf } from './squad';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const run = NFL && (globalThis as any).process?.env?.TUNE ? it : it.skip;
+// the autopilot's skill (TUNE_SKILL=0.45 for the rookie AI, 0.88 for the legend)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SKILL = Number((globalThis as any).process?.env?.TUNE_SKILL) || 0.68;
 
 run('football v2 numbers', async () => {
   const at = await loadAttrs();
@@ -28,7 +31,7 @@ run('football v2 numbers', async () => {
       const N = 40;
       for (let i = 0; i < N; i++) {
         const g = newGame(off, def, 'tune' + i + olab + dlab);
-        const pl = pilot(0.7, 'p' + i);
+        const pl = pilot(SKILL, 'p' + i);
         let guard = 0;
         while (!g.over && guard++ < 300) {
           if (g.down === 4) {
@@ -52,6 +55,8 @@ run('football v2 numbers', async () => {
             if (thrown) add('att');
             if (e.kind === 'sack') add('sack');
             if (thrown && e.kind !== 'incomplete' && e.kind !== 'int') { add('cmp'); add('pyds', e.gain); }
+            if (thrown && p.aim) { const z = p.aim.y - p.los < 10 ? 's' : p.aim.y - p.los < 20 ? 'm' : 'd'; add('att:' + z); if (e.caught) add('cmp:' + z); if (e.kind === 'int') add('int:' + z); }
+            if (e.kind === 'sack') add('sackT', p.t);
             if (e.kind === 'int') add('int');
           } else { add('runs'); add('ryds', e.gain); }
           if (e.kind === 'fumble') add('fum');
@@ -61,6 +66,7 @@ run('football v2 numbers', async () => {
         for (const e of g.ends) add('end:' + e);
       }
       console.log(olab.padEnd(8), dlab.padEnd(8), 'pts/g', (pts / N).toFixed(1), 'cmp%', ((c.cmp ?? 0) / Math.max(1, c.att ?? 0)).toFixed(2), 'Y/C', ((c.pyds ?? 0) / Math.max(1, c.cmp ?? 0)).toFixed(1), 'INT/att', ((c.int ?? 0) / Math.max(1, c.att ?? 0)).toFixed(3), 'sack/db', ((c.sack ?? 0) / Math.max(1, (c.att ?? 0) + (c.sack ?? 0))).toFixed(3), 'Y/run', ((c.ryds ?? 0) / Math.max(1, c.runs ?? 0)).toFixed(1), 'plays/dr', ((c.plays ?? 0) / drives).toFixed(1));
+      console.log('   by depth', ['s', 'm', 'd'].map((z) => z + ' ' + (c['cmp:' + z] ?? 0) + '/' + (c['att:' + z] ?? 0) + ' int ' + (c['int:' + z] ?? 0)).join(' · '), 'sack at', ((c.sackT ?? 0) / Math.max(1, c.sack ?? 0)).toFixed(2) + 's');
       console.log('   air', ((c.air ?? 0) / Math.max(1, c.nc ?? 0)).toFixed(1), 'yac', ((c.yac ?? 0) / Math.max(1, c.nc ?? 0)).toFixed(1), 'targets', ['X', 'Z', 'SL', 'TE', 'RB'].map((k) => k + ':' + (c['to:' + k] ?? 0)).join(' '));
       console.log('   ends', ['TD', 'FG', 'MISS', 'INT', 'DOWNS', 'PUNT', 'FUM'].map((k) => k + ':' + (c['end:' + k] ?? 0)).join(' '), 'broken', c.broken ?? 0, 'pancake', c.pancake ?? 0, 'O ovr', [off.qb, off.rb, ...off.wr, off.te].map((x) => x.ovr).join('/'), 'D ovr', [...def.dl, ...def.lb, ...def.cb, ...def.s].map((x) => x.ovr).join('/'));
     }

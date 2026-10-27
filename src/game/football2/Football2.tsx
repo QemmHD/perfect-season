@@ -145,6 +145,8 @@ export function Football2({
   const highlight = useRef<{ t: number; x: number; y: number; before: number } | null>(null);
   const replayRef = useRef<Replay<Snap> | null>(null);
   const [replaying, setReplaying] = useState(false);
+  // On Fire (three completions in a row): the chip under the drive marks
+  const [fire, setFire] = useState(false);
 
   const say = (text: string, tone: Tone, ms = 1200, sub?: string) => {
     const id = ++popId.current;
@@ -281,6 +283,13 @@ export function Football2({
     setPhase('dead');
     const a = afterPlay(game, e);
     setUi('after');
+    if (a.fire === 'lit') {
+      setFire(true);
+      sfx.levelUp();
+      crowd.swell(0.8);
+      vibrate([20, 20, 40]);
+      tip('fire', 'On Fire: the whole arc and quicker throws, until a miss, a sack or a pick');
+    } else if (a.fire === 'out') setFire(false);
     const yds = Math.round(e.gain);
     const gain = (yds >= 0 ? '+' : '') + yds + ' YDS';
     if (a.points) {
@@ -679,6 +688,11 @@ export function Football2({
               {g.ends[i] ? MARK_TEXT[g.ends[i]] : i === g.drive ? 'D' + (i + 1) : ''}
             </i>
           ))}
+        </div>
+      )}
+      {fire && g && !g.over && (
+        <div className="fb2-fire" role="status">
+          ON FIRE <small>the whole arc · quicker throws</small>
         </div>
       )}
       {pop && (
