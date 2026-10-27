@@ -1,7 +1,7 @@
 // A player for arcade basketball: plays the AI's possessions, sims a side, tunes the game and drives
 // the tests. It reads the floor the way a person would: shoot when open with a shooter, drive an
 // open lane with a finisher, kick to the open man, lob to a dunker on the cut, cross up a tight
-// defender, and sprint (the stick at its edge) only on a drive. `skill` (0-1) is how sharp its
+// defender, move it out of a double team, and sprint (the stick at its edge) only on a drive. `skill` (0-1) is how sharp its
 // reads and its release timing are.
 import { hashString, rng } from '../../engine/rng';
 import { crossover, dist, pass, pressShoot, releaseShoot, RIM, shotValue, step } from './engine';
@@ -19,10 +19,12 @@ export interface Pilot {
   driving: boolean;
   /** crossovers this possession */
   crosses: number;
+  /** a double team it's seen: on whom, by whom, and when it gets the ball out */
+  trap: { p: Possession; handler: number; trapper: number; at: number } | null;
 }
 
 export function pilot(skill: number, seed: string): Pilot {
-  return { skill, rand: rng(hashString('p2:' + seed)), letGo: null, nextThink: 0, goal: null, driving: false, crosses: 0 };
+  return { skill, rand: rng(hashString('p2:' + seed)), letGo: null, nextThink: 0, goal: null, driving: false, crosses: 0, trap: null };
 }
 
 const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
@@ -79,6 +81,17 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
     }
     if (!laneOpen(p, h) && d > 12 && pl.rand() < 0.5) pl.driving = false;
     return dir;
+  }
+  // doubled: get it out to the man the second defender left (a sharper player sooner)
+  if (p.trapper !== null) {
+    const tr = pl.trap;
+    if (!tr || tr.p !== p || tr.handler !== h.idx || tr.trapper !== p.trapper) pl.trap = { p, handler: h.idx, trapper: p.trapper, at: p.t + 0.2 + (1 - pl.skill) * 0.7 + pl.rand() * 0.2 };
+    const free = p.bodies[p.bodies[p.trapper].mark];
+    if (pl.trap && p.t >= pl.trap.at && free && free !== h && free.side === 'O' && p.passes < 6) {
+      pl.trap.at = Infinity;
+      pass(p, free.idx);
+      return null;
+    }
   }
   if (p.t < pl.nextThink) return pl.goal ? towards(h, pl.goal) : null;
   pl.nextThink = p.t + 0.22 + (1 - pl.skill) * 0.25;

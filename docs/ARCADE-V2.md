@@ -104,3 +104,28 @@ Decisions from the owner's answers (2026-10-27). Everything ships in one release
   buys time); the last drive runs against a two-minute clock (out of bounds and incompletions
   stop it); 3 straight completions put the QB On Fire (the full arc, quicker throws) until an
   incompletion, a sack or a pick.
+- **As built (round 3):**
+  - Basketball: a green is a make (no block on a green); the green window shrinks with the
+    contest, and a man with room (6 ft or more when he rose) can't be graded worse than a light
+    contest. Pushing the stick to its edge sprints on a stamina bar; a beaten defender loses a
+    step, a step-back roots him. The live shot % sits under the handler and over pass targets. The
+    defense's look each possession (man, sagging off a poor shooter, switching, trapping a good
+    ball handler) shows as a chip with a hint; a trap calls DOUBLE TEAM.
+  - Football passing: the throw lands exactly on the aim; the visible arc is the QB's accuracy at
+    that distance (short, medium, deep blended), cut by pressure unless he's poised; the landing
+    ring and the receiver's name show only with the whole arc. Bullets under about 12 yards, lobs
+    past 30, blended between. The pocket closes as rushers walk their blockers back (an even
+    rusher wins at about 2.9 s); the QB's ring reddens with the rush. Coverage was fixed so off
+    defenders don't run downhill into a vertical route and deep thirds carry the deepest man.
+  - Football running: blocking opens the play's hole (A gap, off tackle, the edge); linebackers read
+    (now and then one bites the wrong way), the secondary is late to the run, and now and then a
+    lineman wins at the snap. Tacklers wind up (a ring and a !) before a committed dive; a juke or
+    spin as he leaves his feet fakes him out. Moves cost stamina (a bar under the runner) and the
+    same move twice works less.
+  - Football tension: the last drive's clock in the scoreboard runs through plays and 20 s between
+    plays in bounds; at zero, one last kick in range or TIME'S UP. On Fire after 3 completions.
+  - Measured with the autopilot (pro level, 40 games each): an even matchup scores about 12-14 a
+    game over 4 drives; completions 55-80% by matchup, picks 1-3%, sacks 2-9%, runs 2.3-3.3 a carry
+    against an elite defense, 4.3-5.2 against an average one, 6-7 against a weak one, with stuffs
+    and breakaways. Averaged over the matchups the AI levels score about 11.5 (rookie), 13
+    (pro) and 14 (legend); the teams matter more than the level.

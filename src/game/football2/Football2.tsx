@@ -753,15 +753,15 @@ export function Football2({
             </span>
           )}
           {g.clock !== 0 && (
-          <div className="fb2-cards" role="radiogroup" aria-label="Pick a play">
-            {opts.map((o, i) => (
-              <button key={i} className={'fb2-card ' + o.choice.call + (i === picked ? ' on' : '')} role="radio" aria-checked={i === picked} onClick={() => pick(i)}>
-                <PlayArt play={o.play} />
-                <small>{o.choice.call === 'pass' ? 'PASS' : 'RUN'}</small>
-                <b>{o.choice.call === 'pass' ? CONCEPT_NAMES[o.choice.concept] : RUN_NAMES[o.choice.run]}</b>
-              </button>
-            ))}
-          </div>
+            <div className="fb2-cards" role="radiogroup" aria-label="Pick a play">
+              {opts.map((o, i) => (
+                <button key={i} className={'fb2-card ' + o.choice.call + (i === picked ? ' on' : '')} role="radio" aria-checked={i === picked} onClick={() => pick(i)}>
+                  <PlayArt play={o.play} />
+                  <small>{o.choice.call === 'pass' ? 'PASS' : 'RUN'}</small>
+                  <b>{o.choice.call === 'pass' ? CONCEPT_NAMES[o.choice.concept] : RUN_NAMES[o.choice.run]}</b>
+                </button>
+              ))}
+            </div>
           )}
           <div className="fb2-btns">
             {g.clock !== 0 && (
