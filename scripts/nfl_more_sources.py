@@ -132,13 +132,15 @@ def wikidata_pfr(more):
         data = get(WDQS + "?" + urllib.parse.urlencode({"query": q}), accept="text/csv")
         with open(path, "wb") as f:
             f.write(data)
-    title_pfr, pfr_title = {}, {}
+    title_pfr, pfr_title, born = {}, {}, defaultdict(set)
     for r in csv.DictReader(open(path, encoding="utf-8")):
         title = urllib.parse.unquote(r["article"].rsplit("/wiki/", 1)[-1]).replace("_", " ")
         pfr = r["pfr"].split("/")[-1]  # "S/stenejan01" -> "stenejan01" (the register's form)
         title_pfr[title] = pfr
         pfr_title[pfr] = title
-    return title_pfr, pfr_title
+        if r["born"]:
+            born[(nkey(re.sub(r"\s*\(.*\)", "", title)), r["born"][:10])].add(pfr)
+    return title_pfr, pfr_title, born
 
 
 def wiki_file(more, title):
@@ -244,12 +246,14 @@ def wiki_fr(texts, season):
             return "TEN" if season <= 1996 else "HOU"
         if re.search(r"\bSt\. Louis\b", t or ""):
             return "ARI" if season <= 1987 else "LAR"
+        if re.search(r"\bLos Angeles\b|\bL\. ?A\.", t or "") and season < 1982:
+            return "LAR"  # the Raiders came in 1982; from then on the city alone is ambiguous
     for t in texts:
-        code = (t or "").strip().upper()
+        code = (t or "").strip().upper().replace(".", "").replace(" ", "")
         if re.fullmatch(r"[A-Z]{2,3}", code):
-            fr = S.VERSE.get(code) or S.pfr_franchise(code, season)
             if code == "LA":
-                fr = "LAR"
+                return None if 1982 <= season <= 1994 else "LAR"  # Rams or Raiders
+            fr = S.VERSE.get(code) or S.pfr_franchise(code, season)
             if fr in S.FRANCHISES:
                 return fr
     return None
@@ -296,11 +300,12 @@ class Register:
 # ---------------------------------------------------------------- rosters, stats, games, starts
 
 def new_rec(pid, name, season, fr, gp, reg_p):
-    return {"id": pid, "gsis_id": reg_p["id"] if reg_p else None, "pfr_id": (reg_p or {}).get("pfr") or None,
+    pfr = (reg_p or {}).get("pfr") or (pid[4:] if pid.startswith("pfr:") else None)
+    return {"id": pid, "gsis_id": reg_p["id"] if reg_p else None, "pfr_id": pfr,
             "name": name, "season": season, "team": fr, "group": gp[0], "pos": gp[1], "src": set()}
 
 
-def rosters(raw_dir, reg, recs):
+def rosters(raw_dir, reg, recs, wd_born):
     """Every rostered DL/LB/DB/OL/K, 1970-2025, keyed by (player id, season, franchise)."""
     unmatched = 0
     for y in range(FIRST, LAST + 1):
@@ -311,9 +316,15 @@ def rosters(raw_dir, reg, recs):
                 continue
             names = [r["full_name"], r["first_name"] + " " + r["last_name"]]
             p = reg.by_id.get(r["gsis_id"]) or reg.by_id.get(r.get("esb_id") or "-") or reg.find(names, r["birth_date"])
+            pid = p["id"] if p else None
             if p is None:
+                # not in the register (mostly careers over by the mid-1970s): Wikidata's PFR id
+                # for the same name and birth date, else a stand-in
+                c = set().union(*(wd_born.get((nkey(n), r["birth_date"]), set()) for n in names))
+                pid = "pfr:" + c.pop() if len(c) == 1 else None
+            if pid is None:
                 unmatched += 1
-            pid = p["id"] if p else "nfl:%s:%s" % (nkey(r["full_name"]).replace(" ", "-"), r["birth_date"] or "?")
+                pid = "nfl:%s:%s" % (nkey(r["full_name"]).replace(" ", "-"), r["birth_date"] or "?")
             fr = roster_fr(r["team"], y)
             key = (pid, y, fr)
             rec = recs.get(key)
@@ -557,15 +568,15 @@ def entries(cell):
             name = label or title
             team = [x for l in links[1:2] for x in l]
             if not team:
-                rest = plain(p).split(",", 1)
+                rest = re.split(r",|\u2013|\u2014| - ", plain(p), maxsplit=1)
                 team = [re.sub(r"\(.*", "", rest[1]).strip()] if len(rest) > 1 else []
         else:
             txt = plain(p)
-            parts = txt.split(",", 1)
+            parts = re.split(r",|\u2013|\u2014| - ", txt, maxsplit=1)
             title, name = None, parts[0]
             team = [re.sub(r"\(.*", "", parts[1]).strip()] if len(parts) > 1 else []
         name = re.sub(r"[*†‡#^§¤+]|\(.*?\)", "", plain(name)).strip()
-        if name and len(name) > 2:
+        if name and len(name) > 2 and name.lower() not in ("none", "vacant", "n/a"):
             out.append({"title": title.strip() if title else None, "name": name, "team": team, "sel": sel, "jersey": jersey})
     return out
 
@@ -634,18 +645,73 @@ def probowl(text, season):
             if not re.search(pat, text):
                 continue
         keep.append(e)
-    # the bullet-list rosters (2014-2016): '''[[Position]]''' headings, then * {{NFLplayer ...}}
-    pos = None
-    for line in text.split("\n"):
+    return keep + probowl_lists(text, season)
+
+
+LISTPOS = {"offensive linemen": ("OL", "OL"), "offensive line": ("OL", "OL"), "ol": ("OL", "OL"),
+           "defensive linemen": ("DL", "DL"), "defensive line": ("DL", "DL"), "dl": ("DL", "DL"),
+           "linebackers": ("LB", "LB"), "lb": ("LB", "LB"), "defensive backs": ("DB", "DB"), "db": ("DB", "DB"),
+           "k": ("K", "K"), "kicker": ("K", "K"), "kickers": ("K", "K"), "special teams": ("ST", "ST")}
+
+
+def list_pos(label):
+    t = plain(label).lower().strip(" :")
+    return LISTPOS.get(t) or (None if t in ("qb", "rb", "wr", "te", "p", "kr", "pr", "st") else honor_pos(label))
+
+
+def probowl_lists(text, season):
+    """Pro Bowl rosters written as lists rather than tables (the late 1970s, 1994-98 and
+    2014-16 pages): position headings ("== Linebackers ==", bold "OL", a bold link to
+    Cornerback), then one player per line: * {{NFLplayer|..}}, "* 58 [[Jack Lambert]] (PIT) MLB",
+    "[[Bruce Armstrong]] - N.E." or "*[[Ty Law]] - New England Patriots"."""
+    out, pos = [], None
+    for line in TAGS.sub("", text).split("\n"):
         s = line.strip()
-        m = re.match(r"^'''\s*(\[\[[^\]]+\]\]\w*)\s*'''$", s)
+        m = re.match(r"^(={2,})\s*(.*?)\s*\1$", s)
         if m:
-            pos = honor_pos(m.group(1))
+            pos = list_pos(m.group(2))
             continue
-        if pos and re.match(r"^\*\s*\{\{\s*NFLplayer", s, re.I):
-            for e in entries(s[1:]):
-                keep.append(dict(e, season=season, gp=pos, kind="probowl"))
-    return keep
+        m = re.match(r"^(?:\|[^|\[]*\|)?\s*'''\s*([^'\[\]]+|\[\[[^\]]+\]\]\w*)\s*'''\s*(?:<br\s*/?>)?\s*$", s)
+        if m:
+            pos = list_pos(m.group(1))
+            continue
+        if not pos or "[[" not in s or s.startswith("|") or s.startswith("{"):
+            continue
+        if re.match(r"^\*\s*\{\{\s*NFLplayer", s, re.I):
+            if pos[0] != "ST":
+                for e in entries(s[1:]):
+                    out.append(dict(e, season=season, gp=pos, kind="probowl"))
+            continue
+        body = re.sub(r"<br\s*/?>\s*$", "", s.lstrip("*").strip())
+        jersey = None
+        m = re.match(r"^<span[^>]*>(?:&nbsp;|\s)*(\d+)</span>\s*", body)
+        if m:
+            jersey, body = int(m.group(1)), body[m.end():]
+        body = re.sub(r"^'+|(?<=\]\])'+", "", body)
+        m = re.match(r"^\[\[([^\]|]+)(?:\|([^\]]*))?\]\]\s*(.*)$", body)
+        if not m:
+            continue
+        title, label, rest = m.group(1), m.group(2), m.group(3)
+        team, suffix = [], ""
+        mm = re.match(r"^\(([A-Z][A-Za-z.]{1,4})\)\s*(.*)$", rest)
+        if mm:
+            team, suffix = [mm.group(1)], mm.group(2)
+        else:
+            mm = re.match(r"^[–—-]\s*(.*)$", rest)
+            if not mm:
+                continue
+            links = LINK.findall(mm.group(1))
+            team = [x for l in links[:1] for x in l] or [re.sub(r"\(.*", "", plain(mm.group(1))).strip()]
+        gp = pos
+        fine = classify(re.split(r"[\s/]+", suffix.strip())[0]) if suffix.strip() else None
+        if pos[0] == "ST":
+            gp = fine if fine and fine[0] == "K" else None
+        elif fine and (fine[0] == pos[0] or pos[0] == "DB" and fine[0] in ("CB", "S")):
+            gp = fine
+        if gp:
+            out.append({"title": title.strip(), "name": plain(label or title), "team": team, "sel": [],
+                        "jersey": jersey, "season": season, "gp": gp, "kind": "probowl"})
+    return out
 
 
 def probowl_title(season):
@@ -776,10 +842,10 @@ def main():
     more = os.path.join(raw_dir, "more")
     fetch(raw_dir)
     reg = Register(os.path.join(raw_dir, "players.csv"))
-    title_pfr, pfr_title = wikidata_pfr(more)
+    title_pfr, pfr_title, wd_born = wikidata_pfr(more)
 
     recs = {}
-    rosters(raw_dir, reg, recs)
+    rosters(raw_dir, reg, recs, wd_born)
 
     # stats 1999-2025, and players with stats the season roster misses
     print("reading weekly stats")
@@ -827,7 +893,7 @@ def main():
             rec["g"], rec["g_src"] = 0, "active"
         rec["rostered_weeks"] = rostered.get((pid, y, fr))
 
-    # honors
+    # honors: the All-Pro and Pro Bowl pages
     print("reading Wikipedia honors pages")
     titles = ["%d All-Pro Team" % y for y in range(FIRST, LAST + 1)] + [probowl_title(y) for y in range(FIRST, LAST + 1)]
     pages = wiki_pages(more, titles)
@@ -836,76 +902,60 @@ def main():
         honors += allpro(pages["%d All-Pro Team" % y], y)
         honors += probowl(pages[probowl_title(y)], y)
     no_pb = [y for y in range(FIRST, LAST + 1) if not any(h["kind"] == "probowl" and h["season"] == y for h in honors)]
-    print("seasons whose Pro Bowl page has no rosters:", no_pb)
+    print("seasons whose Pro Bowl page lists no rosters (filled from player infoboxes):", no_pb)
     by_season = defaultdict(list)
     for rec in recs.values():
         by_season[rec["season"]].append(rec)
-    honors_only = 0
+    honors_only = unplaced = 0
     for h in honors:
         fr = wiki_fr(h["team"], h["season"])
         rec = match_honor(h, fr, by_season[h["season"]], reg, title_pfr)
         if rec is None:
-            p = None
             pfr = title_pfr.get(h["title"] or "")
-            if pfr:
-                p = reg.by_pfr.get(pfr)
-            p = p or reg.near(h["name"], h["season"], h["gp"][0])
-            pid = p["id"] if p else "wiki:" + (h["title"] or h["name"]).replace(" ", "_")
+            p = (reg.by_pfr.get(pfr) if pfr else None) or reg.near(h["name"], h["season"], h["gp"][0])
+            pid = p["id"] if p else ("pfr:" + pfr if pfr else "wiki:" + (h["title"] or h["name"]).replace(" ", "_"))
             if fr is None:
+                unplaced += 1
                 continue
             key = (pid, h["season"], fr)
             if key not in recs:
                 honors_only += 1
-                gp = h["gp"] if h["gp"][0] != "DB" else ("DB", "DB")
-                recs[key] = new_rec(pid, p["name"] if p else h["name"], h["season"], fr, gp, p)
+                recs[key] = new_rec(pid, p["name"] if p else h["name"], h["season"], fr, h["gp"], p)
                 recs[key].update(status=None, height=(p or {}).get("ht"), weight=(p or {}).get("wt"), birth_date=(p or {}).get("born"))
                 by_season[h["season"]].append(recs[key])
             rec = recs[key]
-        hn = rec.setdefault("honors", {})
-        rec["src"].add("wikipedia_honors")
-        if h["kind"] == "probowl":
-            hn["pro_bowl"] = True
-            if h.get("jersey") and not rec.get("jersey"):
-                rec["jersey"], rec["jersey_src"] = h["jersey"], "pro_bowl_page"
-        else:
-            for s in h["sel"]:
-                second = "-2" in s
-                lst = hn.setdefault("all_pro_2" if second else "all_pro", [])
-                tag = s.split("-")[0]
-                if tag not in lst:
-                    lst.append(tag)
-                if tag == "AP":
-                    hn["ap2" if second else "ap1"] = True
-            hn["all_pro_pos"] = h["gp"][1]
-        if rec.get("wiki_title") is None and h.get("title"):
-            rec["wiki_title"] = h["title"]
-    for rec in recs.values():
-        hn = rec.get("honors")
-        if hn and hn.get("ap1"):
-            hn.pop("ap2", None)
-    print("honors with no roster row (honors-only records):", honors_only)
+        add_honor(rec, h)
+    print("honors lines with no roster row (honors-only records): %d; not placed at all: %d" % (honors_only, unplaced))
 
-    # before 1999: kickers' and defenders' season tables from their Wikipedia articles
-    titles = {}
+    # before 1999: the players' own Wikipedia articles, for kickers' and defenders' season
+    # tables, and for the Pro Bowls of seasons whose Pro Bowl page has no rosters
     for rec in recs.values():
         t = rec.get("wiki_title") or pfr_title.get(rec.get("pfr_id") or "")
         if t:
             rec["wiki_title"] = t
-            if rec["season"] < SPLIT and rec["group"] != "OL":
-                titles[rec["id"]] = t
-    print("kickers and defenders before 1999 with a Wikipedia article:", len(set(titles.values())))
-    arts = wiki_pages(more, sorted(set(titles.values())))
+    want = {rec["wiki_title"] for rec in recs.values() if rec.get("wiki_title") and rec["season"] < SPLIT
+            and (rec["group"] != "OL" or rec["season"] in no_pb)}
+    print("pre-1999 player articles to read:", len(want))
+    arts = wiki_pages(more, sorted(want))
     by_pid_season = defaultdict(list)
     for rec in recs.values():
         by_pid_season[(rec["id"], rec["season"])].append(rec)
-    parsed = {}
+    parsed, boxes = {}, {}
     for (pid, y), lst in by_pid_season.items():
-        t = titles.get(pid)
-        if not t or y >= SPLIT:
+        t = lst[0].get("wiki_title")
+        if not t or t not in arts or y >= SPLIT:
+            continue
+        if y in no_pb:
+            if t not in boxes:
+                boxes[t] = infobox_probowls(arts[t])
+            if y in boxes[t]:
+                for rec in lst:
+                    add_honor(rec, {"kind": "probowl", "src": "infobox"})
+        if lst[0]["group"] == "OL":
             continue
         kind = "K" if lst[0]["group"] == "K" else "D"
         if (t, kind) not in parsed:
-            parsed[(t, kind)] = season_tables(arts.get(t, ""), kind)
+            parsed[(t, kind)] = season_tables(arts[t], kind)
         rows = parsed[(t, kind)].get(y, [])
         for team, st in rows:
             fr = wiki_fr(team, y)
@@ -923,9 +973,60 @@ def main():
                 if st.get("gs") is not None:
                     rec["gs"], rec["gs_src"] = st["gs"], "wikipedia"
                 rec["src"].add("wikipedia_career_table")
+    for rec in recs.values():
+        hn = rec.get("honors")
+        if hn and hn.get("ap1"):
+            hn.pop("ap2", None)
 
     settle_db(recs, reg)
+    for rec in recs.values():
+        p = reg.by_id.get(rec.get("gsis_id") or "-")
+        if p and any(p["draft"][:3]):
+            rec["draft"] = p["draft"]  # [year, round, pick, team]; undrafted players have none
+        if p and not rec.get("jersey") and p["jersey"] and p["last"] and p["last"] >= SPLIT:
+            rec["jersey"], rec["jersey_src"] = p["jersey"], "register_latest"
     finish(recs, out_path)
+
+
+def add_honor(rec, h):
+    hn = rec.setdefault("honors", {})
+    rec["src"].add("wikipedia_honors")
+    if h["kind"] == "probowl":
+        hn["pro_bowl"] = True
+        if h.get("src"):
+            hn["pro_bowl_src"] = h["src"]
+        if h.get("jersey") and not rec.get("jersey"):
+            rec["jersey"], rec["jersey_src"] = h["jersey"], "pro_bowl_page"
+    else:
+        for s in h["sel"]:
+            second = "-2" in s
+            tag = s.split("-")[0]
+            lst = hn.setdefault("all_pro_2" if second else "all_pro", [])
+            if tag not in lst:
+                lst.append(tag)
+            if tag == "AP":
+                hn["ap2" if second else "ap1"] = True
+        hn["all_pro_pos"] = h["gp"][1]
+    if h.get("title") and not rec.get("wiki_title"):
+        rec["wiki_title"] = h["title"]
+
+
+def infobox_probowls(text):
+    """Seasons an article's infobox lists for the Pro Bowl ('6x [[Pro Bowl]] (1970-1975)');
+    Wikipedia's football articles list the season, not the year the game was played."""
+    years = set()
+    for line in TAGS.sub("", text).split("\n"):
+        if not re.search(r"\[\[Pro Bowl[\]|]", line) or re.search(r"MVP|Hall of Fame", line):
+            continue
+        seg = line[line.index("Pro Bowl"):]
+        seg = re.sub(r"\{\{\s*(?:NFL ?Year|nfly|AFL ?Year)\s*\|\s*(\d{4})\s*\|\s*(\d{4})\s*\}\}", r"\1-\2", seg, flags=re.I)
+        seg = re.sub(r"\{\{\s*(?:NFL ?Year|nfly|AFL ?Year)\s*\|\s*(\d{4})\s*\}\}", r"\1", seg, flags=re.I)
+        seg = plain(seg).replace("–", "-").replace("—", "-")
+        for a, b in re.findall(r"(\d{4})\s*-\s*(\d{2,4})\b", seg):
+            b = int(b) if len(b) == 4 else int(a[:2] + b)
+            years |= set(range(int(a), b + 1))
+        years |= {int(x) for x in re.findall(r"\b(19\d\d|20[0-2]\d)\b", seg)}
+    return years
 
 
 def match_honor(h, fr, recs, reg, title_pfr):
@@ -933,9 +1034,10 @@ def match_honor(h, fr, recs, reg, title_pfr):
     then by name with the team, then by surname and first initial with the team, then by name
     across the league that season."""
     pfr = title_pfr.get(h["title"] or "")
-    p = reg.by_pfr.get(pfr) if pfr else None
-    if p:
-        c = [r for r in recs if r["id"] == p["id"]]
+    if pfr:
+        p = reg.by_pfr.get(pfr)
+        ids = {"pfr:" + pfr, p["id"] if p else None}
+        c = [r for r in recs if r["id"] in ids]
         if c:
             return next((r for r in c if r["team"] == fr), c[0])
     k = nkey(h["name"])
@@ -994,16 +1096,16 @@ def finish(recs, out_path):
             continue
         r["team_abbr"] = S.identity(r["team"], y)[0]
         if not r.get("jersey"):
-            p_j = None
             r.pop("jersey_src", None)
-        if r.get("draft") is None:
-            pass
+        if "nflverse_stats" in r["src"]:
+            r["stats_src"] = "nflverse"
+        elif "wikipedia_career_table" in r["src"]:
+            r["stats_src"] = "wikipedia"
         r["src"] = sorted(r["src"])
+        r["roster_status"] = r.pop("status", None)
         for k in ("defense", "kicking"):
-            if k in r:
+            if k in r:  # zeros left out: with stats_src set, a missing stat is 0
                 r[k] = {a: (int(b) if float(b).is_integer() else round(b, 1)) for a, b in r[k].items() if b}
-                if not r[k]:
-                    del r[k]
         keep.append({k: v for k, v in r.items() if v not in (None, "", [], {}) and k != "stat_g"})
     keep.sort(key=lambda r: (r["season"], r["team"], r["group"], r["name"]))
     report(keep)
@@ -1034,10 +1136,10 @@ def report(rows):
         d = r["season"] // 10 * 10
         c = cells[(d, r["group"])]
         c["n"] += 1
-        has = bool(r.get("defense") or r.get("kicking"))
+        has = bool(r.get("stats_src"))
         c["stats"] += has
         c["hon"] += bool(r.get("honors"))
-        c["only"] += bool(r.get("honors")) and r["src"] == ["wikipedia_honors"]
+        c["only"] += bool(r.get("honors")) and not {"roster", "nflverse_stats"} & set(r["src"])
         c["g"] += r.get("g") is not None
         c["gs"] += bool(r.get("gs"))
     for d in range(FIRST // 10 * 10, LAST + 1, 10):
