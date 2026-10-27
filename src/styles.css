@@ -886,7 +886,16 @@ button:focus-visible {
   box-shadow: 0 0 20px rgba(25, 227, 201, 0.3);
 }
 .mode .disp {
+  max-width: 100%;
   font-size: 24px;
+  white-space: nowrap;
+}
+/* a little short of room (HomePage's `snug`): the mode tiles give it */
+.home.snug .modes {
+  margin-top: 10px;
+}
+.home.snug .mode {
+  height: 64px;
 }
 .mode small {
   font-size: 12px;

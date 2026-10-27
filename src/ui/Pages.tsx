@@ -128,7 +128,7 @@ export function HomePage(props: {
       </i>
     ));
   return (
-    <div className={'page-view home' + (content < 620 ? ' short' : '') + (content >= 816 ? ' tall' : '')}>
+    <div className={'page-view home' + (content < 620 ? ' short' : content < 700 ? ' snug' : '') + (content >= 816 ? ' tall' : '')}>
       <h1 className={'logo' + (intro ? ' intro' : '')} aria-label="Perfect Season">
         <span className="disp l1" aria-hidden="true">
           {letters('PERFECT', 80)}
@@ -199,7 +199,9 @@ export function HomePage(props: {
       <div className="modes" role="group" aria-label="Game mode">
         {MODES.map((m) => (
           <button key={m.key} className="mode" aria-pressed={p.mode === m.key} onClick={() => props.onMode(m.key)}>
-            <span className="disp">{m.key === 'daily' ? 'Daily #' + props.dailyNo : m.title}</span>
+            <span className="disp">
+              <Fit text={m.key === 'daily' ? 'Daily #' + props.dailyNo : m.title} />
+            </span>
             {m.key === '1v1' && live && <span className="livebadge">LIVE</span>}
             {m.key === '1v1' && props.online && props.online.searching > 0 ? (
               <small className="queue-now" key={props.online.searching}>

@@ -249,3 +249,32 @@
 .fit-compact .fav-chip small {
   display: none;
 }
+
+/* first launch on a shorter screen: the grid tighter, so LET'S GO stays in view */
+@media (max-height: 760px) {
+  .welcome.fav-step .welcome-card p {
+    display: none;
+  }
+  .welcome.fav-step .fav-chip {
+    height: 40px;
+  }
+  .welcome.fav-step .fav-chip b {
+    font-size: 17px;
+  }
+}
+@media (max-height: 680px) {
+  .welcome.fav-step .welcome-card {
+    margin-top: 10px;
+    padding: 14px;
+  }
+  .welcome.fav-step .welcome-card h2 {
+    font-size: 26px;
+  }
+  .welcome.fav-step .fav-chip {
+    height: 34px;
+  }
+  .welcome.fav-step .fav-chip small,
+  .welcome.fav-step .fav-name {
+    display: none;
+  }
+}
