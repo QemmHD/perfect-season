@@ -128,7 +128,7 @@ export function HomePage(props: {
       </i>
     ));
   return (
-    <div className={'page-view home' + (content < 620 ? ' short' : content < 700 ? ' snug' : '') + (content >= 816 ? ' tall' : '')}>
+    <div className={'page-view home' + (content < 620 ? ' short' : content < 730 ? ' snug' : '') + (content >= 816 ? ' tall' : '')}>
       <h1 className={'logo' + (intro ? ' intro' : '')} aria-label="Perfect Season">
         <span className="disp l1" aria-hidden="true">
           {letters('PERFECT', 80)}

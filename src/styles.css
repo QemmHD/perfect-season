@@ -895,7 +895,11 @@ button:focus-visible {
   margin-top: 10px;
 }
 .home.snug .mode {
-  height: 64px;
+  height: 58px;
+  padding: 7px 12px;
+}
+.home.snug .under {
+  min-height: 34px;
 }
 .mode small {
   font-size: 12px;
