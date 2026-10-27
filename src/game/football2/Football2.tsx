@@ -224,8 +224,9 @@ export function Football2({
 
   const handleEvents = (p: Play) => {
     for (const e of p.events) {
-      if (e === 'snap') sfx.click();
-      else if (e === 'handoff') sfx.tick();
+      if (e === 'snap') sfx.hit(0.15);
+      else if (e === 'handoff') sfx.catch();
+      else if (e === 'pancake') sfx.hit(0.6);
       else if (e === 'throw' || e === 'throw-pressure' || e === 'scramble') sfx.whoosh();
       else if (e === 'catch') {
         sfx.catch();
@@ -235,9 +236,12 @@ export function Football2({
         sfx.catch();
         crowd.swell(0.7);
         say('CONTESTED CATCH!', 'good', 900);
-      } else if (e.startsWith('move:')) sfx.select();
-      else if (e.startsWith('beat:')) {
+      } else if (e.startsWith('beat:')) {
         const kind = e.slice(5);
+        if (kind === 'truck') {
+          sfx.hit(1);
+          sfx.thud(0.2);
+        } else if (kind === 'stiff') sfx.hit(0.6);
         if ((kind === 'truck' || kind === 'stiff') && p.carrier && !highlight.current) highlight.current = { t: p.t, x: p.carrier.x, y: p.carrier.y, before: REPLAY_BEFORE };
         vibrate([20, 30, 20]);
         crowd.swell(0.8);
@@ -245,6 +249,7 @@ export function Football2({
         if (kind === 'truck') slowUntil.current = performance.now() + 450;
         say(kind === 'juke' ? 'JUKED!' : kind === 'spin' ? 'SPIN MOVE!' : kind === 'truck' ? 'TRUCKED!' : 'STIFF ARM!', 'big', 900);
       } else if (e === 'break') {
+        sfx.hit(0.4);
         crowd.swell(0.5);
         say('BROKE A TACKLE', 'good', 800);
       } else if (e === 'bighit') {
@@ -294,21 +299,20 @@ export function Football2({
       vibrate(50);
       say(a.driveOver === 'INT' ? 'INTERCEPTED' : 'FUMBLE', 'bad', 1700, e.text);
     } else if (a.driveOver === 'SAF') {
-      sfx.scoreThem();
+      sfx.groan();
       vibrate(50);
       say('SAFETY', 'bad', 1700, 'TACKLED IN YOUR END ZONE');
     } else if (e.text.startsWith('BIG HIT')) {
-      sfx.stop();
       say('BIG HIT!', 'big', 1500, e.text.slice(4) + ' · ' + gain);
     } else if (a.driveOver === 'DOWNS') {
       sfx.groan(0.8);
       say('TURNOVER ON DOWNS', 'bad', 1600, e.kind === 'incomplete' ? e.text : gain);
     } else if (a.firstDown) {
-      sfx.coin();
+      sfx.cheer(yds >= 20 ? 0.9 : 0.45);
       crowd.swell(yds >= 20 ? 0.9 : 0.45);
       say(yds >= 20 ? 'BIG PLAY · FIRST DOWN' : 'FIRST DOWN', yds >= 20 ? 'big' : 'good', 1300, gain);
     } else if (e.kind === 'incomplete') {
-      sfx.nope();
+      sfx.groan(0.4);
       say(e.text, 'plain', 1100);
     } else if (e.kind === 'sack') say(e.text, 'bad', 1300, gain);
     else say(gain, yds > 0 ? 'good' : 'plain', 1000, e.kind === 'out' ? 'OUT OF BOUNDS' : undefined);
@@ -316,6 +320,8 @@ export function Football2({
       const c = p.carrier ?? p.catcher;
       if (c) highlight.current = { t: p.t, x: c.x, y: c.y - 6, before: 2.4 };
     }
+    // the whistle: the play's dead (a touchdown has its horn)
+    if (!a.points) window.setTimeout(() => sfx.whistle(), 220);
     const hl = highlight.current;
     highlight.current = null;
     if (hl && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) {
@@ -384,11 +390,11 @@ export function Football2({
     window.setTimeout(() => {
       kick(game, aim);
       if (good) {
-        sfx.seriesWin();
+        sfx.cheer(1);
         crowd.swell(0.9);
         say('IT’S GOOD! +3', 'good', 1600, k.dist + ' YARDS');
       } else {
-        sfx.seriesLoss();
+        sfx.groan(1);
         say('NO GOOD', 'bad', 1500, side < 0 ? 'WIDE LEFT' : 'WIDE RIGHT');
       }
       nextUp(game, true, 1700);

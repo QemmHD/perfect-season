@@ -116,6 +116,8 @@ export function Hoops2({
   const rec = useRef(new Recorder<Snap>(5));
   const highlight = useRef<{ t: number; cx: number; cz: number } | null>(null);
   const replayRef = useRef<Replay<Snap> | null>(null);
+  /** where the dribble was in its beat last frame (the bounce sounds as it hits the floor) */
+  const lastBeat = useRef(1);
   const [replaying, setReplaying] = useState(false);
 
   const say = (text: string, tone: 'good' | 'bad' | 'big' | 'plain' | 'green', ms = 1200) => {
@@ -167,8 +169,8 @@ export function Hoops2({
       else if (e === 'lob') {
         sfx.whoosh();
         say('LOB!', 'plain', 600);
-      } else if (e === 'catch') sfx.catch();
-      else if (e === 'rise') sfx.click();
+      } else if (e === 'catch' || e === 'oop-catch') sfx.catch();
+      else if (e === 'rise' || e.startsWith('cut:')) sfx.squeak();
       else if (e === 'release-green') {
         sfx.coin();
         vibrate(15);
@@ -202,6 +204,8 @@ export function Hoops2({
       if (e.startsWith('posterized:')) {
         // the posterizer: the crowd comes out of its seats, the hit in slow motion
         slowUntil.current = Math.max(slowUntil.current, performance.now() + 1100);
+        sfx.roar();
+        sfx.thud(0.35);
         crowd.swell(1);
         fx.crowd = 1;
         shake(6);
@@ -225,7 +229,7 @@ export function Hoops2({
         say('REJECTED BY ' + d.p.tag, 'bad', 1100);
       } else if (e === 'rim') sfx.rim();
       else if (e.startsWith('orb:')) {
-        sfx.select();
+        sfx.catch();
         say('OFFENSIVE BOARD', 'good', 800);
         crowd.swell(0.4);
       }
@@ -258,6 +262,7 @@ export function Hoops2({
       sfx.groan(0.6);
       say(e.text, 'plain', 1000);
     } else {
+      if (e.kind === 'clock') sfx.buzzer();
       sfx.groan();
       vibrate(40);
       say(e.text, 'bad', 1300);
@@ -265,6 +270,8 @@ export function Hoops2({
     if (wasFire >= 0 && game.fire < 0) window.setTimeout(() => say('FIRE PUT OUT', 'plain', 900), 1000);
     onProgress(progress(game));
     setBetween(true);
+    // the final buzzer
+    if (game.over) window.setTimeout(() => sfx.buzzer(), 500);
     const proceed = () => {
       if (game.over) {
         onDone(progress(game));
@@ -362,7 +369,17 @@ export function Hoops2({
           }
         }
       }
-      if (p && !replayRef.current) rec.current.push(p.t, snapOf(p));
+      if (p && !replayRef.current) {
+        rec.current.push(p.t, snapOf(p));
+        // the dribble on the floor: on the same beat the drawing bounces the ball
+        const h = p.handler !== null ? p.bodies[p.handler] : null;
+        if (h && h.act === 'dribble' && !p.ball && !p.meter && !p.finish && !p.end) {
+          const sp = Math.hypot(h.vx, h.vz);
+          const beat = ((((p.t * (sp > 1.8 ? 1.5 + sp / 18 : 1.6)) % 1) * (sp > 1.8 ? 2 : 1.6)) % 1 + 1) % 1;
+          if (lastBeat.current < 0.45 && beat >= 0.45) sfx.dribble(sp > 12);
+          lastBeat.current = beat;
+        } else lastBeat.current = 1;
+      }
       fx.swish = Math.max(0, fx.swish - elapsed * 1.3);
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.crowd = Math.max(0, fx.crowd - elapsed * 0.45);
