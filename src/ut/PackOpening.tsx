@@ -172,7 +172,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
       {phase === 'reveal' && (
         <div className="ut-reveal">
           <span className="eyebrow">{opening.title}</span>
-          <h2 className="disp">{done ? (golds ? golds + (golds === 1 ? ' gold or better' : ' golds or better') : order.length + ' new cards') : 'Opening…'}</h2>
+          <h2 className="disp">{!done ? 'Opening…' : star?.tier === 'legend' ? 'A Legend!' : star?.tier === 'promo' ? 'A Hot Season!' : golds ? golds + (golds === 1 ? ' gold' : ' golds') : order.length + ' new cards'}</h2>
           <div className="ut-reveal-grid" style={{ gridTemplateColumns: 'repeat(' + g.cols + ', ' + g.w + 'px)' }}>
             {order.map((rc, i) => (
               <span key={rc.line.id + i} className={'ut-flip' + (i < flipped ? ' on t-' + rc.tier : '')} style={{ width: g.w, height: Math.round(g.w * 1.4) }}>

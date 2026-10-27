@@ -6,7 +6,9 @@
 // `request.cards` (basketball: `toHooper()` from rate.ts turns each into the game's player; the
 // bench subs in on fatigue), and when the game ends calls `request.done(result)`. The UT screen
 // then credits the coins and the cards' XP (state.ts `awardXp`) and shows the result.
+import type { Profile } from '../lib/profile';
 import type { SquadRating } from './squad';
+import { awardXp } from './state';
 import type { RatedCard, UtSport } from './types';
 
 export interface UtMatchRequest {
@@ -41,4 +43,13 @@ export const COINS_LOSS = 30;
 
 export function matchRewards(r: UtMatchResult): { coins: number; xp: number } {
   return { coins: r.won ? COINS_WIN : COINS_LOSS, xp: XP_PER_GAME + (r.won ? XP_FOR_WIN : 0) };
+}
+
+/**
+ * `awardXp(uids, n)` for the match code, bound to the profile: e.g. in App.tsx,
+ * `const award = xpAwarder(update); award(result.played, matchRewards(result).xp)`.
+ * (For the result screen's level-ups, `awardXp(profile.ut, uids, n).ups` before calling it.)
+ */
+export function xpAwarder(update: (fn: (p: Profile) => Profile) => void): (uids: string[], n: number) => void {
+  return (uids, n) => update((p) => ({ ...p, ut: awardXp(p.ut, uids, n).ut }));
 }
