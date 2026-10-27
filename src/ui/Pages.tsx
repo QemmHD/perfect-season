@@ -8,7 +8,7 @@ import { type Booster, BOOSTERS, type BotLevel, type Mode } from '../engine/type
 import { bestRuns, type Profile, type RunRecord } from '../lib/profile';
 import { sfx } from '../lib/sound';
 import { APP_VERSION } from '../lib/update';
-import { viewportInfo } from '../stage';
+import { useLayout, viewportInfo } from '../stage';
 import type { OnlineCount } from '../net/match';
 import { NET_ON } from '../net/nostr';
 import { Fit, lastName, Sheet } from './common';
@@ -116,6 +116,8 @@ export function HomePage(props: {
     introPlayed = true;
   }, []);
   const p = props.profile;
+  // the rows that give way on shorter screens (styles.css "home")
+  const { content } = useLayout();
   const playLabel = p.mode === 'daily' ? (props.dailyDone ? 'PRACTICE DAILY' : 'PLAY DAILY #' + props.dailyNo) : p.mode === '1v1' ? (NET_ON ? 'FIND A MATCH' : 'PLAY THE BOT') : 'PLAY';
   // someone to play: another player with this sport open
   const live = props.online && props.online.here > 1;
@@ -126,7 +128,7 @@ export function HomePage(props: {
       </i>
     ));
   return (
-    <div className="page-view home">
+    <div className={'page-view home' + (content < 620 ? ' short' : '') + (content >= 816 ? ' tall' : '')}>
       <h1 className={'logo' + (intro ? ' intro' : '')} aria-label="Perfect Season">
         <span className="disp l1" aria-hidden="true">
           {letters('PERFECT', 80)}

@@ -736,6 +736,9 @@ button:focus-visible {
   justify-content: center;
   gap: 10px;
 }
+.fit-normal .logo .disp {
+  font-size: 49px;
+}
 .fit-tight .logo .disp {
   font-size: 46px;
 }
@@ -758,9 +761,14 @@ button:focus-visible {
   isolation: isolate;
   background: #081f29;
 }
+/* the hero gives way further below roomy (its numbers shrink to fit) */
+.fit-normal .hero,
+.fit-tight .hero {
+  min-height: 88px;
+}
 .fit-compact .hero {
   margin-top: 8px;
-  min-height: 88px;
+  min-height: 84px;
 }
 .hero canvas {
   position: absolute;
@@ -806,8 +814,12 @@ button:focus-visible {
   font-size: 30px;
   color: var(--sub);
 }
+.fit-normal .jumbo .rec b,
+.fit-tight .jumbo .rec b {
+  font-size: 50px;
+}
 .fit-compact .jumbo .rec b {
-  font-size: 46px;
+  font-size: 44px;
 }
 .tagline {
   text-wrap: balance;
@@ -832,6 +844,12 @@ button:focus-visible {
 .fit-tight .tagline,
 .fit-compact .tagline,
 .fit-compact .sports {
+  display: none;
+}
+/* the home makes room for everything below the hero: only tall screens keep the tagline, and the
+   shortest ones (under ~620 frame px of content, HomePage's `short`) let the hero go */
+.home:not(.tall) .tagline,
+.home.short .hero {
   display: none;
 }
 .modes {
@@ -8340,16 +8358,16 @@ button.friendcard:active {
    the club, the squad builder and the challenges.
    ========================================================================== */
 
-/* the home screen's way in */
+/* the home screen's way in: a slim strip, so the home still fits (see the fits under "home") */
 .ut-entry {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 10px 16px 0 16px;
-  height: 56px;
-  padding: 0 14px 0 10px;
-  border-radius: 14px;
+  gap: 10px;
+  margin: 8px 16px 0 16px;
+  height: 46px;
+  padding: 0 12px 0 8px;
+  border-radius: 13px;
   flex-shrink: 0;
   text-align: left;
   color: var(--text);
@@ -8365,17 +8383,17 @@ button.friendcard:active {
 }
 .ut-entry-fan {
   position: relative;
-  width: 44px;
-  height: 40px;
+  width: 38px;
+  height: 34px;
   flex-shrink: 0;
 }
 .ut-entry-fan i {
   position: absolute;
-  left: 13px;
+  left: 11px;
   top: 2px;
-  width: 22px;
-  height: 31px;
-  border-radius: 4px;
+  width: 18px;
+  height: 26px;
+  border-radius: 3px;
   transform-origin: 50% 100%;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
@@ -8396,10 +8414,10 @@ button.friendcard:active {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 .ut-entry-txt b {
-  font-size: 23px;
+  font-size: 20px;
   line-height: 1;
   background: linear-gradient(180deg, #ffe7a8 0%, var(--gold) 60%, #c98a1d 100%);
   -webkit-background-clip: text;
@@ -8407,7 +8425,8 @@ button.friendcard:active {
   color: transparent;
 }
 .ut-entry-txt small {
-  font-size: 11.5px;
+  font-size: 11px;
+  line-height: 1.25;
   color: var(--soft);
   white-space: nowrap;
   overflow: hidden;
@@ -8420,17 +8439,23 @@ button.friendcard:active {
   animation: none;
 }
 .ut-entry-go {
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1;
   color: var(--gold);
   margin-top: -3px;
 }
+.fit-tight .ut-entry {
+  height: 42px;
+}
 .fit-compact .ut-entry {
-  height: 50px;
-  margin-top: 8px;
+  height: 38px;
+  margin-top: 6px;
 }
 .fit-compact .ut-entry-txt b {
-  font-size: 21px;
+  font-size: 18px;
+}
+.fit-compact .ut-entry-fan {
+  transform: scale(0.85);
 }
 
 /* the screen: a top bar, the view, its own tabs */
