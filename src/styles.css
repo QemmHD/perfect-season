@@ -8260,3 +8260,31 @@ button.friendcard:active {
 .fb2 .hg2-bug .mid {
   white-space: nowrap;
 }
+/* sideways the play call sits at the right, clear of the formation */
+.fb2.wide .fb2-call,
+.fb2.wide .fb2-kick {
+  left: auto;
+  right: calc(var(--sar) + 12px);
+  transform: none;
+  width: 300px;
+  animation-name: fb2-in;
+}
+@keyframes fb2-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+.fb2.wide .fb2-go {
+  height: 46px;
+  font-size: 17px;
+}
+.fb2.wide .fb2-play b {
+  font-size: 17px;
+}
+.fb2.wide .hg2-hint {
+  left: calc(var(--sal) + 14px);
+  transform: none;
+  max-width: 46%;
+  text-align: left;
+}

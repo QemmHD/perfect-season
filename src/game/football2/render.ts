@@ -464,7 +464,7 @@ export class FootballRenderer {
       const h = heads[b.id];
       if (h) label(ctx, b.p.tag, h.x, h.y - 14, color, this.W);
     };
-    if (p.phase === 'pre') for (const b of p.bodies) if (b.side === 'O' && !isLine(b) && b !== p.qb) tag(b, '#ffffff');
+    if (o.routes) for (const b of p.bodies) if (b.side === 'O' && !isLine(b) && b !== p.qb) tag(b, '#ffffff');
     if (p.carrier && p.phase === 'run') tag(p.carrier, '#ffe08a');
     ctx.restore();
     if (o.flash > 0) {
@@ -481,7 +481,7 @@ const ROUTE_COLOR: Record<string, string> = { X: '#ffd23a', SL: '#ff7aa8', Z: '#
 function football(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, t: number) {
   const X = Math.round(x);
   const Y = Math.round(y);
-  const w = Math.max(3, Math.round(s * 0.34));
+  const w = Math.max(4, Math.round(s * 0.34));
   const h = Math.max(2, Math.round(w * 0.62));
   const turn = Math.floor(t * 12) % 2;
   ctx.fillStyle = '#2e1606';

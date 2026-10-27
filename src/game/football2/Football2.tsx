@@ -14,7 +14,7 @@ import type { Progress, RivalLive } from '../progress';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, fourthDown, pilot } from './autopilot';
 import { afterPlay, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type Game, kick, kickWindow, newGame, nextConcept, punt, spotText, startPlay } from './drive';
-import { CONCEPT_NAMES, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
+import { CONCEPT_NAMES, FIELD_W, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Play, Pt } from './types';
@@ -85,7 +85,7 @@ export function Football2({
   const dragRef = useRef<{ id: number; x0: number; y0: number; dx: number; dy: number } | null>(null);
   // steering: a stick that floats wherever the finger lands
   const stickRef = useRef<{ id: number; x0: number; y0: number; x: number; y: number } | null>(null);
-  const kickRef = useRef<{ t0: number; stopped: number | null } | null>(null);
+  const kickRef = useRef<{ t0: number; stopped: number | null; dist: number; win: number } | null>(null);
   const [ui, setUi] = useState<Ui>('loading');
   const [, setTick] = useState(0);
   const [pop, setPop] = useState<{ id: number; text: string; tone: Tone; sub?: string } | null>(null);
@@ -238,31 +238,57 @@ export function Football2({
     nextUp(game, !!a.driveOver, a.points ? 2300 : a.driveOver ? 1900 : 1350);
   };
 
-  // fourth down
+  // fourth down: the field goal unit lines up, the meter decides it, the ball flies at the posts
+  const kickAnim = useRef<{ good: boolean; at: number } | null>(null);
   const startKick = () => {
     if (!game || ui !== 'fourth') return;
     sfx.click();
-    kickRef.current = { t0: performance.now(), stopped: null };
+    playRef.current = fieldGoalUnit(game);
+    kickRef.current = { t0: performance.now(), stopped: null, dist: fgDistance(game), win: kickWindow(game) };
     setUi('kick');
   };
   const kickNow = () => {
     const k = kickRef.current;
-    if (!game || !k || k.stopped !== null) return;
+    const p = playRef.current;
+    if (!game || !p || !k || k.stopped !== null) return;
     const ph = ((performance.now() - k.t0) / 1100) % 2;
     const pos = ph < 1 ? ph : 2 - ph;
     k.stopped = pos;
     setTick((n) => n + 1);
     const a = kick(game, Math.abs(pos - 0.5) * 2);
-    if (a.points) {
-      sfx.seriesWin();
-      crowd.swell(0.9);
-      say('IT’S GOOD! +3', 'good', 1600);
-    } else {
-      sfx.seriesLoss();
-      say('NO GOOD', 'bad', 1500);
-    }
-    window.setTimeout(() => (kickRef.current = null), 1500);
-    nextUp(game, true, 1600);
+    const good = a.points > 0;
+    // the kick: the leg swings, the ball's away a beat later; wide by the side the needle missed on
+    const kicker = p.rb;
+    kicker.act = 'kick';
+    kicker.actAt = p.t;
+    const from = { x: p.bx, y: p.los - 7 };
+    const side = pos < 0.5 ? -1 : 1;
+    const toX = FIELD_W / 2 + (good ? side * Math.random() * 1.6 : side * (4.2 + Math.random() * 2.5));
+    // aimed long, so it's still climbing over the crossbar; stopped when it reaches the stands
+    const to = { x: from.x + (toX - from.x) * ((150 - from.y) / (110 - from.y)), y: 150 };
+    const t0 = p.t + 0.22;
+    const t1 = t0 + 1.25 + (150 - from.y) * 0.004;
+    p.ball = { from, to, t0, t1, peak: 7 + (110 - from.y) * 0.04 };
+    p.carrier = null;
+    p.phase = 'air';
+    kickAnim.current = { good, at: t0 + ((110 - from.y) / (150 - from.y)) * (t1 - t0) };
+    sfx.whoosh();
+    window.setTimeout(() => setUi('after'), 450);
+    window.setTimeout(() => {
+      if (good) {
+        sfx.seriesWin();
+        crowd.swell(0.9);
+        say('IT’S GOOD! +3', 'good', 1600, k.dist + ' YARDS');
+      } else {
+        sfx.seriesLoss();
+        say('NO GOOD', 'bad', 1500, (side < 0 ? 'WIDE LEFT' : 'WIDE RIGHT'));
+      }
+    }, 1000);
+    window.setTimeout(() => {
+      kickRef.current = null;
+      kickAnim.current = null;
+    }, 2800);
+    nextUp(game, true, 2700);
   };
   const puntNow = () => {
     if (!game || ui !== 'fourth') return;
@@ -338,7 +364,15 @@ export function Football2({
       const elapsed = Math.min(0.1, (now - last) / 1000);
       last = now;
       acc += now < slowUntil.current ? elapsed * 0.4 : elapsed;
-      if (p && p.phase !== 'pre' && !p.end) {
+      if (p && kickAnim.current) {
+        p.t += elapsed;
+        // the ball stops at the stands
+        if (p.ball && p.t > p.ball.t0) {
+          const k = (p.t - p.ball.t0) / (p.ball.t1 - p.ball.t0);
+          if (p.ball.from.y + (p.ball.to.y - p.ball.from.y) * k > 117) p.ball.t1 = p.t;
+        }
+        acc = 0;
+      } else if (p && p.phase !== 'pre' && !p.end) {
         while (acc >= DT) {
           acc -= DT;
           const steer = autoplayHook ? decide(p, game, pilotRef.current) : steerNow(p);
@@ -355,7 +389,7 @@ export function Football2({
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.flash = Math.max(0, fx.flash - elapsed * 1.8);
       const ctx = canvas.getContext('2d')!;
-      if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: game.ballOn + game.toGo <= 100 ? (p.end ? null : p.los + game.toGo) : null, routes: p.phase === 'pre' && p.call === 'pass', shake: fx.shake, flash: fx.flash });
+      if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo, routes: p.phase === 'pre' && p.call === 'pass', shake: fx.shake, flash: fx.flash });
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
@@ -540,7 +574,7 @@ export function Football2({
           </button>
         </div>
       )}
-      {ui === 'kick' && g && <KickMeter window={kickWindow(g)} start={kickRef.current?.t0 ?? 0} stopped={kickRef.current?.stopped ?? null} distance={fgDistance(g)} onKick={kickNow} />}
+      {ui === 'kick' && kickRef.current && <KickMeter window={kickRef.current.win} start={kickRef.current.t0} stopped={kickRef.current.stopped} distance={kickRef.current.dist} onKick={kickNow} />}
       {ui === 'final' && g && (
         <div className="fg-final hg2-final" role="status">
           <span className="eyebrow">Your drives</span>
@@ -584,6 +618,30 @@ function KickMeter({ window: win, start, stopped, distance, onKick }: { window: 
       </span>
     </button>
   );
+}
+
+/** The field goal unit: the holder down seven yards back, the kicker behind him, the line tight. */
+function fieldGoalUnit(g: Game): Play {
+  const p = startPlay(g, 'run');
+  const { bx, los } = p;
+  p.qb.x = bx;
+  p.qb.y = los - 7;
+  p.rb.p = g.off.k;
+  p.rb.x = bx - 1.2;
+  p.rb.y = los - 9.6;
+  p.rb.route = [];
+  const wings: Record<string, number> = { X: -4.1, SL: -5.3, Z: 4.1, TE: 5.3 };
+  for (const b of p.bodies) {
+    if (b.side === 'O' && b.slot in wings) {
+      b.x = bx + wings[b.slot];
+      b.y = los - 0.9;
+      b.route = [];
+    }
+    b.vx = 0;
+    b.vy = 0;
+  }
+  p.call = 'run';
+  return p;
 }
 
 /** The AI's drives, played by the autopilot against your defense. */
