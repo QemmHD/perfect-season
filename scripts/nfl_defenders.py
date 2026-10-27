@@ -179,7 +179,6 @@ def build(team_games, int_rate, int_scale, qmap_cls, cells, more_path=MORE):
         tg = team_games.get((s, fr)) or (14 if s < 1978 else 16)
         r["tg"] = tg
         g = r.get("g")
-        r["has_stats"] = bool(r.get("stats_src"))
         if g:
             r["w"] = min(1.0, g / tg)
         elif s < SPLIT:
