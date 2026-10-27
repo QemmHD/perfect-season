@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { NFL } from '../engine/sport';
+import { type Favorites, markFavoritesAsked, readFavorites, saveFavorites } from '../lib/favorites';
 import { nameProblem, randomName } from '../lib/names';
 import { sfx } from '../lib/sound';
 import { Fit } from './common';
+import { FavPicker } from './Favorites';
 import { NameField } from './Leaderboard';
 
-/** First launch of the web app: pick the name everyone else will see. */
+/** First launch of the web app: pick the name everyone else will see, then your NBA and NFL teams. */
 export function Welcome({ onDone }: { onDone: (name: string) => void }) {
   const [name, setName] = useState(randomName);
   const [err, setErr] = useState<string | null>(null);
+  const [step, setStep] = useState<'name' | 'teams'>('name');
+  const [favs, setFavs] = useState<Favorites>(readFavorites);
   const letters = (word: string, offset: number) =>
     word.split('').map((ch, i) => (
       <i key={i} style={{ animationDelay: offset + i * 45 + 'ms' }}>
@@ -22,9 +26,46 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
       sfx.nope();
       return;
     }
+    sfx.select();
+    setStep('teams');
+  };
+  const finish = (skip: boolean) => {
+    if (!skip && (!favs.nba || !favs.nfl)) {
+      sfx.nope();
+      return;
+    }
+    // skipping keeps a pick already made; the rest can be picked in Profile
+    if (favs.nba || favs.nfl) saveFavorites(favs);
+    markFavoritesAsked();
     sfx.seriesWin();
     onDone(name.trim());
   };
+  if (step === 'teams')
+    return (
+      <form
+        className="screen welcome fav-step"
+        onSubmit={(e) => {
+          e.preventDefault();
+          finish(false);
+        }}
+      >
+        <div className="welcome-card rise-in">
+          <span className="eyebrow wide">Welcome, {name.trim()}</span>
+          <h2 className="disp">Pick your teams</h2>
+          <p>Your players wear their colors when you play head to head.</p>
+          <FavPicker value={favs} onChange={setFavs} />
+        </div>
+        <div className="spacer" />
+        <div className="actionbar">
+          <button type="submit" className="big shine" aria-disabled={!favs.nba || !favs.nfl}>
+            <Fit text={!favs.nba ? 'PICK AN NBA TEAM' : !favs.nfl ? 'PICK AN NFL TEAM' : 'LET’S GO'} />
+          </button>
+          <button type="button" className="fav-skip" onClick={() => finish(true)}>
+            Skip for now
+          </button>
+        </div>
+      </form>
+    );
   return (
     <form
       className="screen welcome"
@@ -75,7 +116,7 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
       <div className="spacer" />
       <div className="actionbar">
         <button type="submit" className="big shine">
-          <Fit text="LET’S GO" />
+          <Fit text="NEXT" />
         </button>
       </div>
     </form>

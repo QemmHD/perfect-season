@@ -11,7 +11,7 @@ import { asOpponent, castGame, matchScore, mirrorCast } from './engine/broadcast
 import { CLEAR_COINS, clearChance, GAUNTLET_SIZE, gauntletLadder, RUNG_COINS, rungChance, rungsWon } from './engine/gauntlet';
 import { GAMES, gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
-import { clearSportParam, NFL, type SportId, switchSport } from './engine/sport';
+import { clearSportParam, NFL, SPORT, type SportId, switchSport } from './engine/sport';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
 import { type Booster, type BotLevel, type Mode, type Player, type PlayoffTeam, type Slot, SLOTS } from './engine/types';
 import { freshProfile, type H2HStats, loadProfile, newId, type Profile, readOtherLb, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
@@ -32,6 +32,11 @@ import { Binder } from './ui/Binder';
 import { GameCast } from './ui/GameCast';
 import { Gauntlet } from './ui/Gauntlet';
 import { Arcade, arcadeAvailable } from './game/Arcade';
+import { aiFavorite, kitsFor } from './game/uniforms';
+import { favoriteFor, shouldAskFavorites } from './lib/favorites';
+import { NO_VOTE, type VoteWire, voteWireOf } from './net/vote';
+import { FavSheet } from './ui/Favorites';
+import { Vote } from './ui/Vote';
 
 /** tests: ?autoplay lets the autopilot play the arcade game */
 const AUTOPLAY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('autoplay');
@@ -39,7 +44,7 @@ import { Playoffs, Reveal } from './ui/Season';
 import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
 
-type Screen = 'tab' | 'search' | 'draft' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet';
+type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet';
 
 interface Run {
   id: number;
@@ -68,6 +73,10 @@ interface OppView {
   arcade: ArcadeState | null;
   /** their phone gave up on ours in that game and let the AI finish our drives from this one on */
   arcadeTook: number | null;
+  /** their sim-or-play vote, as last heard */
+  vote: VoteWire;
+  /** their favorite team in this sport (their uniforms) */
+  fav: string | null;
 }
 
 const MODE_LABEL: Record<Mode, string> = { classic: 'Classic', blind: 'Blind', daily: 'Daily', '1v1': '1 vs 1' };
@@ -115,7 +124,7 @@ export function App() {
   const [run, setRun] = useState<Run | null>(null);
   /** the run whose head-to-head game has been watched */
   const [watched, setWatched] = useState<number | null>(null);
-  const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
@@ -267,6 +276,22 @@ export function App() {
     return () => clearTimeout(t);
   }, [updateReady, screen, modal, needsName]);
 
+  // ---------- favorite teams ----------
+
+  /** asked once on the home screen of a player who doesn't have them yet (new players pick them in Welcome) */
+  const favAsked = useRef(false);
+  /** the sheet on screen is that first ask (not a change from Profile) */
+  const favFirst = useRef(false);
+  useEffect(() => {
+    if (needsName || screen !== 'tab' || modal || favAsked.current || !shouldAskFavorites()) return;
+    const t = window.setTimeout(() => {
+      favAsked.current = true;
+      favFirst.current = true;
+      setModal('fav');
+    }, 450);
+    return () => clearTimeout(t);
+  }, [needsName, screen, modal]);
+
   // ---------- daily reward and missions ----------
 
   /** the day the chest was last offered this session (once a day, even if the app stays open) */
@@ -377,18 +402,21 @@ export function App() {
   const onFound = (f: Found) => {
     matchRef.current?.close(false);
     droppedRef.current = false;
-    setOpp({ picks: [], lineup: {}, gone: false, left: false, tookOver: false, arcade: null, arcadeTook: null });
+    setOpp({ picks: [], lineup: {}, gone: false, left: false, tookOver: false, arcade: null, arcadeTook: null, vote: NO_VOTE, fav: null });
     const conn: MatchConn = new MatchConn(f, (theirs, gone) => {
       // only the current match talks to the screen
       if (matchRef.current !== conn) return;
       setOpp((prev) => {
-        const next: OppView = { picks: theirs.picks, lineup: theirs.lineup, gone, left: theirs.left, tookOver: theirs.tookOver, arcade: theirs.arcade ?? null, arcadeTook: theirs.arcadeTook ?? null };
+        const next: OppView = { picks: theirs.picks, lineup: theirs.lineup, gone, left: theirs.left, tookOver: theirs.tookOver, arcade: theirs.arcade ?? null, arcadeTook: theirs.arcadeTook ?? null, vote: voteWireOf(theirs), fav: theirs.fav ?? null };
         if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
         return next;
       });
     });
     matchRef.current = conn;
     conn.start();
+    // our favorite team rides along with everything else: the other phone dresses our side in it
+    const fav = favoriteFor(SPORT);
+    if (fav) conn.update((s) => ({ ...s, fav }));
     runCounter.current += 1;
     setRun({ id: runCounter.current, mode: '1v1', botLevel: 'pro', botFirst: !f.host, dailyKey: null, ranked: false, online: { found: f } });
     setScreen('draft');
@@ -424,7 +452,7 @@ export function App() {
   // stop the match here at once, so this phone can't answer with a takeover of its own. It can
   // land just after this phone finished the draft too (its last pick never reached them).
   useEffect(() => {
-    if ((screen === 'draft' || screen === 'arcade') && run?.online && opp?.tookOver && !droppedRef.current) {
+    if ((screen === 'draft' || screen === 'vote' || screen === 'arcade') && run?.online && opp?.tookOver && !droppedRef.current) {
       endMatch(false);
       setKicked(true);
     }
@@ -633,10 +661,11 @@ export function App() {
     if (!run) return;
     const r = { ...run, draft };
     if (r.mode === '1v1') {
-      // played out on the field, unless the other player already dropped out of the draft
+      // sim or play, then played out on the field (or simmed), unless the other player already
+      // dropped out of the draft (tests: ?autoplay goes straight to the game)
       if (arcadeAvailable() && !droppedRef.current) {
         setRun(r);
-        setScreen('arcade');
+        setScreen(AUTOPLAY ? 'arcade' : 'vote');
         return;
       }
       const season = playSeason(draft.lineup);
@@ -648,6 +677,12 @@ export function App() {
     const season = playSeason(draft.lineup);
     setRun({ ...r, season });
     setScreen('reveal');
+  };
+
+  /** A head to head the vote sent to the sim: the broadcast of the game, the same on both phones. */
+  const simH2H = (r: Run) => {
+    const d = r.draft!;
+    finish(r, playSeason(d.lineup), null, { lineup: d.botLineup, rating: rateTeam(SLOTS.map((s) => d.botLineup[s])) });
   };
 
   const onRevealDone = () => {
@@ -704,7 +739,19 @@ export function App() {
         }}
       />
     );
-  else if (tab === 'profile') page = <ProfilePage profile={profile} onName={NET_ON ? () => (sfx.click(), setModal('name')) : undefined} onBinder={() => (sfx.click(), setModal('binder'))} />;
+  else if (tab === 'profile')
+    page = (
+      <ProfilePage
+        profile={profile}
+        onName={NET_ON ? () => (sfx.click(), setModal('name')) : undefined}
+        onBinder={() => (sfx.click(), setModal('binder'))}
+        onFavs={() => {
+          sfx.click();
+          favFirst.current = false;
+          setModal('fav');
+        }}
+      />
+    );
   else
     page = (
       <HomePage
@@ -809,9 +856,30 @@ export function App() {
         online={onlineProps}
       />
     );
+  } else if (screen === 'vote' && run?.draft) {
+    const r = run;
+    const d = run.draft;
+    viewId = 'vote:' + run.id;
+    enter = 'zoom';
+    body = (
+      <Vote
+        key={run.id}
+        rivalName={r.online ? r.online.found.opp.name : 'AI ' + r.botLevel.toUpperCase()}
+        online={!!r.online}
+        seed={r.online ? r.online.found.matchId : 'vote:' + r.id + ':' + lineupKey(d.lineup)}
+        rival={r.online ? (opp?.vote ?? null) : null}
+        rivalGone={!!r.online && (!!opp?.gone || !!opp?.left)}
+        onWire={(w) => matchRef.current?.update((s) => ({ ...s, vote: w.vote, voteAt: w.at, voteSaw: w.saw }))}
+        onDone={(o) => (o === 'play' ? setScreen('arcade') : simH2H(r))}
+      />
+    );
   } else if (screen === 'arcade' && run?.draft) {
     const r = run;
     const d = run.draft;
+    const seed = 'arc:' + (r.online ? r.online.found.matchId : r.id + ':' + lineupKey(d.lineup));
+    // each side in its favorite team's colors (the AI picks one from the game's seed)
+    const mine = favoriteFor('nba');
+    const kits = NFL ? undefined : kitsFor(mine, r.online ? (opp?.fav ?? null) : aiFavorite(seed, 'nba', mine), 'nba');
     viewId = 'arcade:' + run.id;
     enter = 'zoom';
     body = (
@@ -820,13 +888,14 @@ export function App() {
           lineup={d.lineup}
           rivalLineup={d.botLineup}
           rivalName={r.online ? r.online.found.opp.name : 'AI ' + r.botLevel.toUpperCase()}
-          seed={'arc:' + (r.online ? r.online.found.matchId : r.id + ':' + lineupKey(d.lineup))}
+          seed={seed}
           online={!!r.online}
           botLevel={r.botLevel}
           rivalLive={opp?.arcade ?? null}
           rivalGone={!!r.online && (!!opp?.gone || !!opp?.left)}
           tookMe={r.online ? (opp?.arcadeTook ?? null) : null}
           autoplay={AUTOPLAY}
+          kits={kits}
           onProgress={(p) => matchRef.current?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => matchRef.current?.update((s) => ({ ...s, arcadeTook: k }))}
           onFinish={(us, them, how, took) => {
@@ -949,6 +1018,7 @@ export function App() {
       )}
       {modal === 'howto' && <HowToSheet onClose={() => setModal(null)} />}
       {modal === 'binder' && <Binder collection={profile.collection ?? {}} onClose={() => setModal(null)} />}
+      {modal === 'fav' && <FavSheet first={favFirst.current} onClose={() => setModal(null)} />}
       {modal === 'name' && (
         <NameSheet
           profile={profile}
