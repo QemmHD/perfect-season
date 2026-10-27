@@ -225,11 +225,11 @@ export function Football2({
       else if (e === 'handoff') sfx.tick();
       else if (e === 'throw' || e === 'throw-pressure' || e === 'scramble') sfx.whoosh();
       else if (e === 'catch') {
-        sfx.place();
+        sfx.catch();
         crowd.swell(0.3);
         tip('runafter', 'Drag to steer · swipe ← → juke · swipe ↑ spin · double-tap truck');
       } else if (e === 'catch-contested') {
-        sfx.place();
+        sfx.catch();
         crowd.swell(0.7);
         say('CONTESTED CATCH!', 'good', 900);
       } else if (e.startsWith('move:')) sfx.select();
@@ -248,13 +248,15 @@ export function Football2({
         if (p.carrier) highlight.current = { t: p.t, x: p.carrier.x, y: p.carrier.y, before: REPLAY_BEFORE };
         // the hit lands in slow motion
         slowUntil.current = performance.now() + 750;
+        sfx.hit(1);
+        sfx.thud(0.12);
         shake(6);
         vibrate([40, 30, 60]);
         crowd.swell(1);
         fxRef.current.flash = 0.35;
-      } else if (e === 'tackle') sfx.stop();
+      } else if (e === 'tackle') sfx.tackle(0.5);
       else if (e === 'sack') {
-        sfx.stop();
+        sfx.tackle(1);
         shake(4);
         vibrate(40);
       }
@@ -280,12 +282,12 @@ export function Football2({
         c.actAt = p.t;
       }
       fxRef.current.flash = 0.5;
-      sfx.scoreUs(true);
+      sfx.touchdown();
       crowd.swell(1);
       vibrate([30, 40, 30]);
       say('TOUCHDOWN! +7', 'big', 2000, c ? c.p.tag + (yds >= 20 ? ' · ' + yds + ' YDS' : '') : undefined);
     } else if (a.driveOver === 'INT' || a.driveOver === 'FUM') {
-      sfx.scoreThem();
+      sfx.groan();
       vibrate(50);
       say(a.driveOver === 'INT' ? 'INTERCEPTED' : 'FUMBLE', 'bad', 1700, e.text);
     } else if (a.driveOver === 'SAF') {
@@ -296,7 +298,7 @@ export function Football2({
       sfx.stop();
       say('BIG HIT!', 'big', 1500, e.text.slice(4) + ' · ' + gain);
     } else if (a.driveOver === 'DOWNS') {
-      sfx.nope();
+      sfx.groan(0.8);
       say('TURNOVER ON DOWNS', 'bad', 1600, e.kind === 'incomplete' ? e.text : gain);
     } else if (a.firstDown) {
       sfx.coin();
@@ -374,7 +376,7 @@ export function Football2({
     p.carrier = null;
     p.phase = 'air';
     kickAnim.current = { good, at: t0 + ((110 - from.y) / (150 - from.y)) * (t1 - t0) };
-    sfx.whoosh();
+    sfx.kick(0.22);
     window.setTimeout(() => setUi('after'), 450);
     window.setTimeout(() => {
       kick(game, aim);
@@ -397,7 +399,7 @@ export function Football2({
   };
   const puntNow = () => {
     if (!game || ui !== 'fourth') return;
-    sfx.whoosh();
+    sfx.kick();
     punt(game);
     say('PUNT', 'plain', 1100, 'DRIVE OVER');
     setUi('after');
