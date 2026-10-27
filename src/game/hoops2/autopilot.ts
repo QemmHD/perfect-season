@@ -1,7 +1,8 @@
 // A player for arcade basketball: plays the AI's possessions, sims a side, tunes the game and drives
 // the tests. It reads the floor the way a person would: shoot when open with a shooter, drive an
 // open lane with a finisher, kick to the open man, lob to a dunker on the cut, cross up a tight
-// defender. `skill` (0-1) is how sharp its reads and its release timing are.
+// defender, and sprint (the stick at its edge) only on a drive. `skill` (0-1) is how sharp its
+// reads and its release timing are.
 import { hashString, rng } from '../../engine/rng';
 import { crossover, dist, pass, pressShoot, releaseShoot, RIM, shotValue, step } from './engine';
 import { afterPossession, type HoopsGame, startPossession } from './game';
@@ -25,6 +26,12 @@ export function pilot(skill: number, seed: string): Pilot {
 }
 
 const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
+
+/** Its release timing's spread (seconds): a Legend's about as tight as a good person's thumb, a
+ * Rookie's loose. */
+function releaseSd(pl: Pilot): number {
+  return 0.15 - 0.11 * pl.skill;
+}
 
 /** Is there a lane to the rim: no defender in a cone between him and it. */
 function laneOpen(p: Possession, b: Body): boolean {
@@ -53,7 +60,7 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
   const h = p.bodies[p.handler];
   // the shot meter: let go near the top, sharper with skill
   if (p.meter && p.meter.off === undefined) {
-    pl.letGo ??= p.meter.top + gauss(pl.rand) * (0.06 - 0.03 * pl.skill);
+    pl.letGo ??= p.meter.top + gauss(pl.rand) * releaseSd(pl);
     if (p.t - p.meter.t0 >= pl.letGo) {
       releaseShoot(p);
       pl.letGo = null;
@@ -76,7 +83,7 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
   if (p.t < pl.nextThink) return pl.goal ? towards(h, pl.goal) : null;
   pl.nextThink = p.t + 0.22 + (1 - pl.skill) * 0.25;
   const a = h.p;
-  const sd = 0.06 - 0.03 * pl.skill;
+  const sd = releaseSd(pl);
   // the shot clock's running out: put it up
   if (p.clock < 2.2) {
     if (d < 10) pl.driving = true;
@@ -85,7 +92,9 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
   }
   // how picky: early in the clock only a good look, late anything decent
   const used = 14 - p.clock;
-  const want = used < 2 ? 1.5 : 1.3 - Math.min(0.45, (used - 2) * 0.05) - pl.rand() * 0.08;
+  // (a sharper player waits for a better look)
+  const picky = 0.7 + 0.65 * pl.skill;
+  const want = used < 2 ? picky + 0.15 : picky - Math.min(0.4, (used - 2) * 0.05) - pl.rand() * 0.08;
   const shot = shotValue(p, h, sd);
   // a drive: an open lane for a finisher is worth a lot; a guard lays it in
   const finisher = Math.max(a.lay, a.ddk);
@@ -100,7 +109,9 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
     const cutting = m.cutUntil > p.t;
     const mm = p.bodies.find((o) => o.side === 'D' && o.mark === m.idx);
     const behind = !!mm && dist(mm, RIM) > dist(m, RIM) + 1;
-    const v = cutting && behind && m.p.ddk >= 74 && dist(m, RIM) < 14 ? 1.05 + (m.p.ddk - 74) / 100 : shotValue(p, m, sd).value - 0.08;
+    // (the lob to a cutter takes a sharp eye: a Rookie mostly misses it)
+    const sees = pl.rand() < 0.3 + 0.7 * pl.skill;
+    const v = sees && cutting && behind && m.p.ddk >= 74 && dist(m, RIM) < 14 ? 1.05 + (m.p.ddk - 74) / 100 : shotValue(p, m, sd).value - 0.08;
     if (v > bestVal) {
       bestVal = v;
       best = m;
@@ -141,11 +152,12 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
   return towards(h, pl.goal);
 }
 
+/** Toward a spot at a probing jog (short of a sprint: the stick isn't at its edge). */
 function towards(h: Body, g: Pt): Pt {
   const dx = g.cx - h.cx;
   const dz = g.cz - h.cz;
   const l = Math.hypot(dx, dz) || 1;
-  return l < 1 ? { cx: 0, cz: 0 } : { cx: dx / l, cz: dz / l };
+  return l < 1 ? { cx: 0, cz: 0 } : { cx: (dx / l) * 0.8, cz: (dz / l) * 0.8 };
 }
 
 /** Play a whole game with the autopilot. */

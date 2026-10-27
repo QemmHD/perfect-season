@@ -1,11 +1,11 @@
 // How the game answers a person playing simple, honest strategies (HUMAN=1 npx vitest run
 // src/game/hoops2/human.test.ts): drive at the rim, cross over then drive, spot up for a three,
-// pull up from the elbow. Inputs carry a person's timing error (the release off the top by a few
+// pull up from the elbow, step back into a three, kick it to the open man. Inputs carry a person's timing error (the release off the top by a few
 // dozen milliseconds), so this measures what playing feels like, not what a perfect bot gets.
 import { CELLS } from '../../engine/data';
-import { rng } from '../../engine/rng';
+import { hashString, rng } from '../../engine/rng';
 import { loadAttrs } from '../attrs';
-import { crossover, dist, isThree, pressShoot, releaseShoot, RIM, step } from './engine';
+import { aimPass, crossover, dist, isThree, pass, pressShoot, releaseShoot, RIM, step, stepback } from './engine';
 import { afterPossession, newHoopsGame, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import type { Hooper, Possession, Pt } from './types';
@@ -13,7 +13,7 @@ import type { Hooper, Possession, Pt } from './types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const run = (globalThis as any).process?.env?.HUMAN ? it : it.skip;
 
-type Strategy = 'drive' | 'cross-drive' | 'three' | 'elbow';
+type Strategy = 'drive' | 'cross-drive' | 'three' | 'elbow' | 'stepback' | 'kick';
 
 /** The stick toward a spot from the handler (null when there). */
 function toward(p: Possession, at: Pt): Pt | null {
@@ -22,6 +22,12 @@ function toward(p: Possession, at: Pt): Pt | null {
   const dz = at.cz - h.cz;
   const l = Math.hypot(dx, dz);
   return l < 0.6 ? null : { cx: dx / l, cz: dz / l };
+}
+
+/** The same at a jog (the stick short of its edge: no sprint). */
+function jog(p: Possession, at: Pt): Pt | null {
+  const s = toward(p, at);
+  return s && { cx: s.cx * 0.8, cz: s.cz * 0.8 };
 }
 
 run('a person playing simple strategies', async () => {
@@ -33,7 +39,7 @@ run('a person playing simple strategies', async () => {
       const p = list[Math.min(list.length - 1, Math.floor((level - i * 0.004) * (list.length - 1)))];
       return hooper(lineOf(p, at(p)), s, null);
     });
-  for (const strat of ['drive', 'cross-drive', 'three', 'elbow'] as Strategy[])
+  for (const strat of ['drive', 'cross-drive', 'three', 'elbow', 'stepback', 'kick'] as Strategy[])
     for (const [ol, dl, lab] of [[0.85, 0.75, 'good O vs good D'], [0.6, 0.6, 'avg O vs avg D']] as const) {
       const O = five(ol);
       const D = five(dl);
@@ -43,11 +49,13 @@ run('a person playing simple strategies', async () => {
       let poss = 0;
       for (let gi = 0; gi < 20; gi++) {
         const g = newHoopsGame(O, D, 'human' + gi + strat + lab);
-        const r = rng('hand' + gi + strat);
+        const r = rng(hashString('hand' + gi + strat));
         while (!g.over) {
           const p = startPossession(g);
           let pressedAt = -1;
           let crossed = false;
+          let stepped = -1;
+          let passed = false;
           // a person's release: off the top by up to ~70 ms either way
           const err = (r() - 0.5) * 0.14;
           for (let k = 0; k < 60 * 30 && !p.end; k++) {
@@ -66,17 +74,42 @@ run('a person playing simple strategies', async () => {
                   pressedAt = p.t;
                   add('shootFrom:' + (dRim < 7 ? 'rim' : 'out'));
                 }
+              } else if (strat === 'stepback') {
+                // jog to just inside the arc, step back behind it, rise
+                const spot = { cx: RIM.cx - 21, cz: h.cz > 0 ? 6 : -6 };
+                if (stepped < 0) {
+                  stick = jog(p, spot);
+                  if (!stick || p.t > 3) {
+                    stepback(p);
+                    stepped = p.t;
+                  }
+                } else if (p.t - stepped > 0.2 || p.t > 6) {
+                  pressShoot(p);
+                  pressedAt = p.t;
+                }
+              } else if (strat === 'kick') {
+                // the first handler drives a beat then kicks it to the open man; whoever catches it shoots
+                if (!passed) {
+                  stick = toward(p, RIM);
+                  if (p.t > 1.2) {
+                    pass(p, aimPass(p, null));
+                    passed = true;
+                  }
+                } else if (p.t - p.bodies[p.handler].actAt > 0.25 || p.t > 6) {
+                  pressShoot(p);
+                  pressedAt = p.t;
+                }
               } else if (strat === 'three') {
                 // out to the arc, square up, shoot
                 const spot = { cx: RIM.cx - 24.5, cz: h.cz > 0 ? 6 : -6 };
-                stick = toward(p, spot);
+                stick = jog(p, spot);
                 if ((isThree(h) && !stick) || p.t > 5) {
                   pressShoot(p);
                   pressedAt = p.t;
                 }
               } else {
                 const spot = { cx: RIM.cx - 15, cz: h.cz > 0 ? 8 : -8 };
-                stick = toward(p, spot);
+                stick = jog(p, spot);
                 if (!stick || p.t > 4) {
                   pressShoot(p);
                   pressedAt = p.t;

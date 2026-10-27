@@ -2,11 +2,15 @@
 // (0 midcourt, 47 the baseline), cz across (-25 to 25); the rim is at (41.75, 0), ten feet up.
 // Your five attack, the rival's five defend with their real ratings.
 //
-// The shot meter works like 2K's: hold to rise, let go at the top. The green window (a perfect
-// release, all but automatic) is wide for a great shooter and a sliver for a poor one, and it shrinks
-// the closer and longer the defender who closes out on him. Near the rim, what he can do comes from
-// his ratings: a layup, a driving dunk, a standing dunk, or through a defender only for a posterizer.
-import type { Act, Body, Contest, EndKind, Hooper, Possession, Pt, ShotKind } from './types';
+// The shot meter works like 2K's: hold to rise, let go at the top. A green release always goes in;
+// the green window is wide for a great shooter and a sliver for a poor one, and it shrinks the
+// closer and longer the defender who closes out on him. Near the rim, what he can do comes from his
+// ratings: a layup, a driving dunk, a standing dunk, or through a defender only for a posterizer.
+//
+// Getting open is the game: the stick at its edge is a sprint (on a stamina bar) that beats a slower
+// man, crossovers and step-backs shake a defender by the handle, and each possession the defense
+// shows a look to read (man, sagging off a poor shooter, switching, trapping the ball).
+import type { Act, Body, Contest, EndKind, Hooper, Possession, Pt, Scheme, ShotKind } from './types';
 
 export const RIM: Pt = { cx: 41.75, cz: 0 };
 export const RIM_H = 10;
@@ -47,7 +51,7 @@ export function isThree(p: Pt): boolean {
 }
 
 function body(idx: number, side: 'O' | 'D', p: Hooper, at: Pt, mark: number, energy: number): Body {
-  return { idx, side, p, cx: at.cx, cz: at.cz, vx: 0, vz: 0, h: 0, vh: 0, face: 0, act: 'idle', actAt: 0, home: { ...at }, mark, cutUntil: 0, stunUntil: 0, energy, trail: [] };
+  return { idx, side, p, cx: at.cx, cz: at.cz, vx: 0, vz: 0, h: 0, vh: 0, face: 0, act: 'idle', actAt: 0, home: { ...at }, mark, cutUntil: 0, stunUntil: 0, energy, burst: 1, trail: [] };
 }
 
 /**
@@ -70,7 +74,29 @@ export function newPossession(ours: Hooper[], theirs: Hooper[], energy: number[]
     b.face = Math.PI;
     bodies.push(b);
   });
-  return { t: 0, clock: SHOT_CLOCK, bodies, handler: 0, ball: null, meter: null, finish: null, end: null, events: [], rand, lastShot: null, passes: 0, fire: -1, target: null };
+  const scheme = schemeFor(ours, rand);
+  return { t: 0, clock: SHOT_CLOCK, bodies, handler: 0, ball: null, meter: null, finish: null, end: null, events: ['scheme:' + scheme], rand, lastShot: null, passes: 0, fire: -1, target: null, scheme, trapper: null, sprinting: false };
+}
+
+/**
+ * The defense's look for a possession, read off the five it faces: it sags off a team that can't
+ * shoot, traps a star ball handler, and otherwise mixes man-to-man with switching everything.
+ */
+function schemeFor(ours: Hooper[], rand: () => number): Scheme {
+  const shooting = ours.reduce((a, p) => a + p.thr, 0) / Math.max(1, ours.length);
+  const handle = ours[0]?.hnd ?? 60;
+  const w: [Scheme, number][] = [
+    ['man', 0.42],
+    ['sag', clamp(0.14 + (70 - shooting) / 60, 0.06, 0.4)],
+    ['switch', 0.2],
+    ['trap', clamp(0.1 + (handle - 72) / 80, 0.05, 0.3)],
+  ];
+  let x = rand() * w.reduce((a, [, v]) => a + v, 0);
+  for (const [k, v] of w) {
+    x -= v;
+    if (x <= 0) return k;
+  }
+  return 'man';
 }
 
 function unit(v: Pt): Pt {
@@ -166,18 +192,31 @@ export function contestOf(p: Possession, s: Body): Contest {
   const reach = (d.p.ht - s.p.ht) / 12 + (d.p.vrt - s.p.vrt) / 120 + (d.h > 1 ? 0.6 : 0);
   const clampDef = has(d.p, 'clamps') ? 0.6 : 0;
   const eff = r - reach * 0.7 - clampDef - (d.p.prd - 60) / 60;
-  if (eff >= 5.8) return 'open';
-  if (eff >= 3.5) return 'light';
-  if (eff >= 2) return 'heavy';
+  if (eff >= 4.6) return 'open';
+  if (eff >= 2.9) return 'light';
+  if (eff >= 1.2) return 'heavy';
   return 'smothered';
 }
 
-const CONTEST_WINDOW: Record<Contest, number> = { open: 1, light: 0.6, heavy: 0.35, smothered: 0.12 };
-const CONTEST_MAKE: Record<Contest, number> = { open: 1, light: 0.84, heavy: 0.6, smothered: 0.34 };
-const GREEN_MAKE: Record<Contest, number> = { open: 0.95, light: 0.8, heavy: 0.45, smothered: 0.18 };
-/** at the rim a hand in the face matters less than on a jumper */
-const RIM_MAKE: Record<Contest, number> = { open: 1, light: 0.92, heavy: 0.78, smothered: 0.6 };
-const RIM_GREEN: Record<Contest, number> = { open: 0.97, light: 0.93, heavy: 0.84, smothered: 0.68 };
+const CONTESTS: Contest[] = ['open', 'light', 'heavy', 'smothered'];
+
+/**
+ * A closeout from far off arrives late: a man who had 6 feet or more when the shooter went up can
+ * at most get a light hand up, 4 or more a heavy one. Catch-and-shoot and a step-back pay off.
+ */
+function closeoutCap(c: Contest, room: number | undefined): Contest {
+  if (room === undefined) return c;
+  const cap = room >= 6 ? 1 : room >= 4 ? 2 : 3;
+  return CONTESTS[Math.min(CONTESTS.indexOf(c), cap)];
+}
+
+/** How much of the green window a contest leaves, and what it does to a release outside it. */
+const CONTEST_WINDOW: Record<Contest, number> = { open: 1, light: 0.7, heavy: 0.4, smothered: 0.15 };
+const CONTEST_MAKE: Record<Contest, number> = { open: 1, light: 0.84, heavy: 0.52, smothered: 0.3 };
+/** at the rim a hand in the face matters less than on a jumper: the window shrinks less, and so
+ * does a finish's chance */
+const RIM_WINDOW: Record<Contest, number> = { open: 1, light: 0.85, heavy: 0.65, smothered: 0.45 };
+const RIM_MAKE: Record<Contest, number> = { open: 1, light: 0.93, heavy: 0.8, smothered: 0.66 };
 
 /** The rating that matters for a shot from here. */
 function shotRating(b: Body, kind: ShotKind): number {
@@ -192,21 +231,24 @@ function shotKindAt(b: Body): ShotKind {
   return 'close';
 }
 
+/** The widest jump-shot half-window (seconds), an elite shooter's when open. */
+export const GREEN_W = 0.038;
+
 /**
  * Half the green window (seconds) for this shooter on this shot under this contest. Arcade: a good
  * open shooter's window is wide; a poor shooter's is a sliver; deep threes past his range shrink it.
  */
 export function greenWindow(p: Possession, b: Body, kind: ShotKind, contest: Contest): number {
   const r = shotRating(b, kind);
-  // half-windows in seconds: an elite shooter's is about 40 ms each side open, a 75's about 15,
-  // a 55's next to nothing; layups are kinder
-  let w = 0.042 * Math.pow(rate(r, 50, 97), 1.6);
+  // half-windows in seconds: an elite shooter's is about 36 ms each side open, an 85's about 26, a
+  // 70's 13, a 55's next to nothing; layups are kinder. A green always goes in, so this is the game.
+  let w = GREEN_W * Math.pow(rate(r, 50, 97), 1.3);
   if (kind === 'layup') w = 0.07 * Math.pow(rate(r, 40, 97), 1.2);
   const d = dist(b, RIM);
   if (kind === 'three' && d > 26) w *= has(b.p, 'limitless') ? 0.92 : lerp(1, 0.4, (d - 26) / 6);
-  const cw = CONTEST_WINDOW[contest];
+  const cw = (kind === 'layup' ? RIM_WINDOW : CONTEST_WINDOW)[contest];
   w *= has(b.p, 'deadeye') ? 1 - (1 - cw) * 0.5 : cw;
-  if (p.fire === b.idx) w *= 1.35;
+  if (p.fire === b.idx) w *= 1.2;
   return Math.max(0.002, w * lerp(0.85, 1, b.energy));
 }
 
@@ -223,10 +265,10 @@ export function shotValue(p: Possession, b: Body, sd: number): { kind: ShotKind;
   const pGreen = clamp(1 - 2 * normTail(z), 0, 1);
   const d = dist(b, RIM);
   const rt = shotRating(b, kind);
-  let base = kind === 'three' ? lerp(0.16, 0.47, rate(rt, 40, 97)) : kind === 'mid' ? lerp(0.24, 0.53, rate(rt, 40, 97)) : lerp(0.34, 0.64, rate(rt, 40, 97));
+  let base = kind === 'three' ? lerp(0.16, 0.47, rate(rt, 40, 97)) : kind === 'mid' ? lerp(0.24, 0.53, rate(rt, 40, 97)) : lerp(0.32, 0.6, rate(rt, 40, 97));
   if (kind === 'three' && d > 26) base *= has(b.p, 'limitless') ? 0.92 : lerp(1, 0.5, (d - 26) / 6);
   const miss = base * 0.8 * CONTEST_MAKE[contest];
-  const pm = pGreen * GREEN_MAKE[contest] + (1 - pGreen) * miss;
+  const pm = pGreen + (1 - pGreen) * miss;
   return { kind, contest, value: pm * (kind === 'three' ? 3 : 2) };
 }
 
@@ -265,12 +307,12 @@ export function pressShoot(p: Possession) {
     p.finish = { kind, t0: p.t, tUp: p.t + (kind === 'standdunk' ? 0.2 : 0.26), target: inWay ? def.idx : null };
     act(b, kind === 'layup' ? 'layup' : kind === 'contact' ? 'contact' : kind === 'standdunk' ? 'standdunk' : 'dunk', p.t);
     p.events.push('gather:' + kind);
-    if (kind === 'layup') p.meter = { t0: p.t, top: LAYUP_TOP, green: greenWindow(p, b, 'layup', contestOf(p, b)), kind: 'layup' };
+    if (kind === 'layup') p.meter = { t0: p.t, top: LAYUP_TOP, green: greenWindow(p, b, 'layup', contestOf(p, b)), kind: 'layup', room: closest(p, b).r };
     return;
   }
   const kind = shotKindAt(b);
   const contest = contestOf(p, b);
-  p.meter = { t0: p.t, top: JUMPER_TOP, green: greenWindow(p, b, kind, contest), kind };
+  p.meter = { t0: p.t, top: JUMPER_TOP, green: greenWindow(p, b, kind, contest), kind, room: closest(p, b).r };
   act(b, 'shoot', p.t);
   b.vh = 12.5;
   b.h = 0.01;
@@ -306,22 +348,23 @@ export function releaseShoot(p: Possession) {
 
 function shoot(p: Possession, b: Body, kind: ShotKind, greened: boolean, off: number, green: number) {
   const r = p.rand;
-  const contest = contestOf(p, b);
+  const contest = closeoutCap(contestOf(p, b), p.meter?.room);
   const { d: cd, r: cr } = closest(p, b);
   const d = dist(b, RIM);
   const rt = shotRating(b, kind);
   let base: number;
   if (kind === 'three') base = lerp(0.16, 0.47, rate(rt, 40, 97)) * (d > 26 ? (has(b.p, 'limitless') ? 0.92 : lerp(1, 0.5, (d - 26) / 6)) : 1);
   else if (kind === 'mid') base = lerp(0.24, 0.53, rate(rt, 40, 97));
-  else if (kind === 'close') base = lerp(0.34, 0.64, rate(rt, 40, 97));
+  else if (kind === 'close') base = lerp(0.32, 0.6, rate(rt, 40, 97));
   else base = lerp(0.42, 0.82, rate(rt, 40, 97));
   const timing = lerp(0.95, 0.33, (Math.abs(off) - green) / 0.22);
   const cm = has(b.p, 'deadeye') ? 1 - (1 - CONTEST_MAKE[contest]) * 0.55 : CONTEST_MAKE[contest];
-  let pm = greened ? GREEN_MAKE[contest] : base * timing * cm;
+  // a green always goes in; anything else is the shot's chance by how close the release was
+  let pm = greened ? 1 : base * timing * cm;
   if (!greened && p.fire === b.idx) pm *= 1.12;
-  pm = clamp(pm, 0.02, 0.99);
-  // a block on a jump shot: only when he's right on him and long
-  const blockP = contest === 'smothered' && kind !== 'layup' ? clamp(0.04 + (cd.p.blk - 60) / 250 + (cd.p.ht - b.p.ht) / 120, 0.02, 0.22) : 0;
+  pm = greened ? 1 : clamp(pm, 0.02, 0.97);
+  // a block on a jump shot: only when he's right on him and long (never a green)
+  const blockP = !greened && contest === 'smothered' && kind !== 'layup' ? clamp(0.04 + (cd.p.blk - 60) / 250 + (cd.p.ht - b.p.ht) / 120, 0.02, 0.22) : 0;
   if (r() < blockP && cr < 3.5) {
     act(cd, 'block', p.t);
     // swatted: he comes down off balance
@@ -347,8 +390,11 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   const { d: cd, r: cr } = closest(p, b);
   const reach = (cd.p.ht - b.p.ht) / 12 + (cd.p.vrt - b.p.vrt) / 100;
   const protector = has(cd.p, 'rim-protector') ? 0.08 : 0;
-  // blocks: the closer, the longer and the better a shot blocker he is
-  let blockP = cr < 4 && p.t >= cd.stunUntil ? clamp((cd.p.blk - 45) / 220 + reach * 0.06 + protector, 0, 0.42) * ((4 - cr) / 4) : 0;
+  // blocks: the closer, the longer and the better a shot blocker he is, and only a man who's set
+  // (not stumbling, not beaten a moment ago); never on a green layup
+  const set = p.t >= cd.stunUntil && !(cd.beatenAt !== undefined && p.t - cd.beatenAt < 0.6);
+  let blockP = cr < 3.2 && set ? clamp((cd.p.blk - 50) / 250 + reach * 0.05 + protector, 0, 0.3) * ((3.2 - cr) / 3.2) : 0;
+  if (kind === 'layup' && p.meter?.greened) blockP = 0;
   if (kind === 'dunk' || kind === 'standdunk') blockP *= 0.45;
   if (kind === 'contact') blockP *= 0.3 * lerp(1.3, 0.6, rate(b.p.ddk, 80, 99));
   if (kind === 'oop') blockP *= 0.3;
@@ -368,12 +414,12 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
     const m = p.meter;
     const off = m?.off !== undefined ? m.off * 0.25 : 0.2;
     greened = !!m?.greened;
-    const base = lerp(0.48, 0.86, rate(b.p.lay, 40, 97));
-    pm = greened ? RIM_GREEN[contest] : base * lerp(0.95, 0.55, (Math.abs(off) - (m?.green ?? 0.05)) / 0.25) * RIM_MAKE[contest];
+    const base = lerp(0.55, 0.88, rate(b.p.lay, 40, 97));
+    pm = greened ? 1 : base * lerp(0.95, 0.55, (Math.abs(off) - (m?.green ?? 0.05)) / 0.25) * RIM_MAKE[contest];
   } else if (kind === 'contact') pm = lerp(0.74, 0.92, rate(b.p.ddk, 80, 99));
   else if (kind === 'oop') pm = lerp(0.82, 0.96, rate(b.p.ddk, 60, 99));
   else pm = lerp(0.86, 0.97, rate(kind === 'standdunk' ? b.p.sdk : b.p.ddk, 60, 99)) * (contest === 'smothered' ? 0.88 : 1);
-  pm = clamp(pm, 0.05, 0.99);
+  pm = greened ? 1 : clamp(pm, 0.05, 0.99);
   const make = r() < pm;
   // an and-one: contact on the way up, more often the stronger he is
   const contact = cr < 3 && p.t >= cd.stunUntil;
@@ -520,7 +566,10 @@ export function stepback(p: Possession) {
   const burst = topSpeed(h, true) * 0.85;
   h.vx = away.cx * burst;
   h.vz = away.cz * burst;
-  // his man is caught leaning in: a little less often than on a crossover, but the space is the point
+  // his man is caught leaning in: rooted a moment (longer the better the handle against him), and
+  // now and then shaken outright; the space is the point
+  const def = p.bodies.find((d) => d.side === 'D' && d.mark === h.idx);
+  if (def && dist(def, h) < 6 && p.t >= def.stunUntil && !has(def.p, 'clamps')) def.stunUntil = p.t + lerp(0.3, 0.5, rate(h.p.hnd - def.p.prd, -20, 20));
   shakeMan(p, h, -0.02);
 }
 
@@ -541,6 +590,11 @@ export function spin(p: Possession, dir: number) {
 
 // ---------- the step ----------
 
+/** The stick past this share of its reach sprints; the stamina a second of it costs, and refills. */
+export const SPRINT_AT = 0.92;
+const BURST_DRAIN = 0.34;
+const BURST_FILL = 0.2;
+
 /**
  * Advance by dt. `stick` is where the handler wants to go, as a court direction (length up to 1),
  * or null to stand.
@@ -559,6 +613,22 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
   const handler = p.handler !== null ? p.bodies[p.handler] : null;
   const ballAt: Pt = handler ?? (p.ball ? ballPos(p) : RIM);
   const inside = handler ? dist(handler, RIM) < 14 : false;
+  if (!handler) p.sprinting = false;
+  // a trap: once the ball's past the top of the key, the nearest man off the ball comes to double it
+  // (his own man is left open: the pass out beats it); it ends when the ball moves
+  if (p.scheme === 'trap') {
+    if (!handler || p.meter || p.finish || p.ball) p.trapper = null;
+    else if (p.trapper === null && t > 1.4 && dist(handler, RIM) < 29) {
+      let best: Body | null = null;
+      for (const d of p.bodies) if (d.side === 'D' && d.mark !== handler.idx && t >= d.stunUntil && (!best || dist(d, handler) < dist(best, handler))) best = d;
+      if (best && dist(best, handler) < 18) {
+        p.trapper = best.idx;
+        p.events.push('trap:' + best.idx);
+      }
+    }
+  }
+  // switching: two defenders whose men cross swap them
+  if (p.scheme === 'switch' && Math.floor(t * 4) !== Math.floor((t - dt) * 4)) switchMarks(p);
 
   // the finish at the rim: gather, rise, then it goes up at the top
   if (p.finish && handler) {
@@ -601,9 +671,15 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
         // held too long: it goes up on the way down
         if (t - p.meter.t0 > p.meter.top + 0.3 && p.meter.off === undefined) releaseShoot(p);
       } else if (!p.finish) {
-        const sp = topSpeed(b, true);
         const s = stick && Math.hypot(stick.cx, stick.cz) > 0.12 ? stick : null;
-        const want = s ? { x: s.cx * sp, z: s.cz * sp } : { x: 0, z: 0 };
+        // the stick at its edge: a sprint while the stamina lasts (faster for a fast man), which
+        // refills when he eases off
+        const mag = s ? Math.min(1, Math.hypot(s.cx, s.cz)) : 0;
+        const sprint = mag >= SPRINT_AT && b.burst > 0.04;
+        p.sprinting = sprint;
+        b.burst = clamp(b.burst + (sprint ? -BURST_DRAIN : BURST_FILL) * dt, 0, 1);
+        const sp = topSpeed(b, true) * (sprint ? lerp(1.12, 1.22, rate(b.p.spd, 30, 99)) : 1);
+        const want = s ? { x: (s.cx / mag) * sp * mag, z: (s.cz / mag) * sp * mag } : { x: 0, z: 0 };
         const a = accelOf(b) * dt;
         if (b.act !== 'cross' || t - b.actAt > 0.28) {
           b.vx += clamp(want.x - b.vx, -a, a);
@@ -758,29 +834,62 @@ function defend(p: Possession, b: Body, handler: Body | null, ballAt: Pt, inside
   const lag = Math.round(lerp(14, 4, rate(b.p.prd, 40, 99)) * (60 * dt));
   const seen = man.trail[Math.max(0, man.trail.length - 1 - lag)] ?? man;
   const onBall = man === handler;
-  const helper = handler && inside && !onBall && b === helpDefender(p, handler);
+  const trapping = p.trapper === b.idx && !!handler;
+  const helper = handler && inside && !onBall && !trapping && b === helpDefender(p, handler);
+  // beaten off the dribble: his man got by him toward the rim; he turns and chases, slower a moment
+  if (onBall && handler && !p.meter && !p.finish) {
+    const toRim = unit({ cx: RIM.cx - handler.cx, cz: RIM.cz - handler.cz });
+    const ahead = (b.cx - handler.cx) * toRim.cx + (b.cz - handler.cz) * toRim.cz;
+    if (ahead < -0.6 && (b.beatenAt === undefined || t - b.beatenAt > 1.2)) b.beatenAt = t;
+  }
+  const beaten = b.beatenAt !== undefined && t - b.beatenAt < 0.5;
   let target: Pt;
   if (p.ball?.kind === 'loose') target = p.ball.to;
   else if (p.ball?.kind === 'shot') target = { cx: RIM.cx - 4.5, cz: b.cz * 0.5 };
-  else if (helper && handler) target = { cx: handler.cx + (RIM.cx - handler.cx) * 0.4, cz: handler.cz + (RIM.cz - handler.cz) * 0.4 };
+  else if (trapping && handler) {
+    // the double: at his shoulder on the side away from the first man
+    const side = unit({ cx: handler.cx - man.cx || 1, cz: handler.cz - man.cz });
+    target = { cx: handler.cx + side.cx * 2.2 + (RIM.cx - handler.cx) * 0.06, cz: handler.cz + side.cz * 2.2 };
+  } else if (helper && handler) target = { cx: handler.cx + (RIM.cx - handler.cx) * 0.4, cz: handler.cz + (RIM.cz - handler.cz) * 0.4 };
   else {
     const toRim = unit({ cx: RIM.cx - seen.cx, cz: RIM.cz - seen.cz });
-    const gap = onBall ? lerp(4.4, 2.5, rate(b.p.prd, 40, 99)) : 4.5 + Math.min(4.5, dist(seen, ballAt) * 0.13);
+    // the cushion: a sagging defense plays off a man who can't shoot and packs the paint
+    const sagOff = p.scheme === 'sag' ? (onBall ? (man.p.thr < 72 ? 2.2 : 0.8) : 2.4) : 0;
+    const gap = (onBall ? lerp(4.4, 2.5, rate(b.p.prd, 40, 99)) : 4.5 + Math.min(4.5, dist(seen, ballAt) * 0.13)) + sagOff;
     const sag = onBall ? { cx: 0, cz: 0 } : unit({ cx: ballAt.cx - seen.cx, cz: ballAt.cz - seen.cz });
     target = { cx: seen.cx + toRim.cx * gap + sag.cx * 1.3, cz: seen.cz + toRim.cz * gap + sag.cz * 1.3 };
   }
   const closing = p.meter && handler && closest(p, handler).d === b;
-  steer(b, target.cx, target.cz, topSpeed(b, false) * (closing ? 1.15 : onBall ? 1 : 0.94), dt);
+  steer(b, target.cx, target.cz, topSpeed(b, false) * (closing ? 1.15 : onBall ? 1 : 0.94) * (beaten ? 0.78 : 1), dt);
   move(b, dt);
   if (b.act === 'contest' || b.act === 'block' || b.act === 'stumble') {
     if (t - b.actAt > 0.75 && b.h === 0) act(b, 'defend', t);
   } else act(b, 'defend', t);
   b.face = Math.atan2(ballAt.cz - b.cz, ballAt.cx - b.cx);
   // reaching in on the dribble: a thief against a loose handle
-  if (onBall && handler && !p.meter && !p.finish && !p.ball && dist(b, handler) < 2.6) {
-    const chance = dt * 0.13 * rate(b.p.stl, 30, 99) * (1.15 - rate(handler.p.hnd, 30, 99));
+  if ((onBall || trapping) && handler && !p.meter && !p.finish && !p.ball && dist(b, handler) < 2.6) {
+    const chance = dt * (trapping ? 0.2 : 0.13) * rate(b.p.stl, 30, 99) * (1.15 - rate(handler.p.hnd, 30, 99));
     if (r() < chance) end(p, 'steal', 0, 'STRIPPED BY ' + b.p.tag, handler.idx);
   }
+}
+
+/** A switch: two defenders whose men have come together (a cut past, a crossing) take each other's. */
+function switchMarks(p: Possession) {
+  const ds = p.bodies.filter((d) => d.side === 'D' && p.t >= d.stunUntil);
+  for (let i = 0; i < ds.length; i++)
+    for (let j = i + 1; j < ds.length; j++) {
+      const a = ds[i];
+      const b = ds[j];
+      const ma = p.bodies[a.mark];
+      const mb = p.bodies[b.mark];
+      if (dist(ma, mb) > 6) continue;
+      if (dist(a, mb) + dist(b, ma) + 1 < dist(a, ma) + dist(b, mb)) {
+        const k = a.mark;
+        a.mark = b.mark;
+        b.mark = k;
+        p.events.push('switch');
+      }
+    }
 }
 
 /** Who steps over to help on a drive: the nearest defender off the ball, shot blockers first. */

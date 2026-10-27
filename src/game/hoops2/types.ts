@@ -99,8 +99,15 @@ export interface Body {
   fallKind?: 'posterized' | 'ankles';
   /** 0-1, drains as he plays */
   energy: number;
+  /** 0-1, the sprint's stamina: drains while he bursts (the stick at its edge), refills after */
+  burst: number;
+  /** a defender beaten off the dribble (the man got past him): turning to chase, slower a moment */
+  beatenAt?: number;
   trail: Pt[];
 }
+
+/** How the defense plays a possession: it picks one and says so, and the offense reads it. */
+export type Scheme = 'man' | 'sag' | 'switch' | 'trap';
 
 export type ShotKind = 'three' | 'mid' | 'close' | 'layup' | 'dunk' | 'contact' | 'standdunk' | 'oop';
 
@@ -115,6 +122,8 @@ export interface Meter {
   /** half the green window, seconds */
   green: number;
   kind: ShotKind;
+  /** the nearest defender's room at the press: a man that far off can only close out so well */
+  room?: number;
   /** the result once released: -1 very early .. 1 very late, and whether it was green */
   off?: number;
   greened?: boolean;
@@ -165,4 +174,9 @@ export interface Possession {
   fire: number;
   /** the next pass target the stick is pointing at */
   target: number | null;
+  /** the defense's look this possession, and the defender doubling the ball in a trap */
+  scheme: Scheme;
+  trapper: number | null;
+  /** the handler is sprinting (the stick at its edge) */
+  sprinting: boolean;
 }

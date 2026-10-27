@@ -9,6 +9,9 @@ import type { Hooper } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const run = (globalThis as any).process?.env?.TUNE ? it : it.skip;
+/** the autopilot's skill (TUNE_SKILL=0.45 a Rookie, 0.68 a Pro, 0.88 a Legend) */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SKILL = Number((globalThis as any).process?.env?.TUNE_SKILL ?? 0.68);
 
 run('basketball v2 numbers', async () => {
   const at = await loadAttrs();
@@ -29,7 +32,7 @@ run('basketball v2 numbers', async () => {
       let pts = 0, poss = 0, secs = 0;
       for (let i = 0; i < N; i++) {
         const g = newHoopsGame(O, D, 'tune' + i + olab + dlab);
-        const pl = pilot(0.7, 'p' + i);
+        const pl = pilot(SKILL, 'p' + i);
         while (!g.over) {
           const p = startPossession(g);
           pl.letGo = null; pl.driving = false; pl.goal = null; pl.nextThink = 0; pl.crosses = 0;
