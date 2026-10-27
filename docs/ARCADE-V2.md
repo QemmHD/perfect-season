@@ -52,6 +52,12 @@ Decisions from the owner's answers (2026-10-27). Everything ships in one release
 - **Motion:** real motion capture drives the pixel players (free CMU Graphics Lab recordings:
   jump shot, layup, runs, cuts, falls, throws), retargeted to each player's height and build.
   Keeps the HD pixel art, team uniforms, numbers and heights. No hand-keyed robot poses.
+  - As built: recorded clips for the jump shot (its release timed to the meter's green), layups,
+    jog/run/sprint strides, defensive slides, idle stances, falls and get-ups, stumbles,
+    celebrations; in football also throws, catches, blocks, diving tackles, knockdowns and the
+    kick. Still hand-keyed (no free recording fits them yet): the crossover, step-back and spin,
+    passes, contests and blocks at the rim and the dunks; football's stances, backpedal and the
+    ball carrier's jukes, spins, stiff arms and trucks.
 - **Contact reactions, basketball (all):** posterizer (defender knocked down, slow-mo), blocked
   shot (shooter swatted, blocker's flex), ankle breaker (defender drops), and-one bump (shooter
   absorbs contact, still finishes).
@@ -62,7 +68,8 @@ Decisions from the owner's answers (2026-10-27). Everything ships in one release
   screen point), like the football.
 - **Dunks:** automatic by ratings: attack the rim and hold SHOOT; layup, dunk or contact dunk from
   the dunk ratings, vertical, size and the defender in the way.
-- **Shot meter:** the 2K-style arch over the shooter's head: it fills from the left end as he rises, the green slice sits at the top of his jump, and a green release lights the whole arch.
+- **Shot meter:** the 2K-style arch over the shooter's head: it fills from the left end as he
+  rises, the green slice sits at the top of his jump, and a green release lights the whole arch.
 - **Football play call:** pick one of three play cards each down (routes drawn), then snap.
 - **Moves by swipe, both sports:** football: steer by dragging, swipe left/right juke, up spin,
   double-tap truck (no move buttons). Basketball: stick to move, swipe left/right crossover, swipe
