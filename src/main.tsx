@@ -9,6 +9,10 @@ import './styles.css';
 // the arcade games' test bench (?arcade), loaded only when asked for
 const Lab = React.lazy(() => import('./game/Lab'));
 const LAB = new URLSearchParams(location.search).has('arcade');
+// the pixel-art test sheet (?pixel)
+const PIXEL = new URLSearchParams(location.search).get('pixel');
+const Gallery = React.lazy(() => (PIXEL === 'court' ? import('./game/pixel/Scene') : import('./game/pixel/Gallery')));
+const GALLERY = PIXEL !== null;
 
 // iOS Safari only shows :active press states when the page listens for touches
 document.addEventListener('touchstart', () => {}, { passive: true });
@@ -65,5 +69,13 @@ function Root() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<Root />);
+createRoot(document.getElementById('root')!).render(
+  GALLERY ? (
+    <React.Suspense fallback={null}>
+      <Gallery />
+    </React.Suspense>
+  ) : (
+    <Root />
+  )
+);
 window.addEventListener('load', registerServiceWorker);
