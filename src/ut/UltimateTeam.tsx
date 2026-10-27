@@ -120,7 +120,8 @@ export default function UltimateTeam(props: {
     if (!pool || busy.current) return;
     busy.current = true;
     window.setTimeout(() => (busy.current = false), 600);
-    const cards = openPack(pool, kind, seed);
+    // truly random cards (`seed` only names the pack and its cards' ids)
+    const cards = openPack(pool, kind);
     const at = Date.now();
     const tag = seed.replace(/[^a-z0-9]/gi, '').slice(0, 10);
     const owned: OwnedCard[] = cards.map((rc, i) => ({ uid: tag + '-' + i, cardId: rc.line.id, level: 1, xp: 0, at: at + i }));
@@ -207,7 +208,7 @@ export default function UltimateTeam(props: {
     if (!pool || ut.sbc.done[s.id]) return;
     const gone = new Set(uids);
     const week = weekOf(day);
-    const rc = s.reward.card ? rewardCard(pool, s.reward.card, s.id) : null;
+    const rc = s.reward.card ? rewardCard(pool, s.reward.card) : null;
     const prize: OwnedCard | null = rc ? { uid: 'sbc' + newId().replace(/-/g, '').slice(0, 8), cardId: rc.line.id, level: 1, xp: 0, at: Date.now() } : null;
     const pack = s.reward.pack ? { id: newId(), kind: s.reward.pack, at: Date.now() } : null;
     update((p) => {

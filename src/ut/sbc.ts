@@ -1,7 +1,7 @@
 // Squad Building Challenges: trade in cards that meet a challenge's requirements for a pack, coins
 // or a special card. Three daily and two weekly, the same for everyone, picked from the date the
 // way the Daily is. See docs/ULTIMATE-TEAM.md.
-import { hashString, pickOne, rng, type Rand, shuffle } from '../engine/rng';
+import { hashString, pickOne, rng, type Rand, shuffle, trueRand } from '../engine/rng';
 import { openPack, packRand, quickSellValue } from './packs';
 import { decadeOf, type Pool, TIER_RANK } from './pool';
 import { onScale } from './rate';
@@ -372,14 +372,18 @@ export function autoFill<C extends FillCard>(s: Sbc, club: C[]): string[] | null
   return null;
 }
 
-/** The special card a challenge pays: drawn from its seed, so it's the same card every time. */
-export function rewardCard(pool: Pool, want: NonNullable<Reward['card']>, seed: string): RatedCard | null {
-  const rand = packRand('sbc-card:' + seed);
+/**
+ * The special card a challenge pays: a random one of every card that fits what it promises (its
+ * tier, its overall, its franchise), drawn when it's claimed, so no two players are bound to get
+ * the same one. With a `seed` (the tests) the same seed gives the same card.
+ */
+export function rewardCard(pool: Pool, want: NonNullable<Reward['card']>, seed?: string): RatedCard | null {
+  const rand = seed === undefined ? trueRand() : packRand('sbc-card:' + seed);
   const all = Object.values(pool.buckets[want.tier]).flat();
   const fit = (rc: RatedCard) => rc.ovr >= (want.minOvr ?? 0);
   const fromFr = all.filter((rc) => fit(rc) && (!want.fr || rc.line.fr === want.fr));
   const list = fromFr.length ? fromFr : all.filter(fit);
   if (list.length) return list[Math.floor(rand() * list.length)];
   // nothing that good: the best of a Gold pack
-  return openPack(pool, 'gold', 'sbc-card:' + seed).sort((a, b) => b.ovr - a.ovr)[0] ?? null;
+  return openPack(pool, 'gold', seed === undefined ? undefined : 'sbc-card:' + seed).sort((a, b) => b.ovr - a.ovr)[0] ?? null;
 }

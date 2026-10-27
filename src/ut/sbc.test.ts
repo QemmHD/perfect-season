@@ -107,7 +107,7 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     expect(autoFill({ ...s, reqs: [{ k: 'sameFr', n: 3 }, { k: 'minOvr', ovr: 95 }] }, club)).toBeNull();
   });
 
-  it('pays the same reward card every time for a challenge', () => {
+  it('pays a random card that fits the reward (the same one for a seed, in tests)', () => {
     const want = { tier: 'gold' as const, minOvr: 80 };
     const a = rewardCard(pool, want, 'd:2026-10-27:2');
     expect(a).not.toBeNull();
@@ -115,5 +115,13 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     expect(rewardCard(pool, want, 'd:2026-10-27:2')!.line.id).toBe(a!.line.id);
     const promo = rewardCard(pool, { tier: 'promo' }, 'w');
     expect(promo?.tier).toBe('promo');
+    // claimed for real (no seed): a fresh draw each time, always one that fits
+    const ids = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      const c = rewardCard(pool, want)!;
+      expect(c.ovr).toBeGreaterThanOrEqual(80);
+      ids.add(c.line.id);
+    }
+    expect(ids.size).toBeGreaterThan(5);
   });
 });

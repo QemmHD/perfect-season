@@ -33,7 +33,7 @@
 //
 // Legends: about 1 in 150 Premium packs (0.66% a pack), 1 in 500 Gold packs; Hot Season promos
 // 6% of Premium packs, 2% of Gold packs.
-import { hashString, rng, type Rand } from '../engine/rng';
+import { hashString, rng, type Rand, trueRand } from '../engine/rng';
 import { type Pool, TIER_RANK } from './pool';
 import { onScale, TIER_CUTS } from './rate';
 import { positionMix } from './squad';
@@ -228,11 +228,12 @@ export const NFL_UNITS: [string, string, string[]][] = [
 ];
 
 /**
- * A pack's contents: the same seed always gives the same cards. `kind` is a store pack, the
- * starter, or "position:<key>" (a key from positionChoices).
+ * A pack's contents, truly random (the device's randomness); with a `seed` (the tests) the same
+ * seed always gives the same cards. `kind` is a store pack, the starter, or "position:<key>" (a
+ * key from positionChoices).
  */
-export function openPack(pool: Pool, kind: string, seed: string): RatedCard[] {
-  const rand = packRand(seed);
+export function openPack(pool: Pool, kind: string, seed?: string): RatedCard[] {
+  const rand = seed === undefined ? trueRand() : packRand(seed);
   if (kind === 'starter') return starterCards(pool, rand);
   const defs = packDefs(pool.sport);
   if (kind.startsWith('position:')) {

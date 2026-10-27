@@ -145,3 +145,11 @@ describe('packs (' + SPORT + ')', () => {
     expect(walkoutLevel(revealOrder(openPack(pool, 'bronze', 'b'))[0])).toBe(0);
   });
 });
+
+describe('pack randomness', () => {
+  it('opens a different pack each time with no seed (the device’s randomness)', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 12; i++) seen.add(openPack(pool, 'gold').map((c) => c.line.id).join(','));
+    expect(seen.size).toBe(12);
+  });
+});

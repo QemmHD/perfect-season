@@ -11,6 +11,24 @@ export function rng(seed: number): Rand {
   };
 }
 
+/**
+ * True randomness from the device (crypto.getRandomValues), for what nobody needs to reproduce:
+ * the cards in a pack, the player a challenge pays. Falls back to Math.random without crypto.
+ */
+export function trueRand(): Rand {
+  const c = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function' ? crypto : null;
+  const buf = new Uint32Array(64);
+  let i = buf.length;
+  return () => {
+    if (!c) return Math.random();
+    if (i >= buf.length) {
+      c.getRandomValues(buf);
+      i = 0;
+    }
+    return buf[i++] / 4294967296;
+  };
+}
+
 export function hashString(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
