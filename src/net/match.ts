@@ -10,7 +10,8 @@ import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_Q
 
 /** Bump when the draft rules change, so only players on the same rules get paired. 2: the
     match is played out (the arcade game), and each side's score goes over the match channel.
-    3: a sim-or-play vote before the game, favorite teams for the uniforms, basketball v2. */
+    3: a sim-or-play vote before the game, favorite teams for the uniforms, basketball v2, and
+       football drafts eight: a DL, a LB and a DB in place of a team defense. */
 const DRAFT_RULES = 3;
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = 'ps1-' + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;

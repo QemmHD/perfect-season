@@ -21,6 +21,13 @@ export type Room = { code: string; hosting: boolean } | null;
  * Finding a head-to-head opponent: the public queue (the AI steps in after 30 seconds),
  * or a private code to play a friend.
  */
+/** The rounds you pick first in, every other one from `from`: "1, 3, 5 and 7". */
+function firstPicks(from: number): string {
+  const r: number[] = [];
+  for (let i = from; i <= ROUNDS; i += 2) r.push(i);
+  return r.length > 1 ? r.slice(0, -1).join(', ') + ' and ' + r[r.length - 1] : String(r[0]);
+}
+
 export function Search(props: {
   name: string;
   level: number;
@@ -321,7 +328,7 @@ export function Search(props: {
               <small>Level {found.opp.level}</small>
             </div>
           </div>
-          <small className="vs-note">{found.host ? 'You pick first in rounds 1, 3 and 5.' : ROUNDS === 6 ? 'You pick first in rounds 2, 4 and 6.' : 'You pick first in rounds 2 and 4.'} 25 seconds a pick.</small>
+          <small className="vs-note">You pick first in rounds {firstPicks(found.host ? 1 : 2)}. 25 seconds a pick.</small>
           <span className="vs-burst" aria-hidden="true">
             <Sparks color="#F5B83D" />
           </span>

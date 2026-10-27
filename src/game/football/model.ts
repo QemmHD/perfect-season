@@ -4,7 +4,7 @@
 // accuracy, a receiver's yards a catch for his speed). Ratings run 0 (the worst line at the spot)
 // to 1 (the best).
 import { CELLS } from '../../engine/data';
-import type { Lineup, Player } from '../../engine/types';
+import { DEF_SLOTS, type Lineup, type Player } from '../../engine/types';
 import type { Attrs } from '../attrs';
 
 export interface Look {
@@ -160,25 +160,40 @@ function generic(role: Role, c1: string, c2: string, i: number, quality: number)
   return { role, name: role, tag: role, speed, hands: lerp(0.35, 0.7, quality), power: lerp(0.45, 0.85, quality), acc: 0, arm: 0, poise: 0, look, player: null, ovr: 0 };
 }
 
-/** the defense a drafted DEF line gives: its rank among all team defenses */
-export function defenseOf(def: Player | null): number {
-  return def ? rankOf(def) : 0.5;
+/** A lineup's drafted defenders: its DL, LB and DB. */
+export function defendersOf(lineup: Lineup): Player[] {
+  return DEF_SLOTS.map((k) => lineup[k]).filter((p): p is Player => !!p);
 }
 
-export function squadOf(lineup: Lineup, rivalDef: Player | null, attrs: (p: Player) => Attrs | null): Squad {
+/**
+ * How good a drafted defense is, 0-1: its defenders' average rank, each among all lines at his
+ * spot. (An adapter until the game's defense is made of the real defenders: the rebuild.)
+ */
+export function defenseOf(defs: Player[]): number {
+  return defs.length ? defs.reduce((a, p) => a + rankOf(p), 0) / defs.length : 0.5;
+}
+
+/** The defense's colors: its best defender's team. */
+export function defenseColors(defs: Player[]): { c1: string; c2: string; abbr: string } | null {
+  const best = defs.slice().sort((a, b) => b.val - a.val)[0];
+  return best ? { c1: best.c1, c2: best.c2, abbr: best.abbr } : null;
+}
+
+export function squadOf(lineup: Lineup, rivalDefense: Player[], attrs: (p: Player) => Attrs | null): Squad {
   const pick = (k: string) => lineup[k] as Player;
   const flexP = pick('FLEX');
   const team = pick('QB');
   const ol = [0, 1, 2].map((i) => generic('OL', team.c1, team.c2, i, 0.5));
+  const look = defenseColors(rivalDefense);
   return {
     qb: athlete(pick('QB'), 'QB', attrs(pick('QB'))),
     rb: athlete(pick('RB'), 'RB', attrs(pick('RB'))),
     wr: athlete(pick('WR'), 'WR', attrs(pick('WR'))),
     te: athlete(pick('TE'), 'TE', attrs(pick('TE'))),
     flex: athlete(flexP, 'FLEX', attrs(flexP)),
-    def: defenseOf(rivalDef),
-    defName: rivalDef ? rivalDef.teamName : 'Defense',
-    defLook: { c1: rivalDef?.c1 ?? '#444', c2: rivalDef?.c2 ?? '#ddd', pants: lighten(rivalDef?.c2 ?? '#ddd'), num: null, width: 1, tall: 1 },
+    def: defenseOf(rivalDefense),
+    defName: 'Defense',
+    defLook: { c1: look?.c1 ?? '#444', c2: look?.c2 ?? '#ddd', pants: lighten(look?.c2 ?? '#ddd'), num: null, width: 1, tall: 1 },
     ol,
   };
 }

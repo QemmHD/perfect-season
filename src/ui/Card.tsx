@@ -5,7 +5,7 @@ import { NFL } from '../engine/sport';
 import type { Player, Slot } from '../engine/types';
 import { initials, seasonLabel, Sheet, shortEra } from './common';
 import { reducedMotion } from './motion';
-import { cardName, isDefense, posLabel, statCols } from './sportui';
+import { cardName, isDefender, roleLabel, statCols } from './sportui';
 
 /** A card's era, which sets its frame: the decade's look, not any maker's design. */
 export type Era = 'vintage' | 'retro' | 'chrome' | 'diecut' | 'modern';
@@ -63,18 +63,8 @@ export function useTilt<T extends HTMLElement>(max = 14) {
   return { ref, handlers };
 }
 
-/** The art: the player's jersey in his team's colors, his initials for a number. A defense gets its shield. */
-export function Jersey({ c1, c2, text, defense }: { c1: string; c2: string; text: string; defense?: boolean }) {
-  if (defense)
-    return (
-      <svg className="tc-jersey" viewBox="0 0 100 100" aria-hidden="true">
-        <path d="M50 6 L86 18 V48 C86 72 70 86 50 95 C30 86 14 72 14 48 V18 Z" fill={c1} stroke={c2} strokeWidth="5" strokeLinejoin="round" />
-        <path d="M50 16 L76 25 V48 C76 66 65 77 50 84 C35 77 24 66 24 48 V25 Z" fill="none" stroke="#fff" strokeOpacity="0.28" strokeWidth="2" />
-        <text x="50" y="60" textAnchor="middle" className="tc-num" fill="#fff" fontSize="28">
-          {text}
-        </text>
-      </svg>
-    );
+/** The art: the player's jersey in his team's colors, his initials for a number. */
+export function Jersey({ c1, c2, text }: { c1: string; c2: string; text: string }) {
   if (NFL)
     // a football jersey: shoulder pads, short sleeves, a stripe on each sleeve
     return (
@@ -107,7 +97,6 @@ export function TradingCard({ p, slot, blind, big, tilt = true }: { p: Player; s
   const { ref, handlers } = useTilt<HTMLSpanElement>(big ? 18 : 12);
   const rar = blind ? 'common' : rarityOf(p);
   const era = eraOf(p.era);
-  const def = isDefense(p);
   const name = cardName(p);
   return (
     <span
@@ -119,7 +108,7 @@ export function TradingCard({ p, slot, blind, big, tilt = true }: { p: Player; s
       <span className="tc-body">
         <span className="tc-art">
           <span className="tc-pattern" aria-hidden="true" />
-          <Jersey c1={p.c1} c2={p.c2} text={def ? p.abbr.slice(0, 3) : initials(p.name)} defense={def} />
+          <Jersey c1={p.c1} c2={p.c2} text={initials(p.name)} />
         </span>
         <span className="tc-plate">
           <b className="tc-name">{name}</b>
@@ -157,9 +146,10 @@ export function CardSheet({ p, slot, blind, onClose }: { p: Player; slot?: Slot;
             </span>
             <strong>{p.name}</strong>
             <small>
-              {posLabel(p)} · {p.teamName} · {years}
+              {roleLabel(p)} · {p.teamName} · {years}
             </small>
             <small>
+              {NFL && p.est ? 'About ' : ''}
               {p.g} games{p.seasons > 1 ? ' over ' + p.seasons + ' seasons' : ''}
               {p.primedFrom ? ' · primed to ' + p.primedFrom.abbr + ' ' + p.primedFrom.era : ''}
             </small>
@@ -173,6 +163,7 @@ export function CardSheet({ p, slot, blind, onClose }: { p: Player; slot?: Slot;
                 ))}
               </div>
             )}
+            {!blind && isDefender(p) && <small>A season, where kept (– not kept then) · Pro Bowl and All-Pro years with this team</small>}
             {up && <small className="cs-prime">Best decade: {up.primedFrom?.abbr} {up.primedFrom?.era} (value {up.val.toFixed(1)})</small>}
           </div>
           <span className="cs-hint">Drag the card to tilt it</span>

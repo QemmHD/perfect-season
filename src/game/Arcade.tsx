@@ -124,7 +124,6 @@ export function Arcade({
     const ends = wire.ends.filter((e) => owns(e)).slice(0, TOTAL);
     return { score: pointsThrough({ score: 0, drive: 0, done: false, ends }, TOTAL), drive: ends.length, done: wire.done && ends.length >= TOTAL, ends, plays: wire.plays ?? 0 };
   }, [wire?.done, wire?.plays, wire?.ends.join()]);
-  const rivalDef = (rivalLineup?.DEF as Player | null) ?? null;
   // one side's offense played by the autopilot against the other's defense: the rival's (`rival`), or yours
   const aiPlay = (rival: boolean, s: string, skill: number, a: (p: Player) => Attrs | null): Progress => {
     if (teams) {
@@ -267,7 +266,7 @@ export function Arcade({
     return (
       <div className="arc-kick">
         <span className="eyebrow">Head to head · kickoff</span>
-        <h1 className="disp">YOUR OFFENSE VS {(rivalDef?.teamName ?? rivalName).toUpperCase()}</h1>
+        <h1 className="disp">YOUR OFFENSE VS {rivalName.toUpperCase()}</h1>
         <p>
           {TOTAL} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
         </p>

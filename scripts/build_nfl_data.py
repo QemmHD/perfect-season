@@ -1,13 +1,16 @@
 """Build the NFL player database for Perfect Season.
 
 Sources: see scripts/nfl_sources.py (Pro-Football-Reference season tables 1970-2021,
-nflverse weekly stats and rosters 1999-2025, FiveThirtyEight and nflverse game scores).
+nflverse weekly stats and rosters 1999-2025, FiveThirtyEight and nflverse game scores) and,
+for defenders, scripts/nfl_more_sources.py (.cache/nfl_players_more.json; see
+scripts/nfl_defenders.py for how they're valued).
 
 Output: src/data/nfl.json with
   teams:   franchise-decade cells. Each holds its quarterbacks, running backs, receivers
-           and tight ends (per-game averages for that team in that decade) and the team's
-           defense over those seasons
-  playoff: every real playoff team since 1970, used as playoff opponents
+           and tight ends (per-game averages for that team in that decade) and its defensive
+           linemen, linebackers and defensive backs (per-season averages, Pro Bowls, All-Pros)
+  playoff: every real playoff team since 1970, used as playoff opponents, with its key
+           players on offense and its best defender at each position that season
 
 Rules:
   - seasons 1970 (the first after the AFL-NFL merger) through 2025; a season belongs to the
@@ -32,18 +35,17 @@ Rules:
         percentile tight end is worth what a 95th percentile quarterback is, and rarity tiers
         mean the same thing in both sports. Above the 98th percentile the map goes by yards,
         not rank, so two near-equal lines at the top are worth near the same
-  - defense: the team's points allowed per game in those seasons, era-rated the same way,
-    valued as points saved against the league average and mapped onto the same scale
+  - defenders: DL, LB and DB lines, the same rule (one player, one franchise, one decade),
+    valued on the same scale (scripts/nfl_defenders.py); the best few of each per cell
   - positions: the player's most-played position over his career (FB counts as RB; from
     1999 each season's roster position). The few PFR rows with no position get the one from
     his other seasons, or the nearest by stats
   - lists: QBs with 4+ starts and 100+ attempts, RBs with 6+ games and 40+ touches,
     WRs and TEs with 6+ games and 15+ catches; at most POS_CAP of each per cell
   - same name, different players: all but the one with the most games get their years
-  - prime = the player's best listed line (8+ games) by value; a defense's is its franchise's best decade
-  - a defense goes by its team's name that decade (the 1980s Oilers, not the Titans)
+  - prime = the player's best listed line (8+ games) by value
 
-Usage: python3 scripts/build_nfl_data.py [raw_dir]
+Usage: python3 scripts/build_nfl_data.py [raw_dir] [players_more.json]
 """
 
 import json
@@ -53,6 +55,7 @@ from bisect import bisect_left
 from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import nfl_defenders as D  # noqa: E402
 import nfl_sources as S  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -67,8 +70,8 @@ POS_POOL = {"QB": 2, "RB": 3, "WR": 4, "TE": 2}
 TARGET = [(0, 5.19), (0.02, 8.59), (0.05, 10.05), (0.1, 10.91), (0.2, 11.83), (0.3, 12.54), (0.4, 13.18), (0.5, 13.69), (0.6, 14.41),
           (0.7, 15.37), (0.8, 16.46), (0.9, 18.18), (0.95, 19.81), (0.98, 22.07), (0.99, 23.32), (0.995, 24.41), (1, 30.33)]
 SHOWN = ("pass_yds", "pass_td", "int", "rush_yds", "rush_td", "rec", "rec_yds", "rec_td")
-# a defense is called by its team's nickname; Washington's by the city, whatever the decade
-NICK_OVERRIDE = {"WAS": "Washington"}
+# a defender's shown stats: per season (-1 not known), then Pro Bowls and All-Pro seasons in the line
+DEF_SHOWN = ("sacks", "tkl", "int", "pd", "ff", "pb", "ap")
 
 
 def target_at(q):
@@ -112,6 +115,7 @@ class QuantileMap:
 
 def main():
     raw_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", ".cache", "nfl")
+    more_path = sys.argv[2] if len(sys.argv) > 2 else os.path.join(raw_dir, "..", "nfl_players_more.json")
     S.fetch(raw_dir)
     reg = S.Register(os.path.join(raw_dir, "players.csv"))
     rows = S.player_rows(raw_dir, reg)
@@ -240,29 +244,6 @@ def main():
         for a in lst:
             a["val"] = qmap[a["pos"]](a["ay"])
 
-    # defenses: points allowed per game in the cell's seasons, era-rated
-    defense = {}
-    for (fr, dec) in cells:
-        ss = [s for s in range(dec, dec + 10) if (s, fr) in ts]
-        g = sum(ts[(s, fr)]["g"] for s in ss)
-        pa = sum(ts[(s, fr)]["pa"] for s in ss)
-        adj = sum(ts[(s, fr)]["pa"] * scale["pts"] / league[s]["pts"] for s in ss)
-        lg = sum(league[s]["pts"] * ts[(s, fr)]["g"] for s in ss)
-        # league rank in points allowed, each season
-        ranks = []
-        for s in ss:
-            field = sorted((t["pa"] / t["g"], f) for (y, f), t in ts.items() if y == s and t["g"])
-            ranks.append(1 + [f for _, f in field].index(fr))
-        defense[(fr, dec)] = {"g": g, "pa": pa / g, "lg": lg / g, "saved": scale["pts"] - adj / g, "seasons": ss, "top5": sum(1 for k in ranks if k <= 5), "best": min(ranks)}
-    dmap = QuantileMap([d["saved"] for d in defense.values()])
-    for d in defense.values():
-        d["val"] = dmap(d["saved"])
-    # a defense's prime is its franchise's best decade
-    best_def = {}
-    for (fr, dec), d in defense.items():
-        if fr not in best_def or d["val"] > defense[best_def[fr]]["val"]:
-            best_def[fr] = (fr, dec)
-
     # each cell's listed players: the best at each position, up to its cap
     kept = {}
     for (fr, dec), lst in cells.items():
@@ -270,6 +251,23 @@ def main():
         for pos, cap in POS_CAP.items():
             keep += sorted((a for a in lst if a["pos"] == pos), key=lambda a: -a["val"])[:cap]
         kept[(fr, dec)] = keep
+
+    # defenders: DL, LB and DB lines on the same value scale
+    int_rate = {s: league[s]["int"] for s in league}
+    defs, playoff_defs = D.build({k: t["g"] for k, t in ts.items()}, int_rate, scale["int"], QuantileMap, set(cells), more_path)
+    for cell in cells:
+        # a two-way player (Deion Sanders, the 1990s Cowboys) keeps his better line: one a cell
+        off = {a["pid"]: a for a in kept[cell]}
+        dfn = {a["pid"]: a for a in defs.get(cell, [])}
+        both = off.keys() & dfn.keys()
+        kept[cell] = [a for a in kept[cell] if a["pid"] not in both or a["val"] >= dfn[a["pid"]]["val"]]
+        defs[cell] = [a for a in defs.get(cell, []) if a["pid"] not in both or a["val"] > off[a["pid"]]["val"]]
+    # a defender's prime: his best listed line with 8+ games
+    def_prime = {}
+    for (fr, dec), lst in defs.items():
+        for a in lst:
+            if a["g"] >= 8 and (a["pid"] not in def_prime or a["val"] > def_prime[a["pid"]][0]):
+                def_prime[a["pid"]] = (a["val"], fr, dec)
 
     def stored(a):
         """The value as the app reads it: the three rated parts, each rounded on its own."""
@@ -300,7 +298,7 @@ def main():
     # same name, different players
     by_name = defaultdict(set)
     games_of = Counter()
-    for lst in cells.values():
+    for lst in list(cells.values()) + list(defs.values()):
         for a in lst:
             by_name[a["name"]].add(a["pid"])
             games_of[a["pid"]] += a["g"]
@@ -330,13 +328,20 @@ def main():
                 *[round(raw[k] / g, 2 if k in ("pass_td", "int", "rush_td", "rec_td") else 1) for k in SHOWN],
                 *shown, 0,
             ])
-        d = defense[(fr, dec)]
-        plist.append([
-            NICK_OVERRIDE.get(fr, name.split()[-1]) + " Defense", "DEF", int(d["g"]), len(d["seasons"]), d["seasons"][0], d["seasons"][-1],
-            best_def[fr][0] + "-" + str(best_def[fr][1]) if best_def[fr] != (fr, dec) else None, "D-" + fr,
-            round(d["pa"], 1), round(d["lg"], 1), d["top5"], d["best"], 0, 0, 0, 0,
-            0, 0, 0, round(d["val"], 2),
-        ])
+        for a in defs[(fr, dec)]:
+            seas = a["seasons"]
+            pr = def_prime.get(a["pid"])
+            val = round(a["val"], 2)
+            pr_ref = pr[1] + "-" + str(pr[2]) if pr and (pr[1], pr[2]) != (fr, dec) and round(pr[0], 2) >= val + 0.01 else None
+            nm = a["name"]
+            if a["pid"] in namesakes:
+                nm += " (" + str(seas[0]) + ("–" + str(seas[-1])[2:] if seas[-1] != seas[0] else "") + ")"
+            shown = a["shown"]
+            plist.append([
+                nm, a["slot"], a["g"], len(seas), seas[0], seas[-1], pr_ref, a["pid"],
+                *[shown[k] for k in DEF_SHOWN[:5]], a["pb"], a["ap"], 1 if a["est"] else 0,
+                0, 0, 0, val, a["role"],
+            ])
         plist.sort(key=lambda p: -(p[16] + p[17] + p[18] + p[19]))
         teams.append({"id": fr + "-" + str(dec), "fr": fr, "abbr": disp, "name": name, "era": str(dec) + "s", "c1": c1, "c2": c2,
                       "from": first, "to": last, "players": plist})
@@ -369,15 +374,16 @@ def main():
         playoff.append({
             "year": str(s), "team": name, "abbr": disp, "w": t["w"], "l": t["l"], "t": t["t"], "w17": w17, "c1": c1, "c2": c2,
             "star": star["name"] if star else "", "pf": round(t["pf"] / t["g"], 1), "pa": round(t["pa"] / t["g"], 1),
-            "champ": t["champ"], "won": rounds_won, "five": five,
+            "champ": t["champ"], "won": rounds_won, "five": five, "def": playoff_defs.get((s, fr), []),
         })
     playoff.sort(key=lambda x: (-x["w17"], x["year"]))
 
     out = {
-        "source": "Pro-Football-Reference via github.com/fantasydatapros/data (1970-98), nflverse (1999-2025), FiveThirtyEight and nflverse scores",
+        "source": "Pro-Football-Reference via github.com/fantasydatapros/data (1970-98), nflverse (1999-2025), FiveThirtyEight and nflverse scores; defenders: nflverse, Wikidata and Wikipedia",
         "built": S.LAST_SEASON,
         "fields": ["name", "pos", "g", "seasons", "from", "to", "prime", "pid", *SHOWN, "r_pass", "r_rush", "r_recv", "r_def"],
-        "def_fields": ["pa", "lg", "top5", "best"],
+        "def_fields": ["name", "pos", "g", "seasons", "from", "to", "prime", "pid", *DEF_SHOWN, "games_est", "-", "-", "-", "r_def", "role"],
+        "playoff_def_fields": ["name", "pos", "g", "sacks", "tkl", "int", "honor (2 first-team All-Pro, 1 Pro Bowl or second team)"],
         "scale": {k: round(v, 2) for k, v in scale.items()},
         "teams": teams,
         "playoff": playoff,

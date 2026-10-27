@@ -4,7 +4,7 @@ import { crowd, sfx, vibrate } from '../../lib/sound';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
 import { afterPlay, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type Game, kick, kickWindow, newGame, nextConcept, spotText, startPlay } from './drive';
-import { squadOf } from './model';
+import { defenseColors, squadOf } from './model';
 import { CONCEPT_NAMES, juke, type Play, type Pt, snap, step, throwTo } from './play';
 import { type Camera, cameraTarget, draw, toScreen, toWorld } from './render';
 import { autoplay, decide, pilot } from './autopilot';
@@ -25,7 +25,7 @@ const END_TEXT: Record<DriveEnd, string> = { TD: 'TD', FG: 'FG', MISS: 'MISSED F
  */
 export function Football({
   lineup,
-  rivalDef,
+  rivalDefense,
   rivalName,
   seed,
   drives = DRIVES,
@@ -35,7 +35,8 @@ export function Football({
   onDone,
 }: {
   lineup: Lineup;
-  rivalDef: Player | null;
+  /** the rival's drafted defenders (DL, LB, DB) */
+  rivalDefense: Player[];
   rivalName: string;
   seed: string;
   drives?: number;
@@ -55,7 +56,8 @@ export function Football({
       live = false;
     };
   }, []);
-  const game = useMemo<Game | null>(() => (attrs ? newGame(squadOf(lineup, rivalDef, attrs), seed, drives) : null), [attrs]);
+  const game = useMemo<Game | null>(() => (attrs ? newGame(squadOf(lineup, rivalDefense, attrs), seed, drives) : null), [attrs]);
+  const rivalLook = useMemo(() => defenseColors(rivalDefense), [rivalDefense]);
   const playRef = useRef<Play | null>(null);
   const camRef = useRef<Camera>({ x: 26.67, y: 34, z: 11, w: 390, h: 700 });
   const aimRef = useRef<Pt | null>(null);
@@ -138,7 +140,7 @@ export function Football({
       cam.y += (tgt.y - cam.y) * k;
       const ctx = canvas.getContext('2d')!;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      draw(ctx, cam, p, { ourColor: '#0f3a44', rivalColor: rivalDef?.c1 ?? '#333', rivalTrim: rivalDef?.c2 ?? '#fff', rivalAbbr: rivalDef?.abbr ?? 'OPP', toGain: game.ballOn + game.toGo }, {
+      draw(ctx, cam, p, { ourColor: '#0f3a44', rivalColor: rivalLook?.c1 ?? '#333', rivalTrim: rivalLook?.c2 ?? '#fff', rivalAbbr: rivalLook?.abbr ?? 'OPP', toGain: game.ballOn + game.toGo }, {
         aim: aimRef.current,
         showRoutes: p.phase === 'pre' && p.call === 'pass',
         tags: p.phase === 'pre',
@@ -457,8 +459,8 @@ function KickMeter({ window: win, start, stopped, distance, onKick }: { window: 
 }
 
 /** The AI's drives, played by the autopilot against your defense, for a head to head with the AI. */
-export function aiDrives(lineup: Lineup, yourDef: Player | null, seed: string, skill: number, attrs: (p: Player) => Attrs | null, drives = DRIVES): Progress {
-  const g = newGame(squadOf(lineup, yourDef, attrs), 'ai:' + seed, drives);
+export function aiDrives(lineup: Lineup, yourDefense: Player[], seed: string, skill: number, attrs: (p: Player) => Attrs | null, drives = DRIVES): Progress {
+  const g = newGame(squadOf(lineup, yourDefense, attrs), 'ai:' + seed, drives);
   autoplay(g, skill, 'ai:' + seed);
   return { score: g.score, drive: g.drive, done: true, ends: g.ends.slice() };
 }

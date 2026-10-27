@@ -456,72 +456,57 @@ function palette(look: Look): RGB[][] {
 
 function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, top: number): Sprite {
   const { w, h, slot, tone, depth, part } = b;
-  const out = new Uint8ClampedArray(w * h * 4);
-  // inner lines: where a nearer part overlaps a farther one, the farther one gets a dark edge
-  const dark = new Uint8Array(w * h);
+  // the colors packed once per slot: its three tones, and the dark line drawn along its edges
+  const pack = (c: RGB) => (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+  const col = pal.map((tones) => (tones ? tones.map(pack) : [0, 0, 0]));
+  const line = pal.map((tones) => (tones ? pack(outlineOf(tones[1])) : 0));
+  const out = new Uint32Array(w * h);
   const T = 1.6;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
-      if (!slot[i]) continue;
-      for (const [dx, dy] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ]) {
-        const xx = x + dx;
-        const yy = y + dy;
-        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
-        const k = yy * w + xx;
-        if (slot[k] && part[k] !== part[i] && depth[k] > depth[i] + T) {
-          dark[i] = 1;
-          break;
-        }
+      const s = slot[i];
+      if (s) {
+        // an inner line where a nearer part overlaps this farther one
+        const d = depth[i] + T;
+        const pi = part[i];
+        let k = i + 1;
+        let edge = x + 1 < w && slot[k] !== 0 && part[k] !== pi && depth[k] > d;
+        k = i - 1;
+        if (!edge) edge = x > 0 && slot[k] !== 0 && part[k] !== pi && depth[k] > d;
+        k = i + w;
+        if (!edge) edge = y + 1 < h && slot[k] !== 0 && part[k] !== pi && depth[k] > d;
+        k = i - w;
+        if (!edge) edge = y > 0 && slot[k] !== 0 && part[k] !== pi && depth[k] > d;
+        out[i] = edge ? line[s] : col[s][tone[i]];
+        continue;
       }
-    }
-  for (let i = 0; i < w * h; i++) {
-    const s = slot[i];
-    if (!s) continue;
-    const c = dark[i] ? outlineOf(pal[s][1]) : pal[s][tone[i]];
-    out[i * 4] = c[0];
-    out[i * 4 + 1] = c[1];
-    out[i * 4 + 2] = c[2];
-    out[i * 4 + 3] = 255;
-  }
-  // the outline around the whole figure, in a dark version of what it borders
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (slot[i]) continue;
+      // the outline around the whole figure, in a dark version of the nearest part it borders
       let best = -1;
       let bd = -1e9;
-      for (const [dx, dy] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ]) {
-        const xx = x + dx;
-        const yy = y + dy;
-        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
-        const k = yy * w + xx;
-        if (slot[k] && depth[k] > bd) {
-          bd = depth[k];
-          best = k;
-        }
+      let k = i + 1;
+      if (x + 1 < w && slot[k] && depth[k] > bd) {
+        bd = depth[k];
+        best = k;
       }
-      if (best < 0) continue;
-      const c = outlineOf(pal[slot[best]][1]);
-      out[i * 4] = c[0];
-      out[i * 4 + 1] = c[1];
-      out[i * 4 + 2] = c[2];
-      out[i * 4 + 3] = 255;
+      k = i - 1;
+      if (x > 0 && slot[k] && depth[k] > bd) {
+        bd = depth[k];
+        best = k;
+      }
+      k = i + w;
+      if (y + 1 < h && slot[k] && depth[k] > bd) {
+        bd = depth[k];
+        best = k;
+      }
+      k = i - w;
+      if (y > 0 && slot[k] && depth[k] > bd) best = k;
+      if (best >= 0) out[i] = line[slot[best]];
     }
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  canvas.getContext('2d')!.putImageData(new ImageData(out, w, h), 0, 0);
+  canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(out.buffer), w, h), 0, 0);
   return { canvas, ax: ox, ay: oy, handL: { x: ox + hl.x, y: oy + hl.y }, handR: { x: ox + hr.x, y: oy + hr.y }, top };
 }
 

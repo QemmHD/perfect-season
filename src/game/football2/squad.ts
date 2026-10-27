@@ -17,8 +17,10 @@ function tagOf(name: string): string {
 /** A drafted player, rated. */
 export function fromDraft(p: Player, a: Attrs | null, pos?: string): FbPlayer {
   const pp = pos ?? (p.pos[0] === 'FLEX' ? 'WR' : p.pos[0]);
-  const r = rateDraftLine(p, a, pp);
-  return { id: p.id, name: p.name, tag: tagOf(p.name), num: a?.num ?? null, ht: a?.ht ?? 74, wt: a?.wt ?? 220, pos: pp, ovr: r.ovr, a: r.attrs, abil: r.abil };
+  // a size for his position when the attributes file doesn't know his
+  const [ht, wt] = SIZES[pp] ?? [74, 220];
+  const r = rateDraftLine(p, a ? { ...a, ht: a.ht ?? ht, wt: a.wt ?? wt } : { ht, wt }, pp);
+  return { id: p.id, name: p.name, tag: tagOf(p.name), num: a?.num ?? null, ht: a?.ht ?? ht, wt: a?.wt ?? wt, pos: pp, ovr: r.ovr, a: r.attrs, abil: r.abil };
 }
 
 const NUMS: Record<string, [number, number]> = {

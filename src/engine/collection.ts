@@ -1,10 +1,10 @@
 // The binder: every player you've drafted is a card you keep. Each team-decade has a core set,
-// its best players (and in football its defense); finishing one pays out. Cosmetic: nothing here
-// changes how a team is rated or ranked.
+// its best players (in football, a lineup's worth: five on offense, a defender at each spot);
+// finishing one pays out. Cosmetic: nothing here changes how a team is rated or ranked.
 import { CELL_BY_ID, CELLS } from './data';
 import { rarityOf } from './rarity';
 import { NFL } from './sport';
-import type { Cell, Player } from './types';
+import { type Cell, DEF_SLOTS, type Player } from './types';
 
 /** card id (a player's line on one team-decade) -> times drafted */
 export type Collection = Record<string, number>;
@@ -12,13 +12,13 @@ export type Collection = Record<string, number>;
 /** coins for finishing a team-decade's core set */
 export const SET_REWARD = 40;
 
-/** A team-decade's core set: its five best players (football: its defense and five best). */
+/** A team-decade's core set: its five best players (football: its five best on offense and its best DL, LB and DB). */
 export function coreSet(cell: Cell): Player[] {
   const byVal = cell.players.slice().sort((a, b) => b.val - a.val);
   if (!NFL) return byVal.slice(0, 5);
-  const def = byVal.find((p) => p.pos[0] === 'DEF');
-  const rest = byVal.filter((p) => p.pos[0] !== 'DEF').slice(0, 5);
-  return def ? [...rest, def] : rest;
+  const offense = byVal.filter((p) => !DEF_SLOTS.includes(p.pos[0])).slice(0, 5);
+  const defense = DEF_SLOTS.map((k) => byVal.find((p) => p.pos[0] === k)).filter((p): p is Player => !!p);
+  return [...offense, ...defense];
 }
 
 export function setProgress(c: Collection, cell: Cell): { have: number; size: number; done: boolean } {

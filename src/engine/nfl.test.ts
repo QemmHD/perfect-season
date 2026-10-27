@@ -2,12 +2,12 @@
 import { CELLS, CELL_BY_ID, PLAYOFF_TEAMS, primeVersion } from './data';
 import { assignSlots, draftReducer, eligibleSlots, isDraftComplete, newDraft, ROUNDS, whyUnavailable } from './draft';
 import { buildBracket, isPerfect, matchupOdds, playoffOutcome, PLAYOFF_MIN_WINS, seriesWinChance, simSeries } from './playoffs';
-import { rarityOf } from './rarity';
+import { RARITY_MIN, rarityOf } from './rarity';
 import { gradeFor, rateTeam, ratingForWins, WIN_CURVE, winsFromRating } from './rating';
 import { rng } from './rng';
 import { gameScore, playSeason } from './season';
 import { NFL } from './sport';
-import { emptyLineup, type Player, SLOTS } from './types';
+import { DEF_SLOTS, emptyLineup, type Player, SLOTS } from './types';
 import { autoDraft } from './autodraft';
 
 const find = (cellId: string, name: string) => CELL_BY_ID[cellId].players.find((p) => p.name === name)!;
@@ -26,11 +26,18 @@ describe.skipIf(!NFL)('football data', () => {
     expect(CELL_BY_ID['IND-1970'].name).toBe('Baltimore Colts');
     expect(CELL_BY_ID['LAR-2010'].name).toBe('St. Louis Rams');
   });
-  it('gives every cell a defense and enough players for every spot', () => {
+  it('gives every cell its defenders and enough players for every spot', () => {
     for (const c of CELLS) {
-      const def = c.players.filter((p) => p.pos[0] === 'DEF');
-      expect(def.length).toBe(1);
-      expect(def[0].s.pa).toBeGreaterThan(5);
+      for (const k of DEF_SLOTS) {
+        const d = c.players.filter((p) => p.pos[0] === k);
+        expect(d.length, c.id + ' ' + k).toBeGreaterThanOrEqual(3);
+        expect(d.length).toBeLessThanOrEqual(7);
+        // a defender plays his own spot only, and knows the position he played
+        for (const p of d) {
+          expect(p.pos).toEqual([k]);
+          expect(p.role).toBeTruthy();
+        }
+      }
       expect(c.players.some((p) => p.pos[0] === 'QB')).toBe(true);
       const ids = new Set(c.players.map((p) => p.id));
       expect(ids.size).toBe(c.players.length);
@@ -43,9 +50,36 @@ describe.skipIf(!NFL)('football data', () => {
       }
     }
   });
-  it('rates the great defenses and players as such', () => {
-    expect(rarityOf(find('CHI-1980', 'Bears Defense'))).toBe('legendary');
-    expect(rarityOf(find('PIT-1970', 'Steelers Defense'))).toBe('legendary');
+  it('rates the great defenders and players as such, whatever their era', () => {
+    const lt = find('NYG-1980', 'Lawrence Taylor');
+    expect(lt.pos).toEqual(['LB']);
+    expect(lt.r.def).toBe(lt.val);
+    expect(lt.s.sacks).toBeGreaterThan(10);
+    expect(lt.s.pb).toBe(9);
+    const reggie = find('PHI-1980', 'Reggie White');
+    expect(reggie.pos).toEqual(['DL']);
+    expect(reggie.s.sacks).toBeGreaterThan(14);
+    const greats = [lt, reggie, find('SF-1980', 'Ronnie Lott'), find('SF-1990', 'Deion Sanders'), find('DAL-1990', 'Deion Sanders'), find('LAR-2010', 'Aaron Donald'), find('CHI-1980', 'Mike Singletary')];
+    for (const p of greats) expect(rarityOf(p), p.name + ' ' + p.cellId).toBe('legendary');
+    // near the top of every line at their spot: Taylor and White the top 1%, the defensive backs the top 2%
+    const above = (p: Player) => {
+      const all = CELLS.flatMap((c) => c.players).filter((x) => x.pos[0] === p.pos[0]);
+      return all.filter((x) => x.val > p.val).length / all.length;
+    };
+    expect(above(lt)).toBeLessThan(0.01);
+    expect(above(reggie)).toBeLessThan(0.01);
+    expect(above(find('SF-1980', 'Ronnie Lott'))).toBeLessThan(0.02);
+    expect(above(find('SF-1990', 'Deion Sanders'))).toBeLessThan(0.02);
+    // a backup who barely played rates low
+    const backups = CELLS.flatMap((c) => c.players).filter((p) => DEF_SLOTS.includes(p.pos[0]) && p.seasons === 1 && p.g < 8 && !p.s.pb && !p.s.ap);
+    expect(backups.length).toBeGreaterThan(5);
+    expect(backups.reduce((a, p) => a + p.val, 0) / backups.length).toBeLessThan(RARITY_MIN.rare);
+    // each decade's best defenders are about as strong as any other's
+    const decade = (era: string) => {
+      const vals = CELLS.filter((c) => c.era === era).flatMap((c) => DEF_SLOTS.map((k) => c.players.find((p) => p.pos[0] === k)!.val));
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    };
+    for (const era of ['1970s', '1980s', '1990s', '2010s', '2020s']) expect(Math.abs(decade(era) - decade('2000s')), era).toBeLessThan(1.5);
     expect(rarityOf(find('KC-2010', 'Patrick Mahomes'))).toBe('legendary');
     expect(rarityOf(find('NE-2010', 'Rob Gronkowski'))).toBe('legendary');
     // a quarterback's value is passing and running; a receiver's is catching and running
@@ -68,45 +102,58 @@ describe.skipIf(!NFL)('football data', () => {
     const fins = PLAYOFF_TEAMS.find((t) => t.year === '1972' && t.team === 'Miami Dolphins')!;
     expect(fins.wFull).toBe(17);
     for (const t of PLAYOFF_TEAMS) expect(t.five.length).toBeGreaterThanOrEqual(3);
+    // and their defense: the season's best at each spot
+    expect(bears.def!.map((p) => p.pos)).toEqual(['DL', 'LB', 'DB']);
+    expect(bears.def!.map((p) => p.name)).toContain('Mike Singletary');
+    for (const t of PLAYOFF_TEAMS) expect(t.def!.length).toBe(3);
   });
 });
 
 describe.skipIf(!NFL)('football rules', () => {
-  it('has six spots and a FLEX that takes backs, receivers and tight ends', () => {
-    expect(SLOTS).toEqual(['QB', 'RB', 'WR', 'TE', 'FLEX', 'DEF']);
-    expect(ROUNDS).toBe(6);
+  it('has eight spots: a FLEX that takes backs, receivers and tight ends, and three defenders', () => {
+    expect(SLOTS).toEqual(['QB', 'RB', 'WR', 'TE', 'FLEX', 'DL', 'LB', 'DB']);
+    expect(ROUNDS).toBe(8);
     const rb = find('CHI-1980', 'Walter Payton');
     let s = newDraft('classic', 'pro', null);
     s = draftReducer(s, { type: 'land', cellId: 'CHI-1980', ptr: 0 });
     expect(eligibleSlots(s, rb)).toEqual(['RB', 'FLEX']);
     s = draftReducer(s, { type: 'place', playerId: rb.id, slot: 'FLEX' });
     expect(s.lineup.FLEX?.name).toBe('Walter Payton');
-    // the defense only plays DEF
-    const d = find('CHI-1980', 'Bears Defense');
-    expect(d.pos).toEqual(['DEF']);
-    expect(whyUnavailable(s, d)).toBe(null);
-  });
-  it("trades a defense for the same franchise's from another decade, but never holds anyone twice", () => {
-    const d70 = find('CHI-1970', 'Bears Defense');
-    const d80 = find('CHI-1980', 'Bears Defense');
-    const qb = find('SF-1980', 'Joe Montana');
-    let s = newDraft('classic', 'pro', null);
-    s = draftReducer(s, { type: 'land', cellId: 'CHI-1970', ptr: 0 });
-    s = draftReducer(s, { type: 'place', playerId: d70.id, slot: 'DEF' });
+    // a defender only plays his own spot
+    s = draftReducer(s, { type: 'endCell' });
+    s = draftReducer(s, { type: 'land', cellId: 'NYG-1980', ptr: 0 });
+    const lt = find('NYG-1980', 'Lawrence Taylor');
+    expect(whyUnavailable(s, lt)).toBe(null);
+    expect(eligibleSlots(s, lt)).toEqual(['LB']);
+    expect(draftReducer(s, { type: 'place', playerId: lt.id, slot: 'DL' }).lineup.DL).toBe(null);
+    s = draftReducer(s, { type: 'place', playerId: lt.id, slot: 'LB' });
+    expect(s.lineup.LB?.name).toBe('Lawrence Taylor');
     s = draftReducer(s, { type: 'endCell' });
     s = draftReducer(s, { type: 'land', cellId: 'CHI-1980', ptr: 0 });
-    expect(whyUnavailable(s, d80)).toBe('dup');
+    expect(whyUnavailable(s, find('CHI-1980', 'Mike Singletary'))).toBe('nofit');
+    expect(whyUnavailable(s, find('CHI-1980', 'Richard Dent'))).toBe(null);
+  });
+  it('trades a defender for his line from another decade, but never holds anyone twice', () => {
+    const r80 = find('PHI-1980', 'Reggie White');
+    const r90 = find('GB-1990', 'Reggie White');
+    const qb = find('SF-1980', 'Joe Montana');
+    let s = newDraft('classic', 'pro', null);
+    s = draftReducer(s, { type: 'land', cellId: 'GB-1990', ptr: 0 });
+    s = draftReducer(s, { type: 'place', playerId: r90.id, slot: 'DL' });
+    s = draftReducer(s, { type: 'endCell' });
+    s = draftReducer(s, { type: 'land', cellId: 'PHI-1980', ptr: 0 });
+    expect(whyUnavailable(s, r80)).toBe('dup');
     s = draftReducer(s, { type: 'arm', booster: 'trade' });
-    expect(whyUnavailable(s, d80)).toBe(null);
-    s = draftReducer(s, { type: 'place', playerId: d80.id, slot: 'DEF' });
-    expect(s.lineup.DEF?.id).toBe(d80.id);
+    expect(whyUnavailable(s, r80)).toBe(null);
+    s = draftReducer(s, { type: 'place', playerId: r80.id, slot: 'DL' });
+    expect(s.lineup.DL?.id).toBe(r80.id);
     // never for the very line already on the team (picked earlier this turn with Double)
     let u = newDraft('classic', 'pro', null);
-    u = draftReducer(u, { type: 'land', cellId: 'CHI-1980', ptr: 0 });
+    u = draftReducer(u, { type: 'land', cellId: 'PHI-1980', ptr: 0 });
     u = draftReducer(u, { type: 'arm', booster: 'double' });
-    u = draftReducer(u, { type: 'place', playerId: d80.id, slot: 'DEF' });
+    u = draftReducer(u, { type: 'place', playerId: r80.id, slot: 'DL' });
     u = draftReducer(u, { type: 'arm', booster: 'trade' });
-    expect(whyUnavailable(u, d80)).toBe('dup');
+    expect(whyUnavailable(u, r80)).toBe('dup');
     // a back held at RB could take FLEX in a trade and be on the team twice
     const p70 = find('CHI-1970', 'Walter Payton');
     const p80 = find('CHI-1980', 'Walter Payton');
@@ -121,11 +168,21 @@ describe.skipIf(!NFL)('football rules', () => {
     expect(whyUnavailable(t, p80)).toBe('dup');
   });
   it('seats any legal team', () => {
-    const team: Player[] = [find('SF-1980', 'Joe Montana'), find('SF-1980', 'Jerry Rice'), find('CHI-1980', 'Walter Payton'), find('NE-2010', 'Rob Gronkowski'), find('KC-2020', 'Tyreek Hill'), find('PIT-1970', 'Steelers Defense')];
+    const team: Player[] = [
+      find('SF-1980', 'Joe Montana'),
+      find('SF-1980', 'Jerry Rice'),
+      find('CHI-1980', 'Walter Payton'),
+      find('NE-2010', 'Rob Gronkowski'),
+      find('KC-2020', 'Tyreek Hill'),
+      find('PHI-1980', 'Reggie White'),
+      find('NYG-1980', 'Lawrence Taylor'),
+      find('SF-1980', 'Ronnie Lott'),
+    ];
     const l = assignSlots(team)!;
     expect(l).not.toBeNull();
     for (const k of SLOTS) expect(l[k]!.pos).toContain(k);
     expect(l.FLEX).not.toBeNull();
+    expect([l.DL!.name, l.LB!.name, l.DB!.name]).toEqual(['Reggie White', 'Lawrence Taylor', 'Ronnie Lott']);
   });
   it('plays a 17-game season with scores that agree with the record', () => {
     const s = autoDraft('best', 7, 'classic');

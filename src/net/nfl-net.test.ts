@@ -33,9 +33,9 @@ describe.skipIf(!NFL)('football boards', () => {
     // basketball's fingerprint, which football must never match
     expect(DATA_V).not.toBe('1gypzor');
   });
-  it('accepts a real six-player lineup at the record it earns', () => {
+  it('accepts a real eight-player lineup at the record it earns', () => {
     const ids = realLineup();
-    expect(ids.length).toBe(6);
+    expect(ids.length).toBe(8);
     const r = rateTeam(rebuildLineup(ids, null)!);
     const ok = readEntry(entry({ v: 1, name: 'Joe', wins: r.wins, series: r.wins >= 10 ? 2 : 0, title: false, perfect: false, rating: 1, lineup: ids }), 'classic', day);
     expect(ok?.run?.wins).toBe(r.wins);
@@ -48,11 +48,12 @@ describe.skipIf(!NFL)('football boards', () => {
     expect(readEntry(entry({ ...base, wins: r.wins === 17 ? 16 : r.wins + 1 }), 'classic', day)).toBeNull();
     // five players is a basketball lineup
     expect(readEntry(entry({ ...base, lineup: ids.slice(0, 5) }), 'classic', day)).toBeNull();
-    // a quarterback can't be the FLEX, a defense can't play QB
+    // a quarterback can't be the FLEX, a lineman can't play QB or linebacker
     const qb = ids.find((x) => x.s === 'QB')!;
-    const def = ids.find((x) => x.s === 'DEF')!;
+    const def = ids.find((x) => x.s === 'DL')!;
     expect(readEntry(entry({ ...base, lineup: ids.map((x) => (x.s === 'FLEX' ? { s: 'FLEX', id: qb.id } : x.s === 'QB' ? { s: 'QB', id: ids.find((y) => y.s === 'FLEX')!.id } : x)) }), 'classic', day)).toBeNull();
-    expect(readEntry(entry({ ...base, lineup: ids.map((x) => (x.s === 'QB' ? { s: 'QB', id: def.id } : x.s === 'DEF' ? { s: 'DEF', id: qb.id } : x)) }), 'classic', day)).toBeNull();
+    expect(readEntry(entry({ ...base, lineup: ids.map((x) => (x.s === 'QB' ? { s: 'QB', id: def.id } : x.s === 'DL' ? { s: 'DL', id: qb.id } : x)) }), 'classic', day)).toBeNull();
+    expect(readEntry(entry({ ...base, lineup: ids.map((x) => (x.s === 'LB' ? { s: 'LB', id: def.id } : x.s === 'DL' ? { s: 'DL', id: ids.find((y) => y.s === 'LB')!.id } : x)) }), 'classic', day)).toBeNull();
     // a basketball spot
     expect(readEntry(entry({ ...base, lineup: ids.map((x) => (x.s === 'TE' ? { ...x, s: 'C' } : x)) }), 'classic', day)).toBeNull();
     // a perfect season needs 17-0 and a title
@@ -70,17 +71,17 @@ describe.skipIf(!NFL)('football boards', () => {
       expect(readEntry(entry({ v: 1, name: 'D', wins: rb.wins, series: 0, title: false, perfect: false, rating: 1, lineup: bad }), 'daily', day)).toBeNull();
     }
   });
-  it('plays six head-to-head rounds and redraws outside them', () => {
+  it('plays eight head-to-head rounds and redraws outside them', () => {
     const order = onlineOrder('seed1');
     expect(order.length).toBe(CELLS.length);
     const s = { ...newDraft('1v1', 'pro', null, false), order };
     const host = redrawCell(s, order, true)!;
     const guest = redrawCell(s, order, false)!;
-    expect(order.slice(0, 6)).not.toContain(host);
-    expect(order.slice(0, 6)).not.toContain(guest);
+    expect(order.slice(0, 8)).not.toContain(host);
+    expect(order.slice(0, 8)).not.toContain(guest);
     expect(order.indexOf(host) % 2).toBe(0);
     expect(order.indexOf(guest) % 2).toBe(1);
-    expect(order.indexOf(host)).toBeGreaterThanOrEqual(12);
+    expect(order.indexOf(host)).toBeGreaterThanOrEqual(16);
   });
   it('has football missions', () => {
     const texts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((i) => missionsFor('2026-11-0' + i).map((m) => m.text)).join(' | ');

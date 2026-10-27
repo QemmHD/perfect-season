@@ -9,7 +9,7 @@ import { fbKitsFor, Football2 } from './football2/Football2';
 import { Hoops2, kitsFor } from './hoops2/Hoops2';
 import { rankOf } from './football/model';
 
-function sample(level: number): { lineup: Lineup; def: Player } {
+function sample(level: number): { lineup: Lineup; def: Player[] } {
   const by = (pos: string) =>
     CELLS.flatMap((c) => c.players)
       .filter((p) => p.pos[0] === pos)
@@ -18,7 +18,8 @@ function sample(level: number): { lineup: Lineup; def: Player } {
     const list = by(pos);
     return list[Math.min(list.length - 1, Math.floor(l * (list.length - 1)))];
   };
-  return { lineup: { QB: at('QB', level), RB: at('RB', level), WR: at('WR', level), TE: at('TE', level), FLEX: at('WR', level - 0.04), DEF: at('DEF', level) } as Lineup, def: at('DEF', 0.5) };
+  const lineup = { QB: at('QB', level), RB: at('RB', level), WR: at('WR', level), TE: at('TE', level), FLEX: at('WR', level - 0.04), DL: at('DL', level), LB: at('LB', level), DB: at('DB', level) } as Lineup;
+  return { lineup, def: ['DL', 'LB', 'DB'].map((k) => at(k, 0.5)) };
 }
 
 function hoopFive(level: number): Lineup {

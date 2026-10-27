@@ -8,8 +8,8 @@ describe('binder', () => {
     for (const c of CELLS) {
       const set = coreSet(c);
       expect(set.length).toBeGreaterThan(2);
-      expect(set.length).toBeLessThanOrEqual(NFL ? 6 : 5);
-      if (NFL) expect(set.some((p) => p.pos[0] === 'DEF')).toBe(true);
+      expect(set.length).toBeLessThanOrEqual(NFL ? 8 : 5);
+      if (NFL) for (const k of ['DL', 'LB', 'DB']) expect(set.some((p) => p.pos[0] === k)).toBe(true);
     }
   });
   it('collects cards and finishes a set exactly once', () => {

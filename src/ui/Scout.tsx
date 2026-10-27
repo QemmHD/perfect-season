@@ -2,9 +2,9 @@ import React from 'react';
 import { matchupOdds, ROUND_NAMES, type Series, seriesScore, seriesWinChance } from '../engine/playoffs';
 import { GAMES } from '../engine/rating';
 import { NFL } from '../engine/sport';
-import { type PlayoffTeam, SLOTS } from '../engine/types';
+import { type OppPlayer, type PlayoffTeam, SLOTS } from '../engine/types';
 import { Sheet, lastName } from './common';
-import { oppCols, record } from './sportui';
+import { honorLabel, oppCols, record } from './sportui';
 
 const pct = (x: number) => Math.round(x * 100) + '%';
 
@@ -19,8 +19,30 @@ export function oppNames(s: Series): string {
 }
 
 function sortedFive(s: Series) {
-  const order = (pos: string) => (SLOTS.indexOf(pos as never) + 6) % 6;
+  const order = (pos: string) => (SLOTS.indexOf(pos as never) + SLOTS.length) % SLOTS.length;
   return s.opp.five.slice().sort((a, b) => order(a.pos) - order(b.pos));
+}
+
+/** A key player's row: position, name (a defender's honor beside it) and three stats. */
+function KeyRow({ p }: { p: OppPlayer }) {
+  const honor = honorLabel(p);
+  return (
+    <div className="scout-row">
+      <span>
+        <b className="pos">{p.pos}</b>
+        <span className="nm">{p.name}</span>
+        {honor && <em className="honor">{honor}</em>}
+      </span>
+      {oppCols(p)
+        .slice(0, 3)
+        .map((c) => (
+          <i className="num" key={c.key}>
+            <small>{c.label}</small>
+            {c.text}
+          </i>
+        ))}
+    </div>
+  );
 }
 
 /**
@@ -68,22 +90,19 @@ export function Scout({ series, gamesShown, ours, onClose }: { series: Series; g
                 <span>Their key players</span>
               </div>
               {sortedFive(series).map((p) => (
-                <div className="scout-row" key={p.name}>
-                  <span>
-                    <b className="pos">{p.pos}</b>
-                    <span className="nm">{p.name}</span>
-                  </span>
-                  {oppCols(p)
-                    .slice(0, 3)
-                    .map((c) => (
-                      <i className="num" key={c.key}>
-                        <small>{c.label}</small>
-                        {c.text}
-                      </i>
-                    ))}
-                </div>
+                <KeyRow p={p} key={p.name} />
               ))}
-              <p className="note">Per game, that season. Their defense allowed {t.pa?.toFixed(1)} points a game.</p>
+              {!!t.def?.length && (
+                <>
+                  <div className="scout-row hd">
+                    <span>Their defense</span>
+                  </div>
+                  {t.def.map((p) => (
+                    <KeyRow p={p} key={p.name} />
+                  ))}
+                </>
+              )}
+              <p className="note">Offense per game, defense that season (– not kept then). They allowed {t.pa?.toFixed(1)} points a game.</p>
             </div>
           ) : (
             <div className="scout-five">

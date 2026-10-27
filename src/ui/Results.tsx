@@ -296,7 +296,7 @@ export function Results({
 
         {info.bracket && <PlayoffRun bracket={info.bracket} onScout={setScout} />}
 
-        <div className="hand" aria-label="Your team">
+        <div className={'hand' + (SLOTS.length > 6 ? ' many' : '')} aria-label="Your team">
           {SLOTS.map((k, i) => {
             const p = info.lineup[k] as Player;
             return (

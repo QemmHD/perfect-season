@@ -1,5 +1,5 @@
 // The Legends Gauntlet (npm test runs both sports).
-import { climb, clearChance, coinsFor, GAUNTLET_SIZE, gauntletLadder, LIVES, RUNG_COINS, rungChance, rungsWon } from './gauntlet';
+import { climb, clearChance, coinsFor, defensiveStar, GAUNTLET_SIZE, gauntletLadder, LIVES, RUNG_COINS, rungChance, rungsWon } from './gauntlet';
 import { ratingForWins, type TeamRating } from './rating';
 import { NFL } from './sport';
 
@@ -16,6 +16,11 @@ describe('legends gauntlet', () => {
     // the weeks differ
     const weeks = new Set(['2026-W40', '2026-W41', '2026-W42', '2026-W43'].map((w) => gauntletLadder(w).map((t) => t.year + t.team).join()));
     expect(weeks.size).toBeGreaterThan(1);
+    // football's legends bring their defense: a lineman, a linebacker, a defensive back, and most a star
+    if (NFL) {
+      for (const t of a) expect(t.def!.map((p) => p.pos)).toEqual(['DL', 'LB', 'DB']);
+      expect(a.filter((t) => defensiveStar(t)).length).toBeGreaterThan(GAUNTLET_SIZE / 2);
+    }
   });
 
   it('is hard: a perfect team clears it often, a good one almost never', () => {
