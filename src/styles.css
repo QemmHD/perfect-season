@@ -7894,7 +7894,8 @@ button.friendcard:active {
 .hg2-hint {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--sab) + 172px);
+  /* up in the stands, under the scoreboard: clear of the man with the ball */
+  top: calc(var(--sat) + 84px);
   transform: translateX(-50%);
   max-width: 86%;
   padding: 7px 14px;
@@ -7906,6 +7907,7 @@ button.friendcard:active {
   pointer-events: none;
 }
 .hg2.wide .hg2-hint {
+  top: auto;
   bottom: calc(var(--sab) + 18px);
 }
 .hg2-pad {
