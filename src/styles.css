@@ -10792,3 +10792,17 @@ button.friendcard:active {
     transition: none;
   }
 }
+/* the pops stack their subtitle under the headline and shrink to fit a narrow phone */
+.hg2-pop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: min(24px, 6.2vw);
+  max-width: calc(100vw - 16px);
+}
+.hg2-pop.big {
+  font-size: min(40px, 10vw);
+}
+.hg2-pop.green {
+  font-size: min(30px, 8vw);
+}
