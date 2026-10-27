@@ -8,6 +8,7 @@ import type { SportId } from '../engine/sport';
 import type { Kit as BasketballKit } from './hoops2/render';
 import { hex, luma, onColor, type RGB, rgb } from './pixel/color';
 import type { CourtTheme } from './pixel/court';
+import type { FieldTheme } from './pixel/field';
 
 export type { BasketballKit };
 
@@ -31,6 +32,8 @@ export interface Kits<K extends Kit = Kit> {
   court: CourtTheme;
   /** the rival changed into his away set */
   rivalAway: boolean;
+  /** football: your end zone behind you, theirs the one you're going for */
+  field: FieldTheme;
 }
 
 const WHITE = '#F4F4F4';
@@ -106,7 +109,13 @@ export function kitsFor(myFav: string | null, rivalFav: string | null, sport: Sp
   const same = me.abbr === them.abbr && me !== HOUSE;
   const clash = same || colorsClash(me.c1, them.c1);
   const rivalAway = clash && (same || colorDistance(me.c1, them.alt) > colorDistance(me.c1, them.c1));
-  return { mine, theirs: rivalAway ? away : home, court: courtOf(them), rivalAway };
+  return { mine, theirs: rivalAway ? away : home, court: courtOf(them), rivalAway, field: fieldOf(me, them) };
+}
+
+/** The end zones: the nickname across each, yours behind your offense. */
+export function fieldOf(me: TeamInfo, them: TeamInfo): FieldTheme {
+  const nick = (t: TeamInfo, fallback: string) => (t.abbr === 'PS' ? fallback : t.name.split(' ').pop() ?? t.abbr);
+  return { homeC1: me.c1, homeC2: me.c2, homeName: nick(me, 'Perfect'), awayC1: them.c1, awayC2: them.c2, awayName: nick(them, 'Rivals') };
 }
 
 /** The AI's favorite for a game, from its seed: any team but yours, so it usually wears its home set. */

@@ -7,22 +7,21 @@ import { NFL } from '../engine/sport';
 import type { BotLevel, Lineup, Player } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { type Attrs, loadAttrs } from './attrs';
-import { aiDrives, Football } from './football/Football';
+import { aiDrives2, Football2 } from './football2/Football2';
 import type { RivalLive } from './progress';
 import { WaitLine } from './Wait';
-import { DRIVES } from './football/drive';
-import { squadOf } from './football/model';
+import { DRIVES } from './football2/drive';
+import { offenseOf } from './football2/squad';
 import { POSSESSIONS } from './hoops2/game';
-import { aiPossessions2, Hoops2 } from './hoops2/Hoops2';
-import { fiveOf } from './hoops/model';
-import { type BasketballKit, type Kits, kitsFor } from './uniforms';
+import { aiPossessions2, fiveOf, Hoops2 } from './hoops2/Hoops2';
+import { type BasketballKit, type FootballKit, type Kits, kitsFor } from './uniforms';
 
 import type { Progress } from './progress';
 
 export type { Progress };
 
 /** what each way a drive or possession can end is worth, and the ones the wire may carry */
-const POINTS: Record<string, number> = NFL ? { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0 } : { '2': 2, '3': 3, A: 3, X: 0, TO: 0 };
+const POINTS: Record<string, number> = NFL ? { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0, PUNT: 0, FUM: 0 } : { '2': 2, '3': 3, A: 3, X: 0, TO: 0 };
 /** drives or possessions each */
 const TOTAL = NFL ? DRIVES : POSSESSIONS;
 const UNIT = NFL ? 'drive' : 'possession';
@@ -82,8 +81,8 @@ export function Arcade({
   /** online: the other phone gave up on this one and let the AI finish its drives from this one on */
   tookMe: number | null;
   autoplay?: boolean;
-  /** basketball: what each side wears, and the court (the rival's) */
-  kits?: Kits<BasketballKit>;
+  /** what each side wears, and the court or the end zones */
+  kits?: Kits;
   onProgress: (p: Progress) => void;
   /** this phone let the AI finish the rival's drives from drive `k` on: tell the other phone */
   onTakeover: (k: number) => void;
@@ -108,7 +107,7 @@ export function Arcade({
   const rivalDef = (rivalLineup.DEF as Player | null) ?? null;
   // the AI's side, played up front (its offense against your defense)
   const aiPlay = (off: Lineup, def: Lineup, s: string, skill: number, a: (p: Player) => Attrs | null): Progress =>
-    NFL ? aiDrives(off, (def.DEF as Player | null) ?? null, s, skill, a) : aiPossessions2(off, def, s, skill, a);
+    NFL ? aiDrives2(off, def, s, skill, a) : aiPossessions2(off, def, s, skill, a);
   const ai = useMemo(() => (!online && attrs ? aiPlay(rivalLineup, lineup, seed, AI_SKILL[botLevel], attrs) : null), [attrs]);
 
   // Online, the AI can finish the other side's drives: when that phone goes quiet, or when you're
@@ -196,7 +195,6 @@ export function Arcade({
 
   if (stage === 'kickoff' && !NFL) {
     const five = attrs ? fiveOf(lineup, attrs) : null;
-    const r = (x: number) => Math.round(x * 99);
     return (
       <div className="arc-kick">
         <span className="eyebrow">Head to head · tip-off</span>
@@ -207,11 +205,11 @@ export function Arcade({
         {five && (
           <div className="arc-roster">
             {five.map((a) => (
-              <span key={a.spot}>
-                <b>{a.spot}</b>
+              <span key={a.id}>
+                <b>{a.pos}</b>
                 <i>{a.name}</i>
                 <small className="num">
-                  3PT {r(a.three)} · FIN {r(a.finish)} · PAS {r(a.pass)}
+                  OVR {a.ovr} · 3PT {a.thr} · DNK {a.ddk}
                 </small>
               </span>
             ))}
@@ -238,7 +236,7 @@ export function Arcade({
     );
   }
   if (stage === 'kickoff') {
-    const sq = attrs ? squadOf(lineup, rivalDef, attrs) : null;
+    const off = attrs ? offenseOf(lineup, attrs, seed) : null;
     return (
       <div className="arc-kick">
         <span className="eyebrow">Head to head · kickoff</span>
@@ -246,22 +244,22 @@ export function Arcade({
         <p>
           {TOTAL} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
         </p>
-        {sq && (
+        {off && (
           <div className="arc-roster">
-            {[sq.qb, sq.rb, sq.wr, sq.te, sq.flex].map((a) => (
-              <span key={a.name}>
-                <b>{a.role === 'FLEX' ? 'FLX' : a.role}</b>
-                <i>{a.player?.name}</i>
+            {[off.qb, off.rb, off.wr[0], off.wr[1], off.te].map((a) => (
+              <span key={a.id}>
+                <b>{a.pos}</b>
+                <i>{a.name}</i>
                 <small className="num">
-                  {a.role === 'QB' ? 'ACC ' + Math.round(a.acc * 99) + ' · ARM ' + Math.round(a.arm * 99) : 'SPD ' + Math.round(((a.speed - 7) / 2.4) * 99) + ' · HND ' + Math.round(a.hands * 99)}
+                  OVR {a.ovr} · {a.pos === 'QB' ? 'THP ' + a.a.THP + ' · ACC ' + Math.round(((a.a.SAC ?? 0) + (a.a.MAC ?? 0) + (a.a.DAC ?? 0)) / 3) : 'SPD ' + a.a.SPD + ' · CTH ' + a.a.CTH}
                 </small>
               </span>
             ))}
           </div>
         )}
         <div className="arc-how">
-          <span>Pass: hold and drag to aim, let go to throw</span>
-          <span>Run: drag to steer, tap to juke</span>
+          <span>Pass: drag back anywhere, let go to throw · the arc shows who it’s going to</span>
+          <span>Run: drag to steer · JUKE, SPIN or POWER at a tackler</span>
         </div>
         {online && rivalLive?.done && (
           <p className="arc-wait">
@@ -303,7 +301,8 @@ export function Arcade({
   }
   if (!NFL) {
     const k = kits ?? kitsFor(null, null, 'nba');
-    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine} theirKit={k.theirs} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
   }
-  return <Football lineup={lineup} rivalDef={rivalDef} rivalName={rivalName} seed={seed} rival={shown} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  const k = kits ?? kitsFor(null, null, 'nfl');
+  return <Football2 lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
 }

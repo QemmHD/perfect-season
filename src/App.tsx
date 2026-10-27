@@ -878,8 +878,8 @@ export function App() {
     const d = run.draft;
     const seed = 'arc:' + (r.online ? r.online.found.matchId : r.id + ':' + lineupKey(d.lineup));
     // each side in its favorite team's colors (the AI picks one from the game's seed)
-    const mine = favoriteFor('nba');
-    const kits = NFL ? undefined : kitsFor(mine, r.online ? (opp?.fav ?? null) : aiFavorite(seed, 'nba', mine), 'nba');
+    const mine = favoriteFor(SPORT);
+    const kits = kitsFor(mine, r.online ? (opp?.fav ?? null) : aiFavorite(seed, SPORT, mine), SPORT);
     viewId = 'arcade:' + run.id;
     enter = 'zoom';
     body = (
