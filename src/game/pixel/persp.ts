@@ -143,21 +143,38 @@ export function fieldTexture(theme: FieldTheme): FieldTex {
 }
 
 /**
- * Draw the ground, the far wall and the sky into `out` (W x H pixels), a row at a time. Returns the
- * row where the wall's top meets the sky, for lights and such.
+ * Draw the ground, the far wall and the sky into `out`, a row at a time, at 1/q of the screen's
+ * resolution (out is ceil(W/q) x ceil(H/q)); the caller scales it up with nearest-neighbour.
  */
-export function drawFloor(c: PCam, tex: FieldTex, out: Uint32Array) {
+export function drawFloor(c: PCam, tex: FieldTex, out: Uint32Array, q = 1) {
   const { W, H, f, ch, cx, cy } = c;
+  const Wq = Math.ceil(W / q);
+  const Hq = Math.ceil(H / q);
   const cs = Math.cos(c.pitch);
   const sn = Math.sin(c.pitch);
   const wallBase = project(c, cx, WALL_Y, 0).y;
   const wallTop = project(c, cx, WALL_Y, WALL_H).y;
   const wallZ = Math.max(0.5, (WALL_Y - cy) * cs + ch * sn);
-  for (let sy = 0; sy < H; sy++) {
-    const row = sy * W;
+  // a run of texels across a row: u the first texel (fractional), du per output pixel
+  const span = (row: number, src: Uint32Array, srcRow: number, w: number, u: number, du: number, wrap: boolean) => {
+    if (wrap) {
+      for (let ox = 0; ox < Wq; ox++, u += du) {
+        const tx = Math.floor(u) % w;
+        out[row + ox] = src[srcRow + (tx < 0 ? tx + w : tx)];
+      }
+      return;
+    }
+    // dark off either side of the texture, a straight copy in between
+    let ox = 0;
+    for (; ox < Wq && u < 0; ox++, u += du) out[row + ox] = tex.dark;
+    for (; ox < Wq && u < w; ox++, u += du) out[row + ox] = src[srcRow + (u | 0)];
+    for (; ox < Wq; ox++) out[row + ox] = tex.dark;
+  };
+  for (let oy = 0; oy < Hq; oy++) {
+    const sy = oy * q + q / 2;
+    const row = oy * Wq;
     if (sy < wallTop) {
-      const v = tex.sky[Math.max(0, Math.min(255, Math.round((sy / Math.max(1, wallTop)) * 255)))];
-      out.fill(v, row, row + W);
+      out.fill(tex.sky[Math.max(0, Math.min(255, Math.round((sy / Math.max(1, wallTop)) * 255)))], row, row + Wq);
       continue;
     }
     if (sy < wallBase) {
@@ -165,36 +182,27 @@ export function drawFloor(c: PCam, tex: FieldTex, out: Uint32Array) {
       const hgt = ((wallBase - sy) / Math.max(1, wallBase - wallTop)) * WALL_H;
       const wy = Math.max(0, Math.min(WALL_H * 4 - 1, Math.floor((WALL_H - hgt) * 4)));
       const step = wallZ / f;
-      for (let sx = 0; sx < W; sx++) {
-        const gx = cx + (sx - W / 2) * step;
-        const wx = ((Math.floor(gx * 4) % tex.wallW) + tex.wallW) % tex.wallW;
-        out[row + sx] = tex.wall[wy * tex.wallW + wx];
-      }
+      span(row, tex.wall, wy * tex.wallW, tex.wallW, (cx + (q / 2 - W / 2) * step) * 4 + tex.wallW * 64, step * q * 4, true);
       continue;
     }
     const b = (c.hy - sy) / f;
     const den = sn - b * cs;
     if (den <= 1e-4) {
-      out.fill(tex.dark, row, row + W);
+      out.fill(tex.dark, row, row + Wq);
       continue;
     }
     const t = ch / den;
     const gy = cy + t * (cs + b * sn);
     const step = t / f;
-    // the nearest level that's still at least a texel a pixel
-    const want = step * 8;
+    // the nearest level that's still about a texel a pixel
+    const want = step * q * 8;
     const L = tex.lv[want < 1.6 ? 0 : want < 3.2 ? 1 : 2];
     const ty = Math.floor((tex.y0 - gy) * L.k);
     if (ty < 0 || ty >= L.h) {
-      out.fill(tex.dark, row, row + W);
+      out.fill(tex.dark, row, row + Wq);
       continue;
     }
-    const tRow = ty * L.w;
-    let gx = cx - (W / 2) * step;
-    for (let sx = 0; sx < W; sx++, gx += step) {
-      const tx = Math.floor((gx - tex.x0) * L.k);
-      out[row + sx] = tx < 0 || tx >= L.w ? tex.dark : L.px[tRow + tx];
-    }
+    span(row, L.px, ty * L.w, L.w, (cx + (q / 2 - W / 2) * step - tex.x0) * L.k, step * q * L.k, false);
   }
 }
 

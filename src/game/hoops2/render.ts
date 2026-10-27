@@ -128,6 +128,9 @@ export class HoopsRenderer {
   private stands!: PixBuf;
   private standsCanvas = document.createElement('canvas');
   private sprites = new Map<string, Sprite>();
+  private last = new Map<string, Sprite>();
+  private budget = 0;
+  private standsTick = -1;
   private looks = new Map<string, Look>();
   private hoopFront = new Map<number, HTMLCanvasElement>();
   private balls: HTMLCanvasElement[] = [];
@@ -157,6 +160,7 @@ export class HoopsRenderer {
     this.stands = new PixBuf(W, Math.max(1, wallOf(this.cam)));
     this.standsCanvas.width = W;
     this.standsCanvas.height = this.stands.h;
+    this.standsTick = -1;
     this.balls = [];
   }
 
@@ -221,17 +225,23 @@ export class HoopsRenderer {
     const px = Math.round((b.p.ht / 12) * this.cam.k);
     const { key, pose } = poseOf(b, t, carrying);
     const k = b.p.id + '|' + b.side + '|' + key + '|' + fb + '|' + px;
+    const who = b.p.id + '|' + b.side;
     let s = this.sprites.get(k);
     if (!s) {
-      let look = this.looks.get(b.p.id + b.side);
+      // a few new drawings a frame (the man with the ball always gets his): the rest keep last frame's
+      const last = this.last.get(who);
+      if (this.budget <= 0 && last && !carrying) return last;
+      this.budget--;
+      let look = this.looks.get(who);
       if (!look) {
         look = lookFor(b, kit);
-        this.looks.set(b.p.id + b.side, look);
+        this.looks.set(who, look);
       }
       s = drawBody(look, { ...pose, lift: 0 }, { facing: (fb / 16) * Math.PI * 2, pitch: this.cam.pitch }, px);
-      if (this.sprites.size > 900) this.sprites.clear();
+      if (this.sprites.size > 3000) this.sprites.clear();
       this.sprites.set(k, s);
     }
+    this.last.set(who, s);
     return s;
   }
 
@@ -254,6 +264,9 @@ export class HoopsRenderer {
 
   /** One frame. `now` is the possession clock; `real` keeps the crowd and ticker moving between plays. */
   draw(ctx: CanvasRenderingContext2D, p: Possession, real: number, fx: Fx) {
+    this.budget = 4;
+    // the net's swish frames, all made up front (the first make would stall on them otherwise)
+    if (!this.hoopFront.size) for (let q = 0; q <= 8; q++) this.rim(q / 8);
     const c = this.cam;
     ctx.imageSmoothingEnabled = false;
     // the camera: upright, it pans across with the ball
@@ -268,9 +281,13 @@ export class HoopsRenderer {
     ctx.save();
     ctx.translate(sx, sy);
     // the stands, then the court (and the hoop standing in front of them)
-    drawStands(this.stands, c, this.theme, fx.crowd, real);
-    const sctx = this.standsCanvas.getContext('2d')!;
-    this.stands.put(sctx);
+    // the crowd moves at 20 frames a second: plenty for a bounce, a third of the work
+    const tick = Math.floor(real * 20);
+    if (tick !== this.standsTick) {
+      this.standsTick = tick;
+      drawStands(this.stands, c, this.theme, fx.crowd, real);
+      this.stands.put(this.standsCanvas.getContext('2d')!);
+    }
     ctx.fillStyle = '#0e121e';
     ctx.fillRect(0, 0, this.W, this.H);
     ctx.drawImage(this.standsCanvas, 0, 0);

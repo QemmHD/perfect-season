@@ -80,11 +80,11 @@ function poseOf(b: Body, t: number, p: Play): { key: string; pose: Pose } {
     case 'run':
     case 'rush': {
       const ph = cycle(1.2 + sp * 1.4, 8);
-      return { key: 'rn' + ph + Math.round(sp * 3), pose: P.run(ph, 0.4 + 0.6 * sp) };
+      return { key: 'rn' + ph + (sp > 0.55 ? 'f' : 's'), pose: P.run(ph, sp > 0.55 ? 1 : 0.6) };
     }
     case 'carry': {
       const ph = cycle(1.2 + sp * 1.4, 8);
-      return { key: 'ca' + ph + Math.round(sp * 3), pose: P.carry(ph, 0.4 + 0.6 * sp) };
+      return { key: 'ca' + ph + (sp > 0.55 ? 'f' : 's'), pose: P.carry(ph, sp > 0.55 ? 1 : 0.6) };
     }
     case 'block': {
       const ph = cycle(1.5, 4);
@@ -152,6 +152,9 @@ export class FootballRenderer {
   private sprites = new Map<string, Sprite>();
   private looks = new Map<string, Look>();
   private follow: Pt | null = null;
+  /** each player's drawing last frame, and how many new drawings this frame may still make */
+  private last = new Map<string, Sprite>();
+  private budget = 0;
   private lens!: Lens;
 
   constructor(
@@ -243,23 +246,33 @@ export class FootballRenderer {
     const moving = Math.hypot(b.vx, b.vy) > 0.6;
     // facing: where he's going, or (set) up the field for the offense, down it for the defense
     const dir = moving ? { x: b.vx, y: b.vy } : b.side === 'O' ? { x: 0, y: 1 } : { x: 0, y: -1 };
-    const fb = Math.round((L.facing(dir.x, dir.y) / (Math.PI * 2)) * 16);
-    const px = Math.max(8, Math.round((b.p.ht / 36) * s));
+    // sizes, angles and (for small, far players) facings in steps, so a player moving up the field
+    // reuses his drawings
+    const raw = Math.max(8, Math.round((b.p.ht / 36) * s));
+    const px = raw > 14 ? raw - (raw % 2) : raw;
+    const dirs = px < 22 ? 8 : 16;
+    const fb = (Math.round((L.facing(dir.x, dir.y) / (Math.PI * 2)) * dirs) + dirs) % dirs;
     // seen from high up close: the rig reads best no steeper than this
-    const pitch = Math.round(Math.min(0.9, L.pitch(b.y)) * 10) / 10;
+    const pitch = Math.round(Math.min(0.9, L.pitch(b.y)) / 0.15) * 0.15;
     const { key, pose } = poseOf(b, t, p);
-    const k = b.p.id + '|' + b.side + '|' + key + '|' + fb + '|' + px + '|' + pitch;
+    const who = b.p.id + '|' + b.side;
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
     let spr = this.sprites.get(k);
     if (!spr) {
-      let look = this.looks.get(b.p.id + b.side);
+      // a few new drawings a frame at most: past that, he keeps his last one a frame longer
+      const last = this.last.get(who);
+      if (this.budget <= 0 && last) return last;
+      this.budget--;
+      let look = this.looks.get(who);
       if (!look) {
         look = lookFor(b, this.kits[b.side === 'O' ? 0 : 1]);
-        this.looks.set(b.p.id + b.side, look);
+        this.looks.set(who, look);
       }
-      spr = drawBody(look, { ...pose, lift: 0 }, { facing: (fb / 16) * Math.PI * 2, pitch }, px);
-      if (this.sprites.size > 2400) this.sprites.clear();
+      spr = drawBody(look, { ...pose, lift: 0 }, { facing: (fb / dirs) * Math.PI * 2, pitch }, px);
+      if (this.sprites.size > 3000) this.sprites.clear();
       this.sprites.set(k, spr);
     }
+    this.last.set(who, spr);
     return spr;
   }
 
@@ -275,17 +288,19 @@ export class FootballRenderer {
       return;
     }
     if (!this.tex) this.tex = fieldTexture(this.theme);
+    // the grass at half resolution, doubled: a quarter of the work, and the pixels still square
+    const q = 2;
     if (!this.floor) {
       const canvas = document.createElement('canvas');
-      canvas.width = this.W;
-      canvas.height = this.H;
-      const img = canvas.getContext('2d')!.createImageData(this.W, this.H);
+      canvas.width = Math.ceil(this.W / q);
+      canvas.height = Math.ceil(this.H / q);
+      const img = canvas.getContext('2d')!.createImageData(canvas.width, canvas.height);
       this.floor = { canvas, img, px: new Uint32Array(img.data.buffer) };
     }
     const fl = this.floor;
-    drawFloor(this.persp!, this.tex, fl.px);
+    drawFloor(this.persp!, this.tex, fl.px, q);
     fl.canvas.getContext('2d')!.putImageData(fl.img, 0, 0);
-    ctx.drawImage(fl.canvas, 0, 0);
+    ctx.drawImage(fl.canvas, 0, 0, fl.canvas.width * q, fl.canvas.height * q);
   }
 
   /** Goal posts at the back of an end zone: yellow, a crossbar at 10 ft, uprights to 35 ft. */
@@ -324,6 +339,7 @@ export class FootballRenderer {
     } else this.persp = this.perspAt(this.follow.x, this.follow.y);
     this.lens = this.makeLens();
     const L = this.lens;
+    this.budget = 4;
     const shx = o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0;
     const shy = o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0;
     ctx.save();
