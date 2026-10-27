@@ -8,7 +8,9 @@
 // defender's, and a tackle is the tackler against the runner's moves, all rolled when they happen.
 // A throw goes exactly where it's aimed: the passer's accuracy is how much of the arc he sees
 // (Retro Bowl's rule), less with a rusher in his face. Short throws are bullets, long ones lobs.
-import type { Act, Body, Call, Concept, Defense, FbPlayer, Job, Offense, Play, PlayEnd, Pt, RunPlay } from './types';
+// On a run the line drives its men away from the play's hole. A tackler winds up before he dives
+// (the runner can see it coming), and a juke as he leaves his feet fakes him out.
+import type { Act, Body, Call, Concept, Defense, FbPlayer, Job, Move, Offense, Play, PlayEnd, Pt, RunPlay } from './types';
 
 export const FIELD_W = 53.33;
 const HASH_L = 23.58;
@@ -29,6 +31,11 @@ export function speedOf(p: FbPlayer): number {
 export const CONCEPTS: Concept[] = ['verts', 'slants', 'smash', 'flood', 'dagger', 'mesh', 'curls', 'posts'];
 export const CONCEPT_NAMES: Record<Concept, string> = { verts: 'Four Verticals', slants: 'Slants', smash: 'Smash', flood: 'Flood', dagger: 'Dagger', mesh: 'Mesh', curls: 'Curl Flats', posts: 'Double Post' };
 export const RUN_NAMES: Record<RunPlay, string> = { inside: 'Inside Zone', outside: 'Outside Zone', power: 'Power' };
+/** where each run's hole is, yards to the right of the ball (toward the tight end): the A gap, off
+ * tackle outside the tight end's block, the edge */
+export const HOLE: Record<RunPlay, number> = { inside: 0.7, power: 3.4, outside: 7.5 };
+/** where the back takes the handoff: deeper and wider the farther out the run goes */
+const MESH: Record<RunPlay, Pt> = { inside: { x: 0.4, y: -3.3 }, power: { x: 0.9, y: -3.4 }, outside: { x: 1.7, y: -3.7 } };
 
 /** Route shapes: waypoints from where the receiver lines up. `s` is his side (+1 right), `i` inward. */
 function routeOf(kind: string, s: number, i: number): { pts: Pt[]; sit?: boolean } {
@@ -77,7 +84,7 @@ const CONCEPT_ROUTES: Record<Concept, [string, string, string, string, string]> 
 };
 
 function body(id: number, side: 'O' | 'D', p: FbPlayer, slot: string, x: number, y: number, job: Job): Body {
-  return { id, side, p, slot, x, y, vx: 0, vy: 0, job, act: 'stance', actAt: 0, route: [], sit: false, mark: null, zone: null, heldUntil: 0, stunUntil: 0, breakAt: Infinity, winAt: Infinity, trail: [] };
+  return { id, side, p, slot, x, y, vx: 0, vy: 0, job, act: 'stance', actAt: 0, route: [], sit: false, mark: null, zone: null, heldUntil: 0, readUntil: 0, misread: false, stunUntil: 0, breakAt: Infinity, winAt: Infinity, windAt: Infinity, diveAt: -Infinity, dive: null, trail: [] };
 }
 
 function act(b: Body, a: Act, t: number) {
@@ -178,6 +185,9 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     caughtAt: null,
     aim: null,
     fire: false,
+    stamina: 1,
+    used: {},
+    hole: bx + HOLE[run],
   };
   // routes (drawn before the snap so the player can read the play)
   const routes = CONCEPT_ROUTES[concept];
@@ -199,12 +209,26 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     }
     rb.route = [];
     rb.job = 'handoff';
-    // the line fires out: linemen tied up from the snap (longer by a good run blocker)
+    // the line fires out: linemen tied up from the snap (longer by a good run blocker), driven away
+    // from the hole; the linebackers read their keys a beat before they flow to the ball
+    // (now and then a lineman beats his man at the snap and is in the backfield; now and then a
+    // linebacker bites the wrong way and opens a cutback)
     dl.forEach((d, i) => {
       const blk = blockerOf[i];
-      d.heldUntil = Math.max(0.5, 1.2 + (rt(blk.p.a.RBK) - rt(d.p.a.BSH)) * 1.4 + rand() * 0.4);
+      const edge = rt(d.p.a.BSH) - rt(blk.p.a.RBK);
+      d.heldUntil = rand() < clamp(0.03 + edge * 0.2, 0.01, 0.1) ? 0.25 + rand() * 0.2 : Math.max(0.7, 1.4 - edge * 0.6 + rand() * 0.4);
+      // his blocker's on him from the snap: once he's off it, it's a while before anyone gets him again
+      blk.heldUntil = d.heldUntil + 1.2;
     });
-    for (const lb of [lbW, lbM, lbS]) lb.heldUntil = lerp(1.0, 0.35, rt(lb.p.a.PRC)) + rand() * 0.3;
+    // the tight end blocks the strong-side linebacker
+    TE.route = [];
+    TE.job = 'block';
+    for (const lb of [lbW, lbM, lbS]) {
+      lb.misread = rand() < lerp(0.3, 0.06, rt(lb.p.a.PRC));
+      lb.readUntil = lerp(0.9, 0.45, rt(lb.p.a.PRC)) + rand() * 0.3 + (lb.misread ? 0.45 : 0);
+    }
+    // the secondary plays the pass until it sees the handoff for what it is
+    for (const db of [cb1, cb2, fs, ss]) db.readUntil = 0.45 + lerp(0.7, 0.25, rt(db.p.a.PRC)) + rand() * 0.25;
   }
   return play;
 }
@@ -329,16 +353,31 @@ export function isLine(b: Body) {
   return b.slot === 'LT' || b.slot === 'LG' || b.slot === 'C' || b.slot === 'RG' || b.slot === 'RT';
 }
 
+/** what each move takes out of the runner, and how fast it comes back (a second's running) */
+const DRAIN: Record<Move, number> = { juke: 0.28, spin: 0.34, stiff: 0.3, truck: 0.36 };
+const STAMINA_BACK = 0.1;
+/** the same move again in a play works this much as well as the last time */
+const REPEAT = 0.6;
+
+/** How long a tackler gathers before he dives: a sharp one tips it off for less time. */
+export function windupOf(b: Body) {
+  return lerp(0.4, 0.24, rt(b.p.a.PRC, 45, 99));
+}
+
 /**
  * A move with the ball: a juke (a cut away from the nearest tackler), a spin, a stiff arm or a
- * truck (lowering the shoulder). Each works by the runner's rating for it.
+ * truck (lowering the shoulder). Each works by the runner's rating for it, less when he's tired
+ * and less each time he makes the same one again.
  */
-export function moveWithBall(p: Play, kind: 'juke' | 'spin' | 'stiff' | 'truck', dir = 0) {
+export function moveWithBall(p: Play, kind: Move, dir = 0) {
   const c = p.carrier;
   if (!c || p.phase !== 'run' || p.t < p.moveReady) return;
   const near = p.bodies.filter((b) => b.side === 'D').sort((a, b) => dist(a, c) - dist(b, c))[0];
   const away = near ? Math.sign(c.x - near.x) || 1 : 1;
-  p.move = { kind, until: p.t + (kind === 'juke' ? 0.32 : kind === 'spin' ? 0.42 : 0.5), dir: dir || away };
+  const eff = (0.35 + 0.65 * p.stamina) * Math.pow(REPEAT, p.used[kind] ?? 0);
+  p.used[kind] = (p.used[kind] ?? 0) + 1;
+  p.stamina = Math.max(0, p.stamina - DRAIN[kind]);
+  p.move = { kind, at: p.t, until: p.t + (kind === 'juke' ? 0.32 : kind === 'spin' ? 0.42 : 0.5), dir: dir || away, eff, x: c.x, y: c.y, vx: c.vx, vy: c.vy };
   p.moveReady = p.t + (kind === 'juke' ? 1 : 1.3);
   act(c, kind === 'juke' ? 'juke' : kind === 'spin' ? 'spin' : kind === 'stiff' ? 'stiff' : 'truck', p.t);
   p.events.push('move:' + kind);
@@ -378,7 +417,7 @@ function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string) {
     text = 'TOUCHDOWN';
   }
   const y = kind === 'td' ? 100 : at.y;
-  p.end = { kind, x: at.x, y, gain: Math.round((y - p.los) * 10) / 10, text, caught: !!p.catcher && kind !== 'int' };
+  p.end = { kind, x: at.x, y, gain: Math.round((y - p.los) * 10) / 10, text, caught: !!p.catcher && kind !== 'int', secs: p.t };
   p.phase = 'dead';
   p.events.push(kind === 'tackle' ? 'tackle' : kind);
 }
@@ -409,10 +448,10 @@ export function step(p: Play, dt: number, steer: number | null) {
   // the handoff
   if (p.call === 'run' && p.carrier === qb) {
     const rb = p.rb;
-    const lane = p.run === 'outside' ? (p.rand() < 0.5 ? -1 : 1) : 0;
-    steerTo(rb, p.bx + 0.4 + lane * 0.6, p.los - 3.3, speedOf(rb.p) * 0.65, dt);
+    const mesh = MESH[p.run];
+    steerTo(rb, p.bx + mesh.x, p.los + mesh.y, speedOf(rb.p) * 0.65, dt);
     steerTo(qb, p.bx - 0.4, p.los - 3.7, 4, dt);
-    if (t > 0.42 && dist(rb, qb) < 1.6) {
+    if (t > 0.42 && dist(rb, qb) < 1.8) {
       p.carrier = rb;
       rb.job = 'carry';
       qb.job = 'idle';
@@ -438,17 +477,20 @@ export function step(p: Play, dt: number, steer: number | null) {
       continue;
     }
     if (b === carrier && p.phase === 'run') {
-      // the runner: upfield, cutting toward the finger; a move is its own burst
-      const sp = speedOf(b.p) * (t < p.slowUntil ? 0.55 : 0.9);
+      // the runner: upfield, cutting toward the finger (on a run, through the hole until he's past
+      // the line, unless the finger says otherwise); a move is its own burst. Tired, he's a step slower.
+      const sp = speedOf(b.p) * (t < p.slowUntil ? 0.55 : 0.9) * lerp(0.9, 1, p.stamina);
       const m = p.move && t < p.move.until ? p.move : null;
+      if (!m) p.stamina = Math.min(1, p.stamina + STAMINA_BACK * dt);
+      const aim = steer ?? (p.call === 'run' && b === p.rb && b.y < p.los + 1 ? p.hole : null);
       if (m?.kind === 'juke') {
-        b.vx = m.dir * sp * 1.15;
+        b.vx = m.dir * sp * (0.8 + 0.35 * m.eff);
         b.vy = sp * 0.45;
       } else if (m?.kind === 'spin') {
         b.vx *= 0.9;
         b.vy = sp * 0.6;
       } else {
-        const wantX = steer === null ? 0 : clamp((steer - b.x) * 2.2, -sp * 0.65, sp * 0.65);
+        const wantX = aim === null ? 0 : clamp((aim - b.x) * 2.2, -sp * 0.65, sp * 0.65);
         const wantY = Math.sqrt(Math.max(0, sp * sp - wantX * wantX)) * (m ? 0.8 : 1);
         b.vx += clamp(wantX - b.vx, -18 * dt, 18 * dt);
         b.vy += clamp(wantY - b.vy, -12 * dt, 12 * dt);
@@ -487,8 +529,11 @@ function offense(p: Play, b: Body, dt: number) {
     return;
   }
   if (b.job === 'block' || (p.phase === 'run' && b !== p.carrier && b.job !== 'handoff')) {
-    // linemen (and, once someone's running, everyone) block the nearest defender in front
-    const target = p.bodies.filter((d) => d.side === 'D' && t >= d.stunUntil && d.y > b.y - 2.5).sort((a1, a2) => dist(a1, b) - dist(a2, b))[0];
+    // linemen (and, once someone's running, everyone) block the nearest defender in front; on a run
+    // the center climbs to the middle linebacker and the tight end takes the strong-side one
+    const climbTo = p.call === 'run' ? (b.slot === 'C' ? 'MLB' : b.slot === 'TE' ? 'SLB' : null) : null;
+    const climb = climbTo ? p.bodies.find((d) => d.slot === climbTo && t >= d.stunUntil) : undefined;
+    const target = climb ?? p.bodies.filter((d) => d.side === 'D' && t >= d.stunUntil && d.y > b.y - 2.5).sort((a1, a2) => dist(a1, b) - dist(a2, b))[0];
     const line = isLine(b);
     if (target) {
       const d = dist(target, b);
@@ -550,15 +595,75 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
   const held = t < b.heldUntil;
   const sp = speedOf(b.p) * (held ? 0.12 : 1);
   if (p.phase === 'run' && carrier) {
-    // everyone to the runner: where he is, led by the way he was heading a beat ago
+    if (held) {
+      // locked up with a blocker: on a run the line drives him off the ball and away from the hole;
+      // otherwise he fights to get off it toward the ball
+      if (p.call === 'run' && b.job === 'rush') steerTo(b, b.x + (Math.sign(b.x - p.hole) || 1) * 1.2, b.y + 0.3, 1.3, dt);
+      else steerTo(b, carrier.x, carrier.y, sp, dt);
+      act(b, 'block', t);
+      move(b, dt);
+      return;
+    }
+    if (b.dive) {
+      // in the air, committed to where he aimed it
+      if (t < b.dive.until) {
+        b.vx = b.dive.vx;
+        b.vy = b.dive.vy;
+        move(b, dt);
+        if (dist(b, carrier) < 1.15) tackle(p, b, carrier);
+        return;
+      }
+      // he dove at air: on the turf (faked out by a move timed against his dive, or just missed)
+      const m = p.move;
+      const faked = m && (m.kind === 'juke' || m.kind === 'spin') && m.at >= b.diveAt - FAKE && m.at <= b.diveAt + 0.15;
+      b.dive = null;
+      b.stunUntil = t + 0.75;
+      b.vx *= 0.3;
+      b.vy *= 0.3;
+      act(b, 'down', t);
+      p.events.push(faked ? 'beat:' + m.kind : 'whiff');
+      move(b, dt);
+      return;
+    }
+    // everyone to the runner (a linebacker reads his keys first, shading to the hole): where he is,
+    // led by the way he was heading a beat ago
+    if (t < b.readUntil) {
+      if (b.slot.endsWith('LB')) steerTo(b, b.misread ? b.x - (p.hole - b.x) * 0.6 : (b.x + p.hole) / 2, b.y, sp * (b.misread ? 0.45 : 0.3), dt);
+      else steerTo(b, b.x, b.y + 1, sp * 0.3, dt);
+      act(b, 'backpedal', t);
+      move(b, dt);
+      return;
+    }
     const v = seenVel(carrier, b);
     const rel = dist(b, carrier);
     const tau = clamp(rel / (sp + 4), 0, 1.1) * lerp(0.7, 1, rt(b.p.a.PUR ?? b.p.a.PRC));
-    const lunge = rel < 2 && !held ? 1.3 : 1;
-    steerTo(b, carrier.x + v.x * tau, carrier.y + v.y * tau, sp * lunge, dt, 18);
-    act(b, held ? 'block' : 'run', t);
+    const winding = b.windAt < Infinity;
+    steerTo(b, carrier.x + v.x * tau, carrier.y + v.y * tau, sp * (winding ? 0.85 : 1), dt, 18);
+    const closing = ((carrier.x - b.x) * (b.vx - carrier.vx) + (carrier.y - b.y) * (b.vy - carrier.vy)) / Math.max(0.3, rel);
+    if (!winding) {
+      // close and closing: he gathers to dive (the runner can see it)
+      if (rel < WIND_R && closing > 1.5 && t > b.stunUntil) {
+        b.windAt = t;
+        act(b, 'windup', t);
+      } else act(b, 'run', t);
+    } else if (rel > WIND_R + 2.5) {
+      b.windAt = Infinity;
+      act(b, 'run', t);
+    } else if (t >= b.windAt + windupOf(b)) {
+      // he dives at where the runner's going; fooled by a juke that's just begun, at where he was going
+      b.windAt = Infinity;
+      const m = p.move && p.move.kind === 'juke' && t - p.move.at < FAKE ? p.move : null;
+      const lead = m ? { x: m.x + m.vx * (t - m.at + 0.2), y: m.y + m.vy * (t - m.at + 0.2) } : { x: carrier.x + carrier.vx * 0.2, y: carrier.y + carrier.vy * 0.2 };
+      const d = Math.max(0.3, dist(b, lead));
+      const ds = lerp(7.5, 9.5, rt(b.p.a.SPD, 40, 99));
+      b.dive = { vx: ((lead.x - b.x) / d) * ds, vy: ((lead.y - b.y) / d) * ds, until: t + Math.min(0.42, d / ds + 0.1) };
+      b.diveAt = t;
+      act(b, 'tackle', t);
+      p.events.push('dive');
+    }
     move(b, dt);
-    if (!held && dist(b, carrier) < 1.15 && t > b.stunUntil) tackle(p, b, carrier);
+    // run right into him: no dive needed
+    if (dist(b, carrier) < 0.8 && t > b.stunUntil) tackle(p, b, carrier);
     return;
   }
   if (p.phase === 'air' && p.ball && t >= b.breakAt) {
@@ -633,9 +738,16 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
   move(b, dt);
 }
 
+/** a tackler starts his wind-up this close to the runner (yards) */
+const WIND_R = 2.6;
+/** a juke this soon before a tackler leaves his feet (seconds) fakes him out */
+const FAKE = 0.3;
+
 function tackle(p: Play, d: Body, c: Body) {
   const r = p.rand;
   const m = p.move && p.t < p.move.until + 0.15 ? p.move : null;
+  d.windAt = Infinity;
+  d.dive = null;
   const help = p.bodies.some((o) => o !== d && o.side === 'D' && p.t >= o.stunUntil && p.t >= o.heldUntil && dist(o, c) < 1.6);
   const tak = rt(d.p.a.TAK, 40, 99);
   const btk = rt(c.p.a.BTK, 40, 99);
@@ -644,7 +756,9 @@ function tackle(p: Play, d: Body, c: Body) {
     // the move against this tackler: a juke against his pursuit, a spin, a stiff arm or a truck against his tackling
     const v = m.kind === 'juke' ? c.p.a.JKM : m.kind === 'spin' ? c.p.a.SPM : m.kind === 'stiff' ? c.p.a.SFA : c.p.a.TRK;
     const vs = m.kind === 'juke' ? (d.p.a.PUR ?? d.p.a.TAK) : m.kind === 'truck' ? Math.max(d.p.a.TAK ?? 60, d.p.a.HIT ?? 60) : d.p.a.TAK;
-    pt -= 0.18 + (rt(v, 40, 99) - rt(vs, 40, 99)) * 0.45;
+    pt -= (0.18 + (rt(v, 40, 99) - rt(vs, 40, 99)) * 0.45) * m.eff;
+    // timed against his dive (a juke or a spin as he leaves his feet): he's grabbing at air
+    if ((m.kind === 'juke' || m.kind === 'spin') && m.at >= d.diveAt - FAKE && m.at <= d.diveAt + 0.15) pt -= (m.kind === 'juke' ? 0.32 : 0.2) * m.eff;
   }
   if (r() < clamp(pt, 0.15, 0.96)) {
     // a big hit can jar it loose

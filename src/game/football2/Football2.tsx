@@ -15,7 +15,7 @@ import type { Progress, RivalLive } from '../progress';
 import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, fourthDown, pilot } from './autopilot';
-import { afterPlay, choices, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type Game, kick, kickWindow, newGame, type PlayChoice, punt, spotText, startChoice, startPlay } from './drive';
+import { afterPlay, choices, clockText, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type Game, kick, kickWindow, newGame, type PlayChoice, punt, spotText, startChoice, startPlay } from './drive';
 import { CONCEPT_NAMES, FIELD_W, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
@@ -34,7 +34,7 @@ const snapOf = (p: Play): Snap => ({ bodies: p.bodies.map((b) => ({ ...b, trail:
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
 
 const DT = 1 / 60;
-const MARK_TEXT: Record<DriveEnd, string> = { TD: 'TD', FG: 'FG', MISS: 'X', INT: 'INT', DOWNS: '–', PUNT: 'P', FUM: 'FUM', SAF: 'SAF' };
+const MARK_TEXT: Record<DriveEnd, string> = { TD: 'TD', FG: 'FG', MISS: 'X', INT: 'INT', DOWNS: '–', PUNT: 'P', FUM: 'FUM', SAF: 'SAF', TIME: '0:00' };
 
 /** Who's open (rings on the receivers while you aim) shows only in a player's first games. */
 const PLAYED_KEY = 'perfect-season:fb2-played';
@@ -147,6 +147,10 @@ export function Football2({
   const [replaying, setReplaying] = useState(false);
   // On Fire (three completions in a row): the chip under the drive marks
   const [fire, setFire] = useState(false);
+  // the two-minute clock on the last drive: written straight into the scoreboard each frame, and
+  // run down to the new time between plays rather than jumping
+  const clockRef = useRef<HTMLElement>(null);
+  const shownClock = useRef<number | null>(null);
 
   const say = (text: string, tone: Tone, ms = 1200, sub?: string) => {
     const id = ++popId.current;
@@ -195,7 +199,7 @@ export function Football2({
     playRef.current = startChoice(game, opts[i].choice);
   };
   const snapNow = () => {
-    if (!game || (ui !== 'pre' && ui !== 'fourth')) return;
+    if (!game || (ui !== 'pre' && ui !== 'fourth') || game.clock === 0) return;
     const p = playRef.current;
     if (!p || p.phase !== 'pre') return;
     sfx.click();
@@ -219,7 +223,10 @@ export function Football2({
         onDone(progress(g));
         return;
       }
-      if (driveOver) say('DRIVE ' + (g.drive + 1) + ' OF ' + g.drives, 'plain', 1100);
+      if (driveOver && g.clock !== null) {
+        say('TWO-MINUTE DRILL', 'big', 1700, 'LAST DRIVE · ' + clockText(g.clock) + ' ON THE CLOCK');
+        tip('clock', 'The clock runs between plays · an incompletion or going out of bounds stops it');
+      } else if (driveOver) say('DRIVE ' + (g.drive + 1) + ' OF ' + g.drives, 'plain', 1100);
       lineUpNext(g);
     }, wait);
   };
@@ -250,6 +257,9 @@ export function Football2({
         shake(kind === 'truck' ? 4 : 2);
         if (kind === 'truck') slowUntil.current = performance.now() + 450;
         say(kind === 'juke' ? 'JUKED!' : kind === 'spin' ? 'SPIN MOVE!' : kind === 'truck' ? 'TRUCKED!' : 'STIFF ARM!', 'big', 900);
+      } else if (e === 'whiff') {
+        sfx.whoosh();
+        crowd.swell(0.4);
       } else if (e === 'break') {
         sfx.hit(0.4);
         crowd.swell(0.5);
@@ -313,6 +323,12 @@ export function Football2({
       say('SAFETY', 'bad', 1700, 'TACKLED IN YOUR END ZONE');
     } else if (e.text.startsWith('BIG HIT')) {
       say('BIG HIT!', 'big', 1500, e.text.slice(4) + ' · ' + gain);
+    } else if (a.driveOver === 'TIME') {
+      sfx.buzzer();
+      say('TIME’S UP', 'bad', 1700, 'OUT OF FIELD GOAL RANGE');
+    } else if (a.timeUp) {
+      sfx.buzzer();
+      say('TIME’S UP', 'plain', 1500, 'ONE LAST KICK · ' + fgDistance(game) + ' YARDS');
     } else if (a.driveOver === 'DOWNS') {
       sfx.groan(0.8);
       say('TURNOVER ON DOWNS', 'bad', 1600, e.kind === 'incomplete' ? e.text : gain);
@@ -417,7 +433,7 @@ export function Football2({
     }, 2650);
   };
   const puntNow = () => {
-    if (!game || ui !== 'fourth') return;
+    if (!game || ui !== 'fourth' || game.clock === 0) return;
     sfx.kick();
     punt(game);
     say('PUNT', 'plain', 1100, 'DRIVE OVER');
@@ -528,6 +544,15 @@ export function Football2({
         }
       } else acc = 0;
       if (p && p.phase !== 'pre' && !replayRef.current) rec.current.push(p.t, snapOf(p));
+      const ck = clockRef.current;
+      if (game.clock !== null && ck) {
+        const want = Math.max(0, game.clock - (p && !p.end && p.phase !== 'pre' && !kickRef.current ? p.t : 0));
+        const was = shownClock.current;
+        const shown = was === null || want > was ? want : Math.max(want, was - 14 * elapsed);
+        shownClock.current = shown;
+        ck.textContent = clockText(shown);
+        ck.classList.toggle('low', shown < 30);
+      } else shownClock.current = null;
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.flash = Math.max(0, fx.flash - elapsed * 1.8);
       const ctx = canvas.getContext('2d')!;
@@ -671,6 +696,11 @@ export function Football2({
             <>
               <b>{downText(g)}</b>
               <small>{spotText(g.ballOn)}</small>
+              {g.clock !== null && (
+                <em ref={clockRef} aria-label="Time left on the last drive">
+                  {clockText(g.clock)}
+                </em>
+              )}
             </>
           ) : (
             <b>FINAL</b>
@@ -719,9 +749,10 @@ export function Football2({
         <div className="fb2-call" onPointerDown={(e) => e.stopPropagation()}>
           {ui === 'fourth' && (
             <span className="fb2-4th">
-              {downText(g)} · {fgOk ? fgDistance(g) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE'}
+              {g.clock === 0 ? 'TIME’S UP · ' + fgDistance(g) + ' YD FIELD GOAL TO FINISH IT' : downText(g) + ' · ' + (fgOk ? fgDistance(g) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE')}
             </span>
           )}
+          {g.clock !== 0 && (
           <div className="fb2-cards" role="radiogroup" aria-label="Pick a play">
             {opts.map((o, i) => (
               <button key={i} className={'fb2-card ' + o.choice.call + (i === picked ? ' on' : '')} role="radio" aria-checked={i === picked} onClick={() => pick(i)}>
@@ -731,16 +762,19 @@ export function Football2({
               </button>
             ))}
           </div>
+          )}
           <div className="fb2-btns">
-            <button className="fb2-go snap" onClick={snapNow}>
-              {ui === 'fourth' ? 'GO FOR IT' : 'SNAP'}
-            </button>
+            {g.clock !== 0 && (
+              <button className="fb2-go snap" onClick={snapNow}>
+                {ui === 'fourth' ? 'GO FOR IT' : 'SNAP'}
+              </button>
+            )}
             {ui === 'fourth' && fgOk && (
               <button className="fb2-go kick" onClick={startKick}>
                 KICK
               </button>
             )}
-            {ui === 'fourth' && (
+            {ui === 'fourth' && g.clock !== 0 && (
               <button className="fb2-go punt" onClick={puntNow}>
                 PUNT
               </button>

@@ -68,6 +68,7 @@ export default function Lab() {
         ourKit={fbKitsFor('#203731', '#ffb612').home}
         theirKit={fbKitsFor('#aa0000', '#b3995d').away}
         field={{ homeC1: '#203731', homeC2: '#ffb612', homeName: 'Packers', awayC1: '#aa0000', awayC2: '#b3995d', awayName: '49ers' }}
+        drives={q.has('drives') ? Number(q.get('drives')) : undefined}
         autoplayHook={q.has('auto')}
         timeScale={Number(q.get('slowmo') ?? 1)}
         onProgress={setProg}

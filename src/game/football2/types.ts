@@ -46,7 +46,9 @@ export interface Pt {
 export type Job = 'block' | 'route' | 'rush' | 'man' | 'zone' | 'spy' | 'carry' | 'pursue' | 'qb' | 'idle' | 'track' | 'handoff';
 
 /** what a body is doing, for the animation */
-export type Act = 'stance' | 'run' | 'block' | 'throw' | 'catch' | 'carry' | 'juke' | 'spin' | 'stiff' | 'truck' | 'tackle' | 'down' | 'rush' | 'backpedal' | 'celebrate' | 'kick';
+export type Act = 'stance' | 'run' | 'block' | 'throw' | 'catch' | 'carry' | 'juke' | 'spin' | 'stiff' | 'truck' | 'windup' | 'tackle' | 'down' | 'rush' | 'backpedal' | 'celebrate' | 'kick';
+
+export type Move = 'juke' | 'spin' | 'stiff' | 'truck';
 
 export interface Body {
   id: number;
@@ -66,11 +68,20 @@ export interface Body {
   mark: number | null;
   /** zone landmark for zone coverage */
   zone: Pt | null;
+  /** locked up with a blocker until then */
   heldUntil: number;
+  /** a linebacker reading the run (his keys) until then, and whether he bit the wrong way */
+  readUntil: number;
+  misread: boolean;
   stunUntil: number;
   breakAt: number;
   /** a pass rusher beats his man then */
   winAt: number;
+  /** a tackler gathering to dive at the runner since then (Infinity when he isn't), when his last
+   * dive left the ground, and the dive in flight (committed: where he aimed it) */
+  windAt: number;
+  diveAt: number;
+  dive: { vx: number; vy: number; until: number } | null;
   trail: Pt[];
 }
 
@@ -96,6 +107,8 @@ export interface PlayEnd {
   text: string;
   /** a completed pass (the On Fire streak counts these) */
   caught: boolean;
+  /** how long the play ran (seconds, for the two-minute clock) */
+  secs: number;
 }
 
 export interface Play {
@@ -114,9 +127,16 @@ export interface Play {
   phase: 'pre' | 'drop' | 'air' | 'run' | 'dead';
   end: PlayEnd | null;
   rand: () => number;
-  /** a move under way (juke, spin, stiff arm, truck) and when the next can start */
-  move: { kind: 'juke' | 'spin' | 'stiff' | 'truck'; until: number; dir: number } | null;
+  /** a move under way (juke, spin, stiff arm, truck): when it started, how well it works (by the
+   * runner's stamina and how often he's used it), where he was and how he was heading as it began */
+  move: { kind: Move; at: number; until: number; dir: number; eff: number; x: number; y: number; vx: number; vy: number } | null;
   moveReady: number;
+  /** the runner's stamina (0-1): moves drain it, it comes back as he runs */
+  stamina: number;
+  /** the moves he's made this play (the same one again works less) */
+  used: Partial<Record<Move, number>>;
+  /** across the field, the hole a run is blocked for */
+  hole: number;
   slowUntil: number;
   /** pressure on the quarterback right now (0-1), for the HUD and the throw */
   pressure: number;

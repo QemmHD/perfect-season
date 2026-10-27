@@ -23,7 +23,7 @@ import type { Progress } from './progress';
 export type { Progress };
 
 /** what each way a drive or possession can end is worth, and the ones the wire may carry */
-const POINTS: Record<string, number> = NFL ? { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0, PUNT: 0, FUM: 0, SAF: 0 } : { '2': 2, '3': 3, A: 3, X: 0, TO: 0 };
+const POINTS: Record<string, number> = NFL ? { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0, PUNT: 0, FUM: 0, SAF: 0, TIME: 0 } : { '2': 2, '3': 3, A: 3, X: 0, TO: 0 };
 /** drives or possessions each */
 const TOTAL = NFL ? DRIVES : POSSESSIONS;
 const UNIT = NFL ? 'drive' : 'possession';

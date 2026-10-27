@@ -8,7 +8,7 @@ import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoin
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import * as P from '../pixel/poses';
 import type { Joints, Pose } from '../pixel/rig';
-import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf } from './engine';
+import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, windupOf } from './engine';
 import type { Body, Play, Pt } from './types';
 
 export interface FbKit {
@@ -238,6 +238,9 @@ function animOf(b: Body, t: number, p: Play, look: Look, m: Memo, aiming: boolea
       const name = speed > 3 ? 'catch_run' : 'catch';
       return clip(name, clipMeta(name).events.catch - 0.06 + since, { step: 1 });
     }
+    case 'windup':
+      // gathering to dive: the crouch before he leaves his feet
+      return has('dive') ? clip('dive', Math.max(0, clipMeta('dive').events.takeoff - 0.3 + Math.min(0.26, since * 0.7))) : pose;
     case 'tackle':
       return clip('dive', DIVE(since));
     case 'down': {
@@ -677,6 +680,33 @@ export class FootballRenderer {
       ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(2, Math.round(rx * Math.sin(L.pitch(lead.y)) * 0.85)), 0, 0, Math.PI * 2);
       ctx.stroke();
     }
+    // a tackler gathering to dive: a ring that tightens and reddens as he's about to go
+    if (p.phase === 'run') {
+      for (const b of p.bodies) {
+        if (b.side !== 'D' || b.windAt === Infinity) continue;
+        const k = Math.min(1, (p.t - b.windAt) / windupOf(b));
+        const f = L.at(b.x, b.y);
+        const rx = Math.max(5, Math.round(f.s * (0.95 - 0.3 * k)));
+        ctx.strokeStyle = 'rgba(255,' + Math.round(170 - 120 * k) + ',40,0.95)';
+        ctx.lineWidth = Math.max(2, Math.round(f.s * 0.14));
+        ctx.beginPath();
+        ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(2, Math.round(rx * Math.sin(L.pitch(b.y)))), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    // the runner's stamina, under him, once a move has cost him some
+    if (p.phase === 'run' && p.carrier && p.stamina < 0.99) {
+      const c = p.carrier;
+      const f = L.at(c.x, c.y);
+      const w = Math.max(16, Math.round(f.s * 1.5));
+      const h = Math.max(3, Math.round(f.s * 0.14));
+      const x = Math.round(f.x - w / 2);
+      const y = Math.round(f.y + Math.max(4, f.s * 0.45));
+      ctx.fillStyle = 'rgba(6,10,8,0.8)';
+      ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+      ctx.fillStyle = p.stamina < 0.25 ? '#ff5a5a' : p.stamina < 0.5 ? '#ffd23a' : '#3ef0c0';
+      ctx.fillRect(x, y, Math.max(1, Math.round(w * p.stamina)), h);
+    }
     // the players, far to near
     const order = [...p.bodies].sort((a, b) => L.near(a.x, a.y) - L.near(b.x, b.y));
     const heads: Record<number, { x: number; y: number }> = {};
@@ -750,12 +780,13 @@ export class FootballRenderer {
     }
     this.particles(ctx, p);
     // names: the receivers before the snap, the man with the ball after
-    const tag = (b: Body, color: string) => {
+    const tag = (b: Body, color: string, text = b.p.tag, up = 14) => {
       const h = heads[b.id];
-      if (h) label(ctx, b.p.tag, h.x, h.y - 14, color, this.W);
+      if (h) label(ctx, text, h.x, h.y - up, color, this.W);
     };
     if (o.routes) for (const b of p.bodies) if (b.side === 'O' && !isLine(b) && b !== p.qb) tag(b, '#ffffff');
     if (p.carrier && p.phase === 'run') tag(p.carrier, '#ffe08a');
+    if (p.phase === 'run') for (const b of p.bodies) if (b.side === 'D' && b.windAt !== Infinity) tag(b, '#ff8a3a', '!', 32);
     ctx.restore();
     if (o.flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + Math.min(0.8, o.flash).toFixed(2) + ')';
@@ -784,7 +815,7 @@ function football(ctx: CanvasRenderingContext2D, x: number, y: number, s: number
 
 const F35: Record<string, string> = {
   A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100', G: '011100101101011', H: '101101111101101', I: '111010010010111', J: '001001001101010', K: '101101110101101', L: '100100100100111', M: '101111111101101', N: '110101101101101', O: '010101101101010', P: '110101110100100', Q: '010101101110011', R: '110101110101101', S: '011100010001110', T: '111010010010010', U: '101101101101111', V: '101101101101010', W: '101101111111101', X: '101101010101101', Y: '101101010010010', Z: '111001010100111',
-  '0': '111101101101111', '1': '010110010010111', '2': '111001111100111', '3': '111001011001111', '4': '101101111001001', '5': '111100111001111', '6': '111100111101111', '7': '111001010010010', '8': '111101111101111', '9': '111101111001111', ' ': '000000000000000', '-': '000000111000000', '.': '000000000000010', "'": '010010000000000',
+  '0': '111101101101111', '1': '010110010010111', '2': '111001111100111', '3': '111001011001111', '4': '101101111001001', '5': '111100111001111', '6': '111100111101111', '7': '111001010010010', '8': '111101111101111', '9': '111101111001111', ' ': '000000000000000', '-': '000000111000000', '.': '000000000000010', "'": '010010000000000', '!': '010010010000010',
 };
 
 /** A name tag: 3x5 letters doubled up, on a dark chip, kept on screen. */
