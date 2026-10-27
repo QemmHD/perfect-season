@@ -17,7 +17,7 @@ import { aimPass, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, st
 import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
-import type { Body, Hooper, Possession, Pt } from './types';
+import type { Body, Hooper, Possession, Pt, Scheme } from './types';
 
 const DT = 1 / 60;
 
@@ -31,6 +31,9 @@ interface Snap {
 }
 const snapOf = (p: Possession): Snap => ({ bodies: p.bodies.map((b) => ({ ...b, trail: [] })), ball: p.ball ? { ...p.ball } : null, handler: p.handler, fire: p.fire, lastShot: p.lastShot });
 const MARK_TEXT: Record<Mark, string> = { '2': '2', '3': '3', A: '3', X: '–', TO: 'TO' };
+/** The defense's looks, and what beats each. */
+const LOOK_TEXT: Record<Scheme, string> = { man: 'MAN-TO-MAN', sag: 'SAGGING OFF', switch: 'SWITCHING', trap: 'TRAPPING' };
+const LOOK_TIP: Record<Scheme, string> = { man: 'beat your man', sag: 'shoot over it', switch: 'attack the mismatch', trap: 'move it early' };
 
 /** The five from a drafted lineup, rated. */
 export function fiveOf(lineup: Lineup, attrs: (p: Player) => Attrs | null): Hooper[] {
@@ -108,9 +111,11 @@ export function Hoops2({
   const [between, setBetween] = useState(true);
   const [, setTick] = useState(0);
   const [pop, setPop] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'big' | 'plain' | 'green' } | null>(null);
+  /** the defense's look this possession, named under the scoreboard */
+  const [look, setLook] = useState<{ scheme: Scheme; trapped: boolean } | null>(null);
   const popId = useRef(0);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [hint, setHint] = useState<string | null>('Stick: move · flick ← → crossover · flick ↓ step-back · flick ↑ spin · hold SHOOT, let go in the green');
+  const [hint, setHint] = useState<string | null>('Stick: move, push it to the edge to sprint · flick ← → crossover · flick ↓ step-back · flick ↑ spin · hold SHOOT, let go in the green');
   const [wide, setWide] = useState(false);
   // instant replay: the last seconds of play, the highlight to show, the replay running
   const rec = useRef(new Recorder<Snap>(5));
@@ -165,7 +170,13 @@ export function Hoops2({
   const handleEvents = (p: Possession) => {
     const fx = fxRef.current;
     for (const e of p.events) {
-      if (e === 'pass') sfx.whoosh();
+      if (e.startsWith('scheme:')) setLook({ scheme: e.slice(7) as Scheme, trapped: false });
+      else if (e.startsWith('trap:')) {
+        setLook({ scheme: 'trap', trapped: true });
+        sfx.squeak();
+        vibrate(12);
+        say('DOUBLE TEAM!', 'plain', 800);
+      } else if (e === 'pass') sfx.whoosh();
       else if (e === 'lob') {
         sfx.whoosh();
         say('LOB!', 'plain', 600);
@@ -296,6 +307,7 @@ export function Hoops2({
     }
     replayRef.current = { frames, t0: frames[0].t, t1: frames[frames.length - 1].t, start: performance.now(), speed: REPLAY_SPEED, focus: { a: hl.cx, b: hl.cz }, done };
     renderer.replay = { cx: hl.cx, cz: hl.cz };
+    renderer.showOdds = false;
     setReplaying(true);
   };
   const endReplay = () => {
@@ -303,6 +315,7 @@ export function Hoops2({
     if (!r) return;
     replayRef.current = null;
     renderer.replay = null;
+    renderer.showOdds = true;
     setReplaying(false);
     r.done();
   };
@@ -532,6 +545,12 @@ export function Hoops2({
               {g.marks[i] ? MARK_TEXT[g.marks[i]] : ''}
             </i>
           ))}
+        </div>
+      )}
+      {look && g && !g.over && (
+        <div key={look.scheme + look.trapped} className={'hg2-look l-' + look.scheme + (look.trapped ? ' on' : '')} role="status">
+          {LOOK_TEXT[look.scheme]}
+          <small>{look.trapped ? 'find the open man' : LOOK_TIP[look.scheme]}</small>
         </div>
       )}
       {pop && (

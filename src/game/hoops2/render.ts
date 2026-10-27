@@ -8,7 +8,7 @@ import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoin
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import * as P from '../pixel/poses';
 import type { Joints, Pose } from '../pixel/rig';
-import { ballPos, contestOf, JUMPER_TOP, RIM, RIM_H } from './engine';
+import { ballPos, contestOf, JUMPER_TOP, RIM, RIM_H, shotChance } from './engine';
 import type { Body, Contest, Possession } from './types';
 
 export interface Kit {
@@ -316,6 +316,8 @@ export class HoopsRenderer {
   private focus = { x: 0, y: 14 };
   /** an instant replay: the spot to look at, and the camera pushed in a little */
   replay: { cx: number; cz: number } | null = null;
+  /** the live shot % under the ball handler and over a pass target (off in replays and the autopilot) */
+  showOdds = true;
   private zoomK = 1;
   /** the last shot meter, kept a moment after the release to show how it went */
   private meterShown: { idx: number; t0: number; top: number; green: number; until: number; frac: number; greened: boolean | null } | null = null;
@@ -636,13 +638,36 @@ export class HoopsRenderer {
         ctx.lineTo(h.x, ty + 7);
         ctx.closePath();
         ctx.fill();
+        // his shot if he catches it and lets it fly
+        if (this.showOdds) {
+          const c = shotChance(p, p.bodies[p.target]);
+          label(ctx, Math.round(c * 100) + '%', h.x, ty - 15, oddsColor(c));
+        }
       }
     }
-    // the handler's name over his head (the contest grade takes its place while he shoots)
+    // the handler's name over his head (the contest grade takes its place while he shoots); at his
+    // feet his sprint's stamina while it isn't full, and his shot % from here
     if (p.handler !== null && !p.ball && !p.meter) {
       const b = p.bodies[p.handler];
       const h = headOf[b.idx];
       if (h) label(ctx, b.p.tag, h.x, h.y - 16, p.fire === b.idx ? '#ffb02e' : '#ffffff');
+      if (!p.finish) {
+        const f = this.at(b.cx, b.cz);
+        let y = Math.round(f.y + Math.max(4, f.s * 0.5));
+        if (b.burst < 0.99 || p.sprinting) {
+          const w = Math.max(22, Math.round(f.s * 2.6));
+          const x0 = Math.round(f.x - w / 2);
+          ctx.fillStyle = 'rgba(8,10,18,0.8)';
+          ctx.fillRect(x0 - 1, y - 1, w + 2, 5);
+          ctx.fillStyle = b.burst < 0.25 ? '#ff6a4a' : p.sprinting ? '#ffd35a' : '#19e3c9';
+          ctx.fillRect(x0, y, Math.round(w * b.burst), 3);
+          y += 7;
+        }
+        if (this.showOdds) {
+          const c = shotChance(p, b);
+          label(ctx, Math.round(c * 100) + '%', f.x, y, oddsColor(c));
+        }
+      }
     }
     ctx.restore();
     // the crowd on its feet: a warm pulse from the stands
@@ -734,6 +759,11 @@ export class HoopsRenderer {
   }
 }
 
+/** The live shot %'s color: green a good look, yellow a fair one, orange a poor one. */
+function oddsColor(c: number): string {
+  return c >= 0.5 ? '#3ef07a' : c >= 0.35 ? '#ffd35a' : '#ff8c5a';
+}
+
 /** a blend of two #rrggbb colors */
 function mixHex(a: string, b: string, k: number): string {
   const ch = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
@@ -760,7 +790,7 @@ function label(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, c
 // a 3x5 font for labels
 const F35: Record<string, string> = {
   A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100', G: '011100101101011', H: '101101111101101', I: '111010010010111', J: '001001001101010', K: '101101110101101', L: '100100100100111', M: '101111111101101', N: '110101101101101', O: '010101101101010', P: '110101110100100', Q: '010101101110011', R: '110101110101101', S: '011100010001110', T: '111010010010010', U: '101101101101111', V: '101101101101010', W: '101101111111101', X: '101101010101101', Y: '101101010010010', Z: '111001010100111',
-  '0': '111101101101111', '1': '010110010010111', '2': '111001111100111', '3': '111001011001111', '4': '101101111001001', '5': '111100111001111', '6': '111100111101111', '7': '111001010010010', '8': '111101111101111', '9': '111101111001111', ' ': '000000000000000', '-': '000000111000000', '.': '000000000000010', "'": '010010000000000', '!': '010010010000010',
+  '0': '111101101101111', '1': '010110010010111', '2': '111001111100111', '3': '111001011001111', '4': '101101111001001', '5': '111100111001111', '6': '111100111101111', '7': '111001010010010', '8': '111101111101111', '9': '111101111001111', ' ': '000000000000000', '-': '000000111000000', '.': '000000000000010', "'": '010010000000000', '!': '010010010000010', '%': '101001010100101',
 };
 
 export function tiny(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, color: string) {

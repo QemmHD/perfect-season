@@ -7821,6 +7821,51 @@ button.friendcard:active {
   background: #5a1420;
   color: #ff8a8a;
 }
+/* the defense's look this possession, under the possession marks */
+.hg2-look {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat) + 70px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(6, 10, 20, 0.72);
+  font-family: var(--display);
+  font-stretch: 75%;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.6px;
+  color: #e8ecf5;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fade-in 0.3s ease both;
+}
+.hg2-look small {
+  font-family: var(--body, inherit);
+  font-style: normal;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--sub);
+}
+.hg2-look.l-trap,
+.hg2-look.l-sag {
+  color: #ffd35a;
+}
+.hg2-look.on {
+  background: rgba(214, 40, 40, 0.85);
+  color: #fff;
+}
+.hg2-look.on small {
+  color: #ffe0e0;
+}
+.hg2.wide .hg2-look {
+  top: calc(var(--sat) + 64px);
+}
 .hg2-marks {
   position: absolute;
   left: 50%;
@@ -7907,8 +7952,8 @@ button.friendcard:active {
 .hg2-hint {
   position: absolute;
   left: 50%;
-  /* up in the stands, under the scoreboard: clear of the man with the ball */
-  top: calc(var(--sat) + 84px);
+  /* up in the stands, under the scoreboard and the defense's look: clear of the man with the ball */
+  top: calc(var(--sat) + 100px);
   transform: translateX(-50%);
   max-width: 86%;
   padding: 7px 14px;

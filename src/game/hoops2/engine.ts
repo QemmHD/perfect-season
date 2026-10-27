@@ -272,6 +272,40 @@ export function shotValue(p: Possession, b: Body, sd: number): { kind: ShotKind;
   return { kind, contest, value: pm * (kind === 'three' ? 3 : 2) };
 }
 
+/** A person's thumb on the release: within about 70 ms of the top either way (the live % assumes it). */
+const THUMB = 0.07;
+
+/**
+ * The live shot %: the chance a shot from here goes in with an ordinary release, as the game shows
+ * it under the ball handler (and over an open teammate when you aim a pass). Near the rim, the
+ * finish he'd get (layup or dunk), the block risk taken off.
+ */
+export function shotChance(p: Possession, b: Body): number {
+  const d = dist(b, RIM);
+  const speed = Math.hypot(b.vx, b.vz);
+  const toward = speed > 0.5 ? (b.vx * (RIM.cx - b.cx) + b.vz * (RIM.cz - b.cz)) / (speed * Math.max(d, 0.01)) : 0;
+  const contest = contestOf(p, b);
+  if (d < 6 || (d < 11 && toward > 0.35 && speed > 6)) {
+    const pp = b.p;
+    let pm: number;
+    if ((pp.ddk >= 68 && speed > 6 && d < 10.5) || (d < 5.5 && pp.sdk >= 72 && speed < 7)) pm = lerp(0.86, 0.97, rate(Math.max(pp.ddk, pp.sdk), 60, 99)) * (contest === 'smothered' ? 0.88 : 1);
+    else {
+      const pGreen = clamp(greenWindow(p, b, 'layup', contest) / THUMB, 0, 1);
+      pm = pGreen + (1 - pGreen) * lerp(0.55, 0.88, rate(pp.lay, 40, 97)) * 0.85 * RIM_MAKE[contest];
+    }
+    const { d: cd, r: cr } = closest(p, b);
+    const block = cr < 3.2 && p.t >= cd.stunUntil ? clamp((cd.p.blk - 50) / 250, 0, 0.3) * ((3.2 - cr) / 3.2) : 0;
+    return clamp(pm * (1 - block), 0.02, 0.99);
+  }
+  const kind = shotKindAt(b);
+  const pGreen = clamp(greenWindow(p, b, kind, contest) / THUMB, 0, 1);
+  const rt = shotRating(b, kind);
+  let base = kind === 'three' ? lerp(0.16, 0.47, rate(rt, 40, 97)) : kind === 'mid' ? lerp(0.24, 0.53, rate(rt, 40, 97)) : lerp(0.32, 0.6, rate(rt, 40, 97));
+  if (kind === 'three' && d > 26) base *= has(b.p, 'limitless') ? 0.92 : lerp(1, 0.5, (d - 26) / 6);
+  const cm = has(b.p, 'deadeye') ? 1 - (1 - CONTEST_MAKE[contest]) * 0.55 : CONTEST_MAKE[contest];
+  return clamp(pGreen + (1 - pGreen) * base * 0.8 * cm, 0.01, 0.99);
+}
+
 /** the chance a normal variable is above z */
 function normTail(z: number): number {
   const t = 1 / (1 + 0.2316419 * Math.abs(z));
