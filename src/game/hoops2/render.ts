@@ -4,10 +4,11 @@
 // the backboard, rim and net, the 2K-style shot meter arched over the shooter and the contest grade.
 import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, hairFor, type Look, type Sprite } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
+import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoints, mocapKey, warp } from '../pixel/mocap';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import * as P from '../pixel/poses';
-import type { Pose } from '../pixel/rig';
-import { ballPos, contestOf, RIM, RIM_H } from './engine';
+import type { Joints, Pose } from '../pixel/rig';
+import { ballPos, contestOf, JUMPER_TOP, RIM, RIM_H } from './engine';
 import type { Body, Contest, Possession } from './types';
 
 export interface Kit {
@@ -48,6 +49,156 @@ function lookFor(b: Body, kit: Kit): Look {
     socks: kit.socks,
     shoes: kit.shoes,
   };
+}
+
+/** The motion-capture clips the court uses (mocap.ts). They load with the renderer; until they're in,
+ * the hand-keyed poses below stand in. */
+const CLIPS = ['jumpshot', 'layup', 'ready', 'jog', 'run', 'sprint', 'shuffle', 'shuffle_l', 'celebrate', 'stumble', 'stumble_m', 'fall_back', 'fall_back_m', 'slip', 'slip_m', 'getup'];
+
+/** The jump shot: its recorded release lands at the top of the meter, so a green is let go at the
+ * height of his jump. */
+const JUMPER = warp(clipMeta('jumpshot'), { release: JUMPER_TOP });
+/** The layup: he leaves the floor and lets it go when the engine says (finish: up at 0.26 s, the
+ * ball off his hand at the top, about 0.31 s later). */
+const LAYUP = warp(clipMeta('layup'), { takeoff: 0.26, release: 0.57 });
+/** Posterized: rocked back by the contact, flat on his back, then up again (quick, athletic: the
+ * recorded get-up at about three times its speed) just as he's back in play (engine: 2.2 s). */
+const POSTERIZED = warp(clipMeta('fall_back'), { impact: 0.3, ground: 0.55 });
+const POSTER_UP = { at: 1.05, from: 0.4, rate: 2.8 };
+/** Ankles broken: his feet go out from under him, then he scrambles up (engine: back in at 1.9 s). */
+const ANKLES = warp(clipMeta('slip'), { impact: 0.42, ground: 0.8 });
+const ANKLES_UP = { at: 0.9, from: 0.47, rate: 3.2 };
+const GETUP_END = 3.63;
+
+/** What a body shows: a recorded clip at a time, or a hand-keyed pose. */
+interface Anim {
+  key: string;
+  pose: Pose;
+  clip?: string;
+  /** clip seconds */
+  ct?: number;
+  /** frame step: 1 is the clip's 30 fps, 2 is 15 */
+  step?: number;
+  /** 'clip': the recorded jump is in the drawing (he's drawn from the floor); 'pin': feet on the floor */
+  ground?: Ground;
+  /** the ball hand dribbling (0 the ball at the floor, 1 in his hand): the run with the ball */
+  dribble?: number;
+}
+
+/** What the drawing remembers of a body between frames: the stride it's in, the last shot or fall
+ * (so a follow-through and a get-up play out after the engine has moved on). */
+interface Memo {
+  gait: { t: number; frac: number };
+  last: { act: 'shoot' | 'layup' | 'fall'; at: number; kind?: 'posterized' | 'ankles' } | null;
+}
+
+const has = (name: string) => !!getClip(name);
+const mirrorOf = (b: Body, name: string) => (b.p.id.length % 2 ? name + '_m' : name);
+
+/** A stride on the run: jog, run or sprint by his speed, played at the rate his feet keep up with
+ * the floor, the phase carried from frame to frame so a change of speed doesn't skip a step. */
+function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { clip: string; ct: number } | null {
+  if (!has('jog') || !has('run') || !has('sprint')) return null;
+  // the clip's ground speed in feet a second on this man's sprite legs
+  const ft = (name: string) => clipMeta(name).root.speed * legScale(look) * (b.p.ht / 12);
+  const options = ['jog', 'run', 'sprint'];
+  let clip = options[0];
+  let best = Infinity;
+  for (const c of options) {
+    const d = Math.abs(Math.log(speed / ft(c)));
+    if (d < best) {
+      best = d;
+      clip = c;
+    }
+  }
+  const rate = Math.max(0.65, Math.min(1.5, speed / ft(clip)));
+  const dt = t - m.gait.t;
+  if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + (dt * rate) / clipMeta(clip).duration) % 1;
+  m.gait.t = t;
+  return { clip, ct: m.gait.frac * clipMeta(clip).duration };
+}
+
+/** What a body is doing right now, as a clip or a pose. */
+function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo): Anim {
+  const pose: Anim = poseOf(b, t, carrying);
+  const speed = Math.hypot(b.vx, b.vz);
+  const clip = (name: string, ct: number, opts: Partial<Anim> = {}): Anim =>
+    has(name) ? { key: '', pose: pose.pose, clip: name, ct, step: 2, ground: 'clip', ...opts } : pose;
+  // remember the moments whose ends play out after the engine moves on
+  if (m.last && t < m.last.at) m.last = null;
+  if (b.act === 'shoot' || b.act === 'layup') m.last = { act: b.act, at: b.actAt };
+  else if (b.act === 'fall') m.last = { act: 'fall', at: b.actAt, kind: b.fallKind };
+  const since = t - b.actAt;
+  // the follow-through and the landing after the ball's gone; the get-up after a fall
+  const tail = m.last && b.act !== m.last.act && (b.act === 'idle' || b.act === 'run' || b.act === 'defend') ? m.last : null;
+  if (tail) {
+    const ts = t - tail.at;
+    if (tail.act === 'shoot' && ts < 1.0 && (ts < 0.8 || speed < 6)) return clip('jumpshot', JUMPER(ts), { step: 1 });
+    if (tail.act === 'layup' && ts < 0.95) return clip('layup', LAYUP(ts), { ground: 'pin' });
+    if (tail.act === 'fall') {
+      const up = tail.kind === 'posterized' ? POSTER_UP : ANKLES_UP;
+      const ct = up.from + (ts - up.at) * up.rate;
+      if (ct < GETUP_END) return clip('getup', ct);
+    }
+  }
+  switch (b.act) {
+    case 'shoot':
+      return clip('jumpshot', JUMPER(since), { step: 1 });
+    case 'layup':
+      return clip('layup', LAYUP(since), { ground: 'pin' });
+    case 'fall': {
+      const up = b.fallKind === 'posterized' ? POSTER_UP : ANKLES_UP;
+      if (since >= up.at) return clip('getup', up.from + (since - up.at) * up.rate);
+      return b.fallKind === 'posterized' ? clip(mirrorOf(b, 'fall_back'), POSTERIZED(since)) : clip(mirrorOf(b, 'slip'), ANKLES(since));
+    }
+    case 'stumble':
+      return clip(mirrorOf(b, 'stumble'), since * 1.3);
+    case 'celebrate':
+      return clip('celebrate', since);
+    case 'run': {
+      const g = speed > 2.5 ? gait(b, t, look, m, speed) : null;
+      return g ? clip(g.clip, g.ct) : clip('ready', t + b.idx * 0.37, { step: 3 });
+    }
+    case 'idle':
+      return clip('ready', t + b.idx * 0.37, { step: 3 });
+    case 'dribble': {
+      // on the move: a real stride, the ball hand pumping with the bounce (the same beat the ball keeps)
+      if (speed <= 1.8) return pose;
+      const g = gait(b, t, look, m, speed);
+      if (!g) return pose;
+      const up = P.dribbleBall((t * (1.5 + speed / 18)) % 1, 1);
+      return clip(g.clip, g.ct, { dribble: Math.round(up * 4) / 4 });
+    }
+    case 'defend': {
+      if (speed <= 3) return pose;
+      // sliding with his man: the defensive shuffle to his right or left; going back or up the
+      // floor, a stride
+      const lat = -b.vx * Math.sin(b.face) + b.vz * Math.cos(b.face);
+      const fwd = b.vx * Math.cos(b.face) + b.vz * Math.sin(b.face);
+      if (Math.abs(lat) > Math.abs(fwd) && has('shuffle')) {
+        const name = lat > 0 ? 'shuffle' : 'shuffle_l';
+        const ft = clipMeta(name).root.speed * legScale(look) * (b.p.ht / 12);
+        const dt = t - m.gait.t;
+        if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + (dt * Math.max(0.7, Math.min(1.6, Math.abs(lat) / ft))) / clipMeta(name).duration) % 1;
+        m.gait.t = t;
+        return clip(name, m.gait.frac * clipMeta(name).duration);
+      }
+      const g = gait(b, t, look, m, speed);
+      return g ? clip(g.clip, g.ct) : pose;
+    }
+    default:
+      return pose;
+  }
+}
+
+/** The ball hand in a dribble on the run: out in front at his side, down with the bounce. */
+function dribbleArm(j: Joints, up: number): Joints {
+  const sh = j.shR;
+  const hy = j.pelvis.y + 0.02 - 0.08 * (1 - up);
+  const hand = { x: sh.x + 0.14, y: hy, z: sh.z + 0.05 };
+  const el = { x: sh.x - 0.03, y: (sh.y + hy) / 2 + 0.03, z: sh.z + 0.08 };
+  const wr = { x: el.x + (hand.x - el.x) * 0.82, y: el.y + (hand.y - el.y) * 0.82, z: el.z + (hand.z - el.z) * 0.82 };
+  return { ...j, elR: el, wrR: wr, handR: hand };
 }
 
 /** The pose and its cache key for what a body is doing right now. */
@@ -148,6 +299,8 @@ export class HoopsRenderer {
   private last = new Map<string, Sprite>();
   private budget = 0;
   private looks = new Map<string, Look>();
+  private memos = new Map<string, Memo>();
+  private lastLift = new Map<string, boolean>();
   private focus = { x: 0, y: 14 };
   /** an instant replay: the spot to look at, and the camera pushed in a little */
   replay: { cx: number; cz: number } | null = null;
@@ -158,7 +311,11 @@ export class HoopsRenderer {
   constructor(
     private theme: CourtTheme,
     private kits: [Kit, Kit]
-  ) {}
+  ) {
+    loadClips(CLIPS).catch(() => {
+      // the hand-keyed poses carry on
+    });
+  }
 
   /** Game pixels are screen pixels: fine pixel art, crisp on any phone. */
   resize(cssW: number, cssH: number) {
@@ -187,7 +344,8 @@ export class HoopsRenderer {
     return project(this.pc, cz, cx, h);
   }
 
-  private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number): Sprite {
+  /** A body's drawing this frame and whether the jump is drawn into it (then he's placed on the floor). */
+  private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number): { spr: Sprite; ownLift: boolean } {
     // facing on screen: the camera looks up the floor (+cx), across is +cz to the right
     const dcx = Math.cos(b.face);
     const dcz = Math.sin(b.face);
@@ -196,26 +354,40 @@ export class HoopsRenderer {
     const dirs = px < 26 ? 8 : 16;
     const fb = (Math.round((Math.atan2(-dcx, dcz) / (Math.PI * 2)) * dirs) + dirs) % dirs;
     const pitch = Math.round(Math.min(0.9, pitchAt(this.pc, b.cx)) / 0.15) * 0.15;
-    const { key, pose } = poseOf(b, t, carrying);
     const who = b.p.id + '|' + b.side;
+    let look = this.looks.get(who);
+    if (!look) {
+      look = lookFor(b, kit);
+      this.looks.set(who, look);
+    }
+    let memo = this.memos.get(who);
+    if (!memo) {
+      memo = { gait: { t, frac: (b.idx * 0.29) % 1 }, last: null };
+      this.memos.set(who, memo);
+    }
+    const an = animOf(b, t, carrying, look, memo);
+    const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, an.step ?? 2) : 0;
+    const key = an.clip ? mocapKey(an.clip, frame, an.ground) + (an.dribble !== undefined ? 'd' + an.dribble : '') : an.key;
+    const ownLift = !!an.clip && an.ground === 'clip';
     const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
     let spr = this.sprites.get(k);
     if (!spr) {
       // a few new drawings a frame (the man with the ball always gets his): the rest keep last frame's
       const last = this.last.get(who);
-      if (this.budget <= 0 && last && !carrying) return last;
+      if (this.budget <= 0 && last && !carrying) return { spr: last, ownLift: this.lastLift.get(who) ?? false };
       this.budget--;
-      let look = this.looks.get(who);
-      if (!look) {
-        look = lookFor(b, kit);
-        this.looks.set(who, look);
-      }
-      spr = drawBody(look, { ...pose, lift: 0 }, { facing: (fb / dirs) * Math.PI * 2, pitch }, px);
+      const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
+      if (an.clip) {
+        let j = mocapJoints(an.clip, frame, look, { ground: an.ground });
+        if (an.dribble !== undefined) j = dribbleArm(j, an.dribble);
+        spr = drawBody(look, j, view, px);
+      } else spr = drawBody(look, { ...an.pose, lift: 0 }, view, px);
       if (this.sprites.size > 3000) this.sprites.clear();
       this.sprites.set(k, spr);
     }
     this.last.set(who, spr);
-    return spr;
+    this.lastLift.set(who, ownLift);
+    return { spr, ownLift };
   }
 
   private drawFloorNow(ctx: CanvasRenderingContext2D) {
@@ -396,8 +568,10 @@ export class HoopsRenderer {
         depth: b.cx,
         draw: () => {
           const carrying = p.handler === b.idx;
-          const f = this.at(b.cx, b.cz, b.h);
-          const s = this.sprite(b, t, carrying, this.kits[b.side === 'O' ? 0 : 1], f.s);
+          const f0 = this.at(b.cx, b.cz, b.h);
+          const { spr: s, ownLift } = this.sprite(b, t, carrying, this.kits[b.side === 'O' ? 0 : 1], f0.s);
+          // a recorded jump is in the drawing itself: then he stands on the floor spot
+          const f = ownLift ? this.at(b.cx, b.cz) : f0;
           const x = Math.round(f.x - s.ax);
           const y = Math.round(f.y - s.ay);
           ctx.drawImage(s.canvas, x, y);

@@ -265,12 +265,12 @@ export function pressShoot(p: Possession) {
     p.finish = { kind, t0: p.t, tUp: p.t + (kind === 'standdunk' ? 0.2 : 0.26), target: inWay ? def.idx : null };
     act(b, kind === 'layup' ? 'layup' : kind === 'contact' ? 'contact' : kind === 'standdunk' ? 'standdunk' : 'dunk', p.t);
     p.events.push('gather:' + kind);
-    if (kind === 'layup') p.meter = { t0: p.t, top: 0.42, green: greenWindow(p, b, 'layup', contestOf(p, b)), kind: 'layup' };
+    if (kind === 'layup') p.meter = { t0: p.t, top: LAYUP_TOP, green: greenWindow(p, b, 'layup', contestOf(p, b)), kind: 'layup' };
     return;
   }
   const kind = shotKindAt(b);
   const contest = contestOf(p, b);
-  p.meter = { t0: p.t, top: 0.52, green: greenWindow(p, b, kind, contest), kind };
+  p.meter = { t0: p.t, top: JUMPER_TOP, green: greenWindow(p, b, kind, contest), kind };
   act(b, 'shoot', p.t);
   b.vh = 12.5;
   b.h = 0.01;
@@ -285,6 +285,11 @@ export function pressShoot(p: Possession) {
     cd.h = 0.01;
   }
 }
+
+/** The top of a jump shot's meter (seconds after SHOOT): the green, and where the drawing puts
+ * the release at the height of his jump. A layup's comes sooner. */
+export const JUMPER_TOP = 0.52;
+export const LAYUP_TOP = 0.42;
 
 /** SHOOT let go: the jump shot (or layup) leaves his hands, timed against the green window. */
 export function releaseShoot(p: Possession) {
@@ -382,8 +387,9 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
     const away = unit({ cx: cd.cx - b.cx, cz: cd.cz - b.cz });
     cd.vx = away.cx * 9;
     cd.vz = away.cz * 9;
-    cd.stunUntil = p.t + 1.9;
+    cd.stunUntil = p.t + 2.2;
     act(cd, 'fall', p.t);
+    cd.fallKind = 'posterized';
     p.events.push('posterized:' + cd.idx);
   }
   p.handler = null;
@@ -472,8 +478,9 @@ export function crossover(p: Possession, dir: number) {
   const shake = clamp(0.12 + edge * 0.7 + (has(h.p, 'ankle-breaker') ? 0.1 : 0) - (has(def.p, 'clamps') ? 0.1 : 0), 0.04, 0.5);
   if (r() < shake) {
     const dropped = has(h.p, 'ankle-breaker') && r() < 0.22;
-    def.stunUntil = p.t + (dropped ? 1.5 : 0.85);
+    def.stunUntil = p.t + (dropped ? 1.9 : 0.85);
     act(def, dropped ? 'fall' : 'stumble', p.t);
+    if (dropped) def.fallKind = 'ankles';
     p.events.push(dropped ? 'ankles:' + def.idx : 'shook:' + def.idx);
   } else if (r() < clamp(0.03 + (def.p.stl - h.p.hnd) / 400, 0.01, 0.1)) {
     end(p, 'steal', 0, 'STRIPPED BY ' + def.p.tag, h.idx);
@@ -494,8 +501,9 @@ function shakeMan(p: Possession, h: Body, bonus: number) {
   const shake = clamp(0.1 + bonus + edge * 0.7 + (has(h.p, 'ankle-breaker') ? 0.1 : 0) - (has(def.p, 'clamps') ? 0.1 : 0), 0.04, 0.55);
   if (r() < shake) {
     const dropped = has(h.p, 'ankle-breaker') && r() < 0.22;
-    def.stunUntil = p.t + (dropped ? 1.5 : 0.85);
+    def.stunUntil = p.t + (dropped ? 1.9 : 0.85);
     act(def, dropped ? 'fall' : 'stumble', p.t);
+    if (dropped) def.fallKind = 'ankles';
     p.events.push(dropped ? 'ankles:' + def.idx : 'shook:' + def.idx);
   } else if (r() < clamp(0.03 + (def.p.stl - h.p.hnd) / 400, 0.01, 0.1)) {
     end(p, 'steal', 0, 'STRIPPED BY ' + def.p.tag, h.idx);

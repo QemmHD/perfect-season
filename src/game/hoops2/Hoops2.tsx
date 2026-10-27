@@ -63,6 +63,7 @@ export function Hoops2({
   theirKit,
   court,
   autoplayHook,
+  timeScale = 1,
   onProgress,
   onDone,
 }: {
@@ -82,6 +83,8 @@ export function Hoops2({
   /** the home court: the defending team's colors and letters */
   court: CourtTheme;
   autoplayHook?: boolean;
+  /** the lab's slow motion, for filming the moves frame by frame (1 in the app) */
+  timeScale?: number;
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
 }) {
@@ -320,7 +323,7 @@ export function Hoops2({
       const p = possRef.current;
       const real = now / 1000;
       const fx = fxRef.current;
-      const elapsed = Math.min(0.1, (now - last) / 1000);
+      const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
       // the posterizer in slow motion
       acc += now < slowUntil.current ? elapsed * 0.35 : elapsed;

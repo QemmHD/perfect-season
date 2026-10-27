@@ -95,6 +95,8 @@ export interface Body {
   stunUntil: number;
   /** bumped in the air (an and-one): he stumbles when he lands */
   bumped?: boolean;
+  /** how his last fall went down: knocked flat by a dunk, or his ankles gone (for the drawing) */
+  fallKind?: 'posterized' | 'ankles';
   /** 0-1, drains as he plays */
   energy: number;
   trail: Pt[];

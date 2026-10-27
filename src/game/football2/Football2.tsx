@@ -77,6 +77,7 @@ export function Football2({
   theirKit,
   field,
   autoplayHook,
+  timeScale = 1,
   onProgress,
   onDone,
 }: {
@@ -96,6 +97,8 @@ export function Football2({
   field: FieldTheme;
   /** tests: let the autopilot play */
   autoplayHook?: boolean;
+  /** the lab's slow motion, for filming the moves frame by frame (1 in the app) */
+  timeScale?: number;
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
 }) {
@@ -471,7 +474,7 @@ export function Football2({
       }
       const p = playRef.current;
       const fx = fxRef.current;
-      const elapsed = Math.min(0.1, (now - last) / 1000);
+      const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
       acc += now < slowUntil.current ? elapsed * 0.4 : elapsed;
       if (p && p.end) {

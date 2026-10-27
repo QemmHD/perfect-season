@@ -50,6 +50,7 @@ export default function Lab() {
           theirKit={kitsFor('#ce1141', '#000000').away}
           court={{ c1: '#ce1141', c2: '#ffffff', abbr: 'CHI' }}
           autoplayHook={q.has('auto')}
+          timeScale={Number(q.get('slowmo') ?? 1)}
           onProgress={setProg}
           onDone={setProg}
         />
@@ -68,6 +69,7 @@ export default function Lab() {
         theirKit={fbKitsFor('#aa0000', '#b3995d').away}
         field={{ homeC1: '#203731', homeC2: '#ffb612', homeName: 'Packers', awayC1: '#aa0000', awayC2: '#b3995d', awayName: '49ers' }}
         autoplayHook={q.has('auto')}
+        timeScale={Number(q.get('slowmo') ?? 1)}
         onProgress={setProg}
         onDone={setProg}
       />
