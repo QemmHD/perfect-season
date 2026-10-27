@@ -1,15 +1,23 @@
-// The club: every card you own. Filter by position, tier, team and decade; sort by overall, newest
-// or position; tap one for its details (and to quick-sell it).
+// The club: every card you own. Filter by position, tier, team and decade; sort by overall, newest,
+// position or any rating (speed, three-point shot, dunk...); tap one for its details (and to
+// quick-sell it).
 import React, { useMemo, useState } from 'react';
 import { SPORT } from '../engine/sport';
 import { Confirm } from '../ui/common';
 import { UtCard } from './CardArt';
 import { quickSellValue } from './packs';
+import { NFL_KEYS } from '../game/football2/ratings';
 import { byValue, decadeOf } from './pool';
+import { attrName, NBA_ATTRS } from './rate';
 import { POSITIONS } from './squad';
 import type { ClubCard } from './UltimateTeam';
 
-type Sort = 'ovr' | 'new' | 'pos';
+/** Overall, newest, position, or a rating's code ('SPD', '3PT', ...). */
+type Sort = string;
+
+/** The ratings to sort by, speed first. */
+const SORT_ATTRS: string[] =
+  SPORT === 'nba' ? NBA_ATTRS.map(([c]) => c) : Array.from(new Set(['SPD', 'ACC', ...Object.values(NFL_KEYS).flatMap((ks) => ks.map(([c]) => c))]));
 type TierF = 'all' | 'bronze' | 'silver' | 'gold' | 'special';
 
 /** The filters stay as they were for the rest of the visit. */
@@ -40,7 +48,9 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
     );
     if (f.sort === 'new') out.sort((a, b) => b.oc.at - a.oc.at);
     else if (f.sort === 'pos') out.sort((a, b) => posOrder.indexOf(a.rc.line.pos[0]) - posOrder.indexOf(b.rc.line.pos[0]) || byValue(a.rc, b.rc));
-    else out.sort((a, b) => byValue(a.rc, b.rc) || b.oc.at - a.oc.at);
+    else if (f.sort === 'ovr' || !SORT_ATTRS.includes(f.sort)) out.sort((a, b) => byValue(a.rc, b.rc) || b.oc.at - a.oc.at);
+    // a rating, best first (cards without it, like a lineman's throw power, go last)
+    else out.sort((a, b) => (b.rc.attrs[f.sort] ?? -1) - (a.rc.attrs[f.sort] ?? -1) || byValue(a.rc, b.rc));
     return out;
   }, [club, f]);
   // spare copies: a second card of the same player-season, not in the squad (the better level stays)
@@ -54,6 +64,7 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
     return spare;
   }, [club]);
   const dupeCoins = dupes.reduce((a, c) => a + quickSellValue(c.rc), 0);
+  const byAttr = SORT_ATTRS.includes(f.sort);
   const filtered = f.pos !== 'all' || f.tier !== 'all' || f.team !== 'all' || f.dec !== 'all';
 
   return (
@@ -96,13 +107,21 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
               ))}
             </select>
           </label>
-          <span className="seg ut-sort" role="group" aria-label="Sort">
-            {(['ovr', 'new', 'pos'] as Sort[]).map((s) => (
-              <button key={s} className={f.sort === s ? 'on' : ''} aria-pressed={f.sort === s} onClick={() => set({ sort: s })}>
-                {s === 'ovr' ? 'OVR' : s === 'new' ? 'NEW' : 'POS'}
-              </button>
-            ))}
-          </span>
+          <label className="ut-select">
+            <span className="eyebrow">Sort</span>
+            <select value={f.sort} onChange={(e) => set({ sort: e.target.value })}>
+              <option value="ovr">Overall</option>
+              <option value="new">Newest</option>
+              <option value="pos">Position</option>
+              <optgroup label="Ratings">
+                {SORT_ATTRS.map((c) => (
+                  <option key={c} value={c}>
+                    {attrName(c)}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
         </div>
       </div>
       <div className="ut-club-head">
@@ -126,6 +145,11 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
           {list.map((c) => (
             <button key={c.uid} className="ut-gridcard" onClick={() => onInspect(c.uid)} aria-label={c.rc.line.name + ', ' + c.rc.ovr + (c.slot ? ', in your squad at ' + c.slot : '')}>
               <UtCard rc={c.rc} w={80} level={c.oc.level} />
+              {byAttr && c.rc.attrs[f.sort] !== undefined && (
+                <i className="ut-attrtag num">
+                  {f.sort} {c.rc.attrs[f.sort]}
+                </i>
+              )}
               {c.slot && <i className="ut-insquad">{c.slot}</i>}
             </button>
           ))}

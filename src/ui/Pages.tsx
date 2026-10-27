@@ -7,6 +7,7 @@ import { NFL, type SportId } from '../engine/sport';
 import { type Booster, BOOSTERS, type BotLevel, type Mode } from '../engine/types';
 import { bestRuns, type Profile, type RunRecord } from '../lib/profile';
 import { sfx } from '../lib/sound';
+import { clearErrors, loggedErrors } from '../lib/errlog';
 import { APP_VERSION } from '../lib/update';
 import { useLayout, viewportInfo } from '../stage';
 import type { OnlineCount } from '../net/match';
@@ -478,6 +479,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
 
 export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' | 'haptics' | 'hints', v: boolean) => void; onReset: () => void; onClose: () => void; source: string; latest: number }) {
   const [confirm, setConfirm] = useState(false);
+  const [errs, setErrs] = useState(loggedErrors);
   const row = (k: 'sound' | 'haptics' | 'hints', label: string) => (
     <div className="toggle">
       <span>{label}</span>
@@ -516,6 +518,20 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
           <p className="note num">
             Version {APP_VERSION} · {viewportInfo()}
           </p>
+          {errs.length > 0 && (
+            <div className="errlog">
+              <span className="eyebrow">Problems on this phone</span>
+              {errs.map((e, i) => (
+                <p key={i} className="note num">
+                  {new Date(e.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {e.where}
+                  {e.n > 1 ? ' ×' + e.n : ''} · {e.msg} · {e.v}
+                </p>
+              ))}
+              <button className="ut-link" onClick={() => (clearErrors(), setErrs([]))}>
+                CLEAR
+              </button>
+            </div>
+          )}
           <button className="btn primary" onClick={() => close()}>
             DONE
           </button>

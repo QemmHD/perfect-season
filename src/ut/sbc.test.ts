@@ -2,7 +2,7 @@
 import { SPORT } from '../engine/sport';
 import { fakeCard } from './fake.test-util';
 import { getPool, type Pool } from './pool';
-import { autoFill, checkReq, checkSbc, type Req, rewardCard, rewardText, type Sbc, sbcsFor, weekOf } from './sbc';
+import { autoFill, checkReq, checkSbc, type Req, rewardCard, rewardText, type Sbc, sbcsFor, teamNeed, weekOf } from './sbc';
 
 const bulls96 = (n: number, ovr = 80) => Array.from({ length: n }, (_, i) => fakeCard({ pos: ['PG', 'SG', 'SF', 'PF', 'C'][i % 5], ovr, fr: 'CHI', season: 1996 }));
 
@@ -118,6 +118,14 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     expect(ids.size).toBe(12);
     expect(rewardText(s.reward, SPORT, () => 'Pack')).toMatch(/Gold card/);
     expect(rewardText({ card: { tier: 'gold' } }, SPORT, () => 'Pack')).toBe('a Gold card');
+  });
+
+  it('says what the empty spots need to average for the team overall', () => {
+    expect(teamNeed([], 8, 83)).toEqual({ now: 0, need: 83 });
+    // 412 in five: three 83s make 661 (82.6, rounds to 83); three 82s only 658 (82.25)
+    expect(teamNeed([85, 85, 80, 80, 82], 8, 83)).toEqual({ now: 82, need: 83 });
+    expect(teamNeed([60, 60, 60, 60, 60, 60, 60], 8, 83).need).toBeGreaterThan(99);
+    expect(teamNeed([83, 83, 83, 83, 83, 83, 83, 83], 8, 83)).toEqual({ now: 83, need: null });
   });
 
   it('pays packs and cards, not coins', () => {

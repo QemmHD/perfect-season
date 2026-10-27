@@ -5,6 +5,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
+import { logError } from '../../lib/errlog';
 import { crowd, sfx, vibrate } from '../../lib/sound';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
@@ -323,6 +324,35 @@ export function Hoops2({
     r.done();
   };
 
+  /**
+   * A play the game can't go on with (it shouldn't happen) mustn't freeze the game: it ends as a dead
+   * ball and the next one starts. Kept on the phone for Settings to show.
+   */
+  const rescued = useRef<Possession | null>(null);
+  const rescue = (p: Possession, e: unknown) => {
+    console.error('[play]', e);
+    logError('hoops play', e);
+    if (!game || rescued.current === p) return;
+    rescued.current = p;
+    if (!p.end) {
+      p.end = { kind: 'out', points: 0, text: 'DEAD BALL', who: p.handler ?? 0 };
+      try {
+        finish(p);
+        return;
+      } catch (e2) {
+        logError('hoops finish', e2);
+      }
+    }
+    // the finish itself broke: straight on to the next play (or the result)
+    window.setTimeout(() => {
+      if (!game.over) next(game);
+      else {
+        onDone(progress(game));
+        setTick((n) => n + 1);
+      }
+    }, 1200);
+  };
+
   // the loop: fixed steps for the game, a draw every frame
   useEffect(() => {
     if (!game) return;
@@ -373,17 +403,21 @@ export function Hoops2({
         }
         acc = 0;
       } else if (p) {
-        while (acc >= DT) {
-          acc -= DT;
-          if (p.end) break;
-          if (p.handler !== null && !p.ball && !p.meter && !p.finish) p.target = aimPass(p, stickOnCourt());
-          const stick = autoplayHook ? decide(p, pilotRef.current) : stickOnCourt();
-          step(p, DT, stick);
-          handleEvents(p);
-          if (p.end) {
-            finish(p);
-            break;
+        try {
+          while (acc >= DT) {
+            acc -= DT;
+            if (p.end) break;
+            if (p.handler !== null && !p.ball && !p.meter && !p.finish) p.target = aimPass(p, stickOnCourt());
+            const stick = autoplayHook ? decide(p, pilotRef.current) : stickOnCourt();
+            step(p, DT, stick);
+            handleEvents(p);
+            if (p.end) {
+              finish(p);
+              break;
+            }
           }
+        } catch (e) {
+          rescue(p, e);
         }
       } else acc = 0;
       if (p && !replayRef.current) {
@@ -415,6 +449,7 @@ export function Hoops2({
         } else if (p) renderer.draw(ctx, p, real, fx);
       } catch (e) {
         console.error('[draw]', e);
+        logError('hoops draw', e);
         renderer.dispose();
         ctx.restore();
         ctx.setTransform(1, 0, 0, 1, 0, 0);

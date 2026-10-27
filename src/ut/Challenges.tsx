@@ -1,5 +1,5 @@
-// Squad Building Challenges: today's three and this week's two. Put cards in, watch each
-// requirement tick as you go, and trade them in for the reward.
+// Squad Building Challenges: the day's, the week's and the repeatables. Put cards in, watch each
+// requirement tick and the team overall move as you go, and trade them in for the reward.
 import React, { useEffect, useMemo, useState } from 'react';
 import { SPORT } from '../engine/sport';
 import { sfx } from '../lib/sound';
@@ -8,7 +8,8 @@ import { UtCard } from './CardArt';
 import { IconCheck, IconWand, IconX } from './icons';
 import { packName, quickSellValue } from './packs';
 import { type Pool, seasonText } from './pool';
-import { autoFill, cardFits, checkSbc, type Req, rewardText, type Sbc } from './sbc';
+import { autoFill, cardFits, checkSbc, type Req, rewardText, type Sbc, teamNeed } from './sbc';
+import { playsIn } from './squad';
 import type { ClubCard } from './UltimateTeam';
 
 /** Time left until midnight Eastern, or until the end of the week (Sunday night). */
@@ -123,11 +124,15 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
   const cards = picked.map((u) => (u ? byUid.get(u) : undefined)).filter((c): c is ClubCard => !!c);
   const check = checkSbc(s, cards.map((c) => c.rc));
   const fromSquad = cards.filter((c) => c.slot).length;
+  const teamReq = s.reqs.find((r) => r.k === 'teamOvr') as { ovr: number } | undefined;
+  const team = teamNeed(cards.map((c) => c.rc.ovr), s.size, teamReq?.ovr ?? 0);
+  const left = s.size - cards.length;
   const fill = () => {
-    const got = autoFill(s, club);
+    // never the cards that play: the starters and the first three off the bench (a football squad's all of them)
+    const got = autoFill(s, club.filter((c) => !playsIn(SPORT, c.slot)));
     if (!got) {
       sfx.nope();
-      onToast('Your club doesn’t have cards that meet all of this yet.');
+      onToast('Not enough cards outside your ' + (SPORT === 'nba' ? 'starters and first three off the bench' : 'squad') + ' meet all of this yet.');
       return;
     }
     sfx.select();
@@ -139,9 +144,16 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
         {(close) => (
           <div className="ut-sbcsheet">
             <div className="ut-sbcsheet-head">
-              <span className="eyebrow">{s.kind === 'daily' ? 'Daily challenge' : s.kind === 'weekly' ? 'Weekly challenge' : s.left ? 'Upgrade · ' + s.left + ' left today' : 'Repeatable · as often as you like'}</span>
-              <h2 className="disp">{s.title}</h2>
-              <small>Reward: {rewardText(s.reward, SPORT, packName)}</small>
+              <div className="ut-sbcsheet-title">
+                <span className="eyebrow">{s.kind === 'daily' ? 'Daily challenge' : s.kind === 'weekly' ? 'Weekly challenge' : s.left ? 'Upgrade · ' + s.left + ' left today' : 'Repeatable · as often as you like'}</span>
+                <h2 className="disp">{s.title}</h2>
+                <small>Reward: {rewardText(s.reward, SPORT, packName)}</small>
+              </div>
+              <span className={'ut-sbc-rating' + (teamReq && cards.length ? (team.now >= teamReq.ovr ? ' ok' : ' low') : '')} aria-label={'Team overall ' + (cards.length ? team.now : 'none yet') + (teamReq ? ', needs ' + teamReq.ovr : '')}>
+                <i className="eyebrow">Team</i>
+                <b className="num">{cards.length ? team.now : '—'}</b>
+                {teamReq && <small className="num">of {teamReq.ovr}</small>}
+              </span>
             </div>
             <div className="ut-reqs">
               {check.reqs.map((r, i) => (
@@ -158,6 +170,13 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
                   {cards.length}/{s.size}
                 </b>
               </span>
+              {teamReq && left > 0 && team.need !== null && (
+                <p className={'ut-need' + (team.need > 99 ? ' bad' : '')}>
+                  {team.need > 99
+                    ? 'Too low to reach ' + teamReq.ovr + ' from here: swap one for a better card.'
+                    : (left === 1 ? 'The last card needs to be ' : 'The ' + left + ' left need to average ') + team.need + '+ for a team ' + teamReq.ovr + '.'}
+                </p>
+              )}
             </div>
             <div className="ut-sbc-slots" style={{ gridTemplateColumns: 'repeat(' + Math.min(s.size, 4) + ', 72px)' }}>
               {picked.map((u, i) => {
@@ -190,6 +209,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
           club={club}
           taken={picked.filter((u, i) => u && i !== slotAt) as string[]}
           current={picked[slotAt]}
+          teamOvr={teamReq?.ovr}
           onPick={(uid) => {
             setPicked((p) => p.map((x, i) => (i === slotAt ? uid : x)));
             setSlotAt(null);
@@ -215,9 +235,13 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
   );
 }
 
-function SbcPicker({ s, club, taken, current, onPick, onClose }: { s: Sbc; club: ClubCard[]; taken: string[]; current: string | null; onPick: (uid: string | null) => void; onClose: () => void }) {
+function SbcPicker({ s, club, taken, current, teamOvr, onPick, onClose }: { s: Sbc; club: ClubCard[]; taken: string[]; current: string | null; teamOvr?: number; onPick: (uid: string | null) => void; onClose: () => void }) {
   const [fits, setFits] = useState(true);
-  const takenPids = new Set(taken.map((u) => club.find((c) => c.uid === u)?.rc.line.pid));
+  const takenCards = taken.map((u) => club.find((c) => c.uid === u)).filter((c): c is ClubCard => !!c);
+  const takenPids = new Set(takenCards.map((c) => c.rc.line.pid));
+  // the team overall with this card in
+  const sum = takenCards.reduce((a, c) => a + c.rc.ovr, 0);
+  const withIt = (c: ClubCard) => Math.round((sum + c.rc.ovr) / (takenCards.length + 1));
   const list = club
     .filter((c) => !taken.includes(c.uid) && !takenPids.has(c.rc.line.pid))
     .filter((c) => !fits || s.reqs.every((r) => cardFits(r, c.rc, s.size)))
@@ -255,7 +279,7 @@ function SbcPicker({ s, club, taken, current, onPick, onClose }: { s: Sbc; club:
                   </span>
                   <span className="ut-pickrow-nums">
                     <b className="num">{c.rc.ovr}</b>
-                    <small className="num">{quickSellValue(c.rc)}c</small>
+                    {teamOvr !== undefined ? <small className={'num ' + (withIt(c) >= teamOvr ? 'up' : 'down')}>team {withIt(c)}</small> : <small className="num">{quickSellValue(c.rc)}c</small>}
                   </span>
                 </button>
               ))}

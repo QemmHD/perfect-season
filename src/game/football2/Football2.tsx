@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
+import { logError } from '../../lib/errlog';
 import { crowd, sfx, vibrate } from '../../lib/sound';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
@@ -578,6 +579,7 @@ export function Football2({
         } else if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo, routes: p.phase === 'pre' && p.call === 'pass', open: openRings && !autoplayHook, shake: fx.shake, flash: fx.flash });
       } catch (e) {
         console.error('[draw]', e);
+        logError('football draw', e);
         renderer.dispose();
         ctx.restore();
         ctx.setTransform(1, 0, 0, 1, 0, 0);

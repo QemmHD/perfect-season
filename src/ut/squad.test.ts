@@ -1,7 +1,7 @@
 // Squads: chemistry, the team overall and auto-build (npm test runs both sports; these use made-up
 // cards, so they check both sports' formations either way).
 import { fakeCard } from './fake.test-util';
-import { autoBuild, canPlay, chemistry, CHEM_BONUS, FULL_LINK, linkScore, NBA_LINKS, NBA_SLOTS, NFL_LINKS, NFL_SLOTS, positionMix, rateSquad, startersComplete } from './squad';
+import { autoBuild, canPlay, chemistry, CHEM_BONUS, FULL_LINK, linkScore, NBA_LINKS, NBA_SLOTS, NFL_LINKS, NFL_SLOTS, playsIn, positionMix, rateSquad, startersComplete } from './squad';
 import type { RatedCard } from './types';
 
 const fiveOf = (o: { fr?: string; season?: (i: number) => number; ovr?: number[] }): Record<string, RatedCard> =>
@@ -132,5 +132,16 @@ describe('auto-build', () => {
     const bulls = ['PG', 'SG', 'SF', 'PF'].map((p) => ({ uid: p, rc: fakeCard({ pos: p, ovr: 80, fr: 'CHI', season: 1996 }) }));
     const club = [...bulls, { uid: 'bull', rc: fakeCard({ pos: 'C', ovr: 78, fr: 'CHI', season: 1996 }) }, { uid: 'stranger', rc: fakeCard({ pos: 'C', ovr: 79, fr: 'UTA', season: 1973 }) }];
     expect(autoBuild('nba', club).C).toBe('bull');
+  });
+});
+
+describe('the cards that play', () => {
+  it('are the five and the first three off the bench in basketball, everyone in football', () => {
+    for (const x of ['PG', 'C', 'B1', 'B2', 'B3']) expect(playsIn('nba', x)).toBe(true);
+    expect(playsIn('nba', 'B4')).toBe(false);
+    expect(playsIn('nba', 'B5')).toBe(false);
+    expect(playsIn('nba', null)).toBe(false);
+    for (const x of NFL_SLOTS) expect(playsIn('nfl', x.id)).toBe(true);
+    expect(playsIn('nfl', null)).toBe(false);
   });
 });

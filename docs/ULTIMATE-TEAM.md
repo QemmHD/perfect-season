@@ -75,6 +75,9 @@ always agree.
   - The squad's chemistry gives up to +3 overall across the squad, applied as attribute boosts in
     the games.
 - **Uniforms:** the squad wears your favorite team's uniforms.
+- **The club:** every card you own, filtered by position, tier, team and decade, and sorted by
+  overall, newest, position or any rating (speed, three-point shot, driving dunk, throw power...),
+  with that rating shown on each card.
 
 ## Squad Building Challenges (SBCs)
 
@@ -87,8 +90,12 @@ always agree.
   each: any five cards for a Silver pack, five silvers for a Gold pack, five good golds for a
   Premium pack. And three repeatables, as often as you like, each asking more the better it
   pays: five silvers for a Gold card, eight golds with a team overall of 77+ for an 84+ Gold card
-  (Golden Hour), eight golds with a team overall of 81+ for an 88+ Gold card (Elite Pull). Reward
+  (Golden Hour), eight golds with a team overall of 83+ for an 88+ Gold card (Elite Pull). Reward
   cards are drawn at random from every card that fits. Challenges pay packs and cards, not coins.
+- Building one: the team overall of the cards put in shows as you go, with what the empty spots
+  have to average to reach the requirement, and the card picker shows the team overall each card
+  would make. Auto-fill never uses the cards that play (basketball: the five starters and the
+  first three off the bench; football: the whole squad); they can still go in by hand.
 
 ## Playing
 

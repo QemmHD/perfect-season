@@ -102,6 +102,13 @@ export const NFL_LINKS: [string, string][] = [
 export function slotsFor(sport: UtSport): SlotDef[] {
   return sport === 'nba' ? NBA_SLOTS : NFL_SLOTS;
 }
+/**
+ * Whether a squad spot is one that plays: in basketball the five and the first three off the bench,
+ * in football all of them. Auto-fill keeps these out of challenges.
+ */
+export function playsIn(sport: UtSport, slot: string | null): boolean {
+  return !!slot && !(sport === 'nba' && (slot === 'B4' || slot === 'B5'));
+}
 export function linksFor(sport: UtSport): [string, string][] {
   return sport === 'nba' ? NBA_LINKS : NFL_LINKS;
 }

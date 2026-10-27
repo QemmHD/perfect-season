@@ -151,6 +151,20 @@ export function matchPositions(pos: string[], cards: { line: { pos: string[] } }
   return out;
 }
 
+/**
+ * The team overall of the cards in so far, and what the empty spots have to average for it to
+ * reach `ovr` (null when it already will whatever goes in, or when nothing is left to fill).
+ */
+export function teamNeed(ovrs: number[], size: number, ovr: number): { now: number; need: number | null } {
+  const sum = ovrs.reduce((a, x) => a + x, 0);
+  const now = ovrs.length ? Math.round(sum / ovrs.length) : 0;
+  const left = size - ovrs.length;
+  if (left <= 0) return { now, need: null };
+  // the overall is rounded, so the total has to reach (ovr - 0.5) a card
+  const need = Math.ceil(((ovr - 0.5) * size - sum) / left - 1e-9);
+  return { now, need: need > 0 ? need : null };
+}
+
 /** A challenge checked against the cards put in: every requirement, and the right number of cards. */
 export function checkSbc(s: Sbc, cards: RatedCard[]): { ok: boolean; full: boolean; reqs: { req: Req; text: string; ok: boolean; have: string }[] } {
   const reqs = s.reqs.map((req) => ({ req, text: reqText(req), ...checkReq(req, cards) }));
@@ -302,7 +316,7 @@ const UPGRADES: [Template, number][] = [
   [(c) => ({ title: 'Gold Upgrade', blurb: 'Five good golds for a Premium pack.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium' } }), UPGRADE_TIMES],
   [() => ({ title: 'Silver to Gold', blurb: 'Five silvers for a gold.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { card: { tier: 'gold' } } }), Infinity],
   [(c) => ({ title: 'Golden Hour', blurb: 'Eight golds for a better one.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 77) }], reward: { card: { tier: 'gold', minOvr: sc(c, 84) } } }), Infinity],
-  [(c) => ({ title: 'Elite Pull', blurb: 'Eight strong golds for a star.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 81) }], reward: { card: { tier: 'gold', minOvr: sc(c, 88) } } }), Infinity],
+  [(c) => ({ title: 'Elite Pull', blurb: 'Eight strong golds for a star.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 83) }], reward: { card: { tier: 'gold', minOvr: sc(c, 88) } } }), Infinity],
 ];
 
 /**

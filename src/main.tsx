@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { NFL } from './engine/sport';
+import { watchErrors } from './lib/errlog';
 import { registerServiceWorker } from './lib/update';
 import { Stage } from './stage';
 import './styles.css';
@@ -13,6 +14,8 @@ const LAB = new URLSearchParams(location.search).has('arcade');
 const PIXEL = new URLSearchParams(location.search).get('pixel');
 const Gallery = React.lazy(() => (PIXEL === 'court' ? import('./game/pixel/Scene') : import('./game/pixel/Gallery')));
 const GALLERY = PIXEL !== null;
+
+watchErrors();
 
 // iOS Safari only shows :active press states when the page listens for touches
 document.addEventListener('touchstart', () => {}, { passive: true });

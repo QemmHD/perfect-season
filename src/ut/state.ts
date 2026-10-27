@@ -26,7 +26,6 @@ export interface UtState {
   packs: PendingPack[];
   /** what was quick-sold, for the hub */
   sold: { cards: number; coins: number };
-  /** Squad Battles: rungs cleared this week (`week` is its key), the best week, and games played */
   /** Squad Battles this week: rungs cleared on the ladder, the best ever, which ladder of the week
    * it is (the next one comes up after clearing one), and the difficulty */
   battles: { week: string; cleared: number; best: number; round?: number; level?: Level };
