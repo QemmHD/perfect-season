@@ -107,6 +107,8 @@ export function HomePage(props: {
   onSport: (s: SportId) => void;
   /** this week's Legends Gauntlet: your best climb, and who waits at the top */
   gauntlet: { best: number; boss: string };
+  /** open Ultimate Team (src/ut) */
+  onUltimate?: () => void;
 }) {
   const [intro] = useState(() => !introPlayed);
   useEffect(() => {
@@ -176,6 +178,21 @@ export function HomePage(props: {
           <b className="num">{props.gauntlet.best}/8</b>
         </button>
       </div>
+      {props.onUltimate && (
+        <button className="ut-entry" onClick={props.onUltimate} aria-label={'Ultimate Team: ' + (NFL ? 'football' : 'basketball') + ' packs, squads and challenges'}>
+          <span className="ut-entry-fan" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="ut-entry-txt">
+            <b className="disp">Ultimate Team</b>
+            <small>{p.ut.owned.length ? p.ut.owned.length + ' cards · packs, squad, challenges' : 'Open packs, build a squad, play it'}</small>
+          </span>
+          {!p.ut.starterClaimed && <span className="livebadge ut-entry-new">FREE PACK</span>}
+          <span className="ut-entry-go" aria-hidden="true">›</span>
+        </button>
+      )}
       <div className="modes" role="group" aria-label="Game mode">
         {MODES.map((m) => (
           <button key={m.key} className="mode" aria-pressed={p.mode === m.key} onClick={() => props.onMode(m.key)}>
