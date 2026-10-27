@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { easternDateKey } from '../engine/season';
 import { NFL, SPORT } from '../engine/sport';
 import { newId, type Profile } from '../lib/profile';
+import { reloadForMissingFiles } from '../lib/update';
 import { sfx, vibrate } from '../lib/sound';
 import { NET_ON } from '../net/nostr';
 import { CoinChip } from '../ui/common';
@@ -76,8 +77,11 @@ export default function UltimateTeam(props: {
   const busy = useRef(false);
   const [day] = useState(() => easternDateKey());
 
+  const tries = useRef(0);
   const load = () => {
     setFailed(false);
+    // a second miss: this build's card files are likely gone (a newer build is live), so reload
+    if (tries.current++ >= 1 && reloadForMissingFiles()) return;
     getPool()
       .then(setPool)
       .catch(() => setFailed(true));

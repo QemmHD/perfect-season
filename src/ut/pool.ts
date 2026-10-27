@@ -1,5 +1,6 @@
 // The card pool the mode plays with: every card line, rated once at level 1, and grouped by tier
 // and position for the packs. Loaded when Ultimate Team opens, never before.
+import { hashString } from '../engine/rng';
 import { SPORT } from '../engine/sport';
 // the per-season card data (src/data/cards-<sport>.json, scripts/build_cards.py)
 import { loadCards } from './cards';
@@ -14,17 +15,21 @@ export interface Pool {
   base: Map<string, RatedCard>;
   /** tier → main position → cards (a promo or legend is filed under its own tier) */
   buckets: Record<Tier, Record<string, RatedCard[]>>;
+  /** a fingerprint of every card and its rating: online squads only pair with the same cards */
+  print: string;
 }
 
 export function buildPool(sport: UtSport, lines: CardLine[], byId?: Map<string, CardLine>): Pool {
   const base = new Map<string, RatedCard>();
   const buckets: Pool['buckets'] = { bronze: {}, silver: {}, gold: {}, promo: {}, legend: {} };
+  let h = 2166136261;
   for (const l of lines) {
     const rc = rateCard(l);
     base.set(l.id, rc);
     (buckets[rc.tier][l.pos[0]] ??= []).push(rc);
+    h = Math.imul(h ^ hashString(l.id + ':' + rc.ovr + ':' + rc.tier), 16777619) >>> 0;
   }
-  return { sport, lines, byId: byId ?? new Map(lines.map((l) => [l.id, l])), base, buckets };
+  return { sport, lines, byId: byId ?? new Map(lines.map((l) => [l.id, l])), base, buckets, print: h.toString(36) };
 }
 
 let cache: Promise<Pool> | null = null;

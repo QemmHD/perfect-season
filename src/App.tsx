@@ -16,7 +16,7 @@ import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from 
 import { type Booster, type BotLevel, type Mode, type Player, type PlayoffTeam, type Slot, SLOTS } from './engine/types';
 import { freshProfile, type H2HStats, loadProfile, newId, type Profile, readOtherLb, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
 import { setFeedback, sfx, vibrate } from './lib/sound';
-import { applyUpdate, justUpdated, newerVersionLive } from './lib/update';
+import { applyUpdate, justUpdated, newerVersionLive, reloadForMissingFiles } from './lib/update';
 import { type BoardKind, boardTag, fetchBoard, prune, publishEntry, renamed, type Span, weekKey, withH2H, withRun } from './net/leaderboard';
 import { type ArcadeState, cleanRoomCode, type Found, MatchConn, type OnlineCount, type OnlinePick, onCounts, setPresence, startPresence } from './net/match';
 import { NET_ON } from './net/nostr';
@@ -47,9 +47,33 @@ import type { UtMatchRequest } from './ut/play';
 
 type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet' | 'ut' | 'utmatch';
 
+/**
+ * A screen's code, fetched when it's first opened. If this build's files are gone (a newer build
+ * went live and cleared them), reload into it rather than leave the app blank.
+ */
+function lazyScreen<C extends React.ComponentType<any>>(load: () => Promise<{ default: C }>) {
+  return React.lazy(() =>
+    load().catch(() => {
+      reloadForMissingFiles();
+      return { default: ScreenMissing as unknown as C };
+    })
+  );
+}
+
+function ScreenMissing() {
+  return (
+    <div className="screen ut-loading" role="alert">
+      <p>This screen didn’t load. A new version may be out.</p>
+      <button className="btn primary" onClick={() => location.reload()}>
+        RELOAD
+      </button>
+    </div>
+  );
+}
+
 /** Ultimate Team, loaded (with its cards) only when it's opened */
-const UltimateTeam = React.lazy(() => import('./ut/UltimateTeam'));
-const UtMatch = React.lazy(() => import('./ut/Match'));
+const UltimateTeam = lazyScreen(() => import('./ut/UltimateTeam'));
+const UtMatch = lazyScreen(() => import('./ut/Match'));
 
 interface Run {
   id: number;

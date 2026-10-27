@@ -29,10 +29,12 @@ export interface UtState {
   battles: { week: string; cleared: number; best: number };
   /** results of played matches: vs the AI and online head to head */
   record: { w: number; l: number; h2hW: number; h2hL: number };
+  /** games that paid coins and XP today (`day`, Eastern): a day's paid games are limited (play.ts) */
+  paid: { day: string; n: number };
 }
 
 export function freshUt(): UtState {
-  return { v: 1, owned: [], squad: {}, packsOpened: 0, starterClaimed: false, sbc: { done: {} }, packs: [], sold: { cards: 0, coins: 0 }, battles: { week: '', cleared: 0, best: 0 }, record: { w: 0, l: 0, h2hW: 0, h2hL: 0 } };
+  return { v: 1, owned: [], squad: {}, packsOpened: 0, starterClaimed: false, sbc: { done: {} }, packs: [], sold: { cards: 0, coins: 0 }, battles: { week: '', cleared: 0, best: 0 }, record: { w: 0, l: 0, h2hW: 0, h2hL: 0 }, paid: { day: '', n: 0 } };
 }
 
 const num = (x: unknown, d: number): number => (typeof x === 'number' && Number.isFinite(x) ? x : d);
@@ -64,6 +66,7 @@ export function migrateUt(raw: unknown): UtState {
   const sold = r.sold as { cards?: unknown; coins?: unknown } | undefined;
   const bt = r.battles as { week?: unknown; cleared?: unknown; best?: unknown } | undefined;
   const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL', unknown>> | undefined;
+  const paid = r.paid as { day?: unknown; n?: unknown } | undefined;
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
   return {
     v: 1,
@@ -76,6 +79,7 @@ export function migrateUt(raw: unknown): UtState {
     sold: { cards: num(sold?.cards, 0), coins: num(sold?.coins, 0) },
     battles: { week: typeof bt?.week === 'string' ? bt.week : '', cleared: Math.min(8, count(bt?.cleared)), best: Math.min(8, count(bt?.best)) },
     record: { w: count(rec?.w), l: count(rec?.l), h2hW: count(rec?.h2hW), h2hL: count(rec?.h2hL) },
+    paid: { day: typeof paid?.day === 'string' ? paid.day : '', n: count(paid?.n) },
   };
 }
 

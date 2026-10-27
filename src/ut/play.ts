@@ -33,6 +33,13 @@ export const XP_FOR_WIN = 20;
 export const COINS_WIN = 60;
 export const COINS_LOSS = 30;
 
+/**
+ * Games a day that pay coins and XP (Squad Battles and head to head together): enough for a good
+ * session, not a farm (a simmed game takes seconds). Past it a game still counts for the record and
+ * the ladder, and its rung's pack.
+ */
+export const PAID_GAMES_A_DAY = 8;
+
 export function matchRewards(r: UtMatchResult): { coins: number; xp: number } {
   return { coins: r.won ? COINS_WIN : COINS_LOSS, xp: XP_PER_GAME + (r.won ? XP_FOR_WIN : 0) };
 }
@@ -56,6 +63,8 @@ export interface Settled {
   /** a Squad Battles rung cleared for the first time this week, and the pack it paid */
   climbed: boolean;
   pack: string | null;
+  /** today's paid games were used up before this one: it paid nothing */
+  capped: boolean;
 }
 
 /**
@@ -65,10 +74,12 @@ export interface Settled {
  */
 export function settle(
   ut: UtState,
-  r: { won: boolean; us: number; them: number; online: boolean; rung: { i: number; pack: string | null } | null; played: string[]; week: string; packId: string; at: number }
+  r: { won: boolean; us: number; them: number; online: boolean; rung: { i: number; pack: string | null } | null; played: string[]; week: string; day: string; packId: string; at: number }
 ): Settled {
-  const { coins, xp } = matchRewards(r);
-  const x = awardXp(ut, r.played, xp);
+  const today = ut.paid.day === r.day ? ut.paid.n : 0;
+  const capped = today >= PAID_GAMES_A_DAY;
+  const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards(r);
+  const x = awardXp({ ...ut, paid: { day: r.day, n: today + (capped ? 0 : 1) } }, r.played, xp);
   const rec = x.ut.record;
   const record = r.online ? { ...rec, h2hW: rec.h2hW + (r.won ? 1 : 0), h2hL: rec.h2hL + (r.won ? 0 : 1) } : { ...rec, w: rec.w + (r.won ? 1 : 0), l: rec.l + (r.won ? 0 : 1) };
   let battles = battlesThisWeek(x.ut.battles, r.week);
@@ -76,5 +87,5 @@ export function settle(
   const pack = climbed ? r.rung!.pack : null;
   if (climbed) battles = { week: r.week, cleared: r.rung!.i + 1, best: Math.max(battles.best, r.rung!.i + 1) };
   const packs = pack ? [...x.ut.packs, { id: r.packId, kind: pack, at: r.at }] : x.ut.packs;
-  return { ut: { ...x.ut, record, battles, packs }, coins, xp, ups: x.ups, climbed, pack };
+  return { ut: { ...x.ut, record, battles, packs }, coins, xp, ups: x.ups, climbed, pack, capped };
 }

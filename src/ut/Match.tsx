@@ -27,7 +27,7 @@ import { Vote } from '../ui/Vote';
 import { aiOpponent, type Rung, RUNGS, shortName, skillName, weekLadder } from './battles';
 import { UtCard } from './CardArt';
 import { packName } from './packs';
-import { decide, settle, type UtMatchRequest } from './play';
+import { decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
 import { byValue, getPool, type Pool } from './pool';
 import { weekOf } from './sbc';
 import { type SquadRating, startersComplete } from './squad';
@@ -35,8 +35,13 @@ import { lineupOf, ratingOf, type SquadCards, squadFromWire, squadToWire, type S
 import type { UtState } from './state';
 import './match.css';
 
-/** The queue of its own: Ultimate Team squads never pair with draft head to heads. */
-const QUEUE = 'ut';
+/**
+ * The queue of its own: Ultimate Team squads never pair with draft head to heads, nor with a build
+ * whose cards (the pool's fingerprint) or match rules differ, since each phone rates both squads
+ * and plays the sim itself. Bump UT_RULES when teams.ts or play.ts change how a match comes out.
+ */
+const UT_RULES = 1;
+const queueOf = (pool: Pool) => 'ut-' + UT_RULES + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;
 /** The match found, the other phone's squad not here after this long: back to the queue. */
@@ -86,6 +91,8 @@ interface Outcome {
   ups: { name: string; level: number }[];
   climbed: boolean;
   pack: string | null;
+  /** past today's paid games: no coins or XP */
+  capped: boolean;
 }
 
 type Stage = 'load' | 'search' | 'found' | 'vs' | 'vote' | 'play' | 'result' | 'error';
@@ -296,6 +303,7 @@ export default function UtMatch(props: {
       rung: s.rung && s.rung.i >= 0 ? { i: s.rung.i, pack: s.rung.pack } : null,
       played: Object.values(ut.squad),
       week,
+      day: easternDateKey(),
       packId: newId(),
       at: Date.now(),
     };
@@ -310,7 +318,7 @@ export default function UtMatch(props: {
     setPresence('menu');
     const cardOf = new Map(ut.owned.map((o) => [o.uid, o.cardId]));
     const ups = shown.ups.map((u) => ({ name: pool.byId.get(cardOf.get(u.uid) ?? '')?.name ?? 'A card', level: u.level }));
-    setOut({ ...d, us: us.score, them: them.score, how, ends: [us.ends, them.ends], coins: shown.coins, xp: shown.xp, ups, climbed: shown.climbed, pack: shown.pack });
+    setOut({ ...d, us: us.score, them: them.score, how, ends: [us.ends, them.ends], coins: shown.coins, xp: shown.xp, ups, climbed: shown.climbed, pack: shown.pack, capped: shown.capped });
     setStage('result');
     if (d.won) {
       sfx.seriesWin();
@@ -395,7 +403,7 @@ export default function UtMatch(props: {
         <p>Loading your squad…</p>
       </div>
     );
-  else if (stage === 'search' || stage === 'found') body = <SearchView key={searchNo} me={me} level={levelInfo(profile.xp).level} found={found} onFound={onFound} onAI={goAI} />;
+  else if (stage === 'search' || stage === 'found') body = <SearchView key={searchNo} me={me} queue={pool ? queueOf(pool) : 'ut'} level={levelInfo(profile.xp).level} found={found} onFound={onFound} onAI={goAI} />;
   else if (stage === 'vs' && setup) body = <VsView setup={setup} />;
   else if (stage === 'result' && setup && out)
     body = (
@@ -433,7 +441,7 @@ export default function UtMatch(props: {
 }
 
 /** Waiting in the queue: the window of overalls it takes, widening, and the AI after UT_AI_AFTER. */
-function SearchView(props: { me: Side; level: number; found: Found | null; onFound: (f: Found) => void; onAI: () => void }) {
+function SearchView(props: { me: Side; queue: string; level: number; found: Found | null; onFound: (f: Found) => void; onAI: () => void }) {
   const { me, found } = props;
   const [t0] = useState(Date.now());
   const [now, setNow] = useState(Date.now());
@@ -452,7 +460,7 @@ function SearchView(props: { me: Side; level: number; found: Found | null; onFou
 
   useEffect(() => {
     let got = false;
-    const mm = new Matchmaker({ name: me.name, level: props.level, queue: QUEUE, ovr: me.rating.ovr }, (f) => {
+    const mm = new Matchmaker({ name: me.name, level: props.level, queue: props.queue, ovr: me.rating.ovr }, (f) => {
       if (got) return;
       got = true;
       foundRef.current(f);
@@ -620,14 +628,18 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           {out.pack ? <small>Your {packName(SPORT, out.pack)} is waiting in the Store.</small> : !top && <small>Next up: rung {r!.i + 2}.</small>}
         </div>
       )}
-      <div className="utm-rewards">
-        <span>
-          <Coin size={16} /> <b className="num">+{out.coins}</b> coins
-        </span>
-        <span>
-          <b className="num">+{out.xp}</b> XP for every card in your squad
-        </span>
-      </div>
+      {out.capped ? (
+        <p className="utm-note">Today’s {PAID_GAMES_A_DAY} paid games are played: games pay coins and XP again tomorrow.</p>
+      ) : (
+        <div className="utm-rewards">
+          <span>
+            <Coin size={16} /> <b className="num">+{out.coins}</b> coins
+          </span>
+          <span>
+            <b className="num">+{out.xp}</b> XP for every card in your squad
+          </span>
+        </div>
+      )}
       {out.ups.length > 0 && (
         <div className="utm-ups">
           <span className="eyebrow">{out.ups.length === 1 ? 'Level up' : out.ups.length + ' level-ups'}</span>

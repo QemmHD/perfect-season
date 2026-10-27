@@ -34,6 +34,16 @@ describe('requirements', () => {
     expect(checkReq({ k: 'positions', pos: ['SG', 'PG'] }, [combo, fakeCard({ pos: 'SG', ovr: 70 })]).ok).toBe(true);
   });
 
+  it('finds the full five among two-position cards whatever order they came in', () => {
+    const five = [['SF', 'PF'], ['PF', 'SG'], ['PG', 'PF'], ['C', 'SF'], ['SF']].map((pos) => fakeCard({ pos, ovr: 70 }));
+    const all = ['PG', 'SG', 'SF', 'PF', 'C'];
+    for (let k = 0; k < five.length; k++) {
+      const order = five.slice(k).concat(five.slice(0, k));
+      expect(checkReq({ k: 'positions', pos: all }, order)).toEqual({ ok: true, have: '5/5' });
+      expect(checkReq({ k: 'positions', pos: all }, order.slice().reverse())).toEqual({ ok: true, have: '5/5' });
+    }
+  });
+
   it('needs exactly the right number of different players', () => {
     const s: Sbc = { id: 't', kind: 'daily', title: 'T', blurb: '', size: 3, reqs: [{ k: 'sameFr', n: 3 }], reward: { coins: 100 } };
     expect(checkSbc(s, bulls96(3)).ok).toBe(true);

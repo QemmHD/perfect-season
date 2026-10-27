@@ -94,6 +94,10 @@ always agree.
   - The match uses the same Sim/Play vote and the played arcade games, with each side's squad.
   - The wire carries each side's squad as card ids plus levels. Both phones rate cards with the
     same code, so they agree.
+- **What a game pays:** 60 coins for a win, 30 for a loss, and XP for every card in the squad,
+  for the first 8 games of a day (Squad Battles and head to head together, played or simmed). Past
+  that a game still counts for the record and the ladder (and a rung's pack), but pays nothing:
+  a simmed game takes seconds, so unlimited pay would be a coin farm.
 - **Cheating:** collections live on the phone, so a tampered client could fake cards. Accepted;
   there's no server.
 

@@ -115,18 +115,36 @@ export function checkReq(r: Req, cards: RatedCard[]): { ok: boolean; have: strin
       return { ok: k >= r.n, have: k + '/' + r.n };
     }
     case 'positions': {
-      // a matching: each listed position filled by a different card that plays it
-      const left = cards.slice();
-      let k = 0;
-      for (const p of r.pos.slice().sort((a, b) => cards.filter((c) => c.line.pos.includes(a)).length - cards.filter((c) => c.line.pos.includes(b)).length)) {
-        const i = left.findIndex((c) => c.line.pos.includes(p));
-        if (i < 0) continue;
-        left.splice(i, 1);
-        k++;
-      }
+      // each listed position filled by a different card that plays it
+      const k = matchPositions(r.pos, cards).filter((i) => i >= 0).length;
       return { ok: k === r.pos.length, have: k + '/' + r.pos.length };
     }
   }
+}
+
+/**
+ * The most positions that can each get a card of their own (cards play every position they list):
+ * for each position, the index of its card, or -1. A true matching (augmenting paths), so a card
+ * that plays two positions goes where it's needed whatever order the cards came in; earlier cards
+ * are tried first.
+ */
+export function matchPositions(pos: string[], cards: { line: { pos: string[] } }[]): number[] {
+  const owner: number[] = cards.map(() => -1);
+  const seat = (p: number, seen: boolean[]): boolean => {
+    for (let c = 0; c < cards.length; c++) {
+      if (seen[c] || !cards[c].line.pos.includes(pos[p])) continue;
+      seen[c] = true;
+      if (owner[c] < 0 || seat(owner[c], seen)) {
+        owner[c] = p;
+        return true;
+      }
+    }
+    return false;
+  };
+  for (let p = 0; p < pos.length; p++) seat(p, cards.map(() => false));
+  const out = pos.map(() => -1);
+  owner.forEach((p, c) => p >= 0 && (out[p] = c));
+  return out;
 }
 
 /** A challenge checked against the cards put in: every requirement, and the right number of cards. */
@@ -320,7 +338,9 @@ export function autoFill<C extends FillCard>(s: Sbc, club: C[]): string[] | null
       pids.add(c.rc.line.pid);
       return true;
     };
-    if (posReq) for (const p of posReq.pos) core.some((c) => c.rc.line.pos.includes(p) && add(c));
+    // the positions: a matching over the core (cheapest first), so a two-position card doesn't
+    // take a spot another one needs
+    if (posReq) for (const i of matchPositions(posReq.pos, rcs(core))) if (i >= 0) add(core[i]);
     // "at least n" of a tier, a franchise, a decade: the cheapest n that are
     for (const r of s.reqs) {
       if (r.k !== 'tier' && r.k !== 'fr' && r.k !== 'decade') continue;

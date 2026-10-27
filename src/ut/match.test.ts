@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { SPORT } from '../engine/sport';
 import { squadsFit, squadWindow } from '../net/match';
 import { aiOpponent, battlesThisWeek, ladderFor, RUNG_PACKS, RUNGS, shortName, weekLadder } from './battles';
-import { COINS_LOSS, COINS_WIN, decide, settle, XP_FOR_WIN, XP_PER_GAME } from './play';
+import { COINS_LOSS, COINS_WIN, decide, PAID_GAMES_A_DAY, settle, XP_FOR_WIN, XP_PER_GAME } from './play';
 import { getPool, type Pool } from './pool';
 import { onScale, rateCard } from './rate';
 import { startersComplete } from './squad';
@@ -193,7 +193,7 @@ describe('a finished match', () => {
     ],
     squad: { PG: 'a', SG: 'b' },
   });
-  const base = { us: 20, them: 10, online: false, played: ['a', 'b'], week: WEEK, packId: 'p1', at: 5 };
+  const base = { us: 20, them: 10, online: false, played: ['a', 'b'], week: WEEK, day: '2026-10-27', packId: 'p1', at: 5 };
 
   it('pays coins and XP for every card that played', () => {
     const s = settle(withCards(), { ...base, won: true, rung: null });
@@ -228,6 +228,30 @@ describe('a finished match', () => {
     expect(settle(stale, { ...base, won: true, rung: { i: 3, pack: null } }).climbed).toBe(false);
     const fresh = settle(stale, { ...base, won: true, rung: { i: 0, pack: null } });
     expect(fresh.ut.battles).toEqual({ week: WEEK, cleared: 1, best: 7 });
+  });
+
+  it('pays for the first games of a day only, the ladder and the record go on', () => {
+    let ut = withCards();
+    for (let i = 0; i < PAID_GAMES_A_DAY; i++) {
+      const s = settle(ut, { ...base, won: true, rung: null });
+      expect(s.capped).toBe(false);
+      expect(s.coins).toBe(COINS_WIN);
+      ut = s.ut;
+    }
+    expect(ut.paid).toEqual({ day: base.day, n: PAID_GAMES_A_DAY });
+    const over = settle(ut, { ...base, won: true, rung: { i: 0, pack: 'silver' } });
+    expect(over.capped).toBe(true);
+    expect(over.coins).toBe(0);
+    expect(over.xp).toBe(0);
+    expect(over.ut.owned).toEqual(ut.owned);
+    expect(over.ut.record.w).toBe(PAID_GAMES_A_DAY + 1);
+    expect(over.climbed).toBe(true);
+    expect(over.pack).toBe('silver');
+    // a new day pays again
+    const next = settle(over.ut, { ...base, day: '2026-10-28', won: false, rung: null });
+    expect(next.capped).toBe(false);
+    expect(next.coins).toBe(COINS_LOSS);
+    expect(next.ut.paid).toEqual({ day: '2026-10-28', n: 1 });
   });
 
   it('breaks a tie with the better squad, then the coin', () => {

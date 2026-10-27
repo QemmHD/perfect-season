@@ -40,6 +40,24 @@ export async function newerVersionLive(): Promise<boolean> {
 }
 
 const UPDATED = 'perfect-season:updated';
+const MISSING = 'perfect-season:missing-files';
+
+/**
+ * This build's code or data couldn't be fetched: most likely a newer build went live and the old
+ * files are gone from the server and the cache. Reloads into the live build (at most once a
+ * minute, so a phone that's simply offline doesn't loop); false when it just tried that.
+ */
+export function reloadForMissingFiles(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(MISSING) || 0);
+    if (Date.now() - last < 60000) return false;
+    sessionStorage.setItem(MISSING, String(Date.now()));
+  } catch {
+    return false;
+  }
+  applyUpdate();
+  return true;
+}
 
 /** Reloads into the new build and leaves a note so the app can say it updated. */
 export function applyUpdate(): void {
