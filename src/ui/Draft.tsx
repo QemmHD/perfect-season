@@ -1110,7 +1110,7 @@ export function Draft(props: DraftProps) {
         </div>
       )}
       {mode === '1v1' && (
-        <div className={'botstrip' + (online ? ' live' : '')} aria-label={online ? online.oppName + "'s lineup" : 'AI lineup'}>
+        <div className={'botstrip' + (online ? ' live' : '') + (ROUNDS > 6 ? ' many' : '')} aria-label={online ? online.oppName + "'s lineup" : 'AI lineup'}>
           <span>{online ? online.oppName.toUpperCase() + (online.oppGone ? ' · AI' : '') : 'AI · ' + botLevel.toUpperCase()}</span>
           {SLOTS.map((k) => {
             const p = s.botLineup[k];

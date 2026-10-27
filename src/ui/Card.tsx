@@ -163,7 +163,7 @@ export function CardSheet({ p, slot, blind, onClose }: { p: Player; slot?: Slot;
                 ))}
               </div>
             )}
-            {!blind && isDefender(p) && <small>Per season, where kept (– before records were kept). Pro Bowls and All-Pro years with this team.</small>}
+            {!blind && isDefender(p) && <small>A season, where kept (– not kept then) · Pro Bowl and All-Pro years with this team</small>}
             {up && <small className="cs-prime">Best decade: {up.primedFrom?.abbr} {up.primedFrom?.era} (value {up.val.toFixed(1)})</small>}
           </div>
           <span className="cs-hint">Drag the card to tilt it</span>

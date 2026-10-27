@@ -76,7 +76,7 @@ export function TopBar({ xp, coins, onProfile, onSettings, onHelp }: { xp: numbe
 
 export function TeamChips({ players, stagger, lit = -1, on = 99 }: { players: (Player | null)[]; stagger?: boolean; lit?: number; on?: number }) {
   return (
-    <div className="teamchips">
+    <div className={'teamchips' + (players.length > 6 ? ' many' : '')}>
       {players.filter(Boolean).map((p, i) => (
         <span key={p!.id} className={'teamchip' + (stagger ? ' rise-in' : '') + (i === lit ? ' lit' : '') + (i >= on ? ' unlit' : '')} style={{ background: p!.c1, borderColor: p!.c2, animationDelay: i * 70 + 'ms' }}>
           {initials(p!.name)}

@@ -1798,6 +1798,14 @@ button:focus-visible {
   border: 1px dashed #4a3c80;
   box-sizing: border-box;
 }
+/* football's eight spots */
+.botstrip.many {
+  gap: 4px;
+}
+.botstrip.many .botchip {
+  width: 32px;
+  font-size: 11px;
+}
 .botchip.on {
   color: #fff;
   border-style: solid;
@@ -2131,6 +2139,14 @@ button:focus-visible {
   gap: 6px;
   flex-wrap: wrap;
   justify-content: center;
+}
+/* football's eight fit one row */
+.teamchips.many {
+  gap: 5px;
+}
+.teamchips.many .teamchip {
+  min-width: 38px;
+  padding: 0 5px;
 }
 .teamchip {
   min-width: 46px;
@@ -6359,6 +6375,15 @@ button.friendcard:active {
 }
 .hand-card:active {
   transform: scale(0.95);
+}
+/* football's eight: two rows of four */
+.hand.many {
+  grid-template-columns: repeat(4, 78px);
+  gap: 12px 10px;
+}
+.hand.many .hand-card {
+  width: 78px;
+  height: 110px;
 }
 .hand-hint {
   display: block;
