@@ -7642,3 +7642,344 @@ button.friendcard:active {
     0 2px 0 #0a7d6e,
     0 5px 12px rgba(0, 0, 0, 0.45);
 }
+
+/* ---------- arcade basketball v2: pixel court, 2K-style bug and controls ---------- */
+/* the played games fill the real screen above the portrait frame, either way up */
+.arcade-full {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  color: #fff;
+  font-family: var(--body, inherit);
+}
+.hg2 {
+  overflow: clip;
+  background: #0e121e;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.hg2-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+}
+.hg2-bug {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat) + 8px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(6, 10, 20, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  font-family: var(--display);
+  pointer-events: none;
+}
+.hg2-bug > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+}
+.hg2-bug i {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  opacity: 0.75;
+}
+.hg2-bug b {
+  font-style: italic;
+  font-weight: 900;
+  font-size: 22px;
+  line-height: 1;
+}
+.hg2-bug .us {
+  background: linear-gradient(90deg, rgba(25, 227, 201, 0.28), transparent);
+  color: var(--teal);
+}
+.hg2-bug .them {
+  background: linear-gradient(270deg, rgba(167, 139, 250, 0.28), transparent);
+  color: var(--rival-soft);
+  flex-direction: row-reverse;
+}
+.hg2-bug .mid {
+  gap: 6px;
+  color: #fff;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+.hg2-bug .mid b {
+  font-size: 13px;
+  font-style: normal;
+  color: var(--gold);
+}
+.hg2-bug .mid small {
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.8;
+}
+.hg2-bug .mid em {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 15px;
+  min-width: 20px;
+  text-align: center;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #1b2236;
+  color: #ffe08a;
+}
+.hg2-bug .mid em.low {
+  background: #5a1420;
+  color: #ff8a8a;
+}
+.hg2-marks {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat) + 48px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  pointer-events: none;
+}
+.hg2-marks i {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  font-style: normal;
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  background: rgba(6, 10, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.5);
+}
+.hg2-marks i.half {
+  margin-left: 6px;
+}
+.hg2-marks i.now {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold);
+}
+.hg2-marks i.m-2,
+.hg2-marks i.m-3,
+.hg2-marks i.m-A {
+  background: var(--teal);
+  color: var(--teal-ink);
+  border-color: transparent;
+}
+.hg2-marks i.m-3,
+.hg2-marks i.m-A {
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+.hg2-marks i.m-TO {
+  background: #5a1420;
+  color: #ff9a9a;
+}
+.hg2-pop {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  padding: 7px 16px;
+  border-radius: 12px;
+  background: rgba(6, 10, 20, 0.84);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 72%;
+  font-size: 24px;
+  white-space: nowrap;
+  color: #fff;
+  pointer-events: none;
+  animation: fg-pop 0.35s var(--ease-spring) both;
+}
+.hg2-pop.good {
+  color: var(--teal);
+}
+.hg2-pop.bad {
+  color: var(--red);
+}
+.hg2-pop.green {
+  color: #3ef07a;
+  font-size: 30px;
+  text-shadow: 0 0 16px rgba(62, 240, 122, 0.6);
+}
+.hg2-pop.big {
+  font-size: 40px;
+  color: var(--gold);
+  background: none;
+  text-shadow:
+    0 3px 0 #000,
+    0 0 24px rgba(255, 199, 44, 0.55);
+}
+.hg2-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab) + 172px);
+  transform: translateX(-50%);
+  max-width: 86%;
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: rgba(6, 10, 20, 0.82);
+  font-weight: 800;
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+.hg2.wide .hg2-hint {
+  bottom: calc(var(--sab) + 18px);
+}
+.hg2-pad {
+  position: absolute;
+  left: calc(var(--sal) + 14px);
+  right: calc(var(--sar) + 14px);
+  bottom: calc(var(--sab) + 12px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.hg2-stick {
+  position: relative;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 70%);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  touch-action: none;
+  pointer-events: auto;
+}
+.hg2-stick i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #3fe9d4, #0f9e8c);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.hg2-btns {
+  position: relative;
+  width: 200px;
+  height: 156px;
+  pointer-events: none;
+}
+.hg2-btns button {
+  position: absolute;
+  border-radius: 50%;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  touch-action: none;
+  pointer-events: auto;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.hg2-shoot {
+  right: 0;
+  bottom: 0;
+  width: 100px;
+  height: 100px;
+  font-size: 21px;
+  color: var(--gold-ink);
+  background: radial-gradient(circle at 40% 35%, #ffd97a, #e9a21f);
+  box-shadow:
+    0 6px 0 #9b6a10,
+    0 10px 20px rgba(0, 0, 0, 0.45);
+}
+.hg2-shoot:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 #9b6a10,
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+.hg2-pass {
+  right: 98px;
+  top: 0;
+  width: 70px;
+  height: 70px;
+  font-size: 15px;
+  color: var(--teal-ink);
+  background: radial-gradient(circle at 40% 35%, #6ff0de, #10bfa8);
+  box-shadow:
+    0 5px 0 #0a7d6e,
+    0 8px 16px rgba(0, 0, 0, 0.45);
+}
+.hg2-cross {
+  left: 0;
+  bottom: 4px;
+  width: 62px;
+  height: 62px;
+  font-size: 13px;
+  color: #fff;
+  background: radial-gradient(circle at 40% 35%, #8a7cff, #5442d6);
+  box-shadow:
+    0 5px 0 #352a96,
+    0 8px 16px rgba(0, 0, 0, 0.45);
+}
+.hg2-pass:active,
+.hg2-cross:active {
+  transform: translateY(3px);
+}
+.hg2.wide .hg2-stick {
+  width: 104px;
+  height: 104px;
+}
+.hg2.wide .hg2-stick i {
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+}
+.hg2.wide .hg2-btns {
+  width: 164px;
+  height: 118px;
+}
+.hg2.wide .hg2-shoot {
+  width: 80px;
+  height: 80px;
+  font-size: 17px;
+}
+.hg2.wide .hg2-pass {
+  right: 82px;
+  width: 56px;
+  height: 56px;
+  font-size: 12px;
+}
+.hg2.wide .hg2-cross {
+  width: 48px;
+  height: 48px;
+  font-size: 10px;
+  bottom: 0;
+}
+.hg2.wide .hg2-bug b {
+  font-size: 18px;
+}
+.hg2.wide .hg2-bug > span {
+  padding: 3px 9px;
+}
+.hg2.wide .hg2-marks {
+  top: calc(var(--sat) + 40px);
+}
+.hg2-final {
+  z-index: 3;
+}

@@ -794,8 +794,10 @@ def season_tables(text, kind):
     """A player article's regular-season table: {season: [(team texts, stats)]}. kind K wants a
     table with FGM and FGA, kind D one with interceptions, sacks or tackles."""
     out = defaultdict(list)
-    for _, rows in tables(text):
-        hdr, hrows, last_year, fields = None, [], None, None
+    for heading, rows in tables(text):
+        if re.search(r"post|playoff", heading, re.I):
+            continue
+        hdr, hrows, last_year, fields, mine = None, [], None, None, defaultdict(list)
         for row in rows:
             if row and all(c[0] for c in row):
                 hrows.append(row)
@@ -807,7 +809,7 @@ def season_tables(text, kind):
                     hdr, fields = h, def_fields(h)
                 continue
             hrows = []
-            if not hdr or not row:
+            if not hdr or not row or re.search(r"playoff|post", row[0][2], re.I):
                 continue
             m = re.search(r"\b(19[2-9]\d|20[0-2]\d)\b", plain(row[0][2]))
             if not m and last_year and len(row) == len(hdr) - 1:
@@ -830,7 +832,9 @@ def season_tables(text, kind):
                     if n and n != ".":
                         st[f] = st.get(f, 0) + float(n) if f == "def_td" else float(n)
             if kind == "K" and "fgm" in st and "fga" in st or kind == "D" and len(st) >= 2:
-                out[year].append((team, st))
+                mine[year].append((team, st))
+        for year, lst in mine.items():
+            out.setdefault(year, lst)  # the first table with that season (regular season comes first)
     return out
 
 
@@ -870,11 +874,12 @@ def main():
             ks["fgm_50_plus"] = ks.pop("fgm_50_59") + ks.pop("fgm_60_plus")
             ks["fga_50_plus"] = ks.pop("fga_50_59") + ks.pop("fga_60_plus")
             rec["kicking"] = ks
-        if rec["group"] != "K":
+        if rec["group"] not in ("K", "OL"):  # a lineman's tackle after a turnover isn't a stat line
             ds = {k: s[k] for k in DEF}
             ds["tkl"] = ds["tkl_solo"] + ds["tkl_ast"]
             rec["defense"] = ds
-        rec["src"].add("nflverse_stats")
+        if "defense" in rec or "kicking" in rec:
+            rec["src"].add("nflverse_stats")
 
     print("reading weekly rosters and depth charts")
     played = played_weeks(raw_dir)
@@ -1113,12 +1118,12 @@ def finish(recs, out_path):
         "built": time.strftime("%Y-%m-%d"),
         "groups": list(GROUPS),
         "notes": [
-            "one record per player, season and franchise; id is the nflverse gsis id where the register has him, else a stand-in (nfl:name:birthdate or wiki:title)",
-            "g: games. g_src active = weekly-roster active games (2002-2015, 2020-2025); min = games with a stat or first-string weeks (a lower bound); wikipedia = kicker article table. No games before 1999 except kickers' tables",
-            "gs: weeks listed first string on the nflverse depth chart (2001-2025), not official starts",
-            "defense: nflverse weekly stats 1999-2025 summed (regular season). tkl = solo + assists. None before 1999",
-            "kicking: nflverse 1999-2025 (fg by distance), Wikipedia kicker articles before 1999 where they have a season table",
-            "honors: all_pro / all_pro_2 list first- and second-team selectors (AP, NEA, PFWA, PFW, SN...); ap1 / ap2 the AP team; pro_bowl selected (incl. injury/declined; alternates only as replacements)",
+            "one record per player, season and franchise. id: the nflverse gsis id when the register has him; else pfr:<Pro-Football-Reference id> via Wikidata (name + birth date); else a stand-in nfl:<name>:<birth date> or wiki:<title>",
+            "g: games. g_src active = weekly-roster active games (2002-2015, 2020-2025); min = games with a stat or first-string weeks, a lower bound (1999-2001 and 2016-2019); wikipedia = the player's article table. No other games before 1999",
+            "gs: gs_src depth_chart = weeks listed first string on the nflverse depth chart (2001-2025), not official starts; wikipedia = GS from the player's article",
+            "stats_src nflverse: weekly stats summed, regular season, 1999-2025 (tfl missing 2003-2011, qb_hits missing 2003-2005; tackles are play-by-play credits, not team-scored totals; assisted tackles are credited far more often from 2020). stats_src wikipedia: the season table of the player's article (pre-1999; sacks before 1982 are unofficial). With stats_src set, a missing stat is 0",
+            "honors: all_pro / all_pro_2 list first- and second-team selectors (AP, NEA, PFWA, PFW, TSN/SN, UPI...); ap1 / ap2 the AP team; pro_bowl = selected (incl. injured/declined; alternates only as replacements); pro_bowl_src infobox = from the player's article (1970 and 1979, whose Pro Bowl pages list no rosters)",
+            "jersey_src: roster, pro_bowl_page, or register_latest (his last number, may differ for earlier seasons). roster_status is the nflverse roster status (ACT, RES, ...)",
             "Wikipedia-derived fields are CC BY-SA 4.0; nflverse fields CC BY 4.0; Wikidata CC0",
         ],
     }

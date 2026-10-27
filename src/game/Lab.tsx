@@ -5,7 +5,7 @@ import { CELLS } from '../engine/data';
 import { NFL } from '../engine/sport';
 import type { Lineup, Player } from '../engine/types';
 import { Football, type Progress } from './football/Football';
-import { Hoops } from './hoops/Hoops';
+import { Hoops2, kitsFor } from './hoops2/Hoops2';
 import { rankOf } from './football/model';
 
 function sample(level: number): { lineup: Lineup; def: Player } {
@@ -38,12 +38,15 @@ export default function Lab() {
   if (!NFL)
     return (
       <div className="screen" style={{ paddingTop: 0, paddingBottom: 0 }}>
-        <Hoops
+        <Hoops2
           lineup={hoopFive(level)}
           rivalLineup={hoopFive(Number(q.get('rival') ?? 0.7))}
           rivalName="Rival"
           seed={q.get('seed') ?? 'lab'}
           rival={{ name: 'Rival', score: 9, drive: 4, done: false }}
+          ourKit={kitsFor('#1d428a', '#ffc72c').home}
+          theirKit={kitsFor('#ce1141', '#000000').away}
+          court={{ c1: '#ce1141', c2: '#ffffff', abbr: 'CHI' }}
           autoplayHook={q.has('auto')}
           onProgress={setProg}
           onDone={setProg}

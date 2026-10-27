@@ -166,3 +166,39 @@ export function celebrate(phase: number): Pose {
   const s = Math.abs(Math.sin(phase * TAU));
   return { ...STAND, lift: 0.05 * s, shR: 2.5 + 0.5 * s, elR: 0.9, shL: 0.3, elL: 1.2, nod: 0.2 };
 }
+
+/** Off balance: crossed up or posterized, leaning back with the arms out (0-1). */
+export function stumble(phase: number): Pose {
+  const t = clamp(phase);
+  const fall: Pose = { lean: -0.38, side: 0.18, crouch: 0.12, lift: 0, spread: 0.3, hipL: 0.75, kneeL: 1.1, hipR: -0.25, kneeR: 0.5, shL: 1.5, elL: 0.4, shR: 2.2, elR: 0.6, abL: 1.1, abR: 0.9, nod: 0.35 };
+  if (t < 0.3) return blend(defend(0, 0), fall, ease(t / 0.3));
+  return blend(fall, { ...fall, lean: -0.3, crouch: 0.1 }, ease((t - 0.3) / 0.7));
+}
+
+/** A crossover: low, the ball whipped from one hand to the other, a hard plant (0-1). */
+export function crossover(phase: number): Pose {
+  const t = clamp(phase);
+  const s = Math.sin(t * Math.PI);
+  return {
+    lean: 0.3,
+    side: -0.25 * s,
+    crouch: 0.1,
+    lift: 0,
+    spread: 0.25,
+    hipL: 0.5 * s,
+    kneeL: 0.9,
+    hipR: -0.3 * s,
+    kneeR: 0.7,
+    shL: 0.5 + 0.3 * s,
+    elL: 0.9,
+    shR: 0.4 + 0.4 * (1 - s),
+    elR: 0.5,
+    abL: 0.3 + 0.4 * s,
+    abR: 0.3 + 0.4 * (1 - s),
+  };
+}
+
+/** A standing dunk: a two-foot power jump, both hands (0-1). */
+export function standDunk(phase: number): Pose {
+  return dunk(phase, 'two');
+}

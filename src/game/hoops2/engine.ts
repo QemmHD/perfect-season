@@ -58,7 +58,7 @@ export function newPossession(ours: Hooper[], theirs: Hooper[], energy: number[]
   const bodies: Body[] = [];
   ours.forEach((p, i) => {
     const s = SPOTS[p.pos] ?? DRIFT[i];
-    const at = i === 0 ? { cx: 6, cz: (rand() - 0.5) * 6 } : { cx: s.cx - 3, cz: s.cz };
+    const at = i === 0 ? { cx: 12, cz: (rand() - 0.5) * 6 } : { cx: s.cx - 3, cz: s.cz };
     const b = body(i, 'O', p, at, -1, energy[i] ?? 1);
     b.home = { ...s };
     bodies.push(b);

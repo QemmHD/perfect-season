@@ -56,16 +56,18 @@ export function nearness(c: CourtCam, cx: number, cz: number): number {
  */
 export function courtCam(W: number, H: number, focusCx = 30, focusCz = 0): CourtCam {
   if (W > H) {
-    const k = W / 50;
-    const pitch = 0.36;
+    // sideways: a high three-quarter look, the near sideline running under the controls
+    const k = W / 51;
+    const pitch = 0.46;
     const floorH = 50 * k * Math.sin(pitch);
-    return { mode: 'side', W, H, k, pitch, cam: 3.5, origin: Math.round(H - floorH - k * 1.2), top: 0 };
+    return { mode: 'side', W, H, k, pitch, cam: 3, origin: Math.round(Math.max(H * 0.2, H - floorH + k * 2.5)), top: 0 };
   }
   void focusCx;
-  const k = W / 30;
-  const pitch = 0.72;
-  const pan = Math.max(-11, Math.min(11, focusCz));
-  return { mode: 'end', W, H, k, pitch, cam: COURT_LEN, origin: Math.round(W / 2 - pan * k * 0.85), top: Math.round(H * 0.27) };
+  // upright: looking up the floor, zoomed in on the half court, panning across with the ball
+  const k = W / 27;
+  const pitch = 0.8;
+  const pan = Math.max(-7, Math.min(7, focusCz * 0.6));
+  return { mode: 'end', W, H, k, pitch, cam: COURT_LEN, origin: Math.round(W / 2 - pan * k), top: Math.round(H * 0.25) };
 }
 
 export interface CourtTheme {
@@ -147,15 +149,17 @@ export function textWidth(s: string, scale: number): number {
  * The court and the arena around it, drawn whole. `crowd` (0-1) gets the fans on their feet; `t`
  * moves the scoreboard ticker and the crowd.
  */
-export function drawCourt(buf: PixBuf, c: CourtCam, theme: CourtTheme, crowd = 0, t = 0) {
+export function drawCourt(buf: PixBuf, c: CourtCam, theme: CourtTheme, crowd = 0, t = 0, stands = true) {
   const c1 = rgb(theme.c1);
   const c2 = rgb(theme.c2);
   const sp = Math.sin(c.pitch);
   const dark: RGB = [14, 18, 30];
-  buf.fill(PixBuf.pack(dark));
   // where the stands end: behind the far sideline (side) or the baseline (end)
-  const wallY = Math.round(c.mode === 'side' ? at(c, 0, -28).y : at(c, COURT_LEN + 7, 0).y);
-  drawCrowd(buf, c, wallY, c1, c2, crowd, t);
+  const wallY = wallOf(c);
+  if (stands) {
+    buf.fill(PixBuf.pack(dark));
+    drawCrowd(buf, c, wallY, c1, c2, crowd, t);
+  }
   // the floor: each pixel finds its spot on the court
   const apron = mix(c1, [0, 0, 0], 0.18);
   const outer = mix(c1, [0, 0, 0], 0.5);
@@ -180,15 +184,7 @@ export function drawCourt(buf: PixBuf, c: CourtCam, theme: CourtTheme, crowd = 0
       buf.set(x, y, PixBuf.pack(col));
     }
   }
-  // the courtside board: a lit strip in the home color with a ticker
-  const boardH = Math.max(5, Math.round(c.k * (c.mode === 'side' ? 1.1 : 1.3)));
-  buf.rect(0, wallY - boardH, c.W, boardH, PixBuf.pack(mix(c1, [0, 0, 0], 0.25)));
-  buf.rect(0, wallY - boardH, c.W, 1, PixBuf.pack(mix(c1, [255, 255, 255], 0.45)));
-  buf.rect(0, wallY - 1, c.W, 1, PixBuf.pack(mix(c1, [0, 0, 0], 0.55)));
-  const unit = ' ' + theme.abbr + ' + PERFECT SEASON +';
-  const scale = Math.max(1, Math.floor((boardH - 2) / 7));
-  const shift = Math.round((t * 20) % textWidth(unit, scale));
-  text(buf, unit.repeat(8), -shift, wallY - boardH + Math.max(1, Math.floor((boardH - 7 * scale) / 2)), scale, PixBuf.pack(mix(c2, [255, 255, 255], 0.35)));
+  if (stands) drawBoard(buf, c, theme, wallY, t);
   // the midcourt logo: the home team's letters lying on the floor
   const mid = at(c, 0, 0);
   const logoScale = Math.max(2, Math.round(c.k * 0.8));
@@ -279,6 +275,33 @@ function drawCrowd(buf: PixBuf, c: CourtCam, wallY: number, c1: RGB, c2: RGB, cr
       }
     }
   }
+}
+
+/** Where the stands meet the floor. */
+export function wallOf(c: CourtCam): number {
+  return Math.round(c.mode === 'side' ? at(c, 0, -28).y : at(c, COURT_LEN + 7, 0).y);
+}
+
+/** The courtside board: a lit strip in the home color with a scrolling ticker. */
+export function drawBoard(buf: PixBuf, c: CourtCam, theme: CourtTheme, wallY: number, t: number) {
+  const c1 = rgb(theme.c1);
+  const c2 = rgb(theme.c2);
+  const boardH = Math.max(5, Math.round(c.k * (c.mode === 'side' ? 1.1 : 1.3)));
+  buf.rect(0, wallY - boardH, c.W, boardH, PixBuf.pack(mix(c1, [0, 0, 0], 0.25)));
+  buf.rect(0, wallY - boardH, c.W, 1, PixBuf.pack(mix(c1, [255, 255, 255], 0.45)));
+  buf.rect(0, wallY - 1, c.W, 1, PixBuf.pack(mix(c1, [0, 0, 0], 0.55)));
+  const unit = ' ' + theme.abbr + ' + PERFECT SEASON +';
+  const scale = Math.max(1, Math.floor((boardH - 2) / 7));
+  const shift = Math.round((t * 20) % textWidth(unit, scale));
+  text(buf, unit.repeat(8), -shift, wallY - boardH + Math.max(1, Math.floor((boardH - 7 * scale) / 2)), scale, PixBuf.pack(mix(c2, [255, 255, 255], 0.35)));
+}
+
+/** The stands and the board alone (redrawn every frame: the ticker scrolls, the crowd jumps). */
+export function drawStands(buf: PixBuf, c: CourtCam, theme: CourtTheme, crowd: number, t: number) {
+  const wallY = wallOf(c);
+  buf.rect(0, 0, c.W, wallY, PixBuf.pack([14, 18, 30]));
+  drawCrowd(buf, c, wallY, rgb(theme.c1), rgb(theme.c2), crowd, t);
+  drawBoard(buf, c, theme, wallY, t);
 }
 
 /** The hoop behind the play: stanchion, backboard and the back of the rim. */
