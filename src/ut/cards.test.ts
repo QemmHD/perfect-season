@@ -1,10 +1,12 @@
 // The card data (src/data/cards-<sport>.json, scripts/build_cards.py) as the loader expands it:
 // invariants over every line, and spot checks against well-known seasons.
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { legendsOf, loadCards, promosOf } from './cards';
 import type { CardLine, UtSport } from './types';
 
 const RANGE: Record<UtSport, [number, number]> = { nba: [1960, 2026], nfl: [1970, 2025] };
+// the first load imports a few MB of JSON (seconds with other suites running): done once, outside the tests' 5s limit
+const LOAD_MS = 60_000;
 
 function season(lines: CardLine[], name: string, year: number, fr?: string): CardLine {
   const found = lines.filter((l) => l.kind === 'season' && l.name === name && l.season === year && (!fr || l.fr === fr));
@@ -13,6 +15,8 @@ function season(lines: CardLine[], name: string, year: number, fr?: string): Car
 }
 
 describe.each(['nba', 'nfl'] as UtSport[])('%s cards: invariants', (sport) => {
+  beforeAll(() => loadCards(sport), LOAD_MS);
+
   // checked line by line, failures collected (an expect per line would take seconds)
   it('ids are unique and well formed', async () => {
     const { lines, byId } = await loadCards(sport);
@@ -57,6 +61,8 @@ describe.each(['nba', 'nfl'] as UtSport[])('%s cards: invariants', (sport) => {
 });
 
 describe('nba cards: spot checks', () => {
+  beforeAll(() => loadCards('nba'), LOAD_MS);
+
   it('Jordan 1996 Bulls: MVP, scoring title, a promo', async () => {
     const { lines, byId } = await loadCards('nba');
     const mj = season(lines, 'Michael Jordan', 1996, 'CHI');
@@ -106,6 +112,8 @@ describe('nba cards: spot checks', () => {
 });
 
 describe('nfl cards: spot checks', () => {
+  beforeAll(() => loadCards('nfl'), LOAD_MS);
+
   it('Lawrence Taylor 1986 Giants: LB, first-team All-Pro', async () => {
     const lt = season((await loadCards('nfl')).lines, 'Lawrence Taylor', 1986, 'NYG');
     expect(lt.pos[0]).toBe('LB');
