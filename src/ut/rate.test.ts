@@ -2,7 +2,7 @@
 import { SPORT } from '../engine/sport';
 import { hooper } from '../game/hoops2/ratings';
 import { getPool } from './pool';
-import { levelBonus, NBA_KEYS, nbaLineOf, rateCard, tierOf, toHooper } from './rate';
+import { levelBonus, NBA_KEYS, nbaLineOf, onScale, rateCard, tierOf, toHooper } from './rate';
 import type { CardLine } from './types';
 
 describe('rating cards (' + SPORT + ')', () => {
@@ -11,11 +11,14 @@ describe('rating cards (' + SPORT + ')', () => {
     lines = (await getPool()).lines;
   });
 
-  it('gives tiers by overall: bronze under 65, silver to 74, gold 75 and up', () => {
-    expect([50, 64, 65, 74, 75, 99].map(tierOf)).toEqual(['bronze', 'bronze', 'silver', 'silver', 'gold', 'gold']);
+  it('gives tiers by overall: bronze under 65, silver to 74, gold 75 and up (football on its own scale)', () => {
+    expect([50, 64, 65, 74, 75, 99].map((o) => tierOf(o))).toEqual(['bronze', 'bronze', 'silver', 'silver', 'gold', 'gold']);
+    expect([75, 83, 84, 88, 89, 99].map((o) => tierOf(o, 'nfl'))).toEqual(['bronze', 'bronze', 'silver', 'silver', 'gold', 'gold']);
+    expect([56, 65, 75, 99].map((o) => onScale(o, 'nfl'))).toEqual([75, 84, 89, 99]);
+    expect(onScale(72, 'nba')).toBe(72);
     for (const l of lines.slice(0, 400)) {
       const rc = rateCard(l);
-      if (l.kind === 'season') expect(rc.tier).toBe(tierOf(rc.ovr));
+      if (l.kind === 'season') expect(rc.tier).toBe(tierOf(rc.ovr, l.sport));
       else expect(rc.tier).toBe(l.kind);
       expect(rc.key).toHaveLength(6);
       expect(rc.ovr).toBeGreaterThanOrEqual(1);

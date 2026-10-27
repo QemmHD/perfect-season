@@ -35,6 +35,7 @@
 // 6% of Premium packs, 2% of Gold packs.
 import { hashString, rng, type Rand } from '../engine/rng';
 import { type Pool, TIER_RANK } from './pool';
+import { onScale, TIER_CUTS } from './rate';
 import { positionMix } from './squad';
 import type { RatedCard, Tier, UtSport } from './types';
 
@@ -129,16 +130,21 @@ function drawPos(mix: [string, number][], rand: Rand): string {
   return mix[mix.length - 1][0];
 }
 
-/** Within a tier the lower overalls are the common ones: each point above the tier's floor is 20% rarer. */
-const FLOOR: Record<Tier, number> = { bronze: 0, silver: 65, gold: 75, promo: 0, legend: 0 };
+/**
+ * Within a tier the lower overalls are the common ones: each point above the tier's floor is 20%
+ * rarer (football's scale is about half as wide at the top, so a point there counts 2.2 times).
+ */
 const RARER = 0.8;
+const STEP: Record<UtSport, number> = { nba: 1, nfl: 2.2 };
 const cum = new WeakMap<RatedCard[], number[]>();
 
 function weighted(list: RatedCard[], tier: Tier, rand: Rand): RatedCard {
   let c = cum.get(list);
   if (!c) {
     let t = 0;
-    c = list.map((rc) => (t += tier === 'silver' || tier === 'gold' ? Math.pow(RARER, Math.max(0, rc.ovr - FLOOR[tier])) : 1));
+    const sport = list[0]?.line.sport ?? 'nba';
+    const floor = tier === 'gold' ? TIER_CUTS[sport].gold : TIER_CUTS[sport].silver;
+    c = list.map((rc) => (t += tier === 'silver' || tier === 'gold' ? Math.pow(RARER, Math.max(0, rc.ovr - floor) * STEP[sport]) : 1));
     cum.set(list, c);
   }
   const x = rand() * c[c.length - 1];
@@ -276,13 +282,16 @@ function starterCards(pool: Pool, rand: Rand): RatedCard[] {
  */
 export function quickSellValue(rc: RatedCard): number {
   const o = rc.ovr;
+  const sport = rc.line.sport;
+  const { silver, gold } = TIER_CUTS[sport];
+  const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
   let v: number;
-  if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - 90);
-  else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - 78);
-  else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(Math.min(1, Math.max(0, o - 75) / 20), 1.5);
-  else if (rc.tier === 'silver') v = 40 + 40 * Math.min(1, Math.max(0, o - 65) / 9);
-  else v = 15 + 15 * Math.min(1, Math.max(0, o - 50) / 14);
-  v *= PACK_SHAPE[rc.line.sport].qs;
+  if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - onScale(90, sport));
+  else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - onScale(78, sport));
+  else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (99 - gold)), 1.5);
+  else if (rc.tier === 'silver') v = 40 + 40 * clamp01((o - silver) / (gold - silver - 1));
+  else v = 15 + 15 * clamp01((o - (silver - 15)) / 14);
+  v *= PACK_SHAPE[sport].qs;
   return Math.max(5, Math.round(v / 5) * 5);
 }
 
@@ -292,11 +301,11 @@ export function revealOrder(cards: RatedCard[]): RatedCard[] {
 }
 
 /**
- * How big a walkout a pull gets: 0 none (bronze, silver), 1 a gold, 2 a star (an 85+ gold or a
- * Hot Season), 3 a legend.
+ * How big a walkout a pull gets: 0 none (bronze, silver), 1 a gold, 2 a star (an 85+ gold on
+ * basketball's scale, or a Hot Season), 3 a legend.
  */
 export function walkoutLevel(rc: RatedCard): 0 | 1 | 2 | 3 {
   if (rc.tier === 'legend') return 3;
-  if (rc.tier === 'promo' || (rc.tier === 'gold' && rc.ovr >= 85)) return 2;
+  if (rc.tier === 'promo' || (rc.tier === 'gold' && rc.ovr >= onScale(85, rc.line.sport))) return 2;
   return rc.tier === 'gold' ? 1 : 0;
 }

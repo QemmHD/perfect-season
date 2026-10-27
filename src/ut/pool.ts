@@ -1,8 +1,8 @@
 // The card pool the mode plays with: every card line, rated once at level 1, and grouped by tier
 // and position for the packs. Loaded when Ultimate Team opens, never before.
 import { SPORT } from '../engine/sport';
-// The real per-season card data replaces the stand-in here: `from './cards'` (same signature).
-import { loadCards } from './devcards';
+// the per-season card data (src/data/cards-<sport>.json, scripts/build_cards.py)
+import { loadCards } from './cards';
 import { rateCard } from './rate';
 import type { CardLine, OwnedCard, RatedCard, Tier, UtSport } from './types';
 

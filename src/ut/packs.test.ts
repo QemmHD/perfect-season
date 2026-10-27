@@ -4,6 +4,7 @@
 import { SPORT } from '../engine/sport';
 import { LEGEND_GOLD, LEGEND_PREMIUM, openPack, PACK_SHAPE, packDefs, positionChoices, PROMO_GOLD, PROMO_PREMIUM, quickSellValue, revealOrder, walkoutLevel } from './packs';
 import { getPool, type Pool, TIER_RANK } from './pool';
+import { onScale } from './rate';
 import { positionMix } from './squad';
 import type { RatedCard, Tier } from './types';
 
@@ -69,8 +70,8 @@ describe('packs (' + SPORT + ')', () => {
     const golds = Array.from({ length: 600 }, (_, i) => openPack(pool, 'gold', 'r' + i))
       .flat()
       .filter((c) => c.tier === 'gold');
-    const low = golds.filter((c) => c.ovr < 80).length;
-    const high = golds.filter((c) => c.ovr >= 88).length;
+    const low = golds.filter((c) => c.ovr < onScale(80, SPORT)).length;
+    const high = golds.filter((c) => c.ovr >= onScale(88, SPORT)).length;
     expect(low).toBeGreaterThan(high * 3);
   });
 

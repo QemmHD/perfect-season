@@ -147,7 +147,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
           )}
           {step >= 3 && (
             <>
-              <b className={'disp ut-walk-tier t-' + star.tier}>{star.tier === 'gold' ? (star.ovr >= 85 ? 'GOLD STAR' : 'GOLD') : TIER_NAMES[star.tier].toUpperCase()}</b>
+              <b className={'disp ut-walk-tier t-' + star.tier}>{star.tier === 'gold' ? (level >= 2 ? 'GOLD STAR' : 'GOLD') : TIER_NAMES[star.tier].toUpperCase()}</b>
               <span className="ut-walk-card">
                 <UtCard rc={star} w={190} attrs pose={level >= 2 ? 'cheer' : 'stand'} tilt={step >= 4} />
               </span>

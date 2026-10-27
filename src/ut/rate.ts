@@ -8,11 +8,42 @@ import { groupOf, NFL_KEYS, rateNflLine } from '../game/football2/ratings';
 import { BADGE_NAMES, hooper, type NbaLine } from '../game/hoops2/ratings';
 import type { Hooper } from '../game/hoops2/types';
 import { MAX_LEVEL } from './state';
-import type { CardLine, RatedCard, Tier } from './types';
+import type { CardLine, RatedCard, Tier, UtSport } from './types';
 
-/** Bronze under 65, silver 65-74, gold 75 and up. */
-export function tierOf(ovr: number): Tier {
-  return ovr >= 75 ? 'gold' : ovr >= 65 ? 'silver' : 'bronze';
+/**
+ * Where silver and gold start, per sport. Basketball follows the doc: bronze under 65, silver
+ * 65-74, gold 75 and up (about 62% / 16% / 22% of its season cards). Football's ratings run
+ * hotter (median 82; 80% of its cards are 75+, and under 1% would be bronze), so its cuts sit where
+ * they give the same mix: bronze under 84, silver 84-88, gold 89 and up.
+ */
+export const TIER_CUTS: Record<UtSport, { silver: number; gold: number }> = { nba: { silver: 65, gold: 75 }, nfl: { silver: 84, gold: 89 } };
+
+export function tierOf(ovr: number, sport: UtSport = 'nba'): Tier {
+  const c = TIER_CUTS[sport];
+  return ovr >= c.gold ? 'gold' : ovr >= c.silver ? 'silver' : 'bronze';
+}
+
+/** basketball's overall → football's, at the same standing (from the two pools' distributions) */
+const SCALE: [number, number][] = [
+  [40, 62],
+  [56, 75],
+  [65, 84],
+  [75, 89],
+  [99, 99],
+];
+
+/**
+ * A number written on basketball's 0-99 scale (a challenge's "team overall 72", a star's 85) at the
+ * same standing in this sport.
+ */
+export function onScale(x: number, sport: UtSport): number {
+  if (sport === 'nba') return x;
+  for (let i = 1; i < SCALE.length; i++) {
+    const [a0, b0] = SCALE[i - 1];
+    const [a1, b1] = SCALE[i];
+    if (x <= a1 || i === SCALE.length - 1) return Math.round(b0 + ((Math.max(a0, Math.min(a1, x)) - a0) * (b1 - b0)) / (a1 - a0));
+  }
+  return x;
 }
 
 export const TIER_NAMES: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', legend: 'Legend' };
@@ -153,7 +184,7 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   const baseOvr = cap(base + boost);
   const ovr = cap(base + bonus);
   // a season card's tier is its unlevelled overall's, so levelling never turns bronze into silver
-  const tier: Tier = line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(baseOvr);
+  const tier: Tier = line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(baseOvr, line.sport);
   return { line, ovr, tier, pos: at, attrs, key: keys.map(([c, n]) => [c, n, attrs[c] ?? ovr]), abil };
 }
 

@@ -4,6 +4,7 @@
 import { hashString, pickOne, rng, type Rand, shuffle } from '../engine/rng';
 import { openPack, packRand, quickSellValue } from './packs';
 import { decadeOf, type Pool, TIER_RANK } from './pool';
+import { onScale } from './rate';
 import type { RatedCard, Tier, UtSport } from './types';
 
 export type Req =
@@ -185,6 +186,8 @@ function context(pool: Pool, seed: string): Ctx {
 type Template = (c: Ctx) => Omit<Sbc, 'id' | 'kind'>;
 
 const nba = (c: Ctx) => c.pool.sport === 'nba';
+/** a threshold written on basketball's scale, in this sport's */
+const sc = (c: Ctx, x: number) => onScale(x, c.pool.sport);
 
 const EASY: Template[] = [
   () => ({ title: 'Three of a Kind', blurb: 'Teammates trade well.', size: 3, reqs: [{ k: 'sameFr', n: 3 }], reward: { pack: 'silver' } }),
@@ -193,34 +196,34 @@ const EASY: Template[] = [
     return { title: d + 's Night', blurb: 'A trip back to the ' + d + 's.', size: 3, reqs: [{ k: 'decade', decade: d, n: 3 }], reward: { coins: 300 } };
   },
   () => ({ title: 'Silver Lining', blurb: 'Swap some silver for something shinier.', size: 4, reqs: [{ k: 'tier', tier: 'silver', n: 3 }], reward: { pack: 'silver', coins: 100 } }),
-  () => ({ title: 'Bronze Age', blurb: 'Clear out the bench.', size: 5, reqs: [{ k: 'minOvr', ovr: 50 }], reward: { coins: 250 } }),
+  (c) => ({ title: 'Bronze Age', blurb: 'Clear out the bench.', size: 5, reqs: [{ k: 'minOvr', ovr: sc(c, 50) }], reward: { coins: 250 } }),
 ];
 
 const MEDIUM: Template[] = [
   (c) => {
     const f = pickOne(c.frs, c.rand);
-    return { title: 'Franchise Night', blurb: 'Bring the ' + f.name + '.', size: 4, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 2 }, { k: 'teamOvr', ovr: 64 }], reward: { pack: 'silver', coins: 250 } };
+    return { title: 'Franchise Night', blurb: 'Bring the ' + f.name + '.', size: 4, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 2 }, { k: 'teamOvr', ovr: sc(c, 64) }], reward: { pack: 'silver', coins: 250 } };
   },
-  () => ({ title: 'Same Era', blurb: 'One decade, one team.', size: 5, reqs: [{ k: 'sameDecade', n: 5 }, { k: 'teamOvr', ovr: 65 }], reward: { pack: 'gold' } }),
+  (c) => ({ title: 'Same Era', blurb: 'One decade, one team.', size: 5, reqs: [{ k: 'sameDecade', n: 5 }, { k: 'teamOvr', ovr: sc(c, 65) }], reward: { pack: 'gold' } }),
   () => ({ title: 'Silver Squad', blurb: 'A whole lineup of silver or better.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { pack: 'gold' } }),
 ];
 
 const HARD: Template[] = [
   (c) =>
     nba(c)
-      ? { title: 'A Full Five', blurb: 'A real lineup, and a good one.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'teamOvr', ovr: 72 }], reward: { pack: 'gold', coins: 300 } }
-      : { title: 'Skill Set', blurb: 'A whole offense around the quarterback.', size: 5, reqs: [{ k: 'positions', pos: ['QB', 'RB', 'WR', 'WR', 'TE'] }, { k: 'teamOvr', ovr: 72 }], reward: { pack: 'gold', coins: 300 } },
-  () => ({ title: 'Golden Hour', blurb: 'Three golds for a better one.', size: 3, reqs: [{ k: 'tier', tier: 'gold', n: 3 }], reward: { card: { tier: 'gold', minOvr: 84 } } }),
+      ? { title: 'A Full Five', blurb: 'A real lineup, and a good one.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'gold', coins: 300 } }
+      : { title: 'Skill Set', blurb: 'A whole offense around the quarterback.', size: 5, reqs: [{ k: 'positions', pos: ['QB', 'RB', 'WR', 'WR', 'TE'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'gold', coins: 300 } },
+  (c) => ({ title: 'Golden Hour', blurb: 'Three golds for a better one.', size: 3, reqs: [{ k: 'tier', tier: 'gold', n: 3 }], reward: { card: { tier: 'gold', minOvr: sc(c, 84) } } }),
   (c) => {
     const f = pickOne(c.frs, c.rand);
-    return { title: f.name + ' Legacy', blurb: 'Three from one franchise, all good ones.', size: 3, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 3 }, { k: 'minOvr', ovr: 68 }], reward: { card: { tier: 'gold', minOvr: 78, fr: f.fr } } };
+    return { title: f.name + ' Legacy', blurb: 'Three from one franchise, all good ones.', size: 3, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 3 }, { k: 'minOvr', ovr: sc(c, 68) }], reward: { card: { tier: 'gold', minOvr: sc(c, 78), fr: f.fr } } };
   },
 ];
 
 const WEEKLY: Template[] = [
   (c) => {
     const f = pickOne(c.frs, c.rand);
-    return { title: 'Dynasty: ' + f.name, blurb: 'Five from one franchise. A Hot Season card comes back.', size: 5, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 5 }, { k: 'teamOvr', ovr: 70 }], reward: { card: { tier: 'promo', fr: f.fr } } };
+    return { title: 'Dynasty: ' + f.name, blurb: 'Five from one franchise. A Hot Season card comes back.', size: 5, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 5 }, { k: 'teamOvr', ovr: sc(c, 70) }], reward: { card: { tier: 'promo', fr: f.fr } } };
   },
   (c) => {
     const d = pickOne(c.decades, c.rand);
@@ -230,7 +233,7 @@ const WEEKLY: Template[] = [
     nba(c)
       ? { title: 'Gold Standard', blurb: 'A gold five at every position.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'tier', tier: 'gold', n: 5 }], reward: { pack: 'premium', coins: 500 } }
       : { title: 'Gold Front Seven', blurb: 'A gold front seven.', size: 7, reqs: [{ k: 'positions', pos: ['DE', 'DE', 'DT', 'DT', 'LB', 'LB', 'LB'] }, { k: 'tier', tier: 'gold', n: 7 }], reward: { pack: 'premium', coins: 500 } },
-  () => ({ title: 'Team Builders', blurb: 'Eight cards, one era, real chemistry.', size: 8, reqs: [{ k: 'sameDecade', n: 6 }, { k: 'sameFr', n: 3 }, { k: 'teamOvr', ovr: 70 }], reward: { pack: 'premium' } }),
+  (c) => ({ title: 'Team Builders', blurb: 'Eight cards, one era, real chemistry.', size: 8, reqs: [{ k: 'sameDecade', n: 6 }, { k: 'sameFr', n: 3 }, { k: 'teamOvr', ovr: sc(c, 70) }], reward: { pack: 'premium' } }),
 ];
 
 /** Today's three (easy, medium, hard) and this week's two challenges. */
