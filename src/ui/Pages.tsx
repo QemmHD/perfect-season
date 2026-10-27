@@ -16,6 +16,7 @@ import { ArenaHero } from './Hero';
 import { usePulse } from './motion';
 import { GlobalBoard } from './Leaderboard';
 import { StreakChip } from './Rewards';
+import { FavoritesCard } from './Favorites';
 import { Bolt, Calendar, Crown, Football, Home as HomeIcon, Hoop, Lock, Ranks as RanksIcon, Target, User } from './icons';
 import { PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
 
@@ -377,7 +378,7 @@ export function BoostersPage(props: { profile: Profile; onBuy: (b: Booster) => v
   );
 }
 
-export function ProfilePage(props: { profile: Profile; onName?: () => void; onBinder: () => void }) {
+export function ProfilePage(props: { profile: Profile; onName?: () => void; onBinder: () => void; onFavs?: () => void }) {
   const p = props.profile;
   const lv = levelInfo(p.xp);
   const best = bestRuns(p.history, 'all', 1)[0];
@@ -423,6 +424,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
             </div>
           ))}
         </div>
+        {props.onFavs && <FavoritesCard onEdit={props.onFavs} />}
         <button className="binder-card rise-in" onClick={props.onBinder}>
           <span className="stack" aria-hidden="true">
             <i />

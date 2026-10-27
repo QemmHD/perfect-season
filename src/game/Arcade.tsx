@@ -12,16 +12,17 @@ import type { RivalLive } from './progress';
 import { WaitLine } from './Wait';
 import { DRIVES } from './football/drive';
 import { squadOf } from './football/model';
-import { POSSESSIONS } from './hoops/game';
-import { aiPossessions, Hoops } from './hoops/Hoops';
+import { POSSESSIONS } from './hoops2/game';
+import { aiPossessions2, Hoops2 } from './hoops2/Hoops2';
 import { fiveOf } from './hoops/model';
+import { type BasketballKit, type Kits, kitsFor } from './uniforms';
 
 import type { Progress } from './progress';
 
 export type { Progress };
 
 /** what each way a drive or possession can end is worth, and the ones the wire may carry */
-const POINTS: Record<string, number> = NFL ? { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0 } : { '2': 2, '3': 3, X: 0, TO: 0 };
+const POINTS: Record<string, number> = NFL ? { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0 } : { '2': 2, '3': 3, A: 3, X: 0, TO: 0 };
 /** drives or possessions each */
 const TOTAL = NFL ? DRIVES : POSSESSIONS;
 const UNIT = NFL ? 'drive' : 'possession';
@@ -63,6 +64,7 @@ export function Arcade({
   rivalGone,
   tookMe,
   autoplay,
+  kits,
   onProgress,
   onTakeover,
   onFinish,
@@ -80,6 +82,8 @@ export function Arcade({
   /** online: the other phone gave up on this one and let the AI finish its drives from this one on */
   tookMe: number | null;
   autoplay?: boolean;
+  /** basketball: what each side wears, and the court (the rival's) */
+  kits?: Kits<BasketballKit>;
   onProgress: (p: Progress) => void;
   /** this phone let the AI finish the rival's drives from drive `k` on: tell the other phone */
   onTakeover: (k: number) => void;
@@ -104,7 +108,7 @@ export function Arcade({
   const rivalDef = (rivalLineup.DEF as Player | null) ?? null;
   // the AI's side, played up front (its offense against your defense)
   const aiPlay = (off: Lineup, def: Lineup, s: string, skill: number, a: (p: Player) => Attrs | null): Progress =>
-    NFL ? aiDrives(off, (def.DEF as Player | null) ?? null, s, skill, a) : aiPossessions(off, def, s, skill, a);
+    NFL ? aiDrives(off, (def.DEF as Player | null) ?? null, s, skill, a) : aiPossessions2(off, def, s, skill, a);
   const ai = useMemo(() => (!online && attrs ? aiPlay(rivalLineup, lineup, seed, AI_SKILL[botLevel], attrs) : null), [attrs]);
 
   // Online, the AI can finish the other side's drives: when that phone goes quiet, or when you're
@@ -214,8 +218,8 @@ export function Arcade({
           </div>
         )}
         <div className="arc-how">
-          <span>Stick: move · PASS to the man you point at (or the open one)</span>
-          <span>Hold SHOOT and let go at the top of the jump · near the rim it’s a layup, or a dunk</span>
+          <span>Stick: move · PASS to the man you point at · CROSS breaks your man down</span>
+          <span>Hold SHOOT and let go in the green · near the rim it’s a layup, or a dunk</span>
         </div>
         {online && rivalLive?.done && (
           <p className="arc-wait">
@@ -297,6 +301,9 @@ export function Arcade({
       </div>
     );
   }
-  if (!NFL) return <Hoops lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  if (!NFL) {
+    const k = kits ?? kitsFor(null, null, 'nba');
+    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} rivalName={rivalName} seed={seed} rival={shown} ourKit={k.mine} theirKit={k.theirs} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  }
   return <Football lineup={lineup} rivalDef={rivalDef} rivalName={rivalName} seed={seed} rival={shown} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
 }

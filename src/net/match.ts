@@ -4,11 +4,14 @@ import { NFL, SPORT, type SportId } from '../engine/sport';
 import { DATA_V } from '../engine/version';
 import type { Slot } from '../engine/types';
 import { displayName } from '../lib/names';
+import { teamOf } from '../data/teams';
+import { type Ballot, type Seen, voteWireOf } from './vote';
 import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_QUEUE, myPubkey, NET_ON, NS_SUFFIX, pool, query, sign, tagValue } from './nostr';
 
 /** Bump when the draft rules change, so only players on the same rules get paired. 2: the
-    match is played out (the arcade game), and each side's score goes over the match channel. */
-const DRAFT_RULES = 2;
+    match is played out (the arcade game), and each side's score goes over the match channel.
+    3: a sim-or-play vote before the game, favorite teams for the uniforms, basketball v2. */
+const DRAFT_RULES = 3;
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = 'ps1-' + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
 /** Everyone with the app open, whichever sport: the online count is the whole app's. */
@@ -395,6 +398,14 @@ export interface MatchState {
   /** this player's phone gave up on the other one in the game after the draft and let the AI
    * finish their drives, from this one on (the other phone then counts its score the same way) */
   arcadeTook?: number | null;
+  /** the sim-or-play vote (see vote.ts): this phone's vote, null until it reaches the vote screen */
+  vote?: Ballot | null;
+  /** set once this phone's countdown ended: its vote is final */
+  voteAt?: number | null;
+  /** the other phone's final vote as this phone took it, or 'lost' (it went with the coin) */
+  voteSaw?: Seen | null;
+  /** this player's favorite team in this sport: the colors his side wears */
+  fav?: string | null;
 }
 
 export interface ArcadeState {
@@ -416,6 +427,12 @@ function arcadeOf(x: unknown): ArcadeState | null {
   if (score === null || drive === null) return null;
   const ends = Array.isArray(a.ends) ? a.ends.filter((e): e is string => typeof e === 'string' && e.length <= 8).slice(0, 40) : [];
   return { score, drive, done: a.done === true, ends, plays: n(a.plays, 99999) ?? 0 };
+}
+
+/** The vote's fields from the wire, checked. */
+function voteFields(c: Record<string, unknown>): Pick<MatchState, 'vote' | 'voteAt' | 'voteSaw'> {
+  const w = voteWireOf(c);
+  return { vote: w.vote, voteAt: w.at, voteSaw: w.saw };
 }
 
 function tookOf(x: unknown): number | null {
@@ -542,6 +559,8 @@ export class MatchConn {
       tookOver: c.tookOver === true,
       arcade: arcadeOf(c.arcade),
       arcadeTook: tookOf(c.arcadeTook),
+      ...voteFields(c),
+      fav: teamOf(SPORT, c.fav)?.abbr ?? null,
     };
     this.report();
   }
