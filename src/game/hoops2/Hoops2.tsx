@@ -148,7 +148,7 @@ export function Hoops2({
       else if (e === 'lob') {
         sfx.whoosh();
         say('LOB!', 'plain', 600);
-      } else if (e === 'catch') sfx.tick();
+      } else if (e === 'catch') sfx.catch();
       else if (e === 'rise') sfx.click();
       else if (e === 'release-green') {
         sfx.coin();
@@ -175,20 +175,20 @@ export function Hoops2({
           if (kind === 'contact') fx.flash = 0.7;
         }
       } else if (e.startsWith('ankles:')) {
-        sfx.stamp();
+        sfx.ooh();
         crowd.swell(0.9);
         fx.crowd = 1;
         say('ANKLES BROKEN!', 'big', 1100);
       } else if (e.startsWith('shook:')) {
-        sfx.select();
+        sfx.squeak();
         say('SHOOK HIM', 'good', 700);
       } else if (e.startsWith('blocked:')) {
-        sfx.stamp();
+        sfx.block();
         vibrate(30);
         shake(3);
         const d = p.bodies[Number(e.slice(8))];
         say('REJECTED BY ' + d.p.tag, 'bad', 1100);
-      } else if (e === 'rim') sfx.stop();
+      } else if (e === 'rim') sfx.rim();
       else if (e.startsWith('orb:')) {
         sfx.select();
         say('OFFENSIVE BOARD', 'good', 800);
@@ -208,7 +208,7 @@ export function Hoops2({
       fx.swish = 1;
       const ls = p.lastShot;
       const big = ls?.kind === 'three' || ls?.kind === 'dunk' || ls?.kind === 'contact' || ls?.kind === 'oop' || ls?.kind === 'standdunk';
-      sfx.scoreUs(!!big);
+      sfx.bucket(ls?.kind, !!big);
       crowd.swell(big ? 1 : 0.55);
       fx.crowd = big ? 1 : 0.5;
       const shooter = p.bodies[e.who];
@@ -220,10 +220,10 @@ export function Hoops2({
       say(e.text + and1 + ' +' + (mark === 'A' ? 3 : e.points), big || and1 ? 'big' : 'good', 1400);
       if (game.fire >= 0 && game.fire !== wasFire) window.setTimeout(() => say(game.ours[game.fire].tag + ' IS ON FIRE!', 'big', 1400), 900);
     } else if (e.kind === 'miss') {
-      sfx.nope();
+      sfx.groan(0.6);
       say(e.text, 'plain', 1000);
     } else {
-      sfx.scoreThem();
+      sfx.groan();
       vibrate(40);
       say(e.text, 'bad', 1300);
     }
