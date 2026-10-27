@@ -4,7 +4,7 @@
 // scaled up with smoothing off, so every pixel stays crisp. Uniform colors, number, hair and size
 // all come from the look, so any player can wear any team's home or away set.
 import { type RGB, mix, onColor, outlineOf, ramp, rgb } from './color';
-import { joints, type P2, type Pose, project, shapeOf, type View } from './rig';
+import { type Joints, joints, type P2, type Pose, project, type Shape, shapeOf, type View } from './rig';
 
 export interface Look {
   sport: 'nba' | 'nfl';
@@ -236,14 +236,26 @@ export interface Sprite {
   top: number;
 }
 
+/** A player's body proportions, from his look (height, weight, football pads). */
+export function shapeFor(look: Look): Shape {
+  return shapeOf({ ht: look.ht, wt: look.wt }, look.sport === 'nfl' ? (look.pads ?? 1) : 0);
+}
+
+/** Joints handed in (motion capture, mocap.ts) rather than a pose to build them from. */
+function isJoints(p: Pose | Joints): p is Joints {
+  return typeof (p as Joints).pelvis === 'object';
+}
+
 /**
  * Draw a player: `px` is his height in pixels on the grid (the game scales the grid up). Parts are
- * drawn far to near with a depth test, so overlaps come out right from any side.
+ * drawn far to near with a depth test, so overlaps come out right from any side. The body is a
+ * hand-keyed pose (poses.ts) or ready-made joints, such as a motion-capture frame retargeted to
+ * this player (mocap.ts: built with shapeFor(look), feet at y = 0).
  */
-export function drawBody(look: Look, pose: Pose, view: View, px: number): Sprite {
+export function drawBody(look: Look, pose: Pose | Joints, view: View, px: number): Sprite {
   const nfl = look.sport === 'nfl';
-  const s = shapeOf({ ht: look.ht, wt: look.wt }, nfl ? (look.pads ?? 1) : 0);
-  const j = joints(pose, s);
+  const s = shapeFor(look);
+  const j = isJoints(pose) ? pose : joints(pose, s);
   const P = (k: keyof typeof j) => project(j[k], view, px);
   const W = Math.ceil(px * 1.25) + 6;
   const H = Math.ceil(px * 1.7) + 6;
@@ -531,4 +543,4 @@ export function beardFor(id: string): boolean {
   return (hash(id + ':b') % 4) === 0;
 }
 
-export type { Pose, View };
+export type { Joints, Pose, View };
