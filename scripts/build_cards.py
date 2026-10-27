@@ -35,7 +35,10 @@ Chicago Bulls).
 pos: the season's listed position first, then his other career positions (12%+ of his games).
 num: the number he wore for that team that season: the APBR uniform-number lists (1960-2007),
 then the nba.stats season rosters (1997-2026), both cached by build_game_attrs.py's sources if
-present; else null. ht/wt: inches/pounds from Player Career Info (one value per career).
+present; where neither has him, src/data/nba-attrs.json's `num` for his line with that franchise
+in that decade (the number he wore most there that decade, which adds ESPN's rosters from
+2012-13; line key "<fr>-<decade>:<pid>", a season in the decade it ends in); else null.
+ht/wt: inches/pounds from Player Career Info (one value per career).
 stats (per game unless noted):
   g      games;  mpg minutes per game
   pts reb ast stl blk tov   per game (stl/blk from 1973-74, tov from 1977-78; null before)
@@ -454,6 +457,18 @@ def nba_numbers(cache, stints, names):
     return out
 
 
+def attrs_numbers():
+    """build_game_attrs.py's per-line jersey numbers ("<fr>-<decade>:<pid>" -> number), or {}."""
+    path = os.path.join(DATA, "nba-attrs.json")
+    if not os.path.exists(path):
+        return {}
+    d = json.load(open(path, encoding="utf-8"))
+    if "num" not in d["fields"]:
+        return {}
+    i = d["fields"].index("num")
+    return {k: v[i] for k, v in d["lines"].items() if v[i] is not None}
+
+
 def build_nba(cache):
     franchise, identity, w = B.from_build_script("build_nba_data.py", "FRANCHISE", "IDENTITY", "W")
     totals = nba_file(cache, "Player Totals.csv", "raw", "attrs", "ut")
@@ -621,6 +636,8 @@ def build_nba(cache):
             main_stint[key] = s
 
     numbers = nba_numbers(cache, stints, names)
+    decade_num = attrs_numbers()
+    filled = 0
     lines = []
     for s in stints:
         r, season, g = s["r"], s["season"], s["g"]
@@ -661,13 +678,20 @@ def build_nba(cache):
         pos += [p for p in career_pos(s["pid"]) if p not in pos]
         abbr, c1, c2 = identity[s["team"]]
         ht, wt = body.get(s["pid"], (None, None))
+        n = numbers.get((season, s["fr"], s["pid"]))
+        if n is None:
+            n = decade_num.get("%s-%d:%s" % (s["fr"], season // 10 * 10, s["pid"]))
+            filled += n is not None
         lines.append({
             "pid": s["pid"], "name": s["name"], "ht": sig3(ht), "wt": sig3(wt), "season": season, "fr": s["fr"],
             "team": (s["fr"], abbr, team_name.get((season, s["team"]), abbr), c1, c2), "pos": pos or ["SF"],
-            "num": numbers.get((season, s["fr"], s["pid"])), "games": g, "starts": num(r["gs"]), "grp": "ALL",
+            "num": n, "games": g, "starts": num(r["gs"]), "grp": "ALL",
             "stats": st, "honors": hn, "records": recs, "val": s["val"],
             "_rk": {"pts": st["pts"], **per36, "val": s["val"], "fg3": st["fg3"], "ft": st["ft"]},
         })
+
+    print("nba numbers from nba-attrs.json (where the season lists have none): %d; known on %.1f%% of lines"
+          % (filled, 100.0 * sum(ln["num"] is not None for ln in lines) / len(lines)))
 
     # ranks within the season among stints with 20+ games
     by_season = defaultdict(list)
