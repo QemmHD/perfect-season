@@ -6,8 +6,10 @@ import { easternDateKey } from '../engine/season';
 import { NFL, SPORT } from '../engine/sport';
 import { newId, type Profile } from '../lib/profile';
 import { sfx, vibrate } from '../lib/sound';
+import { NET_ON } from '../net/nostr';
 import { CoinChip } from '../ui/common';
 import { Back } from '../ui/icons';
+import { Battles } from './Battles';
 import { CardDetail } from './CardDetail';
 import { Challenges } from './Challenges';
 import { Club } from './Club';
@@ -18,7 +20,7 @@ import { openPack, packDefs, packName, quickSellValue } from './packs';
 import type { PlaySquad } from './play';
 import { getPool, type Pool, ratedOf } from './pool';
 import { rewardCard, type Sbc, sbcsFor, weekOf } from './sbc';
-import { canPlay, type Lineup, rateSquad, slotsFor } from './squad';
+import { canPlay, type Lineup, rateSquad, slotsFor, startersComplete } from './squad';
 import { SquadView } from './SquadView';
 import type { UtState } from './state';
 import { Store } from './Store';
@@ -32,7 +34,10 @@ export interface ClubCard {
   slot: string | null;
 }
 
-export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc';
+export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles';
+
+/** the view to come back to after a match (the screen unmounts while it's played) */
+let lastView: UtView = 'hub';
 
 const TABS: [UtView, string, React.ReactNode][] = [
   ['hub', 'HOME', <IconHub />],
@@ -54,14 +59,18 @@ export default function UltimateTeam(props: {
   update: (fn: (p: Profile) => Profile) => void;
   onExit: () => void;
   onToast: (t: string) => void;
-  /** the played matches (the next step): absent until then */
+  /** play the squad: a Squad Battles rung, or online head to head (App.tsx opens Match.tsx) */
   onPlaySquad?: PlaySquad;
 }) {
   const { profile, update, onToast } = props;
   const ut = profile.ut;
   const [pool, setPool] = useState<Pool | null>(null);
   const [failed, setFailed] = useState(false);
-  const [view, setView] = useState<UtView>('hub');
+  const [view, setViewNow] = useState<UtView>(() => lastView);
+  const setView = (v: UtView) => {
+    lastView = v;
+    setViewNow(v);
+  };
   const [opening, setOpening] = useState<Opening | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const busy = useRef(false);
@@ -89,6 +98,7 @@ export default function UltimateTeam(props: {
   const lineup: Lineup = useMemo(() => Object.fromEntries(Object.entries(ut.squad).map(([s, u]) => [s, byUid.get(u)?.rc ?? null])), [ut.squad, byUid]);
   const rating = useMemo(() => rateSquad(SPORT, lineup), [lineup]);
   const sbcs = useMemo(() => (pool ? sbcsFor(pool, day) : []), [pool, day]);
+  const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
 
   const setUt = (fn: (u: UtState) => UtState) => update((p) => ({ ...p, ut: fn(p.ut) }));
 
@@ -238,6 +248,24 @@ export default function UltimateTeam(props: {
   else if (view === 'club') body = <Club club={club} onInspect={setDetail} onSell={quickSell} />;
   else if (view === 'store')
     body = <Store sport={SPORT} coins={profile.coins} starter={!ut.starterClaimed} pending={ut.packs} defs={packDefs(SPORT)} onBuy={buy} onStarter={claimStarter} onPending={openPending} />;
+  else if (view === 'battles')
+    body = (
+      <Battles
+        pool={pool}
+        sport={SPORT}
+        week={weekOf(day)}
+        battles={ut.battles}
+        rating={rating}
+        ready={ready}
+        onSquad={() => go('squad')}
+        onToast={onToast}
+        onPlay={(rung) => {
+          const play = props.onPlaySquad;
+          if (!play) return onToast('Squad Battles aren’t available here.');
+          play({ id: Date.now(), mode: 'ai', rung });
+        }}
+      />
+    );
   else if (view === 'sbc') body = <Challenges pool={pool} sbcs={sbcs} done={ut.sbc.done} club={club} day={day} onSubmit={submitSbc} onToast={onToast} />;
   else
     body = (
@@ -253,13 +281,20 @@ export default function UltimateTeam(props: {
         onGo={go}
         onStarter={claimStarter}
         onPlay={(mode) => {
+          if (mode === 'ai') return go('battles');
           const play = props.onPlaySquad;
-          if (!play) {
+          if (!play || !NET_ON) {
             sfx.nope();
-            onToast((mode === 'ai' ? 'Squad battles vs the AI' : 'Online head to head') + ' arrive in the next update. Build your squad meanwhile!');
+            onToast('Head to head needs a connection.');
             return;
           }
-          play({ id: Date.now(), mode, rung: mode === 'ai' ? ut.battles.cleared : undefined });
+          if (!ready) {
+            sfx.nope();
+            onToast('Fill every starting spot in your squad first.');
+            return go('squad');
+          }
+          sfx.click();
+          play({ id: Date.now(), mode: 'online' });
         }}
       />
     );
@@ -267,10 +302,10 @@ export default function UltimateTeam(props: {
   return (
     <div className={'screen ut ut-v-' + view}>
       <div className="topbar ut-top">
-        <button className="icon-btn pill-btn" onClick={() => (view === 'hub' ? (sfx.click(), props.onExit()) : go('hub'))} aria-label={view === 'hub' ? 'Leave Ultimate Team' : 'Back to the Ultimate Team home'}>
+        <button className="icon-btn pill-btn" onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go('hub'))} aria-label={view === 'hub' ? 'Leave Ultimate Team' : 'Back to the Ultimate Team home'}>
           <Back size={16} /> {view === 'hub' ? 'HOME' : 'UT'}
         </button>
-        <span className="ut-title disp">{view === 'hub' ? 'Ultimate Team' : TABS.find((t) => t[0] === view)![1]}</span>
+        <span className="ut-title disp">{view === 'hub' ? 'Ultimate Team' : view === 'battles' ? 'Squad Battles' : TABS.find((t) => t[0] === view)![1]}</span>
         <CoinChip coins={profile.coins} />
       </div>
       <div className="ut-body">{body}</div>

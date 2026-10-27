@@ -1,12 +1,11 @@
-// The hook for playing a squad. The played matches (vs AI ladders and online head to head, matched
-// by squad overall: docs/ULTIMATE-TEAM.md "Playing") are the next step; this is the contract the UT
-// screens call and what a finished match hands back.
+// Playing a squad: what the UT screens ask for, and what a finished match pays (docs/ULTIMATE-TEAM.md
+// "Playing").
 //
 // App.tsx gives <UltimateTeam> an `onPlaySquad` that opens the match screen (src/ut/Match.tsx) with
 // the request; that screen finds the opponent, builds both teams (teams.ts), runs the vote and the
-// arcade game, then credits coins and XP and shows the result.
-import type { Profile } from '../lib/profile';
-import { awardXp } from './state';
+// arcade game, then settles the result here: coins, card XP, the record and the ladder.
+import { battlesThisWeek } from './battles';
+import { awardXp, type UtState } from './state';
 
 export interface UtMatchRequest {
   /** unique per match started */
@@ -39,10 +38,43 @@ export function matchRewards(r: UtMatchResult): { coins: number; xp: number } {
 }
 
 /**
- * `awardXp(uids, n)` for the match code, bound to the profile: e.g. in App.tsx,
- * `const award = xpAwarder(update); award(result.played, matchRewards(result).xp)`.
- * (For the result screen's level-ups, `awardXp(profile.ut, uids, n).ups` before calling it.)
+ * Who won: the higher score; a tie goes to the better squad (its unrounded overall), and two
+ * squads exactly as good to `coin` (online, read off the match the same way on both phones).
  */
-export function xpAwarder(update: (fn: (p: Profile) => Profile) => void): (uids: string[], n: number) => void {
-  return (uids, n) => update((p) => ({ ...p, ut: awardXp(p.ut, uids, n).ut }));
+export function decide(us: number, them: number, mine: number, theirs: number, coin: () => boolean): { won: boolean; tiebreak: boolean } {
+  if (us !== them) return { won: us > them, tiebreak: false };
+  if (Math.abs(mine - theirs) > 1e-9) return { won: mine > theirs, tiebreak: true };
+  return { won: coin(), tiebreak: true };
+}
+
+export interface Settled {
+  ut: UtState;
+  coins: number;
+  xp: number;
+  /** cards that went up a level */
+  ups: { uid: string; level: number }[];
+  /** a Squad Battles rung cleared for the first time this week, and the pack it paid */
+  climbed: boolean;
+  pack: string | null;
+}
+
+/**
+ * A finished match on the profile's UT state: XP for every card in the squad, the record (online
+ * head to head apart from games against the AI), and on the ladder, the next rung cleared (with its
+ * pack, the first time this week). Coins go to the profile's purse: `coins` says how many.
+ */
+export function settle(
+  ut: UtState,
+  r: { won: boolean; us: number; them: number; online: boolean; rung: { i: number; pack: string | null } | null; played: string[]; week: string; packId: string; at: number }
+): Settled {
+  const { coins, xp } = matchRewards(r);
+  const x = awardXp(ut, r.played, xp);
+  const rec = x.ut.record;
+  const record = r.online ? { ...rec, h2hW: rec.h2hW + (r.won ? 1 : 0), h2hL: rec.h2hL + (r.won ? 0 : 1) } : { ...rec, w: rec.w + (r.won ? 1 : 0), l: rec.l + (r.won ? 0 : 1) };
+  let battles = battlesThisWeek(x.ut.battles, r.week);
+  const climbed = !!r.rung && r.rung.i >= 0 && r.won && r.rung.i === battles.cleared;
+  const pack = climbed ? r.rung!.pack : null;
+  if (climbed) battles = { week: r.week, cleared: r.rung!.i + 1, best: Math.max(battles.best, r.rung!.i + 1) };
+  const packs = pack ? [...x.ut.packs, { id: r.packId, kind: pack, at: r.at }] : x.ut.packs;
+  return { ut: { ...x.ut, record, battles, packs }, coins, xp, ups: x.ups, climbed, pack };
 }

@@ -44,6 +44,7 @@ export function Vote({
   seed,
   rival,
   rivalGone,
+  waitFor = 'to finish the draft',
   onWire,
   onDone,
 }: {
@@ -55,6 +56,8 @@ export function Vote({
   rival: VoteWire | null;
   /** online: the other phone has gone quiet (or left) */
   rivalGone: boolean;
+  /** online: what the rival is still doing before they reach the vote ("Waiting for Sam to finish the draft…") */
+  waitFor?: string;
   /** online: put this phone's vote on the wire */
   onWire?: (w: VoteWire) => void;
   onDone: (outcome: Choice) => void;
@@ -163,7 +166,7 @@ export function Vote({
     rv === null
       ? rivalGone
         ? rivalName + ' isn’t answering'
-        : 'Waiting for ' + rivalName + ' to finish the draft…'
+        : 'Waiting for ' + rivalName + ' ' + waitFor + '…'
       : rv === 'none'
         ? rLocked
           ? rivalName + ' didn’t vote'

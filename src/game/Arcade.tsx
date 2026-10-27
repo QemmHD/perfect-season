@@ -77,6 +77,7 @@ export function Arcade({
   seed,
   online,
   botLevel,
+  aiSkill,
   rivalLive: wire,
   rivalGone,
   tookMe,
@@ -94,6 +95,8 @@ export function Arcade({
   seed: string;
   online: boolean;
   botLevel: BotLevel;
+  /** against the AI: how sharp it plays (0-1), in place of its level's */
+  aiSkill?: number;
   /** online: the other phone's progress, as last heard (from the wire: checked here) */
   rivalLive: { score: number; drive: number; done: boolean; ends: string[]; plays?: number } | null;
   /** online: the other phone has gone quiet (or left) */
@@ -134,7 +137,7 @@ export function Arcade({
     const [off, def] = rival ? [rivalLineup!, lineup!] : [lineup!, rivalLineup!];
     return NFL ? aiDrives2(off, def, s, skill, a) : aiPossessions2(off, def, s, skill, a);
   };
-  const ai = useMemo(() => (!online && attrs ? aiPlay(true, seed, AI_SKILL[botLevel], attrs) : null), [attrs]);
+  const ai = useMemo(() => (!online && attrs ? aiPlay(true, seed, aiSkill ?? AI_SKILL[botLevel], attrs) : null), [attrs]);
 
   // Online, the AI can finish the other side's drives: when that phone goes quiet, or when you're
   // done and it stops playing. Both phones work it out the same way (same seed, same drives played
@@ -224,7 +227,10 @@ export function Arcade({
     return (
       <div className="arc-kick">
         <span className="eyebrow">Head to head · tip-off</span>
-        <h1 className="disp">YOUR FIVE VS {rivalName.toUpperCase()}’S FIVE</h1>
+        <h1 className="disp">
+          YOUR FIVE VS {rivalName.toUpperCase()}
+          {/s$/i.test(rivalName) ? '’' : '’S'} FIVE
+        </h1>
         <p>
           {TOTAL} possessions each on offense, {rivalName} guarding you with {teams ? 'their five' : 'the five they drafted'}, while they play theirs against yours. Most points wins; a tie goes to the better team.
         </p>

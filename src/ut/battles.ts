@@ -13,8 +13,11 @@ import type { SquadWire } from './teams';
 import type { RatedCard, UtSport } from './types';
 
 export const RUNGS = 8;
-/** each rung's target team overall, on basketball's scale (onScale for football) */
-const TARGETS = [62, 66, 70, 74, 78, 82, 86, 90];
+/**
+ * Each rung's target team overall, on the sport's own scale: the first a little under a starter
+ * pack's squad (basketball's rate about 68-75, football's about 80), the last an all-time team.
+ */
+const TARGETS: Record<UtSport, number[]> = { nba: [62, 66, 70, 74, 78, 82, 86, 90], nfl: [76, 79, 82, 85, 88, 90, 92, 94] };
 /** how well the AI plays its own offense on each rung (0-1, the autopilot's skill) */
 const SKILLS = [0.45, 0.5, 0.56, 0.62, 0.68, 0.74, 0.8, 0.87];
 
@@ -108,7 +111,7 @@ export function wireRating(pool: Pool, w: SquadWire): number {
 }
 
 /** A themed AI squad around a target overall (this sport's scale). */
-function themedAround(pool: Pool, all: Theme[], target: number, rand: () => number, seed: string, avoid: Set<string>): { theme: Theme; squad: SquadWire; ovr: number } {
+function themedAround(pool: Pool, all: Theme[], target: number, rand: () => number, seed: string, avoid: Set<string>, min = 0): { theme: Theme; squad: SquadWire; ovr: number } {
   // a theme with cards near this level: its best players should reach the target
   const fits = all.filter((th) => !avoid.has(th.fr + th.decade) && th.cards.filter((c) => c.ovr >= target).length >= 3);
   const theme = pickOne(fits.length ? fits : all, rand);
@@ -116,8 +119,9 @@ function themedAround(pool: Pool, all: Theme[], target: number, rand: () => numb
   let aim = target - 1;
   let squad = buildSquad(pool, theme, aim, seed);
   let ovr = wireRating(pool, squad);
-  for (let k = 0; k < 4 && Math.abs(ovr - target) > 1; k++) {
-    aim += target - ovr;
+  // (and above `min`: a ladder's rungs only get harder)
+  for (let k = 0; k < 5 && (Math.abs(ovr - target) > 1 || ovr < min); k++) {
+    aim += ovr < min ? min - ovr : target - ovr;
     squad = buildSquad(pool, theme, aim, seed);
     ovr = wireRating(pool, squad);
   }
@@ -132,10 +136,11 @@ export function ladderFor(pool: Pool, week: string): Rung[] {
   const rand = rng(hashString('ut-battles:' + sport + ':' + week));
   const all = themes(pool);
   const picked = new Set<string>();
-  return TARGETS.map((t, i) => {
-    const target = onScale(t, sport);
-    const { theme, squad, ovr } = themedAround(pool, all, target, rand, week + ':' + i, picked);
+  let prev = 0;
+  return TARGETS[sport].map((target, i) => {
+    const { theme, squad, ovr } = themedAround(pool, all, target, rand, week + ':' + i, picked, prev + 1);
     picked.add(theme.fr + theme.decade);
+    prev = ovr;
     return { i, title: theme.decade + 's ' + theme.name, fr: theme.fr, decade: theme.decade, target, ovr, squad, skill: SKILLS[i], fav: favOf(pool, theme.fr, 'battle:' + week + ':' + i), pack: RUNG_PACKS[i] ?? null };
   });
 }
@@ -145,6 +150,29 @@ export function aiOpponent(pool: Pool, target: number, seed: string): Rung {
   const rand = rng(hashString('ut-ai:' + pool.sport + ':' + seed));
   const { theme, squad, ovr } = themedAround(pool, themes(pool), target, rand, 'ai:' + seed, new Set());
   return { i: -1, title: theme.decade + 's ' + theme.name, fr: theme.fr, decade: theme.decade, target, ovr, squad, skill: 0.68, fav: favOf(pool, theme.fr, 'ai:' + seed), pack: null };
+}
+
+const ladders = new Map<string, { pool: Pool; rungs: Rung[] }>();
+
+/** The week's ladder, worked out once per pool and week (the ladder screen and the match share it). */
+export function weekLadder(pool: Pool, week: string): Rung[] {
+  const k = pool.sport + ':' + week;
+  const got = ladders.get(k);
+  if (got && got.pool === pool) return got.rungs;
+  const rungs = ladderFor(pool, week);
+  ladders.set(k, { pool, rungs });
+  return rungs;
+}
+
+/** What the game calls a rung's team: "’90s Bulls". */
+export function shortName(r: Pick<Rung, 'title' | 'decade'>): string {
+  const nick = r.title.split(' ').pop() ?? r.title;
+  return '’' + String(r.decade).slice(2) + 's ' + nick;
+}
+
+/** How hard a rung's AI plays, in words. */
+export function skillName(skill: number): string {
+  return skill < 0.53 ? 'Rookie' : skill < 0.65 ? 'Pro' : skill < 0.77 ? 'All-Star' : 'Legend';
 }
 
 /** This week's progress: a new week starts at the bottom (the best week stays). */

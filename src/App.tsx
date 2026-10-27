@@ -43,11 +43,13 @@ const AUTOPLAY = typeof location !== 'undefined' && new URLSearchParams(location
 import { Playoffs, Reveal } from './ui/Season';
 import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
+import type { UtMatchRequest } from './ut/play';
 
-type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet' | 'ut';
+type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet' | 'ut' | 'utmatch';
 
 /** Ultimate Team, loaded (with its cards) only when it's opened */
 const UltimateTeam = React.lazy(() => import('./ut/UltimateTeam'));
+const UtMatch = React.lazy(() => import('./ut/Match'));
 
 interface Run {
   id: number;
@@ -125,6 +127,8 @@ export function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [screen, setScreen] = useState<Screen>('tab');
   const [run, setRun] = useState<Run | null>(null);
+  /** an Ultimate Team match: a Squad Battles rung or online head to head (src/ut/Match.tsx) */
+  const [utReq, setUtReq] = useState<UtMatchRequest | null>(null);
   /** the run whose head-to-head game has been watched */
   const [watched, setWatched] = useState<number | null>(null);
   const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | null>(null);
@@ -825,7 +829,24 @@ export function App() {
     enter = 'up';
     body = (
       <React.Suspense fallback={<div className="screen ut" />}>
-        <UltimateTeam profile={profile} update={update} onExit={() => goTab('home')} onToast={showToast} />
+        <UltimateTeam
+          profile={profile}
+          update={update}
+          onExit={() => goTab('home')}
+          onToast={showToast}
+          onPlaySquad={(req) => {
+            setUtReq(req);
+            setScreen('utmatch');
+          }}
+        />
+      </React.Suspense>
+    );
+  } else if (screen === 'utmatch' && utReq) {
+    viewId = 'utmatch:' + utReq.id;
+    enter = 'zoom';
+    body = (
+      <React.Suspense fallback={<div className="screen ut" />}>
+        <UtMatch key={utReq.id} req={utReq} profile={profile} update={update} onToast={showToast} onExit={() => setScreen('ut')} onAgain={setUtReq} autoplay={AUTOPLAY} />
       </React.Suspense>
     );
   } else if (screen === 'search') {
