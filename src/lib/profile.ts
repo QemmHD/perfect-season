@@ -1,6 +1,7 @@
 import { NFL } from '../engine/sport';
 import type { Booster, BotLevel, Mode, Slot } from '../engine/types';
 import type { EntryContent } from '../net/leaderboard';
+import { freshUt, migrateUt, type UtState } from '../ut/state';
 
 export interface RunRecord {
   /** Unique id. Older records have none. */
@@ -76,6 +77,8 @@ export interface Profile {
   missions: { day: string; progress: number[]; claimed: boolean[] } | null;
   /** A head-to-head match in progress; still set on launch means the app was closed mid-match */
   activeMatch: { id: string; opp: string } | null;
+  /** Ultimate Team: this sport's club, squad, packs and challenges (src/ut/state.ts) */
+  ut: UtState;
 }
 
 /** A random v4 UUID. */
@@ -128,6 +131,7 @@ export function freshProfile(): Profile {
     rewardDay: null,
     missions: null,
     activeMatch: null,
+    ut: freshUt(),
   };
 }
 
@@ -170,6 +174,7 @@ function loadFrom(p: Profile | null): Profile {
       collection: p.collection && typeof p.collection === 'object' ? p.collection : {},
       gauntlet: { ...base.gauntlet, ...p.gauntlet },
       streak: { ...base.streak, ...p.streak },
+      ut: migrateUt(p.ut),
     };
   } catch {
     return freshProfile();
