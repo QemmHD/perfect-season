@@ -43,7 +43,7 @@ The home screen has an **NBA / NFL** switch. Each sport is its own game with the
 - **Rarity:** about the best 0.5% of player lines are Legendary, the next tiers Epic and Rare. Rows and cards show it, drafting one sets off a full-screen moment, and the reels flash when a team has a Legendary player.
 - **Big moments:** a match-found VS screen, a running win-streak flame and 10-win milestones during the season, Playoffs Clinched at 50 wins, New Personal Best, Mission Complete, and a live player count.
 - **Other pages:** Daily, Boosters store (earned coins only), Profile and history, Settings (sound, vibration, booster hints, reset), How to play.
-- **Sound and saving:** synthesized sound effects, vibration on Android, and haptic ticks on iPhone (iOS 18+). Progress is saved in the browser (localStorage).
+- **Sound and saving:** the arcade games and the game casts play real recordings (an arena or stadium crowd that cheers, oohs and groans, sneakers, swishes, rims, pads, whistles, buzzer and horn; free sources, credited in [`docs/CREDITS.md`](docs/CREDITS.md)); the menus' sounds are synthesized. Vibration on Android and haptic ticks on iPhone (iOS 18+). Progress is saved in the browser (localStorage).
 - **Fits every phone:** the 390px-wide layout scales to the screen width (an iPhone 15 Pro Max gets it 10% larger), and the height adapts, with tighter spacing on shorter screens.
   - Content stays clear of the Dynamic Island, the status bar and the home indicator, while backgrounds run edge to edge.
   - Tablets and desktops show a phone-shaped frame.
@@ -166,7 +166,7 @@ Two notes on the source data:
 | `src/ui/` | React screens: `Welcome` (first-launch name), `Search` (matchmaking), `Draft`, `Season` (reveal, playoffs, champion screen), `Scout` (opponent scouting sheet), `Results`, `Leaderboard` (global board, name sheet), `Rewards` (daily chest, missions), `Pages` (home, tabs, settings, how to play) |
 | `src/ui/sportui.ts` | What the screens show differently per sport: stat columns, sorts, records, wording |
 | `src/ui/motion.tsx`, `src/ui/Hero.tsx` | View transitions, count-ups and sparks; the animated arena behind the home scoreboard |
-| `src/lib/` | `profile` (saved progress), `sound` (Web Audio + vibration), `share` (share text and card image), `names` (name rules and random names), `update` (service worker and auto-update) |
+| `src/lib/` | `profile` (saved progress), `sound` (Web Audio: recorded game sounds from `src/assets/sfx`, made by `scripts/build_sfx.py`, and synthesized menu sounds; vibration), `share` (share text and card image), `names` (name rules and random names), `update` (service worker and auto-update) |
 | `src/net/` | `nostr` (relay pool, keys, signing), `leaderboard` (entries, checks, ranking), `match` (presence, matchmaking, the live match channel) |
 | `src/engine/online.ts`, `rarity.ts`, `missions.ts` | Head-to-head rules (shared cell order, redraws, shot-clock pick), rarity tiers, daily missions and the reward streak |
 | `pwa/sw.js` | Service worker template; `vite.config.ts` fills in the version and file list |
