@@ -45,6 +45,7 @@ export function Vote({
   rival,
   rivalGone,
   waitFor = 'to finish the draft',
+  simText = 'Watch the game: win odds, play by play',
   onWire,
   onDone,
 }: {
@@ -58,6 +59,8 @@ export function Vote({
   rivalGone: boolean;
   /** online: what the rival is still doing before they reach the vote ("Waiting for Sam to finish the draft…") */
   waitFor?: string;
+  /** what SIM means here */
+  simText?: string;
   /** online: put this phone's vote on the wire */
   onWire?: (w: VoteWire) => void;
   onDone: (outcome: Choice) => void;
@@ -210,7 +213,7 @@ export function Vote({
           <button key={c} className={'vote-opt ' + c + (m.mine === c ? ' on' : '') + (rv === c ? ' theirs' : '')} aria-pressed={m.mine === c} aria-disabled={locked} onClick={() => pick(c)}>
             <span className="vote-ico">{c === 'play' ? <PadIcon /> : <CastIcon />}</span>
             <b className="disp">{label(c)}</b>
-            <small>{c === 'play' ? 'Run your offense ' + (NFL ? 'down the field' : 'on the court') + ', live' : 'Watch the game: win odds, play by play'}</small>
+            <small>{c === 'play' ? 'Run your offense ' + (NFL ? 'down the field' : 'on the court') + ', live' : simText}</small>
             <span className="vote-who" aria-hidden="true">
               {m.mine === c && <i className="you">YOU</i>}
               {rv === c && <i className="them">{online ? initials(rivalName) || '?' : 'AI'}</i>}

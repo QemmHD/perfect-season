@@ -506,3 +506,42 @@
   line-height: 1.4;
   color: var(--sub);
 }
+.utm-ends {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.utm-ends span {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+}
+.utm-ends i {
+  min-width: 18px;
+  padding: 2px 3px;
+  border-radius: 5px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  background: var(--panel-2);
+  color: var(--sub);
+}
+.utm-ends .us i.e-pts {
+  background: rgba(25, 227, 201, 0.18);
+  color: var(--teal);
+}
+.utm-ends .them i.e-pts {
+  background: rgba(245, 184, 61, 0.18);
+  color: var(--gold);
+}
+.utm-ends span.many {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 3px;
+  max-width: 300px;
+  margin: 0 auto;
+  width: 100%;
+}

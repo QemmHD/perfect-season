@@ -90,6 +90,10 @@ interface Outcome {
 
 type Stage = 'load' | 'search' | 'found' | 'vs' | 'vote' | 'play' | 'result' | 'error';
 
+/** how each drive or possession ended, on the result screen */
+const END_LABEL: Record<string, string> = { A: '2+1', X: '·', TO: 'TO', MISS: 'FG✕', DOWNS: 'DWN' };
+const END_POINTS: Record<string, number> = { TD: 7, FG: 3, '2': 2, '3': 3, A: 3 };
+
 const clock = (s: number) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
 /** Your squad as it is in the profile, read the way the other phone reads it off the wire. */
@@ -362,6 +366,7 @@ export default function UtMatch(props: {
         rival={setup.online ? (opp?.vote ?? NO_VOTE) : null}
         rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
         waitFor="to get here"
+        simText="Skip to the final: both sides simmed"
         onWire={(w) => connRef.current?.update((s) => ({ ...s, vote: w.vote, voteAt: w.at, voteSaw: w.saw }))}
         onDone={(o) => (o === 'play' ? setStage('play') : simBoth())}
       />
@@ -591,6 +596,17 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           <b className="disp num">{out.them}</b>
           <small>{setup.rival.name}</small>
         </span>
+      </div>
+      <div className="utm-ends" aria-label={(NFL ? 'Drives' : 'Possessions') + ': yours ' + out.ends[0].join(', ') + '; theirs ' + out.ends[1].join(', ')}>
+        {out.ends.map((ends, k) => (
+          <span key={k} className={(k ? 'them' : 'us') + (ends.length > 8 ? ' many' : '')}>
+            {ends.map((e, i) => (
+              <i key={i} className={'e-' + (END_POINTS[e] ? 'pts' : 'none')}>
+                {END_LABEL[e] ?? e}
+              </i>
+            ))}
+          </span>
+        ))}
       </div>
       {(out.tiebreak || out.how === 'sim') && (
         <p className="utm-note">
