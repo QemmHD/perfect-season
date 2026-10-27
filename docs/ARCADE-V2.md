@@ -62,7 +62,7 @@ Decisions from the owner's answers (2026-10-27). Everything ships in one release
   screen point), like the football.
 - **Dunks:** automatic by ratings: attack the rim and hold SHOOT; layup, dunk or contact dunk from
   the dunk ratings, vertical, size and the defender in the way.
-- **Shot meter:** the vertical bar beside the shooter, with the green window.
+- **Shot meter:** the 2K-style arch over the shooter's head: it fills from the left end as he rises, the green slice sits at the top of his jump, and a green release lights the whole arch.
 - **Football play call:** pick one of three play cards each down (routes drawn), then snap.
 - **Moves by swipe, both sports:** football: steer by dragging, swipe left/right juke, up spin,
   double-tap truck (no move buttons). Basketball: stick to move, swipe left/right crossover, swipe

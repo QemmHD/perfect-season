@@ -1,7 +1,7 @@
 // Draws arcade basketball as fine pixel art from behind the shooter, facing the hoop, with
 // perspective (the same either way up; sideways shows more of the floor across): the court drawn a
 // row at a time, the arena's stands behind the basket, ten rigged players in their moves, the ball,
-// the backboard, rim and net, the 2K-style shot meter beside the shooter and the contest grade.
+// the backboard, rim and net, the 2K-style shot meter arched over the shooter and the contest grade.
 import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, hairFor, type Look, type Sprite } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
@@ -489,40 +489,70 @@ export class HoopsRenderer {
     }
     const head = heads[ms.idx];
     if (!head) return;
-    // a 2K-style meter beside him: a tall bar that fills as he rises, the green window near the top
-    const hgt = Math.max(46, Math.round(Math.min(this.W, this.H) * 0.15));
-    const w = 10;
-    const x = Math.min(this.W - w - 4, head.right + 4);
-    const y = Math.max(4, head.y - 6);
+    // a 2K-style arch over his head: it fills from the left end as he rises, the green slice sits
+    // where the top of his jump lands, near the right end
+    const R = Math.max(26, Math.round(Math.min(this.W, this.H) * 0.09));
+    const th = Math.max(7, Math.round(R * 0.27));
+    const cx = head.x;
+    // centered low enough that the arch frames his head and arms (it reads as his, not the
+    // defender's in front of him), high enough that his hands and the ball stay inside it
+    const cy = Math.max(R + th + 24, head.y + Math.round(R * 0.3));
+    const A0 = Math.PI + 0.36;
+    const SW = Math.PI - 0.72;
     const span = ms.top * 1.3;
-    // the frame: a dark case with a light rim
-    ctx.fillStyle = '#05070d';
-    ctx.fillRect(x - 3, y - 3, w + 6, hgt + 6);
-    ctx.fillStyle = '#e8ecf5';
-    ctx.fillRect(x - 1, y - 1, w + 2, hgt + 2);
-    ctx.fillStyle = '#1a2235';
-    ctx.fillRect(x, y, w, hgt);
-    // the green window, around the top of the jump
-    const gy = y + hgt - Math.round((ms.top / span) * hgt);
-    const gh = Math.max(2, Math.round(((ms.green * 2) / span) * hgt));
-    ctx.fillStyle = '#1f9e4c';
-    ctx.fillRect(x, gy - Math.floor(gh / 2), w, gh);
-    ctx.fillStyle = '#3ef07a';
-    ctx.fillRect(x - 3, gy - Math.floor(gh / 2), 2, gh);
-    ctx.fillRect(x + w + 1, gy - Math.floor(gh / 2), 2, gh);
-    // the fill: warm while rising, then green, white (close) or red (off)
-    const fh = Math.round(ms.frac * hgt);
-    const off = p.lastShot && ms.greened !== null ? Math.abs(p.lastShot.off) : 1;
-    ctx.fillStyle = ms.greened === null ? '#ffd35a' : ms.greened ? '#3ef07a' : off < 0.32 ? '#f4f4f4' : '#ff5a5a';
-    ctx.fillRect(x + 2, y + hgt - fh, w - 4, fh);
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillRect(x + 2, y + hgt - fh, w - 4, 1);
+    const band = (a0: number, a1: number, r: number, w: number, color: string) => {
+      if (a1 <= a0) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, a0, a1);
+      ctx.stroke();
+    };
+    ctx.save();
+    ctx.lineCap = 'butt';
+    // the case: a dark edge, a light rim, a deep track
+    band(A0 - 0.05, A0 + SW + 0.05, R, th + 5, '#05070d');
+    band(A0 - 0.03, A0 + SW + 0.03, R, th + 2, '#e8ecf5');
+    band(A0, A0 + SW, R, th, '#1a2235');
+    // the green slice, with bright marks just outside the track
+    const gc = A0 + (ms.top / span) * SW;
+    const gw = Math.max(0.05, (ms.green / span) * SW);
+    const g0 = Math.max(A0, gc - gw);
+    const g1 = Math.min(A0 + SW, gc + gw);
+    const result = ms.greened !== null;
+    const glow = result ? 0 : Math.max(0, 1 - Math.abs(ms.frac * span - ms.top) / 0.12);
+    band(g0, g1, R, th, glow > 0 ? mixHex('#1f9e4c', '#7dffab', glow) : '#1f9e4c');
+    band(g0, g1, R + th / 2 + 2, 2, '#3ef07a');
+    band(g0, g1, R - th / 2 - 2, 2, '#3ef07a');
+    // the fill: warm while he rises, then green, white (close) or red (off)
+    const off = p.lastShot && result ? Math.abs(p.lastShot.off) : 1;
+    const fillTo = A0 + ms.frac * SW;
+    const color = !result ? '#ffd35a' : ms.greened ? '#3ef07a' : off < 0.32 ? '#f4f4f4' : '#ff5a5a';
+    band(A0, fillTo, R, th - 2, color);
+    band(A0, fillTo, R - th / 2 + 2, 1, 'rgba(255,255,255,0.55)');
+    // the leading edge: a bright notch that runs ahead of the fill
+    if (ms.frac > 0.01) band(fillTo - 0.035, fillTo, R, th + 4, '#ffffff');
+    // a green release: the whole arch lights up and a ring bursts off it
+    if (ms.greened && ms.until !== Infinity) {
+      const k = Math.min(1, (real - (ms.until - 0.7)) / 0.35);
+      band(A0, A0 + SW, R, th, 'rgba(62,240,122,' + (0.9 * (1 - k * 0.5)).toFixed(2) + ')');
+      if (k < 1) band(A0 - 0.1, A0 + SW + 0.1, R + 4 + k * R * 0.6, 3 * (1 - k) + 1, 'rgba(160,255,190,' + (1 - k).toFixed(2) + ')');
+    }
+    ctx.restore();
     // the contest grade over his head while he rises
     if (p.meter && p.handler === ms.idx) {
       const grade = contestOf(p, p.bodies[ms.idx]);
-      label(ctx, CONTEST_TEXT[grade], head.x, head.y - 16, CONTEST_COLOR[grade]);
+      label(ctx, CONTEST_TEXT[grade], head.x, cy - R - th - 16, CONTEST_COLOR[grade]);
     }
   }
+}
+
+/** a blend of two #rrggbb colors */
+function mixHex(a: string, b: string, k: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  let out = '#';
+  for (let i = 0; i < 3; i++) out += Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * k).toString(16).padStart(2, '0');
+  return out;
 }
 
 /** A pixel label (the 3x5 letters doubled) with a dark backing, centered at x. */
