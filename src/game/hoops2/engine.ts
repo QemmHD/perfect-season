@@ -367,12 +367,16 @@ export function pressShoot(p: Possession) {
 export const JUMPER_TOP = 0.52;
 export const LAYUP_TOP = 0.42;
 
-/** SHOOT let go: the jump shot (or layup) leaves his hands, timed against the green window. */
-export function releaseShoot(p: Possession) {
+/**
+ * SHOOT let go: the jump shot (or layup) leaves his hands, timed against the green window. `lag`
+ * (seconds) is taken off a person's release: a phone shows the meter a little behind and hears the
+ * finger come up a little after, so what they saw when they let go was that much earlier.
+ */
+export function releaseShoot(p: Possession, lag = 0) {
   const m = p.meter;
   if (!m || p.handler === null || p.end || m.off !== undefined) return;
   const b = p.bodies[p.handler];
-  const held = p.t - m.t0;
+  const held = p.t - m.t0 - lag;
   const off = held - m.top;
   m.off = clamp(off / 0.25, -1, 1);
   m.greened = Math.abs(off) <= m.green;

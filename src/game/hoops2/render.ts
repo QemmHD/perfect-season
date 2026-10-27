@@ -725,9 +725,10 @@ export class HoopsRenderer {
     band(A0 - 0.05, A0 + SW + 0.05, R, th + 5, '#05070d');
     band(A0 - 0.03, A0 + SW + 0.03, R, th + 2, '#e8ecf5');
     band(A0, A0 + SW, R, th, '#1a2235');
-    // the green slice, with bright marks just outside the track
+    // the green slice at its true size (a let-go inside it is a green), with bright marks just
+    // outside the track; a sliver under a heavy contest is drawn as the sliver it is
     const gc = A0 + (ms.top / span) * SW;
-    const gw = Math.max(0.05, (ms.green / span) * SW);
+    const gw = Math.max(0.006, (ms.green / span) * SW);
     const g0 = Math.max(A0, gc - gw);
     const g1 = Math.min(A0 + SW, gc + gw);
     const result = ms.greened !== null;

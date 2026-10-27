@@ -20,6 +20,8 @@ import { type Fx, HoopsRenderer, type Kit } from './render';
 import type { Body, Hooper, Possession, Pt, Scheme } from './types';
 
 const DT = 1 / 60;
+/** what a phone's screen and touch add between what you saw and the release it hears (seconds) */
+const RELEASE_LAG = 0.03;
 
 /** What a replay needs to redraw a moment of a possession. */
 interface Snap {
@@ -441,7 +443,7 @@ export function Hoops2({
   };
   const shootUp = () => {
     const p = possRef.current;
-    if (p && !p.end) releaseShoot(p);
+    if (p && !p.end) releaseShoot(p, RELEASE_LAG);
   };
   const doPass = (e: React.PointerEvent) => {
     e.preventDefault();
