@@ -45,6 +45,12 @@ export interface CardLine {
   /** promo/legend: the boost it carries (+overall) and its label */
   boost?: number;
   label?: string;
+  /** the position group its stats and ranks are keyed by: NBA 'ALL'; NFL QB RB WR TE OL DL LB CB S K */
+  grp?: string;
+  /** no games and no stats in the sources (pre-1999 NFL defenders and linemen): rate from honors, size, draft */
+  sparse?: boolean;
+  /** promo/legend: the id of the season card it is made from */
+  seasonId?: string;
 }
 
 /** A card in a player's club. */
