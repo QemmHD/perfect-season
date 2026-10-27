@@ -324,7 +324,8 @@ export function Football2({
     if (!a.points) window.setTimeout(() => sfx.whistle(), 220);
     const hl = highlight.current;
     highlight.current = null;
-    if (hl && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) {
+    // (not the game's last play: it's reported done, and the results come next)
+    if (hl && !game.over && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) {
       onProgress(progress(game));
       window.setTimeout(() => startReplay(hl, () => nextUp(game, !!a.driveOver, 250)), a.points ? 1500 : 1100);
     } else nextUp(game, !!a.driveOver, a.points ? 2300 : a.driveOver ? 1900 : 1350);
@@ -624,6 +625,16 @@ export function Football2({
       setFloat(null);
     }
   };
+  /** The touch taken away (a system swipe from an edge, a call): let go of everything, throw nothing. */
+  const cancel = (e: React.PointerEvent) => {
+    if (dragRef.current?.id === e.pointerId) dragRef.current = null;
+    const s = stickRef.current;
+    if (s && s.id === e.pointerId) {
+      stickRef.current = null;
+      gesture.current = null;
+      setFloat(null);
+    }
+  };
   const doScramble = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -639,7 +650,7 @@ export function Football2({
   const fgOk = g ? fgInRange(g) : false;
   const passing = ui === 'live' && phase === 'drop' && p?.call === 'pass';
   return createPortal(
-    <div className={'arcade-full hg2 fb2' + (wide ? ' wide' : '')} ref={wrapRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+    <div className={'arcade-full hg2 fb2' + (wide ? ' wide' : '')} ref={wrapRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}>
       <canvas ref={canvasRef} className="hg2-canvas" />
       <div className="hg2-bug" aria-label="Score">
         <span className="us">

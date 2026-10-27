@@ -282,7 +282,8 @@ export function Hoops2({
     };
     const hl = highlight.current;
     highlight.current = null;
-    if (hl && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) window.setTimeout(() => startReplay(hl, proceed), e.kind === 'make' ? 1300 : 1000);
+    // (not the game's last play: it's reported done, and the results come next)
+    if (hl && !game.over && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) window.setTimeout(() => startReplay(hl, proceed), e.kind === 'make' ? 1300 : 1000);
     else window.setTimeout(proceed, e.kind === 'make' ? 1600 : 1250);
   };
 
@@ -368,7 +369,7 @@ export function Hoops2({
             break;
           }
         }
-      }
+      } else acc = 0;
       if (p && !replayRef.current) {
         rec.current.push(p.t, snapOf(p));
         // the dribble on the floor: on the same beat the drawing bounces the ball

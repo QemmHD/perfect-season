@@ -89,8 +89,11 @@ interface Anim {
  * (so a follow-through and a get-up play out after the engine has moved on). */
 interface Memo {
   gait: { t: number; frac: number };
-  last: { act: 'shoot' | 'layup' | 'fall'; at: number; kind?: 'posterized' | 'ankles' } | null;
+  last: { act: 'shoot' | 'layup' | 'fall' | 'dunk' | 'contact' | 'standdunk'; at: number; kind?: 'posterized' | 'ankles' } | null;
 }
+
+/** The finishes that aren't jump shots (the rest of a shot's kinds are jumpers). */
+const AT_RIM = ['layup', 'dunk', 'contact', 'standdunk', 'oop'];
 
 const has = (name: string) => !!getClip(name);
 const mirrorOf = (b: Body, name: string) => (b.p.id.length % 2 ? name + '_m' : name);
@@ -118,22 +121,31 @@ function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { clip: s
   return { clip, ct: m.gait.frac * clipMeta(clip).duration };
 }
 
-/** What a body is doing right now, as a clip or a pose. */
-function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo): Anim {
+/**
+ * What a body is doing right now, as a clip or a pose. `shotAt`: when a jump shot of his left his
+ * hands (the ball's in the air), so a shot tapped too quickly to be seen rising still follows through.
+ */
+function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shotAt: number | null): Anim {
   const pose: Anim = poseOf(b, t, carrying);
   const speed = Math.hypot(b.vx, b.vz);
+  // off the floor (still up after a dunk, knocked back in the air), a clip keeps its feet under him
+  // and he's drawn at his height; only the jump shot's recorded leap is drawn into the clip itself
+  const air = b.h > 0.05;
   const clip = (name: string, ct: number, opts: Partial<Anim> = {}): Anim =>
-    has(name) ? { key: '', pose: pose.pose, clip: name, ct, step: 2, ground: 'clip', ...opts } : pose;
+    has(name) ? { key: '', pose: pose.pose, clip: name, ct, step: 2, ground: air ? 'pin' : 'clip', ...opts } : pose;
   // remember the moments whose ends play out after the engine moves on
   if (m.last && t < m.last.at) m.last = null;
-  if (b.act === 'shoot' || b.act === 'layup') m.last = { act: b.act, at: b.actAt };
+  if (b.act === 'shoot' || b.act === 'layup' || b.act === 'dunk' || b.act === 'contact' || b.act === 'standdunk') m.last = { act: b.act, at: b.actAt };
   else if (b.act === 'fall') m.last = { act: 'fall', at: b.actAt, kind: b.fallKind };
+  else if (shotAt !== null && !(m.last?.act === 'shoot' && m.last.at > shotAt - 1.5)) m.last = { act: 'shoot', at: shotAt - JUMPER_TOP };
   const since = t - b.actAt;
   // the follow-through and the landing after the ball's gone; the get-up after a fall
   const tail = m.last && b.act !== m.last.act && (b.act === 'idle' || b.act === 'run' || b.act === 'defend') ? m.last : null;
   if (tail) {
     const ts = t - tail.at;
-    if (tail.act === 'shoot' && ts < 1.0 && (ts < 0.8 || speed < 6)) return clip('jumpshot', JUMPER(ts), { step: 1 });
+    if (tail.act === 'shoot' && ts < 1.0 && (ts < 0.8 || speed < 6)) return clip('jumpshot', JUMPER(ts), { step: 1, ground: 'clip' });
+    // a dunker hangs on in his dunk until he's down
+    if ((tail.act === 'dunk' || tail.act === 'contact' || tail.act === 'standdunk') && (air || ts < 0.75)) return poseOf({ ...b, act: tail.act, actAt: tail.at }, t, false);
     if (tail.act === 'layup' && ts < 0.95) return clip('layup', LAYUP(ts), { ground: 'pin' });
     if (tail.act === 'fall') {
       const up = tail.kind === 'posterized' ? POSTER_UP : ANKLES_UP;
@@ -143,7 +155,7 @@ function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo): Ani
   }
   switch (b.act) {
     case 'shoot':
-      return clip('jumpshot', JUMPER(since), { step: 1 });
+      return clip('jumpshot', JUMPER(since), { step: 1, ground: 'clip' });
     case 'layup':
       return clip('layup', LAYUP(since), { ground: 'pin' });
     case 'fall': {
@@ -345,7 +357,7 @@ export class HoopsRenderer {
   }
 
   /** A body's drawing this frame and whether the jump is drawn into it (then he's placed on the floor). */
-  private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number): { spr: Sprite; ownLift: boolean } {
+  private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number, ball: Possession['ball']): { spr: Sprite; ownLift: boolean } {
     // facing on screen: the camera looks up the floor (+cx), across is +cz to the right
     const dcx = Math.cos(b.face);
     const dcz = Math.sin(b.face);
@@ -365,7 +377,8 @@ export class HoopsRenderer {
       memo = { gait: { t, frac: (b.idx * 0.29) % 1 }, last: null };
       this.memos.set(who, memo);
     }
-    const an = animOf(b, t, carrying, look, memo);
+    const shotAt = ball && ball.kind === 'shot' && ball.who === b.idx && !AT_RIM.includes(ball.shot ?? '') ? ball.t0 : null;
+    const an = animOf(b, t, carrying, look, memo, shotAt);
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, an.step ?? 2) : 0;
     const key = an.clip ? mocapKey(an.clip, frame, an.ground) + (an.dribble !== undefined ? 'd' + an.dribble : '') : an.key;
     const ownLift = !!an.clip && an.ground === 'clip';
@@ -569,7 +582,7 @@ export class HoopsRenderer {
         draw: () => {
           const carrying = p.handler === b.idx;
           const f0 = this.at(b.cx, b.cz, b.h);
-          const { spr: s, ownLift } = this.sprite(b, t, carrying, this.kits[b.side === 'O' ? 0 : 1], f0.s);
+          const { spr: s, ownLift } = this.sprite(b, t, carrying, this.kits[b.side === 'O' ? 0 : 1], f0.s, p.ball);
           // a recorded jump is in the drawing itself: then he stands on the floor spot
           const f = ownLift ? this.at(b.cx, b.cz) : f0;
           const x = Math.round(f.x - s.ax);
