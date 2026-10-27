@@ -177,6 +177,8 @@ export interface Possession {
   /** the defense's look this possession, and the defender doubling the ball in a trap */
   scheme: Scheme;
   trapper: number | null;
+  /** the double team came this possession already (once: the pass out beats it) */
+  trapped: boolean;
   /** the handler is sprinting (the stick at its edge) */
   sprinting: boolean;
 }

@@ -154,6 +154,8 @@ export function Vote({
     if (!m.choose(c)) return;
     sfx.select();
     vibrate(10);
+    // against the AI the pick is the answer
+    if (!online) m.closeNow(Date.now());
     step();
   };
 
@@ -174,9 +176,9 @@ export function Vote({
           ? rivalName + ' didn’t vote'
           : online
             ? rivalName + ' hasn’t voted yet'
-            : rivalName + ' is thinking…'
+            : rivalName + ' goes with your pick'
         : rivalName + (rLocked ? ' is locked in: ' : ' wants to ') + label(rv);
-  const why = !d
+  const why = !d || !online
     ? ''
     : d.how === 'lost'
       ? 'Couldn’t hear ' + rivalName + '’s vote, so the coin decides.'
@@ -196,7 +198,7 @@ export function Vote({
         <span className="eyebrow wide">Head to head · {NFL ? 'kickoff' : 'tip-off'}</span>
         <h1 className="disp">SIM OR PLAY?</h1>
         <p>
-          You and {rivalName} vote. The same vote decides it; a split goes to a coin toss.
+          {online ? 'You and ' + rivalName + ' vote. The same vote decides it; a split goes to a coin toss.' : 'Your pick decides it.'}
         </p>
       </div>
       <div className={'vote-clock' + (left !== null && left <= 3 && !locked ? ' low' : '') + (left === null ? ' waiting' : '')} role="timer" aria-label={left === null ? 'Waiting for ' + rivalName : locked ? 'Votes are in' : left + ' seconds to vote'}>
@@ -223,7 +225,7 @@ export function Vote({
       <p className={'vote-rival' + (rv === 'play' || rv === 'sim' ? ' voted' : '')} role="status" key={status}>
         {status}
       </p>
-      <p className="vote-rule">{locked && !d ? 'Votes are in. Hearing from ' + rivalName + '…' : 'Nobody votes: PLAY. You can change your vote until the clock runs out.'}</p>
+      <p className="vote-rule">{locked && !d ? 'Votes are in. Hearing from ' + rivalName + '…' : online ? 'Nobody votes: PLAY. You can change your vote until the clock runs out.' : 'No pick before the clock runs out: PLAY.'}</p>
       {d && byToss(d) && (
         <div className={'vote-toss' + (phase === 'result' ? ' landed' : '')} role="status">
           <div className="coin-wrap">

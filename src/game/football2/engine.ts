@@ -596,8 +596,9 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
   const sp = speedOf(b.p) * (held ? 0.12 : 1);
   if (p.phase === 'run' && carrier) {
     if (held) {
-      // locked up with a blocker: on a run the line drives him off the ball and away from the hole;
-      // otherwise he fights to get off it toward the ball
+      // locked up with a blocker (a wind-up he'd started is off): on a run the line drives him off
+      // the ball and away from the hole; otherwise he fights to get off it toward the ball
+      b.windAt = Infinity;
       if (p.call === 'run' && b.job === 'rush') steerTo(b, b.x + (Math.sign(b.x - p.hole) || 1) * 1.2, b.y + 0.3, 1.3, dt);
       else steerTo(b, carrier.x, carrier.y, sp, dt);
       act(b, 'block', t);

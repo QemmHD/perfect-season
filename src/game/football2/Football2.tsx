@@ -36,6 +36,10 @@ type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
 const DT = 1 / 60;
 const MARK_TEXT: Record<DriveEnd, string> = { TD: 'TD', FG: 'FG', MISS: 'X', INT: 'INT', DOWNS: '–', PUNT: 'P', FUM: 'FUM', SAF: 'SAF', TIME: '0:00' };
 
+/** A game's drive ends as the other phone hears them: the clock running out goes as a turnover on
+ * downs (worth the same nothing), which phones from before the two-minute drill understand. */
+const wireEnds = (g: Game): string[] => g.ends.map((e) => (e === 'TIME' ? 'DOWNS' : e));
+
 /** Who's open (rings on the receivers while you aim) shows only in a player's first games. */
 const PLAYED_KEY = 'perfect-season:fb2-played';
 const OPEN_RING_GAMES = 3;
@@ -163,7 +167,7 @@ export function Football2({
     setHint(text);
     window.setTimeout(() => setHint((h) => (h === text ? null : h)), 4200);
   };
-  const progress = (g: Game): Progress => ({ score: g.score, drive: g.drive, done: g.over, ends: g.ends.slice(), plays: g.plays });
+  const progress = (g: Game): Progress => ({ score: g.score, drive: g.drive, done: g.over, ends: wireEnds(g), plays: g.plays });
   const shake = (px: number) => {
     if (!reducedMotion()) fxRef.current.shake = Math.max(fxRef.current.shake, px);
   };
@@ -321,14 +325,14 @@ export function Football2({
       sfx.groan();
       vibrate(50);
       say('SAFETY', 'bad', 1700, 'TACKLED IN YOUR END ZONE');
-    } else if (e.text.startsWith('BIG HIT')) {
-      say('BIG HIT!', 'big', 1500, e.text.slice(4) + ' · ' + gain);
     } else if (a.driveOver === 'TIME') {
       sfx.buzzer();
       say('TIME’S UP', 'bad', 1700, 'OUT OF FIELD GOAL RANGE');
     } else if (a.timeUp) {
       sfx.buzzer();
       say('TIME’S UP', 'plain', 1500, 'ONE LAST KICK · ' + fgDistance(game) + ' YARDS');
+    } else if (e.text.startsWith('BIG HIT')) {
+      say('BIG HIT!', 'big', 1500, e.text.slice(4) + ' · ' + gain);
     } else if (a.driveOver === 'DOWNS') {
       sfx.groan(0.8);
       say('TURNOVER ON DOWNS', 'bad', 1600, e.kind === 'incomplete' ? e.text : gain);
@@ -915,5 +919,5 @@ export function aiDrives2(rivalLineup: Lineup, yourLineup: Lineup, seed: string,
 export function aiDrivesOf(offense: Offense, defense: Defense, seed: string, skill: number, drives = DRIVES): Progress {
   const g = newGame(offense, defense, 'ai:' + seed, drives);
   autoplay(g, skill, 'ai:' + seed);
-  return { score: g.score, drive: g.drive, done: true, ends: g.ends.slice(), plays: g.plays };
+  return { score: g.score, drive: g.drive, done: true, ends: wireEnds(g), plays: g.plays };
 }

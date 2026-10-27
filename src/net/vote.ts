@@ -128,6 +128,11 @@ export class VoteMachine {
     this.since = now;
   }
 
+  /** End the vote now (against the AI, your pick is the answer: no need to wait out the clock). */
+  closeNow(now: number): void {
+    if (this.lockedAt === null && this.deadline !== null) this.deadline = Math.min(this.deadline, now);
+  }
+
   /** Vote (or take it back with 'none'). Only until the lock. */
   choose(b: Ballot): boolean {
     if (this.lockedAt !== null || this.decision) return false;

@@ -75,7 +75,7 @@ export function newPossession(ours: Hooper[], theirs: Hooper[], energy: number[]
     bodies.push(b);
   });
   const scheme = schemeFor(ours, rand);
-  return { t: 0, clock: SHOT_CLOCK, bodies, handler: 0, ball: null, meter: null, finish: null, end: null, events: ['scheme:' + scheme], rand, lastShot: null, passes: 0, fire: -1, target: null, scheme, trapper: null, sprinting: false };
+  return { t: 0, clock: SHOT_CLOCK, bodies, handler: 0, ball: null, meter: null, finish: null, end: null, events: ['scheme:' + scheme], rand, lastShot: null, passes: 0, fire: -1, target: null, scheme, trapper: null, trapped: false, sprinting: false };
 }
 
 /**
@@ -649,14 +649,15 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
   const inside = handler ? dist(handler, RIM) < 14 : false;
   if (!handler) p.sprinting = false;
   // a trap: once the ball's past the top of the key, the nearest man off the ball comes to double it
-  // (his own man is left open: the pass out beats it); it ends when the ball moves
+  // (his own man is left open: the pass out beats it); it ends when the ball moves, once a possession
   if (p.scheme === 'trap') {
     if (!handler || p.meter || p.finish || p.ball) p.trapper = null;
-    else if (p.trapper === null && t > 1.4 && dist(handler, RIM) < 29) {
+    else if (p.trapper === null && !p.trapped && t > 1.4 && dist(handler, RIM) < 29) {
       let best: Body | null = null;
       for (const d of p.bodies) if (d.side === 'D' && d.mark !== handler.idx && t >= d.stunUntil && (!best || dist(d, handler) < dist(best, handler))) best = d;
       if (best && dist(best, handler) < 18) {
         p.trapper = best.idx;
+        p.trapped = true;
         p.events.push('trap:' + best.idx);
       }
     }
