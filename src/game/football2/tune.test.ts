@@ -17,7 +17,7 @@ run('football v2 numbers', async () => {
   const all = CELLS.flatMap((c) => c.players);
   const by = (pos: string) => all.filter((p) => p.pos[0] === pos).sort((a, b) => rankOf(a) - rankOf(b));
   const pick = (pos: string, l: number) => { const list = by(pos); return list[Math.min(list.length - 1, Math.floor(l * (list.length - 1)))]; };
-  const lineupAt = (l: number) => ({ QB: pick('QB', l), RB: pick('RB', l), WR: pick('WR', l), TE: pick('TE', l), FLEX: pick('WR', Math.max(0, l - 0.05)), DEF: pick('DEF', l) }) as unknown as Lineup;
+  const lineupAt = (l: number) => ({ QB: pick('QB', l), RB: pick('RB', l), WR: pick('WR', l), TE: pick('TE', l), FLEX: pick('WR', Math.max(0, l - 0.05)), DL: pick('DL', l), LB: pick('LB', l), DB: pick('DB', l) }) as unknown as Lineup;
   for (const [ol, olab] of [[0.97, 'elite O'], [0.6, 'avg O'], [0.2, 'weak O']] as const)
     for (const [dl, dlab] of [[0.95, 'elite D'], [0.5, 'avg D'], [0.1, 'weak D']] as const) {
       const off = offenseOf(lineupAt(ol), at, 'o');

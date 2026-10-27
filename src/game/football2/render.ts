@@ -28,6 +28,8 @@ export interface FbOverlay {
   toGain: number | null;
   /** pre-snap: show the routes */
   routes: boolean;
+  /** a new player's help: rings on the receivers while he's back to pass, by how open each is */
+  open: boolean;
   shake: number;
   flash: number;
 }
@@ -119,11 +121,19 @@ function poseOf(b: Body, t: number, p: Play): { key: string; pose: Pose } {
       return { key: 'tr' + ph, pose: P.truck(ph) };
     }
     case 'tackle': {
+      // the dive, then on the turf
+      if (since > 0.55) return { key: 'dn', pose: P.grounded() };
       const ph = timed(0.35, 5);
       return { key: 'tk' + ph, pose: P.dive(ph) };
     }
-    case 'down':
+    case 'down': {
+      // knocked over: a stumble back first, then on the ground
+      if (since < 0.3) {
+        const ph = timed(0.3, 3);
+        return { key: 'kb' + ph, pose: P.stumble(ph) };
+      }
       return { key: 'dn', pose: P.grounded() };
+    }
     case 'celebrate': {
       const ph = cycle(1.4, 6);
       return { key: 'ce' + ph, pose: P.celebrate(ph) };
@@ -224,6 +234,8 @@ export class FootballRenderer {
     const pre = p.phase === 'pre' || p.phase === 'drop';
     let y = at.y + (pre ? (this.mode === 'side' ? 9 : 1) : this.mode === 'side' ? 3 : -1);
     if (aim && p.phase === 'drop') y = Math.max(y, (p.qb.y + aim.y) / 2 + (this.mode === 'side' ? 2 : -6));
+    // an overthrow out the back: the camera stops at the end zone
+    y = Math.min(y, this.mode === 'side' ? 100 : 104);
     // sideways the camera follows across too; upright it stays near the middle before the throw so
     // both sides show, then rides with the ball
     const x =
@@ -473,6 +485,21 @@ export class FootballRenderer {
       ctx.beginPath();
       ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, ry, 0, 0, Math.PI * 2);
       ctx.fill();
+    }
+    // who's open: green, tight (yellow) or covered (red), live while the quarterback has it
+    if (o.open && p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) {
+      for (const b of p.bodies) {
+        if (b.side !== 'O' || b === p.qb || isLine(b) || b.job === 'block') continue;
+        let near = 99;
+        for (const d of p.bodies) if (d.side === 'D' && d.job !== 'rush') near = Math.min(near, dist(d, b));
+        const f = L.at(b.x, b.y);
+        const rx = Math.max(5, Math.round(f.s * 0.7));
+        ctx.strokeStyle = near >= 3.2 ? 'rgba(62,240,122,0.95)' : near >= 1.8 ? 'rgba(255,210,58,0.95)' : 'rgba(255,90,90,0.9)';
+        ctx.lineWidth = Math.max(2, Math.round(f.s * 0.12));
+        ctx.beginPath();
+        ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(2, Math.round(rx * Math.sin(L.pitch(b.y)))), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
     // the man with the ball, ringed so the eye finds him
     const lead = p.carrier && p.phase !== 'pre' ? p.carrier : null;

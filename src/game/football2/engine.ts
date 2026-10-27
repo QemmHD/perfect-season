@@ -347,7 +347,7 @@ function move(b: Body, dt: number) {
 function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string) {
   if (p.end) return;
   // brought down (or out) past the goal line: the ball broke the plane
-  if ((kind === 'tackle' || kind === 'out') && at.y >= 100) {
+  if ((kind === 'tackle' || kind === 'out' || kind === 'fumble') && at.y >= 100) {
     kind = 'td';
     text = 'TOUCHDOWN';
   }
@@ -614,16 +614,43 @@ function tackle(p: Play, d: Body, c: Body) {
       endPlay(p, 'fumble', c, 'FUMBLE! ' + d.p.tag + ' FORCES IT');
       return;
     }
+    // a big hit: a hard hitter arriving fast drives the runner back (the screen shows it in slow motion)
+    const closing = Math.hypot(d.vx - c.vx, d.vy - c.vy);
+    const big = hit > 0.55 && closing > 7.5 && r() < 0.35 + 0.5 * hit;
+    if (big) {
+      const k = 4.5 / Math.max(0.1, Math.hypot(d.vx, d.vy));
+      c.vx = d.vx * k;
+      c.vy = d.vy * k;
+      p.events.push('bighit');
+    } else {
+      c.vx *= 0.3;
+      c.vy *= 0.3;
+    }
     act(c, 'down', p.t);
     act(d, 'tackle', p.t);
-    endPlay(p, 'tackle', c, 'TACKLED');
+    endPlay(p, 'tackle', c, big ? 'BIG HIT BY ' + d.p.tag : 'TACKLED');
     return;
   }
-  // broken: the tackler goes down, the runner stumbles and keeps going
-  d.stunUntil = p.t + 0.9;
-  d.vx = 0;
-  d.vy = 0;
-  act(d, 'down', p.t);
+  // broken: the runner goes on. Juked, the tackler dives at air; trucked or stiff-armed, he's knocked
+  // onto his back; otherwise he just goes down
+  d.stunUntil = p.t + (m?.kind === 'juke' ? 1.1 : 0.9);
+  if (m?.kind === 'juke') {
+    // he keeps his momentum into the dive, past where the runner was
+    d.vx *= 0.9;
+    d.vy *= 0.9;
+    act(d, 'tackle', p.t);
+  } else if (m?.kind === 'truck' || m?.kind === 'stiff') {
+    const dx = d.x - c.x;
+    const dy = d.y - c.y;
+    const l = Math.max(0.1, Math.hypot(dx, dy));
+    d.vx = (dx / l) * 3.2;
+    d.vy = (dy / l) * 3.2;
+    act(d, 'down', p.t);
+  } else {
+    d.vx = 0;
+    d.vy = 0;
+    act(d, 'down', p.t);
+  }
   p.slowUntil = p.t + (m?.kind === 'truck' ? 0.2 : 0.3);
   p.events.push(m ? 'beat:' + m.kind : 'break');
 }

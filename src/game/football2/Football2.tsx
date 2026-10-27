@@ -1,7 +1,8 @@
 // Arcade football, Retro Bowl style: your offense against the rival's defense, eleven on eleven.
-// Before the snap pick PASS (the play's routes are drawn) or RUN. On a pass, drag back anywhere and
-// let go to throw: the arc shows where it lands and who it's going to. With the ball in your hands,
-// drag anywhere to steer and hit JUKE, SPIN or POWER at a tackler. Fourth down: go, kick or punt.
+// Before the snap pick one of three play cards (its routes are drawn on the field) and SNAP. On a
+// pass, drag back anywhere and let go to throw: the arc shows where it lands and who it's going to.
+// With the ball in your hands, drag to steer; swipe across to juke, swipe up field to spin,
+// double-tap to truck. Fourth down: go for it, kick on the meter, or punt.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
@@ -13,7 +14,7 @@ import type { FieldTheme } from '../pixel/field';
 import type { Progress, RivalLive } from '../progress';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, fourthDown, pilot } from './autopilot';
-import { afterPlay, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type Game, kick, kickWindow, newGame, nextConcept, punt, spotText, startPlay } from './drive';
+import { afterPlay, choices, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type Game, kick, kickWindow, newGame, type PlayChoice, punt, spotText, startChoice, startPlay } from './drive';
 import { CONCEPT_NAMES, FIELD_W, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
@@ -23,7 +24,25 @@ type Ui = 'loading' | 'pre' | 'fourth' | 'live' | 'after' | 'kick' | 'final';
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
 
 const DT = 1 / 60;
-const MARK_TEXT: Record<DriveEnd, string> = { TD: 'TD', FG: 'FG', MISS: 'X', INT: 'INT', DOWNS: '–', PUNT: 'P', FUM: 'FUM' };
+const MARK_TEXT: Record<DriveEnd, string> = { TD: 'TD', FG: 'FG', MISS: 'X', INT: 'INT', DOWNS: '–', PUNT: 'P', FUM: 'FUM', SAF: 'SAF' };
+
+/** Who's open (rings on the receivers while you aim) shows only in a player's first games. */
+const PLAYED_KEY = 'perfect-season:fb2-played';
+const OPEN_RING_GAMES = 3;
+function gamesPlayed(): number {
+  try {
+    return Number(localStorage.getItem(PLAYED_KEY)) || 0;
+  } catch {
+    return OPEN_RING_GAMES;
+  }
+}
+function countGame() {
+  try {
+    localStorage.setItem(PLAYED_KEY, String(gamesPlayed() + 1));
+  } catch {
+    // storage blocked: the rings just keep showing
+  }
+}
 
 /** A home kit from a team's colors, and an away kit (white jerseys, the team's helmet). */
 export function fbKitsFor(c1: string, c2: string): { home: FbKit; away: FbKit } {
@@ -100,6 +119,14 @@ export function Football2({
   const [wide, setWide] = useState(false);
   const [float, setFloat] = useState<{ x: number; y: number; kx: number; ky: number } | null>(null);
   const [phase, setPhase] = useState<Play['phase']>('pre');
+  // the three play cards for this down, and the one lined up
+  const [opts, setOpts] = useState<{ choice: PlayChoice; play: Play }[]>([]);
+  const [picked, setPicked] = useState(0);
+  // a swipe in progress (a fast flick reads as a move; a slow drag steers) and the last tap (double-tap)
+  const gesture = useRef<{ id: number; t0: number; x0: number; y0: number; used: boolean } | null>(null);
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  const openRings = useMemo(() => gamesPlayed() < OPEN_RING_GAMES, []);
+  const counted = useRef(false);
 
   const say = (text: string, tone: Tone, ms = 1200, sub?: string) => {
     const id = ++popId.current;
@@ -117,15 +144,20 @@ export function Football2({
     if (!reducedMotion()) fxRef.current.shake = Math.max(fxRef.current.shake, px);
   };
 
-  /** Line up the next snap: a pass play shown with its routes until you call it. */
+  /** Line up the next snap: three play cards, the first lined up with its routes until you pick another. */
   const lineUpNext = (g: Game) => {
-    playRef.current = startPlay(g, 'pass');
+    const cs = choices(g);
+    const lined = cs.map((choice) => ({ choice, play: startChoice(g, choice) }));
+    setOpts(lined);
+    setPicked(0);
+    playRef.current = startChoice(g, cs[0]);
     dragRef.current = null;
     stickRef.current = null;
+    gesture.current = null;
     setFloat(null);
     setPhase('pre');
     setUi(g.down === 4 ? 'fourth' : 'pre');
-    if (g.down !== 4) tip('call', 'PASS runs the routes drawn · RUN hands it off · ↻ another play');
+    if (g.down !== 4) tip('call', 'Pick a play · its routes show on the field · SNAP');
   };
 
   useEffect(() => {
@@ -135,24 +167,24 @@ export function Football2({
     return () => crowd.stop(0.6);
   }, [game]);
 
-  const go = (call: 'pass' | 'run') => {
-    if (!game || (ui !== 'pre' && ui !== 'fourth')) return;
+  /** Line up another of the three cards (before the snap). */
+  const pick = (i: number) => {
+    if (!game || (ui !== 'pre' && ui !== 'fourth') || !opts[i]) return;
     sfx.click();
-    const p = call === 'pass' ? (playRef.current ?? startPlay(game, 'pass')) : startPlay(game, 'run');
-    playRef.current = p;
+    setPicked(i);
+    playRef.current = startChoice(game, opts[i].choice);
+  };
+  const snapNow = () => {
+    if (!game || (ui !== 'pre' && ui !== 'fourth')) return;
+    const p = playRef.current;
+    if (!p || p.phase !== 'pre') return;
+    sfx.click();
     pilotRef.current.readAt = 0;
     snap(p);
     setUi('live');
     setPhase(p.phase);
-    if (call === 'pass') tip('pass', 'Drag back anywhere · let go to throw');
-    else tip('run', 'Drag to steer · JUKE, SPIN or POWER at a tackler');
-  };
-  const reroll = () => {
-    if (!game || ui !== 'pre') return;
-    sfx.click();
-    nextConcept(game);
-    playRef.current = startPlay(game, 'pass');
-    setTick((n) => n + 1);
+    if (p.call === 'pass') tip('pass', 'Drag back anywhere · let go to throw');
+    else tip('run', 'Drag to steer · swipe ← → juke · swipe ↑ spin · double-tap truck');
   };
 
   const nextUp = (g: Game, driveOver: boolean, wait: number) => {
@@ -160,6 +192,10 @@ export function Football2({
     window.setTimeout(() => {
       if (g.over) {
         setUi('final');
+        if (!counted.current) {
+          counted.current = true;
+          countGame();
+        }
         onDone(progress(g));
         return;
       }
@@ -176,7 +212,7 @@ export function Football2({
       else if (e === 'catch') {
         sfx.place();
         crowd.swell(0.3);
-        tip('runafter', 'Drag to steer · JUKE, SPIN or POWER at a tackler');
+        tip('runafter', 'Drag to steer · swipe ← → juke · swipe ↑ spin · double-tap truck');
       } else if (e === 'catch-contested') {
         sfx.place();
         crowd.swell(0.7);
@@ -192,6 +228,13 @@ export function Football2({
       } else if (e === 'break') {
         crowd.swell(0.5);
         say('BROKE A TACKLE', 'good', 800);
+      } else if (e === 'bighit') {
+        // the hit lands in slow motion
+        slowUntil.current = performance.now() + 750;
+        shake(6);
+        vibrate([40, 30, 60]);
+        crowd.swell(1);
+        fxRef.current.flash = 0.35;
       } else if (e === 'tackle') sfx.stop();
       else if (e === 'sack') {
         sfx.stop();
@@ -228,6 +271,13 @@ export function Football2({
       sfx.scoreThem();
       vibrate(50);
       say(a.driveOver === 'INT' ? 'INTERCEPTED' : 'FUMBLE', 'bad', 1700, e.text);
+    } else if (a.driveOver === 'SAF') {
+      sfx.scoreThem();
+      vibrate(50);
+      say('SAFETY', 'bad', 1700, 'TACKLED IN YOUR END ZONE');
+    } else if (e.text.startsWith('BIG HIT')) {
+      sfx.stop();
+      say('BIG HIT!', 'big', 1500, e.text.slice(4) + ' · ' + gain);
     } else if (a.driveOver === 'DOWNS') {
       sfx.nope();
       say('TURNOVER ON DOWNS', 'bad', 1600, e.kind === 'incomplete' ? e.text : gain);
@@ -260,8 +310,9 @@ export function Football2({
     const pos = ph < 1 ? ph : 2 - ph;
     k.stopped = pos;
     setTick((n) => n + 1);
-    const a = kick(game, Math.abs(pos - 0.5) * 2);
-    const good = a.points > 0;
+    // the same test kick() makes; the drive itself is settled when the ball reaches the posts
+    const aim = Math.abs(pos - 0.5) * 2;
+    const good = aim <= kickWindow(game) && fgInRange(game);
     // the kick: the leg swings, the ball's away a beat later; wide by the side the needle missed on
     const kicker = p.rb;
     kicker.act = 'kick';
@@ -269,7 +320,7 @@ export function Football2({
     const from = { x: p.bx, y: p.los - 7 };
     const side = pos < 0.5 ? -1 : 1;
     const toX = FIELD_W / 2 + (good ? side * Math.random() * 1.6 : side * (4.2 + Math.random() * 2.5));
-    // aimed long, so it's still climbing over the crossbar; stopped when it reaches the stands
+    // aimed long, so it's still climbing over the crossbar; it disappears into the stands
     const to = { x: from.x + (toX - from.x) * ((150 - from.y) / (110 - from.y)), y: 150 };
     const t0 = p.t + 0.22;
     const t1 = t0 + 1.25 + (150 - from.y) * 0.004;
@@ -280,20 +331,23 @@ export function Football2({
     sfx.whoosh();
     window.setTimeout(() => setUi('after'), 450);
     window.setTimeout(() => {
+      kick(game, aim);
       if (good) {
         sfx.seriesWin();
         crowd.swell(0.9);
         say('IT’S GOOD! +3', 'good', 1600, k.dist + ' YARDS');
       } else {
         sfx.seriesLoss();
-        say('NO GOOD', 'bad', 1500, (side < 0 ? 'WIDE LEFT' : 'WIDE RIGHT'));
+        say('NO GOOD', 'bad', 1500, side < 0 ? 'WIDE LEFT' : 'WIDE RIGHT');
       }
+      nextUp(game, true, 1700);
     }, 1000);
     window.setTimeout(() => {
       kickRef.current = null;
       kickAnim.current = null;
-    }, 2800);
-    nextUp(game, true, 2700);
+      // the kick play is over: nothing steps it again (the game may be over and keep showing it)
+      p.phase = 'dead';
+    }, 2650);
   };
   const puntNow = () => {
     if (!game || ui !== 'fourth') return;
@@ -308,12 +362,15 @@ export function Football2({
   useEffect(() => {
     if (!autoplayHook || !game) return;
     const t = window.setTimeout(() => {
-      if (ui === 'pre') go(pilotRef.current.rand() < 0.3 ? 'run' : 'pass');
-      else if (ui === 'fourth') {
+      if (ui === 'pre') {
+        const i = pilotRef.current.rand() < 0.3 ? 2 : pilotRef.current.rand() < 0.5 ? 1 : 0;
+        if (opts[i]) playRef.current = startChoice(game, opts[i].choice);
+        snapNow();
+      } else if (ui === 'fourth') {
         const d = fourthDown(game);
         if (d === 'kick') startKick();
         else if (d === 'punt') puntNow();
-        else go('pass');
+        else snapNow();
       } else if (ui === 'kick') kickNow();
     }, ui === 'kick' ? 700 : 450);
     return () => clearTimeout(t);
@@ -369,7 +426,19 @@ export function Football2({
       const elapsed = Math.min(0.1, (now - last) / 1000);
       last = now;
       acc += now < slowUntil.current ? elapsed * 0.4 : elapsed;
-      if (p && kickAnim.current) {
+      if (p && p.end) {
+        // after the whistle: the hit lands, the tackled man slides, the pile settles
+        const vis = now < slowUntil.current ? elapsed * 0.4 : elapsed;
+        p.t += vis;
+        for (const b of p.bodies) {
+          if (Math.abs(b.vx) + Math.abs(b.vy) < 0.05) continue;
+          b.x += b.vx * vis;
+          b.y += b.vy * vis;
+          b.vx *= Math.pow(0.08, vis);
+          b.vy *= Math.pow(0.08, vis);
+        }
+        acc = 0;
+      } else if (p && kickAnim.current) {
         p.t += elapsed;
         // the ball disappears into the stands (left in the air it would read as a man by the posts)
         if (p.ball && p.t > p.ball.t0) {
@@ -380,8 +449,8 @@ export function Football2({
       } else if (p && p.phase !== 'pre' && !p.end) {
         while (acc >= DT) {
           acc -= DT;
-          const steer = autoplayHook ? decide(p, game, pilotRef.current) : steerNow(p);
           const was: Play['phase'] = p.phase;
+          const steer = autoplayHook ? decide(p, game, pilotRef.current) : steerNow(p);
           step(p, DT, steer);
           handleEvents(p);
           if (p.phase !== was) setPhase(p.phase);
@@ -394,21 +463,38 @@ export function Football2({
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.flash = Math.max(0, fx.flash - elapsed * 1.8);
       const ctx = canvas.getContext('2d')!;
-      if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo, routes: p.phase === 'pre' && p.call === 'pass', shake: fx.shake, flash: fx.flash });
+      if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo, routes: p.phase === 'pre' && p.call === 'pass', open: openRings && !autoplayHook, shake: fx.shake, flash: fx.flash });
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [game]);
 
-  // ---- touch: the slingshot while he's back to throw, the floating stick once someone's running ----
+  // ---- touch: the slingshot while he's back to throw; once someone's running (or the ball's in the
+  // air on its way to him), a stick that floats where the finger lands, with flicks for moves ----
+  const move3 = (p: Play, kind: 'juke' | 'spin' | 'power', dir = 0) => {
+    const c = p.carrier;
+    if (!c || p.phase !== 'run') return;
+    if (kind === 'power') moveWithBall(p, (c.p.a.TRK ?? 50) >= (c.p.a.SFA ?? 50) ? 'truck' : 'stiff');
+    else moveWithBall(p, kind, dir);
+  };
   const down = (e: React.PointerEvent) => {
     const p = playRef.current;
     if (!p || ui !== 'live' || autoplayHook) return;
+    // one finger drives at a time
+    if (dragRef.current || stickRef.current) return;
     (e.target as Element).setPointerCapture?.(e.pointerId);
     if (p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) {
       dragRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 };
-    } else if (p.phase === 'run' || (p.phase === 'drop' && p.call === 'run')) {
+    } else if (p.phase === 'run' || p.phase === 'air' || (p.phase === 'drop' && p.call === 'run')) {
+      const now = performance.now();
+      const t = lastTap.current;
+      // a double-tap: lower the shoulder (a truck, or a stiff arm for the man who's better at it)
+      if (t && now - t.t < 300 && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 60) {
+        move3(p, 'power');
+        lastTap.current = null;
+      } else lastTap.current = { t: now, x: e.clientX, y: e.clientY };
       stickRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: 0, y: 0 };
+      gesture.current = { id: e.pointerId, t0: now, x0: e.clientX, y0: e.clientY, used: false };
       setFloat({ x: e.clientX, y: e.clientY, kx: 0, ky: 0 });
     }
   };
@@ -420,19 +506,39 @@ export function Football2({
       return;
     }
     const s = stickRef.current;
-    if (s && s.id === e.pointerId) {
-      const R = 46;
-      let x = (e.clientX - s.x0) / R;
-      let y = (e.clientY - s.y0) / R;
-      const l = Math.hypot(x, y);
-      if (l > 1) {
-        x /= l;
-        y /= l;
+    if (!s || s.id !== e.pointerId) return;
+    // a flick (far, fast) is a move: across the field a juke that way, up the field a spin
+    const g = gesture.current;
+    const p = playRef.current;
+    if (g && p && !g.used && performance.now() - g.t0 < 240) {
+      const dx = e.clientX - g.x0;
+      const dy = e.clientY - g.y0;
+      if (Math.hypot(dx, dy) > 46) {
+        g.used = true;
+        const upField = renderer.mode === 'side' ? dx : -dy;
+        const across = renderer.mode === 'side' ? -dy : dx;
+        if (upField > Math.abs(across) * 1.2) move3(p, 'spin');
+        else if (Math.abs(across) > Math.abs(upField)) move3(p, 'juke', Math.sign(across));
+        // steer from here on, not from where the flick began
+        s.x0 = e.clientX;
+        s.y0 = e.clientY;
+        s.x = 0;
+        s.y = 0;
+        setFloat({ x: s.x0, y: s.y0, kx: 0, ky: 0 });
+        return;
       }
-      s.x = x;
-      s.y = y;
-      setFloat({ x: s.x0, y: s.y0, kx: x, ky: y });
     }
+    const R = 46;
+    let x = (e.clientX - s.x0) / R;
+    let y = (e.clientY - s.y0) / R;
+    const l = Math.hypot(x, y);
+    if (l > 1) {
+      x /= l;
+      y /= l;
+    }
+    s.x = x;
+    s.y = y;
+    setFloat({ x: s.x0, y: s.y0, kx: x, ky: y });
   };
   const up = (e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -440,28 +546,15 @@ export function Football2({
     if (d && d.id === e.pointerId) {
       const aim = p ? aimNow(p) : null;
       dragRef.current = null;
-      if (p && aim) throwTo(p, aim);
+      if (p && aim && throwTo(p, aim)) setPhase(p.phase);
       return;
     }
     const s = stickRef.current;
     if (s && s.id === e.pointerId) {
       stickRef.current = null;
+      gesture.current = null;
       setFloat(null);
     }
-  };
-  const doMove = (kind: 'juke' | 'spin' | 'power') => (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const p = playRef.current;
-    const c = p?.carrier;
-    if (!p || !c || p.phase !== 'run') return;
-    if (kind === 'power') {
-      moveWithBall(p, (c.p.a.TRK ?? 50) >= (c.p.a.SFA ?? 50) ? 'truck' : 'stiff');
-      return;
-    }
-    const s = stickRef.current;
-    const across = s ? (renderer.mode === 'side' ? -s.y : s.x) : 0;
-    moveWithBall(p, kind, Math.abs(across) > 0.2 ? Math.sign(across) : 0);
   };
   const doScramble = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -476,7 +569,6 @@ export function Football2({
   const g = game;
   const p = playRef.current;
   const fgOk = g ? fgInRange(g) : false;
-  const running = ui === 'live' && phase === 'run';
   const passing = ui === 'live' && phase === 'drop' && p?.call === 'pass';
   return createPortal(
     <div className={'arcade-full hg2 fb2' + (wide ? ' wide' : '')} ref={wrapRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
@@ -527,24 +619,21 @@ export function Football2({
         <div className="fb2-call" onPointerDown={(e) => e.stopPropagation()}>
           {ui === 'fourth' && (
             <span className="fb2-4th">
-              4TH & {g.toGo < 1 ? 'INCHES' : Math.round(g.toGo)} · {fgOk ? fgDistance(g) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE'}
+              {downText(g)} · {fgOk ? fgDistance(g) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE'}
             </span>
           )}
-          <div className="fb2-play">
-            <button className="fb2-reroll" onClick={reroll} disabled={ui !== 'pre'} aria-label="Another pass play">
-              ↻
-            </button>
-            <span>
-              <small>PASS PLAY · RUN: {RUN_NAMES[p.run].toUpperCase()}</small>
-              <b>{CONCEPT_NAMES[p.concept]}</b>
-            </span>
+          <div className="fb2-cards" role="radiogroup" aria-label="Pick a play">
+            {opts.map((o, i) => (
+              <button key={i} className={'fb2-card ' + o.choice.call + (i === picked ? ' on' : '')} role="radio" aria-checked={i === picked} onClick={() => pick(i)}>
+                <PlayArt play={o.play} />
+                <small>{o.choice.call === 'pass' ? 'PASS' : 'RUN'}</small>
+                <b>{o.choice.call === 'pass' ? CONCEPT_NAMES[o.choice.concept] : RUN_NAMES[o.choice.run]}</b>
+              </button>
+            ))}
           </div>
           <div className="fb2-btns">
-            <button className="fb2-go pass" onClick={() => go('pass')}>
-              PASS
-            </button>
-            <button className="fb2-go run" onClick={() => go('run')}>
-              RUN
+            <button className="fb2-go snap" onClick={snapNow}>
+              {ui === 'fourth' ? 'GO FOR IT' : 'SNAP'}
             </button>
             {ui === 'fourth' && fgOk && (
               <button className="fb2-go kick" onClick={startKick}>
@@ -563,19 +652,6 @@ export function Football2({
         <div className="fb2-moves" onPointerDown={(e) => e.stopPropagation()}>
           <button className="fb2-mv scramble" onPointerDown={doScramble} aria-label="Scramble: the quarterback runs">
             RUN IT
-          </button>
-        </div>
-      )}
-      {running && !autoplayHook && (
-        <div className="fb2-moves" onPointerDown={(e) => e.stopPropagation()}>
-          <button className="fb2-mv juke" onPointerDown={doMove('juke')} aria-label="Juke">
-            JUKE
-          </button>
-          <button className="fb2-mv spin" onPointerDown={doMove('spin')} aria-label="Spin">
-            SPIN
-          </button>
-          <button className="fb2-mv power" onPointerDown={doMove('power')} aria-label="Power: truck or stiff arm">
-            POWER
           </button>
         </div>
       )}
@@ -622,6 +698,53 @@ function KickMeter({ window: win, start, stopped, distance, onKick }: { window: 
         <i className="needle" style={{ left: pos * 100 + '%' }} />
       </span>
     </button>
+  );
+}
+
+const ART_COLOR: Record<string, string> = { X: '#ffd23a', SL: '#ff7aa8', Z: '#5cb8ff', TE: '#7cf08c', RB: '#c7a2ff' };
+
+/** A play card's drawing: the line, the backs, and each route (or the run's path) in its color. */
+function PlayArt({ play }: { play: Play }) {
+  const { bx, los } = play;
+  const X = (x: number) => 50 + (x - bx) * 2.3;
+  const Y = (y: number) => 52 - (y - los) * 1.55;
+  const paths: { color: string; pts: [number, number][] }[] = [];
+  if (play.call === 'pass') {
+    for (const b of play.bodies) {
+      if (b.side !== 'O' || !b.route.length || !ART_COLOR[b.slot]) continue;
+      paths.push({ color: ART_COLOR[b.slot], pts: [[X(b.x), Y(b.y)], ...b.route.map((w) => [X(w.x), Y(w.y)] as [number, number])] });
+    }
+  } else {
+    // the back's path: up the middle, bounced outside, or off tackle behind a pulling guard
+    const rb = play.rb;
+    const side = rb.x < bx ? 1 : -1;
+    const pts: [number, number][] =
+      play.run === 'outside'
+        ? [[X(rb.x), Y(rb.y)], [X(bx + side * 6), Y(los - 2)], [X(bx + side * 10), Y(los + 7)]]
+        : play.run === 'power'
+          ? [[X(rb.x), Y(rb.y)], [X(bx + side * 2.5), Y(los - 1)], [X(bx + side * 3.5), Y(los + 7)]]
+          : [[X(rb.x), Y(rb.y)], [X(bx + 0.6), Y(los)], [X(bx + 0.6), Y(los + 8)]];
+    paths.push({ color: ART_COLOR.RB, pts });
+  }
+  const end = (pts: [number, number][]) => {
+    const [ax, ay] = pts[pts.length - 2];
+    const [ex, ey] = pts[pts.length - 1];
+    const a = Math.atan2(ey - ay, ex - ax);
+    return [ex + Math.cos(a) * 3, ey + Math.sin(a) * 3, ex + Math.cos(a + 2.4) * 3, ey + Math.sin(a + 2.4) * 3, ex + Math.cos(a - 2.4) * 3, ey + Math.sin(a - 2.4) * 3].join(',');
+  };
+  return (
+    <svg className="fb2-art" viewBox="0 0 100 64" aria-hidden="true">
+      <line x1="0" y1={Y(los)} x2="100" y2={Y(los)} stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
+      {play.bodies
+        .filter((b) => b.side === 'O')
+        .map((b) => (b.slot === 'LT' || b.slot === 'LG' || b.slot === 'C' || b.slot === 'RG' || b.slot === 'RT' ? <rect key={b.id} x={X(b.x) - 1.6} y={Y(b.y) - 1.6} width="3.2" height="3.2" fill="#d8dee8" /> : <circle key={b.id} cx={X(b.x)} cy={Y(b.y)} r="1.9" fill={ART_COLOR[b.slot] ?? '#ffffff'} />))}
+      {paths.map((pa, i) => (
+        <g key={i}>
+          <polyline points={pa.pts.map((q) => q.join(',')).join(' ')} fill="none" stroke={pa.color} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+          <polygon points={end(pa.pts)} fill={pa.color} />
+        </g>
+      ))}
+    </svg>
   );
 }
 

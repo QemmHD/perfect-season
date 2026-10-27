@@ -38,6 +38,8 @@ function lead(p: Play, b: Body): { at: Pt; open: number } {
   let at: Pt = { x: b.x, y: b.y };
   for (let i = 0; i < 3; i++) at = projectRoute(b, flightTime(p, dist(qb, at)));
   at.x = Math.max(1, Math.min(FIELD_W - 1, at.x));
+  // the back of the end zone is the end of the field
+  at.y = Math.min(at.y, 109);
   let open = 99;
   for (const d of p.bodies) {
     if (d.side !== 'D' || d.job === 'rush') continue;

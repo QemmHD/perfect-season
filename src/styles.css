@@ -10806,3 +10806,72 @@ button.friendcard:active {
 .hg2-pop.green {
   font-size: min(30px, 8vw);
 }
+/* football: three play cards before each snap */
+.fb2-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.fb2-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 6px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  text-align: left;
+  touch-action: manipulation;
+  transition:
+    transform 0.12s var(--ease-spring),
+    border-color 0.12s,
+    background 0.12s;
+}
+.fb2-card:active {
+  transform: scale(0.97);
+}
+.fb2-card.on {
+  border-color: var(--teal);
+  background: rgba(25, 227, 201, 0.12);
+  box-shadow: 0 0 0 1px var(--teal) inset;
+}
+.fb2-card.run.on {
+  border-color: #8a7cff;
+  background: rgba(138, 124, 255, 0.16);
+  box-shadow: 0 0 0 1px #8a7cff inset;
+}
+.fb2-card small {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+  color: var(--sub);
+}
+.fb2-card.run small {
+  color: #b9b0ff;
+}
+.fb2-card b {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 14px;
+  line-height: 1.05;
+}
+.fb2-art {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #1e5a26, #16461d);
+}
+.fb2-go.snap {
+  color: var(--teal-ink);
+  background: linear-gradient(180deg, #6ff0de, #10bfa8);
+  box-shadow: 0 4px 0 #0a7d6e;
+}
+.fb2.wide .fb2-card b {
+  font-size: 12px;
+}
+.fb2.wide .fb2-cards {
+  gap: 6px;
+}

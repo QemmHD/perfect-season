@@ -9,8 +9,8 @@ import type { Call, Concept, Defense, Offense, Play, PlayEnd, RunPlay } from './
 export const DRIVES = 4;
 export const START = 25;
 
-export type DriveEnd = 'TD' | 'FG' | 'MISS' | 'INT' | 'DOWNS' | 'PUNT' | 'FUM';
-export const END_POINTS: Record<DriveEnd, number> = { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0, PUNT: 0, FUM: 0 };
+export type DriveEnd = 'TD' | 'FG' | 'MISS' | 'INT' | 'DOWNS' | 'PUNT' | 'FUM' | 'SAF';
+export const END_POINTS: Record<DriveEnd, number> = { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0, PUNT: 0, FUM: 0, SAF: 0 };
 
 export interface Game {
   off: Offense;
@@ -57,6 +57,32 @@ export function nextConcept(g: Game) {
   const was = g.concept;
   for (let i = 1; i < 8 && g.concept === was; i++) g.concept = conceptFor(g, ++g.conceptNo);
   if (g.concept === was) g.concept = CONCEPTS[(CONCEPTS.indexOf(was) + 1) % CONCEPTS.length];
+}
+
+export interface PlayChoice {
+  call: Call;
+  concept: Concept;
+  run: RunPlay;
+}
+
+/** The three plays offered before a snap: two different pass plays and the down's run play. */
+export function choices(g: Game): PlayChoice[] {
+  const a = conceptFor(g, 0);
+  let b = a;
+  for (let i = 1; i < 10 && b === a; i++) b = conceptFor(g, i);
+  if (b === a) b = CONCEPTS[(CONCEPTS.indexOf(a) + 3) % CONCEPTS.length];
+  return [
+    { call: 'pass', concept: a, run: g.run },
+    { call: 'pass', concept: b, run: g.run },
+    { call: 'run', concept: a, run: g.run },
+  ];
+}
+
+/** Line up one of the offered plays. */
+export function startChoice(g: Game, c: PlayChoice): Play {
+  g.concept = c.concept;
+  g.run = c.run;
+  return startPlay(g, c.call);
 }
 
 export function startPlay(g: Game, call: Call): Play {
@@ -122,17 +148,25 @@ export function afterPlay(g: Game, end: PlayEnd): After {
     endDrive(g, 'FUM');
     return { text: end.text, firstDown: false, points: 0, driveOver: 'FUM', fourth: false };
   }
-  const gain = end.kind === 'incomplete' ? 0 : end.y - g.ballOn;
+  // the line to gain is fixed before the snap; at or past the goal line it's goal to go (only a
+  // touchdown moves the chains)
+  const line = g.ballOn + g.toGo;
+  const goalToGo = line >= 100;
+  if (end.kind !== 'incomplete' && end.y <= 0) {
+    // brought down in his own end zone: a safety ends the drive
+    endDrive(g, 'SAF');
+    return { text: 'SAFETY', firstDown: false, points: 0, driveOver: 'SAF', fourth: false };
+  }
   if (end.kind !== 'incomplete') {
     g.ballOn = Math.max(1, Math.min(99, end.y));
     g.ballX = end.x;
   }
-  if (gain >= g.toGo) {
+  if (!goalToGo && end.kind !== 'incomplete' && end.y >= line) {
     g.down = 1;
     g.toGo = Math.min(10, 100 - g.ballOn);
     return { text: 'FIRST DOWN', firstDown: true, points: 0, driveOver: null, fourth: false };
   }
-  g.toGo = Math.max(0.5, g.toGo - gain);
+  g.toGo = goalToGo ? 100 - g.ballOn : Math.max(0.3, line - g.ballOn);
   if (g.down === 4) {
     endDrive(g, 'DOWNS');
     return { text: 'TURNOVER ON DOWNS', firstDown: false, points: 0, driveOver: 'DOWNS', fourth: false };
