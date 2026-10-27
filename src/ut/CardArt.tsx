@@ -3,7 +3,7 @@
 // played games draw, in that season's team colors and his own number, drawn small and scaled up
 // with crisp pixels.
 import React from 'react';
-import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, hairFor, type Look } from '../game/pixel/body';
+import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, freeCanvas, hairFor, type Look } from '../game/pixel/body';
 import { celebrate, idle } from '../game/pixel/poses';
 import { useTilt } from '../ui/Card';
 import { shortSeason } from './pool';
@@ -50,6 +50,8 @@ export function portraitUrl(line: CardLine, pose: 'stand' | 'cheer' = 'stand'): 
     g.imageSmoothingEnabled = false;
     g.drawImage(sp.canvas, Math.round(W / 2 - sp.ax), Math.round(H - 2 - sp.ay));
     url = c.toDataURL();
+    freeCanvas(c);
+    freeCanvas(sp.canvas);
   } catch {
     url = '';
   }

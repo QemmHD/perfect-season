@@ -2,7 +2,7 @@
 // once, blitted under a camera that follows the ball); upright it's a broadcast camera from behind
 // the offense with perspective, the grass drawn a row at a time. On top: twenty-two rigged players
 // in their kits, the ball, the posts, the lines, the routes before the snap and the slingshot's arc.
-import { DEFAULT_HAIR, DEFAULT_SKIN, drawBody, type Look, type Sprite, SpriteCache } from '../pixel/body';
+import { DEFAULT_HAIR, DEFAULT_SKIN, drawBody, type Look, type Sprite, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { drawField, type FieldCam, fieldAt, fieldCam, fieldFacing, type FieldTheme } from '../pixel/field';
 import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoints, mocapKey, warp } from '../pixel/mocap';
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
@@ -286,7 +286,18 @@ export class FootballRenderer {
   private field: { canvas: HTMLCanvasElement; cam: FieldCam } | null = null;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache(900);
+  private sprites = new SpriteCache(600);
+
+  /** The game's over: hand back every canvas this drew with, now (iOS caps a page's canvas memory). */
+  dispose() {
+    this.sprites.dispose();
+    for (const s of this.last.values()) freeCanvas(s.canvas);
+    this.last.clear();
+    freeCanvas(this.floor?.canvas);
+    this.floor = null;
+    freeCanvas(this.field?.canvas);
+    this.field = null;
+  }
   private looks = new Map<string, Look>();
   private memos = new Map<string, Memo>();
   /** the slingshot's drawn back this frame: the quarterback cocks his arm */
@@ -447,11 +458,26 @@ export class FootballRenderer {
       if (this.budget <= 0 && last && b !== p.carrier) return last;
       this.budget--;
       const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
-      if (an.clip) {
+      const make = () => {
+        if (!an.clip) return drawBody(look, { ...an.pose, lift: 0 }, view, px);
         let j = mocapJoints(an.clip, frame, look, { ground: an.ground });
         if (an.ball) j = ballArm(j, an.ball);
-        spr = drawBody(look, j, view, px);
-      } else spr = drawBody(look, { ...an.pose, lift: 0 }, view, px);
+        return drawBody(look, j, view, px);
+      };
+      try {
+        spr = make();
+      } catch (e) {
+        if (!(e instanceof CanvasOut)) throw e;
+        // the phone is out of canvas memory: let go of every old drawing and try once more; failing
+        // that, he keeps last frame's
+        this.sprites.dispose(this.last.values());
+        try {
+          spr = make();
+        } catch {
+          if (last) return last;
+          throw e;
+        }
+      }
       this.sprites.set(k, spr, this.last.values());
     }
     this.last.set(who, spr);

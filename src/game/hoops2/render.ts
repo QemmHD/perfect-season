@@ -2,7 +2,7 @@
 // perspective (the same either way up; sideways shows more of the floor across): the court drawn a
 // row at a time, the arena's stands behind the basket, ten rigged players in their moves, the ball,
 // the backboard, rim and net, the 2K-style shot meter arched over the shooter and the contest grade.
-import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, hairFor, type Look, type Sprite, SpriteCache } from '../pixel/body';
+import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, hairFor, type Look, type Sprite, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
 import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoints, mocapKey, warp } from '../pixel/mocap';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
@@ -307,8 +307,17 @@ export class HoopsRenderer {
   private pc!: PCam;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache(700);
+  private sprites = new SpriteCache(360);
   private last = new Map<string, Sprite>();
+
+  /** The game's over: hand back every canvas this drew with, now (iOS caps a page's canvas memory). */
+  dispose() {
+    this.sprites.dispose();
+    for (const s of this.last.values()) freeCanvas(s.canvas);
+    this.last.clear();
+    freeCanvas(this.floor?.canvas);
+    this.floor = null;
+  }
   private budget = 0;
   private looks = new Map<string, Look>();
   private memos = new Map<string, Memo>();
@@ -392,11 +401,26 @@ export class HoopsRenderer {
       if (this.budget <= 0 && last && !carrying) return { spr: last, ownLift: this.lastLift.get(who) ?? false };
       this.budget--;
       const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
-      if (an.clip) {
+      const make = () => {
+        if (!an.clip) return drawBody(look, { ...an.pose, lift: 0 }, view, px);
         let j = mocapJoints(an.clip, frame, look, { ground: an.ground });
         if (an.dribble !== undefined) j = dribbleArm(j, an.dribble);
-        spr = drawBody(look, j, view, px);
-      } else spr = drawBody(look, { ...an.pose, lift: 0 }, view, px);
+        return drawBody(look, j, view, px);
+      };
+      try {
+        spr = make();
+      } catch (e) {
+        if (!(e instanceof CanvasOut)) throw e;
+        // the phone is out of canvas memory: let go of every old drawing and try once more; failing
+        // that, he keeps last frame's
+        this.sprites.dispose(this.last.values());
+        try {
+          spr = make();
+        } catch {
+          if (last) return { spr: last, ownLift: this.lastLift.get(who) ?? false };
+          throw e;
+        }
+      }
       this.sprites.set(k, spr, this.last.values());
     }
     this.last.set(who, spr);

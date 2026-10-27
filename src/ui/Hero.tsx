@@ -171,6 +171,11 @@ export function ArenaHero({ children }: { children: React.ReactNode }) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       document.removeEventListener('visibilitychange', vis);
+      // its layers' memory back now (iOS counts a dropped canvas until it's collected)
+      for (const cv of [base, top]) {
+        cv.width = 0;
+        cv.height = 0;
+      }
     };
   }, [k]);
   return (

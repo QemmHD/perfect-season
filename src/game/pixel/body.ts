@@ -236,6 +236,20 @@ export interface Sprite {
   top: number;
 }
 
+/** The browser wouldn't give a new canvas (iOS caps the canvas memory a page holds). */
+export class CanvasOut extends Error {
+  constructor() {
+    super('out of canvas memory');
+  }
+}
+
+/** Give a canvas's memory back now rather than whenever it's collected (iOS counts it till then). */
+export function freeCanvas(c: HTMLCanvasElement | null | undefined) {
+  if (!c) return;
+  c.width = 0;
+  c.height = 0;
+}
+
 /**
  * The drawings a renderer keeps, the oldest out first once there are `cap` of them. Each is a canvas,
  * and a phone's browser caps the canvas memory a page may hold (iOS freezes the page past it), so a
@@ -261,15 +275,18 @@ export class SpriteCache {
         if (drop-- <= 0) break;
         this.map.delete(k);
         // let the browser have the memory back now (a zero-size canvas holds none)
-        if (!keep.has(s)) {
-          s.canvas.width = 0;
-          s.canvas.height = 0;
-        }
+        if (!keep.has(s)) freeCanvas(s.canvas);
       }
     }
     this.map.set(key, spr);
   }
   clear() {
+    this.map.clear();
+  }
+  /** Drop every drawing and hand back its memory (the game's over, or the phone is short of it). */
+  dispose(keep: Iterable<Sprite> = []) {
+    const k = new Set(keep);
+    for (const s of this.map.values()) if (!k.has(s)) freeCanvas(s.canvas);
     this.map.clear();
   }
 }
@@ -556,7 +573,11 @@ function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, to
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(out.buffer), w, h), 0, 0);
+  // (a phone out of canvas memory hands back no context: the sprite stays blank, and the caller
+  // is told so it can let go of old drawings)
+  const g = canvas.getContext('2d');
+  if (!g) throw new CanvasOut();
+  g.putImageData(new ImageData(new Uint8ClampedArray(out.buffer), w, h), 0, 0);
   return { canvas, ax: ox, ay: oy, handL: { x: ox + hl.x, y: oy + hl.y }, handR: { x: ox + hr.x, y: oy + hr.y }, top };
 }
 

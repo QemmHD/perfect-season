@@ -118,6 +118,7 @@ export function Football2({
   }, []);
   const game = useMemo<Game | null>(() => (attrs ? newGame(offense ?? offenseOf(lineup!, attrs, seed), rivalDefense ?? defenseOf(rivalLineup!, attrs, 'def:' + seed), seed, drives) : null), [attrs]);
   const renderer = useMemo(() => new FootballRenderer(field, [ourKit, theirKit]), []);
+  useEffect(() => () => renderer.dispose(), []);
   const playRef = useRef<Play | null>(null);
   const pilotRef = useRef(pilot(0.75, seed));
   const fxRef = useRef({ shake: 0, flash: 0 });
@@ -559,18 +560,29 @@ export function Football2({
       } else shownClock.current = null;
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.flash = Math.max(0, fx.flash - elapsed * 1.8);
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
       const rp = replayRef.current;
-      if (rp && p) {
-        const rt = replayTime(rp, now);
-        const sn = rt === null ? null : frameAt(rp.frames, rt);
-        if (rt === null || !sn) endReplay();
-        else {
-          const at = (b: Body) => sn.bodies[b.id];
-          const view: Play = { ...p, t: rt, bodies: sn.bodies, qb: at(p.qb), rb: at(p.rb), carrier: sn.carrier !== null ? sn.bodies[sn.carrier] : null, ball: sn.ball, phase: sn.phase };
-          renderer.draw(ctx, view, p.los, { aim: null, toGain: null, routes: false, open: false, shake: 0, flash: 0 });
-        }
-      } else if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo, routes: p.phase === 'pre' && p.call === 'pass', open: openRings && !autoplayHook, shake: fx.shake, flash: fx.flash });
+      // a frame that can't be drawn (a phone short of memory) mustn't stop the game: let go of the
+      // old drawings and carry on
+      try {
+        if (rp && p) {
+          const rt = replayTime(rp, now);
+          const sn = rt === null ? null : frameAt(rp.frames, rt);
+          if (rt === null || !sn) endReplay();
+          else {
+            const at = (b: Body) => sn.bodies[b.id];
+            const view: Play = { ...p, t: rt, bodies: sn.bodies, qb: at(p.qb), rb: at(p.rb), carrier: sn.carrier !== null ? sn.bodies[sn.carrier] : null, ball: sn.ball, phase: sn.phase };
+            renderer.draw(ctx, view, p.los, { aim: null, toGain: null, routes: false, open: false, shake: 0, flash: 0 });
+          }
+        } else if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo, routes: p.phase === 'pre' && p.call === 'pass', open: openRings && !autoplayHook, shake: fx.shake, flash: fx.flash });
+      } catch (e) {
+        console.error('[draw]', e);
+        renderer.dispose();
+        ctx.restore();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+      }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);

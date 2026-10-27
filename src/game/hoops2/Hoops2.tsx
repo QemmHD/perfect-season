@@ -105,6 +105,7 @@ export function Hoops2({
   }, []);
   const game = useMemo<HoopsGame | null>(() => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench) : null), [attrs]);
   const renderer = useMemo(() => new HoopsRenderer(court, [ourKit, theirKit]), []);
+  useEffect(() => () => renderer.dispose(), []);
   const possRef = useRef<Possession | null>(null);
   const stickRef = useRef<{ x: number; y: number } | null>(null);
   const pilotRef = useRef(pilot(0.75, seed));
@@ -400,14 +401,25 @@ export function Hoops2({
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.crowd = Math.max(0, fx.crowd - elapsed * 0.45);
       fx.flash = Math.max(0, fx.flash - elapsed * 2.2);
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
       const r = replayRef.current;
-      if (r && p) {
-        const rt = replayTime(r, now);
-        const snap = rt === null ? null : frameAt(r.frames, rt);
-        if (rt === null || !snap) endReplay();
-        else renderer.draw(ctx, { ...p, t: rt, bodies: snap.bodies, ball: snap.ball, handler: snap.handler, fire: snap.fire, lastShot: snap.lastShot, meter: null, finish: null, target: null }, real, fx);
-      } else if (p) renderer.draw(ctx, p, real, fx);
+      // a frame that can't be drawn (a phone short of memory) mustn't stop the game: let go of the
+      // old drawings and carry on
+      try {
+        if (r && p) {
+          const rt = replayTime(r, now);
+          const snap = rt === null ? null : frameAt(r.frames, rt);
+          if (rt === null || !snap) endReplay();
+          else renderer.draw(ctx, { ...p, t: rt, bodies: snap.bodies, ball: snap.ball, handler: snap.handler, fire: snap.fire, lastShot: snap.lastShot, meter: null, finish: null, target: null }, real, fx);
+        } else if (p) renderer.draw(ctx, p, real, fx);
+      } catch (e) {
+        console.error('[draw]', e);
+        renderer.dispose();
+        ctx.restore();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+      }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
