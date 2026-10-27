@@ -20,7 +20,7 @@ import { openPack, packDefs, packName, quickSellValue } from './packs';
 import type { PlaySquad } from './play';
 import { getPool, type Pool, ratedOf } from './pool';
 import { rewardCard, type Sbc, sbcsFor, weekOf } from './sbc';
-import { canPlay, type Lineup, rateSquad, slotsFor, startersComplete } from './squad';
+import { autoBuild, canPlay, type Lineup, rateSquad, slotsFor, startersComplete } from './squad';
 import { SquadView } from './SquadView';
 import type { UtState } from './state';
 import { Store } from './Store';
@@ -110,8 +110,9 @@ export default function UltimateTeam(props: {
 
   // ---------- packs ----------
 
-  /** Open a pack now: its cards go into the club at once (closing the app mid-reveal keeps them). */
-  const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile) => {
+  /** Open a pack now: its cards go into the club at once (closing the app mid-reveal keeps them).
+   * `fill`: an empty squad is built from the club, these cards included (the starter pack). */
+  const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile, fill = false) => {
     if (!pool || busy.current) return;
     busy.current = true;
     window.setTimeout(() => (busy.current = false), 600);
@@ -119,8 +120,10 @@ export default function UltimateTeam(props: {
     const at = Date.now();
     const tag = seed.replace(/[^a-z0-9]/gi, '').slice(0, 10);
     const owned: OwnedCard[] = cards.map((rc, i) => ({ uid: tag + '-' + i, cardId: rc.line.id, level: 1, xp: 0, at: at + i }));
+    const empty = fill && !Object.keys(ut.squad).length;
+    const squad = empty ? autoBuild(SPORT, [...club.map((c) => ({ uid: c.uid, rc: c.rc })), ...owned.map((o, i) => ({ uid: o.uid, rc: cards[i] }))]) : null;
     update((p) => {
-      const q = { ...p, ut: { ...p.ut, owned: [...p.ut.owned, ...owned], packsOpened: p.ut.packsOpened + 1 } };
+      const q = { ...p, ut: { ...p.ut, owned: [...p.ut.owned, ...owned], packsOpened: p.ut.packsOpened + 1, ...(squad && !Object.keys(p.ut.squad).length ? { squad } : {}) } };
       return also ? also(q) : q;
     });
     setOpening({ id: seed, title, kind, cards: cards.map((rc, i) => ({ uid: owned[i].uid, rc })) });
@@ -139,7 +142,8 @@ export default function UltimateTeam(props: {
   const claimStarter = () => {
     if (ut.starterClaimed) return;
     sfx.click();
-    openNow('starter', newId(), 'Starter Pack', (p) => ({ ...p, ut: { ...p.ut, starterClaimed: true } }));
+    // a card for every spot: they go straight into the squad (if it's still empty)
+    openNow('starter', newId(), 'Starter Pack', (p) => ({ ...p, ut: { ...p.ut, starterClaimed: true } }), true);
   };
 
   const openPending = (id: string) => {
