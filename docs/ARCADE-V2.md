@@ -81,3 +81,26 @@ Decisions from the owner's answers (2026-10-27). Everything ships in one release
 - **Who's open (football):** live open/tight/covered rings on receivers only in a player's first
   games, then off.
 - **Tutorial:** tips only (hint banners in the first games), no guided practice.
+
+## Round 3 decisions (after measuring how a person plays, and researching Retro Bowl, Hoop Land, 2K, Tecmo, Blitz, NBA Jam)
+- **Basketball greens always go in.** Ratings and the contest decide how big the green is, never
+  whether a green falls (2K's rule). A green layup is a make too.
+- **Basketball: push the stick to its edge to sprint.** A burst past your man that drains a
+  stamina bar (refills when you ease off); a fast guard can beat a slower defender. Crossovers and
+  step-backs create real space for good ball handlers.
+- **Basketball: live shot % before you shoot** (Hoop Land): under the ball handler, changing as
+  defenders close in, with the contest grade; open teammates show theirs when you aim a pass.
+- **Basketball stays offense-only, with a smarter defense:** each possession the defense picks a
+  look you can read (man, sagging off poor shooters, switching, trapping the ball handler) and
+  names it, so you react: pass out of the trap, shoot over the sag.
+- **Football QB accuracy shortens the visible arc** (Retro Bowl): an accurate QB sees the whole
+  dotted arc to its landing spot, a weaker one only its start. What you see is where it goes: no
+  hidden scatter. Pressure shortens it too.
+- **Football throw types by distance:** short throws are flat, fast bullets; long ones are lobs.
+- **Football runs:** real holes from the blocking (3-5 yards a carry, big ones possible). Moves
+  drain the runner's stamina and the same move twice in a play is weaker; a tackler shows a dive
+  wind-up, and a juke timed against it makes him miss.
+- **Football tension:** real pocket pressure (hold it too long and you're sacked; a better line
+  buys time); the last drive runs against a two-minute clock (out of bounds and incompletions
+  stop it); 3 straight completions put the QB On Fire (the full arc, quicker throws) until an
+  incompletion, a sack or a pick.
