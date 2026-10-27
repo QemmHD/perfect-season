@@ -57,6 +57,8 @@ export interface NbaLine {
   /** era-adjusted per-game stats and overall value */
   r: { pts: number; reb: number; ast: number; stl: number; blk: number };
   val: number;
+  /** ranks already worked out (a season card's, within its season, per 36 minutes): used instead of ranking `r` */
+  rk?: { pts: number; reb: number; ast: number; stl: number; blk: number; val: number };
   ppg: number;
   apg: number;
   a: Attrs | null;
@@ -90,12 +92,12 @@ export function hooper(l: NbaLine, spot: string, num: number | null): Hooper {
   // rates per minute, not per game: a star's 38 minutes shouldn't make him a great shot blocker
   const mpg = a?.mpg ?? null;
   const per = mpg !== null ? Math.max(0.82, Math.min(1.5, 30 / Math.max(mpg, 8))) : 1;
-  const pts = rankIn('pts', l.r.pts);
-  const reb = rankIn('reb', l.r.reb * per);
-  const ast = rankIn('ast', l.r.ast * per);
-  const stl = rankIn('stl', l.r.stl * per);
-  const blk = rankIn('blk', l.r.blk * per);
-  const val = rankIn('val', l.val);
+  const pts = l.rk ? l.rk.pts : rankIn('pts', l.r.pts);
+  const reb = l.rk ? l.rk.reb : rankIn('reb', l.r.reb * per);
+  const ast = l.rk ? l.rk.ast : rankIn('ast', l.r.ast * per);
+  const stl = l.rk ? l.rk.stl : rankIn('stl', l.r.stl * per);
+  const blk = l.rk ? l.rk.blk : rankIn('blk', l.r.blk * per);
+  const val = l.rk ? l.rk.val : rankIn('val', l.val);
   const ft = a?.ft ?? null;
   const touch = ft !== null ? clamp01((ft - 0.6) / 0.32) : 0.35 + 0.3 * pts;
   const fta = a?.fta ?? null;
@@ -143,9 +145,7 @@ export function hooper(l: NbaLine, spot: string, num: number | null): Hooper {
   const orb = a?.orb ?? null;
   const rebR = 32 + 54 * Math.pow(reb, 1.5) + 12 * (orb !== null ? clamp01(orb / 3.5) : size);
   const ftR = ft !== null ? 25 + 74 * clamp01((ft - 0.48) / 0.44) : 50 + 25 * touch;
-  // overall: what he was worth, with a nod to scoring (2K rates scorers up)
-  void val;
-  const ovr = overallFromRank(0.75 * rankIn('val', l.val) + 0.25 * pts);
+  const ovr = overallFromRank(0.75 * val + 0.25 * pts);
   const h: Hooper = {
     id: l.id,
     name: l.name,
