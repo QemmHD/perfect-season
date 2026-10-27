@@ -44,7 +44,10 @@ import { Playoffs, Reveal } from './ui/Season';
 import { Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
 
-type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet';
+type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet' | 'ut';
+
+/** Ultimate Team, loaded (with its cards) only when it's opened */
+const UltimateTeam = React.lazy(() => import('./ut/UltimateTeam'));
 
 interface Run {
   id: number;
@@ -779,6 +782,7 @@ export function App() {
           showToast(c > 1 ? c + ' days in a row. Come back tomorrow for a ' + rewardFor(c + 1).coins + '-coin chest.' : 'Open the app every day: the daily chest grows for 7 days.');
         }}
         onSport={goSport}
+        onUltimate={() => (sfx.click(), setScreen('ut'))}
       />
     );
 
@@ -815,6 +819,14 @@ export function App() {
           showToast('Welcome, ' + name + '!');
         }}
       />
+    );
+  } else if (screen === 'ut') {
+    viewId = 'ut';
+    enter = 'up';
+    body = (
+      <React.Suspense fallback={<div className="screen ut" />}>
+        <UltimateTeam profile={profile} update={update} onExit={() => goTab('home')} onToast={showToast} />
+      </React.Suspense>
     );
   } else if (screen === 'search') {
     viewId = 'search';
