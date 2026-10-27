@@ -4,7 +4,7 @@
 // App.tsx gives <UltimateTeam> an `onPlaySquad` that opens the match screen (src/ut/Match.tsx) with
 // the request; that screen finds the opponent, builds both teams (teams.ts), runs the vote and the
 // arcade game, then settles the result here: coins, card XP, the record and the ladder.
-import { battlesThisWeek } from './battles';
+import { battlesThisWeek, RUNGS } from './battles';
 import { awardXp, type UtState } from './state';
 
 export interface UtMatchRequest {
@@ -36,12 +36,13 @@ export const COINS_LOSS = 30;
 /**
  * Games a day that pay coins and XP (Squad Battles and head to head together): enough for a good
  * session, not a farm (a simmed game takes seconds). Past it a game still counts for the record and
- * the ladder, and its rung's pack.
+ * the ladder, but pays nothing (a rung's pack included: a ladder that refreshes isn't a pack farm).
  */
 export const PAID_GAMES_A_DAY = 8;
 
-export function matchRewards(r: UtMatchResult): { coins: number; xp: number } {
-  return { coins: r.won ? COINS_WIN : COINS_LOSS, xp: XP_PER_GAME + (r.won ? XP_FOR_WIN : 0) };
+/** What a game pays: coins (times the Squad Battles difficulty's `pay`) and XP for every card. */
+export function matchRewards(r: Pick<UtMatchResult, 'won'>, pay = 1): { coins: number; xp: number } {
+  return { coins: Math.round((r.won ? COINS_WIN : COINS_LOSS) * pay), xp: XP_PER_GAME + (r.won ? XP_FOR_WIN : 0) };
 }
 
 /**
@@ -60,9 +61,11 @@ export interface Settled {
   xp: number;
   /** cards that went up a level */
   ups: { uid: string; level: number }[];
-  /** a Squad Battles rung cleared for the first time this week, and the pack it paid */
+  /** a Squad Battles rung cleared for the first time on this ladder, and the pack it paid */
   climbed: boolean;
   pack: string | null;
+  /** that was the top rung: the next ladder is up */
+  refreshed: boolean;
   /** today's paid games were used up before this one: it paid nothing */
   capped: boolean;
 }
@@ -74,18 +77,23 @@ export interface Settled {
  */
 export function settle(
   ut: UtState,
-  r: { won: boolean; us: number; them: number; online: boolean; rung: { i: number; pack: string | null } | null; played: string[]; week: string; day: string; packId: string; at: number }
+  r: { won: boolean; us: number; them: number; online: boolean; rung: { i: number; pack: string | null } | null; played: string[]; week: string; day: string; packId: string; at: number; pay?: number }
 ): Settled {
   const today = ut.paid.day === r.day ? ut.paid.n : 0;
   const capped = today >= PAID_GAMES_A_DAY;
-  const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards(r);
+  const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
   const x = awardXp({ ...ut, paid: { day: r.day, n: today + (capped ? 0 : 1) } }, r.played, xp);
   const rec = x.ut.record;
   const record = r.online ? { ...rec, h2hW: rec.h2hW + (r.won ? 1 : 0), h2hL: rec.h2hL + (r.won ? 0 : 1) } : { ...rec, w: rec.w + (r.won ? 1 : 0), l: rec.l + (r.won ? 0 : 1) };
   let battles = battlesThisWeek(x.ut.battles, r.week);
   const climbed = !!r.rung && r.rung.i >= 0 && r.won && r.rung.i === battles.cleared;
-  const pack = climbed ? r.rung!.pack : null;
-  if (climbed) battles = { week: r.week, cleared: r.rung!.i + 1, best: Math.max(battles.best, r.rung!.i + 1) };
+  const pack = climbed && !capped ? r.rung!.pack : null;
+  // the top rung: the next ladder comes up (at the same difficulty)
+  const refreshed = climbed && r.rung!.i + 1 >= RUNGS;
+  if (climbed)
+    battles = refreshed
+      ? { ...battles, week: r.week, cleared: 0, best: RUNGS, round: (battles.round ?? 0) + 1 }
+      : { ...battles, week: r.week, cleared: r.rung!.i + 1, best: Math.max(battles.best, r.rung!.i + 1) };
   const packs = pack ? [...x.ut.packs, { id: r.packId, kind: pack, at: r.at }] : x.ut.packs;
-  return { ut: { ...x.ut, record, battles, packs }, coins, xp, ups: x.ups, climbed, pack, capped };
+  return { ut: { ...x.ut, record, battles, packs }, coins, xp, ups: x.ups, climbed, pack, capped, refreshed };
 }

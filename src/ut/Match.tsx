@@ -24,7 +24,7 @@ import { CoinChip, initials } from '../ui/common';
 import { Back, Coin } from '../ui/icons';
 import { Sparks } from '../ui/motion';
 import { Vote } from '../ui/Vote';
-import { aiOpponent, type Rung, RUNGS, shortName, skillName, weekLadder } from './battles';
+import { aiOpponent, battlesThisWeek, LEVEL, LEVEL_NAME, levelOf, type Rung, RUNGS, shortName, skillName, weekLadder } from './battles';
 import { UtCard } from './CardArt';
 import { packName } from './packs';
 import { decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
@@ -67,6 +67,8 @@ interface Setup {
   online: Found | null;
   /** the AI: a ladder rung (i from 0), or the squad that stepped in for a no-show (i = -1) */
   rung: Rung | null;
+  /** Squad Battles: the difficulty's name and what it pays (times the coins) */
+  level?: { name: string; pay: number };
 }
 
 interface OppView {
@@ -93,6 +95,8 @@ interface Outcome {
   pack: string | null;
   /** past today's paid games: no coins or XP */
   capped: boolean;
+  /** the top rung: the next ladder is up */
+  refreshed: boolean;
 }
 
 type Stage = 'load' | 'search' | 'found' | 'vs' | 'vote' | 'play' | 'result' | 'error';
@@ -197,13 +201,15 @@ export default function UtMatch(props: {
       setStage('search');
       return;
     }
-    const rung = weekLadder(pool, week)[req.rung ?? 0];
+    const bt = battlesThisWeek(profileRef.current.ut.battles, week);
+    const level = levelOf(bt.level);
+    const rung = weekLadder(pool, week, bt.round ?? 0, level)[req.rung ?? 0];
     if (!rung) {
       setError('That rung isn’t on this week’s ladder.');
       setStage('error');
       return;
     }
-    setSetup({ seed: 'ut:' + SPORT + ':' + week + ':' + rung.i + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung });
+    setSetup({ seed: 'ut:' + SPORT + ':' + week + ':' + (bt.round ?? 0) + ':' + level + ':' + rung.i + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, level: { name: LEVEL_NAME[level], pay: LEVEL[level].pay } });
     setStage('vs');
   }, [pool, me, stage]);
 
@@ -306,6 +312,7 @@ export default function UtMatch(props: {
       day: easternDateKey(),
       packId: newId(),
       at: Date.now(),
+      pay: s.rung && s.rung.i >= 0 ? s.level?.pay : undefined,
     };
     const shown = settle(ut, input);
     props.update((p) => {
@@ -318,7 +325,7 @@ export default function UtMatch(props: {
     setPresence('menu');
     const cardOf = new Map(ut.owned.map((o) => [o.uid, o.cardId]));
     const ups = shown.ups.map((u) => ({ name: pool.byId.get(cardOf.get(u.uid) ?? '')?.name ?? 'A card', level: u.level }));
-    setOut({ ...d, us: us.score, them: them.score, how, ends: [us.ends, them.ends], coins: shown.coins, xp: shown.xp, ups, climbed: shown.climbed, pack: shown.pack, capped: shown.capped });
+    setOut({ ...d, us: us.score, them: them.score, how, ends: [us.ends, them.ends], coins: shown.coins, xp: shown.xp, ups, climbed: shown.climbed, pack: shown.pack, capped: shown.capped, refreshed: shown.refreshed });
     setStage('result');
     if (d.won) {
       sfx.seriesWin();
@@ -415,7 +422,7 @@ export default function UtMatch(props: {
           sfx.click();
           const r = setup.rung;
           if (setup.online || !r || r.i < 0) props.onAgain({ id: Date.now(), mode: req.mode });
-          else props.onAgain({ id: Date.now(), mode: 'ai', rung: out.climbed && r.i + 1 < RUNGS ? r.i + 1 : r.i });
+          else props.onAgain({ id: Date.now(), mode: 'ai', rung: out.refreshed ? 0 : out.climbed ? r.i + 1 : r.i });
         }}
       />
     );
@@ -569,7 +576,7 @@ function SideCard({ side, you }: { side: Side; you: boolean }) {
 
 function VsView({ setup }: { setup: Setup }) {
   const r = setup.rung;
-  const eyebrow = setup.online ? 'Head to head · online' : r && r.i >= 0 ? 'Squad Battles · rung ' + (r.i + 1) + ' of ' + RUNGS : 'No one near your squad right now';
+  const eyebrow = setup.online ? 'Head to head · online' : r && r.i >= 0 ? 'Squad Battles · ' + (setup.level ? setup.level.name + ' · ' : '') + 'rung ' + (r.i + 1) + ' of ' + RUNGS : 'No one near your squad right now';
   return (
     <div className="utm-vs rise-in" role="status" aria-label={setup.me.name + ' versus ' + setup.rival.name}>
       <span className="eyebrow wide">{eyebrow}</span>
@@ -589,7 +596,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
   const r = setup.rung;
   const ladder = !!r && r.i >= 0;
   const top = ladder && out.climbed && r!.i + 1 >= RUNGS;
-  const again = setup.online || (r && r.i < 0) ? 'PLAY AGAIN' : out.climbed && !top ? 'NEXT RUNG' : out.won ? 'PLAY IT AGAIN' : 'TRY AGAIN';
+  const again = setup.online || (r && r.i < 0) ? 'PLAY AGAIN' : out.refreshed ? 'NEW LADDER' : out.climbed && !top ? 'NEXT RUNG' : out.won ? 'PLAY IT AGAIN' : 'TRY AGAIN';
   return (
     <div className="page utm-result">
       <span className="eyebrow wide">{ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
@@ -626,6 +633,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
         <div className="utm-climb rise-in">
           <b className="disp">{top ? 'LADDER CLEARED!' : 'RUNG ' + (r!.i + 1) + ' CLEARED'}</b>
           {out.pack ? <small>Your {packName(SPORT, out.pack)} is waiting in the Store.</small> : !top && <small>Next up: rung {r!.i + 2}.</small>}
+          {out.refreshed && <small>A new ladder of {RUNGS} squads is up{setup.level ? ' on ' + setup.level.name : ''}.</small>}
         </div>
       )}
       {out.capped ? (

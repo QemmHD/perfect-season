@@ -85,14 +85,20 @@ always agree.
 - A rotating set: 6 daily (two easy, two medium, two hard) and 4 weekly, deterministic from the
   date (like the Daily), from a pool of 29 challenges. Plus three upgrades open every day, twice
   each: any five cards for a Silver pack, five silvers for a Gold pack, five good golds for a
-  Premium pack. And three repeatables, as often as you like: five silvers for a Gold card, five
-  golds for an 84+ Gold card (Golden Hour), five golds with a team overall of 80+ for an 88+ Gold
-  card (Elite Pull). Reward cards are drawn at random from every card that fits.
+  Premium pack. And three repeatables, as often as you like, each asking more the better it
+  pays: five silvers for a Gold card, eight golds with a team overall of 77+ for an 84+ Gold card
+  (Golden Hour), eight golds with a team overall of 81+ for an 88+ Gold card (Elite Pull). Reward
+  cards are drawn at random from every card that fits. Challenges pay packs and cards, not coins.
 
 ## Playing
 
-- **Vs AI challenges:** ladders of themed AI squads. Example: a 90s Bulls ladder of 5 games of
-  increasing overall. Coins and packs as rewards.
+- **Vs AI challenges (Squad Battles):** ladders of 8 themed AI squads of increasing overall.
+  Example: rung 1 the '70s Nuggets, the top an all-time team. Beat all eight and the next ladder
+  comes up. Four difficulties move every squad's overall and the AI's play, and what it pays:
+  Rookie (weaker, x0.6 coins, Bronze and Silver packs), Pro (the standard, Silver and Gold),
+  All-Star (better, x1.5, Gold and Premium), Legend (all-time squads, x2.2, four packs, two of
+  them Premium). Changing difficulty starts that ladder from the bottom. Games pay, rung packs
+  included, up to the day's paid-games limit.
 - **Online UT head to head:**
   - Matched by squad overall: within ±3, widening by 2 every 10 seconds up to ±10, then an AI
     fallback.

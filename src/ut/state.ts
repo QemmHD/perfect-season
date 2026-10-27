@@ -1,6 +1,7 @@
 // Ultimate Team: what the profile keeps, per sport (the basketball and football profiles each have
 // their own `ut`). Small and free of card data on purpose: the profile loads it on every launch,
 // while the cards themselves load only when the mode opens. See docs/ULTIMATE-TEAM.md.
+import { type Level, levelOf } from './battles';
 import type { OwnedCard } from './types';
 
 /** A pack waiting to be opened (a challenge reward, the starter). */
@@ -26,7 +27,9 @@ export interface UtState {
   /** what was quick-sold, for the hub */
   sold: { cards: number; coins: number };
   /** Squad Battles: rungs cleared this week (`week` is its key), the best week, and games played */
-  battles: { week: string; cleared: number; best: number };
+  /** Squad Battles this week: rungs cleared on the ladder, the best ever, which ladder of the week
+   * it is (the next one comes up after clearing one), and the difficulty */
+  battles: { week: string; cleared: number; best: number; round?: number; level?: Level };
   /** results of played matches: vs the AI and online head to head */
   record: { w: number; l: number; h2hW: number; h2hL: number };
   /** games that paid coins and XP today (`day`, Eastern): a day's paid games are limited (play.ts) */
@@ -64,7 +67,7 @@ export function migrateUt(raw: unknown): UtState {
   if (sbc && sbc.done && typeof sbc.done === 'object') for (const [k, v] of Object.entries(sbc.done as Record<string, unknown>)) if (typeof v === 'number') done[k] = v;
   const packs: PendingPack[] = Array.isArray(r.packs) ? (r.packs as PendingPack[]).filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string').map((p) => ({ id: p.id, kind: p.kind, at: num(p.at, 0) })) : [];
   const sold = r.sold as { cards?: unknown; coins?: unknown } | undefined;
-  const bt = r.battles as { week?: unknown; cleared?: unknown; best?: unknown } | undefined;
+  const bt = r.battles as { week?: unknown; cleared?: unknown; best?: unknown; round?: unknown; level?: unknown } | undefined;
   const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL', unknown>> | undefined;
   const paid = r.paid as { day?: unknown; n?: unknown } | undefined;
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
@@ -77,7 +80,7 @@ export function migrateUt(raw: unknown): UtState {
     sbc: { done },
     packs,
     sold: { cards: num(sold?.cards, 0), coins: num(sold?.coins, 0) },
-    battles: { week: typeof bt?.week === 'string' ? bt.week : '', cleared: Math.min(8, count(bt?.cleared)), best: Math.min(8, count(bt?.best)) },
+    battles: { week: typeof bt?.week === 'string' ? bt.week : '', cleared: Math.min(8, count(bt?.cleared)), best: Math.min(8, count(bt?.best)), ...(count(bt?.round) ? { round: count(bt?.round) } : {}), ...(bt?.level ? { level: levelOf(bt.level) } : {}) },
     record: { w: count(rec?.w), l: count(rec?.l), h2hW: count(rec?.h2hW), h2hL: count(rec?.h2hL) },
     paid: { day: typeof paid?.day === 'string' ? paid.day : '', n: count(paid?.n) },
   };

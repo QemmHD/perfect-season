@@ -545,3 +545,49 @@
   margin: 0 auto;
   width: 100%;
 }
+
+/* the difficulty: four levels, what each pays */
+.utb-levels {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+.utb-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 4px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+}
+.utb-level b {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.utb-level small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sub);
+}
+.utb-level.on {
+  border-color: var(--gold);
+  background: linear-gradient(160deg, rgba(245, 184, 61, 0.2), var(--panel) 75%);
+  box-shadow: 0 0 0 1px var(--gold);
+}
+.utb-level.on small {
+  color: var(--gold);
+}
+.utb-level-note {
+  margin: 2px 2px 10px;
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.4;
+}

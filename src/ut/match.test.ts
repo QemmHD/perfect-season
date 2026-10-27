@@ -3,7 +3,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SPORT } from '../engine/sport';
 import { squadsFit, squadWindow } from '../net/match';
-import { aiOpponent, battlesThisWeek, ladderFor, RUNG_PACKS, RUNGS, shortName, weekLadder } from './battles';
+import { aiOpponent, battlesThisWeek, LEVEL, LEVELS, ladderFor, RUNG_PACKS, RUNGS, shortName, weekLadder } from './battles';
 import { COINS_LOSS, COINS_WIN, decide, PAID_GAMES_A_DAY, settle, XP_FOR_WIN, XP_PER_GAME } from './play';
 import { getPool, type Pool } from './pool';
 import { onScale, rateCard } from './rate';
@@ -246,12 +246,38 @@ describe('a finished match', () => {
     expect(over.ut.owned).toEqual(ut.owned);
     expect(over.ut.record.w).toBe(PAID_GAMES_A_DAY + 1);
     expect(over.climbed).toBe(true);
-    expect(over.pack).toBe('silver');
+    // past the day's paid games a rung's pack doesn't pay either (a refreshing ladder isn't a pack farm)
+    expect(over.pack).toBeNull();
     // a new day pays again
     const next = settle(over.ut, { ...base, day: '2026-10-28', won: false, rung: null });
     expect(next.capped).toBe(false);
     expect(next.coins).toBe(COINS_LOSS);
     expect(next.ut.paid).toEqual({ day: '2026-10-28', n: 1 });
+  });
+
+  it('brings up the next ladder after the top rung, and pays by difficulty', () => {
+    let ut = withCards();
+    ut = { ...ut, battles: { week: base.week, cleared: RUNGS - 1, best: RUNGS - 1, level: 'allstar' } };
+    const top = settle(ut, { ...base, won: true, rung: { i: RUNGS - 1, pack: 'premium' }, pay: 1.5 });
+    expect(top.climbed).toBe(true);
+    expect(top.refreshed).toBe(true);
+    expect(top.pack).toBe('premium');
+    expect(top.ut.battles).toEqual({ week: base.week, cleared: 0, best: RUNGS, round: 1, level: 'allstar' });
+    expect(top.coins).toBe(Math.round(COINS_WIN * 1.5));
+    // the next ladder is a different one
+    expect(JSON.stringify(ladderFor(pool, WEEK, 1))).not.toBe(JSON.stringify(ladderFor(pool, WEEK, 0)));
+  });
+
+  it('makes each difficulty noticeably tougher, and pay more', () => {
+    const avg = (rs: { ovr: number; skill: number }[], k: 'ovr' | 'skill') => rs.reduce((a, r) => a + r[k], 0) / rs.length;
+    const by = LEVELS.map((l) => ladderFor(pool, WEEK, 0, l));
+    for (let i = 1; i < by.length; i++) {
+      expect(avg(by[i], 'ovr')).toBeGreaterThan(avg(by[i - 1], 'ovr') + 1.5);
+      expect(avg(by[i], 'skill')).toBeGreaterThan(avg(by[i - 1], 'skill'));
+      expect(LEVEL[LEVELS[i]].pay).toBeGreaterThan(LEVEL[LEVELS[i - 1]].pay);
+    }
+    // the first Pro ladder of a week is the one there always was
+    expect(JSON.stringify(ladderFor(pool, WEEK, 0, 'pro'))).toBe(JSON.stringify(ladder));
   });
 
   it('breaks a tie with the better squad, then the coin', () => {

@@ -95,12 +95,17 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     expect(sbcsFor(pool, '2026-10-28', { [first.id]: 1, [second.id]: 1 }).filter((s) => s.kind === 'upgrade')[0].left).toBe(2);
   });
 
-  it('a repeatable takes five golds for a better gold, as often as you like', () => {
+  it('a repeatable takes eight golds for a better gold, as often as you like', () => {
     const day = '2026-10-27';
     const gh = (done: Record<string, number>) => sbcsFor(pool, day, done).find((s) => s.title === 'Golden Hour')!;
     let s = gh({});
-    expect(s.size).toBe(5);
-    expect(s.reqs).toContainEqual({ k: 'tier', tier: 'gold', n: 5 });
+    expect(s.size).toBe(8);
+    expect(s.reqs).toContainEqual({ k: 'tier', tier: 'gold', n: 8 });
+    // the better the card it pays, the more it asks
+    const ep = sbcsFor(pool, day).find((x) => x.title === 'Elite Pull')!;
+    const team = (x: typeof s) => (x.reqs.find((r) => r.k === 'teamOvr') as { ovr: number }).ovr;
+    expect(ep.reward.card!.minOvr!).toBeGreaterThan(s.reward.card!.minOvr!);
+    expect(team(ep)).toBeGreaterThan(team(s));
     expect(s.left).toBeUndefined();
     const done: Record<string, number> = {};
     const ids = new Set<string>();
@@ -113,6 +118,10 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     expect(ids.size).toBe(12);
     expect(rewardText(s.reward, SPORT, () => 'Pack')).toMatch(/Gold card/);
     expect(rewardText({ card: { tier: 'gold' } }, SPORT, () => 'Pack')).toBe('a Gold card');
+  });
+
+  it('pays packs and cards, not coins', () => {
+    for (let d = 1; d <= 28; d++) for (const x of sbcsFor(pool, '2026-11-' + String(d).padStart(2, '0'))) expect(x.reward.coins).toBeUndefined();
   });
 
   it('every challenge can be met by some cards in the pool, and pays something', () => {

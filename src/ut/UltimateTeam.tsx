@@ -20,6 +20,7 @@ import { PackOpening } from './PackOpening';
 import { openPack, packDefs, packName, quickSellValue } from './packs';
 import type { PlaySquad } from './play';
 import { getPool, type Pool, ratedOf } from './pool';
+import { battlesThisWeek } from './battles';
 import { rewardCard, type Sbc, sbcsFor, weekOf } from './sbc';
 import { autoBuild, canPlay, type Lineup, rateSquad, slotsFor, startersComplete } from './squad';
 import { SquadView } from './SquadView';
@@ -269,6 +270,7 @@ export default function UltimateTeam(props: {
         ready={ready}
         onSquad={() => go('squad')}
         onToast={onToast}
+        onLevel={(level) => setUt((u) => ({ ...u, battles: { ...battlesThisWeek(u.battles, weekOf(day)), level, cleared: 0 } }))}
         onPlay={(rung) => {
           const play = props.onPlaySquad;
           if (!play) return onToast('Squad Battles aren’t available here.');

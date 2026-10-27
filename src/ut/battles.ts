@@ -1,7 +1,8 @@
-// Squad Battles: this week's ladder of AI squads, each built from real cards around a target
-// overall, harder every rung. A rung is a franchise in a decade (the 1990s Bulls), its own cards
-// first, then that decade's, then anyone's, picked to land near the target. The same ladder for
-// everyone all week (from the week's key), different every week.
+// Squad Battles: a ladder of AI squads, each built from real cards around a target overall,
+// harder every rung. A rung is a franchise in a decade (the 1990s Bulls), its own cards first, then
+// that decade's, then anyone's, picked to land near the target. The same ladders for everyone all
+// week (from the week's key); beat all eight and the next ladder comes up. The difficulty you pick
+// moves every squad's overall and the AI's play up or down, and what the ladder pays with it.
 import { teamOf } from '../data/teams';
 import { hashString, pickOne, rng } from '../engine/rng';
 import { aiFavorite } from '../game/uniforms';
@@ -21,6 +22,24 @@ const TARGETS: Record<UtSport, number[]> = { nba: [62, 66, 70, 74, 78, 82, 86, 9
 /** how well the AI plays its own offense on each rung (0-1, the autopilot's skill) */
 const SKILLS = [0.45, 0.5, 0.56, 0.62, 0.68, 0.74, 0.8, 0.87];
 
+export type Level = 'rookie' | 'pro' | 'allstar' | 'legend';
+export const LEVELS: Level[] = ['rookie', 'pro', 'allstar', 'legend'];
+export const LEVEL_NAME: Record<Level, string> = { rookie: 'Rookie', pro: 'Pro', allstar: 'All-Star', legend: 'Legend' };
+/**
+ * Each difficulty: how much better (or worse) every squad on the ladder is (on the sport's own
+ * scale), how much sharper its AI plays, what a win pays (times the coins), and the packs its rungs
+ * pay the first time they're cleared.
+ */
+export const LEVEL: Record<Level, { ovr: Record<UtSport, number>; skill: number; pay: number; packs: Record<number, string> }> = {
+  rookie: { ovr: { nba: -6, nfl: -4 }, skill: -0.15, pay: 0.6, packs: { 3: 'bronze', 7: 'silver' } },
+  pro: { ovr: { nba: 0, nfl: 0 }, skill: 0, pay: 1, packs: { 3: 'silver', 7: 'gold' } },
+  allstar: { ovr: { nba: 5, nfl: 3 }, skill: 0.08, pay: 1.5, packs: { 3: 'gold', 7: 'premium' } },
+  legend: { ovr: { nba: 9, nfl: 5 }, skill: 0.15, pay: 2.2, packs: { 1: 'gold', 3: 'gold', 5: 'premium', 7: 'premium' } },
+};
+
+/** a saved difficulty, or Pro */
+export const levelOf = (x: unknown): Level => (LEVELS.includes(x as Level) ? (x as Level) : 'pro');
+
 export interface Rung {
   i: number;
   /** "1990s Chicago Bulls" */
@@ -38,8 +57,8 @@ export interface Rung {
   pack: string | null;
 }
 
-/** First clears this week: a Silver pack at rung 4, a Gold pack at the top. */
-export const RUNG_PACKS: Record<number, string> = { 3: 'silver', 7: 'gold' };
+/** First clears on Pro: a Silver pack at rung 4, a Gold pack at the top (the other levels: LEVEL). */
+export const RUNG_PACKS: Record<number, string> = LEVEL.pro.packs;
 
 interface Theme {
   fr: string;
@@ -130,18 +149,25 @@ function themedAround(pool: Pool, all: Theme[], target: number, rand: () => numb
 
 const favOf = (pool: Pool, fr: string, seed: string) => teamOf(pool.sport, fr)?.abbr ?? aiFavorite(seed, pool.sport);
 
-/** This week's ladder. */
-export function ladderFor(pool: Pool, week: string): Rung[] {
+/**
+ * A week's ladder: its `round` (the first, or the next one after clearing it) at a difficulty.
+ * (The first Pro ladder of a week is the one there always was.)
+ */
+export function ladderFor(pool: Pool, week: string, round = 0, level: Level = 'pro'): Rung[] {
   const sport: UtSport = pool.sport;
-  const rand = rng(hashString('ut-battles:' + sport + ':' + week));
+  const key = week + (round ? ':r' + round : '') + (level !== 'pro' ? ':' + level : '');
+  const rand = rng(hashString('ut-battles:' + sport + ':' + key));
+  const lv = LEVEL[level];
   const all = themes(pool);
   const picked = new Set<string>();
   let prev = 0;
-  return TARGETS[sport].map((target, i) => {
-    const { theme, squad, ovr } = themedAround(pool, all, target, rand, week + ':' + i, picked, prev + 1);
+  return TARGETS[sport].map((base, i) => {
+    const target = Math.min(sport === 'nba' ? 97 : 98, base + lv.ovr[sport]);
+    const { theme, squad, ovr } = themedAround(pool, all, target, rand, key + ':' + i, picked, prev + 1);
     picked.add(theme.fr + theme.decade);
     prev = ovr;
-    return { i, title: theme.decade + 's ' + theme.name, fr: theme.fr, decade: theme.decade, target, ovr, squad, skill: SKILLS[i], fav: favOf(pool, theme.fr, 'battle:' + week + ':' + i), pack: RUNG_PACKS[i] ?? null };
+    const skill = Math.max(0.25, Math.min(0.97, SKILLS[i] + lv.skill));
+    return { i, title: theme.decade + 's ' + theme.name, fr: theme.fr, decade: theme.decade, target, ovr, squad, skill, fav: favOf(pool, theme.fr, 'battle:' + key + ':' + i), pack: lv.packs[i] ?? null };
   });
 }
 
@@ -154,12 +180,12 @@ export function aiOpponent(pool: Pool, target: number, seed: string): Rung {
 
 const ladders = new Map<string, { pool: Pool; rungs: Rung[] }>();
 
-/** The week's ladder, worked out once per pool and week (the ladder screen and the match share it). */
-export function weekLadder(pool: Pool, week: string): Rung[] {
-  const k = pool.sport + ':' + week;
+/** A ladder, worked out once per pool, week, round and difficulty (the ladder screen and the match share it). */
+export function weekLadder(pool: Pool, week: string, round = 0, level: Level = 'pro'): Rung[] {
+  const k = pool.sport + ':' + week + ':' + round + ':' + level;
   const got = ladders.get(k);
   if (got && got.pool === pool) return got.rungs;
-  const rungs = ladderFor(pool, week);
+  const rungs = ladderFor(pool, week, round, level);
   ladders.set(k, { pool, rungs });
   return rungs;
 }
@@ -172,10 +198,10 @@ export function shortName(r: Pick<Rung, 'title' | 'decade'>): string {
 
 /** How hard a rung's AI plays, in words. */
 export function skillName(skill: number): string {
-  return skill < 0.53 ? 'Rookie' : skill < 0.65 ? 'Pro' : skill < 0.77 ? 'All-Star' : 'Legend';
+  return skill < 0.53 ? 'Rookie' : skill < 0.65 ? 'Pro' : skill < 0.77 ? 'All-Star' : skill < 0.9 ? 'Legend' : 'Hall of Fame';
 }
 
-/** This week's progress: a new week starts at the bottom (the best week stays). */
+/** This week's progress: a new week starts at the bottom of its first ladder (the best week and the difficulty stay). */
 export function battlesThisWeek(b: UtState['battles'], week: string): UtState['battles'] {
-  return b.week === week ? b : { week, cleared: 0, best: b.best };
+  return b.week === week ? b : { week, cleared: 0, best: b.best, ...(b.level ? { level: b.level } : {}) };
 }
