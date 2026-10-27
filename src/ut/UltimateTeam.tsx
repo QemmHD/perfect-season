@@ -101,7 +101,7 @@ export default function UltimateTeam(props: {
   const byUid = useMemo(() => new Map(club.map((c) => [c.uid, c])), [club]);
   const lineup: Lineup = useMemo(() => Object.fromEntries(Object.entries(ut.squad).map(([s, u]) => [s, byUid.get(u)?.rc ?? null])), [ut.squad, byUid]);
   const rating = useMemo(() => rateSquad(SPORT, lineup), [lineup]);
-  const sbcs = useMemo(() => (pool ? sbcsFor(pool, day) : []), [pool, day]);
+  const sbcs = useMemo(() => (pool ? sbcsFor(pool, day, ut.sbc.done) : []), [pool, day, ut.sbc.done]);
   const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
 
   const setUt = (fn: (u: UtState) => UtState) => update((p) => ({ ...p, ut: fn(p.ut) }));

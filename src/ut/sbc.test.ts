@@ -61,12 +61,16 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     pool = await getPool();
   });
 
-  it('are three daily and two weekly, the same for everyone on a day', () => {
+  it('are six daily, four weekly and three upgrades, the same for everyone on a day', () => {
     const a = sbcsFor(pool, '2026-10-27');
-    expect(a.filter((s) => s.kind === 'daily')).toHaveLength(3);
-    expect(a.filter((s) => s.kind === 'weekly')).toHaveLength(2);
+    expect(a.filter((s) => s.kind === 'daily')).toHaveLength(6);
+    expect(a.filter((s) => s.kind === 'weekly')).toHaveLength(4);
+    expect(a.filter((s) => s.kind === 'upgrade')).toHaveLength(3);
     expect(sbcsFor(pool, '2026-10-27')).toEqual(a);
-    expect(new Set(a.map((s) => s.id)).size).toBe(5);
+    expect(new Set(a.map((s) => s.id)).size).toBe(13);
+    // no challenge twice in a day's or a week's list
+    expect(new Set(a.filter((s) => s.kind === 'daily').map((s) => s.title)).size).toBe(6);
+    expect(new Set(a.filter((s) => s.kind === 'weekly').map((s) => s.title)).size).toBe(4);
     // the weekly ones hold all week; the daily ones change
     const b = sbcsFor(pool, '2026-10-28');
     expect(b.filter((s) => s.kind === 'weekly')).toEqual(a.filter((s) => s.kind === 'weekly'));
@@ -74,6 +78,21 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     expect(new Set(days).size).toBeGreaterThan(1);
     expect(weekOf('2026-10-27')).toBe('2026-W44');
     expect(weekOf('2026-11-02')).toBe('2026-W45');
+  });
+
+  it('an upgrade can be done twice a day, then shows as done', () => {
+    const day = '2026-10-27';
+    const up = (done: Record<string, number>) => sbcsFor(pool, day, done).filter((s) => s.kind === 'upgrade')[0];
+    const first = up({});
+    expect(first.left).toBe(2);
+    const second = up({ [first.id]: 1 });
+    expect(second.id).not.toBe(first.id);
+    expect(second.left).toBe(1);
+    // both done: the second one, done
+    const after = up({ [first.id]: 1, [second.id]: 1 });
+    expect(after.id).toBe(second.id);
+    // a new day starts over
+    expect(sbcsFor(pool, '2026-10-28', { [first.id]: 1, [second.id]: 1 }).filter((s) => s.kind === 'upgrade')[0].left).toBe(2);
   });
 
   it('every challenge can be met by some cards in the pool, and pays something', () => {

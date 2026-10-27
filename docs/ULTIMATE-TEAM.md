@@ -82,7 +82,10 @@ always agree.
   - "3 players from the same franchise, 70+"
   - "a five with team overall 80"
   - "any 1990s lineup"
-- A rotating set: 3 daily and 2 weekly, deterministic from the date (like the Daily).
+- A rotating set: 6 daily (two easy, two medium, two hard) and 4 weekly, deterministic from the
+  date (like the Daily), from a pool of 30 challenges. Plus three upgrades open every day, twice
+  each: any five cards for a Silver pack, five silvers for a Gold pack, five good golds for a
+  Premium pack.
 
 ## Playing
 

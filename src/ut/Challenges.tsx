@@ -30,7 +30,7 @@ function timeLeft(week: boolean): string {
 
 function SbcCard({ s, done, onOpen }: { s: Sbc; done: boolean; onOpen: () => void }) {
   return (
-    <button className={'ut-sbc' + (done ? ' done' : '') + (s.kind === 'weekly' ? ' weekly' : '')} onClick={onOpen} disabled={done}>
+    <button className={'ut-sbc' + (done ? ' done' : '') + (s.kind === 'weekly' ? ' weekly' : s.kind === 'upgrade' ? ' upgrade' : '')} onClick={onOpen} disabled={done}>
       <span className="ut-sbc-top">
         <b className="disp">{s.title}</b>
         {done ? (
@@ -38,7 +38,9 @@ function SbcCard({ s, done, onOpen }: { s: Sbc; done: boolean; onOpen: () => voi
             <IconCheck size={14} /> DONE
           </i>
         ) : (
-          <i className="ut-sbc-size">{s.size} cards</i>
+          <i className="ut-sbc-size">
+            {s.size} cards{s.left ? ' · ' + s.left + ' left today' : ''}
+          </i>
         )}
       </span>
       <small>{s.blurb}</small>
@@ -84,6 +86,7 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
   }, []);
   const daily = props.sbcs.filter((s) => s.kind === 'daily');
   const weekly = props.sbcs.filter((s) => s.kind === 'weekly');
+  const upgrades = props.sbcs.filter((s) => s.kind === 'upgrade');
   return (
     <div className="page ut-sbcs">
       <p className="lead ut-sbc-lead">Trade in cards that meet the requirements. Everyone gets the same challenges.</p>
@@ -99,6 +102,14 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
           <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
         ))}
       </div>
+      {upgrades.length > 0 && (
+        <div className="ut-sbc-group">
+          <span className="eyebrow">Upgrades · twice a day each</span>
+          {upgrades.map((s) => (
+            <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
+          ))}
+        </div>
+      )}
       {open && <SbcSheet s={open} club={props.club} onClose={() => setOpen(null)} onSubmit={(uids) => (setOpen(null), props.onSubmit(open, uids))} onToast={props.onToast} />}
     </div>
   );
@@ -128,7 +139,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
         {(close) => (
           <div className="ut-sbcsheet">
             <div className="ut-sbcsheet-head">
-              <span className="eyebrow">{s.kind === 'daily' ? 'Daily challenge' : 'Weekly challenge'}</span>
+              <span className="eyebrow">{s.kind === 'daily' ? 'Daily challenge' : s.kind === 'weekly' ? 'Weekly challenge' : 'Upgrade · ' + (s.left ?? 1) + ' left today'}</span>
               <h2 className="disp">{s.title}</h2>
               <small>Reward: {rewardText(s.reward, SPORT, packName)}</small>
             </div>

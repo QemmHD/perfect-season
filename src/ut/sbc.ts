@@ -1,6 +1,7 @@
 // Squad Building Challenges: trade in cards that meet a challenge's requirements for a pack, coins
-// or a special card. Three daily and two weekly, the same for everyone, picked from the date the
-// way the Daily is. See docs/ULTIMATE-TEAM.md.
+// or a special card. Six daily and four weekly, the same for everyone, picked from the date the
+// way the Daily is, and three upgrades (cards in for a better pack) that can be done twice a day.
+// See docs/ULTIMATE-TEAM.md.
 import { hashString, pickOne, rng, type Rand, shuffle, trueRand } from '../engine/rng';
 import { openPack, packRand, quickSellValue } from './packs';
 import { decadeOf, type Pool, TIER_RANK } from './pool';
@@ -36,7 +37,9 @@ export interface Reward {
 export interface Sbc {
   /** unique: the day or week it belongs to and its place in the list */
   id: string;
-  kind: 'daily' | 'weekly';
+  kind: 'daily' | 'weekly' | 'upgrade';
+  /** an upgrade: how many more times it can be done today (counting this one) */
+  left?: number;
   title: string;
   blurb: string;
   /** how many cards go in */
@@ -215,6 +218,13 @@ const EASY: Template[] = [
   },
   () => ({ title: 'Silver Lining', blurb: 'Swap some silver for something shinier.', size: 4, reqs: [{ k: 'tier', tier: 'silver', n: 3 }], reward: { pack: 'silver', coins: 100 } }),
   (c) => ({ title: 'Bronze Age', blurb: 'Clear out the bench.', size: 5, reqs: [{ k: 'minOvr', ovr: sc(c, 50) }], reward: { coins: 250 } }),
+  (c) => ({ title: nba(c) ? 'Pickup Game' : 'Scrimmage', blurb: 'Any five who can play a little.', size: 5, reqs: [{ k: 'teamOvr', ovr: sc(c, 56) }], reward: { pack: 'bronze', coins: 150 } }),
+  (c) => {
+    const [a, b] = shuffle(c.decades, c.rand);
+    return { title: 'Then and Now', blurb: 'Two from the ' + a + 's, two from the ' + b + 's.', size: 4, reqs: [{ k: 'decade', decade: a, n: 2 }, { k: 'decade', decade: b, n: 2 }], reward: { coins: 350 } };
+  },
+  () => ({ title: 'Pairs', blurb: 'Two teammates, two from one decade.', size: 4, reqs: [{ k: 'sameFr', n: 2 }, { k: 'sameDecade', n: 2 }], reward: { pack: 'silver' } }),
+  () => ({ title: 'Silver Service', blurb: 'Three silvers, cashed in.', size: 3, reqs: [{ k: 'tier', tier: 'silver', n: 3 }], reward: { pack: 'bronze', coins: 200 } }),
 ];
 
 const MEDIUM: Template[] = [
@@ -224,6 +234,19 @@ const MEDIUM: Template[] = [
   },
   (c) => ({ title: 'Same Era', blurb: 'One decade, one team.', size: 5, reqs: [{ k: 'sameDecade', n: 5 }, { k: 'teamOvr', ovr: sc(c, 65) }], reward: { pack: 'gold' } }),
   () => ({ title: 'Silver Squad', blurb: 'A whole lineup of silver or better.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { pack: 'gold' } }),
+  (c) => {
+    const [a, b] = shuffle(c.frs, c.rand);
+    return { title: 'Rivalry Week', blurb: a.name + ' and ' + b.name + ', on one sheet.', size: 4, reqs: [{ k: 'fr', fr: a.fr, name: a.name, n: 2 }, { k: 'fr', fr: b.fr, name: b.name, n: 2 }], reward: { pack: 'silver', coins: 300 } };
+  },
+  (c) => {
+    const d = pickOne(c.decades, c.rand);
+    return { title: 'Decade Draft', blurb: 'Four from the ' + d + 's, and they can play.', size: 5, reqs: [{ k: 'decade', decade: d, n: 4 }, { k: 'teamOvr', ovr: sc(c, 66) }], reward: { pack: 'gold' } };
+  },
+  () => ({ title: 'Golden Pair', blurb: 'Two golds and a shared era.', size: 4, reqs: [{ k: 'tier', tier: 'gold', n: 2 }, { k: 'sameDecade', n: 3 }], reward: { pack: 'silver', coins: 400 } }),
+  (c) =>
+    nba(c)
+      ? { title: 'Backcourt', blurb: 'A point guard and a shooting guard, and a third.', size: 3, reqs: [{ k: 'positions', pos: ['PG', 'SG'] }, { k: 'teamOvr', ovr: sc(c, 68) }], reward: { pack: 'gold' } }
+      : { title: 'Pass Catchers', blurb: 'Two receivers and a tight end.', size: 3, reqs: [{ k: 'positions', pos: ['WR', 'WR', 'TE'] }, { k: 'teamOvr', ovr: sc(c, 68) }], reward: { pack: 'gold' } },
 ];
 
 const HARD: Template[] = [
@@ -236,6 +259,12 @@ const HARD: Template[] = [
     const f = pickOne(c.frs, c.rand);
     return { title: f.name + ' Legacy', blurb: 'Three from one franchise, all good ones.', size: 3, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 3 }, { k: 'minOvr', ovr: sc(c, 68) }], reward: { card: { tier: 'gold', minOvr: sc(c, 78), fr: f.fr } } };
   },
+  (c) => ({ title: 'Golden Era', blurb: 'Five from one decade, four of them gold.', size: 5, reqs: [{ k: 'sameDecade', n: 5 }, { k: 'tier', tier: 'gold', n: 4 }], reward: { card: { tier: 'gold', minOvr: sc(c, 82) } } }),
+  (c) => ({ title: 'Deep Bench', blurb: 'Eight cards, five of them gold.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'premium' } }),
+  (c) =>
+    nba(c)
+      ? { title: 'Frontcourt', blurb: 'A gold three, four and five.', size: 3, reqs: [{ k: 'positions', pos: ['SF', 'PF', 'C'] }, { k: 'tier', tier: 'gold', n: 3 }], reward: { pack: 'gold', coins: 400 } }
+      : { title: 'No Fly Zone', blurb: 'A gold secondary.', size: 4, reqs: [{ k: 'positions', pos: ['CB', 'CB', 'S', 'S'] }, { k: 'tier', tier: 'gold', n: 4 }], reward: { pack: 'gold', coins: 400 } },
 ];
 
 const WEEKLY: Template[] = [
@@ -252,19 +281,54 @@ const WEEKLY: Template[] = [
       ? { title: 'Gold Standard', blurb: 'A gold five at every position.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'tier', tier: 'gold', n: 5 }], reward: { pack: 'premium', coins: 500 } }
       : { title: 'Gold Front Seven', blurb: 'A gold front seven.', size: 7, reqs: [{ k: 'positions', pos: ['DE', 'DE', 'DT', 'DT', 'LB', 'LB', 'LB'] }, { k: 'tier', tier: 'gold', n: 7 }], reward: { pack: 'premium', coins: 500 } },
   (c) => ({ title: 'Team Builders', blurb: 'Eight cards, one era, real chemistry.', size: 8, reqs: [{ k: 'sameDecade', n: 6 }, { k: 'sameFr', n: 3 }, { k: 'teamOvr', ovr: sc(c, 70) }], reward: { pack: 'premium' } }),
+  (c) => ({ title: 'Hall of Fame Class', blurb: 'Eight golds, and good ones.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium', coins: 1000 } }),
+  (c) => {
+    const [a, b] = shuffle(c.frs, c.rand);
+    return { title: 'Rival Dynasties', blurb: 'Three ' + a.name + ', three ' + b.name + '. A Hot Season card comes back.', size: 6, reqs: [{ k: 'fr', fr: a.fr, name: a.name, n: 3 }, { k: 'fr', fr: b.fr, name: b.name, n: 3 }, { k: 'teamOvr', ovr: sc(c, 70) }], reward: { card: { tier: 'promo' } } };
+  },
+  (c) => {
+    const d = pickOne(c.decades, c.rand);
+    return { title: 'Champions of the ' + d + 's', blurb: 'Five from the ' + d + 's, built to win.', size: 5, reqs: [{ k: 'decade', decade: d, n: 5 }, { k: 'teamOvr', ovr: sc(c, 74) }], reward: { card: { tier: 'gold', minOvr: sc(c, 85) } } };
+  },
+  () => ({ title: 'Hot Season Hunt', blurb: 'Six cards: five golds, three teammates.', size: 6, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'sameFr', n: 3 }], reward: { card: { tier: 'promo' } } }),
 ];
 
-/** Today's three (easy, medium, hard) and this week's two challenges. */
-export function sbcsFor(pool: Pool, day: string): Sbc[] {
+/** Upgrades: cards in for a better pack, open every day, twice each. */
+export const UPGRADE_TIMES = 2;
+const UPGRADES: Template[] = [
+  () => ({ title: 'Bronze Upgrade', blurb: 'Any five cards for a Silver pack.', size: 5, reqs: [{ k: 'tier', tier: 'bronze', n: 5 }], reward: { pack: 'silver' } }),
+  () => ({ title: 'Silver Upgrade', blurb: 'Five silvers (or better) for a Gold pack.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { pack: 'gold' } }),
+  (c) => ({ title: 'Gold Upgrade', blurb: 'Five good golds for a Premium pack.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium' } }),
+];
+
+/**
+ * Today's six (two easy, two medium, two hard), this week's four, and the upgrades. `done` (the
+ * challenges done, by id) says which round of each upgrade is next: after its last one today it
+ * shows as done.
+ */
+export function sbcsFor(pool: Pool, day: string, done: Record<string, unknown> = {}): Sbc[] {
   const sport = pool.sport;
   const d = context(pool, 'ut-sbc:' + sport + ':' + day);
-  const daily = [EASY, MEDIUM, HARD].map((list, i) => ({ ...pickOne(list, d.rand)(d), id: 'd:' + day + ':' + i, kind: 'daily' as const }));
+  const daily = [EASY, EASY, MEDIUM, MEDIUM, HARD, HARD];
+  const picked = new Map<Template[], Template[]>();
+  const dailies = daily.map((list, i) => {
+    // two different ones from each list
+    const left = picked.get(list) ?? shuffle(list, d.rand);
+    picked.set(list, left.slice(1));
+    return { ...left[0](d), id: 'd:' + day + ':' + i, kind: 'daily' as const };
+  });
   const week = weekOf(day);
   const w = context(pool, 'ut-sbc:' + sport + ':' + week);
   const weekly = shuffle(WEEKLY, w.rand)
-    .slice(0, 2)
+    .slice(0, 4)
     .map((t, i) => ({ ...t(w), id: 'w:' + week + ':' + i, kind: 'weekly' as const }));
-  return [...daily, ...weekly];
+  const u = context(pool, 'ut-sbc:' + sport + ':upgrades');
+  const upgrades = UPGRADES.map((t, i) => {
+    let n = 0;
+    while (n < UPGRADE_TIMES - 1 && done['u:' + day + ':' + i + ':' + n]) n++;
+    return { ...t(u), id: 'u:' + day + ':' + i + ':' + n, kind: 'upgrade' as const, left: UPGRADE_TIMES - n };
+  });
+  return [...dailies, ...weekly, ...upgrades];
 }
 
 // ---------- filling a challenge from the club ----------

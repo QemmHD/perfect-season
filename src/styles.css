@@ -10794,6 +10794,10 @@ button.friendcard:active {
   border-color: rgba(245, 184, 61, 0.45);
   background: linear-gradient(160deg, #18200f 0%, var(--panel) 70%);
 }
+.ut-sbc.upgrade {
+  border-color: rgba(25, 227, 201, 0.4);
+  background: linear-gradient(160deg, #0d2224 0%, var(--panel) 70%);
+}
 .ut-sbc.done {
   opacity: 0.55;
 }

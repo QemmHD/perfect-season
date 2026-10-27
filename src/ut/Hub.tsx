@@ -125,6 +125,9 @@ export function Hub(props: {
           <span className="eyebrow">Today’s challenges</span>
           {props.sbcs
             .filter((s) => s.kind === 'daily')
+            // the ones still to do first, three of them
+            .sort((a, b) => Number(!!ut.sbc.done[a.id]) - Number(!!ut.sbc.done[b.id]))
+            .slice(0, 3)
             .map((s) => (
               <button key={s.id} className={'ut-hub-sbc' + (ut.sbc.done[s.id] ? ' done' : '')} onClick={() => props.onGo('sbc')}>
                 <b>{s.title}</b>
