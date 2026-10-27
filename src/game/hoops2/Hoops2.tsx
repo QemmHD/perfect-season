@@ -12,7 +12,7 @@ import type { CourtTheme } from '../pixel/court';
 import type { Progress, RivalLive } from '../progress';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
-import { aimPass, crossover, pass, pressShoot, releaseShoot, RIM, step } from './engine';
+import { aimPass, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
 import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
@@ -96,7 +96,7 @@ export function Hoops2({
   const [pop, setPop] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'big' | 'plain' | 'green' } | null>(null);
   const popId = useRef(0);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [hint, setHint] = useState<string | null>('Stick: move · hold SHOOT, let go in the green · PASS · CROSS');
+  const [hint, setHint] = useState<string | null>('Stick: move · flick ← → crossover · flick ↓ step-back · flick ↑ spin · hold SHOOT, let go in the green');
   const [wide, setWide] = useState(false);
 
   const say = (text: string, tone: 'good' | 'bad' | 'big' | 'plain' | 'green', ms = 1200) => {
@@ -330,16 +330,65 @@ export function Hoops2({
     const p = possRef.current;
     if (p && !p.end) pass(p, null);
   };
-  const doCross = (e: React.PointerEvent) => {
-    e.preventDefault();
+  // moves by swipe, anywhere off the stick and the buttons: a flick across crosses over that way, a
+  // flick back (down the screen) steps back, a flick up or a circle spins
+  const swipe = useRef<{ id: number; pts: { x: number; y: number; t: number }[]; done: boolean } | null>(null);
+  const turning = (pts: { x: number; y: number }[]) => {
+    let sum = 0;
+    let prev: number | null = null;
+    let last = pts[0];
+    for (const q of pts) {
+      if (Math.hypot(q.x - last.x, q.y - last.y) < 6) continue;
+      const a = Math.atan2(q.y - last.y, q.x - last.x);
+      if (prev !== null) {
+        let d = a - prev;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        sum += d;
+      }
+      prev = a;
+      last = q;
+    }
+    return sum;
+  };
+  const moveBy = (kind: 'cross' | 'back' | 'spin', dir: number) => {
     const p = possRef.current;
     if (!p || p.end || p.handler === null) return;
-    // cross toward the side the stick leans, else back the other way
-    const s = stickOnCourt();
     const h = p.bodies[p.handler];
-    const toRim = { cx: RIM.cx - h.cx, cz: RIM.cz - h.cz };
-    const side = s ? Math.sign(-toRim.cz * s.cx + toRim.cx * s.cz) || 1 : h.cz > 0 ? -1 : 1;
-    crossover(p, side);
+    // screen right is +cz from behind the shooter; the engine's side is measured from his line to the rim
+    const toRimCx = Math.sign(RIM.cx - h.cx) || 1;
+    if (kind === 'cross') crossover(p, dir * toRimCx);
+    else if (kind === 'back') stepback(p);
+    else spin(p, dir * toRimCx);
+  };
+  const swipeDown = (e: React.PointerEvent) => {
+    if (swipe.current) return;
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    swipe.current = { id: e.pointerId, pts: [{ x: e.clientX, y: e.clientY, t: performance.now() }], done: false };
+  };
+  const swipeMove = (e: React.PointerEvent) => {
+    const sw = swipe.current;
+    if (!sw || sw.id !== e.pointerId || sw.done) return;
+    const now = performance.now();
+    sw.pts.push({ x: e.clientX, y: e.clientY, t: now });
+    const a = sw.pts[0];
+    const dx = e.clientX - a.x;
+    const dy = e.clientY - a.y;
+    const turn = turning(sw.pts);
+    let len = 0;
+    for (let i = 1; i < sw.pts.length; i++) len += Math.hypot(sw.pts[i].x - sw.pts[i - 1].x, sw.pts[i].y - sw.pts[i - 1].y);
+    if (Math.abs(turn) > 4.2 && len > 110) {
+      sw.done = true;
+      moveBy('spin', turn > 0 ? 1 : -1);
+    } else if (now - a.t < 230 && Math.hypot(dx, dy) > 48 && Math.abs(turn) < 0.9) {
+      sw.done = true;
+      if (Math.abs(dx) > Math.abs(dy)) moveBy('cross', Math.sign(dx));
+      else if (dy > 0) moveBy('back', 0);
+      else moveBy('spin', stickRef.current && Math.abs(stickRef.current.x) > 0.2 ? Math.sign(stickRef.current.x) : 1);
+    }
+  };
+  const swipeUp = (e: React.PointerEvent) => {
+    if (swipe.current?.id === e.pointerId) swipe.current = null;
   };
 
   const g = game;
@@ -387,15 +436,13 @@ export function Hoops2({
       )}
       {hint && <div className="hg2-hint">{hint}</div>}
       {!attrs && <div className="fg-loading">Taking the floor…</div>}
+      {g && !g.over && !autoplayHook && <div className="hg2-swipe" onPointerDown={swipeDown} onPointerMove={swipeMove} onPointerUp={swipeUp} onPointerCancel={swipeUp} aria-hidden="true" />}
       {g && !g.over && !autoplayHook && (
         <div className="hg2-pad">
           <div className="hg2-stick" ref={stickEl} onPointerDown={stickDown} onPointerMove={(e) => stickRef.current && stickAt(e)} onPointerUp={stickUp} onPointerCancel={stickUp} aria-label="Move">
             <i style={{ transform: 'translate(' + knob.x * 30 + 'px,' + knob.y * 30 + 'px)' }} />
           </div>
           <div className="hg2-btns">
-            <button className="hg2-cross" onPointerDown={doCross} aria-label="Crossover">
-              CROSS
-            </button>
             <button className="hg2-pass" onPointerDown={doPass} aria-label="Pass">
               PASS
             </button>

@@ -444,7 +444,7 @@ export function aimPass(p: Possession, dir: Pt | null): number | null {
 export function crossover(p: Possession, dir: number) {
   if (p.handler === null || p.ball || p.end || p.meter || p.finish) return;
   const h = p.bodies[p.handler];
-  if (p.t - (h.act === 'cross' ? h.actAt : -9) < 1.3) return;
+  if (p.t - lastMove(h) < 1.3) return;
   act(h, 'cross', p.t);
   const r = p.rand;
   const toRim = unit({ cx: RIM.cx - h.cx, cz: RIM.cz - h.cz });
@@ -460,11 +460,62 @@ export function crossover(p: Possession, dir: number) {
   if (r() < shake) {
     const dropped = has(h.p, 'ankle-breaker') && r() < 0.22;
     def.stunUntil = p.t + (dropped ? 1.5 : 0.85);
-    act(def, 'stumble', p.t);
+    act(def, dropped ? 'fall' : 'stumble', p.t);
     p.events.push(dropped ? 'ankles:' + def.idx : 'shook:' + def.idx);
   } else if (r() < clamp(0.03 + (def.p.stl - h.p.hnd) / 400, 0.01, 0.1)) {
     end(p, 'steal', 0, 'STRIPPED BY ' + def.p.tag, h.idx);
   }
+}
+
+/** The handler's last move, for the shared cool-down between crossovers, step-backs and spins. */
+function lastMove(h: Body): number {
+  return h.act === 'cross' || h.act === 'stepback' || h.act === 'spin' ? h.actAt : -9;
+}
+
+/** Shake his man with a move: by the handle against the defender's perimeter defense. */
+function shakeMan(p: Possession, h: Body, bonus: number) {
+  const def = p.bodies.find((d) => d.side === 'D' && d.mark === h.idx);
+  if (!def || dist(def, h) > 6) return;
+  const r = p.rand;
+  const edge = (h.p.hnd - def.p.prd) / 100;
+  const shake = clamp(0.1 + bonus + edge * 0.7 + (has(h.p, 'ankle-breaker') ? 0.1 : 0) - (has(def.p, 'clamps') ? 0.1 : 0), 0.04, 0.55);
+  if (r() < shake) {
+    const dropped = has(h.p, 'ankle-breaker') && r() < 0.22;
+    def.stunUntil = p.t + (dropped ? 1.5 : 0.85);
+    act(def, dropped ? 'fall' : 'stumble', p.t);
+    p.events.push(dropped ? 'ankles:' + def.idx : 'shook:' + def.idx);
+  } else if (r() < clamp(0.03 + (def.p.stl - h.p.hnd) / 400, 0.01, 0.1)) {
+    end(p, 'steal', 0, 'STRIPPED BY ' + def.p.tag, h.idx);
+  }
+}
+
+/** A step-back: a hop away from his man and the rim, space for the jumper. */
+export function stepback(p: Possession) {
+  if (p.handler === null || p.ball || p.end || p.meter || p.finish) return;
+  const h = p.bodies[p.handler];
+  if (p.t - lastMove(h) < 1.3) return;
+  act(h, 'stepback', p.t);
+  const away = unit({ cx: h.cx - RIM.cx, cz: h.cz - RIM.cz });
+  const burst = topSpeed(h, true) * 0.85;
+  h.vx = away.cx * burst;
+  h.vz = away.cz * burst;
+  // his man is caught leaning in: a little less often than on a crossover, but the space is the point
+  shakeMan(p, h, -0.02);
+}
+
+/** A spin: around his man toward the rim, turning the way `dir` says (+1 his right). */
+export function spin(p: Possession, dir: number) {
+  if (p.handler === null || p.ball || p.end || p.meter || p.finish) return;
+  const h = p.bodies[p.handler];
+  if (p.t - lastMove(h) < 1.3) return;
+  act(h, 'spin', p.t);
+  const toRim = unit({ cx: RIM.cx - h.cx, cz: RIM.cz - h.cz });
+  const side = { cx: -toRim.cz * dir, cz: toRim.cx * dir };
+  const burst = topSpeed(h, true) * 0.9;
+  h.vx = toRim.cx * burst * 0.7 + side.cx * burst * 0.5;
+  h.vz = toRim.cz * burst * 0.7 + side.cz * burst * 0.5;
+  // a spin beats a man who's up on him more often, and the strong ones bully through
+  shakeMan(p, h, 0.04 + (h.p.str - 60) / 600);
 }
 
 // ---------- the step ----------

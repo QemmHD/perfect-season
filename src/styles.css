@@ -10875,3 +10875,9 @@ button.friendcard:active {
 .fb2.wide .fb2-cards {
   gap: 6px;
 }
+/* basketball: the swipe layer under the stick and buttons (moves by flick) */
+.hg2-swipe {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}

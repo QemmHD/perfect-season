@@ -1,12 +1,13 @@
-// Draws arcade basketball as pixel art: the court (cached), the stands and ticker, ten rigged players
-// in their moves, the ball, the hoop, the 2K-style shot meter and the contest grade. Everything is
-// drawn at the game's own low resolution onto one canvas the page scales up by a whole number.
+// Draws arcade basketball as fine pixel art from behind the shooter, facing the hoop, with
+// perspective (the same either way up; sideways shows more of the floor across): the court drawn a
+// row at a time, the arena's stands behind the basket, ten rigged players in their moves, the ball,
+// the backboard, rim and net, the 2K-style shot meter beside the shooter and the contest grade.
 import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, hairFor, type Look, type Sprite } from '../pixel/body';
-import { at, type CourtCam, courtCam, type CourtTheme, drawCourt, drawHoopBack, drawHoopFront, drawStands, facingOn, nearness, text, textWidth, wallOf } from '../pixel/court';
-import { PixBuf } from '../pixel/pixbuf';
+import { type CourtTheme, text } from '../pixel/court';
+import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
-import { ballPos, contestOf, RIM } from './engine';
+import { ballPos, contestOf, RIM, RIM_H } from './engine';
 import type { Body, Contest, Possession } from './types';
 
 export interface Kit {
@@ -92,6 +93,22 @@ function poseOf(b: Body, t: number, carrying: boolean): { key: string; pose: Pos
       const ph = timed(0.35, 6);
       return { key: 'cr' + ph, pose: P.crossover(ph) };
     }
+    case 'stepback': {
+      const ph = timed(0.35, 6);
+      return { key: 'sb' + ph, pose: P.crossover(1 - ph) };
+    }
+    case 'spin': {
+      const ph = timed(0.45, 6);
+      return { key: 'sn' + ph, pose: P.spin(ph) };
+    }
+    case 'fall': {
+      // ankles broken: he stumbles, then he's down, then he scrambles up
+      if (since < 0.35) {
+        const ph = timed(0.35, 4);
+        return { key: 'fs' + ph, pose: P.stumble(ph) };
+      }
+      return since < 1.2 ? { key: 'fd', pose: P.grounded() } : { key: 'fu', pose: P.stumble(0.4) };
+    }
     case 'contest':
     case 'block':
     case 'rebound': {
@@ -119,22 +136,19 @@ function poseOf(b: Body, t: number, carrying: boolean): { key: string; pose: Pos
 }
 
 export class HoopsRenderer {
-  cam!: CourtCam;
+  /** the stick's mapping in Hoops2: the camera looks up the floor at the hoop, as the old upright one did */
+  cam = { mode: 'end' as const };
   W = 0;
   H = 0;
-  zoom = 2;
-  private court: HTMLCanvasElement | null = null;
-  private courtCam: CourtCam | null = null;
-  private stands!: PixBuf;
-  private standsCanvas = document.createElement('canvas');
+  zoom = 1;
+  private pc!: PCam;
+  private tex: FieldTex | null = null;
+  private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
   private sprites = new Map<string, Sprite>();
   private last = new Map<string, Sprite>();
   private budget = 0;
-  private standsTick = -1;
   private looks = new Map<string, Look>();
-  private hoopFront = new Map<number, HTMLCanvasElement>();
-  private balls: HTMLCanvasElement[] = [];
-  private focusCz = 0;
+  private focus = { x: 0, y: 14 };
   /** the last shot meter, kept a moment after the release to show how it went */
   private meterShown: { idx: number; t0: number; top: number; green: number; until: number; frac: number; greened: boolean | null } | null = null;
 
@@ -143,91 +157,47 @@ export class HoopsRenderer {
     private kits: [Kit, Kit]
   ) {}
 
-  /** Fit the screen: a whole-number zoom so every game pixel is the same size. */
+  /** Game pixels are screen pixels: fine pixel art, crisp on any phone. */
   resize(cssW: number, cssH: number) {
-    const wide = cssW > cssH;
-    const target = wide ? 440 : 210;
-    this.zoom = Math.max(1, Math.round(cssW / target));
-    const W = Math.ceil(cssW / this.zoom);
-    const H = Math.ceil(cssH / this.zoom);
+    const W = Math.max(1, Math.round(cssW));
+    const H = Math.max(1, Math.round(cssH));
     if (W === this.W && H === this.H) return;
     this.W = W;
     this.H = H;
-    this.cam = courtCam(W, H, 30, 0);
+    this.floor = null;
     this.sprites.clear();
-    this.hoopFront.clear();
-    this.court = null;
-    this.stands = new PixBuf(W, Math.max(1, wallOf(this.cam)));
-    this.standsCanvas.width = W;
-    this.standsCanvas.height = this.stands.h;
-    this.standsTick = -1;
-    this.balls = [];
+    this.last.clear();
+    this.pc = this.camAt(this.focus.x, this.focus.y);
   }
 
-  /** The static court, drawn wide enough to pan across (upright, the camera follows the ball sideways). */
-  private courtCanvas(): { canvas: HTMLCanvasElement; cam: CourtCam } {
-    if (this.court && this.courtCam) return { canvas: this.court, cam: this.courtCam };
-    const c = this.cam;
-    const extra = c.mode === 'end' ? Math.ceil(8 * c.k) : 0;
-    const wide: CourtCam = { ...c, W: c.W + extra * 2, origin: c.mode === 'end' ? Math.round((c.W + extra * 2) / 2) : c.origin };
-    const buf = new PixBuf(wide.W, wide.H);
-    // see-through above the floor: the stands are drawn underneath, every frame
-    drawCourt(buf, wide, this.theme, 0, 0, false);
-    drawHoopBack(buf, wide, this.theme);
-    const canvas = document.createElement('canvas');
-    canvas.width = wide.W;
-    canvas.height = wide.H;
-    buf.put(canvas.getContext('2d')!);
-    this.court = canvas;
-    this.courtCam = wide;
-    return { canvas, cam: wide };
+  /** The camera behind the shooter: the top of the key two thirds down, the rim up near the stands. */
+  private camAt(fx: number, fy: number): PCam {
+    // the man with the ball two thirds down, the rim around a third, the stands and the arena's dark
+    // roof behind it
+    return this.W > this.H
+      ? pcam(this.W, this.H, fx, fy, { row: 0.74, s: this.H / 38, horizon: -0.25, pitch: 0.5, fov: 0.55 })
+      : pcam(this.W, this.H, fx, fy, { row: 0.68, s: this.W / 30, horizon: 0.1, pitch: 0.45, fov: 0.6 });
   }
 
-  private ballSprite(frame: number, fire: boolean): HTMLCanvasElement {
-    const key = frame + (fire ? 4 : 0);
-    if (this.balls[key]) return this.balls[key];
-    const r = Math.max(2.5, this.cam.k * 0.42);
-    const n = Math.ceil(r * 2 + 3);
-    const buf = new PixBuf(n, n);
-    const c = n / 2;
-    const base: [number, number, number] = fire ? [255, 120, 30] : [222, 104, 34];
-    for (let y = 0; y < n; y++)
-      for (let x = 0; x < n; x++) {
-        const dx = x + 0.5 - c;
-        const dy = y + 0.5 - c;
-        const d = Math.hypot(dx, dy);
-        if (d > r + 0.6) continue;
-        if (d > r - 0.4) {
-          buf.set(x, y, PixBuf.pack([60, 24, 10]));
-          continue;
-        }
-        const light = (-dx - dy) / (r * 1.4);
-        let col: [number, number, number] = light > 0.35 ? [248, 150, 70] : light < -0.35 ? [168, 66, 20] : base;
-        // the seams turn as it spins
-        const a = (frame * Math.PI) / 8;
-        const sx = dx * Math.cos(a) - dy * Math.sin(a);
-        const sy = dx * Math.sin(a) + dy * Math.cos(a);
-        if (Math.abs(sx) < 0.5 || Math.abs(sy) < 0.5) col = [70, 28, 12];
-        buf.set(x, y, PixBuf.pack(col));
-      }
-    const cv = document.createElement('canvas');
-    cv.width = n;
-    cv.height = n;
-    buf.put(cv.getContext('2d')!);
-    this.balls[key] = cv;
-    return cv;
+  /** A court point (along cx, across cz, height h, feet) on screen, and the pixels a foot there. */
+  private at(cx: number, cz: number, h = 0) {
+    return project(this.pc, cz, cx, h);
   }
 
-  private sprite(b: Body, t: number, carrying: boolean, kit: Kit): Sprite {
-    const facing = facingOn(this.cam, Math.cos(b.face), Math.sin(b.face));
-    // 16 directions
-    const fb = Math.round((facing / (Math.PI * 2)) * 16);
-    const px = Math.round((b.p.ht / 12) * this.cam.k);
+  private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number): Sprite {
+    // facing on screen: the camera looks up the floor (+cx), across is +cz to the right
+    const dcx = Math.cos(b.face);
+    const dcz = Math.sin(b.face);
+    const raw = Math.max(10, Math.round((b.p.ht / 12) * s));
+    const px = raw > 14 ? raw - (raw % 2) : raw;
+    const dirs = px < 26 ? 8 : 16;
+    const fb = (Math.round((Math.atan2(-dcx, dcz) / (Math.PI * 2)) * dirs) + dirs) % dirs;
+    const pitch = Math.round(Math.min(0.9, pitchAt(this.pc, b.cx)) / 0.15) * 0.15;
     const { key, pose } = poseOf(b, t, carrying);
-    const k = b.p.id + '|' + b.side + '|' + key + '|' + fb + '|' + px;
     const who = b.p.id + '|' + b.side;
-    let s = this.sprites.get(k);
-    if (!s) {
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
+    let spr = this.sprites.get(k);
+    if (!spr) {
       // a few new drawings a frame (the man with the ball always gets his): the rest keep last frame's
       const last = this.last.get(who);
       if (this.budget <= 0 && last && !carrying) return last;
@@ -237,123 +207,229 @@ export class HoopsRenderer {
         look = lookFor(b, kit);
         this.looks.set(who, look);
       }
-      s = drawBody(look, { ...pose, lift: 0 }, { facing: (fb / 16) * Math.PI * 2, pitch: this.cam.pitch }, px);
+      spr = drawBody(look, { ...pose, lift: 0 }, { facing: (fb / dirs) * Math.PI * 2, pitch }, px);
       if (this.sprites.size > 3000) this.sprites.clear();
-      this.sprites.set(k, s);
+      this.sprites.set(k, spr);
     }
-    this.last.set(who, s);
-    return s;
+    this.last.set(who, spr);
+    return spr;
   }
 
-  /** The rim and net, drawn on the wide court's camera (blitted with the same pan offset as the court). */
-  private rim(swish: number): HTMLCanvasElement {
-    const q = Math.round(swish * 8);
-    let cv = this.hoopFront.get(q);
-    if (!cv) {
-      const { cam } = this.courtCanvas();
-      const buf = new PixBuf(cam.W, cam.H);
-      drawHoopFront(buf, cam, q / 8);
-      cv = document.createElement('canvas');
-      cv.width = cam.W;
-      cv.height = cam.H;
-      buf.put(cv.getContext('2d')!);
-      this.hoopFront.set(q, cv);
+  private drawFloorNow(ctx: CanvasRenderingContext2D) {
+    if (!this.tex) this.tex = courtTexture(this.theme);
+    // the floor at half resolution, doubled: a quarter of the work, the pixels still square
+    const q = 2;
+    if (!this.floor) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(this.W / q);
+      canvas.height = Math.ceil(this.H / q);
+      const img = canvas.getContext('2d')!.createImageData(canvas.width, canvas.height);
+      this.floor = { canvas, img, px: new Uint32Array(img.data.buffer) };
     }
-    return cv;
+    const fl = this.floor;
+    drawFloor(this.pc, this.tex, fl.px, q);
+    fl.canvas.getContext('2d')!.putImageData(fl.img, 0, 0);
+    ctx.drawImage(fl.canvas, 0, 0, fl.canvas.width * q, fl.canvas.height * q);
   }
 
-  /** One frame. `now` is the possession clock; `real` keeps the crowd and ticker moving between plays. */
+  /** The stanchion and the backboard, behind everything near the hoop. */
+  private drawBoard(ctx: CanvasRenderingContext2D) {
+    const c1 = this.theme.c1;
+    const poly = (pts: { x: number; y: number }[], fill: string, stroke?: string, lw = 1) => {
+      ctx.beginPath();
+      pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      if (stroke) {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = lw;
+        ctx.stroke();
+      }
+    };
+    // the padded base behind the baseline, the pole and the arm out to the board
+    const bx = 51;
+    poly([this.at(bx - 1.5, -2.6, 0), this.at(bx - 1.5, 2.6, 0), this.at(bx - 1.5, 2.6, 3.4), this.at(bx - 1.5, -2.6, 3.4)], c1, 'rgba(0,0,0,0.5)');
+    const pb = this.at(bx, 0, 3.4);
+    const pt = this.at(bx, 0, 12.8);
+    const pw = Math.max(2, Math.round(pb.s * 0.55));
+    ctx.fillStyle = '#3a3e4a';
+    ctx.fillRect(Math.round(pb.x - pw / 2), Math.round(pt.y), pw, Math.round(pb.y - pt.y));
+    const arm0 = this.at(bx, 0, 12.6);
+    const arm1 = this.at(43.2, 0, 12.6);
+    ctx.strokeStyle = '#3a3e4a';
+    ctx.lineWidth = Math.max(2, Math.round(arm1.s * 0.45));
+    ctx.beginPath();
+    ctx.moveTo(arm0.x, arm0.y);
+    ctx.lineTo(arm1.x, arm1.y);
+    ctx.stroke();
+    // the glass, its frame, the shooter's square
+    const B = 43;
+    const g = [this.at(B, -3, 13.5), this.at(B, 3, 13.5), this.at(B, 3, 10), this.at(B, -3, 10)];
+    const s = g[0].s;
+    poly(g, 'rgba(196,222,236,0.82)', '#f6f6f6', Math.max(1, Math.round(s * 0.16)));
+    const sq = [this.at(B, -1, 11.5), this.at(B, 1, 11.5), this.at(B, 1, 10.15), this.at(B, -1, 10.15)];
+    ctx.strokeStyle = '#d62828';
+    ctx.lineWidth = Math.max(1, Math.round(s * 0.13));
+    ctx.beginPath();
+    sq.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+    ctx.closePath();
+    ctx.stroke();
+    // a glint across the glass
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = Math.max(1, Math.round(s * 0.2));
+    const a = this.at(B, -2.4, 13.2);
+    const b = this.at(B, -0.8, 10.4);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  /** The rim (back or front half) and, with the front, the net, swaying after a make. */
+  private drawRim(ctx: CanvasRenderingContext2D, half: 'back' | 'front', swish: number) {
+    const r = 0.75;
+    const ring = (a: number, h = RIM_H) => this.at(RIM.cx + Math.cos(a) * r, RIM.cz + Math.sin(a) * r, h);
+    const c = this.at(RIM.cx, RIM.cz, RIM_H);
+    const lw = Math.max(1, Math.round(c.s * 0.14));
+    // back half: away from the camera (cos > 0); front: toward it
+    const a0 = half === 'back' ? -Math.PI / 2 : Math.PI / 2;
+    if (half === 'front') {
+      // the net: strands from the rim down to a narrower ring, swaying after a swish
+      const len = 1.5 * (1 - swish * 0.25);
+      ctx.lineWidth = Math.max(1, Math.round(c.s * 0.07));
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const top = ring(a);
+        const sway = Math.sin(swish * 22 + i * 1.3) * swish * 0.3;
+        const bot = this.at(RIM.cx + Math.cos(a) * r * 0.5 + sway, RIM.cz + Math.sin(a) * r * 0.5, RIM_H - len);
+        ctx.strokeStyle = Math.cos(a) > 0 ? 'rgba(200,204,214,0.85)' : 'rgba(246,246,246,0.95)';
+        ctx.beginPath();
+        ctx.moveTo(top.x, top.y);
+        ctx.lineTo(bot.x, bot.y);
+        ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = half === 'back' ? '#b8481a' : '#f06422';
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    for (let i = 0; i <= 16; i++) {
+      const q = ring(a0 + (i / 16) * Math.PI);
+      if (i) ctx.lineTo(q.x, q.y);
+      else ctx.moveTo(q.x, q.y);
+    }
+    ctx.stroke();
+  }
+
+  /** The ball, its size by its distance, the seams turning as it spins. */
+  private drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, real: number, fire: boolean) {
+    const r = Math.max(2.5, s * 0.4);
+    const X = Math.round(x);
+    const Y = Math.round(y);
+    ctx.fillStyle = '#3c180a';
+    ctx.beginPath();
+    ctx.arc(X, Y, r + 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = fire ? '#ff7a1e' : '#de6822';
+    ctx.beginPath();
+    ctx.arc(X, Y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = fire ? '#ffc070' : '#f8964a';
+    ctx.beginPath();
+    ctx.arc(X - r * 0.3, Y - r * 0.3, r * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+    const a = real * 9;
+    ctx.strokeStyle = '#46200c';
+    ctx.lineWidth = Math.max(1, r * 0.18);
+    ctx.beginPath();
+    ctx.moveTo(X + Math.cos(a) * r, Y + Math.sin(a) * r);
+    ctx.lineTo(X - Math.cos(a) * r, Y - Math.sin(a) * r);
+    ctx.stroke();
+  }
+
+  /** One frame. `real` keeps the crowd and the ball's spin moving between plays. */
   draw(ctx: CanvasRenderingContext2D, p: Possession, real: number, fx: Fx) {
     this.budget = 4;
-    // the net's swish frames, all made up front (the first make would stall on them otherwise)
-    if (!this.hoopFront.size) for (let q = 0; q <= 8; q++) this.rim(q / 8);
-    const c = this.cam;
     ctx.imageSmoothingEnabled = false;
-    // the camera: upright, it pans across with the ball
-    if (c.mode === 'end') {
-      const want = ballPos(p).cz;
-      this.focusCz += (want - this.focusCz) * 0.08;
-      const pan = Math.max(-7, Math.min(7, this.focusCz * 0.6));
-      c.origin = Math.round(c.W / 2 - pan * c.k);
-    }
+    // the camera drifts across with the ball and a little up and down the floor with it
+    const bp = ballPos(p);
+    const wantX = Math.max(-10, Math.min(10, bp.cz * 0.6));
+    const wantY = Math.max(13, Math.min(30, bp.cx));
+    this.focus.x += (wantX - this.focus.x) * 0.07;
+    this.focus.y += (wantY - this.focus.y) * 0.05;
+    this.pc = this.camAt(this.focus.x, this.focus.y);
     const sx = fx.shake ? Math.round((Math.random() - 0.5) * fx.shake * 2) : 0;
     const sy = fx.shake ? Math.round((Math.random() - 0.5) * fx.shake * 2) : 0;
     ctx.save();
     ctx.translate(sx, sy);
-    // the stands, then the court (and the hoop standing in front of them)
-    // the crowd moves at 20 frames a second: plenty for a bounce, a third of the work
-    const tick = Math.floor(real * 20);
-    if (tick !== this.standsTick) {
-      this.standsTick = tick;
-      drawStands(this.stands, c, this.theme, fx.crowd, real);
-      this.stands.put(this.standsCanvas.getContext('2d')!);
-    }
-    ctx.fillStyle = '#0e121e';
-    ctx.fillRect(0, 0, this.W, this.H);
-    ctx.drawImage(this.standsCanvas, 0, 0);
-    const court = this.courtCanvas();
-    const panX = c.mode === 'end' ? Math.round(c.origin - court.cam.origin) : 0;
-    ctx.drawImage(court.canvas, panX, 0);
+    this.drawFloorNow(ctx);
+    this.drawBoard(ctx);
     // shadows on the floor
     const t = p.t;
-    const sp = Math.sin(c.pitch);
     for (const b of p.bodies) {
-      const f = at(c, b.cx, b.cz);
+      const f = this.at(b.cx, b.cz);
       const shrink = 1 / (1 + b.h * 0.12);
-      ctx.fillStyle = 'rgba(30,14,6,' + (0.42 * shrink).toFixed(2) + ')';
-      const rx = Math.round(c.k * 1.05 * shrink);
-      const ry = Math.max(1, Math.round(rx * sp));
-      ctx.fillRect(Math.round(f.x - rx), Math.round(f.y - ry / 2), rx * 2, ry);
-      ctx.fillRect(Math.round(f.x - rx + 1), Math.round(f.y - ry / 2) - 1, rx * 2 - 2, ry + 2);
+      const rx = Math.max(3, Math.round(f.s * 1.05 * shrink));
+      const ry = Math.max(1, Math.round(rx * Math.sin(pitchAt(this.pc, b.cx)) * 0.9));
+      ctx.fillStyle = 'rgba(30,14,6,' + (0.4 * shrink).toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
     // the ball's shadow
-    const bp = ballPos(p);
-    const bs = at(c, bp.cx, bp.cz);
+    const bsh = this.at(bp.cx, bp.cz);
     ctx.fillStyle = 'rgba(30,14,6,0.35)';
-    ctx.fillRect(Math.round(bs.x - c.k * 0.35), Math.round(bs.y - 1), Math.round(c.k * 0.7), 2);
-    // the players, far to near
-    const order = [...p.bodies].sort((a, b) => nearness(c, a.cx, a.cz) - nearness(c, b.cx, b.cz));
-    let handSpot: { x: number; y: number } | null = null;
-    let headOf: Record<number, { x: number; y: number; right: number }> = {};
-    for (const b of order) {
-      const carrying = p.handler === b.idx;
-      const s = this.sprite(b, t, carrying, this.kits[b.side === 'O' ? 0 : 1]);
-      const f = at(c, b.cx, b.cz, b.h);
-      const x = Math.round(f.x - s.ax);
-      const y = Math.round(f.y - s.ay);
-      ctx.drawImage(s.canvas, x, y);
-      headOf[b.idx] = { x: Math.round(f.x), y: y + s.top, right: x + s.canvas.width };
-      if (carrying) handSpot = { x: x + s.handR.x, y: y + s.handR.y };
+    ctx.beginPath();
+    ctx.ellipse(Math.round(bsh.x), Math.round(bsh.y), Math.max(2, bsh.s * 0.4), Math.max(1, bsh.s * 0.18), 0, 0, Math.PI * 2);
+    ctx.fill();
+    // the players and the back of the rim, far to near
+    const items: { depth: number; draw: () => void }[] = [];
+    let handSpot: { x: number; y: number; s: number } | null = null;
+    const headOf: Record<number, { x: number; y: number; right: number }> = {};
+    for (const b of p.bodies) {
+      items.push({
+        depth: b.cx,
+        draw: () => {
+          const carrying = p.handler === b.idx;
+          const f = this.at(b.cx, b.cz, b.h);
+          const s = this.sprite(b, t, carrying, this.kits[b.side === 'O' ? 0 : 1], f.s);
+          const x = Math.round(f.x - s.ax);
+          const y = Math.round(f.y - s.ay);
+          ctx.drawImage(s.canvas, x, y);
+          headOf[b.idx] = { x: Math.round(f.x), y: y + s.top, right: x + s.canvas.width };
+          if (carrying) handSpot = { x: x + s.handR.x, y: y + s.handR.y, s: f.s };
+        },
+      });
     }
-    void headOf;
+    items.push({ depth: RIM.cx + 0.4, draw: () => this.drawRim(ctx, 'back', fx.swish) });
+    items.sort((a, b) => b.depth - a.depth);
+    for (const it of items) it.draw();
     // the ball: in a flight, on the dribble, or in his hands
     const fire = p.fire >= 0 && (p.handler === p.fire || p.ball?.who === p.fire);
-    const frame = Math.floor(real * 10) % 4;
-    const ball = this.ballSprite(frame, fire);
-    let ballXY: { x: number; y: number };
-    if (p.ball) {
-      const s = at(c, bp.cx, bp.cz, bp.h);
-      ballXY = s;
-    } else if (handSpot && p.handler !== null) {
+    let ball: { x: number; y: number; s: number };
+    const hs = handSpot as { x: number; y: number; s: number } | null;
+    if (p.ball) ball = this.at(bp.cx, bp.cz, bp.h);
+    else if (hs && p.handler !== null) {
       const h = p.bodies[p.handler];
       if (h.act === 'dribble' && !p.meter && !p.finish) {
         const speed = Math.hypot(h.vx, h.vz);
         const up = P.dribbleBall((t * (speed > 1.8 ? 1.5 + speed / 18 : 1.6)) % 1, speed > 1.8 ? 1 : 0);
-        const floor = at(c, h.cx, h.cz).y;
-        ballXY = { x: handSpot.x, y: floor + (handSpot.y + 2 - floor) * up };
-      } else ballXY = { x: handSpot.x, y: handSpot.y - 1 };
-    } else ballXY = at(c, bp.cx, bp.cz, bp.h);
-    ctx.drawImage(ball, Math.round(ballXY.x - ball.width / 2), Math.round(ballXY.y - ball.height / 2));
+        const floor = this.at(h.cx, h.cz).y;
+        ball = { x: hs.x, y: floor + (hs.y + 2 - floor) * up, s: hs.s };
+      } else ball = { x: hs.x, y: hs.y - 1, s: hs.s };
+    } else ball = this.at(bp.cx, bp.cz, bp.h);
+    this.drawBall(ctx, ball.x, ball.y, ball.s, real, fire);
     if (fire) {
       // flames trailing the ball
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 8; i++) {
         const a = real * 9 + i * 1.7;
         ctx.fillStyle = i % 2 ? '#ffd23a' : '#ff6a1a';
-        ctx.fillRect(Math.round(ballXY.x + Math.sin(a) * 3), Math.round(ballXY.y - 3 - ((real * 30 + i * 3) % 7)), 1, 2);
+        const d = Math.max(1, Math.round(ball.s * 0.18));
+        ctx.fillRect(Math.round(ball.x + Math.sin(a) * ball.s * 0.4), Math.round(ball.y - ball.s * 0.4 - ((real * 30 + i * 3) % (ball.s * 1.2))), d, d * 2);
       }
     }
-    // the rim and net in front of the ball
-    ctx.drawImage(this.rim(fx.swish), panX, 0);
+    // the front of the rim and the net, over the ball
+    this.drawRim(ctx, 'front', fx.swish);
     // the shot meter and the contest on the shooter
     this.drawMeter(ctx, p, real, headOf);
     // the pass target: a marker over the man the stick points at
@@ -361,25 +437,31 @@ export class HoopsRenderer {
       const h = headOf[p.target];
       if (h) {
         ctx.fillStyle = '#19e3c9';
-        const ty = h.y - 6;
-        ctx.fillRect(h.x - 2, ty, 5, 1);
-        ctx.fillRect(h.x - 1, ty + 1, 3, 1);
-        ctx.fillRect(h.x, ty + 2, 1, 1);
+        const ty = h.y - 12;
+        ctx.beginPath();
+        ctx.moveTo(h.x - 6, ty);
+        ctx.lineTo(h.x + 6, ty);
+        ctx.lineTo(h.x, ty + 7);
+        ctx.closePath();
+        ctx.fill();
       }
     }
     // the handler's name over his head (the contest grade takes its place while he shoots)
     if (p.handler !== null && !p.ball && !p.meter) {
       const b = p.bodies[p.handler];
       const h = headOf[b.idx];
-      if (h) label(ctx, b.p.tag, h.x, h.y - 10, p.fire === b.idx ? '#ffb02e' : '#ffffff');
+      if (h) label(ctx, b.p.tag, h.x, h.y - 16, p.fire === b.idx ? '#ffb02e' : '#ffffff');
     }
     ctx.restore();
+    // the crowd on its feet: a warm pulse from the stands
+    if (fx.crowd > 0.05) {
+      ctx.fillStyle = 'rgba(255,214,120,' + (fx.crowd * 0.08).toFixed(3) + ')';
+      ctx.fillRect(0, 0, this.W, this.H * 0.4);
+    }
     if (fx.flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + Math.min(0.8, fx.flash).toFixed(2) + ')';
       ctx.fillRect(0, 0, this.W, this.H);
     }
-    void textWidth;
-    void RIM;
   }
 
   private drawMeter(ctx: CanvasRenderingContext2D, p: Possession, real: number, heads: Record<number, { x: number; y: number; right: number }>) {
@@ -403,47 +485,54 @@ export class HoopsRenderer {
     const head = heads[ms.idx];
     if (!head) return;
     // a 2K-style meter beside him: a tall bar that fills as he rises, the green window near the top
-    const hgt = Math.max(26, Math.round(this.cam.k * 4.6));
-    const w = 6;
-    const x = Math.min(this.W - w - 3, head.right + 2);
-    const y = Math.max(3, head.y - 4);
+    const hgt = Math.max(46, Math.round(Math.min(this.W, this.H) * 0.15));
+    const w = 10;
+    const x = Math.min(this.W - w - 4, head.right + 4);
+    const y = Math.max(4, head.y - 6);
     const span = ms.top * 1.3;
     // the frame: a dark case with a light rim
     ctx.fillStyle = '#05070d';
-    ctx.fillRect(x - 2, y - 2, w + 4, hgt + 4);
+    ctx.fillRect(x - 3, y - 3, w + 6, hgt + 6);
     ctx.fillStyle = '#e8ecf5';
     ctx.fillRect(x - 1, y - 1, w + 2, hgt + 2);
     ctx.fillStyle = '#1a2235';
     ctx.fillRect(x, y, w, hgt);
     // the green window, around the top of the jump
     const gy = y + hgt - Math.round((ms.top / span) * hgt);
-    const gh = Math.max(1, Math.round(((ms.green * 2) / span) * hgt));
+    const gh = Math.max(2, Math.round(((ms.green * 2) / span) * hgt));
     ctx.fillStyle = '#1f9e4c';
     ctx.fillRect(x, gy - Math.floor(gh / 2), w, gh);
     ctx.fillStyle = '#3ef07a';
-    ctx.fillRect(x - 2, gy - Math.floor(gh / 2), 1, gh);
-    ctx.fillRect(x + w + 1, gy - Math.floor(gh / 2), 1, gh);
+    ctx.fillRect(x - 3, gy - Math.floor(gh / 2), 2, gh);
+    ctx.fillRect(x + w + 1, gy - Math.floor(gh / 2), 2, gh);
     // the fill: warm while rising, then green, white (close) or red (off)
     const fh = Math.round(ms.frac * hgt);
     const off = p.lastShot && ms.greened !== null ? Math.abs(p.lastShot.off) : 1;
     ctx.fillStyle = ms.greened === null ? '#ffd35a' : ms.greened ? '#3ef07a' : off < 0.32 ? '#f4f4f4' : '#ff5a5a';
-    ctx.fillRect(x + 1, y + hgt - fh, w - 2, fh);
+    ctx.fillRect(x + 2, y + hgt - fh, w - 4, fh);
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillRect(x + 1, y + hgt - fh, w - 2, 1);
+    ctx.fillRect(x + 2, y + hgt - fh, w - 4, 1);
     // the contest grade over his head while he rises
     if (p.meter && p.handler === ms.idx) {
       const grade = contestOf(p, p.bodies[ms.idx]);
-      label(ctx, CONTEST_TEXT[grade], head.x, head.y - 10, CONTEST_COLOR[grade]);
+      label(ctx, CONTEST_TEXT[grade], head.x, head.y - 16, CONTEST_COLOR[grade]);
     }
   }
 }
 
-/** A small pixel label with a dark backing, centered at x. */
+/** A pixel label (the 3x5 letters doubled) with a dark backing, centered at x. */
 function label(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, color: string) {
-  const w = s.length * 4 + 1;
+  const z = 2;
+  const up = s.toUpperCase();
+  const w = (up.length * 4 - 1) * z;
+  const x0 = Math.round(x - w / 2);
   ctx.fillStyle = 'rgba(8,10,18,0.78)';
-  ctx.fillRect(Math.round(x - w / 2) - 1, y - 1, w + 2, 7);
-  tiny(ctx, s, Math.round(x - w / 2) + 1, y, color);
+  ctx.fillRect(x0 - 3, y - 3, w + 6, 5 * z + 6);
+  ctx.fillStyle = color;
+  for (let i = 0; i < up.length; i++) {
+    const g = F35[up[i]] ?? F35[' '];
+    for (let r = 0; r < 5; r++) for (let col = 0; col < 3; col++) if (g[r * 3 + col] === '1') ctx.fillRect(x0 + (i * 4 + col) * z, y + r * z, z, z);
+  }
 }
 
 // a 3x5 font for labels

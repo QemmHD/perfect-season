@@ -64,7 +64,10 @@ export type Act =
   | 'contest'
   | 'block'
   | 'cross'
+  | 'stepback'
+  | 'spin'
   | 'stumble'
+  | 'fall'
   | 'land'
   | 'celebrate'
   | 'rebound';
