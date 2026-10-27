@@ -236,6 +236,44 @@ export interface Sprite {
   top: number;
 }
 
+/**
+ * The drawings a renderer keeps, the oldest out first once there are `cap` of them. Each is a canvas,
+ * and a phone's browser caps the canvas memory a page may hold (iOS freezes the page past it), so a
+ * long game mustn't pile them up. `inUse` are drawings still on screen (kept whole). A hit moves a
+ * drawing to the back of the line.
+ */
+export class SpriteCache {
+  private map = new Map<string, Sprite>();
+  constructor(private cap: number) {}
+  get(key: string): Sprite | undefined {
+    const s = this.map.get(key);
+    if (s) {
+      this.map.delete(key);
+      this.map.set(key, s);
+    }
+    return s;
+  }
+  set(key: string, spr: Sprite, inUse: Iterable<Sprite>) {
+    if (this.map.size >= this.cap) {
+      const keep = new Set(inUse);
+      let drop = Math.ceil(this.cap / 3);
+      for (const [k, s] of this.map) {
+        if (drop-- <= 0) break;
+        this.map.delete(k);
+        // let the browser have the memory back now (a zero-size canvas holds none)
+        if (!keep.has(s)) {
+          s.canvas.width = 0;
+          s.canvas.height = 0;
+        }
+      }
+    }
+    this.map.set(key, spr);
+  }
+  clear() {
+    this.map.clear();
+  }
+}
+
 /** A player's body proportions, from his look (height, weight, football pads). */
 export function shapeFor(look: Look): Shape {
   return shapeOf({ ht: look.ht, wt: look.wt }, look.sport === 'nfl' ? (look.pads ?? 1) : 0);

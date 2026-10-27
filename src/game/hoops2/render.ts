@@ -2,7 +2,7 @@
 // perspective (the same either way up; sideways shows more of the floor across): the court drawn a
 // row at a time, the arena's stands behind the basket, ten rigged players in their moves, the ball,
 // the backboard, rim and net, the 2K-style shot meter arched over the shooter and the contest grade.
-import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, hairFor, type Look, type Sprite } from '../pixel/body';
+import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, hairFor, type Look, type Sprite, SpriteCache } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
 import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoints, mocapKey, warp } from '../pixel/mocap';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
@@ -307,7 +307,7 @@ export class HoopsRenderer {
   private pc!: PCam;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new Map<string, Sprite>();
+  private sprites = new SpriteCache(700);
   private last = new Map<string, Sprite>();
   private budget = 0;
   private looks = new Map<string, Look>();
@@ -397,8 +397,7 @@ export class HoopsRenderer {
         if (an.dribble !== undefined) j = dribbleArm(j, an.dribble);
         spr = drawBody(look, j, view, px);
       } else spr = drawBody(look, { ...an.pose, lift: 0 }, view, px);
-      if (this.sprites.size > 3000) this.sprites.clear();
-      this.sprites.set(k, spr);
+      this.sprites.set(k, spr, this.last.values());
     }
     this.last.set(who, spr);
     this.lastLift.set(who, ownLift);

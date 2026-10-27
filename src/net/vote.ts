@@ -189,9 +189,3 @@ export class VoteMachine {
     return Math.max(0, Math.ceil((this.deadline - now) / 1000));
   }
 }
-
-/** The AI's vote in a game against it, from the game's seed: PLAY or SIM, cast a moment into the countdown. */
-export function aiBallot(seed: string): { vote: Choice; atMs: number } {
-  const r = rng(hashString('aivote:' + seed));
-  return { vote: r() < 0.5 ? 'play' : 'sim', atMs: 1200 + Math.floor(r() * 4200) };
-}

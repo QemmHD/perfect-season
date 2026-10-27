@@ -192,21 +192,21 @@ export function contestOf(p: Possession, s: Body): Contest {
   const reach = (d.p.ht - s.p.ht) / 12 + (d.p.vrt - s.p.vrt) / 120 + (d.h > 1 ? 0.6 : 0);
   const clampDef = has(d.p, 'clamps') ? 0.6 : 0;
   const eff = r - reach * 0.7 - clampDef - (d.p.prd - 60) / 60;
-  if (eff >= 4.6) return 'open';
-  if (eff >= 2.9) return 'light';
-  if (eff >= 1.2) return 'heavy';
+  if (eff >= 4.2) return 'open';
+  if (eff >= 2.6) return 'light';
+  if (eff >= 1.0) return 'heavy';
   return 'smothered';
 }
 
 const CONTESTS: Contest[] = ['open', 'light', 'heavy', 'smothered'];
 
 /**
- * A closeout from far off arrives late: a man who had 6 feet or more when the shooter went up can
- * at most get a light hand up, 4 or more a heavy one. Catch-and-shoot and a step-back pay off.
+ * A closeout from far off arrives late: a man who had 5 feet or more when the shooter went up can
+ * at most get a light hand up, 3 or more a heavy one. Catch-and-shoot and a step-back pay off.
  */
 function closeoutCap(c: Contest, room: number | undefined): Contest {
   if (room === undefined) return c;
-  const cap = room >= 6 ? 1 : room >= 4 ? 2 : 3;
+  const cap = room >= 5 ? 1 : room >= 3 ? 2 : 3;
   return CONTESTS[Math.min(CONTESTS.indexOf(c), cap)];
 }
 

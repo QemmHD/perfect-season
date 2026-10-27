@@ -1,11 +1,11 @@
 // Sim or play: before a head to head both players vote, with a countdown, each seeing the other's
 // vote live and free to change his own until it runs out. The same vote decides it; otherwise a
 // coin toss read off the match does (src/net/vote.ts has the rule and how two phones agree on it).
-// Against the AI, it votes too, from the game's seed.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+// Against the AI there's nothing to settle: it goes with your pick (no pick: play).
+import React, { useEffect, useRef, useState } from 'react';
 import { NFL } from '../engine/sport';
 import { sfx, vibrate } from '../lib/sound';
-import { aiBallot, type Ballot, byToss, type Choice, RESEND_MS, VOTE_MS, VoteMachine, type VoteWire } from '../net/vote';
+import { type Ballot, byToss, type Choice, RESEND_MS, VOTE_MS, VoteMachine, type VoteWire } from '../net/vote';
 import { initials } from './common';
 import { reducedMotion } from './motion';
 import './vote.css';
@@ -51,7 +51,7 @@ export function Vote({
 }: {
   rivalName: string;
   online: boolean;
-  /** the match's id online, the game's seed against the AI: the coin, and the AI's vote, come from it */
+  /** the match's id online, the game's seed against the AI: the coin comes from it */
   seed: string;
   /** online: the other phone's vote, as last heard */
   rival: VoteWire | null;
@@ -68,8 +68,6 @@ export function Vote({
   const mRef = useRef<VoteMachine | null>(null);
   mRef.current ??= new VoteMachine(seed, Date.now());
   const m = mRef.current;
-  const t0 = useRef(Date.now());
-  const ai = useMemo(() => (online ? null : aiBallot(seed)), []);
   const [, render] = useState(0);
   const [phase, setPhase] = useState<'vote' | 'toss' | 'result'>('vote');
   const sent = useRef({ key: '', at: 0 });
@@ -81,15 +79,16 @@ export function Vote({
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
-  /** The AI as the other phone: here from the start, votes a moment in, locks with you and echoes your vote. */
-  const aiWire = (now: number): VoteWire => {
-    const v: Ballot = ai && now - t0.current >= ai.atMs ? ai.vote : 'none';
+  /** The AI as the other phone: here from the start, it takes whatever you pick, locks with you and
+   * echoes your vote, so your pick decides (never the coin). */
+  const aiWire = (): VoteWire => {
+    const v: Ballot = m.mine;
     return m.lockedAt !== null ? { vote: v, at: m.lockedAt, saw: m.mine } : { vote: v, at: null, saw: null };
   };
 
   const step = () => {
     const now = Date.now();
-    if (!online) m.receive(aiWire(now), now);
+    if (!online) m.receive(aiWire(), now);
     m.tick(now, goneRef.current);
     if (online && wireRef.current) {
       const w = m.wire();
@@ -161,7 +160,7 @@ export function Vote({
   const now = Date.now();
   const left = m.left(now);
   const locked = m.lockedAt !== null;
-  const r = online ? m.rival : aiWire(now);
+  const r = online ? m.rival : aiWire();
   const rv = r?.vote ?? null;
   const rLocked = r?.at != null;
   const frac = m.deadline === null ? 1 : locked ? 0 : Math.max(0, Math.min(1, (m.deadline - now) / VOTE_MS));
@@ -245,7 +244,7 @@ export function Vote({
       )}
       {d && !byToss(d) && phase === 'result' && (
         <div className="vote-toss agreed" role="status">
-          <h2 className="disp">{d.how === 'none' ? 'NO VOTES: PLAY' : 'YOU BOTH SAID ' + label(d.outcome)}</h2>
+          <h2 className="disp">{d.how === 'none' ? 'NO VOTES: PLAY' : (online ? 'YOU BOTH SAID ' : 'YOU PICKED ') + label(d.outcome)}</h2>
           <p>{d.outcome === 'play' ? (NFL ? 'Grab the ball: you’re on offense.' : 'Take the floor: you’re on offense.') : 'To the broadcast booth.'}</p>
         </div>
       )}
