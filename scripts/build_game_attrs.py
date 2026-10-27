@@ -21,6 +21,19 @@ Basketball (Basketball-Reference via github.com/sumitrodatta/bball-reference-dat
   tov      turnovers per game (from 1977-78)
   dunk     share of field-goal attempts that were dunks (Player Shooting.csv, from 1996-97)
   rim      FG% from 0-3 feet (Player Shooting.csv, from 1996-97)
+  num      the uniform number he wore most for that franchise in that decade, each season's games
+           shared out over the numbers he wore that season; ties to the later season's. "00" is
+           written 0 (the field is a number). Per team-season, through 2011-12 from APBR's lists
+           (apbr.org/nmbr*.html: the Association for Professional Basketball Research), from
+           2012-13 from ESPN's game rosters, games worn counted over the regular season (as
+           republished by github.com/sportsdataverse/sportsdataverse-data; ESPN's are blank before
+           2012-13), and from 1996-97 the NBA's season-end rosters (stats.nba.com commonteamroster,
+           same republisher) where neither has the player, or where APBR's number differs from the
+           NBA's. Sources name players, not Basketball-Reference ids, so each team-season list is
+           put on the team whose roster shares most of its names and matched to that roster by
+           name, close spelling, the source's own id across seasons, or (for a renamed player) the
+           one player every list of his leaves unmatched; the build stops if a source matches
+           under 97% of its players or team-seasons
   A line is the player's rows with one franchise in one decade (a season belongs to the decade it
   ends in), NBA only, 1959-60 on; a traded season's combined 2TM/3TM row is left out and each team's
   own row counts for that team, exactly as in build_nba_data.py.
@@ -62,7 +75,8 @@ Shared rules:
     1999), so they're the same on each of his lines
 
 Usage: python3 scripts/build_game_attrs.py [--cache DIR] [--nba-raw DIR] [--nfl-raw DIR]
-  --cache    where this script's own downloads go (default .cache/attrs)
+  --cache    where this script's own downloads go (default .cache/attrs; about 130 MB, mostly ESPN's
+             game rosters), fetched once each, a couple of seconds apart
   --nba-raw  build_nba_data.py's cache; its Player_Totals.csv is the very file nba.json was built
              from (default .cache/raw; downloaded into --cache if it isn't there)
   --nfl-raw  build_nfl_data.py's cache (default .cache/nfl; nfl_sources.py fills in anything missing)
@@ -71,9 +85,15 @@ Usage: python3 scripts/build_game_attrs.py [--cache DIR] [--nba-raw DIR] [--nfl-
 import argparse
 import ast
 import csv
+import difflib
+import html
 import json
 import os
+import re
 import sys
+import time
+import unicodedata
+import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
 
@@ -90,8 +110,18 @@ TOV_FIRST = 1978
 SHOOT_FIRST = 1997
 TGT_FIRST = 1999  # targets as asked for: from 1999 (PFR's tables have them from 1992 too)
 NUMBER_ZERO_FIRST = 2023  # the NFL allowed #0 from 2023; earlier a 0 means "unknown"
+PAUSE = 2  # seconds between downloads, to go easy on the sites
+# NBA uniform numbers: APBR's lists to 2011-12, ESPN's game rosters from 2012-13 (they're blank
+# before), the NBA's own season-end rosters from 1996-97 where neither has the player
+APBR = "https://apbr.org/"
+APBR_PAGES = ("nmbr4660", "nmbr6070", "nmbr7080", "nmbr8090", "nmbr9000", "nmbr0107")
+APBR_LAST = 2012
+SDV = "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/"
+ESPN_FIRST = 2013
+STATS_FIRST = 1997
+MATCHED_MIN = 0.97  # a number source that matches less of Basketball-Reference than this has changed shape
 
-NBA_FIELDS = ["ht", "wt", "mpg", "fg2", "fg3", "a3", "ft", "fta", "orb", "drb", "tov", "dunk", "rim"]
+NBA_FIELDS = ["ht", "wt", "mpg", "fg2", "fg3", "a3", "ft", "fta", "orb", "drb", "tov", "dunk", "rim", "num"]
 NFL_FIELDS = ["ht", "wt", "num", "cmp", "ypa", "att", "intr", "sk", "ry", "ypc", "car", "rec", "ypr", "tgt", "cr", "dsk", "dto"]
 
 
@@ -134,7 +164,39 @@ def download(url, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         print("downloading", url)
         urllib.request.urlretrieve(url, path)
+        time.sleep(PAUSE)
     return path
+
+
+def fetch(url, path):
+    """download(), or None when the source has no such file (a season it doesn't reach yet)."""
+    try:
+        return download(url, path)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        print("not there, skipped:", url)
+        return None
+
+
+def most_worn(seasons, games):
+    """The number worn most over a line's seasons [(season, games, Counter of number -> weight)]:
+    each season's games shared out by the weights, ties to the number of the later season. None
+    unless the seasons with a number hold at least half the line's games."""
+    weight = Counter()
+    last_seen = {}
+    known = 0.0
+    for season, g, worn in sorted(seasons, key=lambda x: x[0]):
+        total = sum(worn.values())
+        if not total:
+            continue
+        for n, c in worn.items():
+            weight[n] += g * c / total
+            last_seen[n] = season
+        known += g
+    if not weight or not covered(known, games):
+        return None
+    return max(weight, key=lambda n: (round(weight[n], 6), last_seen[n]))
 
 
 def write(name, fields, lines):
@@ -142,6 +204,250 @@ def write(name, fields, lines):
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"fields": fields, "lines": lines}, f, ensure_ascii=False, separators=(",", ":"))
     return os.path.getsize(path)
+
+
+# ---------------------------------------------------------------- basketball numbers
+#
+# Each source gives, per team-season, the players it lists and the numbers they wore, under its own
+# team labels and spellings. A block (season, label, entries) is placed on the Basketball-Reference
+# team of that season whose roster shares the most names with it, and each entry, (the source's id
+# for the person, his name, Counter of number -> weight), is then matched to a player on that roster.
+
+SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
+
+
+def name_key(name):
+    """A name to compare across sources: no accents, punctuation, case or Jr./III."""
+    name = name.replace("\ufffd", "'")  # APBR's page has lost some apostrophes: O\ufffdNeal
+    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"[.'`]", "", s)
+    return " ".join(t for t in re.sub(r"[^a-z]+", " ", s).split() if t not in SUFFIXES)
+
+
+def name_forms(name):
+    """The name as written, and with a quoted nickname (Ronald "Flip" Murray) as his first name or dropped."""
+    forms = [name]
+    m = re.search(r'"([^"]+)"', name)
+    if m:
+        forms += [re.sub(r'^\S+\s+"[^"]+"', m.group(1), name), re.sub(r'\s*"[^"]+"', "", name)]
+    return [k for k in map(name_key, forms) if k]
+
+
+def jersey_str(x):
+    x = (x or "").strip()
+    return x if re.fullmatch(r"\d{1,2}", x) else None  # "0" and "00" are different numbers
+
+
+def apbr_blocks(cache, first, last):
+    """APBR's lists, team by team: "6 Bill Russell, 14 Bob Cousy, ...", one weight per listed number."""
+    lines = {}
+    for page in APBR_PAGES:
+        text = open(download(APBR + page + ".html", os.path.join(cache, "apbr", page + ".html")), encoding="utf-8", errors="replace").read()
+        text = html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"(?is)<head.*?</head>", " ", text))).replace("\xa0", " ")
+        season = label = None
+        for line in text.split("\n"):
+            line = line.strip()
+            m = re.search(r"\b(?:(\d{4})-(?:\d{2}|\d{4})\s+NBA|NBA\s+(\d{4})-\d{2})\b", line)
+            if m:  # a season: "1990-91 NBA", "NBA 1960-61", "2000-2001 NBA"
+                season, label = int(m.group(1) or m.group(2)) + 1, None
+                line = line[m.end():].strip()
+            if not line or season is None or not first <= season <= last:
+                continue
+            if re.fullmatch(r"[A-Z0-9 .'&/-]+", line) and re.search("[A-Z]{3}", line):
+                label = line  # a team, "ST. LOUIS HAWKS" (or the referees)
+                lines.setdefault((season, label), [])
+            elif label is not None:
+                lines[(season, label)].append(line)
+    blocks = []
+    for (season, label), text in lines.items():
+        entries = []
+        # a name can run onto the next line and a comma can be missing; "n/a" is a number nobody
+        # recorded, "(DNP)" a player who never got into a game
+        for item in re.split(r",|(?=\b\d{1,2}\s+[A-Z])|(?=\bn/a\s)", " ".join(text)):
+            m = re.fullmatch(r"(\d{1,2})\s+(.+)", item.strip())
+            if m and not re.search(r"\(\s*DNP\s*\)", item, re.I):
+                name = re.sub(r"\(.*?\)", "", m.group(2)).strip()
+                entries.append((name_key(name), name, Counter({m.group(1): 1})))
+        blocks.append((season, label, entries))
+    return blocks
+
+
+def espn_blocks(cache, first, last):
+    """ESPN's game rosters (SportsDataverse's copies): each athlete's numbers over the regular-season
+    games he played, per team-season."""
+    blocks = []
+    for season in range(first, last + 1):
+        sched = fetch(SDV + "espn_nba_schedules/nba_schedule_%d.csv" % season, os.path.join(cache, "espn", "nba_schedule_%d.csv" % season))
+        rost = sched and fetch(SDV + "espn_nba_game_rosters/game_rosters_%d.csv" % season, os.path.join(cache, "espn", "game_rosters_%d.csv" % season))
+        if not rost:
+            continue
+        games = {r["game_id"] for r in csv.DictReader(open(sched, encoding="utf-8")) if r["season_type"] == "2" and r["type_abbreviation"] == "STD"}
+        teams = defaultdict(dict)
+        seen = set()
+        for r in csv.DictReader(open(rost, encoding="utf-8")):
+            n = jersey_str(r["athlete_jersey"])
+            key = (r["game_id"], r["team_abbreviation"], r["athlete_id"])
+            if r["game_id"] in games and r["did_not_play"].lower() == "false" and n and key not in seen:
+                seen.add(key)  # each game once
+                e = teams[r["team_abbreviation"]].setdefault(r["athlete_id"], ("espn:" + r["athlete_id"], r["athlete_display_name"], Counter()))
+                e[2][n] += 1
+        blocks += [(season, team, list(ents.values())) for team, ents in teams.items()]
+    return blocks
+
+
+def stats_blocks(cache, first, last):
+    """The NBA's season rosters (stats.nba.com's commonteamroster, SportsDataverse's copies): the
+    number each player had on the team's roster at the end of the season."""
+    blocks = []
+    for season in range(first, last + 1):
+        path = fetch(SDV + "nba_stats_rosters/rosters_%d.csv" % season, os.path.join(cache, "nbastats", "rosters_%d.csv" % season))
+        if not path:
+            continue
+        teams = defaultdict(list)
+        for r in csv.DictReader(open(path, encoding="utf-8")):
+            n = jersey_str(r["num"])
+            if n and r["season"] == str(season):
+                teams[r["team_id"]].append(("nba:" + r["player_id"], r["player"], Counter({n: 1})))
+        blocks += [(season, team, ents) for team, ents in teams.items()]
+    return blocks
+
+
+def place(blocks, rosters):
+    """Each block on the season's team whose roster shares the most of its names: at least 3 and half
+    the block, and more than any other team (so the referees and All-Star teams go nowhere)."""
+    teams_of = defaultdict(set)
+    for (season, team), roster in rosters.items():
+        for nm in roster.values():
+            teams_of[(season, name_key(nm))].add(team)
+    placed = []
+    for season, label, entries in blocks:
+        votes = Counter()
+        for e in entries:
+            votes.update(set().union(*(teams_of.get((season, k), set()) for k in name_forms(e[1]))))
+        best = votes.most_common(2) + [(None, 0)]
+        if best[0][1] >= max(3, len(entries) / 2) and best[1][1] < best[0][1]:
+            placed.append((season, best[0][0], entries))
+    return placed
+
+
+def similar(a, b):
+    return difflib.SequenceMatcher(None, a, b).ratio()
+
+
+def match_block(entries, roster, playing, ever):
+    """The block's entries to the roster's players: by name; then, among the players still unmatched,
+    by last name and first initial (Mike, Michael), a close spelling (Luckinbill, Luckenbill), or a
+    last name alone (Eric "Sleepy" Floyd). Each test must point to one player. A source's name that
+    belongs to another player is a slip, not a spelling: no test is tried for one in the league that
+    season (`playing`: its 1997-98 "Rasheed Wallace" isn't Ben), and the last name alone isn't tried
+    for anyone's ever (`ever`), though a close one is (its 1980s "Isaiah Thomas" is Isiah).
+    -> ({entry index: pid}, pids left unmatched)."""
+    by_key = defaultdict(list)
+    for pid, nm in roster.items():
+        by_key[name_key(nm)].append(pid)
+    got = {}
+    for i, e in enumerate(entries):
+        for k in name_forms(e[1]):
+            if len(by_key.get(k, ())) == 1:
+                got[i] = by_key[k][0]  # the same player twice in a block: two numbers that season
+                break
+    free = {pid: name_key(nm).split() for pid, nm in roster.items() if pid not in got.values()}
+    tests = (
+        lambda f, t: f[-1] == t[-1] and f[0][0] == t[0][0],
+        lambda f, t: similar(" ".join(f), " ".join(t)) >= 0.88,
+        lambda f, t: len(f) > 1 and f[0][0] == t[0][0] and similar(f[-1], t[-1]) >= 0.8,
+        lambda f, t: f[-1] == t[-1],
+    )
+    for i, e in enumerate(entries):
+        keys = name_forms(e[1])
+        if i in got or any(k in playing for k in keys):
+            continue
+        forms = [k.split() for k in keys]
+        for test in tests[:-1] if any(k in ever for k in keys) else tests:
+            hits = [pid for pid, toks in free.items() if toks and any(test(f, toks) for f in forms)]
+            if len(hits) == 1:
+                got[i] = hits[0]
+                del free[hits[0]]
+                break
+    return got, set(free)
+
+
+def source_numbers(blocks, rosters, franchise):
+    """(pid, season, franchise) -> Counter of number -> weight from one source; the share of its entries
+    (in blocks placed on a team) matched to a player; and the share of team-seasons it reaches."""
+    playing = defaultdict(set)  # season -> every name in the league
+    for (s, t), roster in rosters.items():
+        playing[s].update(map(name_key, roster.values()))
+    ever = set().union(*playing.values())
+    placed = [(s, t, e) + match_block(e, rosters[(s, t)], playing[s], ever) for s, t, e in place(blocks, rosters)]
+    pids_of = defaultdict(set)
+    for s, t, entries, got, free in placed:
+        for i, pid in got.items():
+            pids_of[entries[i][0]].add(pid)
+    # a person whose name didn't match in a block but whose id (or, in APBR, name) matched one
+    # player everywhere else
+    for s, t, entries, got, free in placed:
+        for i, e in enumerate(entries):
+            pids = pids_of.get(e[0], ())
+            if i not in got and len(pids) == 1 and next(iter(pids)) in free:
+                got[i] = next(iter(pids))
+                free.discard(got[i])
+    # a person whose full name matched nobody anywhere and is nobody's on Basketball-Reference (a name
+    # he gave up: APBR's Ron Artest is Metta World Peace there): the one player left unmatched in every
+    # block he's in, if there are several such blocks or his one block has just the two of them left
+    def renamed(e):
+        forms = name_forms(e[1])
+        return forms and not pids_of.get(e[0]) and all(len(k.split()) > 1 and k not in ever for k in forms)
+
+    where = defaultdict(list)
+    for b in placed:
+        for i, e in enumerate(b[2]):
+            if i not in b[3] and renamed(e):
+                where[e[0]].append((b, i))
+    claims = defaultdict(list)
+    for key, spots in where.items():
+        left = set.intersection(*(b[4] for b, i in spots))
+        b, i = spots[0]
+        alone = len(spots) == 1 and len(b[4]) == 1 and sum(1 for j in range(len(b[2])) if j not in b[3]) == 1
+        if len(left) == 1 and (len(spots) > 1 or alone):
+            for b, i in spots:
+                claims[(id(b), next(iter(left)))].append((b, i))
+    for (_, pid), spots in claims.items():
+        if len({b[2][i][0] for b, i in spots}) == 1:  # one person claims him there
+            for b, i in spots:
+                b[3][i] = pid
+    out = defaultdict(Counter)
+    listed = matched = 0
+    for s, t, entries, got, free in placed:
+        listed += len(entries)
+        matched += len(got)
+        for i, pid in got.items():
+            out[(pid, s, franchise[t])].update(entries[i][2])
+    seasons = {s for s, *_ in placed}
+    reach = len({(s, t) for s, t, *_ in placed}) / max(1, sum(1 for s, t in rosters if s in seasons))
+    return out, matched / max(1, listed), reach
+
+
+def nba_numbers(cache, rosters, franchise, first, last):
+    """(pid, season, franchise) -> Counter of number -> weight: APBR to 2011-12, ESPN from 2012-13,
+    and the NBA's season-end rosters (1996-97 on) for a player-team-season neither has. Where the
+    NBA's number isn't among APBR's, the NBA's is taken: the two differ on 1 in 100 player-seasons,
+    and where the right one is known it is mostly the NBA's (O'Neal 34, not 32, in 2003-04)."""
+    sources = (
+        ("APBR", apbr_blocks(cache, first, min(last, APBR_LAST))),
+        ("ESPN", espn_blocks(cache, ESPN_FIRST, last)),
+        ("NBA", stats_blocks(cache, STATS_FIRST, last)),
+    )
+    numbers = {}
+    for name, blocks in sources:
+        got, share, reach = source_numbers(blocks, rosters, franchise)
+        if share < MATCHED_MIN or reach < MATCHED_MIN:
+            sys.exit("nba numbers: %s matched %.3f of its players and %.3f of the team-seasons it covers" % (name, share, reach))
+        for key, worn in got.items():
+            have = numbers.get(key)
+            if have is None or (name == "NBA" and key[1] <= APBR_LAST and not set(have) & set(worn)):
+                numbers[key] = worn
+    return numbers
 
 
 # ---------------------------------------------------------------- basketball
@@ -167,6 +473,7 @@ def build_nba(cache, nba_raw):
             shoot[(int(r["season"]), r["player_id"], r["team"])] = r
 
     agg = {}
+    rosters = defaultdict(dict)  # (season, team) -> {pid: name}, for matching the number sources
     for r in csv.DictReader(open(totals, encoding="utf-8")):
         if r["lg"] != "NBA" or r["team"] not in franchise:
             continue
@@ -174,12 +481,15 @@ def build_nba(cache, nba_raw):
         g = num(r["g"]) or 0
         if g <= 0 or season < first_season or season > built:
             continue
+        rosters[(season, r["team"])][r["player_id"]] = r["player"]
         key = (r["player_id"], franchise[r["team"]], season // 10 * 10)
         a = agg.get(key)
         if a is None:
             a = agg[key] = defaultdict(float)
             a["seasons"] = set()
+            a["season_g"] = Counter()
         a["seasons"].add(season)
+        a["season_g"][season] += g
         a["g"] += g
         a["pts"] += num(r["pts"]) or 0.0
         mp = num(r["mp"])
@@ -221,6 +531,8 @@ def build_nba(cache, nba_raw):
                     a["rim_a"] += rim_a
                     a["rim_m"] += round(rim_a * p03) if rim_a else 0
 
+    numbers = nba_numbers(cache, rosters, franchise, first_season, built)
+
     lines = {}
     bad = []
     for t in main["teams"]:
@@ -236,6 +548,8 @@ def build_nba(cache, nba_raw):
                 bad.append((lid, (int(a["g"]), len(seas), seas[0], seas[-1]), tuple(p[7:11])))
             g = a["g"]
             ht, wt = body.get(p[13], (None, None))
+            worn = [(s, sg, numbers[(p[13], s, t["fr"])]) for s, sg in a["season_g"].items() if (p[13], s, t["fr"]) in numbers]
+            jersey = most_worn(worn, g)
             lines[lid] = [
                 rnd(ht, 0), rnd(wt, 0),
                 ratio(a["mp"], a["g_mp"], 1) if covered(a["g_mp"], g) else None,
@@ -249,6 +563,7 @@ def build_nba(cache, nba_raw):
                 ratio(a["tov"], a["g_tov"], 1) if covered(a["g_tov"], g) else None,
                 ratio(a["dunk_a"], a["sh_fga"]) if covered(a["g_sh"], g) else None,
                 ratio(a["rim_m"], a["rim_a"]) if covered(a["g_sh"], g) else None,
+                int(jersey) if jersey is not None else None,  # "00" is written 0: the field is a number
             ]
     return lines, bad
 
@@ -481,30 +796,17 @@ def build_nfl(nfl_raw):
         return n if later and register_franchise(p["latest_team"], later[-1][0]) == fr else None
 
     def line_number(pid, fr, a):
-        weight = Counter()
-        last_seen = {}
-        known = 0.0
         first = min(r["season"] for r in a["rows"])
         reg_n = register_number(pid, fr, first) if first < S.SPLIT else None
+        seasons = []
         for r in sorted(a["rows"], key=lambda r: r["season"]):
-            g = r["g"]
             if r["season"] >= S.SPLIT:
                 worn = numbers.get((pid, r["season"], fr))
-                if not worn:
-                    continue
-                total = sum(worn.values())
-                for n, c in worn.items():
-                    weight[n] += g * c / total
-                    last_seen[n] = r["season"]
-            elif reg_n is not None:
-                weight[reg_n] += g
-                last_seen[reg_n] = r["season"]
             else:
-                continue
-            known += g
-        if not weight or not covered(known, a["sum"]["g"]):
-            return None
-        return max(weight, key=lambda n: (round(weight[n], 6), last_seen[n]))
+                worn = Counter({reg_n: 1}) if reg_n is not None else None
+            if worn:
+                seasons.append((r["season"], r["g"], worn))
+        return most_worn(seasons, a["sum"]["g"])
 
     lines = {}
     bad = []
