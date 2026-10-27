@@ -171,6 +171,9 @@ export class FootballRenderer {
   private acts = new Map<number, string>();
   private playSeen: Play | null = null;
   private lastNow = 0;
+  /** an instant replay: the spot to look at, the camera pushed in a little */
+  replay: Pt | null = null;
+  private zoomK = 1;
   private lens!: Lens;
 
   constructor(
@@ -202,7 +205,7 @@ export class FootballRenderer {
 
   private perspAt(fx: number, fy: number): PCam {
     // the play's spot two thirds down the screen, the far stands under the scoreboard
-    return pcam(this.W, this.H, fx, fy, { row: 0.68, s: Math.max(11, this.W / 26), horizon: 0.13, pitch: 0.5, fov: 0.42 });
+    return pcam(this.W, this.H, fx, fy, { row: 0.68, s: Math.max(11, this.W / 26) * this.zoomK, horizon: 0.13, pitch: 0.5, fov: 0.42 });
   }
 
   private makeLens(): Lens {
@@ -228,6 +231,7 @@ export class FootballRenderer {
 
   /** where the camera wants to be: the ball (in the air, the man with it) and a bit downfield */
   private target(p: Play, aim: Pt | null): Pt {
+    if (this.replay) return { x: Math.max(12, Math.min(FIELD_W - 12, this.replay.x)), y: Math.min(this.replay.y + 2, 104) };
     const b = ballNow(p);
     const c = p.carrier ?? p.qb;
     const at = b ?? c;
@@ -416,6 +420,7 @@ export class FootballRenderer {
   draw(ctx: CanvasRenderingContext2D, p: Play, ballOn: number, o: FbOverlay) {
     ctx.imageSmoothingEnabled = false;
     // follow the play
+    this.zoomK += ((this.replay ? 1.3 : 1) - this.zoomK) * 0.08;
     const want = this.target(p, o.aim);
     if (!this.follow) this.follow = want;
     this.follow = { x: this.follow.x + (want.x - this.follow.x) * 0.08, y: this.follow.y + (want.y - this.follow.y) * 0.1 };

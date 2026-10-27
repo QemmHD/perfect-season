@@ -12,15 +12,25 @@ import { type Attrs, loadAttrs } from '../attrs';
 import { luma, rgb } from '../pixel/color';
 import type { FieldTheme } from '../pixel/field';
 import type { Progress, RivalLive } from '../progress';
+import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, fourthDown, pilot } from './autopilot';
 import { afterPlay, choices, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type Game, kick, kickWindow, newGame, type PlayChoice, punt, spotText, startChoice, startPlay } from './drive';
 import { CONCEPT_NAMES, FIELD_W, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
-import type { Defense, Offense, Play, Pt } from './types';
+import type { Body, Defense, Offense, Play, Pt } from './types';
 
 type Ui = 'loading' | 'pre' | 'fourth' | 'live' | 'after' | 'kick' | 'final';
+
+/** What a replay needs to redraw a moment of a play. */
+interface Snap {
+  bodies: Body[];
+  ball: Play['ball'];
+  carrier: number | null;
+  phase: Play['phase'];
+}
+const snapOf = (p: Play): Snap => ({ bodies: p.bodies.map((b) => ({ ...b, trail: [], route: b.route })), ball: p.ball ? { ...p.ball } : null, carrier: p.carrier ? p.carrier.id : null, phase: p.phase });
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
 
 const DT = 1 / 60;
@@ -127,6 +137,11 @@ export function Football2({
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const openRings = useMemo(() => gamesPlayed() < OPEN_RING_GAMES, []);
   const counted = useRef(false);
+  // instant replay: the last seconds of play, the highlight to show, the replay running
+  const rec = useRef(new Recorder<Snap>(6));
+  const highlight = useRef<{ t: number; x: number; y: number; before: number } | null>(null);
+  const replayRef = useRef<Replay<Snap> | null>(null);
+  const [replaying, setReplaying] = useState(false);
 
   const say = (text: string, tone: Tone, ms = 1200, sub?: string) => {
     const id = ++popId.current;
@@ -220,6 +235,7 @@ export function Football2({
       } else if (e.startsWith('move:')) sfx.select();
       else if (e.startsWith('beat:')) {
         const kind = e.slice(5);
+        if ((kind === 'truck' || kind === 'stiff') && p.carrier && !highlight.current) highlight.current = { t: p.t, x: p.carrier.x, y: p.carrier.y, before: REPLAY_BEFORE };
         vibrate([20, 30, 20]);
         crowd.swell(0.8);
         shake(kind === 'truck' ? 4 : 2);
@@ -229,6 +245,7 @@ export function Football2({
         crowd.swell(0.5);
         say('BROKE A TACKLE', 'good', 800);
       } else if (e === 'bighit') {
+        if (p.carrier) highlight.current = { t: p.t, x: p.carrier.x, y: p.carrier.y, before: REPLAY_BEFORE };
         // the hit lands in slow motion
         slowUntil.current = performance.now() + 750;
         shake(6);
@@ -290,7 +307,36 @@ export function Football2({
       say(e.text, 'plain', 1100);
     } else if (e.kind === 'sack') say(e.text, 'bad', 1300, gain);
     else say(gain, yds > 0 ? 'good' : 'plain', 1000, e.kind === 'out' ? 'OUT OF BOUNDS' : undefined);
-    nextUp(game, !!a.driveOver, a.points ? 2300 : a.driveOver ? 1900 : 1350);
+    if (a.points && yds >= 25 && !highlight.current) {
+      const c = p.carrier ?? p.catcher;
+      if (c) highlight.current = { t: p.t, x: c.x, y: c.y - 6, before: 2.4 };
+    }
+    const hl = highlight.current;
+    highlight.current = null;
+    if (hl && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) {
+      onProgress(progress(game));
+      window.setTimeout(() => startReplay(hl, () => nextUp(game, !!a.driveOver, 250)), a.points ? 1500 : 1100);
+    } else nextUp(game, !!a.driveOver, a.points ? 2300 : a.driveOver ? 1900 : 1350);
+  };
+
+  /** Play the highlight again, slower, from closer; then on with the drive. */
+  const startReplay = (hl: { t: number; x: number; y: number; before: number }, done: () => void) => {
+    const frames = rec.current.clip(hl.t - hl.before, hl.t + REPLAY_AFTER);
+    if (frames.length < 10) {
+      done();
+      return;
+    }
+    replayRef.current = { frames, t0: frames[0].t, t1: frames[frames.length - 1].t, start: performance.now(), speed: REPLAY_SPEED, focus: { a: hl.x, b: hl.y }, done };
+    renderer.replay = { x: hl.x, y: hl.y };
+    setReplaying(true);
+  };
+  const endReplay = () => {
+    const r = replayRef.current;
+    if (!r) return;
+    replayRef.current = null;
+    renderer.replay = null;
+    setReplaying(false);
+    r.done();
   };
 
   // fourth down: the field goal unit lines up, the meter decides it, the ball flies at the posts
@@ -460,10 +506,21 @@ export function Football2({
           }
         }
       } else acc = 0;
+      if (p && p.phase !== 'pre' && !replayRef.current) rec.current.push(p.t, snapOf(p));
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.flash = Math.max(0, fx.flash - elapsed * 1.8);
       const ctx = canvas.getContext('2d')!;
-      if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo, routes: p.phase === 'pre' && p.call === 'pass', open: openRings && !autoplayHook, shake: fx.shake, flash: fx.flash });
+      const rp = replayRef.current;
+      if (rp && p) {
+        const rt = replayTime(rp, now);
+        const sn = rt === null ? null : frameAt(rp.frames, rt);
+        if (rt === null || !sn) endReplay();
+        else {
+          const at = (b: Body) => sn.bodies[b.id];
+          const view: Play = { ...p, t: rt, bodies: sn.bodies, qb: at(p.qb), rb: at(p.rb), carrier: sn.carrier !== null ? sn.bodies[sn.carrier] : null, ball: sn.ball, phase: sn.phase };
+          renderer.draw(ctx, view, p.los, { aim: null, toGain: null, routes: false, open: false, shake: 0, flash: 0 });
+        }
+      } else if (p) renderer.draw(ctx, p, p.los, { aim: aimNow(p), toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo, routes: p.phase === 'pre' && p.call === 'pass', open: openRings && !autoplayHook, shake: fx.shake, flash: fx.flash });
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
@@ -609,6 +666,13 @@ export function Football2({
         </div>
       )}
       {hint && <div className="hg2-hint">{hint}</div>}
+      {replaying && (
+        <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
+          <i />
+          REPLAY
+          <small>TAP TO SKIP</small>
+        </button>
+      )}
       {ui === 'loading' && <div className="fg-loading">Taking the field…</div>}
       {float && (
         <div className="fb2-float" style={{ left: float.x, top: float.y }} aria-hidden="true">
