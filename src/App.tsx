@@ -24,6 +24,7 @@ import { Sheet, Toast, TopBar } from './ui/common';
 import { Transition } from './ui/motion';
 import { Draft, type OnlineProps } from './ui/Draft';
 import { type LbStatus, NameSheet, openBoardNext, openOnlineNext } from './ui/Leaderboard';
+import { AdminSheet } from './ui/Admin';
 import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, showGlobalRanks, type Tab, Tabs } from './ui/Pages';
 import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
@@ -158,7 +159,7 @@ export function App() {
   const [utReq, setUtReq] = useState<UtMatchRequest | null>(null);
   /** the run whose head-to-head game has been watched */
   const [watched, setWatched] = useState<number | null>(null);
-  const [modal, setModal] = useState<'settings' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'admin' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
@@ -1099,6 +1100,7 @@ export function App() {
           source={DATA_SOURCE}
           latest={LATEST_SEASON}
           onClose={() => setModal(null)}
+          onAdmin={() => setModal('admin')}
           onChange={(k, v) => update((p) => ({ ...p, settings: { ...p.settings, [k]: v } }))}
           onReset={() => {
             // keep your name, and your entries on the boards stay yours (in both sports)
@@ -1109,6 +1111,7 @@ export function App() {
           }}
         />
       )}
+      {modal === 'admin' && <AdminSheet profile={profile} update={update} onToast={showToast} onClose={() => setModal(null)} />}
       {modal === 'howto' && <HowToSheet onClose={() => setModal(null)} />}
       {modal === 'binder' && <Binder collection={profile.collection ?? {}} onClose={() => setModal(null)} />}
       {modal === 'fav' && <FavSheet first={favFirst.current} onClose={() => setModal(null)} />}

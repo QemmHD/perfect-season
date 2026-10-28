@@ -477,7 +477,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
   );
 }
 
-export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' | 'haptics' | 'hints', v: boolean) => void; onReset: () => void; onClose: () => void; source: string; latest: number }) {
+export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' | 'haptics' | 'hints', v: boolean) => void; onReset: () => void; onAdmin: () => void; onClose: () => void; source: string; latest: number }) {
   const [confirm, setConfirm] = useState(false);
   const [errs, setErrs] = useState(loggedErrors);
   const row = (k: 'sound' | 'haptics' | 'hints', label: string) => (
@@ -534,6 +534,9 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
           )}
           <button className="btn primary" onClick={() => close()}>
             DONE
+          </button>
+          <button className="ut-link settings-admin" onClick={() => close(props.onAdmin)}>
+            ADMIN
           </button>
         </>
       )}

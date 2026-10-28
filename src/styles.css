@@ -11290,3 +11290,58 @@ button.friendcard:active {
   font-size: 11px;
   word-break: break-word;
 }
+
+/* Settings: the way into the admin panel, quiet at the bottom */
+.settings-admin {
+  align-self: center;
+  color: var(--sub);
+}
+
+/* the admin panel */
+.admin {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.admin-pw {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-pw input,
+.admin-num {
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.admin-msg {
+  color: var(--red);
+  font-weight: 700;
+}
+.admin-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.admin-row .btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 12px;
+  font-size: 13px;
+}
+.admin-num {
+  flex: 2 1 120px;
+  min-width: 0;
+}
