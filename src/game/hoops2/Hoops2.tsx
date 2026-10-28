@@ -1,3 +1,4 @@
+import type { Practice } from '../../evolution/training';
 // Arcade basketball, the way it's played: your five on offense against the rival's five. Left thumb
 // on the stick moves the man with the ball; PASS throws to the man the stick points at (a lob to a
 // dunker on the cut); CROSS breaks down your man; hold SHOOT to rise and let go in the green.
@@ -65,6 +66,7 @@ export function Hoops2({
   rivalName,
   seed,
   possessions = POSSESSIONS,
+  practice,
   defIQ = 0,
   rival,
   ourKit,
@@ -85,6 +87,7 @@ export function Hoops2({
   rivalName: string;
   seed: string;
   possessions?: number;
+  practice?: Practice;
   /** how well the rival defends beyond its ratings (Squad Battles' difficulty; 0 standard) */
   defIQ?: number;
   rival: RivalLive | null;
@@ -131,7 +134,7 @@ export function Hoops2({
   const [look, setLook] = useState<{ scheme: Scheme; trapped: boolean } | null>(null);
   const popId = useRef(0);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [hint, setHint] = useState<string | null>('Stick: move, push it to the edge to sprint · flick ← → crossover · flick ↓ step-back · flick ↑ spin · hold SHOOT, let go in the green');
+  const [hint, setHint] = useState<string | null>(practice ? null : 'Stick: move, push it to the edge to sprint · flick ← → crossover · flick ↓ step-back · flick ↑ spin · hold SHOOT, let go in the green');
   const [wide, setWide] = useState(false);
   // instant replay: the last seconds of play, the highlight to show, the replay running
   const rec = useRef(new Recorder<Snap>(5));
@@ -153,6 +156,13 @@ export function Hoops2({
 
   const next = (g: HoopsGame) => {
     possRef.current = startPossession(g);
+    if (practice) {
+      const p = possRef.current, h = p.bodies[0];
+      const at = practice.drill === 'finish' ? {cx:RIM.cx-13,cz:0} : {cx:RIM.cx-24.5,cz:0};
+      Object.assign(h,at); h.home = {...at};
+      const d=p.bodies[5]; Object.assign(d,{cx:at.cx+7,cz:at.cz+2});
+      if (practice.drill === 'pass') {p.scheme='trap';p.events=['scheme:trap'];}
+    }
     const pl = pilotRef.current;
     pl.letGo = null;
     pl.driving = false;
@@ -272,6 +282,7 @@ export function Hoops2({
     const e = p.end!;
     const wasFire = game.fire;
     const mark = afterPossession(game, p);
+    if (practice) { const ls=p.lastShot; practice.onAttempt({points:e.points,success:e.kind==='make' && (practice.drill!=='pass'||p.passes>0),green:ls?.greened,offset:ls?Math.round(ls.off*250):undefined,contest:ls?.contest,detail:practice.drill==='pass' && !p.passes ? 'MOVE THE BALL FIRST' : e.text}); }
     const fx = fxRef.current;
     if (e.kind === 'make') {
       fx.swish = 1;

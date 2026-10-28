@@ -1,3 +1,4 @@
+import { saveWarning } from './recovery';
 import { NFL } from '../engine/sport';
 import type { Booster, BotLevel, Mode, Slot } from '../engine/types';
 import type { EntryContent } from '../net/leaderboard';
@@ -199,18 +200,20 @@ function loadFrom(p: Profile | null): Profile {
   }
 }
 
-export function saveProfile(p: Profile): void {
+export function saveProfile(p: Profile): boolean {
   try {
     if (!NFL) {
       localStorage.setItem(KEY, JSON.stringify(p));
-      return;
+      return true;
     }
     // the shared part goes back into the basketball profile, without touching basketball's own
     const base = read(KEY) ?? freshProfile();
     localStorage.setItem(KEY, JSON.stringify({ ...base, ...pick(p, SHARED, true) }));
     localStorage.setItem(NFL_KEY, JSON.stringify({ ...pick(p, SHARED, false), v: 1 }));
+    return true;
   } catch {
-    // storage blocked (private window, previews): the game still works for this session
+    saveWarning();
+    return false;
   }
 }
 

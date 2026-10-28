@@ -1,3 +1,4 @@
+import type { Practice } from '../../evolution/training';
 // Arcade football, Retro Bowl style: your offense against the rival's defense, eleven on eleven.
 // Before the snap pick one of three play cards (its routes are drawn on the field) and SNAP. On a
 // pass, drag back anywhere and let go to throw: the arc shows where it lands and who it's going to.
@@ -78,6 +79,7 @@ export function Football2({
   rivalName,
   seed,
   drives = DRIVES,
+  practice,
   defIQ = 0,
   rival,
   ourKit,
@@ -97,6 +99,7 @@ export function Football2({
   rivalName: string;
   seed: string;
   drives?: number;
+  practice?: Practice;
   /** how well the rival defends beyond its ratings (Squad Battles' difficulty; 0 standard) */
   defIQ?: number;
   rival: RivalLive | null;
@@ -176,7 +179,7 @@ export function Football2({
     window.setTimeout(() => setPop((p) => (p && p.id === id ? null : p)), ms);
   };
   const tip = (key: string, text: string) => {
-    if (autoplayHook || hinted.current.has(key)) return;
+    if (practice || autoplayHook || hinted.current.has(key)) return;
     hinted.current.add(key);
     setHint(text);
     window.setTimeout(() => setHint((h) => (h === text ? null : h)), 4200);
@@ -188,7 +191,8 @@ export function Football2({
 
   /** Line up the next snap: three play cards, the first lined up with its routes until you pick another. */
   const lineUpNext = (g: Game) => {
-    const cs = choices(g);
+    if (practice) {g.down=practice.drill==='kick'?4:1;g.toGo=10;g.ballOn=practice.drill==='kick'? Math.max(60,80-g.plays*2):25;g.clock=null;}
+    const cs = practice?.drill==='run' ? choices(g).filter(c=>c.call==='run') : practice?.drill==='throw' ? choices(g).filter(c=>c.call==='pass') : choices(g);
     const lined = cs.map((choice) => ({ choice, play: startChoice(g, choice) }));
     setOpts(lined);
     setPicked(0);
@@ -236,7 +240,7 @@ export function Football2({
         setUi('final');
         if (!counted.current) {
           counted.current = true;
-          countGame();
+          if (!practice) countGame();
         }
         onDone(progress(g));
         return;
@@ -310,6 +314,7 @@ export function Football2({
     setFloat(null);
     setPhase('dead');
     const a = afterPlay(game, e);
+    practice?.onAttempt({points:a.points,success:practice.drill==='run'?e.gain>=5:e.caught,yards:Math.round(e.gain),detail:e.text});
     setUi('after');
     if (a.fire === 'lit') {
       setFire(true);
@@ -433,6 +438,7 @@ export function Football2({
     window.setTimeout(() => setUi('after'), 450);
     window.setTimeout(() => {
       kick(game, aim);
+      practice?.onAttempt({points:good?3:0,success:good,detail:(good?'GOOD FROM ':'WIDE FROM ')+k.dist+' YARDS'});
       if (good) {
         sfx.cheer(1);
         crowd.swell(0.9);
@@ -469,7 +475,7 @@ export function Football2({
         snapNow();
       } else if (ui === 'fourth') {
         const d = fourthDown(game);
-        if (d === 'kick') startKick();
+        if (practice?.drill === 'kick' || d === 'kick') startKick();
         else if (d === 'punt') puntNow();
         else snapNow();
       } else if (ui === 'kick') kickNow();
@@ -782,7 +788,7 @@ export function Football2({
               {g.clock === 0 ? 'TIME’S UP · ' + fgDistance(g) + ' YD FIELD GOAL TO FINISH IT' : downText(g) + ' · ' + (fgOk ? fgDistance(g) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE')}
             </span>
           )}
-          {g.clock !== 0 && (
+          {g.clock !== 0 && practice?.drill !== 'kick' && (
             <div className="fb2-cards" role="radiogroup" aria-label="Pick a play">
               {opts.map((o, i) => (
                 <button key={i} className={'fb2-card ' + o.choice.call + (i === picked ? ' on' : '')} role="radio" aria-checked={i === picked} onClick={() => pick(i)}>
@@ -794,7 +800,7 @@ export function Football2({
             </div>
           )}
           <div className="fb2-btns">
-            {g.clock !== 0 && (
+            {g.clock !== 0 && practice?.drill !== 'kick' && (
               <button className="fb2-go snap" onClick={snapNow}>
                 {ui === 'fourth' ? 'GO FOR IT' : 'SNAP'}
               </button>
@@ -804,7 +810,7 @@ export function Football2({
                 KICK
               </button>
             )}
-            {ui === 'fourth' && g.clock !== 0 && (
+            {ui === 'fourth' && g.clock !== 0 && practice?.drill !== 'kick' && (
               <button className="fb2-go punt" onClick={puntNow}>
                 PUNT
               </button>

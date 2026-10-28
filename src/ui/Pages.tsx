@@ -1,3 +1,4 @@
+import { ArrowMark, DrillMark } from '../evolution/Marks';
 import React, { useEffect, useMemo, useState } from 'react';
 import { summarize } from '../engine/collection';
 import { BOOSTER_HELP, BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, levelInfo } from '../engine/economy';
@@ -113,6 +114,9 @@ export function HomePage(props: {
   gauntlet: { best: number; boss: string };
   /** open Ultimate Team (src/ut) */
   onUltimate?: () => void;
+  onTraining: () => void;
+  onResume: () => void;
+  checkpoint: {count: number; mode: string; screen: string; wins?: number; at: number} | null;
 }) {
   const [intro] = useState(() => !introPlayed);
   useEffect(() => {
@@ -199,6 +203,10 @@ export function HomePage(props: {
           <span className="ut-entry-go" aria-hidden="true">›</span>
         </button>
       )}
+      <div className="evo-home-actions">
+        {props.checkpoint && <button className="continue-card" onClick={props.onResume} aria-label="Continue saved run"><span className="continue-orbit" aria-hidden="true"><ArrowMark/></span><span><small className="eyebrow">YOUR RUN IS WAITING</small><b className="disp">PICK UP THE LEGACY</b><em>{props.checkpoint.screen === 'draft' ? props.checkpoint.count + '/' + ROUNDS + ' drafted' : props.checkpoint.wins + ' wins · ' + (props.checkpoint.screen === 'playoffs' ? 'Playoffs' : 'Season')} · {props.checkpoint.mode}</em></span><i>›</i></button>}
+        <button className="training-entry" onClick={props.onTraining}><span className="training-crosshair" aria-hidden="true"><DrillMark drill="shoot"/></span><span><b className="disp">TRAINING CAMP</b><small>Find your rhythm. Own the game.</small></span><i><ArrowMark/></i></button>
+      </div>
       <div className="modes" role="group" aria-label="Game mode">
         {MODES.map((m) => (
           <button key={m.key} className="mode" aria-pressed={p.mode === m.key} onClick={() => props.onMode(m.key)}>
@@ -477,7 +485,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
   );
 }
 
-export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' | 'haptics' | 'hints', v: boolean) => void; onReset: () => void; onAdmin: () => void; onClose: () => void; source: string; latest: number }) {
+export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' | 'haptics' | 'hints', v: boolean) => void; onReset: () => void; onLocker: () => void; onAdmin: () => void; onClose: () => void; source: string; latest: number }) {
   const [confirm, setConfirm] = useState(false);
   const [errs, setErrs] = useState(loggedErrors);
   const row = (k: 'sound' | 'haptics' | 'hints', label: string) => (
@@ -496,6 +504,7 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
             {row('haptics', 'Vibration')}
             {row('hints', 'Booster hints')}
           </div>
+          <button className="locker-entry" onClick={() => close(props.onLocker)}><span>◈</span><span><b className="disp">SAVE LOCKER</b><small>Back up. Switch phones. Keep your legacy.</small></span><i>›</i></button>
           {confirm ? (
             <div className="btnrow">
               <button className="btn" onClick={() => setConfirm(false)}>

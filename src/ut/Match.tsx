@@ -1,3 +1,6 @@
+import { Promotion } from './Rivals';
+import { divisionOf, rivalsOf } from './rivals';
+import { publishRivals } from './rivals-net';
 // Ultimate Team's played matches: Squad Battles against this week's AI ladder, and online head to
 // head against a squad near yours (by overall: within 3, wider by 2 every 10 seconds up to 10, then
 // an AI squad at your level steps in). The two squads become the arcade game's teams (teams.ts):
@@ -157,6 +160,7 @@ export default function UtMatch(props: {
   const [found, setFound] = useState<Found | null>(null);
   const [opp, setOpp] = useState<OppView | null>(null);
   const [out, setOut] = useState<Outcome | null>(null);
+  const [promotion,setPromotion] = useState<number|null>(null);
   const [week] = useState(() => weekOf(easternDateKey()));
   const connRef = useRef<MatchConn | null>(null);
   const oppRef = useRef(opp);
@@ -302,6 +306,7 @@ export default function UtMatch(props: {
     const d = decide(us.score, them.score, s.me.rating.raw, s.rival.rating.raw, s.online ? coin : () => true);
     const ut = profileRef.current.ut;
     const input = {
+      matchId: s.online?.matchId ?? 'ut-ai:'+req.id,
       won: d.won,
       us: us.score,
       them: them.score,
@@ -315,6 +320,9 @@ export default function UtMatch(props: {
       pay: s.rung && s.rung.i >= 0 ? s.level?.pay : undefined,
     };
     const shown = settle(ut, input);
+    const beforeDivision=divisionOf(rivalsOf(ut.rivals,week).points),afterDivision=divisionOf(rivalsOf(shown.ut.rivals,week).points);
+    if(s.online && afterDivision>beforeDivision) setPromotion(afterDivision);
+    if(s.online) void publishRivals({...profileRef.current,ut:shown.ut},week);
     props.update((p) => {
       const r = settle(p.ut, input);
       return { ...p, coins: p.coins + r.coins, ut: r.ut };
@@ -428,6 +436,7 @@ export default function UtMatch(props: {
       />
     );
 
+  if (promotion!==null && stage==='result') return <Promotion division={promotion} onDone={()=>setPromotion(null)}/>;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
   const title = req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
   return (

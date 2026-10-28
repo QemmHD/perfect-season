@@ -1,3 +1,4 @@
+import { rivalsOf, type RivalsState } from './rivals';
 // Ultimate Team: what the profile keeps, per sport (the basketball and football profiles each have
 // their own `ut`). Small and free of card data on purpose: the profile loads it on every launch,
 // while the cards themselves load only when the mode opens. See docs/ULTIMATE-TEAM.md.
@@ -14,6 +15,8 @@ export interface PendingPack {
 
 export interface UtState {
   v: 1;
+  rivals?: RivalsState;
+  settled?: string[];
   owned: OwnedCard[];
   /** the squad: slot id (PG, B1, QB, WR2, ...) to an owned card's uid */
   squad: Record<string, string>;
@@ -72,6 +75,8 @@ export function migrateUt(raw: unknown): UtState {
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
   return {
     v: 1,
+    ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),
+    ...(Array.isArray(r.settled) ? { settled: r.settled.filter(x => typeof x === 'string').slice(-1000) } : {}),
     owned,
     squad,
     packsOpened: Math.max(0, Math.round(num(r.packsOpened, 0))),

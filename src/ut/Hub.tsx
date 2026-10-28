@@ -30,6 +30,7 @@ export function PackArt({ kind, label, sport, small }: { kind: string; label: st
 }
 
 export function Hub(props: {
+  rivals?: React.ReactNode;
   sport: UtSport;
   club: ClubCard[];
   lineup: Lineup;
@@ -91,6 +92,7 @@ export function Hub(props: {
         </span>
       </button>
 
+      {props.rivals}
       <div className="ut-play">
         <button className="big shine" onClick={() => props.onPlay('ai')}>
           <span>Squad Battles</span>

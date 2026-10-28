@@ -1,3 +1,4 @@
+import { Rivals, RivalsTeaser } from './Rivals';
 // Ultimate Team: the mode's own screen, with its own tabs (hub, squad, club, store, challenges).
 // It keeps everything in the profile's `ut` (this sport's) and spends the profile's coins. The
 // card pool loads when the screen opens. App.tsx only routes here (screen 'ut').
@@ -36,7 +37,7 @@ export interface ClubCard {
   slot: string | null;
 }
 
-export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles';
+export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles' | 'rivals';
 
 /** the view to come back to after a match (the screen unmounts while it's played) */
 let lastView: UtView = 'hub';
@@ -278,10 +279,12 @@ export default function UltimateTeam(props: {
         }}
       />
     );
+  else if (view === 'rivals') body = <Rivals profile={profile} update={update} onToast={onToast} onPlay={() => { if (!ready) { onToast('Fill your starting squad first.'); go('squad'); return; } props.onPlaySquad?.({id:Date.now(),mode:'online'}); }} />;
   else if (view === 'sbc') body = <Challenges pool={pool} sbcs={sbcs} done={ut.sbc.done} club={club} day={day} onSubmit={submitSbc} onToast={onToast} />;
   else
     body = (
       <Hub
+        rivals={<RivalsTeaser profile={profile} onOpen={()=>go('rivals')}/>}
         sport={SPORT}
         club={club}
         lineup={lineup}
@@ -317,7 +320,7 @@ export default function UltimateTeam(props: {
         <button className="icon-btn pill-btn" onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go('hub'))} aria-label={view === 'hub' ? 'Leave Ultimate Team' : 'Back to the Ultimate Team home'}>
           <Back size={16} /> {view === 'hub' ? 'HOME' : 'UT'}
         </button>
-        <span className="ut-title disp">{view === 'hub' ? 'Ultimate Team' : view === 'battles' ? 'Squad Battles' : TABS.find((t) => t[0] === view)![1]}</span>
+        <span className="ut-title disp">{view === 'hub' ? 'Ultimate Team' : view === 'battles' ? 'Squad Battles' : view === 'rivals' ? 'Rivals' : TABS.find((t) => t[0] === view)![1]}</span>
         <CoinChip coins={profile.coins} />
       </div>
       <div className="ut-body">{body}</div>

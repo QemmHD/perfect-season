@@ -1,3 +1,7 @@
+import { clearCheckpoint, readCheckpoint, writeCheckpoint, SAVE_WARNING } from './lib/recovery';
+import { Recovery } from './evolution/Recovery';
+import { Training } from './evolution/Training';
+import './evolution/evolution.css';
 import React, { useEffect, useRef, useState } from 'react';
 import { DATA_SOURCE, LATEST_SEASON } from './engine/data';
 import { assignSlots, type DraftState } from './engine/draft';
@@ -47,7 +51,7 @@ import { Coin, Football, Hoop } from './ui/icons';
 import { Welcome } from './ui/Welcome';
 import type { UtMatchRequest } from './ut/play';
 
-type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet' | 'ut' | 'utmatch';
+type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet' | 'ut' | 'utmatch' | 'training';
 
 /**
  * A screen's code, fetched when it's first opened. If this build's files are gone (a newer build
@@ -78,6 +82,7 @@ const UltimateTeam = lazyScreen(() => import('./ut/UltimateTeam'));
 const UtMatch = lazyScreen(() => import('./ut/Match'));
 
 interface Run {
+  saveId?: string;
   id: number;
   mode: Mode;
   botLevel: BotLevel;
@@ -156,12 +161,16 @@ export function App() {
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
   const [tab, setTab] = useState<Tab>('home');
   const [screen, setScreen] = useState<Screen>('tab');
+  const [saved, setSaved] = useState(() => readCheckpoint<Run>());
   const [run, setRun] = useState<Run | null>(null);
+  const [locker, setLocker] = useState(false);
+  const [nextMode, setNextMode] = useState<Mode>('classic');
+  const [saveFailed, setSaveFailed] = useState(false);
   /** an Ultimate Team match: a Squad Battles rung or online head to head (src/ut/Match.tsx) */
   const [utReq, setUtReq] = useState<UtMatchRequest | null>(null);
   /** the run whose head-to-head game has been watched */
   const [watched, setWatched] = useState<number | null>(null);
-  const [modal, setModal] = useState<'settings' | 'admin' | 'admingift' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'admin' | 'admingift' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | 'replace' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
@@ -180,7 +189,23 @@ export function App() {
   const [gauntletAt, setGauntletAt] = useState<{ runId: number; week: string; ladder: PlayoffTeam[]; best: number } | null>(null);
   const needsName = NET_ON && !profile.name;
 
-  useEffect(() => saveProfile(profile), [profile]);
+  useEffect(() => {
+    const ok = saveProfile(profile);
+    if (!ok) setSaveFailed(true);
+    if (ok && saved?.run.saveId && profile.history.some((h) => h.id === saved.run.saveId)) {
+      clearCheckpoint();
+      setSaved(null);
+    }
+  }, [profile]);
+  useEffect(() => {
+    if (!run || run.mode === '1v1' || !run.draft || !['draft', 'reveal', 'playoffs'].includes(screen)) return;
+    if (writeCheckpoint(run, screen as 'draft' | 'reveal' | 'playoffs')) setSaved(readCheckpoint<Run>());
+  }, [run, screen]);
+  useEffect(() => {
+    const warn = () => setSaveFailed(true);
+    window.addEventListener(SAVE_WARNING, warn);
+    return () => window.removeEventListener(SAVE_WARNING, warn);
+  }, []);
   useEffect(() => {
     if (screen === 'draft') return;
     toastT.current.forEach(clearTimeout);
@@ -317,6 +342,23 @@ export function App() {
     return () => clearTimeout(t);
   }, [updateReady, screen, modal, needsName]);
 
+  // Rivals is an additive board. Retry its latest local record on reconnection/resume.
+  useEffect(() => {
+    let live = true;
+    const retry = () => {
+      if (!NET_ON || document.visibilityState !== 'visible' || !profileRef.current.ut.rivals) return;
+      void import('./ut/rivals-net').then((m) => live && m.publishRivals(profileRef.current, weekKey(easternDateKey())));
+    };
+    retry();
+    window.addEventListener('online', retry);
+    document.addEventListener('visibilitychange', retry);
+    return () => {
+      live = false;
+      window.removeEventListener('online', retry);
+      document.removeEventListener('visibilitychange', retry);
+    };
+  }, [profile.ut.rivals?.points, profile.ut.rivals?.w, profile.ut.rivals?.l]);
+
   // ---------- favorite teams ----------
 
   /** asked once on the home screen of a player who doesn't have them yet (new players pick them in Welcome) */
@@ -412,7 +454,7 @@ export function App() {
     runCounter.current += 1;
     const level = profile.botLevel;
     const botFirst = mode === '1v1' && (level === 'legend' || (level === 'pro' && Math.random() < 0.5));
-    setRun({ id: runCounter.current, mode, botLevel: level, botFirst, dailyKey, ranked: mode === 'daily' && !dailyDone });
+    setRun({ saveId: newId(), id: runCounter.current, mode, botLevel: level, botFirst, dailyKey, ranked: mode === 'daily' && !dailyDone });
     setScreen('draft');
     if (mode === '1v1')
       showToast(
@@ -427,6 +469,7 @@ export function App() {
   const roomRef = useRef(room);
   roomRef.current = room;
   const startRun = (mode: Mode = profile.mode) => {
+    if (saved && screen === 'tab' && mode !== '1v1') { setNextMode(mode); setModal('replace'); return; }
     if (mode === '1v1' && NET_ON) {
       sfx.click();
       setRoom(null);
@@ -539,6 +582,7 @@ export function App() {
   ) => {
     const draft = r.draft!;
     const p0 = profileRef.current;
+    if (r.saveId && p0.history.some(h => h.id === r.saveId)) { clearCheckpoint(); setSaved(null); setScreen('tab'); return; }
     const po = bracket ? playoffLine(bracket) : null;
     const oppName = r.online?.found.opp.name;
     const oppKey = r.online?.found.opp.pubkey;
@@ -574,7 +618,7 @@ export function App() {
     const review = draft.log?.length ? reviewDraft(draft.log, draft.lineup) : undefined;
     const par = r.mode === 'daily' && r.dailyKey ? dailyPar(r.dailyKey) : undefined;
     const record: RunRecord = {
-      id: newId(),
+      id: r.saveId ?? newId(),
       at: new Date().toISOString(),
       mode: r.mode,
       dailyKey: r.dailyKey ?? undefined,
@@ -823,6 +867,9 @@ export function App() {
   else
     page = (
       <HomePage
+        checkpoint={saved ? { count: saved.run.draft ? Object.values(saved.run.draft.lineup).filter(Boolean).length : 0, mode: saved.run.mode, screen: saved.screen, wins: saved.run.season?.wins, at: saved.at } : null}
+        onResume={() => { if (!saved) return; setRun(saved.run); runCounter.current = Math.max(runCounter.current,saved.run.id); setScreen(saved.screen); sfx.select(); }}
+        onTraining={() => { sfx.select(); setScreen('training'); }}
         gauntlet={{ best: gauntletBest, boss: ladder[ladder.length - 1].year + ' ' + ladder[ladder.length - 1].team }}
         profile={profile}
         dailyNo={dailyNo}
@@ -891,6 +938,9 @@ export function App() {
         }}
       />
     );
+  } else if (screen === 'training') {
+    viewId = 'training'; enter = 'up';
+    body = <Training profile={profile} autoplay={AUTOPLAY} onExit={() => goTab('home')} />;
   } else if (screen === 'ut') {
     viewId = 'ut';
     enter = 'up';
@@ -946,6 +996,8 @@ export function App() {
     body = (
       <Draft
         key={run.id}
+        initial={run.draft}
+        onCheckpoint={draft => setRun(r => r && r.draft !== draft ? { ...r, draft } : r)}
         mode={run.mode}
         botLevel={run.botLevel}
         botFirst={run.botFirst}
@@ -1108,17 +1160,23 @@ export function App() {
       <Transition id={viewId} enter={enter} exitMs={260}>
         {body}
       </Transition>
+      {saveFailed && <div className="save-warning" role="alert"><span>Progress isn’t saving on this phone.</span><button onClick={() => setLocker(true)}>BACK UP</button><button aria-label="Retry saving" onClick={() => { if(saveProfile(profile)){setSaveFailed(false); if(run?.draft && ['draft','reveal','playoffs'].includes(screen)) writeCheckpoint(run,screen as any);} }}>RETRY</button></div>}
+      {modal === 'replace' && <Sheet label="Start a new draft?" kind="center" onClose={()=>setModal(null)}>{close=><div className="save-locker"><h2 className="disp">START FRESH?</h2><p>A new solo draft replaces your unfinished run. Your cards, coins and completed records stay with you.</p><button className="btn gold" onClick={()=>{clearCheckpoint();setSaved(null);setModal(null);startDraft(nextMode);}}>START NEW DRAFT</button><button className="btn ghost" onClick={()=>close()}>KEEP MY RUN</button></div>}</Sheet>}
+      {locker && <Recovery onClose={() => setLocker(false)} />}
       {modal === 'settings' && (
         <SettingsSheet
           profile={profile}
           source={DATA_SOURCE}
           latest={LATEST_SEASON}
           onClose={() => setModal(null)}
+          onLocker={() => { setModal(null); setLocker(true); }}
           onAdmin={() => setModal('admin')}
           onChange={(k, v) => update((p) => ({ ...p, settings: { ...p.settings, [k]: v } }))}
           onReset={() => {
             // keep your name, and your entries on the boards stay yours (in both sports)
             setProfile({ ...freshProfile(), name: profile.name, lb: profile.lb, h2h: profile.h2h, streak: profile.streak, rewardDay: profile.rewardDay });
+            clearCheckpoint(); setSaved(null);
+            try { localStorage.removeItem('perfect-season:checkpoint:' + (NFL ? 'nba' : 'nfl')); } catch {}
             resetOtherSport();
             setModal(null);
             showToast('Progress erased.');
