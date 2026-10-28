@@ -20,23 +20,49 @@ export interface Pool {
 }
 
 export function buildPool(sport: UtSport, lines: CardLine[], byId?: Map<string, CardLine>): Pool {
+  const b = poolBuilder(sport, lines, byId);
+  for (const l of lines) b.add(l);
+  return b.done();
+}
+
+/** Rates the cards one at a time into a pool. */
+function poolBuilder(sport: UtSport, lines: CardLine[], byId?: Map<string, CardLine>) {
   const base = new Map<string, RatedCard>();
   const buckets: Pool['buckets'] = { bronze: {}, silver: {}, gold: {}, promo: {}, legend: {} };
   let h = 2166136261;
+  return {
+    add(l: CardLine) {
+      const rc = rateCard(l);
+      base.set(l.id, rc);
+      (buckets[rc.tier][l.pos[0]] ??= []).push(rc);
+      h = Math.imul(h ^ hashString(l.id + ':' + rc.ovr + ':' + rc.tier), 16777619) >>> 0;
+    },
+    done: (): Pool => ({ sport, lines, byId: byId ?? new Map(lines.map((l) => [l.id, l])), base, buckets, print: h.toString(36) }),
+  };
+}
+
+/**
+ * The same, a slice at a time with a breath between: rating twenty thousand cards takes a phone a
+ * couple of seconds, and the page shouldn't stand still that long.
+ */
+async function buildPoolInSlices(sport: UtSport, lines: CardLine[], byId?: Map<string, CardLine>): Promise<Pool> {
+  const b = poolBuilder(sport, lines, byId);
+  let t0 = performance.now();
   for (const l of lines) {
-    const rc = rateCard(l);
-    base.set(l.id, rc);
-    (buckets[rc.tier][l.pos[0]] ??= []).push(rc);
-    h = Math.imul(h ^ hashString(l.id + ':' + rc.ovr + ':' + rc.tier), 16777619) >>> 0;
+    b.add(l);
+    if (performance.now() - t0 > 12) {
+      await new Promise((r) => setTimeout(r, 0));
+      t0 = performance.now();
+    }
   }
-  return { sport, lines, byId: byId ?? new Map(lines.map((l) => [l.id, l])), base, buckets, print: h.toString(36) };
+  return b.done();
 }
 
 let cache: Promise<Pool> | null = null;
 
 /** This page's sport's pool (cached). */
 export function getPool(): Promise<Pool> {
-  cache ??= loadCards(SPORT).then((s) => buildPool(SPORT, s.lines, s.byId));
+  cache ??= loadCards(SPORT).then((s) => buildPoolInSlices(SPORT, s.lines, s.byId));
   // a failed load can be tried again
   cache.catch(() => (cache = null));
   return cache;

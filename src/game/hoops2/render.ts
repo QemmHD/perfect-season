@@ -347,9 +347,12 @@ export class HoopsRenderer {
     if (W === this.W && H === this.H) return;
     this.W = W;
     this.H = H;
+    // only the floor is drawn for a size: the players' drawings are keyed by their size on screen,
+    // so they stay and the old sizes age out. Nothing goes without its memory handed back: Safari
+    // slides its toolbar in and out as you tap near the bottom, resizing the game each time, and
+    // a page's canvases count against a cap (the game freezes past it) until they're freed
+    freeCanvas(this.floor?.canvas);
     this.floor = null;
-    this.sprites.clear();
-    this.last.clear();
     this.pc = this.camAt(this.focus.x, this.focus.y);
   }
 

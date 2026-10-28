@@ -9013,6 +9013,12 @@ button.friendcard:active {
   opacity: 0.32;
   animation: holo 5s linear infinite;
 }
+/* only a big card's foil moves: a grid of hundreds of moving blended layers is more than a phone
+   can composite (the page stalls); a small card's foil sits still where the sweep catches the light */
+.utc:not(.big) .utc-shine {
+  animation: none;
+  background-position: 62% 0;
+}
 .utc .tc-glare {
   z-index: 3;
 }
@@ -10167,6 +10173,11 @@ button.friendcard:active {
 }
 .ut-gridcard:active {
   transform: scale(0.95);
+}
+/* where the next page of the club comes in */
+.ut-more {
+  grid-column: 1 / -1;
+  height: 1px;
 }
 .ut-insquad {
   position: absolute;

@@ -6,6 +6,7 @@
 import { mix, type RGB, rgb } from './color';
 import { type CourtCam, type CourtTheme, drawCourt } from './court';
 import { drawField, FIELD_W, type FieldCam, type FieldTheme } from './field';
+import { freeCanvas } from './body';
 import { noise, PixBuf } from './pixbuf';
 
 export interface PCam {
@@ -153,7 +154,10 @@ export function fieldTexture(theme: FieldTheme): FieldTex {
   const x0 = cam.fx - cam.ax / k;
   const y0 = cam.fy + cam.ay / k;
   const { wall, wallW } = standsWall(28, 4, { pad: 1, ribbon: 1.75, facade: 10, facadeH: 1.5, roof: 25.5 }, { home: rgb(theme.homeC1), away: rgb(theme.awayC1), trim: rgb(theme.awayC2) });
-  return { lv: levels(canvas, k), x0, y0, dark: pack([18, 30, 20]), wallY: WALL_Y, wallH: 28, wallK: 4, wall, wallW, sky: skyRamp() };
+  const lv = levels(canvas, k);
+  // read into the texture: the canvas can go
+  freeCanvas(canvas);
+  return { lv, x0, y0, dark: pack([18, 30, 20]), wallY: WALL_Y, wallH: 28, wallK: 4, wall, wallW, sky: skyRamp() };
 }
 
 /** The court's far wall of stands, behind the basket (feet past midcourt) */
@@ -191,7 +195,9 @@ export function courtTexture(theme: CourtTheme): FieldTex {
   buf.put(canvas.getContext('2d')!);
   const home = rgb(theme.c1);
   const { wall, wallW } = standsWall(24, 3, { pad: 3, ribbon: 5.5, facade: 13, facadeH: 2, roof: 22 }, { home, away: home, trim: rgb(theme.c2) });
-  return { lv: levels(canvas, k), x0: -half, y0: top, dark: pack([14, 16, 24]), wallY: COURT_WALL, wallH: 24, wallK: 3, wall, wallW, sky: skyRamp() };
+  const lv = levels(canvas, k);
+  freeCanvas(canvas);
+  return { lv, x0: -half, y0: top, dark: pack([14, 16, 24]), wallY: COURT_WALL, wallH: 24, wallK: 3, wall, wallW, sky: skyRamp() };
 }
 
 /**

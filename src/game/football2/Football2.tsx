@@ -10,6 +10,7 @@ import { logError } from '../../lib/errlog';
 import { crowd, sfx, vibrate } from '../../lib/sound';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
+import { freeCanvas } from '../pixel/body';
 import { luma, rgb } from '../pixel/color';
 import type { FieldTheme } from '../pixel/field';
 import type { Progress, RivalLive } from '../progress';
@@ -122,7 +123,15 @@ export function Football2({
   }, []);
   const game = useMemo<Game | null>(() => (attrs ? newGame(offense ?? offenseOf(lineup!, attrs, seed), rivalDefense ?? defenseOf(rivalLineup!, attrs, 'def:' + seed), seed, drives, defIQ) : null), [attrs]);
   const renderer = useMemo(() => new FootballRenderer(field, [ourKit, theirKit]), []);
-  useEffect(() => () => renderer.dispose(), []);
+  // the game's drawings and its canvas let go of their memory as it closes (Safari counts a dropped
+  // canvas against the page's cap until it's collected, which can be a while)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    return () => {
+      renderer.dispose();
+      freeCanvas(canvas);
+    };
+  }, []);
   const playRef = useRef<Play | null>(null);
   const pilotRef = useRef(pilot(0.75, seed));
   const fxRef = useRef({ shake: 0, flash: 0 });

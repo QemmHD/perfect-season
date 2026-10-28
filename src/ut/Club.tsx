@@ -1,7 +1,7 @@
 // The club: every card you own. Filter by position, tier, team and decade; sort by overall, newest,
 // position or any rating (speed, three-point shot, dunk...); tap one for its details (and to
 // quick-sell it).
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SPORT } from '../engine/sport';
 import { Confirm } from '../ui/common';
 import { UtCard } from './CardArt';
@@ -20,6 +20,9 @@ const SORT_ATTRS: string[] =
   SPORT === 'nba' ? NBA_ATTRS.map(([c]) => c) : Array.from(new Set(['SPD', 'ACC', ...Object.values(NFL_KEYS).flatMap((ks) => ks.map(([c]) => c))]));
 type TierF = 'all' | 'bronze' | 'silver' | 'gold' | 'special';
 
+/** Cards put on the page at a time: more come as you scroll down to them. */
+const PAGE = 48;
+
 /** The filters stay as they were for the rest of the visit. */
 let saved: { pos: string; tier: TierF; team: string; dec: string; sort: Sort } = { pos: 'all', tier: 'all', team: 'all', dec: 'all', sort: 'ovr' };
 
@@ -31,6 +34,8 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
     setF(next);
   };
   const [sellDupes, setSellDupes] = useState(false);
+  const [shown, setShown] = useState(PAGE);
+  const moreRef = useRef<HTMLDivElement>(null);
   const teams = useMemo(() => {
     const m = new Map<string, string>();
     for (const c of club) m.set(c.rc.line.fr, c.rc.line.teamName);
@@ -64,6 +69,15 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
     return spare;
   }, [club]);
   const dupeCoins = dupes.reduce((a, c) => a + quickSellValue(c.rc), 0);
+  // a new filter or sort starts from the top; nearing the end of what's shown brings the next page
+  useEffect(() => setShown(PAGE), [f]);
+  useEffect(() => {
+    const el = moreRef.current;
+    if (!el || shown >= list.length || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && setShown((n) => n + PAGE), { rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [shown, list.length]);
   const byAttr = SORT_ATTRS.includes(f.sort);
   const filtered = f.pos !== 'all' || f.tier !== 'all' || f.team !== 'all' || f.dec !== 'all';
 
@@ -142,7 +156,7 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
       </div>
       {list.length ? (
         <div className="ut-grid">
-          {list.map((c) => (
+          {list.slice(0, typeof IntersectionObserver === 'undefined' ? list.length : shown).map((c) => (
             <button key={c.uid} className="ut-gridcard" onClick={() => onInspect(c.uid)} aria-label={c.rc.line.name + ', ' + c.rc.ovr + (c.slot ? ', in your squad at ' + c.slot : '')}>
               <UtCard rc={c.rc} w={80} level={c.oc.level} />
               {byAttr && c.rc.attrs[f.sort] !== undefined && (
@@ -153,6 +167,7 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
               {c.slot && <i className="ut-insquad">{c.slot}</i>}
             </button>
           ))}
+          {shown < list.length && <div ref={moreRef} className="ut-more" aria-hidden="true" />}
         </div>
       ) : (
         <div className="empty">{club.length ? 'No cards match these filters.' : 'No cards yet. Open your starter pack in the Store.'}</div>

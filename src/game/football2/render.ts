@@ -334,10 +334,14 @@ export class FootballRenderer {
     this.W = W;
     this.H = H;
     this.mode = W > H ? 'side' : 'end';
+    // the field and the floor are drawn for a size; the players' drawings are keyed by their size,
+    // so they stay. What goes is freed (Safari's toolbar resizes the game as you tap near the
+    // bottom, and a page's canvases count against a cap until they're freed)
+    freeCanvas(this.field?.canvas);
     this.field = null;
+    freeCanvas(this.floor?.canvas);
     this.floor = null;
     this.follow = null;
-    this.sprites.clear();
     if (this.mode === 'side') {
       this.side = fieldCam(W, H, FIELD_W / 2, 25);
       this.persp = null;

@@ -2,7 +2,7 @@
 // position, the team and season, and the player himself in pixel art: the same rigged body the
 // played games draw, in that season's team colors and his own number, drawn small and scaled up
 // with crisp pixels.
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, freeCanvas, hairFor, type Look } from '../game/pixel/body';
 import { celebrate, idle } from '../game/pixel/poses';
 import { useTilt } from '../ui/Card';
@@ -55,8 +55,47 @@ export function portraitUrl(line: CardLine, pose: 'stand' | 'cheer' = 'stand'): 
   } catch {
     url = '';
   }
-  if (portraits.size > 600) portraits.clear();
+  // the oldest go first (a Map keeps the order they came in)
+  if (portraits.size >= 1500) portraits.delete(portraits.keys().next().value!);
   portraits.set(k, url);
+  return url;
+}
+
+/**
+ * Portraits still to draw, a few a frame: a club of hundreds of cards fills in over a moment
+ * instead of holding the page up while every one is drawn (a phone took seconds).
+ */
+const todo: (() => void)[] = [];
+let pumping = false;
+function pump() {
+  const t0 = performance.now();
+  while (todo.length && performance.now() - t0 < 6) todo.shift()!();
+  if (todo.length) requestAnimationFrame(pump);
+  else pumping = false;
+}
+
+/** The portrait now when it's drawn already (or `now`), otherwise as soon as its turn comes. */
+function usePortrait(line: CardLine, pose: 'stand' | 'cheer', now: boolean): string | null {
+  const k = line.id + ':' + pose;
+  const [, redraw] = useState(0);
+  const have = portraits.get(k);
+  const url = have ?? (now ? portraitUrl(line, pose) : null);
+  useEffect(() => {
+    if (url !== null) return;
+    let live = true;
+    todo.push(() => {
+      if (!live) return;
+      portraitUrl(line, pose);
+      redraw((n) => n + 1);
+    });
+    if (!pumping) {
+      pumping = true;
+      requestAnimationFrame(pump);
+    }
+    return () => {
+      live = false;
+    };
+  }, [k, url === null]);
   return url;
 }
 
@@ -86,12 +125,15 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
   const { ref, handlers } = useTilt<HTMLSpanElement>(w > 150 ? 16 : 10);
   const l = rc.line;
   const name = plateName(l.name);
-  const src = portraitUrl(l, pose);
+  // a big card (the details, a pack's reveal) is drawn there and then; the small ones of a list
+  // or grid as their turn comes
+  const big = w >= 120;
+  const src = usePortrait(l, pose, big);
   return (
     <span
       ref={ref}
       {...(tilt ? handlers : {})}
-      className={'utc t-' + rc.tier + (attrs ? ' with-attrs' : '') + (w < 52 ? ' xs' : w < 70 ? ' sm' : '') + (name.length > 9 ? ' long' : '') + (className ? ' ' + className : '')}
+      className={'utc t-' + rc.tier + (big ? ' big' : '') + (attrs ? ' with-attrs' : '') + (w < 52 ? ' xs' : w < 70 ? ' sm' : '') + (name.length > 9 ? ' long' : '') + (className ? ' ' + className : '')}
       style={{ '--w': w + 'px', '--c1': l.c1, '--c2': l.c2 } as React.CSSProperties}
       role="img"
       aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + TIER_NAMES[rc.tier]}
