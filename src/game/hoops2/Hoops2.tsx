@@ -264,8 +264,11 @@ export function Hoops2({
     p.events.length = 0;
   };
 
+  /** the possession last booked: each is booked once, however it ended */
+  const booked = useRef<Possession | null>(null);
   const finish = (p: Possession) => {
-    if (!game) return;
+    if (!game || booked.current === p) return;
+    booked.current = p;
     const e = p.end!;
     const wasFire = game.fire;
     const mark = afterPossession(game, p);
@@ -393,6 +396,16 @@ export function Hoops2({
       last = now;
       // the posterizer in slow motion
       acc += now < slowUntil.current ? elapsed * 0.35 : elapsed;
+      // a play can end between the steps too: a crossover, a spin or a step-back stripped as you
+      // swipe it ends the possession in the swipe itself, and unbooked the game would wait on it
+      // forever (the court still drawn, the clock stopped)
+      if (p && p.end && booked.current !== p) {
+        try {
+          finish(p);
+        } catch (e) {
+          rescue(p, e);
+        }
+      }
       if (p && p.end) {
         // after the play: a posterized man still falls, the net still swings, the shooter lands
         const vis = now < slowUntil.current ? elapsed * 0.35 : elapsed;
