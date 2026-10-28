@@ -24,7 +24,8 @@ import { Sheet, Toast, TopBar } from './ui/common';
 import { Transition } from './ui/motion';
 import { Draft, type OnlineProps } from './ui/Draft';
 import { type LbStatus, NameSheet, openBoardNext, openOnlineNext } from './ui/Leaderboard';
-import { AdminSheet } from './ui/Admin';
+import { type Gift, watchGifts } from './net/gifts';
+import { AdminSheet, giftText, withGift } from './ui/Admin';
 import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, showGlobalRanks, type Tab, Tabs } from './ui/Pages';
 import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
@@ -133,6 +134,7 @@ function playoffLine(bracket: Series[]): { text: string; title: boolean; perfect
 /** A head-to-head result against a real player, all-time and this week. */
 /** A thank-you to everyone testing the game: these coins once, for players already here and new ones. */
 const TESTER_GIFT = { id: 'testers-2026-10', coins: 9000 };
+const GIFT_HAS_PACKS = (g: Gift) => Object.values(g.packs).some((n) => (n ?? 0) > 0);
 
 function addH2H(h: H2HStats, won: boolean, week: string): H2HStats {
   const b = h.week === week ? h : { ...h, week, ww: 0, wl: 0, wstreak: 0 };
@@ -159,7 +161,7 @@ export function App() {
   const [utReq, setUtReq] = useState<UtMatchRequest | null>(null);
   /** the run whose head-to-head game has been watched */
   const [watched, setWatched] = useState<number | null>(null);
-  const [modal, setModal] = useState<'settings' | 'admin' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'admin' | 'admingift' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
@@ -341,6 +343,18 @@ export function App() {
   }, [needsName, screen, modal, giftPending]);
   const collectGift = () =>
     update((p) => ((p.gifts ?? []).includes(TESTER_GIFT.id) ? p : { ...p, coins: p.coins + TESTER_GIFT.coins, gifts: [...(p.gifts ?? []), TESTER_GIFT.id] }));
+
+  // ---------- gifts from the admin (src/net/gifts.ts): each collected once, shown between games ----------
+
+  const [adminGifts, setAdminGifts] = useState<Gift[]>([]);
+  useEffect(() => watchGifts((g) => setAdminGifts((q) => (q.some((x) => x.id === g.id) ? q : [...q, g]))), []);
+  const adminGift = adminGifts.find((g) => !(profile.gifts ?? []).includes(g.id)) ?? null;
+  useEffect(() => {
+    if (needsName || screen !== 'tab' || modal || !adminGift) return;
+    const t = window.setTimeout(() => setModal('admingift'), 500);
+    return () => clearTimeout(t);
+  }, [needsName, screen, modal, adminGift?.id]);
+  const collectAdminGift = (g: Gift) => update((p) => withGift(p, g, g.id));
 
   // ---------- daily reward and missions ----------
 
@@ -1112,6 +1126,32 @@ export function App() {
         />
       )}
       {modal === 'admin' && <AdminSheet profile={profile} update={update} onToast={showToast} onClose={() => setModal(null)} />}
+      {modal === 'admingift' && adminGift && (
+        <Sheet label="A gift for you" kind="center" onClose={() => (collectAdminGift(adminGift), setModal(null))}>
+          {(close) => (
+            <div className="gift">
+              <span className="eyebrow wide">A gift from Perfect Season</span>
+              <h2 className="disp">{giftText(adminGift)}</h2>
+              <span className="gift-coin" aria-hidden="true">
+                <Coin size={44} />
+              </span>
+              {adminGift.note && <p>{adminGift.note}</p>}
+              {GIFT_HAS_PACKS(adminGift) && <p className="note">The packs are waiting in Ultimate Team’s Store.</p>}
+              <button
+                className="btn gold"
+                onClick={() => {
+                  sfx.coin();
+                  vibrate([20, 30, 20]);
+                  collectAdminGift(adminGift);
+                  close(() => setModal(null));
+                }}
+              >
+                COLLECT
+              </button>
+            </div>
+          )}
+        </Sheet>
+      )}
       {modal === 'howto' && <HowToSheet onClose={() => setModal(null)} />}
       {modal === 'binder' && <Binder collection={profile.collection ?? {}} onClose={() => setModal(null)} />}
       {modal === 'fav' && <FavSheet first={favFirst.current} onClose={() => setModal(null)} />}
