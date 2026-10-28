@@ -4,6 +4,7 @@ import { rivalsOf, type RivalsState } from './rivals';
 // while the cards themselves load only when the mode opens. See docs/ULTIMATE-TEAM.md.
 import { type Level, levelOf } from './battles';
 import type { OwnedCard } from './types';
+import { organizeStorage } from './storage';
 
 /** A pack waiting to be opened (a challenge reward, the starter). */
 export interface PendingPack {
@@ -18,6 +19,8 @@ export interface UtState {
   rivals?: RivalsState;
   settled?: string[];
   owned: OwnedCard[];
+  /** UIDs of spare exact-edition copies. All cards remain in `owned` for original-build restores. */
+  duplicateStorage?: string[];
   /** the squad: slot id (PG, B1, QB, WR2, ...) to an owned card's uid */
   squad: Record<string, string>;
   packsOpened: number;
@@ -39,7 +42,7 @@ export interface UtState {
 }
 
 export function freshUt(): UtState {
-  return { v: 1, owned: [], squad: {}, packsOpened: 0, starterClaimed: false, sbc: { done: {} }, packs: [], sold: { cards: 0, coins: 0 }, battles: { week: '', cleared: 0, best: 0 }, record: { w: 0, l: 0, h2hW: 0, h2hL: 0 }, paid: { day: '', n: 0 } };
+  return { v: 1, owned: [], duplicateStorage: [], squad: {}, packsOpened: 0, starterClaimed: false, sbc: { done: {} }, packs: [], sold: { cards: 0, coins: 0 }, battles: { week: '', cleared: 0, best: 0 }, record: { w: 0, l: 0, h2hW: 0, h2hL: 0 }, paid: { day: '', n: 0 } };
 }
 
 const num = (x: unknown, d: number): number => (typeof x === 'number' && Number.isFinite(x) ? x : d);
@@ -73,11 +76,12 @@ export function migrateUt(raw: unknown): UtState {
   const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL', unknown>> | undefined;
   const paid = r.paid as { day?: unknown; n?: unknown } | undefined;
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
-  return {
+  return organizeStorage({
     v: 1,
     ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),
     ...(Array.isArray(r.settled) ? { settled: r.settled.filter(x => typeof x === 'string').slice(-1000) } : {}),
     owned,
+    duplicateStorage: Array.isArray(r.duplicateStorage) ? r.duplicateStorage.filter((uid): uid is string => typeof uid === 'string' && seen.has(uid)) : [],
     squad,
     packsOpened: Math.max(0, Math.round(num(r.packsOpened, 0))),
     starterClaimed: r.starterClaimed === true,
@@ -87,7 +91,7 @@ export function migrateUt(raw: unknown): UtState {
     battles: { week: typeof bt?.week === 'string' ? bt.week : '', cleared: Math.min(8, count(bt?.cleared)), best: Math.min(8, count(bt?.best)), ...(count(bt?.round) ? { round: count(bt?.round) } : {}), ...(bt?.level ? { level: levelOf(bt.level) } : {}) },
     record: { w: count(rec?.w), l: count(rec?.l), h2hW: count(rec?.h2hW), h2hL: count(rec?.h2hL) },
     paid: { day: typeof paid?.day === 'string' ? paid.day : '', n: count(paid?.n) },
-  };
+  });
 }
 
 // ---------- upgrades ----------

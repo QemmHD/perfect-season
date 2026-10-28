@@ -22,10 +22,12 @@ import { openPack, packDefs, packName, quickSellValue } from './packs';
 import type { PlaySquad } from './play';
 import { getPool, type Pool, ratedOf } from './pool';
 import { battlesThisWeek } from './battles';
-import { rewardCard, type Sbc, sbcsFor, weekOf } from './sbc';
+import { checkSbc, rewardCard, type Sbc, sbcsFor, weekOf } from './sbc';
 import { autoBuild, canPlay, type Lineup, rateSquad, slotsFor, startersComplete } from './squad';
 import { SquadView } from './SquadView';
 import type { UtState } from './state';
+import { organizeStorage, removeCards, storedCards, useStoredCopy } from './storage';
+import './storage.css';
 import { Store } from './Store';
 import type { OwnedCard, RatedCard } from './types';
 
@@ -35,6 +37,7 @@ export interface ClubCard {
   oc: OwnedCard;
   rc: RatedCard;
   slot: string | null;
+  storage?: boolean;
 }
 
 export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles' | 'rivals';
@@ -55,6 +58,7 @@ export interface Opening {
   title: string;
   kind: string;
   cards: { uid: string; rc: RatedCard }[];
+  stored?: number;
 }
 
 export default function UltimateTeam(props: {
@@ -75,6 +79,7 @@ export default function UltimateTeam(props: {
     setViewNow(v);
   };
   const [opening, setOpening] = useState<Opening | null>(null);
+  const [showStorage, setShowStorage] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
   const busy = useRef(false);
   const [day] = useState(() => easternDateKey());
@@ -94,19 +99,29 @@ export default function UltimateTeam(props: {
   const club: ClubCard[] = useMemo(() => {
     if (!pool) return [];
     const out: ClubCard[] = [];
+    const stored = new Set(ut.duplicateStorage ?? []);
     for (const oc of ut.owned) {
+      if (stored.has(oc.uid)) continue;
       const rc = ratedOf(pool, oc);
       if (rc) out.push({ uid: oc.uid, oc, rc, slot: slotOf.get(oc.uid) ?? null });
     }
     return out;
-  }, [pool, ut.owned, slotOf]);
-  const byUid = useMemo(() => new Map(club.map((c) => [c.uid, c])), [club]);
+  }, [pool, ut.owned, ut.duplicateStorage, slotOf]);
+  const stored: ClubCard[] = useMemo(() => {
+    if (!pool) return [];
+    return storedCards(ut).flatMap(oc => {
+      const rc = ratedOf(pool, oc);
+      return rc ? [{ uid: oc.uid, oc, rc, slot: null, storage: true }] : [];
+    });
+  }, [pool, ut.owned, ut.duplicateStorage]);
+  const inventory = useMemo(() => [...club, ...stored], [club, stored]);
+  const byUid = useMemo(() => new Map(inventory.map((c) => [c.uid, c])), [inventory]);
   const lineup: Lineup = useMemo(() => Object.fromEntries(Object.entries(ut.squad).map(([s, u]) => [s, byUid.get(u)?.rc ?? null])), [ut.squad, byUid]);
   const rating = useMemo(() => rateSquad(SPORT, lineup), [lineup]);
   const sbcs = useMemo(() => (pool ? sbcsFor(pool, day, ut.sbc.done) : []), [pool, day, ut.sbc.done]);
   const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
 
-  const setUt = (fn: (u: UtState) => UtState) => update((p) => ({ ...p, ut: fn(p.ut) }));
+  const setUt = (fn: (u: UtState) => UtState) => update((p) => ({ ...p, ut: organizeStorage(fn(p.ut)) }));
 
   const go = (v: UtView) => {
     if (v === view) return;
@@ -127,13 +142,18 @@ export default function UltimateTeam(props: {
     const at = Date.now();
     const tag = seed.replace(/[^a-z0-9]/gi, '').slice(0, 10);
     const owned: OwnedCard[] = cards.map((rc, i) => ({ uid: tag + '-' + i, cardId: rc.line.id, level: 1, xp: 0, at: at + i }));
-    const empty = fill && !Object.keys(ut.squad).length;
-    const squad = empty ? autoBuild(SPORT, [...club.map((c) => ({ uid: c.uid, rc: c.rc })), ...owned.map((o, i) => ({ uid: o.uid, rc: cards[i] }))]) : null;
     update((p) => {
-      const q = { ...p, ut: { ...p.ut, owned: [...p.ut.owned, ...owned], packsOpened: p.ut.packsOpened + 1, ...(squad && !Object.keys(p.ut.squad).length ? { squad } : {}) } };
+      const deposited = organizeStorage(p.ut, owned);
+      const empty = fill && !Object.keys(deposited.squad).length;
+      const squad = empty ? autoBuild(SPORT, deposited.owned.filter(oc => !deposited.duplicateStorage?.includes(oc.uid)).flatMap(oc => {
+        const rc = ratedOf(pool, oc);
+        return rc ? [{ uid: oc.uid, rc }] : [];
+      })) : deposited.squad;
+      const q = { ...p, ut: { ...deposited, squad, packsOpened: p.ut.packsOpened + 1 } };
       return also ? also(q) : q;
     });
-    setOpening({ id: seed, title, kind, cards: cards.map((rc, i) => ({ uid: owned[i].uid, rc })) });
+    const stored = new Set(organizeStorage(ut, owned).duplicateStorage);
+    setOpening({ id: seed, title, kind, stored: owned.filter(c => stored.has(c.uid)).length, cards: cards.map((rc, i) => ({ uid: owned[i].uid, rc })) });
   };
 
   const buy = (kind: string, price: number) => {
@@ -163,20 +183,24 @@ export default function UltimateTeam(props: {
   // ---------- the club ----------
 
   const quickSell = (uids: string[]) => {
-    const cards = uids.map((u) => byUid.get(u)).filter((c): c is ClubCard => !!c);
+    const cards = [...new Set(uids)].map((u) => byUid.get(u)).filter((c): c is ClubCard => !!c);
     if (!cards.length) return;
     const coins = cards.reduce((a, c) => a + quickSellValue(c.rc), 0);
     const gone = new Set(cards.map((c) => c.uid));
-    update((p) => ({
-      ...p,
-      coins: p.coins + coins,
-      ut: {
-        ...p.ut,
-        owned: p.ut.owned.filter((o) => !gone.has(o.uid)),
-        squad: Object.fromEntries(Object.entries(p.ut.squad).filter(([, u]) => !gone.has(u))),
-        sold: { cards: p.ut.sold.cards + cards.length, coins: p.ut.sold.coins + coins },
-      },
-    }));
+    update((p) => {
+      const current = new Set(p.ut.owned.map(c => c.uid));
+      const sold = cards.filter(c => current.has(c.uid));
+      if (!sold.length) return p;
+      const proceeds = sold.reduce((sum, c) => sum + quickSellValue(c.rc), 0);
+      return {
+        ...p,
+        coins: p.coins + proceeds,
+        ut: {
+          ...removeCards(p.ut, gone),
+          sold: { cards: p.ut.sold.cards + sold.length, coins: p.ut.sold.coins + proceeds },
+        },
+      };
+    });
     sfx.coin();
     onToast('Sold ' + (cards.length === 1 ? cards[0].rc.line.name : cards.length + ' cards') + ' for ' + coins.toLocaleString('en-US') + ' coins.');
   };
@@ -208,12 +232,16 @@ export default function UltimateTeam(props: {
 
   const submitSbc = (s: Sbc, uids: string[]) => {
     if (!pool || ut.sbc.done[s.id]) return;
+    const selected = uids.map(uid => byUid.get(uid));
+    if (new Set(uids).size !== uids.length || selected.some(c => !c) || !checkSbc(s, selected.map(c => c!.rc)).ok) return;
     const gone = new Set(uids);
     const week = weekOf(day);
     const rc = s.reward.card ? rewardCard(pool, s.reward.card) : null;
     const prize: OwnedCard | null = rc ? { uid: 'sbc' + newId().replace(/-/g, '').slice(0, 8), cardId: rc.line.id, level: 1, xp: 0, at: Date.now() } : null;
     const pack = s.reward.pack ? { id: newId(), kind: s.reward.pack, at: Date.now() } : null;
     update((p) => {
+      const current = new Set(p.ut.owned.map(c => c.uid));
+      if (p.ut.sbc.done[s.id] || uids.some(uid => !current.has(uid))) return p;
       // only this day's and week's challenges need remembering
       const done = Object.fromEntries(Object.entries(p.ut.sbc.done).filter(([k]) => k.includes(day) || k.includes(week)));
       done[s.id] = Date.now();
@@ -221,9 +249,7 @@ export default function UltimateTeam(props: {
         ...p,
         coins: p.coins + (s.reward.coins ?? 0),
         ut: {
-          ...p.ut,
-          owned: [...p.ut.owned.filter((o) => !gone.has(o.uid)), ...(prize ? [prize] : [])],
-          squad: Object.fromEntries(Object.entries(p.ut.squad).filter(([, u]) => !gone.has(u))),
+          ...organizeStorage(removeCards(p.ut, gone), prize ? [prize] : []),
           sbc: { done },
           packs: pack ? [...p.ut.packs, pack] : p.ut.packs,
         },
@@ -257,7 +283,13 @@ export default function UltimateTeam(props: {
       </div>
     );
   else if (view === 'squad') body = <SquadView pool={pool} club={club} lineup={lineup} squad={ut.squad} rating={rating} onSlot={setSlot} onSquad={setSquad} onInspect={setDetail} onToast={onToast} />;
-  else if (view === 'club') body = <Club club={club} onInspect={setDetail} onSell={quickSell} />;
+  else if (view === 'club') body = <div className="ut-collection-shell">
+    <div className="ut-storage-tabs" role="group" aria-label="Card location">
+      <button aria-pressed={!showStorage} onClick={() => setShowStorage(false)}>CLUB <b className="num">{club.length}</b></button>
+      <button aria-pressed={showStorage} onClick={() => setShowStorage(true)}>DUPLICATE STORAGE <b className="num">{stored.length}</b></button>
+    </div>
+    <Club key={showStorage ? 'storage' : 'club'} club={showStorage ? stored : club} storage={showStorage} onInspect={setDetail} onSell={quickSell} />
+  </div>;
   else if (view === 'store')
     body = <Store sport={SPORT} coins={profile.coins} starter={!ut.starterClaimed} pending={ut.packs} defs={packDefs(SPORT)} onBuy={buy} onStarter={claimStarter} onPending={openPending} />;
   else if (view === 'battles')
@@ -280,7 +312,7 @@ export default function UltimateTeam(props: {
       />
     );
   else if (view === 'rivals') body = <Rivals profile={profile} update={update} onToast={onToast} onPlay={() => { if (!ready) { onToast('Fill your starting squad first.'); go('squad'); return; } props.onPlaySquad?.({id:Date.now(),mode:'online'}); }} />;
-  else if (view === 'sbc') body = <Challenges pool={pool} sbcs={sbcs} done={ut.sbc.done} club={club} day={day} onSubmit={submitSbc} onToast={onToast} />;
+  else if (view === 'sbc') body = <Challenges pool={pool} sbcs={sbcs} done={ut.sbc.done} club={inventory} day={day} onSubmit={submitSbc} onToast={onToast} />;
   else
     body = (
       <Hub
@@ -334,7 +366,11 @@ export default function UltimateTeam(props: {
           </button>
         ))}
       </nav>
-      {detailCard && <CardDetail cc={detailCard} sport={SPORT} onSell={() => quickSell([detailCard.uid])} onClose={() => setDetail(null)} />}
+      {detailCard && <CardDetail cc={detailCard} sport={SPORT} onUse={detailCard.storage ? () => {
+        setUt(u => useStoredCopy(u, detailCard.uid));
+        setDetail(null);
+        onToast('Copy moved to your club. Your other copy is safe in Duplicate Storage.');
+      } : undefined} onSell={() => quickSell([detailCard.uid])} onClose={() => setDetail(null)} />}
       {opening && (
         <PackOpening
           key={opening.id}

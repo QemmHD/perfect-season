@@ -90,7 +90,7 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
   const upgrades = props.sbcs.filter((s) => s.kind === 'upgrade');
   return (
     <div className="page ut-sbcs">
-      <p className="lead ut-sbc-lead">Trade in cards that meet the requirements. Everyone gets the same challenges.</p>
+      <p className="lead ut-sbc-lead">Trade in cards that meet the requirements. Everyone gets the same challenges. Duplicate Storage cards are available here and auto-fill prefers equally valued spares.</p>
       <div className="ut-sbc-group">
         <span className="eyebrow">Daily{left[0] ? ' · new in ' + left[0] : ''}</span>
         {daily.map((s) => (
@@ -246,7 +246,7 @@ function SbcPicker({ s, club, taken, current, teamOvr, onPick, onClose }: { s: S
     .filter((c) => !taken.includes(c.uid) && !takenPids.has(c.rc.line.pid))
     .filter((c) => !fits || s.reqs.every((r) => cardFits(r, c.rc, s.size)))
     // cheapest first: these cards are leaving; squad cards last
-    .sort((a, b) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || quickSellValue(a.rc) - quickSellValue(b.rc) || a.rc.ovr - b.rc.ovr)
+    .sort((a, b) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || Number(!!b.storage) - Number(!!a.storage) || quickSellValue(a.rc) - quickSellValue(b.rc) || a.rc.ovr - b.rc.ovr)
     .slice(0, 100);
   return (
     <Sheet label="Pick a card" kind="bottom" onClose={onClose}>
@@ -274,7 +274,7 @@ function SbcPicker({ s, club, taken, current, teamOvr, onPick, onClose }: { s: S
                     <b>{c.rc.line.name}</b>
                     <small>
                       {c.rc.line.pos.join('/')} · {seasonText(c.rc.line)} {c.rc.line.abbr}
-                      {c.slot ? ' · in squad at ' + c.slot : ''}
+                      {c.storage ? ' · Duplicate Storage' : c.slot ? ' · in squad at ' + c.slot : ''}
                     </small>
                   </span>
                   <span className="ut-pickrow-nums">

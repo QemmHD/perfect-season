@@ -86,7 +86,7 @@ function Bar({ v }: { v: number }) {
   );
 }
 
-export function CardDetail({ cc, sport, onSell, onClose }: { cc: ClubCard; sport: UtSport; onSell: () => void; onClose: () => void }) {
+export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard; sport: UtSport; onUse?: () => void; onSell: () => void; onClose: () => void }) {
   const [selling, setSelling] = useState(false);
   const { rc, oc } = cc;
   const l = rc.line;
@@ -123,6 +123,7 @@ export function CardDetail({ cc, sport, onSell, onClose }: { cc: ClubCard; sport
                     ))}
                   </span>
                 )}
+                {cc.storage && <span className="ut-detail-slot">In Duplicate Storage · Level {oc.level}</span>}
                 {cc.slot && <span className="ut-detail-slot">In your squad · {cc.slot}</span>}
               </div>
             </div>
@@ -203,6 +204,7 @@ export function CardDetail({ cc, sport, onSell, onClose }: { cc: ClubCard; sport
               ))}
             </div>
 
+            {onUse && <button className="btn primary" onClick={() => close(onUse)}>USE THIS COPY IN CLUB</button>}
             <div className="btnrow ut-detail-btns">
               <button className="btn" onClick={() => close()}>
                 CLOSE

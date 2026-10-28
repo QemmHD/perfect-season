@@ -38,6 +38,16 @@ The protocol, queue identifiers, existing leaderboard payloads and scoring data 
 
 ## Validation and remaining release checks
 
+### Duplicate Storage
+
+Club now has Club / Duplicate Storage tabs. Existing exact-edition extras and future duplicate pack/SBC pulls are stored automatically. Different seasons and card editions remain separate club cards. The existing equipped copy stays in place; a legacy squad using two identical copies keeps both. Among unequipped copies on the first migration, the highest level and XP stays in the club.
+
+Storage copies retain their UID, level, XP and packed time. They can be inspected, exchanged with the club copy (including its squad slot), quick-sold individually or in bulk with confirmation, and used directly in SBCs. SBC auto-fill prefers equally valued stored copies after protecting the playing squad; it does not prefer an expensive spare over cheaper eligible cards. Selling or submitting the club copy promotes an available spare back into the club.
+
+`ut.owned` remains the canonical list of **all** cards. The optional `ut.duplicateStorage` contains only UIDs controlling their location in the new UI. This intentionally preserves compatibility with the original restore build, which reads `owned` and ignores the new marker. No automatic quick-sells, new storage capacity limit, wallet reset or profile-version change is introduced. Save Locker exports both the canonical cards and the storage marker.
+
+The live game's networking remains Nostr (`src/net/nostr.ts`, `leaderboard.ts`, `match.ts`, `gifts.ts`). Supabase is a proposed separate registry for future globally numbered cards; it is not used by the existing game and is not a dependency of Duplicate Storage.
+
 Automated coverage includes original-save round trips, encrypted backup round trips and wrong-password rejection, solo checkpoint round trips, unchanged old UT migration, duplicate match/reward prevention, AI exclusion, promotion/demotion, weekly rollover, and namespaced leaderboard filtering.
 
 Chromium browser checks use copied/local test profiles, a test namespace and a localhost relay override. They exercise draft → reload → identical resume, manual shot input, ten-attempt NBA and NFL drill completion, starter packs, Rivals rewards, encrypted file download and restore preview. Preview leaderboard standings use a local fixture, not live-player data.

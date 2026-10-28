@@ -37,6 +37,8 @@ describe('original-player compatibility', () => {
         at: 1,
       },
     ];
+    p.ut.owned.push({ ...p.ut.owned[0], uid: 'spare-1', level: 2, xp: 12 });
+    p.ut.duplicateStorage = ['spare-1'];
     p.ut.squad = { SG: 'owned-1' };
     p.ut.packs = [{ id: 'earned', kind: 'gold', at: 7 }];
     p.ut.starterClaimed = true;
@@ -83,6 +85,11 @@ describe('encrypted save locker', () => {
     p.name = 'ReturningPlayer';
     p.coins = 9000;
     p.gifts = ['claimed'];
+    p.ut.owned = [
+      { uid: 'main', cardId: 'same', level: 4, xp: 35, at: 1 },
+      { uid: 'spare', cardId: 'same', level: 2, xp: 17, at: 2 },
+    ];
+    p.ut.duplicateStorage = ['spare'];
     values.set(NBA, JSON.stringify(p));
     values.set(NFL_KEY, JSON.stringify(p));
     values.set('perfect-season:key:v1', '11'.repeat(32));
@@ -92,9 +99,12 @@ describe('encrypted save locker', () => {
     expect(file).not.toContain('do-not-copy');
     const preview = await openBackup(file, 'my backup password');
     expect(preview.name).toBe('ReturningPlayer');
+    expect(preview.cards).toBe(4);
     values.set(NBA, JSON.stringify({ ...p, coins: 1 }));
     restoreBackup(preview);
     expect(JSON.parse(values.get(NBA)!).coins).toBe(9000);
+    expect(JSON.parse(values.get(NBA)!).ut.owned).toEqual(p.ut.owned);
+    expect(JSON.parse(values.get(NFL_KEY)!).ut.duplicateStorage).toEqual(['spare']);
     expect(values.get('perfect-season:key:v1')).toBe('11'.repeat(32));
   }, 10000);
   it('rejects a wrong password and leaves the current save untouched', async () => {

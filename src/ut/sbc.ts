@@ -356,6 +356,7 @@ export interface FillCard {
   uid: string;
   rc: RatedCard;
   slot: string | null;
+  storage?: boolean;
 }
 
 /**
@@ -387,7 +388,7 @@ export function cardFits(r: Req, c: RatedCard, size?: number): boolean {
  * do it. The first set that passes wins; null when none does.
  */
 export function autoFill<C extends FillCard>(s: Sbc, club: C[]): string[] | null {
-  const cheap = (a: C, b: C) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || quickSellValue(a.rc) - quickSellValue(b.rc) || a.rc.ovr - b.rc.ovr;
+  const cheap = (a: C, b: C) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || quickSellValue(a.rc) - quickSellValue(b.rc) || Number(!!b.storage) - Number(!!a.storage) || a.rc.ovr - b.rc.ovr;
   // only cards that meet what every card must (an overall floor, a tier for all, ...)
   const cands = club.filter((c) => s.reqs.every((r) => cardFits(r, c.rc, s.size))).sort(cheap);
   const has = (k: Req['k']) => s.reqs.some((r) => r.k === k);
