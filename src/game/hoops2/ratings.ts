@@ -101,15 +101,17 @@ export function hooper(l: NbaLine, spot: string, num: number | null): Hooper {
   const ft = a?.ft ?? null;
   const touch = ft !== null ? clamp01((ft - 0.6) / 0.32) : 0.35 + 0.3 * pts;
   const fta = a?.fta ?? null;
-  // threes: accuracy first, then volume; a handful of attempts says little; before the line, his touch
+  // threes: his accuracy, pulled toward the league's (two attempts a game at 34%) so a handful of
+  // attempts says little either way, then his touch (free throws), volume and scoring; before the
+  // line, his touch
   const fg3 = a?.fg3 ?? null;
   const a3 = a?.a3 ?? 0;
   let thr: number;
   if (fg3 !== null && a3 >= 0.3) {
-    const acc = clamp01((fg3 - 0.28) / 0.16) * clamp01(a3 / 1.4);
-    thr = 40 + 50 * acc + 9 * clamp01(a3 / 9);
+    const eff = (fg3 * a3 + 0.34 * 2) / (a3 + 2);
+    thr = 38 + 34 * clamp01((eff - 0.28) / 0.15) + 14 * touch + 8 * clamp01(a3 / 8) + 5 * pts;
   } else if (l.from < 1980) thr = 38 + 40 * touch + 8 * pts;
-  else thr = 30 + 18 * touch;
+  else thr = 32 + 24 * touch + 5 * pts;
   const fg2 = a?.fg2 ?? 0.46;
   const mid = 42 + 22 * clamp01((fg2 - 0.42) / 0.15) + 22 * touch + 13 * pts;
   const rim = a?.rim ?? null;

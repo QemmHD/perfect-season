@@ -218,6 +218,15 @@ const CONTEST_MAKE: Record<Contest, number> = { open: 1, light: 0.84, heavy: 0.5
 const RIM_WINDOW: Record<Contest, number> = { open: 1, light: 0.85, heavy: 0.65, smothered: 0.45 };
 const RIM_MAKE: Record<Contest, number> = { open: 1, light: 0.93, heavy: 0.8, smothered: 0.66 };
 
+/** A jumper's chance released just outside the green, open (timing and the contest come off it). */
+function offGreenBase(b: Body, kind: ShotKind, d: number): number {
+  const rt = shotRating(b, kind);
+  if (kind === 'three') return lerp(0.2, 0.47, rate(rt, 40, 97)) * (d > 26 ? (has(b.p, 'limitless') ? 0.92 : lerp(1, 0.5, (d - 26) / 6)) : 1);
+  if (kind === 'mid') return lerp(0.28, 0.53, rate(rt, 40, 97));
+  if (kind === 'close') return lerp(0.32, 0.6, rate(rt, 40, 97));
+  return lerp(0.42, 0.82, rate(rt, 40, 97));
+}
+
 /** The rating that matters for a shot from here. */
 function shotRating(b: Body, kind: ShotKind): number {
   const p = b.p;
@@ -232,7 +241,7 @@ function shotKindAt(b: Body): ShotKind {
 }
 
 /** The widest jump-shot half-window (seconds), an elite shooter's when open. */
-export const GREEN_W = 0.038;
+export const GREEN_W = 0.036;
 
 /**
  * Half the green window (seconds) for this shooter on this shot under this contest. Arcade: a good
@@ -240,9 +249,10 @@ export const GREEN_W = 0.038;
  */
 export function greenWindow(p: Possession, b: Body, kind: ShotKind, contest: Contest): number {
   const r = shotRating(b, kind);
-  // half-windows in seconds: an elite shooter's is about 36 ms each side open, an 85's about 26, a
-  // 70's 13, a 55's next to nothing; layups are kinder. A green always goes in, so this is the game.
-  let w = GREEN_W * Math.pow(rate(r, 50, 97), 1.3);
+  // half-windows in seconds, open: an elite shooter's about 36 ms each side, an 85's about 29, a
+  // 70's 20, a 55's 12 (hard, not hopeless); layups are kinder. A green always goes in, so this is
+  // the game.
+  let w = GREEN_W * (0.22 + 0.78 * Math.pow(rate(r, 45, 97), 1.15));
   if (kind === 'layup') w = 0.07 * Math.pow(rate(r, 40, 97), 1.2);
   const d = dist(b, RIM);
   if (kind === 'three' && d > 26) w *= has(b.p, 'limitless') ? 0.92 : lerp(1, 0.4, (d - 26) / 6);
@@ -263,11 +273,7 @@ export function shotValue(p: Possession, b: Body, sd: number): { kind: ShotKind;
   // the chance of a green with a normal spread of release timing
   const z = w / Math.max(0.005, sd);
   const pGreen = clamp(1 - 2 * normTail(z), 0, 1);
-  const d = dist(b, RIM);
-  const rt = shotRating(b, kind);
-  let base = kind === 'three' ? lerp(0.16, 0.47, rate(rt, 40, 97)) : kind === 'mid' ? lerp(0.24, 0.53, rate(rt, 40, 97)) : lerp(0.32, 0.6, rate(rt, 40, 97));
-  if (kind === 'three' && d > 26) base *= has(b.p, 'limitless') ? 0.92 : lerp(1, 0.5, (d - 26) / 6);
-  const miss = base * 0.8 * CONTEST_MAKE[contest];
+  const miss = offGreenBase(b, kind, dist(b, RIM)) * 0.8 * CONTEST_MAKE[contest];
   const pm = pGreen + (1 - pGreen) * miss;
   return { kind, contest, value: pm * (kind === 'three' ? 3 : 2) };
 }
@@ -327,18 +333,21 @@ export function pressShoot(p: Possession) {
   const d = dist(b, RIM);
   const speed = Math.hypot(b.vx, b.vz);
   const toward = speed > 0.5 ? (b.vx * (RIM.cx - b.cx) + b.vz * (RIM.cz - b.cz)) / (speed * Math.max(d, 0.01)) : 0;
-  if (d < 6 || (d < 11 && toward > 0.35 && speed > 6)) {
+  // at the rim, or running at it from the edge of the paint on: a finish, never a jumper
+  if (d < 6 || (d < 15 && toward > 0.45 && speed > 5)) {
     const { d: def, r } = closest(p, b);
     const inWay = r < 4.2 && p.t >= def.stunUntil;
     const pp = b.p;
     let kind: ShotKind = 'layup';
     if (d < 5.5 && pp.sdk >= 72 && speed < 7) kind = 'standdunk';
-    if (pp.ddk >= 68 && speed > 6 && d < 10.5) kind = 'dunk';
+    if (pp.ddk >= 64 && speed > 5 && d < 15) kind = 'dunk';
     if (kind !== 'layup' && inWay) {
       const wall = def.p.blk + (def.p.ht - pp.ht) * 3 > pp.ddk + 8;
       kind = has(pp, 'posterizer') ? 'contact' : wall ? 'layup' : kind;
     }
-    p.finish = { kind, t0: p.t, tUp: p.t + (kind === 'standdunk' ? 0.2 : 0.26), target: inWay ? def.idx : null };
+    // from further out he takes a step or two more before he goes up, from about 7 feet
+    const gather = kind === 'standdunk' ? 0.2 : Math.min(0.7, Math.max(0.26, (d - 7) / Math.max(speed, 6)));
+    p.finish = { kind, t0: p.t, tUp: p.t + gather, target: inWay ? def.idx : null };
     act(b, kind === 'layup' ? 'layup' : kind === 'contact' ? 'contact' : kind === 'standdunk' ? 'standdunk' : 'dunk', p.t);
     p.events.push('gather:' + kind);
     if (kind === 'layup') p.meter = { t0: p.t, top: LAYUP_TOP, green: greenWindow(p, b, 'layup', contestOf(p, b)), kind: 'layup', room: closest(p, b).r };
@@ -389,12 +398,7 @@ function shoot(p: Possession, b: Body, kind: ShotKind, greened: boolean, off: nu
   const contest = closeoutCap(contestOf(p, b), p.meter?.room);
   const { d: cd, r: cr } = closest(p, b);
   const d = dist(b, RIM);
-  const rt = shotRating(b, kind);
-  let base: number;
-  if (kind === 'three') base = lerp(0.16, 0.47, rate(rt, 40, 97)) * (d > 26 ? (has(b.p, 'limitless') ? 0.92 : lerp(1, 0.5, (d - 26) / 6)) : 1);
-  else if (kind === 'mid') base = lerp(0.24, 0.53, rate(rt, 40, 97));
-  else if (kind === 'close') base = lerp(0.32, 0.6, rate(rt, 40, 97));
-  else base = lerp(0.42, 0.82, rate(rt, 40, 97));
+  const base = offGreenBase(b, kind, d);
   const timing = lerp(0.95, 0.33, (Math.abs(off) - green) / 0.22);
   const cm = has(b.p, 'deadeye') ? 1 - (1 - CONTEST_MAKE[contest]) * 0.55 : CONTEST_MAKE[contest];
   // a green always goes in; anything else is the shot's chance by how close the release was

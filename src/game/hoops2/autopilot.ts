@@ -32,7 +32,7 @@ const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
 /** Its release timing's spread (seconds): a Legend's about as tight as a good person's thumb, a
  * Rookie's loose. */
 function releaseSd(pl: Pilot): number {
-  return 0.15 - 0.11 * pl.skill;
+  return 0.17 - 0.11 * pl.skill;
 }
 
 /** Is there a lane to the rim: no defender in a cone between him and it. */
