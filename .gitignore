@@ -6,3 +6,4 @@ dist-artifact/
 __pycache__
 *.local
 .claude/worktrees/
+supabase/.temp/

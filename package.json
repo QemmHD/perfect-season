@@ -9,7 +9,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173",
     "test": "vitest run && PS_SPORT=nfl vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "data:registry": "vite-node scripts/build_registry_catalog.ts",
+    "audit:ratings": "vite-node scripts/audit_ut_ratings.ts"
   },
   "dependencies": {
     "nostr-tools": "^2.25.2",

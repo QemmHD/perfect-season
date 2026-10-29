@@ -1,6 +1,7 @@
 // Ultimate Team's home: the free starter (until it's opened), your squad at a glance, play, and the
 // way to the store, the club and the challenges.
 import React from 'react';
+import './pack-art.css';
 import { Coin } from '../ui/icons';
 import { UtCard } from './CardArt';
 import { IconClub, IconSbc, IconStore } from './icons';
@@ -67,7 +68,11 @@ export function Hub(props: {
         </button>
       )}
 
-      <button className="ut-squadcard" onClick={() => props.onGo('squad')} aria-label={'Your squad: ' + rating.ovr + ' overall, ' + rating.chem + ' chemistry, ' + rating.filled + ' of ' + size + ' spots filled'}>
+      <button
+        className="ut-squadcard"
+        onClick={() => props.onGo('squad')}
+        aria-label={'Your squad: ' + rating.ovr + ' overall, ' + rating.chem + ' chemistry, ' + rating.filled + ' of ' + size + ' spots filled'}
+      >
         <span className="ut-sq-stats">
           <span className="eyebrow">Your squad</span>
           <span className="ut-sq-nums">
@@ -102,6 +107,25 @@ export function Hub(props: {
         </button>
       </div>
 
+      <button className="ut-content-launch" onClick={() => props.onGo('events')}>
+        <span className="eyebrow">SPOTLIGHT SERIES · NEW</span>
+        <b className="disp">Take on the greats.</b>
+        <small>Three themed series. Earn a guaranteed 99+ Spotlight reward.</small>
+        <span className="ut-launch-action">
+          EXPLORE EVENTS{' '}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>
+        </span>
+      </button>
+      <button className="ut-book-launch" onClick={() => props.onGo('gallery')}>
+        <IconClub size={24} />
+        <span>
+          <b>Collection Gallery</b>
+          <small>Track every edition and claim collection rewards.</small>
+        </span>
+        <b className="num">{new Set([...(ut.collected ?? []), ...ut.owned.map((c) => c.cardId)]).size}</b>
+      </button>
       <div className="ut-tiles">
         <button className="ut-tile" onClick={() => props.onGo('store')}>
           <IconStore size={24} />

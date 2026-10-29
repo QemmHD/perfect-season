@@ -48,9 +48,9 @@ describe('original-player compatibility', () => {
     if (NFL) values.set(NFL_KEY, JSON.stringify(p));
     values.set('perfect-season:key:v1', '11'.repeat(32));
     const loaded = loadProfile();
-    expect(loaded).toEqual(p);
+    expect(loaded).toEqual({...p,ut:{...p.ut,collected:['nba:season:1996:jordan:CHI']}});
     expect(saveProfile(loaded)).toBe(true);
-    expect(loadProfile()).toEqual(p);
+    expect(loadProfile()).toEqual(loaded);
     expect(values.get('perfect-season:key:v1')).toBe('11'.repeat(32));
   });
   it('stores and reloads a solo checkpoint without changing a player profile', () => {

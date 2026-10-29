@@ -1,57 +1,17 @@
 // A card up close: the big card (tilt it), its six key attributes and all the rest, its abilities,
 // the season it stands for, its level, and quick-sell.
 import React, { useState } from 'react';
+import { CardSerial } from './CardSerial';
 import { Confirm, Sheet } from '../ui/common';
 import { Coin } from '../ui/icons';
 import { UtCard } from './CardArt';
 import { quickSellValue } from './packs';
 import { seasonText } from './pool';
-import { ABILITY_HELP, abilityName, attrName, levelBonus, NBA_ATTRS, TIER_NAMES } from './rate';
+import { ABILITY_HELP, abilityName, attrName, NBA_ATTRS, TIER_NAMES } from './rate';
 import { MAX_LEVEL, xpToNext } from './state';
-import type { CardLine, UtSport } from './types';
+import { cardStatLine as statLine } from './card-stats';
+import type { UtSport } from './types';
 import type { ClubCard } from './UltimateTeam';
-
-const STAT_LABEL: Record<string, string> = {
-  g: 'G',
-  gs: 'GS',
-  mpg: 'MIN',
-  pts: 'PTS',
-  reb: 'REB',
-  ast: 'AST',
-  stl: 'STL',
-  blk: 'BLK',
-  tov: 'TOV',
-  fg2: '2P%',
-  fg3: '3P%',
-  ft: 'FT%',
-  passYds: 'PASS YDS',
-  passTd: 'PASS TD',
-  int: 'INT',
-  rushYds: 'RUSH YDS',
-  rushTd: 'RUSH TD',
-  rec: 'REC',
-  recYds: 'REC YDS',
-  recTd: 'REC TD',
-  tkl: 'TACKLES',
-  sk: 'SACKS',
-  pd: 'PD',
-  ff: 'FF',
-  fgm: 'FGM',
-  fga: 'FGA',
-  xpm: 'XPM',
-  lng: 'LONG',
-  cmp: 'CMP%',
-  ypa: 'Y/A',
-};
-const PCT = new Set(['fg2', 'fg3', 'ft', 'cmp']);
-const NBA_STATS = ['g', 'mpg', 'pts', 'reb', 'ast', 'stl', 'blk', 'fg2', 'fg3', 'ft'];
-const NFL_STATS: Record<string, string[]> = {
-  QB: ['g', 'passYds', 'passTd', 'int', 'rushYds', 'rushTd'],
-  RB: ['g', 'rushYds', 'rushTd', 'rec', 'recYds', 'recTd'],
-  WR: ['g', 'rec', 'recYds', 'recTd', 'rushYds'],
-  TE: ['g', 'rec', 'recYds', 'recTd'],
-  K: ['g', 'fgm', 'fga', 'lng', 'xpm'],
-};
 
 const HONOR: Record<string, string> = {
   MVP: 'MVP',
@@ -65,23 +25,12 @@ const HONOR: Record<string, string> = {
   SCORING: 'Scoring title',
 };
 
-function statLine(l: CardLine): [string, string][] {
-  const keys = l.sport === 'nba' ? NBA_STATS : (NFL_STATS[l.pos[0]] ?? Object.keys(l.stats).filter((k) => STAT_LABEL[k]));
-  return keys
-    .filter((k) => k in l.stats)
-    .map((k) => {
-      const v = l.stats[k];
-      const txt = v === null || v === undefined ? '—' : PCT.has(k) && v <= 1 ? (v * 100).toFixed(1) : Number.isInteger(v) ? v.toLocaleString('en-US') : v.toFixed(1);
-      return [STAT_LABEL[k] ?? k.toUpperCase(), txt];
-    });
-}
-
 const height = (ht: number | null) => (ht ? Math.floor(ht / 12) + '′' + (ht % 12) + '″' : '');
 
-function Bar({ v }: { v: number }) {
+function Bar({ v, max = 99 }: { v: number; max?: number }) {
   return (
     <span className={'ut-abar' + (v >= 90 ? ' elite' : v >= 80 ? ' good' : v >= 65 ? '' : ' low')}>
-      <i style={{ width: Math.max(4, v) + '%' }} />
+      <i style={{ width: Math.max(4, Math.min(100, (v / max) * 100)) + '%' }} />
     </span>
   );
 }
@@ -91,6 +40,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
   const { rc, oc } = cc;
   const l = rc.line;
   const value = quickSellValue(rc);
+  const cap = rc.tier === 'goat' ? 110 : rc.tier === 'spotlight' ? 105 : 99;
   const keySet = new Set(rc.key.map(([c]) => c));
   const all = sport === 'nba' ? NBA_ATTRS.map(([c]) => c) : Object.keys(rc.attrs);
   const need = xpToNext(oc.level);
@@ -128,6 +78,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
               </div>
             </div>
 
+            {oc.mint && <CardSerial mint={oc.mint} cardId={oc.cardId} sport={sport} />}
             <div className="ut-level">
               <span className="ut-level-pips" aria-hidden="true">
                 {Array.from({ length: MAX_LEVEL }, (_, i) => (
@@ -138,10 +89,10 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
                 <b>Level {oc.level}</b>
                 {oc.level < MAX_LEVEL ? (
                   <small>
-                    {oc.xp}/{need} XP to level {oc.level + 1} (+1 overall)
+                    {oc.xp}/{need} XP to level {oc.level + 1} (edition cap applies)
                   </small>
                 ) : (
-                  <small>Max level: +{levelBonus(oc.level)} overall</small>
+                  <small>Max level for this edition</small>
                 )}
               </span>
               {oc.level < MAX_LEVEL && (
@@ -150,7 +101,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
                 </span>
               )}
             </div>
-            <p className="note ut-xpnote">Cards earn XP in every game they play. Each level adds 1 overall, spread over the key attributes.</p>
+            <p className="note ut-xpnote">Cards earn XP in games. Each level improves key attributes and adds up to 1 overall, within the edition’s rating cap.</p>
 
             <div className="ut-keys">
               {rc.key.map(([c, n, v]) => (
@@ -160,7 +111,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
                     <i>{c}</i>
                     <small>{n}</small>
                   </span>
-                  <Bar v={v} />
+                  <Bar v={v} max={cap} />
                 </span>
               ))}
             </div>
@@ -193,18 +144,34 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
               </>
             )}
 
+            <p className="note">
+              {rc.ratingSource ? (
+                <>
+                  <a href={rc.ratingSource} target="_blank" rel="noreferrer">
+                    Peak 2K reference
+                  </a>{' '}
+                  · Season-specific estimates, then edition and level boosts.
+                </>
+              ) : (
+                'Attributes estimated from this season’s statistics, honors and player role.'
+              )}
+            </p>
             <span className="eyebrow">All attributes</span>
             <div className="ut-allattrs">
               {all.map((c) => (
                 <span key={c} className={keySet.has(c) ? 'key' : ''}>
                   <i>{attrName(c)}</i>
                   <b className="num">{rc.attrs[c] ?? '—'}</b>
-                  <Bar v={rc.attrs[c] ?? 0} />
+                  <Bar v={rc.attrs[c] ?? 0} max={cap} />
                 </span>
               ))}
             </div>
 
-            {onUse && <button className="btn primary" onClick={() => close(onUse)}>USE THIS COPY IN CLUB</button>}
+            {onUse && (
+              <button className="btn primary" onClick={() => close(onUse)}>
+                USE THIS COPY IN CLUB
+              </button>
+            )}
             <div className="btnrow ut-detail-btns">
               <button className="btn" onClick={() => close()}>
                 CLOSE
@@ -219,7 +186,20 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
       {selling && (
         <Confirm
           title="Quick sell?"
-          body={l.name + ' (' + seasonText(l) + ', ' + rc.ovr + ' overall' + (oc.level > 1 ? ', level ' + oc.level : '') + ') goes for ' + value.toLocaleString('en-US') + ' coins.' + (cc.slot ? ' He leaves your squad.' : '') + ' This can’t be undone.'}
+          body={
+            l.name +
+            ' (' +
+            seasonText(l) +
+            ', ' +
+            rc.ovr +
+            ' overall' +
+            (oc.level > 1 ? ', level ' + oc.level : '') +
+            ') goes for ' +
+            value.toLocaleString('en-US') +
+            ' coins.' +
+            (cc.slot ? ' He leaves your squad.' : '') +
+            ' This can’t be undone.'
+          }
           yes={'SELL · ' + value.toLocaleString('en-US')}
           no="KEEP"
           tone="gold"

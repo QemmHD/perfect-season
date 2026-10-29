@@ -3,6 +3,8 @@
 Spin a random NBA or NFL team and decade, draft players who played for them, and try for a perfect season: 82-0, then 16-0 in the playoffs, or 17-0 and four straight playoff wins through the Super Bowl.
 Product spec: [`docs/SPEC.md`](docs/SPEC.md).
 
+**Codex update and Claude handoff:** [`CLAUDE.md`](CLAUDE.md) maps the code and save rules; [`docs/CODEX-UPDATE-LOG.md`](docs/CODEX-UPDATE-LOG.md) identifies changes implemented by Codex, connections, validation and release status. The [Spotlight content guide](docs/UT-CONTENT-UPDATE.md) covers GOAT/Spotlight cards, new packs, the collection gallery, duplicate storage, events and global copy numbers. [Ratings methodology and audit](docs/RATINGS-AUDIT.md).
+
 ## Two sports
 
 The home screen has an **NBA / NFL** switch. Each sport is its own game with the same modes, boosters, rarity, missions, leaderboards and Head to Head; your name, coins, level, boosters, settings and daily chest are shared.
@@ -17,13 +19,17 @@ The home screen has an **NBA / NFL** switch. Each sport is its own game with the
 
 ## What's in this build
 
+- **Ultimate Team Spotlight:** 251 new Spotlight editions (100–105 overall), 40 GOAT editions (106–110), a 3,500-coin promo pack with a 0.05% chance of any GOAT, and globally numbered copies. Real attributes carry into the played game.
+- **Collection and events:** a collection gallery with permanent discovery/milestone rewards, dedicated exact-copy duplicate storage, and three themed three-match series per sport with guaranteed Spotlight rewards for their final first clears.
+- **Progress, practice and Rivals:** encrypted Save Locker, solo Continue, six Training Camp drills and weekly UT Rivals divisions/rewards. Existing saves migrate additively.
+
 - **Modes:** Classic, Blind (stats hidden, +50% rewards), Daily (same spins for everyone, first try ranked, resets at midnight US Eastern), and Head to Head.
 - **Head to Head, live against real players:**
   - Quick Match finds whoever else is searching. After 30 seconds with no one around, the AI (Rookie, Pro or Legend) steps in, or you can play it right away.
   - Play a Friend: make a 4-letter code and send it, or share an invite link (`?room=CODE`).
   - Both players draft from the same five team-decades, taking turns going first, with a 25-second shot clock. Run out of time and the best fit is picked for you.
   - If the other player leaves or their phone drops for 20 seconds, the AI finishes their draft and you win by forfeit. A 10-second blip (a notification, a quick app switch) changes nothing.
-- **Online without accounts or a server:** everything goes over five public [Nostr](https://nostr.com) relays at once, so one going down changes nothing. Each phone signs its messages with its own key, so nobody can post as you.
+- **Online without a new player login:** matches, leaderboards and admin gifts use five public [Nostr](https://nostr.com) relays. Each phone signs with its own key. Numbered Spotlight/GOAT pulls additionally use the separate [card registry](docs/UT-CONTENT-UPDATE.md#global-copy-numbers-and-backend); existing ordinary packs remain usable offline.
 - **Your name:** asked for the first time the app opens (with a dice for random names). It shows on the boards and to your opponents.
 - **Draft:**
   - Slot-machine reels and a no-repeat team-decade rule.

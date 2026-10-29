@@ -21,7 +21,7 @@ const MAX_CZ = 24.4;
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * clamp(t, 0, 1);
 /** a 0-99 rating as 0-1 between two marks */
-const rate = (r: number, lo = 40, hi = 95) => clamp((r - lo) / (hi - lo), 0, 1);
+const rate = (r: number, lo = 40, hi = 95) => clamp((r - lo) / (hi - lo), 0, 1) + (r > 99 ? Math.min(11, r - 99) * .009 : 0);
 export const dist = (a: Pt, b: Pt) => Math.hypot(a.cx - b.cx, a.cz - b.cz);
 
 export function has(p: Hooper, a: string): boolean {
@@ -113,12 +113,12 @@ function act(b: Body, a: Act, t: number) {
 
 /** top speed in feet a second: 14 to 20.5 by speed rating, slowed by tiredness */
 export function topSpeed(b: Body, withBall: boolean): number {
-  const s = lerp(14, 20.5, rate(b.p.spd, 30, 99)) * lerp(0.86, 1, b.energy);
+  const s = (lerp(14, 20.5, rate(b.p.spd, 30, 99)) + Math.max(0, Math.min(11, b.p.spd - 99)) * .12) * lerp(0.86, 1, b.energy);
   return withBall ? s * lerp(0.86, 0.95, rate(b.p.hnd)) : s;
 }
 
 function accelOf(b: Body): number {
-  return lerp(42, 78, rate(b.p.acc, 30, 99));
+  return lerp(42, 78, rate(b.p.acc, 30, 99)) + Math.max(0, Math.min(11, b.p.acc - 99)) * .6;
 }
 
 function steer(b: Body, tx: number, tz: number, speed: number, dt: number) {

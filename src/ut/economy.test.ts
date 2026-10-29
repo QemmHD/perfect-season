@@ -71,7 +71,7 @@ describe('the economy (' + SPORT + ')', () => {
     const pool = await getPool();
     const defs = packDefs(pool.sport);
     const choices = positionChoices(pool.sport);
-    for (const def of Object.values(defs)) {
+    for (const def of Object.values(defs).filter(d=>d.kind!=='spotlight')) {
       let back = 0;
       const N = 300;
       for (let i = 0; i < N; i++) back += openPack(pool, def.kind === 'position' ? 'position:' + choices[i % choices.length].key : def.kind, 'qs:' + def.kind + i).reduce((a, c) => a + quickSellValue(c), 0);

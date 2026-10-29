@@ -1,3 +1,4 @@
+import { specialEditions } from './specials';
 // Ultimate Team card data: every player-season as a CardLine, plus promo ("Hot Season") and legend
 // lines. Built by scripts/build_cards.py into src/data/cards-<sport>.json (stored column by
 // column; the script's header has every rule) and loaded only when Ultimate Team opens.
@@ -122,7 +123,7 @@ export function expandCards(f: CardsFile): CardPool {
   };
   const promos = f.promos.map(derive('promo'));
   const legends = f.legends.map(derive('legend'));
-  const lines = [...seasons, ...promos, ...legends];
+  const lines = [...seasons, ...promos, ...legends, ...specialEditions(seasons)];
   return { lines, byId: new Map(lines.map((l) => [l.id, l])), promos, legends };
 }
 

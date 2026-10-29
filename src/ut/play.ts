@@ -1,3 +1,4 @@
+import { settleEvent } from './events';
 import { rivalsMatch } from './rivals';
 // Playing a squad: what the UT screens ask for, and what a finished match pays (docs/ULTIMATE-TEAM.md
 // "Playing").
@@ -15,6 +16,7 @@ export interface UtMatchRequest {
   mode: 'ai' | 'online';
   /** Squad Battles: the rung of this week's ladder */
   rung?: number;
+  event?: { id: string; node: number };
 }
 
 export interface UtMatchResult {
@@ -78,13 +80,28 @@ export interface Settled {
  */
 export function settle(
   ut: UtState,
-  r: { won: boolean; us: number; them: number; online: boolean; rung: { i: number; pack: string | null } | null; played: string[]; week: string; day: string; packId: string; at: number; pay?: number; matchId?: string }
+  r: {
+    won: boolean;
+    us: number;
+    them: number;
+    online: boolean;
+    rung: { i: number; pack: string | null } | null;
+    played: string[];
+    week: string;
+    day: string;
+    packId: string;
+    at: number;
+    pay?: number;
+    matchId?: string;
+    event?: { id: string; node: number };
+  }
 ): Settled {
-  if (r.matchId && ut.settled?.includes(r.matchId)) return {ut,coins:0,xp:0,ups:[],climbed:false,pack:null,capped:false,refreshed:false};
+  if (r.matchId && ut.settled?.includes(r.matchId)) return { ut, coins: 0, xp: 0, ups: [], climbed: false, pack: null, capped: false, refreshed: false };
   const today = ut.paid.day === r.day ? ut.paid.n : 0;
   const capped = today >= PAID_GAMES_A_DAY;
   const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
   const x = awardXp({ ...ut, paid: { day: r.day, n: today + (capped ? 0 : 1) } }, r.played, xp);
+  if (r.event && r.won && !r.online) x.ut = settleEvent(x.ut, r.event.id, r.event.node, r.at);
   const rec = x.ut.record;
   const record = r.online ? { ...rec, h2hW: rec.h2hW + (r.won ? 1 : 0), h2hL: rec.h2hL + (r.won ? 0 : 1) } : { ...rec, w: rec.w + (r.won ? 1 : 0), l: rec.l + (r.won ? 0 : 1) };
   let battles = battlesThisWeek(x.ut.battles, r.week);
@@ -97,5 +114,21 @@ export function settle(
       ? { ...battles, week: r.week, cleared: 0, best: RUNGS, round: (battles.round ?? 0) + 1 }
       : { ...battles, week: r.week, cleared: r.rung!.i + 1, best: Math.max(battles.best, r.rung!.i + 1) };
   const packs = pack ? [...x.ut.packs, { id: r.packId, kind: pack, at: r.at }] : x.ut.packs;
-  return { ut: { ...x.ut, record, battles, packs, ...(r.matchId ? {settled:[...(ut.settled??[]),r.matchId].slice(-1000)} : {}), ...(r.online && r.matchId ? {rivals:rivalsMatch(ut.rivals,r.week,r.matchId,r.won)} : {}) }, coins, xp, ups: x.ups, climbed, pack, capped, refreshed };
+  return {
+    ut: {
+      ...x.ut,
+      record,
+      battles,
+      packs,
+      ...(r.matchId ? { settled: [...(ut.settled ?? []), r.matchId].slice(-1000) } : {}),
+      ...(r.online && r.matchId ? { rivals: rivalsMatch(ut.rivals, r.week, r.matchId, r.won) } : {}),
+    },
+    coins,
+    xp,
+    ups: x.ups,
+    climbed,
+    pack,
+    capped,
+    refreshed,
+  };
 }

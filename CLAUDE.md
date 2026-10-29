@@ -1,0 +1,31 @@
+# Perfect Season — handoff for Claude and future contributors
+
+This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub Pages. NBA and NFL share a wallet/settings/identity and keep separate sporting progress. Read `docs/CODEX-UPDATE-LOG.md` first for additions **implemented by Codex**, their file map, validation and release status.
+
+## Preserve player progress
+
+- Keep profile version 1 and the existing localStorage keys. Never reset profiles, rename existing card IDs, regenerate signed player identities, auto-sell cards, or clear collections to ship an update.
+- `ut.owned` is the canonical list of **every** owned copy. `ut.duplicateStorage` is a list of UIDs for UI placement. The original restore build can still read all cards. Equipped UIDs, levels and XP must survive migrations.
+- New fields are optional and migrate additively in `src/ut/state.ts`. Save Locker includes both sports and the player signing key, excluding admin session credentials.
+- Original source restore: branch `backup/original-working-2026-10-28`, commit `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. A source restore is separate from restoring phone-local saves.
+
+## Connections and module map
+
+- `src/net/nostr.ts`: original five-relay Nostr transport and signed player identity. `match.ts`: existing matchmaking/live matches. `leaderboard.ts`: original boards. `gifts.ts`: admin gifts. These are **not Supabase features**.
+- `src/ut/UltimateTeam.tsx`: UT routing, transactions, packs, card details and SBC submission.
+- `src/ut/state.ts`, `storage.ts`: additive profile migration and duplicate storage.
+- `src/ut/cards.ts`, `rate.ts`, `pool.ts`, `teams.ts`: stable edition IDs → rated gameplay attributes → pool fingerprint → playable squads.
+- `src/game/hoops2/` and `src/game/football2/`: existing actual match engines. Above-99 UT ratings must affect real play; standard ratings must retain their existing engine behavior.
+- `src/evolution/`: Codex Save Locker/continuation UI, Training Camp and SVG marks. `src/lib/recovery.ts`: encrypted backups/checkpoints.
+- `src/ut/rivals.ts`, `rivals-net.ts`, `Rivals.tsx`: Codex division progress/rewards and separate signed Nostr standings.
+- New collection, event and card-registry modules are detailed in the update log. `src/ut/pack-reveal.css` and `PackOpening.tsx` implement the Codex Spotlight/GOAT reveal sequences; `GoatCrown` in `CardArt.tsx` is the shared card/reveal mark. Keep globally registered mint serials separate from player-local copy UIDs.
+
+## Working and verification
+
+`npm run dev`, `npm run typecheck`, `npm test` (both sports), `npm run build`. Test browser profiles with `?ns=inspect&relay=ws://localhost:7777`; do not submit fixtures to live boards. Verify phone widths, reduced motion, storage migration, exact-once rewards, and online pool compatibility. Installed-iPhone and two-phone checks complement Chromium tests.
+
+Use the existing Archivo typography, teal/gold palette, pixel players and game card proportions. New symbols use SVG instead of unsupported Unicode glyphs.
+
+## Attribution and maintenance
+
+Codex implemented the changes recorded in `docs/CODEX-UPDATE-LOG.md`. Keep attribution factual: distinguish original Claude/game code, Codex additions, subsequent fixes and source-backed estimates. Each future change should update that log (or its successor) with author/tool, date, commit or release reference, purpose, file/connection map, tests and deployment state. Never mark unverified or undeployed work as live.

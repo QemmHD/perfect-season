@@ -8,12 +8,18 @@ import { IconInfo } from './icons';
 import { type Odds, type PackDef, packName, positionChoices, STORE_ORDER } from './packs';
 import { TIER_NAMES, TIER_ORDER } from './rate';
 import type { PendingPack } from './state';
-import type { UtSport } from './types';
+import type { Tier, UtSport } from './types';
 
-const SHORT: Record<string, string> = { bronze: 'BRONZE', silver: 'SILVER', gold: 'GOLD', premium: 'PREMIUM', position: 'POSITION', starter: 'STARTER' };
+const SHORT: Record<string, string> = { bronze: 'BRONZE', silver: 'SILVER', gold: 'GOLD', premium: 'PREMIUM', position: 'POSITION', starter: 'STARTER', spotlight: 'SPOTLIGHT' };
 
 function pct(p: number): string {
-  return p >= 0.995 ? '100%' : p >= 0.1 ? Math.round(p * 100) + '%' : p >= 0.01 ? (Math.round(p * 1000) / 10).toString().replace(/\.0$/, '') + '%' : (Math.round(p * 10000) / 100).toString() + '%';
+  return p >= 0.995
+    ? '100%'
+    : p >= 0.1
+      ? Math.round(p * 100) + '%'
+      : p >= 0.01
+        ? (Math.round(p * 1000) / 10).toString().replace(/\.0$/, '') + '%'
+        : (Math.round(p * 10000) / 100).toString() + '%';
 }
 
 /** What a pack holds, slot by slot, and the chance of a promo or a legend in the whole pack. */
@@ -25,7 +31,7 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
     if (r) r.n++;
     else rows.set(k, { o, n: 1 });
   }
-  const any = (t: 'promo' | 'legend') => 1 - def.slots.reduce((a, o) => a * (1 - (o[t] ?? 0)), 1);
+  const any = (t: Tier) => 1 - def.slots.reduce((a, o) => a * (1 - (o[t] ?? 0)), 1);
   return (
     <Sheet label={def.name + ' odds'} kind="center" onClose={onClose}>
       {(close) => (
@@ -48,6 +54,12 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
               </div>
             ))}
           </div>
+          {any('goat') > 0 && (
+            <p className="note">
+              GOAT: {pct(any('goat'))} per pack (1 in 2,000). Spotlight: {pct(any('spotlight'))}. This is the chance of any GOAT edition; one specific GOAT is rarer. Odds reset
+              each pack; no guaranteed GOAT after 2,000 packs. Special editions are chosen uniformly within their tier.
+            </p>
+          )}
           {any('legend') > 0 && (
             <p className="note">
               Chance of a Hot Season card in this pack: {pct(any('promo'))}. Of a Legend: {pct(any('legend'))} (about 1 in {Math.round(1 / any('legend'))}).
@@ -114,7 +126,11 @@ export function Store(props: {
                   <IconInfo size={13} /> Odds
                 </button>
               </div>
-              <button className={'btn ut-buy' + (short ? ' short' : ' gold')} aria-disabled={short} onClick={() => (k === 'position' ? (short ? props.onBuy(k, d.price) : setChoose(true)) : props.onBuy(k, d.price))}>
+              <button
+                className={'btn ut-buy' + (short ? ' short' : ' gold')}
+                aria-disabled={short}
+                onClick={() => (k === 'position' ? (short ? props.onBuy(k, d.price) : setChoose(true)) : props.onBuy(k, d.price))}
+              >
                 <Coin size={14} />
                 <span className="num">{d.price.toLocaleString('en-US')}</span>
               </button>
@@ -130,7 +146,8 @@ export function Store(props: {
             <div className="ut-choose">
               <h2 className="disp">{props.sport === 'nfl' ? 'Pick a unit' : 'Pick a position'}</h2>
               <p>
-                {pos.slots.length} golds {props.sport === 'nfl' ? 'from that unit, its positions in the mix a squad needs' : 'at that position'}, for {pos.price.toLocaleString('en-US')} coins.
+                {pos.slots.length} golds {props.sport === 'nfl' ? 'from that unit, its positions in the mix a squad needs' : 'at that position'}, for{' '}
+                {pos.price.toLocaleString('en-US')} coins.
               </p>
               <div className="ut-choose-grid">
                 {positionChoices(props.sport).map((c) => (

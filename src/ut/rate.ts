@@ -1,22 +1,20 @@
 // Ultimate Team ratings: a card line becomes a rated card with the same code the played games use,
 // so a card shows exactly what it plays like. Basketball goes through hoops2's `hooper()` (fed the
 // season's own ranks), football through football2's `rateNflLine()`. On top of the base rating:
-// a promo's or legend's boost, and +1 per level above 1 (levels 1-5), both spread over the six key
-// attributes. See docs/ULTIMATE-TEAM.md.
+// standard promo/legend boosts and levels affect the six key attributes. Codex Spotlight/GOAT
+// editions improve the full profile, retain signature weaknesses, and support 100–110 gameplay. See docs/ULTIMATE-TEAM.md.
+import { calibrateNba, nbaRosterScale } from './calibration';
 import type { Attrs } from '../game/attrs';
 import { groupOf, NFL_KEYS, rateNflLine } from '../game/football2/ratings';
-import { BADGE_NAMES, hooper, type NbaLine } from '../game/hoops2/ratings';
+import { BADGE_NAMES, badges, hooper, type NbaLine } from '../game/hoops2/ratings';
 import type { Hooper } from '../game/hoops2/types';
 import { MAX_LEVEL } from './state';
 import type { CardLine, RatedCard, Tier, UtSport } from './types';
 
-/**
- * Where silver and gold start, per sport. Basketball follows the doc: bronze under 65, silver
- * 65-74, gold 75 and up (about 62% / 16% / 22% of its season cards). Football's ratings run
- * hotter (median 82; 80% of its cards are 75+, and under 1% would be bronze), so its cuts sit where
- * they give the same mix: bronze under 84, silver 84-88, gold 89 and up.
- */
-export const TIER_CUTS: Record<UtSport, { silver: number; gold: number }> = { nba: { silver: 65, gold: 75 }, nfl: { silver: 84, gold: 89 } };
+/** Codex roster calibration: NBA Bronze <75, Silver 75–84, Gold 85+.
+ * NFL retains its own distribution: Bronze <84, Silver 84–88, Gold 89+.
+ * Old challenge thresholds pass through onScale(), preserving their relative difficulty. */
+export const TIER_CUTS: Record<UtSport, { silver: number; gold: number }> = { nba: { silver: 75, gold: 85 }, nfl: { silver: 84, gold: 89 } };
 
 export function tierOf(ovr: number, sport: UtSport = 'nba'): Tier {
   const c = TIER_CUTS[sport];
@@ -37,7 +35,7 @@ const SCALE: [number, number][] = [
  * same standing in this sport.
  */
 export function onScale(x: number, sport: UtSport): number {
-  if (sport === 'nba') return x;
+  if (sport === 'nba') return nbaRosterScale(x);
   for (let i = 1; i < SCALE.length; i++) {
     const [a0, b0] = SCALE[i - 1];
     const [a1, b1] = SCALE[i];
@@ -46,8 +44,8 @@ export function onScale(x: number, sport: UtSport): number {
   return x;
 }
 
-export const TIER_NAMES: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', legend: 'Legend' };
-export const TIER_ORDER: Tier[] = ['bronze', 'silver', 'gold', 'promo', 'legend'];
+export const TIER_NAMES: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', spotlight: 'Spotlight', legend: 'Legend', goat: 'GOAT' };
+export const TIER_ORDER: Tier[] = ['bronze', 'silver', 'gold', 'promo', 'legend', 'spotlight', 'goat'];
 
 /** Basketball attributes: card code, the Hooper field, the name. */
 export const NBA_ATTRS: [string, keyof Hooper, string][] = [
@@ -122,7 +120,22 @@ const val = (x: number | null | undefined): number | null => (typeof x === 'numb
 /** The card's stats as the attrs hooper() reads (size, minutes, splits). */
 function nbaAttrs(line: CardLine): Attrs {
   const s = line.stats;
-  return { ht: line.ht, wt: line.wt, num: line.num, mpg: val(s.mpg), fg2: val(s.fg2), fg3: val(s.fg3), a3: val(s.a3), ft: val(s.ft), fta: val(s.fta), orb: val(s.orb), drb: val(s.drb), tov: val(s.tov), dunk: val(s.dunk), rim: val(s.rim) };
+  return {
+    ht: line.ht,
+    wt: line.wt,
+    num: line.num,
+    mpg: val(s.mpg),
+    fg2: val(s.fg2),
+    fg3: val(s.fg3),
+    a3: val(s.a3),
+    ft: val(s.ft),
+    fta: val(s.fta),
+    orb: val(s.orb),
+    drb: val(s.drb),
+    tov: val(s.tov),
+    dunk: val(s.dunk),
+    rim: val(s.rim),
+  };
 }
 
 export function nbaLineOf(line: CardLine): NbaLine {
@@ -160,11 +173,16 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   let attrs: Record<string, number>;
   let keys: [string, string][];
   let abil: string[];
+  let ratingSource: string | undefined;
   if (line.sport === 'nba') {
     at = pos && NBA_KEYS[pos] ? pos : NBA_KEYS[line.pos[0]] ? line.pos[0] : 'SF';
     const h = hooper(nbaLineOf(line), at, line.num);
     base = h.ovr;
     attrs = Object.fromEntries(NBA_ATTRS.map(([c, f]) => [c, h[f] as number]));
+    const calibrated = calibrateNba(line, base, attrs);
+    base = calibrated.ovr;
+    attrs = calibrated.attrs;
+    ratingSource = calibrated.source;
     keys = NBA_KEYS[at].map((c) => [c, NBA_NAME[c]]);
     abil = h.abil.slice();
   } else {
@@ -177,15 +195,28 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
     if (!keys.length) keys = (NFL_KEYS[groupOf(at)] ?? NFL_KEYS.WR).map(([c, n]) => [c, n]);
     abil = r.abil.slice();
   }
-  // the boost and the levels go onto the key attributes
-  if (bonus) for (const [c] of keys) attrs[c] = cap((attrs[c] ?? base) + bonus);
-  if (line.kind === 'promo' && !abil.includes(PROMO_ABILITY)) abil.push(PROMO_ABILITY);
-  if (line.kind === 'legend' && !abil.includes(LEGEND_ABILITY)) abil.unshift(LEGEND_ABILITY);
-  const baseOvr = cap(base + boost);
-  const ovr = cap(base + bonus);
+  const special = line.kind === 'goat' || line.kind === 'spotlight';
+  const goat = line.kind === 'goat';
+  const limit = goat ? 110 : special ? 105 : 99;
+  const bounded = (x: number) => Math.max(1, Math.min(limit, Math.round(x)));
+  // Boost exactly once. Promo editions improve the whole playable profile, preserving signature skills.
+  if (special) {
+    for (const code of Object.keys(attrs)) attrs[code] = bounded(attrs[code] + boost);
+    for (const [code] of keys) attrs[code] = bounded(Math.max(goat ? 100 : 96, attrs[code]) + levelBonus(level));
+  } else if (bonus) for (const [code] of keys) attrs[code] = cap((attrs[code] ?? base) + bonus);
+  if (line.sport === 'nba') {
+    const h = hooper(nbaLineOf(line), at, line.num);
+    for (const [code, field] of NBA_ATTRS) (h as unknown as Record<string, unknown>)[field] = attrs[code];
+    abil = badges(h, line.stats.a3 ?? 0);
+  }
+  if (line.kind === 'promo') abil.push(PROMO_ABILITY);
+  if (line.kind === 'legend' || goat) abil.unshift(LEGEND_ABILITY);
+  const baseOvr = special ? bounded(Math.max(goat ? 106 : 100, base + (goat ? 11 : 6))) : cap(base + boost);
+  const ovr = special ? bounded(baseOvr + levelBonus(level)) : cap(base + bonus);
   // a season card's tier is its unlevelled overall's, so levelling never turns bronze into silver
-  const tier: Tier = line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(baseOvr, line.sport);
-  return { line, ovr, tier, pos: at, attrs, key: keys.map(([c, n]) => [c, n, attrs[c] ?? ovr]), abil };
+  const tier: Tier =
+    line.kind === 'goat' ? 'goat' : line.kind === 'spotlight' ? 'spotlight' : line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(baseOvr, line.sport);
+  return { line, ovr, tier, pos: at, attrs, ratingSource, key: keys.map(([c, n]) => [c, n, attrs[c] ?? ovr]), abil };
 }
 
 /** A rated basketball card as the arcade game's player (for the match step). */

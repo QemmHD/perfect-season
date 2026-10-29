@@ -1,0 +1,101 @@
+/* Implemented by Codex. Shared edition skins travel with CardArt, including match screens. */
+.utc.t-spotlight {
+  --frame: linear-gradient(140deg, #f5dcff, #8250d5 27%, #a2fff1 57%, #b37aef 80%, #f5e8ff);
+  --face: radial-gradient(ellipse at 60% 45%, #7a4ba9, #23153f 65%, #12182c);
+  --ink: #fcf4ff;
+  --plate: #100d30b8;
+  box-shadow:
+    0 0 0 0.1em #bca0ed70,
+    0 0 1.6em #a55ded30;
+}
+.utc.t-goat {
+  --frame: linear-gradient(135deg, #fff8d3, #d1a652 17%, #fff9dc 34%, #6f5124 51%, #e2c17b 70%, #fff4ce 83%, #b98a3c);
+  --face: radial-gradient(ellipse at 50% 48%, #655024, #17242a 55%, #060f19);
+  --ink: #fff1c7;
+  --plate: linear-gradient(180deg, #04111be0, #16272bf5);
+  box-shadow:
+    0 0 0 0.12em #ffe7aa90,
+    0 0 2em #f4cc683d;
+}
+.t-spotlight .utc-glow {
+  background: repeating-conic-gradient(from 22deg at 50% 50%, #d8c5ff26 0deg 2deg, transparent 2deg 22deg), radial-gradient(ellipse at 50% 60%, #39e2c155, transparent 65%);
+}
+.t-goat .utc-glow {
+  background: repeating-linear-gradient(120deg, transparent 0 1.2em, #eed59b17 1.2em 1.26em), radial-gradient(ellipse at 50% 60%, #ffe8a75a, transparent 60%);
+}
+.utc.t-goat .utc-ovr,
+.utc.t-spotlight .utc-ovr {
+  font-size: 2.7em;
+  letter-spacing: -0.05em;
+}
+.utc-crown {
+  position: absolute;
+  width: 3.1em;
+  height: 2.5em;
+  left: 50%;
+  top: 1.4em;
+  transform: translateX(-50%);
+  color: #e7cb86;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 0.5em #fce5a573);
+}
+.utc-edition {
+  position: absolute;
+  right: 0.6em;
+  top: 5.5em;
+  writing-mode: vertical-rl;
+  font-size: 0.55em;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  opacity: 0.85;
+}
+.t-spotlight .utc-edition {
+  color: #e0caff;
+}
+.t-goat .utc-edition {
+  color: #f4d58b;
+}
+.utc.t-spotlight .utc-badge,
+.utc.t-goat .utc-badge {
+  box-shadow: 0 0 0.8em #fff2;
+}
+.utc.t-goat .utc-shine,
+.utc.t-spotlight .utc-shine {
+  opacity: 0.8;
+}
+.tier-goat,
+.ut-tiername.t-goat,
+.ut-walk-tier.t-goat {
+  color: #f4d58b;
+}
+.ut-tiername.t-spotlight,
+.ut-walk-tier.t-spotlight {
+  color: #d3aeff;
+}
+.ut-tierchip.t-goat {
+  background: #bd934333;
+  color: #f4d58b;
+}
+.ut-tierchip.t-spotlight {
+  background: #a16ef02b;
+  color: #d3aeff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .utc.t-goat,
+  .utc.t-spotlight {
+    transition: none;
+  }
+}
+.utc.big.t-goat .utc-shine,
+.utc.big.t-spotlight .utc-shine {
+  background: linear-gradient(115deg, transparent 24%, #fff5da4d 46%, transparent 61%) 0 0/300% 100%;
+  opacity: 0.2;
+  mix-blend-mode: screen;
+  animation: foil-sweep 6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .utc.big.t-goat .utc-shine,
+  .utc.big.t-spotlight .utc-shine {
+    animation: none !important;
+  }
+}

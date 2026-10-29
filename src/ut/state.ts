@@ -17,6 +17,11 @@ export interface PendingPack {
 export interface UtState {
   v: 1;
   rivals?: RivalsState;
+  collected?: string[];
+  collectionClaims?: string[];
+  events?: Record<string, number>;
+  registeredOpenings?: string[];
+  pendingPromo?: { id: string; kind: string; price: number; packId?: string; at: number };
   settled?: string[];
   owned: OwnedCard[];
   /** UIDs of spare exact-edition copies. All cards remain in `owned` for original-build restores. */
@@ -42,7 +47,20 @@ export interface UtState {
 }
 
 export function freshUt(): UtState {
-  return { v: 1, owned: [], duplicateStorage: [], squad: {}, packsOpened: 0, starterClaimed: false, sbc: { done: {} }, packs: [], sold: { cards: 0, coins: 0 }, battles: { week: '', cleared: 0, best: 0 }, record: { w: 0, l: 0, h2hW: 0, h2hL: 0 }, paid: { day: '', n: 0 } };
+  return {
+    v: 1,
+    owned: [],
+    duplicateStorage: [],
+    squad: {},
+    packsOpened: 0,
+    starterClaimed: false,
+    sbc: { done: {} },
+    packs: [],
+    sold: { cards: 0, coins: 0 },
+    battles: { week: '', cleared: 0, best: 0 },
+    record: { w: 0, l: 0, h2hW: 0, h2hL: 0 },
+    paid: { day: '', n: 0 },
+  };
 }
 
 const num = (x: unknown, d: number): number => (typeof x === 'number' && Number.isFinite(x) ? x : d);
@@ -62,15 +80,34 @@ export function migrateUt(raw: unknown): UtState {
     for (const c of r.owned as Partial<OwnedCard>[]) {
       if (!c || typeof c.uid !== 'string' || typeof c.cardId !== 'string' || seen.has(c.uid)) continue;
       seen.add(c.uid);
-      owned.push({ uid: c.uid, cardId: c.cardId, level: Math.max(1, Math.min(5, Math.round(num(c.level, 1)))), xp: Math.max(0, num(c.xp, 0)), at: num(c.at, 0) });
+      owned.push({
+        uid: c.uid,
+        cardId: c.cardId,
+        level: Math.max(1, Math.min(5, Math.round(num(c.level, 1)))),
+        xp: Math.max(0, num(c.xp, 0)),
+        at: num(c.at, 0),
+        ...(c.mint && Number.isSafeInteger(c.mint.serial) && c.mint.serial > 0 && typeof c.mint.requestId === 'string' && typeof c.mint.namespace === 'string'
+          ? {
+              mint: {
+                serial: c.mint.serial,
+                totalAtPull: Math.max(c.mint.serial, num(c.mint.totalAtPull, c.mint.serial)),
+                requestId: c.mint.requestId,
+                namespace: c.mint.namespace,
+              },
+            }
+          : {}),
+      });
     }
   const squad: Record<string, string> = {};
   if (r.squad && typeof r.squad === 'object')
-    for (const [slot, uid] of Object.entries(r.squad as Record<string, unknown>)) if (typeof uid === 'string' && seen.has(uid) && !Object.values(squad).includes(uid)) squad[slot] = uid;
+    for (const [slot, uid] of Object.entries(r.squad as Record<string, unknown>))
+      if (typeof uid === 'string' && seen.has(uid) && !Object.values(squad).includes(uid)) squad[slot] = uid;
   const done: Record<string, number> = {};
   const sbc = r.sbc as { done?: unknown } | undefined;
   if (sbc && sbc.done && typeof sbc.done === 'object') for (const [k, v] of Object.entries(sbc.done as Record<string, unknown>)) if (typeof v === 'number') done[k] = v;
-  const packs: PendingPack[] = Array.isArray(r.packs) ? (r.packs as PendingPack[]).filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string').map((p) => ({ id: p.id, kind: p.kind, at: num(p.at, 0) })) : [];
+  const packs: PendingPack[] = Array.isArray(r.packs)
+    ? (r.packs as PendingPack[]).filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string').map((p) => ({ id: p.id, kind: p.kind, at: num(p.at, 0) }))
+    : [];
   const sold = r.sold as { cards?: unknown; coins?: unknown } | undefined;
   const bt = r.battles as { week?: unknown; cleared?: unknown; best?: unknown; round?: unknown; level?: unknown } | undefined;
   const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL', unknown>> | undefined;
@@ -79,8 +116,18 @@ export function migrateUt(raw: unknown): UtState {
   return organizeStorage({
     v: 1,
     ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),
-    ...(Array.isArray(r.settled) ? { settled: r.settled.filter(x => typeof x === 'string').slice(-1000) } : {}),
+    ...(Array.isArray(r.settled) ? { settled: r.settled.filter((x) => typeof x === 'string').slice(-1000) } : {}),
     owned,
+    ...(Array.isArray(r.collected) ? { collected: [...new Set([...r.collected.filter((id): id is string => typeof id === 'string'), ...owned.map((c) => c.cardId)])] } : {}),
+    ...(Array.isArray(r.collectionClaims) ? { collectionClaims: [...new Set(r.collectionClaims.filter((id): id is string => typeof id === 'string'))] } : {}),
+    ...(Array.isArray(r.registeredOpenings) ? { registeredOpenings: [...new Set(r.registeredOpenings.filter((id): id is string => typeof id === 'string'))] } : {}),
+    ...(r.events && typeof r.events === 'object' ? { events: Object.fromEntries(Object.entries(r.events).map(([id, n]) => [id, Math.min(3, count(n))])) } : {}),
+    ...(r.pendingPromo &&
+    typeof r.pendingPromo === 'object' &&
+    typeof (r.pendingPromo as UtState['pendingPromo'])?.id === 'string' &&
+    typeof (r.pendingPromo as UtState['pendingPromo'])?.kind === 'string'
+      ? { pendingPromo: { ...(r.pendingPromo as NonNullable<UtState['pendingPromo']>), price: count((r.pendingPromo as NonNullable<UtState['pendingPromo']>).price) } }
+      : {}),
     duplicateStorage: Array.isArray(r.duplicateStorage) ? r.duplicateStorage.filter((uid): uid is string => typeof uid === 'string' && seen.has(uid)) : [],
     squad,
     packsOpened: Math.max(0, Math.round(num(r.packsOpened, 0))),
@@ -88,7 +135,13 @@ export function migrateUt(raw: unknown): UtState {
     sbc: { done },
     packs,
     sold: { cards: num(sold?.cards, 0), coins: num(sold?.coins, 0) },
-    battles: { week: typeof bt?.week === 'string' ? bt.week : '', cleared: Math.min(8, count(bt?.cleared)), best: Math.min(8, count(bt?.best)), ...(count(bt?.round) ? { round: count(bt?.round) } : {}), ...(bt?.level ? { level: levelOf(bt.level) } : {}) },
+    battles: {
+      week: typeof bt?.week === 'string' ? bt.week : '',
+      cleared: Math.min(8, count(bt?.cleared)),
+      best: Math.min(8, count(bt?.best)),
+      ...(count(bt?.round) ? { round: count(bt?.round) } : {}),
+      ...(bt?.level ? { level: levelOf(bt.level) } : {}),
+    },
     record: { w: count(rec?.w), l: count(rec?.l), h2hW: count(rec?.h2hW), h2hL: count(rec?.h2hL) },
     paid: { day: typeof paid?.day === 'string' ? paid.day : '', n: count(paid?.n) },
   });

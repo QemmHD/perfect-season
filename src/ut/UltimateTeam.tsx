@@ -5,7 +5,7 @@ import { Rivals, RivalsTeaser } from './Rivals';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { easternDateKey } from '../engine/season';
 import { NFL, SPORT } from '../engine/sport';
-import { newId, type Profile } from '../lib/profile';
+import { newId, saveProfile, type Profile } from '../lib/profile';
 import { reloadForMissingFiles } from '../lib/update';
 import { sfx, vibrate } from '../lib/sound';
 import { NET_ON } from '../net/nostr';
@@ -28,6 +28,13 @@ import { SquadView } from './SquadView';
 import type { UtState } from './state';
 import { organizeStorage, removeCards, storedCards, useStoredCopy } from './storage';
 import './storage.css';
+import './content.css';
+import { CollectionGallery } from './CollectionGallery';
+import { Events } from './Events';
+import { ownedCardsForPack } from './acquisition';
+import { claimCollection } from './collection';
+import { openRegisteredPack } from './registry';
+import { registeredOpening } from './promo';
 import { Store } from './Store';
 import type { OwnedCard, RatedCard } from './types';
 
@@ -40,7 +47,7 @@ export interface ClubCard {
   storage?: boolean;
 }
 
-export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles' | 'rivals';
+export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles' | 'rivals' | 'gallery' | 'events';
 
 /** the view to come back to after a match (the screen unmounts while it's played) */
 let lastView: UtView = 'hub';
@@ -59,6 +66,7 @@ export interface Opening {
   kind: string;
   cards: { uid: string; rc: RatedCard }[];
   stored?: number;
+  mint?: { serial: number; total: number };
 }
 
 export default function UltimateTeam(props: {
@@ -82,6 +90,11 @@ export default function UltimateTeam(props: {
   const [showStorage, setShowStorage] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
   const busy = useRef(false);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoError, setPromoError] = useState('');
+  const [promoRetry, setPromoRetry] = useState(0);
+  const latest = useRef(profile);
+  latest.current = profile;
   const [day] = useState(() => easternDateKey());
 
   const tries = useRef(0);
@@ -109,7 +122,7 @@ export default function UltimateTeam(props: {
   }, [pool, ut.owned, ut.duplicateStorage, slotOf]);
   const stored: ClubCard[] = useMemo(() => {
     if (!pool) return [];
-    return storedCards(ut).flatMap(oc => {
+    return storedCards(ut).flatMap((oc) => {
       const rc = ratedOf(pool, oc);
       return rc ? [{ uid: oc.uid, oc, rc, slot: null, storage: true }] : [];
     });
@@ -129,34 +142,92 @@ export default function UltimateTeam(props: {
     setView(v);
   };
 
+  // A pending request is persisted before contact. Retries recover the same server receipt.
+  const startPromo = (kind: string, price: number, packId?: string) => {
+    if (busy.current || promoBusy || ut.pendingPromo) {
+      onToast('Finish your reserved pack in the Store first.');
+      return;
+    }
+    if (profile.coins < price) {
+      onToast('Not enough coins for this pack.');
+      return;
+    }
+    busy.current = true;
+    const pending = { id: newId(), kind, price, at: Date.now(), ...(packId ? { packId } : {}) };
+    const next = { ...profile, ut: { ...ut, pendingPromo: pending } };
+    if (!saveProfile(next)) {
+      busy.current = false;
+      onToast('Your phone could not save the pack request. Back up your progress and retry.');
+      return;
+    }
+    setPromoError('');
+    update((p) => ({ ...p, ut: { ...p.ut, pendingPromo: pending } }));
+  };
+  useEffect(() => {
+    const pending = ut.pendingPromo;
+    if (!pool || !pending) return;
+    let live = true;
+    setPromoBusy(true);
+    setPromoError('');
+    void openRegisteredPack(SPORT, pending.id, pending.kind)
+      .then((receipt) => {
+        if (!live) return;
+        const preview = registeredOpening(pool, latest.current, receipt);
+        update((p) => registeredOpening(pool, p, receipt).profile);
+        if (preview.opening) setOpening(preview.opening);
+        busy.current = false;
+        setPromoBusy(false);
+      })
+      .catch((e) => {
+        if (live) {
+          busy.current = false;
+          setPromoBusy(false);
+          setPromoError(e instanceof Error ? e.message : 'Retry to recover your reserved pack.');
+        }
+      });
+    return () => {
+      live = false;
+    };
+  }, [pool, ut.pendingPromo?.id, promoRetry]);
+
   // ---------- packs ----------
 
   /** Open a pack now: its cards go into the club at once (closing the app mid-reveal keeps them).
    * `fill`: an empty squad is built from the club, these cards included (the starter pack). */
   const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile, fill = false) => {
-    if (!pool || busy.current) return;
+    if (!pool || busy.current || promoBusy || ut.pendingPromo) {
+      if (ut.pendingPromo) onToast('Finish your reserved pack in the Store first.');
+      return;
+    }
     busy.current = true;
     window.setTimeout(() => (busy.current = false), 600);
     // truly random cards (`seed` only names the pack and its cards' ids)
     const cards = openPack(pool, kind);
     const at = Date.now();
-    const tag = seed.replace(/[^a-z0-9]/gi, '').slice(0, 10);
-    const owned: OwnedCard[] = cards.map((rc, i) => ({ uid: tag + '-' + i, cardId: rc.line.id, level: 1, xp: 0, at: at + i }));
+    const owned = ownedCardsForPack(cards, seed, at);
     update((p) => {
       const deposited = organizeStorage(p.ut, owned);
       const empty = fill && !Object.keys(deposited.squad).length;
-      const squad = empty ? autoBuild(SPORT, deposited.owned.filter(oc => !deposited.duplicateStorage?.includes(oc.uid)).flatMap(oc => {
-        const rc = ratedOf(pool, oc);
-        return rc ? [{ uid: oc.uid, rc }] : [];
-      })) : deposited.squad;
+      const squad = empty
+        ? autoBuild(
+            SPORT,
+            deposited.owned
+              .filter((oc) => !deposited.duplicateStorage?.includes(oc.uid))
+              .flatMap((oc) => {
+                const rc = ratedOf(pool, oc);
+                return rc ? [{ uid: oc.uid, rc }] : [];
+              })
+          )
+        : deposited.squad;
       const q = { ...p, ut: { ...deposited, squad, packsOpened: p.ut.packsOpened + 1 } };
       return also ? also(q) : q;
     });
     const stored = new Set(organizeStorage(ut, owned).duplicateStorage);
-    setOpening({ id: seed, title, kind, stored: owned.filter(c => stored.has(c.uid)).length, cards: cards.map((rc, i) => ({ uid: owned[i].uid, rc })) });
+    setOpening({ id: seed, title, kind, stored: owned.filter((c) => stored.has(c.uid)).length, cards: cards.map((rc, i) => ({ uid: owned[i].uid, rc })) });
   };
 
   const buy = (kind: string, price: number) => {
+    if (kind === 'spotlight') return startPromo(kind, packDefs(SPORT).spotlight.price);
     if (profile.coins < price) {
       sfx.nope();
       onToast('Not enough coins yet: ' + (price - profile.coins).toLocaleString('en-US') + ' more. Games, missions and challenges all pay.');
@@ -176,6 +247,7 @@ export default function UltimateTeam(props: {
   const openPending = (id: string) => {
     const pp = ut.packs.find((x) => x.id === id);
     if (!pp) return;
+    if (pp.kind.startsWith('event-spotlight:') || pp.kind === 'spotlight') return startPromo(pp.kind, 0, pp.id);
     sfx.click();
     openNow(pp.kind, pp.id, packName(SPORT, pp.kind), (p) => ({ ...p, ut: { ...p.ut, packs: p.ut.packs.filter((x) => x.id !== id) } }));
   };
@@ -188,8 +260,8 @@ export default function UltimateTeam(props: {
     const coins = cards.reduce((a, c) => a + quickSellValue(c.rc), 0);
     const gone = new Set(cards.map((c) => c.uid));
     update((p) => {
-      const current = new Set(p.ut.owned.map(c => c.uid));
-      const sold = cards.filter(c => current.has(c.uid));
+      const current = new Set(p.ut.owned.map((c) => c.uid));
+      const sold = cards.filter((c) => current.has(c.uid));
       if (!sold.length) return p;
       const proceeds = sold.reduce((sum, c) => sum + quickSellValue(c.rc), 0);
       return {
@@ -232,16 +304,24 @@ export default function UltimateTeam(props: {
 
   const submitSbc = (s: Sbc, uids: string[]) => {
     if (!pool || ut.sbc.done[s.id]) return;
-    const selected = uids.map(uid => byUid.get(uid));
-    if (new Set(uids).size !== uids.length || selected.some(c => !c) || !checkSbc(s, selected.map(c => c!.rc)).ok) return;
+    const selected = uids.map((uid) => byUid.get(uid));
+    if (
+      new Set(uids).size !== uids.length ||
+      selected.some((c) => !c) ||
+      !checkSbc(
+        s,
+        selected.map((c) => c!.rc)
+      ).ok
+    )
+      return;
     const gone = new Set(uids);
     const week = weekOf(day);
     const rc = s.reward.card ? rewardCard(pool, s.reward.card) : null;
     const prize: OwnedCard | null = rc ? { uid: 'sbc' + newId().replace(/-/g, '').slice(0, 8), cardId: rc.line.id, level: 1, xp: 0, at: Date.now() } : null;
     const pack = s.reward.pack ? { id: newId(), kind: s.reward.pack, at: Date.now() } : null;
     update((p) => {
-      const current = new Set(p.ut.owned.map(c => c.uid));
-      if (p.ut.sbc.done[s.id] || uids.some(uid => !current.has(uid))) return p;
+      const current = new Set(p.ut.owned.map((c) => c.uid));
+      if (p.ut.sbc.done[s.id] || uids.some((uid) => !current.has(uid))) return p;
       // only this day's and week's challenges need remembering
       const done = Object.fromEntries(Object.entries(p.ut.sbc.done).filter(([k]) => k.includes(day) || k.includes(week)));
       done[s.id] = Date.now();
@@ -258,10 +338,11 @@ export default function UltimateTeam(props: {
     sfx.levelUp();
     vibrate([20, 40, 20]);
     if (rc && prize) setOpening({ id: 'sbc:' + s.id, title: s.title, kind: 'reward', cards: [{ uid: prize.uid, rc }] });
-    else onToast(s.title + ' done!' + (pack ? ' Your ' + packName(SPORT, pack.kind) + ' is waiting in the Store.' : '') + (s.reward.coins ? ' +' + s.reward.coins + ' coins.' : ''));
+    else
+      onToast(s.title + ' done!' + (pack ? ' Your ' + packName(SPORT, pack.kind) + ' is waiting in the Store.' : '') + (s.reward.coins ? ' +' + s.reward.coins + ' coins.' : ''));
   };
 
-  const detailCard = detail ? byUid.get(detail) ?? null : null;
+  const detailCard = detail ? (byUid.get(detail) ?? null) : null;
   // (the upgrades and repeatables are always there: they don't count toward what's left to do)
   const todo = sbcs.filter((s) => s.kind !== 'upgrade' && !ut.sbc.done[s.id]).length;
 
@@ -282,16 +363,65 @@ export default function UltimateTeam(props: {
         <p>Loading {NFL ? 'football' : 'basketball'} cards…</p>
       </div>
     );
-  else if (view === 'squad') body = <SquadView pool={pool} club={club} lineup={lineup} squad={ut.squad} rating={rating} onSlot={setSlot} onSquad={setSquad} onInspect={setDetail} onToast={onToast} />;
-  else if (view === 'club') body = <div className="ut-collection-shell">
-    <div className="ut-storage-tabs" role="group" aria-label="Card location">
-      <button aria-pressed={!showStorage} onClick={() => setShowStorage(false)}>CLUB <b className="num">{club.length}</b></button>
-      <button aria-pressed={showStorage} onClick={() => setShowStorage(true)}>DUPLICATE STORAGE <b className="num">{stored.length}</b></button>
-    </div>
-    <Club key={showStorage ? 'storage' : 'club'} club={showStorage ? stored : club} storage={showStorage} onInspect={setDetail} onSell={quickSell} />
-  </div>;
+  else if (view === 'squad')
+    body = <SquadView pool={pool} club={club} lineup={lineup} squad={ut.squad} rating={rating} onSlot={setSlot} onSquad={setSquad} onInspect={setDetail} onToast={onToast} />;
+  else if (view === 'club')
+    body = (
+      <div className="ut-collection-shell">
+        <div className="ut-storage-tabs" role="group" aria-label="Card location">
+          <button aria-pressed={!showStorage} onClick={() => setShowStorage(false)}>
+            CLUB <b className="num">{club.length}</b>
+          </button>
+          <button aria-pressed={showStorage} onClick={() => setShowStorage(true)}>
+            DUPLICATE STORAGE <b className="num">{stored.length}</b>
+          </button>
+        </div>
+        <Club key={showStorage ? 'storage' : 'club'} club={showStorage ? stored : club} storage={showStorage} onInspect={setDetail} onSell={quickSell} />
+      </div>
+    );
+  else if (view === 'gallery')
+    body = (
+      <CollectionGallery
+        pool={pool}
+        ut={ut}
+        onClaim={(id) => {
+          update((p) => {
+            const result = claimCollection(pool, p.ut, id, Date.now());
+            return { ...p, coins: p.coins + result.coins, ut: result.ut };
+          });
+        }}
+      />
+    );
+  else if (view === 'events')
+    body = <Events pool={pool} ut={ut} ready={ready} onSquad={() => go('squad')} onPlay={(id, node) => props.onPlaySquad?.({ id: Date.now(), mode: 'ai', event: { id, node } })} />;
   else if (view === 'store')
-    body = <Store sport={SPORT} coins={profile.coins} starter={!ut.starterClaimed} pending={ut.packs} defs={packDefs(SPORT)} onBuy={buy} onStarter={claimStarter} onPending={openPending} />;
+    body = (
+      <>
+        <div className="ut-registry-status" aria-live="polite">
+          {ut.pendingPromo && (
+            <>
+              <b>{promoBusy ? 'Registering your pack…' : 'Your pack is reserved.'}</b>
+              <p>{promoError || 'Your pull is being checked and saved. Coins are charged once when the cards arrive.'}</p>
+              {!promoBusy && (
+                <button className="btn primary" onClick={() => setPromoRetry((n) => n + 1)}>
+                  RETRY SAME PACK
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        <Store
+          sport={SPORT}
+          coins={profile.coins}
+          starter={!ut.starterClaimed}
+          pending={ut.packs}
+          defs={packDefs(SPORT)}
+          onBuy={buy}
+          onStarter={claimStarter}
+          onPending={openPending}
+        />
+      </>
+    );
   else if (view === 'battles')
     body = (
       <Battles
@@ -311,12 +441,27 @@ export default function UltimateTeam(props: {
         }}
       />
     );
-  else if (view === 'rivals') body = <Rivals profile={profile} update={update} onToast={onToast} onPlay={() => { if (!ready) { onToast('Fill your starting squad first.'); go('squad'); return; } props.onPlaySquad?.({id:Date.now(),mode:'online'}); }} />;
+  else if (view === 'rivals')
+    body = (
+      <Rivals
+        profile={profile}
+        update={update}
+        onToast={onToast}
+        onPlay={() => {
+          if (!ready) {
+            onToast('Fill your starting squad first.');
+            go('squad');
+            return;
+          }
+          props.onPlaySquad?.({ id: Date.now(), mode: 'online' });
+        }}
+      />
+    );
   else if (view === 'sbc') body = <Challenges pool={pool} sbcs={sbcs} done={ut.sbc.done} club={inventory} day={day} onSubmit={submitSbc} onToast={onToast} />;
   else
     body = (
       <Hub
-        rivals={<RivalsTeaser profile={profile} onOpen={()=>go('rivals')}/>}
+        rivals={<RivalsTeaser profile={profile} onOpen={() => go('rivals')} />}
         sport={SPORT}
         club={club}
         lineup={lineup}
@@ -349,10 +494,26 @@ export default function UltimateTeam(props: {
   return (
     <div className={'screen ut ut-v-' + view}>
       <div className="topbar ut-top">
-        <button className="icon-btn pill-btn" onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go('hub'))} aria-label={view === 'hub' ? 'Leave Ultimate Team' : 'Back to the Ultimate Team home'}>
+        <button
+          className="icon-btn pill-btn"
+          onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go('hub'))}
+          aria-label={view === 'hub' ? 'Leave Ultimate Team' : 'Back to the Ultimate Team home'}
+        >
           <Back size={16} /> {view === 'hub' ? 'HOME' : 'UT'}
         </button>
-        <span className="ut-title disp">{view === 'hub' ? 'Ultimate Team' : view === 'battles' ? 'Squad Battles' : view === 'rivals' ? 'Rivals' : TABS.find((t) => t[0] === view)![1]}</span>
+        <span className="ut-title disp">
+          {view === 'hub'
+            ? 'Ultimate Team'
+            : view === 'battles'
+              ? 'Squad Battles'
+              : view === 'rivals'
+                ? 'Rivals'
+                : view === 'gallery'
+                  ? 'Collection'
+                  : view === 'events'
+                    ? 'Spotlight Events'
+                    : TABS.find((t) => t[0] === view)![1]}
+        </span>
         <CoinChip coins={profile.coins} />
       </div>
       <div className="ut-body">{body}</div>
@@ -366,11 +527,23 @@ export default function UltimateTeam(props: {
           </button>
         ))}
       </nav>
-      {detailCard && <CardDetail cc={detailCard} sport={SPORT} onUse={detailCard.storage ? () => {
-        setUt(u => useStoredCopy(u, detailCard.uid));
-        setDetail(null);
-        onToast('Copy moved to your club. Your other copy is safe in Duplicate Storage.');
-      } : undefined} onSell={() => quickSell([detailCard.uid])} onClose={() => setDetail(null)} />}
+      {detailCard && (
+        <CardDetail
+          cc={detailCard}
+          sport={SPORT}
+          onUse={
+            detailCard.storage
+              ? () => {
+                  setUt((u) => useStoredCopy(u, detailCard.uid));
+                  setDetail(null);
+                  onToast('Copy moved to your club. Your other copy is safe in Duplicate Storage.');
+                }
+              : undefined
+          }
+          onSell={() => quickSell([detailCard.uid])}
+          onClose={() => setDetail(null)}
+        />
+      )}
       {opening && (
         <PackOpening
           key={opening.id}

@@ -21,11 +21,11 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * clamp(t, 0, 1);
 export const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
 /** a rating (0-99) as 0-1 between two marks */
-export const rt = (v: number | undefined, lo = 45, hi = 99) => clamp(((v ?? 60) - lo) / (hi - lo), 0, 1);
+export const rt = (v: number | undefined, lo = 45, hi = 99) => clamp(((v ?? 60) - lo) / (hi - lo), 0, 1) + ((v ?? 60) > 99 ? Math.min(11, v! - 99) * .009 : 0);
 
 /** top speed, yards a second: about 6.3 for a slow lineman to 9.6 for a burner */
 export function speedOf(p: FbPlayer): number {
-  return lerp(6.2, 9.6, rt(p.a.SPD, 40, 99));
+  return lerp(6.2, 9.6, rt(p.a.SPD, 40, 99)) + Math.max(0, Math.min(11, (p.a.SPD ?? 60) - 99)) * .045;
 }
 
 export const CONCEPTS: Concept[] = ['verts', 'slants', 'smash', 'flood', 'dagger', 'mesh', 'curls', 'posts'];

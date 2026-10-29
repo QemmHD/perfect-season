@@ -88,11 +88,12 @@ function themes(pool: Pool): Theme[] {
 }
 
 /** A squad for a theme, each spot the card nearest `aim` from the theme, then its decade, then anyone. */
-export function buildSquad(pool: Pool, theme: Theme, aim: number, seed: string): SquadWire {
+export function buildSquad(pool: Pool, theme: Theme, aim: number, seed: string, allowSpecial = false): SquadWire {
   const rand = rng(hashString(seed));
   const slots = slotsFor(pool.sport);
-  const decadeCards = Array.from(pool.base.values()).filter((rc) => rc.line.kind === 'season' && Math.floor(rc.line.season / 10) * 10 === theme.decade);
-  const all = Array.from(pool.base.values()).filter((rc) => rc.line.kind === 'season');
+  const eligible = (rc: RatedCard) => rc.line.kind === 'season' || (allowSpecial && (rc.tier === 'spotlight' || rc.tier === 'goat'));
+  const decadeCards = Array.from(pool.base.values()).filter((rc) => eligible(rc) && Math.floor(rc.line.season / 10) * 10 === theme.decade);
+  const all = Array.from(pool.base.values()).filter(eligible);
   const used = new Set<string>();
   const out: SquadWire = [];
   // the starters first (they make the overall), the bench after
@@ -130,21 +131,43 @@ export function wireRating(pool: Pool, w: SquadWire): number {
 }
 
 /** A themed AI squad around a target overall (this sport's scale). */
-function themedAround(pool: Pool, all: Theme[], target: number, rand: () => number, seed: string, avoid: Set<string>, min = 0): { theme: Theme; squad: SquadWire; ovr: number } {
+function themedAround(
+  pool: Pool,
+  all: Theme[],
+  target: number,
+  rand: () => number,
+  seed: string,
+  avoid: Set<string>,
+  min = 0,
+  allowSpecial = false
+): { theme: Theme; squad: SquadWire; ovr: number } {
   // a theme with cards near this level: its best players should reach the target
   const fits = all.filter((th) => !avoid.has(th.fr + th.decade) && th.cards.filter((c) => c.ovr >= target).length >= 3);
   const theme = pickOne(fits.length ? fits : all, rand);
   // a themed squad's chemistry adds a little: aim its cards just under the target, then correct
   let aim = target - 1;
-  let squad = buildSquad(pool, theme, aim, seed);
+  let squad = buildSquad(pool, theme, aim, seed, allowSpecial);
   let ovr = wireRating(pool, squad);
+  let best = { squad, ovr, aim };
+  const cost = (n: number) => Math.abs(n - target) + (n < min ? 100 : 0);
+  // Keep the closest candidate if discrete card ratings make the aim adjustment oscillate.
   // (and above `min`: a ladder's rungs only get harder)
   for (let k = 0; k < 5 && (Math.abs(ovr - target) > 1 || ovr < min); k++) {
     aim += ovr < min ? min - ovr : target - ovr;
-    squad = buildSquad(pool, theme, aim, seed);
+    squad = buildSquad(pool, theme, aim, seed, allowSpecial);
     ovr = wireRating(pool, squad);
+    if (cost(ovr) < cost(best.ovr)) best = { squad, ovr, aim };
   }
-  return { theme, squad, ovr };
+  if (cost(best.ovr) > 2 || best.ovr < min) {
+    const center = best.aim;
+    for (const offset of [0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2]) {
+      const candidate = buildSquad(pool, theme, center + offset, seed, allowSpecial),
+        rating = wireRating(pool, candidate);
+      if (cost(rating) < cost(best.ovr)) best = { squad: candidate, ovr: rating, aim: center + offset };
+      if (cost(best.ovr) <= 1) break;
+    }
+  }
+  return { theme, squad: best.squad, ovr: best.ovr };
 }
 
 const favOf = (pool: Pool, fr: string, seed: string) => teamOf(pool.sport, fr)?.abbr ?? aiFavorite(seed, pool.sport);
@@ -162,20 +185,42 @@ export function ladderFor(pool: Pool, week: string, round = 0, level: Level = 'p
   const picked = new Set<string>();
   let prev = 0;
   return TARGETS[sport].map((base, i) => {
-    const target = Math.min(sport === 'nba' ? 97 : 98, base + lv.ovr[sport]);
+    const target = Math.min(sport === 'nba' ? 97 : 98, (sport === 'nba' ? onScale(base, 'nba') : base) + lv.ovr[sport]);
     const { theme, squad, ovr } = themedAround(pool, all, target, rand, key + ':' + i, picked, prev + 1);
     picked.add(theme.fr + theme.decade);
     prev = ovr;
     const skill = Math.max(0.25, Math.min(0.97, SKILLS[i] + lv.skill));
-    return { i, title: theme.decade + 's ' + theme.name, fr: theme.fr, decade: theme.decade, target, ovr, squad, skill, fav: favOf(pool, theme.fr, 'battle:' + key + ':' + i), pack: lv.packs[i] ?? null };
+    return {
+      i,
+      title: theme.decade + 's ' + theme.name,
+      fr: theme.fr,
+      decade: theme.decade,
+      target,
+      ovr,
+      squad,
+      skill,
+      fav: favOf(pool, theme.fr, 'battle:' + key + ':' + i),
+      pack: lv.packs[i] ?? null,
+    };
   });
 }
 
 /** The AI that steps in when no one online is near your squad: a themed squad at your overall. */
 export function aiOpponent(pool: Pool, target: number, seed: string): Rung {
   const rand = rng(hashString('ut-ai:' + pool.sport + ':' + seed));
-  const { theme, squad, ovr } = themedAround(pool, themes(pool), target, rand, 'ai:' + seed, new Set());
-  return { i: -1, title: theme.decade + 's ' + theme.name, fr: theme.fr, decade: theme.decade, target, ovr, squad, skill: 0.68, fav: favOf(pool, theme.fr, 'ai:' + seed), pack: null };
+  const { theme, squad, ovr } = themedAround(pool, themes(pool), target, rand, 'ai:' + seed, new Set(), 0, target > 99);
+  return {
+    i: -1,
+    title: theme.decade + 's ' + theme.name,
+    fr: theme.fr,
+    decade: theme.decade,
+    target,
+    ovr,
+    squad,
+    skill: 0.68,
+    fav: favOf(pool, theme.fr, 'ai:' + seed),
+    pack: null,
+  };
 }
 
 const ladders = new Map<string, { pool: Pool; rungs: Rung[] }>();

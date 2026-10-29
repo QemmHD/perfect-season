@@ -322,7 +322,21 @@ export function rateNflLine(line: CardLine, pos = line.pos[0]): NflRating {
   // the standing: the best of its main ranks, honors aside
   const main = Object.values(line.rk).filter((v): v is number => typeof v === 'number');
   const rank = main.length ? main.reduce((s, v) => s + v, 0) / main.length * 0.5 + Math.max(...main) * 0.5 : 0.35;
-  const r = rateNfl({ pos, ht: line.ht, wt: line.wt, rank, stats: line.stats, rk: line.rk, honors: line.honors });
+  // Card data are season totals; rateNfl expects per-game rates and efficiency fractions.
+  const stats = { ...line.stats };
+  const per = (key: string) => typeof stats[key] === 'number' && (line.games ?? 0) > 0 ? stats[key]! / line.games! : null;
+  const ratio = (a: string, b: string) => typeof stats[a] === 'number' && (stats[b] ?? 0) > 0 ? stats[a]! / stats[b]! : null;
+  const g = groupOf(pos);
+  if (g === 'QB') {
+    stats.ypa = ratio('yds', 'att'); stats.intr = ratio('int', 'att');
+    stats.cmp = ratio('cmp', 'att'); stats.sk = per('sk'); stats.ry = per('ry');
+    // Missing interception fractions use the already-inverted good-decision percentile.
+    if (stats.intr === null && typeof line.rk.intr === 'number') stats.intr = .015 + (1 - line.rk.intr) * .035;
+  } else if (g === 'RB') { stats.ypc = ratio('ry', 'car'); stats.rec = per('rec'); }
+  else if (g === 'WR' || g === 'TE') { stats.ypr = ratio('recy', 'rec'); stats.cr = ratio('rec', 'tgt'); }
+  stats.starts = line.starts;
+  const r = rateNfl({ pos, ht: line.ht, wt: line.wt, rank, stats, rk: line.rk, honors: line.honors });
+  if (g === 'QB') { r.attrs.ACC = r99(r.attrs.SPD + 3); r.attrs.AGI = r99(r.attrs.SPD + 1); }
   if (line.boost) {
     r.ovr = Math.min(99, r.ovr + line.boost);
     for (const k of Object.keys(r.attrs)) r.attrs[k] = Math.min(99, r.attrs[k] + Math.round(line.boost * 0.8));

@@ -1,0 +1,4 @@
+project_id = "ryqaibujweiwwvdtswxj"
+[functions.card-registry]
+# Authentication is verified by the function using the player's signed Nostr event.
+verify_jwt = false

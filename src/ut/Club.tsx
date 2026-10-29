@@ -18,7 +18,7 @@ type Sort = string;
 /** The ratings to sort by, speed first. */
 const SORT_ATTRS: string[] =
   SPORT === 'nba' ? NBA_ATTRS.map(([c]) => c) : Array.from(new Set(['SPD', 'ACC', ...Object.values(NFL_KEYS).flatMap((ks) => ks.map(([c]) => c))]));
-type TierF = 'all' | 'bronze' | 'silver' | 'gold' | 'special';
+type TierF = 'all' | 'bronze' | 'silver' | 'gold' | 'special' | 'spotlight' | 'goat';
 
 /** Cards put on the page at a time: more come as you scroll down to them. */
 const PAGE = 48;
@@ -47,7 +47,7 @@ export function Club({ club, storage = false, onInspect, onSell }: { club: ClubC
     const out = club.filter(
       (c) =>
         (f.pos === 'all' || c.rc.line.pos.includes(f.pos)) &&
-        (f.tier === 'all' || (f.tier === 'special' ? c.rc.tier === 'promo' || c.rc.tier === 'legend' : c.rc.tier === f.tier)) &&
+        (f.tier === 'all' || (f.tier === 'special' ? ['promo','spotlight','legend','goat'].includes(c.rc.tier) : c.rc.tier === f.tier)) &&
         (f.team === 'all' || c.rc.line.fr === f.team) &&
         (f.dec === 'all' || decadeOf(c.rc.line.season) === f.dec)
     );
@@ -89,7 +89,7 @@ export function Club({ club, storage = false, onInspect, onSell }: { club: ClubC
           ))}
         </div>
         <div className="ut-chips" role="group" aria-label="Tier">
-          {(['all', 'bronze', 'silver', 'gold', 'special'] as TierF[]).map((t) => (
+          {(['all', 'bronze', 'silver', 'gold', 'special', 'spotlight', 'goat'] as TierF[]).map((t) => (
             <button key={t} className={'chip ut-tf tf-' + t + (f.tier === t ? ' on' : '')} aria-pressed={f.tier === t} onClick={() => set({ tier: t })}>
               {t === 'all' ? 'ANY TIER' : t === 'special' ? 'SPECIAL' : t.toUpperCase()}
             </button>

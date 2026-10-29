@@ -1,5 +1,6 @@
-import type { UtState } from "./state";
-import type { OwnedCard } from "./types";
+import type { UtState } from './state';
+import { rememberCollection } from './collection';
+import type { OwnedCard } from './types';
 
 /** Canonical cards stay in `owned` so the original restore build can still read every copy. */
 export function storedCards(ut: UtState): OwnedCard[] {
@@ -8,15 +9,10 @@ export function storedCards(ut: UtState): OwnedCard[] {
 }
 
 /** Exact editions only: another season or special edition always remains a separate club card. */
-export function organizeStorage(
-  ut: UtState,
-  additions: OwnedCard[] = [],
-): UtState {
+export function organizeStorage(ut: UtState, additions: OwnedCard[] = []): UtState {
   const equipped = new Set(Object.values(ut.squad));
   const previous = new Set(ut.duplicateStorage ?? []);
-  const inClub = new Set(
-    ut.owned.filter((c) => !previous.has(c.uid)).map((c) => c.uid),
-  );
+  const inClub = new Set(ut.owned.filter((c) => !previous.has(c.uid)).map((c) => c.uid));
   const seen = new Set<string>();
   const groups = new Map<string, OwnedCard[]>();
   const owned: OwnedCard[] = [];
@@ -36,19 +32,12 @@ export function organizeStorage(
     else {
       const best = group
         .slice()
-        .sort(
-          (a, b) =>
-            Number(inClub.has(b.uid)) - Number(inClub.has(a.uid)) ||
-            b.level - a.level ||
-            b.xp - a.xp ||
-            a.at - b.at ||
-            a.uid.localeCompare(b.uid),
-        )[0];
+        .sort((a, b) => Number(inClub.has(b.uid)) - Number(inClub.has(a.uid)) || b.level - a.level || b.xp - a.xp || a.at - b.at || a.uid.localeCompare(b.uid))[0];
       keep.add(best.uid);
     }
   }
   return {
-    ...ut,
+    ...(owned.length || ut.collected ? rememberCollection({ ...ut, owned }) : ut),
     owned,
     duplicateStorage: owned.filter((c) => !keep.has(c.uid)).map((c) => c.uid),
   };
@@ -60,22 +49,13 @@ export function useStoredCopy(ut: UtState, uid: string): UtState {
   const card = ut.owned.find((c) => c.uid === uid);
   if (!card) return ut;
   const stored = new Set(ut.duplicateStorage);
-  const current = ut.owned.find(
-    (c) => c.cardId === card.cardId && !stored.has(c.uid),
-  );
+  const current = ut.owned.find((c) => c.cardId === card.cardId && !stored.has(c.uid));
   stored.delete(uid);
   if (current) stored.add(current.uid);
   return {
     ...ut,
-    duplicateStorage: ut.owned
-      .filter((c) => stored.has(c.uid))
-      .map((c) => c.uid),
-    squad: Object.fromEntries(
-      Object.entries(ut.squad).map(([slot, id]) => [
-        slot,
-        id === current?.uid ? uid : id,
-      ]),
-    ),
+    duplicateStorage: ut.owned.filter((c) => stored.has(c.uid)).map((c) => c.uid),
+    squad: Object.fromEntries(Object.entries(ut.squad).map(([slot, id]) => [slot, id === current?.uid ? uid : id])),
   };
 }
 
@@ -83,10 +63,8 @@ export function useStoredCopy(ut: UtState, uid: string): UtState {
 export function removeCards(ut: UtState, uids: Iterable<string>): UtState {
   const gone = new Set(uids);
   return organizeStorage({
-    ...ut,
+    ...rememberCollection(ut),
     owned: ut.owned.filter((c) => !gone.has(c.uid)),
-    squad: Object.fromEntries(
-      Object.entries(ut.squad).filter(([, uid]) => !gone.has(uid)),
-    ),
+    squad: Object.fromEntries(Object.entries(ut.squad).filter(([, uid]) => !gone.has(uid))),
   });
 }
