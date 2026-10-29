@@ -27,4 +27,16 @@ No credentials are stored in this document. Native Sites deployment returned `su
 
 ## Follow-up client update (Codex)
 
-The preview is being updated in place from the feature branch with automatic encrypted server saves and the all-tier ratings corrections. Its original origin, `preview2026` namespace, profile keys and installed app ID remain; existing preview progress is preserved. The old file-backup UI is replaced by Cloud Save. New saved-version/source/deployment references are recorded below after successful publication; the original deployment references above remain historical evidence.
+The preview is updated in place from the feature branch with automatic encrypted server saves and the all-tier ratings corrections. Its original origin, `preview2026` namespace, profile keys and installed app ID remain; existing preview progress is preserved. The old file-backup UI is replaced by Cloud Save. New saved-version/source/deployment references are listed below; the original deployment references above remain historical evidence.
+
+
+### Current deployed follow-up
+
+- GitHub content: `967599c4f5f2be556a3de1d80d29cba53c1244f6` (tree `df86d3708469f7847d1268068c8905e3a2978506`), with 493 passing tests and a passing GitHub Review build.
+- Sites source: `5deb0d2e04a2375eb74ad50c0421748c8c2ac22e`.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_8580ca16b3cc8191a72ebeba1f1f251c`.
+- Deployment: `appgdep_6ae3373a88d88191928a2266010ad020`, **succeeded**, 2026-10-29.
+- URL stays https://perfect-season-private-preview.qem.chatgpt.site . Its current private audience, origin and installed app ID remain unchanged.
+- New server-save function: `player-save` version 2 in the existing approved Supabase project, isolated by `preview2026` alongside card counts. It uses the existing Nostr player identity; no downloaded backup file or new username/password system is required. Identity recovery limits are explicit in AUTOMATIC-SAVES.md.
+
+Main/Pages still serves the original release. The first deployment references above are retained as history; this section identifies the current private test copy.
