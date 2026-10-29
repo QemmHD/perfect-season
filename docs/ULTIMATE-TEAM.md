@@ -23,7 +23,7 @@ The card pool is every player-season in the data, rated 2K/Madden-style.
   legend style, 90-99.
 - **Spotlight / GOAT:** Codex added frozen editions with base overalls 100–105 / 106–110, whole-profile boosts and global copy numbers. See [the content rules](UT-CONTENT-UPDATE.md).
 - **Upgradable card:** any card can be levelled. Each game it plays in earns XP. Levels 1-5, each
-  giving +1 overall (spread over its key attributes). A promo or legend keeps its own cap.
+  giving up to +1 overall with improved key attributes, within the edition cap and attribute-supported overall. A promo or legend keeps its own cap.
 
 The card id is stable: `<sport>:<kind>:<season>:<pid>:<team>`.
 

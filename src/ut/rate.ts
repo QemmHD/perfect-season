@@ -1,3 +1,5 @@
+import { nflIdentity } from './nfl-identity';
+import { editionAttributes, profileQuality, supportEdition } from './rating-quality';
 // Ultimate Team ratings: a card line becomes a rated card with the same code the played games use,
 // so a card shows exactly what it plays like. Basketball goes through hoops2's `hooper()` (fed the
 // season's own ranks), football through football2's `rateNflLine()`. On top of the base rating:
@@ -5,7 +7,7 @@
 // editions improve the full profile, retain signature weaknesses, and support 100–110 gameplay. See docs/ULTIMATE-TEAM.md.
 import { calibrateNba, nbaRosterScale } from './calibration';
 import type { Attrs } from '../game/attrs';
-import { groupOf, NFL_KEYS, rateNflLine } from '../game/football2/ratings';
+import { groupOf, NFL_KEYS, rateNflLine, nflAbilities } from '../game/football2/ratings';
 import { BADGE_NAMES, badges, hooper, type NbaLine } from '../game/hoops2/ratings';
 import type { Hooper } from '../game/hoops2/types';
 import { MAX_LEVEL } from './state';
@@ -188,9 +190,10 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   } else {
     // the boost is applied here, the same way for both sports, whatever rateNflLine does with it
     const r = rateNflLine({ ...line, boost: undefined }, pos ?? line.pos[0]);
-    base = r.ovr;
+    const actualAttrs = nflIdentity(line, r.attrs);
+    base = Math.min(r.ovr, Math.round(profileQuality('nfl', r.pos, actualAttrs) + 5));
     at = r.pos;
-    attrs = { ...r.attrs };
+    attrs = actualAttrs;
     keys = r.key.map(([c, n]) => [c, n]);
     if (!keys.length) keys = (NFL_KEYS[groupOf(at)] ?? NFL_KEYS.WR).map(([c, n]) => [c, n]);
     abil = r.abil.slice();
@@ -200,19 +203,19 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   const limit = goat ? 110 : special ? 105 : 99;
   const bounded = (x: number) => Math.max(1, Math.min(limit, Math.round(x)));
   // Boost exactly once. Promo editions improve the whole playable profile, preserving signature skills.
-  if (special) {
-    for (const code of Object.keys(attrs)) attrs[code] = bounded(attrs[code] + boost);
-    for (const [code] of keys) attrs[code] = bounded(Math.max(goat ? 100 : 96, attrs[code]) + levelBonus(level));
-  } else if (bonus) for (const [code] of keys) attrs[code] = cap((attrs[code] ?? base) + bonus);
+  if (boost) attrs = editionAttributes(attrs, boost, limit, special);
+  if (special) attrs = supportEdition(line.sport, at, attrs, limit, goat ? 106 : 100);
+  if (levelBonus(level)) for (const [code] of keys) attrs[code] = bounded((attrs[code] ?? base) + levelBonus(level));
   if (line.sport === 'nba') {
     const h = hooper(nbaLineOf(line), at, line.num);
     for (const [code, field] of NBA_ATTRS) (h as unknown as Record<string, unknown>)[field] = attrs[code];
     abil = badges(h, line.stats.a3 ?? 0);
-  }
+  } else abil = nflAbilities(groupOf(at), attrs);
   if (line.kind === 'promo') abil.push(PROMO_ABILITY);
   if (line.kind === 'legend' || goat) abil.unshift(LEGEND_ABILITY);
-  const baseOvr = special ? bounded(Math.max(goat ? 106 : 100, base + (goat ? 11 : 6))) : cap(base + boost);
-  const ovr = special ? bounded(baseOvr + levelBonus(level)) : cap(base + bonus);
+  const support = Math.round(profileQuality(line.sport, at, attrs) + 8);
+  const baseOvr = special ? bounded(Math.min(support, Math.max(goat ? 106 : 100, base + (goat ? 11 : 6)))) : cap(base + boost);
+  const ovr = special ? bounded(Math.min(support, baseOvr + levelBonus(level))) : cap(Math.min(support + 2, base + bonus));
   // a season card's tier is its unlevelled overall's, so levelling never turns bronze into silver
   const tier: Tier =
     line.kind === 'goat' ? 'goat' : line.kind === 'spotlight' ? 'spotlight' : line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(baseOvr, line.sport);

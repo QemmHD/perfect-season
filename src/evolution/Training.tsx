@@ -1,3 +1,4 @@
+import { progressChanged } from '../lib/save-events';
 import { ArrowMark, DrillMark, MedalMark } from './Marks';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -81,6 +82,7 @@ export function Training({
     setRecords(next);
     try {
       localStorage.setItem(STORE, JSON.stringify(next));
+      progressChanged();
     } catch {}
     sfx.seriesWin();
   }, [done]);

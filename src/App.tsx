@@ -1,3 +1,4 @@
+import { startCloudSaving } from './lib/cloud-save';
 import { clearCheckpoint, readCheckpoint, writeCheckpoint, SAVE_WARNING } from './lib/recovery';
 import { Recovery } from './evolution/Recovery';
 import { Training } from './evolution/Training';
@@ -188,6 +189,9 @@ export function App() {
   /** the climb on screen: its run, and the week, ladder and best it started with */
   const [gauntletAt, setGauntletAt] = useState<{ runId: number; week: string; ladder: PlayoffTeam[]; best: number } | null>(null);
   const needsName = NET_ON && !profile.name;
+  const cloudCanRestore = useRef(true);
+  cloudCanRestore.current = screen === 'tab' && !utReq && !run;
+  useEffect(() => startCloudSaving(() => cloudCanRestore.current, () => location.reload()), []);
 
   useEffect(() => {
     const ok = saveProfile(profile);
@@ -1160,7 +1164,7 @@ export function App() {
       <Transition id={viewId} enter={enter} exitMs={260}>
         {body}
       </Transition>
-      {saveFailed && <div className="save-warning" role="alert"><span>Progress isn’t saving on this phone.</span><button onClick={() => setLocker(true)}>BACK UP</button><button aria-label="Retry saving" onClick={() => { if(saveProfile(profile)){setSaveFailed(false); if(run?.draft && ['draft','reveal','playoffs'].includes(screen)) writeCheckpoint(run,screen as any);} }}>RETRY</button></div>}
+      {saveFailed && <div className="save-warning" role="alert"><span>Progress isn’t saving on this phone.</span><button onClick={() => setLocker(true)}>CLOUD SAVE</button><button aria-label="Retry saving" onClick={() => { if(saveProfile(profile)){setSaveFailed(false); if(run?.draft && ['draft','reveal','playoffs'].includes(screen)) writeCheckpoint(run,screen as any);} }}>RETRY</button></div>}
       {modal === 'replace' && <Sheet label="Start a new draft?" kind="center" onClose={()=>setModal(null)}>{close=><div className="save-locker"><h2 className="disp">START FRESH?</h2><p>A new solo draft replaces your unfinished run. Your cards, coins and completed records stay with you.</p><button className="btn gold" onClick={()=>{clearCheckpoint();setSaved(null);setModal(null);startDraft(nextMode);}}>START NEW DRAFT</button><button className="btn ghost" onClick={()=>close()}>KEEP MY RUN</button></div>}</Sheet>}
       {locker && <Recovery onClose={() => setLocker(false)} />}
       {modal === 'settings' && (

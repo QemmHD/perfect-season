@@ -21,7 +21,7 @@ The home screen has an **NBA / NFL** switch. Each sport is its own game with the
 
 - **Ultimate Team Spotlight:** 251 new Spotlight editions (100–105 overall), 40 GOAT editions (106–110), a 3,500-coin promo pack with a 0.05% chance of any GOAT, and globally numbered copies. Real attributes carry into the played game.
 - **Collection and events:** a collection gallery with permanent discovery/milestone rewards, dedicated exact-copy duplicate storage, and three themed three-match series per sport with guaranteed Spotlight rewards for their final first clears.
-- **Progress, practice and Rivals:** encrypted Save Locker, solo Continue, six Training Camp drills and weekly UT Rivals divisions/rewards. Existing saves migrate additively.
+- **Progress, practice and Rivals:** automatic encrypted server saves, solo Continue, six Training Camp drills and weekly UT Rivals divisions/rewards. Existing saves migrate additively.
 
 - **Modes:** Classic, Blind (stats hidden, +50% rewards), Daily (same spins for everyone, first try ranked, resets at midnight US Eastern), and Head to Head.
 - **Head to Head, live against real players:**

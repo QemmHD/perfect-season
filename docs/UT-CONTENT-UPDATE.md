@@ -7,7 +7,7 @@
 - **251 Spotlight editions:** 120 NBA and 131 NFL. Base overalls 100–105; levels cap at 105.
 - **40 GOAT editions:** 20 per sport, including Michael Jordan, LeBron James, Kobe Bryant and Scottie Pippen. Base overalls 106–110; levels cap at 110.
 - Standard Season, Hot Season and Legend editions retain a maximum of 99. Existing owned IDs, UIDs, levels and XP are preserved.
-- Spotlight adds eight points to the underlying attribute profile; GOAT adds fourteen, bounded by the edition's cap. Key attributes have edition floors of 96/100. Overall uses the calibrated base plus the edition's own floor/scale; it is not merely a label. Signature weaknesses outside the key attributes remain: ordinary Shaq is not a shooter, GOAT Brady remains a pocket passer.
+- Spotlight/GOAT apply up to eight/fourteen points to signature skills, smaller gains to secondary skills, bounded physical gains, and small improvements to weaknesses. There are no universal 96/100 key-attribute floors. Position-relevant strengths support the premium overall; all editions retain player identity, including Shaq's range/free throws and Brady's speed. The same all-tier correction also applies to every ordinary Season, Hot Season and Legend card.
 - The actual basketball and football engines support attributes over 99. Basketball gets wider shooting windows and additional speed/acceleration. Football gets additional movement speed and advantages in rating comparisons. Standard 0–99 engine behavior is retained.
 - Edition identities are fixed in [`src/data/special-editions.json`](../src/data/special-editions.json). `cards.ts` → `specials.ts` resolves these against their original season IDs. Future data refreshes must retain every released manifest entry; never silently replace a pulled edition with a new peak season.
 
@@ -83,6 +83,6 @@ Backend sources, catalog and migrations are committed under [`supabase/`](../sup
 
 ## Compatibility and verification
 
-Profile version and keys are unchanged. Migrations add collection history, event progress, pending opening/receipt IDs and optional mint metadata. Save Locker includes them in both sports. Core original online/gift payloads remain compatible. UT's revised full-attribute pool fingerprint and rules version 2 pair clients using the same rating model; both phones need the updated build to match in that UT queue. Draft queues retain their original protocol.
+Profile version and keys are unchanged. Migrations add collection history, event progress, pending opening/receipt IDs and optional mint metadata. Automatic encrypted server saves include them in both sports, alongside the existing immediate phone save; see [AUTOMATIC-SAVES.md](AUTOMATIC-SAVES.md). Core original online/gift payloads remain compatible. UT's revised full-attribute pool fingerprint and rules version 3 pair clients using the same rating model; both phones need the updated build to match in that UT queue. Draft queues retain their original protocol.
 
 [Browser QA instructions](BROWSER-QA.md) cover fresh isolated profiles, pack recovery, global numbers, collection claims, events, two-client online matches and animated/reduced-motion reveals. [CODEX-UPDATE-LOG.md](CODEX-UPDATE-LOG.md) records the final measured checks and GitHub release state.

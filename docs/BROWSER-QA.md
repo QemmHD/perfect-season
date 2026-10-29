@@ -31,3 +31,10 @@ Content tests contact the real new registry only in the **inspect** namespace. L
 ## Device checks
 
 Chromium verifies layout, input and state transitions. Before claiming device-specific behavior, check on installed iPhones: safe areas, Safari share-to-Files backup/restore, audio permissions, background/reload, orientation, and a two-phone match/rematch. The scripts' proxy certificate exception is a QA-environment setting, not a production security setting.
+
+
+## Automatic server saves (Codex follow-up)
+
+`node scripts/qa/cloud.mjs` tests both sports using real UI and isolated identities: successful server save, exact owned-copy/XP/squad/wallet restoration for the same identity, an offline divergent device, paused conflict, and server choice only after preserving the device copy. It uses Settings → Cloud Save and does not rely on file inputs or UI-global test hooks. It waits for the actual reload before reading restored state. New identities are required because inspect saves persist on the real backend.
+
+`NODE_USE_ENV_PROXY=1 node scripts/qa/cloud-backend.mjs` tests signed API idempotency, one winner/one 409 for concurrent saves, per-identity isolation and invalid-signature rejection in qacloud. `supabase/tests/cloud_saves.sql` tests database invariants with rollback. No user saves are loaded. See AUTOMATIC-SAVES.md for the identity/recovery boundary.

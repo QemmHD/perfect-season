@@ -6,7 +6,7 @@ This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub P
 
 - Keep profile version 1 and the existing localStorage keys. Never reset profiles, rename existing card IDs, regenerate signed player identities, auto-sell cards, or clear collections to ship an update.
 - `ut.owned` is the canonical list of **every** owned copy. `ut.duplicateStorage` is a list of UIDs for UI placement. The original restore build can still read all cards. Equipped UIDs, levels and XP must survive migrations.
-- New fields are optional and migrate additively in `src/ut/state.ts`. Save Locker includes both sports and the player signing key, excluding admin session credentials.
+- New fields are optional and migrate additively in `src/ut/state.ts`. Automatic server saves include both sports; the player signing key stays on the device and admin credentials are excluded. See docs/AUTOMATIC-SAVES.md for identity/recovery limits.
 - Original source restore: branch `backup/original-working-2026-10-28`, commit `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. A source restore is separate from restoring phone-local saves.
 
 ## Connections and module map
@@ -16,8 +16,9 @@ This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub P
 - `src/ut/state.ts`, `storage.ts`: additive profile migration and duplicate storage.
 - `src/ut/cards.ts`, `rate.ts`, `pool.ts`, `teams.ts`: stable edition IDs → rated gameplay attributes → pool fingerprint → playable squads.
 - `src/game/hoops2/` and `src/game/football2/`: existing actual match engines. Above-99 UT ratings must affect real play; standard ratings must retain their existing engine behavior.
-- `src/evolution/`: Codex Save Locker/continuation UI, Training Camp and SVG marks. `src/lib/recovery.ts`: encrypted backups/checkpoints.
+- `src/evolution/`: Codex Cloud Save status/conflict UI (replacing the file-backup screen), continuation, Training Camp and SVG marks. `src/lib/cloud-{save,sync,data}.ts`: original signed identity → encrypted server saves → revision/conflict protection. `src/lib/recovery.ts`: checkpoints/shared validation and unreachable legacy file helpers.
 - `src/ut/rivals.ts`, `rivals-net.ts`, `Rivals.tsx`: Codex division progress/rewards and separate signed Nostr standings.
+- `src/ut/rating-quality.ts`, `calibration.ts`, `nfl-identity.ts`: all-tier position/season-supported ratings, 372 public NBA anchors and explicitly estimated NFL physical identities; no universal promo attribute floors. Read docs/RATINGS-AUDIT.md before tuning; keep ordinary draft engines unchanged.
 - New collection, event and card-registry modules are detailed in the update log. `src/ut/pack-reveal.css` and `PackOpening.tsx` implement the Codex Spotlight/GOAT reveal sequences; `GoatCrown` in `CardArt.tsx` is the shared card/reveal mark. Keep globally registered mint serials separate from player-local copy UIDs.
 
 ## Private test copy

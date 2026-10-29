@@ -504,7 +504,7 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
             {row('haptics', 'Vibration')}
             {row('hints', 'Booster hints')}
           </div>
-          <button className="locker-entry" onClick={() => close(props.onLocker)}><span>◈</span><span><b className="disp">SAVE LOCKER</b><small>Back up. Switch phones. Keep your legacy.</small></span><i>›</i></button>
+          <button className="locker-entry" onClick={() => close(props.onLocker)}><span aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 17a4 4 0 0 1-.5-7.97 6.5 6.5 0 0 1 12.5-.8A4.5 4.5 0 0 1 18 17"/><path d="m8 16 3 3 5-6"/></svg></span><span><b className="disp">CLOUD SAVE</b><small>Automatic server saves. Keep your legacy.</small></span><i>›</i></button>
           {confirm ? (
             <div className="btnrow">
               <button className="btn" onClick={() => setConfirm(false)}>

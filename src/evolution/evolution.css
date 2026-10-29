@@ -1309,3 +1309,10 @@ button:disabled {
   width: 100%;
   box-sizing: border-box;
 }
+
+/* Codex: server-save status reuses the original sheet, typography and palette. */
+.cloud-save-status{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:14px;background:rgba(13,210,186,.07);padding:16px;margin:18px 0;color:var(--teal)}
+.cloud-save-status svg{flex-shrink:0}.cloud-save-status b{font-size:12px;letter-spacing:.08em}.cloud-save-status p{font-size:12px;line-height:1.5;margin:7px 0 0;color:var(--sub)}
+.cloud-save-status.is-conflict,.cloud-save-status.is-offline,.cloud-save-status.is-blocked{color:var(--gold);background:rgba(255,196,62,.06)}
+.cloud-save-includes{display:flex;flex-direction:column;gap:9px;margin:22px 0;padding:16px;border:1px solid var(--line);border-radius:14px;color:var(--sub);font-size:12px}
+.cloud-save-includes b{color:var(--teal);font-size:10px;letter-spacing:.15em;margin-bottom:5px}.cloud-save-panel .btnrow{flex-wrap:wrap}

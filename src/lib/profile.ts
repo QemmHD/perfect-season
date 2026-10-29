@@ -1,3 +1,4 @@
+import { progressChanged } from './save-events';
 import { saveWarning } from './recovery';
 import { NFL } from '../engine/sport';
 import type { Booster, BotLevel, Mode, Slot } from '../engine/types';
@@ -204,12 +205,14 @@ export function saveProfile(p: Profile): boolean {
   try {
     if (!NFL) {
       localStorage.setItem(KEY, JSON.stringify(p));
+      progressChanged();
       return true;
     }
     // the shared part goes back into the basketball profile, without touching basketball's own
     const base = read(KEY) ?? freshProfile();
     localStorage.setItem(KEY, JSON.stringify({ ...base, ...pick(p, SHARED, true) }));
     localStorage.setItem(NFL_KEY, JSON.stringify({ ...pick(p, SHARED, false), v: 1 }));
+    progressChanged();
     return true;
   } catch {
     saveWarning();
@@ -231,6 +234,7 @@ export function resetOtherSport(): void {
     // basketball's profile also carries the shared part, which this sport has just reset itself
     const next = NFL ? { ...fresh, ...pick(other, SHARED, true), ...kept } : { ...pick(fresh, SHARED, false), ...kept, v: 1 };
     localStorage.setItem(key, JSON.stringify(next));
+    progressChanged();
   } catch {
     // storage blocked
   }

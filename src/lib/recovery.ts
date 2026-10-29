@@ -1,3 +1,4 @@
+import { progressChanged } from './save-events';
 import { DATA_V } from '../engine/version';
 import { SPORT } from '../engine/sport';
 import { getPublicKey } from 'nostr-tools/pure';
@@ -102,6 +103,7 @@ export function writeCheckpoint<T>(
         run,
       })
     );
+    progressChanged();
     return true;
   } catch {
     saveWarning();
@@ -111,11 +113,12 @@ export function writeCheckpoint<T>(
 export function clearCheckpoint() {
   try {
     localStorage.removeItem(checkpointKey());
+    progressChanged();
   } catch {
     saveWarning();
   }
 }
-const KEYS = [
+export const RECOVERY_KEYS = [
   'perfect-season:profile:v1',
   'perfect-season:profile:nfl:v1',
   'perfect-season:key:v1',
@@ -156,10 +159,10 @@ async function key(password: string, salt: Uint8Array, usage: KeyUsage[]) {
 }
 export async function createBackup(password: string): Promise<string> {
   const values = Object.fromEntries(
-    KEYS.map((k) => [k, localStorage.getItem(k)])
+    RECOVERY_KEYS.map((k) => [k, localStorage.getItem(k)])
   );
   // A backup is progress recovery, never a replay of a live online session.
-  for (const k of KEYS.slice(0, 2)) {
+  for (const k of RECOVERY_KEYS.slice(0, 2)) {
     if (values[k]) {
       const p = JSON.parse(values[k]!);
       p.activeMatch = null;
@@ -209,15 +212,19 @@ export async function openBackup(
       'Couldn’t unlock this backup. Check the file and password.'
     );
   }
+  return validateSaveValues(data, o.at);
+}
+/** Validate the full original save shape before any file or cloud restore writes. */
+export function validateSaveValues(data: Record<string, string | null>, at: number): BackupPreview {
   if (
     !data ||
     typeof data !== 'object' ||
-    Object.keys(data).some((k) => !KEYS.includes(k)) ||
-    KEYS.some((k) => data[k] !== null && typeof data[k] !== 'string')
+    Object.keys(data).some((k) => !RECOVERY_KEYS.includes(k)) ||
+    RECOVERY_KEYS.some((k) => data[k] !== null && typeof data[k] !== 'string')
   )
     throw new Error('The backup is incomplete or invalid.');
-  const nba = JSON.parse(data[KEYS[0]] ?? 'null'),
-    nfl = JSON.parse(data[KEYS[1]] ?? 'null');
+  const nba = JSON.parse(data[RECOVERY_KEYS[0]] ?? 'null'),
+    nfl = JSON.parse(data[RECOVERY_KEYS[1]] ?? 'null');
   for (const p of [nba, nfl])
     if (
       p &&
@@ -256,14 +263,14 @@ export async function openBackup(
     name: nba.name ?? 'Player',
     coins: nba.coins,
     cards: (nba.ut?.owned.length ?? 0) + (nfl?.ut?.owned.length ?? 0),
-    at: o.at,
+    at,
   };
 }
 /** All writes are prepared before replacement; roll back on storage failure. */
 export function restoreBackup(preview: BackupPreview) {
-  const before = KEYS.map((k) => [k, localStorage.getItem(k)] as const);
+  const before = RECOVERY_KEYS.map((k) => [k, localStorage.getItem(k)] as const);
   try {
-    for (const k of KEYS) {
+    for (const k of RECOVERY_KEYS) {
       const v = preview.values[k];
       v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v);
     }

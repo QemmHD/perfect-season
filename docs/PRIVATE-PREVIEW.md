@@ -23,3 +23,8 @@ Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_42e7ed8be43c819
 The hosting copy has `.openai/hosting.json` with that exact project ID and `static.directory=dist`. Keep its audience owner-private and reuse this project for updates. The full source is in the Sites source repository returned by its credential tool. Local checkout: `/workspace/sites/perfect-season-preview`. Source differences from GitHub: preview namespace bootstrap in index.html, preview title/PWA name/start URL, hosting metadata and PREVIEW.md. The original GitHub Pages workflow is omitted in this separate hosting-only copy. Never copy the preview bootstrap/hosting identity into the original Pages build.
 
 No credentials are stored in this document. Native Sites deployment returned `succeeded` on 2026-10-29. TypeScript/production build passed; localhost production-build boot at 390px passed with no page errors, wrong/missing namespace override and preview PWA manifest checked. Device-specific iPhone installation remains unverified. Full gameplay/content tests for the underlying feature build are recorded in CODEX-UPDATE-LOG.md.
+
+
+## Follow-up client update (Codex)
+
+The preview is being updated in place from the feature branch with automatic encrypted server saves and the all-tier ratings corrections. Its original origin, `preview2026` namespace, profile keys and installed app ID remain; existing preview progress is preserved. The old file-backup UI is replaced by Cloud Save. New saved-version/source/deployment references are recorded below after successful publication; the original deployment references above remain historical evidence.

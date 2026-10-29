@@ -1,149 +1,143 @@
-import React, { useState } from 'react';
+// Implemented by Codex. Automatic server saving replaces the downloaded-file flow.
+import React, { useState, useSyncExternalStore } from "react";
 import {
-  createBackup,
-  openBackup,
-  restoreBackup,
-  type BackupPreview,
-} from '../lib/recovery';
-import { Sheet } from '../ui/common';
+  cloudStatus,
+  resolveCloud,
+  subscribeCloud,
+  syncCloudNow,
+} from "../lib/cloud-save";
+import { Sheet } from "../ui/common";
 
 export function Recovery({ onClose }: { onClose: () => void }) {
-  const [password, setPassword] = useState(''),
-    [file, setFile] = useState<File | null>(null),
-    [preview, setPreview] = useState<BackupPreview | null>(null),
-    [message, setMessage] = useState(''),
+  const status = useSyncExternalStore(subscribeCloud, cloudStatus),
+    [choice, setChoice] = useState<"device" | "server" | null>(null),
     [busy, setBusy] = useState(false);
-  const act = async (fn: () => Promise<void>) => {
-    setBusy(true);
-    setMessage('');
-    try {
-      await fn();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
-    <Sheet label="Save locker" onClose={onClose}>
+    <Sheet label="Cloud save" onClose={onClose}>
       {(close) => (
-        <div className="save-locker">
-          <span className="eyebrow">Your legacy. Yours to keep.</span>
-          <h2 className="disp">SAVE LOCKER</h2>
+        <div className="save-locker cloud-save-panel">
+          <span className="eyebrow">YOUR LEGACY. YOUR PROGRESS.</span>
+          <h2 className="disp">CLOUD SAVE</h2>
           <p>
-            Keep both sports, every card and your online identity together in
-            one encrypted file.
+            Your club, coins and progress save automatically to the server. Your
+            phone keeps an offline copy.
           </p>
-          <label className="evo-field">
-            Backup password
-            <input
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setPreview(null);
-              }}
-              placeholder="At least 8 characters"
-            />
-          </label>
-          <p className="note">
-            Keep this password somewhere safe. It’s needed to restore your file.
-          </p>
-          <button
-            className="btn gold"
-            disabled={busy || password.length < 8}
-            onClick={() =>
-              act(async () => {
-                const content = await createBackup(password);
-                const blob = new Blob([content], { type: 'application/json' });
-                const f = new File(
-                  [blob],
-                  'perfect-season-' +
-                    new Date().toISOString().slice(0, 10) +
-                    '.psbackup',
-                  { type: 'application/json' }
-                );
-                if (navigator.canShare?.({ files: [f] })) {
-                  await navigator.share({
-                    files: [f],
-                    title: 'Perfect Season backup',
-                  });
-                } else {
-                  const u = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = u;
-                  a.download = f.name;
-                  a.click();
-                  setTimeout(() => URL.revokeObjectURL(u), 1000);
-                }
-                setMessage(
-                  'Backup ready. Keep the file and password for your next phone.'
-                );
-              })
-            }
+          <div
+            className={"cloud-save-status is-" + status.phase}
+            role="status"
+            aria-live="polite"
           >
-            {busy ? 'WORKING…' : 'SAVE MY BACKUP'}
-          </button>
-          <div className="locker-divider">
-            <span>RESTORE YOUR LEGACY</span>
-          </div>
-          <label className="evo-file">
-            {file ? file.name : 'Choose a backup file'}
-            <input
-              type="file"
-              accept=".psbackup,.json,application/json"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
-                setPreview(null);
-                setMessage('');
-              }}
-            />
-          </label>
-          {!preview ? (
-            <button
-              className="btn"
-              disabled={busy || !file || password.length < 8}
-              onClick={() =>
-                act(async () =>
-                  setPreview(await openBackup(await file!.text(), password))
-                )
-              }
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              aria-hidden="true"
             >
-              PREVIEW RESTORE
-            </button>
-          ) : (
-            <div className="restore-preview">
-              <b>{preview.name}</b>
-              <span>
-                {preview.cards.toLocaleString()} cards ·{' '}
-                {preview.coins.toLocaleString()} coins
-              </span>
-              <p>
-                This replaces this phone’s progress and online identity with the
-                backup. Save a backup of this phone first if you want to keep
-                it.
-              </p>
-              <button
-                className="btn gold"
-                disabled={busy}
-                onClick={() =>
-                  act(async () => {
-                    restoreBackup(preview);
-                    location.reload();
-                  })
-                }
-              >
-                RESTORE THIS SAVE
-              </button>
+              <path d="M6 17a4 4 0 0 1-.5-7.97 6.5 6.5 0 0 1 12.5-.8A4.5 4.5 0 0 1 18 17" />
+              <path d="m8 16 3 3 5-6" />
+            </svg>
+            <div>
+              <b>
+                {status.phase === "saved"
+                  ? "SAVED TO SERVER"
+                  : status.phase === "conflict"
+                    ? "TWO SAVES FOUND"
+                    : status.phase === "offline"
+                      ? "WAITING TO SYNC"
+                      : status.phase === "blocked"
+                        ? "SYNC PAUSED"
+                        : "SYNCING YOUR PROGRESS"}
+              </b>
+              <p>{status.message}</p>
             </div>
-          )}
-          {message && (
-            <p role="status" className="locker-message">
-              {message}
+          </div>
+          {status.updatedAt && (
+            <p className="note">
+              Last confirmed save: {new Date(status.updatedAt).toLocaleString()}{" "}
+              · Revision {status.revision}
             </p>
           )}
+          <div className="cloud-save-includes">
+            <b>BOTH SPORTS. ONE LEGACY.</b>
+            <span>Cards & duplicate storage</span>
+            <span>Coins, XP & squads</span>
+            <span>Collections, events & rewards</span>
+            <span>Unfinished solo runs & training</span>
+          </div>
+          {status.phase === "conflict" ? (
+            <>
+              <p className="note">
+                Syncing is paused so neither copy overwrites the other. Choose a
+                save to continue; the other copy will be retained on the server.
+              </p>
+              {!choice ? (
+                <div className="btnrow">
+                  <button
+                    className="btn gold"
+                    onClick={() => setChoice("device")}
+                  >
+                    KEEP THIS PHONE
+                  </button>
+                  <button className="btn" onClick={() => setChoice("server")}>
+                    USE SERVER SAVE
+                  </button>
+                </div>
+              ) : (
+                <div className="restore-preview">
+                  <b>
+                    {choice === "device"
+                      ? "Continue this phone’s progress?"
+                      : "Load the server’s progress?"}
+                  </b>
+                  <p>
+                    {choice === "server"
+                      ? "The current device copy will be preserved on the server before this phone loads the server save. Finish or leave any active game first."
+                      : "This phone becomes the current server save. The previous server version will be retained."}
+                  </p>
+                  <button
+                    className="btn gold"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        await resolveCloud(choice);
+                      } finally {
+                        setBusy(false);
+                        setChoice(null);
+                      }
+                    }}
+                  >
+                    {busy ? "SAVING…" : "CONFIRM & CONTINUE"}
+                  </button>
+                  <button
+                    className="btn ghost"
+                    disabled={busy}
+                    onClick={() => setChoice(null)}
+                  >
+                    KEEP BOTH FOR NOW
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <button
+              className="btn gold"
+              disabled={["saving", "restoring", "starting"].includes(
+                status.phase,
+              )}
+              onClick={syncCloudNow}
+            >
+              {status.phase === "saved" ? "SYNC NOW" : "RETRY SYNC"}
+            </button>
+          )}
+          <p className="note">
+            This save belongs to this game’s existing player identity. There is
+            no username/password recovery yet; a fresh phone or different site
+            starts with a different identity. Keep the original app installed.
+          </p>
           <button className="btn ghost" onClick={() => close()}>
             DONE
           </button>
