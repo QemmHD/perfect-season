@@ -20,6 +20,10 @@ This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub P
 - `src/ut/rivals.ts`, `rivals-net.ts`, `Rivals.tsx`: Codex division progress/rewards and separate signed Nostr standings.
 - New collection, event and card-registry modules are detailed in the update log. `src/ut/pack-reveal.css` and `PackOpening.tsx` implement the Codex Spotlight/GOAT reveal sequences; `GoatCrown` in `CardArt.tsx` is the shared card/reveal mark. Keep globally registered mint serials separate from player-local copy UIDs.
 
+## Private test copy
+
+[docs/PRIVATE-PREVIEW.md](docs/PRIVATE-PREVIEW.md) records the separate owner-private Sites test URL, exact project/source/deployment IDs, and `preview2026` namespace. Keep its preview bootstrap and hosting identity out of the live Pages build. Main and the original restore branch remain unchanged.
+
 ## Working and verification
 
 `npm run dev`, `npm run typecheck`, `npm test` (both sports), `npm run build`. Test browser profiles with `?ns=inspect&relay=ws://localhost:7777`; do not submit fixtures to live boards. Verify phone widths, reduced motion, storage migration, exact-once rewards, and online pool compatibility. Installed-iPhone and two-phone checks complement Chromium tests.

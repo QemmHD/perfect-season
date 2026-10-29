@@ -93,3 +93,10 @@ Published content commit: [`ec59cda8afce7298efd93468a620959c8f5a6ae7`](https://g
 GitHub [Review build #3](https://github.com/QemmHD/perfect-season/actions/runs/40859786388) **passed** on this exact uploaded code: NBA **243 passed / 31 skipped**, NFL **210 passed / 63 skipped**, whole-pool ratings audit, TypeScript check and production build. Skips are the sport-specific tests not applicable to each run. This final entry only changes documentation.
 
 PR #1 contains the finished implementation and preview evidence. The shared registry is active at Edge Function version 2; the frontend remains on the feature branch for review. At verification, both `main` and `backup/original-working-2026-10-28` still point to the original `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; no live Pages client was replaced and no player account or save was reset. Physical iPhone behavior remains a device-specific verification limit, as documented in `BROWSER-QA.md`.
+
+
+### Private test deployment — Codex, 2026-10-29
+
+At the user's request to test without launching to main, Codex deployed a separate **owner-private Sites copy**: https://perfect-season-private-preview.qem.chatgpt.site . [Private preview handoff](PRIVATE-PREVIEW.md) records exact source/version/deployment IDs, update instructions and namespace isolation. Preview-only index bootstrap sets `ns=preview2026` before module initialization; preview PWA branding/start URL identify it as PS Preview. Origin-local saves are separate, Nostr features and card registry use the preview namespace, and ordinary game odds/economy remain. No accounts are copied or reset. The original main/Pages and restore branch are untouched.
+
+The preview source is based on feature commit `661c51411c865efbe0c231801d0fca03a0dd3ca9`, published as Sites source commit `e9325cb7790d9d8a8fa267a0694511d27b75c926`; deployment returned `succeeded`. TypeScript/build and the production-build preview boot/namespace/PWA checks passed without page errors. This GitHub follow-up only documents the separate test hosting; it does not deploy the Pages client.
