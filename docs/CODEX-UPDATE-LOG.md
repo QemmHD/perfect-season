@@ -27,7 +27,7 @@ Every copy stays in `ut.owned`, including stored cards, preserving original-buil
 
 Validation: NBA 228 passed/30 skipped; NFL 196 passed/61 skipped; typecheck/build passed. Chromium at 390px and 320px: five stored copies submitted to an SBC, reward pack received once, original NBA/NFL cards, squad and wallet unchanged, no page errors.
 
-## Implemented by Codex — Ultimate Team content expansion (current work)
+## Implemented by Codex — Ultimate Team content expansion
 
 Requested scope: 0.05% GOAT odds per Spotlight Pack, genuine 99+ gameplay, all-time great editions, collection gallery/rewards, themed events, global serials and improved ratings. Implementation is on `feature/season-evolution`. The sections below identify the concrete additions, connections, validation and release status.
 
@@ -84,3 +84,12 @@ At this source publication, the frontend update is on `feature/season-evolution`
 The [committed reveal previews](previews/README.md) show the actual new components with explicit QA fixture captions. `scripts/qa/reveal.mjs` verifies the original scaled frame, simulated 59px/34px phone safe areas, normal GOAT/Spotlight motion at 390×844, reduced motion at 320×568, serial-stamp bounds and stable early skipping. `card-editions.css` is imported by the card component and `pack-art.css` by the pack art, so skins do not depend on visiting another UT screen first.
 
 Both Review and Pages workflows now run the whole-pool level-1/level-5 audit in addition to the existing tests and production build.
+
+
+### GitHub verification — Codex, 2026-10-29
+
+Published content commit: [`ec59cda8afce7298efd93468a620959c8f5a6ae7`](https://github.com/QemmHD/perfect-season/commit/ec59cda8afce7298efd93468a620959c8f5a6ae7), with tree `7761619d954d4d0d97ec89a8b791fa708717fd28` (identical to local content commit `455db18ed42eec91048a157ed536ff9aa92ac8cc`).
+
+GitHub [Review build #3](https://github.com/QemmHD/perfect-season/actions/runs/40859786388) **passed** on this exact uploaded code: NBA **243 passed / 31 skipped**, NFL **210 passed / 63 skipped**, whole-pool ratings audit, TypeScript check and production build. Skips are the sport-specific tests not applicable to each run. This final entry only changes documentation.
+
+PR #1 contains the finished implementation and preview evidence. The shared registry is active at Edge Function version 2; the frontend remains on the feature branch for review. At verification, both `main` and `backup/original-working-2026-10-28` still point to the original `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; no live Pages client was replaced and no player account or save was reset. Physical iPhone behavior remains a device-specific verification limit, as documented in `BROWSER-QA.md`.
