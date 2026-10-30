@@ -35,7 +35,7 @@ function Bar({ v, max = 99 }: { v: number; max?: number }) {
   );
 }
 
-export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard; sport: UtSport; onUse?: () => void; onSell: () => void; onClose: () => void }) {
+export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, developed }: { cc: ClubCard; sport: UtSport; onUse?: () => void; onSell: () => void; onClose: () => void; clubRecord?: { games:number; wins:number }; developed?: boolean }) {
   const [selling, setSelling] = useState(false);
   const { rc, oc } = cc;
   const l = rc.line;
@@ -103,6 +103,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
             </div>
             <p className="note ut-xpnote">Cards earn XP in games. Each level improves key attributes and adds up to 1 overall, within the edition’s rating cap.</p>
 
+            {(clubRecord || developed) && <div className="hq-card-record"><span className="eyebrow">YOUR CLUB STORY</span><b className="num">{clubRecord?.games ?? 0} squad appearances · {clubRecord?.wins ?? 0} wins</b><small>{developed ? 'CLUB HERO · Development program completed' : 'Recorded since the clubhouse update; squad selection includes the bench.'}</small></div>}
             <div className="ut-keys">
               {rc.key.map(([c, n, v]) => (
                 <span key={c} className="ut-key">

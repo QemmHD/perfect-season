@@ -32,6 +32,8 @@ import { aiOpponent, battlesThisWeek, LEVEL, LEVEL_NAME, levelOf, type Rung, RUN
 import { UtCard } from './CardArt';
 import { packName } from './packs';
 import { eventRung } from './events';
+import { circuitRung } from './circuit';
+import { hqOf } from './progression';
 import { decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
 import { byValue, getPool, type Pool } from './pool';
 import { weekOf } from './sbc';
@@ -46,7 +48,7 @@ import './match.css';
  * and plays the sim itself. Bump UT_RULES when teams.ts or play.ts change how a match comes out.
  */
 // Codex: NFL rushing execution differs from v4; NBA queues remain compatible.
-const UT_RULES = { nba: 4, nfl: 5 };
+const UT_RULES = { nba: 6, nfl: 6 };
 const queueOf = (pool: Pool) => 'ut-' + UT_RULES[pool.sport] + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;
@@ -74,6 +76,7 @@ interface Setup {
   /** the AI: a ladder rung (i from 0), or the squad that stepped in for a no-show (i = -1) */
   rung: Rung | null;
   event?: { id: string; node: number; title: string };
+  circuit?: { runId: string; round: number };
   /** Squad Battles: the difficulty's name and what it pays (times the coins) */
   level?: { name: string; pay: number; def: number };
 }
@@ -95,6 +98,8 @@ interface Outcome {
   them: number;
   how: 'played' | 'sim';
   eventCleared?: boolean;
+  seasonXP?: number;
+  circuitPrizes?: string[];
   ends: [string[], string[]];
   coins: number;
   xp: number;
@@ -218,6 +223,12 @@ export default function UtMatch(props: {
       setStage('search');
       return;
     }
+    if (req.circuit) {
+      const rung = circuitRung(pool, profileRef.current.ut, req.circuit.runId, req.circuit.round, me.rating.ovr);
+      if (!rung) { setError('This Circuit match is no longer active. Return to Play HQ.'); setStage('error'); return; }
+      setSetup({ seed: 'circuit:' + req.circuit.runId + ':' + req.circuit.round + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, circuit: req.circuit, level: { name: req.circuit.round === 5 ? 'Legend' : 'Circuit', pay: 1, def: req.circuit.round / 5 } });
+      setStage('vs'); return;
+    }
     if (req.event) {
       const e = req.event;
       if (e.node > (profileRef.current.ut.events?.[e.id] ?? 0)) {
@@ -327,7 +338,7 @@ export default function UtMatch(props: {
 
   useEffect(() => {
     if (stage !== 'vs') return;
-    const t = window.setTimeout(() => setStage(props.autoplay ? 'play' : 'vote'), props.autoplay ? 400 : VS_MS);
+    const t = window.setTimeout(() => setStage(props.autoplay || setup?.circuit ? 'play' : 'vote'), props.autoplay ? 400 : VS_MS);
     return () => clearTimeout(t);
   }, [stage]);
 
@@ -346,6 +357,9 @@ export default function UtMatch(props: {
     const input = {
       matchId: s.online?.matchId ?? 'ut-ai:' + req.id,
       event: s.event,
+      circuit: s.circuit,
+      opponent: s.rival.name,
+      how,
       won: d.won,
       us: us.score,
       them: them.score,
@@ -374,6 +388,8 @@ export default function UtMatch(props: {
     const cardOf = new Map(ut.owned.map((o) => [o.uid, o.cardId]));
     const ups = shown.ups.map((u) => ({ name: pool.byId.get(cardOf.get(u.uid) ?? '')?.name ?? 'A card', level: u.level }));
     setOut({
+      seasonXP: shown.seasonXP,
+      circuitPrizes: shown.circuitPrizes,
       eventCleared: !!s.event && (shown.ut.events?.[s.event.id] ?? 0) > (ut.events?.[s.event.id] ?? 0),
       ...d,
       us: us.score,
@@ -428,6 +444,7 @@ export default function UtMatch(props: {
           rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
           tookMe={setup.online ? (opp?.arcadeTook ?? null) : null}
           autoplay={props.autoplay}
+          manualOnly={!!setup.circuit}
           kits={kits}
           onProgress={(p) => conn?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => conn?.update((s) => ({ ...s, arcadeTook: k }))}
@@ -487,6 +504,12 @@ export default function UtMatch(props: {
         onAgain={() => {
           sfx.click();
           const r = setup.rung;
+          if (setup.circuit) {
+            const active = hqOf(profileRef.current.ut).circuit.active;
+            if (active) props.onAgain({ id: Date.now(), mode: 'ai', circuit: { runId: active.id, round: active.games } });
+            else leave();
+            return;
+          }
           if (setup.event) {
             props.onAgain({ id: Date.now(), mode: 'ai', event: { id: setup.event.id, node: out.won ? Math.min(2, setup.event.node + 1) : setup.event.node } });
             return;
@@ -499,7 +522,7 @@ export default function UtMatch(props: {
 
   if (promotion !== null && stage === 'result') return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
-  const title = req.event ? 'Spotlight Events' : req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
+  const title = req.circuit ? 'Champions Circuit' : req.event ? 'Spotlight Events' : req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
   return (
     <div className={'screen ut utm utm-s-' + stage}>
       <div className="topbar ut-top">
@@ -679,7 +702,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
   const r = setup.rung;
   const ladder = !!r && r.i >= 0;
   const top = ladder && out.climbed && r!.i + 1 >= RUNGS;
-  const again = setup.event
+  const again = setup.circuit ? (setup.circuit.round < 5 ? 'NEXT CIRCUIT MATCH' : 'BACK TO CLUB') : setup.event
     ? out.won && setup.event.node < 2
       ? 'NEXT EVENT MATCH'
       : 'PLAY AGAIN'
@@ -694,7 +717,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
             : 'TRY AGAIN';
   return (
     <div className="page utm-result">
-      <span className="eyebrow wide">{setup.event ? setup.event.title : ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
+      <span className="eyebrow wide">{setup.circuit ? 'Solo Champions Circuit · Match ' + (setup.circuit.round + 1) + ' / 6' : setup.event ? setup.event.title : ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
       <h1 className={'disp utm-verdict ' + (out.won ? 'win' : 'loss')}>{out.won ? 'WIN' : 'LOSS'}</h1>
       <div className="utm-score" aria-label={'You ' + out.us + ', ' + setup.rival.name + ' ' + out.them}>
         <span>
@@ -753,6 +776,8 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           </span>
         </div>
       )}
+      {!!out.seasonXP && <div className="utm-climb rise-in"><b className="disp">+{out.seasonXP} SEASON POINTS</b><small>Your free reward track moves forward. Claim unlocked tiers in the clubhouse.</small></div>}
+      {!!out.circuitPrizes?.length && <div className="utm-climb rise-in"><b className="disp">CIRCUIT REWARD UNLOCKED</b>{out.circuitPrizes.map(p => <small key={p}>{p} · waiting in your Store</small>)}</div>}
       {out.ups.length > 0 && (
         <div className="utm-ups">
           <span className="eyebrow">{out.ups.length === 1 ? 'Level up' : out.ups.length + ' level-ups'}</span>

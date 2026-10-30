@@ -36,3 +36,16 @@ The reveal includes charge/tear, opening doors, mystery card, position/team clue
 ## NFL rushing fix — Codex, 2026-10-30
 
 [390px portrait](nfl-rushing-390.png) · [320px short portrait](nfl-rushing-320.png) · [844px landscape](nfl-rushing-844.png). Actual NFL component, manual forward-stick input after the handoff, equal real gold squads at Legend, isolated inspect profile. Juke/Spin/Power reuse the existing game-control skins; short portrait sizes leave the runner and blockers visible. Screenshots are rendered QA fixtures, not a real player account or a promise of a successful run. The controls/path fixes and complete fixed-seed measurements are documented in [NFL-RUSHING.md](../NFL-RUSHING.md).
+
+
+## Connected Ultimate Team clubhouse — Codex, 2026-10-30
+
+Actual rendered components, original fonts/cards and isolated localhost/inspect profiles. These show implemented screens, not mockups or real player accounts. Fixture cards, balances, Moment claims and any copy numbers are QA-only. The game ships no preview coin/card/claim override.
+
+- [Clubhouse home](ut-clubhouse-home.png) and [Play HQ](ut-play-hq.png).
+- [Free Season Pass](ut-season-pass.png), [objectives](ut-objectives.png) and [Champions Circuit](ut-champions-circuit.png).
+- [Development Lab](ut-development-lab.png), [saved lineups](ut-saved-lineups.png) and [Moments](ut-moments.png).
+- [NBA screen-and-roll call](ut-nba-coach-call.png) and [320px NBA controls](ut-nba-controls-320.png).
+- [NFL full playbook](ut-nfl-playbook.png), [left-side outside run](ut-nfl-flipped-run.png) and [landscape playbook](ut-nfl-playbook-landscape.png).
+
+`scripts/qa/clubhouse.mjs` exercises both sports, navigation, preserved wallet/copies, reload/claims, actual manual Moment attempts, existing practice callbacks, pre-snap book/flip and Circuit launch. The viewport checks are Chromium at 390×844, 320×568 and 844×390; they are not a physical-iPhone playtest. [Implementation, connections, economy and primary sources](../UT-OVERHAUL.md).

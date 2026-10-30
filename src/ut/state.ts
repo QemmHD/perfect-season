@@ -5,6 +5,7 @@ import { rivalsOf, type RivalsState } from './rivals';
 import { type Level, levelOf } from './battles';
 import type { OwnedCard, CardRetirement } from './types';
 import { organizeStorage } from './storage';
+import { normalizeHQ, type ClubHQ } from './hq-state';
 
 /** A pack waiting to be opened (a challenge reward, the starter). */
 export interface PendingPack {
@@ -16,6 +17,7 @@ export interface PendingPack {
 
 export interface UtState {
   v: 1;
+  hq?: ClubHQ;
   rivals?: RivalsState;
   collected?: string[];
   collectionClaims?: string[];
@@ -118,6 +120,7 @@ export function migrateUt(raw: unknown): UtState {
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
   return organizeStorage({
     v: 1,
+    ...(r.hq && typeof r.hq === 'object' ? { hq: normalizeHQ(r.hq, owned) } : {}),
     ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),
     ...(Array.isArray(r.settled) ? { settled: r.settled.filter((x) => typeof x === 'string').slice(-1000) } : {}),
     owned,

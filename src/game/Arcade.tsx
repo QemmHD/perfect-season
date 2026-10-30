@@ -84,6 +84,7 @@ export function Arcade({
   rivalGone,
   tookMe,
   autoplay,
+  manualOnly = false,
   kits,
   onProgress,
   onTakeover,
@@ -108,6 +109,8 @@ export function Arcade({
   /** online: the other phone gave up on this one and let the AI finish its drives from this one on */
   tookMe: number | null;
   autoplay?: boolean;
+  /** Solo challenges can require an actual played match instead of the instant sim. */
+  manualOnly?: boolean;
   /** what each side wears, and the court or the end zones */
   kits?: Kits;
   onProgress: (p: Progress) => void;
@@ -116,7 +119,7 @@ export function Arcade({
   onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }) => void;
 }) {
   const defenseIQ = defenseDifficulty(online, botLevel, aiDefense);
-  const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay ? 'play' : 'kickoff');
+  const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay || manualOnly ? 'play' : 'kickoff');
   const [mine, setMine] = useState<Progress | null>(null);
   const [attrs, setAttrs] = useState<((p: Player) => Attrs | null) | null>(null);
   useEffect(() => {
@@ -220,7 +223,7 @@ export function Arcade({
 
   // sim: the autopilot plays your drives at a middling level
   const sim = () => {
-    if (!attrs) return;
+    if (!attrs || manualOnly) return;
     sfx.click();
     how.current = 'sim';
     progress(aiPlay(false, seed + ':sim', 0.6, attrs));
@@ -262,9 +265,9 @@ export function Arcade({
           </p>
         )}
         <div className="arc-btns">
-          <button className="big ghost small" onClick={sim} disabled={!attrs}>
+          {!manualOnly && <button className="big ghost small" onClick={sim} disabled={!attrs}>
             <span>SIM IT</span>
-          </button>
+          </button>}
           <button className="big shine" onClick={() => (sfx.whistle(), setStage('play'))} disabled={!attrs}>
             <span>PLAY</span>
           </button>
@@ -304,9 +307,9 @@ export function Arcade({
           </p>
         )}
         <div className="arc-btns">
-          <button className="big ghost small" onClick={sim} disabled={!attrs}>
+          {!manualOnly && <button className="big ghost small" onClick={sim} disabled={!attrs}>
             <span>SIM MY DRIVES</span>
-          </button>
+          </button>}
           <button className="big shine" onClick={() => (sfx.whistle(), setStage('play'))} disabled={!attrs}>
             <span>PLAY</span>
           </button>

@@ -1,0 +1,47 @@
+/* Codex: compact play calls in the game's existing glass, teal and Archivo treatment. */
+.hg2-coach {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat) + 104px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid #ffffff26;
+  border-radius: 13px;
+  background: #081a18d9;
+  box-shadow: 0 4px 18px #0005;
+}
+.hg2-coach button {
+  min-height: 42px;
+  min-width: 70px;
+  padding: 8px 11px;
+  border: 1px solid #ffffff12;
+  border-radius: 9px;
+  background: #ffffff08;
+  color: #b8ede5;
+  font: 900 10px var(--display);
+  letter-spacing: 1px;
+  touch-action: manipulation;
+}
+.hg2-coach button:active {
+  color: #092821;
+  background: var(--teal);
+}
+.hg2-coach button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.hg2.wide .hg2-coach {
+  top: auto;
+  bottom: calc(var(--sab) + 12px);
+}
+.hg2:not(.wide) .hg2-hint { top:calc(var(--sat) + 161px); font-size:11px; max-width:240px; }
+.hg2.wide .hg2-hint { bottom:calc(var(--sab) + 69px); max-width:240px; font-size:11px; }
+.ut-moment-playing .hg2:not(.wide) .hg2-coach { top:calc(var(--sat) + 185px); }
+@media (max-width: 350px) and (orientation: portrait) {
+  .hg2-coach button {
+    min-width: 63px;
+    padding: 8px;
+  }
+}

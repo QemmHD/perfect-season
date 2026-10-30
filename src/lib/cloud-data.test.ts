@@ -9,6 +9,10 @@ import {
   progressDigest,
 } from "./cloud-data";
 import { freshProfile } from "./profile";
+import { startCircuit } from '../ut/circuit';
+import { savePreset, startDevelopment } from '../ut/club-management';
+import { addSeasonXP, claimSeason } from '../ut/progression';
+import { migrateUt } from '../ut/state';
 function store() {
   const values = new Map<string, string>();
   const storage = {
@@ -41,6 +45,16 @@ function store() {
   return { storage, values };
 }
 describe("encrypted server progress", () => {
+  it('round-trips new clubhouse claims, saved squads, development and an active Circuit without changing original copies', async () => {
+    const {storage}=store(),p=JSON.parse(storage.getItem(CLOUD_KEYS[0])!),at=Date.now();
+    p.ut=savePreset(startDevelopment(startCircuit(p.ut,'2026-W44','saved-run',at),'original','breakout',at),0,'Original Five',at);
+    p.ut=claimSeason(addSeasonXP(p.ut,'2026-10-30',300),'season:1',1,at).ut;
+    const expected=migrateUt(p.ut);storage.setItem(CLOUD_KEYS[0],JSON.stringify(p));
+    const snapshot=captureProgress(storage),encrypted=await encryptProgress(snapshot,'11'.repeat(32),'inspect','actor');
+    const restored=await decryptProgress(encrypted,'11'.repeat(32),'inspect','actor');applyProgress(storage,restored);
+    const loaded=migrateUt(JSON.parse(storage.getItem(CLOUD_KEYS[0])!).ut);
+    expect(loaded).toEqual(expected);expect(loaded.hq?.circuit.active?.at).toBe(at);expect(loaded.hq?.seasons['season:1'].claimed).toEqual([1]);expect(loaded.owned).toEqual(p.ut.owned);
+  });
   it("preserves both sports, cards, XP, duplicate storage and squad UIDs without sending identity/admin secrets", async () => {
     const { storage, values } = store(),
       snapshot = captureProgress(storage);

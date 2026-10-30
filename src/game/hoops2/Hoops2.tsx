@@ -16,11 +16,12 @@ import type { Progress, RivalLive } from '../progress';
 import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
-import { aimPass, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
+import { aimPass, callPlay, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
 import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
 import type { Body, Hooper, Possession, Pt, Scheme } from './types';
+import './coach-controls.css';
 
 const DT = 1 / 60;
 /** what a phone's screen and touch add between what you saw and the release it hears (seconds) */
@@ -204,6 +205,9 @@ export function Hoops2({
         sfx.squeak();
         vibrate(12);
         say('DOUBLE TEAM!', 'plain', 800);
+      } else if (e.startsWith('call:')) {
+        sfx.squeak();
+        say(e === 'call:screen' ? 'SCREEN & ROLL' : e === 'call:cut' ? 'CUT TO THE RIM' : 'SPREAD THE FLOOR', 'plain', 1100);
       } else if (e === 'pass') sfx.whoosh();
       else if (e === 'lob') {
         sfx.whoosh();
@@ -656,6 +660,18 @@ export function Hoops2({
       )}
       {!attrs && <div className="fg-loading">Taking the floor…</div>}
       {g && !g.over && !autoplayHook && <div className="hg2-swipe" onPointerDown={swipeDown} onPointerMove={swipeMove} onPointerUp={swipeUp} onPointerCancel={swipeUp} aria-hidden="true" />}
+      {g && !g.over && !autoplayHook && (
+        <div className="hg2-coach" aria-label="Offensive play calls">
+          {(['screen', 'cut', 'space'] as const).map(kind => <button key={kind} onClick={() => {
+            const current = possRef.current;
+            if (!current || current.end || replaying) return;
+            if (!callPlay(current, kind)) {
+              const wait = Math.ceil(Math.max(0, (current.callReadyAt ?? 0) - current.t));
+              say(wait ? 'CALL READY IN ' + wait + 's' : 'CALL WHEN THE BALL IS IN HAND', 'plain', 700);
+            }
+          }} aria-label={kind === 'screen' ? 'Call a screen and roll' : kind === 'cut' ? 'Call a teammate to cut to the rim' : 'Space the floor'}>{kind === 'screen' ? 'SCREEN' : kind === 'cut' ? 'CUT' : 'SPACE'}</button>)}
+        </div>
+      )}
       {g && !g.over && !autoplayHook && (
         <div className="hg2-pad">
           <div className="hg2-stick" ref={stickEl} onPointerDown={stickDown} onPointerMove={(e) => stickRef.current && stickAt(e)} onPointerUp={stickUp} onPointerCancel={stickUp} aria-label="Move">

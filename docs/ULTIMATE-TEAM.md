@@ -1,5 +1,7 @@
 # Ultimate Team: design
 
+The connected clubhouse overhaul is implemented by Codex and documented in [UT-OVERHAUL.md](UT-OVERHAUL.md): free season rewards, objectives, Champions Circuit, Moments, development, saved lineups, records and new real-engine play calls. This document retains the original mode foundations.
+
 Current Codex additions and revised rules: [Spotlight content update](UT-CONTENT-UPDATE.md), [ratings audit](RATINGS-AUDIT.md), and [implementation/connection log](CODEX-UPDATE-LOG.md).
 
 The owner's choices are in docs/ARCADE-V2.md. This file is the working design that the code

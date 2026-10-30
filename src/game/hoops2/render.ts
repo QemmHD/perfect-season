@@ -231,6 +231,9 @@ function poseOf(b: Body, t: number, carrying: boolean): { key: string; pose: Pos
   const timed = (dur: number, frames = 10) => Math.min(frames, Math.floor((since / dur) * frames)) / frames;
   const cycle = (hz: number, frames: number) => Math.floor((((t * hz) % 1) + 1) % 1 * frames) / frames;
   switch (b.act) {
+    case 'screen':
+      // Original brace pose: feet planted, elbows tucked, with no new art dependency.
+      return { key: 'screen', pose: { ...P.idle(0), lean: .04, crouch: .07, spread: .2, kneeL: .25, kneeR: .25, shL: .12, shR: .12, elL: 1.4, elR: 1.4, abL: .12, abR: .12 } };
     case 'dribble': {
       const sp = Math.min(1, speed / 18);
       const ph = cycle(sp > 0.1 ? 1.5 + sp : 1.6, 8);
@@ -593,6 +596,18 @@ export class HoopsRenderer {
     ctx.translate(sx, sy);
     this.drawFloorNow(ctx);
     this.drawBoard(ctx);
+    const call = p.playCall;
+    if (!this.replay && !p.end && !p.meter && !p.finish && call && call.until > p.t && call.kind !== 'space') {
+      const actor = p.bodies[call.actor];
+      if (actor && actor.idx !== p.handler) {
+        const goal = call.kind === 'screen' && !call.rolling ? call.target : { cx: RIM.cx - 2, cz: actor.cz > 0 ? 2.5 : -2.5 };
+        const from = this.at(actor.cx, actor.cz), to = this.at(goal.cx, goal.cz);
+        ctx.save(); ctx.strokeStyle = '#88f6da99'; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+        ctx.beginPath();ctx.moveTo(from.x,from.y);ctx.lineTo(to.x,to.y);ctx.stroke();ctx.setLineDash([]);
+        ctx.beginPath();ctx.ellipse(to.x,to.y,Math.max(4,to.s*1.3),Math.max(2,to.s*.45),0,0,Math.PI*2);ctx.stroke();
+        label(ctx,call.kind === 'cut' || call.rolling ? 'CUT' : 'SCREEN',to.x,to.y-9,'#b4ffe6');ctx.restore();
+      }
+    }
     // shadows on the floor
     const t = p.t;
     for (const b of p.bodies) {

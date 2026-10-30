@@ -1,0 +1,128 @@
+/* Codex: the full playbook uses the existing route diagrams and play-card visual language. */
+.fb2-coach-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.fb2-coach-row button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 7px 10px;
+  border: 1px solid #ffffff26;
+  border-radius: 9px;
+  background: #ffffff08;
+  color: #d7eee5;
+  font: 900 10px var(--display);
+  letter-spacing: 0.5px;
+}
+.fb2-coach-row button span {
+  color: var(--teal);
+  font-size: 10px;
+}
+.fb2-coach-row button[aria-pressed='true'] {
+  border-color: var(--teal);
+  background: #19e3c916;
+}
+.fb2-book-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--sat) + 12px) calc(var(--sar) + 12px)
+    calc(var(--sab) + 12px) calc(var(--sal) + 12px);
+  background: #021510e8;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.fb2-playbook {
+  display: flex;
+  flex-direction: column;
+  width: min(620px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid #78c2a73b;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #132e25, #081d17);
+  box-shadow: 0 20px 60px #0007;
+}
+.fb2-playbook header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fb2-playbook header span {
+  display: grid;
+  gap: 4px;
+}
+.fb2-playbook header small {
+  color: var(--teal);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+}
+.fb2-playbook header b {
+  color: #fff;
+  font: italic 900 29px/1 var(--display);
+}
+.fb2-playbook header button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ffffff26;
+  border-radius: 50%;
+  background: #ffffff08;
+  color: white;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+.fb2-playbook p {
+  color: #a8c5b9;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 12px 0;
+}
+.fb2-book-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 1px 2px 8px;
+}
+.fb2-book-grid .fb2-card {
+  min-width: 0;
+}
+.fb2-book-grid .fb2-card b {
+  font-size: 13px;
+}
+.fb2-playbook button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .fb2-playbook {
+    padding: 12px;
+  }
+  .fb2-playbook p {
+    margin: 6px 0;
+  }
+  .fb2-book-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .fb2-book-grid .fb2-art {
+    max-height: 64px;
+  }
+  .fb2.wide .fb2-coach-row button {
+    min-height: 36px;
+    padding: 5px 9px;
+  }
+}
+@media (max-width: 350px) {
+  .fb2-book-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

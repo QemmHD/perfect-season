@@ -1,4 +1,6 @@
 // Implemented by Codex. See docs/CODEX-UPDATE-LOG.md for ownership, connections and validation.
+import { easternDateKey } from '../engine/season';
+import { recordActivity } from './progression';
 import type { Profile } from '../lib/profile';
 import { registeredPack } from './packs';
 import type { Pool } from './pool';
@@ -42,7 +44,7 @@ export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryRecei
     at: pending.at + i,
     ...(rare && i === cards.length - 1 ? { mint: { serial: receipt.serial!, totalAtPull: receipt.totalAtPull!, ...(Number.isSafeInteger(receipt.activeAtPull) && receipt.activeAtPull! >= 0 ? { activeAtPull: receipt.activeAtPull! } : {}), requestId: receipt.id, namespace: receipt.namespace } } : {}),
   }));
-  const ut = organizeStorage(p.ut, owned);
+  const ut = organizeStorage(recordActivity(p.ut, 'pack:' + receipt.id, easternDateKey(), { packs: 1 }), owned);
   const stored = new Set(ut.duplicateStorage);
   return {
     profile: {

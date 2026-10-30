@@ -235,6 +235,22 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
   return play;
 }
 
+/** Mirror a complete formation before the snap, retaining players, assignments and ratings. */
+export function flipPlay(p: Play): boolean {
+  if (p.phase !== 'pre' || p.end) return false;
+  const mirror = (x: number) => 2 * p.bx - x;
+  for (const b of p.bodies) {
+    b.x = mirror(b.x);
+    b.vx = -b.vx;
+    b.route = b.route.map(at => ({ x: mirror(at.x), y: at.y }));
+    if (b.zone) b.zone = { x: mirror(b.zone.x), y: b.zone.y };
+    b.trail = b.trail.map(at => ({ x: mirror(at.x), y: at.y }));
+  }
+  p.hole = mirror(p.hole);
+  p.direction = p.direction === -1 ? 1 : -1;
+  return true;
+}
+
 export function snap(p: Play) {
   if (p.phase !== 'pre') return;
   p.phase = 'drop';
@@ -472,8 +488,9 @@ export function step(p: Play, dt: number, steer: number | null) {
   if (p.call === 'run' && p.carrier === qb) {
     const rb = p.rb;
     const mesh = MESH[p.run];
-    steerTo(rb, p.bx + mesh.x, p.los + mesh.y, speedOf(rb.p) * 0.65, dt);
-    steerTo(qb, p.bx - 0.4, p.los - 3.7, 4, dt);
+    const direction = p.direction ?? 1;
+    steerTo(rb, p.bx + mesh.x * direction, p.los + mesh.y, speedOf(rb.p) * 0.65, dt);
+    steerTo(qb, p.bx - 0.4 * direction, p.los - 3.7, 4, dt);
     if (t > 0.42 && dist(rb, qb) < 1.8) {
       p.carrier = rb;
       rb.job = 'carry';
@@ -508,7 +525,7 @@ export function step(p: Play, dt: number, steer: number | null) {
       const followingRun = steer === null && p.call === 'run' && b === p.rb && b.y < p.los + 1;
       // An outside handoff stretches behind the line before turning upfield. A constant forward
       // velocity used to drag every run into the tackle box, even when its arrow pointed outside.
-      const stretching = followingRun && p.run === 'outside' && b.x < p.hole - 0.8;
+      const stretching = followingRun && p.run === 'outside' && (p.direction ?? 1) * (p.hole - b.x) > 0.8;
       const landmark = stretching ? { x: p.hole, y: p.los - 0.1 } : null;
       const aim = steer ?? (followingRun ? p.hole : null);
       if (m?.kind === 'juke') {

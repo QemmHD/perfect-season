@@ -1,4 +1,11 @@
 import { Rivals, RivalsTeaser } from './Rivals';
+import { recordActivity, claimObjective, claimSeason, hqOf, objectiveDeck, rewardLabel, type Prize } from './progression';
+import { PlayHQ, SeasonView, ObjectivesView, CircuitView, DevelopmentView, SquadPresets, ClubRecords } from './Clubhouse';
+import { Moments } from './Moments';
+import { claimMoment, finishMoment } from './moments';
+import { startCircuit, abandonCircuit } from './circuit';
+import { savePreset, loadPreset, startDevelopment, cancelDevelopment, claimDevelopment } from './club-management';
+import './clubhouse.css';
 // Ultimate Team: the mode's own screen, with its own tabs (hub, squad, club, store, challenges).
 // It keeps everything in the profile's `ut` (this sport's) and spends the profile's coins. The
 // card pool loads when the screen opens. App.tsx only routes here (screen 'ut').
@@ -47,7 +54,7 @@ export interface ClubCard {
   storage?: boolean;
 }
 
-export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles' | 'rivals' | 'gallery' | 'events';
+export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles' | 'rivals' | 'gallery' | 'events' | 'play' | 'season' | 'objectives' | 'circuit' | 'moments' | 'development' | 'records';
 
 /** the view to come back to after a match (the screen unmounts while it's played) */
 let lastView: UtView = 'hub';
@@ -95,7 +102,8 @@ export default function UltimateTeam(props: {
   const [promoRetry, setPromoRetry] = useState(0);
   const latest = useRef(profile);
   latest.current = profile;
-  const [day] = useState(() => easternDateKey());
+  const [day, setDay] = useState(() => easternDateKey());
+  useEffect(() => { const refresh = () => setDay(easternDateKey()); const timer = window.setInterval(refresh, 60000); document.addEventListener('visibilitychange', refresh); return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); }; }, []);
 
   const tries = useRef(0);
   const load = () => {
@@ -190,6 +198,13 @@ export default function UltimateTeam(props: {
     };
   }, [pool, ut.pendingPromo?.id, promoRetry]);
 
+  const claimPrize = (get: (u: UtState) => Prize) => {
+    const shown = get(latest.current.ut);
+    if (shown.ut === latest.current.ut) return;
+    update(p => { const r = get(p.ut); return { ...p, coins: p.coins + r.coins, ut: r.ut }; });
+    sfx.coin(); onToast('Reward claimed. ' + rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }));
+  };
+
   // ---------- packs ----------
 
   /** Open a pack now: its cards go into the club at once (closing the app mid-reveal keeps them).
@@ -206,7 +221,7 @@ export default function UltimateTeam(props: {
     const at = Date.now();
     const owned = ownedCardsForPack(cards, seed, at);
     update((p) => {
-      const deposited = organizeStorage(p.ut, owned);
+      const deposited = organizeStorage(recordActivity(p.ut, 'pack:' + seed, easternDateKey(), { packs: 1 }), owned);
       const empty = fill && !Object.keys(deposited.squad).length;
       const squad = empty
         ? autoBuild(
@@ -329,7 +344,7 @@ export default function UltimateTeam(props: {
         ...p,
         coins: p.coins + (s.reward.coins ?? 0),
         ut: {
-          ...organizeStorage(removeCards(p.ut, gone, 'sbc'), prize ? [prize] : []),
+          ...organizeStorage(removeCards(recordActivity(p.ut, 'sbc:' + s.id, easternDateKey(), { sbcs: 1 }, 50), gone, 'sbc'), prize ? [prize] : []),
           sbc: { done },
           packs: pack ? [...p.ut.packs, pack] : p.ut.packs,
         },
@@ -364,7 +379,15 @@ export default function UltimateTeam(props: {
       </div>
     );
   else if (view === 'squad')
-    body = <SquadView pool={pool} club={club} lineup={lineup} squad={ut.squad} rating={rating} onSlot={setSlot} onSquad={setSquad} onInspect={setDetail} onToast={onToast} />;
+    body = <SquadView pool={pool} club={club} lineup={lineup} squad={ut.squad} rating={rating} onSlot={setSlot} onSquad={setSquad} onInspect={setDetail} onToast={onToast}
+      management={<SquadPresets ut={ut} pool={pool} onSave={(id,name) => { setUt(u => savePreset(u,id,name,Date.now())); onToast('Current squad saved. Every card stays in your club.'); }} onLoad={id => { setUt(u => loadPreset(u,pool,id)); onToast('Saved lineup loaded using your owned copies.'); }} />} />;
+  else if (view === 'play') body = <PlayHQ onGo={go} onOnline={() => { if (!ready) { onToast('Fill your starting squad first.'); go('squad'); return; } props.onPlaySquad?.({ id: Date.now(), mode: 'online' }); }} />;
+  else if (view === 'season') body = <SeasonView ut={ut} day={day} sport={SPORT} onStore={() => go('store')} onClaim={(period,tier) => { const at=Date.now(); claimPrize(u => claimSeason(u,period,tier,at)); }} />;
+  else if (view === 'objectives') body = <ObjectivesView ut={ut} day={day} onClaim={id => { const at=Date.now(); claimPrize(u => claimObjective(u,id,day,at)); }} onClaimAll={() => { const at=Date.now(); claimPrize(u => { let next=u,coins=0,sp=0; for (const o of objectiveDeck(u,day)) if (!o.claimed && o.progress>=o.target) { const r=claimObjective(next,o.id,day,at); next=r.ut; coins+=r.coins; sp+=r.sp; } return { ut:next,coins,sp,pack:null }; }); }} />;
+  else if (view === 'circuit') body = <CircuitView ut={ut} week={weekOf(day)} ready={ready} onSquad={() => go('squad')} onStart={() => { const id=newId(),at=Date.now(); setUt(u => startCircuit(u,weekOf(day),id,at)); }} onPlay={(runId,round) => props.onPlaySquad?.({id:Date.now(),mode:'ai',circuit:{runId,round}})} onEnd={() => setUt(abandonCircuit)} />;
+  else if (view === 'moments') body = <Moments pool={pool} ut={ut} ready={ready} onSquad={() => go('squad')} onFinish={(m,attempts) => { const at=Date.now(); setUt(u => finishMoment(u,m,attempts,at)); }} onClaim={id => { const at=Date.now(); claimPrize(u => claimMoment(u,SPORT,id,day,at)); }} />;
+  else if (view === 'development') body = <DevelopmentView ut={ut} club={club} onSquad={() => go('squad')} onStart={(uid,path) => {const at=Date.now();setUt(u => startDevelopment(u,uid,path,at));}} onCancel={() => setUt(cancelDevelopment)} onClaim={() => { const at=Date.now();const shown=claimDevelopment(latest.current.ut,day,at);if(!shown.xp)return;setUt(u => claimDevelopment(u,day,at).ut);sfx.levelUp();onToast('Program complete. +'+shown.xp+' card XP and +'+shown.sp+' Season Points.'); }} />;
+  else if (view === 'records') body = <ClubRecords ut={ut} />;
   else if (view === 'club')
     body = (
       <div className="ut-collection-shell">
@@ -463,6 +486,7 @@ export default function UltimateTeam(props: {
       <Hub
         rivals={<RivalsTeaser profile={profile} onOpen={() => go('rivals')} />}
         sport={SPORT}
+        day={day}
         club={club}
         lineup={lineup}
         rating={rating}
@@ -502,17 +526,7 @@ export default function UltimateTeam(props: {
           <Back size={16} /> {view === 'hub' ? 'HOME' : 'UT'}
         </button>
         <span className="ut-title disp">
-          {view === 'hub'
-            ? 'Ultimate Team'
-            : view === 'battles'
-              ? 'Squad Battles'
-              : view === 'rivals'
-                ? 'Rivals'
-                : view === 'gallery'
-                  ? 'Collection'
-                  : view === 'events'
-                    ? 'Spotlight Events'
-                    : TABS.find((t) => t[0] === view)![1]}
+          {view === 'hub' ? 'Ultimate Team' : ({ battles:'Squad Battles',rivals:'Rivals',gallery:'Collection',events:'Spotlight Events',play:'Play HQ',season:'Season Rewards',objectives:'Objectives',circuit:'Champions Circuit',moments:'Moments',development:'Development',records:'Club Records' } as Partial<Record<UtView,string>>)[view] ?? TABS.find(t => t[0] === view)?.[1] ?? 'Ultimate Team'}
         </span>
         <CoinChip coins={profile.coins} />
       </div>
@@ -530,6 +544,8 @@ export default function UltimateTeam(props: {
       {detailCard && (
         <CardDetail
           cc={detailCard}
+          clubRecord={hqOf(ut).cardStats[detailCard.uid]}
+          developed={!!hqOf(ut).development.completed[detailCard.uid]}
           sport={SPORT}
           onUse={
             detailCard.storage

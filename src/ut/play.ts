@@ -1,4 +1,6 @@
 import { settleEvent } from './events';
+import { settleCircuit } from './circuit';
+import { hqOf, recordMatchProgress } from './progression';
 import { rivalsMatch } from './rivals';
 // Playing a squad: what the UT screens ask for, and what a finished match pays (docs/ULTIMATE-TEAM.md
 // "Playing").
@@ -17,6 +19,7 @@ export interface UtMatchRequest {
   /** Squad Battles: the rung of this week's ladder */
   rung?: number;
   event?: { id: string; node: number };
+  circuit?: { runId: string; round: number };
 }
 
 export interface UtMatchResult {
@@ -69,6 +72,8 @@ export interface Settled {
   pack: string | null;
   /** that was the top rung: the next ladder is up */
   refreshed: boolean;
+  seasonXP: number;
+  circuitPrizes: string[];
   /** today's paid games were used up before this one: it paid nothing */
   capped: boolean;
 }
@@ -94,9 +99,14 @@ export function settle(
     pay?: number;
     matchId?: string;
     event?: { id: string; node: number };
+    circuit?: { runId: string; round: number };
+    opponent?: string;
+    how?: 'played' | 'sim';
   }
 ): Settled {
-  if (r.matchId && ut.settled?.includes(r.matchId)) return { ut, coins: 0, xp: 0, ups: [], climbed: false, pack: null, capped: false, refreshed: false };
+  const activeCircuit = r.circuit ? hqOf(ut).circuit.active : undefined;
+  if ((r.matchId && ut.settled?.includes(r.matchId)) || (r.circuit && (r.how === 'sim' || !activeCircuit || activeCircuit.id !== r.circuit.runId || activeCircuit.games !== r.circuit.round))) return { ut, coins: 0, xp: 0, ups: [], climbed: false, pack: null, capped: false, refreshed: false, seasonXP: 0, circuitPrizes: [] };
+  ut = ut.hq ? ut : { ...ut, hq: hqOf(ut) };
   const today = ut.paid.day === r.day ? ut.paid.n : 0;
   const capped = today >= PAID_GAMES_A_DAY;
   const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
@@ -114,16 +124,21 @@ export function settle(
       ? { ...battles, week: r.week, cleared: 0, best: RUNGS, round: (battles.round ?? 0) + 1 }
       : { ...battles, week: r.week, cleared: r.rung!.i + 1, best: Math.max(battles.best, r.rung!.i + 1) };
   const packs = pack ? [...x.ut.packs, { id: r.packId, kind: pack, at: r.at }] : x.ut.packs;
-  return {
-    ut: {
+  const settledUt: UtState = {
       ...x.ut,
       record,
       battles,
       packs,
       ...(r.matchId ? { settled: [...(ut.settled ?? []), r.matchId].slice(-1000) } : {}),
       ...(r.online && r.matchId ? { rivals: rivalsMatch(ut.rivals, r.week, r.matchId, r.won) } : {}),
-    },
-    coins,
+    };
+  const circuit = r.circuit ? settleCircuit(settledUt, r.circuit.runId, r.circuit.round, r.won, r.at) : { ut: settledUt, coins: 0, prizes: [] };
+  const progression = recordMatchProgress(circuit.ut, { id: r.matchId ?? 'legacy:' + r.packId, at: r.at, mode: r.circuit ? 'circuit' : r.online ? 'online' : r.event ? 'event' : 'battle', won: r.won, us: r.us, them: r.them, opponent: r.opponent ?? 'Opponent', coins: coins + circuit.coins, xp, day: r.day, how: r.how ?? 'played', played: r.played });
+  return {
+    ut: progression.ut,
+    coins: coins + circuit.coins,
+    seasonXP: progression.sp,
+    circuitPrizes: circuit.prizes,
     xp,
     ups: x.ups,
     climbed,

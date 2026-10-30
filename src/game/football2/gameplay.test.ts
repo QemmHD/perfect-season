@@ -1,7 +1,7 @@
 // Implemented by Codex: actual throws and physical passing lanes, using synthetic fixture teams.
 import { describe, expect, it } from 'vitest';
 import { rng } from '../../engine/rng';
-import { ballNow, dist, lineUp, maxThrow, snap, step, throwErrorRadius, throwTo } from './engine';
+import { ballNow, dist, flipPlay, lineUp, maxThrow, snap, step, throwErrorRadius, throwTo } from './engine';
 import type { Defense, FbPlayer, Offense } from './types';
 const player = (id: string, pos: string): FbPlayer => ({
   id,
@@ -65,6 +65,24 @@ function play(seed = 1) {
   return p;
 }
 describe('football accuracy and credible defense', () => {
+  it('mirrors routes, coverage, personnel and landmarks together, and locks the call at the snap', () => {
+    const p=lineUp(offense(),defense(),'pass','flood','outside',35,26,rng(5),1);
+    const before=p.bodies.map(b=>({x:b.x,y:b.y,route:b.route.map(a=>({...a})),zone:b.zone?{...b.zone}:null,mark:b.mark,p:JSON.stringify(b.p)})),hole=p.hole;
+    expect(flipPlay(p)).toBe(true);
+    p.bodies.forEach((b,i)=>{expect(b.x).toBeCloseTo(2*p.bx-before[i].x);expect(b.y).toBe(before[i].y);expect(b.mark).toBe(before[i].mark);expect(JSON.stringify(b.p)).toBe(before[i].p);b.route.forEach((a,j)=>expect(a.x).toBeCloseTo(2*p.bx-before[i].route[j].x));if(b.zone)expect(b.zone.x).toBeCloseTo(2*p.bx-before[i].zone!.x)});
+    expect(p.hole).toBeCloseTo(2*p.bx-hole);expect(flipPlay(p)).toBe(true);
+    p.bodies.forEach((b,i)=>expect(b.x).toBeCloseTo(before[i].x));
+    snap(p);const xs=p.bodies.map(b=>b.x);expect(flipPlay(p)).toBe(false);expect(p.bodies.map(b=>b.x)).toEqual(xs);
+  });
+  it('executes a mirrored outside handoff and follows the left landmark at a matching pace', () => {
+    const normal=lineUp(offense(),defense(),'run','slants','outside',35,26,rng(40),0),flipped=lineUp(offense(),defense(),'run','slants','outside',35,26,rng(40),0);
+    flipPlay(flipped);for(const p of [normal,flipped]){for(const d of p.bodies.filter(b=>b.side==='D'))d.stunUntil=Infinity;snap(p)}
+    for(let i=0;i<210;i++){step(normal,1/60,null);step(flipped,1/60,null)}
+    expect(normal.events).toContain('handoff');expect(flipped.events).toContain('handoff');
+    expect(normal.rb.x).toBeGreaterThan(normal.bx+3);expect(flipped.rb.x).toBeLessThan(flipped.bx-3);
+    expect(normal.rb.x+flipped.rb.x).toBeCloseTo(2*normal.bx,1);expect(normal.rb.y).toBeCloseTo(flipped.rb.y,1);
+    expect(normal.bodies.every(b=>Number.isFinite(b.x)&&Number.isFinite(b.y))).toBe(true);
+  });
   it('makes actual high-accuracy throws tighter than weak throws, with bounded error', () => {
     let good = 0,
       bad = 0;

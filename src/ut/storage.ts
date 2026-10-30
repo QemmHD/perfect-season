@@ -1,3 +1,4 @@
+import { normalizeHQ } from './hq-state';
 import type { UtState } from './state';
 import { rememberCollection } from './collection';
 import type { OwnedCard } from './types';
@@ -66,6 +67,7 @@ export function removeCards(ut: UtState, uids: Iterable<string>, reason?: 'sold'
     ...rememberCollection(ut),
     ...(reason ? { retirements: [...(ut.retirements ?? []), ...ut.owned.filter(c => gone.has(c.uid)).map(c => ({ uid: c.uid, cardId: c.cardId, level: c.level, reason, ...(c.mint ? { mint: c.mint } : {}) }))] } : {}),
     owned: ut.owned.filter((c) => !gone.has(c.uid)),
+    ...(ut.hq ? { hq: normalizeHQ(ut.hq, ut.owned.filter(c => !gone.has(c.uid))) } : {}),
     squad: Object.fromEntries(Object.entries(ut.squad).filter(([, uid]) => !gone.has(uid))),
   });
 }

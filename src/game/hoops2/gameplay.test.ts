@@ -1,7 +1,7 @@
 // Implemented by Codex: regression cases for the execution problems reported by the owner.
 import { describe, expect, it } from 'vitest';
 import { rng } from '../../engine/rng';
-import { crossover, greenWindow, newPossession, releaseProbability, RIM, spin, step, stepback } from './engine';
+import { callPlay, crossover, dist, greenWindow, newPossession, releaseProbability, RIM, spin, step, stepback } from './engine';
 import type { Hooper } from './types';
 const player = (id: number): Hooper => ({
   id: 'test-' + id,
@@ -35,6 +35,37 @@ const player = (id: number): Hooper => ({
 });
 const possession = (iq = 0) => newPossession([0, 1, 2, 3, 4].map(player), [5, 6, 7, 8, 9].map(player), [1, 1, 1, 1, 1], rng(42), iq);
 describe('basketball decision and motion quality', () => {
+  it('moves the called teammate on a cut, spaces back out and enforces a persistent call cooldown', () => {
+    const p = possession(); p.scheme = 'man'; p.target = 1;
+    const cutter = p.bodies[1], before = dist(cutter, RIM), ratings = JSON.stringify(p.bodies.map(b=>b.p));
+    expect(callPlay(p,'cut')).toBe(true); expect(p.playCall?.actor).toBe(1);
+    expect(callPlay(p,'screen')).toBe(false);
+    for(let i=0;i<35;i++) step(p,1/60,null);
+    expect(dist(cutter,RIM)).toBeLessThan(before-2);
+    expect(callPlay(p,'space')).toBe(true); expect(cutter.cutUntil).toBe(0);
+    expect(callPlay(p,'cut')).toBe(false);
+    expect(JSON.stringify(p.bodies.map(b=>b.p))).toBe(ratings);
+    p.ball={kind:'pass',from:{cx:0,cz:0,h:1},to:{cx:1,cz:0,h:1},t0:p.t,t1:p.t+1,arc:1,who:1};
+    expect(callPlay(p,'space')).toBe(false);
+  });
+  it('walks a screener to his landmark, plants and rolls without teleporting or stunning defenders', () => {
+    const p=possession();p.scheme='man';expect(callPlay(p,'screen')).toBe(true);
+    const c=p.playCall!,actor=p.bodies[c.actor],start={cx:actor.cx,cz:actor.cz};
+    // Isolate the approach, then exercise real planted contact with an on-ball defender.
+    for(const d of p.bodies.filter(b=>b.side==='D')) {d.cz=23;d.cx=44;d.stunUntil=0;}
+    const before=JSON.stringify(p.bodies.map(b=>b.p));
+    let planted=false;
+    for(let i=0;i<350&&!p.end;i++) {
+      const last={cx:actor.cx,cz:actor.cz};step(p,1/60,null);
+      expect(dist(actor,last)).toBeLessThan(.8);
+      if(c.plantedAt!==undefined)planted=true;
+      if(c.rolling)break;
+    }
+    expect(dist(actor,start)).toBeGreaterThan(3);expect(planted).toBe(true);expect(c.rolling).toBe(true);
+    expect(p.bodies.filter(b=>b.side==='D').every(d=>d.stunUntil===0)).toBe(true);
+    expect(JSON.stringify(p.bodies.map(b=>b.p))).toBe(before);
+    p.end={kind:'clock',who:0,points:0,text:'CLOCK'};expect(callPlay(p,'cut')).toBe(false);
+  });
   it('rewards open perfect releases, grades nearby timing smoothly, and respects a smothering defender', () => {
     const p = possession(),
       b = p.bodies[0];

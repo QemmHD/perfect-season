@@ -139,6 +139,8 @@ export interface Play {
   used: Partial<Record<Move, number>>;
   /** across the field, the hole a run is blocked for */
   hole: number;
+  /** Formation handedness; a pre-snap flip mirrors assignments and run landmarks together. */
+  direction?: 1 | -1;
   /**
    * How well the defense plays, beyond its ratings (Squad Battles' difficulty): 0 the standard, up
    * to 1 (reads and breaks on the ball sooner, covers tighter, gets home faster, misreads runs less),

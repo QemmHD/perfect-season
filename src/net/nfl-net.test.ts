@@ -30,7 +30,7 @@ describe.skipIf(!NFL)('football boards', () => {
     expect(boardTag('classic', 'all', day)).toContain('perfect-season/nfl/v1');
     expect(boardTag('h2h', 'week', day)).toContain('/nfl/');
     expect(NET_V).toContain(DATA_V);
-    expect(NET_V).toMatch(/-5$/); // Updated rushing clients cannot pair with the prior NFL physics.
+    expect(NET_V).toMatch(/-6$/); // Playbook clients cannot pair with earlier NFL physics.
     // basketball's fingerprint, which football must never match
     expect(DATA_V).not.toBe('1gypzor');
   });

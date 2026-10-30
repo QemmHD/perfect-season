@@ -653,6 +653,33 @@ const BURST_FILL = 0.2;
  * Advance by dt. `stick` is where the handler wants to go, as a court direction (length up to 1),
  * or null to stand.
  */
+/** Call the aimed teammate through, bring a big to the ball, or spread the floor. */
+export function callPlay(p: Possession, kind: 'screen' | 'cut' | 'space'): boolean {
+  if (p.end || p.handler === null || p.ball || p.meter || p.finish || p.clock < 1) return false;
+  if (kind !== 'space' && p.t < (p.callReadyAt ?? 0)) return false;
+  const handler = p.bodies[p.handler];
+  const mates = p.bodies.filter(b => b.side === 'O' && b !== handler);
+  if (!mates.length) return false;
+  for (const b of mates) b.cutUntil = 0;
+  const toward = unit({ cx: RIM.cx - handler.cx, cz: RIM.cz - handler.cz });
+  const score = (b: Body) => (b.p.pos === 'C' ? 7 : b.p.pos === 'PF' ? 6 : 0) + b.p.str / 10 - dist(b, handler) * .6;
+  const actor = kind === 'cut'
+    ? mates.find(b => b.idx === p.target) ?? mates.slice().sort((a, b) => (b.p.lay + b.p.ddk - dist(b, RIM)) - (a.p.lay + a.p.ddk - dist(a, RIM)))[0]
+    : mates.slice().sort((a, b) => score(b) - score(a))[0];
+  const side = handler.cz >= 0 ? -1 : 1;
+  const target = { cx: clamp(handler.cx + toward.cx * 3.3 - toward.cz * side * 3, 2, MAX_CX - 2), cz: clamp(handler.cz + toward.cz * 3.3 + toward.cx * side * 3, -MAX_CZ + 2, MAX_CZ - 2) };
+  p.playCall = { kind, actor: actor.idx, target, until: p.t + (kind === 'screen' ? 6.5 : 3.5), sides: {} };
+  if (kind !== 'space') p.callReadyAt = p.t + 4.5;
+  if (kind === 'cut') { actor.cutUntil = p.t + 3; p.target = actor.idx; }
+  p.events.push('call:' + kind);
+  return true;
+}
+
+function plantedScreen(p: Possession, b: Body): boolean {
+  const c = p.playCall;
+  return !!c && c.kind === 'screen' && c.actor === b.idx && c.until > p.t && c.plantedAt !== undefined && !c.rolling && Math.hypot(b.vx, b.vz) < 2;
+}
+
 export function step(p: Possession, dt: number, stick: Pt | null) {
   if (p.end) return;
   p.t += dt;
@@ -776,7 +803,8 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
       const min = 1.7 * (0.85 + 0.15 * ((o.p.wt + d.p.wt) / 460));
       if (dd < min && dd > 1e-6) {
         const push = (min - dd) / dd;
-        const strength = clamp(0.85 + (d.p.str - o.p.str) / 500, 0.7, 0.95);
+        // A planted screener holds his ground. Moving screens retain the usual offensive give.
+        const strength = plantedScreen(p, o) ? clamp(.18 + (d.p.str - o.p.str) / 500, .1, .3) : clamp(0.85 + (d.p.str - o.p.str) / 500, 0.7, 0.95);
         o.cx += dx * push * strength;
         o.cz += dz * push * strength;
         d.cx -= dx * push * (1 - strength);
@@ -874,25 +902,34 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
 function offBall(p: Possession, b: Body, handler: Body | null, inside: boolean, dt: number) {
   const t = p.t;
   const r = p.rand;
+  const call = p.playCall && p.playCall.until > t ? p.playCall : null;
   // after a shot, crash the glass (the bigs) or get back
   if (p.ball?.kind === 'shot' || p.ball?.kind === 'loose') {
     const big = b.p.pos === 'C' || b.p.pos === 'PF';
     const tgt = p.ball.kind === 'loose' ? p.ball.to : big ? { cx: RIM.cx - 4, cz: b.cz > 0 ? 3 : -3 } : b.home;
     steer(b, tgt.cx, tgt.cz, topSpeed(b, false) * 0.9, dt);
+  } else if (call?.kind === 'screen' && call.actor === b.idx && handler) {
+    if (call.plantedAt === undefined && dist(b, call.target) < 1.15 && Math.hypot(b.vx, b.vz) < 2) call.plantedAt = t;
+    if (call.plantedAt !== undefined && (t - call.plantedAt > 1.5 || (handler.cx > b.cx + 1 && dist(handler, b) < 7))) {
+      if (!call.rolling) { call.rolling = true; b.cutUntil = t + 2; p.events.push('cut:' + b.idx); }
+    }
+    const to = call.rolling ? { cx: RIM.cx - 2, cz: b.cz > 0 ? 2.5 : -2.5 } : call.target;
+    steer(b, to.cx, to.cz, topSpeed(b, false) * (call.plantedAt !== undefined && !call.rolling ? 0 : .9), dt);
   } else if (b.cutUntil > t) {
     steer(b, RIM.cx - 2, b.cz > 0 ? 2.5 : -2.5, topSpeed(b, false), dt);
   } else {
-    const home = inside && b.p.pos !== 'C' ? nearestDrift(b) : b.home;
+    const home = call?.kind === 'space' ? DRIFT[b.idx % DRIFT.length] : inside && b.p.pos !== 'C' ? nearestDrift(b) : b.home;
     steer(b, home.cx, home.cz, topSpeed(b, false) * 0.62, dt);
     const md = p.bodies.find((d) => d.side === 'D' && d.mark === b.idx);
     // his man's lost him, the ball's outside: cut
-    if (md && handler && !inside && dist(handler, RIM) > 16 && (dist(md, b) > 6.5 || t < md.stunUntil) && r() < dt * 0.28 && b.p.pos !== 'PG') {
+    if (call?.kind !== 'space' && md && handler && !inside && dist(handler, RIM) > 16 && (dist(md, b) > 6.5 || t < md.stunUntil) && r() < dt * 0.28 && b.p.pos !== 'PG') {
       b.cutUntil = t + 1.5;
       p.events.push('cut:' + b.idx);
     }
   }
   const moving = Math.hypot(b.vx, b.vz) > 2;
-  if (b.act !== 'catch' && b.act !== 'pass' && b.act !== 'rebound') act(b, moving ? 'run' : 'idle', t);
+  if (plantedScreen(p, b)) act(b, 'screen', t);
+  else if (b.act !== 'catch' && b.act !== 'pass' && b.act !== 'rebound') act(b, moving ? 'run' : 'idle', t);
   else if (t - b.actAt > 0.4) act(b, moving ? 'run' : 'idle', t);
   b.face = moving ? Math.atan2(b.vz, b.vx) : handler ? Math.atan2(handler.cz - b.cz, handler.cx - b.cx) : 0;
   move(b, dt);
@@ -954,6 +991,20 @@ function defend(p: Possession, b: Body, handler: Body | null, ballAt: Pt, inside
     }
   }
   if (closing && handler) target = { cx: handler.cx + (RIM.cx - handler.cx) * 0.04, cz: handler.cz + (RIM.cz - handler.cz) * 0.04 };
+  // Read the obstacle and go around it. Contact consumes distance rather than stunning a defender
+  // or gifting the ball handler an artificial shooting bonus.
+  const call = p.playCall;
+  const screen = call?.kind === 'screen' ? p.bodies[call.actor] : null;
+  if (screen && call && plantedScreen(p, screen) && dist(b, screen) < 7 && b.mark !== screen.idx) {
+    const dx = target.cx - b.cx, dz = target.cz - b.cz, len2 = dx * dx + dz * dz;
+    const projection = len2 > .01 ? ((screen.cx - b.cx) * dx + (screen.cz - b.cz) * dz) / len2 : -1;
+    const gap = Math.hypot(b.cx + dx * projection - screen.cx, b.cz + dz * projection - screen.cz);
+    if (projection > 0 && projection < 1.3 && gap < 2.3) {
+      const toward = unit({ cx: dx, cz: dz });
+      const side = call.sides[b.idx] ?? (call.sides[b.idx] = ((b.cx - screen.cx) * -toward.cz + (b.cz - screen.cz) * toward.cx) >= 0 ? 1 : -1);
+      target = { cx: screen.cx - toward.cz * side * 2.8 - toward.cx, cz: screen.cz + toward.cx * side * 2.8 - toward.cz };
+    }
+  }
   steer(b, target.cx, target.cz, topSpeed(b, false) * (closing ? 1.12 : onBall ? 1 : 0.94) * (beaten ? 0.92 : 1), dt);
   move(b, dt);
   if (b.act === 'contest' || b.act === 'block' || b.act === 'stumble') {

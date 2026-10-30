@@ -51,6 +51,7 @@ export interface Pt {
 /** What a body is doing, for the animation. */
 export type Act =
   | 'idle'
+  | 'screen'
   | 'run'
   | 'dribble'
   | 'shoot'
@@ -190,4 +191,7 @@ export interface Possession {
   trapped: boolean;
   /** the handler is sprinting (the stick at its edge) */
   sprinting: boolean;
+  /** A coach call moves real teammates; it never changes ratings or shot odds. */
+  playCall?: { kind: 'screen' | 'cut' | 'space'; actor: number; target: Pt; until: number; plantedAt?: number; rolling?: boolean; sides: Record<number, number> };
+  callReadyAt?: number;
 }

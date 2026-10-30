@@ -53,6 +53,7 @@ export function SquadView(props: {
   onSquad: (squad: Record<string, string>) => void;
   onInspect: (uid: string) => void;
   onToast: (t: string) => void;
+  management?: React.ReactNode;
 }) {
   const { lineup, rating, squad } = props;
   const nba = SPORT === 'nba';
@@ -143,6 +144,7 @@ export function SquadView(props: {
           <IconWand size={16} /> AUTO
         </button>
       </div>
+      {props.management && <div className="hq-squad-toolbar"><span className="eyebrow">ONE CLUB. THREE MATCHDAY LINEUPS.</span>{props.management}</div>}
       {!nba && (
         <span className="seg ut-unit" role="group" aria-label="Unit">
           {(['off', 'def'] as const).map((u) => (

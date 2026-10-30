@@ -19,11 +19,12 @@ import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPE
 import { WaitLine } from '../Wait';
 import { autoplay, decide, fourthDown, pilot } from './autopilot';
 import { afterPlay, choices, clockText, downText, type DriveEnd, DRIVES, fgDistance, fgInRange, type Game, kick, kickWindow, newGame, type PlayChoice, punt, spotText, startChoice, startPlay } from './drive';
-import { CONCEPT_NAMES, FIELD_W, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
+import { CONCEPTS, CONCEPT_NAMES, FIELD_W, flipPlay, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, Play, Pt } from './types';
 import './rushing-controls.css';
+import './playbook.css';
 
 type Ui = 'loading' | 'pre' | 'fourth' | 'live' | 'after' | 'kick' | 'final';
 
@@ -157,6 +158,8 @@ export function Football2({
   // the three play cards for this down, and the one lined up
   const [opts, setOpts] = useState<{ choice: PlayChoice; play: Play }[]>([]);
   const [picked, setPicked] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [book, setBook] = useState<{choice: PlayChoice; play: Play}[] | null>(null);
   // a swipe in progress (a fast flick reads as a move; a slow drag steers) and the last tap (double-tap)
   const gesture = useRef<{ id: number; t0: number; x0: number; y0: number; used: boolean } | null>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
@@ -197,6 +200,8 @@ export function Football2({
     const lined = cs.map((choice) => ({ choice, play: startChoice(g, choice) }));
     setOpts(lined);
     setPicked(0);
+    setFlipped(false);
+    setBook(null);
     playRef.current = startChoice(g, cs[0]);
     dragRef.current = null;
     stickRef.current = null;
@@ -220,6 +225,36 @@ export function Football2({
     sfx.click();
     setPicked(i);
     playRef.current = startChoice(game, opts[i].choice);
+    if (flipped) flipPlay(playRef.current);
+  };
+  const openBook = () => {
+    if (!game || playRef.current?.phase !== 'pre') return;
+    const calls: PlayChoice[] = [
+      ...CONCEPTS.map(concept => ({call: 'pass' as const, concept, run: game.run})),
+      ...(['inside', 'power', 'outside'] as const).map(run => ({call: 'run' as const, concept: game.concept, run}))
+    ].filter(c => !practice || (practice.drill === 'run' ? c.call === 'run' : practice.drill === 'throw' ? c.call === 'pass' : false));
+    setBook(calls.map(choice => { const play = startChoice({...game}, choice); if (flipped) flipPlay(play); return {choice, play}; }));
+    sfx.click();
+  };
+  const chooseBook = (choice: PlayChoice) => {
+    if (!game || playRef.current?.phase !== 'pre') return;
+    const remaining = opts.filter(o => o.choice.call !== choice.call || (choice.call === 'run' ? o.choice.run !== choice.run : o.choice.concept !== choice.concept));
+    setOpts([choice, ...remaining.map(o => o.choice)].slice(0,3).map(c => {
+      const play = startChoice({...game},c); if (flipped) flipPlay(play); return {choice:c,play};
+    }));
+    playRef.current = startChoice(game,choice);
+    if (flipped) flipPlay(playRef.current);
+    setPicked(0); setBook(null); sfx.click();
+  };
+  const flipFormation = () => {
+    const play = playRef.current;
+    if (!play || !flipPlay(play)) return;
+    const next = !flipped;
+    setFlipped(next);
+    setOpts(old => old.map(o => {
+      const diagram = startChoice({...game!},o.choice); if (next) flipPlay(diagram); return {choice:o.choice,play:diagram};
+    }));
+    sfx.click();
   };
   const snapNow = () => {
     if (!game || (ui !== 'pre' && ui !== 'fourth') || game.clock === 0) return;
@@ -228,6 +263,7 @@ export function Football2({
     sfx.click();
     pilotRef.current.readAt = 0;
     snap(p);
+    setBook(null);
     setUi('live');
     setPhase(p.phase);
     if (p.call === 'pass') tip('pass', 'Drag back anywhere · let go to throw');
@@ -793,6 +829,9 @@ export function Football2({
             </span>
           )}
           {g.clock !== 0 && practice?.drill !== 'kick' && (
+            <div className="fb2-coach-row"><button onClick={openBook}>FULL PLAYBOOK <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 13 13 3M4 3h9v9"/></svg></button><button onClick={flipFormation} aria-pressed={flipped}>FLIP PLAY <span>{flipped ? 'LEFT' : 'RIGHT'}</span></button></div>
+          )}
+          {g.clock !== 0 && practice?.drill !== 'kick' && (
             <div className="fb2-cards" role="radiogroup" aria-label="Pick a play">
               {opts.map((o, i) => (
                 <button key={i} className={'fb2-card ' + o.choice.call + (i === picked ? ' on' : '')} role="radio" aria-checked={i === picked} onClick={() => pick(i)}>
@@ -822,6 +861,13 @@ export function Football2({
           </div>
         </div>
       )}
+      {book && (ui === 'pre' || ui === 'fourth') && <div className="fb2-book-shade" onPointerDown={e=>e.stopPropagation()}>
+        <section className="fb2-playbook" role="dialog" aria-modal="true" aria-label="Full playbook" onKeyDown={e=>{if(e.key==='Escape')setBook(null)}}>
+          <header><span><small>YOUR OFFENSE. YOUR CALL.</small><b>THE PLAYBOOK</b></span><button autoFocus onClick={()=>setBook(null)} aria-label="Close playbook">×</button></header>
+          <p>Pick your concept. Flip the formation before the snap to attack either side.</p>
+          <div className="fb2-book-grid">{book.map(o=><button className={'fb2-card '+o.choice.call} key={o.choice.call+':'+(o.choice.call==='pass'?o.choice.concept:o.choice.run)} onClick={()=>chooseBook(o.choice)}><PlayArt play={o.play}/><small>{o.choice.call==='pass'?'PASS CONCEPT':'RUN GAME'}</small><b>{o.choice.call==='pass'?CONCEPT_NAMES[o.choice.concept]:RUN_NAMES[o.choice.run]}</b></button>)}</div>
+        </section>
+      </div>}
       {passing && !autoplayHook && (
         <div className="fb2-moves" onPointerDown={(e) => e.stopPropagation()}>
           <button className="fb2-mv scramble" onPointerDown={doScramble} aria-label="Scramble: the quarterback runs">
@@ -906,12 +952,13 @@ function PlayArt({ play }: { play: Play }) {
   } else {
     // the back's path: up the middle, bounced outside, or off tackle behind a pulling guard
     const rb = play.rb;
+    const direction = play.direction ?? 1;
     const pts: [number, number][] =
       play.run === 'outside'
-        ? [[X(rb.x), Y(rb.y)], [X(play.hole - 0.8), Y(los - 0.1)], [X(play.hole), Y(los + 7)]]
+        ? [[X(rb.x), Y(rb.y)], [X(play.hole - 0.8 * direction), Y(los - 0.1)], [X(play.hole), Y(los + 7)]]
         : play.run === 'power'
-          ? [[X(rb.x), Y(rb.y)], [X(play.hole - 0.9), Y(los - 1)], [X(play.hole), Y(los + 7)]]
-          : [[X(rb.x), Y(rb.y)], [X(bx + 0.6), Y(los)], [X(bx + 0.6), Y(los + 8)]];
+          ? [[X(rb.x), Y(rb.y)], [X(play.hole - 0.9 * direction), Y(los - 1)], [X(play.hole), Y(los + 7)]]
+          : [[X(rb.x), Y(rb.y)], [X(play.hole), Y(los)], [X(play.hole), Y(los + 8)]];
     paths.push({ color: ART_COLOR.RB, pts });
   }
   const end = (pts: [number, number][]) => {
