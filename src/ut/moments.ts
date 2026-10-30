@@ -3,6 +3,7 @@ import type { Drill, Attempt } from '../evolution/training';
 import type { UtSport } from './types';
 import type { UtState } from './state';
 import { depositPrize, hqOf, recordActivity, type Reward } from './progression';
+import { LEVEL, LEVEL_NAME, LEVELS } from './battles';
 export interface Moment {
   id: string;
   title: string;
@@ -14,6 +15,26 @@ export interface Moment {
   measure: 'success' | 'green' | 'yards';
   difficulty: number;
   reward: Reward;
+}
+export function momentUnit(m: Moment): string {
+  return m.measure === 'yards'
+    ? 'YARDS'
+    : m.measure === 'green'
+      ? 'GREEN RELEASES'
+      : m.drill === 'throw'
+        ? 'COMPLETIONS'
+        : m.drill === 'kick'
+          ? 'FIELD GOALS'
+          : 'BASKETS';
+}
+export function momentDifficulty(m: Moment): string {
+  const level = LEVELS.reduce((best, candidate) =>
+    Math.abs(LEVEL[candidate].def - m.difficulty) <
+    Math.abs(LEVEL[best].def - m.difficulty)
+      ? candidate
+      : best
+  );
+  return LEVEL_NAME[level];
 }
 export function momentsFor(sport: UtSport): Moment[] {
   return sport === 'nba'

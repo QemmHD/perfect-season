@@ -19,6 +19,7 @@ export interface Prize {
   coins: number;
   sp: number;
   pack: string | null;
+  packCount?: number;
 }
 export interface Objective {
   id: string;
@@ -39,7 +40,9 @@ export function seasonFor(day: string) {
     epoch = Date.parse('2026-10-26T12:00:00Z'),
     n = Math.max(0, Math.floor((stamp - epoch) / (28 * 86400000)));
   const start = new Date(epoch + n * 28 * 86400000).toISOString().slice(0, 10),
-    end = new Date(epoch + ((n + 1) * 28 - 1) * 86400000).toISOString().slice(0, 10);
+    end = new Date(epoch + ((n + 1) * 28 - 1) * 86400000)
+      .toISOString()
+      .slice(0, 10);
   return {
     id: 'season:' + (n + 1),
     number: n + 1,
@@ -230,6 +233,35 @@ export function claimSeason(
   };
   return depositPrize(next, period + ':tier:' + tier, seasonReward(tier), at);
 }
+/** One transactional batch for the selected season, retaining the same per-tier receipts. */
+export function claimReadySeason(
+  ut: UtState,
+  period: string,
+  at: number
+): Prize {
+  let next = ut,
+    coins = 0;
+  for (let tier = 1; tier <= SEASON_TIERS; tier++) {
+    const result = claimSeason(next, period, tier, at);
+    next = result.ut;
+    coins += result.coins;
+  }
+  return {
+    ut: next,
+    coins,
+    sp: 0,
+    pack: null,
+    packCount: next.packs.length - ut.packs.length
+  };
+}
+export function seasonReady(ut: UtState, period: string): number {
+  const track = hqOf(ut).seasons[period];
+  if (!track) return 0;
+  return Array.from({ length: SEASON_TIERS }, (_, i) => i + 1).filter(
+    (tier) => track.xp >= tier * SEASON_STEP && !track.claimed.includes(tier)
+  ).length;
+}
+
 const DAILY: [string, string, Counter, number, Reward][] = [
   ['show-up', 'Two games. One goal.', 'games', 2, { coins: 50, sp: 70 }],
   ['winner', 'Find a way to win.', 'wins', 1, { coins: 75, sp: 90 }],

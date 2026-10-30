@@ -1508,3 +1508,59 @@
     opacity: 0.8;
   }
 }
+
+/* Codex polish: clear banked rewards, exact-copy status and readable earned goals. */
+.hq-banked-season {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 15px;
+  border: 1px solid #e4cb7c5c;
+  border-radius: 11px;
+  background: linear-gradient(120deg, #323121, #0e2b31);
+  color: var(--gold);
+  min-height: 64px;
+}
+.hq-banked-season > span {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+}
+.hq-banked-season b {
+  font-size: 10px;
+  letter-spacing: 0.7px;
+}
+.hq-banked-season small {
+  color: #becdc2;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.hq-copy-status {
+  display: block;
+  margin-top: 12px;
+  font-size: 8px !important;
+  letter-spacing: 0.5px;
+  color: var(--gold);
+}
+.hq-copy-status.equipped {
+  color: var(--teal);
+}
+.hq-moment-best {
+  font-size: 9px !important;
+  color: #9be6c7 !important;
+  line-height: 1.5;
+}
+.hq-tier > .chip,
+.hq-preset-actions > .chip,
+.hq-squad-toolbar > .chip,
+.hq-objective-prize > .chip {
+  min-height: 44px;
+}
+.hq-preset-actions > .chip {
+  min-width: 90px;
+}
+.hq-development-active > .btn + .btn {
+  margin-top: 10px;
+}

@@ -49,3 +49,10 @@ Actual rendered components, original fonts/cards and isolated localhost/inspect 
 - [NFL full playbook](ut-nfl-playbook.png), [left-side outside run](ut-nfl-flipped-run.png) and [landscape playbook](ut-nfl-playbook-landscape.png).
 
 `scripts/qa/clubhouse.mjs` exercises both sports, navigation, preserved wallet/copies, reload/claims, actual manual Moment attempts, existing practice callbacks, pre-snap book/flip and Circuit launch. The viewport checks are Chromium at 390×844, 320×568 and 844×390; they are not a physical-iPhone playtest. [Implementation, connections, economy and primary sources](../UT-OVERHAUL.md).
+
+
+## Researched fixes and polish — Codex, 2026-10-30
+
+[Batch season claims](ut-polish-nba-season-ready.png) · [Exact development copy in duplicate storage](ut-polish-nba-development-copy.png) · [Modal playbook in landscape](ut-polish-nfl-modal-landscape.png) · [Earlier earned season rewards](ut-polish-saved-season.png) · [320px NBA controls](ut-polish-nba-controls-320.png).
+
+Actual components and original materials in isolated localhost/inspect fixtures. The archived-season image uses an explicit future date supplied to the real SeasonView; the OS/server clock was not changed. The dedicated input-isolation game uses weak synthetic defenders to distinguish gesture bugs from steals/sacks. No fixture balances, cards, counts, date override or weak-defense setting is shipped. [Research, confirmed issues, fixes and validation](../UT-POLISH.md).

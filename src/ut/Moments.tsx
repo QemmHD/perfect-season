@@ -10,7 +10,13 @@ import type { Kit as BasketKit } from '../game/hoops2/render';
 import type { FbKit } from '../game/football2/render';
 import type { Attempt } from '../evolution/training';
 import { teamsOf, type SquadCards } from './teams';
-import { momentsFor, momentScore, type Moment } from './moments';
+import {
+  momentsFor,
+  momentScore,
+  momentUnit,
+  momentDifficulty,
+  type Moment
+} from './moments';
 import { hqOf, rewardLabel } from './progression';
 import type { Pool } from './pool';
 import type { UtState } from './state';
@@ -92,12 +98,7 @@ function MomentArena({
           <span>
             <b>{m.title.toUpperCase()}</b>
             <strong className="num">
-              {momentScore(m, attempts)} / {m.target}{' '}
-              {m.measure === 'yards'
-                ? 'YARDS'
-                : m.measure === 'green'
-                  ? 'GREEN'
-                  : 'MAKES'}
+              {momentScore(m, attempts)} / {m.target} {momentUnit(m)}
             </strong>
             <small>
               {attempts.length} / {m.attempts} ATTEMPTS
@@ -163,30 +164,38 @@ export function Moments({
         >
           <Back size={16} /> ALL MOMENTS
         </button>
-        <div className={'hq-moment-brief' + (won ? ' complete' : '')}>
+        <div
+          className={
+            'hq-moment-brief' + (won || p?.completedAt ? ' complete' : '')
+          }
+        >
           <span className="hq-moment-emblem">
             <Trophy size={56} />
           </span>
           <span className="eyebrow">{selected.kicker}</span>
           <h1 className="disp">{selected.title}</h1>
           <p>{selected.story}</p>
+          {p && (
+            <p className="hq-moment-best">
+              YOUR BEST ·{' '}
+              <b className="num">
+                {p.best} / {selected.target}
+              </b>{' '}
+              {momentUnit(selected)}
+            </p>
+          )}
           <div className="hq-moment-goal">
             <b className="disp num">
               {score === null ? selected.target : score}
             </b>
             <span>
               {score === null
-                ? 'YOUR TARGET'
+                ? 'TARGET · ' + momentUnit(selected)
                 : won
                   ? 'MOMENT COMPLETE'
                   : 'KEEP BUILDING'}
               <small>
-                {selected.attempts} attempts ·{' '}
-                {selected.difficulty === 1
-                  ? 'Legend'
-                  : selected.difficulty < 0
-                    ? 'Rookie'
-                    : 'Pro'}{' '}
+                {selected.attempts} attempts · {momentDifficulty(selected)}{' '}
                 defense
               </small>
             </span>
@@ -271,8 +280,14 @@ export function Moments({
                 <i className="eyebrow">{m.kicker}</i>
                 <b className="disp">{m.title}</b>
                 <small>
-                  {m.attempts} attempts · {rewardLabel(m.reward)}
+                  {m.attempts} attempts · {momentDifficulty(m)} ·{' '}
+                  {rewardLabel(m.reward)}
                 </small>
+                {p && (
+                  <strong className="hq-moment-best">
+                    BEST {p.best} / {m.target} {momentUnit(m)}
+                  </strong>
+                )}
                 {p?.completedAt && (
                   <em>{p.claimed ? 'REWARD CLAIMED' : 'REWARD READY'}</em>
                 )}

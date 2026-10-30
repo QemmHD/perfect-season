@@ -394,6 +394,14 @@ export function pressShoot(p: Possession) {
 export const JUMPER_TOP = 0.52;
 export const LAYUP_TOP = 0.42;
 
+/** A system-canceled held jumper is not a release. Committed finishes/shots keep playing. */
+export function cancelShoot(p: Possession): boolean {
+  if (!p.meter || p.meter.off !== undefined || p.handler === null || p.finish || p.ball || p.end) return false;
+  p.meter = null;
+  act(p.bodies[p.handler], 'land', p.t);
+  return true;
+}
+
 /**
  * SHOOT let go: the jump shot (or layup) leaves his hands, timed against the green window. `lag`
  * (seconds) is taken off a person's release: a phone shows the meter a little behind and hears the

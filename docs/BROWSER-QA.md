@@ -71,3 +71,10 @@ Displayed 8/20 and `packart` aggregate responses are presentation-only fixtures.
 The updated `cloud.mjs` enrolls development, saves a lineup and enters a Circuit through the actual UI before server save/second-device restore/conflict handling. It checks structural equality of the whole HQ object and all owned fields, including serial metadata. Mint normalization may reorder JSON object keys, so equality compares values rather than raw JSON text. The original serialized-text assertion incorrectly rejected a correctly restored serial when property order differed; only that QA comparison changed, with no runtime encryption/restore change.
 
 `online.mjs` verifies the new rule-6 handshake for both sports. `content.mjs` retains the paid-pack failure/retry, registered rewards, collection claims and themed-event checks. Final source/CI/private deployment references are in `CODEX-UPDATE-LOG.md`. See `UT-OVERHAUL.md` for implementation and economy limits. Installed-iPhone background/audio/safe-area behavior remains a device playtest, separate from Chromium verification.
+
+
+## Researched Ultimate Team polish — Codex, 2026-10-30
+
+`node scripts/qa/polish.mjs` checks batch season rewards/reload, selected-copy development recovery, pack focus/inert background, actual canceled/dragged NBA releases and input cleanup, native NFL playbook containment/Escape/focus return/choice/mirrored diagrams, interrupted throw gestures and a completed manual throw attempt. `PS_POLISH_SPORT=nba` or `nfl` selects a focused case. Future-season UI coverage mounts the real SeasonView with an explicit date instead of forging the clock. Browser fixtures stay on localhost/inspect; weak defense in the dedicated input-isolation case is never a shipped game setting. Original wallet/copy fields are still compared.
+
+Unit regressions are in `src/ut/polish.test.ts` and the basketball gameplay tests. Current online mechanics are NBA 7 / NFL 6, with unchanged data/leaderboard history. See [UT-POLISH.md](UT-POLISH.md) for confirmed reproductions, primary-source research, implementation, results and device-test limits.

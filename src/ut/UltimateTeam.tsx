@@ -1,5 +1,5 @@
 import { Rivals, RivalsTeaser } from './Rivals';
-import { recordActivity, claimObjective, claimSeason, hqOf, objectiveDeck, rewardLabel, type Prize } from './progression';
+import { recordActivity, claimObjective, claimSeason, claimReadySeason, hqOf, objectiveDeck, rewardLabel, type Prize } from './progression';
 import { PlayHQ, SeasonView, ObjectivesView, CircuitView, DevelopmentView, SquadPresets, ClubRecords } from './Clubhouse';
 import { Moments } from './Moments';
 import { claimMoment, finishMoment } from './moments';
@@ -64,7 +64,7 @@ const TABS: [UtView, string, React.ReactNode][] = [
   ['squad', 'SQUAD', <IconSquad />],
   ['club', 'CLUB', <IconClub />],
   ['store', 'STORE', <IconStore />],
-  ['sbc', 'SBC', <IconSbc />],
+  ['sbc', 'SBC', <IconSbc />]
 ];
 
 export interface Opening {
@@ -103,7 +103,15 @@ export default function UltimateTeam(props: {
   const latest = useRef(profile);
   latest.current = profile;
   const [day, setDay] = useState(() => easternDateKey());
-  useEffect(() => { const refresh = () => setDay(easternDateKey()); const timer = window.setInterval(refresh, 60000); document.addEventListener('visibilitychange', refresh); return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); }; }, []);
+  useEffect(() => {
+    const refresh = () => setDay(easternDateKey());
+    const timer = window.setInterval(refresh, 60000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
 
   const tries = useRef(0);
   const load = () => {
@@ -201,8 +209,15 @@ export default function UltimateTeam(props: {
   const claimPrize = (get: (u: UtState) => Prize) => {
     const shown = get(latest.current.ut);
     if (shown.ut === latest.current.ut) return;
-    update(p => { const r = get(p.ut); return { ...p, coins: p.coins + r.coins, ut: r.ut }; });
-    sfx.coin(); onToast('Reward claimed. ' + rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }));
+    update((p) => {
+      const r = get(p.ut);
+      return { ...p, coins: p.coins + r.coins, ut: r.ut };
+    });
+    sfx.coin();
+    onToast(
+      'Reward claimed. ' +
+        [rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }), shown.packCount ? shown.packCount + ' packs added to your Store' : ''].filter(Boolean).join(' · ')
+    );
   };
 
   // ---------- packs ----------
@@ -284,8 +299,8 @@ export default function UltimateTeam(props: {
         coins: p.coins + proceeds,
         ut: {
           ...removeCards(p.ut, gone, 'sold'),
-          sold: { cards: p.ut.sold.cards + sold.length, coins: p.ut.sold.coins + proceeds },
-        },
+          sold: { cards: p.ut.sold.cards + sold.length, coins: p.ut.sold.coins + proceeds }
+        }
       };
     });
     sfx.coin();
@@ -346,15 +361,14 @@ export default function UltimateTeam(props: {
         ut: {
           ...organizeStorage(removeCards(recordActivity(p.ut, 'sbc:' + s.id, easternDateKey(), { sbcs: 1 }, 50), gone, 'sbc'), prize ? [prize] : []),
           sbc: { done },
-          packs: pack ? [...p.ut.packs, pack] : p.ut.packs,
-        },
+          packs: pack ? [...p.ut.packs, pack] : p.ut.packs
+        }
       };
     });
     sfx.levelUp();
     vibrate([20, 40, 20]);
     if (rc && prize) setOpening({ id: 'sbc:' + s.id, title: s.title, kind: 'reward', cards: [{ uid: prize.uid, rc }] });
-    else
-      onToast(s.title + ' done!' + (pack ? ' Your ' + packName(SPORT, pack.kind) + ' is waiting in the Store.' : '') + (s.reward.coins ? ' +' + s.reward.coins + ' coins.' : ''));
+    else onToast(s.title + ' done!' + (pack ? ' Your ' + packName(SPORT, pack.kind) + ' is waiting in the Store.' : '') + (s.reward.coins ? ' +' + s.reward.coins + ' coins.' : ''));
   };
 
   const detailCard = detail ? (byUid.get(detail) ?? null) : null;
@@ -379,14 +393,149 @@ export default function UltimateTeam(props: {
       </div>
     );
   else if (view === 'squad')
-    body = <SquadView pool={pool} club={club} lineup={lineup} squad={ut.squad} rating={rating} onSlot={setSlot} onSquad={setSquad} onInspect={setDetail} onToast={onToast}
-      management={<SquadPresets ut={ut} pool={pool} onSave={(id,name) => { setUt(u => savePreset(u,id,name,Date.now())); onToast('Current squad saved. Every card stays in your club.'); }} onLoad={id => { setUt(u => loadPreset(u,pool,id)); onToast('Saved lineup loaded using your owned copies.'); }} />} />;
-  else if (view === 'play') body = <PlayHQ onGo={go} onOnline={() => { if (!ready) { onToast('Fill your starting squad first.'); go('squad'); return; } props.onPlaySquad?.({ id: Date.now(), mode: 'online' }); }} />;
-  else if (view === 'season') body = <SeasonView ut={ut} day={day} sport={SPORT} onStore={() => go('store')} onClaim={(period,tier) => { const at=Date.now(); claimPrize(u => claimSeason(u,period,tier,at)); }} />;
-  else if (view === 'objectives') body = <ObjectivesView ut={ut} day={day} onClaim={id => { const at=Date.now(); claimPrize(u => claimObjective(u,id,day,at)); }} onClaimAll={() => { const at=Date.now(); claimPrize(u => { let next=u,coins=0,sp=0; for (const o of objectiveDeck(u,day)) if (!o.claimed && o.progress>=o.target) { const r=claimObjective(next,o.id,day,at); next=r.ut; coins+=r.coins; sp+=r.sp; } return { ut:next,coins,sp,pack:null }; }); }} />;
-  else if (view === 'circuit') body = <CircuitView ut={ut} week={weekOf(day)} ready={ready} onSquad={() => go('squad')} onStart={() => { const id=newId(),at=Date.now(); setUt(u => startCircuit(u,weekOf(day),id,at)); }} onPlay={(runId,round) => props.onPlaySquad?.({id:Date.now(),mode:'ai',circuit:{runId,round}})} onEnd={() => setUt(abandonCircuit)} />;
-  else if (view === 'moments') body = <Moments pool={pool} ut={ut} ready={ready} onSquad={() => go('squad')} onFinish={(m,attempts) => { const at=Date.now(); setUt(u => finishMoment(u,m,attempts,at)); }} onClaim={id => { const at=Date.now(); claimPrize(u => claimMoment(u,SPORT,id,day,at)); }} />;
-  else if (view === 'development') body = <DevelopmentView ut={ut} club={club} onSquad={() => go('squad')} onStart={(uid,path) => {const at=Date.now();setUt(u => startDevelopment(u,uid,path,at));}} onCancel={() => setUt(cancelDevelopment)} onClaim={() => { const at=Date.now();const shown=claimDevelopment(latest.current.ut,day,at);if(!shown.xp)return;setUt(u => claimDevelopment(u,day,at).ut);sfx.levelUp();onToast('Program complete. +'+shown.xp+' card XP and +'+shown.sp+' Season Points.'); }} />;
+    body = (
+      <SquadView
+        pool={pool}
+        club={club}
+        lineup={lineup}
+        squad={ut.squad}
+        rating={rating}
+        onSlot={setSlot}
+        onSquad={setSquad}
+        onInspect={setDetail}
+        onToast={onToast}
+        management={
+          <SquadPresets
+            ut={ut}
+            pool={pool}
+            onSave={(id, name) => {
+              setUt((u) => savePreset(u, id, name, Date.now()));
+              onToast('Current squad saved. Every card stays in your club.');
+            }}
+            onLoad={(id) => {
+              setUt((u) => loadPreset(u, pool, id));
+              onToast('Saved lineup loaded using your owned copies.');
+            }}
+          />
+        }
+      />
+    );
+  else if (view === 'play')
+    body = (
+      <PlayHQ
+        onGo={go}
+        onOnline={() => {
+          if (!ready) {
+            onToast('Fill your starting squad first.');
+            go('squad');
+            return;
+          }
+          props.onPlaySquad?.({ id: Date.now(), mode: 'online' });
+        }}
+      />
+    );
+  else if (view === 'season')
+    body = (
+      <SeasonView
+        ut={ut}
+        day={day}
+        sport={SPORT}
+        onStore={() => go('store')}
+        onClaim={(period, tier) => {
+          const at = Date.now();
+          claimPrize((u) => claimSeason(u, period, tier, at));
+        }}
+        onClaimReady={(period) => {
+          const at = Date.now();
+          claimPrize((u) => claimReadySeason(u, period, at));
+        }}
+      />
+    );
+  else if (view === 'objectives')
+    body = (
+      <ObjectivesView
+        ut={ut}
+        day={day}
+        onClaim={(id) => {
+          const at = Date.now();
+          claimPrize((u) => claimObjective(u, id, day, at));
+        }}
+        onClaimAll={() => {
+          const at = Date.now();
+          claimPrize((u) => {
+            let next = u,
+              coins = 0,
+              sp = 0;
+            for (const o of objectiveDeck(u, day))
+              if (!o.claimed && o.progress >= o.target) {
+                const r = claimObjective(next, o.id, day, at);
+                next = r.ut;
+                coins += r.coins;
+                sp += r.sp;
+              }
+            return { ut: next, coins, sp, pack: null, packCount: next.packs.length - u.packs.length };
+          });
+        }}
+      />
+    );
+  else if (view === 'circuit')
+    body = (
+      <CircuitView
+        ut={ut}
+        week={weekOf(day)}
+        ready={ready}
+        onSquad={() => go('squad')}
+        onStart={() => {
+          const id = newId(),
+            at = Date.now();
+          setUt((u) => startCircuit(u, weekOf(day), id, at));
+        }}
+        onPlay={(runId, round) => props.onPlaySquad?.({ id: Date.now(), mode: 'ai', circuit: { runId, round } })}
+        onEnd={() => setUt(abandonCircuit)}
+      />
+    );
+  else if (view === 'moments')
+    body = (
+      <Moments
+        pool={pool}
+        ut={ut}
+        ready={ready}
+        onSquad={() => go('squad')}
+        onFinish={(m, attempts) => {
+          const at = Date.now();
+          setUt((u) => finishMoment(u, m, attempts, at));
+        }}
+        onClaim={(id) => {
+          const at = Date.now();
+          claimPrize((u) => claimMoment(u, SPORT, id, day, at));
+        }}
+      />
+    );
+  else if (view === 'development')
+    body = (
+      <DevelopmentView
+        ut={ut}
+        club={inventory}
+        onUseCopy={(uid) => {
+          setUt((u) => useStoredCopy(u, uid));
+          onToast('Your development copy is back in the club. Its XP and serial are kept.');
+        }}
+        onSquad={() => go('squad')}
+        onStart={(uid, path) => {
+          const at = Date.now();
+          setUt((u) => startDevelopment(u, uid, path, at));
+        }}
+        onCancel={() => setUt(cancelDevelopment)}
+        onClaim={() => {
+          const at = Date.now();
+          const shown = claimDevelopment(latest.current.ut, day, at);
+          if (!shown.xp) return;
+          setUt((u) => claimDevelopment(u, day, at).ut);
+          sfx.levelUp();
+          onToast('Program complete. +' + shown.xp + ' card XP and +' + shown.sp + ' Season Points.');
+        }}
+      />
+    );
   else if (view === 'records') body = <ClubRecords ut={ut} />;
   else if (view === 'club')
     body = (
@@ -433,16 +582,7 @@ export default function UltimateTeam(props: {
             </>
           )}
         </div>
-        <Store
-          sport={SPORT}
-          coins={profile.coins}
-          starter={!ut.starterClaimed}
-          pending={ut.packs}
-          defs={packDefs(SPORT)}
-          onBuy={buy}
-          onStarter={claimStarter}
-          onPending={openPending}
-        />
+        <Store sport={SPORT} coins={profile.coins} starter={!ut.starterClaimed} pending={ut.packs} defs={packDefs(SPORT)} onBuy={buy} onStarter={claimStarter} onPending={openPending} />
       </>
     );
   else if (view === 'battles')
@@ -517,7 +657,7 @@ export default function UltimateTeam(props: {
 
   return (
     <div className={'screen ut ut-v-' + view}>
-      <div className="topbar ut-top">
+      <div className="topbar ut-top" {...(opening ? { inert: '' } : {})}>
         <button
           className="icon-btn pill-btn"
           onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go('hub'))}
@@ -526,12 +666,30 @@ export default function UltimateTeam(props: {
           <Back size={16} /> {view === 'hub' ? 'HOME' : 'UT'}
         </button>
         <span className="ut-title disp">
-          {view === 'hub' ? 'Ultimate Team' : ({ battles:'Squad Battles',rivals:'Rivals',gallery:'Collection',events:'Spotlight Events',play:'Play HQ',season:'Season Rewards',objectives:'Objectives',circuit:'Champions Circuit',moments:'Moments',development:'Development',records:'Club Records' } as Partial<Record<UtView,string>>)[view] ?? TABS.find(t => t[0] === view)?.[1] ?? 'Ultimate Team'}
+          {view === 'hub'
+            ? 'Ultimate Team'
+            : ((
+                {
+                  battles: 'Squad Battles',
+                  rivals: 'Rivals',
+                  gallery: 'Collection',
+                  events: 'Spotlight Events',
+                  play: 'Play HQ',
+                  season: 'Season Rewards',
+                  objectives: 'Objectives',
+                  circuit: 'Champions Circuit',
+                  moments: 'Moments',
+                  development: 'Development',
+                  records: 'Club Records'
+                } as Partial<Record<UtView, string>>
+              )[view] ??
+              TABS.find((t) => t[0] === view)?.[1] ??
+              'Ultimate Team')}
         </span>
         <CoinChip coins={profile.coins} />
       </div>
-      <div className="ut-body">{body}</div>
-      <nav className="ut-tabs" aria-label="Ultimate Team">
+      <div className="ut-body" {...(opening ? { inert: '' } : {})}>{body}</div>
+      <nav className="ut-tabs" aria-label="Ultimate Team" {...(opening ? { inert: '' } : {})}>
         {TABS.map(([k, label, icon]) => (
           <button key={k} aria-current={view === k ? 'page' : undefined} onClick={() => go(k)}>
             {icon}
@@ -563,7 +721,7 @@ export default function UltimateTeam(props: {
       {opening && (
         <PackOpening
           key={opening.id}
-          opening={{...opening,cards:opening.cards.map(c=>({...c,mint:byUid.get(c.uid)?.oc.mint??c.mint}))}}
+          opening={{ ...opening, cards: opening.cards.map((c) => ({ ...c, mint: byUid.get(c.uid)?.oc.mint ?? c.mint })) }}
           onDone={(to) => {
             setOpening(null);
             if (to) setView(to);

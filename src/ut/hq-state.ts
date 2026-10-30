@@ -44,6 +44,11 @@ export interface CircuitRun {
   results: boolean[];
   at: number;
 }
+export interface CircuitWeek {
+  entries: number;
+  best: number;
+  claimed: number[];
+}
 export interface ClubHQ {
   totals: Totals;
   days: Record<string, Totals>;
@@ -69,6 +74,8 @@ export interface ClubHQ {
     claimed: number[];
     active?: CircuitRun;
   };
+  /** Optional summaries retain entries/results when the calendar moves between weeks. */
+  circuitHistory?: Record<string, CircuitWeek>;
 }
 export const emptyTotals = (): Totals =>
   Object.fromEntries(COUNTERS.map((k) => [k, 0])) as Totals;
@@ -257,6 +264,22 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
           }
         ])
     ),
+    ...(r.circuitHistory
+      ? {
+          circuitHistory: Object.fromEntries(
+            Object.entries(obj(r.circuitHistory))
+              .filter(([week]) => week.length > 0 && week.length < 40)
+              .map(([week, value]) => [
+                week,
+                {
+                  entries: nat(obj(value).entries, 3),
+                  best: nat(obj(value).best, 6),
+                  claimed: numbers(obj(value).claimed, 6)
+                }
+              ])
+          )
+        }
+      : {}),
     circuit: {
       week: typeof circuit.week === 'string' ? circuit.week : '',
       entries: nat(circuit.entries, 3),

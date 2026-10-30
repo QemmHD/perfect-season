@@ -1,5 +1,7 @@
 # Ultimate Team clubhouse overhaul — Codex, 2026-10-30
 
+Latest follow-up: [UT-POLISH.md](UT-POLISH.md) records the researched control, modal, reward, weekly-history and exact-copy fixes. Current mechanics queues are **NBA 7 / NFL 6**; the rule-6 descriptions below record this original overhaul revision.
+
 **Implemented by Codex (OpenAI)** on `feature/season-evolution`. Verification/publication references are recorded in `CODEX-UPDATE-LOG.md` when complete. Main/Pages and the original restore source are not promoted. Pre-overhaul source restore: `backup/pre-ut-overhaul-2026-10-30` at `8e7773bc329cf9cdf10431bb95ec72a022a15603`.
 
 ## The connected experience

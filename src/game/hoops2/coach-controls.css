@@ -45,3 +45,5 @@
     padding: 8px;
   }
 }
+
+.hg2-btns button:disabled,.hg2-coach button:disabled{opacity:.45;filter:saturate(.4)}

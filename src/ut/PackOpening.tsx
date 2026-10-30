@@ -1,7 +1,7 @@
 import { MintNumber } from './CardSerial';
 // Codex: presentation-only arena entrance for the already-awarded pack. Position/team clues,
 // tier-aware impact and an extra GOAT escalation precede the original full-pack reveal.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { packSound, sfx, vibrate } from '../lib/sound';
 import { Confetti } from '../ui/common';
 import { CountUp, reducedMotion } from '../ui/motion';
@@ -28,6 +28,12 @@ function gridFor(n: number): { cols: number; w: number } {
 }
 
 export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to?: UtView) => void }) {
+  const modal = useRef<HTMLDivElement>(null);
+  const invoker = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  useLayoutEffect(() => {
+    modal.current?.focus({ preventScroll: true });
+    return () => { if (invoker.current?.isConnected) invoker.current.focus({ preventScroll: true }); };
+  }, []);
   const still = useMemo(reducedMotion, []);
   const order = useMemo(() => revealOrder(opening.cards.map((c) => c.rc)), [opening]);
   const copies = useMemo(() => {
@@ -150,8 +156,20 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
       }
       style={{ '--c1': l?.c1 ?? '#19e3c9', '--c2': l?.c2 ?? '#f5b83d', '--tear-ms': sequence.tear + 'ms' } as React.CSSProperties}
       role="dialog"
+      ref={modal}
+      tabIndex={-1}
       aria-modal="true"
       aria-label={'Opening ' + opening.title}
+      onKeyDown={event => {
+        if (event.key === 'Escape') { event.preventDefault(); if (done) onDone(); else skip(); }
+        if (event.key !== 'Tab') return;
+        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],[tabindex="0"]')).filter(el => el.getClientRects().length > 0);
+        const first = buttons[0], last = buttons[buttons.length - 1];
+        if (!first) { event.preventDefault(); return; }
+        if (!event.currentTarget.contains(document.activeElement) || document.activeElement === event.currentTarget || (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
+          event.preventDefault(); (event.shiftKey ? last : first).focus();
+        }
+      }}
       onClick={() => (phase === 'pack' ? tear() : phase === 'walkout' && step >= 4 ? setPhase('reveal') : undefined)}
     >
       {!still && !walkoutSkipped.current && phase !== 'reveal' && (

@@ -740,6 +740,8 @@ export class HoopsRenderer {
       const frac = Math.min(1, (p.t - m.t0) / span);
       this.meterShown = { idx: p.handler, t0: m.t0, top: m.top, green: m.green, until: Infinity, frac, greened: m.off !== undefined ? !!m.greened : null };
     } else if (this.meterShown && this.meterShown.until === Infinity) {
+      // A canceled hold has no release result to display.
+      if (!p.lastShot && !p.ball && !p.finish) { this.meterShown = null; return; }
       // just released (the engine let go of the meter): hold the result a moment
       const ls = p.lastShot;
       this.meterShown.greened = ls ? ls.greened : false;

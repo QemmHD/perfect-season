@@ -11,10 +11,29 @@ export const CIRCUIT_PRIZES = [
   { wins: 6, title: 'Champion', coins: 750, pack: 'spotlight' }
 ];
 export function circuitOf(ut: UtState, week: string) {
-  const c = hqOf(ut).circuit;
-  return c.week === week || c.active
-    ? c
-    : { week, entries: 0, best: 0, claimed: [], active: undefined };
+  const h = hqOf(ut),
+    c = h.circuit;
+  const selected =
+    c.week === week || c.active
+      ? c
+      : {
+          week,
+          entries: 0,
+          best: 0,
+          claimed: [],
+          ...h.circuitHistory?.[week],
+          active: undefined
+        };
+  // Older clients already kept prize receipts. Reflect them even without a weekly summary.
+  const claimed = [
+    ...new Set([
+      ...selected.claimed,
+      ...CIRCUIT_PRIZES.filter((p) =>
+        h.claims.includes('circuit:' + selected.week + ':' + p.wins)
+      ).map((p) => p.wins)
+    ])
+  ];
+  return { ...selected, claimed, best: Math.max(selected.best, ...claimed, 0) };
 }
 export function startCircuit(
   ut: UtState,
@@ -29,6 +48,18 @@ export function startCircuit(
     ...ut,
     hq: {
       ...h,
+      ...(h.circuit.week && h.circuit.week !== c.week
+        ? {
+            circuitHistory: {
+              ...h.circuitHistory,
+              [h.circuit.week]: {
+                entries: h.circuit.entries,
+                best: h.circuit.best,
+                claimed: h.circuit.claimed.slice()
+              }
+            }
+          }
+        : {}),
       circuit: {
         ...c,
         entries: c.entries + 1,

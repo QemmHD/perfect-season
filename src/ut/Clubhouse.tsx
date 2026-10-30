@@ -14,6 +14,7 @@ import {
   rewardLabel,
   seasonFor,
   seasonReward,
+  seasonReady,
   SEASON_STEP,
   SEASON_TIERS
 } from './progression';
@@ -40,11 +41,20 @@ export function HQArrow() {
     </svg>
   );
 }
-function ProgressBar({ value, max }: { value: number; max: number }) {
+function ProgressBar({
+  value,
+  max,
+  label
+}: {
+  value: number;
+  max: number;
+  label: string;
+}) {
   return (
     <span
       className="hq-progress"
       role="progressbar"
+      aria-label={label}
       aria-valuemin={0}
       aria-valuemax={max}
       aria-valuenow={Math.min(value, max)}
@@ -89,6 +99,7 @@ export function SeasonRibbon({
           {season.title.toUpperCase()} <i>FREE REWARDS</i>
         </b>
         <ProgressBar
+          label="Season points toward the next reward"
           value={level === 25 ? 1 : s.xp % SEASON_STEP}
           max={level === 25 ? 1 : SEASON_STEP}
         />
@@ -206,20 +217,26 @@ export function SeasonView({
   day,
   sport,
   onClaim,
+  onClaimReady,
   onStore
 }: {
   ut: UtState;
   day: string;
   sport: UtSport;
   onClaim: (period: string, tier: number) => void;
+  onClaimReady: (period: string) => void;
   onStore: () => void;
 }) {
   const h = hqOf(ut),
     current = seasonFor(day),
-    [chosen, setChosen] = useState(current.id),
-    period = chosen === current.id || h.seasons[chosen] ? chosen : current.id,
+    [chosen, setChosen] = useState<string | null>(null),
+    period = chosen && h.seasons[chosen] ? chosen : current.id,
     s = h.seasons[period] ?? { xp: 0, claimed: [] },
-    level = Math.min(25, Math.floor(s.xp / SEASON_STEP));
+    level = Math.min(25, Math.floor(s.xp / SEASON_STEP)),
+    ready = seasonReady(ut, period),
+    previousReady = Object.keys(h.seasons).filter(
+      (p) => p !== current.id && seasonReady(ut, p) > 0
+    );
   const periods = [
     current.id,
     ...Object.keys(h.seasons)
@@ -245,7 +262,11 @@ export function SeasonView({
           </span>
           <Crown size={48} />
         </div>
-        <ProgressBar value={s.xp} max={SEASON_TIERS * SEASON_STEP} />
+        <ProgressBar
+          value={s.xp}
+          max={SEASON_TIERS * SEASON_STEP}
+          label="Season reward track"
+        />
         <p>
           {period === current.id
             ? 'Season ' +
@@ -257,6 +278,18 @@ export function SeasonView({
             : 'Your previously earned rewards are kept here.'}
         </p>
       </div>
+      {period === current.id && previousReady.length > 0 && (
+        <button
+          className="hq-banked-season"
+          onClick={() => setChosen(previousReady[0])}
+        >
+          <span>
+            <b>EARNED REWARDS WAITING</b>
+            <small>Open your earlier season rewards. Nothing expired.</small>
+          </span>
+          <HQArrow />
+        </button>
+      )}
       {periods.length > 1 && (
         <label className="hq-select-label">
           REWARD TRACK
@@ -268,6 +301,14 @@ export function SeasonView({
             ))}
           </select>
         </label>
+      )}
+      {ready > 0 && (
+        <button
+          className="btn primary hq-wide"
+          onClick={() => onClaimReady(period)}
+        >
+          CLAIM READY ({ready}) <HQArrow />
+        </button>
       )}
       <div className="hq-section-head">
         <span className="eyebrow">25 LEVELS. NO PREMIUM TRACK.</span>
@@ -427,7 +468,7 @@ export function ObjectivesView({
             </div>
             <p>{o.text}</p>
             <div className="hq-objective-meter">
-              <ProgressBar value={o.progress} max={o.target} />
+              <ProgressBar value={o.progress} max={o.target} label={o.text} />
               <b className="num">
                 {o.progress} / {o.target}
               </b>
@@ -615,9 +656,10 @@ export function CircuitView({
         ))}
       </div>
       <p className="note">
-        Play all six matches on the court or field. Solo AI opponents rise toward Legend difficulty in the finale.
-        First-time weekly milestones deposit automatically, including after
-        reload. Your existing Squad Battles and online records remain.
+        Play all six matches on the court or field. Solo AI opponents rise
+        toward Legend difficulty in the finale. First-time weekly milestones
+        deposit automatically, including after reload. Your existing Squad
+        Battles and online records remain.
       </p>
       {ending && (
         <Confirm
@@ -641,7 +683,8 @@ export function DevelopmentView({
   onStart,
   onCancel,
   onClaim,
-  onSquad
+  onSquad,
+  onUseCopy
 }: {
   ut: UtState;
   club: ClubCard[];
@@ -649,6 +692,7 @@ export function DevelopmentView({
   onCancel: () => void;
   onClaim: () => void;
   onSquad: () => void;
+  onUseCopy: (uid: string) => void;
 }) {
   const h = hqOf(ut),
     [query, setQuery] = useState(''),
@@ -659,7 +703,7 @@ export function DevelopmentView({
     [selected, setSelected] = useState<string | null>(null),
     [cancel, setCancel] = useState(false),
     eligible = club.filter(
-      (c) => c.oc.level < 5 && !h.development.completed[c.uid]
+      (c) => !c.storage && c.oc.level < 5 && !h.development.completed[c.uid]
     ),
     filtered = eligible.filter((c) =>
       c.rc.line.name.toLowerCase().includes(query.trim().toLowerCase())
@@ -697,6 +741,18 @@ export function DevelopmentView({
               <small>
                 Manually played squad matches · {p.xp} card XP + {p.sp} SP
               </small>
+              <b
+                className={
+                  'hq-copy-status' +
+                  (Object.values(ut.squad).includes(a.uid) ? ' equipped' : '')
+                }
+              >
+                {active?.storage
+                  ? 'COPY IN DUPLICATE STORAGE'
+                  : Object.values(ut.squad).includes(a.uid)
+                    ? 'IN YOUR MATCH SQUAD'
+                    : 'ADD THIS COPY TO YOUR SQUAD'}
+              </b>
             </span>
           </div>
           <div className="hq-goal">
@@ -706,7 +762,11 @@ export function DevelopmentView({
                 {Math.min(a.games, p.games)} / {p.games}
               </b>
             </span>
-            <ProgressBar value={a.games} max={p.games} />
+            <ProgressBar
+              value={a.games}
+              max={p.games}
+              label="Development played matches"
+            />
           </div>
           {p.wins > 0 && (
             <div className="hq-goal">
@@ -716,8 +776,17 @@ export function DevelopmentView({
                   {Math.min(a.wins, p.wins)} / {p.wins}
                 </b>
               </span>
-              <ProgressBar value={a.wins} max={p.wins} />
+              <ProgressBar
+                value={a.wins}
+                max={p.wins}
+                label="Development wins"
+              />
             </div>
+          )}
+          {active?.storage && (
+            <button className="btn hq-wide" onClick={() => onUseCopy(a.uid)}>
+              RETURN THIS COPY TO CLUB <HQArrow />
+            </button>
           )}
           <button
             className="btn primary hq-wide"

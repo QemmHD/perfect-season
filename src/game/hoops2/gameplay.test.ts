@@ -1,7 +1,7 @@
 // Implemented by Codex: regression cases for the execution problems reported by the owner.
 import { describe, expect, it } from 'vitest';
 import { rng } from '../../engine/rng';
-import { callPlay, crossover, dist, greenWindow, newPossession, releaseProbability, RIM, spin, step, stepback } from './engine';
+import { callPlay, cancelShoot, pressShoot, releaseShoot, crossover, dist, greenWindow, newPossession, releaseProbability, RIM, spin, step, stepback } from './engine';
 import type { Hooper } from './types';
 const player = (id: number): Hooper => ({
   id: 'test-' + id,
@@ -35,6 +35,19 @@ const player = (id: number): Hooper => ({
 });
 const possession = (iq = 0) => newPossession([0, 1, 2, 3, 4].map(player), [5, 6, 7, 8, 9].map(player), [1, 1, 1, 1, 1], rng(42), iq);
 describe('basketball decision and motion quality', () => {
+  it('cancels an interrupted held jumper without firing a shot or resetting the clock/ratings', () => {
+    const p=possession();p.scheme='man';const ratings=JSON.stringify(p.bodies.map(b=>b.p));
+    pressShoot(p);for(let i=0;i<8;i++)step(p,1/60,null);const clock=p.clock,height=p.bodies[0].h;
+    expect(cancelShoot(p)).toBe(true);expect(p.meter).toBeNull();expect(p.ball).toBeNull();expect(p.bodies[0].h).toBe(height);expect(p.clock).toBe(clock);
+    for(let i=0;i<50;i++)step(p,1/60,null);
+    expect(p.ball).toBeNull();expect(p.lastShot).toBeNull();expect(p.clock).toBeLessThan(clock);expect(JSON.stringify(p.bodies.map(b=>b.p))).toBe(ratings);
+  });
+  it('does not cancel a committed shot or a finish after the player actually released', () => {
+    const p=possession();pressShoot(p);p.t+=.52;releaseShoot(p);const ball=p.ball;
+    expect(cancelShoot(p)).toBe(false);expect(p.ball).toBe(ball);
+    const close=possession();Object.assign(close.bodies[0],{cx:RIM.cx-2,cz:0});pressShoot(close);expect(close.finish).not.toBeNull();expect(cancelShoot(close)).toBe(false);
+  });
+
   it('moves the called teammate on a cut, spaces back out and enforces a persistent call cooldown', () => {
     const p = possession(); p.scheme = 'man'; p.target = 1;
     const cutter = p.bodies[1], before = dist(cutter, RIM), ratings = JSON.stringify(p.bodies.map(b=>b.p));
