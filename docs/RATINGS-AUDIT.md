@@ -1,6 +1,13 @@
 # Ultimate Team ratings audit
 
-**Implemented by Codex (OpenAI), 2026-10-28–2026-10-29.** The owner's request was to bring NBA ratings closer to 2K and correct player identities, overalls and stats without deleting or resetting owned cards.
+**Implemented by Codex (OpenAI), 2026-10-28–2026-10-30.** The owner's request was to bring NBA ratings closer to 2K and correct player identities, overalls and stats without deleting or resetting owned cards.
+
+
+## Current research revision — 2026-10-30
+
+Codex added same-era benchmarks for **8,938 NBA** and **2,114 NFL unique player-seasons**, inherited by every derived edition of those cards. The compact generated snapshots load with their sport's UT catalog. NBA mappings respect the archive's launch-vs-updated roster basis; NFL mappings retain the explicit season and final published iteration date. Exact normalized player names, compatible positions and available height checks prevent speculative matches.
+
+The remaining cards retain season/role estimates and available peak anchors. These are not exact official ratings for every historical season. [GAMEPLAY-RESEARCH.md](GAMEPLAY-RESEARCH.md) gives the source list, coverage table, blending rules, rejected matches, licenses, reproduction and actual engine changes. The updated [audit summary](ratings-audit-summary.json) validates all 54,324 editions at levels 1 and 5 with zero invalid entries.
 
 ## Coverage and references
 

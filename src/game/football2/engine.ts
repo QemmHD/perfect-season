@@ -158,8 +158,8 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     d.mark = blk.id;
     const move = Math.max(d.p.a.PMV ?? 55, d.p.a.FMV ?? 55);
     const edge = (move - (blk.p.a.PBK ?? 60)) / 100;
-    // (a smarter defense gets home a little sooner)
-    d.winAt = Math.max(1.5, WIN_AT - edge * 3 + gauss(rand) * 0.45 + (i === 1 || i === 2 ? 0.25 : 0) - 0.2 * defIQ);
+    // Rush wins follow the actual matchup; difficulty improves reads and coverage.
+    d.winAt = Math.max(1.85, WIN_AT - edge * 2.5 + gauss(rand) * 0.45 + (i === 1 || i === 2 ? 0.25 : 0));
   });
   const play: Play = {
     t: 0,
@@ -265,17 +265,17 @@ export function projectRoute(b: Body, t: number): Pt {
 
 /** How far the quarterback can throw it: 40 yards for a weak arm, 64 for a cannon. */
 export function maxThrow(p: Play) {
-  return lerp(40, 64, rt(p.qb.p.a.THP, 55, 99));
+  return lerp(40, 64, rt(p.qb.p.a.THP, 55, 99)) + Math.max(0, Math.min(11, (p.qb.p.a.THP ?? 60) - 99)) * 0.2;
 }
 
 /** when an even pass rusher beats his man, on average (seconds after the snap) */
-export const WIN_AT = 2.9;
+export const WIN_AT = 3.05;
 /** how close (yards in front of the quarterback) the pocket has closed when a rusher wins */
 const POCKET = 4.2;
 
 /** The ball's speed in the air (yards a second): a strong arm gets it there sooner, On Fire sooner still. */
 function throwSpeed(p: Play) {
-  return lerp(17, 26, rt(p.qb.p.a.THP, 55, 99)) * (p.fire ? 1.12 : 1);
+  return (lerp(17, 26, rt(p.qb.p.a.THP, 55, 99)) + Math.max(0, Math.min(11, (p.qb.p.a.THP ?? 60) - 99)) * 0.055) * (p.fire ? 1.12 : 1);
 }
 
 /** 0 for a bullet (short and flat), 1 for a lob (long and high), blended between. */
@@ -315,18 +315,34 @@ export function sight(p: Play, len: number) {
 }
 
 /**
- * The quarterback throws to a spot (the slingshot's aim), as far as his arm reaches: it lands there.
- * Whoever can get there goes for it.
+ * Bounded throw dispersion in yards, driven by distance accuracy, movement and pressure/poise.
+ * The slingshot remains the user's intended spot; the same model drives the preview and the throw.
  */
+export function throwErrorRadius(p: Play, len: number): number {
+  const accuracy = clamp(accAt(p.qb.p, len), 0, 1);
+  const poise = rt(p.qb.p.a.TUP, 50, 99);
+  const movement = clamp(Math.hypot(p.qb.vx, p.qb.vy) / 6, 0, 1);
+  const eliteTouch = Math.max(0, Math.min(11, (p.qb.p.a.SAC ?? 60) - 99)) * 0.002;
+  return Math.min(4.2, 0.12 - eliteTouch + Math.pow(1 - accuracy, 1.5) * (0.65 + len * 0.035)
+    + p.pressure * (1 - poise * 0.75) * (0.6 + len * 0.025)
+    + movement * (1 - accuracy * 0.6) * 0.6);
+}
+
 export function throwTo(p: Play, to: Pt): boolean {
   if (p.phase !== 'drop' || p.call !== 'pass' || p.carrier !== p.qb || p.t < 0.3) return false;
   const qb = p.qb;
   const r = p.rand;
   const ang = Math.atan2(to.y - qb.y, to.x - qb.x);
   const len = Math.max(1.5, Math.min(Math.hypot(to.x - qb.x, to.y - qb.y), maxThrow(p)));
-  const land = { x: qb.x + Math.cos(ang) * len, y: qb.y + Math.sin(ang) * len };
+  const intended = { x: qb.x + Math.cos(ang) * len, y: qb.y + Math.sin(ang) * len };
+  const error = throwErrorRadius(p, len);
+  // Triangular noise favors the intended spot, stays bounded and never aims the ball at a defender.
+  let lateral = (r() - r()) * error, depth = (r() - r()) * error * 0.8;
+  const radius = Math.hypot(lateral, depth);
+  if (radius > error) { lateral *= error / radius; depth *= error / radius; }
+  const land = { x: intended.x - Math.sin(ang) * lateral + Math.cos(ang) * depth, y: intended.y + Math.cos(ang) * lateral + Math.sin(ang) * depth };
   const flight = flightTime(p, len);
-  p.aim = land;
+  p.aim = intended;
   p.ball = { from: { x: qb.x, y: qb.y + 0.3 }, to: land, t0: p.t, t1: p.t + flight, peak: peakOf(len) };
   p.carrier = null;
   p.phase = 'air';
@@ -342,10 +358,10 @@ export function throwTo(p: Play, to: Pt): boolean {
   for (const b of p.bodies) {
     if (b.side !== 'D') continue;
     const near = dist(b, land);
-    if (near < 15 && b.job !== 'rush') {
+    if (b.job !== 'rush') {
       // a sharp defender breaks on the ball sooner
       const read = rt(b.p.a.PRC, 45, 99) * 0.5 + rt(b.p.a.ZCV ?? b.p.a.MCV, 45, 99) * 0.5;
-      b.breakAt = p.t + lerp(0.6, 0.22, read) * (1 - 0.2 * p.defIQ) + r() * 0.15 + near * 0.015;
+      b.breakAt = p.t + lerp(0.42, 0.16, read) * (1 - 0.2 * p.defIQ) + r() * 0.07 + near * 0.005;
     }
   }
   return true;
@@ -402,8 +418,13 @@ function steerTo(b: Body, tx: number, ty: number, speed: number, dt: number, acc
   const dy = ty - b.y;
   const d = Math.hypot(dx, dy);
   const want = d < 0.05 ? { x: 0, y: 0 } : { x: (dx / d) * Math.min(speed, d * 6), y: (dy / d) * Math.min(speed, d * 6) };
-  b.vx += clamp(want.x - b.vx, -accel * dt, accel * dt);
-  b.vy += clamp(want.y - b.vy, -accel * dt, accel * dt);
+  const acceleration = accel * lerp(0.7, 1.15, rt(b.p.a.ACC, 40, 99));
+  const turn = lerp(0.7, 1.1, rt(b.p.a.AGI, 40, 99));
+  const dvx = want.x - b.vx, dvy = want.y - b.vy;
+  const delta = Math.hypot(dvx, dvy);
+  const scale = Math.min(1, acceleration * turn * dt / Math.max(0.001, delta));
+  b.vx += dvx * scale;
+  b.vy += dvy * scale;
 }
 
 function move(b: Body, dt: number) {
@@ -436,9 +457,9 @@ export function step(p: Play, dt: number, steer: number | null) {
   const qb = p.qb;
   for (const b of p.bodies) {
     b.trail.push({ x: b.x, y: b.y });
-    if (b.trail.length > 40) b.trail.shift();
+    if (b.trail.length > Math.ceil(0.7 / dt)) b.trail.shift();
   }
-  const lagOf = (b: Body) => Math.round(lerp(18, 4, rt(b.p.a.PRC, 45, 99) * 0.4 + rt(b.p.a.MCV ?? b.p.a.ZCV, 45, 99) * 0.6) * (1 - 0.25 * p.defIQ) * (60 * dt));
+  const lagOf = (b: Body) => Math.round(lerp(18, 4, rt(b.p.a.PRC, 45, 99) * 0.4 + rt(b.p.a.MCV ?? b.p.a.ZCV, 45, 99) * 0.6) * (1 - 0.25 * p.defIQ) / (60 * dt));
   const seen = (b: Body, by: Body): Pt => b.trail[Math.max(0, b.trail.length - 1 - lagOf(by))] ?? b;
   const seenVel = (b: Body, by: Body): Pt => {
     const i = Math.max(1, b.trail.length - 1 - lagOf(by));
@@ -466,7 +487,7 @@ export function step(p: Play, dt: number, steer: number | null) {
   // pressure: the nearest free rusher to the quarterback
   if (p.carrier === qb && p.phase === 'drop') {
     let near = 99;
-    for (const b of p.bodies) if (b.side === 'D' && b.job === 'rush' && t >= b.winAt) near = Math.min(near, dist(b, qb));
+    for (const b of p.bodies) if (b.side === 'D' && b.job === 'rush') near = Math.min(near, dist(b, qb) + Math.max(0, b.winAt - t) * 2);
     p.pressure = clamp(1 - (near - 1.2) / 4, 0, 1);
   } else p.pressure = 0;
 
@@ -494,8 +515,10 @@ export function step(p: Play, dt: number, steer: number | null) {
       } else {
         const wantX = aim === null ? 0 : clamp((aim - b.x) * 2.2, -sp * 0.65, sp * 0.65);
         const wantY = Math.sqrt(Math.max(0, sp * sp - wantX * wantX)) * (m ? 0.8 : 1);
-        b.vx += clamp(wantX - b.vx, -18 * dt, 18 * dt);
-        b.vy += clamp(wantY - b.vy, -12 * dt, 12 * dt);
+        const turn = lerp(11, 21, rt(b.p.a.AGI, 40, 99)) * dt;
+        const acceleration = lerp(8, 15, rt(b.p.a.ACC, 40, 99)) * dt;
+        b.vx += clamp(wantX - b.vx, -turn, turn);
+        b.vy += clamp(wantY - b.vy, -acceleration, acceleration);
       }
       act(b, m ? (m.kind === 'juke' ? 'juke' : m.kind === 'spin' ? 'spin' : m.kind === 'stiff' ? 'stiff' : 'truck') : 'carry', t);
       move(b, dt);
@@ -513,7 +536,10 @@ export function step(p: Play, dt: number, steer: number | null) {
     if (carrier.y >= 100) endPlay(p, 'td', carrier, 'TOUCHDOWN');
     else if (carrier.x < 0.2 || carrier.x > FIELD_W - 0.2) endPlay(p, 'out', carrier, 'OUT OF BOUNDS');
   }
-  if (p.phase === 'air' && p.ball && t >= p.ball.t1) arrive(p);
+  if (p.phase === 'air' && p.ball) {
+    if (t >= p.ball.t1) arrive(p);
+    else playPassingLane(p, dt);
+  }
   if (!p.end && t > 22) endPlay(p, 'tackle', p.carrier ?? qb, 'DOWN');
   void r;
 }
@@ -705,7 +731,8 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
       // lined up off him: while he comes up the field the defender keeps his depth and backpedals,
       // never coming downhill into his man; when the route breaks, he drives on it
       if (m.vy > 2.5 && b.y > ty) ty = Math.min(b.y, at.y + cushion + 7);
-      steerTo(b, at.x + m.vx * 0.22, ty, sp, dt, lerp(12, 19, cover) + 2 * p.defIQ);
+      const velocity = seenVel(m, b);
+      steerTo(b, at.x + velocity.x * 0.18, ty, sp, dt, lerp(12, 19, cover) + 2 * p.defIQ);
     }
     act(b, 'backpedal', t);
     move(b, dt);
@@ -811,6 +838,35 @@ function tackle(p: Play, d: Body, c: Body) {
   p.events.push(m ? 'beat:' + m.kind : 'break');
 }
 
+/** A defender can touch the actual ball's swept path only after reading the throw, and within
+ * arm/jump reach. High lobs clear underneath defenders; each player attempts once per pass. */
+function playPassingLane(p: Play, dt: number) {
+  const ball = p.ball!;
+  const k = clamp((p.t - ball.t0) / (ball.t1 - ball.t0), 0, 1);
+  if (k < 0.12 || k > 0.92) return; // catch-point battles are resolved by arrive()
+  const at = ballNow(p)!;
+  const before = clamp((p.t - dt - ball.t0) / (ball.t1 - ball.t0), 0, 1);
+  const old = { x: ball.from.x + (ball.to.x - ball.from.x) * before, y: ball.from.y + (ball.to.y - ball.from.y) * before };
+  const dx = at.x - old.x, dy = at.y - old.y, length2 = dx * dx + dy * dy;
+  for (const b of p.bodies.filter((b) => b.side === 'D').sort((a, b) => dist(a, at) - dist(b, at))) {
+    if (p.t < b.breakAt || p.t < b.stunUntil || ball.tried?.includes(b.id)) continue;
+    const u = clamp(((b.x - old.x) * dx + (b.y - old.y) * dy) / Math.max(0.001, length2), 0, 1);
+    const near = Math.hypot(b.x - old.x - dx * u, b.y - old.y - dy * u);
+    const reach = 0.65 + rt(b.p.a.MCV ?? b.p.a.ZCV, 40, 99) * 0.4 + Math.max(0, b.p.ht - 72) * 0.02;
+    const height = 2.35 + Math.max(0, b.p.ht - 72) * 0.025 + rt(b.p.a.AGI, 40, 99) * 0.5;
+    if (near > reach || at.h > height) continue;
+    (ball.tried ??= []).push(b.id);
+    act(b, 'catch', p.t);
+    const play = 0.25 + 0.48 * rt(b.p.a.PRC, 40, 99) + 0.07 * p.defIQ;
+    if (p.rand() >= play) continue;
+    const picked = p.rand() < 0.18 + 0.3 * rt(b.p.a.CTH, 40, 99);
+    p.ball = null;
+    p.events.push(picked ? 'lane-int' : 'pass-deflected');
+    endPlay(p, picked ? 'int' : 'incomplete', b, (picked ? 'PICKED OFF BY ' : 'TIPPED BY ') + b.p.tag);
+    return;
+  }
+}
+
 function arrive(p: Play) {
   const ball = p.ball!;
   const r = p.rand;
@@ -843,7 +899,7 @@ function arrive(p: Play) {
       endPlay(p, 'int', at, 'PICKED OFF BY ' + (def?.p.tag ?? ''));
       return;
     }
-    if (roll < pi + clamp(pc, 0.08, 0.97)) {
+    if (roll < pi + clamp(pc, 0.08, 0.97 - pi)) {
       p.carrier = off;
       off.job = 'carry';
       off.x = at.x;

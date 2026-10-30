@@ -51,6 +51,8 @@ export interface CardLine {
   sparse?: boolean;
   /** promo/legend: the id of the season card it is made from */
   seasonId?: string;
+  /** Optional public same-era benchmark, attached before all edition copies are derived. */
+  ratingReference?: { source: string; snapshot: string; ovr: number; attrs: Record<string, number> };
 }
 
 /** A card in a player's club. */

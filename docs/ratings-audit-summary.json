@@ -5,27 +5,33 @@
   "methodology": "docs/RATINGS-AUDIT.md",
   "nba": {
     "seasonCards": 21304,
+    "seasonBenchmarkedCards": 9419,
+    "benchmarkedEditions": 9739,
+    "seasonBenchmarkPlayers": 1771,
+    "seasonBenchmarkPlayerSeasons": 8938,
+    "estimateOnlySeasonCards": 11885,
+    "peakAnchoredSeasonCards": 2508,
     "allEditions": 22082,
     "tiers": {
-      "bronze": 10222,
-      "silver": 6966,
-      "gold": 4116,
+      "bronze": 10895,
+      "silver": 7507,
+      "gold": 2902,
       "promo": 518,
       "legend": 120,
       "spotlight": 120,
       "goat": 20
     },
     "seasonOverallPercentiles": {
-      "0": 53,
-      "10": 66,
+      "0": 46,
+      "10": 65,
       "25": 69,
-      "50": 75,
-      "75": 83,
-      "90": 88,
+      "50": 74,
+      "75": 80,
+      "90": 86,
       "100": 99
     },
-    "season99AtLevel1": 55,
-    "season99AtLevel5": 492,
+    "season99AtLevel1": 40,
+    "season99AtLevel5": 380,
     "maximumOverallAboveRoleQuality": 8.49933333333334,
     "invalid": [],
     "spotChecks": [
@@ -82,13 +88,19 @@
           "BLK": 52,
           "REB": 77
         },
-        "source": "https://www.2kratings.com/lebron-james-all-time-cleveland-cavaliers",
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2014",
+          "ovr": 99,
+          "attrs": {}
+        },
         "originalOverall": 99
       },
       {
         "name": "Kobe Bryant",
         "season": 2006,
-        "ovr": 99,
+        "ovr": 98,
         "attrs": {
           "SPD": 90,
           "ACC": 94,
@@ -110,7 +122,13 @@
           "BLK": 47,
           "REB": 53
         },
-        "source": "https://www.2kratings.com/kobe-bryant-all-time-los-angeles-lakers",
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2007",
+          "ovr": 98,
+          "attrs": {}
+        },
         "originalOverall": 98
       },
       {
@@ -144,16 +162,16 @@
       {
         "name": "Stephen Curry",
         "season": 2016,
-        "ovr": 98,
+        "ovr": 94,
         "attrs": {
-          "SPD": 92,
+          "SPD": 83,
           "ACC": 85,
           "HND": 97,
           "PAS": 96,
           "3PT": 99,
-          "MID": 94,
+          "MID": 95,
           "CLS": 89,
-          "LAY": 96,
+          "LAY": 93,
           "FT": 94,
           "DNK": 37,
           "SDK": 26,
@@ -166,13 +184,26 @@
           "BLK": 36,
           "REB": 53
         },
-        "source": "https://www.2kratings.com/stephen-curry-all-time-golden-state-warriors",
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2017",
+          "ovr": 94,
+          "attrs": {
+            "3PT": 99,
+            "MID": 94,
+            "LAY": 94,
+            "DNK": 36,
+            "SPD": 83,
+            "HND": 98
+          }
+        },
         "originalOverall": 98
       },
       {
         "name": "Shaquille O'Neal",
         "season": 2000,
-        "ovr": 99,
+        "ovr": 98,
         "attrs": {
           "SPD": 76,
           "ACC": 56,
@@ -194,7 +225,13 @@
           "BLK": 98,
           "REB": 98
         },
-        "source": "https://www.2kratings.com/shaquille-oneal-all-time-los-angeles-lakers",
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2001",
+          "ovr": 98,
+          "attrs": {}
+        },
         "originalOverall": 99
       },
       {
@@ -222,7 +259,13 @@
           "BLK": 95,
           "REB": 96
         },
-        "source": "https://www.2kratings.com/tim-duncan-all-time-san-antonio-spurs",
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2004",
+          "ovr": 99,
+          "attrs": {}
+        },
         "originalOverall": 98
       },
       {
@@ -366,7 +409,7 @@
       {
         "name": "Steve Nash",
         "season": 2006,
-        "ovr": 96,
+        "ovr": 92,
         "attrs": {
           "SPD": 91,
           "ACC": 86,
@@ -388,13 +431,19 @@
           "BLK": 30,
           "REB": 59
         },
-        "source": "https://www.2kratings.com/steve-nash-all-time-phoenix-suns",
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2007",
+          "ovr": 91,
+          "attrs": {}
+        },
         "originalOverall": 91
       },
       {
         "name": "Tracy McGrady",
         "season": 2003,
-        "ovr": 95,
+        "ovr": 96,
         "attrs": {
           "SPD": 88,
           "ACC": 81,
@@ -416,7 +465,13 @@
           "BLK": 47,
           "REB": 59
         },
-        "source": "https://www.2kratings.com/tracy-mcgrady-all-time-orlando-magic",
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2004",
+          "ovr": 96,
+          "attrs": {}
+        },
         "originalOverall": 97
       },
       {
@@ -446,23 +501,119 @@
         },
         "source": "https://www.2kratings.com/kobe-bryant-all-time-los-angeles-lakers",
         "originalOverall": 78
+      },
+      {
+        "name": "Nikola Jokić",
+        "season": 2024,
+        "ovr": 97,
+        "attrs": {
+          "SPD": 64,
+          "ACC": 50,
+          "HND": 76,
+          "PAS": 94,
+          "3PT": 82,
+          "MID": 97,
+          "CLS": 98,
+          "LAY": 91,
+          "FT": 84,
+          "DNK": 72,
+          "SDK": 88,
+          "STR": 93,
+          "VRT": 63,
+          "STA": 96,
+          "PRD": 63,
+          "IND": 79,
+          "STL": 56,
+          "BLK": 57,
+          "REB": 93
+        },
+        "source": "https://www.2kratings.com/nikola-jokic-all-time-denver-nuggets",
+        "originalOverall": 98
+      },
+      {
+        "name": "Giannis Antetokounmpo",
+        "season": 2024,
+        "ovr": 96,
+        "attrs": {
+          "SPD": 85,
+          "ACC": 86,
+          "HND": 84,
+          "PAS": 85,
+          "3PT": 60,
+          "MID": 73,
+          "CLS": 89,
+          "LAY": 97,
+          "FT": 66,
+          "DNK": 92,
+          "SDK": 85,
+          "STR": 89,
+          "VRT": 85,
+          "STA": 97,
+          "PRD": 85,
+          "IND": 88,
+          "STL": 66,
+          "BLK": 77,
+          "REB": 91
+        },
+        "source": "https://www.2kratings.com/giannis-antetokounmpo-all-time-milwaukee-bucks",
+        "originalOverall": 98
+      },
+      {
+        "name": "Stephen Curry",
+        "season": 2010,
+        "ovr": 82,
+        "attrs": {
+          "SPD": 86,
+          "ACC": 87,
+          "HND": 90,
+          "PAS": 89,
+          "3PT": 91,
+          "MID": 83,
+          "CLS": 67,
+          "LAY": 77,
+          "FT": 92,
+          "DNK": 33,
+          "SDK": 29,
+          "STR": 41,
+          "VRT": 63,
+          "STA": 93,
+          "PRD": 84,
+          "IND": 41,
+          "STL": 92,
+          "BLK": 28,
+          "REB": 46
+        },
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2011",
+          "ovr": 80,
+          "attrs": {}
+        },
+        "originalOverall": 87
       }
     ]
   },
   "nfl": {
     "seasonCards": 30855,
+    "seasonBenchmarkedCards": 2120,
+    "benchmarkedEditions": 2186,
+    "seasonBenchmarkPlayers": 1135,
+    "seasonBenchmarkPlayerSeasons": 2114,
+    "estimateOnlySeasonCards": 28735,
+    "peakAnchoredSeasonCards": 0,
     "allEditions": 32242,
     "tiers": {
-      "bronze": 20575,
-      "silver": 5802,
-      "gold": 4478,
+      "bronze": 20846,
+      "silver": 5600,
+      "gold": 4409,
       "promo": 1106,
       "legend": 130,
       "spotlight": 131,
       "goat": 20
     },
     "seasonOverallPercentiles": {
-      "0": 58,
+      "0": 57,
       "10": 68,
       "25": 71,
       "50": 78,
@@ -470,8 +621,8 @@
       "90": 90,
       "100": 99
     },
-    "season99AtLevel1": 95,
-    "season99AtLevel5": 1072,
+    "season99AtLevel1": 98,
+    "season99AtLevel5": 1057,
     "maximumOverallAboveRoleQuality": 8.450333333333333,
     "invalid": [],
     "spotChecks": [
@@ -587,6 +738,256 @@
           "RBK": 83,
           "BTK": 75,
           "JKM": 65
+        }
+      },
+      {
+        "name": "Patrick Mahomes",
+        "season": 2022,
+        "ovr": 98,
+        "attrs": {
+          "SPD": 84,
+          "ACC": 87,
+          "AGI": 88,
+          "STR": 70,
+          "AWR": 97,
+          "THP": 97,
+          "SAC": 96,
+          "MAC": 93,
+          "DAC": 91,
+          "TUP": 97
+        },
+        "source": "https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings",
+        "benchmark": {
+          "source": "https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings",
+          "snapshot": "2023-02-15",
+          "ovr": 98,
+          "attrs": {
+            "SPD": 84,
+            "ACC": 87,
+            "AGI": 88,
+            "STR": 70,
+            "AWR": 97,
+            "THP": 97,
+            "SAC": 97,
+            "MAC": 93,
+            "DAC": 91,
+            "TUP": 97,
+            "BTK": 75,
+            "TRK": 51,
+            "JKM": 77,
+            "SPM": 71,
+            "SFA": 57,
+            "CAR": 64,
+            "BCV": 87,
+            "CTH": 59,
+            "CIT": 32,
+            "SPC": 30,
+            "REL": 22,
+            "RBK": 23,
+            "PBK": 10,
+            "IBL": 27,
+            "PMV": 10,
+            "FMV": 10,
+            "BSH": 24,
+            "TAK": 26,
+            "PUR": 37,
+            "PRC": 22,
+            "MCV": 17,
+            "ZCV": 19,
+            "PRS": 10,
+            "HIT": 18,
+            "KPW": 20,
+            "KAC": 10,
+            "RTE": 20
+          }
+        }
+      },
+      {
+        "name": "Josh Allen",
+        "season": 2023,
+        "ovr": 91,
+        "attrs": {
+          "SPD": 88,
+          "ACC": 92,
+          "AGI": 85,
+          "STR": 80,
+          "AWR": 86,
+          "THP": 99,
+          "SAC": 92,
+          "MAC": 89,
+          "DAC": 86,
+          "TUP": 90
+        },
+        "source": "https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings",
+        "benchmark": {
+          "source": "https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings",
+          "snapshot": "2024-02-15",
+          "ovr": 92,
+          "attrs": {
+            "SPD": 88,
+            "ACC": 92,
+            "AGI": 85,
+            "STR": 80,
+            "AWR": 87,
+            "THP": 99,
+            "SAC": 92,
+            "MAC": 89,
+            "DAC": 87,
+            "TUP": 91,
+            "BTK": 84,
+            "TRK": 75,
+            "JKM": 81,
+            "SPM": 77,
+            "SFA": 83,
+            "CAR": 60,
+            "BCV": 96,
+            "CTH": 40,
+            "CIT": 20,
+            "SPC": 23,
+            "REL": 18,
+            "RBK": 17,
+            "PBK": 14,
+            "IBL": 26,
+            "PMV": 9,
+            "FMV": 9,
+            "BSH": 23,
+            "TAK": 32,
+            "PUR": 33,
+            "PRC": 15,
+            "MCV": 12,
+            "ZCV": 18,
+            "PRS": 9,
+            "HIT": 11,
+            "KPW": 22,
+            "KAC": 14,
+            "RTE": 17
+          }
+        }
+      },
+      {
+        "name": "Tom Brady",
+        "season": 2021,
+        "ovr": 99,
+        "attrs": {
+          "SPD": 71,
+          "ACC": 70,
+          "AGI": 70,
+          "STR": 64,
+          "AWR": 98,
+          "THP": 92,
+          "SAC": 98,
+          "MAC": 98,
+          "DAC": 95,
+          "TUP": 88
+        },
+        "source": "https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings",
+        "benchmark": {
+          "source": "https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings",
+          "snapshot": "2022-02-15",
+          "ovr": 99,
+          "attrs": {
+            "SPD": 71,
+            "ACC": 70,
+            "AGI": 70,
+            "STR": 64,
+            "AWR": 99,
+            "THP": 92,
+            "SAC": 99,
+            "MAC": 99,
+            "DAC": 97,
+            "TUP": 86,
+            "BTK": 31,
+            "TRK": 20,
+            "JKM": 57,
+            "SPM": 35,
+            "SFA": 27,
+            "CAR": 69,
+            "BCV": 51,
+            "CTH": 39,
+            "CIT": 15,
+            "SPC": 30,
+            "REL": 12,
+            "RBK": 25,
+            "PBK": 19,
+            "IBL": 34,
+            "PMV": 10,
+            "FMV": 10,
+            "BSH": 33,
+            "TAK": 32,
+            "PUR": 30,
+            "PRC": 20,
+            "MCV": 11,
+            "ZCV": 19,
+            "PRS": 10,
+            "HIT": 12,
+            "KPW": 43,
+            "KAC": 28,
+            "RTE": 14
+          }
+        }
+      },
+      {
+        "name": "Aaron Donald",
+        "season": 2022,
+        "ovr": 98,
+        "attrs": {
+          "SPD": 82,
+          "ACC": 90,
+          "AGI": 86,
+          "STR": 99,
+          "AWR": 98,
+          "PMV": 97,
+          "FMV": 94,
+          "BSH": 96,
+          "TAK": 93,
+          "PUR": 96,
+          "PRC": 97,
+          "HIT": 88
+        },
+        "source": "https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings",
+        "benchmark": {
+          "source": "https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings",
+          "snapshot": "2023-02-15",
+          "ovr": 99,
+          "attrs": {
+            "SPD": 82,
+            "ACC": 90,
+            "AGI": 86,
+            "STR": 99,
+            "AWR": 99,
+            "THP": 20,
+            "SAC": 6,
+            "MAC": 6,
+            "DAC": 6,
+            "TUP": 15,
+            "BTK": 17,
+            "TRK": 32,
+            "JKM": 28,
+            "SPM": 25,
+            "SFA": 30,
+            "CAR": 48,
+            "BCV": 49,
+            "CTH": 42,
+            "CIT": 23,
+            "SPC": 47,
+            "REL": 12,
+            "RBK": 45,
+            "PBK": 45,
+            "IBL": 93,
+            "PMV": 99,
+            "FMV": 96,
+            "BSH": 97,
+            "TAK": 93,
+            "PUR": 98,
+            "PRC": 99,
+            "MCV": 25,
+            "ZCV": 29,
+            "PRS": 21,
+            "HIT": 89,
+            "KPW": 25,
+            "KAC": 21,
+            "RTE": 10
+          }
         }
       }
     ]

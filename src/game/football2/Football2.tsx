@@ -943,8 +943,8 @@ function fieldGoalUnit(g: Game): Play {
 }
 
 /** The AI's drives, played by the autopilot against your defense. */
-export function aiDrives2(rivalLineup: Lineup, yourLineup: Lineup, seed: string, skill: number, attrs: (p: Player) => Attrs | null, drives = DRIVES): Progress {
-  return aiDrivesOf(offenseOf(rivalLineup, attrs, 'ai:' + seed), defenseOf(yourLineup, attrs, 'aidef:' + seed), seed, skill, drives);
+export function aiDrives2(rivalLineup: Lineup, yourLineup: Lineup, seed: string, skill: number, attrs: (p: Player) => Attrs | null, drives = DRIVES, defIQ = 0): Progress {
+  return aiDrivesOf(offenseOf(rivalLineup, attrs, 'ai:' + seed), defenseOf(yourLineup, attrs, 'aidef:' + seed), seed, skill, drives, defIQ);
 }
 
 /** The same from the teams themselves (Ultimate Team): one side's offense against the other's defense. */

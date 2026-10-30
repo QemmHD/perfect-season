@@ -25,6 +25,28 @@ describe("all-tier ratings corrections (" + SPORT + ")", () => {
         expect(c.line.pid).toBe(original.pid);
       }
   });
+  it("carries same-era provenance through every edition and uses bounded source attributes", () => {
+    const referenced = [...pool.base.values()].filter(c => c.line.ratingReference);
+    expect(referenced.length).toBeGreaterThan(SPORT === 'nba' ? 8000 : 2000);
+    for (const c of referenced) {
+      expect(c.line.ratingReference!.source).toMatch(/^https:\/\//);
+      if (c.line.seasonId) expect(c.line.ratingReference).toEqual(pool.byId.get(c.line.seasonId)!.ratingReference);
+    }
+    if (SPORT === 'nfl') {
+      const brady=season('Tom Brady',2021), mahomes=season('Patrick Mahomes',2022);
+      expect(brady.attrs.SPD).toBe(brady.line.ratingReference!.attrs.SPD);
+      expect(mahomes.attrs.THP).toBe(mahomes.line.ratingReference!.attrs.THP);
+      expect(mahomes.ovr).toBeGreaterThanOrEqual(93);
+      expect(brady.attrs.SPD).toBeLessThan(75);
+    } else {
+      const jokic=season('Nikola Jokić',2024), giannis=season('Giannis Antetokounmpo',2024);
+      expect(jokic.ovr).toBeGreaterThanOrEqual(95);
+      expect(jokic.attrs.SPD).toBeLessThan(75);
+      expect(jokic.attrs.PAS).toBeGreaterThan(90);
+      expect(giannis.attrs.DNK).toBeGreaterThan(85);
+      expect(jokic.attrs['3PT']).toBeGreaterThan(giannis.attrs['3PT']);
+    }
+  });
   if (SPORT === "nba") {
     it("ordinary overalls cannot turn a middling attribute profile into an all-time superstar", () => {
       expect(season("Bob Rule", 1969).ovr).toBeLessThanOrEqual(85);
@@ -84,6 +106,7 @@ describe("all-tier ratings corrections (" + SPORT + ")", () => {
       const tiny: CardLine = {
         ...base,
         name: "Unproven backup",
+        ratingReference: undefined,
         honors: [],
         games: 2,
         starts: 0,

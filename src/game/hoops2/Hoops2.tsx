@@ -134,7 +134,7 @@ export function Hoops2({
   const [look, setLook] = useState<{ scheme: Scheme; trapped: boolean } | null>(null);
   const popId = useRef(0);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [hint, setHint] = useState<string | null>(practice ? null : 'Stick: move, push it to the edge to sprint · flick ← → crossover · flick ↓ step-back · flick ↑ spin · hold SHOOT, let go in the green');
+  const [hint, setHint] = useState<string | null>(practice ? null : 'Hold SHOOT, release in green · move or pass to create space');
   const [wide, setWide] = useState(false);
   // instant replay: the last seconds of play, the highlight to show, the replay running
   const rec = useRef(new Recorder<Snap>(5));
@@ -178,9 +178,11 @@ export function Hoops2({
     if (!game) return;
     crowd.start(0.24);
     const t = window.setTimeout(() => next(game), 700);
-    const h = window.setTimeout(() => setHint(null), 7000);
+    const moves = window.setTimeout(() => !practice && setHint('Stick edge: sprint · flick ← → cross, ↓ step-back, ↑ spin'), 3800);
+    const h = window.setTimeout(() => setHint(null), 7600);
     return () => {
       clearTimeout(t);
+      clearTimeout(moves);
       clearTimeout(h);
       crowd.stop(0.6);
     };
@@ -211,7 +213,8 @@ export function Hoops2({
       else if (e === 'release-green') {
         sfx.coin();
         vibrate(15);
-        say('GREEN!', 'green', 800);
+        const contested = p.lastShot?.contest === 'heavy' || p.lastShot?.contest === 'smothered';
+        say(contested ? 'PERFECT TIMING · CONTESTED' : 'PERFECT!', 'green', 800);
       } else if (e === 'release') {
         const ls = p.lastShot;
         if (ls) {
@@ -682,8 +685,8 @@ export function Hoops2({
 }
 
 /** The AI's possessions, played by the autopilot against your five. */
-export function aiPossessions2(rivalLineup: Lineup, yourLineup: Lineup, seed: string, skill: number, attrs: (p: Player) => Attrs | null, possessions = POSSESSIONS): Progress {
-  return aiPossessionsOf(fiveOf(rivalLineup, attrs), fiveOf(yourLineup, attrs), seed, skill, possessions);
+export function aiPossessions2(rivalLineup: Lineup, yourLineup: Lineup, seed: string, skill: number, attrs: (p: Player) => Attrs | null, possessions = POSSESSIONS, defIQ = 0): Progress {
+  return aiPossessionsOf(fiveOf(rivalLineup, attrs), fiveOf(yourLineup, attrs), seed, skill, possessions, [], defIQ);
 }
 
 /** The same from the teams themselves (Ultimate Team): one five on offense, with its bench, against the other. */

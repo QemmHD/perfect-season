@@ -1,4 +1,5 @@
 import { nflIdentity } from './nfl-identity';
+import { calibrateNflReference } from './season-reference';
 import { editionAttributes, profileQuality, supportEdition } from './rating-quality';
 // Ultimate Team ratings: a card line becomes a rated card with the same code the played games use,
 // so a card shows exactly what it plays like. Basketball goes through hoops2's `hooper()` (fed the
@@ -191,9 +192,11 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
     // the boost is applied here, the same way for both sports, whatever rateNflLine does with it
     const r = rateNflLine({ ...line, boost: undefined }, pos ?? line.pos[0]);
     const actualAttrs = nflIdentity(line, r.attrs);
-    base = Math.min(r.ovr, Math.round(profileQuality('nfl', r.pos, actualAttrs) + 5));
+    const calibrated = calibrateNflReference(line, r.pos, r.ovr, actualAttrs);
+    base = calibrated.ovr;
     at = r.pos;
-    attrs = actualAttrs;
+    attrs = calibrated.attrs;
+    ratingSource = calibrated.source;
     keys = r.key.map(([c, n]) => [c, n]);
     if (!keys.length) keys = (NFL_KEYS[groupOf(at)] ?? NFL_KEYS.WR).map(([c, n]) => [c, n]);
     abil = r.abil.slice();

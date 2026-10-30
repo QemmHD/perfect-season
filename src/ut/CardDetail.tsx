@@ -148,9 +148,9 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
               {rc.ratingSource ? (
                 <>
                   <a href={rc.ratingSource} target="_blank" rel="noreferrer">
-                    Peak 2K reference
+                    {rc.line.ratingReference ? `${rc.line.sport === 'nba' ? '2K' : 'Madden'} ${rc.line.ratingReference.snapshot} benchmark` : 'Peak 2K reference'}
                   </a>{' '}
-                  · Season-specific estimates, then edition and level boosts.
+                  · Season-calibrated attributes, then edition and level boosts.
                 </>
               ) : (
                 'Attributes estimated from this season’s statistics, honors and player role.'

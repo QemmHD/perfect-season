@@ -1,6 +1,6 @@
 # Perfect Season — handoff for Claude and future contributors
 
-This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub Pages. NBA and NFL share a wallet/settings/identity and keep separate sporting progress. Read `docs/CODEX-UPDATE-LOG.md` first for additions **implemented by Codex**, their file map, validation and release status.
+This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub Pages. NBA and NFL share a wallet/settings/identity and keep separate sporting progress. Read `docs/GAMEPLAY-RESEARCH.md` for the latest ratings/gameplay revision, then `docs/CODEX-UPDATE-LOG.md` for additions **implemented by Codex**, their file map, validation and release status.
 
 ## Preserve player progress
 
@@ -15,10 +15,11 @@ This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub P
 - `src/ut/UltimateTeam.tsx`: UT routing, transactions, packs, card details and SBC submission.
 - `src/ut/state.ts`, `storage.ts`: additive profile migration and duplicate storage.
 - `src/ut/cards.ts`, `rate.ts`, `pool.ts`, `teams.ts`: stable edition IDs → rated gameplay attributes → pool fingerprint → playable squads.
-- `src/game/hoops2/` and `src/game/football2/`: existing actual match engines. Above-99 UT ratings must affect real play; standard ratings must retain their existing engine behavior.
+- `src/game/hoops2/` and `src/game/football2/`: existing actual match engines. The Codex 2026-10-30 revision changes shared gameplay for both draft and UT. Above-99 ratings must stay finite and affect actual play; preserve the original pixel/mocap visual style.
 - `src/evolution/`: Codex Cloud Save status/conflict UI (replacing the file-backup screen), continuation, Training Camp and SVG marks. `src/lib/cloud-{save,sync,data}.ts`: original signed identity → encrypted server saves → revision/conflict protection. `src/lib/recovery.ts`: checkpoints/shared validation and unreachable legacy file helpers.
+- `src/game/difficulty.ts`: selected offline defensive settings and equal Legend defense online (including simulations/takeovers). Match protocol rules are 4; `DATA_V`/leaderboard history is retained. The NBA/NFL `gameplay.test.ts` regressions and `scripts/qa/gameplay.mjs` check the revised engines.
 - `src/ut/rivals.ts`, `rivals-net.ts`, `Rivals.tsx`: Codex division progress/rewards and separate signed Nostr standings.
-- `src/ut/rating-quality.ts`, `calibration.ts`, `nfl-identity.ts`: all-tier position/season-supported ratings, 372 public NBA anchors and explicitly estimated NFL physical identities; no universal promo attribute floors. Read docs/RATINGS-AUDIT.md before tuning; keep ordinary draft engines unchanged.
+- `src/ut/rating-quality.ts`, `calibration.ts`, `nfl-identity.ts`: all-tier position/season-supported ratings, 372 public NBA anchors and explicitly estimated NFL physical identities; no universal promo attribute floors. New `season-reference.ts` and lazy `season-references-<sport>.json` add exact-matched public same-era benchmarks, before edition boosts. Read docs/RATINGS-AUDIT.md and GAMEPLAY-RESEARCH.md before tuning; ordinary draft rating formulas remain separate from UT calibration.
 - New collection, event and card-registry modules are detailed in the update log. `src/ut/pack-reveal.css` and `PackOpening.tsx` implement the Codex Spotlight/GOAT reveal sequences; `GoatCrown` in `CardArt.tsx` is the shared card/reveal mark. Keep globally registered mint serials separate from player-local copy UIDs.
 
 ## Private test copy

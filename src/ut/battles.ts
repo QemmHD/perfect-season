@@ -34,7 +34,7 @@ export const LEVEL: Record<Level, { ovr: Record<UtSport, number>; skill: number;
   rookie: { ovr: { nba: -6, nfl: -4 }, skill: -0.15, def: -0.5, pay: 0.6, packs: { 3: 'bronze', 7: 'silver' } },
   pro: { ovr: { nba: 0, nfl: 0 }, skill: 0, def: 0, pay: 1, packs: { 3: 'silver', 7: 'gold' } },
   allstar: { ovr: { nba: 5, nfl: 3 }, skill: 0.08, def: 0.5, pay: 1.5, packs: { 3: 'gold', 7: 'premium' } },
-  legend: { ovr: { nba: 9, nfl: 5 }, skill: 0.15, def: 1, pay: 2.2, packs: { 1: 'gold', 3: 'gold', 5: 'premium', 7: 'premium' } },
+  legend: { ovr: { nba: 9, nfl: 6 }, skill: 0.15, def: 1, pay: 2.2, packs: { 1: 'gold', 3: 'gold', 5: 'premium', 7: 'premium' } },
 };
 
 /** a saved difficulty, or Pro */

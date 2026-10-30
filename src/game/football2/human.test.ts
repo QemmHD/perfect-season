@@ -12,6 +12,7 @@ import { snap, step } from './engine';
 import { defenseOf, offenseOf } from './squad';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const testEnv = (globalThis as { process?: { env?: Record<string, string> } }).process?.env ?? {};
 const run = NFL && (globalThis as any).process?.env?.HUMAN ? it : it.skip;
 
 run('a person playing football', async () => {
@@ -27,9 +28,9 @@ run('a person playing football', async () => {
       const c: Record<string, number> = {};
       const add = (k: string, n = 1) => (c[k] = (c[k] ?? 0) + n);
       let pts = 0, drives = 0;
-      const N = 40;
+      const N = Number(testEnv.HUMAN_GAMES ?? 40);
       for (let i = 0; i < N; i++) {
-        const g = newGame(off, def, 'tune' + i + olab + dlab);
+        const g = newGame(off, def, 'tune' + i + olab + dlab, undefined, Number(testEnv.HUMAN_DEF_IQ ?? 0));
         const pl = pilot(0.35, 'p' + i);
         let guard = 0;
         while (!g.over && guard++ < 300) {

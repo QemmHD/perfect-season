@@ -8,7 +8,7 @@ import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoin
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import * as P from '../pixel/poses';
 import type { Joints, Pose } from '../pixel/rig';
-import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, windupOf } from './engine';
+import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, throwErrorRadius, windupOf } from './engine';
 import type { Body, Play, Pt } from './types';
 
 export interface FbKit {
@@ -152,7 +152,7 @@ function poseOf(b: Body, t: number, p: Play): { key: string; pose: Pose } {
 
 /** The motion-capture clips the field uses (mocap.ts). They load with the renderer; until they're in,
  * the hand-keyed poses stand in (and keep the stances, the backpedal and the moves with the ball). */
-const CLIPS = ['ready', 'jog', 'run', 'sprint', 'block', 'throw', 'catch', 'catch_run', 'dive', 'fall_back', 'fall_back_m', 'fall_forward', 'fall_forward_m', 'kick', 'celebrate'];
+const CLIPS = ['ready', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'block', 'throw', 'catch', 'catch_run', 'dive', 'fall_back', 'fall_back_m', 'fall_forward', 'fall_forward_m', 'kick', 'celebrate'];
 
 /** The throw: the arm comes through from the cocked frame (held while he aims) and the ball's off
  * as the engine lets it go, then the follow-through. */
@@ -182,6 +182,7 @@ interface Anim {
 interface Memo {
   gait: { t: number; frac: number };
   face: { x: number; y: number };
+  faceAt: number;
 }
 
 const has = (name: string) => !!getClip(name);
@@ -218,6 +219,21 @@ function animOf(b: Body, t: number, p: Play, look: Look, m: Memo, aiming: boolea
   // the quarterback with the slingshot drawn back: arm cocked, ready to let it go
   if (aiming && b === p.qb && b === p.carrier) return clip('throw', THROW_COCKED, { step: 1 });
   switch (b.act) {
+    case 'backpedal': {
+      if (speed < 0.7) return clip('ready', t + b.id * 0.37, { step: 3 });
+      const forward = b.vx * m.face.x + b.vy * m.face.y;
+      const lateral = -b.vx * m.face.y + b.vy * m.face.x;
+      const name = Math.abs(lateral) > Math.abs(forward) ? (lateral > 0 ? 'shuffle' : 'shuffle_l') : forward < -0.4 ? 'backpedal' : null;
+      if (!name || !has(name)) {
+        const g = gait(b, t, look, m, speed);
+        return g ? clip(g.clip, g.ct) : pose;
+      }
+      const groundSpeed = clipMeta(name).root.speed * legScale(look) * (b.p.ht / 36);
+      const dt = t - m.gait.t;
+      if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + dt * Math.max(0.65, Math.min(1.8, speed / Math.max(0.1, groundSpeed))) / clipMeta(name).duration) % 1;
+      m.gait.t = t;
+      return clip(name, m.gait.frac * clipMeta(name).duration);
+    }
     case 'run':
     case 'rush': {
       // a rusher locked up with his blocker: driving into him
@@ -423,18 +439,25 @@ export class FootballRenderer {
     const who = b.p.id + '|' + b.side;
     let memo = this.memos.get(who);
     if (!memo) {
-      memo = { gait: { t, frac: (b.id * 0.29) % 1 }, face: { x: 0, y: b.side === 'O' ? 1 : -1 } };
+      memo = { gait: { t, frac: (b.id * 0.29) % 1 }, face: { x: 0, y: b.side === 'O' ? 1 : -1 }, faceAt: t };
       this.memos.set(who, memo);
     }
     const moving = Math.hypot(b.vx, b.vy) > 0.6;
     const grounded = b.act === 'tackle' || b.act === 'down';
     // facing: where he's going, or (set) up the field for the offense, down it for the defense; a
     // man diving or going down keeps the way he faced as it started
-    const dir = grounded ? memo.face : moving ? { x: b.vx, y: b.vy } : b.side === 'O' ? { x: 0, y: 1 } : { x: 0, y: -1 };
+    const assignment = p.bodies.find((o) => o.id === b.mark);
+    const openHips = b.act === 'backpedal' && Math.hypot(b.vx, b.vy) > 4.8 && assignment && assignment.y > b.y - 1;
+    const watch = b.act === 'backpedal' && !openHips ? p.qb : null;
+    let dir = grounded ? memo.face : watch ? { x: watch.x - b.x, y: watch.y - b.y } : moving ? { x: b.vx, y: b.vy } : b.side === 'O' ? { x: 0, y: 1 } : { x: 0, y: -1 };
     if (!grounded) {
-      const l = Math.hypot(dir.x, dir.y) || 1;
-      memo.face = { x: dir.x / l, y: dir.y / l };
+      const target = Math.atan2(dir.y, dir.x), old = Math.atan2(memo.face.y, memo.face.x);
+      const delta = Math.atan2(Math.sin(target - old), Math.cos(target - old));
+      const facing = old + delta * Math.min(1, Math.max(0, t - memo.faceAt) * 14);
+      memo.face = { x: Math.cos(facing), y: Math.sin(facing) };
+      dir = memo.face;
     }
+    memo.faceAt = t;
     // sizes, angles and (for small, far players) facings in steps, so a player moving up the field
     // reuses his drawings
     const raw = Math.max(8, Math.round((b.p.ht / 36) * s));
@@ -799,7 +822,7 @@ export class FootballRenderer {
       }
       if (seen >= 1) {
         const land = L.at(o.aim.x, o.aim.y);
-        const r = Math.max(9, Math.round(land.s * 1.1));
+        const r = Math.max(6, Math.round(land.s * throwErrorRadius(p, len)));
         ctx.strokeStyle = to ? '#3ef0a0' : '#ffffff';
         ctx.lineWidth = Math.max(2, Math.round(land.s * 0.16));
         ctx.beginPath();

@@ -38,3 +38,8 @@ Chromium verifies layout, input and state transitions. Before claiming device-sp
 `node scripts/qa/cloud.mjs` tests both sports using real UI and isolated identities: successful server save, exact owned-copy/XP/squad/wallet restoration for the same identity, an offline divergent device, paused conflict, and server choice only after preserving the device copy. It uses Settings → Cloud Save and does not rely on file inputs or UI-global test hooks. It waits for the actual reload before reading restored state. New identities are required because inspect saves persist on the real backend.
 
 `NODE_USE_ENV_PROXY=1 node scripts/qa/cloud-backend.mjs` tests signed API idempotency, one winner/one 409 for concurrent saves, per-identity isolation and invalid-signature rejection in qacloud. `supabase/tests/cloud_saves.sql` tests database invariants with rollback. No user saves are loaded. See AUTOMATIC-SAVES.md for the identity/recovery boundary.
+
+
+## Codex gameplay revision, 2026-10-30
+
+`node scripts/qa/gameplay.mjs` mounts the actual NBA/NFL match components with rated isolated fixture squads at Legend defense. It sends manual pointer shooting/throwing input, checks populated canvas pixels, runs complete autoplay possessions/drives, checks finite progress and unchanged original owned copies, and captures release/aim/action screenshots. The same optional QA-tool path/proxy environment variables apply. `online.mjs` also verifies the revised rules/pool handshake and deterministic Sim settlement with two independent signed local-relay clients per sport. See GAMEPLAY-RESEARCH.md and CODEX-UPDATE-LOG.md for final results and device-test limits.

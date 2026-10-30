@@ -95,6 +95,8 @@ export interface Ball {
   t0: number;
   t1: number;
   peak: number;
+  /** Each defender gets one physical play on this pass, rather than a fresh lottery every frame. */
+  tried?: number[];
 }
 
 export type EndKind = 'tackle' | 'incomplete' | 'td' | 'int' | 'sack' | 'out' | 'fumble';

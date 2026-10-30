@@ -13,6 +13,7 @@ import { hashString } from '../engine/rng';
 import { easternDateKey } from '../engine/season';
 import { NFL, SPORT } from '../engine/sport';
 import { AI_SKILL, Arcade, type Progress } from '../game/Arcade';
+import { DRIVES } from '../game/football2/drive';
 import { aiDrivesOf } from '../game/football2/Football2';
 import { POSSESSIONS } from '../game/hoops2/game';
 import { aiPossessionsOf } from '../game/hoops2/Hoops2';
@@ -44,7 +45,7 @@ import './match.css';
  * whose cards (the pool's fingerprint) or match rules differ, since each phone rates both squads
  * and plays the sim itself. Bump UT_RULES when teams.ts or play.ts change how a match comes out.
  */
-const UT_RULES = 3;
+const UT_RULES = 4;
 const queueOf = (pool: Pool) => 'ut-' + UT_RULES + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;
@@ -321,6 +322,7 @@ export default function UtMatch(props: {
   const teams = useMemo(() => (setup ? teamsOf(SPORT, setup.me.sq, setup.rival.sq, setup.seed) : null), [setup]);
   const kits = useMemo(() => (setup ? kitsFor(setup.me.fav, setup.rival.fav, SPORT) : undefined), [setup]);
   const aiSkill = setup?.rung ? setup.rung.skill : AI_SKILL.pro;
+  const defenseIQ = setup?.online ? 1 : (setup?.level?.def ?? 0);
 
   useEffect(() => {
     if (stage !== 'vs') return;
@@ -400,10 +402,10 @@ export default function UtMatch(props: {
     const key = (w: SquadWire) => setup.seed + ':sim:' + hashString(JSON.stringify(w));
     const mine = 0.6;
     const theirs = setup.online ? 0.6 : aiSkill;
-    const us = NFL ? aiDrivesOf(t.offense!, t.rivalDefense!, key(setup.me.wire), mine) : aiPossessionsOf(t.five!, t.rivalFive!, key(setup.me.wire), mine, POSSESSIONS, t.bench);
+    const us = NFL ? aiDrivesOf(t.offense!, t.rivalDefense!, key(setup.me.wire), mine, DRIVES, defenseIQ) : aiPossessionsOf(t.five!, t.rivalFive!, key(setup.me.wire), mine, POSSESSIONS, t.bench, defenseIQ);
     const them = NFL
-      ? aiDrivesOf(t.rivalOffense!, t.defense!, key(setup.rival.wire), theirs)
-      : aiPossessionsOf(t.rivalFive!, t.five!, key(setup.rival.wire), theirs, POSSESSIONS, t.rivalBench);
+      ? aiDrivesOf(t.rivalOffense!, t.defense!, key(setup.rival.wire), theirs, DRIVES, defenseIQ)
+      : aiPossessionsOf(t.rivalFive!, t.five!, key(setup.rival.wire), theirs, POSSESSIONS, t.rivalBench, defenseIQ);
     finish(us, them, 'sim');
   };
 
@@ -420,7 +422,7 @@ export default function UtMatch(props: {
           online={!!setup.online}
           botLevel="pro"
           aiSkill={aiSkill}
-          aiDefense={setup.online ? 0 : (setup.level?.def ?? 0)}
+          aiDefense={defenseIQ}
           rivalLive={setup.online ? (opp?.arcade ?? null) : null}
           rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
           tookMe={setup.online ? (opp?.arcadeTook ?? null) : null}

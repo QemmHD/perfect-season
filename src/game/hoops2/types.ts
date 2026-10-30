@@ -103,6 +103,10 @@ export interface Body {
   burst: number;
   /** a defender beaten off the dribble (the man got past him): turning to chase, slower a moment */
   beatenAt?: number;
+  /** Persistent across animation changes, so a dribble animation cannot reset a move's cooldown. */
+  lastMoveAt?: number;
+  /** Brief planted-contact response, separate from a turnover or a stun. */
+  contactAt?: number;
   trail: Pt[];
 }
 

@@ -92,6 +92,12 @@ export function calibrateNba(
     }))
       attrs[code] = clamp(value - decline);
   }
+  // A same-era roster is stronger evidence than a player's all-time peak. These are public
+  // release/update benchmarks, blended with actual season performance; never claimed as an exact roster clone.
+  const seasonRef = line.ratingReference;
+  if (seasonRef) for (const [code, value] of Object.entries(seasonRef.attrs)) {
+    if (code in attrs) attrs[code] = clamp(value * 0.85 + raw[code] * 0.15);
+  }
   // Percentages alone are noisy: shrink toward 34% with a 75-attempt prior, using the actual season sample.
   const attempts = (s.a3 ?? 0) * (line.games ?? s.g ?? 0),
     pct = s.fg3;
@@ -136,9 +142,10 @@ export function calibrateNba(
   else if (honors.has("DPOY")) ovr = Math.max(ovr, 88);
   const mpg = s.mpg ?? 24;
   if (!honors.size && mpg < 15) ovr = Math.min(ovr, 68 + Math.max(0, mpg - 8));
+  if (seasonRef) ovr = 0.88 * seasonRef.ovr + 0.12 * ovr;
   return {
     ovr: clamp(Math.min(ovr, quality + 8), 40),
     attrs,
-    source: ref?.source,
+    source: seasonRef?.source ?? ref?.source,
   };
 }

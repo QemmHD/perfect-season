@@ -22,6 +22,9 @@ const cases: Record<string, [string, number][]> = {
     ["Steve Nash", 2006],
     ["Tracy McGrady", 2003],
     ["Kobe Bryant", 2016],
+    ["Nikola Jokić", 2024],
+    ["Giannis Antetokounmpo", 2024],
+    ["Stephen Curry", 2010],
   ],
   nfl: [
     ["Tom Brady", 2007],
@@ -30,6 +33,10 @@ const cases: Record<string, [string, number][]> = {
     ["Barry Sanders", 1997],
     ["Peyton Manning", 2013],
     ["Rob Gronkowski", 2011],
+    ["Patrick Mahomes", 2022],
+    ["Josh Allen", 2023],
+    ["Tom Brady", 2021],
+    ["Aaron Donald", 2022],
   ],
 };
 const report: Record<string, unknown> = {
@@ -63,6 +70,12 @@ for (const sport of ["nba", "nfl"] as const) {
   const sorted = seasons.map((c) => c.ovr).sort((a, b) => a - b);
   report[sport] = {
     seasonCards: seasons.length,
+    seasonBenchmarkedCards: seasons.filter(c => c.line.ratingReference).length,
+    benchmarkedEditions: cards.filter(c => c.line.ratingReference).length,
+    seasonBenchmarkPlayers: new Set(seasons.filter(c => c.line.ratingReference).map(c => c.line.pid)).size,
+    seasonBenchmarkPlayerSeasons: new Set(seasons.filter(c => c.line.ratingReference).map(c => c.line.pid + ':' + c.line.season)).size,
+    estimateOnlySeasonCards: seasons.filter(c => !c.line.ratingReference).length,
+    peakAnchoredSeasonCards: seasons.filter(c => !c.line.ratingReference && c.ratingSource).length,
     allEditions: cards.length,
     tiers: Object.fromEntries(
       ["bronze", "silver", "gold", "promo", "legend", "spotlight", "goat"].map(
@@ -94,6 +107,7 @@ for (const sport of ["nba", "nfl"] as const) {
         ovr: rc.ovr,
         attrs: rc.attrs,
         source: rc.ratingSource,
+        benchmark: rc.line.ratingReference,
         ...(sport === "nba"
           ? {
               originalOverall: hooper(nbaLineOf(rc.line), rc.pos, rc.line.num)
