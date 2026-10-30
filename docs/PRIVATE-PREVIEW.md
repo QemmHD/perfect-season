@@ -42,7 +42,7 @@ The preview is updated in place from the feature branch with automatic encrypted
 Main/Pages still serves the original release. The first deployment references above are retained as history; this section records the previous private test copy; the next entry identifies the current deployment.
 
 
-## Current gameplay/research preview — Codex, 2026-10-30
+## Previous gameplay/research preview — Codex, 2026-10-30
 
 - GitHub feature source: `4769e4507b632c55aeb7f4e05937ce3db356fb2e`, exact tree `769a8730d43addab9d8667665cb7052967d0262c`. Local implementation commit `0c6543f32ed8a935a4cb62c38244611978613f02` has that same tree.
 - Sites source: `b888d32ca308732555f529dea6e0295c6e5731e3`.
@@ -53,3 +53,17 @@ Main/Pages still serves the original release. The first deployment references ab
 - Local production build passed; packaged output explicitly checked for namespace bootstrap, installed app identity and omission of the original Pages deployment workflow. GitHub [Review build #8](https://github.com/QemmHD/perfect-season/actions/runs/41029135522) passed: NBA 275 / NFL 242 passing tests, whole-pool audit, TypeScript and build.
 
 Main/GitHub Pages and the original restore branch still point to `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. New source restore point before the gameplay revision: `backup/pre-gameplay-research-2026-10-30` → `f3ccd941475bc209c750557df0ef4850385bce49`. No new backend deployment or account migration was required. Both online clients must use the same revised preview/rules.
+
+
+## Current 90+ circulation preview — Codex, 2026-10-30
+
+- GitHub implementation: `47f498592a01535e8684a735bedef988ed0cc006`, tree `4eb2c4c63b757090bdbe42ec9e8377cf824d69d8`; local implementation `f6159c34fe51bcec0fe65fdc8610e21d69fa495b` has the same tree.
+- Sites source: `612ebbd3ef53201082728584caee2f6d24f21f73`.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_69fa63fa507c8191bb42a459b6e45974`.
+- Deployment: `appgdep_6ae46abe5d888191adc4258f5d0c4d0a`, **succeeded**, 2026-10-30.
+- Same URL: https://perfect-season-private-preview.qem.chatgpt.site . Owner-private audience, existing origin, `preview2026` namespace and `./preview` installed-app identity remain.
+- Card feature: [CARD-CIRCULATION.md](CARD-CIRCULATION.md). Number all 90+ holdings including upgrades; old unnumbered copies register in first-connection order; left issue number stays fixed while the active total rises/falls. Existing rare serials stay fixed. Offline sales/SBC removals retry idempotently.
+- [Review build #10](https://github.com/QemmHD/perfect-season/actions/runs/41037238347) passed for the exact GitHub implementation: full tests, whole-pool ratings audit, TypeScript and production build. Private source install/build and namespace/PWA/Pages isolation checks passed.
+- Existing registry now runs Edge Function v3 with additive copy/circulation migrations; `player-save` v2 and original Nostr features stay connected. Test traffic remains in separate namespaces.
+
+No merge or GitHub Pages deployment. Main/original restore remains `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-circulation source backup is `backup/pre-card-circulation-2026-10-30` at `e7a4ac7a5426b89b66d7f36037a5ab5af56ef7f8`. This release-record follow-up is documentation only; the deployed implementation is the exact code identified above.
