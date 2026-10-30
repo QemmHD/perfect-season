@@ -25,7 +25,7 @@ Exa reviewed 15 search-result slots across three angles, then read four primary 
 
 ## Verification and release
 
-Status: implemented and verified locally; independent CI/private publication references follow in the change log. Final module map, checks, screenshots, exact source/CI/private deployment references and observed limitations will be recorded here and in `CODEX-UPDATE-LOG.md` once verified. No account reset, card replacement, pack-odds change or backend migration is planned.
+Status: implemented, independently verified and published to the existing owner-private preview. Main/Pages remains unchanged. Final module map, checks, screenshots, exact source/CI/private deployment references and observed limitations will be recorded here and in `CODEX-UPDATE-LOG.md` once verified. No account reset, card replacement, pack-odds change or backend migration is planned.
 
 
 ## Implemented source map and preservation
@@ -60,3 +60,10 @@ The complete source/CI/private deployment references and final results will be a
 - All seven `pack-cinema.mjs` cases passed: normal GOAT/Spotlight/Gold and NFL Legend, 320px GOAT, touch landscape NFL GOAT and reduced-motion GOAT. Open/skip, final control/card bounds, inventory preservation and zero page errors were verified.
 
 [Actual rendered captures](previews/README.md#researched-fixes-and-polish--codex-2026-10-30) preserve the game's materials. Physical installed-iPhone system gestures/audio/background behavior and a real two-phone network match remain device playtests; Chromium event tests are not represented as those checks.
+
+
+## Verified publication
+
+GitHub implementation `f2ad6df57b45e22f1e4aa19952061f11e8d41ab4` matches local `e0ad4bb44997aed953eb901efc608e341a37cbe5`, tree `6633946c382d8dc5e29e0c9d6a9abdf899abbd0f`. Remote tree equality was checked before moving the feature ref. [Review build #19](https://github.com/QemmHD/perfect-season/actions/runs/41113183845), job `124260552711`, **passed**: 311 NBA / 278 NFL tests, whole-pool ratings audit, TypeScript and production build. PR #1 remains open and unmerged.
+
+Private preview: https://perfect-season-private-preview.qem.chatgpt.site . Pushed source `8ed7d0391455d599380d525c0adc0d32eaa2f8a4`; saved version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_546a72c062a88191b3b0ea2ee1fe6c4d`; deployment `appgdep_6ae4eca9ef088191af6f95cff1fe12ed` returned **succeeded**. Exact pushed source built successfully and passed production boot/forced namespace/PWA manifest checks with no page errors. Owner-private access, origin, `preview2026` namespace and installed PWA ID are retained. Main/original restore were checked at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-polish restore remains `f5f4e5138e7bf3bf60cd67f61c6795dbf24bb4d1`. This release-record follow-up changes documentation only.

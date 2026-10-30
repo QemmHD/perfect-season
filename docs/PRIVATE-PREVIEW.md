@@ -1,6 +1,6 @@
 # Private preview — implemented by Codex, 2026-10-29
 
-Latest update: the **Codex Ultimate Team clubhouse overhaul** is deployed privately; see the final section for the exact source/version/deployment and [UT-OVERHAUL.md](UT-OVERHAUL.md) for the complete handoff. Main/Pages remains unchanged.
+Latest update: the **Codex researched fixes and polish** are deployed privately; see the final section for the exact source/version/deployment and [UT-POLISH.md](UT-POLISH.md) for the latest complete handoff. Main/Pages remains unchanged.
 
 Test URL: https://perfect-season-private-preview.qem.chatgpt.site
 
@@ -110,3 +110,15 @@ The rushing deployment's independent check is [Review build #15](https://github.
 - Production build, boot/manifest/namespace smoke and clean pushed source passed. [Review build #17](https://github.com/QemmHD/perfect-season/actions/runs/41106465021), job `124237473199`, independently passed 575 tests, whole-pool audit and build. Both-sport new-flow, server HQ restore/conflict, existing content, real-engine input/progress and two-client H2H QA passed without page errors. Phone-size Chromium captures are in `docs/previews`; physical installed-iPhone feel remains a device playtest.
 
 [UT-OVERHAUL.md](UT-OVERHAUL.md) documents the complete module map, free-season/goal/Circuit/Moment rewards, exact-copy development, saved lineups, card story, real NBA/NFL calls and rule-6 compatibility. Pre-overhaul source restore: `backup/pre-ut-overhaul-2026-10-30` → `8e7773bc329cf9cdf10431bb95ec72a022a15603`. Main/original restore remain at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. This final record follow-up affects documentation only; it does not require re-deploying the already verified runtime.
+
+
+## Researched fixes and polish — Codex, 2026-10-30
+
+- GitHub implementation: `f2ad6df57b45e22f1e4aa19952061f11e8d41ab4`; local `e0ad4bb44997aed953eb901efc608e341a37cbe5`, identical tree `6633946c382d8dc5e29e0c9d6a9abdf899abbd0f`.
+- Pushed Sites source: `8ed7d0391455d599380d525c0adc0d32eaa2f8a4`.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_546a72c062a88191b3b0ea2ee1fe6c4d`.
+- Deployment: `appgdep_6ae4eca9ef088191af6f95cff1fe12ed`, **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site .
+- Exact source production build, namespace bootstrap ordering, forced `preview2026`, manifest/installed PWA identity and zero-error boot passed. Owner-private access and the same origin are retained; existing preview progress remains on its original keys/server identity.
+- [Review build #19](https://github.com/QemmHD/perfect-season/actions/runs/41113183845), job `124260552711`, independently passed **589 tests**, ratings audit, TypeScript and build. Both-sport browser interruption, modality, reward/exact-copy, full clubhouse, registered-pack/content, server restore/conflict and signed H2H checks passed; seven pack-cinema viewport/motion cases passed. Physical iPhone/two-phone testing remains separate.
+
+Read [UT-POLISH.md](UT-POLISH.md) for research, prioritized findings, exact fixes and preservation guarantees. Mechanics queues are NBA 7 / NFL 6; leaderboard/data history and identities remain. Pre-polish source restore: `backup/pre-ut-polish-2026-10-30` at `f5f4e5138e7bf3bf60cd67f61c6795dbf24bb4d1`. Main/original restore remain `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. The release-record follow-up changes documentation only; the deployed runtime above is already verified.
