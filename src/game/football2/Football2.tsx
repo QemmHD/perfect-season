@@ -37,10 +37,10 @@ import {
   startChoice,
   startPlay
 } from './drive';
-import { CONCEPTS, CONCEPT_NAMES, FIELD_W, flipPlay, maxThrow, moveWithBall, RUN_NAMES, scramble, snap, step, throwTo } from './engine';
+import { CONCEPTS, CONCEPT_NAMES, FIELD_W, flipPlay, maxThrow, moveWithBall, RUN_NAMES, scramble, setBurst, snap, step, throwTo, throwToReceiver } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
-import type { Body, Defense, Offense, Play, Pt } from './types';
+import type { Body, Defense, Offense, PassType, Play, Pt } from './types';
 import './rushing-controls.css';
 import './playbook.css';
 import { PlaybookDialog } from './PlaybookDialog';
@@ -183,6 +183,9 @@ export function Football2({
   const [wide, setWide] = useState(false);
   const [float, setFloat] = useState<{ x: number; y: number; kx: number; ky: number } | null>(null);
   const [phase, setPhase] = useState<Play['phase']>('pre');
+  const [passType, setPassType] = useState<PassType>('touch');
+  const [bursting, setBursting] = useState(false);
+  const burstPointer = useRef<number | 'keyboard' | null>(null);
   // the three play cards for this down, and the one lined up
   const [opts, setOpts] = useState<{ choice: PlayChoice; play: Play }[]>([]);
   const [picked, setPicked] = useState(0);
@@ -311,12 +314,13 @@ export function Football2({
     if (!p || p.phase !== 'pre') return;
     sfx.click();
     pilotRef.current.readAt = 0;
+    p.passType = passType;
     snap(p);
     setBook(null);
     setUi('live');
     setPhase(p.phase);
-    if (p.call === 'pass') tip('pass', 'Drag back anywhere · let go to throw');
-    else tip('run', 'Follow the lane · drag to cut · tap Juke, Spin or Power');
+    if (p.call === 'pass') tip('pass', 'Tap a receiver to lead him · or drag back to aim');
+    else tip('run', 'Follow your blockers · hold BURST through the gap');
   };
 
   const nextUp = (g: Game, driveOver: boolean, wait: number) => {
@@ -681,7 +685,16 @@ export function Football2({
           if (rt === null || !sn) endReplay();
           else {
             const at = (b: Body) => sn.bodies[b.id];
-            const view: Play = { ...p, t: rt, bodies: sn.bodies, qb: at(p.qb), rb: at(p.rb), carrier: sn.carrier !== null ? sn.bodies[sn.carrier] : null, ball: sn.ball, phase: sn.phase };
+            const view: Play = {
+              ...p,
+              t: rt,
+              bodies: sn.bodies,
+              qb: at(p.qb),
+              rb: at(p.rb),
+              carrier: sn.carrier !== null ? sn.bodies[sn.carrier] : null,
+              ball: sn.ball,
+              phase: sn.phase
+            };
             renderer.draw(ctx, view, p.los, { aim: null, toGain: null, routes: false, open: false, shake: 0, flash: 0 });
           }
         } else if (p)
@@ -810,7 +823,13 @@ export function Football2({
     gesture.current = null;
     lastTap.current = null;
     setFloat(null);
+    stopBurst();
   });
+  const stopBurst = () => {
+    burstPointer.current = null;
+    if (playRef.current) setBurst(playRef.current, false);
+    setBursting(false);
+  };
   const doScramble = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -826,8 +845,20 @@ export function Football2({
   const fgOk = g ? fgInRange(g) : false;
   const passing = ui === 'live' && phase === 'drop' && p?.call === 'pass';
   const running = ui === 'live' && phase === 'run';
+  const rushing = running || (ui === 'live' && phase === 'drop' && p?.call === 'run');
+  useEffect(() => {
+    if (!rushing) stopBurst();
+  }, [rushing]);
   return createPortal(
-    <div className={'arcade-full hg2 fb2' + (wide ? ' wide' : '')} ref={wrapRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel}>
+    <div
+      className={'arcade-full hg2 fb2' + (wide ? ' wide' : '')}
+      ref={wrapRef}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
+    >
       <canvas ref={canvasRef} className="hg2-canvas" />
       <div className="hg2-bug" aria-label="Score">
         <span className="us">
@@ -892,7 +923,9 @@ export function Football2({
         <div className="fb2-call" onPointerDown={(e) => e.stopPropagation()}>
           {ui === 'fourth' && (
             <span className="fb2-4th">
-              {g.clock === 0 ? 'TIME’S UP · ' + fgDistance(g) + ' YD FIELD GOAL TO FINISH IT' : downText(g) + ' · ' + (fgOk ? fgDistance(g) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE')}
+              {g.clock === 0
+                ? 'TIME’S UP · ' + fgDistance(g) + ' YD FIELD GOAL TO FINISH IT'
+                : downText(g) + ' · ' + (fgOk ? fgDistance(g) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE')}
             </span>
           )}
           {g.clock !== 0 && practice?.drill !== 'kick' && (
@@ -952,7 +985,11 @@ export function Football2({
           <p>Pick your concept. Flip the formation before the snap to attack either side.</p>
           <div className="fb2-book-grid">
             {book.map((o) => (
-              <button className={'fb2-card ' + o.choice.call} key={o.choice.call + ':' + (o.choice.call === 'pass' ? o.choice.concept : o.choice.run)} onClick={() => chooseBook(o.choice)}>
+              <button
+                className={'fb2-card ' + o.choice.call}
+                key={o.choice.call + ':' + (o.choice.call === 'pass' ? o.choice.concept : o.choice.run)}
+                onClick={() => chooseBook(o.choice)}
+              >
                 <PlayArt play={o.play} />
                 <small>{o.choice.call === 'pass' ? 'PASS CONCEPT' : 'RUN GAME'}</small>
                 <b>{o.choice.call === 'pass' ? CONCEPT_NAMES[o.choice.concept] : RUN_NAMES[o.choice.run]}</b>
@@ -962,7 +999,47 @@ export function Football2({
         </PlaybookDialog>
       )}
       {passing && !autoplayHook && (
-        <div className="fb2-moves" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="fb2-passing" onPointerDown={(e) => e.stopPropagation()} aria-label="Passing controls">
+          <small>PASS TO</small>
+          <div className="fb2-receivers">
+            {(['X', 'SL', 'Z', 'TE', 'RB'] as const).map((slot) => {
+              const receiver = p?.bodies.find((b) => b.side === 'O' && b.slot === slot);
+              return (
+                <button
+                  key={slot}
+                  onClick={() => {
+                    const live = playRef.current;
+                    if (live && receiver && throwToReceiver(live, receiver.id)) {
+                      dragRef.current = null;
+                      setPhase(live.phase);
+                    }
+                  }}
+                  aria-label={'Pass to ' + slot + (receiver ? ' · ' + receiver.p.name : '')}
+                  title={receiver?.p.name}
+                >
+                  {slot}
+                </button>
+              );
+            })}
+          </div>
+          <div className="fb2-pass-types" aria-label="Pass trajectory">
+            {(['bullet', 'touch', 'lob'] as const).map((type) => (
+              <button
+                key={type}
+                aria-pressed={passType === type}
+                onClick={() => {
+                  setPassType(type);
+                  if (playRef.current) playRef.current.passType = type;
+                }}
+              >
+                {type.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {passing && !autoplayHook && (
+        <div className="fb2-moves fb2-scramble-controls" onPointerDown={(e) => e.stopPropagation()}>
           <button
             className="fb2-mv scramble"
             onPointerDown={doScramble}
@@ -974,6 +1051,49 @@ export function Football2({
             RUN IT
           </button>
         </div>
+      )}
+      {rushing && !autoplayHook && (
+        <button
+          className={'fb2-burst' + (bursting ? ' held' : '')}
+          aria-label="Burst: hold to sprint"
+          aria-pressed={bursting}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (burstPointer.current !== null) return;
+            const live = playRef.current;
+            if (live && setBurst(live, true)) {
+              burstPointer.current = e.pointerId;
+              setBursting(true);
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }
+          }}
+          onPointerUp={(e) => {
+            if (burstPointer.current === e.pointerId) stopBurst();
+          }}
+          onPointerCancel={(e) => {
+            if (burstPointer.current === e.pointerId) stopBurst();
+          }}
+          onLostPointerCapture={(e) => {
+            if (burstPointer.current === e.pointerId) stopBurst();
+          }}
+          onKeyDown={(e) => {
+            if (!e.repeat && (e.key === ' ' || e.key === 'Enter')) {
+              e.preventDefault();
+              const live = playRef.current;
+              if (live && setBurst(live, true)) {
+                burstPointer.current = 'keyboard';
+                setBursting(true);
+              }
+            }
+          }}
+          onKeyUp={(e) => {
+            if ((e.key === ' ' || e.key === 'Enter') && burstPointer.current === 'keyboard') stopBurst();
+          }}
+          onBlur={stopBurst}
+        >
+          BURST<small>HOLD</small>
+        </button>
       )}
       {running && !autoplayHook && (
         <div className="fb2-moves" onPointerDown={(e) => e.stopPropagation()}>
@@ -998,7 +1118,9 @@ export function Football2({
           ))}
         </div>
       )}
-      {ui === 'kick' && kickRef.current && <KickMeter window={kickRef.current.win} start={kickRef.current.t0} stopped={kickRef.current.stopped} distance={kickRef.current.dist} onKick={kickNow} />}
+      {ui === 'kick' && kickRef.current && (
+        <KickMeter window={kickRef.current.win} start={kickRef.current.t0} stopped={kickRef.current.stopped} distance={kickRef.current.dist} onKick={kickNow} />
+      )}
       {ui === 'final' && g && (
         <div className="fg-final hg2-final" role="status">
           <span className="eyebrow">Your drives</span>

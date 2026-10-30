@@ -791,7 +791,7 @@ export class FootballRenderer {
     if (o.aim && p.qb) {
       const from = p.qb;
       const len = Math.hypot(o.aim.x - from.x, o.aim.y - from.y);
-      const peak = peakOf(len);
+      const peak = peakOf(len,p.passType);
       const seen = sight(p, len);
       const n = Math.max(10, Math.round(len / 1.1));
       // the arc: bold dots with a dark edge, smaller as they go away, fading out where his sight ends
@@ -837,6 +837,7 @@ export class FootballRenderer {
       if (h) label(ctx, text, h.x, h.y - up, color, this.W);
     };
     if (o.routes) for (const b of p.bodies) if (b.side === 'O' && !isLine(b) && b !== p.qb) tag(b, '#ffffff');
+    if(p.phase==='drop'&&p.call==='pass')for(const b of p.bodies)if(b.side==='O'&&b!==p.qb&&!isLine(b))tag(b,ROUTE_COLOR[b.slot]??'#ffffff',b.slot,18);
     if (p.carrier && p.phase === 'run') tag(p.carrier, '#ffe08a');
     if (p.phase === 'run') for (const b of p.bodies) if (b.side === 'D' && b.windAt !== Infinity) tag(b, '#ff8a3a', '!', 32);
     ctx.restore();

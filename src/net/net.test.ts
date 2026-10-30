@@ -136,7 +136,7 @@ describe.skipIf(NFL)('leaderboard entries', () => {
     expect(nameProblem('Grapes')).not.toBeNull(); // "rape" inside: blocked on purpose, err on the safe side
     expect(nameProblem('A'.repeat(17))).not.toBeNull();
     expect(cleanRoomCode(' k7q-m ')).toBe('K7QM');
-    expect(NET_V).toMatch(/^ps1-[0-9a-z]+-7$/);
+    expect(NET_V).toMatch(/^ps1-[0-9a-z]+-8$/);
   });
 });
 

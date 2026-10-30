@@ -16,7 +16,7 @@ import type { Progress, RivalLive } from '../progress';
 import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
-import { aimPass, callPlay, cancelShoot, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
+import { aimPass, callPlay, cancelShoot, jumpRebound, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
 import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
@@ -36,7 +36,13 @@ interface Snap {
   fire: number;
   lastShot: Possession['lastShot'];
 }
-const snapOf = (p: Possession): Snap => ({ bodies: p.bodies.map((b) => ({ ...b, trail: [] })), ball: p.ball ? { ...p.ball } : null, handler: p.handler, fire: p.fire, lastShot: p.lastShot });
+const snapOf = (p: Possession): Snap => ({
+  bodies: p.bodies.map((b) => ({ ...b, trail: [] })),
+  ball: p.ball ? { ...p.ball } : null,
+  handler: p.handler,
+  fire: p.fire,
+  lastShot: p.lastShot
+});
 const MARK_TEXT: Record<Mark, string> = { '2': '2', '3': '3', A: '3', X: '–', TO: 'TO' };
 /** The defense's looks, and what beats each. */
 const LOOK_TEXT: Record<Scheme, string> = { man: 'MAN-TO-MAN', sag: 'SAGGING OFF', switch: 'SWITCHING', trap: 'TRAPPING' };
@@ -113,7 +119,10 @@ export function Hoops2({
       live = false;
     };
   }, []);
-  const game = useMemo<HoopsGame | null>(() => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench, defIQ) : null), [attrs]);
+  const game = useMemo<HoopsGame | null>(
+    () => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench, defIQ) : null),
+    [attrs]
+  );
   const renderer = useMemo(() => new HoopsRenderer(court, [ourKit, theirKit]), []);
   // the game's drawings and its canvas let go of their memory as it closes (Safari counts a dropped
   // canvas against the page's cap until it's collected, which can be a while)
@@ -130,13 +139,14 @@ export function Hoops2({
   const fxRef = useRef<Fx>({ swish: 0, shake: 0, crowd: 0, flash: 0 });
   const slowUntil = useRef(0);
   const [between, setBetween] = useState(true);
+  const [boarding, setBoarding] = useState(false);
   const [, setTick] = useState(0);
   const [pop, setPop] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'big' | 'plain' | 'green' } | null>(null);
   /** the defense's look this possession, named under the scoreboard */
   const [look, setLook] = useState<{ scheme: Scheme; trapped: boolean } | null>(null);
   const popId = useRef(0);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [hint, setHint] = useState<string | null>(practice ? null : 'Hold SHOOT, release in green · move or pass to create space');
+  const [hint, setHint] = useState<string | null>(practice ? null : 'Tap a teammate to pass · hold SHOOT and release in green');
   const [wide, setWide] = useState(false);
   // instant replay: the last seconds of play, the highlight to show, the replay running
   const rec = useRef(new Recorder<Snap>(5));
@@ -178,6 +188,7 @@ export function Hoops2({
     pl.nextThink = 0;
     pl.crosses = 0;
     setBetween(false);
+    setBoarding(false);
     setTick((n) => n + 1);
     if (g.done === g.total / 2) say('SECOND HALF', 'plain', 1300);
   };
@@ -215,7 +226,12 @@ export function Hoops2({
       } else if (e.startsWith('call:')) {
         sfx.squeak();
         say(e === 'call:screen' ? 'SCREEN & ROLL' : e === 'call:cut' ? 'CUT TO THE RIM' : 'SPREAD THE FLOOR', 'plain', 1100);
-      } else if (e === 'pass') sfx.whoosh();
+      } else if (e === 'rim' || e === 'loose') {
+        setBoarding(true);
+        if (e === 'rim') sfx.rim();
+        else sfx.squeak();
+      } else if (e === 'board-jump') sfx.squeak();
+      else if (e === 'pass') sfx.whoosh();
       else if (e === 'lob') {
         sfx.whoosh();
         say('LOB!', 'plain', 600);
@@ -278,8 +294,8 @@ export function Hoops2({
         shake(3);
         const d = p.bodies[Number(e.slice(8))];
         say('REJECTED BY ' + d.p.tag, 'bad', 1100);
-      } else if (e === 'rim') sfx.rim();
-      else if (e.startsWith('orb:')) {
+      } else if (e.startsWith('orb:')) {
+        setBoarding(false);
         sfx.catch();
         say('OFFENSIVE BOARD', 'good', 800);
         crowd.swell(0.4);
@@ -335,6 +351,7 @@ export function Hoops2({
     if (wasFire >= 0 && game.fire < 0) window.setTimeout(() => say('FIRE PUT OUT', 'plain', 900), 1000);
     onProgress(progress(game));
     setBetween(true);
+    setBoarding(false);
     // the final buzzer
     if (game.over) window.setTimeout(() => sfx.buzzer(), 500);
     const proceed = () => {
@@ -560,6 +577,12 @@ export function Hoops2({
   };
   const beginShot = (pointer: number | 'keyboard') => {
     const p = possRef.current;
+    if (shotPointer.current !== null) return false;
+    if (p?.ball?.kind === 'loose') {
+      const jumped = jumpRebound(p);
+      if (jumped) shotPointer.current = pointer;
+      return jumped;
+    }
     if (shotPointer.current !== null || !p || p.end || p.handler === null || p.bodies[p.handler].h > 0.15) return false;
     shotPointer.current = pointer;
     pressShoot(p);
@@ -647,6 +670,21 @@ export function Hoops2({
     }
   };
   const swipeUp = (e: React.PointerEvent) => {
+    const sw = swipe.current;
+    if (sw?.id === e.pointerId) {
+      if (!sw.done && performance.now() - sw.pts[0].t < 350 && Math.hypot(e.clientX - sw.pts[0].x, e.clientY - sw.pts[0].y) < 12) {
+        const p = possRef.current,
+          canvas = canvasRef.current;
+        if (p && canvas && p.handler !== null && !p.ball) {
+          const r = canvas.getBoundingClientRect();
+          const target = renderer.teammateAt(p, ((e.clientX - r.left) * renderer.W) / r.width, ((e.clientY - r.top) * renderer.H) / r.height, 26 / renderer.zoom);
+          if (target !== null) pass(p, target);
+        }
+      }
+      swipe.current = null;
+    }
+  };
+  const swipeCancel = (e: React.PointerEvent) => {
     if (swipe.current?.id === e.pointerId) swipe.current = null;
   };
 
@@ -699,7 +737,7 @@ export function Hoops2({
           {pop.text}
         </div>
       )}
-      {hint && <div className="hg2-hint">{hint}</div>}
+      {boarding ? <div className="hg2-hint hg2-board-hint">Move to the ball · tap BOARD to jump</div> : hint && <div className="hg2-hint">{hint}</div>}
       {replaying && (
         <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
           <i />
@@ -708,9 +746,19 @@ export function Hoops2({
         </button>
       )}
       {!attrs && <div className="fg-loading">Taking the floor…</div>}
-      {g && !g.over && !autoplayHook && <div className="hg2-swipe" onPointerDown={swipeDown} onPointerMove={swipeMove} onPointerUp={swipeUp} onPointerCancel={swipeUp} aria-hidden="true" />}
       {g && !g.over && !autoplayHook && (
-        <div className="hg2-coach" aria-label="Offensive play calls">
+        <div
+          className="hg2-swipe"
+          onPointerDown={swipeDown}
+          onPointerMove={swipeMove}
+          onPointerUp={swipeUp}
+          onPointerCancel={swipeCancel}
+          onLostPointerCapture={swipeCancel}
+          aria-hidden="true"
+        />
+      )}
+      {g && !g.over && !autoplayHook && (
+        <div className="hg2-coach" aria-label="Offensive play calls" style={boarding ? { visibility: 'hidden' } : undefined}>
           {(['screen', 'cut', 'space'] as const).map((kind) => (
             <button
               key={kind}
@@ -780,7 +828,7 @@ export function Hoops2({
               }}
               aria-label="Shoot: hold, and let go in the green"
             >
-              SHOOT
+              {boarding ? 'BOARD' : 'SHOOT'}
             </button>
           </div>
         </div>
@@ -799,7 +847,15 @@ export function Hoops2({
 }
 
 /** The AI's possessions, played by the autopilot against your five. */
-export function aiPossessions2(rivalLineup: Lineup, yourLineup: Lineup, seed: string, skill: number, attrs: (p: Player) => Attrs | null, possessions = POSSESSIONS, defIQ = 0): Progress {
+export function aiPossessions2(
+  rivalLineup: Lineup,
+  yourLineup: Lineup,
+  seed: string,
+  skill: number,
+  attrs: (p: Player) => Attrs | null,
+  possessions = POSSESSIONS,
+  defIQ = 0
+): Progress {
   return aiPossessionsOf(fiveOf(rivalLineup, attrs), fiveOf(yourLineup, attrs), seed, skill, possessions, [], defIQ);
 }
 

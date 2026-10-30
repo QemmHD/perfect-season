@@ -48,7 +48,7 @@ import './match.css';
  * and plays the sim itself. Bump UT_RULES when teams.ts or play.ts change how a match comes out.
  */
 // Codex: NFL rushing execution differs from v4; NBA queues remain compatible.
-const UT_RULES = { nba: 7, nfl: 6 };
+const UT_RULES = { nba: 8, nfl: 8 };
 const queueOf = (pool: Pool) => 'ut-' + UT_RULES[pool.sport] + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;

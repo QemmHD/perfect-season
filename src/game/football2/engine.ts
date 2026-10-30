@@ -6,11 +6,11 @@
 // closes as they walk their men back), coverage is a corner's man coverage (or a zone defender's
 // read) against a receiver's routes and release, a catch is the receiver's hands against the
 // defender's, and a tackle is the tackler against the runner's moves, all rolled when they happen.
-// A throw goes exactly where it's aimed: the passer's accuracy is how much of the arc he sees
-// (Retro Bowl's rule), less with a rusher in his face. Short throws are bullets, long ones lobs.
+// Throws use bounded rating/pressure/movement error around the intended target. The selected
+// bullet/touch/lob trajectory drives the real flight, lane defense, receiver lead and aim preview.
 // On a run the line drives its men away from the play's hole. A tackler winds up before he dives
 // (the runner can see it coming), and a juke as he leaves his feet fakes him out.
-import type { Act, Body, Call, Concept, Defense, FbPlayer, Job, Move, Offense, Play, PlayEnd, Pt, RunPlay } from './types';
+import type { Act, Body, Call, Concept, Defense, FbPlayer, Job, Move, Offense, PassType, Play, PlayEnd, Pt, RunPlay } from './types';
 
 export const FIELD_W = 53.33;
 const HASH_L = 23.58;
@@ -21,15 +21,24 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * clamp(t, 0, 1);
 export const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
 /** a rating (0-99) as 0-1 between two marks */
-export const rt = (v: number | undefined, lo = 45, hi = 99) => clamp(((v ?? 60) - lo) / (hi - lo), 0, 1) + ((v ?? 60) > 99 ? Math.min(11, v! - 99) * .009 : 0);
+export const rt = (v: number | undefined, lo = 45, hi = 99) => clamp(((v ?? 60) - lo) / (hi - lo), 0, 1) + ((v ?? 60) > 99 ? Math.min(11, v! - 99) * 0.009 : 0);
 
 /** top speed, yards a second: about 6.3 for a slow lineman to 9.6 for a burner */
 export function speedOf(p: FbPlayer): number {
-  return lerp(6.2, 9.6, rt(p.a.SPD, 40, 99)) + Math.max(0, Math.min(11, (p.a.SPD ?? 60) - 99)) * .045;
+  return lerp(6.2, 9.6, rt(p.a.SPD, 40, 99)) + Math.max(0, Math.min(11, (p.a.SPD ?? 60) - 99)) * 0.045;
 }
 
 export const CONCEPTS: Concept[] = ['verts', 'slants', 'smash', 'flood', 'dagger', 'mesh', 'curls', 'posts'];
-export const CONCEPT_NAMES: Record<Concept, string> = { verts: 'Four Verticals', slants: 'Slants', smash: 'Smash', flood: 'Flood', dagger: 'Dagger', mesh: 'Mesh', curls: 'Curl Flats', posts: 'Double Post' };
+export const CONCEPT_NAMES: Record<Concept, string> = {
+  verts: 'Four Verticals',
+  slants: 'Slants',
+  smash: 'Smash',
+  flood: 'Flood',
+  dagger: 'Dagger',
+  mesh: 'Mesh',
+  curls: 'Curl Flats',
+  posts: 'Double Post'
+};
 export const RUN_NAMES: Record<RunPlay, string> = { inside: 'Inside Zone', outside: 'Outside Zone', power: 'Power' };
 /** where each run's hole is, yards to the right of the ball (toward the tight end): the A gap, off
  * tackle outside the tight end's block, the edge */
@@ -43,25 +52,78 @@ function routeOf(kind: string, s: number, i: number): { pts: Pt[]; sit?: boolean
     case 'go':
       return { pts: [{ x: 0, y: 45 }] };
     case 'seam':
-      return { pts: [{ x: i * 2, y: 12 }, { x: i * 3, y: 45 }] };
+      return {
+        pts: [
+          { x: i * 2, y: 12 },
+          { x: i * 3, y: 45 }
+        ]
+      };
     case 'slant':
-      return { pts: [{ x: 0, y: 3 }, { x: i * 9, y: 11 }, { x: i * 22, y: 24 }] };
+      return {
+        pts: [
+          { x: 0, y: 3 },
+          { x: i * 9, y: 11 },
+          { x: i * 22, y: 24 }
+        ]
+      };
     case 'out':
-      return { pts: [{ x: 0, y: 9 }, { x: s * 16, y: 9.5 }] };
+      return {
+        pts: [
+          { x: 0, y: 9 },
+          { x: s * 16, y: 9.5 }
+        ]
+      };
     case 'flat':
-      return { pts: [{ x: s * 5, y: 1.5 }, { x: s * 14, y: 4 }] };
+      return {
+        pts: [
+          { x: s * 5, y: 1.5 },
+          { x: s * 14, y: 4 }
+        ]
+      };
     case 'swing':
-      return { pts: [{ x: s * 4, y: -1 }, { x: s * 13, y: 3 }, { x: s * 15, y: 12 }] };
+      return {
+        pts: [
+          { x: s * 4, y: -1 },
+          { x: s * 13, y: 3 },
+          { x: s * 15, y: 12 }
+        ]
+      };
     case 'dig':
-      return { pts: [{ x: 0, y: 13 }, { x: i * 26, y: 14 }] };
+      return {
+        pts: [
+          { x: 0, y: 13 },
+          { x: i * 26, y: 14 }
+        ]
+      };
     case 'curl':
-      return { pts: [{ x: 0, y: 11 }, { x: i * 1.2, y: 9 }], sit: true };
+      return {
+        pts: [
+          { x: 0, y: 11 },
+          { x: i * 1.2, y: 9 }
+        ],
+        sit: true
+      };
     case 'post':
-      return { pts: [{ x: 0, y: 12 }, { x: i * 13, y: 34 }] };
+      return {
+        pts: [
+          { x: 0, y: 12 },
+          { x: i * 13, y: 34 }
+        ]
+      };
     case 'corner':
-      return { pts: [{ x: 0, y: 11 }, { x: s * 11, y: 25 }] };
+      return {
+        pts: [
+          { x: 0, y: 11 },
+          { x: s * 11, y: 25 }
+        ]
+      };
     case 'drag':
-      return { pts: [{ x: i * 3, y: 2.5 }, { x: i * 30, y: 5 }] };
+      return {
+        pts: [
+          { x: i * 3, y: 2.5 },
+          { x: i * 30, y: 5 }
+        ]
+      };
     case 'check':
       return { pts: [{ x: s * 3, y: 4 }], sit: true };
     case 'block':
@@ -80,11 +142,37 @@ const CONCEPT_ROUTES: Record<Concept, [string, string, string, string, string]> 
   dagger: ['dig', 'seam', 'curl', 'check', 'flat'],
   mesh: ['drag', 'drag', 'corner', 'curl', 'swing'],
   curls: ['curl', 'flat', 'curl', 'seam', 'flat'],
-  posts: ['post', 'curl', 'post', 'drag', 'check'],
+  posts: ['post', 'curl', 'post', 'drag', 'check']
 };
 
 function body(id: number, side: 'O' | 'D', p: FbPlayer, slot: string, x: number, y: number, job: Job): Body {
-  return { id, side, p, slot, x, y, vx: 0, vy: 0, job, act: 'stance', actAt: 0, route: [], sit: false, mark: null, zone: null, heldUntil: 0, readUntil: 0, misread: false, stunUntil: 0, breakAt: Infinity, winAt: Infinity, windAt: Infinity, diveAt: -Infinity, dive: null, trail: [] };
+  return {
+    id,
+    side,
+    p,
+    slot,
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    job,
+    act: 'stance',
+    actAt: 0,
+    route: [],
+    sit: false,
+    mark: null,
+    zone: null,
+    heldUntil: 0,
+    readUntil: 0,
+    misread: false,
+    stunUntil: 0,
+    breakAt: Infinity,
+    winAt: Infinity,
+    windAt: Infinity,
+    diveAt: -Infinity,
+    dive: null,
+    trail: []
+  };
 }
 
 function act(b: Body, a: Act, t: number) {
@@ -124,7 +212,7 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     add('D', def.dl[0], 'LE', bx - 3.9, los + 1, 'rush'),
     add('D', def.dl[1], 'LDT', bx - 0.9, los + 1, 'rush'),
     add('D', def.dl[2], 'RDT', bx + 0.9, los + 1, 'rush'),
-    add('D', def.dl[3], 'RE', bx + 4.6, los + 1, 'rush'),
+    add('D', def.dl[3], 'RE', bx + 4.6, los + 1, 'rush')
   ];
   const lbW = add('D', def.lb[0], 'WLB', bx - 4.2, los + 4.8, zone ? 'zone' : 'man');
   const lbM = add('D', def.lb[1], 'MLB', bx + 0.3, los + 5.2, 'spy');
@@ -156,6 +244,7 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
   dl.forEach((d, i) => {
     const blk = blockerOf[i];
     d.mark = blk.id;
+    d.blocker = blk.id;
     const move = Math.max(d.p.a.PMV ?? 55, d.p.a.FMV ?? 55);
     const edge = (move - (blk.p.a.PBK ?? 60)) / 100;
     // Rush wins follow the actual matchup; difficulty improves reads and coverage.
@@ -189,7 +278,7 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     stamina: 1,
     used: {},
     hole: bx + HOLE[run],
-    defIQ,
+    defIQ
   };
   // routes (drawn before the snap so the player can read the play)
   const routes = CONCEPT_ROUTES[concept];
@@ -242,9 +331,9 @@ export function flipPlay(p: Play): boolean {
   for (const b of p.bodies) {
     b.x = mirror(b.x);
     b.vx = -b.vx;
-    b.route = b.route.map(at => ({ x: mirror(at.x), y: at.y }));
+    b.route = b.route.map((at) => ({ x: mirror(at.x), y: at.y }));
     if (b.zone) b.zone = { x: mirror(b.zone.x), y: b.zone.y };
-    b.trail = b.trail.map(at => ({ x: mirror(at.x), y: at.y }));
+    b.trail = b.trail.map((at) => ({ x: mirror(at.x), y: at.y }));
   }
   p.hole = mirror(p.hole);
   p.direction = p.direction === -1 ? 1 : -1;
@@ -300,13 +389,26 @@ export function loft(len: number) {
 }
 
 /** The flight time for a throw of this length (for the slingshot's arc and the AI's lead). */
-export function flightTime(p: Play, len: number) {
-  return Math.max(0.3, len / (throwSpeed(p) * lerp(1.3, 0.92, loft(len))) + len * 0.006);
+export function flightTime(p: Play, len: number, type = p.passType) {
+  const lift = type === 'bullet' ? 0 : type === 'touch' ? 0.55 : type === 'lob' ? 1 : loft(len);
+  return Math.max(0.3, len / (throwSpeed(p) * lerp(1.3, 0.92, lift)) + len * 0.006 + (type === 'lob' ? 0.12 : 0));
 }
 
 /** How high the ball rides over its line (yards, at the middle): a bullet barely rises, a lob hangs. */
-export function peakOf(len: number) {
-  return lerp(0.35 + len * 0.06, Math.min(11, 2 + len * 0.2), loft(len));
+export function peakOf(len: number, type?: PassType) {
+  const lift = type === 'bullet' ? 0 : type === 'touch' ? 0.55 : type === 'lob' ? 1 : loft(len);
+  return lerp(0.35 + len * 0.06, Math.min(11, 2 + len * 0.2), lift);
+}
+
+/** Lead along the actual remaining route, iterating flight time rather than aiming at old feet. */
+export function receiverLead(p: Play, receiver: Body, type = p.passType): Pt {
+  let at: Pt = receiver;
+  for (let i = 0; i < 4; i++) at = projectRoute(receiver, flightTime(p, Math.min(maxThrow(p), dist(p.qb, at)), type));
+  return { x: clamp(at.x, 0.5, FIELD_W - 0.5), y: Math.min(109.5, at.y) };
+}
+export function throwToReceiver(p: Play, id: number): boolean {
+  const receiver = p.bodies.find((b) => b.id === id && b.side === 'O' && b !== p.qb && !isLine(b));
+  return !!receiver && throwTo(p, receiverLead(p, receiver));
 }
 
 /** The passer's accuracy (0-1) at this distance, his short, medium and deep accuracy blended. */
@@ -339,12 +441,13 @@ export function throwErrorRadius(p: Play, len: number): number {
   const poise = rt(p.qb.p.a.TUP, 50, 99);
   const movement = clamp(Math.hypot(p.qb.vx, p.qb.vy) / 6, 0, 1);
   const eliteTouch = Math.max(0, Math.min(11, (p.qb.p.a.SAC ?? 60) - 99)) * 0.002;
-  return Math.min(4.2, 0.12 - eliteTouch + Math.pow(1 - accuracy, 1.5) * (0.65 + len * 0.035)
-    + p.pressure * (1 - poise * 0.75) * (0.6 + len * 0.025)
-    + movement * (1 - accuracy * 0.6) * 0.6);
+  return Math.min(
+    4.2,
+    0.12 - eliteTouch + Math.pow(1 - accuracy, 1.5) * (0.65 + len * 0.035) + p.pressure * (1 - poise * 0.75) * (0.6 + len * 0.025) + movement * (1 - accuracy * 0.6) * 0.6
+  );
 }
 
-export function throwTo(p: Play, to: Pt): boolean {
+export function throwTo(p: Play, to: Pt, type = p.passType): boolean {
   if (p.phase !== 'drop' || p.call !== 'pass' || p.carrier !== p.qb || p.t < 0.3) return false;
   const qb = p.qb;
   const r = p.rand;
@@ -353,13 +456,17 @@ export function throwTo(p: Play, to: Pt): boolean {
   const intended = { x: qb.x + Math.cos(ang) * len, y: qb.y + Math.sin(ang) * len };
   const error = throwErrorRadius(p, len);
   // Triangular noise favors the intended spot, stays bounded and never aims the ball at a defender.
-  let lateral = (r() - r()) * error, depth = (r() - r()) * error * 0.8;
+  let lateral = (r() - r()) * error,
+    depth = (r() - r()) * error * 0.8;
   const radius = Math.hypot(lateral, depth);
-  if (radius > error) { lateral *= error / radius; depth *= error / radius; }
+  if (radius > error) {
+    lateral *= error / radius;
+    depth *= error / radius;
+  }
   const land = { x: intended.x - Math.sin(ang) * lateral + Math.cos(ang) * depth, y: intended.y + Math.cos(ang) * lateral + Math.sin(ang) * depth };
-  const flight = flightTime(p, len);
+  const flight = flightTime(p, len, type);
   p.aim = intended;
-  p.ball = { from: { x: qb.x, y: qb.y + 0.3 }, to: land, t0: p.t, t1: p.t + flight, peak: peakOf(len) };
+  p.ball = { from: { x: qb.x, y: qb.y + 0.3 }, to: land, t0: p.t, t1: p.t + flight, peak: peakOf(len, type), type };
   p.carrier = null;
   p.phase = 'air';
   act(qb, 'throw', p.t);
@@ -390,6 +497,36 @@ export function isLine(b: Body) {
 /** what each move takes out of the runner, and how fast it comes back (a second's running) */
 const DRAIN: Record<Move, number> = { juke: 0.28, spin: 0.34, stiff: 0.3, truck: 0.36 };
 const STAMINA_BACK = 0.1;
+
+/** Sprint at the cost of the same stamina used by skill moves; release to recover. */
+export function setBurst(p: Play, held: boolean): boolean {
+  p.bursting = held && !p.end && (p.phase === 'run' || (p.phase === 'drop' && p.call === 'run'));
+  return p.bursting;
+}
+
+/** Read a runner's observed velocity, then take a bounded intercept angle. No input prediction. */
+export function pursuitTarget(defender: Body, runner: Pt, velocity: Pt, speed: number): Pt {
+  const dx = runner.x - defender.x,
+    dy = runner.y - defender.y;
+  const a = velocity.x ** 2 + velocity.y ** 2 - speed ** 2,
+    b = 2 * (dx * velocity.x + dy * velocity.y),
+    c = dx * dx + dy * dy;
+  const roots =
+    Math.abs(a) < 0.001
+      ? b < -0.001
+        ? [-c / b]
+        : []
+      : b * b - 4 * a * c >= 0
+        ? [(-b - Math.sqrt(b * b - 4 * a * c)) / (2 * a), (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a)]
+        : [];
+  const intercept = roots.filter((t) => t > 0).sort((x, y) => x - y)[0] ?? Math.sqrt(c) / Math.max(1, speed);
+  const anticipation = lerp(0.5, 1, rt(defender.p.a.PUR ?? defender.p.a.PRC));
+  // Far away, take the angle; close down, attack the runner's body. A full intercept horizon at
+  // arm's length steers a tackler past the runner and creates repeated cartoon fly-bys.
+  const horizon = lerp(0.1, 0.85, clamp((Math.sqrt(c) - 1.5) / 12, 0, 1));
+  const tau = clamp(intercept, 0, horizon) * anticipation;
+  return { x: clamp(runner.x + velocity.x * tau, 0.2, FIELD_W - 0.2), y: runner.y + velocity.y * tau };
+}
 /** the same move again in a play works this much as well as the last time */
 const REPEAT = 0.6;
 
@@ -436,9 +573,10 @@ function steerTo(b: Body, tx: number, ty: number, speed: number, dt: number, acc
   const want = d < 0.05 ? { x: 0, y: 0 } : { x: (dx / d) * Math.min(speed, d * 6), y: (dy / d) * Math.min(speed, d * 6) };
   const acceleration = accel * lerp(0.7, 1.15, rt(b.p.a.ACC, 40, 99));
   const turn = lerp(0.7, 1.1, rt(b.p.a.AGI, 40, 99));
-  const dvx = want.x - b.vx, dvy = want.y - b.vy;
+  const dvx = want.x - b.vx,
+    dvy = want.y - b.vy;
   const delta = Math.hypot(dvx, dvy);
-  const scale = Math.min(1, acceleration * turn * dt / Math.max(0.001, delta));
+  const scale = Math.min(1, (acceleration * turn * dt) / Math.max(0.001, delta));
   b.vx += dvx * scale;
   b.vy += dvy * scale;
 }
@@ -475,7 +613,7 @@ export function step(p: Play, dt: number, steer: number | null) {
     b.trail.push({ x: b.x, y: b.y });
     if (b.trail.length > Math.ceil(0.7 / dt)) b.trail.shift();
   }
-  const lagOf = (b: Body) => Math.round(lerp(18, 4, rt(b.p.a.PRC, 45, 99) * 0.4 + rt(b.p.a.MCV ?? b.p.a.ZCV, 45, 99) * 0.6) * (1 - 0.25 * p.defIQ) / (60 * dt));
+  const lagOf = (b: Body) => Math.round((lerp(18, 4, rt(b.p.a.PRC, 45, 99) * 0.4 + rt(b.p.a.MCV ?? b.p.a.ZCV, 45, 99) * 0.6) * (1 - 0.25 * p.defIQ)) / (60 * dt));
   const seen = (b: Body, by: Body): Pt => b.trail[Math.max(0, b.trail.length - 1 - lagOf(by))] ?? b;
   const seenVel = (b: Body, by: Body): Pt => {
     const i = Math.max(1, b.trail.length - 1 - lagOf(by));
@@ -519,9 +657,10 @@ export function step(p: Play, dt: number, steer: number | null) {
     if (b === carrier && p.phase === 'run') {
       // the runner: upfield, cutting toward the finger (on a run, through the hole until he's past
       // the line, unless the finger says otherwise); a move is its own burst. Tired, he's a step slower.
-      const sp = speedOf(b.p) * (t < p.slowUntil ? 0.55 : 0.94) * lerp(0.9, 1, p.stamina);
       const m = p.move && t < p.move.until ? p.move : null;
-      if (!m) p.stamina = Math.min(1, p.stamina + STAMINA_BACK * dt);
+      const burst = !!p.bursting && p.stamina > 0.06 && !m && t >= p.slowUntil;
+      if (!m) p.stamina = clamp(p.stamina + (burst ? -0.27 : STAMINA_BACK) * dt, 0, 1);
+      const sp = speedOf(b.p) * (t < p.slowUntil ? 0.65 : burst ? 1.09 : 0.94) * lerp(0.9, 1, p.stamina);
       const followingRun = steer === null && p.call === 'run' && b === p.rb && b.y < p.los + 1;
       // An outside handoff stretches behind the line before turning upfield. A constant forward
       // velocity used to drag every run into the tackle box, even when its arrow pointed outside.
@@ -543,7 +682,9 @@ export function step(p: Play, dt: number, steer: number | null) {
         b.vx += clamp(wantX - b.vx, -turn, turn);
         b.vy += clamp(wantY - b.vy, -acceleration, acceleration);
       }
-      act(b, m ? (m.kind === 'juke' ? 'juke' : m.kind === 'spin' ? 'spin' : m.kind === 'stiff' ? 'stiff' : 'truck') : 'carry', t);
+      // Finish bringing the catch into the body while still moving; one frame of 'catch' made
+      // the recorded catch-in-stride clip disappear before the hands reached the ball.
+      if (m || b.act !== 'catch' || t - b.actAt > 0.24) act(b, m ? (m.kind === 'juke' ? 'juke' : m.kind === 'spin' ? 'spin' : m.kind === 'stiff' ? 'stiff' : 'truck') : 'carry', t);
       move(b, dt);
       continue;
     }
@@ -555,6 +696,25 @@ export function step(p: Play, dt: number, steer: number | null) {
     if (p.end) return;
   }
 
+  // Real engaged bodies keep separate feet. Leverage and weight determine who gives ground;
+  // small fixed-step corrections cannot turn a distant blocking timer into ghost contact.
+  if (p.phase === 'run')
+    for (const d of p.bodies) {
+      if (d.side !== 'D' || t >= d.heldUntil || t < d.stunUntil) continue;
+      const o = p.bodies.find((o) => o.id === d.blocker && o.side === 'O' && o !== carrier && o !== qb);
+      if (!o) continue;
+      const dx = d.x - o.x,
+        dy = d.y - o.y,
+        dd = Math.hypot(dx, dy);
+      if (dd > 0.001 && dd < 0.95) {
+        const shift = Math.min(0.95 - dd, dt * 2.5),
+          leverage = clamp(0.5 + (o.p.wt - d.p.wt) / 600 + (rt(o.p.a.RBK) - rt(d.p.a.BSH)) * 0.15, 0.3, 0.7);
+        d.x += (dx / dd) * shift * leverage;
+        d.y += (dy / dd) * shift * leverage;
+        o.x -= (dx / dd) * shift * (1 - leverage);
+        o.y -= (dy / dd) * shift * (1 - leverage);
+      }
+    }
   if (p.phase === 'run' && carrier) {
     if (carrier.y >= 100) endPlay(p, 'td', carrier, 'TOUCHDOWN');
     else if (carrier.x < 0.2 || carrier.x > FIELD_W - 0.2) endPlay(p, 'out', carrier, 'OUT OF BOUNDS');
@@ -586,7 +746,7 @@ function offense(p: Play, b: Body, dt: number) {
     const climb = climbTo ? p.bodies.find((d) => d.slot === climbTo && t >= d.stunUntil) : undefined;
     // Keep each tackle/guard on the front defender he was assigned at the snap. Nearest-man
     // selection let both guards chase one DT while another defender escaped untouched.
-    const assigned = p.call === 'run' && isLine(b) && !climbTo ? p.bodies.find(d => d.side === 'D' && d.mark === b.id && t < d.heldUntil) : undefined;
+    const assigned = p.call === 'run' && isLine(b) && !climbTo ? p.bodies.find((d) => d.side === 'D' && d.mark === b.id && t < d.heldUntil) : undefined;
     const target = assigned ?? climb ?? p.bodies.filter((d) => d.side === 'D' && t >= d.stunUntil && d.y > b.y - 2.5).sort((a1, a2) => dist(a1, b) - dist(a2, b))[0];
     const line = isLine(b);
     if (target) {
@@ -597,6 +757,7 @@ function offense(p: Play, b: Body, dt: number) {
         const shed = rt(target.p.a.BSH);
         const hold = Math.max(0.25, (b.slot === 'TE' ? 1.15 + blk * 1.2 - shed * 0.65 : 0.9 + blk * 1.1 - shed * 0.8) * (line || b.slot === 'TE' ? 1 : 0.5) + p.rand() * 0.3);
         target.heldUntil = t + hold;
+        target.blocker = b.id;
         b.heldUntil = t + hold + 1.2;
         if (line && b.p.a.IBL >= 85 && p.rand() < 0.12) {
           target.stunUntil = t + 0.8;
@@ -646,7 +807,9 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
   const t = p.t;
   const qb = p.qb;
   const carrier = p.carrier;
-  const held = t < b.heldUntil;
+  // A timer cannot pin a defender to an invisible blocker across the field.
+  const blocker = p.bodies.find((o) => o.id === b.blocker && o.side === 'O' && o !== carrier && o !== qb && t >= o.stunUntil);
+  const held = t < b.heldUntil && !!blocker && dist(blocker, b) < 2.8;
   const sp = speedOf(b.p) * (held ? 0.12 : 1);
   // Before the exchange, read the run keys rather than following the back into the mesh as if
   // he were a pass route. The existing PRC/difficulty reaction window still determines the read.
@@ -699,9 +862,9 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
     }
     const v = seenVel(carrier, b);
     const rel = dist(b, carrier);
-    const tau = clamp(rel / (sp + 4), 0, 1.1) * lerp(0.7, 1, rt(b.p.a.PUR ?? b.p.a.PRC));
+    const intercept = pursuitTarget(b, carrier, v, sp);
     const winding = b.windAt < Infinity;
-    steerTo(b, carrier.x + v.x * tau, carrier.y + v.y * tau, sp * (winding ? 0.85 : 1), dt, 18);
+    steerTo(b, intercept.x, intercept.y, sp * (winding ? 0.85 : 1), dt, 18);
     const closing = ((carrier.x - b.x) * (b.vx - carrier.vx) + (carrier.y - b.y) * (b.vy - carrier.vy)) / Math.max(0.3, rel);
     if (!winding) {
       // close and closing: he gathers to dive (the runner can see it)
@@ -881,7 +1044,9 @@ function playPassingLane(p: Play, dt: number) {
   const at = ballNow(p)!;
   const before = clamp((p.t - dt - ball.t0) / (ball.t1 - ball.t0), 0, 1);
   const old = { x: ball.from.x + (ball.to.x - ball.from.x) * before, y: ball.from.y + (ball.to.y - ball.from.y) * before };
-  const dx = at.x - old.x, dy = at.y - old.y, length2 = dx * dx + dy * dy;
+  const dx = at.x - old.x,
+    dy = at.y - old.y,
+    length2 = dx * dx + dy * dy;
   for (const b of p.bodies.filter((b) => b.side === 'D').sort((a, b) => dist(a, at) - dist(b, at))) {
     if (p.t < b.breakAt || p.t < b.stunUntil || ball.tried?.includes(b.id)) continue;
     const u = clamp(((b.x - old.x) * dx + (b.y - old.y) * dy) / Math.max(0.001, length2), 0, 1);
@@ -936,14 +1101,15 @@ function arrive(p: Play) {
     if (roll < pi + clamp(pc, 0.08, 0.97 - pi)) {
       p.carrier = off;
       off.job = 'carry';
-      off.x = at.x;
-      off.y = at.y;
       p.catcher = off;
       p.caughtAt = { x: at.x, y: at.y };
       p.phase = 'run';
-      p.slowUntil = p.t + 0.33;
-      off.vx *= 0.5;
-      off.vy *= 0.5;
+      const traffic = !!def && rd < 1.8,
+        reaching = ro > 1;
+      p.slowUntil = p.t + (traffic ? 0.3 : reaching ? 0.2 : 0.06);
+      const momentum = traffic ? 0.55 : reaching ? 0.72 : 0.96;
+      off.vx *= momentum;
+      off.vy *= momentum;
       act(off, 'catch', p.t);
       p.events.push(def && rd < 1.3 ? 'catch-contested' : 'catch');
       for (const b of p.bodies) if (b.side === 'D') b.job = 'pursue';

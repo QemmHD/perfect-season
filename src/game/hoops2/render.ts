@@ -147,7 +147,7 @@ function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shot
   const tail = m.last && b.act !== m.last.act && (b.act === 'idle' || b.act === 'run' || b.act === 'defend') ? m.last : null;
   if (tail) {
     const ts = t - tail.at;
-    if (tail.act === 'shoot' && ts < 1.0 && (ts < 0.8 || speed < 6)) return clip('jumpshot', JUMPER(ts), { step: 1, ground: 'clip' });
+    if (tail.act === 'shoot' && ts < 1.0 && (ts < 0.8 || speed < 6)) return clip('jumpshot', JUMPER(ts*(b.shotTempo??1)), { step: 1, ground: 'clip' });
     // a dunker hangs on in his dunk until he's down
     if ((tail.act === 'dunk' || tail.act === 'contact' || tail.act === 'standdunk') && (air || ts < 0.75)) return poseOf({ ...b, act: tail.act, actAt: tail.at }, t, false);
     if (tail.act === 'layup' && ts < 0.95) return clip('layup', LAYUP(ts), { ground: 'pin' });
@@ -159,7 +159,7 @@ function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shot
   }
   switch (b.act) {
     case 'shoot':
-      return clip('jumpshot', JUMPER(since), { step: 1, ground: 'clip' });
+      return clip('jumpshot', JUMPER(since*(b.shotTempo??1)), { step: 1, ground: 'clip' });
     case 'layup':
       return clip('layup', LAYUP(since), { ground: 'pin' });
     case 'fall': {
@@ -245,7 +245,7 @@ function poseOf(b: Body, t: number, carrying: boolean): { key: string; pose: Pos
       return { key: 'rn' + ph + Math.round(sp * 3), pose: P.run(ph, 0.4 + sp * 0.6) };
     }
     case 'shoot': {
-      const ph = timed(0.62, 12);
+      const ph = timed(0.62/(b.shotTempo??1), 12);
       return { key: 'js' + ph, pose: P.jumpShot(ph) };
     }
     case 'layup': {
@@ -578,6 +578,14 @@ export class HoopsRenderer {
   }
 
   /** One frame. `real` keeps the crowd and the ball's spin moving between plays. */
+  /** Pick a real teammate's projected body, so tapping him passes directly. */
+  teammateAt(p: Possession,x:number,y:number,radius:number):number|null {
+    if(!this.pc)return null;
+    let nearest=radius,target:number|null=null;
+    for(const b of p.bodies)if(b.side==='O'&&b.idx!==p.handler){const foot=this.at(b.cx,b.cz),head=this.at(b.cx,b.cz,b.h+b.p.ht/12);const d=Math.hypot(x-foot.x,y-(head.y+foot.y)/2);if(d<nearest){nearest=d;target=b.idx;}}
+    return target;
+  }
+
   draw(ctx: CanvasRenderingContext2D, p: Possession, real: number, fx: Fx) {
     this.budget = 4;
     ctx.imageSmoothingEnabled = false;
@@ -607,6 +615,11 @@ export class HoopsRenderer {
         ctx.beginPath();ctx.ellipse(to.x,to.y,Math.max(4,to.s*1.3),Math.max(2,to.s*.45),0,0,Math.PI*2);ctx.stroke();
         label(ctx,call.kind === 'cut' || call.rolling ? 'CUT' : 'SCREEN',to.x,to.y-9,'#b4ffe6');ctx.restore();
       }
+    }
+    if(!this.replay&&p.ball?.kind==='loose'&&p.rebounder!==undefined){
+      const b=p.bodies[p.rebounder],f=this.at(b.cx,b.cz),to=this.at(p.ball.to.cx,p.ball.to.cz);
+      ctx.strokeStyle='#19e3c9';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(f.x,f.y,Math.max(6,f.s*1.7),Math.max(2,f.s*.6),0,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle='#ffd579bb';ctx.setLineDash([3,3]);ctx.beginPath();ctx.ellipse(to.x,to.y,Math.max(6,to.s*2),Math.max(2,to.s*.7),0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
     }
     // shadows on the floor
     const t = p.t;
@@ -810,6 +823,7 @@ export class HoopsRenderer {
     if (p.meter && p.handler === ms.idx) {
       const grade = contestOf(p, p.bodies[ms.idx]);
       label(ctx, CONTEST_TEXT[grade], head.x, cy - R - th - 16, CONTEST_COLOR[grade]);
+      if(p.meter.style)label(ctx,p.meter.style==='catch'?'CATCH & SHOOT':p.meter.style==='pullup'?'MOVING SHOT':'SET SHOT',head.x,cy-R-th-29,'#d6e5ed');
     } else if (result && p.lastShot) {
       const shot = p.lastShot;
       const text = shot.greened ? (shot.contest === 'heavy' || shot.contest === 'smothered' ? 'PERFECT / ' + CONTEST_TEXT[shot.contest] : 'PERFECT') : Math.abs(shot.off) < 0.22 ? 'GOOD RELEASE' : shot.off < 0 ? 'EARLY' : 'LATE';

@@ -56,3 +56,15 @@ Actual rendered components, original fonts/cards and isolated localhost/inspect 
 [Batch season claims](ut-polish-nba-season-ready.png) · [Exact development copy in duplicate storage](ut-polish-nba-development-copy.png) · [Modal playbook in landscape](ut-polish-nfl-modal-landscape.png) · [Earlier earned season rewards](ut-polish-saved-season.png) · [320px NBA controls](ut-polish-nba-controls-320.png).
 
 Actual components and original materials in isolated localhost/inspect fixtures. The archived-season image uses an explicit future date supplied to the real SeasonView; the OS/server clock was not changed. The dedicated input-isolation game uses weak synthetic defenders to distinguish gesture bugs from steals/sacks. No fixture balances, cards, counts, date override or weak-defense setting is shipped. [Research, confirmed issues, fixes and validation](../UT-POLISH.md).
+
+
+## Actual court and field overhaul — Codex, 2026-10-30
+
+Actual NBA/NFL components with isolated rated squads and the original UI/art. Core interaction captures run at the existing lab's **0.5×** playback speed to show motion; the normal-speed match QA is separate. No live accounts were copied. [Mechanics, research and measurements](../CORE-GAMEPLAY.md).
+
+- [NBA court and shot rhythm](core-nba-live.png)
+- [NFL receiver targets and pass types](core-nfl-pass-390.png)
+- [NFL compact phone layout](core-nfl-pass-320.png)
+- [NFL landscape passing](core-nfl-pass-844.png)
+- [NFL held burst](core-nfl-burst.png)
+- [NFL landscape running controls](core-nfl-run-landscape.png)

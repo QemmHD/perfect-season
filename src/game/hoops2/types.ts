@@ -108,6 +108,9 @@ export interface Body {
   lastMoveAt?: number;
   /** Brief planted-contact response, separate from a turnover or a stun. */
   contactAt?: number;
+  lastCatchAt?: number;
+  reboundAt?: number;
+  shotTempo?: number;
   trail: Pt[];
 }
 
@@ -127,6 +130,7 @@ export interface Meter {
   /** half the green window, seconds */
   green: number;
   kind: ShotKind;
+  style?: 'set' | 'catch' | 'pullup';
   /** the nearest defender's room at the press: a man that far off can only close out so well */
   room?: number;
   /** the result once released: -1 very early .. 1 very late, and whether it was green */
@@ -145,8 +149,6 @@ export interface BallFlight {
   make?: boolean;
   points?: number;
   shot?: ShotKind;
-  /** a miss: does the offense get it back */
-  orb?: boolean;
   tried?: number[];
 }
 
@@ -194,4 +196,7 @@ export interface Possession {
   /** A coach call moves real teammates; it never changes ratings or shot odds. */
   playCall?: { kind: 'screen' | 'cut' | 'space'; actor: number; target: Pt; until: number; plantedAt?: number; rolling?: boolean; sides: Record<number, number> };
   callReadyAt?: number;
+  /** The player controlled during a physical rebound race, with neutral-stick assistance. */
+  rebounder?: number;
+  rotation?: { at: number; helper: number | null; rotator: number | null; cover: number | null };
 }

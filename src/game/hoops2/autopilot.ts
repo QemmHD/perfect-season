@@ -4,7 +4,7 @@
 // defender, move it out of a double team, and sprint (the stick at its edge) only on a drive. `skill` (0-1) is how sharp its
 // reads and its release timing are.
 import { hashString, rng } from '../../engine/rng';
-import { crossover, dist, pass, pressShoot, releaseShoot, RIM, shotValue, step } from './engine';
+import { crossover, dist, jumpRebound, ballPos, pass, pressShoot, releaseShoot, RIM, shotValue, step } from './engine';
 import { afterPossession, type HoopsGame, startPossession } from './game';
 import type { Body, Possession, Pt } from './types';
 
@@ -54,6 +54,12 @@ function laneOpen(p: Possession, b: Body): boolean {
 
 /** One step of decisions: returns the stick (a court direction) for the handler. */
 export function decide(p: Possession, pl: Pilot): Pt | null {
+  if (!p.end && p.ball?.kind === 'loose' && p.rebounder !== undefined) {
+    const b = p.bodies[p.rebounder],
+      at = ballPos(p);
+    if (dist(b, at) < 3 && p.t - p.ball.t0 > 0.2 + (1 - pl.skill) * 0.15) jumpRebound(p);
+    return towards(b, p.ball.to);
+  }
   if (p.end || p.handler === null) {
     pl.letGo = null;
     pl.driving = false;
@@ -85,7 +91,8 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
   // doubled: get it out to the man the second defender left (a sharper player sooner)
   if (p.trapper !== null) {
     const tr = pl.trap;
-    if (!tr || tr.p !== p || tr.handler !== h.idx || tr.trapper !== p.trapper) pl.trap = { p, handler: h.idx, trapper: p.trapper, at: p.t + 0.2 + (1 - pl.skill) * 0.7 + pl.rand() * 0.2 };
+    if (!tr || tr.p !== p || tr.handler !== h.idx || tr.trapper !== p.trapper)
+      pl.trap = { p, handler: h.idx, trapper: p.trapper, at: p.t + 0.2 + (1 - pl.skill) * 0.7 + pl.rand() * 0.2 };
     const free = p.bodies[p.bodies[p.trapper].mark];
     if (pl.trap && p.t >= pl.trap.at && free && free !== h && free.side === 'O' && p.passes < 6) {
       pl.trap.at = Infinity;
@@ -158,7 +165,7 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
       { cx: 27, cz: -14 },
       { cx: 27, cz: 14 },
       { cx: 33, cz: -10 },
-      { cx: 33, cz: 10 },
+      { cx: 33, cz: 10 }
     ];
     pl.goal = spots[Math.floor(pl.rand() * spots.length)];
   }

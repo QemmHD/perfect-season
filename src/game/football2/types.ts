@@ -70,6 +70,7 @@ export interface Body {
   zone: Pt | null;
   /** locked up with a blocker until then */
   heldUntil: number;
+  blocker?: number;
   /** a linebacker reading the run (his keys) until then, and whether he bit the wrong way */
   readUntil: number;
   misread: boolean;
@@ -88,6 +89,7 @@ export interface Body {
 export type Call = 'pass' | 'run';
 export type Concept = 'verts' | 'slants' | 'smash' | 'flood' | 'dagger' | 'mesh' | 'curls' | 'posts';
 export type RunPlay = 'inside' | 'outside' | 'power';
+export type PassType = 'bullet' | 'touch' | 'lob';
 
 export interface Ball {
   from: Pt;
@@ -95,6 +97,7 @@ export interface Ball {
   t0: number;
   t1: number;
   peak: number;
+  type?: PassType;
   /** Each defender gets one physical play on this pass, rather than a fresh lottery every frame. */
   tried?: number[];
 }
@@ -135,6 +138,9 @@ export interface Play {
   moveReady: number;
   /** the runner's stamina (0-1): moves drain it, it comes back as he runs */
   stamina: number;
+  /** Held by the player; transient, never saved to a profile. */
+  bursting?: boolean;
+  passType?: PassType;
   /** the moves he's made this play (the same one again works less) */
   used: Partial<Record<Move, number>>;
   /** across the field, the hole a run is blocked for */

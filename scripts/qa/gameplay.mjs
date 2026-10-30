@@ -69,7 +69,8 @@ try {
       );
     await mount(false);
     await page.locator('.hg2-canvas').waitFor();
-    await page.waitForTimeout(1500);
+    await page.locator('.fg-loading').waitFor({ state: 'detached' });
+    if(sport==='nba')await page.waitForFunction(()=>/^\d+$/.test(document.querySelector('.hg2-bug .mid em')?.textContent??''));
     if (sport === 'nba') {
       const shoot = page.getByRole('button', { name: 'Shoot: hold, and let go in the green' });
       await shoot.waitFor();

@@ -18,3 +18,132 @@
     font-size: 13px;
   }
 }
+/* Codex: reuse the court/field HUD palette, bevels and display face for live decisions. */
+.fb2-passing {
+  box-sizing: border-box;
+  position: absolute;
+  left: calc(var(--sal) + 14px);
+  bottom: calc(var(--sab) + 18px);
+  width: min(290px, calc(100% - var(--sal) - var(--sar) - 118px));
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(12, 18, 28, 0.92);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+  color: #fff;
+}
+.fb2-passing > small {
+  display: block;
+  font: 800 10px var(--display);
+  letter-spacing: 2px;
+  color: var(--teal);
+  margin-bottom: 7px;
+}
+.fb2-receivers,
+.fb2-pass-types {
+  display: flex;
+  gap: 5px;
+}
+.fb2-passing button {
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font: 900 italic 14px var(--display);
+  color: #fff;
+  touch-action: manipulation;
+}
+.fb2-passing button:active {
+  transform: translateY(2px);
+}
+.fb2-pass-types {
+  margin-top: 7px;
+}
+.fb2-pass-types button {
+  font-size: 10px;
+  min-height: 36px;
+}
+.fb2-pass-types button[aria-pressed='true'] {
+  color: var(--teal-ink);
+  background: var(--teal);
+  border-color: var(--teal);
+}
+.fb2-burst {
+  position: absolute;
+  left: calc(var(--sal) + 18px);
+  bottom: calc(var(--sab) + 20px);
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font: 900 italic 17px var(--display);
+  color: var(--teal-ink);
+  background: radial-gradient(circle at 40% 35%, #6ff0de, #10bfa8);
+  box-shadow:
+    0 5px 0 #0a7d6e,
+    0 8px 16px rgba(0, 0, 0, 0.45);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.fb2-burst small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 2px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+.fb2-burst.held {
+  transform: translateY(3px);
+  filter: brightness(1.16);
+  box-shadow:
+    0 2px 0 #0a7d6e,
+    0 4px 10px rgba(0, 0, 0, 0.4);
+}
+.fb2-passing button:focus-visible,
+.fb2-burst:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.fb2.wide .fb2-passing {
+  width: 285px;
+  bottom: calc(var(--sab) + 12px);
+  padding: 8px;
+}
+.fb2.wide .fb2-burst {
+  width: 68px;
+  height: 68px;
+}
+@media (max-width: 350px) {
+  .fb2-passing {
+    left: calc(var(--sal) + 8px);
+    width: calc(100% - var(--sal) - var(--sar) - 16px);
+    padding: 7px;
+  }
+  .fb2-passing button {
+    font-size: 12px;
+  }
+  .fb2-pass-types button {
+    font-size: 9px;
+  }
+  .fb2:not(.wide) .fb2-scramble-controls {
+    bottom: calc(var(--sab) + 162px);
+  }
+}
+.fb2-receivers button:nth-child(1) {
+  border-top: 2px solid #ffd23a;
+}
+.fb2-receivers button:nth-child(2) {
+  border-top: 2px solid #ff7aa8;
+}
+.fb2-receivers button:nth-child(3) {
+  border-top: 2px solid #5cb8ff;
+}
+.fb2-receivers button:nth-child(4) {
+  border-top: 2px solid #7cf08c;
+}
+.fb2-receivers button:nth-child(5) {
+  border-top: 2px solid #c7a2ff;
+}
