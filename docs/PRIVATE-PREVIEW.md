@@ -134,3 +134,15 @@ Read [UT-POLISH.md](UT-POLISH.md) for research, prioritized findings, exact fixe
 - Main and original restore were rechecked at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; the pre-core restore is `backup/pre-core-gameplay-2026-10-30` at `0bfe5a54bbf9f87c5865325fd8bd605f20140177`.
 
 This release-record follow-up changes documentation only; deployed runtime is the verified implementation above. No live Pages merge/deploy, account reset, backend migration or transfer of live accounts into preview. The known physical-iPhone testing limit and existing bundle-size warning remain as documented.
+
+
+## Verified direct-control publication — Codex
+
+- GitHub runtime: `1cbf5dfd0b2d4b290e09e5941006f0604690c611`; local runtime `67b56bab53446bb158a2fe0c762952456ff7a363`; identical tree `7b37c39e6191e0316af865660d5feced52aeea45` was checked before updating the feature ref.
+- [Review build #23](https://github.com/QemmHD/perfect-season/actions/runs/41125107355), job `124301297402`, **passed**: 343 NBA / 310 NFL tests (**653 total**, 31/63 existing skips), all-card rating audit with zero invalid entries, TypeScript and production build. The final rear-end-zone boundary is included.
+- Pushed private source: `b76a1d5c83df133c048e607cf4e089e62bafea48`. Exact source build, clean Git, zero-error production boot, forced namespace/bootstrap ordering and retained preview PWA ID passed.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_2e7b381b4904819194847d589359f452`.
+- Deployment: `appgdep_6ae5015e9cf4819194108372d7ded62d`, **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site . Owner-private audience, origin, `preview2026` namespace and `./preview` PWA identity are retained.
+- Main/original restore were rechecked unchanged at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Source restore before this correction is `backup/pre-nfl-direct-stick-2026-10-30` at `aad7e9b4b747527945a481ad03857a8539bc6f05`.
+
+No account reset, inventory/progress migration, backend deployment or promotion to live Pages. This provenance follow-up changes documentation only; the deployed runtime is the verified implementation above. Physical installed-iPhone feel remains an owner playtest; existing large bundle warnings remain.

@@ -34,4 +34,16 @@ New regressions check the actual runner's world coordinates and velocity, rather
 
 Local full suites passed **651 tests** (342 NBA / 309 NFL; 31/63 existing skips); the final rear-end-zone boundary addition passes focused regressions as well. TypeScript and production build passed. Both-sport signed local-relay H2H settled one win/one loss with 30 combined Rivals points; no pairing/account regressions were observed. [Measured browser results](nfl-direct-control-qa.json) retain actual displacements: a full forward/back/lateral input moved about 2.7–2.9 yards in each 450ms hold after acceleration, and diagonals about 1.9 yards per axis. Release and interruption stopped real velocity, not just the knob. The normal Legend-defense fixture completed for 2 yards and a tackle; that is a smoke result, not a fun/balance claim.
 
-[Normal-defense portrait capture](previews/nfl-direct-390.png), [small-phone control-isolation capture](previews/nfl-direct-320.png), [landscape control-isolation capture](previews/nfl-direct-844.png). Exact GitHub/CI and private deployment provenance are appended when verified. Physical installed-iPhone touch latency/feel still requires owner testing; Chromium cannot establish that.
+[Normal-defense portrait capture](previews/nfl-direct-390.png), [small-phone control-isolation capture](previews/nfl-direct-320.png), [landscape control-isolation capture](previews/nfl-direct-844.png). Exact verified provenance follows below. Physical installed-iPhone touch latency/feel still requires owner testing; Chromium cannot establish that.
+
+
+## Verified direct-control publication — Codex
+
+- GitHub runtime: `1cbf5dfd0b2d4b290e09e5941006f0604690c611`; local runtime `67b56bab53446bb158a2fe0c762952456ff7a363`; identical tree `7b37c39e6191e0316af865660d5feced52aeea45` was checked before updating the feature ref.
+- [Review build #23](https://github.com/QemmHD/perfect-season/actions/runs/41125107355), job `124301297402`, **passed**: 343 NBA / 310 NFL tests (**653 total**, 31/63 existing skips), all-card rating audit with zero invalid entries, TypeScript and production build. The final rear-end-zone boundary is included.
+- Pushed private source: `b76a1d5c83df133c048e607cf4e089e62bafea48`. Exact source build, clean Git, zero-error production boot, forced namespace/bootstrap ordering and retained preview PWA ID passed.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_2e7b381b4904819194847d589359f452`.
+- Deployment: `appgdep_6ae5015e9cf4819194108372d7ded62d`, **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site . Owner-private audience, origin, `preview2026` namespace and `./preview` PWA identity are retained.
+- Main/original restore were rechecked unchanged at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Source restore before this correction is `backup/pre-nfl-direct-stick-2026-10-30` at `aad7e9b4b747527945a481ad03857a8539bc6f05`.
+
+No account reset, inventory/progress migration, backend deployment or promotion to live Pages. This provenance follow-up changes documentation only; the deployed runtime is the verified implementation above. Physical installed-iPhone feel remains an owner playtest; existing large bundle warnings remain.
