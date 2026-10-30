@@ -929,7 +929,7 @@ export function SquadPresets({
       </button>
       {open && (
         <Sheet label="Saved lineups" onClose={() => setOpen(false)}>
-          {() => (
+          {(close) => (
             <div className="hq-preset-sheet">
               <span className="eyebrow">YOUR SQUAD, READY WHEN YOU ARE</span>
               <h2 className="disp">SAVED LINEUPS</h2>
@@ -995,6 +995,7 @@ export function SquadPresets({
                 SBC-consumed copies are removed from presets; incomplete lineups
                 can be finished in the squad builder.
               </p>
+              <button className="btn" onClick={() => close()}>CLOSE</button>
             </div>
           )}
         </Sheet>

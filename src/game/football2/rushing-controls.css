@@ -26,10 +26,10 @@
   bottom: calc(var(--sab) + 18px);
   width: min(290px, calc(100% - var(--sal) - var(--sar) - 118px));
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--hud-line);
   border-radius: 14px;
-  background: rgba(12, 18, 28, 0.92);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+  background: var(--hud-surface);
+  box-shadow: var(--hud-elevation);
   color: #fff;
 }
 .fb2-passing > small {
@@ -62,8 +62,8 @@
   margin-top: 7px;
 }
 .fb2-pass-types button {
-  font-size: 10px;
-  min-height: 36px;
+  font-size: 11px;
+  min-height: 44px;
 }
 .fb2-pass-types button[aria-pressed='true'] {
   color: var(--teal-ink);
@@ -178,5 +178,17 @@
     left: calc(var(--sal) + 130px);
     width: 62px;
     height: 62px;
+  }
+}
+
+.fb2-passing button {
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    transform 0.12s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb2-passing button {
+    transition: none;
   }
 }

@@ -28,6 +28,9 @@
   --rival-soft: #b9a4ff;
   --display: 'Archivo', 'Avenir Next Condensed', 'Arial Narrow', 'Roboto Condensed', 'Helvetica Neue', sans-serif;
   --body: 'Archivo', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --hud-surface: rgba(6, 24, 32, 0.94);
+  --hud-line: rgba(143, 166, 178, 0.28);
+  --hud-elevation: inset 0 1px rgba(255,255,255,.04), 0 4px 14px rgba(0,0,0,.3);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --ease-in: cubic-bezier(0.5, 0, 0.9, 0.5);
@@ -3314,6 +3317,9 @@ button:focus-visible {
   background: rgba(2, 8, 12, 0.78);
   animation: fade-in 0.22s ease both;
 }
+/* Programmatic dialog focus is announced; action focus keeps the original gold ring. */
+.scrim[tabindex="-1"]:focus {outline:none;}
+
 .scrim.closing {
   animation: fade-out 0.2s ease both;
 }
@@ -8611,19 +8617,28 @@ button.friendcard:active {
 .ut-top {
   position: relative;
   z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
 }
+/* Reserve real space for the back button and wallet, including long subpage names. */
 .ut-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
+  min-width: 0;
+  text-align: center;
   font-size: 24px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
   background: linear-gradient(180deg, #ffe7a8 0%, var(--gold) 60%, #c98a1d 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+.ut-v-circuit .ut-title,
+.ut-v-events .ut-title,
+.ut-v-season .ut-title {font-size:19px;}
 .ut-body {
   position: relative;
   flex: 1;
@@ -10326,7 +10341,7 @@ button.friendcard:active {
 }
 .ut-key {
   display: grid;
-  grid-template-columns: 34px 1fr;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: 2px 8px;
   padding: 7px 10px;
@@ -10335,6 +10350,7 @@ button.friendcard:active {
   border: 1px solid var(--line);
 }
 .ut-key > b {
+  min-width: 2ch;
   grid-row: span 2;
   font-size: 22px;
   font-weight: 900;

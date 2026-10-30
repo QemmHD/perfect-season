@@ -54,7 +54,23 @@ export interface ClubCard {
   storage?: boolean;
 }
 
-export type UtView = 'hub' | 'squad' | 'club' | 'store' | 'sbc' | 'battles' | 'rivals' | 'gallery' | 'events' | 'play' | 'season' | 'objectives' | 'circuit' | 'moments' | 'development' | 'records';
+export type UtView =
+  | 'hub'
+  | 'squad'
+  | 'club'
+  | 'store'
+  | 'sbc'
+  | 'battles'
+  | 'rivals'
+  | 'gallery'
+  | 'events'
+  | 'play'
+  | 'season'
+  | 'objectives'
+  | 'circuit'
+  | 'moments'
+  | 'development'
+  | 'records';
 
 /** the view to come back to after a match (the screen unmounts while it's played) */
 let lastView: UtView = 'hub';
@@ -216,7 +232,9 @@ export default function UltimateTeam(props: {
     sfx.coin();
     onToast(
       'Reward claimed. ' +
-        [rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }), shown.packCount ? shown.packCount + ' packs added to your Store' : ''].filter(Boolean).join(' · ')
+        [rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }), shown.packCount ? shown.packCount + ' packs added to your Store' : '']
+          .filter(Boolean)
+          .join(' · ')
     );
   };
 
@@ -368,7 +386,8 @@ export default function UltimateTeam(props: {
     sfx.levelUp();
     vibrate([20, 40, 20]);
     if (rc && prize) setOpening({ id: 'sbc:' + s.id, title: s.title, kind: 'reward', cards: [{ uid: prize.uid, rc }] });
-    else onToast(s.title + ' done!' + (pack ? ' Your ' + packName(SPORT, pack.kind) + ' is waiting in the Store.' : '') + (s.reward.coins ? ' +' + s.reward.coins + ' coins.' : ''));
+    else
+      onToast(s.title + ' done!' + (pack ? ' Your ' + packName(SPORT, pack.kind) + ' is waiting in the Store.' : '') + (s.reward.coins ? ' +' + s.reward.coins + ' coins.' : ''));
   };
 
   const detailCard = detail ? (byUid.get(detail) ?? null) : null;
@@ -582,7 +601,16 @@ export default function UltimateTeam(props: {
             </>
           )}
         </div>
-        <Store sport={SPORT} coins={profile.coins} starter={!ut.starterClaimed} pending={ut.packs} defs={packDefs(SPORT)} onBuy={buy} onStarter={claimStarter} onPending={openPending} />
+        <Store
+          sport={SPORT}
+          coins={profile.coins}
+          starter={!ut.starterClaimed}
+          pending={ut.packs}
+          defs={packDefs(SPORT)}
+          onBuy={buy}
+          onStarter={claimStarter}
+          onPending={openPending}
+        />
       </>
     );
   else if (view === 'battles')
@@ -655,6 +683,8 @@ export default function UltimateTeam(props: {
       />
     );
 
+  const activeTab = view === 'gallery' ? 'club' : TABS.some(([tab]) => tab === view) ? view : 'hub';
+
   return (
     <div className={'screen ut ut-v-' + view}>
       <div className="topbar ut-top" {...(opening ? { inert: '' } : {})}>
@@ -688,10 +718,12 @@ export default function UltimateTeam(props: {
         </span>
         <CoinChip coins={profile.coins} />
       </div>
-      <div className="ut-body" {...(opening ? { inert: '' } : {})}>{body}</div>
+      <div className="ut-body" {...(opening ? { inert: '' } : {})}>
+        {body}
+      </div>
       <nav className="ut-tabs" aria-label="Ultimate Team" {...(opening ? { inert: '' } : {})}>
         {TABS.map(([k, label, icon]) => (
-          <button key={k} aria-current={view === k ? 'page' : undefined} onClick={() => go(k)}>
+          <button key={k} aria-current={activeTab === k ? 'page' : undefined} onClick={() => go(k)}>
             {icon}
             <span>{label}</span>
             {k === 'sbc' && pool && todo > 0 && <i className="ut-dot num">{todo}</i>}

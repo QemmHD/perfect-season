@@ -63,12 +63,18 @@ try {
     await page.getByRole('button', { name: /Take on the greats/ }).click();
     await page.getByRole('heading', { name: 'Dynasty Nights', exact: true }).waitFor();
     await shot(page, 'spotlight-events-' + sport);
+    const beforeEvent = await current();
     await page.getByRole('button', { name: 'PLAY MATCH', exact: true }).click();
     await page.getByRole('button', { name: /^SIM/ }).waitFor({ timeout: 15000 });
     await page.getByRole('button', { name: /^SIM/ }).click();
     await page.getByRole('heading', { name: /WIN|LOSS/, exact: true }).waitFor({ timeout: 45000 });
     result = await current();
-    if (!result.ut.events?.dynasty) throw Error('Opening event did not progress with fixture squad');
+    const won=(await page.getByRole('heading',{name:/WIN|LOSS/,exact:true}).innerText()).trim()==='WIN';
+    const expected=(beforeEvent.ut.events?.dynasty??0)+(won?1:0);
+    if((result.ut.events?.dynasty??0)!==expected)throw Error('Event progress did not match the displayed result');
+    if(result.ut.record.w+result.ut.record.l!==beforeEvent.ut.record.w+beforeEvent.ut.record.l+1)throw Error('Event result did not settle exactly once');
+    const match=result.ut.hq?.history?.at(-1);
+    if(match?.mode!=='event'||match.won!==won)throw Error('Event history does not match the result');
     if (errors.length) throw Error(errors.join(';'));
     console.log(
       JSON.stringify({
@@ -76,7 +82,9 @@ try {
         originalCardsPreserved: original.ut.owned.length,
         paidPackRecovered: true,
         registeredCopies: minted.length,
-        eventCleared: result.ut.events.dynasty,
+        eventCleared: result.ut.events?.dynasty ?? 0,
+        eventOutcome: won ? 'win' : 'loss',
+        eventSettledExactlyOnce: true,
         errors,
       })
     );

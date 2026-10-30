@@ -8,13 +8,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 42px;
+  min-height: 44px;
   padding: 7px 10px;
   border: 1px solid #ffffff26;
   border-radius: 9px;
   background: #ffffff08;
   color: #d7eee5;
-  font: 900 10px var(--display);
+  font: 900 11px var(--display);
   letter-spacing: 0.5px;
 }
 .fb2-coach-row button span {
@@ -38,14 +38,13 @@
   z-index: 15;
   display: grid;
   place-items: center;
-  padding: calc(var(--sat) + 12px) calc(var(--sar) + 12px)
-    calc(var(--sab) + 12px) calc(var(--sal) + 12px);
-  background: #021510e8;
+  padding: calc(var(--sat) + 12px) calc(var(--sar) + 12px) calc(var(--sab) + 12px) calc(var(--sal) + 12px);
+  background: rgba(4, 18, 26, 0.94);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
 .fb2-book-shade::backdrop {
-  background: #021510d9;
+  background: rgba(4, 18, 26, 0.88);
 }
 .fb2-playbook {
   display: flex;
@@ -54,9 +53,9 @@
   max-height: 100%;
   overflow: hidden;
   padding: 16px;
-  border: 1px solid #78c2a73b;
+  border: 1px solid var(--line-2);
   border-radius: 18px;
-  background: linear-gradient(145deg, #132e25, #081d17);
+  background: linear-gradient(145deg, var(--panel-3), var(--bg-2));
   box-shadow: 0 20px 60px #0007;
 }
 .fb2-playbook header {
@@ -90,7 +89,7 @@
   flex-shrink: 0;
 }
 .fb2-playbook p {
-  color: #a8c5b9;
+  color: var(--soft);
   font-size: 12px;
   line-height: 1.5;
   margin: 12px 0;

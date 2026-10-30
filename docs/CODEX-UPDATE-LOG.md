@@ -323,3 +323,10 @@ Local full suites passed 651 tests; focused direction/release/speed/boundary reg
 - Main/original restore were rechecked unchanged at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Source restore before this correction is `backup/pre-nfl-direct-stick-2026-10-30` at `aad7e9b4b747527945a481ad03857a8539bc6f05`.
 
 No account reset, inventory/progress migration, backend deployment or promotion to live Pages. This provenance follow-up changes documentation only; the deployed runtime is the verified implementation above. Physical installed-iPhone feel remains an owner playtest; existing large bundle warnings remain.
+
+
+## UI consistency and flow polish — Codex, 2026-10-30
+
+**Implemented by Codex (OpenAI)** for the owner's request that all new UI match Perfect Season's original quality/style. [UI-CONSISTENCY.md](UI-CONSISTENCY.md) records current-run screenshot findings, fixes, file map, numbered flow checks and limits. Fixed long header/wallet collisions, parent-tab state, undersized new labels/actions, three-digit stat column overlap and missing lineup Close; unified court/field panel tokens and selected/disabled feedback. Shared sheets now handle top-modal Tab/Escape/return focus without auto-opening the phone keyboard or drawing a border around the whole screen. Existing Archivo/type hierarchy, teal/gold actions, dark panels, foil/pixel art and round game controls remain the reference.
+
+Local full suites pass 653 tests, TypeScript/build, measured both-sport UI/modal/layout checks at three sizes, complete clubhouse/content/polish/control flows, companion screens and inspect-server restore/conflicts. All original fixture copies/wallet/squads are preserved. Content QA checks event progression/history against the actual displayed win/loss rather than assuming a random simulated fixture must win. Gameplay/ratings/odds/transactions/save schema are unchanged; no queue bump (NBA 8 / NFL 9). Pre-polish restore: `backup/pre-ui-consistency-2026-10-30` at `86d64586271da62ea0fa9934d2c3bd5060307ecb`. Verified publication/CI references follow after release; main is not promoted.

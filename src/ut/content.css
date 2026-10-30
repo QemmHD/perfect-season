@@ -456,3 +456,21 @@
 .ut-catalog-detail > p {
   flex-shrink: 0;
 }
+
+/* Codex: collection controls share the original UT pill/button sizing and disabled treatment. */
+.ut-gallery .ut-chips > .chip {
+  min-height: 44px;
+  height: auto;
+  padding: 10px 12px;
+}
+.ut-book-goal .btn {
+  font-size: 11px;
+  min-height: 44px;
+}
+.ut-book-rewards button:disabled,
+.ut-gallery-pages button:disabled {
+  opacity: 0.5;
+  filter: saturate(0.5);
+  cursor: default;
+  transform: none;
+}

@@ -77,3 +77,17 @@ Actual NBA/NFL components with isolated rated squads and the original UI/art. Co
 - [Landscape two-touch control-isolation fixture](nfl-direct-844.png)
 
 Actual original-style joystick/BURST/skill UI. Direction-isolation captures hold defenders away to measure the player's input and velocity; the normal-defense capture does not. All run at normal 1× speed. [Defect, control contract and measured results](../NFL-DIRECT-CONTROL.md).
+
+
+## UI consistency and flow polish — Codex, 2026-10-30
+
+Current-run actual game captures. [Findings, file connections, numbered review and verification](../UI-CONSISTENCY.md).
+
+- [Before: Circuit title overlaps wallet](ui-before-circuit.png) → [after: small-phone header and menu](ui-circuit-320.png)
+- [Before: Lineups](ui-before-lineups.png) → [after: readable inputs/actions and Close](ui-lineups.png)
+- [Home: original card fan and polished typography](ui-hub.png)
+- [100+ GOAT stat layout](ui-goat-stats.png) (isolated holding still awaiting its serial) / [registered Spotlight detail](ui-registered-card.png)
+- [Passing controls with shared arena panels](ui-nfl-passing.png)
+- [Playbook in landscape](ui-nfl-playbook.png)
+
+Menus use normal-time isolated profiles; game-control captures use the existing lab's 0.5× capture setting. Real card art, profile keys, progress and engine behavior are retained; these are not generated concept images.
