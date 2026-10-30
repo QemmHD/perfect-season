@@ -55,7 +55,7 @@ Main/Pages still serves the original release. The first deployment references ab
 Main/GitHub Pages and the original restore branch still point to `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. New source restore point before the gameplay revision: `backup/pre-gameplay-research-2026-10-30` → `f3ccd941475bc209c750557df0ef4850385bce49`. No new backend deployment or account migration was required. Both online clients must use the same revised preview/rules.
 
 
-## Current 90+ circulation preview — Codex, 2026-10-30
+## Previous 90+ circulation preview — Codex, 2026-10-30
 
 - GitHub implementation: `47f498592a01535e8684a735bedef988ed0cc006`, tree `4eb2c4c63b757090bdbe42ec9e8377cf824d69d8`; local implementation `f6159c34fe51bcec0fe65fdc8610e21d69fa495b` has the same tree.
 - Sites source: `612ebbd3ef53201082728584caee2f6d24f21f73`.
@@ -67,3 +67,16 @@ Main/GitHub Pages and the original restore branch still point to `7285ced3e66cb7
 - Existing registry now runs Edge Function v3 with additive copy/circulation migrations; `player-save` v2 and original Nostr features stay connected. Test traffic remains in separate namespaces.
 
 No merge or GitHub Pages deployment. Main/original restore remains `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-circulation source backup is `backup/pre-card-circulation-2026-10-30` at `e7a4ac7a5426b89b66d7f36037a5ab5af56ef7f8`. This release-record follow-up is documentation only; the deployed implementation is the exact code identified above.
+
+
+## Current pack cinema preview — Codex, 2026-10-30
+
+- GitHub implementation: `8e1611fde2f58905278ac0bcf16536d7500030f1`, exact tree `f1a8893c6225d17c7a0f2df0f7a4256f2dde19c4`; local implementation `85d9aadeeee5a6274b3d7338f59de8a3bca735a4` has the same tree.
+- Sites source: `c60c61367f0c51cd4d46b34086d7c99e1757a55a`.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_cc1a2bc71a4c8191a5c0fa0c66e8c6f0`.
+- Deployment: `appgdep_6ae471a49ba08191b11e0cee10192aa8`, **succeeded**, 2026-10-30.
+- URL remains https://perfect-season-private-preview.qem.chatgpt.site . Confirmed owner-private access (one allowed owner, no groups), same origin, namespace and installed app identity. Existing preview progress remains in place. No fixture profile, boosted odds or forced GOAT demo is included in the shipped client.
+- Changes: arena arrival, charge/foil tear, mystery clues, GOAT-only 99 limit break, procedural effects, card entrance and cancellable synthesized score. Existing pack outcomes, transactions, progress and backend functions are unchanged. [PACK-CINEMA.md](PACK-CINEMA.md) maps every connection; [previews/README.md](previews/README.md) records actual rendered fixtures.
+- Exact pushed source built and packaged successfully. Production-build boot, forced namespace override, bootstrap-before-modules order, preview manifest identity, clean source and absence of the Pages deployment workflow all passed without page errors. Seven touch-browser reveal cases and both-sport real pack/reload/content flows passed; physical installed-iPhone checks remain unverified. Final GitHub CI reference is in CODEX-UPDATE-LOG.md.
+
+Restore point before this presentation revision: `backup/pre-pack-cinema-2026-10-30` → `e9a35dbd1e10d29c524579112608d847747c1dcd`. Main and the original restore remain `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. This release-record follow-up changes documentation only; the deployment above contains the verified implementation.
