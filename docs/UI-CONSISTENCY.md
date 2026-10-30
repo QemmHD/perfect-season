@@ -35,7 +35,7 @@ Use the original game as the reference: Archivo for body/display, heavy italic d
 All evidence was captured from actual current components in isolated localhost profiles, with existing rated fixture cards. These are screenshots of the game, not generated mockups. Each numbered UT step is checked for both sports in the [layout report](ui-layout-audit.json).
 
 1. **UT Home — passed:** original card fan/Archivo/theme, clearer season/action labels, stable wallet.
-2. **Play HQ — passed:** consistent mode cards, Home tab remains selected, header separated from wallet.
+2. **Play HQ — passed:** consistent mode cards, dedicated Play tab remains selected after the [Play-tab update](PLAY-TAB-AND-FOOTBALL-HINT.md), header separated from wallet.
 3. **Season Rewards — passed:** readable tier/reward actions, original claims and archived rewards retained.
 4. **Objectives — passed:** consistent filters and claims, 44px action sizing, rewards still settle once.
 5. **Development — passed:** original card art, clearer paths/copy status, exact-copy squad/storage recovery retained.

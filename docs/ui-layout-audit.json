@@ -30,14 +30,14 @@
     "title": {
       "x": 92,
       "w": 185,
-      "text": "Play HQ",
+      "text": "Play",
       "clipped": false
     },
     "wallet": {
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -109,11 +109,11 @@
     "step": "06-moments",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Moments",
       "clipped": false
     },
@@ -121,7 +121,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -151,11 +151,11 @@
     "step": "08-events",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Spotlight Events",
       "clipped": false
     },
@@ -163,7 +163,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -193,11 +193,11 @@
     "step": "10-circuit-320",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Champions Circuit",
       "clipped": false
     },
@@ -205,7 +205,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -214,11 +214,11 @@
     "step": "wallet-stress-320",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 149,
+      "x": 109,
+      "w": 132,
       "text": "Champions Circuit",
       "clipped": true
     },
@@ -226,7 +226,7 @@
       "x": 249,
       "w": 125
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -235,11 +235,11 @@
     "step": "10-circuit-390",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Champions Circuit",
       "clipped": false
     },
@@ -247,7 +247,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -256,11 +256,11 @@
     "step": "wallet-stress-390",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 149,
+      "x": 109,
+      "w": 132,
       "text": "Champions Circuit",
       "clipped": true
     },
@@ -268,7 +268,7 @@
       "x": 249,
       "w": 125
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -277,11 +277,11 @@
     "step": "10-circuit-844",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Champions Circuit",
       "clipped": false
     },
@@ -289,7 +289,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -298,11 +298,11 @@
     "step": "wallet-stress-844",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 149,
+      "x": 109,
+      "w": 132,
       "text": "Champions Circuit",
       "clipped": true
     },
@@ -310,7 +310,7 @@
       "x": 249,
       "w": 125
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -345,14 +345,14 @@
     "title": {
       "x": 92,
       "w": 185,
-      "text": "Play HQ",
+      "text": "Play",
       "clipped": false
     },
     "wallet": {
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -424,11 +424,11 @@
     "step": "06-moments",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Moments",
       "clipped": false
     },
@@ -436,7 +436,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -466,11 +466,11 @@
     "step": "08-events",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Spotlight Events",
       "clipped": false
     },
@@ -478,7 +478,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -508,11 +508,11 @@
     "step": "10-circuit-320",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Champions Circuit",
       "clipped": false
     },
@@ -520,7 +520,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -529,11 +529,11 @@
     "step": "wallet-stress-320",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 149,
+      "x": 109,
+      "w": 132,
       "text": "Champions Circuit",
       "clipped": true
     },
@@ -541,7 +541,7 @@
       "x": 249,
       "w": 125
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -550,11 +550,11 @@
     "step": "10-circuit-390",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Champions Circuit",
       "clipped": false
     },
@@ -562,7 +562,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -571,11 +571,11 @@
     "step": "wallet-stress-390",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 149,
+      "x": 109,
+      "w": 132,
       "text": "Champions Circuit",
       "clipped": true
     },
@@ -583,7 +583,7 @@
       "x": 249,
       "w": 125
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -592,11 +592,11 @@
     "step": "10-circuit-844",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 185,
+      "x": 109,
+      "w": 168,
       "text": "Champions Circuit",
       "clipped": false
     },
@@ -604,7 +604,7 @@
       "x": 284,
       "w": 90
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   },
@@ -613,11 +613,11 @@
     "step": "wallet-stress-844",
     "back": {
       "x": 16,
-      "w": 68
+      "w": 85
     },
     "title": {
-      "x": 92,
-      "w": 149,
+      "x": 109,
+      "w": 132,
       "text": "Champions Circuit",
       "clipped": true
     },
@@ -625,7 +625,7 @@
       "x": 249,
       "w": 125
     },
-    "active": "HOME",
+    "active": "PLAY",
     "horizontalOverflow": 0,
     "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
   }

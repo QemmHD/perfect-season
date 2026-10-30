@@ -349,3 +349,15 @@ This release-record follow-up changes documentation only; the deployed UI/runtim
 **Implemented by Codex (OpenAI)**. Added the sixth Ultimate Team Play tab and moved all competition entry points there, including saved Circuit continuation. Competition pages keep Play active and return to Play; Home retains club/progression management and a shortcut to the tab. Matched the existing icon/type/material language and retained six usable navigation targets. Fixed the reproduced normal-football 487px dark hint panel caused by basketball top-inset CSS combining with football bottom-inset CSS; football now has compact hints below the scoreboard and clear of play calls. See [file map, cause, QA and screenshots](PLAY-TAB-AND-FOOTBALL-HINT.md). Source restore: `backup/pre-play-tab-2026-10-30` at `c24b293c76441d7552c1d4b03a87aa8e5a1bb306`. No gameplay, account/progress/schema/backend/odds changes; NBA 8 / NFL 9 remain. Publication and exact verification references follow.
 
 Local verification for this update: 653 full-suite tests, TypeScript/build, 30 UI layout/modal checks, both-sport six-tab/all-competition/back/resume checks, six normal-football tip cases (28–42px rather than 487px), complete clubhouse progression and signed two-client NBA/NFL H2H all pass. Original test copies, squad and wallet are preserved. See the new handoff's validation section for scope and limits.
+
+
+## Verified Play-tab / football-hint publication — Codex
+
+- GitHub implementation: `4a4d4afa234cb521ab8cf2e4dc9baf733145f621`; local `a7d12d83420b843ea1f4ceec516d39c94e4abf72`; identical tree `ac3c4e3d2c1a118167a1396265cfb78005720092` verified before updating the feature ref.
+- [Review build #27](https://github.com/QemmHD/perfect-season/actions/runs/41143845149), job `124364191243`, **passed**: full NBA/NFL tests (653), all-card rating audit, TypeScript and production build.
+- Pushed private source: `2f4eb7ad979fd98eab052a80cca1f64eaada4e9f`. Exact pushed-source production build, clean Git, forced `preview2026`, early namespace bootstrap, preview PWA identity and zero-error static boot all passed.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_622801bc1a208191a493ff3b25152bd6`.
+- Deployment: `appgdep_6ae5266b08a881919d00ea23f0c1739c`, **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site . Same owner-private audience, origin, namespace and preview install identity.
+- Main/original restore remain at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-update restore is `backup/pre-play-tab-2026-10-30` at `c24b293c76441d7552c1d4b03a87aa8e5a1bb306`.
+
+This provenance follow-up is documentation only. The deployed runtime is the exact verified source above; no runtime redeploy is needed for this record. No account reset, progress migration, backend deployment or live Pages/main promotion. Physical installed-iPhone playtesting remains an owner check.
