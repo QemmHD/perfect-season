@@ -330,3 +330,15 @@ No account reset, inventory/progress migration, backend deployment or promotion 
 **Implemented by Codex (OpenAI)** for the owner's request that all new UI match Perfect Season's original quality/style. [UI-CONSISTENCY.md](UI-CONSISTENCY.md) records current-run screenshot findings, fixes, file map, numbered flow checks and limits. Fixed long header/wallet collisions, parent-tab state, undersized new labels/actions, three-digit stat column overlap and missing lineup Close; unified court/field panel tokens and selected/disabled feedback. Shared sheets now handle top-modal Tab/Escape/return focus without auto-opening the phone keyboard or drawing a border around the whole screen. Existing Archivo/type hierarchy, teal/gold actions, dark panels, foil/pixel art and round game controls remain the reference.
 
 Local full suites pass 653 tests, TypeScript/build, measured both-sport UI/modal/layout checks at three sizes, complete clubhouse/content/polish/control flows, companion screens and inspect-server restore/conflicts. All original fixture copies/wallet/squads are preserved. Content QA checks event progression/history against the actual displayed win/loss rather than assuming a random simulated fixture must win. Gameplay/ratings/odds/transactions/save schema are unchanged; no queue bump (NBA 8 / NFL 9). Pre-polish restore: `backup/pre-ui-consistency-2026-10-30` at `86d64586271da62ea0fa9934d2c3bd5060307ecb`. Verified publication/CI references follow after release; main is not promoted.
+
+
+## Verified UI polish publication — Codex
+
+- GitHub implementation: `d11d0ad43979caadea3805a4a9901624e134eddb`; local `3b3dbd16b6b50a2b2e968c02ae380b5797e9a655`; identical tree `2625b65a1b4477c830296dc0f2d42020d7176b1c` checked before moving the feature ref.
+- [Review build #25](https://github.com/QemmHD/perfect-season/actions/runs/41141703266), job `124357289800`, **passed**: 343 NBA / 310 NFL tests (**653 total**), all-card rating audit with zero invalid entries, TypeScript and production build.
+- Pushed private source: `78f58146d3e0d7021118b41d7b23413a5c0fe958`. Exact source build, clean Git, namespace bootstrap ordering, forced `preview2026`, retained preview PWA identity and zero-error production boot passed.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_e341e61ba69c8191a27f10e39894a910`.
+- Deployment: `appgdep_6ae521f1c618819181520822c14f870a`, **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site . The same owner-private audience, origin, `preview2026` namespace and `./preview` PWA ID remain.
+- Main/original restore were rechecked at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-polish source restore is `backup/pre-ui-consistency-2026-10-30` at `86d64586271da62ea0fa9934d2c3bd5060307ecb`.
+
+This release-record follow-up changes documentation only; the deployed UI/runtime is the verified implementation above. No live Pages promotion, account reset, save migration, backend deployment, rating/odds/physics changes or transfer of live accounts into preview. Queues stay NBA 8 / NFL 9. Physical installed-iPhone/VoiceOver testing and the existing bundle-size warning remain documented limits.

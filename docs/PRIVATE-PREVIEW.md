@@ -146,3 +146,15 @@ This release-record follow-up changes documentation only; deployed runtime is th
 - Main/original restore were rechecked unchanged at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Source restore before this correction is `backup/pre-nfl-direct-stick-2026-10-30` at `aad7e9b4b747527945a481ad03857a8539bc6f05`.
 
 No account reset, inventory/progress migration, backend deployment or promotion to live Pages. This provenance follow-up changes documentation only; the deployed runtime is the verified implementation above. Physical installed-iPhone feel remains an owner playtest; existing large bundle warnings remain.
+
+
+## Verified UI polish publication — Codex
+
+- GitHub implementation: `d11d0ad43979caadea3805a4a9901624e134eddb`; local `3b3dbd16b6b50a2b2e968c02ae380b5797e9a655`; identical tree `2625b65a1b4477c830296dc0f2d42020d7176b1c` checked before moving the feature ref.
+- [Review build #25](https://github.com/QemmHD/perfect-season/actions/runs/41141703266), job `124357289800`, **passed**: 343 NBA / 310 NFL tests (**653 total**), all-card rating audit with zero invalid entries, TypeScript and production build.
+- Pushed private source: `78f58146d3e0d7021118b41d7b23413a5c0fe958`. Exact source build, clean Git, namespace bootstrap ordering, forced `preview2026`, retained preview PWA identity and zero-error production boot passed.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_e341e61ba69c8191a27f10e39894a910`.
+- Deployment: `appgdep_6ae521f1c618819181520822c14f870a`, **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site . The same owner-private audience, origin, `preview2026` namespace and `./preview` PWA ID remain.
+- Main/original restore were rechecked at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-polish source restore is `backup/pre-ui-consistency-2026-10-30` at `86d64586271da62ea0fa9934d2c3bd5060307ecb`.
+
+This release-record follow-up changes documentation only; the deployed UI/runtime is the verified implementation above. No live Pages promotion, account reset, save migration, backend deployment, rating/odds/physics changes or transfer of live accounts into preview. Queues stay NBA 8 / NFL 9. Physical installed-iPhone/VoiceOver testing and the existing bundle-size warning remain documented limits.
