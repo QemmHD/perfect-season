@@ -30,7 +30,7 @@ Content tests contact the real new registry only in the **inspect** namespace. L
 
 ## Device checks
 
-Chromium verifies layout, input and state transitions. Before claiming device-specific behavior, check on installed iPhones: safe areas, Safari share-to-Files backup/restore, audio permissions, background/reload, orientation, and a two-phone match/rematch. The scripts' proxy certificate exception is a QA-environment setting, not a production security setting.
+Chromium verifies layout, input and state transitions. Before claiming device-specific behavior, check on installed iPhones: safe areas, Cloud Save restore/conflicts, audio permissions, background/reload, orientation, and a two-phone match/rematch. The scripts' proxy certificate exception is a QA-environment setting, not a production security setting.
 
 
 ## Automatic server saves (Codex follow-up)
@@ -48,3 +48,10 @@ Chromium verifies layout, input and state transitions. Before claiming device-sp
 ## Codex 90+ circulation revision
 
 `node scripts/qa/circulation.mjs` tests two signed identities per sport against the existing registry's inspect namespace: first registration, a different player's next issue, live aggregate change within 12 seconds (before polling fallback), repeated sold-copy retirement, and an offline SBC queue through reload/reconnect. It checks other original copies/levels/XP and captures actual numbered gold cards. Whole UI flows accept additive metadata while still requiring every original field to survive. Details: CARD-CIRCULATION.md.
+
+
+## Codex pack cinema revision — 2026-10-30
+
+`node scripts/qa/pack-cinema.mjs` tests the real pack modal within the existing `.stage`: GOAT, Spotlight, gold and NFL Legend at 390×844, GOAT at 320×568 and touch-rotated landscape 844×390, plus reduced motion at 320×568. It checks keyboard open, final-card/control bounds, safe areas, no premature GOAT crown, mid-tear/mid-walkout Skip stability, particle cleanup, reduced-motion CSS and unchanged original copy/level/XP fields. The first case records a video; install the optional tool's FFmpeg once (`/tmp/ps-qa-tools/node_modules/.bin/playwright install ffmpeg`). Output goes to the regular QA artifact directory. `browser.mjs` accepts optional context options for that recording; ordinary fixtures are unchanged.
+
+Displayed 8/20 and `packart` aggregate responses are presentation-only fixtures. No visual-fixture card is deposited/minted; the ordinary isolated profile remains in inspect. No preview cheat UI or altered pack odds is shipped. Run `content.mjs` alongside this to verify real pending-pack/reload settlement and collection/event flows. [Design, sound, timing and connections](PACK-CINEMA.md).

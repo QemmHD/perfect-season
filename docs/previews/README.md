@@ -24,3 +24,10 @@ Source: `scripts/qa/gameplay.mjs`. Full sources, behavior changes, balance diagn
 ## 90+ live issue stamp — Codex, 2026-10-30
 
 [Numbered NBA gold card](serial-nba-live.png) · [Numbered NFL gold card](serial-nfl-live.png) · [NBA card detail](serial-detail-nba.png) · [NFL card detail](serial-detail-nfl.png). Actual localhost components and signed inspect-namespace fixture copies, not player accounts or simulated worldwide claims. Numbers reflect the isolated registry at capture time and subsequently change with registrations/disposals. The inset stamp shares the existing card frame palette and typeface. Reproduction and behavior: [CARD-CIRCULATION.md](../CARD-CIRCULATION.md).
+
+
+## Pack cinema — Codex, 2026-10-30
+
+[Sealed foil](pack-cinema-sealed.png) → [GOAT escalation](pack-cinema-shatter.png) → [GOAT card](pack-cinema-goat.png); [Spotlight entrance](pack-cinema-spotlight.png). These are actual localhost renders with the original stage, Archivo type, card art and simulated iPhone safe areas. The 8/20 copy stamp is a presentation-only fixture with mocked `packart` counts, never a deposited/minted card or a claim about global circulation.
+
+The reveal includes charge/tear, opening doors, mystery card, position/team clues, procedural streaks, a GOAT-only limit break and the actual card's entrance. Stills cannot show all the motion; `scripts/qa/pack-cinema.mjs` records the first case to WebM (visual-only recording, no system audio). [Timing, sound, source connections and device verification limits](../PACK-CINEMA.md). No boosted odds or preview-only cheat UI is shipped.

@@ -17,8 +17,8 @@ export async function launch() {
     args: ['--no-sandbox', ...(proxy ? ['--proxy-server=' + proxy, '--proxy-bypass-list=localhost;127.0.0.1'] : [])],
   });
 }
-export async function fixture(browser, sport = 'nba', name = 'Codex QA', width = 390) {
-  const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: 'reduce', ignoreHTTPSErrors: !!process.env.PS_QA_PROXY });
+export async function fixture(browser, sport = 'nba', name = 'Codex QA', width = 390, contextOptions = {}) {
+  const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: 'reduce', ignoreHTTPSErrors: !!process.env.PS_QA_PROXY, ...contextOptions });
   const page = await context.newPage(),
     errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

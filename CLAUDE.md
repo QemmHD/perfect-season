@@ -11,6 +11,8 @@ This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub P
 
 ## Connections and module map
 
+The latest pack presentation is documented in `docs/PACK-CINEMA.md` (**implemented by Codex**): original procedural arena effects, tier timing and cancellable synthesized cues. It uses the existing pack outcomes and progress without changing odds or transactions.
+
 The latest card-number revision is documented in `docs/CARD-CIRCULATION.md`: **90+ including upgrades**, existing unnumbered holdings issued in first-connection order, fixed serial / live active copies, sold/SBC retirement with offline retries. Preserve the ledger, cumulative sequence, active counts and optional local queue.
 
 - `src/net/nostr.ts`: original five-relay Nostr transport and signed player identity. `match.ts`: existing matchmaking/live matches. `leaderboard.ts`: original boards. `gifts.ts`: admin gifts. These are **not Supabase features**.
@@ -22,7 +24,7 @@ The latest card-number revision is documented in `docs/CARD-CIRCULATION.md`: **9
 - `src/game/difficulty.ts`: selected offline defensive settings and equal Legend defense online (including simulations/takeovers). Match protocol rules are 4; `DATA_V`/leaderboard history is retained. The NBA/NFL `gameplay.test.ts` regressions and `scripts/qa/gameplay.mjs` check the revised engines.
 - `src/ut/rivals.ts`, `rivals-net.ts`, `Rivals.tsx`: Codex division progress/rewards and separate signed Nostr standings.
 - `src/ut/rating-quality.ts`, `calibration.ts`, `nfl-identity.ts`: all-tier position/season-supported ratings, 372 public NBA anchors and explicitly estimated NFL physical identities; no universal promo attribute floors. New `season-reference.ts` and lazy `season-references-<sport>.json` add exact-matched public same-era benchmarks, before edition boosts. Read docs/RATINGS-AUDIT.md and GAMEPLAY-RESEARCH.md before tuning; ordinary draft rating formulas remain separate from UT calibration.
-- New collection, event and card-registry modules are detailed in the update log. `src/ut/pack-reveal.css` and `PackOpening.tsx` implement the Codex Spotlight/GOAT reveal sequences; `GoatCrown` in `CardArt.tsx` is the shared card/reveal mark. Keep globally registered mint serials separate from player-local copy UIDs.
+- New collection, event and card-registry modules are detailed in the update log. `src/ut/pack-reveal.css`, `pack-cinema.css`, `PackAtmosphere.tsx`, `pack-sequence.ts` and `PackOpening.tsx` implement the Codex arena/Spotlight/GOAT reveal sequences; `GoatCrown` in `CardArt.tsx` is the shared card/reveal mark. Keep globally registered mint serials separate from player-local copy UIDs.
 
 ## Private test copy
 
