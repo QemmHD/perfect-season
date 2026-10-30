@@ -222,3 +222,8 @@ Validation: **288 NBA / 255 NFL tests pass (543 total)**, 31/63 existing skips. 
 Real-component browser checks passed at 390×844, 320×568 and 844×390: held-forward exactly matched no-input outcomes, a normal 50px push did not spin, move buttons exercised actual run animations/outcomes, controls/safe areas fit, populated canvases and all 69 original fixture copies/levels/XP were preserved without page errors. The short-portrait layout was refined after screenshot review and rechecked. Two independent signed local-relay clients per sport agreed on one win/one loss and 30 combined Rivals points; NFL rule-5/unchanged NBA rule-4 matching passed. Physical installed-iPhone feel remains a device check.
 
 Restore source: `backup/pre-nfl-rushing-2026-10-30` → `7f1cfbd0b85fe9c2f100f31d60294a3eb3ca7ae5`. The original main/restore remain `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Work stays on the feature branch/PR and existing owner-private preview. Final publication/CI references follow after verification.
+
+
+### Independent CI follow-up: deterministic tamper fixture — Codex
+
+GitHub Review build #14 (`41044181933`, job `124024056003`) passed NBA and all NFL rushing checks but exposed an existing flaky cloud-data test: it always replaced the first Base64 ciphertext character with A, which leaves random ciphertext unchanged when it already begins with A (about 1/64 cases). Codex corrected **only `src/lib/cloud-data.test.ts`** to choose A/B so the first significant character always changes, and asserts that the fixture differs before requiring authenticated decryption to reject it. No runtime save/encryption code, backend, player data or rushing physics changed. Final independent verification is recorded below after the follow-up run.

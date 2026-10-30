@@ -69,7 +69,7 @@ Main/GitHub Pages and the original restore branch still point to `7285ced3e66cb7
 No merge or GitHub Pages deployment. Main/original restore remains `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-circulation source backup is `backup/pre-card-circulation-2026-10-30` at `e7a4ac7a5426b89b66d7f36037a5ab5af56ef7f8`. This release-record follow-up is documentation only; the deployed implementation is the exact code identified above.
 
 
-## Current pack cinema preview — Codex, 2026-10-30
+## Previous pack cinema preview — Codex, 2026-10-30
 
 - GitHub implementation: `8e1611fde2f58905278ac0bcf16536d7500030f1`, exact tree `f1a8893c6225d17c7a0f2df0f7a4256f2dde19c4`; local implementation `85d9aadeeee5a6274b3d7338f59de8a3bca735a4` has the same tree.
 - Sites source: `c60c61367f0c51cd4d46b34086d7c99e1757a55a`.
@@ -80,3 +80,16 @@ No merge or GitHub Pages deployment. Main/original restore remains `7285ced3e66c
 - Exact pushed source built and packaged successfully. Production-build boot, forced namespace override, bootstrap-before-modules order, preview manifest identity, clean source and absence of the Pages deployment workflow all passed without page errors. Seven touch-browser reveal cases and both-sport real pack/reload/content flows passed; physical installed-iPhone checks remain unverified. Final GitHub CI reference is in CODEX-UPDATE-LOG.md.
 
 Restore point before this presentation revision: `backup/pre-pack-cinema-2026-10-30` → `e9a35dbd1e10d29c524579112608d847747c1dcd`. Main and the original restore remain `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. This release-record follow-up changes documentation only; the deployment above contains the verified implementation.
+
+
+## Current NFL rushing preview — Codex, 2026-10-30
+
+- GitHub implementation: `152ec94e7d7d7e339c83facd8a8e2785449005e2`, exact tree `d5e7a7d3c9b805804afe0cf549bc6ddffdff2abd`; local implementation `fb9a527bc66b807aa12cc340a2e96edc2d669d8f` has the same tree.
+- Sites source: `91dca4a555c365031685e02676f2697dff16341d`. All 292 tracked application source files were checked identical to the verified GitHub tree.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_f37dad903af4819184e4fb722394e032`.
+- Deployment: `appgdep_6ae477ee618c819180c36745f2465f35`, **succeeded**, 2026-10-30.
+- Same URL: https://perfect-season-private-preview.qem.chatgpt.site . Confirmed owner-private (one owner, no groups); existing origin, preview namespace, installed app identity and saved progress remain.
+- Changes: neutral/forward input follows the blocking lane, deliberate flick threshold, real outside edge path, assigned front blocks, rated TE seals and existing-style Juke/Spin/Power buttons. NFL queues use rules 5; NBA remains 4. Both phones must use the same updated NFL preview. No card rating, pack odds, progress schema or backend function changed. [NFL-RUSHING.md](NFL-RUSHING.md) and the Codex update log record methods, measurements and verification limits.
+- Exact pushed source built and packaged successfully. Production boot, forced namespace override, bootstrap ordering, preview PWA identity, clean source and exclusion of the Pages deployment workflow passed. Full tests, phone-size pointer/animation/layout checks, preservation of 69 original fixture copies and signed online settlements passed; physical installed-iPhone feel remains a device check. Final GitHub CI reference is in CODEX-UPDATE-LOG.md.
+
+Pre-fix source restore: `backup/pre-nfl-rushing-2026-10-30` → `7f1cfbd0b85fe9c2f100f31d60294a3eb3ca7ae5`. Main/original restore remain `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. This release-record follow-up changes documentation only; the deployment above contains the verified application.

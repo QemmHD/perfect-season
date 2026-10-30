@@ -87,9 +87,16 @@ describe("encrypted server progress", () => {
     await expect(
       decryptProgress(encrypted, "11".repeat(32), "", "actor"),
     ).rejects.toThrow();
+    // Codex: always change a significant Base64 character. The old unconditional "A" was a
+    // no-op whenever random ciphertext already began with A (about 1/64 encryptions).
+    const tampered = {
+      ...encrypted,
+      cipher: (encrypted.cipher[0] === "A" ? "B" : "A") + encrypted.cipher.slice(1),
+    };
+    expect(tampered.cipher).not.toBe(encrypted.cipher);
     await expect(
       decryptProgress(
-        { ...encrypted, cipher: "A" + encrypted.cipher.slice(1) },
+        tampered,
         "11".repeat(32),
         "inspect",
         "actor",
