@@ -1,5 +1,7 @@
 # NFL rushing execution — Codex, 2026-10-30
 
+**Manual running control is superseded by the [direct joystick correction](NFL-DIRECT-CONTROL.md), implemented by Codex after the owner’s strafing report. Humans now control both axes and release to stop; the lane-following description below is retained as historical context for AI/simulations.**
+
 **Implemented by Codex (OpenAI)** after the owner reported that running the ball felt almost impossible. This revision fixes the control/path/blocking interaction in the existing eleven-on-eleven NFL engine. It applies to draft, Ultimate Team, Training Camp, played matches and simulations through the shared engine. The original card ratings, saved progress, wallet, packs and account identity are preserved.
 
 ## Findings and resulting behavior

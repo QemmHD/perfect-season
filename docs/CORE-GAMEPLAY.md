@@ -1,5 +1,7 @@
 # Actual court and field overhaul — Codex, 2026-10-30
 
+**Manual running control is superseded by the [direct joystick correction](NFL-DIRECT-CONTROL.md), implemented by Codex after the owner’s strafing report. Humans now control both axes and release to stop; the lane-following description below is retained as historical context for AI/simulations.**
+
 **Implemented by Codex (OpenAI).** This revision changes actual NBA/NFL play after the owner clarified that menus and reliability polish were not the intended gameplay overhaul. Source restore: `backup/pre-core-gameplay-2026-10-30` at `0bfe5a54bbf9f87c5865325fd8bd605f20140177`. Work remains on `feature/season-evolution`, PR #1 and the existing owner-private preview. Main/Pages and the original restore remain unchanged.
 
 ## Play direction and controls

@@ -147,3 +147,36 @@
 .fb2-receivers button:nth-child(5) {
   border-top: 2px solid #c7a2ff;
 }
+/* Codex: a permanent two-axis stick, using the same court control art and safe-area offsets. */
+.fb2 .fb2-stick {
+  position: absolute;
+  left: calc(var(--sal) + 14px);
+  bottom: calc(var(--sab) + 14px);
+  width: 116px;
+  height: 116px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.fb2 .fb2-stick:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 4px;
+}
+.fb2 .fb2-burst {
+  left: calc(var(--sal) + 146px);
+  bottom: calc(var(--sab) + 22px);
+  width: 68px;
+  height: 68px;
+  font-size: 14px;
+}
+@media (max-width: 350px), (max-height: 450px) {
+  .fb2 .fb2-stick {
+    width: 104px;
+    height: 104px;
+    left: calc(var(--sal) + 10px);
+  }
+  .fb2 .fb2-burst {
+    left: calc(var(--sal) + 130px);
+    width: 62px;
+    height: 62px;
+  }
+}

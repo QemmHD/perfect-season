@@ -2,8 +2,8 @@ import type { Practice } from '../../evolution/training';
 // Arcade football, Retro Bowl style: your offense against the rival's defense, eleven on eleven.
 // Before the snap pick one of three play cards (its routes are drawn on the field) and SNAP. On a
 // pass, drag back anywhere and let go to throw: the arc shows where it lands and who it's going to.
-// With the ball in your hands, drag to steer; swipe across to juke, swipe up field to spin,
-// double-tap to truck. Fourth down: go for it, kick on the meter, or punt.
+// With the ball in your hands, the joystick controls both axes; skill moves have their own buttons.
+// Fourth down: go for it, kick on the meter, or punt.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
@@ -42,6 +42,7 @@ import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, PassType, Play, Pt } from './types';
 import './rushing-controls.css';
+import { screenRunInput } from './controls';
 import './playbook.css';
 import { PlaybookDialog } from './PlaybookDialog';
 import { useInputInterrupt } from '../useInputInterrupt';
@@ -172,7 +173,8 @@ export function Football2({
   // the slingshot: where the drag began and how far back it's pulled (css px)
   const dragRef = useRef<{ id: number; x0: number; y0: number; dx: number; dy: number } | null>(null);
   // steering: a stick that floats wherever the finger lands
-  const stickRef = useRef<{ id: number; x0: number; y0: number; x: number; y: number } | null>(null);
+  const stickRef = useRef<{ id: number; x0: number; y0: number; x: number; y: number; radius: number } | null>(null);
+  const runKeys = useRef(new Set<string>());
   const kickRef = useRef<{ t0: number; stopped: number | null; dist: number; win: number } | null>(null);
   const [ui, setUi] = useState<Ui>('loading');
   const [, setTick] = useState(0);
@@ -181,7 +183,7 @@ export function Football2({
   const [hint, setHint] = useState<string | null>(null);
   const hinted = useRef(new Set<string>());
   const [wide, setWide] = useState(false);
-  const [float, setFloat] = useState<{ x: number; y: number; kx: number; ky: number } | null>(null);
+  const [knob, setKnob] = useState({ x: 0, y: 0 });
   const [phase, setPhase] = useState<Play['phase']>('pre');
   const [passType, setPassType] = useState<PassType>('touch');
   const [bursting, setBursting] = useState(false);
@@ -191,9 +193,6 @@ export function Football2({
   const [picked, setPicked] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [book, setBook] = useState<{ choice: PlayChoice; play: Play }[] | null>(null);
-  // a swipe in progress (a fast flick reads as a move; a slow drag steers) and the last tap (double-tap)
-  const gesture = useRef<{ id: number; t0: number; x0: number; y0: number; used: boolean } | null>(null);
-  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const openRings = useMemo(() => gamesPlayed() < OPEN_RING_GAMES, []);
   const counted = useRef(false);
   // instant replay: the last seconds of play, the highlight to show, the replay running
@@ -241,8 +240,8 @@ export function Football2({
     playRef.current = startChoice(g, cs[0]);
     dragRef.current = null;
     stickRef.current = null;
-    gesture.current = null;
-    setFloat(null);
+    setKnob({ x: 0, y: 0 });
+    runKeys.current.clear();
     setPhase('pre');
     setUi(g.down === 4 ? 'fourth' : 'pre');
     if (g.down !== 4) tip('call', 'Pick a play · its routes show on the field · SNAP');
@@ -320,7 +319,7 @@ export function Football2({
     setUi('live');
     setPhase(p.phase);
     if (p.call === 'pass') tip('pass', 'Tap a receiver to lead him · or drag back to aim');
-    else tip('run', 'Follow your blockers · hold BURST through the gap');
+    else tip('run', 'Joystick to run in any direction · hold BURST for speed');
   };
 
   const nextUp = (g: Game, driveOver: boolean, wait: number) => {
@@ -352,7 +351,7 @@ export function Football2({
       else if (e === 'catch') {
         sfx.catch();
         crowd.swell(0.3);
-        tip('runafter', 'Follow the lane · drag to cut · tap Juke, Spin or Power');
+        tip('runafter', 'Joystick to run · Juke, Spin and Power on the right');
       } else if (e === 'catch-contested') {
         sfx.catch();
         crowd.swell(0.7);
@@ -401,7 +400,8 @@ export function Football2({
     const e = p.end!;
     dragRef.current = null;
     stickRef.current = null;
-    setFloat(null);
+    setKnob({ x: 0, y: 0 });
+    runKeys.current.clear();
     setPhase('dead');
     const a = afterPlay(game, e);
     practice?.onAttempt({ points: a.points, success: practice.drill === 'run' ? e.gain >= 5 : e.caught, yards: Math.round(e.gain), detail: e.text });
@@ -591,14 +591,13 @@ export function Football2({
     return { x: p.qb.x + v.x * k, y: p.qb.y + v.y * k };
   };
 
-  /** Where the runner heads across the field, from the floating stick. */
-  const steerNow = (p: Play): number | null => {
+  /** Both screen axes reach the simulation. An untouched/released human stick means stop. */
+  const steerNow = (): Pt => {
     const s = stickRef.current;
-    const c = p.carrier;
-    if (!s || !c) return null;
-    const across = renderer.mode === 'side' ? -s.y : s.x;
-    // Neutral/upfield pressure follows the called blocking lane; lateral input still cuts freely.
-    return Math.abs(across) < 0.12 ? null : c.x + across * 8;
+    const keys = runKeys.current;
+    const x = s?.x ?? Number(keys.has('arrowright') || keys.has('d')) - Number(keys.has('arrowleft') || keys.has('a'));
+    const y = s?.y ?? Number(keys.has('arrowdown') || keys.has('s')) - Number(keys.has('arrowup') || keys.has('w'));
+    return screenRunInput(x, y, renderer.mode);
   };
 
   // the loop: fixed steps for the play, a draw every frame
@@ -651,7 +650,7 @@ export function Football2({
         while (acc >= DT) {
           acc -= DT;
           const was: Play['phase'] = p.phase;
-          const steer = autoplayHook ? decide(p, game, pilotRef.current) : steerNow(p);
+          const steer = autoplayHook ? decide(p, game, pilotRef.current) : steerNow();
           step(p, DT, steer);
           handleEvents(p);
           if (p.phase !== was) setPhase(p.phase);
@@ -719,8 +718,7 @@ export function Football2({
     return () => cancelAnimationFrame(raf);
   }, [game]);
 
-  // ---- touch: the slingshot while he's back to throw; once someone's running (or the ball's in the
-  // air on its way to him), a stick that floats where the finger lands, with flicks for moves ----
+  // ---- touch: slingshot passing, then direct two-axis running; skills stay on their buttons ----
   const move3 = (p: Play, kind: 'juke' | 'spin' | 'power', dir = 0) => {
     const c = p.carrier;
     if (!c || p.phase !== 'run') return;
@@ -736,16 +734,8 @@ export function Football2({
     if (p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) {
       dragRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 };
     } else if (p.phase === 'run' || p.phase === 'air' || (p.phase === 'drop' && p.call === 'run')) {
-      const now = performance.now();
-      const t = lastTap.current;
-      // a double-tap: lower the shoulder (a truck, or a stiff arm for the man who's better at it)
-      if (t && now - t.t < 300 && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 60) {
-        move3(p, 'power');
-        lastTap.current = null;
-      } else lastTap.current = { t: now, x: e.clientX, y: e.clientY };
-      stickRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: 0, y: 0 };
-      gesture.current = { id: e.pointerId, t0: now, x0: e.clientX, y0: e.clientY, used: false };
-      setFloat({ x: e.clientX, y: e.clientY, kx: 0, ky: 0 });
+      stickRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: 0, y: 0, radius: 46 };
+      setKnob({ x: 0, y: 0 });
     }
   };
   const move = (e: React.PointerEvent) => {
@@ -757,29 +747,7 @@ export function Football2({
     }
     const s = stickRef.current;
     if (!s || s.id !== e.pointerId) return;
-    // a flick (far, fast) is a move: across the field a juke that way, up the field a spin
-    const g = gesture.current;
-    const p = playRef.current;
-    if (g && p?.phase === 'run' && !g.used && performance.now() - g.t0 < 200) {
-      const dx = e.clientX - g.x0;
-      const dy = e.clientY - g.y0;
-      // A full normal stick throw is 46px. Require a deliberate longer flick for a move.
-      if (Math.hypot(dx, dy) > 70) {
-        g.used = true;
-        const upField = renderer.mode === 'side' ? dx : -dy;
-        const across = renderer.mode === 'side' ? -dy : dx;
-        if (upField > Math.abs(across) * 1.2) move3(p, 'spin');
-        else if (Math.abs(across) > Math.abs(upField)) move3(p, 'juke', Math.sign(across));
-        // steer from here on, not from where the flick began
-        s.x0 = e.clientX;
-        s.y0 = e.clientY;
-        s.x = 0;
-        s.y = 0;
-        setFloat({ x: s.x0, y: s.y0, kx: 0, ky: 0 });
-        return;
-      }
-    }
-    const R = 46;
+    const R = s.radius;
     let x = (e.clientX - s.x0) / R;
     let y = (e.clientY - s.y0) / R;
     const l = Math.hypot(x, y);
@@ -789,7 +757,29 @@ export function Football2({
     }
     s.x = x;
     s.y = y;
-    setFloat({ x: s.x0, y: s.y0, kx: x, ky: y });
+    setKnob({ x, y });
+  };
+  const stickDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (ui !== 'live' || stickRef.current || dragRef.current) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    runKeys.current.clear();
+    stickRef.current = { id: e.pointerId, x0: r.left + r.width / 2, y0: r.top + r.height / 2, x: 0, y: 0, radius: r.width / 2 - 27 };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    move(e);
+  };
+  const keyRun = (e: React.KeyboardEvent, held: boolean) => {
+    const key = e.key.toLowerCase();
+    if (!['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) return;
+    e.preventDefault();
+    if (held) runKeys.current.add(key);
+    else runKeys.current.delete(key);
+    const keys = runKeys.current;
+    const x = Number(keys.has('arrowright') || keys.has('d')) - Number(keys.has('arrowleft') || keys.has('a'));
+    const y = Number(keys.has('arrowdown') || keys.has('s')) - Number(keys.has('arrowup') || keys.has('w'));
+    const length = Math.max(1, Math.hypot(x, y));
+    setKnob({ x: x / length, y: y / length });
   };
   const up = (e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -803,8 +793,8 @@ export function Football2({
     const s = stickRef.current;
     if (s && s.id === e.pointerId) {
       stickRef.current = null;
-      gesture.current = null;
-      setFloat(null);
+      setKnob({ x: 0, y: 0 });
+      runKeys.current.clear();
     }
   };
   /** The touch taken away (a system swipe from an edge, a call): let go of everything, throw nothing. */
@@ -813,16 +803,15 @@ export function Football2({
     const s = stickRef.current;
     if (s && s.id === e.pointerId) {
       stickRef.current = null;
-      gesture.current = null;
-      setFloat(null);
+      setKnob({ x: 0, y: 0 });
+      runKeys.current.clear();
     }
   };
   useInputInterrupt(() => {
     dragRef.current = null;
     stickRef.current = null;
-    gesture.current = null;
-    lastTap.current = null;
-    setFloat(null);
+    setKnob({ x: 0, y: 0 });
+    runKeys.current.clear();
     stopBurst();
   });
   const stopBurst = () => {
@@ -846,6 +835,7 @@ export function Football2({
   const passing = ui === 'live' && phase === 'drop' && p?.call === 'pass';
   const running = ui === 'live' && phase === 'run';
   const rushing = running || (ui === 'live' && phase === 'drop' && p?.call === 'run');
+  const steering = rushing || (ui === 'live' && phase === 'air');
   useEffect(() => {
     if (!rushing) stopBurst();
   }, [rushing]);
@@ -914,9 +904,25 @@ export function Football2({
         </button>
       )}
       {ui === 'loading' && <div className="fg-loading">Taking the field…</div>}
-      {float && (
-        <div className="fb2-float" style={{ left: float.x, top: float.y }} aria-hidden="true">
-          <i style={{ transform: 'translate(' + float.kx * 30 + 'px,' + float.ky * 30 + 'px)' }} />
+      {steering && !autoplayHook && (
+        <div
+          className="hg2-stick fb2-stick"
+          role="group"
+          aria-label="Run joystick: drag in any direction. Arrow keys or WASD."
+          tabIndex={0}
+          onPointerDown={stickDown}
+          onPointerMove={move}
+          onPointerUp={up}
+          onPointerCancel={cancel}
+          onLostPointerCapture={cancel}
+          onKeyDown={(e) => keyRun(e, true)}
+          onKeyUp={(e) => keyRun(e, false)}
+          onBlur={() => {
+            runKeys.current.clear();
+            if (!stickRef.current) setKnob({ x: 0, y: 0 });
+          }}
+        >
+          <i style={{ transform: 'translate(' + knob.x * 28 + 'px,' + knob.y * 28 + 'px)' }} />
         </div>
       )}
       {(ui === 'pre' || ui === 'fourth') && g && p && !autoplayHook && (

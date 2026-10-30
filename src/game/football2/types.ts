@@ -43,6 +43,9 @@ export interface Pt {
   y: number;
 }
 
+/** Human input is a normalized field vector; numeric/null input retains the AI's lane following. */
+export type RunInput = Pt | number | null;
+
 export type Job = 'block' | 'route' | 'rush' | 'man' | 'zone' | 'spy' | 'carry' | 'pursue' | 'qb' | 'idle' | 'track' | 'handoff';
 
 /** what a body is doing, for the animation */

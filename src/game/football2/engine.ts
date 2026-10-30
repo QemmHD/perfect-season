@@ -10,7 +10,7 @@
 // bullet/touch/lob trajectory drives the real flight, lane defense, receiver lead and aim preview.
 // On a run the line drives its men away from the play's hole. A tackler winds up before he dives
 // (the runner can see it coming), and a juke as he leaves his feet fakes him out.
-import type { Act, Body, Call, Concept, Defense, FbPlayer, Job, Move, Offense, PassType, Play, PlayEnd, Pt, RunPlay } from './types';
+import type { Act, Body, Call, Concept, Defense, FbPlayer, Job, Move, Offense, PassType, Play, PlayEnd, Pt, RunInput, RunPlay } from './types';
 
 export const FIELD_W = 53.33;
 const HASH_L = 23.58;
@@ -600,10 +600,10 @@ function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string) {
 }
 
 /**
- * Advance the play by dt. `steer` is where the runner heads across the field (the player's finger),
- * or null to run straight up.
+ * Advance the play by dt. A vector directly controls both field axes, including stopping/backward.
+ * A numeric across-field target or null retains the existing simulation/pilot lane behavior.
  */
-export function step(p: Play, dt: number, steer: number | null) {
+export function step(p: Play, dt: number, steer: RunInput) {
   if (p.phase === 'pre' || p.phase === 'dead') return;
   p.t += dt;
   const t = p.t;
@@ -655,10 +655,11 @@ export function step(p: Play, dt: number, steer: number | null) {
       continue;
     }
     if (b === carrier && p.phase === 'run') {
-      // the runner: upfield, cutting toward the finger (on a run, through the hole until he's past
-      // the line, unless the finger says otherwise); a move is its own burst. Tired, he's a step slower.
+      const manual = typeof steer === 'object' && steer !== null;
+      const magnitude = manual ? Math.hypot(steer.x, steer.y) : 1;
+      const strength = Number.isFinite(magnitude) ? Math.min(1, magnitude) : 0;
       const m = p.move && t < p.move.until ? p.move : null;
-      const burst = !!p.bursting && p.stamina > 0.06 && !m && t >= p.slowUntil;
+      const burst = !!p.bursting && strength > 0.1 && p.stamina > 0.06 && !m && t >= p.slowUntil;
       if (!m) p.stamina = clamp(p.stamina + (burst ? -0.27 : STAMINA_BACK) * dt, 0, 1);
       const sp = speedOf(b.p) * (t < p.slowUntil ? 0.65 : burst ? 1.09 : 0.94) * lerp(0.9, 1, p.stamina);
       const followingRun = steer === null && p.call === 'run' && b === p.rb && b.y < p.los + 1;
@@ -666,13 +667,26 @@ export function step(p: Play, dt: number, steer: number | null) {
       // velocity used to drag every run into the tackle box, even when its arrow pointed outside.
       const stretching = followingRun && p.run === 'outside' && (p.direction ?? 1) * (p.hole - b.x) > 0.8;
       const landmark = stretching ? { x: p.hole, y: p.los - 0.1 } : null;
-      const aim = steer ?? (followingRun ? p.hole : null);
+      const aim = typeof steer === 'number' ? steer : followingRun ? p.hole : null;
       if (m?.kind === 'juke') {
         b.vx = m.dir * sp * (0.8 + 0.35 * m.eff);
         b.vy = sp * 0.45;
       } else if (m?.kind === 'spin') {
         b.vx *= 0.9;
         b.vy = sp * 0.6;
+      } else if (manual) {
+        const divisor = Math.max(1, magnitude);
+        const wantX = strength ? (steer.x / divisor) * sp : 0,
+          wantY = strength ? (steer.y / divisor) * sp : 0;
+        const dx = wantX - b.vx,
+          dy = wantY - b.vy,
+          delta = Math.hypot(dx, dy);
+        const braking = strength === 0;
+        const reversing = b.vx * wantX + b.vy * wantY < 0;
+        const acceleration = braking ? lerp(26, 38, rt(b.p.a.AGI, 40, 99)) : reversing ? lerp(18, 30, rt(b.p.a.AGI, 40, 99)) : lerp(16, 26, rt(b.p.a.ACC, 40, 99));
+        const amount = Math.min(1, (acceleration * dt) / Math.max(0.001, delta));
+        b.vx += dx * amount;
+        b.vy += dy * amount;
       } else {
         const len = landmark ? Math.max(0.1, dist(b, landmark)) : 1;
         const wantX = landmark ? ((landmark.x - b.x) / len) * sp : aim === null ? 0 : clamp((aim - b.x) * 2.2, -sp * 0.65, sp * 0.65);
@@ -717,6 +731,7 @@ export function step(p: Play, dt: number, steer: number | null) {
     }
   if (p.phase === 'run' && carrier) {
     if (carrier.y >= 100) endPlay(p, 'td', carrier, 'TOUCHDOWN');
+    else if (carrier.y <= -10) endPlay(p, 'out', carrier, 'OUT OF END ZONE');
     else if (carrier.x < 0.2 || carrier.x > FIELD_W - 0.2) endPlay(p, 'out', carrier, 'OUT OF BOUNDS');
   }
   if (p.phase === 'air' && p.ball) {

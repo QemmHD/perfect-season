@@ -68,3 +68,12 @@ Actual NBA/NFL components with isolated rated squads and the original UI/art. Co
 - [NFL landscape passing](core-nfl-pass-844.png)
 - [NFL held burst](core-nfl-burst.png)
 - [NFL landscape running controls](core-nfl-run-landscape.png)
+
+
+## Direct NFL joystick — Codex, 2026-10-30
+
+- [390px normal Legend defense](nfl-direct-390.png)
+- [320px two-touch control-isolation fixture](nfl-direct-320.png)
+- [Landscape two-touch control-isolation fixture](nfl-direct-844.png)
+
+Actual original-style joystick/BURST/skill UI. Direction-isolation captures hold defenders away to measure the player's input and velocity; the normal-defense capture does not. All run at normal 1× speed. [Defect, control contract and measured results](../NFL-DIRECT-CONTROL.md).

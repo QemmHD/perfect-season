@@ -1,0 +1,198 @@
+{
+  "implementedBy": "Codex (OpenAI)",
+  "method": "Actual component at normal 1x speed; direction-isolation fixture holds defenders away; separate normal-defense run uses unchanged rated teams/Legend. World coordinates observed by a test-only renderer wrapper.",
+  "results": [
+    {
+      "width": 390,
+      "height": 844,
+      "normalTimeScale": 1,
+      "directions": [
+        {
+          "screen": [
+            0,
+            -1
+          ],
+          "world": [
+            0,
+            2.88
+          ]
+        },
+        {
+          "screen": [
+            1,
+            0
+          ],
+          "world": [
+            2.73,
+            0
+          ]
+        },
+        {
+          "screen": [
+            0,
+            1
+          ],
+          "world": [
+            0,
+            -2.73
+          ]
+        },
+        {
+          "screen": [
+            -1,
+            0
+          ],
+          "world": [
+            -2.73,
+            0
+          ]
+        },
+        {
+          "screen": [
+            1,
+            -1
+          ],
+          "world": [
+            1.93,
+            1.93
+          ]
+        }
+      ],
+      "normalDefenseAttempt": {
+        "points": 0,
+        "success": false,
+        "yards": 2,
+        "detail": "TACKLED"
+      },
+      "twoThumbBurst": true,
+      "releaseStops": true,
+      "interruptStops": true,
+      "copiesPreserved": 69,
+      "errors": []
+    },
+    {
+      "width": 320,
+      "height": 568,
+      "normalTimeScale": 1,
+      "directions": [
+        {
+          "screen": [
+            0,
+            -1
+          ],
+          "world": [
+            0,
+            2.73
+          ]
+        },
+        {
+          "screen": [
+            1,
+            0
+          ],
+          "world": [
+            2.73,
+            0
+          ]
+        },
+        {
+          "screen": [
+            0,
+            1
+          ],
+          "world": [
+            0,
+            -2.73
+          ]
+        },
+        {
+          "screen": [
+            -1,
+            0
+          ],
+          "world": [
+            -2.73,
+            0
+          ]
+        },
+        {
+          "screen": [
+            1,
+            -1
+          ],
+          "world": [
+            1.93,
+            1.93
+          ]
+        }
+      ],
+      "twoThumbBurst": true,
+      "releaseStops": true,
+      "interruptStops": true,
+      "copiesPreserved": 69,
+      "errors": []
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "normalTimeScale": 1,
+      "directions": [
+        {
+          "screen": [
+            0,
+            -1
+          ],
+          "world": [
+            2.73,
+            0
+          ]
+        },
+        {
+          "screen": [
+            1,
+            0
+          ],
+          "world": [
+            0,
+            2.73
+          ]
+        },
+        {
+          "screen": [
+            0,
+            1
+          ],
+          "world": [
+            -2.73,
+            0
+          ]
+        },
+        {
+          "screen": [
+            -1,
+            0
+          ],
+          "world": [
+            0,
+            -2.73
+          ]
+        },
+        {
+          "screen": [
+            1,
+            -1
+          ],
+          "world": [
+            1.93,
+            1.93
+          ]
+        }
+      ],
+      "twoThumbBurst": true,
+      "releaseStops": true,
+      "interruptStops": true,
+      "copiesPreserved": 69,
+      "errors": []
+    }
+  ]
+}

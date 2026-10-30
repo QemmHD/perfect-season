@@ -304,3 +304,10 @@ Verification: 611 full-suite tests, focused post-edit physics/catch/input regres
 - Main and original restore were rechecked at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; the pre-core restore is `backup/pre-core-gameplay-2026-10-30` at `0bfe5a54bbf9f87c5865325fd8bd605f20140177`.
 
 This release-record follow-up changes documentation only; deployed runtime is the verified implementation above. No live Pages merge/deploy, account reset, backend migration or transfer of live accounts into preview. The known physical-iPhone testing limit and existing bundle-size warning remain as documented.
+
+
+## Direct NFL joystick correction — Codex, 2026-10-30
+
+**Implemented by Codex (OpenAI)** after the owner reported sideways strafing and missing direct joystick movement. [NFL-DIRECT-CONTROL.md](NFL-DIRECT-CONTROL.md) records the actual defect, superseded test assumption, input contract and module map. The old control discarded one axis and mixed lateral targeting with auto-forward movement; fast stick travel could trigger a skill and zero input. Humans now send normalized two-axis vectors, including reverse/diagonal/analog movement and release-to-stop. A permanent original-style stick and adjacent BURST support two thumbs; skills remain explicit buttons. Numeric/null lane-following remains for AI/simulation. NFL mechanics are 9; NBA stays 8; identities, wallet, owned copies/XP/serials, squads, rewards, saved progress and data history are untouched. Pre-fix source is `backup/pre-nfl-direct-stick-2026-10-30` at `aad7e9b4b747527945a481ad03857a8539bc6f05`.
+
+Local full suites passed 651 tests; focused direction/release/speed/boundary regressions, TypeScript and production build passed. Actual two-axis coordinate movement, simultaneous touch steering/burst, release/interrupt stopping and responsive non-overlapping controls passed at three sizes; all 69 original fixture copies/squad/wallet survived. Separate normal Legend-defense play completed and both-sport signed H2H settled correctly. See the measured report for isolation/physical-device limits. Verified CI/private release provenance follows; main is not promoted.
