@@ -31,3 +31,8 @@ Source: `scripts/qa/gameplay.mjs`. Full sources, behavior changes, balance diagn
 [Sealed foil](pack-cinema-sealed.png) → [GOAT escalation](pack-cinema-shatter.png) → [GOAT card](pack-cinema-goat.png); [Spotlight entrance](pack-cinema-spotlight.png). These are actual localhost renders with the original stage, Archivo type, card art and simulated iPhone safe areas. The 8/20 copy stamp is a presentation-only fixture with mocked `packart` counts, never a deposited/minted card or a claim about global circulation.
 
 The reveal includes charge/tear, opening doors, mystery card, position/team clues, procedural streaks, a GOAT-only limit break and the actual card's entrance. Stills cannot show all the motion; `scripts/qa/pack-cinema.mjs` records the first case to WebM (visual-only recording, no system audio). [Timing, sound, source connections and device verification limits](../PACK-CINEMA.md). No boosted odds or preview-only cheat UI is shipped.
+
+
+## NFL rushing fix — Codex, 2026-10-30
+
+[390px portrait](nfl-rushing-390.png) · [320px short portrait](nfl-rushing-320.png) · [844px landscape](nfl-rushing-844.png). Actual NFL component, manual forward-stick input after the handoff, equal real gold squads at Legend, isolated inspect profile. Juke/Spin/Power reuse the existing game-control skins; short portrait sizes leave the runner and blockers visible. Screenshots are rendered QA fixtures, not a real player account or a promise of a successful run. The controls/path fixes and complete fixed-seed measurements are documented in [NFL-RUSHING.md](../NFL-RUSHING.md).

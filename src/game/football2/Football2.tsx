@@ -23,6 +23,7 @@ import { CONCEPT_NAMES, FIELD_W, maxThrow, moveWithBall, RUN_NAMES, scramble, sn
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, Play, Pt } from './types';
+import './rushing-controls.css';
 
 type Ui = 'loading' | 'pre' | 'fourth' | 'live' | 'after' | 'kick' | 'final';
 
@@ -230,7 +231,7 @@ export function Football2({
     setUi('live');
     setPhase(p.phase);
     if (p.call === 'pass') tip('pass', 'Drag back anywhere · let go to throw');
-    else tip('run', 'Drag to steer · swipe ← → juke · swipe ↑ spin · double-tap truck');
+    else tip('run', 'Follow the lane · drag to cut · tap Juke, Spin or Power');
   };
 
   const nextUp = (g: Game, driveOver: boolean, wait: number) => {
@@ -262,7 +263,7 @@ export function Football2({
       else if (e === 'catch') {
         sfx.catch();
         crowd.swell(0.3);
-        tip('runafter', 'Drag to steer · swipe ← → juke · swipe ↑ spin · double-tap truck');
+        tip('runafter', 'Follow the lane · drag to cut · tap Juke, Spin or Power');
       } else if (e === 'catch-contested') {
         sfx.catch();
         crowd.swell(0.7);
@@ -504,7 +505,8 @@ export function Football2({
     const c = p.carrier;
     if (!s || !c) return null;
     const across = renderer.mode === 'side' ? -s.y : s.x;
-    return Math.abs(across) < 0.12 ? c.x : c.x + across * 8;
+    // Neutral/upfield pressure follows the called blocking lane; lateral input still cuts freely.
+    return Math.abs(across) < 0.12 ? null : c.x + across * 8;
   };
 
   // the loop: fixed steps for the play, a draw every frame
@@ -649,10 +651,11 @@ export function Football2({
     // a flick (far, fast) is a move: across the field a juke that way, up the field a spin
     const g = gesture.current;
     const p = playRef.current;
-    if (g && p && !g.used && performance.now() - g.t0 < 240) {
+    if (g && p?.phase === 'run' && !g.used && performance.now() - g.t0 < 200) {
       const dx = e.clientX - g.x0;
       const dy = e.clientY - g.y0;
-      if (Math.hypot(dx, dy) > 46) {
+      // A full normal stick throw is 46px. Require a deliberate longer flick for a move.
+      if (Math.hypot(dx, dy) > 70) {
         g.used = true;
         const upField = renderer.mode === 'side' ? dx : -dy;
         const across = renderer.mode === 'side' ? -dy : dx;
@@ -719,6 +722,7 @@ export function Football2({
   const p = playRef.current;
   const fgOk = g ? fgInRange(g) : false;
   const passing = ui === 'live' && phase === 'drop' && p?.call === 'pass';
+  const running = ui === 'live' && phase === 'run';
   return createPortal(
     <div className={'arcade-full hg2 fb2' + (wide ? ' wide' : '')} ref={wrapRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}>
       <canvas ref={canvasRef} className="hg2-canvas" />
@@ -825,6 +829,21 @@ export function Football2({
           </button>
         </div>
       )}
+      {running && !autoplayHook && (
+        <div className="fb2-moves" onPointerDown={(e) => e.stopPropagation()}>
+          {(['juke', 'spin', 'power'] as const).map((kind) => (
+            <button
+              key={kind}
+              className={'fb2-mv ' + kind}
+              aria-label={kind === 'power' ? 'Power: truck or stiff arm' : kind === 'juke' ? 'Juke: evade the nearest defender' : 'Spin: evade a tackle'}
+              onPointerDown={(e) => { e.preventDefault(); if (p) move3(p, kind); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (p) move3(p, kind); } }}
+            >
+              {kind.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
       {ui === 'kick' && kickRef.current && <KickMeter window={kickRef.current.win} start={kickRef.current.t0} stopped={kickRef.current.stopped} distance={kickRef.current.dist} onKick={kickNow} />}
       {ui === 'final' && g && (
         <div className="fg-final hg2-final" role="status">
@@ -887,12 +906,11 @@ function PlayArt({ play }: { play: Play }) {
   } else {
     // the back's path: up the middle, bounced outside, or off tackle behind a pulling guard
     const rb = play.rb;
-    const side = rb.x < bx ? 1 : -1;
     const pts: [number, number][] =
       play.run === 'outside'
-        ? [[X(rb.x), Y(rb.y)], [X(bx + side * 6), Y(los - 2)], [X(bx + side * 10), Y(los + 7)]]
+        ? [[X(rb.x), Y(rb.y)], [X(play.hole - 0.8), Y(los - 0.1)], [X(play.hole), Y(los + 7)]]
         : play.run === 'power'
-          ? [[X(rb.x), Y(rb.y)], [X(bx + side * 2.5), Y(los - 1)], [X(bx + side * 3.5), Y(los + 7)]]
+          ? [[X(rb.x), Y(rb.y)], [X(play.hole - 0.9), Y(los - 1)], [X(play.hole), Y(los + 7)]]
           : [[X(rb.x), Y(rb.y)], [X(bx + 0.6), Y(los)], [X(bx + 0.6), Y(los + 8)]];
     paths.push({ color: ART_COLOR.RB, pts });
   }

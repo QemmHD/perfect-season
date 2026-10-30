@@ -64,7 +64,7 @@ The [machine-readable audit](ratings-audit-summary.json) covers **54,324 edition
 
 No profile version, storage key, player signing key, card edition ID, owned UID, XP, squad reference, wallet, pack entitlement, server-save revision or collection claim is reset. No backend schema/Edge Function changed in this revision. Automatic encrypted saves and the worldwide card registry keep their existing connections.
 
-`DRAFT_RULES` and `UT_RULES` are **4** so old and revised clients cannot enter an incompatible match. `DATA_V` and leaderboard history are unchanged. Full UT attribute fingerprints still protect squad compatibility. Both phones need the same preview/update to test online together.
+`DRAFT_RULES` and `UT_RULES` were **4** for this research revision. The subsequent [Codex rushing fix](NFL-RUSHING.md) advances NFL to **5** while NBA stays **4**, so incompatible NFL physics cannot pair. `DATA_V` and leaderboard history are unchanged. Full UT attribute fingerprints still protect squad compatibility. Both phones need the same preview/update to test online together.
 
 Pre-revision restore point: `backup/pre-gameplay-research-2026-10-30` → `f3ccd941475bc209c750557df0ef4850385bce49`. Original main/restore source remains `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. This is source history, not a replacement for the existing player-save service.
 

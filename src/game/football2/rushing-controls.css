@@ -1,0 +1,20 @@
+/* Codex: keep the existing football controls clear of the ball on shorter portrait screens. */
+.fb2-mv:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 4px;
+}
+@media (max-height: 650px) and (max-width: 600px) {
+  .fb2:not(.wide) .fb2-moves {
+    gap: 8px;
+  }
+  .fb2:not(.wide) .fb2-mv {
+    width: 58px;
+    height: 58px;
+    font-size: 12px;
+  }
+  .fb2:not(.wide) .fb2-mv.power {
+    width: 68px;
+    height: 68px;
+    font-size: 13px;
+  }
+}

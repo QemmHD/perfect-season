@@ -33,7 +33,7 @@ export const CONCEPT_NAMES: Record<Concept, string> = { verts: 'Four Verticals',
 export const RUN_NAMES: Record<RunPlay, string> = { inside: 'Inside Zone', outside: 'Outside Zone', power: 'Power' };
 /** where each run's hole is, yards to the right of the ball (toward the tight end): the A gap, off
  * tackle outside the tight end's block, the edge */
-export const HOLE: Record<RunPlay, number> = { inside: 0.7, power: 3.4, outside: 7.5 };
+export const HOLE: Record<RunPlay, number> = { inside: 0.7, power: 3.4, outside: 6.5 };
 /** where the back takes the handoff: deeper and wider the farther out the run goes */
 const MESH: Record<RunPlay, Pt> = { inside: { x: 0.4, y: -3.3 }, power: { x: 0.9, y: -3.4 }, outside: { x: 1.7, y: -3.7 } };
 
@@ -218,7 +218,7 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     dl.forEach((d, i) => {
       const blk = blockerOf[i];
       const edge = rt(d.p.a.BSH) - rt(blk.p.a.RBK);
-      d.heldUntil = rand() < clamp(0.03 + edge * 0.2, 0.01, 0.1) ? 0.25 + rand() * 0.2 : Math.max(0.7, 1.4 - edge * 0.6 + rand() * 0.4);
+      d.heldUntil = rand() < clamp(0.03 + edge * 0.2, 0.01, 0.1) ? 0.25 + rand() * 0.2 : Math.max(0.7, 1.65 - edge * 0.7 + rand() * 0.4);
       // his blocker's on him from the snap: once he's off it, it's a while before anyone gets him again
       blk.heldUntil = d.heldUntil + 1.2;
     });
@@ -502,10 +502,15 @@ export function step(p: Play, dt: number, steer: number | null) {
     if (b === carrier && p.phase === 'run') {
       // the runner: upfield, cutting toward the finger (on a run, through the hole until he's past
       // the line, unless the finger says otherwise); a move is its own burst. Tired, he's a step slower.
-      const sp = speedOf(b.p) * (t < p.slowUntil ? 0.55 : 0.9) * lerp(0.9, 1, p.stamina);
+      const sp = speedOf(b.p) * (t < p.slowUntil ? 0.55 : 0.94) * lerp(0.9, 1, p.stamina);
       const m = p.move && t < p.move.until ? p.move : null;
       if (!m) p.stamina = Math.min(1, p.stamina + STAMINA_BACK * dt);
-      const aim = steer ?? (p.call === 'run' && b === p.rb && b.y < p.los + 1 ? p.hole : null);
+      const followingRun = steer === null && p.call === 'run' && b === p.rb && b.y < p.los + 1;
+      // An outside handoff stretches behind the line before turning upfield. A constant forward
+      // velocity used to drag every run into the tackle box, even when its arrow pointed outside.
+      const stretching = followingRun && p.run === 'outside' && b.x < p.hole - 0.8;
+      const landmark = stretching ? { x: p.hole, y: p.los - 0.1 } : null;
+      const aim = steer ?? (followingRun ? p.hole : null);
       if (m?.kind === 'juke') {
         b.vx = m.dir * sp * (0.8 + 0.35 * m.eff);
         b.vy = sp * 0.45;
@@ -513,8 +518,9 @@ export function step(p: Play, dt: number, steer: number | null) {
         b.vx *= 0.9;
         b.vy = sp * 0.6;
       } else {
-        const wantX = aim === null ? 0 : clamp((aim - b.x) * 2.2, -sp * 0.65, sp * 0.65);
-        const wantY = Math.sqrt(Math.max(0, sp * sp - wantX * wantX)) * (m ? 0.8 : 1);
+        const len = landmark ? Math.max(0.1, dist(b, landmark)) : 1;
+        const wantX = landmark ? ((landmark.x - b.x) / len) * sp : aim === null ? 0 : clamp((aim - b.x) * 2.2, -sp * 0.65, sp * 0.65);
+        const wantY = (landmark ? Math.max(0, ((landmark.y - b.y) / len) * sp) : Math.sqrt(Math.max(0, sp * sp - wantX * wantX))) * (m ? 0.8 : 1);
         const turn = lerp(11, 21, rt(b.p.a.AGI, 40, 99)) * dt;
         const acceleration = lerp(8, 15, rt(b.p.a.ACC, 40, 99)) * dt;
         b.vx += clamp(wantX - b.vx, -turn, turn);
@@ -561,15 +567,18 @@ function offense(p: Play, b: Body, dt: number) {
     // the center climbs to the middle linebacker and the tight end takes the strong-side one
     const climbTo = p.call === 'run' ? (b.slot === 'C' ? 'MLB' : b.slot === 'TE' ? 'SLB' : null) : null;
     const climb = climbTo ? p.bodies.find((d) => d.slot === climbTo && t >= d.stunUntil) : undefined;
-    const target = climb ?? p.bodies.filter((d) => d.side === 'D' && t >= d.stunUntil && d.y > b.y - 2.5).sort((a1, a2) => dist(a1, b) - dist(a2, b))[0];
+    // Keep each tackle/guard on the front defender he was assigned at the snap. Nearest-man
+    // selection let both guards chase one DT while another defender escaped untouched.
+    const assigned = p.call === 'run' && isLine(b) && !climbTo ? p.bodies.find(d => d.side === 'D' && d.mark === b.id && t < d.heldUntil) : undefined;
+    const target = assigned ?? climb ?? p.bodies.filter((d) => d.side === 'D' && t >= d.stunUntil && d.y > b.y - 2.5).sort((a1, a2) => dist(a1, b) - dist(a2, b))[0];
     const line = isLine(b);
     if (target) {
       const d = dist(target, b);
       if (d < 1.3 && target.heldUntil < t && b.heldUntil < t && (p.call === 'run' || p.phase === 'run' || !line)) {
         // engaged: held a while by his run blocking (a lineman far longer than a receiver)
-        const blk = line ? rt(b.p.a.RBK) : b.slot === 'TE' ? rt(b.p.a.RBK) * 0.7 : 0.15;
+        const blk = line || b.slot === 'TE' ? rt(b.p.a.RBK) : 0.15;
         const shed = rt(target.p.a.BSH);
-        const hold = Math.max(0.25, (0.9 + blk * 1.1 - shed * 0.8) * (line ? 1 : 0.5) + p.rand() * 0.3);
+        const hold = Math.max(0.25, (b.slot === 'TE' ? 1.15 + blk * 1.2 - shed * 0.65 : 0.9 + blk * 1.1 - shed * 0.8) * (line || b.slot === 'TE' ? 1 : 0.5) + p.rand() * 0.3);
         target.heldUntil = t + hold;
         b.heldUntil = t + hold + 1.2;
         if (line && b.p.a.IBL >= 85 && p.rand() < 0.12) {
@@ -622,6 +631,14 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
   const carrier = p.carrier;
   const held = t < b.heldUntil;
   const sp = speedOf(b.p) * (held ? 0.12 : 1);
+  // Before the exchange, read the run keys rather than following the back into the mesh as if
+  // he were a pass route. The existing PRC/difficulty reaction window still determines the read.
+  if (p.call === 'run' && p.phase === 'drop' && b.job !== 'rush' && t < b.readUntil) {
+    steerTo(b, b.misread ? b.x - (p.hole - b.x) * 0.25 : b.x, b.y + 0.5, sp * 0.25, dt);
+    act(b, 'backpedal', t);
+    move(b, dt);
+    return;
+  }
   if (p.phase === 'run' && carrier) {
     if (held) {
       // locked up with a blocker (a wind-up he'd started is off): on a run the line drives him off

@@ -55,3 +55,10 @@ Chromium verifies layout, input and state transitions. Before claiming device-sp
 `node scripts/qa/pack-cinema.mjs` tests the real pack modal within the existing `.stage`: GOAT, Spotlight, gold and NFL Legend at 390×844, GOAT at 320×568 and touch-rotated landscape 844×390, plus reduced motion at 320×568. It checks keyboard open, final-card/control bounds, safe areas, no premature GOAT crown, mid-tear/mid-walkout Skip stability, particle cleanup, reduced-motion CSS and unchanged original copy/level/XP fields. The first case records a video; install the optional tool's FFmpeg once (`/tmp/ps-qa-tools/node_modules/.bin/playwright install ffmpeg`). Output goes to the regular QA artifact directory. `browser.mjs` accepts optional context options for that recording; ordinary fixtures are unchanged.
 
 Displayed 8/20 and `packart` aggregate responses are presentation-only fixtures. No visual-fixture card is deposited/minted; the ordinary isolated profile remains in inspect. No preview cheat UI or altered pack odds is shipped. Run `content.mjs` alongside this to verify real pending-pack/reload settlement and collection/event flows. [Design, sound, timing and connections](PACK-CINEMA.md).
+
+
+## Codex NFL rushing revision — 2026-10-30
+
+`node scripts/qa/rushing.mjs` mounts the actual NFL component with equal real gold squads at Legend, inside isolated profiles. Uses manual pointer input at 390×844, 320×568 and 844×390; compares held-forward against no-input lane following, checks no accidental spin from a normal 50px push, checks move-button/safe-area bounds, captures actual Juke/Spin/Power animations and uses the existing practice callback to observe real outcomes. Pressing a move does not imply a successful beat. Original copy/level/XP fields remain checked, with additive serial metadata permitted. `PS_RUSHING_WIDTH=320` selects a single viewport for a focused layout follow-up.
+
+`npx vite-node scripts/audit_nfl_rushing.ts` measures 80 fixed seeds across 81 cases without a profile or online write. Two-client `online.mjs` checks the revised NFL rule-5 queue/settlement and unchanged NBA rule-4 queue. [Findings, metrics and limits](NFL-RUSHING.md).

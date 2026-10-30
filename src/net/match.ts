@@ -13,7 +13,8 @@ import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_Q
     3: a sim-or-play vote before the game, favorite teams for the uniforms, basketball v2, and
        football drafts eight: a DL, a LB and a DB in place of a team defense. */
 // 4: Codex defensive/shot/throw gameplay revision; old clients keep their records but cannot pair across rules.
-const DRAFT_RULES = 4;
+// 5 (NFL only): Codex run lanes, blocking assignments and touch steering; preserve board history.
+const DRAFT_RULES = NFL ? 5 : 4;
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = 'ps1-' + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
 /** Everyone with the app open, whichever sport: the online count is the whole app's. */
