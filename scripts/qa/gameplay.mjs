@@ -110,7 +110,7 @@ try {
     if (!Number.isFinite(result.last?.score) || !result.updates) throw Error('Match did not finish with valid progress');
     await page.evaluate(() => window.__gameQARoot.unmount());
     const after = await current();
-    if (JSON.stringify(after.ut.owned) !== JSON.stringify(original.ut.owned)) throw Error('Gameplay changed original owned copies');
+    if (original.ut.owned.some(card=>!after.ut.owned.some(c=>Object.entries(card).every(([k,v])=>JSON.stringify(c[k])===JSON.stringify(v))))) throw Error('Gameplay changed original owned copies');
     if (errors.length) throw Error(errors.join('; '));
     console.log(
       JSON.stringify({

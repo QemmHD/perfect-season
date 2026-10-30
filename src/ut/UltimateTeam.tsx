@@ -36,7 +36,7 @@ import { claimCollection } from './collection';
 import { openRegisteredPack } from './registry';
 import { registeredOpening } from './promo';
 import { Store } from './Store';
-import type { OwnedCard, RatedCard } from './types';
+import type { OwnedCard, RatedCard, CardMint } from './types';
 
 /** An owned card with its rating and where it plays (if it's in the squad). */
 export interface ClubCard {
@@ -64,7 +64,7 @@ export interface Opening {
   id: string;
   title: string;
   kind: string;
-  cards: { uid: string; rc: RatedCard }[];
+  cards: { uid: string; rc: RatedCard; mint?: CardMint }[];
   stored?: number;
   mint?: { serial: number; total: number };
 }
@@ -268,7 +268,7 @@ export default function UltimateTeam(props: {
         ...p,
         coins: p.coins + proceeds,
         ut: {
-          ...removeCards(p.ut, gone),
+          ...removeCards(p.ut, gone, 'sold'),
           sold: { cards: p.ut.sold.cards + sold.length, coins: p.ut.sold.coins + proceeds },
         },
       };
@@ -329,7 +329,7 @@ export default function UltimateTeam(props: {
         ...p,
         coins: p.coins + (s.reward.coins ?? 0),
         ut: {
-          ...organizeStorage(removeCards(p.ut, gone), prize ? [prize] : []),
+          ...organizeStorage(removeCards(p.ut, gone, 'sbc'), prize ? [prize] : []),
           sbc: { done },
           packs: pack ? [...p.ut.packs, pack] : p.ut.packs,
         },
@@ -547,7 +547,7 @@ export default function UltimateTeam(props: {
       {opening && (
         <PackOpening
           key={opening.id}
-          opening={opening}
+          opening={{...opening,cards:opening.cards.map(c=>({...c,mint:byUid.get(c.uid)?.oc.mint??c.mint}))}}
           onDone={(to) => {
             setOpening(null);
             if (to) setView(to);

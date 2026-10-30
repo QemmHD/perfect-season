@@ -60,10 +60,11 @@ export function useStoredCopy(ut: UtState, uid: string): UtState {
 }
 
 /** Consume exact UIDs from either place; a remaining copy returns to the club. */
-export function removeCards(ut: UtState, uids: Iterable<string>): UtState {
+export function removeCards(ut: UtState, uids: Iterable<string>, reason?: 'sold' | 'sbc'): UtState {
   const gone = new Set(uids);
   return organizeStorage({
     ...rememberCollection(ut),
+    ...(reason ? { retirements: [...(ut.retirements ?? []), ...ut.owned.filter(c => gone.has(c.uid)).map(c => ({ uid: c.uid, cardId: c.cardId, level: c.level, reason, ...(c.mint ? { mint: c.mint } : {}) }))] } : {}),
     owned: ut.owned.filter((c) => !gone.has(c.uid)),
     squad: Object.fromEntries(Object.entries(ut.squad).filter(([, uid]) => !gone.has(uid))),
   });

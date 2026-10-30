@@ -3,13 +3,14 @@
 // played games draw, in that season's team colors and his own number, drawn small and scaled up
 // with crisp pixels.
 import './card-editions.css';
+import { CardStamp } from './CardSerial';
 import React, { useEffect, useState } from 'react';
 import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, freeCanvas, hairFor, type Look } from '../game/pixel/body';
 import { celebrate, idle } from '../game/pixel/poses';
 import { useTilt } from '../ui/Card';
 import { shortSeason } from './pool';
 import { TIER_NAMES } from './rate';
-import type { CardLine, RatedCard } from './types';
+import type { CardLine, RatedCard, CardMint } from './types';
 
 const lum = (hex: string): number => {
   const h = hex.replace('#', '');
@@ -145,6 +146,8 @@ export interface UtCardProps {
   /** the card's width in frame px; everything on it scales from that */
   w: number;
   level?: number;
+  mint?: CardMint;
+  numbered?: boolean;
   /** show the six key attributes (the bigger views) */
   attrs?: boolean;
   pose?: 'stand' | 'cheer';
@@ -155,7 +158,7 @@ export interface UtCardProps {
 }
 
 /** The card. */
-export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, className }: UtCardProps) {
+export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, className, mint, numbered }: UtCardProps) {
   const { ref, handlers } = useTilt<HTMLSpanElement>(w > 150 ? 16 : 10);
   const l = rc.line;
   const name = plateName(l.name);
@@ -172,13 +175,14 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
         rc.tier +
         (big ? ' big' : '') +
         (attrs ? ' with-attrs' : '') +
+        (mint || (numbered && rc.ovr >= 90) ? ' has-serial' : '') +
         (w < 52 ? ' xs' : w < 70 ? ' sm' : '') +
         (name.length > 9 ? ' long' : '') +
         (className ? ' ' + className : '')
       }
       style={{ '--w': w + 'px', '--c1': l.c1, '--c2': l.c2 } as React.CSSProperties}
       role="img"
-      aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + TIER_NAMES[rc.tier]}
+      aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + TIER_NAMES[rc.tier] + (mint ? ', issue number ' + mint.serial : '')}
     >
       <span className="utc-face">
         <span className="utc-glow" aria-hidden="true" />
@@ -205,6 +209,7 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
           </span>
         )}
         <span className="utc-plate">
+          {mint ? <CardStamp mint={mint} cardId={l.id} sport={l.sport} /> : numbered && rc.ovr >= 90 ? <span className="utc-stamp pending">NUMBERING…</span> : null}
           <b className="utc-name">{name}</b>
           {attrs && (
             <span className="utc-attrs">

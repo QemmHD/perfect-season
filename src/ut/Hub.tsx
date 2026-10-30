@@ -173,7 +173,7 @@ export function Hub(props: {
               .slice(0, 8)
               .map((c) => (
                 <button key={c.uid} className="ut-gridcard small" onClick={() => props.onInspect(c.uid)} aria-label={c.rc.line.name + ', ' + c.rc.ovr}>
-                  <UtCard rc={c.rc} w={66} level={c.oc.level} />
+                  <UtCard rc={c.rc} w={66} level={c.oc.level} mint={c.oc.mint} numbered />
                 </button>
               ))}
           </div>

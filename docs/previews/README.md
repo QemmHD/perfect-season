@@ -19,3 +19,8 @@ Actual localhost rendered match captures with isolated rated test squads at Lege
 - [NBA small portrait](gameplay-nba-320.png), 320×568, and [NFL landscape](gameplay-nfl-landscape.png), 844×390.
 
 Source: `scripts/qa/gameplay.mjs`. Full sources, behavior changes, balance diagnostics and verification limits: [GAMEPLAY-RESEARCH.md](../GAMEPLAY-RESEARCH.md).
+
+
+## 90+ live issue stamp — Codex, 2026-10-30
+
+[Numbered NBA gold card](serial-nba-live.png) · [Numbered NFL gold card](serial-nfl-live.png) · [NBA card detail](serial-detail-nba.png) · [NFL card detail](serial-detail-nfl.png). Actual localhost components and signed inspect-namespace fixture copies, not player accounts or simulated worldwide claims. Numbers reflect the isolated registry at capture time and subsequently change with registrations/disposals. The inset stamp shares the existing card frame palette and typeface. Reproduction and behavior: [CARD-CIRCULATION.md](../CARD-CIRCULATION.md).

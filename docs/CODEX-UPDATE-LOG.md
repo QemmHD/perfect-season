@@ -169,3 +169,16 @@ GitHub implementation commit `4769e4507b632c55aeb7f4e05937ce3db356fb2e` matches 
 
 
 GitHub [Review build #8](https://github.com/QemmHD/perfect-season/actions/runs/41029135522) passed for gameplay commit `4769e4507b632c55aeb7f4e05937ce3db356fb2e`, job `123974360887`: **NBA 275 passed / 31 skipped; NFL 242 passed / 63 skipped (517 passing)**. `npm ci`, full tests, whole-pool audit, TypeScript and production build all succeeded. These are the final independently verified code totals; the local counts above describe earlier local execution plus focused final checks. This release-record follow-up only changes documentation; its code tree remains the verified gameplay implementation.
+
+
+## 90+ card stamps and active circulation — Codex, 2026-10-30
+
+**Implemented by Codex (OpenAI)**. Owner clarified eligibility as **90+**, including upgrades, and explicitly chose first-connection registration order for existing unnumbered holdings. Existing numbered copies retain their serial. [CARD-CIRCULATION.md](CARD-CIRCULATION.md) records the exact frontend/backend file map, API, schema, source limitations, authorization model and restore procedure.
+
+Added a matching inset serial stamp across owned cards, squad/club/storage/picker views, gallery and pack reveals. The left number is fixed; the right is active circulation, updated by Supabase Realtime with shared fetch fallback and monotonic revisions. Added generated 90+ eligibility (3,244 NBA / 7,952 NFL editions at an eligible level), additive metadata and persistent sold/SBC disposal queues. Registration races cannot recreate a consumed card; retries cannot assign a new serial or retire it twice. App sync only reads successfully persisted progress. Existing keys, profile v1, UIDs, levels, XP, squads and account identities are preserved.
+
+Applied two additive migrations and deployed `card-registry` **v3**, SHA-256 `fc453c476fd8cbdf91e520c8757ab9dbcb114160d5e5c6979e6f91f324996a2f`. Original Nostr online features and `player-save` v2 are unchanged. Aggregate counts are publicly readable for Realtime; receipts/copy ownership and mutation RPCs remain private. Security/performance advisors are clean. Added pinned Realtime client dependency and lockfile; production dependency audit reports zero vulnerabilities.
+
+Local full suites: **NBA 279 / 31 skipped, NFL 246 / 63 skipped (525 passing)**. TypeScript/build passed. SQL rollback tests verified ordering, exact-once retirement, zero, retained pack serials, no reuse/resurrection and access controls. Two-client signed browser tests in each sport verified rising totals, one-time sold decrease, actual Quick Sell confirmation, Realtime propagation and offline SBC/reload recovery while preserving 55/68 other fixture copies; no page errors. Updated content/pack/reload/gallery/event flows also passed in both sports with all existing fields preserved and additive number metadata allowed. Screenshots and final source/CI/deployment IDs follow after release verification.
+
+Source safety point: `backup/pre-card-circulation-2026-10-30` → `e7a4ac7a5426b89b66d7f36037a5ab5af56ef7f8`. Main and original restore remain `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; source publication stays on the feature branch and existing owner-private preview.

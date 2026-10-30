@@ -106,7 +106,7 @@ export function CollectionGallery({ pool, ut, onClaim }: { pool: Pool; ut: UtSta
               onClick={() => setDetail(rc)}
               aria-label={`${rc.line.name}, ${rc.ovr} ${TIER_NAMES[rc.tier]}, ${have ? 'owned' : discovered ? 'previously collected' : 'missing'}`}
             >
-              <UtCard rc={rc} w={80} />
+              <UtCard rc={rc} w={80} mint={ut.owned.find(c=>c.cardId===rc.line.id&&c.mint)?.mint} numbered={have} />
               <small>{have ? 'OWNED' : discovered ? 'DISCOVERED' : 'MISSING'}</small>
             </button>
           );
@@ -168,14 +168,14 @@ export function CollectionGallery({ pool, ut, onClaim }: { pool: Pool; ut: UtSta
           {(close) => (
             <div className="ut-catalog-detail">
               <span className={'ut-tiername t-' + detail.tier}>{TIER_NAMES[detail.tier].toUpperCase()}</span>
-              <UtCard rc={detail} w={190} attrs tilt />
+              <UtCard rc={detail} w={190} mint={ut.owned.find(c=>c.cardId===detail.line.id&&c.mint)?.mint} numbered={owned.has(detail.line.id)} attrs tilt />
               <h2 className="disp">{detail.line.name}</h2>
               <p>
                 {seasonText(detail.line)} · {detail.line.teamName}
               </p>
               {['goat', 'spotlight'].includes(detail.tier) && (
                 <p className="ut-gallery-count num">
-                  {totals === null ? 'Worldwide count requires a connection' : (totals[detail.line.id] ?? 0).toLocaleString() + ' copies registered worldwide'}
+                  {totals === null ? 'Worldwide count requires a connection' : (totals[detail.line.id] ?? 0).toLocaleString() + ' copies in circulation'}
                 </p>
               )}
               <p className="note">

@@ -40,7 +40,7 @@ export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryRecei
     level: 1,
     xp: 0,
     at: pending.at + i,
-    ...(rare && i === cards.length - 1 ? { mint: { serial: receipt.serial!, totalAtPull: receipt.totalAtPull!, requestId: receipt.id, namespace: receipt.namespace } } : {}),
+    ...(rare && i === cards.length - 1 ? { mint: { serial: receipt.serial!, totalAtPull: receipt.totalAtPull!, ...(Number.isSafeInteger(receipt.activeAtPull) && receipt.activeAtPull! >= 0 ? { activeAtPull: receipt.activeAtPull! } : {}), requestId: receipt.id, namespace: receipt.namespace } } : {}),
   }));
   const ut = organizeStorage(p.ut, owned);
   const stored = new Set(ut.duplicateStorage);

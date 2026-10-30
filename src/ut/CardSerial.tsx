@@ -1,34 +1,33 @@
-// Implemented by Codex. See docs/CODEX-UPDATE-LOG.md for ownership, connections and validation.
-import React, { useEffect, useState } from 'react';
-import { cardCounts } from './registry';
+// Implemented by Codex. Fixed issue number / live copies still in circulation.
+import React from 'react';
+import { useCirculation } from './circulation';
 import type { CardMint, UtSport } from './types';
+export function MintNumber({ mint, cardId, sport }: { mint: CardMint; cardId: string; sport: UtSport }) {
+  const { total } = useCirculation(mint, cardId, sport);
+  return (
+    <>
+      {mint.serial}
+      <i>/</i>
+      {total}
+    </>
+  );
+}
+export function CardStamp({ mint, cardId, sport }: { mint: CardMint; cardId: string; sport: UtSport }) {
+  const { total, fresh } = useCirculation(mint, cardId, sport);
+  return (
+    <span
+      className={'utc-stamp' + (fresh ? '' : ' cached')}
+      title={`Issue #${mint.serial} · ${total} copies in circulation${fresh ? '' : ' · last confirmed count'}`}
+      aria-label={`Issue ${mint.serial}, ${total} copies in circulation`}
+    >
+      <b>{mint.serial}</b>
+      <i>/</i>
+      <b>{total}</b>
+    </span>
+  );
+}
 export function CardSerial({ mint, cardId, sport }: { mint: CardMint; cardId: string; sport: UtSport }) {
-  const [total, setTotal] = useState(mint.totalAtPull),
-    [fresh, setFresh] = useState(false);
-  useEffect(() => {
-    let live = true;
-    const refresh = () => {
-      if (document.visibilityState === 'hidden') return;
-      void cardCounts(sport, mint.namespace)
-        .then((counts) => {
-          if (live) {
-            setTotal((n) => Math.max(n, counts[cardId] ?? n));
-            setFresh(typeof counts[cardId] === 'number' && counts[cardId] >= mint.serial);
-          }
-        })
-        .catch(() => {
-          if (live) setFresh(false);
-        });
-    };
-    refresh();
-    const timer = setInterval(refresh, 30000);
-    window.addEventListener('focus', refresh);
-    return () => {
-      live = false;
-      clearInterval(timer);
-      window.removeEventListener('focus', refresh);
-    };
-  }, [mint.namespace, cardId, sport]);
+  const { total, fresh } = useCirculation(mint, cardId, sport);
   return (
     <div className="ut-card-serial">
       <span className="eyebrow">WORLDWIDE EDITION NUMBER</span>
@@ -38,7 +37,8 @@ export function CardSerial({ mint, cardId, sport }: { mint: CardMint; cardId: st
         {total}
       </b>
       <small>
-        Your copy is #{mint.serial}. {fresh ? 'Total registered worldwide.' : 'Last confirmed total. Reconnect to refresh.'} Your number stays fixed as the total grows.
+        Your copy is #{mint.serial}. {fresh ? 'Live copies in circulation.' : 'Last confirmed circulation. Reconnect to refresh.'} Your
+        number stays fixed; sold and SBC copies leave the total.
       </small>
     </div>
   );

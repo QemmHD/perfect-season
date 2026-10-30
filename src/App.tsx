@@ -1,3 +1,4 @@
+import { startNumberedSync } from './ut/numbered-sync';
 import { startCloudSaving } from './lib/cloud-save';
 import { clearCheckpoint, readCheckpoint, writeCheckpoint, SAVE_WARNING } from './lib/recovery';
 import { Recovery } from './evolution/Recovery';
@@ -176,6 +177,7 @@ export function App() {
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
   const runCounter = useRef(0);
+  const persistedProfileRef = useRef(profile);
   const profileRef = useRef(profile);
   profileRef.current = profile;
 
@@ -196,11 +198,13 @@ export function App() {
   useEffect(() => {
     const ok = saveProfile(profile);
     if (!ok) setSaveFailed(true);
+    if (ok) persistedProfileRef.current = profile;
     if (ok && saved?.run.saveId && profile.history.some((h) => h.id === saved.run.saveId)) {
       clearCheckpoint();
       setSaved(null);
     }
   }, [profile]);
+  useEffect(() => startNumberedSync(SPORT, () => persistedProfileRef.current.ut, (fn) => setProfile(p => ({...p,ut:fn(p.ut)}))), []);
   useEffect(() => {
     if (!run || run.mode === '1v1' || !run.draft || !['draft', 'reveal', 'playoffs'].includes(screen)) return;
     if (writeCheckpoint(run, screen as 'draft' | 'reveal' | 'playoffs')) setSaved(readCheckpoint<Run>());

@@ -99,3 +99,23 @@
     animation: none !important;
   }
 }
+
+/* Codex: inset collector's stamp, using the existing frame palette and Archivo numerals. */
+.utc-stamp {
+ display:inline-flex;align-items:center;justify-content:center;gap:.24em;
+ max-width:100%;padding:.14em .6em;margin:0 0 .2em;
+ font-size:max(.6em,6px);font-weight:900;line-height:1.1;letter-spacing:.02em;
+ font-variant-numeric:tabular-nums;white-space:nowrap;color:#f3e2ae;
+ background:linear-gradient(110deg,#091c25,#243038 52%,#081820);
+ border:1px solid #d9c18680;border-radius:.18em;box-shadow:inset 0 1px #ffffff18;
+}
+.utc-stamp b{font:inherit}.utc-stamp i{font-style:normal;opacity:.48;font-weight:500}
+.t-spotlight .utc-stamp{color:#ede0ff;border-color:#cba6f080;background:linear-gradient(110deg,#18122b,#302444,#13132c)}
+.utc-stamp.pending{opacity:.68;font-size:max(.48em,5px)}
+.utc.has-serial .utc-px{bottom:2.5em}
+.utc.has-serial.with-attrs .utc-px{bottom:4.8em;height:54%}
+.utc.xs.has-serial .utc-plate{display:flex;padding:0 .1em .16em;border:0;background:none}
+.utc.xs.has-serial .utc-name{display:none}
+.utc.xs .utc-stamp{font-size:5px;margin:0;padding:.15em .3em}
+
+.utc-stamp.cached{opacity:.72}

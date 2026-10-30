@@ -110,7 +110,7 @@ export function SquadView(props: {
         aria-label={s.id + (c ? ': ' + c.rc.line.name + ', ' + c.rc.ovr : ': empty')}
       >
         {c ? (
-          <UtCard rc={c.rc} w={w} level={c.oc.level} />
+          <UtCard rc={c.rc} w={w} level={c.oc.level} mint={c.oc.mint} numbered />
         ) : (
           <span className="ut-slot-empty" style={{ width: w, height: Math.round(w * 1.4) }}>
             <b>+</b>
@@ -238,7 +238,7 @@ function Picker(props: { slot: SlotDef; club: ClubCard[]; lineup: Lineup; squad:
             <div className="ut-picker-list">
               {options.map(({ c, d, chem }) => (
                 <button key={c.uid} className="ut-pickrow" onClick={() => close(() => props.onPick(c.uid))}>
-                  <UtCard rc={c.rc} w={44} level={c.oc.level} />
+                  <UtCard rc={c.rc} w={44} level={c.oc.level} mint={c.oc.mint} numbered />
                   <span className="ut-pickrow-txt">
                     <b>{c.rc.line.name}</b>
                     <small>

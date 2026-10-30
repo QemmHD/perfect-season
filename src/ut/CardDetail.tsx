@@ -52,7 +52,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose }: { cc: ClubCard
           <div className="ut-detail">
             <div className="ut-detail-top">
               <span className="ut-detail-card">
-                <UtCard rc={rc} w={150} level={oc.level} tilt />
+                <UtCard rc={rc} w={150} level={oc.level} mint={oc.mint} numbered tilt />
               </span>
               <div className="ut-detail-id">
                 <span className={'ut-tiername t-' + rc.tier}>{TIER_NAMES[rc.tier].toUpperCase()}</span>

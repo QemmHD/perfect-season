@@ -155,7 +155,7 @@ export function Club({ club, storage = false, onInspect, onSell }: { club: ClubC
         <div className="ut-grid">
           {list.slice(0, typeof IntersectionObserver === 'undefined' ? list.length : shown).map((c) => (
             <button key={c.uid} className="ut-gridcard" onClick={() => onInspect(c.uid)} aria-label={c.rc.line.name + ', ' + c.rc.ovr + (c.slot ? ', in your squad at ' + c.slot : '')}>
-              <UtCard rc={c.rc} w={80} level={c.oc.level} />
+              <UtCard rc={c.rc} w={80} level={c.oc.level} mint={c.oc.mint} numbered />
               {byAttr && c.rc.attrs[f.sort] !== undefined && (
                 <i className="ut-attrtag num">
                   {f.sort} {c.rc.attrs[f.sort]}

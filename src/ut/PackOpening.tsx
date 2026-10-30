@@ -1,3 +1,4 @@
+import { MintNumber } from './CardSerial';
 // Opening a pack, full screen: the pack tears open, and its best card (a gold, a Hot Season or a
 // Legend) walks out: the lights go down to his team's colors, then his position, then his team and
 // season, then the man himself with his overall counting up. Then every card in the pack turns
@@ -28,6 +29,11 @@ function gridFor(n: number): { cols: number; w: number } {
 export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to?: UtView) => void }) {
   const still = useMemo(reducedMotion, []);
   const order = useMemo(() => revealOrder(opening.cards.map((c) => c.rc)), [opening]);
+  const copies = useMemo(() => {
+    const remaining=opening.cards.slice();
+    return order.map(rc=>{const i=remaining.findIndex(c=>c.rc.line.id===rc.line.id);return remaining.splice(i,1)[0];});
+  },[opening,order]);
+  const starCopy=copies[copies.length-1];
   const star = order[order.length - 1];
   const special = star?.tier === 'goat' || star?.tier === 'spotlight';
   const level = star ? walkoutLevel(star) : 0;
@@ -185,7 +191,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
               {special && <span className="ut-rare-edition eyebrow">{star.tier === 'goat' ? 'GREATEST OF ALL TIME' : 'SPOTLIGHT EDITION'}</span>}
               <b className={'disp ut-walk-tier t-' + star.tier}>{star.tier === 'gold' ? (level >= 2 ? 'GOLD STAR' : 'GOLD') : TIER_NAMES[star.tier].toUpperCase()}</b>
               <span className="ut-walk-card">
-                <UtCard rc={star} w={190} attrs pose={level >= 2 ? 'cheer' : 'stand'} tilt={step >= 4} />
+                <UtCard rc={star} mint={starCopy?.mint} numbered w={190} attrs pose={level >= 2 ? 'cheer' : 'stand'} tilt={step >= 4} />
               </span>
               <span className="ut-walk-ovr">
                 <b className="disp num">
@@ -202,8 +208,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
                 <div className="ut-rare-number">
                   <span className="eyebrow">YOUR REGISTERED COPY</span>
                   <strong className="disp num">
-                    #{opening.mint.serial}
-                    <i> / {opening.mint.total}</i>
+                    {starCopy?.mint ? <MintNumber mint={starCopy.mint} cardId={star.line.id} sport={star.line.sport} /> : <>{opening.mint.serial}<i> / {opening.mint.total}</i></>}
                   </strong>
                   <small>Worldwide total grows. Your number stays yours.</small>
                 </div>
@@ -240,7 +245,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
           </h2>
           {done && opening.mint && (
             <p className="ut-mint-receipt">
-              YOUR COPY #{opening.mint.serial} · {opening.mint.total} REGISTERED WORLDWIDE
+              {starCopy?.mint ? <>YOUR COPY <MintNumber mint={starCopy.mint} cardId={star.line.id} sport={star.line.sport} /> · IN CIRCULATION</> : <>YOUR COPY #{opening.mint.serial} · {opening.mint.total} REGISTERED WORLDWIDE</>}
             </p>
           )}
           {done && !!opening.stored && (
@@ -256,7 +261,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
                     <UtCardBack w={g.w} />
                   </span>
                   <span className="ut-flip-front">
-                    <UtCard rc={rc} w={g.w} />
+                    <UtCard rc={rc} mint={copies[i]?.mint} numbered w={g.w} />
                   </span>
                 </span>
               </span>

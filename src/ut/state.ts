@@ -3,7 +3,7 @@ import { rivalsOf, type RivalsState } from './rivals';
 // their own `ut`). Small and free of card data on purpose: the profile loads it on every launch,
 // while the cards themselves load only when the mode opens. See docs/ULTIMATE-TEAM.md.
 import { type Level, levelOf } from './battles';
-import type { OwnedCard } from './types';
+import type { OwnedCard, CardRetirement } from './types';
 import { organizeStorage } from './storage';
 
 /** A pack waiting to be opened (a challenge reward, the starter). */
@@ -22,6 +22,8 @@ export interface UtState {
   events?: Record<string, number>;
   registeredOpenings?: string[];
   pendingPromo?: { id: string; kind: string; price: number; packId?: string; at: number };
+  /** Persisted before removal; safe to retry until the server acknowledges retirement. */
+  retirements?: CardRetirement[];
   settled?: string[];
   owned: OwnedCard[];
   /** UIDs of spare exact-edition copies. All cards remain in `owned` for original-build restores. */
@@ -91,6 +93,7 @@ export function migrateUt(raw: unknown): UtState {
               mint: {
                 serial: c.mint.serial,
                 totalAtPull: Math.max(c.mint.serial, num(c.mint.totalAtPull, c.mint.serial)),
+                ...(Number.isSafeInteger(c.mint.activeAtPull) && c.mint.activeAtPull! >= 0 ? { activeAtPull: c.mint.activeAtPull } : {}),
                 requestId: c.mint.requestId,
                 namespace: c.mint.namespace,
               },
@@ -118,6 +121,7 @@ export function migrateUt(raw: unknown): UtState {
     ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),
     ...(Array.isArray(r.settled) ? { settled: r.settled.filter((x) => typeof x === 'string').slice(-1000) } : {}),
     owned,
+    ...(Array.isArray(r.retirements) ? { retirements: (r.retirements as CardRetirement[]).filter(c => c && typeof c.uid === 'string' && typeof c.cardId === 'string' && Number.isInteger(c.level) && c.level >= 1 && c.level <= 5 && ['sold','sbc'].includes(c.reason)) } : {}),
     ...(Array.isArray(r.collected) ? { collected: [...new Set([...r.collected.filter((id): id is string => typeof id === 'string'), ...owned.map((c) => c.cardId)])] } : {}),
     ...(Array.isArray(r.collectionClaims) ? { collectionClaims: [...new Set(r.collectionClaims.filter((id): id is string => typeof id === 'string'))] } : {}),
     ...(Array.isArray(r.registeredOpenings) ? { registeredOpenings: [...new Set(r.registeredOpenings.filter((id): id is string => typeof id === 'string'))] } : {}),

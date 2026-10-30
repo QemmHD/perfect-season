@@ -33,7 +33,7 @@ try {
     result = await current();
     if (result.coins !== 6600 || result.ut.owned.length !== original.ut.owned.length + (sport === 'nba' ? 8 : 16) || result.ut.pendingPromo)
       throw Error('Recovered pack settled incorrectly');
-    for (const card of original.ut.owned) if (!result.ut.owned.some((c) => JSON.stringify(c) === JSON.stringify(card))) throw Error('Original card changed');
+    for (const card of original.ut.owned) if (!result.ut.owned.some((c) => Object.entries(card).every(([k,v])=>JSON.stringify(c[k])===JSON.stringify(v)))) throw Error('Original card changed');
     await shot(page, 'spotlight-pack-' + sport);
     await dismissPack(page);
     await page.locator('.ut-tabs button').filter({ hasText: 'STORE' }).click();
@@ -56,7 +56,7 @@ try {
       .first()
       .click();
     await page.getByText('WORLDWIDE EDITION NUMBER', { exact: true }).waitFor();
-    await page.waitForFunction(() => document.querySelector('.ut-card-serial small')?.textContent.includes('Total registered worldwide.'), null, { timeout: 20000 });
+    await page.waitForFunction(() => document.querySelector('.ut-card-serial small')?.textContent.includes('Live copies in circulation.'), null, { timeout: 20000 });
     await shot(page, 'registered-card-' + sport);
     await page.getByRole('button', { name: 'CLOSE', exact: true }).click();
     await page.locator('.ut-tabs button').filter({ hasText: 'HOME' }).click();

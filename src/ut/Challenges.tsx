@@ -183,7 +183,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
                 const c = u ? byUid.get(u) : undefined;
                 return (
                   <button key={i} className="ut-sbc-slot" onClick={() => (sfx.click(), setSlotAt(i))} aria-label={c ? c.rc.line.name + ', tap to change' : 'Empty, tap to add a card'}>
-                    {c ? <UtCard rc={c.rc} w={72} level={c.oc.level} /> : <span className="ut-slot-empty" style={{ width: 72, height: 101 }}><b>+</b></span>}
+                    {c ? <UtCard rc={c.rc} w={72} level={c.oc.level} mint={c.oc.mint} numbered /> : <span className="ut-slot-empty" style={{ width: 72, height: 101 }}><b>+</b></span>}
                     {c?.slot && <i className="ut-insquad">{c.slot}</i>}
                   </button>
                 );
@@ -269,7 +269,7 @@ function SbcPicker({ s, club, taken, current, teamOvr, onPick, onClose }: { s: S
             <div className="ut-picker-list">
               {list.map((c) => (
                 <button key={c.uid} className="ut-pickrow" onClick={() => close(() => onPick(c.uid))}>
-                  <UtCard rc={c.rc} w={44} level={c.oc.level} />
+                  <UtCard rc={c.rc} w={44} level={c.oc.level} mint={c.oc.mint} numbered />
                   <span className="ut-pickrow-txt">
                     <b>{c.rc.line.name}</b>
                     <small>

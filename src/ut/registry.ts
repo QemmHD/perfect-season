@@ -1,9 +1,10 @@
 // Implemented by Codex. See docs/CODEX-UPDATE-LOG.md for ownership, connections and validation.
 import { NS_SUFFIX, sign } from '../net/nostr';
 import type { UtSport } from './types';
-export const REGISTRY_URL = 'https://ryqaibujweiwwvdtswxj.supabase.co/functions/v1/card-registry';
+export const REGISTRY_BASE = 'https://ryqaibujweiwwvdtswxj.supabase.co';
+export const REGISTRY_URL = REGISTRY_BASE + '/functions/v1/card-registry';
 // Public publishable key only. Service credentials exist solely in the function's environment.
-const PUBLISHABLE = 'sb_publishable_Zl7MIzwPXVO_2azYNqh0Bw_DYZvQRbo';
+export const REGISTRY_PUBLIC_KEY = 'sb_publishable_Zl7MIzwPXVO_2azYNqh0Bw_DYZvQRbo';
 export const registryNamespace = () => NS_SUFFIX.replace(/^-/, '');
 export interface RegistryReceipt {
   id: string;
@@ -15,6 +16,7 @@ export interface RegistryReceipt {
   seed: string;
   serial: number | null;
   totalAtPull: number | null;
+  activeAtPull?: number | null;
 }
 async function request(query: string, body?: unknown): Promise<any> {
   const controller = new AbortController(),
@@ -22,7 +24,7 @@ async function request(query: string, body?: unknown): Promise<any> {
   try {
     const r = await fetch(REGISTRY_URL + query, {
       method: body ? 'POST' : 'GET',
-      headers: { apikey: PUBLISHABLE, 'Content-Type': 'application/json' },
+      headers: { apikey: REGISTRY_PUBLIC_KEY, 'Content-Type': 'application/json' },
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: controller.signal,
     });
@@ -49,7 +51,21 @@ export async function openRegisteredPack(sport: UtSport, id: string, kind: strin
     ),
   });
 }
-export async function cardCounts(sport: UtSport, namespace = registryNamespace()): Promise<Record<string, number>> {
-  const result = await request('?sport=' + sport + '&ns=' + encodeURIComponent(namespace));
-  return Object.fromEntries(Object.entries(result.counts ?? {}).filter(([, v]) => Number.isSafeInteger(v) && Number(v) > 0)) as Record<string, number>;
+export async function countSnapshot(sport: UtSport, namespace=registryNamespace(), ids?:string[]):Promise<{counts:Record<string,number>;versions:Record<string,number>}> {
+ const result=await request('?sport='+sport+'&ns='+encodeURIComponent(namespace)+(ids?.length?'&ids='+encodeURIComponent(JSON.stringify(ids)):''));
+ const valid=(raw:Record<string,unknown>)=>Object.fromEntries(Object.entries(raw??{}).filter(([,v])=>Number.isSafeInteger(v)&&Number(v)>=0)) as Record<string,number>;
+ return {counts:valid(result.activeCounts??result.counts),versions:valid(result.versions)};
+}
+export async function cardCounts(sport:UtSport,namespace=registryNamespace()):Promise<Record<string,number>> {return (await countSnapshot(sport,namespace)).counts;}
+export interface CopyRequest { uid:string;cardId:string;level:number;reason?:'sold'|'sbc'; }
+export interface CopyReply {uid:string;cardId:string;retired:boolean;mint:import('./types').CardMint;active:number;revision:number;}
+export async function syncCopies(sport:UtSport,copies:CopyRequest[],namespace=registryNamespace()):Promise<CopyReply[]> {
+ const content=JSON.stringify({v:1,op:'copies',sport,namespace,copies});
+ const result=await request('',{event:sign(27235,[['u',REGISTRY_URL],['method','POST']],content)});
+ if(!Array.isArray(result.copies)||result.copies.length!==copies.length)throw Error('Incomplete registry response');
+ return result.copies.map((r:CopyReply,i:number)=>{
+  const c=copies[i],m=r.mint;
+  if(r.uid!==c.uid||r.cardId!==c.cardId||typeof r.retired!=='boolean'||!m||!Number.isSafeInteger(m.serial)||m.serial<1||!Number.isSafeInteger(m.totalAtPull)||m.totalAtPull<m.serial||m.namespace!==namespace||typeof m.requestId!=='string'||!Number.isSafeInteger(r.active)||r.active<0||!Number.isSafeInteger(r.revision)||r.revision<1||m.activeAtPull!==r.active)throw Error('Invalid registry copy response');
+  return r;
+ });
 }

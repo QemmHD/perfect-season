@@ -55,12 +55,20 @@ export interface CardLine {
   ratingReference?: { source: string; snapshot: string; ovr: number; attrs: Record<string, number> };
 }
 
-/** A card in a player's club. */
+/** Immutable edition issue number; activeAtPull is only a last-confirmed circulation snapshot. */
 export interface CardMint {
   serial: number;
   totalAtPull: number;
+  activeAtPull?: number;
   requestId: string;
   namespace: string;
+}
+export interface CardRetirement {
+  uid: string;
+  cardId: string;
+  level: number;
+  reason: 'sold' | 'sbc';
+  mint?: CardMint;
 }
 export interface OwnedCard {
   mint?: CardMint;

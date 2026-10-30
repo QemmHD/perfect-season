@@ -11,6 +11,8 @@ This is the existing React/TypeScript iPhone home-screen PWA, served by GitHub P
 
 ## Connections and module map
 
+The latest card-number revision is documented in `docs/CARD-CIRCULATION.md`: **90+ including upgrades**, existing unnumbered holdings issued in first-connection order, fixed serial / live active copies, sold/SBC retirement with offline retries. Preserve the ledger, cumulative sequence, active counts and optional local queue.
+
 - `src/net/nostr.ts`: original five-relay Nostr transport and signed player identity. `match.ts`: existing matchmaking/live matches. `leaderboard.ts`: original boards. `gifts.ts`: admin gifts. These are **not Supabase features**.
 - `src/ut/UltimateTeam.tsx`: UT routing, transactions, packs, card details and SBC submission.
 - `src/ut/state.ts`, `storage.ts`: additive profile migration and duplicate storage.

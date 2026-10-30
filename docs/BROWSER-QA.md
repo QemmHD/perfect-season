@@ -43,3 +43,8 @@ Chromium verifies layout, input and state transitions. Before claiming device-sp
 ## Codex gameplay revision, 2026-10-30
 
 `node scripts/qa/gameplay.mjs` mounts the actual NBA/NFL match components with rated isolated fixture squads at Legend defense. It sends manual pointer shooting/throwing input, checks populated canvas pixels, runs complete autoplay possessions/drives, checks finite progress and unchanged original owned copies, and captures release/aim/action screenshots. The same optional QA-tool path/proxy environment variables apply. `online.mjs` also verifies the revised rules/pool handshake and deterministic Sim settlement with two independent signed local-relay clients per sport. See GAMEPLAY-RESEARCH.md and CODEX-UPDATE-LOG.md for final results and device-test limits.
+
+
+## Codex 90+ circulation revision
+
+`node scripts/qa/circulation.mjs` tests two signed identities per sport against the existing registry's inspect namespace: first registration, a different player's next issue, live aggregate change within 12 seconds (before polling fallback), repeated sold-copy retirement, and an offline SBC queue through reload/reconnect. It checks other original copies/levels/XP and captures actual numbered gold cards. Whole UI flows accept additive metadata while still requiring every original field to survive. Details: CARD-CIRCULATION.md.
