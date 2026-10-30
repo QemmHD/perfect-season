@@ -1,4 +1,4 @@
-import { Rivals, RivalsTeaser } from './Rivals';
+import { Rivals } from './Rivals';
 import { recordActivity, claimObjective, claimSeason, claimReadySeason, hqOf, objectiveDeck, rewardLabel, type Prize } from './progression';
 import { PlayHQ, SeasonView, ObjectivesView, CircuitView, DevelopmentView, SquadPresets, ClubRecords } from './Clubhouse';
 import { Moments } from './Moments';
@@ -6,7 +6,7 @@ import { claimMoment, finishMoment } from './moments';
 import { startCircuit, abandonCircuit } from './circuit';
 import { savePreset, loadPreset, startDevelopment, cancelDevelopment, claimDevelopment } from './club-management';
 import './clubhouse.css';
-// Ultimate Team: the mode's own screen, with its own tabs (hub, squad, club, store, challenges).
+// Ultimate Team: the mode's own screen, with its own tabs (home, play, squad, club, store, challenges).
 // It keeps everything in the profile's `ut` (this sport's) and spends the profile's coins. The
 // card pool loads when the screen opens. App.tsx only routes here (screen 'ut').
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -23,7 +23,7 @@ import { CardDetail } from './CardDetail';
 import { Challenges } from './Challenges';
 import { Club } from './Club';
 import { Hub } from './Hub';
-import { IconClub, IconHub, IconSbc, IconSquad, IconStore } from './icons';
+import { IconClub, IconHub, IconPlay, IconSbc, IconSquad, IconStore } from './icons';
 import { PackOpening } from './PackOpening';
 import { openPack, packDefs, packName, quickSellValue } from './packs';
 import type { PlaySquad } from './play';
@@ -77,6 +77,7 @@ let lastView: UtView = 'hub';
 
 const TABS: [UtView, string, React.ReactNode][] = [
   ['hub', 'HOME', <IconHub />],
+  ['play', 'PLAY', <IconPlay />],
   ['squad', 'SQUAD', <IconSquad />],
   ['club', 'CLUB', <IconClub />],
   ['store', 'STORE', <IconStore />],
@@ -442,8 +443,14 @@ export default function UltimateTeam(props: {
   else if (view === 'play')
     body = (
       <PlayHQ
+        ut={ut}
         onGo={go}
         onOnline={() => {
+          if (!props.onPlaySquad || !NET_ON) {
+            sfx.nope();
+            onToast('Head to head needs a connection.');
+            return;
+          }
           if (!ready) {
             onToast('Fill your starting squad first.');
             go('squad');
@@ -652,7 +659,6 @@ export default function UltimateTeam(props: {
   else
     body = (
       <Hub
-        rivals={<RivalsTeaser profile={profile} onOpen={() => go('rivals')} />}
         sport={SPORT}
         day={day}
         club={club}
@@ -664,36 +670,22 @@ export default function UltimateTeam(props: {
         onInspect={setDetail}
         onGo={go}
         onStarter={claimStarter}
-        onPlay={(mode) => {
-          if (mode === 'ai') return go('battles');
-          const play = props.onPlaySquad;
-          if (!play || !NET_ON) {
-            sfx.nope();
-            onToast('Head to head needs a connection.');
-            return;
-          }
-          if (!ready) {
-            sfx.nope();
-            onToast('Fill every starting spot in your squad first.');
-            return go('squad');
-          }
-          sfx.click();
-          play({ id: Date.now(), mode: 'online' });
-        }}
       />
     );
 
-  const activeTab = view === 'gallery' ? 'club' : TABS.some(([tab]) => tab === view) ? view : 'hub';
+  // Codex: every competition belongs to Play, including the view restored after a match.
+  const playChild = ['battles', 'rivals', 'events', 'circuit', 'moments'].includes(view);
+  const activeTab = playChild ? 'play' : view === 'gallery' ? 'club' : TABS.some(([tab]) => tab === view) ? view : 'hub';
 
   return (
     <div className={'screen ut ut-v-' + view}>
       <div className="topbar ut-top" {...(opening ? { inert: '' } : {})}>
         <button
           className="icon-btn pill-btn"
-          onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go('hub'))}
-          aria-label={view === 'hub' ? 'Leave Ultimate Team' : 'Back to the Ultimate Team home'}
+          onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go(playChild ? 'play' : 'hub'))}
+          aria-label={view === 'hub' ? 'Leave Ultimate Team' : playChild ? 'Back to Play' : 'Back to the Ultimate Team home'}
         >
-          <Back size={16} /> {view === 'hub' ? 'HOME' : 'UT'}
+          <Back size={16} /> {view === 'hub' ? 'HOME' : playChild ? 'PLAY' : 'UT'}
         </button>
         <span className="ut-title disp">
           {view === 'hub'
@@ -704,7 +696,7 @@ export default function UltimateTeam(props: {
                   rivals: 'Rivals',
                   gallery: 'Collection',
                   events: 'Spotlight Events',
-                  play: 'Play HQ',
+                  play: 'Play',
                   season: 'Season Rewards',
                   objectives: 'Objectives',
                   circuit: 'Champions Circuit',

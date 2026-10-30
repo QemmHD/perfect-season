@@ -91,3 +91,14 @@ Current-run actual game captures. [Findings, file connections, numbered review a
 - [Playbook in landscape](ui-nfl-playbook.png)
 
 Menus use normal-time isolated profiles; game-control captures use the existing lab's 0.5× capture setting. Real card art, profile keys, progress and engine behavior are retained; these are not generated concept images.
+
+
+## Play tab and football overlay — Codex, 2026-10-30
+
+Real current-run components on isolated localhost QA profiles. Implemented by Codex (OpenAI).
+
+- [Play tab](play-tab.png): existing Archivo, gold active treatment and all competition entries under Play.
+- [Football before](football-hint-before.png): the reproduced 487px black tip panel.
+- [Football after](football-hint-after.png): compact tip below the scoreboard, with the field and joystick visible. Simulated safe-area insets; normal-match tips enabled.
+
+[Cause, file connections, validation and preservation constraints](../PLAY-TAB-AND-FOOTBALL-HINT.md). Older clubhouse captures above predate the dedicated Play tab.

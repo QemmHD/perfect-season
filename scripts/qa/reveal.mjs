@@ -19,7 +19,7 @@ try {
       await page.waitForTimeout(120);
     }
     await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-    await page.getByRole('button', { name: /Take on the greats/ }).waitFor();
+    await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor();
     const render = () =>
       page.evaluate(async (tier) => {
         const React = (await import('/node_modules/.vite/deps/react.js')).default;

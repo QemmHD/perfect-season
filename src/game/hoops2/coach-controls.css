@@ -36,12 +36,13 @@
   top: auto;
   bottom: calc(var(--sab) + 12px);
 }
-.hg2:not(.wide) .hg2-hint {
+/* Basketball-only: never apply coach-strip offsets to football tips. */
+.hg2:not(.fb2):not(.wide) .hg2-hint {
   top: calc(var(--sat) + 161px);
   font-size: 11px;
   max-width: 240px;
 }
-.hg2.wide .hg2-hint {
+.hg2:not(.fb2).wide .hg2-hint {
   bottom: calc(var(--sab) + 69px);
   max-width: 240px;
   font-size: 11px;

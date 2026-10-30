@@ -59,8 +59,8 @@ try {
     await page.waitForFunction(() => document.querySelector('.ut-card-serial small')?.textContent.includes('Live copies in circulation.'), null, { timeout: 20000 });
     await shot(page, 'registered-card-' + sport);
     await page.getByRole('button', { name: 'CLOSE', exact: true }).click();
-    await page.locator('.ut-tabs button').filter({ hasText: 'HOME' }).click();
-    await page.getByRole('button', { name: /Take on the greats/ }).click();
+    await page.locator('.ut-tabs button').filter({ hasText: 'PLAY' }).click();
+    await page.getByRole('button', { name: /LEGENDS SERIES/ }).click();
     await page.getByRole('heading', { name: 'Dynasty Nights', exact: true }).waitFor();
     await shot(page, 'spotlight-events-' + sport);
     const beforeEvent = await current();

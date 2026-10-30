@@ -42,6 +42,7 @@ try {
     await capture(page, 'clubhouse-' + sport + '-circuit');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await enter();
+    await page.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
     await page.getByRole('button', { name: /CONTINUE YOUR CIRCUIT/ }).click();
     assert.equal((await current()).ut.hq.circuit.active.id, active.id);
     await home();
@@ -110,7 +111,7 @@ try {
       .click();
     const seasonClaim = await current();
     assert.equal(seasonClaim.ut.hq.seasons['season:1'].claimed.length, 1);
-    await home();
+    await page.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
     await page.getByRole('button', { name: /MOMENTS/ }).click();
     await capture(page, 'clubhouse-' + sport + '-moments');
     await page.locator('.hq-moment-tile').first().click();
@@ -221,6 +222,7 @@ try {
     });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await enter();
+    await page.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
     await page.getByRole('button', { name: /MOMENTS/ }).click();
     await page.locator('.hq-moment-tile').first().click();
     const beforeMoment = (await current()).coins;
@@ -232,6 +234,7 @@ try {
         .isVisible()
     );
     await home();
+    await page.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
     await page.getByRole('button', { name: /CONTINUE YOUR CIRCUIT/ }).click();
     await page
       .getByRole('button', { name: 'PLAY MATCH 1', exact: true })

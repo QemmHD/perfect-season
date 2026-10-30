@@ -43,7 +43,8 @@ try {
       b = await fixture(browser, sport, 'Codex QA B');
     for (const p of [a.page, b.page]) {
       await p.getByRole('button', { name: /Ultimate Team:/ }).click();
-      await p.getByRole('button', { name: 'Head to Head', exact: true }).click();
+      await p.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
+      await p.getByRole('button', { name: /HEAD TO HEAD/ }).click();
     }
     await Promise.all(
       [a.page, b.page].map(async (p) => {

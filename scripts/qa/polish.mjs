@@ -120,7 +120,7 @@ try {
     assert.ok(
       await page.getByText('IN YOUR MATCH SQUAD', { exact: true }).isVisible()
     );
-    await page.locator('.ut-tabs button').filter({ hasText: 'HOME' }).click();
+    await page.locator('.ut-tabs button').filter({ hasText: 'PLAY' }).click();
     await page.getByRole('button', { name: /MOMENTS/ }).click();
     await page
       .locator('.hq-moment-tile')

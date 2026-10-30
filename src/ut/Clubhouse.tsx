@@ -117,12 +117,15 @@ export function SeasonRibbon({
   );
 }
 export function PlayHQ({
+  ut,
   onGo,
   onOnline
 }: {
+  ut: UtState;
   onGo: (v: UtView) => void;
   onOnline: () => void;
 }) {
+  const active = hqOf(ut).circuit.active;
   return (
     <div className="page hq-page">
       <div className="hq-page-heading">
@@ -137,9 +140,13 @@ export function PlayHQ({
         <Trophy size={42} />
         <span>
           <i className="eyebrow">SOLO · SIX-MATCH ENTRIES</i>
-          <b className="disp">CHAMPIONS CIRCUIT</b>
+          <b className="disp">
+            {active ? 'CONTINUE YOUR CIRCUIT' : 'CHAMPIONS CIRCUIT'}
+          </b>
           <small>
-            Climb through tougher squads. Earn weekly best-result rewards.
+            {active
+              ? `Match ${active.games + 1} / 6 · ${active.wins} wins so far`
+              : 'Climb through tougher squads. Earn weekly best-result rewards.'}
           </small>
         </span>
         <HQArrow />

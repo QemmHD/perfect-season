@@ -14,7 +14,6 @@ import { HQArrow, SeasonRibbon } from './Clubhouse';
 import { hqOf, objectiveDeck } from './progression';
 export { PackArt } from './PackArt';
 export function Hub(props: {
-  rivals?: React.ReactNode;
   sport: UtSport;
   club: ClubCard[];
   lineup: Lineup;
@@ -26,7 +25,6 @@ export function Hub(props: {
   onGo: (v: UtView) => void;
   onStarter: () => void;
   onInspect: (uid: string) => void;
-  onPlay: (mode: 'ai' | 'online') => void;
 }) {
   const { ut, rating, lineup } = props,
     h = hqOf(ut),
@@ -41,8 +39,7 @@ export function Hub(props: {
     size = slotsFor(props.sport).length,
     rewards = objectiveDeck(ut, props.day).filter(
       (o) => !o.claimed && o.progress >= o.target
-    ).length,
-    active = h.circuit.active;
+    ).length;
   return (
     <div className="page ut-hub hq-home">
       <SeasonRibbon
@@ -106,33 +103,11 @@ export function Hub(props: {
           <HQArrow />
         </button>
       </div>
-      <button
-        className="hq-circuit-launch"
-        onClick={() => props.onGo('circuit')}
-      >
-        <Trophy size={34} />
-        <span>
-          <i className="eyebrow">SOLO · WEEKLY REWARDS</i>
-          <b className="disp">
-            {active ? 'CONTINUE YOUR CIRCUIT' : 'CHAMPIONS CIRCUIT'}
-          </b>
-          <small>
-            {active
-              ? 'Match ' +
-                (active.games + 1) +
-                ' / 6 · ' +
-                active.wins +
-                ' wins so far'
-              : 'Six matches. Three free entries. Build your best run.'}
-          </small>
-        </span>
-        <HQArrow />
-      </button>
       <div className="hq-home-double">
-        <button className="hq-small-mode" onClick={() => props.onGo('moments')}>
-          <i className="eyebrow">SHORT SKILL SCENARIOS</i>
-          <b className="disp">MOMENTS</b>
-          <small>Make the play. Earn the reward.</small>
+        <button className="hq-small-mode" onClick={() => props.onGo('club')}>
+          <i className="eyebrow">YOUR PLAYERS · YOUR COLLECTION</i>
+          <b className="disp">MY CLUB</b>
+          <small>Organize your cards and duplicate storage.</small>
           <HQArrow />
         </button>
         <button className="hq-small-mode" onClick={() => props.onGo('season')}>
@@ -177,29 +152,6 @@ export function Hub(props: {
         </span>
         <span className="hq-squad-arrow">
           <HQArrow />
-        </span>
-      </button>
-      {props.rivals}
-      <div className="ut-play">
-        <button className="big shine" onClick={() => props.onPlay('ai')}>
-          <span>Squad Battles</span>
-        </button>
-        <button
-          className="big ghost small"
-          onClick={() => props.onPlay('online')}
-        >
-          <span>Head to Head</span>
-        </button>
-      </div>
-      <button
-        className="ut-content-launch hq-series-launch"
-        onClick={() => props.onGo('events')}
-      >
-        <span className="eyebrow">SPOTLIGHT SERIES</span>
-        <b className="disp">Take on the greats.</b>
-        <small>Themed match series. Earn a guaranteed Spotlight reward.</small>
-        <span className="ut-launch-action">
-          EXPLORE EVENTS <HQArrow />
         </span>
       </button>
       <button className="ut-book-launch" onClick={() => props.onGo('gallery')}>

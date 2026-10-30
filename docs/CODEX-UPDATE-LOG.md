@@ -342,3 +342,10 @@ Local full suites pass 653 tests, TypeScript/build, measured both-sport UI/modal
 - Main/original restore were rechecked at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-polish source restore is `backup/pre-ui-consistency-2026-10-30` at `86d64586271da62ea0fa9934d2c3bd5060307ecb`.
 
 This release-record follow-up changes documentation only; the deployed UI/runtime is the verified implementation above. No live Pages promotion, account reset, save migration, backend deployment, rating/odds/physics changes or transfer of live accounts into preview. Queues stay NBA 8 / NFL 9. Physical installed-iPhone/VoiceOver testing and the existing bundle-size warning remain documented limits.
+
+
+## Play tab and football black-box correction — Codex, 2026-10-30
+
+**Implemented by Codex (OpenAI)**. Added the sixth Ultimate Team Play tab and moved all competition entry points there, including saved Circuit continuation. Competition pages keep Play active and return to Play; Home retains club/progression management and a shortcut to the tab. Matched the existing icon/type/material language and retained six usable navigation targets. Fixed the reproduced normal-football 487px dark hint panel caused by basketball top-inset CSS combining with football bottom-inset CSS; football now has compact hints below the scoreboard and clear of play calls. See [file map, cause, QA and screenshots](PLAY-TAB-AND-FOOTBALL-HINT.md). Source restore: `backup/pre-play-tab-2026-10-30` at `c24b293c76441d7552c1d4b03a87aa8e5a1bb306`. No gameplay, account/progress/schema/backend/odds changes; NBA 8 / NFL 9 remain. Publication and exact verification references follow.
+
+Local verification for this update: 653 full-suite tests, TypeScript/build, 30 UI layout/modal checks, both-sport six-tab/all-competition/back/resume checks, six normal-football tip cases (28–42px rather than 487px), complete clubhouse progression and signed two-client NBA/NFL H2H all pass. Original test copies, squad and wallet are preserved. See the new handoff's validation section for scope and limits.

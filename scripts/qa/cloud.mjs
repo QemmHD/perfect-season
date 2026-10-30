@@ -67,6 +67,7 @@ try {
       .click();
     await a.page.reload({ waitUntil: 'domcontentloaded' });
     await a.page.getByRole('button', { name: /Ultimate Team:/ }).click();
+    await a.page.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
     await a.page.getByRole('button', { name: /CHAMPIONS CIRCUIT/ }).click();
     await a.page
       .getByRole('button', { name: 'ENTER FREE', exact: true })

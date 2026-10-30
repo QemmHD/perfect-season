@@ -9,7 +9,7 @@ try{
   const {page,context,current,original,errors}=await fixture(browser,sport,'Codex UI Review');
   await page.getByRole('button',{name:/Ultimate Team:/}).click();
   await page.getByRole('button',{name:'PLAY HQ',exact:true}).waitFor();
-  const home=async()=>{const back=page.getByRole('button',{name:'Back to the Ultimate Team home',exact:true});if(await back.count())await back.click();else await page.locator('.ut-tabs button').filter({hasText:'HOME'}).click();};
+  const home=async()=>page.locator('.ut-tabs button').filter({hasText:'HOME'}).click();
   const check=async(name,tab,{capture=true,fullTitle=true,stableCurrency=true}={})=>{
    await page.locator('.ut-title').evaluate(el=>el.getBoundingClientRect().width);
    await page.evaluate(()=>document.fonts.ready);
@@ -29,8 +29,8 @@ try{
    report.push({sport,step:name,...result});
   };
   await check('01-home','HOME');
-  for(const [name,button] of [['02-play','PLAY HQ'],['03-season',/SEASON PASS/],['04-objectives',/OBJECTIVES/],['05-development',/DEVELOPMENT/],['06-moments',/MOMENTS/],['07-records',/Club Records/],['08-events',/Take on the greats/],['09-gallery',/Collection Gallery/]]){
-   await home();await page.getByRole('button',{name:button,exact:typeof button==='string'}).click();await check(name,name==='09-gallery'?'CLUB':'HOME');
+  for(const [name,button] of [['02-play','PLAY HQ'],['03-season',/SEASON PASS/],['04-objectives',/OBJECTIVES/],['05-development',/DEVELOPMENT/],['06-moments',/MOMENTS/],['07-records',/Club Records/],['08-events',/LEGENDS SERIES/],['09-gallery',/Collection Gallery/]]){
+   await home();if(['06-moments','08-events'].includes(name))await page.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();await page.getByRole('button',{name:button,exact:typeof button==='string'}).click();await check(name,name==='09-gallery'?'CLUB':['02-play','06-moments','08-events'].includes(name)?'PLAY':'HOME');
   }
   await page.getByRole('button',{name:/COLLECTION REWARDS/}).click();const rewards=page.getByRole('dialog',{name:'Collection rewards',exact:true});await rewards.waitFor();
   for(let n=0;n<16;n++){await page.keyboard.press('Tab');assert.ok(await rewards.evaluate(el=>el.contains(document.activeElement)));}
@@ -38,9 +38,9 @@ try{
   // Both long-title pages and the header under a large-wallet stress stay separated at each size.
   for(const [width,height] of [[320,568],[390,844],[844,390]]){
    await page.setViewportSize({width,height});await home();await page.getByRole('button',{name:'PLAY HQ',exact:true}).click();await page.getByRole('button',{name:/CHAMPIONS CIRCUIT/}).click();
-   await check('10-circuit-'+width,'HOME');
+   await check('10-circuit-'+width,'PLAY');
    const coin=page.locator('.ut-top .coins span').last(),text=await coin.textContent();await coin.evaluate(el=>el.textContent='123456789');
-   await check('wallet-stress-'+width,'HOME',{capture:false,fullTitle:false,stableCurrency:false});await coin.evaluate((el,text)=>el.textContent=text,text);
+   await check('wallet-stress-'+width,'PLAY',{capture:false,fullTitle:false,stableCurrency:false});await coin.evaluate((el,text)=>el.textContent=text,text);
   }
   await page.setViewportSize({width:390,height:844});await page.locator('.ut-tabs button').filter({hasText:'SQUAD'}).click();await page.getByRole('button',{name:'LINEUPS',exact:true}).click();
   const lineups=page.getByRole('dialog',{name:'Saved lineups',exact:true});await lineups.waitFor();

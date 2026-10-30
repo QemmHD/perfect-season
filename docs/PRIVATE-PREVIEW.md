@@ -1,6 +1,6 @@
 # Private preview — implemented by Codex, 2026-10-29
 
-Latest update: the **Codex researched fixes and polish** are deployed privately; see the final section for the exact source/version/deployment and [UT-POLISH.md](UT-POLISH.md) for the latest complete handoff. Main/Pages remains unchanged.
+Latest implementation: **Codex Play tab and football overlay fix**; see [the handoff](PLAY-TAB-AND-FOOTBALL-HINT.md). The final publication section records the exact deployed source/version. Main/Pages remains unchanged.
 
 Test URL: https://perfect-season-private-preview.qem.chatgpt.site
 

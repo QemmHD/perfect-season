@@ -8238,8 +8238,13 @@ button.friendcard:active {
   color: #ff9a9a;
 }
 .fb2 .hg2-hint {
-  top: auto;
-  bottom: calc(var(--sab) + 196px);
+  /* Codex: intrinsic text height, never a top-to-bottom playfield overlay. */
+  height: fit-content;
+  width: max-content;
+  box-sizing: border-box;
+  /* Under scoreboard/drive/On Fire; clear of both pre-snap calls and run controls. */
+  top: calc(var(--sat) + 98px);
+  bottom: auto;
 }
 .fb2.wide .hg2-hint {
   bottom: auto;
@@ -8651,6 +8656,7 @@ button.friendcard:active {
   display: flex;
   flex-shrink: 0;
   height: calc(var(--tabs-h) + var(--sab));
+  min-height: calc(60px + var(--sab));
   padding-bottom: var(--sab);
   box-sizing: border-box;
   background: var(--bg-2);
@@ -8659,6 +8665,8 @@ button.friendcard:active {
 .ut-tabs button {
   position: relative;
   flex: 1;
+  min-width: 0;
+  padding-inline: 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8669,7 +8677,7 @@ button.friendcard:active {
   color: var(--sub);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   transition: color 0.25s;
 }
 .ut-tabs button[aria-current='page'] {
