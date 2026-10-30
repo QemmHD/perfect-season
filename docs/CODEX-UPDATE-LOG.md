@@ -254,3 +254,12 @@ The extended cloud QA exposed a comparison defect: JSON serialization order of m
 
 
 Final local browser verification passed in both sports: the complete clubhouse script, expanded real-server save/restore/conflict script (including full HQ equality), prior registered-pack/event/collection script, two-client rule-6 H2H, and real engine manual-input/full-autoplay smoke. Every script reported zero page errors. The engine smoke finished with finite scores/progress and preserved all 56/69 original fixture copies. [Thirteen actual captures](previews/README.md#connected-ultimate-team-clubhouse--codex-2026-10-30) show the new screens and responsive controls. Whole-pool audit checked 22,082 NBA / 32,242 NFL editions with zero invalid entries. Build/typecheck and final 31 focused assertions passed. Device-specific iPhone playtesting remains separate.
+
+
+### Verified clubhouse publication — Codex
+
+Runtime/source implementation `cc5179fd00fa4a3d494d08a2e368e18cf7097a0a` matches local `3e874eab4b3dc99bceb832408109d5411cf06f8d`, tree `2bcc7c817592d32f88631f7efd920eadf65200e9` (remote tree equality verified before moving the feature ref). [Review build #17](https://github.com/QemmHD/perfect-season/actions/runs/41106465021), job `124237473199`, **passed**: independently confirmed 304 NBA / 271 NFL tests, 31/63 existing skips, whole-pool ratings audit, TypeScript and production build. PR #1 remains open/unmerged.
+
+Owner-private preview source `ff7b468ef2ff36c0acfbbdf7d37c7db635b885f5` built and passed production bootstrap ordering, forced `preview2026` namespace, PWA manifest/identity and zero-error boot. Saved version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_15cfefa597fc81918446d581d90af8f5`; deployment `appgdep_6ae4e14ec8a48191817acac2811e30bf` returned **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site . Owner-only access, origin, namespace and installed preview PWA ID were retained. This deployment contains the complete verified implementation; this release-record follow-up changes documentation only.
+
+Main and `backup/original-working-2026-10-28` were checked unchanged at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; `backup/pre-ut-overhaul-2026-10-30` was checked at `8e7773bc329cf9cdf10431bb95ec72a022a15603`. No live Pages promotion, account reset, backend deployment or source-account transfer. Localhost/inspect QA fixture accounts are separate from players.

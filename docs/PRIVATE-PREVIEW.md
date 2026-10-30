@@ -1,5 +1,7 @@
 # Private preview — implemented by Codex, 2026-10-29
 
+Latest update: the **Codex Ultimate Team clubhouse overhaul** is deployed privately; see the final section for the exact source/version/deployment and [UT-OVERHAUL.md](UT-OVERHAUL.md) for the complete handoff. Main/Pages remains unchanged.
+
 Test URL: https://perfect-season-private-preview.qem.chatgpt.site
 
 This is a separate owner-private copy hosted using Sites. It does not merge the feature branch, deploy GitHub Pages, or modify main. Sign in with the same ChatGPT account when prompted. Open in Safari; optionally use Share → Add to Home Screen. Its installed name is **PS Preview**. Keep the existing Perfect Season icon for the live game.
@@ -96,3 +98,15 @@ Pre-fix source restore: `backup/pre-nfl-rushing-2026-10-30` → `7f1cfbd0b85fe9c
 
 
 The rushing deployment's independent check is [Review build #15](https://github.com/QemmHD/perfect-season/actions/runs/41044676433), job `124025749338`, **passed**: 288 NBA / 255 NFL tests, whole-pool audit, TypeScript and production build. CI ran on `a143e12151852d6dca11b93f3b1ce79d29dd620e`, which adds a deterministic tamper-test fixture correction and this deployment record to runtime implementation `152ec94e7d7d7e339c83facd8a8e2785449005e2`; runtime code is identical to the deployed application. Details of the earlier test-only CI failure are retained in CODEX-UPDATE-LOG.md.
+
+
+## Ultimate Team clubhouse overhaul — Codex, 2026-10-30
+
+- Original GitHub implementation: `cc5179fd00fa4a3d494d08a2e368e18cf7097a0a` on `feature/season-evolution`; local source `3e874eab4b3dc99bceb832408109d5411cf06f8d`, identical tree `2bcc7c817592d32f88631f7efd920eadf65200e9`.
+- Pushed Sites source: `ff7b468ef2ff36c0acfbbdf7d37c7db635b885f5`.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_15cfefa597fc81918446d581d90af8f5`.
+- Deployment: `appgdep_6ae4e14ec8a48191817acac2811e30bf`, **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site .
+- The same owner-private access policy, origin, `preview2026` namespace and `./preview` PWA identity are retained. The namespace bootstrap precedes the bundled module in the built HTML. Preview branding/namespace patches remain only in the hosting copy; the Pages deploy workflow is excluded there.
+- Production build, boot/manifest/namespace smoke and clean pushed source passed. [Review build #17](https://github.com/QemmHD/perfect-season/actions/runs/41106465021), job `124237473199`, independently passed 575 tests, whole-pool audit and build. Both-sport new-flow, server HQ restore/conflict, existing content, real-engine input/progress and two-client H2H QA passed without page errors. Phone-size Chromium captures are in `docs/previews`; physical installed-iPhone feel remains a device playtest.
+
+[UT-OVERHAUL.md](UT-OVERHAUL.md) documents the complete module map, free-season/goal/Circuit/Moment rewards, exact-copy development, saved lineups, card story, real NBA/NFL calls and rule-6 compatibility. Pre-overhaul source restore: `backup/pre-ut-overhaul-2026-10-30` → `8e7773bc329cf9cdf10431bb95ec72a022a15603`. Main/original restore remain at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. This final record follow-up affects documentation only; it does not require re-deploying the already verified runtime.
