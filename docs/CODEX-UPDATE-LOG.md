@@ -227,3 +227,12 @@ Restore source: `backup/pre-nfl-rushing-2026-10-30` → `7f1cfbd0b85fe9c2f100f31
 ### Independent CI follow-up: deterministic tamper fixture — Codex
 
 GitHub Review build #14 (`41044181933`, job `124024056003`) passed NBA and all NFL rushing checks but exposed an existing flaky cloud-data test: it always replaced the first Base64 ciphertext character with A, which leaves random ciphertext unchanged when it already begins with A (about 1/64 cases). Codex corrected **only `src/lib/cloud-data.test.ts`** to choose A/B so the first significant character always changes, and asserts that the fixture differs before requiring authenticated decryption to reject it. No runtime save/encryption code, backend, player data or rushing physics changed. Final independent verification is recorded below after the follow-up run.
+
+
+### Verified NFL rushing publication — Codex
+
+Runtime implementation `152ec94e7d7d7e339c83facd8a8e2785449005e2` matches local `fb9a527bc66b807aa12cc340a2e96edc2d669d8f`, tree `d5e7a7d3c9b805804afe0cf549bc6ddffdff2abd`. Test-fixture correction/release record `a143e12151852d6dca11b93f3b1ce79d29dd620e` matches local `6b7cd2259c35a53ea1296b49872deb4d17290ff8`, tree `82c850b6baca4e5125255eb1e73cc8a51d621f22`. [Review build #15](https://github.com/QemmHD/perfect-season/actions/runs/41044676433), job `124025749338`, **passed**: independently confirmed **288 NBA / 255 NFL tests (543)**, 31/63 existing skips, whole-pool ratings audit, TypeScript and production build. The earlier CI failure and exact test-only correction are documented above; no runtime encryption change was needed.
+
+Existing owner-private preview source `91dca4a555c365031685e02676f2697dff16341d` built and passed production bootstrap/namespace/manifest checks. Saved version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_f37dad903af4819184e4fb722394e032`; deployment `appgdep_6ae477ee618c819180c36745f2465f35` returned **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site . It contains the verified runtime implementation; subsequent changes affect the cloud-data test fixture and documentation only. Existing private access, origin, preview namespace and installed PWA ID are retained.
+
+Main/original restore refs were checked unchanged at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-rushing restore remains `7f1cfbd0b85fe9c2f100f31d60294a3eb3ca7ae5`. No live Pages promotion, account reset or backend deployment. This final release-record commit changes documentation only.
