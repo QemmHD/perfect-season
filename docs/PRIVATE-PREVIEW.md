@@ -122,3 +122,15 @@ The rushing deployment's independent check is [Review build #15](https://github.
 - [Review build #19](https://github.com/QemmHD/perfect-season/actions/runs/41113183845), job `124260552711`, independently passed **589 tests**, ratings audit, TypeScript and build. Both-sport browser interruption, modality, reward/exact-copy, full clubhouse, registered-pack/content, server restore/conflict and signed H2H checks passed; seven pack-cinema viewport/motion cases passed. Physical iPhone/two-phone testing remains separate.
 
 Read [UT-POLISH.md](UT-POLISH.md) for research, prioritized findings, exact fixes and preservation guarantees. Mechanics queues are NBA 7 / NFL 6; leaderboard/data history and identities remain. Pre-polish source restore: `backup/pre-ut-polish-2026-10-30` at `f5f4e5138e7bf3bf60cd67f61c6795dbf24bb4d1`. Main/original restore remain `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. The release-record follow-up changes documentation only; the deployed runtime above is already verified.
+
+
+### Verified core gameplay publication — Codex
+
+- GitHub runtime implementation: `37c640fb116dfe25dc94667a9cf76751d6c72508`; local source `a4ece2c741c700437fdd9bd99b06f6c104fee405`, identical tree `7c31dc1ce2687dc9798b7f7544e1e8906ae1374e` (remote equality verified).
+- [Review build #21](https://github.com/QemmHD/perfect-season/actions/runs/41118840959), job `124280015967`, **passed**: independently confirmed 322 NBA / 289 NFL tests, all-edition rating audit with no invalid entries, TypeScript and production build.
+- Pushed preview source: `4a8ff15f63840a10dbd88ee3ba0c7d377721a1cf`. Exact source built and passed zero-error production boot, forced namespace, bootstrap-before-module and preview PWA identity checks; source Git is clean.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_d5c3e014595c8191b02e872f60230617`.
+- Deployment: `appgdep_6ae4f634498881918b569ba9e0ebc451`, **succeeded**, https://perfect-season-private-preview.qem.chatgpt.site . The same owner-private audience, origin, `preview2026` namespace and `./preview` PWA identity are preserved.
+- Main and original restore were rechecked at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; the pre-core restore is `backup/pre-core-gameplay-2026-10-30` at `0bfe5a54bbf9f87c5865325fd8bd605f20140177`.
+
+This release-record follow-up changes documentation only; deployed runtime is the verified implementation above. No live Pages merge/deploy, account reset, backend migration or transfer of live accounts into preview. The known physical-iPhone testing limit and existing bundle-size warning remain as documented.
