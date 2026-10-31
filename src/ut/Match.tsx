@@ -1,3 +1,6 @@
+import { leagueOpponent, type LeagueRequest } from './league';
+import { applyLeagueTeams } from './league-match';
+import { withLeagueForm } from './league-form';
 import { Promotion } from './Rivals';
 import { divisionOf, rivalsOf } from './rivals';
 import { publishRivals } from './rivals-net';
@@ -37,7 +40,7 @@ import { hqOf } from './progression';
 import { decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
 import { byValue, getPool, type Pool } from './pool';
 import { weekOf } from './sbc';
-import { CHEM_BONUS, type SquadRating, startersComplete } from './squad';
+import { rateSquad, CHEM_BONUS, type SquadRating, startersComplete } from './squad';
 import { lineupOf, ratingOf, type SquadCards, squadFromWire, squadToWire, type SquadWire, teamsOf } from './teams';
 import type { UtState } from './state';
 import './match.css';
@@ -59,6 +62,7 @@ const FOUND_MS = 2300;
 const VS_MS = 2800;
 
 interface Side {
+  form?: Record<string, number>;
   name: string;
   sq: SquadCards;
   wire: SquadWire;
@@ -77,6 +81,7 @@ interface Setup {
   rung: Rung | null;
   event?: { id: string; node: number; title: string };
   circuit?: { runId: string; round: number };
+  league?: LeagueRequest;
   /** Squad Battles: the difficulty's name and what it pays (times the coins) */
   level?: { name: string; pay: number; def: number };
 }
@@ -138,9 +143,10 @@ function aiSide(pool: Pool, r: Rung): Side {
 }
 
 /** a squad's best cards, for the VS screen */
-function bestOf(sq: SquadCards, n: number) {
+function bestOf(sq: SquadCards, n: number, form?: Record<string, number>) {
   return Object.values(lineupOf(sq))
     .filter((x): x is NonNullable<typeof x> => !!x)
+    .map(rc => form ? withLeagueForm(rc, form[rc.line.id] ?? 0) : rc)
     .sort(byValue)
     .slice(0, n);
 }
@@ -221,6 +227,56 @@ export default function UtMatch(props: {
         return;
       }
       setStage('search');
+      return;
+    }
+    if (req.league) {
+      const season = leagueOpponent(pool, profileRef.current.ut, req.league);
+      if (!season) {
+        setError('This season fixture is no longer active. Return to Play.');
+        setStage('error');
+        return;
+      }
+      const sq = squadFromWire(pool, season.squad);
+      const rated = Object.fromEntries(
+        Object.entries(lineupOf(sq)).map(([slot, rc]) => [
+          slot,
+          rc ? withLeagueForm(rc, season.form[rc.line.id] ?? 0) : null
+        ])
+      );
+      setSetup({
+        seed: 'league:' + req.league.game,
+        me,
+        rival: {
+          name: season.team.name,
+          sq,
+          wire: season.squad,
+          rating: rateSquad(SPORT, rated),
+          fav: season.team.abbr,
+          form: season.form
+        },
+        online: null,
+        rung: {
+          i: -4,
+          title: season.team.name,
+          fr: season.team.abbr,
+          decade: 2020,
+          target: season.rating.ovr,
+          ovr: season.rating.ovr,
+          squad: season.squad,
+          skill: season.skill,
+          fav: season.team.abbr,
+          pack: null
+        },
+        league: req.league,
+        level: {
+          name:
+            'Season · ' +
+            LEVEL_NAME[profileRef.current.ut.league!.active.level],
+          pay: 1,
+          def: season.def
+        }
+      });
+      setStage('vs');
       return;
     }
     if (req.circuit) {
@@ -331,14 +387,18 @@ export default function UtMatch(props: {
 
   // ---------- the game ----------
 
-  const teams = useMemo(() => (setup ? teamsOf(SPORT, setup.me.sq, setup.rival.sq, setup.seed) : null), [setup]);
+  const teams = useMemo(() => {
+    if (!setup) return null;
+    const base = teamsOf(SPORT, setup.me.sq, setup.rival.sq, setup.seed);
+    return setup.league && pool ? applyLeagueTeams(base, pool, setup.rival.form ?? {}) : base;
+  }, [setup, pool]);
   const kits = useMemo(() => (setup ? kitsFor(setup.me.fav, setup.rival.fav, SPORT) : undefined), [setup]);
   const aiSkill = setup?.rung ? setup.rung.skill : AI_SKILL.pro;
   const defenseIQ = setup?.online ? 1 : (setup?.level?.def ?? 0);
 
   useEffect(() => {
     if (stage !== 'vs') return;
-    const t = window.setTimeout(() => setStage(props.autoplay || setup?.circuit ? 'play' : 'vote'), props.autoplay ? 400 : VS_MS);
+    const t = window.setTimeout(() => setStage(props.autoplay || setup?.circuit || setup?.league ? 'play' : 'vote'), props.autoplay ? 400 : VS_MS);
     return () => clearTimeout(t);
   }, [stage]);
 
@@ -358,6 +418,8 @@ export default function UtMatch(props: {
       matchId: s.online?.matchId ?? 'ut-ai:' + req.id,
       event: s.event,
       circuit: s.circuit,
+      league: s.league,
+      clubOvr: s.me.rating.ovr,
       opponent: s.rival.name,
       how,
       won: d.won,
@@ -444,7 +506,7 @@ export default function UtMatch(props: {
           rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
           tookMe={setup.online ? (opp?.arcadeTook ?? null) : null}
           autoplay={props.autoplay}
-          manualOnly={!!setup.circuit}
+          manualOnly={!!setup.circuit || !!setup.league}
           kits={kits}
           onProgress={(p) => conn?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => conn?.update((s) => ({ ...s, arcadeTook: k }))}
@@ -504,6 +566,7 @@ export default function UtMatch(props: {
         onAgain={() => {
           sfx.click();
           const r = setup.rung;
+          if (setup.league) { leave(); return; }
           if (setup.circuit) {
             const active = hqOf(profileRef.current.ut).circuit.active;
             if (active) props.onAgain({ id: Date.now(), mode: 'ai', circuit: { runId: active.id, round: active.games } });
@@ -522,7 +585,7 @@ export default function UtMatch(props: {
 
   if (promotion !== null && stage === 'result') return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
-  const title = req.circuit ? 'Champions Circuit' : req.event ? 'Spotlight Events' : req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
+  const title = req.league ? 'Club Season' : req.circuit ? 'Champions Circuit' : req.event ? 'Spotlight Events' : req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
   return (
     <div className={'screen ut utm utm-s-' + stage}>
       <div className="topbar ut-top">
@@ -647,7 +710,7 @@ function SearchView(props: { me: Side; queue: string; level: number; found: Foun
 }
 
 function SideCard({ side, you }: { side: Side; you: boolean }) {
-  const best = bestOf(side.sq, 3);
+  const best = bestOf(side.sq, 3, side.form);
   return (
     <div className={'utm-side' + (you ? ' utm-me' : ' utm-them')}>
       <span className="utm-fan" aria-hidden="true">
@@ -670,7 +733,7 @@ function SideCard({ side, you }: { side: Side; you: boolean }) {
 
 function VsView({ setup }: { setup: Setup }) {
   const r = setup.rung;
-  const eyebrow = setup.event
+  const eyebrow = setup.league ? 'Club Season · '+(setup.level?.name ?? '') : setup.event
     ? 'Spotlight Series · ' + setup.event.title
     : setup.online
       ? 'Head to head · online'
@@ -686,7 +749,9 @@ function VsView({ setup }: { setup: Setup }) {
         <SideCard side={setup.rival} you={false} />
       </div>
       <small className="utm-vs-note">
-        {setup.event
+        {setup.league
+          ? (setup.level?.name ?? 'Season') + ' · ' + skillName(r!.skill) + ' AI'
+          : setup.event
           ? setup.event.title
           : r
             ? r.i >= 0
@@ -702,7 +767,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
   const r = setup.rung;
   const ladder = !!r && r.i >= 0;
   const top = ladder && out.climbed && r!.i + 1 >= RUNGS;
-  const again = setup.circuit ? (setup.circuit.round < 5 ? 'NEXT CIRCUIT MATCH' : 'BACK TO CLUB') : setup.event
+  const again = setup.league ? 'SEASON HUB' : setup.circuit ? (setup.circuit.round < 5 ? 'NEXT CIRCUIT MATCH' : 'BACK TO CLUB') : setup.event
     ? out.won && setup.event.node < 2
       ? 'NEXT EVENT MATCH'
       : 'PLAY AGAIN'
@@ -717,7 +782,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
             : 'TRY AGAIN';
   return (
     <div className="page utm-result">
-      <span className="eyebrow wide">{setup.circuit ? 'Solo Champions Circuit · Match ' + (setup.circuit.round + 1) + ' / 6' : setup.event ? setup.event.title : ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
+      <span className="eyebrow wide">{setup.league ? 'Club Season · league results and standings updated' : setup.circuit ? 'Solo Champions Circuit · Match ' + (setup.circuit.round + 1) + ' / 6' : setup.event ? setup.event.title : ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
       <h1 className={'disp utm-verdict ' + (out.won ? 'win' : 'loss')}>{out.won ? 'WIN' : 'LOSS'}</h1>
       <div className="utm-score" aria-label={'You ' + out.us + ', ' + setup.rival.name + ' ' + out.them}>
         <span>

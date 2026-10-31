@@ -52,6 +52,7 @@ try {
         );
         await shot(page, `play-${sport}-${width}`);
         for (const name of [
+          /CLUB SEASON/,
           /CHAMPIONS CIRCUIT/,
           /MOMENTS/,
           /SQUAD BATTLES/,

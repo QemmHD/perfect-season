@@ -1,3 +1,4 @@
+import { normalizeLeague, type LeagueState } from './league-state';
 import { rivalsOf, type RivalsState } from './rivals';
 // Ultimate Team: what the profile keeps, per sport (the basketball and football profiles each have
 // their own `ut`). Small and free of card data on purpose: the profile loads it on every launch,
@@ -18,6 +19,7 @@ export interface PendingPack {
 export interface UtState {
   v: 1;
   hq?: ClubHQ;
+  league?: LeagueState;
   rivals?: RivalsState;
   collected?: string[];
   collectionClaims?: string[];
@@ -118,8 +120,10 @@ export function migrateUt(raw: unknown): UtState {
   const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL', unknown>> | undefined;
   const paid = r.paid as { day?: unknown; n?: unknown } | undefined;
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
+  const league = normalizeLeague(r.league);
   return organizeStorage({
     v: 1,
+    ...(league ? { league } : {}),
     ...(r.hq && typeof r.hq === 'object' ? { hq: normalizeHQ(r.hq, owned) } : {}),
     ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),
     ...(Array.isArray(r.settled) ? { settled: r.settled.filter((x) => typeof x === 'string').slice(-1000) } : {}),

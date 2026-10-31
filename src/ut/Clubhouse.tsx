@@ -136,6 +136,19 @@ export function PlayHQ({
           earning.
         </p>
       </div>
+      <button className="hq-mode hq-mode-gold" onClick={() => onGo('league')}>
+        <Trophy size={36} />
+        <span>
+          <i className="eyebrow">YOUR ULTIMATE TEAM · FULL SEASON</i>
+          <b className="disp">CLUB SEASON</b>
+          <small>
+            {ut.league && ut.league.active.phase !== 'complete'
+              ? `Continue season ${ut.league.active.number} · ${ut.league.active.teams[0].w}–${ut.league.active.teams[0].l}`
+              : 'A living league. Adaptive rivals. Your championship chase.'}
+          </small>
+        </span>
+        <HQArrow />
+      </button>
       <button className="hq-mode hq-mode-gold" onClick={() => onGo('circuit')}>
         <Trophy size={42} />
         <span>
@@ -1056,7 +1069,7 @@ export function ClubRecords({ ut }: { ut: UtState }) {
           <span>
             <b>{m.opponent}</b>
             <small>
-              {m.mode === 'online'
+              {m.mode === 'league' ? 'CLUB SEASON' : m.mode === 'online'
                 ? 'HEAD TO HEAD'
                 : m.mode === 'circuit'
                   ? 'CHAMPIONS CIRCUIT'

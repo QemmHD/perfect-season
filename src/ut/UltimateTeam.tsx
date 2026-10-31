@@ -1,3 +1,6 @@
+import { LeagueSeasonView } from './LeagueSeason';
+import { startLeague } from './league';
+import { favoriteFor } from '../lib/favorites';
 import { Rivals } from './Rivals';
 import { recordActivity, claimObjective, claimSeason, claimReadySeason, hqOf, objectiveDeck, rewardLabel, type Prize } from './progression';
 import { PlayHQ, SeasonView, ObjectivesView, CircuitView, DevelopmentView, SquadPresets, ClubRecords } from './Clubhouse';
@@ -67,6 +70,7 @@ export type UtView =
   | 'play'
   | 'season'
   | 'objectives'
+  | 'league'
   | 'circuit'
   | 'moments'
   | 'development'
@@ -499,9 +503,49 @@ export default function UltimateTeam(props: {
                 coins += r.coins;
                 sp += r.sp;
               }
-            return { ut: next, coins, sp, pack: null, packCount: next.packs.length - u.packs.length };
+            return {
+              ut: next,
+              coins,
+              sp,
+              pack: null,
+              packCount: next.packs.length - u.packs.length
+            };
           });
         }}
+      />
+    );
+  else if (view === 'league')
+    body = (
+      <LeagueSeasonView
+        ut={ut}
+        pool={pool}
+        ready={ready}
+        clubOvr={rating.ovr}
+        onSquad={() => go('squad')}
+        onStart={(level) => {
+          const id = newId(),
+            at = Date.now();
+          try {
+            setUt((u) =>
+              startLeague(
+                u,
+                pool,
+                id,
+                at,
+                rating.ovr,
+                level,
+                favoriteFor(SPORT)
+              )
+            );
+          } catch {
+            onToast(
+              'The season could not start. Your club was kept. Please try again.'
+            );
+          }
+        }}
+        onPlay={(league) =>
+          props.onPlaySquad?.({ id: Date.now(), mode: 'ai', league })
+        }
       />
     );
   else if (view === 'circuit')
@@ -516,7 +560,13 @@ export default function UltimateTeam(props: {
             at = Date.now();
           setUt((u) => startCircuit(u, weekOf(day), id, at));
         }}
-        onPlay={(runId, round) => props.onPlaySquad?.({ id: Date.now(), mode: 'ai', circuit: { runId, round } })}
+        onPlay={(runId, round) =>
+          props.onPlaySquad?.({
+            id: Date.now(),
+            mode: 'ai',
+            circuit: { runId, round }
+          })
+        }
         onEnd={() => setUt(abandonCircuit)}
       />
     );
@@ -544,7 +594,9 @@ export default function UltimateTeam(props: {
         club={inventory}
         onUseCopy={(uid) => {
           setUt((u) => useStoredCopy(u, uid));
-          onToast('Your development copy is back in the club. Its XP and serial are kept.');
+          onToast(
+            'Your development copy is back in the club. Its XP and serial are kept.'
+          );
         }}
         onSquad={() => go('squad')}
         onStart={(uid, path) => {
@@ -558,7 +610,13 @@ export default function UltimateTeam(props: {
           if (!shown.xp) return;
           setUt((u) => claimDevelopment(u, day, at).ut);
           sfx.levelUp();
-          onToast('Program complete. +' + shown.xp + ' card XP and +' + shown.sp + ' Season Points.');
+          onToast(
+            'Program complete. +' +
+              shown.xp +
+              ' card XP and +' +
+              shown.sp +
+              ' Season Points.'
+          );
         }}
       />
     );
@@ -566,15 +624,31 @@ export default function UltimateTeam(props: {
   else if (view === 'club')
     body = (
       <div className="ut-collection-shell">
-        <div className="ut-storage-tabs" role="group" aria-label="Card location">
-          <button aria-pressed={!showStorage} onClick={() => setShowStorage(false)}>
+        <div
+          className="ut-storage-tabs"
+          role="group"
+          aria-label="Card location"
+        >
+          <button
+            aria-pressed={!showStorage}
+            onClick={() => setShowStorage(false)}
+          >
             CLUB <b className="num">{club.length}</b>
           </button>
-          <button aria-pressed={showStorage} onClick={() => setShowStorage(true)}>
+          <button
+            aria-pressed={showStorage}
+            onClick={() => setShowStorage(true)}
+          >
             DUPLICATE STORAGE <b className="num">{stored.length}</b>
           </button>
         </div>
-        <Club key={showStorage ? 'storage' : 'club'} club={showStorage ? stored : club} storage={showStorage} onInspect={setDetail} onSell={quickSell} />
+        <Club
+          key={showStorage ? 'storage' : 'club'}
+          club={showStorage ? stored : club}
+          storage={showStorage}
+          onInspect={setDetail}
+          onSell={quickSell}
+        />
       </div>
     );
   else if (view === 'gallery')
@@ -591,17 +665,41 @@ export default function UltimateTeam(props: {
       />
     );
   else if (view === 'events')
-    body = <Events pool={pool} ut={ut} ready={ready} onSquad={() => go('squad')} onPlay={(id, node) => props.onPlaySquad?.({ id: Date.now(), mode: 'ai', event: { id, node } })} />;
+    body = (
+      <Events
+        pool={pool}
+        ut={ut}
+        ready={ready}
+        onSquad={() => go('squad')}
+        onPlay={(id, node) =>
+          props.onPlaySquad?.({
+            id: Date.now(),
+            mode: 'ai',
+            event: { id, node }
+          })
+        }
+      />
+    );
   else if (view === 'store')
     body = (
       <>
         <div className="ut-registry-status" aria-live="polite">
           {ut.pendingPromo && (
             <>
-              <b>{promoBusy ? 'Registering your pack…' : 'Your pack is reserved.'}</b>
-              <p>{promoError || 'Your pull is being checked and saved. Coins are charged once when the cards arrive.'}</p>
+              <b>
+                {promoBusy
+                  ? 'Registering your pack…'
+                  : 'Your pack is reserved.'}
+              </b>
+              <p>
+                {promoError ||
+                  'Your pull is being checked and saved. Coins are charged once when the cards arrive.'}
+              </p>
               {!promoBusy && (
-                <button className="btn primary" onClick={() => setPromoRetry((n) => n + 1)}>
+                <button
+                  className="btn primary"
+                  onClick={() => setPromoRetry((n) => n + 1)}
+                >
                   RETRY SAME PACK
                 </button>
               )}
@@ -631,7 +729,16 @@ export default function UltimateTeam(props: {
         ready={ready}
         onSquad={() => go('squad')}
         onToast={onToast}
-        onLevel={(level) => setUt((u) => ({ ...u, battles: { ...battlesThisWeek(u.battles, weekOf(day)), level, cleared: 0 } }))}
+        onLevel={(level) =>
+          setUt((u) => ({
+            ...u,
+            battles: {
+              ...battlesThisWeek(u.battles, weekOf(day)),
+              level,
+              cleared: 0
+            }
+          }))
+        }
         onPlay={(rung) => {
           const play = props.onPlaySquad;
           if (!play) return onToast('Squad Battles aren’t available here.');
@@ -655,7 +762,18 @@ export default function UltimateTeam(props: {
         }}
       />
     );
-  else if (view === 'sbc') body = <Challenges pool={pool} sbcs={sbcs} done={ut.sbc.done} club={inventory} day={day} onSubmit={submitSbc} onToast={onToast} />;
+  else if (view === 'sbc')
+    body = (
+      <Challenges
+        pool={pool}
+        sbcs={sbcs}
+        done={ut.sbc.done}
+        club={inventory}
+        day={day}
+        onSubmit={submitSbc}
+        onToast={onToast}
+      />
+    );
   else
     body = (
       <Hub
@@ -674,7 +792,7 @@ export default function UltimateTeam(props: {
     );
 
   // Codex: every competition belongs to Play, including the view restored after a match.
-  const playChild = ['battles', 'rivals', 'events', 'circuit', 'moments'].includes(view);
+  const playChild = ['battles', 'rivals', 'events', 'circuit', 'moments', 'league'].includes(view);
   const activeTab = playChild ? 'play' : view === 'gallery' ? 'club' : TABS.some(([tab]) => tab === view) ? view : 'hub';
 
   return (
@@ -700,6 +818,7 @@ export default function UltimateTeam(props: {
                   season: 'Season Rewards',
                   objectives: 'Objectives',
                   circuit: 'Champions Circuit',
+                  league: 'Club Season',
                   moments: 'Moments',
                   development: 'Development',
                   records: 'Club Records'

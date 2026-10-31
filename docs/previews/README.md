@@ -102,3 +102,17 @@ Real current-run components on isolated localhost QA profiles. Implemented by Co
 - [Football after](football-hint-after.png): compact tip below the scoreboard, with the field and joystick visible. Simulated safe-area insets; normal-match tips enabled.
 
 [Cause, file connections, validation and preservation constraints](../PLAY-TAB-AND-FOOTBALL-HINT.md). Older clubhouse captures above predate the dedicated Play tab.
+
+
+## Ultimate Team Club Season — Codex, 2026-10-31
+
+Real current components from isolated QA profiles. Designed and implemented by Codex (OpenAI).
+
+- [Season setup](league-intro.png): full season and difficulty choice in the original clubhouse style.
+- [NBA season after a real game](league-nba-hub.png): saved record, next opponent, real OVR and points averages.
+- [AI player stats](league-stats.png): scouting and simulated season totals; midseason presentation fixture.
+- [Championship](league-champions.png): completed bracket/title presentation fixture.
+- [NFL season after a real game](league-nfl-hub.png): 32-club season, next fixture and saved record.
+- [NFL playoffs](league-nfl-playoffs.png): knockout fixture presentation.
+
+[Rules, save connections, full file map, verification and fixture limits](../UT-CLUB-SEASON.md). Full matches use the existing QA autopilot and an 8× test-only simulation speed; seeded later-season captures are not actual player achievements.

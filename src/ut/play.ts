@@ -1,3 +1,4 @@
+import { settleLeague, validLeagueRequest, type LeagueRequest } from './league';
 import { settleEvent } from './events';
 import { settleCircuit } from './circuit';
 import { hqOf, recordMatchProgress } from './progression';
@@ -20,6 +21,7 @@ export interface UtMatchRequest {
   rung?: number;
   event?: { id: string; node: number };
   circuit?: { runId: string; round: number };
+  league?: LeagueRequest;
 }
 
 export interface UtMatchResult {
@@ -100,12 +102,14 @@ export function settle(
     matchId?: string;
     event?: { id: string; node: number };
     circuit?: { runId: string; round: number };
+    league?: LeagueRequest;
+    clubOvr?: number;
     opponent?: string;
     how?: 'played' | 'sim';
   }
 ): Settled {
   const activeCircuit = r.circuit ? hqOf(ut).circuit.active : undefined;
-  if ((r.matchId && ut.settled?.includes(r.matchId)) || (r.circuit && (r.how === 'sim' || !activeCircuit || activeCircuit.id !== r.circuit.runId || activeCircuit.games !== r.circuit.round))) return { ut, coins: 0, xp: 0, ups: [], climbed: false, pack: null, capped: false, refreshed: false, seasonXP: 0, circuitPrizes: [] };
+  if ((r.league && (r.online || r.rung || r.event || r.circuit || (r.us !== r.them && r.won !== (r.us > r.them)) || r.how !== 'played' || !validLeagueRequest(ut, r.league) || ![r.us,r.them].every(x => Number.isInteger(x) && x >= 0 && x <= 1000))) || (r.matchId && ut.settled?.includes(r.matchId)) || (r.circuit && (r.how === 'sim' || !activeCircuit || activeCircuit.id !== r.circuit.runId || activeCircuit.games !== r.circuit.round))) return { ut, coins: 0, xp: 0, ups: [], climbed: false, pack: null, capped: false, refreshed: false, seasonXP: 0, circuitPrizes: [] };
   ut = ut.hq ? ut : { ...ut, hq: hqOf(ut) };
   const today = ut.paid.day === r.day ? ut.paid.n : 0;
   const capped = today >= PAID_GAMES_A_DAY;
@@ -133,7 +137,8 @@ export function settle(
       ...(r.online && r.matchId ? { rivals: rivalsMatch(ut.rivals, r.week, r.matchId, r.won) } : {}),
     };
   const circuit = r.circuit ? settleCircuit(settledUt, r.circuit.runId, r.circuit.round, r.won, r.at) : { ut: settledUt, coins: 0, prizes: [] };
-  const progression = recordMatchProgress(circuit.ut, { id: r.matchId ?? 'legacy:' + r.packId, at: r.at, mode: r.circuit ? 'circuit' : r.online ? 'online' : r.event ? 'event' : 'battle', won: r.won, us: r.us, them: r.them, opponent: r.opponent ?? 'Opponent', coins: coins + circuit.coins, xp, day: r.day, how: r.how ?? 'played', played: r.played });
+  const seasonUt = r.league ? settleLeague(circuit.ut, r.league, r) : circuit.ut;
+  const progression = recordMatchProgress(seasonUt, { id: r.matchId ?? 'legacy:' + r.packId, at: r.at, mode: r.league ? 'league' : r.circuit ? 'circuit' : r.online ? 'online' : r.event ? 'event' : 'battle', won: r.won, us: r.us, them: r.them, opponent: r.opponent ?? 'Opponent', coins: coins + circuit.coins, xp, day: r.day, how: r.how ?? 'played', played: r.played });
   return {
     ut: progression.ut,
     coins: coins + circuit.coins,
