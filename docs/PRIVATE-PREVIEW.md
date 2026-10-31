@@ -170,3 +170,16 @@ This release-record follow-up changes documentation only; the deployed UI/runtim
 - Main/original restore remain at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`; pre-update restore is `backup/pre-play-tab-2026-10-30` at `c24b293c76441d7552c1d4b03a87aa8e5a1bb306`.
 
 This provenance follow-up is documentation only. The deployed runtime is the exact verified source above; no runtime redeploy is needed for this record. No account reset, progress migration, backend deployment or live Pages/main promotion. Physical installed-iPhone playtesting remains an owner check.
+
+
+## Verified Club Season publication — Codex
+
+- GitHub implementation: `3417c1af36457a1638548b5970ebd9e749676b72`; local `6fdebc5272004a33795a67d84914a752fcb72566`; identical tree `4056d0a9b5b7380d7e6e01601b5da5c62250d8da` verified before moving the feature ref.
+- [Review build #29](https://github.com/QemmHD/perfect-season/actions/runs/41151373240), job `124388440621`, **passed**: 671 tests (352 NBA / 319 NFL), all-card rating audit, TypeScript and production build.
+- Private pushed source: `76032bcac02ef75af814bfe0472676953be94dcd`. Exact pushed-source production build and clean Git verified. Static boot had zero page errors; early forced `preview2026`, retained `./preview` install identity/title and the Club Season bundle passed.
+- Saved version: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_4af7e7309a24819196628dae30776a82`.
+- Deployment: `appgdep_6ae53946c094819186716fb5a74d310a`, **succeeded** at https://perfect-season-private-preview.qem.chatgpt.site . Same owner-private audience, origin, namespace and install identity.
+- Browser evidence: both real App/UT/Arcade matches settled correctly (NBA loss / NFL win), all AI club records advanced once, reload and next-season history survived, 56 NBA / 69 NFL original copies and squads remained. Four season sections at three sizes, manual shot/snap, real runtime autopilot, seeded postseason/finale, Play back/parent navigation and prior football tip bounds passed. Signed two-client H2H still settles in both sports. The unit suite also round-trips the season through encrypted server snapshots.
+- Main/original restore remain at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Pre-season source restore: `backup/pre-ut-league-season-2026-10-31` at `846f0d6364bbbc912408b537eba5eca772d2d238`.
+
+This release-record follow-up changes documentation only; the deployed runtime is the exact verified implementation above. No live Pages/main promotion, account reset, backend migration, queue change or transfer of live player saves into preview. Physical installed-iPhone playtesting remains an owner check.
