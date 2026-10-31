@@ -1,3 +1,4 @@
+import { progressChanged } from './save-events';
 // Each player's favorite NBA and NFL team: stored once on the phone for both sports (the sport is
 // fixed per page load, the favorites aren't), asked for at first launch and changeable in Profile.
 // Their colors dress your players in a head to head.
@@ -58,6 +59,7 @@ export function saveFavorites(next: Partial<Favorites>): Favorites {
   } catch {
     // storage blocked: kept for this visit
   }
+  progressChanged();
   listeners.forEach((fn) => fn());
   return f;
 }
@@ -69,6 +71,7 @@ export function favoriteFor(sport: SportId): string | null {
 export function markFavoritesAsked(): void {
   try {
     store()?.setItem(FAV_ASKED_KEY, '1');
+    progressChanged();
   } catch {
     // storage blocked
   }

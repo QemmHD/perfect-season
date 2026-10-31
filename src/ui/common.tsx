@@ -90,20 +90,86 @@ export function TeamChips({ players, stagger, lit = -1, on = 99 }: { players: (P
  * Modal sheet. `bottom` slides up from the bottom edge like an iOS sheet;
  * `center` pops in like an alert. Both animate out before `onClose` runs.
  */
-export function Sheet({ label, kind = 'bottom', onClose, children }: { label: string; kind?: 'bottom' | 'center' | 'top'; onClose: () => void; children: (close: (after?: () => void) => void) => React.ReactNode }) {
+export function Sheet({
+  label,
+  kind = 'bottom',
+  onClose,
+  children
+}: {
+  label: string;
+  kind?: 'bottom' | 'center' | 'top';
+  onClose: () => void;
+  children: (close: (after?: () => void) => void) => React.ReactNode;
+}) {
   const [closing, setClosing] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const done = useRef(false);
   const close = (after?: () => void) => {
     if (done.current) return;
     done.current = true;
     setClosing(true);
-    window.setTimeout(
-      () => (after ? after() : onClose()),
-      reducedMotion() ? 0 : 200
-    );
+    window.setTimeout(() => (after ? after() : onClose()), reducedMotion() ? 0 : 200);
   };
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  useEffect(() => {
+    const root = dialogRef.current;
+    if (!root) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const top = () => {
+      const dialogs = Array.from(document.querySelectorAll('[aria-modal="true"]')).filter((el) => el.getClientRects().length);
+      return dialogs[dialogs.length - 1] === root;
+    };
+    const focusable = () =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])')
+      ).filter((el) => el.getClientRects().length && !el.closest('[inert]'));
+    // Focus the dialog, not an input: opening a sheet must not summon the phone keyboard.
+    root.focus({ preventScroll: true });
+    const keys = (event: KeyboardEvent) => {
+      if (!top() || event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const list = focusable(),
+        first = list[0],
+        last = list[list.length - 1];
+      if (!first) {
+        event.preventDefault();
+        root.focus({ preventScroll: true });
+      } else if (event.shiftKey && (document.activeElement === first || document.activeElement === root)) {
+        event.preventDefault();
+        last!.focus({ preventScroll: true });
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === root)) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    };
+    const focus = (event: FocusEvent) => {
+      if (top() && event.target instanceof Node && !root.contains(event.target)) root.focus({ preventScroll: true });
+    };
+    document.addEventListener('keydown', keys);
+    document.addEventListener('focusin', focus);
+    return () => {
+      document.removeEventListener('keydown', keys);
+      document.removeEventListener('focusin', focus);
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
   return (
-    <div className={'scrim ' + kind + (closing ? ' closing' : '')} role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.target === e.currentTarget && close()}>
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      className={'scrim ' + kind + (closing ? ' closing' : '')}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      onClick={(e) => e.target === e.currentTarget && close()}
+    >
       <div className={'sheet ' + kind}>
         {kind === 'bottom' && <span className="grip" aria-hidden="true" />}
         {children(close)}

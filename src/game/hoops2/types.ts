@@ -51,6 +51,7 @@ export interface Pt {
 /** What a body is doing, for the animation. */
 export type Act =
   | 'idle'
+  | 'screen'
   | 'run'
   | 'dribble'
   | 'shoot'
@@ -103,6 +104,13 @@ export interface Body {
   burst: number;
   /** a defender beaten off the dribble (the man got past him): turning to chase, slower a moment */
   beatenAt?: number;
+  /** Persistent across animation changes, so a dribble animation cannot reset a move's cooldown. */
+  lastMoveAt?: number;
+  /** Brief planted-contact response, separate from a turnover or a stun. */
+  contactAt?: number;
+  lastCatchAt?: number;
+  reboundAt?: number;
+  shotTempo?: number;
   trail: Pt[];
 }
 
@@ -122,6 +130,7 @@ export interface Meter {
   /** half the green window, seconds */
   green: number;
   kind: ShotKind;
+  style?: 'set' | 'catch' | 'pullup';
   /** the nearest defender's room at the press: a man that far off can only close out so well */
   room?: number;
   /** the result once released: -1 very early .. 1 very late, and whether it was green */
@@ -140,8 +149,6 @@ export interface BallFlight {
   make?: boolean;
   points?: number;
   shot?: ShotKind;
-  /** a miss: does the offense get it back */
-  orb?: boolean;
   tried?: number[];
 }
 
@@ -186,4 +193,10 @@ export interface Possession {
   trapped: boolean;
   /** the handler is sprinting (the stick at its edge) */
   sprinting: boolean;
+  /** A coach call moves real teammates; it never changes ratings or shot odds. */
+  playCall?: { kind: 'screen' | 'cut' | 'space'; actor: number; target: Pt; until: number; plantedAt?: number; rolling?: boolean; sides: Record<number, number> };
+  callReadyAt?: number;
+  /** The player controlled during a physical rebound race, with neutral-stick assistance. */
+  rebounder?: number;
+  rotation?: { at: number; helper: number | null; rotator: number | null; cover: number | null };
 }

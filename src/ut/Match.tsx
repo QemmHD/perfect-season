@@ -1,3 +1,9 @@
+import { leagueOpponent, type LeagueRequest } from './league';
+import { applyLeagueTeams } from './league-match';
+import { withLeagueForm } from './league-form';
+import { Promotion } from './Rivals';
+import { divisionOf, rivalsOf } from './rivals';
+import { publishRivals } from './rivals-net';
 // Ultimate Team's played matches: Squad Battles against this week's AI ladder, and online head to
 // head against a squad near yours (by overall: within 3, wider by 2 every 10 seconds up to 10, then
 // an AI squad at your level steps in). The two squads become the arcade game's teams (teams.ts):
@@ -10,6 +16,7 @@ import { hashString } from '../engine/rng';
 import { easternDateKey } from '../engine/season';
 import { NFL, SPORT } from '../engine/sport';
 import { AI_SKILL, Arcade, type Progress } from '../game/Arcade';
+import { DRIVES } from '../game/football2/drive';
 import { aiDrivesOf } from '../game/football2/Football2';
 import { POSSESSIONS } from '../game/hoops2/game';
 import { aiPossessionsOf } from '../game/hoops2/Hoops2';
@@ -27,10 +34,13 @@ import { Vote } from '../ui/Vote';
 import { aiOpponent, battlesThisWeek, LEVEL, LEVEL_NAME, levelOf, type Rung, RUNGS, shortName, skillName, weekLadder } from './battles';
 import { UtCard } from './CardArt';
 import { packName } from './packs';
+import { eventRung } from './events';
+import { circuitRung } from './circuit';
+import { hqOf } from './progression';
 import { decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
 import { byValue, getPool, type Pool } from './pool';
 import { weekOf } from './sbc';
-import { type SquadRating, startersComplete } from './squad';
+import { rateSquad, CHEM_BONUS, type SquadRating, startersComplete } from './squad';
 import { lineupOf, ratingOf, type SquadCards, squadFromWire, squadToWire, type SquadWire, teamsOf } from './teams';
 import type { UtState } from './state';
 import './match.css';
@@ -40,8 +50,9 @@ import './match.css';
  * whose cards (the pool's fingerprint) or match rules differ, since each phone rates both squads
  * and plays the sim itself. Bump UT_RULES when teams.ts or play.ts change how a match comes out.
  */
-const UT_RULES = 1;
-const queueOf = (pool: Pool) => 'ut-' + UT_RULES + '-' + pool.print;
+// Codex: NFL rushing execution differs from v4; NBA queues remain compatible.
+const UT_RULES = { nba: 8, nfl: 9 };
+const queueOf = (pool: Pool) => 'ut-' + UT_RULES[pool.sport] + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;
 /** The match found, the other phone's squad not here after this long: back to the queue. */
@@ -51,6 +62,7 @@ const FOUND_MS = 2300;
 const VS_MS = 2800;
 
 interface Side {
+  form?: Record<string, number>;
   name: string;
   sq: SquadCards;
   wire: SquadWire;
@@ -67,6 +79,9 @@ interface Setup {
   online: Found | null;
   /** the AI: a ladder rung (i from 0), or the squad that stepped in for a no-show (i = -1) */
   rung: Rung | null;
+  event?: { id: string; node: number; title: string };
+  circuit?: { runId: string; round: number };
+  league?: LeagueRequest;
   /** Squad Battles: the difficulty's name and what it pays (times the coins) */
   level?: { name: string; pay: number; def: number };
 }
@@ -87,6 +102,9 @@ interface Outcome {
   us: number;
   them: number;
   how: 'played' | 'sim';
+  eventCleared?: boolean;
+  seasonXP?: number;
+  circuitPrizes?: string[];
   ends: [string[], string[]];
   coins: number;
   xp: number;
@@ -125,15 +143,24 @@ function aiSide(pool: Pool, r: Rung): Side {
 }
 
 /** a squad's best cards, for the VS screen */
-function bestOf(sq: SquadCards, n: number) {
+function bestOf(sq: SquadCards, n: number, form?: Record<string, number>) {
   return Object.values(lineupOf(sq))
     .filter((x): x is NonNullable<typeof x> => !!x)
+    .map(rc => form ? withLeagueForm(rc, form[rc.line.id] ?? 0) : rc)
     .sort(byValue)
     .slice(0, n);
 }
 
 function oppOf(theirs: MatchState, gone: boolean): OppView {
-  return { gone, left: theirs.left, arcade: theirs.arcade ?? null, arcadeTook: theirs.arcadeTook ?? null, vote: voteWireOf(theirs), fav: theirs.fav ?? null, ut: theirs.ut ?? null };
+  return {
+    gone,
+    left: theirs.left,
+    arcade: theirs.arcade ?? null,
+    arcadeTook: theirs.arcadeTook ?? null,
+    vote: voteWireOf(theirs),
+    fav: theirs.fav ?? null,
+    ut: theirs.ut ?? null,
+  };
 }
 
 export default function UtMatch(props: {
@@ -157,6 +184,7 @@ export default function UtMatch(props: {
   const [found, setFound] = useState<Found | null>(null);
   const [opp, setOpp] = useState<OppView | null>(null);
   const [out, setOut] = useState<Outcome | null>(null);
+  const [promotion, setPromotion] = useState<number | null>(null);
   const [week] = useState(() => weekOf(easternDateKey()));
   const connRef = useRef<MatchConn | null>(null);
   const oppRef = useRef(opp);
@@ -201,6 +229,79 @@ export default function UtMatch(props: {
       setStage('search');
       return;
     }
+    if (req.league) {
+      const season = leagueOpponent(pool, profileRef.current.ut, req.league);
+      if (!season) {
+        setError('This season fixture is no longer active. Return to Play.');
+        setStage('error');
+        return;
+      }
+      const sq = squadFromWire(pool, season.squad);
+      const rated = Object.fromEntries(
+        Object.entries(lineupOf(sq)).map(([slot, rc]) => [
+          slot,
+          rc ? withLeagueForm(rc, season.form[rc.line.id] ?? 0) : null
+        ])
+      );
+      setSetup({
+        seed: 'league:' + req.league.game,
+        me,
+        rival: {
+          name: season.team.name,
+          sq,
+          wire: season.squad,
+          rating: rateSquad(SPORT, rated),
+          fav: season.team.abbr,
+          form: season.form
+        },
+        online: null,
+        rung: {
+          i: -4,
+          title: season.team.name,
+          fr: season.team.abbr,
+          decade: 2020,
+          target: season.rating.ovr,
+          ovr: season.rating.ovr,
+          squad: season.squad,
+          skill: season.skill,
+          fav: season.team.abbr,
+          pack: null
+        },
+        league: req.league,
+        level: {
+          name:
+            'Season · ' +
+            LEVEL_NAME[profileRef.current.ut.league!.active.level],
+          pay: 1,
+          def: season.def
+        }
+      });
+      setStage('vs');
+      return;
+    }
+    if (req.circuit) {
+      const rung = circuitRung(pool, profileRef.current.ut, req.circuit.runId, req.circuit.round, me.rating.ovr);
+      if (!rung) { setError('This Circuit match is no longer active. Return to Play HQ.'); setStage('error'); return; }
+      setSetup({ seed: 'circuit:' + req.circuit.runId + ':' + req.circuit.round + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, circuit: req.circuit, level: { name: req.circuit.round === 5 ? 'Legend' : 'Circuit', pay: 1, def: req.circuit.round / 5 } });
+      setStage('vs'); return;
+    }
+    if (req.event) {
+      const e = req.event;
+      if (e.node > (profileRef.current.ut.events?.[e.id] ?? 0)) {
+        setError('Clear the previous event match first.');
+        setStage('error');
+        return;
+      }
+      const rung = eventRung(pool, e.id, e.node);
+      if (!rung) {
+        setError('This event match is unavailable.');
+        setStage('error');
+        return;
+      }
+      setSetup({ seed: 'event:' + SPORT + ':' + e.id + ':' + e.node + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, event: { ...e, title: rung.title } });
+      setStage('vs');
+      return;
+    }
     const bt = battlesThisWeek(profileRef.current.ut.battles, week);
     const level = levelOf(bt.level);
     const rung = weekLadder(pool, week, bt.round ?? 0, level)[req.rung ?? 0];
@@ -209,7 +310,14 @@ export default function UtMatch(props: {
       setStage('error');
       return;
     }
-    setSetup({ seed: 'ut:' + SPORT + ':' + week + ':' + (bt.round ?? 0) + ':' + level + ':' + rung.i + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, level: { name: LEVEL_NAME[level], pay: LEVEL[level].pay, def: LEVEL[level].def } });
+    setSetup({
+      seed: 'ut:' + SPORT + ':' + week + ':' + (bt.round ?? 0) + ':' + level + ':' + rung.i + ':' + req.id,
+      me,
+      rival: aiSide(pool, rung),
+      online: null,
+      rung,
+      level: { name: LEVEL_NAME[level], pay: LEVEL[level].pay, def: LEVEL[level].def },
+    });
     setStage('vs');
   }, [pool, me, stage]);
 
@@ -279,13 +387,18 @@ export default function UtMatch(props: {
 
   // ---------- the game ----------
 
-  const teams = useMemo(() => (setup ? teamsOf(SPORT, setup.me.sq, setup.rival.sq, setup.seed) : null), [setup]);
+  const teams = useMemo(() => {
+    if (!setup) return null;
+    const base = teamsOf(SPORT, setup.me.sq, setup.rival.sq, setup.seed);
+    return setup.league && pool ? applyLeagueTeams(base, pool, setup.rival.form ?? {}) : base;
+  }, [setup, pool]);
   const kits = useMemo(() => (setup ? kitsFor(setup.me.fav, setup.rival.fav, SPORT) : undefined), [setup]);
   const aiSkill = setup?.rung ? setup.rung.skill : AI_SKILL.pro;
+  const defenseIQ = setup?.online ? 1 : (setup?.level?.def ?? 0);
 
   useEffect(() => {
     if (stage !== 'vs') return;
-    const t = window.setTimeout(() => setStage(props.autoplay ? 'play' : 'vote'), props.autoplay ? 400 : VS_MS);
+    const t = window.setTimeout(() => setStage(props.autoplay || setup?.circuit || setup?.league ? 'play' : 'vote'), props.autoplay ? 400 : VS_MS);
     return () => clearTimeout(t);
   }, [stage]);
 
@@ -302,6 +415,13 @@ export default function UtMatch(props: {
     const d = decide(us.score, them.score, s.me.rating.raw, s.rival.rating.raw, s.online ? coin : () => true);
     const ut = profileRef.current.ut;
     const input = {
+      matchId: s.online?.matchId ?? 'ut-ai:' + req.id,
+      event: s.event,
+      circuit: s.circuit,
+      league: s.league,
+      clubOvr: s.me.rating.ovr,
+      opponent: s.rival.name,
+      how,
       won: d.won,
       us: us.score,
       them: them.score,
@@ -315,6 +435,10 @@ export default function UtMatch(props: {
       pay: s.rung && s.rung.i >= 0 ? s.level?.pay : undefined,
     };
     const shown = settle(ut, input);
+    const beforeDivision = divisionOf(rivalsOf(ut.rivals, week).points),
+      afterDivision = divisionOf(rivalsOf(shown.ut.rivals, week).points);
+    if (s.online && afterDivision > beforeDivision) setPromotion(afterDivision);
+    if (s.online) void publishRivals({ ...profileRef.current, ut: shown.ut }, week);
     props.update((p) => {
       const r = settle(p.ut, input);
       return { ...p, coins: p.coins + r.coins, ut: r.ut };
@@ -325,7 +449,23 @@ export default function UtMatch(props: {
     setPresence('menu');
     const cardOf = new Map(ut.owned.map((o) => [o.uid, o.cardId]));
     const ups = shown.ups.map((u) => ({ name: pool.byId.get(cardOf.get(u.uid) ?? '')?.name ?? 'A card', level: u.level }));
-    setOut({ ...d, us: us.score, them: them.score, how, ends: [us.ends, them.ends], coins: shown.coins, xp: shown.xp, ups, climbed: shown.climbed, pack: shown.pack, capped: shown.capped, refreshed: shown.refreshed });
+    setOut({
+      seasonXP: shown.seasonXP,
+      circuitPrizes: shown.circuitPrizes,
+      eventCleared: !!s.event && (shown.ut.events?.[s.event.id] ?? 0) > (ut.events?.[s.event.id] ?? 0),
+      ...d,
+      us: us.score,
+      them: them.score,
+      how,
+      ends: [us.ends, them.ends],
+      coins: shown.coins,
+      xp: shown.xp,
+      ups,
+      climbed: shown.climbed,
+      pack: shown.pack,
+      capped: shown.capped,
+      refreshed: shown.refreshed,
+    });
     setStage('result');
     if (d.won) {
       sfx.seriesWin();
@@ -341,8 +481,10 @@ export default function UtMatch(props: {
     const key = (w: SquadWire) => setup.seed + ':sim:' + hashString(JSON.stringify(w));
     const mine = 0.6;
     const theirs = setup.online ? 0.6 : aiSkill;
-    const us = NFL ? aiDrivesOf(t.offense!, t.rivalDefense!, key(setup.me.wire), mine) : aiPossessionsOf(t.five!, t.rivalFive!, key(setup.me.wire), mine, POSSESSIONS, t.bench);
-    const them = NFL ? aiDrivesOf(t.rivalOffense!, t.defense!, key(setup.rival.wire), theirs) : aiPossessionsOf(t.rivalFive!, t.five!, key(setup.rival.wire), theirs, POSSESSIONS, t.rivalBench);
+    const us = NFL ? aiDrivesOf(t.offense!, t.rivalDefense!, key(setup.me.wire), mine, DRIVES, defenseIQ) : aiPossessionsOf(t.five!, t.rivalFive!, key(setup.me.wire), mine, POSSESSIONS, t.bench, defenseIQ);
+    const them = NFL
+      ? aiDrivesOf(t.rivalOffense!, t.defense!, key(setup.rival.wire), theirs, DRIVES, defenseIQ)
+      : aiPossessionsOf(t.rivalFive!, t.five!, key(setup.rival.wire), theirs, POSSESSIONS, t.rivalBench, defenseIQ);
     finish(us, them, 'sim');
   };
 
@@ -359,11 +501,12 @@ export default function UtMatch(props: {
           online={!!setup.online}
           botLevel="pro"
           aiSkill={aiSkill}
-          aiDefense={setup.online ? 0 : (setup.level?.def ?? 0)}
+          aiDefense={defenseIQ}
           rivalLive={setup.online ? (opp?.arcade ?? null) : null}
           rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
           tookMe={setup.online ? (opp?.arcadeTook ?? null) : null}
           autoplay={props.autoplay}
+          manualOnly={!!setup.circuit || !!setup.league}
           kits={kits}
           onProgress={(p) => conn?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => conn?.update((s) => ({ ...s, arcadeTook: k }))}
@@ -411,7 +554,8 @@ export default function UtMatch(props: {
         <p>Loading your squad…</p>
       </div>
     );
-  else if (stage === 'search' || stage === 'found') body = <SearchView key={searchNo} me={me} queue={pool ? queueOf(pool) : 'ut'} level={levelInfo(profile.xp).level} found={found} onFound={onFound} onAI={goAI} />;
+  else if (stage === 'search' || stage === 'found')
+    body = <SearchView key={searchNo} me={me} queue={pool ? queueOf(pool) : 'ut'} level={levelInfo(profile.xp).level} found={found} onFound={onFound} onAI={goAI} />;
   else if (stage === 'vs' && setup) body = <VsView setup={setup} />;
   else if (stage === 'result' && setup && out)
     body = (
@@ -422,14 +566,26 @@ export default function UtMatch(props: {
         onAgain={() => {
           sfx.click();
           const r = setup.rung;
+          if (setup.league) { leave(); return; }
+          if (setup.circuit) {
+            const active = hqOf(profileRef.current.ut).circuit.active;
+            if (active) props.onAgain({ id: Date.now(), mode: 'ai', circuit: { runId: active.id, round: active.games } });
+            else leave();
+            return;
+          }
+          if (setup.event) {
+            props.onAgain({ id: Date.now(), mode: 'ai', event: { id: setup.event.id, node: out.won ? Math.min(2, setup.event.node + 1) : setup.event.node } });
+            return;
+          }
           if (setup.online || !r || r.i < 0) props.onAgain({ id: Date.now(), mode: req.mode });
           else props.onAgain({ id: Date.now(), mode: 'ai', rung: out.refreshed ? 0 : out.climbed ? r.i + 1 : r.i });
         }}
       />
     );
 
+  if (promotion !== null && stage === 'result') return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
-  const title = req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
+  const title = req.league ? 'Club Season' : req.circuit ? 'Champions Circuit' : req.event ? 'Spotlight Events' : req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
   return (
     <div className={'screen ut utm utm-s-' + stage}>
       <div className="topbar ut-top">
@@ -489,7 +645,7 @@ function SearchView(props: { me: Side; queue: string; level: number; found: Foun
   }, [elapsed, found]);
 
   const lo = Math.max(1, me.rating.ovr - win);
-  const hi = Math.min(99, me.rating.ovr + win);
+  const hi = Math.min(110 + CHEM_BONUS, me.rating.ovr + win);
   return (
     <div className="page utm-search">
       <div className="radar-wrap">
@@ -554,7 +710,7 @@ function SearchView(props: { me: Side; queue: string; level: number; found: Foun
 }
 
 function SideCard({ side, you }: { side: Side; you: boolean }) {
-  const best = bestOf(side.sq, 3);
+  const best = bestOf(side.sq, 3, side.form);
   return (
     <div className={'utm-side' + (you ? ' utm-me' : ' utm-them')}>
       <span className="utm-fan" aria-hidden="true">
@@ -577,7 +733,13 @@ function SideCard({ side, you }: { side: Side; you: boolean }) {
 
 function VsView({ setup }: { setup: Setup }) {
   const r = setup.rung;
-  const eyebrow = setup.online ? 'Head to head · online' : r && r.i >= 0 ? 'Squad Battles · ' + (setup.level ? setup.level.name + ' · ' : '') + 'rung ' + (r.i + 1) + ' of ' + RUNGS : 'No one near your squad right now';
+  const eyebrow = setup.league ? 'Club Season · '+(setup.level?.name ?? '') : setup.event
+    ? 'Spotlight Series · ' + setup.event.title
+    : setup.online
+      ? 'Head to head · online'
+      : r && r.i >= 0
+        ? 'Squad Battles · ' + (setup.level ? setup.level.name + ' · ' : '') + 'rung ' + (r.i + 1) + ' of ' + RUNGS
+        : 'No one near your squad right now';
   return (
     <div className="utm-vs rise-in" role="status" aria-label={setup.me.name + ' versus ' + setup.rival.name}>
       <span className="eyebrow wide">{eyebrow}</span>
@@ -587,7 +749,15 @@ function VsView({ setup }: { setup: Setup }) {
         <SideCard side={setup.rival} you={false} />
       </div>
       <small className="utm-vs-note">
-        {r ? (r.i >= 0 ? r.title + ' · ' + skillName(r.skill) + ' AI' : 'An AI squad of the ' + r.title + ', at your level') : 'Each of you plays your offense against the other’s defense.'}
+        {setup.league
+          ? (setup.level?.name ?? 'Season') + ' · ' + skillName(r!.skill) + ' AI'
+          : setup.event
+          ? setup.event.title
+          : r
+            ? r.i >= 0
+              ? r.title + ' · ' + skillName(r.skill) + ' AI'
+              : 'An AI squad of the ' + r.title + ', at your level'
+            : 'Each of you plays your offense against the other’s defense.'}
       </small>
     </div>
   );
@@ -597,10 +767,22 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
   const r = setup.rung;
   const ladder = !!r && r.i >= 0;
   const top = ladder && out.climbed && r!.i + 1 >= RUNGS;
-  const again = setup.online || (r && r.i < 0) ? 'PLAY AGAIN' : out.refreshed ? 'NEW LADDER' : out.climbed && !top ? 'NEXT RUNG' : out.won ? 'PLAY IT AGAIN' : 'TRY AGAIN';
+  const again = setup.league ? 'SEASON HUB' : setup.circuit ? (setup.circuit.round < 5 ? 'NEXT CIRCUIT MATCH' : 'BACK TO CLUB') : setup.event
+    ? out.won && setup.event.node < 2
+      ? 'NEXT EVENT MATCH'
+      : 'PLAY AGAIN'
+    : setup.online || (r && r.i < 0)
+      ? 'PLAY AGAIN'
+      : out.refreshed
+        ? 'NEW LADDER'
+        : out.climbed && !top
+          ? 'NEXT RUNG'
+          : out.won
+            ? 'PLAY IT AGAIN'
+            : 'TRY AGAIN';
   return (
     <div className="page utm-result">
-      <span className="eyebrow wide">{ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
+      <span className="eyebrow wide">{setup.league ? 'Club Season · league results and standings updated' : setup.circuit ? 'Solo Champions Circuit · Match ' + (setup.circuit.round + 1) + ' / 6' : setup.event ? setup.event.title : ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
       <h1 className={'disp utm-verdict ' + (out.won ? 'win' : 'loss')}>{out.won ? 'WIN' : 'LOSS'}</h1>
       <div className="utm-score" aria-label={'You ' + out.us + ', ' + setup.rival.name + ' ' + out.them}>
         <span>
@@ -630,11 +812,21 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           {out.tiebreak ? 'A tie goes to the better squad: ' + (out.won ? 'yours.' : 'theirs.') : ''}
         </p>
       )}
+      {setup.event && out.won && (
+        <div className="utm-climb rise-in">
+          <b className="disp">{out.eventCleared ? (setup.event.node === 2 ? 'SERIES COMPLETE' : 'EVENT MATCH WON') : 'REPLAY COMPLETE'}</b>
+          <small>{out.eventCleared ? 'Your first-clear reward is waiting in the Store.' : 'This stage’s first-clear reward has already been earned.'}</small>
+        </div>
+      )}
       {out.climbed && (
         <div className="utm-climb rise-in">
           <b className="disp">{top ? 'LADDER CLEARED!' : 'RUNG ' + (r!.i + 1) + ' CLEARED'}</b>
           {out.pack ? <small>Your {packName(SPORT, out.pack)} is waiting in the Store.</small> : !top && <small>Next up: rung {r!.i + 2}.</small>}
-          {out.refreshed && <small>A new ladder of {RUNGS} squads is up{setup.level ? ' on ' + setup.level.name : ''}.</small>}
+          {out.refreshed && (
+            <small>
+              A new ladder of {RUNGS} squads is up{setup.level ? ' on ' + setup.level.name : ''}.
+            </small>
+          )}
         </div>
       )}
       {out.capped ? (
@@ -649,6 +841,8 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           </span>
         </div>
       )}
+      {!!out.seasonXP && <div className="utm-climb rise-in"><b className="disp">+{out.seasonXP} SEASON POINTS</b><small>Your free reward track moves forward. Claim unlocked tiers in the clubhouse.</small></div>}
+      {!!out.circuitPrizes?.length && <div className="utm-climb rise-in"><b className="disp">CIRCUIT REWARD UNLOCKED</b>{out.circuitPrizes.map(p => <small key={p}>{p} · waiting in your Store</small>)}</div>}
       {out.ups.length > 0 && (
         <div className="utm-ups">
           <span className="eyebrow">{out.ups.length === 1 ? 'Level up' : out.ups.length + ' level-ups'}</span>

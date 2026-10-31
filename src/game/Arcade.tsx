@@ -2,6 +2,7 @@
 // defense, on its own phone, at the same time. Your progress goes to the other phone over the
 // match channel; theirs comes back the same way (against the AI, its drives are played by the
 // autopilot and shown as you finish yours). The higher score wins; a tie goes to the better team.
+import { defenseDifficulty } from './difficulty';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NFL } from '../engine/sport';
 import type { BotLevel, Lineup, Player } from '../engine/types';
@@ -78,11 +79,12 @@ export function Arcade({
   online,
   botLevel,
   aiSkill,
-  aiDefense = 0,
+  aiDefense,
   rivalLive: wire,
   rivalGone,
   tookMe,
   autoplay,
+  manualOnly = false,
   kits,
   onProgress,
   onTakeover,
@@ -107,6 +109,8 @@ export function Arcade({
   /** online: the other phone gave up on this one and let the AI finish its drives from this one on */
   tookMe: number | null;
   autoplay?: boolean;
+  /** Solo challenges can require an actual played match instead of the instant sim. */
+  manualOnly?: boolean;
   /** what each side wears, and the court or the end zones */
   kits?: Kits;
   onProgress: (p: Progress) => void;
@@ -114,7 +118,8 @@ export function Arcade({
   onTakeover: (k: number) => void;
   onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }) => void;
 }) {
-  const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay ? 'play' : 'kickoff');
+  const defenseIQ = defenseDifficulty(online, botLevel, aiDefense);
+  const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay || manualOnly ? 'play' : 'kickoff');
   const [mine, setMine] = useState<Progress | null>(null);
   const [attrs, setAttrs] = useState<((p: Player) => Attrs | null) | null>(null);
   useEffect(() => {
@@ -134,11 +139,11 @@ export function Arcade({
   const aiPlay = (rival: boolean, s: string, skill: number, a: (p: Player) => Attrs | null): Progress => {
     if (teams) {
       const t = teams;
-      if (NFL) return rival ? aiDrivesOf(t.rivalOffense!, t.defense!, s, skill) : aiDrivesOf(t.offense!, t.rivalDefense!, s, skill);
-      return rival ? aiPossessionsOf(t.rivalFive!, t.five!, s, skill, POSSESSIONS, t.rivalBench) : aiPossessionsOf(t.five!, t.rivalFive!, s, skill, POSSESSIONS, t.bench);
+      if (NFL) return rival ? aiDrivesOf(t.rivalOffense!, t.defense!, s, skill, DRIVES, defenseIQ) : aiDrivesOf(t.offense!, t.rivalDefense!, s, skill, DRIVES, defenseIQ);
+      return rival ? aiPossessionsOf(t.rivalFive!, t.five!, s, skill, POSSESSIONS, t.rivalBench, defenseIQ) : aiPossessionsOf(t.five!, t.rivalFive!, s, skill, POSSESSIONS, t.bench, defenseIQ);
     }
     const [off, def] = rival ? [rivalLineup!, lineup!] : [lineup!, rivalLineup!];
-    return NFL ? aiDrives2(off, def, s, skill, a) : aiPossessions2(off, def, s, skill, a);
+    return NFL ? aiDrives2(off, def, s, skill, a, DRIVES, defenseIQ) : aiPossessions2(off, def, s, skill, a, POSSESSIONS, defenseIQ);
   };
   const ai = useMemo(() => (!online && attrs ? aiPlay(true, seed, aiSkill ?? AI_SKILL[botLevel], attrs) : null), [attrs]);
 
@@ -157,7 +162,7 @@ export function Arcade({
     if (!attrs) return;
     const known = rivalLive ?? { score: 0, drive: 0, done: false, ends: [] };
     const k = known.ends.length;
-    setTakeover(finishedFrom(known, k, aiPlay(true, seed + ':takeover', AI_SKILL.pro, attrs)));
+    setTakeover(finishedFrom(known, k, aiPlay(true, seed + ':takeover', (online ? AI_SKILL.legend : AI_SKILL[botLevel]), attrs)));
     onTakeover(k);
   };
   // the deadline for a rival who's connected but not playing, once you're done (one who hasn't
@@ -184,7 +189,7 @@ export function Arcade({
   const taken: Progress | null = useMemo(() => {
     if (tookMe === null || !attrs) return null;
     const played = mine ?? { score: 0, drive: 0, done: false, ends: [] };
-    return finishedFrom(played, Math.min(tookMe, played.ends.length), aiPlay(false, seed + ':takeover', AI_SKILL.pro, attrs));
+    return finishedFrom(played, Math.min(tookMe, played.ends.length), aiPlay(false, seed + ':takeover', (online ? AI_SKILL.legend : AI_SKILL[botLevel]), attrs));
   }, [tookMe, attrs]);
 
   // what the screen shows of the rival
@@ -218,7 +223,7 @@ export function Arcade({
 
   // sim: the autopilot plays your drives at a middling level
   const sim = () => {
-    if (!attrs) return;
+    if (!attrs || manualOnly) return;
     sfx.click();
     how.current = 'sim';
     progress(aiPlay(false, seed + ':sim', 0.6, attrs));
@@ -229,7 +234,7 @@ export function Arcade({
     const five = teams?.five ?? (attrs ? fiveOf(lineup!, attrs) : null);
     return (
       <div className="arc-kick">
-        <span className="eyebrow">Head to head · tip-off</span>
+        <span className="eyebrow">{online ? 'Online · Legend defense' : 'Head to head · tip-off'}</span>
         <h1 className="disp">
           YOUR FIVE VS {rivalName.toUpperCase()}
           {/s$/i.test(rivalName) ? '’' : '’S'} FIVE
@@ -260,9 +265,9 @@ export function Arcade({
           </p>
         )}
         <div className="arc-btns">
-          <button className="big ghost small" onClick={sim} disabled={!attrs}>
+          {!manualOnly && <button className="big ghost small" onClick={sim} disabled={!attrs}>
             <span>SIM IT</span>
-          </button>
+          </button>}
           <button className="big shine" onClick={() => (sfx.whistle(), setStage('play'))} disabled={!attrs}>
             <span>PLAY</span>
           </button>
@@ -274,7 +279,7 @@ export function Arcade({
     const off = teams?.offense ?? (attrs ? offenseOf(lineup!, attrs, seed) : null);
     return (
       <div className="arc-kick">
-        <span className="eyebrow">Head to head · kickoff</span>
+        <span className="eyebrow">{online ? 'Online · Legend defense' : 'Head to head · kickoff'}</span>
         <h1 className="disp">YOUR OFFENSE VS {rivalName.toUpperCase()}</h1>
         <p>
           {TOTAL} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
@@ -302,9 +307,9 @@ export function Arcade({
           </p>
         )}
         <div className="arc-btns">
-          <button className="big ghost small" onClick={sim} disabled={!attrs}>
+          {!manualOnly && <button className="big ghost small" onClick={sim} disabled={!attrs}>
             <span>SIM MY DRIVES</span>
-          </button>
+          </button>}
           <button className="big shine" onClick={() => (sfx.whistle(), setStage('play'))} disabled={!attrs}>
             <span>PLAY</span>
           </button>
@@ -336,8 +341,8 @@ export function Arcade({
   }
   if (!NFL) {
     const k = kits ?? kitsFor(null, null, 'nba');
-    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={online ? 0 : aiDefense} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
   }
   const k = kits ?? kitsFor(null, null, 'nfl');
-  return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={online ? 0 : aiDefense} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
 }

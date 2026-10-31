@@ -1,3 +1,4 @@
+import { specialEditions } from './specials';
 // Ultimate Team card data: every player-season as a CardLine, plus promo ("Hot Season") and legend
 // lines. Built by scripts/build_cards.py into src/data/cards-<sport>.json (stored column by
 // column; the script's header has every rule) and loaded only when Ultimate Team opens.
@@ -74,7 +75,13 @@ export function cardId(sport: UtSport, kind: CardKind, season: number, pid: stri
 }
 
 /** The file's columns as CardLine objects: season lines first, then promos, then legends. */
-export function expandCards(f: CardsFile): CardPool {
+export interface SeasonReferences {
+  source: string;
+  columns: string[];
+  rows: Record<string, (number | string | null)[]>;
+}
+
+export function expandCards(f: CardsFile, references?: SeasonReferences): CardPool {
   const c = f.cols;
   const seen: Record<string, number> = {};
   const seasons: CardLine[] = [];
@@ -114,6 +121,15 @@ export function expandCards(f: CardsFile): CardPool {
       grp,
     };
     if (c.sparse[i]) line.sparse = true;
+    const ref = references?.rows[`${pid}:${line.season}`];
+    if (ref && typeof ref[1] === 'number') {
+      const attrs: Record<string, number> = {};
+      references!.columns.forEach((code, j) => {
+        const value = ref[j + 2];
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 1 && value <= 99) attrs[code] = value;
+      });
+      line.ratingReference = { source: references!.source, snapshot: String(ref[0]), ovr: ref[1], attrs };
+    }
     seasons.push(line);
   }
   const derive = (kind: CardKind) => ([i, boost, label]: [number, number, string]): CardLine => {
@@ -122,12 +138,13 @@ export function expandCards(f: CardsFile): CardPool {
   };
   const promos = f.promos.map(derive('promo'));
   const legends = f.legends.map(derive('legend'));
-  const lines = [...seasons, ...promos, ...legends];
+  const lines = [...seasons, ...promos, ...legends, ...specialEditions(seasons)];
   return { lines, byId: new Map(lines.map((l) => [l.id, l])), promos, legends };
 }
 
 // the files may not exist (an older build): a glob finds whatever is there
 const FILES = import.meta.glob<{ default: CardsFile }>('../data/cards-*.json');
+const REFERENCES = import.meta.glob<{ default: SeasonReferences }>('../data/season-references-*.json');
 
 const pools = new Map<UtSport, Promise<CardPool>>();
 
@@ -137,7 +154,7 @@ export function loadCards(sport: UtSport): Promise<CardPool> {
   if (!p) {
     const key = Object.keys(FILES).find((k) => k.endsWith(`cards-${sport}.json`));
     p = key
-      ? FILES[key]().then((m) => expandCards(m.default))
+      ? Promise.all([FILES[key](), REFERENCES[`../data/season-references-${sport}.json`]?.()]).then(([m, r]) => expandCards(m.default, r?.default))
       : Promise.resolve({ lines: [], byId: new Map(), promos: [], legends: [] });
     p.catch(() => pools.delete(sport));
     pools.set(sport, p);

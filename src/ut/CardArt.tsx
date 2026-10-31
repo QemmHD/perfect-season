@@ -2,13 +2,15 @@
 // position, the team and season, and the player himself in pixel art: the same rigged body the
 // played games draw, in that season's team colors and his own number, drawn small and scaled up
 // with crisp pixels.
+import './card-editions.css';
+import { CardStamp } from './CardSerial';
 import React, { useEffect, useState } from 'react';
 import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, freeCanvas, hairFor, type Look } from '../game/pixel/body';
 import { celebrate, idle } from '../game/pixel/poses';
 import { useTilt } from '../ui/Card';
 import { shortSeason } from './pool';
 import { TIER_NAMES } from './rate';
-import type { CardLine, RatedCard } from './types';
+import type { CardLine, RatedCard, CardMint } from './types';
 
 const lum = (hex: string): number => {
   const h = hex.replace('#', '');
@@ -21,12 +23,34 @@ const lum = (hex: string): number => {
 export function lookOf(line: CardLine): Look {
   const ht = line.ht ?? (line.sport === 'nba' ? 79 : 74);
   const wt = line.wt ?? (line.sport === 'nba' ? 215 : 230);
-  const base = { ht, wt, num: line.num, hair: hairFor(line.pid), beard: beardFor(line.pid), skin: DEFAULT_SKIN, hairColor: DEFAULT_HAIR, jersey: line.c1, trim: line.c2, shoes: '#1b1b1f' };
+  const base = {
+    ht,
+    wt,
+    num: line.num,
+    hair: hairFor(line.pid),
+    beard: beardFor(line.pid),
+    skin: DEFAULT_SKIN,
+    hairColor: DEFAULT_HAIR,
+    jersey: line.c1,
+    trim: line.c2,
+    shoes: '#1b1b1f',
+  };
   if (line.sport === 'nba') return { ...base, sport: 'nba', shorts: line.c1, socks: '#f2f2f2' };
   const big = ['OT', 'OG', 'C', 'DE', 'DT'].includes(line.pos[0]);
   // pants: white against a dark jersey, the trim color against a light one
   const pants = lum(line.c1) < 0.5 ? '#e8e8e4' : line.c2;
-  return { ...base, sport: 'nfl', shorts: pants, socks: line.c1, helmet: line.c1, stripe: line.c2, mask: lum(line.c1) < 0.35 ? '#c9ccd0' : '#2a2d33', pants, pads: big ? 1.25 : 1, sleeves: 'short' };
+  return {
+    ...base,
+    sport: 'nfl',
+    shorts: pants,
+    socks: line.c1,
+    helmet: line.c1,
+    stripe: line.c2,
+    mask: lum(line.c1) < 0.35 ? '#c9ccd0' : '#2a2d33',
+    pants,
+    pads: big ? 1.25 : 1,
+    sleeves: 'short',
+  };
 }
 
 const portraits = new Map<string, string>();
@@ -106,11 +130,24 @@ export function plateName(name: string): string {
   return parts.length > 1 ? parts.slice(1).join(' ') : name;
 }
 
+/** Codex: one crown mark is shared by GOAT card art and its pack reveal. */
+export function GoatCrown({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 36" fill="none" aria-hidden="true">
+      <path d="m5 9 9 9L24 4l10 14 9-9-5 23H10L5 9Z" fill="currentColor" fillOpacity=".18" stroke="currentColor" strokeWidth="2" />
+      <path d="M11 27h26M24 12v8" stroke="currentColor" strokeWidth="2" />
+      <circle cx="24" cy="4" r="2" fill="currentColor" />
+    </svg>
+  );
+}
+
 export interface UtCardProps {
   rc: RatedCard;
   /** the card's width in frame px; everything on it scales from that */
   w: number;
   level?: number;
+  mint?: CardMint;
+  numbered?: boolean;
   /** show the six key attributes (the bigger views) */
   attrs?: boolean;
   pose?: 'stand' | 'cheer';
@@ -121,7 +158,7 @@ export interface UtCardProps {
 }
 
 /** The card. */
-export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, className }: UtCardProps) {
+export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, className, mint, numbered }: UtCardProps) {
   const { ref, handlers } = useTilt<HTMLSpanElement>(w > 150 ? 16 : 10);
   const l = rc.line;
   const name = plateName(l.name);
@@ -133,13 +170,28 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
     <span
       ref={ref}
       {...(tilt ? handlers : {})}
-      className={'utc t-' + rc.tier + (big ? ' big' : '') + (attrs ? ' with-attrs' : '') + (w < 52 ? ' xs' : w < 70 ? ' sm' : '') + (name.length > 9 ? ' long' : '') + (className ? ' ' + className : '')}
+      className={
+        'utc t-' +
+        rc.tier +
+        (big ? ' big' : '') +
+        (attrs ? ' with-attrs' : '') +
+        (mint || (numbered && rc.ovr >= 90) ? ' has-serial' : '') +
+        (w < 52 ? ' xs' : w < 70 ? ' sm' : '') +
+        (name.length > 9 ? ' long' : '') +
+        (className ? ' ' + className : '')
+      }
       style={{ '--w': w + 'px', '--c1': l.c1, '--c2': l.c2 } as React.CSSProperties}
       role="img"
-      aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + TIER_NAMES[rc.tier]}
+      aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + TIER_NAMES[rc.tier] + (mint ? ', issue number ' + mint.serial : '')}
     >
       <span className="utc-face">
         <span className="utc-glow" aria-hidden="true" />
+        {rc.tier === 'goat' && <GoatCrown className="utc-crown" />}
+        {(rc.tier === 'goat' || rc.tier === 'spotlight') && (
+          <span className="utc-edition" aria-hidden="true">
+            {rc.tier === 'goat' ? 'GREATEST OF ALL TIME' : 'SPOTLIGHT'}
+          </span>
+        )}
         {src && <img className="utc-px" src={src} alt="" draggable={false} />}
         <span className="utc-top">
           <b className="utc-ovr">{rc.ovr}</b>
@@ -157,6 +209,7 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
           </span>
         )}
         <span className="utc-plate">
+          {mint ? <CardStamp mint={mint} cardId={l.id} sport={l.sport} /> : numbered && rc.ovr >= 90 ? <span className="utc-stamp pending">NUMBERING…</span> : null}
           <b className="utc-name">{name}</b>
           {attrs && (
             <span className="utc-attrs">

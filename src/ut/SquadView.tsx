@@ -53,6 +53,7 @@ export function SquadView(props: {
   onSquad: (squad: Record<string, string>) => void;
   onInspect: (uid: string) => void;
   onToast: (t: string) => void;
+  management?: React.ReactNode;
 }) {
   const { lineup, rating, squad } = props;
   const nba = SPORT === 'nba';
@@ -110,7 +111,7 @@ export function SquadView(props: {
         aria-label={s.id + (c ? ': ' + c.rc.line.name + ', ' + c.rc.ovr : ': empty')}
       >
         {c ? (
-          <UtCard rc={c.rc} w={w} level={c.oc.level} />
+          <UtCard rc={c.rc} w={w} level={c.oc.level} mint={c.oc.mint} numbered />
         ) : (
           <span className="ut-slot-empty" style={{ width: w, height: Math.round(w * 1.4) }}>
             <b>+</b>
@@ -143,6 +144,7 @@ export function SquadView(props: {
           <IconWand size={16} /> AUTO
         </button>
       </div>
+      {props.management && <div className="hq-squad-toolbar"><span className="eyebrow">ONE CLUB. THREE MATCHDAY LINEUPS.</span>{props.management}</div>}
       {!nba && (
         <span className="seg ut-unit" role="group" aria-label="Unit">
           {(['off', 'def'] as const).map((u) => (
@@ -238,7 +240,7 @@ function Picker(props: { slot: SlotDef; club: ClubCard[]; lineup: Lineup; squad:
             <div className="ut-picker-list">
               {options.map(({ c, d, chem }) => (
                 <button key={c.uid} className="ut-pickrow" onClick={() => close(() => props.onPick(c.uid))}>
-                  <UtCard rc={c.rc} w={44} level={c.oc.level} />
+                  <UtCard rc={c.rc} w={44} level={c.oc.level} mint={c.oc.mint} numbered />
                   <span className="ut-pickrow-txt">
                     <b>{c.rc.line.name}</b>
                     <small>

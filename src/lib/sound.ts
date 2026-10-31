@@ -786,3 +786,47 @@ export const _test = {
   urls: URLS,
   bed: () => bed,
 };
+
+/** Codex: original, cancellable pack score. No downloads, loops or changes to game audio settings. */
+export function packSound(cue: 'charge' | 'surge' | 'reveal', premium = false): () => void {
+  const c = ac();
+  if (!c) return () => {};
+  const bus = c.createGain(),
+    filter = c.createBiquadFilter(),
+    nodes: OscillatorNode[] = [];
+  const now = c.currentTime,
+    duration = cue === 'charge' ? 0.78 : cue === 'surge' ? 1.05 : 0.95;
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(cue === 'reveal' ? 4200 : 900, now);
+  filter.frequency.exponentialRampToValueAtTime(cue === 'surge' ? 5200 : 3000, now + duration * 0.8);
+  bus.gain.setValueAtTime(0.0001, now);
+  bus.gain.exponentialRampToValueAtTime(premium ? 0.17 : 0.12, now + 0.04);
+  bus.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  filter.connect(bus).connect(c.destination);
+  const freqs = cue === 'reveal' ? [65.4, 130.8, 196, 261.6, 329.6] : cue === 'surge' ? [55, 110, 164.8] : [65.4, 98, 130.8];
+  for (const [i, f] of freqs.entries()) {
+    const o = c.createOscillator(),
+      gain = c.createGain();
+    o.type = i === 0 ? 'sine' : 'triangle';
+    o.frequency.setValueAtTime(cue === 'reveal' && i === 0 ? 100 : f, now);
+    o.frequency.exponentialRampToValueAtTime(cue === 'reveal' ? f : Math.min(1900, f * (cue === 'surge' ? 9 : 4)), now + duration * 0.9);
+    gain.gain.value = i === 0 ? 0.48 : 0.18;
+    o.connect(gain).connect(filter);
+    o.start(now);
+    o.stop(now + duration + 0.03);
+    nodes.push(o);
+  }
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    const at = c.currentTime;
+    bus.gain.cancelScheduledValues(at);
+    bus.gain.setValueAtTime(0.0001, at);
+    for (const n of nodes) {
+      try {
+        n.stop(at + 0.015);
+      } catch {}
+    }
+  };
+}

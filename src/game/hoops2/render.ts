@@ -53,7 +53,7 @@ function lookFor(b: Body, kit: Kit): Look {
 
 /** The motion-capture clips the court uses (mocap.ts). They load with the renderer; until they're in,
  * the hand-keyed poses below stand in. */
-const CLIPS = ['jumpshot', 'layup', 'ready', 'jog', 'run', 'sprint', 'shuffle', 'shuffle_l', 'celebrate', 'stumble', 'stumble_m', 'fall_back', 'fall_back_m', 'slip', 'slip_m', 'getup'];
+const CLIPS = ['jumpshot', 'layup', 'ready', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'celebrate', 'stumble', 'stumble_m', 'fall_back', 'fall_back_m', 'slip', 'slip_m', 'getup'];
 
 /** The jump shot: its recorded release lands at the top of the meter, so a green is let go at the
  * height of his jump. */
@@ -139,11 +139,15 @@ function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shot
   else if (b.act === 'fall') m.last = { act: 'fall', at: b.actAt, kind: b.fallKind };
   else if (shotAt !== null && !(m.last?.act === 'shoot' && m.last.at > shotAt - 1.5)) m.last = { act: 'shoot', at: shotAt - JUMPER_TOP };
   const since = t - b.actAt;
+  if (b.contactAt !== undefined && t >= b.contactAt && t - b.contactAt < 0.18 && !air && !AT_RIM.includes(b.act)) {
+    const bump = Math.sin((t - b.contactAt) / 0.18 * Math.PI);
+    return { key: 'body-up:' + Math.round(bump * 5) + ':' + pose.key, pose: { ...pose.pose, lean: pose.pose.lean - 0.18 * bump, crouch: pose.pose.crouch + 0.035 * bump } };
+  }
   // the follow-through and the landing after the ball's gone; the get-up after a fall
   const tail = m.last && b.act !== m.last.act && (b.act === 'idle' || b.act === 'run' || b.act === 'defend') ? m.last : null;
   if (tail) {
     const ts = t - tail.at;
-    if (tail.act === 'shoot' && ts < 1.0 && (ts < 0.8 || speed < 6)) return clip('jumpshot', JUMPER(ts), { step: 1, ground: 'clip' });
+    if (tail.act === 'shoot' && ts < 1.0 && (ts < 0.8 || speed < 6)) return clip('jumpshot', JUMPER(ts*(b.shotTempo??1)), { step: 1, ground: 'clip' });
     // a dunker hangs on in his dunk until he's down
     if ((tail.act === 'dunk' || tail.act === 'contact' || tail.act === 'standdunk') && (air || ts < 0.75)) return poseOf({ ...b, act: tail.act, actAt: tail.at }, t, false);
     if (tail.act === 'layup' && ts < 0.95) return clip('layup', LAYUP(ts), { ground: 'pin' });
@@ -155,7 +159,7 @@ function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shot
   }
   switch (b.act) {
     case 'shoot':
-      return clip('jumpshot', JUMPER(since), { step: 1, ground: 'clip' });
+      return clip('jumpshot', JUMPER(since*(b.shotTempo??1)), { step: 1, ground: 'clip' });
     case 'layup':
       return clip('layup', LAYUP(since), { ground: 'pin' });
     case 'fall': {
@@ -187,6 +191,13 @@ function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shot
       // floor, a stride
       const lat = -b.vx * Math.sin(b.face) + b.vz * Math.cos(b.face);
       const fwd = b.vx * Math.cos(b.face) + b.vz * Math.sin(b.face);
+      if (fwd < -3 && Math.abs(fwd) >= Math.abs(lat) && has('backpedal')) {
+        const name = 'backpedal', ft = clipMeta(name).root.speed * legScale(look) * (b.p.ht / 12);
+        const dt = t - m.gait.t;
+        if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + dt * Math.max(0.7, Math.min(1.6, -fwd / Math.max(0.1, ft))) / clipMeta(name).duration) % 1;
+        m.gait.t = t;
+        return clip(name, m.gait.frac * clipMeta(name).duration);
+      }
       if (Math.abs(lat) > Math.abs(fwd) && has('shuffle')) {
         const name = lat > 0 ? 'shuffle' : 'shuffle_l';
         const ft = clipMeta(name).root.speed * legScale(look) * (b.p.ht / 12);
@@ -220,6 +231,9 @@ function poseOf(b: Body, t: number, carrying: boolean): { key: string; pose: Pos
   const timed = (dur: number, frames = 10) => Math.min(frames, Math.floor((since / dur) * frames)) / frames;
   const cycle = (hz: number, frames: number) => Math.floor((((t * hz) % 1) + 1) % 1 * frames) / frames;
   switch (b.act) {
+    case 'screen':
+      // Original brace pose: feet planted, elbows tucked, with no new art dependency.
+      return { key: 'screen', pose: { ...P.idle(0), lean: .04, crouch: .07, spread: .2, kneeL: .25, kneeR: .25, shL: .12, shR: .12, elL: 1.4, elR: 1.4, abL: .12, abR: .12 } };
     case 'dribble': {
       const sp = Math.min(1, speed / 18);
       const ph = cycle(sp > 0.1 ? 1.5 + sp : 1.6, 8);
@@ -231,7 +245,7 @@ function poseOf(b: Body, t: number, carrying: boolean): { key: string; pose: Pos
       return { key: 'rn' + ph + Math.round(sp * 3), pose: P.run(ph, 0.4 + sp * 0.6) };
     }
     case 'shoot': {
-      const ph = timed(0.62, 12);
+      const ph = timed(0.62/(b.shotTempo??1), 12);
       return { key: 'js' + ph, pose: P.jumpShot(ph) };
     }
     case 'layup': {
@@ -564,6 +578,14 @@ export class HoopsRenderer {
   }
 
   /** One frame. `real` keeps the crowd and the ball's spin moving between plays. */
+  /** Pick a real teammate's projected body, so tapping him passes directly. */
+  teammateAt(p: Possession,x:number,y:number,radius:number):number|null {
+    if(!this.pc)return null;
+    let nearest=radius,target:number|null=null;
+    for(const b of p.bodies)if(b.side==='O'&&b.idx!==p.handler){const foot=this.at(b.cx,b.cz),head=this.at(b.cx,b.cz,b.h+b.p.ht/12);const d=Math.hypot(x-foot.x,y-(head.y+foot.y)/2);if(d<nearest){nearest=d;target=b.idx;}}
+    return target;
+  }
+
   draw(ctx: CanvasRenderingContext2D, p: Possession, real: number, fx: Fx) {
     this.budget = 4;
     ctx.imageSmoothingEnabled = false;
@@ -582,6 +604,23 @@ export class HoopsRenderer {
     ctx.translate(sx, sy);
     this.drawFloorNow(ctx);
     this.drawBoard(ctx);
+    const call = p.playCall;
+    if (!this.replay && !p.end && !p.meter && !p.finish && call && call.until > p.t && call.kind !== 'space') {
+      const actor = p.bodies[call.actor];
+      if (actor && actor.idx !== p.handler) {
+        const goal = call.kind === 'screen' && !call.rolling ? call.target : { cx: RIM.cx - 2, cz: actor.cz > 0 ? 2.5 : -2.5 };
+        const from = this.at(actor.cx, actor.cz), to = this.at(goal.cx, goal.cz);
+        ctx.save(); ctx.strokeStyle = '#88f6da99'; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+        ctx.beginPath();ctx.moveTo(from.x,from.y);ctx.lineTo(to.x,to.y);ctx.stroke();ctx.setLineDash([]);
+        ctx.beginPath();ctx.ellipse(to.x,to.y,Math.max(4,to.s*1.3),Math.max(2,to.s*.45),0,0,Math.PI*2);ctx.stroke();
+        label(ctx,call.kind === 'cut' || call.rolling ? 'CUT' : 'SCREEN',to.x,to.y-9,'#b4ffe6');ctx.restore();
+      }
+    }
+    if(!this.replay&&p.ball?.kind==='loose'&&p.rebounder!==undefined){
+      const b=p.bodies[p.rebounder],f=this.at(b.cx,b.cz),to=this.at(p.ball.to.cx,p.ball.to.cz);
+      ctx.strokeStyle='#19e3c9';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(f.x,f.y,Math.max(6,f.s*1.7),Math.max(2,f.s*.6),0,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle='#ffd579bb';ctx.setLineDash([3,3]);ctx.beginPath();ctx.ellipse(to.x,to.y,Math.max(6,to.s*2),Math.max(2,to.s*.7),0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+    }
     // shadows on the floor
     const t = p.t;
     for (const b of p.bodies) {
@@ -714,6 +753,8 @@ export class HoopsRenderer {
       const frac = Math.min(1, (p.t - m.t0) / span);
       this.meterShown = { idx: p.handler, t0: m.t0, top: m.top, green: m.green, until: Infinity, frac, greened: m.off !== undefined ? !!m.greened : null };
     } else if (this.meterShown && this.meterShown.until === Infinity) {
+      // A canceled hold has no release result to display.
+      if (!p.lastShot && !p.ball && !p.finish) { this.meterShown = null; return; }
       // just released (the engine let go of the meter): hold the result a moment
       const ls = p.lastShot;
       this.meterShown.greened = ls ? ls.greened : false;
@@ -782,6 +823,11 @@ export class HoopsRenderer {
     if (p.meter && p.handler === ms.idx) {
       const grade = contestOf(p, p.bodies[ms.idx]);
       label(ctx, CONTEST_TEXT[grade], head.x, cy - R - th - 16, CONTEST_COLOR[grade]);
+      if(p.meter.style)label(ctx,p.meter.style==='catch'?'CATCH & SHOOT':p.meter.style==='pullup'?'MOVING SHOT':'SET SHOT',head.x,cy-R-th-29,'#d6e5ed');
+    } else if (result && p.lastShot) {
+      const shot = p.lastShot;
+      const text = shot.greened ? (shot.contest === 'heavy' || shot.contest === 'smothered' ? 'PERFECT / ' + CONTEST_TEXT[shot.contest] : 'PERFECT') : Math.abs(shot.off) < 0.22 ? 'GOOD RELEASE' : shot.off < 0 ? 'EARLY' : 'LATE';
+      label(ctx, text, head.x, cy - R - th - 16, shot.greened ? '#3ef07a' : '#ffd35a');
     }
   }
 }

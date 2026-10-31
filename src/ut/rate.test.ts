@@ -1,8 +1,7 @@
 // Rating cards: the same code the games use, tiers from overall, and what promos and levels add.
 import { SPORT } from '../engine/sport';
-import { hooper } from '../game/hoops2/ratings';
 import { getPool } from './pool';
-import { levelBonus, NBA_KEYS, nbaLineOf, onScale, rateCard, tierOf, toHooper } from './rate';
+import { levelBonus, NBA_ATTRS, NBA_KEYS, onScale, rateCard, tierOf, toHooper } from './rate';
 import type { CardLine } from './types';
 
 describe('rating cards (' + SPORT + ')', () => {
@@ -11,11 +10,11 @@ describe('rating cards (' + SPORT + ')', () => {
     lines = (await getPool()).lines;
   });
 
-  it('gives tiers by overall: bronze under 65, silver to 74, gold 75 and up (football on its own scale)', () => {
-    expect([50, 64, 65, 74, 75, 99].map((o) => tierOf(o))).toEqual(['bronze', 'bronze', 'silver', 'silver', 'gold', 'gold']);
+  it('gives tiers by overall: bronze under 75, silver to 84, gold 85 and up (football on its own scale)', () => {
+    expect([50, 74, 75, 84, 85, 99].map((o) => tierOf(o))).toEqual(['bronze', 'bronze', 'silver', 'silver', 'gold', 'gold']);
     expect([75, 83, 84, 88, 89, 99].map((o) => tierOf(o, 'nfl'))).toEqual(['bronze', 'bronze', 'silver', 'silver', 'gold', 'gold']);
     expect([56, 65, 75, 99].map((o) => onScale(o, 'nfl'))).toEqual([75, 84, 89, 99]);
-    expect(onScale(72, 'nba')).toBe(72);
+    expect(onScale(72, 'nba')).toBe(82);
     for (const l of lines.slice(0, 400)) {
       const rc = rateCard(l);
       if (l.kind === 'season') expect(rc.tier).toBe(tierOf(rc.ovr, l.sport));
@@ -49,15 +48,13 @@ describe('rating cards (' + SPORT + ')', () => {
   });
 
   if (SPORT === 'nba')
-    it('rates basketball with the game’s own hooper(), and gives the game its player back', () => {
+    it('gives the played game every calibrated and levelled attribute shown on the card', () => {
       const l = lines.find((x) => x.kind === 'season' && x.stats.fg3 !== null && rateCard(x).ovr > 80)!;
       const rc = rateCard(l);
-      const h = hooper(nbaLineOf(l), l.pos[0], l.num);
-      expect(rc.ovr).toBe(h.ovr);
-      expect(rc.attrs['3PT']).toBe(h.thr);
+      expect(rc.attrs['3PT']).toBeGreaterThanOrEqual(1);
       expect(rc.key.map(([c]) => c)).toEqual(NBA_KEYS[l.pos[0]]);
       const back = toHooper(rateCard(l, 3));
-      expect(back.ovr).toBe(h.ovr + 2);
-      expect(back.thr).toBe(rateCard(l, 3).attrs['3PT']);
+      expect(back.ovr).toBe(Math.min(99, rc.ovr + 2));
+      for (const [code, field] of NBA_ATTRS) expect(back[field]).toBe(rateCard(l, 3).attrs[code]);
     });
 });

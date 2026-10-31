@@ -1,3 +1,4 @@
+import type { Practice } from '../../evolution/training';
 // Arcade basketball, the way it's played: your five on offense against the rival's five. Left thumb
 // on the stick moves the man with the ball; PASS throws to the man the stick points at (a lob to a
 // dunker on the cut); CROSS breaks down your man; hold SHOOT to rise and let go in the green.
@@ -15,11 +16,13 @@ import type { Progress, RivalLive } from '../progress';
 import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
-import { aimPass, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
+import { aimPass, callPlay, cancelShoot, jumpRebound, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
 import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
 import type { Body, Hooper, Possession, Pt, Scheme } from './types';
+import './coach-controls.css';
+import { useInputInterrupt } from '../useInputInterrupt';
 
 const DT = 1 / 60;
 /** what a phone's screen and touch add between what you saw and the release it hears (seconds) */
@@ -33,7 +36,13 @@ interface Snap {
   fire: number;
   lastShot: Possession['lastShot'];
 }
-const snapOf = (p: Possession): Snap => ({ bodies: p.bodies.map((b) => ({ ...b, trail: [] })), ball: p.ball ? { ...p.ball } : null, handler: p.handler, fire: p.fire, lastShot: p.lastShot });
+const snapOf = (p: Possession): Snap => ({
+  bodies: p.bodies.map((b) => ({ ...b, trail: [] })),
+  ball: p.ball ? { ...p.ball } : null,
+  handler: p.handler,
+  fire: p.fire,
+  lastShot: p.lastShot
+});
 const MARK_TEXT: Record<Mark, string> = { '2': '2', '3': '3', A: '3', X: '–', TO: 'TO' };
 /** The defense's looks, and what beats each. */
 const LOOK_TEXT: Record<Scheme, string> = { man: 'MAN-TO-MAN', sag: 'SAGGING OFF', switch: 'SWITCHING', trap: 'TRAPPING' };
@@ -52,7 +61,7 @@ export function fiveOf(lineup: Lineup, attrs: (p: Player) => Attrs | null): Hoop
 export function kitsFor(c1: string, c2: string): { home: Kit; away: Kit } {
   return {
     home: { jersey: c1, trim: c2, shorts: c1, socks: '#f4f4f4', shoes: '#16161c' },
-    away: { jersey: '#f6f6f2', trim: c1, shorts: '#f6f6f2', socks: '#f4f4f4', shoes: '#f4f4f4' },
+    away: { jersey: '#f6f6f2', trim: c1, shorts: '#f6f6f2', socks: '#f4f4f4', shoes: '#f4f4f4' }
   };
 }
 
@@ -65,6 +74,7 @@ export function Hoops2({
   rivalName,
   seed,
   possessions = POSSESSIONS,
+  practice,
   defIQ = 0,
   rival,
   ourKit,
@@ -73,7 +83,7 @@ export function Hoops2({
   autoplayHook,
   timeScale = 1,
   onProgress,
-  onDone,
+  onDone
 }: {
   /** the drafted lineups; or the teams themselves (Ultimate Team), `five` and `rivalFive` */
   lineup?: Lineup;
@@ -85,6 +95,7 @@ export function Hoops2({
   rivalName: string;
   seed: string;
   possessions?: number;
+  practice?: Practice;
   /** how well the rival defends beyond its ratings (Squad Battles' difficulty; 0 standard) */
   defIQ?: number;
   rival: RivalLive | null;
@@ -108,7 +119,10 @@ export function Hoops2({
       live = false;
     };
   }, []);
-  const game = useMemo<HoopsGame | null>(() => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench, defIQ) : null), [attrs]);
+  const game = useMemo<HoopsGame | null>(
+    () => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench, defIQ) : null),
+    [attrs]
+  );
   const renderer = useMemo(() => new HoopsRenderer(court, [ourKit, theirKit]), []);
   // the game's drawings and its canvas let go of their memory as it closes (Safari counts a dropped
   // canvas against the page's cap until it's collected, which can be a while)
@@ -125,13 +139,14 @@ export function Hoops2({
   const fxRef = useRef<Fx>({ swish: 0, shake: 0, crowd: 0, flash: 0 });
   const slowUntil = useRef(0);
   const [between, setBetween] = useState(true);
+  const [boarding, setBoarding] = useState(false);
   const [, setTick] = useState(0);
   const [pop, setPop] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'big' | 'plain' | 'green' } | null>(null);
   /** the defense's look this possession, named under the scoreboard */
   const [look, setLook] = useState<{ scheme: Scheme; trapped: boolean } | null>(null);
   const popId = useRef(0);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [hint, setHint] = useState<string | null>('Stick: move, push it to the edge to sprint · flick ← → crossover · flick ↓ step-back · flick ↑ spin · hold SHOOT, let go in the green');
+  const [hint, setHint] = useState<string | null>(practice ? null : 'Tap a teammate to pass · hold SHOOT and release in green');
   const [wide, setWide] = useState(false);
   // instant replay: the last seconds of play, the highlight to show, the replay running
   const rec = useRef(new Recorder<Snap>(5));
@@ -153,6 +168,19 @@ export function Hoops2({
 
   const next = (g: HoopsGame) => {
     possRef.current = startPossession(g);
+    if (practice) {
+      const p = possRef.current,
+        h = p.bodies[0];
+      const at = practice.drill === 'finish' ? { cx: RIM.cx - 13, cz: 0 } : { cx: RIM.cx - 24.5, cz: 0 };
+      Object.assign(h, at);
+      h.home = { ...at };
+      const d = p.bodies[5];
+      Object.assign(d, { cx: at.cx + 7, cz: at.cz + 2 });
+      if (practice.drill === 'pass') {
+        p.scheme = 'trap';
+        p.events = ['scheme:trap'];
+      }
+    }
     const pl = pilotRef.current;
     pl.letGo = null;
     pl.driving = false;
@@ -160,6 +188,7 @@ export function Hoops2({
     pl.nextThink = 0;
     pl.crosses = 0;
     setBetween(false);
+    setBoarding(false);
     setTick((n) => n + 1);
     if (g.done === g.total / 2) say('SECOND HALF', 'plain', 1300);
   };
@@ -168,9 +197,11 @@ export function Hoops2({
     if (!game) return;
     crowd.start(0.24);
     const t = window.setTimeout(() => next(game), 700);
-    const h = window.setTimeout(() => setHint(null), 7000);
+    const moves = window.setTimeout(() => !practice && setHint('Stick edge: sprint · flick ← → cross, ↓ step-back, ↑ spin'), 3800);
+    const h = window.setTimeout(() => setHint(null), 7600);
     return () => {
       clearTimeout(t);
+      clearTimeout(moves);
       clearTimeout(h);
       crowd.stop(0.6);
     };
@@ -192,7 +223,15 @@ export function Hoops2({
         sfx.squeak();
         vibrate(12);
         say('DOUBLE TEAM!', 'plain', 800);
-      } else if (e === 'pass') sfx.whoosh();
+      } else if (e.startsWith('call:')) {
+        sfx.squeak();
+        say(e === 'call:screen' ? 'SCREEN & ROLL' : e === 'call:cut' ? 'CUT TO THE RIM' : 'SPREAD THE FLOOR', 'plain', 1100);
+      } else if (e === 'rim' || e === 'loose') {
+        setBoarding(true);
+        if (e === 'rim') sfx.rim();
+        else sfx.squeak();
+      } else if (e === 'board-jump') sfx.squeak();
+      else if (e === 'pass') sfx.whoosh();
       else if (e === 'lob') {
         sfx.whoosh();
         say('LOB!', 'plain', 600);
@@ -201,7 +240,8 @@ export function Hoops2({
       else if (e === 'release-green') {
         sfx.coin();
         vibrate(15);
-        say('GREEN!', 'green', 800);
+        const contested = p.lastShot?.contest === 'heavy' || p.lastShot?.contest === 'smothered';
+        say(contested ? 'PERFECT TIMING · CONTESTED' : 'PERFECT!', 'green', 800);
       } else if (e === 'release') {
         const ls = p.lastShot;
         if (ls) {
@@ -254,8 +294,8 @@ export function Hoops2({
         shake(3);
         const d = p.bodies[Number(e.slice(8))];
         say('REJECTED BY ' + d.p.tag, 'bad', 1100);
-      } else if (e === 'rim') sfx.rim();
-      else if (e.startsWith('orb:')) {
+      } else if (e.startsWith('orb:')) {
+        setBoarding(false);
         sfx.catch();
         say('OFFENSIVE BOARD', 'good', 800);
         crowd.swell(0.4);
@@ -272,6 +312,17 @@ export function Hoops2({
     const e = p.end!;
     const wasFire = game.fire;
     const mark = afterPossession(game, p);
+    if (practice) {
+      const ls = p.lastShot;
+      practice.onAttempt({
+        points: e.points,
+        success: e.kind === 'make' && (practice.drill !== 'pass' || p.passes > 0),
+        green: ls?.greened,
+        offset: ls ? Math.round(ls.off * 250) : undefined,
+        contest: ls?.contest,
+        detail: practice.drill === 'pass' && !p.passes ? 'MOVE THE BALL FIRST' : e.text
+      });
+    }
     const fx = fxRef.current;
     if (e.kind === 'make') {
       fx.swish = 1;
@@ -300,6 +351,7 @@ export function Hoops2({
     if (wasFire >= 0 && game.fire < 0) window.setTimeout(() => say('FIRE PUT OUT', 'plain', 900), 1000);
     onProgress(progress(game));
     setBetween(true);
+    setBoarding(false);
     // the final buzzer
     if (game.over) window.setTimeout(() => sfx.buzzer(), 500);
     const proceed = () => {
@@ -451,7 +503,7 @@ export function Hoops2({
         const h = p.handler !== null ? p.bodies[p.handler] : null;
         if (h && h.act === 'dribble' && !p.ball && !p.meter && !p.finish && !p.end) {
           const sp = Math.hypot(h.vx, h.vz);
-          const beat = ((((p.t * (sp > 1.8 ? 1.5 + sp / 18 : 1.6)) % 1) * (sp > 1.8 ? 2 : 1.6)) % 1 + 1) % 1;
+          const beat = (((((p.t * (sp > 1.8 ? 1.5 + sp / 18 : 1.6)) % 1) * (sp > 1.8 ? 2 : 1.6)) % 1) + 1) % 1;
           if (lastBeat.current < 0.45 && beat >= 0.45) sfx.dribble(sp > 12);
           lastBeat.current = beat;
         } else lastBeat.current = 1;
@@ -470,7 +522,13 @@ export function Hoops2({
           const rt = replayTime(r, now);
           const snap = rt === null ? null : frameAt(r.frames, rt);
           if (rt === null || !snap) endReplay();
-          else renderer.draw(ctx, { ...p, t: rt, bodies: snap.bodies, ball: snap.ball, handler: snap.handler, fire: snap.fire, lastShot: snap.lastShot, meter: null, finish: null, target: null }, real, fx);
+          else
+            renderer.draw(
+              ctx,
+              { ...p, t: rt, bodies: snap.bodies, ball: snap.ball, handler: snap.handler, fire: snap.fire, lastShot: snap.lastShot, meter: null, finish: null, target: null },
+              real,
+              fx
+            );
         } else if (p) renderer.draw(ctx, p, real, fx);
       } catch (e) {
         console.error('[draw]', e);
@@ -487,6 +545,8 @@ export function Hoops2({
 
   // ---- the controls ----
   const stickEl = useRef<HTMLDivElement>(null);
+  const stickPointer = useRef<number | null>(null);
+  const shotPointer = useRef<number | 'keyboard' | null>(null);
   const stickAt = (e: React.PointerEvent) => {
     const r = stickEl.current!.getBoundingClientRect();
     const rad = r.width / 2;
@@ -501,23 +561,48 @@ export function Hoops2({
     setKnob({ x, y });
   };
   const stickDown = (e: React.PointerEvent) => {
+    if (!possRef.current || possRef.current.end) return;
+    if (stickPointer.current !== null) return;
+    stickPointer.current = e.pointerId;
     (e.target as Element).setPointerCapture?.(e.pointerId);
     stickAt(e);
   };
-  const stickUp = () => {
+  const clearStick = () => {
+    stickPointer.current = null;
     stickRef.current = null;
     setKnob({ x: 0, y: 0 });
   };
+  const stickUp = (e: React.PointerEvent) => {
+    if (e.pointerId === stickPointer.current) clearStick();
+  };
+  const beginShot = (pointer: number | 'keyboard') => {
+    const p = possRef.current;
+    if (shotPointer.current !== null) return false;
+    if (p?.ball?.kind === 'loose') {
+      const jumped = jumpRebound(p);
+      if (jumped) shotPointer.current = pointer;
+      return jumped;
+    }
+    if (shotPointer.current !== null || !p || p.end || p.handler === null || p.bodies[p.handler].h > 0.15) return false;
+    shotPointer.current = pointer;
+    pressShoot(p);
+    return true;
+  };
   const shootDown = (e: React.PointerEvent) => {
     e.preventDefault();
-    const p = possRef.current;
-    if (p && !p.end) pressShoot(p);
+    if (beginShot(e.pointerId)) e.currentTarget.setPointerCapture?.(e.pointerId);
   };
-  const shootUp = () => {
+  const shootUp = (pointer: number | 'keyboard') => {
+    if (shotPointer.current !== pointer) return;
+    shotPointer.current = null;
     const p = possRef.current;
     if (p && !p.end) releaseShoot(p, RELEASE_LAG);
   };
-  const doPass = (e: React.PointerEvent) => {
+  const cancelHeldShot = () => {
+    if (shotPointer.current !== null && possRef.current) cancelShoot(possRef.current);
+    shotPointer.current = null;
+  };
+  const doPass = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const p = possRef.current;
     if (p && !p.end) pass(p, null);
@@ -525,6 +610,11 @@ export function Hoops2({
   // moves by swipe, anywhere off the stick and the buttons: a flick across crosses over that way, a
   // flick back (down the screen) steps back, a flick up or a circle spins
   const swipe = useRef<{ id: number; pts: { x: number; y: number; t: number }[]; done: boolean } | null>(null);
+  useInputInterrupt(() => {
+    clearStick();
+    cancelHeldShot();
+    swipe.current = null;
+  });
   const turning = (pts: { x: number; y: number }[]) => {
     let sum = 0;
     let prev: number | null = null;
@@ -580,6 +670,21 @@ export function Hoops2({
     }
   };
   const swipeUp = (e: React.PointerEvent) => {
+    const sw = swipe.current;
+    if (sw?.id === e.pointerId) {
+      if (!sw.done && performance.now() - sw.pts[0].t < 350 && Math.hypot(e.clientX - sw.pts[0].x, e.clientY - sw.pts[0].y) < 12) {
+        const p = possRef.current,
+          canvas = canvasRef.current;
+        if (p && canvas && p.handler !== null && !p.ball) {
+          const r = canvas.getBoundingClientRect();
+          const target = renderer.teammateAt(p, ((e.clientX - r.left) * renderer.W) / r.width, ((e.clientY - r.top) * renderer.H) / r.height, 26 / renderer.zoom);
+          if (target !== null) pass(p, target);
+        }
+      }
+      swipe.current = null;
+    }
+  };
+  const swipeCancel = (e: React.PointerEvent) => {
     if (swipe.current?.id === e.pointerId) swipe.current = null;
   };
 
@@ -632,7 +737,7 @@ export function Hoops2({
           {pop.text}
         </div>
       )}
-      {hint && <div className="hg2-hint">{hint}</div>}
+      {boarding ? <div className="hg2-hint hg2-board-hint">Move to the ball · tap BOARD to jump</div> : hint && <div className="hg2-hint">{hint}</div>}
       {replaying && (
         <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
           <i />
@@ -641,18 +746,89 @@ export function Hoops2({
         </button>
       )}
       {!attrs && <div className="fg-loading">Taking the floor…</div>}
-      {g && !g.over && !autoplayHook && <div className="hg2-swipe" onPointerDown={swipeDown} onPointerMove={swipeMove} onPointerUp={swipeUp} onPointerCancel={swipeUp} aria-hidden="true" />}
+      {g && !g.over && !autoplayHook && (
+        <div
+          className="hg2-swipe"
+          onPointerDown={swipeDown}
+          onPointerMove={swipeMove}
+          onPointerUp={swipeUp}
+          onPointerCancel={swipeCancel}
+          onLostPointerCapture={swipeCancel}
+          aria-hidden="true"
+        />
+      )}
+      {g && !g.over && !autoplayHook && (
+        <div className="hg2-coach" aria-label="Offensive play calls" style={boarding ? { visibility: 'hidden' } : undefined}>
+          {(['screen', 'cut', 'space'] as const).map((kind) => (
+            <button
+              key={kind}
+              disabled={between || !p || !!p.end}
+              onClick={() => {
+                const current = possRef.current;
+                if (!current || current.end || replaying) return;
+                if (!callPlay(current, kind)) {
+                  const wait = Math.ceil(Math.max(0, (current.callReadyAt ?? 0) - current.t));
+                  say(wait ? 'CALL READY IN ' + wait + 's' : 'CALL WHEN THE BALL IS IN HAND', 'plain', 700);
+                }
+              }}
+              aria-label={kind === 'screen' ? 'Call a screen and roll' : kind === 'cut' ? 'Call a teammate to cut to the rim' : 'Space the floor'}
+            >
+              {kind === 'screen' ? 'SCREEN' : kind === 'cut' ? 'CUT' : 'SPACE'}
+            </button>
+          ))}
+        </div>
+      )}
       {g && !g.over && !autoplayHook && (
         <div className="hg2-pad">
-          <div className="hg2-stick" ref={stickEl} onPointerDown={stickDown} onPointerMove={(e) => stickRef.current && stickAt(e)} onPointerUp={stickUp} onPointerCancel={stickUp} aria-label="Move">
+          <div
+            className="hg2-stick"
+            ref={stickEl}
+            onPointerDown={stickDown}
+            onPointerMove={(e) => stickPointer.current === e.pointerId && stickAt(e)}
+            onPointerUp={stickUp}
+            onPointerCancel={stickUp}
+            onLostPointerCapture={stickUp}
+            aria-label="Move"
+          >
             <i style={{ transform: 'translate(' + knob.x * 30 + 'px,' + knob.y * 30 + 'px)' }} />
           </div>
           <div className="hg2-btns">
-            <button className="hg2-pass" onPointerDown={doPass} aria-label="Pass">
+            <button
+              className="hg2-pass"
+              disabled={between || !p || !!p.end}
+              onPointerDown={doPass}
+              onKeyDown={(e) => {
+                if (!e.repeat && (e.key === 'Enter' || e.key === ' ')) doPass(e);
+              }}
+              aria-label="Pass"
+            >
               PASS
             </button>
-            <button className="hg2-shoot" onPointerDown={shootDown} onPointerUp={shootUp} onPointerCancel={shootUp} aria-label="Shoot: hold, and let go in the green">
-              SHOOT
+            <button
+              className="hg2-shoot"
+              disabled={between || !p || !!p.end}
+              onPointerDown={shootDown}
+              onPointerUp={(e) => shootUp(e.pointerId)}
+              onPointerCancel={cancelHeldShot}
+              onLostPointerCapture={cancelHeldShot}
+              onKeyDown={(e) => {
+                if (!e.repeat && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  beginShot('keyboard');
+                }
+              }}
+              onKeyUp={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  shootUp('keyboard');
+                }
+              }}
+              onBlur={() => {
+                if (shotPointer.current === 'keyboard') cancelHeldShot();
+              }}
+              aria-label="Shoot: hold, and let go in the green"
+            >
+              {boarding ? 'BOARD' : 'SHOOT'}
             </button>
           </div>
         </div>
@@ -671,8 +847,16 @@ export function Hoops2({
 }
 
 /** The AI's possessions, played by the autopilot against your five. */
-export function aiPossessions2(rivalLineup: Lineup, yourLineup: Lineup, seed: string, skill: number, attrs: (p: Player) => Attrs | null, possessions = POSSESSIONS): Progress {
-  return aiPossessionsOf(fiveOf(rivalLineup, attrs), fiveOf(yourLineup, attrs), seed, skill, possessions);
+export function aiPossessions2(
+  rivalLineup: Lineup,
+  yourLineup: Lineup,
+  seed: string,
+  skill: number,
+  attrs: (p: Player) => Attrs | null,
+  possessions = POSSESSIONS,
+  defIQ = 0
+): Progress {
+  return aiPossessionsOf(fiveOf(rivalLineup, attrs), fiveOf(yourLineup, attrs), seed, skill, possessions, [], defIQ);
 }
 
 /** The same from the teams themselves (Ultimate Team): one five on offense, with its bench, against the other. */

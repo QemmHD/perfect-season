@@ -33,13 +33,14 @@
 //
 // Legends: about 1 in 150 Premium packs (0.66% a pack), 1 in 500 Gold packs; Hot Season promos
 // 6% of Premium packs, 2% of Gold packs.
+import { SPOTLIGHT_RATES } from '../../supabase/functions/card-registry/contract';
 import { hashString, rng, type Rand, trueRand } from '../engine/rng';
 import { type Pool, TIER_RANK } from './pool';
 import { onScale, TIER_CUTS } from './rate';
 import { positionMix } from './squad';
 import type { RatedCard, Tier, UtSport } from './types';
 
-export type PackKind = 'bronze' | 'silver' | 'gold' | 'premium' | 'position' | 'starter';
+export type PackKind = 'bronze' | 'silver' | 'gold' | 'premium' | 'position' | 'spotlight' | 'starter';
 /** Odds of each tier for one card of a pack (they add up to 1). */
 export type Odds = Partial<Record<Tier, number>>;
 
@@ -56,6 +57,8 @@ const rep = (n: number, o: Odds): Odds[] => Array.from({ length: n }, () => o);
 const B: Odds = { bronze: 1 };
 const S: Odds = { silver: 1 };
 const G: Odds = { gold: 1 };
+export const GOAT_SPOTLIGHT = 0.0005;
+export const SPOTLIGHT_ODDS: Odds = SPOTLIGHT_RATES;
 export const LEGEND_PREMIUM = 0.0066;
 export const PROMO_PREMIUM = 0.06;
 export const LEGEND_GOLD = 0.002;
@@ -73,7 +76,15 @@ const premiumPlus: Odds = { gold: 1 - PROMO_PREMIUM - LEGEND_PREMIUM, promo: PRO
 export const PACK_SHAPE = {
   nba: { price: { bronze: 150, silver: 400, gold: 900, premium: 1800, position: 700 }, bronze: [4, 1], silver: [1, 3, 1], gold: [2, 2, 1], premium: [2, 5, 1], position: 3, qs: 1 },
   // football: 23 starters to fill, so two to three times the cards, each worth about a third as much sold
-  nfl: { price: { bronze: 150, silver: 400, gold: 900, premium: 1800, position: 500 }, bronze: [8, 2], silver: [2, 6, 2], gold: [2, 9, 1], premium: [2, 13, 1], position: 6, qs: 0.35 },
+  nfl: {
+    price: { bronze: 150, silver: 400, gold: 900, premium: 1800, position: 500 },
+    bronze: [8, 2],
+    silver: [2, 6, 2],
+    gold: [2, 9, 1],
+    premium: [2, 13, 1],
+    position: 6,
+    qs: 0.35,
+  },
 };
 
 export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, PackDef> {
@@ -83,9 +94,27 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
   const [gs, gg, gr] = k.gold;
   const [ps, pg, pr] = k.premium;
   return {
-    bronze: { kind: 'bronze', name: 'Bronze Pack', price: k.price.bronze, blurb: bb + br + ' cards, mostly bronze, 20% a silver', slots: [...rep(bb, B), ...rep(br, { bronze: 0.8, silver: 0.2 })] },
-    silver: { kind: 'silver', name: 'Silver Pack', price: k.price.silver, blurb: sb + ss + sr + ' cards, silver-heavy, 25% a gold', slots: [...rep(sb, B), ...rep(ss, S), ...rep(sr, { silver: 0.75, gold: 0.25 })] },
-    gold: { kind: 'gold', name: 'Gold Pack', price: k.price.gold, blurb: gs + gg + gr + ' cards, ' + (gg + gr) + ' golds guaranteed', slots: [...rep(gs, S), ...rep(gg, G), ...rep(gr, goldPlus)] },
+    bronze: {
+      kind: 'bronze',
+      name: 'Bronze Pack',
+      price: k.price.bronze,
+      blurb: bb + br + ' cards, mostly bronze, 20% a silver',
+      slots: [...rep(bb, B), ...rep(br, { bronze: 0.8, silver: 0.2 })],
+    },
+    silver: {
+      kind: 'silver',
+      name: 'Silver Pack',
+      price: k.price.silver,
+      blurb: sb + ss + sr + ' cards, silver-heavy, 25% a gold',
+      slots: [...rep(sb, B), ...rep(ss, S), ...rep(sr, { silver: 0.75, gold: 0.25 })],
+    },
+    gold: {
+      kind: 'gold',
+      name: 'Gold Pack',
+      price: k.price.gold,
+      blurb: gs + gg + gr + ' cards, ' + (gg + gr) + ' golds guaranteed',
+      slots: [...rep(gs, S), ...rep(gg, G), ...rep(gr, goldPlus)],
+    },
     premium: {
       kind: 'premium',
       name: 'Premium Gold',
@@ -93,13 +122,21 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       blurb: ps + pg + pr + ' cards, ' + (pg + pr) + ' golds, 6% a Hot Season, 0.66% a Legend',
       slots: [...rep(ps, S), ...rep(pg, G), ...rep(pr, premiumPlus)],
     },
+    spotlight: {
+      kind: 'spotlight',
+      name: 'Spotlight Pack',
+      price: 3500,
+      blurb: (sport === 'nba' ? 8 : 16) + ' gold-or-better cards. 20% Spotlight, 0.05% GOAT. Online.',
+      slots: [...rep(sport === 'nba' ? 7 : 15, G), SPOTLIGHT_ODDS],
+    },
     position: { kind: 'position', name: 'Position Pack', price: k.price.position, blurb: k.position + ' golds at the position you pick', slots: rep(k.position, G) },
   };
 }
 
-export const STORE_ORDER: Exclude<PackKind, 'starter'>[] = ['bronze', 'silver', 'gold', 'premium', 'position'];
+export const STORE_ORDER: Exclude<PackKind, 'starter'>[] = ['spotlight', 'bronze', 'silver', 'gold', 'premium', 'position'];
 
 export function packName(sport: UtSport, kind: string): string {
+  if (kind.startsWith('event-spotlight:')) return 'Spotlight Reward';
   if (kind === 'starter') return 'Starter Pack';
   if (kind.startsWith('position:')) return (positionChoices(sport).find((c) => c.key === kind.slice(9))?.label ?? kind.slice(9)) + ' Pack';
   return packDefs(sport)[kind as Exclude<PackKind, 'starter'>]?.name ?? 'Pack';
@@ -110,7 +147,7 @@ export function packName(sport: UtSport, kind: string): string {
 function drawTier(o: Odds, rand: Rand): Tier {
   let x = rand();
   let last: Tier = 'bronze';
-  for (const t of ['legend', 'promo', 'gold', 'silver', 'bronze'] as Tier[]) {
+  for (const t of ['goat', 'spotlight', 'legend', 'promo', 'gold', 'silver', 'bronze'] as Tier[]) {
     const p = o[t] ?? 0;
     if (p <= 0) continue;
     last = t;
@@ -135,7 +172,7 @@ function drawPos(mix: [string, number][], rand: Rand): string {
  * rarer (football's scale is about half as wide at the top, so a point there counts 2.2 times).
  */
 const RARER = 0.8;
-const STEP: Record<UtSport, number> = { nba: 1, nfl: 2.2 };
+const STEP: Record<UtSport, number> = { nba: 1.6, nfl: 2.2 };
 const cum = new WeakMap<RatedCard[], number[]>();
 
 function weighted(list: RatedCard[], tier: Tier, rand: Rand): RatedCard {
@@ -158,13 +195,13 @@ function weighted(list: RatedCard[], tier: Tier, rand: Rand): RatedCard {
   return list[lo];
 }
 
-const TIERS_DOWN: Tier[] = ['legend', 'promo', 'gold', 'silver', 'bronze'];
+const TIERS_DOWN: Tier[] = ['goat', 'spotlight', 'legend', 'promo', 'gold', 'silver', 'bronze'];
 
 /** One card of a tier: at a position drawn in the squad's mix, or the given mix, or the one asked for. */
 function drawCard(pool: Pool, tier: Tier, rand: Rand, want: string | null, mix?: [string, number][]): RatedCard | null {
   const bucket = pool.buckets[tier];
   let pos = want;
-  if (tier === 'promo' || tier === 'legend') {
+  if (tier === 'promo' || tier === 'legend' || tier === 'spotlight' || tier === 'goat') {
     // few enough that they come from the whole tier, whatever the position
     const all = Object.values(bucket).flat();
     if (all.length) return all[Math.floor(rand() * all.length)];
@@ -234,13 +271,20 @@ export const NFL_UNITS: [string, string, string[]][] = [
  */
 export function openPack(pool: Pool, kind: string, seed?: string): RatedCard[] {
   const rand = seed === undefined ? trueRand() : packRand(seed);
+  // The rare slot is rolled and numbered by the shared registry, never by this local RNG.
+  if (kind === 'spotlight' || kind.startsWith('event-spotlight:')) throw new Error('This pack needs the shared card registry.');
   if (kind === 'starter') return starterCards(pool, rand);
   const defs = packDefs(pool.sport);
   if (kind.startsWith('position:')) {
     const ch = positionChoices(pool.sport).find((c) => c.key === kind.slice(9));
     if (!ch) return [];
     const need = positionMix(pool.sport);
-    return fill(pool, defs.position.slots, rand, ch.positions.map((p) => [p, need[p] ?? 1]));
+    return fill(
+      pool,
+      defs.position.slots,
+      rand,
+      ch.positions.map((p) => [p, need[p] ?? 1])
+    );
   }
   const def = defs[kind as Exclude<PackKind, 'starter'>];
   return def ? fill(pool, def.slots, rand) : [];
@@ -287,7 +331,9 @@ export function quickSellValue(rc: RatedCard): number {
   const { silver, gold } = TIER_CUTS[sport];
   const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
   let v: number;
-  if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - onScale(90, sport));
+  if (rc.tier === 'goat') v = 5000 + 500 * Math.max(0, o - 106);
+  else if (rc.tier === 'spotlight') v = 1400 + 100 * Math.max(0, o - 100);
+  else if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - onScale(90, sport));
   else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - onScale(78, sport));
   else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (99 - gold)), 1.5);
   else if (rc.tier === 'silver') v = 40 + 40 * clamp01((o - silver) / (gold - silver - 1));
@@ -305,8 +351,29 @@ export function revealOrder(cards: RatedCard[]): RatedCard[] {
  * How big a walkout a pull gets: 0 none (bronze, silver), 1 a gold, 2 a star (an 85+ gold on
  * basketball's scale, or a Hot Season), 3 a legend.
  */
-export function walkoutLevel(rc: RatedCard): 0 | 1 | 2 | 3 {
+export function walkoutLevel(rc: RatedCard): 0 | 1 | 2 | 3 | 4 {
+  if (rc.tier === 'goat') return 4;
+  if (rc.tier === 'spotlight') return 3;
   if (rc.tier === 'legend') return 3;
   if (rc.tier === 'promo' || (rc.tier === 'gold' && rc.ovr >= onScale(85, rc.line.sport))) return 2;
   return rc.tier === 'gold' ? 1 : 0;
+}
+
+/** Server-approved chase card plus deterministic common slots; retries reconstruct the same pack. */
+export function registeredPack(pool: Pool, kind: string, seed: string, chaseId: string | null): RatedCard[] {
+  const chase = chaseId ? pool.base.get(chaseId) : null;
+  if (chaseId && !chase) throw new Error('Update the game to load this card edition.');
+  if (kind.startsWith('event-spotlight:')) {
+    if (chase?.tier !== 'spotlight') throw new Error('Invalid event reward.');
+    return [chase];
+  }
+  if (kind !== 'spotlight') throw new Error('Unknown registered pack.');
+  const common = fill(pool, rep(pool.sport === 'nba' ? 7 : 15, G), packRand(seed));
+  const rand = packRand(seed + ':chase');
+  let last = chase;
+  for (let i = 0; !last && i < 20; i++) {
+    const c = drawCard(pool, 'gold', rand, null);
+    if (c && !common.some((x) => x.line.id === c.line.id)) last = c;
+  }
+  return last ? [...common, last] : common;
 }

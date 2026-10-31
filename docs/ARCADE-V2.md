@@ -83,8 +83,10 @@ Decisions from the owner's answers (2026-10-27). Everything ships in one release
 - **Tutorial:** tips only (hint banners in the first games), no guided practice.
 
 ## Round 3 decisions (after measuring how a person plays, and researching Retro Bowl, Hoop Land, 2K, Tecmo, Blitz, NBA Jam)
-- **Basketball greens always go in.** Ratings and the contest decide how big the green is, never
-  whether a green falls (2K's rule). A green layup is a make too.
+- **Codex revision, 2026-10-30:** open perfect timing is rewarded, but a contested perfect release
+  still respects defense and block reach. Nearby releases now have a continuous timing curve.
+  See [GAMEPLAY-RESEARCH.md](GAMEPLAY-RESEARCH.md) for the current rules and source evidence.
+
 - **Basketball: push the stick to its edge to sprint.** A burst past your man that drains a
   stamina bar (refills when you ease off); a fast guard can beat a slower defender. Crossovers and
   step-backs create real space for good ball handlers.

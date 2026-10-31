@@ -1,6 +1,6 @@
 // The game sounds: every recording is in place, each falls back to its synthesized stand-in until
 // it's decoded, sound off stays silent, and the crowd runs on the recorded loop once it's there.
-import { SAMPLES, _test, crowd, filesOf, sample, setFeedback, sfx, type SampleName } from './sound';
+import { SAMPLES, _test, crowd, filesOf, sample, setFeedback, packSound, sfx, type SampleName } from './sound';
 
 /** What a fake AudioContext was asked to make. */
 interface Made {
@@ -244,5 +244,24 @@ describe('the crowd', () => {
     crowd.start(0.3, 'arena');
     setFeedback(false, true);
     expect(_test.bed()).toBeNull();
+  });
+});
+
+describe('Codex pack score', () => {
+  it('creates bounded cues that can be stopped repeatedly without recordings', () => {
+    setFeedback(true, false);
+    for (const cue of ['charge', 'surge', 'reveal'] as const) {
+      const stop = packSound(cue, true);
+      stop();
+      stop();
+    }
+    expect(FakeCtx.made.oscillators).toBeGreaterThan(0);
+    expect(recorded()).toHaveLength(0);
+  });
+  it('obeys sound-off before allocating any cue', () => {
+    setFeedback(false, false);
+    packSound('surge', true)();
+    packSound('reveal', true)();
+    expect(FakeCtx.made.oscillators).toBe(0);
   });
 });

@@ -28,6 +28,9 @@
   --rival-soft: #b9a4ff;
   --display: 'Archivo', 'Avenir Next Condensed', 'Arial Narrow', 'Roboto Condensed', 'Helvetica Neue', sans-serif;
   --body: 'Archivo', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --hud-surface: rgba(6, 24, 32, 0.94);
+  --hud-line: rgba(143, 166, 178, 0.28);
+  --hud-elevation: inset 0 1px rgba(255,255,255,.04), 0 4px 14px rgba(0,0,0,.3);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --ease-in: cubic-bezier(0.5, 0, 0.9, 0.5);
@@ -3314,6 +3317,9 @@ button:focus-visible {
   background: rgba(2, 8, 12, 0.78);
   animation: fade-in 0.22s ease both;
 }
+/* Programmatic dialog focus is announced; action focus keeps the original gold ring. */
+.scrim[tabindex="-1"]:focus {outline:none;}
+
 .scrim.closing {
   animation: fade-out 0.2s ease both;
 }
@@ -8232,8 +8238,13 @@ button.friendcard:active {
   color: #ff9a9a;
 }
 .fb2 .hg2-hint {
-  top: auto;
-  bottom: calc(var(--sab) + 196px);
+  /* Codex: intrinsic text height, never a top-to-bottom playfield overlay. */
+  height: fit-content;
+  width: max-content;
+  box-sizing: border-box;
+  /* Under scoreboard/drive/On Fire; clear of both pre-snap calls and run controls. */
+  top: calc(var(--sat) + 98px);
+  bottom: auto;
 }
 .fb2.wide .hg2-hint {
   bottom: auto;
@@ -8611,19 +8622,28 @@ button.friendcard:active {
 .ut-top {
   position: relative;
   z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
 }
+/* Reserve real space for the back button and wallet, including long subpage names. */
 .ut-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
+  min-width: 0;
+  text-align: center;
   font-size: 24px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
   background: linear-gradient(180deg, #ffe7a8 0%, var(--gold) 60%, #c98a1d 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+.ut-v-circuit .ut-title,
+.ut-v-events .ut-title,
+.ut-v-season .ut-title {font-size:19px;}
 .ut-body {
   position: relative;
   flex: 1;
@@ -8636,6 +8656,7 @@ button.friendcard:active {
   display: flex;
   flex-shrink: 0;
   height: calc(var(--tabs-h) + var(--sab));
+  min-height: calc(60px + var(--sab));
   padding-bottom: var(--sab);
   box-sizing: border-box;
   background: var(--bg-2);
@@ -8644,6 +8665,8 @@ button.friendcard:active {
 .ut-tabs button {
   position: relative;
   flex: 1;
+  min-width: 0;
+  padding-inline: 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8654,7 +8677,7 @@ button.friendcard:active {
   color: var(--sub);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   transition: color 0.25s;
 }
 .ut-tabs button[aria-current='page'] {
@@ -10326,7 +10349,7 @@ button.friendcard:active {
 }
 .ut-key {
   display: grid;
-  grid-template-columns: 34px 1fr;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: 2px 8px;
   padding: 7px 10px;
@@ -10335,6 +10358,7 @@ button.friendcard:active {
   border: 1px solid var(--line);
 }
 .ut-key > b {
+  min-width: 2ch;
   grid-row: span 2;
   font-size: 22px;
   font-weight: 900;

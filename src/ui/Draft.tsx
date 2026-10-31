@@ -84,6 +84,8 @@ export interface DraftProps {
   onToast: (text: string) => void;
   /** leaving; carries the draft when it was already complete, so its result still counts */
   onExit: (done?: DraftState) => void;
+  initial?: DraftState;
+  onCheckpoint?: (s: DraftState) => void;
   onComplete: (s: DraftState) => void;
   onCoachDone: () => void;
   online?: OnlineProps;
@@ -292,14 +294,16 @@ export function Draft(props: DraftProps) {
   const { mode, botLevel, dailyKey, online } = props;
   const layout = useLayout();
   const [s, dispatch] = useReducer(draftReducer, undefined, () => {
+    if (props.initial && !online) return props.initial;
     if (!online) return newDraft(mode, botLevel, dailyKey, props.botFirst);
     // the host picks first in rounds 1, 3 and 5; the AI that covers a dropped player plays like Pro
     return { ...newDraft('1v1', 'pro', null, !online.host), order: onlineOrder(online.seed) };
   });
+  useEffect(() => { if (!online) props.onCheckpoint?.(s); }, [s]);
   const sRef = useRef(s);
   sRef.current = s;
-  const [team, setTeam] = useState<ReelState>({ items: ['?', ''], key: 0, moving: false, landed: 0 });
-  const [era, setEra] = useState<ReelState>({ items: ['?', ''], key: 0, moving: false, landed: 0 });
+  const [team, setTeam] = useState<ReelState>({ items: [s.cellId ? CELL_BY_ID[s.cellId].abbr : '?', ''], key: 0, moving: false, landed: 0 });
+  const [era, setEra] = useState<ReelState>({ items: [s.cellId ? CELL_BY_ID[s.cellId].era : '?', ''], key: 0, moving: false, landed: 0 });
   const [spinning, setSpinning] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -1240,7 +1244,7 @@ export function Draft(props: DraftProps) {
       {leaving && (
         <Confirm
           title={online ? 'Leave the match?' : 'Leave this draft?'}
-          body={online ? 'Leaving counts as a loss on your head-to-head record.' : 'Your picks so far will be lost.'}
+          body={online ? 'Leaving counts as a loss on your head-to-head record.' : 'Your solo draft is saved. Continue it from Home whenever you’re ready.'}
           yes="LEAVE"
           no="KEEP DRAFTING"
           onNo={() => setLeaving(false)}

@@ -1,0 +1,8 @@
+project_id = "ryqaibujweiwwvdtswxj"
+[functions.card-registry]
+# Authentication is verified by the function using the player's signed Nostr event.
+verify_jwt = false
+
+[functions.player-save]
+# Original player identity signs every request; the function verifies it before any database access.
+verify_jwt = false

@@ -1,5 +1,9 @@
 # Ultimate Team: design
 
+The connected clubhouse overhaul is implemented by Codex and documented in [UT-OVERHAUL.md](UT-OVERHAUL.md): free season rewards, objectives, Champions Circuit, Moments, development, saved lineups, records and new real-engine play calls. This document retains the original mode foundations.
+
+Current Codex additions and revised rules: [Spotlight content update](UT-CONTENT-UPDATE.md), [ratings audit](RATINGS-AUDIT.md), and [implementation/connection log](CODEX-UPDATE-LOG.md).
+
 The owner's choices are in docs/ARCADE-V2.md. This file is the working design that the code
 follows. It covers cards, packs, squads, chemistry, challenges and matches, for basketball and
 football alike.
@@ -11,7 +15,7 @@ The card pool is every player-season in the data, rated 2K/Madden-style.
 - **Season card:** one per player per season. NBA covers 1960-2026, NFL 1970-2025.
   - The minimum is 20 games in the NBA, or 8 games or 4 starts in the NFL.
   - Any honors (All-Pro, Pro Bowl, All-NBA, MVP) qualify a season regardless.
-  - The tier comes from overall: Bronze under 65, Silver 65-74, Gold 75 and up.
+  - NBA tier comes from overall: Bronze under 75, Silver 75–84, Gold 85+. NFL retains Bronze under 84, Silver 84–88, Gold 89+.
 - **Promo ("Hot Season"):** a boosted copy of a player's best or most famous seasons, worth +3 to
   +6 overall plus an ability.
   - Qualifying seasons: MVP, All-NBA 1st team, AP All-Pro 1st team, scoring/rushing/receiving/sack
@@ -19,8 +23,9 @@ The card pool is every player-season in the data, rated 2K/Madden-style.
   - About 2-4% of the pool.
 - **Legend / Icon:** about 120 all-time greats per sport, each at his peak season. 2K/Madden
   legend style, 90-99.
+- **Spotlight / GOAT:** Codex added frozen editions with base overalls 100–105 / 106–110, whole-profile boosts and global copy numbers. See [the content rules](UT-CONTENT-UPDATE.md).
 - **Upgradable card:** any card can be levelled. Each game it plays in earns XP. Levels 1-5, each
-  giving +1 overall (spread over its key attributes). A promo or legend keeps its own cap.
+  giving up to +1 overall with improved key attributes, within the edition cap and attribute-supported overall. A promo or legend keeps its own cap.
 
 The card id is stable: `<sport>:<kind>:<season>:<pid>:<team>`.
 
@@ -32,8 +37,7 @@ A card shows:
 
 ## Ratings
 
-There is one implementation, in TypeScript, so the draft games, Ultimate Team and the played games
-always agree.
+UT card attributes and the played UT game use the same final TypeScript rating. NBA cards add Codex season calibration and public peak anchors to the original base rater; the draft model remains separate. NFL UT totals are normalized before the base rater. See [ratings methodology](RATINGS-AUDIT.md).
 
 - **NBA:** `src/game/hoops2/ratings.ts` `hooper(line, spot, num)`.
 - **NFL:** `src/game/football2/ratings.ts`. Madden-style attributes by position; overall weighted
@@ -58,10 +62,11 @@ always agree.
 | Gold | 900 | 5 cards, 3 gold guaranteed |
 | Premium Gold | 1,800 | 8 cards, 6 gold, 6% a promo, 0.66% a legend |
 | Position pack | 700 | 3 golds at one position |
+| Spotlight Pack | 3,500 | 8 NBA / 16 NFL gold-or-better; 20% Spotlight, 0.05% any GOAT; registered online chase slot |
 
 - **Starter pack:** free, once per sport. Enough cards to field a full bronze/silver squad.
 - **Duplicates:** quick-sell value depends on tier and overall: bronze 15-30, silver 40-80,
-  gold 100-400, promo 500+, legend 2,500+.
+  gold 100-400, promo 500+, legend 2,500+, Spotlight 1,400+, GOAT 5,000+ (NBA values; NFL scales by 0.35). Exact extra copies live in Duplicate Storage, stay available to SBCs, and keep levels/XP. All copies remain in the original save list.
 
 ## Squads
 

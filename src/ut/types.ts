@@ -5,9 +5,9 @@
 export type UtSport = 'nba' | 'nfl';
 
 /** What kind of card: a season, a boosted hot season, an all-time legend. */
-export type CardKind = 'season' | 'promo' | 'legend';
+export type CardKind = 'season' | 'promo' | 'spotlight' | 'legend' | 'goat';
 
-export type Tier = 'bronze' | 'silver' | 'gold' | 'promo' | 'legend';
+export type Tier = 'bronze' | 'silver' | 'gold' | 'promo' | 'spotlight' | 'legend' | 'goat';
 
 /**
  * One player-season as stored in src/data/cards-<sport>.json.
@@ -51,10 +51,27 @@ export interface CardLine {
   sparse?: boolean;
   /** promo/legend: the id of the season card it is made from */
   seasonId?: string;
+  /** Optional public same-era benchmark, attached before all edition copies are derived. */
+  ratingReference?: { source: string; snapshot: string; ovr: number; attrs: Record<string, number> };
 }
 
-/** A card in a player's club. */
+/** Immutable edition issue number; activeAtPull is only a last-confirmed circulation snapshot. */
+export interface CardMint {
+  serial: number;
+  totalAtPull: number;
+  activeAtPull?: number;
+  requestId: string;
+  namespace: string;
+}
+export interface CardRetirement {
+  uid: string;
+  cardId: string;
+  level: number;
+  reason: 'sold' | 'sbc';
+  mint?: CardMint;
+}
 export interface OwnedCard {
+  mint?: CardMint;
   uid: string;
   cardId: string;
   level: number;
@@ -70,9 +87,11 @@ export interface RatedCard {
   tier: Tier;
   /** the position it's rated at */
   pos: string;
-  /** 0-99, the sport's attribute names */
+  /** Standard attributes ≤99; Spotlight ≤105; GOAT ≤110. */
   attrs: Record<string, number>;
   /** the six shown on the card, in order */
   key: [string, string, number][];
   abil: string[];
+  /** Public peak-reference source; season ratings remain estimates. */
+  ratingSource?: string;
 }

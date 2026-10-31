@@ -18,7 +18,7 @@ type Sort = string;
 /** The ratings to sort by, speed first. */
 const SORT_ATTRS: string[] =
   SPORT === 'nba' ? NBA_ATTRS.map(([c]) => c) : Array.from(new Set(['SPD', 'ACC', ...Object.values(NFL_KEYS).flatMap((ks) => ks.map(([c]) => c))]));
-type TierF = 'all' | 'bronze' | 'silver' | 'gold' | 'special';
+type TierF = 'all' | 'bronze' | 'silver' | 'gold' | 'special' | 'spotlight' | 'goat';
 
 /** Cards put on the page at a time: more come as you scroll down to them. */
 const PAGE = 48;
@@ -26,7 +26,7 @@ const PAGE = 48;
 /** The filters stay as they were for the rest of the visit. */
 let saved: { pos: string; tier: TierF; team: string; dec: string; sort: Sort } = { pos: 'all', tier: 'all', team: 'all', dec: 'all', sort: 'ovr' };
 
-export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect: (uid: string) => void; onSell: (uids: string[]) => void }) {
+export function Club({ club, storage = false, onInspect, onSell }: { club: ClubCard[]; storage?: boolean; onInspect: (uid: string) => void; onSell: (uids: string[]) => void }) {
   const [f, setF] = useState(saved);
   const set = (k: Partial<typeof f>) => {
     const next = { ...f, ...k };
@@ -47,7 +47,7 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
     const out = club.filter(
       (c) =>
         (f.pos === 'all' || c.rc.line.pos.includes(f.pos)) &&
-        (f.tier === 'all' || (f.tier === 'special' ? c.rc.tier === 'promo' || c.rc.tier === 'legend' : c.rc.tier === f.tier)) &&
+        (f.tier === 'all' || (f.tier === 'special' ? ['promo','spotlight','legend','goat'].includes(c.rc.tier) : c.rc.tier === f.tier)) &&
         (f.team === 'all' || c.rc.line.fr === f.team) &&
         (f.dec === 'all' || decadeOf(c.rc.line.season) === f.dec)
     );
@@ -58,16 +58,7 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
     else out.sort((a, b) => (b.rc.attrs[f.sort] ?? -1) - (a.rc.attrs[f.sort] ?? -1) || byValue(a.rc, b.rc));
     return out;
   }, [club, f]);
-  // spare copies: a second card of the same player-season, not in the squad (the better level stays)
-  const dupes = useMemo(() => {
-    const best = new Map<string, ClubCard>();
-    const spare: ClubCard[] = [];
-    for (const c of club.slice().sort((a, b) => (b.slot ? 1 : 0) - (a.slot ? 1 : 0) || b.oc.level - a.oc.level || b.oc.xp - a.oc.xp)) {
-      if (!best.has(c.oc.cardId)) best.set(c.oc.cardId, c);
-      else if (!c.slot) spare.push(c);
-    }
-    return spare;
-  }, [club]);
+  const dupes = storage ? club : [];
   const dupeCoins = dupes.reduce((a, c) => a + quickSellValue(c.rc), 0);
   // a new filter or sort starts from the top; nearing the end of what's shown brings the next page
   useEffect(() => setShown(PAGE), [f]);
@@ -83,6 +74,12 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
 
   return (
     <div className="page ut-club">
+      {storage && <div className="ut-storage-intro">
+        <span className="eyebrow">ROOM FOR EVERY PULL</span>
+        <h2 className="disp">Duplicate Storage</h2>
+        <p>Extra copies go here automatically. Use them in SBCs, quick-sell them, or swap a copy into your club.</p>
+        <small>Every copy keeps its own level and XP. Different seasons and editions stay in your club.</small>
+      </div>}
       <div className="ut-filters">
         <div className="ut-chips" role="group" aria-label="Position">
           {['all', ...posOrder].map((p) => (
@@ -92,7 +89,7 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
           ))}
         </div>
         <div className="ut-chips" role="group" aria-label="Tier">
-          {(['all', 'bronze', 'silver', 'gold', 'special'] as TierF[]).map((t) => (
+          {(['all', 'bronze', 'silver', 'gold', 'special', 'spotlight', 'goat'] as TierF[]).map((t) => (
             <button key={t} className={'chip ut-tf tf-' + t + (f.tier === t ? ' on' : '')} aria-pressed={f.tier === t} onClick={() => set({ tier: t })}>
               {t === 'all' ? 'ANY TIER' : t === 'special' ? 'SPECIAL' : t.toUpperCase()}
             </button>
@@ -158,7 +155,7 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
         <div className="ut-grid">
           {list.slice(0, typeof IntersectionObserver === 'undefined' ? list.length : shown).map((c) => (
             <button key={c.uid} className="ut-gridcard" onClick={() => onInspect(c.uid)} aria-label={c.rc.line.name + ', ' + c.rc.ovr + (c.slot ? ', in your squad at ' + c.slot : '')}>
-              <UtCard rc={c.rc} w={80} level={c.oc.level} />
+              <UtCard rc={c.rc} w={80} level={c.oc.level} mint={c.oc.mint} numbered />
               {byAttr && c.rc.attrs[f.sort] !== undefined && (
                 <i className="ut-attrtag num">
                   {f.sort} {c.rc.attrs[f.sort]}
@@ -170,12 +167,12 @@ export function Club({ club, onInspect, onSell }: { club: ClubCard[]; onInspect:
           {shown < list.length && <div ref={moreRef} className="ut-more" aria-hidden="true" />}
         </div>
       ) : (
-        <div className="empty">{club.length ? 'No cards match these filters.' : 'No cards yet. Open your starter pack in the Store.'}</div>
+        <div className="empty">{club.length ? 'No cards match these filters.' : storage ? 'All clear. Your next duplicate will be stored here automatically.' : 'No cards yet. Open your starter pack in the Store.'}</div>
       )}
       {sellDupes && (
         <Confirm
-          title="Sell spare copies?"
-          body={'Quick-sell ' + dupes.length + ' spare ' + (dupes.length === 1 ? 'copy' : 'copies') + ' (the same player and season as a card you keep) for ' + dupeCoins.toLocaleString('en-US') + ' coins.'}
+          title="Sell all stored copies?"
+          body={'Quick-sell ' + dupes.length + ' spare ' + (dupes.length === 1 ? 'copy' : 'copies') + ' (your club copies stay safe) for ' + dupeCoins.toLocaleString('en-US') + ' coins. This can’t be undone.'}
           yes={'SELL · ' + dupeCoins.toLocaleString('en-US')}
           no="KEEP"
           tone="gold"

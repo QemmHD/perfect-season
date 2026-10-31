@@ -28,14 +28,14 @@ export function buildPool(sport: UtSport, lines: CardLine[], byId?: Map<string, 
 /** Rates the cards one at a time into a pool. */
 function poolBuilder(sport: UtSport, lines: CardLine[], byId?: Map<string, CardLine>) {
   const base = new Map<string, RatedCard>();
-  const buckets: Pool['buckets'] = { bronze: {}, silver: {}, gold: {}, promo: {}, legend: {} };
+  const buckets: Pool['buckets'] = { bronze: {}, silver: {}, gold: {}, promo: {}, spotlight: {}, legend: {}, goat: {} };
   let h = 2166136261;
   return {
     add(l: CardLine) {
       const rc = rateCard(l);
       base.set(l.id, rc);
       (buckets[rc.tier][l.pos[0]] ??= []).push(rc);
-      h = Math.imul(h ^ hashString(l.id + ':' + rc.ovr + ':' + rc.tier), 16777619) >>> 0;
+      h = Math.imul(h ^ hashString(l.id + ':' + rc.ovr + ':' + rc.tier + ':' + JSON.stringify(rc.attrs) + ':' + rc.abil.join(',')), 16777619) >>> 0;
     },
     done: (): Pool => ({ sport, lines, byId: byId ?? new Map(lines.map((l) => [l.id, l])), base, buckets, print: h.toString(36) }),
   };
@@ -99,7 +99,7 @@ export function shortSeason(line: Pick<CardLine, 'season'>): string {
   return '’' + String(line.season).slice(2);
 }
 
-export const TIER_RANK: Record<Tier, number> = { bronze: 0, silver: 1, gold: 2, promo: 3, legend: 4 };
+export const TIER_RANK: Record<Tier, number> = { bronze: 0, silver: 1, gold: 2, promo: 3, legend: 4, spotlight: 5, goat: 6 };
 
 /** Best first: tier, then overall. */
 export function byValue(a: RatedCard, b: RatedCard): number {
