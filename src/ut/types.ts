@@ -5,9 +5,10 @@
 export type UtSport = 'nba' | 'nfl';
 
 /** What kind of card: a season, a boosted hot season, an all-time legend. */
-export type CardKind = 'season' | 'promo' | 'spotlight' | 'legend' | 'goat';
+export type CardKind = 'season' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark';
 
-export type Tier = 'bronze' | 'silver' | 'gold' | 'promo' | 'spotlight' | 'legend' | 'goat';
+/** Claude 2026-11-01: `standout` (Weekly Standouts) and `landmark` (Landmark Seasons) are derived editions. */
+export type Tier = 'bronze' | 'silver' | 'gold' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark';
 
 /**
  * One player-season as stored in src/data/cards-<sport>.json.
@@ -53,6 +54,12 @@ export interface CardLine {
   seasonId?: string;
   /** Optional public same-era benchmark, attached before all edition copies are derived. */
   ratingReference?: { source: string; snapshot: string; ovr: number; attrs: Record<string, number> };
+  /** Weekly Standout: its Eastern ISO week ("2026-W44") and whether it was that week's featured card */
+  week?: string;
+  featured?: boolean;
+  /** Landmark Season: what made it one, printed on the card ("31.4 PPG"), and its kind of landmark */
+  landmark?: string;
+  landmarkType?: string;
 }
 
 /** Immutable edition issue number; activeAtPull is only a last-confirmed circulation snapshot. */

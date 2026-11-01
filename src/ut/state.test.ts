@@ -33,7 +33,8 @@ describe('profile migration', () => {
     fakeStorage({ [KEY]: JSON.stringify(old), [NFL_KEY]: JSON.stringify({ v: 1, firstRun: false }) });
     const p = loadProfile();
     expect(p.coins).toBe(1234);
-    expect(p.ut).toEqual(freshUt());
+    // Claude: plus the New Era marker (ut/new-era.ts), stamped once: no prior games, so not eligible
+    expect(p.ut).toEqual({ ...freshUt(), content: { era: { eligible: false } } });
   });
 
   it('keeps each sport’s club apart, and the coins shared', () => {

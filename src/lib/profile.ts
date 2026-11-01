@@ -4,6 +4,7 @@ import { NFL } from '../engine/sport';
 import type { Booster, BotLevel, Mode, Slot } from '../engine/types';
 import type { EntryContent } from '../net/leaderboard';
 import { freshUt, migrateUt, type UtState } from '../ut/state';
+import { markNewPlayer, stampNewEra } from '../ut/new-era';
 
 export interface RunRecord {
   /** Unique id. Older records have none. */
@@ -151,7 +152,8 @@ export function freshProfile(): Profile {
     rewardDay: null,
     missions: null,
     activeMatch: null,
-    ut: freshUt(),
+    // Claude: a brand-new profile is never eligible for the one-time New Era bundle (ut/new-era.ts)
+    ut: markNewPlayer(freshUt()),
   };
 }
 
@@ -194,7 +196,7 @@ function loadFrom(p: Profile | null): Profile {
       collection: p.collection && typeof p.collection === 'object' ? p.collection : {},
       gauntlet: { ...base.gauntlet, ...p.gauntlet },
       streak: { ...base.streak, ...p.streak },
-      ut: migrateUt(p.ut),
+      ut: stampNewEra(migrateUt(p.ut), p),
     };
   } catch {
     return freshProfile();

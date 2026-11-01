@@ -1,4 +1,5 @@
 import { nflIdentity } from './nfl-identity';
+import { rateEdition } from './editions';
 import { calibrateNflReference } from './season-reference';
 import { editionAttributes, profileQuality, supportEdition } from './rating-quality';
 // Ultimate Team ratings: a card line becomes a rated card with the same code the played games use,
@@ -47,8 +48,8 @@ export function onScale(x: number, sport: UtSport): number {
   return x;
 }
 
-export const TIER_NAMES: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', spotlight: 'Spotlight', legend: 'Legend', goat: 'GOAT' };
-export const TIER_ORDER: Tier[] = ['bronze', 'silver', 'gold', 'promo', 'legend', 'spotlight', 'goat'];
+export const TIER_NAMES: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', spotlight: 'Spotlight', legend: 'Legend', goat: 'GOAT', standout: 'Standout', landmark: 'Landmark' };
+export const TIER_ORDER: Tier[] = ['bronze', 'silver', 'gold', 'standout', 'promo', 'landmark', 'legend', 'spotlight', 'goat'];
 
 /** Basketball attributes: card code, the Hooper field, the name. */
 export const NBA_ATTRS: [string, keyof Hooper, string][] = [
@@ -169,6 +170,8 @@ export function levelBonus(level: number): number {
  * `pos` rates it at another of its positions (basketball's overall doesn't move; football's may).
  */
 export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
+  // Claude: Weekly Standout / Landmark Season editions rate their season card, then add their boost (editions.ts).
+  if (line.kind === 'standout' || line.kind === 'landmark') return rateEdition(line, level, pos);
   const boost = Math.max(0, line.boost ?? 0);
   const bonus = boost + levelBonus(level);
   let base: number;

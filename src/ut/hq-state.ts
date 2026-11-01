@@ -15,7 +15,7 @@ export type Totals = Record<Counter, number>;
 export interface ClubMatch {
   id: string;
   at: number;
-  mode: 'battle' | 'online' | 'event' | 'circuit' | 'league';
+  mode: 'battle' | 'online' | 'event' | 'circuit' | 'league' | 'draft';
   won: boolean;
   us: number;
   them: number;
@@ -217,7 +217,7 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
         const h = obj(v);
         if (
           typeof h.id !== 'string' ||
-          !['battle', 'online', 'event', 'circuit', 'league'].includes(String(h.mode))
+          !['battle', 'online', 'event', 'circuit', 'league', 'draft'].includes(String(h.mode))
         )
           return [];
         return [

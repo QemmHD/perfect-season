@@ -6,6 +6,65 @@ import { SPORT } from '../engine/sport';
 import { loadCards } from './cards';
 import { rateCard } from './rate';
 import type { CardLine, OwnedCard, RatedCard, Tier, UtSport } from './types';
+import { deriveEditionLine, parseEditionId } from './editions';
+import { rareInfo } from './rare';
+
+/**
+ * Claude: content version mixed into the pool fingerprint. This build can field Weekly Standout and
+ * Landmark Season editions that older builds can't resolve, so its online queue must not pair with
+ * them (`queueOf` in Match.tsx uses the fingerprint).
+ */
+export const CONTENT_PRINT = 'ut-content-2';
+
+/**
+ * Card lines by id that also resolve the derived editions (editions.ts) on demand: a Standout from
+ * any past week, or a Landmark, loads forever from its season card. Derived lines are cached apart
+ * from the map's own entries, so iterating it still sees only the built lines.
+ */
+class EditionLines extends Map<string, CardLine> {
+  private derived = new Map<string, CardLine | null>();
+  constructor(
+    entries: Iterable<[string, CardLine]>,
+    private lines: CardLine[]
+  ) {
+    super(entries);
+  }
+  get(id: string): CardLine | undefined {
+    const own = super.get(id);
+    if (own || !parseEditionId(id)) return own;
+    let d = this.derived.get(id);
+    if (d === undefined) {
+      d = deriveEditionLine(id, (k) => super.get(k), this.lines);
+      this.derived.set(id, d);
+    }
+    return d ?? undefined;
+  }
+  has(id: string): boolean {
+    return this.get(id) !== undefined;
+  }
+}
+
+/** Level-1 ratings that rate a derived edition the first time it is asked for. */
+class EditionRatings extends Map<string, RatedCard> {
+  private derived = new Map<string, RatedCard | null>();
+  constructor(private byId: () => Map<string, CardLine>) {
+    super();
+  }
+  get(id: string): RatedCard | undefined {
+    const own = super.get(id);
+    if (own || !parseEditionId(id)) return own;
+    let d = this.derived.get(id);
+    if (d === undefined) {
+      const line = this.byId().get(id);
+      d = line ? rateCard(line) : null;
+      this.derived.set(id, d);
+    }
+    return d ?? undefined;
+  }
+  has(id: string): boolean {
+    return this.get(id) !== undefined;
+  }
+}
 
 export interface Pool {
   sport: UtSport;
@@ -27,8 +86,9 @@ export function buildPool(sport: UtSport, lines: CardLine[], byId?: Map<string, 
 
 /** Rates the cards one at a time into a pool. */
 function poolBuilder(sport: UtSport, lines: CardLine[], byId?: Map<string, CardLine>) {
-  const base = new Map<string, RatedCard>();
-  const buckets: Pool['buckets'] = { bronze: {}, silver: {}, gold: {}, promo: {}, spotlight: {}, legend: {}, goat: {} };
+  let lookup: Map<string, CardLine> | null = null;
+  const base = new EditionRatings(() => lookup!);
+  const buckets: Pool['buckets'] = { bronze: {}, silver: {}, gold: {}, promo: {}, spotlight: {}, legend: {}, goat: {}, standout: {}, landmark: {} };
   let h = 2166136261;
   return {
     add(l: CardLine) {
@@ -37,7 +97,10 @@ function poolBuilder(sport: UtSport, lines: CardLine[], byId?: Map<string, CardL
       (buckets[rc.tier][l.pos[0]] ??= []).push(rc);
       h = Math.imul(h ^ hashString(l.id + ':' + rc.ovr + ':' + rc.tier + ':' + JSON.stringify(rc.attrs) + ':' + rc.abil.join(',')), 16777619) >>> 0;
     },
-    done: (): Pool => ({ sport, lines, byId: byId ?? new Map(lines.map((l) => [l.id, l])), base, buckets, print: h.toString(36) }),
+    done: (): Pool => {
+      lookup = new EditionLines(byId ?? lines.map((l) => [l.id, l]), lines);
+      return { sport, lines, byId: lookup, base, buckets, print: (Math.imul(h ^ hashString(CONTENT_PRINT), 16777619) >>> 0).toString(36) };
+    },
   };
 }
 
@@ -62,7 +125,9 @@ let cache: Promise<Pool> | null = null;
 
 /** This page's sport's pool (cached). */
 export function getPool(): Promise<Pool> {
-  cache ??= loadCards(SPORT).then((s) => buildPoolInSlices(SPORT, s.lines, s.byId));
+  cache ??= loadCards(SPORT)
+    .then((s) => buildPoolInSlices(SPORT, s.lines, s.byId))
+    .then((p) => (rareInfo(p), p));
   // a failed load can be tried again
   cache.catch(() => (cache = null));
   return cache;
@@ -99,7 +164,7 @@ export function shortSeason(line: Pick<CardLine, 'season'>): string {
   return '’' + String(line.season).slice(2);
 }
 
-export const TIER_RANK: Record<Tier, number> = { bronze: 0, silver: 1, gold: 2, promo: 3, legend: 4, spotlight: 5, goat: 6 };
+export const TIER_RANK: Record<Tier, number> = { bronze: 0, silver: 1, gold: 2, standout: 2.5, promo: 3, landmark: 3.5, legend: 4, spotlight: 5, goat: 6 };
 
 /** Best first: tier, then overall. */
 export function byValue(a: RatedCard, b: RatedCard): number {

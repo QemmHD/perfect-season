@@ -33,12 +33,18 @@ export interface Reward {
   pack?: string;
   /** a card: a Hot Season, or a gold at least this good, from this franchise when there is one */
   card?: { tier: 'gold' | 'promo'; minOvr?: number; fr?: string };
+  /** Claude: a random one of this week's Weekly Standouts */
+  standout?: true;
+  /** Claude: this exact card (a Landmark Season) */
+  cardId?: string;
+  /** Claude: its display name, for the reward line */
+  cardName?: string;
 }
 
 export interface Sbc {
   /** unique: the day or week it belongs to and its place in the list */
   id: string;
-  kind: 'daily' | 'weekly' | 'upgrade';
+  kind: 'daily' | 'weekly' | 'upgrade' | 'standout' | 'landmark';
   /** an upgrade: how many more times it can be done today (counting this one); none: repeatable */
   left?: number;
   title: string;
@@ -49,7 +55,7 @@ export interface Sbc {
   reward: Reward;
 }
 
-const TIER_NAME: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', spotlight: 'Spotlight', legend: 'Legend', goat: 'GOAT' };
+const TIER_NAME: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', spotlight: 'Spotlight', legend: 'Legend', goat: 'GOAT', standout: 'Standout', landmark: 'Landmark' };
 
 export function reqText(r: Req): string {
   switch (r.k) {
@@ -76,6 +82,8 @@ export function rewardText(w: Reward, sport: UtSport, packName: (s: UtSport, k: 
   const parts: string[] = [];
   if (w.pack) parts.push(packName(sport, w.pack));
   if (w.card) parts.push(w.card.tier === 'promo' ? 'a Hot Season card' : w.card.minOvr ? (String(w.card.minOvr).startsWith('8') ? 'an ' : 'a ') + w.card.minOvr + '+ Gold card' : 'a Gold card');
+  if (w.standout) parts.push('a Weekly Standout');
+  if (w.cardId) parts.push(w.cardName ? w.cardName + ' (Landmark)' : 'a Landmark Season card');
   if (w.coins) parts.push(w.coins.toLocaleString('en-US') + ' coins');
   return parts.join(' + ');
 }

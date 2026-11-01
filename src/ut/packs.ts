@@ -39,10 +39,17 @@ import { type Pool, TIER_RANK } from './pool';
 import { onScale, TIER_CUTS } from './rate';
 import { positionMix } from './squad';
 import type { RatedCard, Tier, UtSport } from './types';
+import { easternDateKey } from '../engine/season';
+import { rareInfo } from './rare';
+import { weekOf } from './sbc';
+import { drawStandout } from './standouts';
 
-export type PackKind = 'bronze' | 'silver' | 'gold' | 'premium' | 'position' | 'spotlight' | 'starter';
-/** Odds of each tier for one card of a pack (they add up to 1). */
-export type Odds = Partial<Record<Tier, number>>;
+/** Claude 2026-11-01: daily (Daily Drop), scout (Scout's Choice, pick 1 of 3), elite (Elite Gold),
+ * jumbo (Jumbo Premium), standout (Standout Guarantee) and lightning (its weekend discount copy). */
+export type PackKind = 'bronze' | 'silver' | 'gold' | 'premium' | 'position' | 'spotlight' | 'starter' | 'daily' | 'scout' | 'elite' | 'jumbo' | 'standout' | 'lightning';
+/** A slot's odds by tier, plus `rare` (a rare gold, rare.ts: always a gold). They add up to 1. */
+export type SlotTier = Tier | 'rare';
+export type Odds = Partial<Record<SlotTier, number>>;
 
 export interface PackDef {
   kind: PackKind;
@@ -60,13 +67,31 @@ const G: Odds = { gold: 1 };
 export const GOAT_SPOTLIGHT = 0.0005;
 export const SPOTLIGHT_ODDS: Odds = SPOTLIGHT_RATES;
 export const LEGEND_PREMIUM = 0.0066;
-export const PROMO_PREMIUM = 0.06;
+/** Claude: the special slot is split between this week's Standouts and Hot Season (same total as before). */
+export const STANDOUT_PREMIUM = 0.04;
+export const PROMO_PREMIUM = 0.02;
 export const LEGEND_GOLD = 0.002;
-export const PROMO_GOLD = 0.02;
+export const STANDOUT_GOLD = 0.015;
+export const PROMO_GOLD = 0.005;
+/** Of any Standout pulled, the week's Featured Standout. */
+export const FEATURED_STANDOUT = 0.1;
+export const STANDOUT_ELITE = 0.1;
+export const LEGEND_ELITE = 0.01;
+export const STANDOUT_DAILY = 0.02;
 
 /** the slot that can turn into something special */
-const goldPlus: Odds = { gold: 1 - PROMO_GOLD - LEGEND_GOLD, promo: PROMO_GOLD, legend: LEGEND_GOLD };
-const premiumPlus: Odds = { gold: 1 - PROMO_PREMIUM - LEGEND_PREMIUM, promo: PROMO_PREMIUM, legend: LEGEND_PREMIUM };
+const goldPlus: Odds = { gold: 1 - STANDOUT_GOLD - PROMO_GOLD - LEGEND_GOLD, standout: STANDOUT_GOLD, promo: PROMO_GOLD, legend: LEGEND_GOLD };
+const premiumPlus: Odds = { gold: 1 - STANDOUT_PREMIUM - PROMO_PREMIUM - LEGEND_PREMIUM, standout: STANDOUT_PREMIUM, promo: PROMO_PREMIUM, legend: LEGEND_PREMIUM };
+const R: Odds = { rare: 1 };
+const elitePlus: Odds = { rare: 1 - STANDOUT_ELITE - LEGEND_ELITE, standout: STANDOUT_ELITE, legend: LEGEND_ELITE };
+const dailyLast: Odds = { silver: 0.6, gold: 1 - 0.6 - STANDOUT_DAILY, standout: STANDOUT_DAILY };
+
+/** Claude: the new packs' prices. Football's 16-card Standout pack holds golds that sell for a third
+ * as much, so its chase packs cost less; Lightning is always 25% off. */
+export const CONTENT_PRICES: Record<UtSport, { scout: number; elite: number; jumbo: number; standout: number; lightning: number }> = {
+  nba: { scout: 1500, elite: 3000, jumbo: 3200, standout: 4500, lightning: 3375 },
+  nfl: { scout: 1500, elite: 2500, jumbo: 3200, standout: 3300, lightning: 2475 },
+};
 
 /**
  * Each pack's shape per sport: its price, and its cards as [bronze, chance-of-silver] (Bronze),
@@ -74,7 +99,7 @@ const premiumPlus: Odds = { gold: 1 - PROMO_PREMIUM - LEGEND_PREMIUM, promo: PRO
  * Premium), golds (Position). `qs` scales quick-sell values.
  */
 export const PACK_SHAPE = {
-  nba: { price: { bronze: 150, silver: 400, gold: 900, premium: 1800, position: 700 }, bronze: [4, 1], silver: [1, 3, 1], gold: [2, 2, 1], premium: [2, 5, 1], position: 3, qs: 1 },
+  nba: { price: { bronze: 150, silver: 400, gold: 900, premium: 1800, position: 700 }, bronze: [4, 1], silver: [1, 3, 1], gold: [2, 2, 1], premium: [2, 5, 1], position: 3, qs: 1, rare: { gold: 1, premium: 3, position: 1 } },
   // football: 23 starters to fill, so two to three times the cards, each worth about a third as much sold
   nfl: {
     price: { bronze: 150, silver: 400, gold: 900, premium: 1800, position: 500 },
@@ -84,7 +109,14 @@ export const PACK_SHAPE = {
     premium: [2, 13, 1],
     position: 6,
     qs: 0.35,
+    rare: { gold: 2, premium: 6, position: 2 },
   },
+};
+
+/** Claude: the new packs' shapes: [cards], and their rare-gold guarantees. */
+const CONTENT_SHAPE = {
+  nba: { daily: 3, elite: 6, jumbo: { silver: 4, gold: 4, rare: 7 }, standout: { gold: 4, rare: 3 } },
+  nfl: { daily: 6, elite: 12, jumbo: { silver: 8, gold: 9, rare: 14 }, standout: { gold: 9, rare: 6 } },
 };
 
 export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, PackDef> {
@@ -93,6 +125,8 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
   const [sb, ss, sr] = k.silver;
   const [gs, gg, gr] = k.gold;
   const [ps, pg, pr] = k.premium;
+  const c = CONTENT_SHAPE[sport];
+  const standoutSlots = [...rep(c.standout.gold, G), ...rep(c.standout.rare, R), { standout: 1 }];
   return {
     bronze: {
       kind: 'bronze',
@@ -112,15 +146,15 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       kind: 'gold',
       name: 'Gold Pack',
       price: k.price.gold,
-      blurb: gs + gg + gr + ' cards, ' + (gg + gr) + ' golds guaranteed',
-      slots: [...rep(gs, S), ...rep(gg, G), ...rep(gr, goldPlus)],
+      blurb: gs + gg + gr + ' cards, ' + (gg + gr) + ' golds (' + k.rare.gold + ' rare) guaranteed',
+      slots: [...rep(gs, S), ...rep(gg - k.rare.gold, G), ...rep(k.rare.gold, R), ...rep(gr, goldPlus)],
     },
     premium: {
       kind: 'premium',
       name: 'Premium Gold',
       price: k.price.premium,
-      blurb: ps + pg + pr + ' cards, ' + (pg + pr) + ' golds, 6% a Hot Season, 0.66% a Legend',
-      slots: [...rep(ps, S), ...rep(pg, G), ...rep(pr, premiumPlus)],
+      blurb: ps + pg + pr + ' cards, ' + (pg + pr) + ' golds (' + k.rare.premium + ' rare), 6% a Standout or Hot Season, 0.66% a Legend',
+      slots: [...rep(ps, S), ...rep(pg - k.rare.premium, G), ...rep(k.rare.premium, R), ...rep(pr, premiumPlus)],
     },
     spotlight: {
       kind: 'spotlight',
@@ -129,14 +163,60 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       blurb: (sport === 'nba' ? 8 : 16) + ' gold-or-better cards. 20% Spotlight, 0.05% GOAT. Online.',
       slots: [...rep(sport === 'nba' ? 7 : 15, G), SPOTLIGHT_ODDS],
     },
-    position: { kind: 'position', name: 'Position Pack', price: k.price.position, blurb: k.position + ' golds at the position you pick', slots: rep(k.position, G) },
+    position: { kind: 'position', name: 'Position Pack', price: k.price.position, blurb: k.position + ' golds (' + k.rare.position + ' rare) at the position you pick', slots: [...rep(k.position - k.rare.position, G), ...rep(k.rare.position, R)] },
+    daily: {
+      kind: 'daily',
+      name: 'Daily Drop',
+      price: 0,
+      blurb: c.daily + ' free cards once a day; the last can be a gold or a Weekly Standout',
+      slots: [...rep(c.daily - 1, { bronze: 0.5, silver: 0.5 }), dailyLast],
+    },
+    scout: {
+      kind: 'scout',
+      name: "Scout's Choice",
+      price: CONTENT_PRICES[sport].scout,
+      blurb: 'Three ' + onScale(84, sport) + '+ golds face down' + (sport === 'nfl' ? ' from one position group' : '') + '. Keep one',
+      slots: rep(3, { gold: 1 - SCOUT_STANDOUT, standout: SCOUT_STANDOUT }),
+    },
+    elite: {
+      kind: 'elite',
+      name: 'Elite Gold',
+      price: CONTENT_PRICES[sport].elite,
+      blurb: c.elite + ' rare golds; the last is a Standout 10% or a Legend 1%',
+      slots: [...rep(c.elite - 1, R), elitePlus],
+    },
+    jumbo: {
+      kind: 'jumbo',
+      name: 'Jumbo Premium',
+      price: CONTENT_PRICES[sport].jumbo,
+      blurb: c.jumbo.silver + c.jumbo.gold + c.jumbo.rare + 1 + ' cards: ' + (c.jumbo.gold + c.jumbo.rare + 1) + ' golds, ' + c.jumbo.rare + ' of them rare, and a premium slot',
+      slots: [...rep(c.jumbo.silver, S), ...rep(c.jumbo.gold, G), ...rep(c.jumbo.rare, R), premiumPlus],
+    },
+    standout: {
+      kind: 'standout',
+      name: 'Standout Guarantee',
+      price: CONTENT_PRICES[sport].standout,
+      blurb: standoutSlots.length + ' cards: ' + (c.standout.gold + c.standout.rare) + ' golds (' + c.standout.rare + ' rare) and one of this week’s Standouts guaranteed',
+      slots: standoutSlots,
+    },
+    lightning: {
+      kind: 'lightning',
+      name: 'Lightning Standout',
+      price: CONTENT_PRICES[sport].lightning,
+      blurb: 'The Standout Guarantee, 25% off, in short weekend windows',
+      slots: standoutSlots,
+    },
   };
 }
+
+/** Claude: chance that one Scout's Choice option is a Weekly Standout. */
+export const SCOUT_STANDOUT = 0.03;
 
 export const STORE_ORDER: Exclude<PackKind, 'starter'>[] = ['spotlight', 'bronze', 'silver', 'gold', 'premium', 'position'];
 
 export function packName(sport: UtSport, kind: string): string {
   if (kind.startsWith('event-spotlight:')) return 'Spotlight Reward';
+  if (kind === 'standout-pick') return 'Standout Pick';
   if (kind === 'starter') return 'Starter Pack';
   if (kind.startsWith('position:')) return (positionChoices(sport).find((c) => c.key === kind.slice(9))?.label ?? kind.slice(9)) + ' Pack';
   return packDefs(sport)[kind as Exclude<PackKind, 'starter'>]?.name ?? 'Pack';
@@ -144,10 +224,12 @@ export function packName(sport: UtSport, kind: string): string {
 
 // ---------- drawing cards ----------
 
-function drawTier(o: Odds, rand: Rand): Tier {
+const DRAW_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'promo', 'standout', 'rare', 'gold', 'silver', 'bronze'];
+
+function drawTier(o: Odds, rand: Rand): SlotTier {
   let x = rand();
-  let last: Tier = 'bronze';
-  for (const t of ['goat', 'spotlight', 'legend', 'promo', 'gold', 'silver', 'bronze'] as Tier[]) {
+  let last: SlotTier = 'bronze';
+  for (const t of DRAW_ORDER) {
     const p = o[t] ?? 0;
     if (p <= 0) continue;
     last = t;
@@ -223,19 +305,40 @@ function drawCard(pool: Pool, tier: Tier, rand: Rand, want: string | null, mix?:
   return i + 1 < TIERS_DOWN.length ? drawCard(pool, TIERS_DOWN[i + 1], rand, want, mix) : null;
 }
 
+/** Claude: a rare gold at a position drawn in the mix (any rare gold when that position has none). */
+function drawRare(pool: Pool, rand: Rand, mix?: [string, number][]): RatedCard | null {
+  const r = rareInfo(pool).buckets;
+  const pos = drawPos(mix ?? Object.entries(positionMix(pool.sport)), rand);
+  const list = r[pos]?.length ? r[pos] : Object.values(r).flat();
+  return list.length ? weighted(list, 'gold', rand) : drawCard(pool, 'gold', rand, null, mix);
+}
+
+/** Claude: the Eastern week whose Standouts a pack opened now draws from. */
+export function currentWeek(): string {
+  return weekOf(easternDateKey());
+}
+
+/** One card for a slot's drawn tier: `rare` and `standout` are this module's additions. */
+function drawSlot(pool: Pool, tier: SlotTier, rand: Rand, mix: [string, number][] | undefined, week: string): RatedCard | null {
+  if (tier === 'rare') return drawRare(pool, rand, mix);
+  if (tier === 'standout') return drawStandout(pool, week, rand, FEATURED_STANDOUT) ?? drawRare(pool, rand, mix);
+  return drawCard(pool, tier, rand, null, mix);
+}
+
 /** A pack's cards from its slots: no card twice in one pack. */
-function fill(pool: Pool, slots: Odds[], rand: Rand, mix?: [string, number][]): RatedCard[] {
+function fill(pool: Pool, slots: Odds[], rand: Rand, mix?: [string, number][], week = currentWeek()): RatedCard[] {
   const out: RatedCard[] = [];
   const ids = new Set<string>();
   for (const o of slots) {
     const tier = drawTier(o, rand);
     let c: RatedCard | null = null;
     for (let k = 0; k < 6; k++) {
-      c = drawCard(pool, tier, rand, null, mix);
-      if (c && !ids.has(c.line.id)) break;
+      c = drawSlot(pool, tier, rand, mix, week);
+      if (c && !ids.has(c.line.id) && !(tier === 'standout' && ids.has('pid:' + c.line.pid))) break;
     }
     if (!c) continue;
     ids.add(c.line.id);
+    ids.add('pid:' + c.line.pid);
     out.push(c);
   }
   return out;
@@ -269,8 +372,10 @@ export const NFL_UNITS: [string, string, string[]][] = [
  * seed always gives the same cards. `kind` is a store pack, the starter, or "position:<key>" (a
  * key from positionChoices).
  */
-export function openPack(pool: Pool, kind: string, seed?: string): RatedCard[] {
+export function openPack(pool: Pool, kind: string, seed?: string, week = currentWeek()): RatedCard[] {
   const rand = seed === undefined ? trueRand() : packRand(seed);
+  // Claude: Scout's Choice is a pick of three, not a pack (content-packs.ts pickOptions)
+  if (kind === 'scout' || kind === 'standout-pick') throw new Error('This is a pick, not a pack.');
   // The rare slot is rolled and numbered by the shared registry, never by this local RNG.
   if (kind === 'spotlight' || kind.startsWith('event-spotlight:')) throw new Error('This pack needs the shared card registry.');
   if (kind === 'starter') return starterCards(pool, rand);
@@ -283,11 +388,12 @@ export function openPack(pool: Pool, kind: string, seed?: string): RatedCard[] {
       pool,
       defs.position.slots,
       rand,
-      ch.positions.map((p) => [p, need[p] ?? 1])
+      ch.positions.map((p) => [p, need[p] ?? 1]),
+      week
     );
   }
   const def = defs[kind as Exclude<PackKind, 'starter'>];
-  return def ? fill(pool, def.slots, rand) : [];
+  return def ? fill(pool, def.slots, rand, undefined, week) : [];
 }
 
 /**
@@ -334,7 +440,9 @@ export function quickSellValue(rc: RatedCard): number {
   if (rc.tier === 'goat') v = 5000 + 500 * Math.max(0, o - 106);
   else if (rc.tier === 'spotlight') v = 1400 + 100 * Math.max(0, o - 100);
   else if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - onScale(90, sport));
+  else if (rc.tier === 'landmark') v = 1200 + 60 * Math.max(0, o - onScale(84, sport));
   else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - onScale(78, sport));
+  else if (rc.tier === 'standout') v = 400 + 40 * Math.max(0, o - onScale(78, sport));
   else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (99 - gold)), 1.5);
   else if (rc.tier === 'silver') v = 40 + 40 * clamp01((o - silver) / (gold - silver - 1));
   else v = 15 + 15 * clamp01((o - (silver - 15)) / 14);
@@ -354,8 +462,8 @@ export function revealOrder(cards: RatedCard[]): RatedCard[] {
 export function walkoutLevel(rc: RatedCard): 0 | 1 | 2 | 3 | 4 {
   if (rc.tier === 'goat') return 4;
   if (rc.tier === 'spotlight') return 3;
-  if (rc.tier === 'legend') return 3;
-  if (rc.tier === 'promo' || (rc.tier === 'gold' && rc.ovr >= onScale(85, rc.line.sport))) return 2;
+  if (rc.tier === 'legend' || rc.tier === 'landmark') return 3;
+  if (rc.tier === 'promo' || rc.tier === 'standout' || (rc.tier === 'gold' && rc.ovr >= onScale(85, rc.line.sport))) return 2;
   return rc.tier === 'gold' ? 1 : 0;
 }
 
