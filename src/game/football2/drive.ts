@@ -48,6 +48,26 @@ export interface Game {
 
 /** completions in a row that put the quarterback On Fire */
 export const FIRE_AT = 3;
+/** a Heat Check card in the offense gets the quarterback hot a completion sooner */
+export function fireAtFor(g: Game): number {
+  const o = g.off;
+  return [o.qb, o.rb, o.te, ...o.wr].some((x) => x.abil.includes('heat-check')) ? FIRE_AT - 1 : FIRE_AT;
+}
+
+/** Icon cards on the last drive (the clutch): every attribute +3 (finite above 99). */
+function clutchPlayer<T extends { abil: string[]; a: Record<string, number> }>(x: T): T {
+  if (!x.abil.includes('icon')) return x;
+  const a: Record<string, number> = {};
+  for (const [k, v] of Object.entries(x.a)) a[k] = v + 3;
+  return { ...x, a };
+}
+export function clutchSides(off: Offense, def: Defense): { off: Offense; def: Defense } {
+  const c = clutchPlayer;
+  return {
+    off: { qb: c(off.qb), rb: c(off.rb), wr: [c(off.wr[0]), c(off.wr[1]), c(off.wr[2])], te: c(off.te), ol: [c(off.ol[0]), c(off.ol[1]), c(off.ol[2]), c(off.ol[3]), c(off.ol[4])], k: c(off.k) },
+    def: { dl: [c(def.dl[0]), c(def.dl[1]), c(def.dl[2]), c(def.dl[3])], lb: [c(def.lb[0]), c(def.lb[1]), c(def.lb[2])], cb: [c(def.cb[0]), c(def.cb[1])], s: [c(def.s[0]), c(def.s[1])] }
+  };
+}
 
 const RUNS: RunPlay[] = ['inside', 'outside', 'power'];
 
@@ -103,7 +123,9 @@ export function startChoice(g: Game, c: PlayChoice): Play {
 
 export function startPlay(g: Game, call: Call): Play {
   const r = rng(hashString('play:' + g.seed + ':' + g.drive + ':' + g.playNo));
-  const p = lineUp(g.off, g.def, call, g.concept, g.run, g.ballOn, g.ballX, r, g.defIQ);
+  const last = g.drive === g.drives - 1;
+  const sides = last ? clutchSides(g.off, g.def) : { off: g.off, def: g.def };
+  const p = lineUp(sides.off, sides.def, call, g.concept, g.run, g.ballOn, g.ballX, r, g.defIQ);
   p.fire = g.fire;
   return p;
 }
@@ -114,7 +136,8 @@ export function fgDistance(g: Game) {
 
 /** the kicker's longest try: 46 yards for a weak leg, 60 for a big one */
 export function fgMax(g: Game) {
-  return Math.round(46 + 14 * rt(g.off.k.a.KPW, 55, 99));
+  // Big Leg: four more yards (always on: the range has to show before the kick)
+  return Math.round(46 + 14 * rt(g.off.k.a.KPW, 55, 99) + (g.off.k.abil.includes('big-leg') ? 4 : 0));
 }
 
 export function fgInRange(g: Game) {
@@ -124,8 +147,9 @@ export function fgInRange(g: Game) {
 /** How wide the kick window is at this distance (0-1): wider for an accurate kicker, narrower long. */
 export function kickWindow(g: Game) {
   const d = fgDistance(g);
-  const acc = rt(g.off.k.a.KAC, 55, 99);
-  return Math.max(0.12, 0.5 + 0.32 * acc - Math.max(0, d - 20) * 0.014);
+  // smooth in accuracy from 40 (it flattened out below 55), still narrower the longer the kick
+  const acc = rt(g.off.k.a.KAC, 40, 99);
+  return Math.max(0.12, 0.36 + 0.3 * acc - Math.max(0, d - 20) * 0.014);
 }
 
 export interface After {
@@ -172,7 +196,7 @@ function settle(g: Game, end: PlayEnd): After {
   const was = g.fire;
   if (end.caught) {
     g.streak++;
-    if (g.streak >= FIRE_AT) g.fire = true;
+    if (g.streak >= fireAtFor(g)) g.fire = true;
   } else if (end.kind === 'incomplete' || end.kind === 'sack' || end.kind === 'int') {
     g.streak = 0;
     g.fire = false;
