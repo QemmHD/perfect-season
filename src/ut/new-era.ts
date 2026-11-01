@@ -48,6 +48,9 @@ export function newEraReady(ut: UtState): boolean {
   return !!contentOf(ut).era?.eligible && !claimed(ut, NEW_ERA_ID);
 }
 
+/** Icon picks come from seasons before this year (retired greats), when at least three exist. */
+export const ICON_BEFORE = 2010;
+
 /** Three different Legends at 88+ on the FC-style display scale (deterministic). */
 export function legendOptions(pool: Pool, seed: string): string[] {
   const floor = fcToDisplay(88, pool.sport);
@@ -55,7 +58,11 @@ export function legendOptions(pool: Pool, seed: string): string[] {
     .flat()
     .sort((a, b) => (a.line.id < b.line.id ? -1 : 1));
   const good = all.filter((rc) => rc.ovr >= floor);
-  const list = shuffle(good.length >= 3 ? good : all, rng(hashString('new-era:' + seed)));
+  // An Icon pick offers true all-time greats: the Legend bucket also holds modern star seasons
+  // (e.g. 2020s centres), so prefer seasons before ICON_BEFORE and fall back only if too few.
+  const icons = good.filter((rc) => rc.line.season < ICON_BEFORE);
+  const base = icons.length >= 3 ? icons : good.length >= 3 ? good : all;
+  const list = shuffle(base, rng(hashString('new-era:' + seed)));
   const out: string[] = [];
   const pids = new Set<string>();
   for (const rc of list) {

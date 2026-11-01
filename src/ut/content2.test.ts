@@ -440,6 +440,9 @@ describe('New Era bundle (' + SPORT + ')', () => {
     for (const id of opts) expect(pool.base.get(id)!.tier).toBe('legend');
     expect(new Set(opts.map((id) => pool.base.get(id)!.line.pid)).size).toBe(3);
     expect(legendOptions(pool, 'x')).toEqual(opts);
+    // Icons are all-time greats, not modern star seasons (owner QA: a 2021-22 centre was offered)
+    const { ICON_BEFORE } = await import('./new-era');
+    for (const seed of ['x', 'y', 'z', 'nba', 'nfl']) for (const id of legendOptions(pool, seed)) expect(pool.base.get(id)!.line.season).toBeLessThan(ICON_BEFORE);
     const ut = stampNewEra(migrateUt({ ...freshUt(), packsOpened: 2 }), {});
     const p0 = { coins: 100, gifts: [] as string[], ut };
     const p1 = claimNewEra(p0, pool, 1);
