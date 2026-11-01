@@ -47,7 +47,9 @@ export const NFL_SLOTS: SlotDef[] = [
   s('RG', 'OG', 68, 42, 'off', 0.7),
   s('RT', 'OT', 86, 42, 'off', 0.9),
   s('QB', 'QB', 50, 67, 'off', 2.2),
-  s('RB', 'RB', 50, 90, 'off', 1),
+  // offset back (Claude, final QA 2026-11-01): straight under the QB, his card covered the QB's tag on
+  // short phones (iPhone SE: the pitch is too short for four stacked rows); display only
+  s('RB', 'RB', 30, 90, 'off', 1),
   s('K', 'K', 87, 88, 'off', 0.4),
   s('CB1', 'CB', 9, 14, 'def', 1),
   s('FS', 'S', 34, 14, 'def', 0.8),
