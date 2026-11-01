@@ -1,6 +1,11 @@
 // Codex: evidence-based interruption, modality, reward and exact-copy browser regressions.
 import assert from 'node:assert/strict';
 import { launch, fixture, shot, dismissPack } from './browser.mjs';
+// Claude final QA 2026-11-01: the Season Pass moved to CHALLENGES → SEASON PASS (docs/UI-NAVIGATION.md)
+const seasonPass = async (page) => {
+  await page.locator('.ut-tabs button').filter({ hasText: 'CHALLENGES' }).click();
+  await page.locator('.ut-segs [role=tab]').filter({ hasText: /^SEASON PASS/ }).click();
+};
 const browser = await launch();
 try {
   for (const sport of process.env.PS_POLISH_ARCHIVE_ONLY
@@ -44,9 +49,9 @@ try {
     });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-    await page.getByRole('button', { name: /SEASON PASS/ }).click();
+    await seasonPass(page);
     await page
-      .getByRole('progressbar', { name: 'Season reward track' })
+      .getByRole('progressbar', { name: 'Season Pass progress' })
       .waitFor();
     await shot(page, 'polish-' + sport + '-season-ready');
     const before = await current();
@@ -59,12 +64,12 @@ try {
     assert.equal(claimed.ut.hq.seasons[seeded.season].claimed.length, 6);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-    await page.getByRole('button', { name: /SEASON PASS/ }).click();
+    await seasonPass(page);
     assert.equal(
       await page.getByRole('button', { name: /^CLAIM READY/ }).count(),
       0
     );
-    await page.getByRole('button', { name: 'YOUR PACKS', exact: true }).click();
+    await page.getByRole('button', { name: /PACKS YOU.VE EARNED/ }).click();
     await page
       .getByRole('button', { name: 'Open your Bronze Pack', exact: true })
       .click();
@@ -99,8 +104,9 @@ try {
     await page.keyboard.press('Escape');
     await dismissPack(page);
     assert.equal((await current()).coins, claimed.coins);
-    await page.locator('.ut-tabs button').filter({ hasText: 'HOME' }).click();
-    await page.getByRole('button', { name: /DEVELOPMENT/ }).click();
+    // Claude final QA 2026-11-01: Development lives under CLUB → DEVELOPMENT since the UI reorganisation
+    await page.locator('.ut-tabs button').filter({ hasText: 'CLUB' }).click();
+    await page.locator('.ut-segs [role=tab]').filter({ hasText: /^DEVELOPMENT/ }).click();
     await page
       .getByRole('heading', { name: seeded.name, exact: true })
       .waitFor();
@@ -433,7 +439,7 @@ try {
     }
     root.render(React.createElement(Archive));
   });
-  await f.page.getByRole('button', { name: /EARNED REWARDS WAITING/ }).click();
+  await f.page.getByRole('button', { name: /EARLIER REWARDS WAITING/ }).click();
   await f.page
     .getByRole('button', { name: 'CLAIM READY (2)', exact: true })
     .waitFor();

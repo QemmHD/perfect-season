@@ -88,7 +88,9 @@ try {
       await b.page.getByRole('button',{name:/Ultimate Team:/}).click();
       await b.page.locator('.ut-tabs button').filter({hasText:'CLUB'}).click();
       const imageLabel=await b.page.evaluate(async c=>{const {getPool}=await import('/src/ut/pool.ts');const {ratedOf}=await import('/src/ut/pool.ts');const {TIER_NAMES}=await import('/src/ut/rate.ts');const rc=ratedOf(await getPool(),c),l=rc.line;return l.name+', '+rc.ovr+' overall '+rc.pos+', '+l.season+' '+l.teamName+', '+TIER_NAMES[rc.tier]+', issue number '+c.mint.serial;},peerOwned);
-      await b.page.getByRole('img',{name:imageLabel,exact:true}).locator('..').click();
+      // Claude final QA 2026-11-01: card labels gained Rare/Holographic/week/evolved parts; match name + issue number
+      const [labelName,labelIssue]=[imageLabel.split(',')[0],imageLabel.split('issue number ')[1]].map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+      await b.page.getByRole('img',{name:new RegExp('^'+labelName+', .*issue number '+labelIssue+'$')}).first().locator('..').click();
       await b.page.getByRole('button',{name:/^QUICK SELL/}).click();
       await b.page.getByRole('button',{name:/^SELL ·/}).click();
       await acknowledged(b,peerOwned.uid);

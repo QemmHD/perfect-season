@@ -5,7 +5,9 @@ try {
   for (const sport of ['nba', 'nfl']) {
     const { page, context, current, errors, original } = await fixture(browser, sport);
     await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-    await page.getByRole('button', { name: /Collection Gallery/ }).click();
+    // Claude final QA 2026-11-01: UI reorganisation (docs/UI-NAVIGATION.md) moved Collection to CLUB → COLLECTION
+    await page.locator('.ut-tabs button').filter({ hasText: 'CLUB' }).click();
+    await page.locator('.ut-segs [role=tab]').filter({ hasText: /^COLLECTION/ }).click();
     await page.getByRole('button', { name: /COLLECTION REWARDS/ }).click();
     const claim = page.getByRole('button', { name: 'CLAIM', exact: true });
     await claim.first().waitFor();
@@ -49,7 +51,7 @@ try {
       return { name: rc.line.name, ovr: rc.ovr };
     }, reward.cardId);
     await page.locator('.ut-tabs button').filter({ hasText: 'CLUB' }).click();
-    if (result.ut.duplicateStorage?.includes(reward.uid)) await page.getByRole('button', { name: /DUPLICATE STORAGE/ }).click();
+    if (result.ut.duplicateStorage?.includes(reward.uid)) await page.locator('.ut-segs [role=tab]').filter({ hasText: /^STORAGE/ }).click();
     const escaped = info.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     await page
       .getByRole('button', { name: new RegExp('^' + escaped + ', ' + info.ovr + '(,|$)') })
@@ -60,7 +62,7 @@ try {
     await shot(page, 'registered-card-' + sport);
     await page.getByRole('button', { name: 'CLOSE', exact: true }).click();
     await page.locator('.ut-tabs button').filter({ hasText: 'PLAY' }).click();
-    await page.getByRole('button', { name: /LEGENDS SERIES/ }).click();
+    await page.getByRole('button', { name: /LEGENDS EVENTS/ }).click();
     await page.getByRole('heading', { name: 'Dynasty Nights', exact: true }).waitFor();
     await shot(page, 'spotlight-events-' + sport);
     const beforeEvent = await current();

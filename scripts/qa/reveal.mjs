@@ -19,7 +19,9 @@ try {
       await page.waitForTimeout(120);
     }
     await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-    await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor();
+    // Claude final QA 2026-11-01: the old PLAY HQ button became the PLAY tab (docs/UI-NAVIGATION.md)
+    await page.locator('.ut-tabs').waitFor();
+    await page.waitForFunction(() => !document.querySelector('.ut-loading'), null, { timeout: 60000 });
     const render = () =>
       page.evaluate(async (tier) => {
         const React = (await import('/node_modules/.vite/deps/react.js')).default;
