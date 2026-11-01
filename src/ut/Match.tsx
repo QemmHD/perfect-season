@@ -52,7 +52,7 @@ import './match.css';
  */
 // Codex: NFL rushing execution differs from v4; NBA queues remain compatible.
 // Claude ratings rework + NBA shot curve (2026-11-01): ratings, levels and jumpers changed.
-const UT_RULES = { nba: 9, nfl: 10 };
+const UT_RULES = { nba: 10, nfl: 11 };
 const queueOf = (pool: Pool) => 'ut-' + UT_RULES[pool.sport] + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;
