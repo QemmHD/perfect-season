@@ -24,6 +24,7 @@ Every document in the repository, grouped by topic. New here? Read the [front pa
 | [UT-POLISH.md](UT-POLISH.md) | Research, fixes and polish after the overhaul |
 | [UT-CLUB-SEASON.md](UT-CLUB-SEASON.md) | Club Season: full 82/17-game seasons with playoffs |
 | [UT-CONTENT-2.md](UT-CONTENT-2.md) | Content drop 2: new packs, Weekly Standouts, Landmark Seasons, Scout Market, Sets, UT Draft, New Era bundle; FC 27 mechanics (Item Score, Evolutions, Rewards inbox); the Live Calendar |
+| [PULL-TRACKER.md](PULL-TRACKER.md) | The Pack Tracker: every card pulled and each pack type's return against its odds (Club → Pack Tracker) |
 | [PACK-CINEMA.md](PACK-CINEMA.md) | Pack-opening presentation and walkouts |
 | [CARD-CIRCULATION.md](CARD-CIRCULATION.md) | 90+ card serial numbers and live circulation counts |
 
