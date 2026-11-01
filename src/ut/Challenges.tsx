@@ -78,7 +78,7 @@ const reqLabel = (r: Req) => {
   }
 };
 
-export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string, number>; club: ClubCard[]; day: string; onSubmit: (s: Sbc, uids: string[]) => void; onToast: (t: string) => void }) {
+export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string, number>; club: ClubCard[]; day: string; onSubmit: (s: Sbc, uids: string[]) => void; onToast: (t: string) => void; extra?: React.ReactNode }) {
   const [open, setOpen] = useState<Sbc | null>(null);
   const [left, setLeft] = useState(() => [timeLeft(false), timeLeft(true)]);
   useEffect(() => {
@@ -91,6 +91,7 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
   return (
     <div className="page ut-sbcs">
       <p className="lead ut-sbc-lead">Trade in cards that meet the requirements. Everyone gets the same challenges. Duplicate Storage cards are available here and auto-fill prefers equally valued spares.</p>
+      {props.extra}
       <div className="ut-sbc-group">
         <span className="eyebrow">Daily{left[0] ? ' · new in ' + left[0] : ''}</span>
         {daily.map((s) => (

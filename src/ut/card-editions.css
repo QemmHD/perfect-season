@@ -311,3 +311,69 @@
     animation: none !important;
   }
 }
+
+/* ---------- Claude wave 2: holographic variants and evolved copies ----------
+   Written from scratch: a colour-dodge sheen that follows the pointer (--mx/--my from useTilt),
+   a fine gold/teal diffraction grating and a sparkle field. Small cards sit still. */
+.utc.is-holo {
+  box-shadow:
+    0 0 0 0.12em #ffffffa0,
+    0 0 1.4em #8ff5e655,
+    0 0.25em 0.8em rgba(0, 0, 0, 0.45);
+}
+.utc-holo {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  opacity: 0.55;
+  background:
+    radial-gradient(circle at var(--mx, 35%) var(--my, 30%), #ffffffb0 0%, #ffffff22 18%, transparent 45%),
+    repeating-linear-gradient(115deg, #f5b83d26 0 0.35em, #19e3c926 0.35em 0.7em, #b79aea26 0.7em 1.05em, transparent 1.05em 1.4em),
+    radial-gradient(#fff 0.05em, transparent 0.09em) 0 0 / 0.9em 1.1em;
+  background-blend-mode: screen, normal, normal;
+}
+.utc-holo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(calc(var(--ry, 0deg) * 4 + 110deg), transparent 25%, #ff5e7e40 38%, #ffd36b40 46%, #7dffb440 54%, #63d0ff40 62%, transparent 75%);
+  background-size: 220% 220%;
+  background-position: var(--mx, 50%) var(--my, 50%);
+  mix-blend-mode: overlay;
+}
+.utc.big .utc-holo {
+  animation: holo-breathe 4.5s ease-in-out infinite;
+}
+@keyframes holo-breathe {
+  50% {
+    opacity: 0.8;
+  }
+}
+.utc-evo {
+  position: absolute;
+  z-index: 3;
+  left: 0.5em;
+  bottom: 4.2em;
+  padding: 0.1em 0.35em;
+  border-radius: 0.2em;
+  font-size: max(0.55em, 5px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #032027;
+  background: linear-gradient(110deg, #19e3c9, #f5d88d);
+}
+.utc.xs .utc-evo {
+  bottom: 0.3em;
+}
+.utc.with-attrs .utc-evo {
+  bottom: 6.8em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .utc.big .utc-holo {
+    animation: none !important;
+  }
+}

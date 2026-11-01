@@ -270,3 +270,116 @@ Browser QA: `scripts/qa/ut-content.mjs`, run as `PS_QA_URL=http://localhost:5185
 - Landmark first-clear Moments rewards and an FC-style Evolutions lab are not built. Landmarks come from SBCs and Set rewards.
 - The Standout objective counts Squad Battles, Circuit, Events and Club Season wins. It doesn't count online wins or Draft games.
 - Chemistry pips have no in-match effect. That was deliberate, to keep match strength and online parity unchanged.
+
+---
+
+# Wave 2: FC 27 mechanics — Claude, 2026-11-01
+
+These are modelled on the EA FC 27 research notes. Every rating threshold goes through `onScale`, so each mechanic follows the final rating scale.
+
+| # | Feature | Where | Files |
+|---|---|---|---|
+| 17 | **Item Score**. Curve points by FC overall: Bronze 20, Silver 35, then 75:90, 80:180, 83:410, 84:830, 85:2,100, 86:4,100, 88:8,300, 90:14,000, 92:20,000, 95:40,000, 99:100,000. The overalls are mapped through `onScale` and interpolated log-linearly. Multipliers: Standout/Hot Season ×1.25, Landmark ×1.35, Legend ×1.5, Spotlight ×2, GOAT ×2.5, holo ×1.5 | Shown in the Streamlined sheets | `item-score.ts` |
+| 18 | **Streamlined SBCs**: Gold, Premium, Scout, Elite and Standout streams | SBC tab (top) | `streamlined.ts`, `StreamlinedView.tsx` |
+| 19 | **Daily hub**: Daily Drop + 5-day login calendar + today's 3 objectives with an all-three bonus | Home → Daily card | `daily-hub.ts`, `DailyHubView.tsx` |
+| 20 | **Preview Pack**: see a Premium Gold pack's exact cards, then buy or skip | Store → after Featured | `preview-pack.ts`, `PreviewPack.tsx` |
+| 21 | **Holographic variants** `holo~<card id>` | Packs only | `variants.ts`, `card-editions.css` |
+| 22 | **Walkout sequence**: era → conference/division → franchise → card, with a stage colour per promo | Pack reveals | `walkout.ts`, `PackOpening.tsx`, `content-ui.css` |
+| 23 | **Evolutions lab** | Home → Development → Evolutions Lab | `evolutions.ts`, `EvolutionsView.tsx`, `variants.ts` |
+| 24 | **Rewards inbox** with CLAIM ALL; HOME tab badge | Home → Rewards Inbox | `inbox.ts`, `InboxView.tsx` |
+
+## How each one works
+
+**Streamlined SBCs**
+- Any cards can go in, duplicates included. Locked favourites and players in the starting squad (or the NBA's first three bench spots) are never taken.
+- Progress is saved in `ut.content.streams[id]` and overflow carries over.
+- Each full target deposits the reward pack `stream:<sport>:<id>:<n>`.
+- Targets calibrate themselves: 1.8 × the average Item Score of the reward, measured on 60 seeded packs or picks from the live pool. A stream therefore can't be looped for profit, and it re-scales after the rating merge.
+
+**Login calendar**
+- It moves on each day you claim; missed days don't reset it. FC's calendar works the same way.
+- Rewards:
+
+  | Day | Reward |
+  |---|---|
+  | D1 | Silver Pack + 100 coins |
+  | D2 | 300 coins |
+  | D3 | 200 Season Points |
+  | D4 | Gold pick, 1 of 2 at `onScale(78)`+ |
+  | D5 | Gold Pack + 500 coins |
+
+- The three daily objectives are Codex's existing HQ dailies.
+- The all-three bonus pays 100 coins + a Silver Pack, claimed as `daily-bonus:<day>`.
+
+**Preview Pack**
+- The contents come from a per-player seed (`content.preview.seed`) and the preview number, so reloading never rerolls them.
+- Buying opens exactly the previewed cards (`openNow` preset) and the next preview is ready at once.
+- Skipping advances to the next preview after a 1-hour cooldown.
+- If the Eastern week changes between previewing and buying, a Standout slot could show a different card; at 4% per pack that edge was accepted.
+
+**Holographic variants**
+- Same stats as the edition, plus a pointer-following holo shine written from scratch (colour-dodge sheen, diffraction grating, sparkle field).
+- 4% of the special editions (Standout, Hot Season, Landmark, Legend) drawn in packs come out holo.
+- They are never in picks, SBC rewards or the market.
+
+**Walkout sequence**
+- It plays for golds at `onScale(86)`+ and for every special edition. Bronze and silver have no walkout.
+- The gold "star" walkout threshold moved from `onScale(85)` to `onScale(86)`.
+- Tap to skip, as before; with reduced motion the card shows directly.
+
+**Evolutions**
+
+| Evolution | Eligible | Objectives | Upgrade | Ceiling |
+|---|---|---|---|---|
+| Rising Star I | ≤`onScale(80)`, silver or gold | 3 games, 1 win | +2 OVR, face +2 | `onScale(84)` |
+| Rising Star II (after I) | ≤`onScale(84)` | 4 games, 2 wins | +2 OVR, best 3 +3 | `onScale(87)` |
+| Specialist | ≤`onScale(85)`, gold or Standout | 3 games, 2 wins | +1 OVR, best 2 +4 | `onScale(88)` |
+| Veteran Leader | ≤`onScale(86)`, seasons before 2000 | 5 games, 3 wins | +3 OVR, face +2 | `onScale(89)` |
+
+- Up to 3 evolutions run at once. A match counts once per id, for evolving cards that played in it (any non-draft match).
+- Each evolution is applied once, with APPLY.
+- The owned copy keeps its card id. It shows and plays as `evo~<ids>~<card id>`, which goes on the wire so both phones rate it the same.
+- The lab shows each card's whole chain result before you start.
+- It extends Codex's Development lab, linked from its page.
+
+**Rewards inbox**
+- It aggregates: New Era, Daily Drop, calendar, objectives, the daily bonus, Season Pass tiers, sets, the Standout objective, Draft rewards and finished Evolutions.
+- CLAIM ALL claims everything in one transaction, each with its own receipt. The Daily Drop is deposited as a pack in the Store.
+- Packs and picks still to open are listed with a Store shortcut.
+- The HOME tab badge counts claimables.
+
+## Saves and online
+
+New `ut.content` fields (optional; `normalizeContent` validates them):
+
+| Field | Holds |
+|---|---|
+| `streams` | Streamlined progress and reward counters |
+| `calendar {day, n}` | Login calendar |
+| `preview {seed, n, until?}` | Preview Pack |
+| `evo {uid: {done[], active?}}` | Evolutions per owned copy |
+| `evoSeen` | Match ids already counted for Evolutions |
+
+- `CONTENT_PRINT` is now `ut-content-3`, so wave-1 builds can't resolve holo/evo ids and don't share the online queue with this build.
+- `UT_RULES` is unchanged.
+
+## Tests
+
+`content3.test.ts` (both sports) covers:
+- the Item Score curve and multipliers
+- stream targets: stable, and above the reward's value
+- streams: partial progress, overflow, exactly-once rewards, locked/squad/duplicate exclusions
+- the calendar cycle and once-a-day claims, and the D4 pick
+- the bonus paying once
+- preview determinism across reload, buy/skip and the cooldown
+- holo rating equality and pack-only drops
+- Evolutions: caps, per-match counting, apply once, chain, ceiling, cancel, the wire id, migration
+- walkout thresholds and clues
+- the inbox: listing, CLAIM ALL once, counts
+
+`scripts/qa/ut-content.mjs` now also covers, at 390 and 320 in both sports:
+- Daily hub, calendar, inbox CLAIM ALL
+- Preview Pack: the same cards after a reload, the bought cards matching the preview, skip
+- a Streamlined submission
+- starting and applying an Evolution
+- a holo card's details

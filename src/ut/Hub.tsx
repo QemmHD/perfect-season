@@ -35,6 +35,9 @@ export function Hub(props: {
   // Claude: content drop 2
   onDaily: () => void;
   onNewEra: () => void;
+  onInbox: () => void;
+  inboxReady: number;
+  calendarReady: boolean;
   week: string;
   pool: Pool;
 }) {
@@ -87,13 +90,20 @@ export function Hub(props: {
           <small>One per player. The coins are paid once across both sports.</small>
         </div>
       )}
+      <button className={'ut-home-inbox' + (props.inboxReady ? ' ready' : '')} onClick={props.onInbox}>
+        <span>
+          <i className="eyebrow">REWARDS INBOX</i>
+          <b className="disp">{props.inboxReady ? props.inboxReady + ' ready to claim' : 'All caught up'}</b>
+        </span>
+        {props.inboxReady > 0 ? <b className="num ut-home-inbox-n">{props.inboxReady}</b> : <HQArrow />}
+      </button>
       <div className="ut-home-drops">
         <button className={'ut-home-daily' + (daily.ready ? ' ready' : '')} onClick={() => (daily.ready ? props.onDaily() : props.onGo('store'))}>
           <PackArt kind="daily" label="DAILY" sport={props.sport} small />
           <span>
             <i className="eyebrow">{daily.ready ? 'FREE DAILY DROP' : 'DAILY DROP'}</i>
             <b className="disp">{daily.ready ? 'Open Day ' + daily.streak : 'Day ' + daily.streak + ' claimed'}</b>
-            <small>{daily.ready ? (daily.streak === STREAK_DAYS ? 'Day 7: plus a Gold Pack' : STREAK_DAYS - daily.streak + ' days to a Gold Pack') : 'Back tomorrow'}</small>
+            <small>{daily.ready ? (daily.streak === STREAK_DAYS ? 'Day 7: plus a Gold Pack' : STREAK_DAYS - daily.streak + ' days to a Gold Pack') : props.calendarReady ? 'Calendar reward ready' : 'Calendar · objectives'}</small>
           </span>
         </button>
         <button className="ut-home-so" onClick={() => props.onGo('standouts')}>

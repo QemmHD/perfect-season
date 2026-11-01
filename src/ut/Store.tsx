@@ -157,6 +157,8 @@ export function Store(props: {
   onMarket: (i: number) => void;
   onSwap: () => void;
   onStandouts: () => void;
+  /** Claude wave 2: the Preview Pack card */
+  preview?: React.ReactNode;
 }) {
   const [odds, setOdds] = useState<PackDef | null>(null);
   const [choose, setChoose] = useState(false);
@@ -256,6 +258,7 @@ export function Store(props: {
             {item('jumbo', limitNote('jumbo'), left('jumbo') ? undefined : 'limit')}
             {item('scout', limitNote('scout'), left('scout') ? undefined : 'limit')}
           </div>
+          {props.preview}
           <span className="eyebrow">Gold</span>
           <div className="ut-shop">{['gold', 'premium', 'position'].map((k) => item(k))}</div>
           <span className="eyebrow">Bronze &amp; Silver</span>

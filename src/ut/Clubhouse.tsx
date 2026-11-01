@@ -720,7 +720,8 @@ export function DevelopmentView({
   onCancel,
   onClaim,
   onSquad,
-  onUseCopy
+  onUseCopy,
+  onEvolutions
 }: {
   ut: UtState;
   club: ClubCard[];
@@ -729,6 +730,8 @@ export function DevelopmentView({
   onClaim: () => void;
   onSquad: () => void;
   onUseCopy: (uid: string) => void;
+  /** Claude wave 2: the Evolutions lab (stat upgrades) next to these XP programs */
+  onEvolutions?: () => void;
 }) {
   const h = hqOf(ut),
     [query, setQuery] = useState(''),
@@ -757,6 +760,17 @@ export function DevelopmentView({
           boost through the existing XP and level system.
         </p>
       </div>
+      {onEvolutions && (
+        <button className="hq-mode hq-mode-draft" onClick={onEvolutions}>
+          <IconSquad size={30} />
+          <span>
+            <i className="eyebrow">NEW · STAT UPGRADES WITH CAPS</i>
+            <b className="disp">EVOLUTIONS LAB</b>
+            <small>Play with a card to permanently raise its overall and attributes.</small>
+          </span>
+          <HQArrow />
+        </button>
+      )}
       {a && p ? (
         <div className="hq-development-active">
           <div className="hq-development-card">

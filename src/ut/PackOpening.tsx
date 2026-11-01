@@ -11,6 +11,7 @@ import { PackAtmosphere } from './PackAtmosphere';
 import { packSequence } from './pack-sequence';
 import { GoatCrown, Laurel, Pulse, UtCard, UtCardBack } from './CardArt';
 import { weekLabel } from './editions';
+import { bigWalkout, walkoutClues } from './walkout';
 import { PackArt } from './Hub';
 import { revealOrder, walkoutLevel } from './packs';
 import { seasonText } from './pool';
@@ -63,6 +64,10 @@ export function PackOpening({
   const promoEdition = star?.tier === 'standout' || star?.tier === 'landmark' ? star.tier : null;
   const level = star ? walkoutLevel(star) : 0;
   const sequence = packSequence(star?.tier, level);
+  // Claude wave 2: the big walkout's clue sequence (era → conference/division → franchise → card)
+  const clues = star && level >= 2 && bigWalkout(star) ? walkoutClues(star) : null;
+  const [division, setDivision] = useState(false);
+
   const [surge, setSurge] = useState(false);
   const score = useRef<(() => void)[]>([]);
   const silence = () => {
@@ -103,6 +108,11 @@ export function PackOpening({
       setStep(1);
       sfx.stamp();
     });
+    if (clues)
+      later(Math.round((sequence.position + sequence.team) / 2), () => {
+        setDivision(true);
+        sfx.stamp();
+      });
     later(sequence.team, () => {
       setStep(2);
       sfx.stamp();
@@ -165,6 +175,7 @@ export function PackOpening({
         (surge ? ' is-surge' : '') +
         (special ? ' ut-rare-reveal edition-' + star.tier : '') +
         (promoEdition ? ' ut-promo-reveal edition-' + promoEdition : '') +
+        (clues && phase === 'walkout' ? ' ut-clued ' + clues.stage : '') +
         (walkoutSkipped.current ? ' is-skipped' : '') +
         ' ph-' +
         phase +
@@ -306,10 +317,22 @@ export function PackOpening({
               <span className="eyebrow">{surge ? 'BEYOND 99' : 'THE ARENA IS YOURS'}</span>
             </div>
           )}
-          {step >= 1 && step < 3 && (
+          {step >= 1 && step < 3 && !clues && (
             <span className="ut-walk-pos" key="pos">
               <i className="eyebrow">Position</i>
               <b className="disp">{star.pos}</b>
+            </span>
+          )}
+          {step === 1 && clues && (
+            <span className="ut-walk-pos ut-walk-era" key="era">
+              <i className="eyebrow">Era · {star.pos}</i>
+              <b className="disp">{clues.era}</b>
+              {division && (
+                <span className="ut-walk-conf rise-in">
+                  <i>{clues.conference}</i>
+                  <b>{clues.division}</b>
+                </span>
+              )}
             </span>
           )}
           {step === 2 && (

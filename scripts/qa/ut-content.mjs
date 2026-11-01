@@ -60,6 +60,8 @@ async function run(sport, width, opts = {}) {
       .filter((rc) => rc.line.kind === 'season' && rc.line.fr === fr && Math.floor(rc.line.season / 10) * 10 === Number(decade) && !pids.has(rc.line.pid) && pids.add(rc.line.pid))
       .map((rc) => rc.line.id);
     p.ut.collected = [...new Set([...(p.ut.collected ?? []), ...ids])];
+    const legend = Object.values(pool.buckets.legend).flat()[0];
+    p.ut.owned.push({ uid: 'qa-holo', cardId: 'holo~' + legend.line.id, level: 1, xp: 0, at: 99 });
     p.coins = 40000;
     saveProfile(p);
     void sport;
@@ -91,7 +93,11 @@ async function run(sport, width, opts = {}) {
   // ---- Daily Drop from Home ----
   const before0 = await current();
   const coins0 = before0.coins;
+  await shot(page, 'utc-' + tag + '-home-inbox');
   await page.locator('.ut-home-daily').click();
+  await page.locator('.ut-dailyhub').waitFor();
+  await shot(page, 'utc-' + tag + '-daily-hub');
+  await page.locator('.ut-dailyhub .ut-daily-btn').click();
   await finishOpening(page);
   await page.waitForTimeout(300);
   await shot(page, 'utc-' + tag + '-daily-reveal');
@@ -101,9 +107,29 @@ async function run(sport, width, opts = {}) {
   assert.ok(p.ut.content.daily.streak >= 1, 'streak recorded');
   const ownedAfterDaily = p.ut.owned.length;
   assert.equal(ownedAfterDaily, before0.ut.owned.length + (sport === 'nba' ? 3 : 6));
-  await page.locator('.ut-home-daily').click(); // claimed: goes to the Store, no second drop
+  assert.equal(await page.locator('.ut-dailyhub .ut-daily-btn').count(), 0, 'Daily Drop opens once a day');
+  // ---- login calendar (wave 2) ----
+  const c0 = await current();
+  await page.locator('.ut-cal-claim').click();
   await page.waitForTimeout(300);
-  assert.equal((await current()).ut.owned.length, ownedAfterDaily, 'Daily Drop opens once a day');
+  const c1 = await current();
+  assert.equal(c1.ut.content.calendar.n, 1, 'calendar day 1 claimed');
+  assert.ok(await page.locator('.ut-cal-claim').isDisabled(), 'calendar once a day');
+  assert.ok(c1.ut.packs.length > c0.ut.packs.length, 'calendar day 1 pack');
+  await shot(page, 'utc-' + tag + '-calendar');
+  assert.equal((await current()).ut.owned.length, ownedAfterDaily);
+  // ---- Rewards inbox: CLAIM ALL ----
+  await tab(page, 'HOME');
+  await page.locator('.ut-home-inbox').click();
+  await page.locator('.ut-inbox').waitFor();
+  await shot(page, 'utc-' + tag + '-inbox');
+  const claimAllBtn = page.locator('.ut-claim-all');
+  if (await claimAllBtn.isVisible().catch(() => false)) {
+    await claimAllBtn.click();
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator('.ut-claim-all').count(), 0, 'claim all clears the inbox');
+    await shot(page, 'utc-' + tag + '-inbox-claimed');
+  }
 
   // ---- Store: every new pack ----
   await tab(page, 'STORE');
@@ -167,10 +193,13 @@ async function run(sport, width, opts = {}) {
   await page.waitForTimeout(300);
   await shot(page, 'utc-' + tag + '-sets');
   const sBefore = await current();
-  await page.locator('.ut-set-claim').first().click();
-  await page.waitForTimeout(300);
+  // (the Rewards inbox's CLAIM ALL may already have paid the seeded set)
+  if (await page.locator('.ut-set-claim').count()) {
+    await page.locator('.ut-set-claim').first().click();
+    await page.waitForTimeout(300);
+    assert.ok((await current()).coins > sBefore.coins, 'set pays coins');
+  }
   const sAfter = await current();
-  assert.ok(sAfter.coins > sBefore.coins, 'set pays coins');
   assert.ok(sAfter.ut.content.claims.some((c) => c.startsWith('set:era:')), 'set claimed once');
   await page.getByRole('button', { name: 'Landmarks', exact: true }).click();
   await page.waitForTimeout(500);
@@ -192,6 +221,81 @@ async function run(sport, width, opts = {}) {
   assert.ok((await page.locator('.ut-pips').count()) > 0, 'chemistry pips show');
   await shot(page, 'utc-' + tag + '-squad');
 
+  // ---- Preview Pack (wave 2) ----
+  await tab(page, 'STORE');
+  await page.getByRole('button', { name: 'PACKS', exact: true }).click();
+  await page.getByRole('button', { name: 'PREVIEW A PACK', exact: true }).click();
+  await page.locator('.ut-preview-cards').waitFor();
+  const prev1 = await page.locator('.ut-preview-cards .utc').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  await page.locator('.ut-preview').scrollIntoViewIfNeeded();
+  await shot(page, 'utc-' + tag + '-preview');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /Ultimate Team:/ }).click();
+  await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor({ timeout: 60000 });
+  await tab(page, 'STORE');
+  await page.locator('.ut-preview-cards').waitFor();
+  const prev2 = await page.locator('.ut-preview-cards .utc').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  assert.deepEqual(prev2, prev1, 'a reload shows the same preview');
+  const pv0 = await current();
+  await page.getByRole('button', { name: /^Buy the previewed pack/ }).click();
+  await finishOpening(page);
+  const opened = await page.locator('.ut-reveal-grid .utc').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  assert.deepEqual([...opened].sort(), [...prev1].sort(), 'bought exactly the previewed cards');
+  await closeOpening(page);
+  assert.ok((await current()).coins < pv0.coins, 'preview pack charged');
+  await page.getByRole('button', { name: 'SKIP', exact: true }).click();
+  await page.locator('.ut-preview-wait').waitFor();
+
+  // ---- Streamlined SBC (wave 2) ----
+  await tab(page, 'SBC');
+  await page.locator('.ut-stream').first().click();
+  await page.locator('.ut-stream-sheet').waitFor();
+  await page.locator('.ut-stream-card').nth(0).click();
+  await page.locator('.ut-stream-card').nth(1).click();
+  await shot(page, 'utc-' + tag + '-stream');
+  await page.getByRole('button', { name: /^ADD 2 CARDS/ }).click();
+  await page.waitForTimeout(500);
+  assert.ok((await current()).ut.content.streams.gold > 0, 'stream progress saved');
+
+  // ---- Evolutions lab (wave 2) ----
+  await tab(page, 'HOME');
+  await page.getByRole('button', { name: /DEVELOPMENT/ }).click();
+  await page.getByRole('button', { name: /EVOLUTIONS LAB/ }).click();
+  await page.locator('.ut-evos').waitFor();
+  await shot(page, 'utc-' + tag + '-evolutions');
+  await page.locator('.ut-evo-def .btn').first().click();
+  await page.locator('.ut-evo-choose').waitFor();
+  await shot(page, 'utc-' + tag + '-evo-choose');
+  await page.locator('.ut-evo-row .btn:not([disabled])').first().click();
+  await page.waitForTimeout(400);
+  const evoUid = Object.keys((await current()).ut.content.evo)[0];
+  assert.ok(evoUid, 'an evolution started');
+  // finish its objectives (the matches themselves are covered by the unit tests), then apply it
+  await page.evaluate(async (uid) => {
+    const { loadProfile, saveProfile } = await import('/src/lib/profile.ts');
+    const p = loadProfile();
+    p.ut.content.evo[uid].active.games = 9;
+    p.ut.content.evo[uid].active.wins = 9;
+    saveProfile(p);
+  }, evoUid);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /Ultimate Team:/ }).click();
+  await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor({ timeout: 60000 });
+  await page.getByRole('button', { name: /DEVELOPMENT/ }).click();
+  await page.getByRole('button', { name: /EVOLUTIONS LAB/ }).click();
+  await page.getByRole('button', { name: 'APPLY', exact: true }).click();
+  await page.waitForTimeout(400);
+  assert.deepEqual((await current()).ut.content.evo[evoUid].done, ['rising-1'], 'evolution applied once');
+  await shot(page, 'utc-' + tag + '-evo-applied');
+
+  // ---- holographic card details (seeded holo legend) ----
+  await tab(page, 'CLUB');
+  await page.locator('.ut-gridcard', { has: page.locator('.utc.is-holo') }).first().click();
+  await page.waitForTimeout(500);
+  await shot(page, 'utc-' + tag + '-holo');
+  await page.getByRole('button', { name: 'CLOSE', exact: true }).click();
+  await page.waitForTimeout(300);
+
   // ---- Favourite / LOCK from the card details ----
   await tab(page, 'CLUB');
   await page.locator('.ut-gridcard').first().click();
@@ -208,6 +312,7 @@ async function run(sport, width, opts = {}) {
   await page.getByRole('button', { name: /UT DRAFT/ }).click();
   await page.waitForTimeout(300);
   await shot(page, 'utc-' + tag + '-draft-intro');
+  const ownedBeforeDraft = (await current()).ut.owned.length;
   await page.getByRole('button', { name: 'FREE WEEKLY ENTRY', exact: true }).click();
   await page.locator('.ut-draft-opt').first().waitFor();
   await shot(page, 'utc-' + tag + '-draft-captain');
@@ -218,7 +323,7 @@ async function run(sport, width, opts = {}) {
   await page.locator('.ut-draft-next .btn').waitFor();
   await shot(page, 'utc-' + tag + '-draft-ready');
   const dBefore = await current();
-  assert.equal(dBefore.ut.owned.length, mAfter.ut.owned.length, 'drafting never touches the club');
+  assert.equal(dBefore.ut.owned.length, ownedBeforeDraft, 'drafting never touches the club');
   await page.locator('.ut-draft-next .btn').click();
   await page.locator('.vote-opt.sim').click({ timeout: 30000 });
   await page.locator('.utm-result').waitFor({ timeout: 90000 });

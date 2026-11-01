@@ -65,6 +65,18 @@ import { SetsView } from './SetsView';
 import { DraftView } from './DraftView';
 import './content-ui.css';
 import { claimNewEra, newEraPickId } from './new-era';
+import { cancelEvo, claimEvo, playId, startEvo } from './evolutions';
+import { EvolutionsView } from './EvolutionsView';
+import { calendarStatus, claimCalendar, claimDailyBonus } from './daily-hub';
+import { DailyHubView } from './DailyHubView';
+import { claimAll, inboxCount, inboxItems } from './inbox';
+import { InboxView } from './InboxView';
+import { nextPreview, previewCards, previewId, PREVIEW_KIND, withPreviewSeed } from './preview-pack';
+import { PreviewPack } from './PreviewPack';
+import { submitStream } from './streamlined';
+import { StreamlinedSection } from './StreamlinedView';
+import { itemScore } from './item-score';
+import { claimObjective as claimObjectiveFn } from './progression';
 
 /** An owned card with its rating and where it plays (if it's in the squad). */
 export interface ClubCard {
@@ -95,7 +107,10 @@ export type UtView =
   | 'records'
   | 'standouts'
   | 'sets'
-  | 'draft';
+  | 'draft'
+  | 'daily'
+  | 'evolutions'
+  | 'inbox';
 
 /** the view to come back to after a match (the screen unmounts while it's played) */
 let lastView: UtView = 'hub';
@@ -175,18 +190,19 @@ export default function UltimateTeam(props: {
     const stored = new Set(ut.duplicateStorage ?? []);
     for (const oc of ut.owned) {
       if (stored.has(oc.uid)) continue;
-      const rc = ratedOf(pool, oc);
+      // Claude wave 2: an evolved copy shows and plays as its evolved variant (evolutions.ts)
+      const rc = ratedOf(pool, { cardId: playId(ut, oc), level: oc.level });
       if (rc) out.push({ uid: oc.uid, oc, rc, slot: slotOf.get(oc.uid) ?? null });
     }
     return out;
-  }, [pool, ut.owned, ut.duplicateStorage, slotOf]);
+  }, [pool, ut.owned, ut.duplicateStorage, slotOf, ut.content?.evo]);
   const stored: ClubCard[] = useMemo(() => {
     if (!pool) return [];
     return storedCards(ut).flatMap((oc) => {
-      const rc = ratedOf(pool, oc);
+      const rc = ratedOf(pool, { cardId: playId(ut, oc), level: oc.level });
       return rc ? [{ uid: oc.uid, oc, rc, slot: null, storage: true }] : [];
     });
-  }, [pool, ut.owned, ut.duplicateStorage]);
+  }, [pool, ut.owned, ut.duplicateStorage, ut.content?.evo]);
   const inventory = useMemo(() => [...club, ...stored], [club, stored]);
   const byUid = useMemo(() => new Map(inventory.map((c) => [c.uid, c])), [inventory]);
   const lineup: Lineup = useMemo(() => Object.fromEntries(Object.entries(ut.squad).map(([s, u]) => [s, byUid.get(u)?.rc ?? null])), [ut.squad, byUid]);
@@ -272,7 +288,7 @@ export default function UltimateTeam(props: {
 
   /** Open a pack now: its cards go into the club at once (closing the app mid-reveal keeps them).
    * `fill`: an empty squad is built from the club, these cards included (the starter pack). */
-  const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile, fill = false, guard?: (p: Profile) => boolean) => {
+  const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile, fill = false, guard?: (p: Profile) => boolean, preset?: RatedCard[]) => {
     // Claude: a reserved Spotlight pack only holds other packs while its registry request is in
     // flight. Before, one failed request (offline, a dropped connection) blocked every pack, the
     // starter and reward packs included, until the registry answered. The reservation itself, its
@@ -284,7 +300,8 @@ export default function UltimateTeam(props: {
     busy.current = true;
     window.setTimeout(() => (busy.current = false), 600);
     // truly random cards (`seed` only names the pack and its cards' ids)
-    const cards = openPack(pool, kind);
+    // Claude: a Preview Pack opens exactly the cards it showed
+    const cards = preset ?? openPack(pool, kind);
     const at = Date.now();
     const owned = ownedCardsForPack(cards, seed, at);
     const helper = packTags(pool, ut, lineup, cards);
@@ -452,6 +469,85 @@ export default function UltimateTeam(props: {
     vibrate([20, 40, 20]);
     if (shown.coins > latest.current.coins) onToast('+' + (shown.coins - latest.current.coins).toLocaleString('en-US') + ' coins. Now choose your Icon.');
     setPickOpen(newEraPickId(SPORT));
+  };
+
+  // ---------- Claude wave 2: daily hub, preview pack, streams, evolutions, inbox ----------
+
+  const claimCalendarDay = () => {
+    if (!pool) return;
+    const at = Date.now();
+    const shown = claimCalendar(latest.current.ut, pool, day, at);
+    if (!shown) return;
+    update((p) => {
+      const r = claimCalendar(p.ut, pool, day, at);
+      return r ? { ...p, coins: p.coins + r.coins, ut: r.ut } : p;
+    });
+    sfx.coin();
+    if (shown.reward.pick) setPickOpen('calendar:' + SPORT + ':' + day);
+    else onToast('Login calendar day ' + shown.reward.day + ': ' + shown.reward.label + (shown.reward.pack ? ' (in your Store)' : '') + '.');
+  };
+
+  const claimBonus = () => {
+    const at = Date.now();
+    const shown = claimDailyBonus(latest.current.ut, SPORT, day, at);
+    if (!shown) return;
+    update((p) => {
+      const r = claimDailyBonus(p.ut, SPORT, day, at);
+      return r ? { ...p, coins: p.coins + r.coins, ut: r.ut } : p;
+    });
+    sfx.levelUp();
+    onToast('All three done! +' + shown.coins + ' coins and a Silver Pack in your Store.');
+  };
+
+  const startPreview = () => setUt((u) => withPreviewSeed(u, newId().replace(/-/g, '').slice(0, 12)));
+  const buyPreview = () => {
+    if (!pool) return;
+    const id = previewId(ut);
+    const price = packDefs(SPORT)[PREVIEW_KIND].price;
+    if (!id) return;
+    if (profile.coins < price) {
+      sfx.nope();
+      return onToast('Not enough coins yet: ' + (price - profile.coins).toLocaleString('en-US') + ' more.');
+    }
+    const cards = previewCards(pool, ut, week);
+    const at = Date.now();
+    sfx.coin();
+    openNow(PREVIEW_KIND, id, 'Preview Pack', (p) => ({ ...p, coins: p.coins - price, ut: nextPreview(p.ut, true, at) }), false, (p) => p.coins >= price && previewId(p.ut) === id, cards);
+  };
+  const skipPreview = () => {
+    const at = Date.now();
+    setUt((u) => nextPreview(u, false, at));
+    onToast('Skipped. Your next preview is ready in an hour.');
+  };
+
+  const submitStreamCards = (id: string, uids: string[]) => {
+    if (!pool) return;
+    const score = (uid: string) => {
+      const c = byUid.get(uid);
+      return c ? itemScore(c.rc) : null;
+    };
+    const at = Date.now();
+    const shown = submitStream(latest.current.ut, pool, id, uids, score, at);
+    if (!shown) return onToast('Those cards can’t go in (locked or playing in your squad).');
+    update((p) => {
+      const r = submitStream(p.ut, pool, id, uids, score, at);
+      return r ? { ...p, ut: r.ut } : p;
+    });
+    sfx.levelUp();
+    onToast('+' + shown.points.toLocaleString('en-US') + ' points.' + (shown.rewards ? ' ' + shown.rewards + (shown.rewards === 1 ? ' reward' : ' rewards') + ' in your Store!' : ''));
+  };
+
+  const inbox = pool ? inboxItems(pool, profile, day, week) : [];
+  const inboxReady = pool ? inboxCount(pool, profile, day, week) : 0;
+  const claimEverything = () => {
+    if (!pool) return;
+    const at = Date.now();
+    const shown = claimAll(pool, latest.current, day, week, at);
+    if (!shown.claimed) return;
+    update((p) => claimAll(pool, p, day, week, at).profile);
+    sfx.levelUp();
+    vibrate([20, 40, 20]);
+    onToast('Claimed ' + shown.claimed + (shown.claimed === 1 ? ' reward' : ' rewards') + (shown.coins ? ' · +' + shown.coins.toLocaleString('en-US') + ' coins' : '') + '. Packs and picks are in your Store.');
   };
 
   const claimObjectivePick = () => {
@@ -799,6 +895,7 @@ export default function UltimateTeam(props: {
           );
         }}
         onSquad={() => go('squad')}
+        onEvolutions={() => go('evolutions')}
         onStart={(uid, path) => {
           const at = Date.now();
           setUt((u) => startDevelopment(u, uid, path, at));
@@ -821,6 +918,46 @@ export default function UltimateTeam(props: {
       />
     );
   else if (view === 'records') body = <ClubRecords ut={ut} />;
+  else if (view === 'daily')
+    body = (
+      <DailyHubView
+        ut={ut}
+        day={day}
+        sport={SPORT}
+        onDrop={claimDailyDrop}
+        onCalendar={claimCalendarDay}
+        onObjective={(id) => {
+          const at = Date.now();
+          claimPrize((u) => claimObjectiveFn(u, id, day, at));
+        }}
+        onBonus={claimBonus}
+      />
+    );
+  else if (view === 'inbox') body = <InboxView items={inbox} onClaimAll={claimEverything} onStore={() => go('store')} onDaily={() => go('daily')} />;
+  else if (view === 'evolutions')
+    body = (
+      <EvolutionsView
+        pool={pool}
+        ut={ut}
+        club={inventory}
+        onInspect={setDetail}
+        onStart={(uid, evoId) => {
+          const c = byUid.get(uid);
+          if (!c) return;
+          const at = Date.now();
+          setUt((u) => startEvo(u, pool, uid, c.rc, evoId, at));
+          sfx.select();
+          onToast('Evolution started. Play matches with ' + c.rc.line.name + ' in your squad.');
+        }}
+        onCancel={(uid) => setUt((u) => cancelEvo(u, uid))}
+        onClaim={(uid) => {
+          setUt((u) => claimEvo(u, uid));
+          sfx.levelUp();
+          vibrate([20, 40, 20]);
+          onToast('Evolution applied. The upgrade is permanent.');
+        }}
+      />
+    );
   else if (view === 'standouts')
     body = <StandoutsView pool={pool} ut={ut} week={week} sbcDone={!!sbcDone['so:' + week]} onGo={go} onClaim={claimObjectivePick} />;
   else if (view === 'sets') body = <SetsView pool={pool} ut={ut} onClaim={claimSetReward} onSbc={() => go('sbc')} />;
@@ -968,6 +1105,7 @@ export default function UltimateTeam(props: {
           onMarket={buyFromMarket}
           onSwap={swap}
           onStandouts={() => go('standouts')}
+          preview={<PreviewPack pool={pool} ut={ut} week={week} coins={profile.coins} now={Date.now()} onStart={startPreview} onBuy={buyPreview} onSkip={skipPreview} />}
         />
       </>
     );
@@ -1022,6 +1160,7 @@ export default function UltimateTeam(props: {
         sbcs={sbcs}
         done={sbcDone}
         club={inventory.filter((c) => !isLocked(ut, c.uid))}
+        extra={<StreamlinedSection pool={pool} ut={ut} club={inventory} onSubmit={submitStreamCards} />}
         day={day}
         onSubmit={submitSbc}
         onToast={onToast}
@@ -1041,7 +1180,10 @@ export default function UltimateTeam(props: {
         onInspect={setDetail}
         onGo={go}
         onStarter={claimStarter}
-        onDaily={claimDailyDrop}
+        onDaily={() => go('daily')}
+        onInbox={() => go('inbox')}
+        inboxReady={inboxReady}
+        calendarReady={calendarStatus(ut, day).ready}
         onNewEra={claimNewEraBundle}
         week={week}
         pool={pool}
@@ -1081,7 +1223,10 @@ export default function UltimateTeam(props: {
                   records: 'Club Records',
                   standouts: 'Weekly Standouts',
                   sets: 'Set Collections',
-                  draft: 'UT Draft'
+                  draft: 'UT Draft',
+                  daily: 'Daily',
+                  evolutions: 'Evolutions',
+                  inbox: 'Rewards'
                 } as Partial<Record<UtView, string>>
               )[view] ??
               TABS.find((t) => t[0] === view)?.[1] ??
@@ -1098,6 +1243,7 @@ export default function UltimateTeam(props: {
             {icon}
             <span>{label}</span>
             {k === 'sbc' && pool && todo > 0 && <i className="ut-dot num">{todo}</i>}
+            {k === 'hub' && inboxReady > 0 && <i className="ut-dot num">{inboxReady}</i>}
             {k === 'store' && (ut.packs.length > 0 || !ut.starterClaimed) && <i className="ut-dot num">{ut.packs.length + (ut.starterClaimed ? 0 : 1)}</i>}
           </button>
         ))}

@@ -47,6 +47,7 @@ import './match.css';
 // Claude 2026-11-01: UT Draft matches and the Weekly Standouts objective
 import { DRAFT_GAMES, draftOf, draftRung, draftWire, settleDraft } from './draft-mode';
 import { recordStandoutWin } from './content-progress';
+import { playId, recordEvoMatch } from './evolutions';
 
 /**
  * The queue of its own: Ultimate Team squads never pair with draft head to heads, nor with a build
@@ -137,7 +138,7 @@ function mySide(pool: Pool, ut: UtState, name: string): Side {
   const raw: SquadWire = [];
   for (const [slot, uid] of Object.entries(ut.squad)) {
     const o = byUid.get(uid);
-    if (o) raw.push([slot, o.cardId, o.level]);
+    if (o) raw.push([slot, playId(ut, o), o.level]);
   }
   const sq = squadFromWire(pool, raw);
   return { name, sq, wire: squadToWire(sq), rating: ratingOf(SPORT, sq), fav: favoriteFor(SPORT) };
@@ -484,7 +485,8 @@ export default function UtMatch(props: {
     const cardIds = s.me.wire.map((w) => w[1]);
     props.update((p) => {
       const r = settle(p.ut, input);
-      return { ...p, coins: p.coins + r.coins, ut: s.online ? r.ut : recordStandoutWin(r.ut, { matchId: input.matchId, week, won: d.won, cardIds }) };
+      const evo = recordEvoMatch(r.ut, { matchId: input.matchId, won: d.won, played: input.played });
+      return { ...p, coins: p.coins + r.coins, ut: s.online ? evo : recordStandoutWin(evo, { matchId: input.matchId, week, won: d.won, cardIds }) };
     });
     // our final state lingers a while, for a phone still finishing
     connRef.current?.close(false, 30000);

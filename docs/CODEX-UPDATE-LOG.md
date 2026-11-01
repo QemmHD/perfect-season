@@ -510,3 +510,20 @@ Tests:
 - New: `content2.test.ts` (both sports).
 - Changed: `economy.test.ts` now skips free and pick packs in its quick-sell bound.
 - Browser QA: `scripts/qa/ut-content.mjs` at 390 and 320 in both sports, with zero page errors.
+
+### UT content wave 2 (FC 27 mechanics) — Claude, 2026-11-01 (branch `claude/ut-content`, not deployed)
+
+Added:
+- Item Score and Streamlined SBCs.
+- A Daily hub: login calendar plus an all-three objectives bonus.
+- The Preview Pack.
+- Holographic variants (`holo~` ids).
+- The walkout clue sequence: era → conference/division → franchise, with promo stage colours.
+- An Evolutions lab: `evo~` play ids, while the owned copy's id stays unchanged.
+- A Rewards inbox with CLAIM ALL.
+
+Saves and online:
+- New state stays inside optional `ut.content`.
+- `CONTENT_PRINT` is now `ut-content-3`; no rule or base rating changes.
+
+Validation and details: the "Wave 2" section of [UT-CONTENT-2.md](UT-CONTENT-2.md), `content3.test.ts`, and `scripts/qa/ut-content.mjs`.
