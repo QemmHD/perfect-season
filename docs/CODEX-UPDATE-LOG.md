@@ -632,3 +632,18 @@ What changed:
 Connections, saves and queues for NBA/NFL: unchanged (no profile field, key, card id, rating, price, odds or queue changes). Basketball's and football's `DATA_V` are the same as before.
 
 Validation (Claude, 2026-11-01): `npm run typecheck`; `npm test` — NBA 481 passed, NFL 448 passed, soccer run (`PS_SPORT=soccer vitest run soccer sport-branches`) 53 passed; `npm run build` (static entry 3.71 → 3.76 MB, gzip 1.19 → 1.22 MB; install precache 17.46 → 17.52 MB with no soccer chunk or sound in it; soccer data chunks 1.0 MB and 3.7 MB load on first use); the artifact build (NBA/NFL only, no soccer data). Browser QA (Chromium): `scripts/qa/soccer-app.mjs` switch, draft → season → cup → results, a 1 vs 1 autopilot match, UT starter → squad (formation change) → Squad Battles match → Store, and Home/draft/UT at 430/390/320, all without page errors; `scripts/qa/online.mjs soccer` (two clients, soccer UT queue, settled once each); `scripts/qa/ui-reorg.mjs all all` for NBA and NFL: 204 screens clean. Not yet: an iPhone playtest of the soccer controls.
+
+## Final release QA — Claude (Anthropic), 2026-11-01 (branch `claude/final-qa`, from `1cc9835`, not deployed)
+
+Purpose: the last pass before the live Pages release. Builds (`npm run build`, `npm run audit:ratings`, the testpage build), every browser QA script, a WebKit smoke, an old-save migration check and a visual sweep at 390×844 and 320×568 in all three sports.
+
+Fixed (display only; no save, key, card ID, claim ID, price, odds, reward or queue change):
+- `8d0f5a0` first-launch team picker: the soccer change had flipped `FavPicker`'s opening tab (a new NBA player saw the NFL grid under "PICK AN NBA TEAM"; a soccer player the NBA grid under "PICK A CLUB"). `firstFavTab` in `lib/favorites.ts` (+ test); Welcome asks for this sport first; SOCCER tab label upper case.
+- `4a31ca3`, `ebbac9b` match HUD at 320px: the score bug (football's clock; basketball's two-digit scores and eight-letter rival) and basketball's 16 possession marks were wider than the screen. A `max-width: 350px` block in `styles.css` (football also drops the spot). `gameplay.mjs` asserts both at 320.
+- `bb3f714` soccer UT result: attack outcomes were bare letters with goals unhighlighted; now GOAL/SAVE/WIDE/BLK/LOST/OFF, goals highlighted.
+- `55691cb` NFL squad pitch: an offset RB, so on 320×568/375×667 his card no longer covers the QB tag. `75ce69a` soccer pitch: wider centre backs, 3-5-2's CB/CDM higher, 4-2-3-1's holding pair wider (3-5-2's CB hid the keeper's rating at every size). Measured card/tag overlaps: none at 390×844; at 320×568 only 3-5-2's CB tag still touches the keeper.
+- `7117a12` QA scripts `content`, `polish`, `reveal`, `circulation`, `ui-extras` updated to the reorganised UT navigation and renamed labels (assertions unchanged).
+
+Verified: typecheck; UT/lib/ui tests both sports, soccer run; all QA scripts except `cloud.mjs`/`cloud-backend.mjs` (they write to the live save backend); WebKitGTK 2.52 MiniBrowser smoke (preview build, 3 sports × 2 sizes, 48 steps, no page errors); old saves made by the 7285ced build and by the Codex 3417c1a build keep every copy, level, XP, squad slot, serial, duplicate-storage UID, `ut.hq` field, coin and key; New Era pays 65,000 once across sports and reloads, one Icon pick per eligible sport (waits in the Store if left), never for a new player.
+
+QA side effect to note: generating the Codex-era fixture with the 3417c1a build without `?ns=inspect` registered three throwaway NBA copies in the **live** registry namespace (1961 Richie Guerin NYK, 1996 Tim Hardaway GSW, 1973 Wes Unseld WAS, each serial 1) and saved one encrypted cloud save for a throwaway identity. No player data was touched.
