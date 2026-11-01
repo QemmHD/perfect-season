@@ -27,6 +27,11 @@ async function request(query: string, body?: unknown): Promise<any> {
       headers: { apikey: REGISTRY_PUBLIC_KEY, 'Content-Type': 'application/json' },
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: controller.signal,
+    }).catch((e: unknown) => {
+      // Claude: a failed connection surfaced as "Failed to fetch" / "Load failed" (Safari).
+      if (e instanceof TypeError)
+        throw new Error('Can’t reach the card registry right now. No coins were charged. Retry when you’re back online.');
+      throw e;
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Card registry unavailable. Retry your pack.');

@@ -248,8 +248,12 @@ export default function UltimateTeam(props: {
   /** Open a pack now: its cards go into the club at once (closing the app mid-reveal keeps them).
    * `fill`: an empty squad is built from the club, these cards included (the starter pack). */
   const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile, fill = false) => {
-    if (!pool || busy.current || promoBusy || ut.pendingPromo) {
-      if (ut.pendingPromo) onToast('Finish your reserved pack in the Store first.');
+    // Claude: a reserved Spotlight pack only holds other packs while its registry request is in
+    // flight. Before, one failed request (offline, a dropped connection) blocked every pack, the
+    // starter and reward packs included, until the registry answered. The reservation itself, its
+    // same-ID retry and the charge-on-arrival rule are unchanged.
+    if (!pool || busy.current || promoBusy) {
+      if (promoBusy) onToast('Your Spotlight pack is registering. Try again in a moment.');
       return;
     }
     busy.current = true;
@@ -694,6 +698,7 @@ export default function UltimateTeam(props: {
               <p>
                 {promoError ||
                   'Your pull is being checked and saved. Coins are charged once when the cards arrive.'}
+                {!promoBusy && ' Your other packs still open normally.'}
               </p>
               {!promoBusy && (
                 <button

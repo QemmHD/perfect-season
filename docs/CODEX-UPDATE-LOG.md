@@ -438,6 +438,32 @@ Connections: `Sheet` is used by Settings, Cloud Save, Store, card details, SBC, 
 - Online queues stay NBA 8 / NFL 9.
 - Work is pushed only to `feature/season-evolution`. **Not merged to main, not deployed to live Pages**, and the owner-private Sites preview has **not** been redeployed with these fixes: that deployment is controlled from Codex's/the owner's OpenAI Sites project. Physical installed-iPhone checks of the swipe gesture and season flow remain owner checks.
 
+### Pack fix after owner testing — Claude, 2026-11-01
+
+**Found by the owner on the test page ("packs don't work"), reproduced and fixed by Claude.**
+
+Bug, reproduced in Chromium and WebKit:
+- Buying a Spotlight pack reserves it (`ut.pendingPromo`) and asks the card registry for the pull.
+- If that request failed (offline, a dropped connection, or the test page, where the sandbox blocks the registry), the Store showed "Failed to fetch".
+- **Every other pack was then blocked** ("Finish your reserved pack in the Store first."), including Bronze through Premium, the starter pack and reward packs. This lasted until the registry answered, which on the test page is never.
+
+Fix:
+- `openNow` in `src/ut/UltimateTeam.tsx` now waits only while a registry request is actually in flight. A reserved Spotlight that failed no longer holds other packs.
+- The reservation, its same-ID retry, charge-on-arrival and receipt validation in `promo.ts` are unchanged. Only one Spotlight can be reserved at a time, as before.
+- `src/ut/registry.ts` turns a failed connection into "Can't reach the card registry right now. No coins were charged. Retry when you're back online." The Store adds "Your other packs still open normally."
+
+Validation:
+- New check `reserved-pack` (Chromium, both sports, registry blocked):
+  - The Spotlight is reserved and not charged.
+  - A Gold pack opens and is charged 900, adding its cards (5 NBA / 12 NFL).
+  - The reservation is kept.
+  - With the connection back, RETRY SAME PACK completes the Spotlight once (charged 3,500, reservation cleared).
+  - Original copies are kept and there are no page errors.
+- WebKitGTK on the restricted test build: starter, Gold and Silver open, and Silver opens while a Spotlight is reserved.
+- Codex's `scripts/qa/content.mjs` (failed Spotlight → reload recovery, inspect namespace), typecheck and both test suites: see the commit message.
+
+On the claude.ai test page the Spotlight pack can never complete, because the registry is blocked there. Every other pack works.
+
 ### Separate Claude test copy (owner-private claude.ai page)
 
 At the owner's request, Claude published the production build of `02ccdbc` (`npm run build`, version `20261101.0606-02ccdbc`) as an owner-private claude.ai page: https://claude.ai/artifact/38vSryyQVZLARkNKvq1g6W . It is **not** the Sites preview, and it doesn't replace it.
