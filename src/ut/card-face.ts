@@ -59,6 +59,26 @@ const NFL_FACE_KEYS: Record<string, [string, string][]> = {
   CB: [['SPD', 'Speed'], ['MCV', 'Man coverage'], ['ZCV', 'Zone coverage'], ['PRS', 'Press'], ['PRC', 'Play recognition'], ['CTH', 'Catching']],
 };
 
+/**
+ * Soccer faces (Claude 2026-11-01): PAC SHO PAS DRI DEF PHY, keepers DIV HAN KIC REF SPD POS, as the
+ * card file carries them (scripts/build_soccer_cards.py), and each position's overall weights there.
+ */
+export const SOCCER_OUT_FACE: [string, string][] = [['PAC', 'Pace'], ['SHO', 'Shooting'], ['PAS', 'Passing'], ['DRI', 'Dribbling'], ['DEF', 'Defending'], ['PHY', 'Physical']];
+export const SOCCER_GK_FACE: [string, string][] = [['DIV', 'Diving'], ['HAN', 'Handling'], ['KIC', 'Kicking'], ['REF', 'Reflexes'], ['SPD', 'Speed'], ['POS', 'Positioning']];
+const SOCCER_WEIGHTS: Record<string, Record<string, number>> = {
+  ST: { SHO: 0.45, DRI: 0.18, PAC: 0.15, PHY: 0.12, PAS: 0.1 },
+  W: { DRI: 0.3, PAC: 0.25, SHO: 0.2, PAS: 0.2, PHY: 0.05 },
+  AM: { PAS: 0.3, DRI: 0.3, SHO: 0.2, PAC: 0.1, DEF: 0.05, PHY: 0.05 },
+  CM: { PAS: 0.35, DRI: 0.2, DEF: 0.15, PHY: 0.15, SHO: 0.1, PAC: 0.05 },
+  DM: { DEF: 0.35, PAS: 0.25, PHY: 0.25, DRI: 0.1, PAC: 0.05 },
+  FB: { DEF: 0.3, PAC: 0.25, PAS: 0.2, PHY: 0.15, DRI: 0.1 },
+  CB: { DEF: 0.55, PHY: 0.3, PAC: 0.1, PAS: 0.05 },
+  GK: { REF: 0.25, DIV: 0.22, POS: 0.22, HAN: 0.2, KIC: 0.08, SPD: 0.03 },
+};
+export function soccerFaceKeys(pos: string): [string, string][] {
+  return pos === 'GK' ? SOCCER_GK_FACE : SOCCER_OUT_FACE;
+}
+
 export function nflFaceKeys(pos: string): [string, string][] {
   return NFL_FACE_KEYS[groupOf(pos)] ?? NFL_FACE_KEYS.WR;
 }
@@ -76,12 +96,14 @@ export function nbaCategory(cat: FaceCategory, attrs: Record<string, number>, ca
 
 /** The six numbers printed on the card: [code, name, value]. */
 export function faceOf(sport: UtSport, pos: string, attrs: Record<string, number>, cap = 99): [string, string, number][] {
+  if (sport === 'soccer') return soccerFaceKeys(pos).map(([code, label]) => [code, label, Math.max(1, Math.min(cap, attrs[code] ?? 50))]);
   if (sport === 'nba') return NBA_FACE.map((c) => [c.code, c.label, nbaCategory(c, attrs, cap)]);
   return nflFaceKeys(pos).map(([code, label]) => [code, label, attrs[code] ?? 50]);
 }
 
 /** Face code → its weight in this position's overall (basketball: in the card's best role). */
 export function faceWeights(sport: UtSport, pos: string, attrs?: Record<string, number>): Record<string, number> {
+  if (sport === 'soccer') return SOCCER_WEIGHTS[pos] ?? SOCCER_WEIGHTS.CM;
   if (sport === 'nba') return NBA_ROLES[attrs ? nbaRole(pos, attrs) : (NBA_POSITION_ROLES[pos] ?? NBA_POSITION_ROLES.SF)[0]].w;
   const role = roleWeights('nfl', pos);
   return Object.fromEntries(nflFaceKeys(pos).map(([code]) => [code, role[code] ?? 0]));
@@ -119,6 +141,17 @@ function nbaSpec(role: string): FaceSpec {
   return spec;
 }
 function specOf(sport: UtSport, pos: string, attrs: Record<string, number>): FaceSpec {
+  if (sport === 'soccer') {
+    const k = 'soccer:' + pos;
+    let spec = specs.get(k);
+    if (!spec) {
+      const w = faceWeights(sport, pos);
+      const entries = soccerFaceKeys(pos).map(([code]) => ({ parts: [[code, 1]] as [string, number][], top: 0, w: w[code] ?? 0 })).filter((e) => e.w > 0);
+      spec = { entries, total: entries.reduce((n, e) => n + e.w, 0), feeding: Object.keys(w) };
+      specs.set(k, spec);
+    }
+    return spec;
+  }
   if (sport === 'nba') return nbaSpec(nbaRole(pos, attrs));
   const k = 'nfl:' + groupOf(pos);
   let spec = specs.get(k);
@@ -160,7 +193,7 @@ export function shownFaceMean(sport: UtSport, pos: string, attrs: Record<string,
 }
 
 /** Measured or directly observed: never moved to fit an overall. */
-const PROTECTED: Record<UtSport, string[]> = { nba: ['FT', 'SPD', 'ACC'], nfl: ['SPD', 'ACC', 'AGI', 'STR', 'THP'] };
+const PROTECTED: Record<UtSport, string[]> = { nba: ['FT', 'SPD', 'ACC'], nfl: ['SPD', 'ACC', 'AGI', 'STR', 'THP'], soccer: ['PAC', 'SPD'] };
 
 export interface SupportOptions {
   /** codes that came from a same-era benchmark: they move at most 3 */

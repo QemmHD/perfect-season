@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // Implemented by Codex. Overall must be supported by the attributes used in the actual match.
 import type { UtSport } from "./types";
 const NBA: Record<string, Record<string, number>> = {
@@ -112,7 +113,8 @@ function group(pos: string) {
   return pos === "DB" ? "CB" : pos === "FB" ? "RB" : pos;
 }
 export function roleWeights(sport: UtSport, pos: string) {
-  return sport === "nba" ? (NBA[pos] ?? NBA.SF) : (NFL[group(pos)] ?? NFL.WR);
+  // soccer cards carry their own overall (rate.ts rateSoccerCard): basketball's weights only as a placeholder
+  return pickFor(sport, { nba: () => NBA[pos] ?? NBA.SF, nfl: () => NFL[group(pos)] ?? NFL.WR, soccer: () => NBA.SF })();
 }
 /** A specialist can be great without mastering unrelated skills. Only meaningful position skills count. */
 export function profileQuality(

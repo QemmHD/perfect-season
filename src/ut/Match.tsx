@@ -14,7 +14,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { levelInfo } from '../engine/economy';
 import { hashString } from '../engine/rng';
 import { easternDateKey } from '../engine/season';
-import { NFL, SPORT } from '../engine/sport';
+import { pick, SPORT } from '../engine/sport';
+import { loadSoccerGame } from '../soccer-lazy';
+import type { Pens } from '../game/Arcade';
+
+/** Claude 2026-11-01: soccer is the third sport; each branch names it. */
+const SOCCER = pick({ nba: false, nfl: false, soccer: true });
+const FOOTBALL = pick({ nba: false, nfl: true, soccer: false });
 import { AI_SKILL, Arcade, type Progress } from '../game/Arcade';
 import { DRIVES } from '../game/football2/drive';
 import { aiDrivesOf } from '../game/football2/Football2';
@@ -40,7 +46,7 @@ import { hqOf } from './progression';
 import { decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
 import { byValue, getPool, type Pool } from './pool';
 import { weekOf } from './sbc';
-import { rateSquad, CHEM_BONUS, type SquadRating, startersComplete } from './squad';
+import { rateSquad, CHEM_BONUS, setSoccerFormation, type SquadRating, startersComplete } from './squad';
 import { lineupOf, ratingOf, type SquadCards, squadFromWire, squadToWire, type SquadWire, teamsOf } from './teams';
 import type { UtState } from './state';
 import './match.css';
@@ -48,6 +54,7 @@ import './match.css';
 import { DRAFT_GAMES, draftOf, draftRung, draftWire, settleDraft } from './draft-mode';
 import { recordStandoutWin } from './content-progress';
 import { playId, recordEvoMatch } from './evolutions';
+import type { UtSport } from './types';
 
 /**
  * The queue of its own: Ultimate Team squads never pair with draft head to heads, nor with a build
@@ -56,7 +63,8 @@ import { playId, recordEvoMatch } from './evolutions';
  */
 // Codex: NFL rushing execution differs from v4; NBA queues remain compatible.
 // Claude ratings rework + NBA shot curve (2026-11-01): ratings, levels and jumpers changed.
-const UT_RULES = { nba: 10, nfl: 11 };
+// Soccer (Claude 2026-11-01): its own queue, from 1.
+const UT_RULES: Record<UtSport, number> = { nba: 10, nfl: 11, soccer: 1 };
 const queueOf = (pool: Pool) => 'ut-' + UT_RULES[pool.sport] + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;
@@ -199,6 +207,8 @@ export default function UtMatch(props: {
   oppRef.current = opp;
   const profileRef = useRef(profile);
   profileRef.current = profile;
+  // soccer: the squad's formation (squad.ts), before any squad is rated here
+  setSoccerFormation(profile.ut.formation);
   const done = useRef(false);
   const foundAt = useRef(0);
   // a new search each time the queue starts over (a match that never connected)
@@ -432,7 +442,7 @@ export default function UtMatch(props: {
     return () => clearTimeout(t);
   }, [stage]);
 
-  const finish = (us: Progress, them: Progress, how: 'played' | 'sim') => {
+  const finish = (us: Progress, them: Progress, how: 'played' | 'sim', pens?: Pens) => {
     if (done.current || !setup || !pool) return;
     done.current = true;
     const s = setup;
@@ -442,7 +452,8 @@ export default function UtMatch(props: {
       const b = hashString(s.seed + JSON.stringify(s.rival.wire));
       return a !== b ? a > b : !!s.online?.host;
     };
-    const d = decide(us.score, them.score, s.me.rating.raw, s.rival.rating.raw, s.online ? coin : () => true);
+    // soccer: a level match was settled on penalties (Arcade.tsx)
+    const d = pens && us.score === them.score ? { won: pens.won, tiebreak: true } : decide(us.score, them.score, s.me.rating.raw, s.rival.rating.raw, s.online ? coin : () => true);
     const ut = profileRef.current.ut;
     if (s.draft) {
       // Claude: a draft game settles on the run only (exactly once: active run, its game, a new match id)
@@ -527,8 +538,21 @@ export default function UtMatch(props: {
     const key = (w: SquadWire) => setup.seed + ':sim:' + hashString(JSON.stringify(w));
     const mine = 0.6;
     const theirs = setup.online ? 0.6 : aiSkill;
-    const us = NFL ? aiDrivesOf(t.offense!, t.rivalDefense!, key(setup.me.wire), mine, DRIVES, defenseIQ) : aiPossessionsOf(t.five!, t.rivalFive!, key(setup.me.wire), mine, POSSESSIONS, t.bench, defenseIQ);
-    const them = NFL
+    if (SOCCER) {
+      // soccer's engine loads on first use; both phones work out the same attacks and penalties
+      void loadSoccerGame().then((sg) => {
+        const c = t.soccerCards!;
+        const a = sg.cardSquad(c.us, { name: 'You', abbr: 'YOU', c1: '#19E3C9', c2: '#0B2631' });
+        const b = sg.cardSquad(c.them, { name: setup.rival.name, abbr: 'OPP', c1: '#9B7BFF', c2: '#5B3FD1' });
+        const us = sg.aiProgress(a, b, key(setup.me.wire), mine, defenseIQ);
+        const them = sg.aiProgress(b, a, key(setup.rival.wire), theirs, defenseIQ);
+        const so = us.score === them.score ? sg.agreedShootout(a, b, 'arc:' + setup.seed, setup.online ? !!setup.online.host : true) : null;
+        finish(us, them, 'sim', so ? { us: so.us, them: so.them, won: so.winner === 'us' } : undefined);
+      });
+      return;
+    }
+    const us = FOOTBALL ? aiDrivesOf(t.offense!, t.rivalDefense!, key(setup.me.wire), mine, DRIVES, defenseIQ) : aiPossessionsOf(t.five!, t.rivalFive!, key(setup.me.wire), mine, POSSESSIONS, t.bench, defenseIQ);
+    const them = FOOTBALL
       ? aiDrivesOf(t.rivalOffense!, t.defense!, key(setup.rival.wire), theirs, DRIVES, defenseIQ)
       : aiPossessionsOf(t.rivalFive!, t.five!, key(setup.rival.wire), theirs, POSSESSIONS, t.rivalBench, defenseIQ);
     finish(us, them, 'sim');
@@ -554,9 +578,11 @@ export default function UtMatch(props: {
           autoplay={props.autoplay}
           manualOnly={!!setup.circuit || !!setup.league}
           kits={kits}
+          soccerFavs={{ mine: setup.me.fav, theirs: setup.rival.fav }}
+          host={setup.online ? !!setup.online.host : true}
           onProgress={(p) => conn?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => conn?.update((s) => ({ ...s, arcadeTook: k }))}
-          onFinish={(us, them, how) => finish(us, them, how)}
+          onFinish={(us, them, how, _took, pens) => finish(us, them, how, pens)}
         />
       </div>
     );
@@ -847,7 +873,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           <small>{setup.rival.name}</small>
         </span>
       </div>
-      <div className="utm-ends" aria-label={(NFL ? 'Drives' : 'Possessions') + ': yours ' + out.ends[0].join(', ') + '; theirs ' + out.ends[1].join(', ')}>
+      <div className="utm-ends" aria-label={pick({ nba: 'Possessions', nfl: 'Drives', soccer: 'Attacks' }) + ': yours ' + out.ends[0].join(', ') + '; theirs ' + out.ends[1].join(', ')}>
         {out.ends.map((ends, k) => (
           <span key={k} className={(k ? 'them' : 'us') + (ends.length > 8 ? ' many' : '')}>
             {ends.map((e, i) => (

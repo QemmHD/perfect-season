@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // Claude, 2026-11-01: Weekly Standouts (a team-of-the-week style promo, original name). Every Eastern
 // ISO week the same 8 basketball / 15 football season cards for everyone, drawn from the gold band
 // by the week's key, one of them the week's Featured Standout from the week's theme decade. They
@@ -11,7 +12,9 @@ import { fcToDisplay } from './fc-scale';
 import type { Sbc } from './sbc';
 import type { RatedCard, UtSport } from './types';
 
-export const STANDOUT_COUNT: Record<UtSport, number> = { nba: 8, nfl: 15 };
+export const STANDOUT_COUNT: Record<UtSport, number> = { nba: 8, nfl: 15, soccer: 11 };
+/** soccer's eleven by position (Claude 2026-11-01) */
+const SOCCER_SPOTS = ['GK', 'CB', 'CB', 'FB', 'FB', 'DM', 'CM', 'AM', 'W', 'W', 'ST'];
 /** football's fifteen by position: the skill spots and the defense's playmakers first */
 const NFL_SPOTS = ['QB', 'RB', 'WR', 'WR', 'TE', 'OT', 'OG', 'C', 'DE', 'DT', 'LB', 'LB', 'CB', 'S', 'K'];
 const NBA_SPOTS = ['PG', 'SG', 'SF', 'PF', 'C', '*', '*', '*'];
@@ -54,9 +57,9 @@ export function standoutProgram(pool: Pool, week: string): StandoutProgram {
   const fpick = (top.length ? top : cands)[Math.floor(rand() * (top.length || cands.length))];
   used.add(fpick.line.pid);
   const ids: { line: RatedCard; featured: boolean }[] = [{ line: fpick, featured: true }];
-  const spots = (sport === 'nba' ? NBA_SPOTS : NFL_SPOTS).slice();
+  const spots = pickFor(sport, { nba: NBA_SPOTS, nfl: NFL_SPOTS, soccer: SOCCER_SPOTS }).slice();
   // the featured card fills its own position's spot
-  const own = spots.indexOf(sport === 'nba' ? fpick.line.pos[0] : fpick.pos);
+  const own = spots.indexOf(pickFor(sport, { nba: fpick.line.pos[0], nfl: fpick.pos, soccer: fpick.line.pos[0] }));
   spots.splice(own >= 0 ? own : spots.length - 1, 1);
   for (const spot of spots) {
     const list = shuffle(

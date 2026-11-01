@@ -32,7 +32,7 @@ export interface LeagueFixture {
 const bound = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 const teamCount = (sport: string) => (sport === 'nba' ? 30 : 32);
 /** Circle schedule: 82 complete NBA matchdays, 17 complete NFL matchweeks. Same fixture on reload. */
-export function leagueSchedule(sport: 'nba' | 'nfl'): [number, number][][] {
+export function leagueSchedule(sport: string): [number, number][][] {
   const count = teamCount(sport),
     wheel = Array.from({ length: count }, (_, i) => i),
     rounds: [number, number][][] = [];
@@ -46,7 +46,7 @@ export function leagueSchedule(sport: 'nba' | 'nfl'): [number, number][][] {
     );
     wheel.splice(1, 0, wheel.pop()!);
   }
-  return Array.from({ length: seasonGames(sport) }, (_, i) =>
+  return Array.from({ length: seasonGames(sport as 'nba') }, (_, i) =>
     rounds[i % (count - 1)].map(([h, a]) =>
       Math.floor(i / (count - 1)) % 2 ? [a, h] : [h, a]
     )

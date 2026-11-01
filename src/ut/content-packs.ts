@@ -1,3 +1,4 @@
+import { pickFor as bySport } from '../engine/sport';
 // Claude, 2026-11-01: the new packs' rules outside their slots (packs.ts holds the slots and odds):
 // purchase limits, the weekend Lightning windows, the Daily Drop and its 7-day streak, and pick
 // sheets (Scout's Choice, Standout picks): three face-down options, exactly one kept.
@@ -189,7 +190,7 @@ export function addPick(ut: UtState, pick: PickState): UtState {
 export function pickFor(pool: Pool, kind: 'scout' | 'standout-pick' | 'swap', id: string, week: string, at: number): PickState {
   if (kind === 'standout-pick') return { id, kind, title: 'Standout Pick', options: standoutOptions(pool, id, week).map((rc) => rc.line.id), at };
   const s = scoutOptions(pool, id, week);
-  return { id, kind, title: kind === 'swap' ? 'Swap Desk · Scout’s Choice' : "Scout's Choice" + (pool.sport === 'nfl' ? ' · ' + s.group : ''), options: s.options.map((rc) => rc.line.id), at };
+  return { id, kind, title: kind === 'swap' ? 'Swap Desk · Scout’s Choice' : "Scout's Choice" + bySport(pool.sport, { nba: '', nfl: ' · ' + s.group, soccer: '' }), options: s.options.map((rc) => rc.line.id), at };
 }
 
 /**

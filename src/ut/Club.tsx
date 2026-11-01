@@ -2,7 +2,7 @@
 // position or any rating (speed, three-point shot, dunk...); tap one for its details (and to
 // quick-sell it).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { SPORT } from '../engine/sport';
+import { pickFor, SPORT } from '../engine/sport';
 import { Confirm, Sheet } from '../ui/common';
 import { IconBox, IconClub, IconSliders } from './icons';
 import { EmptyState, Lede } from './ui';
@@ -18,8 +18,12 @@ import type { ClubCard } from './UltimateTeam';
 type Sort = string;
 
 /** The ratings to sort by, speed first. */
-const SORT_ATTRS: string[] =
-  SPORT === 'nba' ? NBA_ATTRS.map(([c]) => c) : Array.from(new Set(['SPD', 'ACC', ...Object.values(NFL_KEYS).flatMap((ks) => ks.map(([c]) => c))]));
+const SORT_ATTRS: string[] = pickFor(SPORT, {
+  nba: () => NBA_ATTRS.map(([c]) => c),
+  nfl: () => Array.from(new Set(['SPD', 'ACC', ...Object.values(NFL_KEYS).flatMap((ks) => ks.map(([c]) => c))])),
+  // soccer (Claude 2026-11-01): the six outfield stats, then the keepers'
+  soccer: () => ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY', 'DIV', 'HAN', 'REF', 'POS'],
+})();
 type TierF = 'all' | 'bronze' | 'silver' | 'gold' | 'special' | 'spotlight' | 'goat';
 
 /** Cards put on the page at a time: more come as you scroll down to them. */
@@ -78,7 +82,11 @@ export function Club({ club, storage = false, onInspect, onSell }: { club: ClubC
   const nFilters = [f.pos, f.tier, f.team, f.dec].filter((x) => x !== 'all').length;
   const sortName = f.sort === 'ovr' ? 'Overall' : f.sort === 'new' ? 'Newest' : f.sort === 'pos' ? 'Position' : attrName(f.sort);
   // Claude (UI reorganisation): football's 13 positions grouped by unit in the filter sheet
-  const posGroups: [string, string[]][] = SPORT === 'nfl' ? [['Offense', ['QB', 'RB', 'WR', 'TE', 'OT', 'OG', 'C']], ['Defense', ['DE', 'DT', 'LB', 'CB', 'S']], ['Kicking', ['K']]] : [['Position', posOrder]];
+  const posGroups: [string, string[]][] = pickFor<[string, string[]][]>(SPORT, {
+    nba: [['Position', posOrder]],
+    nfl: [['Offense', ['QB', 'RB', 'WR', 'TE', 'OT', 'OG', 'C']], ['Defense', ['DE', 'DT', 'LB', 'CB', 'S']], ['Kicking', ['K']]],
+    soccer: [['Defence', ['GK', 'CB', 'FB']], ['Midfield', ['DM', 'CM', 'AM']], ['Attack', ['W', 'ST']]],
+  });
 
   return (
     <div className="page ut-club">

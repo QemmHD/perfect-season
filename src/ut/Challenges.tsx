@@ -1,7 +1,7 @@
 // Squad Building Challenges: the day's, the week's and the repeatables. Put cards in, watch each
 // requirement tick and the team overall move as you go, and trade them in for the reward.
 import React, { useEffect, useMemo, useState } from 'react';
-import { SPORT } from '../engine/sport';
+import { pickFor, SPORT } from '../engine/sport';
 import { sfx } from '../lib/sound';
 import { Confirm, Sheet } from '../ui/common';
 import { UtCard } from './CardArt';
@@ -166,7 +166,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
     const got = autoFill(s, club.filter((c) => !playsIn(SPORT, c.slot)));
     if (!got) {
       sfx.nope();
-      onToast('Not enough cards outside your ' + (SPORT === 'nba' ? 'starters and first three off the bench' : 'squad') + ' meet all of this yet.');
+      onToast('Not enough cards outside your ' + pickFor(SPORT, { nba: 'starters and first three off the bench', nfl: 'squad', soccer: 'squad' }) + ' meet all of this yet.');
       return;
     }
     sfx.select();

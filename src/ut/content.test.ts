@@ -57,7 +57,7 @@ describe('Spotlight content (' + SPORT + ')', () => {
           .filter((l) => l.kind === tier)
           .map((l) => l.id)
           .sort()
-      ).toEqual(catalog[SPORT][tier]);
+      ).toEqual(catalog[SPORT as 'nba'][tier]);
     expect(pool.lines.filter((l) => l.kind === 'goat').length).toBeGreaterThanOrEqual(19);
     const regular = pool.lines.find((l) => l.kind === 'season' && !l.honors.length)!;
     expect(buildPool(SPORT, [regular]).print).not.toBe(buildPool(SPORT, [{ ...regular, stats: { ...regular.stats, ft: 0.99, ypc: 8 }, wt: 160 }]).print);

@@ -45,7 +45,7 @@ export async function fixture(browser, sport = 'nba', name = 'Codex QA', width =
         ...openPack(pool, 'starter', 'qa'),
         ...[...pool.base.values()].filter((c) => c.tier === 'goat'),
         ...[...pool.base.values()]
-          .filter((c) => c.line.kind === 'season' && c.line.fr === (sport === 'nba' ? 'CHI' : 'NE'))
+          .filter((c) => c.line.kind === 'season' && c.line.fr === ({ nba: 'CHI', nfl: 'NE', soccer: 'BAR' })[sport])
           .sort(byValue)
           .slice(0, 25),
       ].filter((c, i, list) => list.findIndex((x) => x.line.id === c.line.id) === i);
@@ -59,7 +59,8 @@ export async function fixture(browser, sport = 'nba', name = 'Codex QA', width =
         ),
         starterClaimed: true,
         packsOpened: 1,
-        packs: [{ id: 'event:immortals:2', kind: 'event-spotlight:immortals', at: 2 }],
+        // soccer has no Spotlight editions (Claude 2026-11-01): its fixture gets a gold pack instead
+        packs: sport === 'soccer' ? [{ id: 'qa-gold', kind: 'gold', at: 2 }] : [{ id: 'event:immortals:2', kind: 'event-spotlight:immortals', at: 2 }],
       };
       localStorage.setItem('perfect-season:fav:asked', '1');
       saveProfile(p);
@@ -69,7 +70,7 @@ export async function fixture(browser, sport = 'nba', name = 'Codex QA', width =
   await page.reload({ waitUntil: 'domcontentloaded' });
   const current = () =>
     page.evaluate((sport) => {
-      const p = JSON.parse(localStorage.getItem(sport === 'nba' ? 'perfect-season:profile:v1' : 'perfect-season:profile:nfl:v1'));
+      const p = JSON.parse(localStorage.getItem({ nba: 'perfect-season:profile:v1', nfl: 'perfect-season:profile:nfl:v1', soccer: 'perfect-season:profile:soccer:v1' }[sport]));
       p.coins = JSON.parse(localStorage.getItem('perfect-season:profile:v1')).coins;
       return p;
     }, sport);

@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // A card up close: the big card (tilt it), its six key attributes and all the rest, its abilities,
 // the season it stands for, its level, and quick-sell.
 import React, { useState } from 'react';
@@ -45,10 +46,10 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
   const keySet = new Set(rc.key.map(([c]) => c));
   // Claude rework: the face is what the overall is weighed on (basketball: in the card's best role)
   const face = rc.face ?? rc.key;
-  const facePos = sport === 'nba' ? l.pos[0] : rc.pos;
+  const facePos = pickFor(sport, { nba: l.pos[0], nfl: rc.pos, soccer: rc.pos });
   const weights = faceWeights(sport, facePos, rc.attrs);
   const role = sport === 'nba' && rc.tier !== 'goat' && rc.tier !== 'spotlight' ? NBA_ROLES[nbaRole(facePos, rc.attrs)]?.label : null;
-  const all = sport === 'nba' ? NBA_ATTRS.map(([c]) => c) : Object.keys(rc.attrs);
+  const all = pickFor(sport, { nba: () => NBA_ATTRS.map(([c]) => c), nfl: () => Object.keys(rc.attrs), soccer: () => Object.keys(rc.attrs) })();
   const need = xpToNext(oc.level);
   const stats = statLine(l);
   return (
@@ -85,7 +86,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
             </div>
 
             {oc.mint && <CardSerial mint={oc.mint} cardId={oc.cardId} sport={sport} />}
-            {!oc.mint && Math.round(rc.rawOvr ?? rc.ovr) >= 90 && <p className="note ut-serial-pending">Its serial number is issued the next time you’re online.</p>}
+            {!oc.mint && rc.line.sport !== 'soccer' && Math.round(rc.rawOvr ?? rc.ovr) >= 90 && <p className="note ut-serial-pending">Its serial number is issued the next time you’re online.</p>}
             <div className="ut-level">
               <span className="ut-level-pips" aria-hidden="true">
                 {Array.from({ length: MAX_LEVEL }, (_, i) => (
@@ -160,7 +161,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
                     {rc.line.ratingReference
                       ? /^[A-Za-z]/.test(rc.line.ratingReference.snapshot)
                         ? `${rc.line.ratingReference.snapshot} benchmark`
-                        : `${rc.line.sport === 'nba' ? '2K' : 'Madden'} ${rc.line.ratingReference.snapshot} benchmark`
+                        : `${pickFor(rc.line.sport, { nba: '2K', nfl: 'Madden', soccer: '' })} ${rc.line.ratingReference.snapshot} benchmark`
                       : 'Peak 2K reference'}
                   </a>{' '}
                   · Season-calibrated attributes, then edition and level boosts.

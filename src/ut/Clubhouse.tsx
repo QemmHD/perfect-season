@@ -162,11 +162,13 @@ export function PlayHQ({
     <div className="page hq-page up">
       <SectionHead title="Solo · vs the AI" />
       <div className="up-list">
-        {row(st.league, 'CLUB SEASON', <IconLeague size={24} />, 'gold', 0)}
+        {/* soccer (Claude 2026-11-01): no Club Season, Legends Events or Moments yet (they need
+            basketball's and football's season engine, GOAT bosses and scenario engines) */}
+        {pool.sport !== 'soccer' && row(st.league, 'CLUB SEASON', <IconLeague size={24} />, 'gold', 0)}
         {row(st.battles, 'SQUAD BATTLES', <IconBattles size={24} />, 'teal', 1)}
         {row(st.circuit, 'CHAMPIONS CIRCUIT', <IconRoute size={24} />, 'gold', 2)}
-        {row(st.events, 'LEGENDS EVENTS', <IconCrown size={24} />, 'violet', 3)}
-        {row(st.moments, 'MOMENTS', <IconBolt size={24} />, 'blue', 4)}
+        {pool.sport !== 'soccer' && row(st.events, 'LEGENDS EVENTS', <IconCrown size={24} />, 'violet', 3)}
+        {pool.sport !== 'soccer' && row(st.moments, 'MOMENTS', <IconBolt size={24} />, 'blue', 4)}
         {row(st.draft, 'UT DRAFT', <IconDraft size={24} />, 'teal', 5)}
       </div>
       <SectionHead title="Online · vs real players" />

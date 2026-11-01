@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 import { nflIdentity } from './nfl-identity';
 import { rateEdition } from './editions';
 import { rateVariant } from './variants';
@@ -6,7 +7,7 @@ import { calibrateNflReference, RATING_CONTEXT } from './season-reference';
 import { careerOf } from './cards';
 import { editionAttributes, profileQuality, supportEdition } from './rating-quality';
 import { TIER_CUTS, editionDisplay, fromDisplay, toDisplay } from './ut-scale';
-import { shownFaceMean, faceOf, levelAttrBonus, levelOvrBonus, nflFaceKeys, supportOverall } from './card-face';
+import { shownFaceMean, faceOf, levelAttrBonus, levelOvrBonus, nflFaceKeys, SOCCER_GK_FACE, SOCCER_OUT_FACE, soccerFaceKeys, supportOverall } from './card-face';
 // Ultimate Team ratings: a card line becomes a rated card with the same code the played games use,
 // so a card shows exactly what it plays like. Basketball goes through hoops2's `hooper()` (fed the
 // season's own ranks), football through football2's `rateNflLine()`. On top of the base rating:
@@ -27,6 +28,7 @@ import type { CardLine, RatedCard, Tier, UtSport } from './types';
 export { TIER_CUTS, UT_SCALE } from './ut-scale';
 
 export function tierOf(ovr: number, sport: UtSport = 'nba'): Tier {
+  // (soccer's cuts are the same 65 / 75: ut-scale.ts)
   const c = TIER_CUTS[sport];
   return ovr >= c.gold ? 'gold' : ovr >= c.silver ? 'silver' : 'bronze';
 }
@@ -52,6 +54,9 @@ export function onScale(x: number, sport: UtSport): number {
 export function ratingStanding(x: number, sport: UtSport): number {
   // unrounded, so neighbouring legacy numbers stay apart on a compressed displayed scale
   if (sport === 'nba') return piecewise(x, [[40, 40], [56, 60], [65, 75], [75, 85], [85, 92], [95, 97], [99, 99]]);
+  // soccer (Claude 2026-11-01): its cards stand on the displayed scale already; basketball's legacy
+  // numbers map through basketball's standing then the displayed curve, the same as basketball's
+  if (sport === 'soccer') return toDisplay('nba', piecewise(x, [[40, 40], [56, 60], [65, 75], [75, 85], [85, 92], [95, 97], [99, 99]]));
   return piecewise(Math.min(99, x), SCALE);
 }
 
@@ -94,7 +99,9 @@ export const NBA_KEYS: Record<string, string[]> = {
 /** Football attribute names, from every position's keys. */
 const NFL_NAME: Record<string, string> = Object.fromEntries(Object.values(NFL_KEYS).flatMap((ks) => ks.map(([c, n]) => [c, n])));
 
-export function attrName(code: string): string {
+const SOCCER_NAME: Record<string, string> = Object.fromEntries([...SOCCER_OUT_FACE, ...SOCCER_GK_FACE]);
+export function attrName(code: string, sport?: UtSport): string {
+  if (sport === 'soccer') return SOCCER_NAME[code] ?? code;
   return NBA_NAME[code] ?? NFL_NAME[code] ?? code;
 }
 
@@ -223,6 +230,8 @@ export function levelBonus(level: number): number {
 export const OVR_BALANCE: Record<UtSport, Record<string, number>> = {
   nba: { 'C:1960': 5.997, 'C:1970': -3.568, 'C:1980': -1.825, 'C:1990': -0.566, 'C:2000': 1.285, 'C:2010': -1.527, 'C:2020': -4, 'PF:1960': 5.997, 'PF:1970': 2.276, 'PF:1980': -1.195, 'PF:1990': 0.203, 'PF:2000': 2.402, 'PF:2010': 1.125, 'PF:2020': -1.937, 'PG:1960': 5.997, 'PG:1970': -2.938, 'PG:1980': -2.183, 'PG:1990': -2.785, 'PG:2000': -1.555, 'PG:2010': -1.803, 'PG:2020': -4, 'SF:1960': 5.997, 'SF:1970': 5.997, 'SF:1980': 5.997, 'SF:1990': 3.998, 'SF:2000': 1.344, 'SF:2010': 3.998, 'SF:2020': -2.691, 'SG:1960': 5.997, 'SG:1970': 0.141, 'SG:1980': -1.189, 'SG:1990': -2.441, 'SG:2000': -1.57, 'SG:2010': -0.439, 'SG:2020': -2.645 },
   nfl: { 'CB': -3.428, 'DL': 1.17, 'K': -3.627, 'LB': -3.529, 'OL': -3.828, 'QB': -1.729, 'RB': -2.746, 'S': -1.662, 'TE': 3.998, 'WR': -3.631 },
+  // soccer's gold share is the same at every position already (docs/SOCCER-DATA.md)
+  soccer: {},
 };
 export function balanceKey(line: Pick<CardLine, 'sport' | 'season' | 'pos'>, pos = line.pos[0]): string {
   if (line.sport === 'nfl') return groupOf(pos);
@@ -245,6 +254,7 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   if (line.variantOf) return rateVariant(line, level, pos);
   if (line.kind === 'standout' || line.kind === 'landmark') return rateEdition(line, level, pos);
   if (line.kind === 'live') return rateLive(line, level, pos);
+  if (line.sport === 'soccer') return rateSoccerCard(line, level, pos);
   const boost = Math.max(0, line.boost ?? 0);
   let base: number;
   let at: string;
@@ -293,7 +303,7 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   const limit = goat ? 110 : special ? 105 : 99;
   const bounded = (x: number) => Math.max(1, Math.min(limit, Math.round(x)));
   // the overall is weighed at the card's own position in basketball (it doesn't move between spots)
-  const facePos = line.sport === 'nba' ? (NBA_KEYS[line.pos[0]] ? line.pos[0] : 'SF') : at;
+  const facePos = pickFor(line.sport, { nfl: at, nba: NBA_KEYS[line.pos[0]] ? line.pos[0] : 'SF', soccer: at });
   base = Math.max(40, Math.min(99, balanced(line, at, base)));
   let baseOvr: number;
   let exact: number;
@@ -341,6 +351,30 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   const tier: Tier =
     line.kind === 'goat' ? 'goat' : line.kind === 'spotlight' ? 'spotlight' : line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(shownBase, line.sport);
   return { line, ovr, rawOvr: bounded(baseOvr + levelBonus(level)), rawExact: exact, tier, pos: at, attrs, ratingSource, key: keys.map(([c, n]) => [c, n, attrs[c] ?? ovr]), face, abil };
+}
+
+/**
+ * Soccer (Claude 2026-11-01): the card file's own overall and six face stats, the same at every
+ * position he plays (a soccer overall doesn't move between his positions). Levels add +1 to each face
+ * stat per level and the usual overall at levels 3 and 5. A promo or legend is its own edition in the
+ * file (its overall and face already boosted). The face stats are the attributes the match reads.
+ */
+function rateSoccerCard(line: CardLine, level: number, pos?: string): RatedCard {
+  const at = pos && line.pos.includes(pos) ? pos : line.pos[0];
+  const keeper = line.pos[0] === 'GK';
+  const keys = soccerFaceKeys(keeper ? 'GK' : 'ST');
+  const raw = line.fixedFace ?? [];
+  const base = Math.max(40, Math.min(99, Math.round(line.fixedOvr ?? 60)));
+  const lv = levelAttrBonus(Math.min(MAX_LEVEL, level));
+  const attrs: Record<string, number> = {};
+  keys.forEach(([code], i) => (attrs[code] = Math.max(1, Math.min(99, Math.round((raw[i] ?? base) + lv)))));
+  const abil: string[] = [];
+  if (line.kind === 'promo') abil.push(PROMO_ABILITY);
+  if (line.kind === 'legend') abil.unshift(LEGEND_ABILITY);
+  const ovr = Math.max(1, Math.min(99, base + levelBonus(level)));
+  const tier: Tier = line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(base, 'soccer');
+  const face = keys.map(([c, n]) => [c, n, attrs[c]] as [string, string, number]);
+  return { line, ovr, rawOvr: ovr, rawExact: base, tier, pos: at, attrs, key: face, face, abil };
 }
 
 /** A rated basketball card as the arcade game's player (for the match step). */

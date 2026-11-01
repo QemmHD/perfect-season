@@ -43,12 +43,23 @@ export const UT_SCALE: Record<UtSport, UtScale> = {
     promo: [[78, 94], [84, 95], [88, 96], [91, 97]],
     legend: [[76, 88], [82, 90], [86, 92], [90, 93], [91, 95]],
   },
+  // Claude 2026-11-01: soccer cards are built on this scale already (scripts/build_soccer_cards.py:
+  // Bronze <65, Silver 65–74, Gold 75+, season cards to 93, promos to 97, legends 88–97), each
+  // edition with its own overall in the card file, so the curve is the identity
+  soccer: {
+    curve: [[40, 40], [99, 99]],
+    cuts: { silver: 65, gold: 75 },
+    walkout: 86,
+    promo: [[75, 80], [99, 99]],
+    legend: [[75, 88], [99, 99]],
+  },
 };
 
 /** Tier cuts on the displayed scale (Bronze < silver ≤ Silver < gold ≤ Gold). */
 export const TIER_CUTS: Record<UtSport, { silver: number; gold: number }> = {
   nba: UT_SCALE.nba.cuts,
   nfl: UT_SCALE.nfl.cuts,
+  soccer: UT_SCALE.soccer.cuts,
 };
 
 /** Piecewise-linear through increasing knots; flat beyond the ends' slope of 1. */

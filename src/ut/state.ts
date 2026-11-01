@@ -37,6 +37,8 @@ export interface UtState {
   duplicateStorage?: string[];
   /** the squad: slot id (PG, B1, QB, WR2, ...) to an owned card's uid */
   squad: Record<string, string>;
+  /** Claude 2026-11-01, soccer only, optional: the squad's formation (squad.ts FORMATIONS; 4-3-3 when absent) */
+  formation?: string;
   packsOpened: number;
   /** the free starter pack (once per sport) has been opened */
   starterClaimed: boolean;
@@ -127,6 +129,7 @@ export function migrateUt(raw: unknown): UtState {
   const content = normalizeContent(r.content);
   return organizeStorage({
     v: 1,
+    ...(typeof r.formation === 'string' && r.formation.length <= 8 ? { formation: r.formation } : {}),
     ...(content ? { content } : {}),
     ...(league ? { league } : {}),
     ...(r.hq && typeof r.hq === 'object' ? { hq: normalizeHQ(r.hq, owned) } : {}),

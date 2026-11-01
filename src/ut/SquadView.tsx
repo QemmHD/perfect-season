@@ -2,14 +2,14 @@
 // chemistry links between neighbours, the team overall, and auto-build. Tap a spot to pick a card
 // for it: the ones that can play there, best first, with what each does to the chemistry.
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { SPORT } from '../engine/sport';
+import { pickFor, SPORT } from '../engine/sport';
 import { sfx } from '../lib/sound';
 import { Sheet } from '../ui/common';
 import { UtCard } from './CardArt';
 import { playerChem } from './chem-pips';
 import { IconWand } from './icons';
 import { type Pool, seasonText } from './pool';
-import { autoBuild, CHEM_BONUS, canPlay, FULL_LINK, type Lineup, rateSquad, type SlotDef, slotsFor, type SquadRating } from './squad';
+import { autoBuild, CHEM_BONUS, canPlay, FORMATIONS, type Formation, FULL_LINK, type Lineup, rateSquad, type SlotDef, slotsFor, type SquadRating } from './squad';
 import type { ClubCard } from './UltimateTeam';
 
 function linkClass(score: number, open: boolean): string {
@@ -17,8 +17,22 @@ function linkClass(score: number, open: boolean): string {
   return score >= FULL_LINK ? 'full' : score >= 3 ? 'mid' : score > 0 ? 'weak' : 'none';
 }
 
-/** The court or the field: its lines, drawn under the cards. */
+/** The court or the field (or soccer's pitch): its lines, drawn under the cards. */
 function Surface({ nba, unit }: { nba: boolean; unit: string }) {
+  if (SPORT === 'soccer')
+    return (
+      <svg className="ut-surface ut-field ut-pitch-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+          <rect key={i} x="0" y={i * 10} width="100" height="10" className={i % 2 ? 'turf b' : 'turf'} />
+        ))}
+        <rect x="1.5" y="1" width="97" height="98" className="ln" fill="none" />
+        <path d="M1.5 1 H98.5" className="ln" />
+        <path d="M38 1 A12 9 0 0 0 62 1" className="ln" fill="none" />
+        <rect x="24" y="82" width="52" height="17" className="ln" fill="none" />
+        <rect x="38" y="93" width="24" height="6" className="ln" fill="none" />
+        <path d="M40 82 A10 6 0 0 1 60 82" className="ln" fill="none" />
+      </svg>
+    );
   if (nba)
     return (
       <svg className="ut-surface ut-court" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -55,13 +69,17 @@ export function SquadView(props: {
   onInspect: (uid: string) => void;
   onToast: (t: string) => void;
   management?: React.ReactNode;
+  /** soccer (Claude 2026-11-01): the formation, and changing it */
+  formation?: Formation;
+  onFormation?: (f: Formation) => void;
 }) {
+  const soccer = SPORT === 'soccer';
   const { lineup, rating, squad } = props;
   const nba = SPORT === 'nba';
   const [unit, setUnit] = useState<'off' | 'def'>('off');
   const [pick, setPick] = useState<SlotDef | null>(null);
   const slots = slotsFor(SPORT);
-  const onPitch = slots.filter((s) => (nba ? s.unit === 'start' : s.unit === unit));
+  const onPitch = slots.filter((s) => (nba || soccer ? s.unit === 'start' : s.unit === unit));
   const bench = nba ? slots.filter((s) => s.unit === 'bench') : [];
   const byUid = useMemo(() => new Map(props.club.map((c) => [c.uid, c])), [props.club]);
   const pos = useMemo(() => new Map(slots.map((s) => [s.id, s])), [slots]);
@@ -77,7 +95,8 @@ export function SquadView(props: {
     setBox({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
   }, []);
-  const cw = Math.floor(nba ? Math.min(box.w * 0.22, (box.h * 0.36) / 1.4, 84) : Math.min(box.w * 0.165, (box.h * 0.235) / 1.4, 64));
+  // soccer's eleven are on one pitch, in up to five lines
+  const cw = Math.floor(nba ? Math.min(box.w * 0.22, (box.h * 0.36) / 1.4, 84) : soccer ? Math.min(box.w * 0.16, (box.h * 0.19) / 1.4, 58) : Math.min(box.w * 0.165, (box.h * 0.235) / 1.4, 64));
 
   // Claude: per-player chemistry pips (display only)
   const pips = useMemo(() => playerChem(SPORT, props.lineup), [props.lineup]);
@@ -136,13 +155,22 @@ export function SquadView(props: {
   };
 
   return (
-    <div className={'ut-squad' + (nba ? ' nba' : ' nfl')}>
+    <div className={'ut-squad' + (nba ? ' nba' : soccer ? ' soccer' : ' nfl')}>
       <div className="ut-squad-head">
         <span className="ut-sq-big">
           <b className="disp num">{rating.filled ? rating.ovr : '—'}</b>
           <i>OVR</i>
         </span>
-        <button className="ut-chem" onClick={() => props.onToast('Chemistry: every line links two neighbours. Same franchise +3, same decade +2, same season +4; six points makes a full link. Full chemistry adds ' + CHEM_BONUS + ' to the team overall.')}>
+        <button
+          className="ut-chem"
+          onClick={() =>
+            props.onToast(
+              soccer
+                ? 'Chemistry: every line links two neighbours. Same club +4, same league +2, same season +1; six points makes a full link. Full chemistry adds ' + CHEM_BONUS + ' to the team overall.'
+                : 'Chemistry: every line links two neighbours. Same franchise +3, same decade +2, same season +4; six points makes a full link. Full chemistry adds ' + CHEM_BONUS + ' to the team overall.'
+            )
+          }
+        >
           <span className="ut-chem-top">
             <i>CHEMISTRY</i>
             <b className="num">{rating.chem}</b>
@@ -157,7 +185,16 @@ export function SquadView(props: {
         </button>
       </div>
       {props.management && <div className="hq-squad-toolbar"><span className="eyebrow">Matchday squad · 3 saved lineups</span>{props.management}</div>}
-      {!nba && (
+      {soccer && props.onFormation && (
+        <span className="seg ut-unit ut-formations" role="group" aria-label="Formation">
+          {FORMATIONS.map((f) => (
+            <button key={f} className={props.formation === f ? 'on' : ''} aria-pressed={props.formation === f} onClick={() => (sfx.click(), props.onFormation!(f))}>
+              {f}
+            </button>
+          ))}
+        </span>
+      )}
+      {!nba && !soccer && (
         <span className="seg ut-unit" role="group" aria-label="Unit">
           {(['off', 'def'] as const).map((u) => (
             <button key={u} className={unit === u ? 'on' : ''} aria-pressed={unit === u} onClick={() => (sfx.click(), setUnit(u))}>
@@ -269,7 +306,7 @@ function Picker(props: { slot: SlotDef; club: ClubCard[]; lineup: Lineup; squad:
               ))}
             </div>
           ) : (
-            <div className="empty">No cards that can play {slot.pos ?? 'here'} yet. {slot.pos ? 'A ' + (SPORT === 'nfl' ? 'Unit' : 'Position') + ' Pack in the Store gets three or more.' : ''}</div>
+            <div className="empty">No cards that can play {slot.pos ?? 'here'} yet. {slot.pos ? 'A ' + pickFor(SPORT, { nba: 'Position', nfl: 'Unit', soccer: 'Position' }) + ' Pack in the Store gets three or more.' : ''}</div>
           )}
         </div>
       )}

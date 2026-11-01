@@ -51,8 +51,10 @@ export interface EditionRef {
 /** An edition id's parts, or null when it isn't a Standout or Landmark id. */
 export function parseEditionId(id: string): EditionRef | null {
   const p = id.split(':');
-  if (p[0] !== 'nba' && p[0] !== 'nfl') return null;
+  // soccer (Claude 2026-11-01): Weekly Standouts only (it has no landmark catalogue)
+  if (p[0] !== 'nba' && p[0] !== 'nfl' && p[0] !== 'soccer') return null;
   const sport = p[0] as UtSport;
+  if (sport === 'soccer' && p[1] === 'landmark') return null;
   if (p[1] === 'standout' && p.length === 6) {
     const featured = p[2].endsWith('F');
     const week = featured ? p[2].slice(0, -1) : p[2];

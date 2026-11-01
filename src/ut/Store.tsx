@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // The store: packs to buy with coins (never real money), packs you've earned waiting to be opened,
 // the free starter, and every pack's odds.
 // Claude 2026-11-01: sections (Daily Drop · Featured · Gold · Bronze & Silver · Online), the new
@@ -312,7 +313,7 @@ export function Store(props: {
           {props.preview}
           <SectionHead title="All packs · by price" />
           <div className="ut-shop">
-            {BY_PRICE.slice()
+            {BY_PRICE.filter((k) => k !== 'spotlight' || props.sport !== 'soccer') /* soccer has no Spotlight (no registered serials) */
               .sort((a, b) => props.defs[a].price - props.defs[b].price)
               .map((k) => item(k, k === 'spotlight' ? 'Every card gets a registered serial' : undefined))}
           </div>
@@ -324,9 +325,9 @@ export function Store(props: {
         <Sheet label="Pick a position" kind="bottom" onClose={() => setChoose(false)}>
           {(close) => (
             <div className="ut-choose">
-              <h2 className="disp">{props.sport === 'nfl' ? 'Pick a unit' : 'Pick a position'}</h2>
+              <h2 className="disp">{pickFor(props.sport, { nba: 'Pick a position', nfl: 'Pick a unit', soccer: 'Pick a line' })}</h2>
               <p>
-                {pos.slots.length} golds {props.sport === 'nfl' ? 'from that unit, its positions in the mix a squad needs' : 'at that position'}, for{' '}
+                {pos.slots.length} golds {pickFor(props.sport, { nba: 'at that position', nfl: 'from that unit, its positions in the mix a squad needs', soccer: 'from that line, its positions in the mix a squad needs' })}, for{' '}
                 {pos.price.toLocaleString('en-US')} coins.
               </p>
               <div className="ut-choose-grid">

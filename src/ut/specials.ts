@@ -47,6 +47,9 @@ export const GOAT_NAMES: Record<UtSport, readonly string[]> = {
     'Emmitt Smith',
     'Drew Brees',
   ],
+  // soccer (Claude 2026-11-01): no Spotlight/GOAT editions (they need registered serials, which the
+  // card registry only keeps for basketball and football)
+  soccer: [],
 };
 /** Implemented by Codex. Frozen IDs are independent of future all-time legend selections.
  * Never remove/rename released manifest entries. Add new editions alongside them. */

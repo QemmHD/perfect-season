@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // The card pool the mode plays with: every card line, rated once at level 1, and grouped by tier
 // and position for the packs. Loaded when Ultimate Team opens, never before.
 import { hashString } from '../engine/rng';
@@ -160,7 +161,8 @@ export function decadeOf(season: number): string {
 
 /** "1995-96" for basketball (the season it ends), "1985" for football. */
 export function seasonText(line: Pick<CardLine, 'sport' | 'season'>): string {
-  return line.sport === 'nba' ? line.season - 1 + '-' + String(line.season).slice(2) : String(line.season);
+  // soccer's season is the year it ends too ("2014-15")
+  return pickFor(line.sport, { nba: line.season - 1 + '-' + String(line.season).slice(2), nfl: String(line.season), soccer: line.season - 1 + '-' + String(line.season).slice(2) });
 }
 
 /** "'96" */

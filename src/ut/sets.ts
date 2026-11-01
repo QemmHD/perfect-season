@@ -24,7 +24,7 @@ export interface CardSet {
 }
 
 const GOLDISH = new Set(['gold', 'standout', 'promo', 'landmark', 'legend', 'spotlight', 'goat']);
-export const ERA_NEED: Record<UtSport, number> = { nba: 5, nfl: 8 };
+export const ERA_NEED: Record<UtSport, number> = { nba: 5, nfl: 8, soccer: 8 };
 const GROUPS: Record<UtSport, [string, string[]][]> = {
   nba: [
     ['PG', ['PG']],
@@ -43,6 +43,13 @@ const GROUPS: Record<UtSport, [string, string[]][]> = {
     ['LB', ['LB']],
     ['DB', ['CB', 'S']],
     ['K', ['K']],
+  ],
+  // soccer (Claude 2026-11-01): the keeper, the defence, the midfield, the attack
+  soccer: [
+    ['GK', ['GK']],
+    ['DEF', ['CB', 'FB']],
+    ['MID', ['DM', 'CM', 'AM']],
+    ['ATT', ['W', 'ST']],
   ],
 };
 

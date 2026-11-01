@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // Claude, 2026-11-01: the content SBCs. The weekly "Standout Squad" (standouts.ts) and Landmark
 // Seasons: three landmark SBCs a week from the real-landmark catalog (the same for everyone), each
 // paying that exact Landmark card. A Landmark SBC is done once forever (`sbc:<id>` in
@@ -34,7 +35,7 @@ export function landmarkSbcs(pool: Pool, week: string): Sbc[] {
   const top = cat.slice(0, Math.max(1, Math.floor(cat.length / 3)));
   const rest = cat.slice(top.length);
   const picks = [...shuffle(top, rand).slice(0, 1), ...shuffle(rest.length ? rest : top, rand).slice(0, LANDMARKS_A_WEEK - 1)];
-  const size = pool.sport === 'nba' ? 6 : 9;
+  const size = pickFor(pool.sport, { nba: 6, nfl: 9, soccer: 8 });
   return picks.flatMap((lm) => {
     const season = pool.byId.get(lm.seasonId);
     if (!season) return [];

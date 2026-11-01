@@ -14,7 +14,7 @@ import './clubhouse.css';
 // card pool loads when the screen opens. App.tsx only routes here (screen 'ut').
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { easternDateKey } from '../engine/season';
-import { NFL, SPORT } from '../engine/sport';
+import { SPORT, SPORT_NAME } from '../engine/sport';
 import { newId, saveProfile, type Profile } from '../lib/profile';
 import { reloadForMissingFiles } from '../lib/update';
 import { sfx, vibrate } from '../lib/sound';
@@ -39,7 +39,7 @@ import type { PlaySquad } from './play';
 import { getPool, type Pool, ratedOf } from './pool';
 import { battlesThisWeek } from './battles';
 import { checkSbc, rewardCard, type Sbc, sbcsFor, weekOf } from './sbc';
-import { autoBuild, canPlay, type Lineup, rateSquad, slotsFor, startersComplete } from './squad';
+import { autoBuild, canPlay, type Lineup, rateSquad, refitSquad, setSoccerFormation, slotsFor, soccerFormationNow, startersComplete } from './squad';
 import { SquadView } from './SquadView';
 import type { UtState } from './state';
 import { organizeStorage, removeCards, storedCards, useStoredCopy } from './storage';
@@ -159,6 +159,8 @@ export default function UltimateTeam(props: {
 }) {
   const { profile, update, onToast } = props;
   const ut = profile.ut;
+  // soccer: the squad's formation, read by every squad rating on this page (squad.ts)
+  setSoccerFormation(ut.formation);
   const [pool, setPool] = useState<Pool | null>(null);
   const [failed, setFailed] = useState(false);
   const [view, setViewNow] = useState<UtView>(() => lastView);
@@ -755,7 +757,7 @@ export default function UltimateTeam(props: {
     body = (
       <div className="ut-loading" role="status">
         <span className="ut-spinner" aria-hidden="true" />
-        <p>Loading {NFL ? 'football' : 'basketball'} cards…</p>
+        <p>Loading {SPORT_NAME[SPORT]} cards…</p>
       </div>
     );
   else if (view === 'squad')
@@ -770,6 +772,13 @@ export default function UltimateTeam(props: {
         onSquad={setSquad}
         onInspect={setDetail}
         onToast={onToast}
+        formation={SPORT === 'soccer' ? soccerFormationNow() : undefined}
+        onFormation={(f) =>
+          setUt((u) => {
+            const posOf = (uid: string) => byUid.get(uid)?.rc.line.pos;
+            return { ...u, formation: f, squad: refitSquad(u.squad, f, posOf) };
+          })
+        }
         management={
           <SquadPresets
             ut={ut}

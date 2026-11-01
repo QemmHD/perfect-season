@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // Squad Battles: a ladder of AI squads, each built from real cards around a target overall,
 // harder every rung. A rung is a franchise in a decade (the 1990s Bulls), its own cards first, then
 // that decade's, then anyone's, picked to land near the target. The same ladders for everyone all
@@ -19,7 +20,8 @@ export const RUNGS = 8;
  * Each rung's target team overall, on the sport's own scale: the first a little under a starter
  * pack's squad (basketball's rate about 68-75, football's about 80), the last an all-time team.
  */
-const TARGETS: Record<UtSport, number[]> = { nba: [62, 66, 70, 74, 78, 82, 86, 90], nfl: [76, 79, 82, 85, 88, 90, 92, 94] };
+// soccer (Claude 2026-11-01): on the displayed scale already (a starter squad is about 63-66)
+const TARGETS: Record<UtSport, number[]> = { nba: [62, 66, 70, 74, 78, 82, 86, 90], nfl: [76, 79, 82, 85, 88, 90, 92, 94], soccer: [62, 66, 70, 74, 78, 82, 85, 88] };
 /** how well the AI plays its own offense on each rung (0-1, the autopilot's skill) */
 const SKILLS = [0.45, 0.5, 0.56, 0.62, 0.68, 0.74, 0.8, 0.87];
 
@@ -32,11 +34,11 @@ export const LEVEL_NAME: Record<Level, string> = { rookie: 'Rookie', pro: 'Pro',
  * pay the first time they're cleared.
  */
 export const LEVEL: Record<Level, { ovr: Record<UtSport, number>; skill: number; def: number; pay: number; packs: Record<number, string> }> = {
-  rookie: { ovr: { nba: -6, nfl: -4 }, skill: -0.15, def: -0.5, pay: 0.6, packs: { 3: 'bronze', 7: 'silver' } },
-  pro: { ovr: { nba: 0, nfl: 0 }, skill: 0, def: 0, pay: 1, packs: { 3: 'silver', 7: 'gold' } },
-  allstar: { ovr: { nba: 5, nfl: 3 }, skill: 0.08, def: 0.5, pay: 1.5, packs: { 3: 'gold', 7: 'premium' } },
+  rookie: { ovr: { nba: -6, nfl: -4, soccer: -4 }, skill: -0.15, def: -0.5, pay: 0.6, packs: { 3: 'bronze', 7: 'silver' } },
+  pro: { ovr: { nba: 0, nfl: 0, soccer: 0 }, skill: 0, def: 0, pay: 1, packs: { 3: 'silver', 7: 'gold' } },
+  allstar: { ovr: { nba: 5, nfl: 3, soccer: 3 }, skill: 0.08, def: 0.5, pay: 1.5, packs: { 3: 'gold', 7: 'premium' } },
   // Claude: NBA Legend +11 (was +9) on the rating scale — the displayed UT scale compresses the top
-  legend: { ovr: { nba: 11, nfl: 6 }, skill: 0.15, def: 1, pay: 2.2, packs: { 1: 'gold', 3: 'gold', 5: 'premium', 7: 'premium' } },
+  legend: { ovr: { nba: 11, nfl: 6, soccer: 6 }, skill: 0.15, def: 1, pay: 2.2, packs: { 1: 'gold', 3: 'gold', 5: 'premium', 7: 'premium' } },
 };
 
 /** a saved difficulty, or Pro */
@@ -188,7 +190,7 @@ export function ladderFor(pool: Pool, week: string, round = 0, level: Level = 'p
   let prev = 0;
   return TARGETS[sport].map((base, i) => {
     // rungs and difficulty steps are set on the rating scale, then shown on the UT scale (ut-scale.ts)
-    const target = Math.round(toDisplay(sport, Math.min(sport === 'nba' ? 97 : 98, (sport === 'nba' ? ratingStanding(base, 'nba') : base) + lv.ovr[sport])));
+    const target = Math.round(toDisplay(sport, Math.min(pickFor(sport, { nba: 97, nfl: 98, soccer: 92 }), ((sport === 'nba' && ratingStanding(base, 'nba')) || base) + lv.ovr[sport]))); // (only basketball's targets are on its legacy scale)
     const { theme, squad, ovr } = themedAround(pool, all, target, rand, key + ':' + i, picked, prev + 1);
     picked.add(theme.fr + theme.decade);
     prev = ovr;

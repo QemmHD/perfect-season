@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // Claude, 2026-11-01: UT Draft. Pay 800 coins (or the free weekly token), pick a captain from five,
 // then one of five for every squad spot. The drafted squad (never owned: no card leaves or joins the
 // club, no XP) plays up to four real matches through Match.tsx against a rising AI ladder; a loss
@@ -33,12 +34,12 @@ export const DRAFT_REWARDS: { coins: number; pack?: string }[] = [
 ];
 
 /** the AI each game: overall vs your draft (this sport's scale), and how well it plays */
-const OFFSETS: Record<UtSport, number[]> = { nba: [-3, -1, 1, 3], nfl: [-2, -1, 1, 2] };
+const OFFSETS: Record<UtSport, number[]> = { nba: [-3, -1, 1, 3], nfl: [-2, -1, 1, 2], soccer: [-2, -1, 1, 2] };
 const SKILL = [0.55, 0.62, 0.7, 0.78];
 
 /** The spots a draft fills: basketball's five and the three who play off the bench; football's 23. */
 export function draftSlots(sport: UtSport): SlotDef[] {
-  return slotsFor(sport).filter((s) => sport === 'nfl' || s.unit === 'start' || ['B1', 'B2', 'B3'].includes(s.id));
+  return slotsFor(sport).filter((s) => sport !== 'nba' || s.unit === 'start' || ['B1', 'B2', 'B3'].includes(s.id));
 }
 
 export function draftOf(ut: UtState): DraftRun | undefined {
@@ -166,7 +167,7 @@ export function draftRating(pool: Pool, run: DraftRun): SquadRating {
 /** Game `game`'s AI squad (deterministic from the run). */
 export function draftRung(pool: Pool, run: DraftRun, game: number): Rung | null {
   if (game < 0 || game >= DRAFT_GAMES) return null;
-  const target = Math.max(TIER_CUTS[pool.sport].silver, Math.min(pool.sport === 'nba' ? 97 : 98, draftRating(pool, run).ovr + OFFSETS[pool.sport][game]));
+  const target = Math.max(TIER_CUTS[pool.sport].silver, Math.min(pickFor(pool.sport, { nba: 97, nfl: 98, soccer: 92 }), draftRating(pool, run).ovr + OFFSETS[pool.sport][game]));
   const r = aiOpponent(pool, target, 'draft:' + run.id + ':' + game);
   return { ...r, i: -5, skill: SKILL[game], pack: null };
 }

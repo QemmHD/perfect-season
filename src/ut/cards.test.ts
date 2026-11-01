@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { legendsOf, loadCards, promosOf } from './cards';
 import type { CardLine, UtSport } from './types';
 
-const RANGE: Record<UtSport, [number, number]> = { nba: [1960, 2026], nfl: [1970, 2025] };
+const RANGE: Record<UtSport, [number, number]> = { nba: [1960, 2026], nfl: [1970, 2025], soccer: [1950, 2026] };
 // the first load imports a few MB of JSON (seconds with other suites running): done once, outside the tests' 5s limit
 const LOAD_MS = 60_000;
 

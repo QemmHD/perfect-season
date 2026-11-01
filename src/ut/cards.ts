@@ -30,6 +30,7 @@ import { registerCombine, type CombineFile } from './nfl-combine';
 //   gs ranks starts; draft ranks the overall pick (earlier is higher, undrafted lowest).
 /// <reference types="vite/client" />
 import type { CardKind, CardLine, UtSport } from './types';
+import { loadSoccerCards } from '../soccer-lazy';
 
 /** The file as build_cards.py writes it. */
 export interface CardsFile {
@@ -62,6 +63,17 @@ export interface CardsFile {
   /** [season line index, boost, label] */
   promos: [number, number, string][];
   legends: [number, number, string][];
+  /** soccer (scripts/build_soccer_cards.py): leagues [code, name], the face keys by group, and per line
+   * its league, overall and face; promos/legends then carry their own overall and face */
+  leagues?: [string, string][];
+  faceKeys?: Record<string, string[]>;
+}
+/** Soccer's extra columns and its editions' own overall and face. */
+interface SoccerCols {
+  lg?: (number | null)[];
+  ovr?: number[];
+  face?: number[][];
+  est?: number[];
 }
 
 export interface CardPool {
@@ -166,6 +178,13 @@ export function expandCards(f: CardsFile, references?: SeasonReferences): CardPo
       grp,
     };
     if (c.sparse[i]) line.sparse = true;
+    const sc = c as typeof c & SoccerCols;
+    if (sc.ovr) {
+      line.fixedOvr = sc.ovr[i];
+      line.fixedFace = sc.face?.[i];
+      const lg = sc.lg?.[i];
+      if (lg !== null && lg !== undefined && f.leagues?.[lg]) line.league = f.leagues[lg][1];
+    }
     const ref = seasonReference(references, pid, line.season);
     if (ref) line.ratingReference = ref;
     seasons.push(line);
@@ -176,9 +195,10 @@ export function expandCards(f: CardsFile, references?: SeasonReferences): CardPo
     career.sort((a, b) => a.season - b.season);
     for (const l of career) CAREERS.set(l.stats, career);
   }
-  const derive = (kind: CardKind) => ([i, boost, label]: [number, number, string]): CardLine => {
+  const derive = (kind: CardKind) => ([i, boost, label, ovr, face]: [number, number, string, number?, number[]?]): CardLine => {
     const base = seasons[i];
-    return { ...base, id: cardId(f.sport, kind, base.season, base.pid, base.fr), kind, boost, label, seasonId: base.id };
+    const own = typeof ovr === 'number' ? { fixedOvr: ovr, ...(face ? { fixedFace: face } : {}) } : {};
+    return { ...base, id: cardId(f.sport, kind, base.season, base.pid, base.fr), kind, boost, label, seasonId: base.id, ...own };
   };
   const promos = f.promos.map(derive('promo'));
   const legends = f.legends.map(derive('legend'));
@@ -187,8 +207,8 @@ export function expandCards(f: CardsFile, references?: SeasonReferences): CardPo
 }
 
 // the files may not exist (an older build): a glob finds whatever is there
-// cards-soccer.json (scripts/build_soccer_cards.py) has its own layout and isn't wired in yet:
-// left out so it is neither bundled nor precached until soccer is added (docs/SOCCER-DATA.md)
+// cards-soccer.json (scripts/build_soccer_cards.py) loads through soccer-lazy.ts instead (Claude
+// 2026-11-01): its own chunk, cached on first use, absent from the single-file artifact build
 const FILES = import.meta.glob<{ default: CardsFile }>(['../data/cards-*.json', '!../data/cards-soccer.json']);
 const REFERENCES = import.meta.glob<{ default: SeasonReferences }>('../data/season-references-*.json');
 const COMBINE = import.meta.glob<{ default: CombineFile }>('../data/nfl-combine.json');
@@ -200,8 +220,10 @@ export function loadCards(sport: UtSport): Promise<CardPool> {
   let p = pools.get(sport);
   if (!p) {
     const key = Object.keys(FILES).find((k) => k.endsWith(`cards-${sport}.json`));
-    p = key
-      ? Promise.all([FILES[key](), REFERENCES[`../data/season-references-${sport}.json`]?.(), sport === 'nfl' ? COMBINE['../data/nfl-combine.json']?.() : undefined]).then(([m, r, c]) => {
+    p = sport === 'soccer'
+      ? loadSoccerCards().then((f) => expandCards(f))
+      : key
+      ? Promise.all([FILES[key](), REFERENCES[`../data/season-references-${sport}.json`]?.(), (sport === 'nfl' && COMBINE['../data/nfl-combine.json']?.()) || undefined] as const).then(([m, r, c]) => {
           registerCombine(c?.default);
           return expandCards(m.default, r?.default);
         })

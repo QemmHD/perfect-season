@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // An Ultimate Team card: a tier frame (bronze, silver, gold, Hot Season, Legend), the overall and
 // position, the team and season, and the player himself in pixel art: the same rigged body the
 // played games draw, in that season's team colors and his own number, drawn small and scaled up
@@ -23,8 +24,8 @@ const lum = (hex: string): number => {
 
 /** The player in his season's uniform. */
 export function lookOf(line: CardLine): Look {
-  const ht = line.ht ?? (line.sport === 'nba' ? 79 : 74);
-  const wt = line.wt ?? (line.sport === 'nba' ? 215 : 230);
+  const ht = line.ht ?? pickFor(line.sport, { nba: 79, nfl: 74, soccer: 71 });
+  const wt = line.wt ?? pickFor(line.sport, { nba: 215, nfl: 230, soccer: 165 });
   const base = {
     ht,
     wt,
@@ -38,6 +39,14 @@ export function lookOf(line: CardLine): Look {
     shoes: '#1b1b1f',
   };
   if (line.sport === 'nba') return { ...base, sport: 'nba', shorts: line.c1, socks: '#f2f2f2' };
+  if (line.sport === 'soccer') {
+    // Claude 2026-11-01: soccer heights are in centimetres; club colors only (no real kits), a keeper
+    // in a keeper's colors with gloves
+    const keeper = line.pos[0] === 'GK';
+    const shirt = keeper ? '#b6f23a' : line.c1;
+    const hIn = line.ht ? line.ht / 2.54 : 71;
+    return { ...base, ht: hIn, wt: Math.round(hIn * 2.35), sport: 'soccer', jersey: shirt, trim: keeper ? '#16161c' : line.c2, shorts: keeper ? shirt : lum(line.c2) > 0.75 ? line.c2 : line.c1, socks: shirt, sleeves: keeper ? 'long' : 'short', ...(keeper ? { gloves: '#f2f2ee' } : {}) };
+  }
   const big = ['OT', 'OG', 'C', 'DE', 'DT'].includes(line.pos[0]);
   // pants: white against a dark jersey, the trim color against a light one
   const pants = lum(line.c1) < 0.5 ? '#e8e8e4' : line.c2;

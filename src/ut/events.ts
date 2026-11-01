@@ -16,7 +16,10 @@ export interface ThemedEvent {
   targets: number[];
 }
 export function eventsFor(pool: Pool): ThemedEvent[] {
-  return pool.sport === 'nba'
+  // soccer has no GOAT bosses (no registered Spotlight/GOAT editions): no Legends Events (Claude 2026-11-01)
+  if (pool.sport === 'soccer') return [];
+  const hoops = pool.sport === 'nba';
+  return hoops
     ? [
         {
           id: EVENT_IDS[0],
@@ -83,7 +86,7 @@ export function eventRung(pool: Pool, id: string, node: number): Rung | null {
   let squad = buildSquad(pool, { fr: event.fr, decade: event.decade, name: event.title, cards }, event.targets[node], 'event:' + pool.sport + ':' + id + ':' + node);
   if (node === 2) {
     const bossName =
-      pool.sport === 'nba'
+      pool.sport === 'nba' || pool.sport === 'soccer'
         ? { dynasty: 'Michael Jordan', 'deep-range': 'Stephen Curry', immortals: 'Kobe Bryant' }[id]
         : { dynasty: 'Tom Brady', 'deep-range': 'Jerry Rice', immortals: 'Emmitt Smith' }[id];
     const boss = [...pool.base.values()].find((rc) => rc.tier === 'goat' && rc.line.name === bossName);

@@ -2,7 +2,7 @@
 // carry it (raw stats plus each stat's rank within that season and position); the ratings code
 // turns it into 2K/Madden-style attributes. See docs/ULTIMATE-TEAM.md.
 
-export type UtSport = 'nba' | 'nfl';
+export type UtSport = 'nba' | 'nfl' | 'soccer';
 
 /** What kind of card: a season, a boosted hot season, an all-time legend. */
 export type CardKind = 'season' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark' | 'live';
@@ -61,6 +61,14 @@ export interface CardLine {
     /** absent for the original rows; 'preseason' and 'retro' are the marked fallbacks */
     kind?: 'final' | 'next' | 'preseason' | 'retro';
   };
+  /**
+   * Soccer (Claude 2026-11-01): the card file carries each edition's own overall and six face stats
+   * (scripts/build_soccer_cards.py: PAC SHO PAS DRI DEF PHY, keepers DIV HAN KIC REF SPD POS), so the
+   * app has no soccer rating model; `league` is the season's league (chemistry links by club and league).
+   */
+  fixedOvr?: number;
+  fixedFace?: number[];
+  league?: string;
   /** Weekly Standout: its Eastern ISO week ("2026-W44") and whether it was that week's featured card */
   week?: string;
   featured?: boolean;

@@ -97,6 +97,8 @@ export const CONTENT_PRICES: Record<UtSport, { scout: number; elite: number; jum
   // Scout's Choice is priced on its best option's value. Lightning stays 25% off the Standout pack.
   nba: { scout: 650, elite: 2200, jumbo: 3600, standout: 3000, lightning: 2250 },
   nfl: { scout: 250, elite: 1500, jumbo: 2700, standout: 1800, lightning: 1350 },
+  // soccer (Claude 2026-11-01): eleven starters, about 1.4 times basketball's cards a pack, each worth 0.7 as much sold
+  soccer: { scout: 500, elite: 1900, jumbo: 3200, standout: 2600, lightning: 1950 },
 };
 
 /**
@@ -120,12 +122,23 @@ export const PACK_SHAPE = {
     qs: 0.35,
     rare: { gold: 2, premium: 6, position: 2 },
   },
+  soccer: {
+    price: { bronze: 220, silver: 380, gold: 900, premium: 1600, position: 650 },
+    bronze: [5, 2],
+    silver: [2, 4, 1],
+    gold: [2, 3, 1],
+    premium: [2, 7, 1],
+    position: 4,
+    qs: 0.7,
+    rare: { gold: 1, premium: 4, position: 1 },
+  },
 };
 
 /** Claude: the new packs' shapes: [cards], and their rare-gold guarantees. */
 const CONTENT_SHAPE = {
   nba: { daily: 3, elite: 6, jumbo: { silver: 4, gold: 4, rare: 7 }, standout: { gold: 4, rare: 3 } },
   nfl: { daily: 6, elite: 12, jumbo: { silver: 8, gold: 9, rare: 14 }, standout: { gold: 9, rare: 6 } },
+  soccer: { daily: 4, elite: 8, jumbo: { silver: 5, gold: 6, rare: 9 }, standout: { gold: 6, rare: 4 } },
 };
 
 export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, PackDef> {
@@ -169,8 +182,9 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       kind: 'spotlight',
       name: 'Spotlight Pack',
       price: 3500,
-      blurb: (sport === 'nba' ? 8 : 16) + ' gold-or-better cards. 20% Spotlight, 0.05% GOAT. Online.',
-      slots: [...rep(sport === 'nba' ? 7 : 15, G), SPOTLIGHT_ODDS],
+      // (soccer has no Spotlight editions: the Store leaves this pack out, storeOrder)
+      blurb: SPOTLIGHT_COMMON[sport] + 1 + ' gold-or-better cards. 20% Spotlight, 0.05% GOAT. Online.',
+      slots: [...rep(SPOTLIGHT_COMMON[sport], G), SPOTLIGHT_ODDS],
     },
     position: { kind: 'position', name: 'Position Pack', price: k.price.position, blurb: k.position + ' golds (' + k.rare.position + ' rare) at the position you pick', slots: [...rep(k.position - k.rare.position, G), ...rep(k.rare.position, R)] },
     daily: {
@@ -184,7 +198,7 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       kind: 'scout',
       name: "Scout's Choice",
       price: CONTENT_PRICES[sport].scout,
-      blurb: 'Three ' + fcToDisplay(84, sport) + '+ golds face down' + (sport === 'nfl' ? ' from one position group' : '') + '. Keep one',
+      blurb: 'Three ' + fcToDisplay(84, sport) + '+ golds face down' + ((sport === 'nfl' && ' from one position group') || '') + '. Keep one',
       slots: rep(3, { gold: 1 - SCOUT_STANDOUT, standout: SCOUT_STANDOUT }),
     },
     elite: {
@@ -222,6 +236,12 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
 export const SCOUT_STANDOUT = 0.03;
 
 export const STORE_ORDER: Exclude<PackKind, 'starter'>[] = ['spotlight', 'bronze', 'silver', 'gold', 'premium', 'position'];
+/** The Spotlight pack's gold slots before its chase card. */
+const SPOTLIGHT_COMMON: Record<UtSport, number> = { nba: 7, nfl: 15, soccer: 10 };
+/** The packs a sport's Store sells: soccer has no Spotlight (no registered serials for soccer). */
+export function storeOrder(sport: UtSport): Exclude<PackKind, 'starter'>[] {
+  return sport === 'soccer' ? STORE_ORDER.filter((k) => k !== 'spotlight') : STORE_ORDER;
+}
 
 export function packName(sport: UtSport, kind: string): string {
   if (kind.startsWith('event-spotlight:')) return 'Spotlight Reward';
@@ -264,7 +284,7 @@ function drawPos(mix: [string, number][], rand: Rand): string {
  * rarer (football's scale is about half as wide at the top, so a point there counts 2.2 times).
  */
 const RARER = 0.8;
-const STEP: Record<UtSport, number> = { nba: 1.6, nfl: 2.2 };
+const STEP: Record<UtSport, number> = { nba: 1.6, nfl: 2.2, soccer: 1.6 };
 const cum = new WeakMap<RatedCard[], number[]>();
 
 function weighted(list: RatedCard[], tier: Tier, rand: Rand): RatedCard {
@@ -369,9 +389,18 @@ export function packRand(seed: string): Rand {
  * fills one of 23 spots, so football's packs cover a unit, positions drawn in the squad's mix).
  */
 export function positionChoices(sport: UtSport): { key: string; label: string; positions: string[] }[] {
+  if (sport === 'soccer') return SOCCER_UNITS.map(([key, label, positions]) => ({ key, label, positions }));
   if (sport === 'nba') return ['PG', 'SG', 'SF', 'PF', 'C'].map((p) => ({ key: p, label: p, positions: [p] }));
   return NFL_UNITS.map(([key, label, positions]) => ({ key, label, positions }));
 }
+
+/** Soccer's position packs (Claude 2026-11-01): the keeper, the defence, the midfield, the attack. */
+export const SOCCER_UNITS: [string, string, string[]][] = [
+  ['GK', 'Goalkeepers', ['GK']],
+  ['DEF', 'Defenders', ['CB', 'FB']],
+  ['MID', 'Midfielders', ['DM', 'CM', 'AM']],
+  ['ATT', 'Attackers', ['W', 'ST']],
+];
 
 export const NFL_UNITS: [string, string, string[]][] = [
   ['QB-RB-K', 'QB · RB · K', ['QB', 'RB', 'K']],
@@ -437,6 +466,8 @@ function starterCards(pool: Pool, rand: Rand): RatedCard[] {
         }
       }
   };
+  // soccer (Claude 2026-11-01): the eleven and three to rotate in
+  if (pool.sport === 'soccer') spots.push('CB', 'CM', 'ST');
   spots.forEach((p, i) => take(i === 0 || rand() < (pool.sport === 'nba' && i < 5 ? 0.6 : 0.3) ? 'silver' : 'bronze', p));
   take('gold', null);
   return out;
@@ -498,7 +529,7 @@ export function registeredPack(pool: Pool, kind: string, seed: string, chaseId: 
     return [chase];
   }
   if (kind !== 'spotlight') throw new Error('Unknown registered pack.');
-  const common = fill(pool, rep(pool.sport === 'nba' ? 7 : 15, G), packRand(seed));
+  const common = fill(pool, rep(SPOTLIGHT_COMMON[pool.sport], G), packRand(seed));
   const rand = packRand(seed + ':chase');
   let last = chase;
   for (let i = 0; !last && i < 20; i++) {

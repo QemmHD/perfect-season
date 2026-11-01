@@ -1,3 +1,4 @@
+import { SPORT } from '../engine/sport';
 // Claude, 2026-11-01 (wave 3): the Live Calendar core. Everything comes from the US-Eastern date
 // plus src/data/live-calendar.json (12 seasons, Nov 2026 to Nov 2027; built and validated by the
 // content-plan tools). After the last season the year repeats seasons 2–12 shifted by 364 days (same
@@ -5,7 +6,7 @@
 // repeat has its own stable ids. The schedule loads with the card pool (pool.ts `getPool`).
 import type { UtSport } from './types';
 
-type PerSport<T> = T | { nba?: T | null; nfl?: T | null };
+type PerSport<T> = T | { nba?: T | null; nfl?: T | null; soccer?: T | null };
 export interface CalWave {
   d: string;
   label?: PerSport<string>;
@@ -27,7 +28,7 @@ export interface CalPromo {
   pick?: 'top' | 'seeded';
   distinct?: string;
   maxPer?: Record<string, PerSport<number>>;
-  waves?: CalWave[] | { nba?: CalWave[] | null; nfl?: CalWave[] | null };
+  waves?: CalWave[] | { nba?: CalWave[] | null; nfl?: CalWave[] | null; soccer?: CalWave[] | null };
   featured?: { count: number; band: [number, number] };
   excludePrevious?: boolean;
 }
@@ -73,7 +74,7 @@ export interface Schedule {
 
 let data: Schedule | null = null;
 /** Frozen promo selections (scripts/freeze_live_editions.ts): promo id → sport → [card id, wave]. */
-export type Manifest = Record<string, { nba?: [string, number][]; nfl?: [string, number][] }>;
+export type Manifest = Record<string, { nba?: [string, number][]; nfl?: [string, number][]; soccer?: [string, number][] }>;
 let frozen: Manifest = {};
 
 /** The schedule and the frozen selections, loaded once (pool.ts loads them with the cards). */
@@ -97,13 +98,15 @@ export function setSchedule(s: Schedule): void {
   data = s;
 }
 export function schedule(): Schedule | null {
+  // soccer has no Live Calendar yet (Claude 2026-11-01): no This Season, program packs or season SBCs
+  if (SPORT === 'soccer') return null;
   return data;
 }
 
 export const CYCLE_DAYS = 364;
 
 export function per<T>(v: PerSport<T> | undefined, sport: UtSport): T | undefined {
-  if (v && typeof v === 'object' && !Array.isArray(v) && ('nba' in (v as object) || 'nfl' in (v as object))) return ((v as { nba?: T; nfl?: T })[sport] ?? undefined) as T | undefined;
+  if (v && typeof v === 'object' && !Array.isArray(v) && ('nba' in (v as object) || 'nfl' in (v as object))) return ((v as { nba?: T; nfl?: T; soccer?: T })[sport] ?? undefined) as T | undefined;
   return v as T | undefined;
 }
 

@@ -1,3 +1,4 @@
+import { pickFor } from '../engine/sport';
 // Claude, 2026-11-01: Landmark Seasons. Real statistical landmarks found in our own card data (a 30
 // PPG season, a rebounding or assists title, a 1,500-yard rushing season, 15 sacks, ...). Each one
 // is a permanent edition `<sport>:landmark:<season>:<pid>:<fr>` (editions.ts), obtainable only from
@@ -108,7 +109,8 @@ export function landmarkCatalog(lines: CardLine[]): Map<string, Landmark> {
   if (!c) {
     const seasons = lines.filter((l) => l.kind === 'season' && !l.sparse);
     const sport: UtSport = seasons[0]?.sport ?? 'nba';
-    const list = sport === 'nba' ? nbaLandmarks(seasons) : nflLandmarks(seasons);
+    // soccer has no landmark catalogue (Claude 2026-11-01): its Landmark editions don't exist
+    const list = pickFor(sport, { nba: () => nbaLandmarks(seasons), nfl: () => nflLandmarks(seasons), soccer: () => [] as Landmark[] })();
     list.sort((a, b) => b.score - a.score || (a.seasonId < b.seasonId ? -1 : 1));
     c = new Map(list.map((x) => [x.seasonId, x]));
     catalogs.set(lines, c);

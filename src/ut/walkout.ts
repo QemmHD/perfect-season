@@ -37,12 +37,16 @@ export interface WalkoutClues {
 
 export function walkoutClues(rc: RatedCard): WalkoutClues {
   const l = rc.line;
-  const cd = (l.sport === 'nba' ? NBA : NFL)[l.fr] ?? (l.sport === 'nba' ? ['NBA', 'LEAGUE'] : ['NFL', 'LEAGUE']);
   const decade = Math.floor(l.season / 10) * 10;
+  // soccer (Claude 2026-11-01): the league, then the club's initial letters
+  if (l.sport === 'soccer')
+    return { era: "THE '" + String(decade).slice(2) + 'S', conference: (l.league ?? 'EUROPE').toUpperCase(), division: (l.league ?? 'A EUROPEAN') + ' CLUB', stage: 'stage-' + (l.holo ? 'holo' : rc.tier) };
+  const nba = l.sport === 'nba';
+  const cd = (nba ? NBA : NFL)[l.fr] ?? (nba ? ['NBA', 'LEAGUE'] : ['NFL', 'LEAGUE']);
   return {
     era: "THE '" + String(decade).slice(2) + 'S',
-    conference: l.sport === 'nba' ? cd[0] + 'ERN CONFERENCE' : cd[0],
-    division: l.sport === 'nba' ? cd[1] + ' DIVISION' : cd[0] + ' ' + cd[1],
+    conference: nba ? cd[0] + 'ERN CONFERENCE' : cd[0],
+    division: nba ? cd[1] + ' DIVISION' : cd[0] + ' ' + cd[1],
     stage: 'stage-' + (l.holo ? 'holo' : rc.tier),
   };
 }

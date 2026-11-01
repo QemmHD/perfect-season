@@ -28,7 +28,9 @@ export const GUARANTEE_PRICE = 12000;
  * scales its scheduled price so a base program pack's quick-sell value lands near half its price
  * (FC research: 45-60%); the pricier elite-tier packs keep their relative premium (lower EV, rarer hits).
  */
-export const PRICE_FACTOR: Record<UtSport, Record<string, number>> = { nba: { program: 0.6, guarantee: 0.27 }, nfl: { program: 0.36, guarantee: 0.155 } };
+export const PRICE_FACTOR: Record<UtSport, Record<string, number>> = { nba: { program: 0.6, guarantee: 0.27 }, nfl: { program: 0.36, guarantee: 0.155 }, soccer: { program: 0.5, guarantee: 0.22 } };
+/** A program pack's rare golds and golds (guarantee: rare golds), per sport. Soccer has no calendar yet: kept for when it does. */
+const LIVE_SHAPE: Record<UtSport, { rare: number; gold: number; guarantee: number }> = { nba: { rare: 3, gold: 4, guarantee: 5 }, nfl: { rare: 6, gold: 9, guarantee: 11 }, soccer: { rare: 4, gold: 5, guarantee: 7 } };
 
 /** The pack's promo id (`live:s4-honors-y2` → `s4-honors-y2`). */
 export const promoOfPack = (kind: string) => kind.replace(/^live(-plus|-pick)?:/, '').split(':')[0];
@@ -42,7 +44,8 @@ export function livePackDef(sport: UtSport, pack: Pick<CalPack, 'id' | 'tpl' | '
   const extra = Object.entries(pack.extraOdds ?? {}).filter(([id]) => promoById(id)?.kind !== FINALE_KIND && promoById(id)?.kind !== 'season-finale');
   const extraP = extra.reduce((a, [, p]) => a + p, 0);
   const slot: Odds = guarantee ? { program: 1 } : { program: odds + extraP, standout: 1 - odds - extraP };
-  const slots = guarantee ? [...rep(sport === 'nba' ? 5 : 11, R), slot] : [...rep(sport === 'nba' ? 3 : 6, R), ...rep(sport === 'nba' ? 4 : 9, G), slot];
+  const ls = LIVE_SHAPE[sport];
+  const slots = guarantee ? [...rep(ls.guarantee, R), slot] : [...rep(ls.rare, R), ...rep(ls.gold, G), slot];
   const name = per(pack.name, sport) ?? pack.id;
   return {
     kind: pack.id as PackDef['kind'],
@@ -50,7 +53,7 @@ export function livePackDef(sport: UtSport, pack: Pick<CalPack, 'id' | 'tpl' | '
     price: Math.round(((pack.price ?? tpl.price ?? (guarantee ? GUARANTEE_PRICE : PROGRAM_PRICE)) * (PRICE_FACTOR[sport][pack.tpl] ?? 1)) / 100) * 100,
     blurb: guarantee
       ? slots.length + ' cards: ' + (slots.length - 1) + ' rare golds and one program card guaranteed'
-      : slots.length + ' cards: ' + (sport === 'nba' ? 3 : 6) + ' rare golds, ' + (sport === 'nba' ? 4 : 9) + ' golds and a program slot (' + Math.round((odds + extraP) * 100) + '% a program card, otherwise a Weekly Standout)',
+      : slots.length + ' cards: ' + ls.rare + ' rare golds, ' + ls.gold + ' golds and a program slot (' + Math.round((odds + extraP) * 100) + '% a program card, otherwise a Weekly Standout)',
     slots,
     odds,
     extra,

@@ -1,3 +1,4 @@
+import { SPORT } from '../engine/sport';
 // Codex: connected season/objective progression. Rewards are deposited once into existing UT packs.
 import type { UtState } from './state';
 import {
@@ -193,7 +194,8 @@ export function depositPrize(
   reward: Reward,
   at: number
 ): Prize {
-  const pack = reward.pack ?? null;
+  // soccer has no Spotlight editions (no registered serials): its Spotlight prizes are Elite Gold packs
+  const pack = reward.pack === 'spotlight' && SPORT === 'soccer' ? 'elite' : (reward.pack ?? null);
   return {
     ut:
       pack && !ut.packs.some((p) => p.id === id)
@@ -448,7 +450,9 @@ export function rewardLabel(r: Reward): string {
     r.coins ? r.coins.toLocaleString('en-US') + ' coins' : '',
     r.pack
       ? r.pack === 'spotlight'
-        ? 'Spotlight Pack'
+        ? SPORT === 'soccer'
+          ? 'Elite Gold Pack'
+          : 'Spotlight Pack'
         : r.pack[0].toUpperCase() + r.pack.slice(1) + ' Pack'
       : '',
     r.sp ? r.sp + ' SP' : ''
