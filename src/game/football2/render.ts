@@ -9,6 +9,8 @@ import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, proje
 import * as P from '../pixel/poses';
 import type { Joints, Pose } from '../pixel/rig';
 import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, throwErrorRadius, windupOf } from './engine';
+import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
+import type { Juice } from '../juice';
 import type { Body, Play, Pt } from './types';
 
 export interface FbKit {
@@ -33,7 +35,12 @@ export interface FbOverlay {
   open: boolean;
   shake: number;
   flash: number;
+  /** trauma shake, kick, zoom and particles (render only) */
+  juice?: Juice;
 }
+
+/** ability pop colours: offense gold, defense teal */
+const POP_COLOR = { O: '#ffd23a', D: '#3ef0c0' };
 
 /** What the drawing needs from a camera, either kind. */
 interface Lens {
@@ -202,7 +209,8 @@ function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { clip: s
       clip = c;
     }
   }
-  const rate = Math.max(0.65, Math.min(1.7, speed / yd(clip)));
+  // a heavy man's stride comes round a little slower (the lineman's plod)
+  const rate = Math.max(0.65, Math.min(1.7, speed / yd(clip))) * (1.04 - 0.1 * heaviness(b.p.wt, b.p.ht));
   const dt = t - m.gait.t;
   if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + (dt * rate) / clipMeta(clip).duration) % 1;
   m.gait.t = t;
@@ -328,6 +336,17 @@ export class FootballRenderer {
   private acts = new Map<number, string>();
   private playSeen: Play | null = null;
   private lastNow = 0;
+  /** ability pops over players' heads: which body, the ability's name, its side, when (real s) */
+  private pops: { id: number; text: string; side: 'O' | 'D'; at: number }[] = [];
+  pop(id: number, text: string, side: 'O' | 'D', real: number) {
+    if (this.pops.some((q) => q.id === id && q.text === text && real - q.at < 1.2)) return;
+    this.pops.push({ id, text, side, at: real });
+    if (this.pops.length > 6) this.pops.shift();
+  }
+  /** a field point on screen (for effects drawn by the game) */
+  screenOf(x: number, y: number, h = 0): { x: number; y: number; s: number } | null {
+    return this.lens ? this.lens.at(x, y, h) : null;
+  }
   /** an instant replay: the spot to look at, the camera pushed in a little */
   replay: Pt | null = null;
   private zoomK = 1;
@@ -475,7 +494,11 @@ export class FootballRenderer {
     // far, small players step their clips more coarsely (fewer new drawings as the camera moves)
     const step = an.clip ? (px < 22 ? Math.max(3, an.step ?? 2) : (an.step ?? 2)) : 1;
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
-    const key = an.clip ? mocapKey(an.clip, frame, an.ground) + (an.ball ?? '') : an.key;
+    // body type on the run: a heavy man's wider base, a burner's sprint lean
+    const striding = !!an.clip && (an.clip === 'jog' || an.clip === 'run' || an.clip === 'sprint');
+    const heavy = striding ? Math.round(heaviness(b.p.wt, b.p.ht) * 4) / 4 : 0;
+    const lean = striding ? sprintLean(b.p.a.SPD ?? 70, Math.hypot(b.vx, b.vy) / Math.max(1, speedOf(b.p))) : 0;
+    const key = (an.clip ? mocapKey(an.clip, frame, an.ground) + (an.ball ?? '') : an.key) + (heavy ? 'w' + heavy : '') + (lean ? 'l' + lean : '');
     const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
     let spr = this.sprites.get(k);
     if (!spr) {
@@ -488,6 +511,8 @@ export class FootballRenderer {
       const make = () => {
         if (!an.clip) return drawBody(look, { ...an.pose, lift: 0 }, view, px);
         let j = mocapJoints(an.clip, frame, look, { ground: an.ground });
+        if (heavy) j = widen(j, heavy * 0.45, heavy * 0.008);
+        if (lean) j = leanForward(j, lean);
         if (an.ball) j = ballArm(j, an.ball);
         return drawBody(look, j, view, px);
       };
@@ -645,9 +670,15 @@ export class FootballRenderer {
     this.lens = this.makeLens();
     const L = this.lens;
     this.budget = 4;
-    const shx = o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0;
-    const shy = o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0;
+    const jv = o.juice?.view() ?? { x: 0, y: 0, scale: 1 };
+    const shx = (o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0) + jv.x;
+    const shy = (o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0) + jv.y;
     ctx.save();
+    if (jv.scale !== 1) {
+      ctx.translate(this.W / 2, this.H * 0.6);
+      ctx.scale(jv.scale, jv.scale);
+      ctx.translate(-this.W / 2, -this.H * 0.6);
+    }
     ctx.translate(shx, shy);
     this.drawGround(ctx);
     // the line of scrimmage and the line to gain
@@ -767,13 +798,34 @@ export class FootballRenderer {
       const f = L.at(b.x, b.y);
       if (f.y < -40 || f.y > this.H + 80 || f.x < -60 || f.x > this.W + 60) continue;
       const spr = this.sprite(b, p.t, p, f.s);
-      const x = Math.round(f.x - spr.ax);
-      const y = Math.round(f.y - spr.ay);
+      // a spectacular catch: a receiver with the hands for it (SPC 85+) goes up and gets a high ball
+      const since = p.t - b.actAt;
+      const leap = b.act === 'catch' && b === p.catcher && p.catchInfo?.high && (b.p.a.SPC ?? 0) >= 85 && since < 0.42 ? Math.sin((since / 0.42) * Math.PI) * 0.55 : 0;
+      const g = leap ? L.at(b.x, b.y, leap) : f;
+      const x = Math.round(g.x - spr.ax);
+      const y = Math.round(g.y - spr.ay);
+      // a burner with the ball in the open field (SPD 92+): a short afterimage
+      if (b === p.carrier && p.phase === 'run' && (b.p.a.SPD ?? 0) >= 92 && Math.hypot(b.vx, b.vy) > 8.6 && !this.replay) {
+        const a0 = ctx.globalAlpha;
+        for (const [back, alpha] of [[14, 0.12], [9, 0.2], [4, 0.3]] as const) {
+          const q = b.trail[b.trail.length - 1 - back];
+          if (!q) continue;
+          const at = L.at(q.x, q.y);
+          ctx.globalAlpha = a0 * alpha;
+          ctx.drawImage(spr.canvas, Math.round(at.x - spr.ax), Math.round(at.y - spr.ay));
+        }
+        ctx.globalAlpha = a0;
+      }
       ctx.drawImage(spr.canvas, x, y);
-      heads[b.id] = { x: Math.round(f.x), y: y + spr.top };
+      heads[b.id] = { x: Math.round(g.x), y: y + spr.top };
       if (b === p.carrier) {
         const hd = b.act === 'throw' || p.phase === 'pre' || p.phase === 'drop' ? spr.handR : spr.handL;
         hand = { x: x + hd.x, y: y + hd.y, s: f.s };
+        // shaky hands (CTH under 70): the ball pops up off his hands before he secures it
+        if (b.act === 'catch' && (b.p.a.CTH ?? 70) < 70 && since < 0.38) {
+          const k = since / 0.38;
+          hand = { x: hand.x + Math.round(Math.sin(k * Math.PI * 3) * f.s * 0.12), y: hand.y - Math.round(Math.sin(k * Math.PI) * f.s * 0.45), s: f.s };
+        }
       }
     }
     // the ball, in the air (with its shadow) or in his hands
@@ -831,6 +883,27 @@ export class FootballRenderer {
       }
     }
     this.particles(ctx, p);
+    o.juice?.draw(ctx);
+    // ability pops: the ability that just did it, over his head
+    const real = performance.now() / 1000;
+    this.pops = this.pops.filter((q) => real - q.at < 1.2);
+    for (const q of this.pops) {
+      const h = heads[q.id];
+      if (!h) continue;
+      const k = (real - q.at) / 1.2;
+      const y = Math.round(h.y - 34 - k * 12);
+      const a0 = ctx.globalAlpha;
+      ctx.globalAlpha = a0 * Math.min(1, (1 - k) * 3);
+      ctx.fillStyle = '#0b0e18';
+      ctx.fillRect(h.x - 5, y - 4, 10, 10);
+      ctx.fillStyle = POP_COLOR[q.side];
+      ctx.fillRect(h.x - 3, y - 4, 6, 10);
+      ctx.fillRect(h.x - 5, y - 2, 10, 6);
+      ctx.fillStyle = '#0b0e18';
+      ctx.fillRect(h.x - 1, y - 1, 2, 4);
+      label(ctx, q.text, h.x, y + 9, POP_COLOR[q.side], this.W);
+      ctx.globalAlpha = a0;
+    }
     // names: the receivers before the snap, the man with the ball after
     const tag = (b: Body, color: string, text = b.p.tag, up = 14) => {
       const h = heads[b.id];
