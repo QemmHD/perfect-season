@@ -113,7 +113,7 @@ export function Hub(props: {
             <span className="uh-continue-txt">
               <i className="eyebrow">READY WHEN YOU ARE</i>
               <b className="disp">Play</b>
-              <small>Club Season, Squad Battles, Rivals and more</small>
+              <small>{props.sport === 'soccer' ? 'Squad Battles, Champions Circuit, Rivals and more' : 'Club Season, Squad Battles, Rivals and more'}</small>
             </span>
             <span className="uh-continue-go" aria-hidden="true">
               <IconPlay size={20} />

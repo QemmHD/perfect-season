@@ -78,7 +78,9 @@ export type Manifest = Record<string, { nba?: [string, number][]; nfl?: [string,
 let frozen: Manifest = {};
 
 /** The schedule and the frozen selections, loaded once (pool.ts loads them with the cards). */
-export async function loadSchedule(): Promise<Schedule> {
+export async function loadSchedule(): Promise<Schedule | null> {
+  // soccer has no Live Calendar yet (Claude 2026-11-01): nothing loads, every calendar view is empty
+  if (SPORT === 'soccer') return null;
   if (!data) {
     const [s, m] = await Promise.all([import('../data/live-calendar.json'), import('../data/live-editions.json')]);
     data = s.default as unknown as Schedule;
@@ -99,7 +101,7 @@ export function setSchedule(s: Schedule): void {
 }
 export function schedule(): Schedule | null {
   // soccer has no Live Calendar yet (Claude 2026-11-01): no This Season, program packs or season SBCs
-  if (SPORT === 'soccer') return null;
+  // (setSchedule in a test can still give it one)
   return data;
 }
 
