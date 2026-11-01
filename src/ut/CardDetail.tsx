@@ -36,7 +36,7 @@ function Bar({ v, max = 99 }: { v: number; max?: number }) {
   );
 }
 
-export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, developed, locked, onLock }: { cc: ClubCard; sport: UtSport; onUse?: () => void; onSell: () => void; onClose: () => void; clubRecord?: { games:number; wins:number }; developed?: boolean; locked?: boolean; onLock?: () => void }) {
+export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, developed, locked, onLock, onSquad, onDevelop }: { cc: ClubCard; sport: UtSport; onUse?: () => void; onSell: () => void; onClose: () => void; clubRecord?: { games:number; wins:number }; developed?: boolean; locked?: boolean; onLock?: () => void; /** Claude (UI reorganisation): the action bar's shortcuts */ onSquad?: () => void; onDevelop?: () => void }) {
   const [selling, setSelling] = useState(false);
   const { rc, oc } = cc;
   const l = rc.line;
@@ -85,6 +85,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
             </div>
 
             {oc.mint && <CardSerial mint={oc.mint} cardId={oc.cardId} sport={sport} />}
+            {!oc.mint && Math.round(rc.rawOvr ?? rc.ovr) >= 90 && <p className="note ut-serial-pending">Its serial number is issued the next time you’re online.</p>}
             <div className="ut-level">
               <span className="ut-level-pips" aria-hidden="true">
                 {Array.from({ length: MAX_LEVEL }, (_, i) => (
@@ -107,9 +108,9 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
                 </span>
               )}
             </div>
-            <p className="note ut-xpnote">Cards earn XP in games. Each level adds 1 to the key attributes marked below; levels 3 and 5 also add 1 overall, within the edition’s rating cap.</p>
+            <p className="note ut-xpnote">Cards earn XP in matches. Each level adds 1 to the key attributes; levels 3 and 5 also add 1 overall, within the edition’s cap.</p>
 
-            {(clubRecord || developed) && <div className="hq-card-record"><span className="eyebrow">YOUR CLUB STORY</span><b className="num">{clubRecord?.games ?? 0} squad appearances · {clubRecord?.wins ?? 0} wins</b><small>{developed ? 'CLUB HERO · Development program completed' : 'Recorded since the clubhouse update; squad selection includes the bench.'}</small></div>}
+            {(clubRecord || developed) && <div className="hq-card-record"><span className="eyebrow">YOUR CLUB STORY</span><b className="num">{clubRecord?.games ?? 0} squad appearances · {clubRecord?.wins ?? 0} wins</b><small>{developed ? 'CLUB HERO · Development program completed' : 'Squad appearances include the bench.'}</small></div>}
             <span className="eyebrow">{role ? 'Card face · weighed as ' + role : 'Card face'}</span>
             <div className="ut-keys">
               {face.map(([c, n, v]) => (
@@ -168,22 +169,22 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
                 'Attributes estimated from this season’s statistics, honors and player role.'
               )}
             </p>
-            <span className="eyebrow">All attributes · key attributes (levels) highlighted</span>
-            <div className="ut-allattrs">
-              {all.map((c) => (
-                <span key={c} className={keySet.has(c) ? 'key' : ''}>
-                  <i>{attrName(c)}</i>
-                  <b className="num">{rc.attrs[c] ?? '—'}</b>
-                  <Bar v={rc.attrs[c] ?? 0} max={cap} />
-                </span>
-              ))}
-            </div>
+            <details className="ut-detail-more">
+              <summary>
+                <span className="eyebrow">All {all.length} attributes</span>
+                <small>Key attributes (they grow with levels) highlighted</small>
+              </summary>
+              <div className="ut-allattrs">
+                {all.map((c) => (
+                  <span key={c} className={keySet.has(c) ? 'key' : ''}>
+                    <i>{attrName(c)}</i>
+                    <b className="num">{rc.attrs[c] ?? '—'}</b>
+                    <Bar v={rc.attrs[c] ?? 0} max={cap} />
+                  </span>
+                ))}
+              </div>
+            </details>
 
-            {onUse && (
-              <button className="btn primary" onClick={() => close(onUse)}>
-                USE THIS COPY IN CLUB
-              </button>
-            )}
             {onLock && (
               <button className={'btn ut-lock-btn' + (locked ? ' on' : '')} aria-pressed={!!locked} onClick={onLock}>
                 <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
@@ -193,12 +194,26 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
                 {locked ? 'LOCKED FAVOURITE · TAP TO UNLOCK' : 'LOCK AS FAVOURITE'}
               </button>
             )}
+            {/* Claude (UI reorganisation): the actions stay at the bottom of the sheet while you read */}
             <div className="btnrow ut-detail-btns">
-              <button className="btn" onClick={() => close()}>
+              <button className="btn ut-detail-close" onClick={() => close()}>
                 CLOSE
               </button>
-              <button className="btn danger withicon" disabled={!!locked} onClick={() => setSelling(true)}>
-                QUICK SELL <Coin size={14} /> <span className="num">{value.toLocaleString('en-US')}</span>
+              {onUse ? (
+                <button className="btn primary" onClick={() => close(onUse)}>
+                  USE IN CLUB
+                </button>
+              ) : !cc.slot && onSquad ? (
+                <button className="btn primary" onClick={() => close(onSquad)}>
+                  ADD TO SQUAD
+                </button>
+              ) : onDevelop && !cc.storage ? (
+                <button className="btn primary" onClick={() => close(onDevelop)}>
+                  DEVELOP
+                </button>
+              ) : null}
+              <button className="btn danger withicon" disabled={!!locked} onClick={() => setSelling(true)} aria-label={'QUICK SELL for ' + value.toLocaleString('en-US') + ' coins'}>
+                SELL <Coin size={14} /> <span className="num">{value.toLocaleString('en-US')}</span>
               </button>
             </div>
           </div>

@@ -10,6 +10,7 @@ import { packName, quickSellValue } from './packs';
 import { type Pool, seasonText } from './pool';
 import { autoFill, cardFits, checkSbc, type Req, rewardText, type Sbc, teamNeed } from './sbc';
 import { playsIn } from './squad';
+import { Lede } from './ui';
 import type { ClubCard } from './UltimateTeam';
 
 /** Time left until midnight Eastern, or until the end of the week (Sunday night). */
@@ -82,7 +83,7 @@ const reqLabel = (r: Req) => {
   }
 };
 
-export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string, number>; club: ClubCard[]; day: string; onSubmit: (s: Sbc, uids: string[]) => void; onToast: (t: string) => void; extra?: React.ReactNode }) {
+export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string, number>; club: ClubCard[]; day: string; onSubmit: (s: Sbc, uids: string[]) => void; onToast: (t: string) => void; extra?: React.ReactNode; onStandouts?: () => void }) {
   const [open, setOpen] = useState<Sbc | null>(null);
   const [left, setLeft] = useState(() => [timeLeft(false), timeLeft(true)]);
   useEffect(() => {
@@ -94,13 +95,30 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
   const upgrades = props.sbcs.filter((s) => s.kind === 'upgrade');
   return (
     <div className="page ut-sbcs">
-      <p className="lead ut-sbc-lead">Trade in cards that meet the requirements. Everyone gets the same challenges. Duplicate Storage cards are available here and auto-fill prefers equally valued spares.</p>
+      <Lede>Trade in cards that meet the requirements for a reward. Spare copies in Storage can go in too.</Lede>
+      {props.onStandouts && (
+        <button className="ut-so-link" onClick={props.onStandouts}>
+          <b>Weekly Standouts</b>
+          <small>This week’s Standouts, their SBC and objective</small>
+        </button>
+      )}
       {/* Claude wave 3: the Live Calendar's season SBCs (calendar-sbc.ts) */}
       {props.sbcs.some((s) => s.kind === 'program') && (
         <div className="ut-sbc-group">
           <span className="eyebrow">This Season</span>
           {props.sbcs
             .filter((s) => s.kind === 'program')
+            .map((s) => (
+              <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
+            ))}
+        </div>
+      )}
+      {/* Claude: Weekly Standouts and Landmark Seasons SBCs (content-sbc.ts) */}
+      {props.sbcs.some((s) => s.kind === 'standout' || s.kind === 'landmark') && (
+        <div className="ut-sbc-group">
+          <span className="eyebrow">Standouts &amp; Landmarks{left[1] ? ' · new in ' + left[1] : ''}</span>
+          {props.sbcs
+            .filter((s) => s.kind === 'standout' || s.kind === 'landmark')
             .map((s) => (
               <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
             ))}
@@ -119,17 +137,6 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
           <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
         ))}
       </div>
-      {/* Claude: Weekly Standouts and Landmark Seasons SBCs (content-sbc.ts) */}
-      {props.sbcs.some((s) => s.kind === 'standout' || s.kind === 'landmark') && (
-        <div className="ut-sbc-group">
-          <span className="eyebrow">Weekly Standouts &amp; Landmark Seasons{left[1] ? ' · new in ' + left[1] : ''}</span>
-          {props.sbcs
-            .filter((s) => s.kind === 'standout' || s.kind === 'landmark')
-            .map((s) => (
-              <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
-            ))}
-        </div>
-      )}
       {upgrades.length > 0 && (
         <div className="ut-sbc-group">
           <span className="eyebrow">Upgrades and repeatables</span>

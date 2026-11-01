@@ -26,7 +26,13 @@ import { CardDetail } from './CardDetail';
 import { Challenges } from './Challenges';
 import { Club } from './Club';
 import { Hub } from './Hub';
-import { IconClub, IconHub, IconPlay, IconSbc, IconSquad, IconStore } from './icons';
+import { IconChallenges, IconClub, IconExit, IconHome, IconPlay, IconSquad, IconStore } from './icons';
+import { rememberSegment, SEGMENTS, tabLabel, tabOf, tabTarget, UT_TABS, viewInfo, type UtTab } from './nav';
+import { Segmented } from './ui';
+import { developmentReady } from './club-management';
+import { readyEvos } from './evolutions';
+import { readyRewards, seasonReady } from './progression';
+import { setsFor } from './sets';
 import { PackOpening } from './PackOpening';
 import { openPack, packDefs, packName, quickSellValue } from './packs';
 import type { PlaySquad } from './play';
@@ -42,7 +48,7 @@ import './content.css';
 import { CollectionGallery } from './CollectionGallery';
 import { Events } from './Events';
 import { ownedCardsForPack } from './acquisition';
-import { claimCollection } from './collection';
+import { claimCollection, collectionRewards } from './collection';
 import { openRegisteredPack } from './registry';
 import { registeredOpening } from './promo';
 import { Store } from './Store';
@@ -81,6 +87,8 @@ import { calendarSbcs } from './calendar-sbc';
 import type { CalPack } from './calendar';
 import { livePackDef, liveBuysLeft, livePick, recordLiveBuy } from './live-packs';
 import { programReward } from './live-cards';
+// Claude (UI reorganisation): last, so the shell and shared pieces win over older rules
+import './nav.css';
 
 /** An owned card with its rating and where it plays (if it's in the squad). */
 export interface ClubCard {
@@ -95,6 +103,7 @@ export type UtView =
   | 'hub'
   | 'squad'
   | 'club'
+  | 'storage'
   | 'store'
   | 'sbc'
   | 'battles'
@@ -119,14 +128,15 @@ export type UtView =
 /** the view to come back to after a match (the screen unmounts while it's played) */
 let lastView: UtView = 'hub';
 
-const TABS: [UtView, string, React.ReactNode][] = [
-  ['hub', 'HOME', <IconHub />],
-  ['play', 'PLAY', <IconPlay />],
-  ['squad', 'SQUAD', <IconSquad />],
-  ['club', 'CLUB', <IconClub />],
-  ['store', 'STORE', <IconStore />],
-  ['sbc', 'SBC', <IconSbc />]
-];
+// Claude (UI reorganisation): six tabs, FC-style order; names and parents live in nav.ts.
+const TAB_ICON: Record<UtTab, React.ReactNode> = {
+  hub: <IconHome />,
+  play: <IconPlay />,
+  squad: <IconSquad />,
+  club: <IconClub />,
+  sbc: <IconChallenges />,
+  store: <IconStore />,
+};
 
 export interface Opening {
   id: string;
@@ -154,10 +164,10 @@ export default function UltimateTeam(props: {
   const [view, setViewNow] = useState<UtView>(() => lastView);
   const setView = (v: UtView) => {
     lastView = v;
+    rememberSegment(v);
     setViewNow(v);
   };
   const [opening, setOpening] = useState<Opening | null>(null);
-  const [showStorage, setShowStorage] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
   const busy = useRef(false);
   const [promoBusy, setPromoBusy] = useState(false);
@@ -214,6 +224,17 @@ export default function UltimateTeam(props: {
   const sbcs = useMemo(() => (pool ? [...calendarSbcs(pool, ut, day), ...sbcsFor(pool, day, ut.sbc.done), ...contentSbcs(pool, weekOf(day))] : []), [pool, day, ut.sbc.done, ut.content?.claims]);
   const sbcDone = useMemo(() => ({ ...ut.sbc.done, ...contentDone(ut, sbcs) }), [ut.sbc.done, ut.content?.claims, sbcs]);
   const [pickOpen, setPickOpen] = useState<string | null>(null);
+  // Claude (UI reorganisation): claimables that live under Club (sets, collection milestones), for the badges
+  const clubReady = useMemo(
+    () =>
+      pool
+        ? {
+            sets: setsFor(pool, ut).filter((x) => !x.claimed && x.have >= x.need).length,
+            collection: collectionRewards(pool, ut).filter((g) => g.have >= g.need && !ut.collectionClaims?.includes(g.id)).length,
+          }
+        : { sets: 0, collection: 0 },
+    [pool, ut.owned, ut.collected, ut.collectionClaims, ut.content?.claims]
+  );
   const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
 
   const setUt = (fn: (u: UtState) => UtState) => update((p) => ({ ...p, ut: organizeStorage(fn(p.ut)) }));
@@ -282,7 +303,7 @@ export default function UltimateTeam(props: {
     sfx.coin();
     onToast(
       'Reward claimed. ' +
-        [rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }), shown.packCount ? shown.packCount + ' packs added to your Store' : '']
+        [rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }), shown.packCount ? shown.packCount + (shown.packCount === 1 ? ' pack' : ' packs') + ' added to your Store' : '']
           .filter(Boolean)
           .join(' · ')
     );
@@ -719,8 +740,6 @@ export default function UltimateTeam(props: {
   };
 
   const detailCard = detail ? (byUid.get(detail) ?? null) : null;
-  // (the upgrades and repeatables are always there: they don't count toward what's left to do)
-  const todo = sbcs.filter((s) => s.kind !== 'upgrade' && !sbcDone[s.id]).length;
 
   let body: React.ReactNode;
   if (failed)
@@ -771,11 +790,13 @@ export default function UltimateTeam(props: {
     body = (
       <PlayHQ
         ut={ut}
+        pool={pool}
+        week={week}
         onGo={go}
         onOnline={() => {
           if (!props.onPlaySquad || !NET_ON) {
             sfx.nope();
-            onToast('Head to head needs a connection.');
+            onToast('Rivals needs a connection.');
             return;
           }
           if (!ready) {
@@ -1028,36 +1049,8 @@ export default function UltimateTeam(props: {
         }}
       />
     );
-  else if (view === 'club')
-    body = (
-      <div className="ut-collection-shell">
-        <div
-          className="ut-storage-tabs"
-          role="group"
-          aria-label="Card location"
-        >
-          <button
-            aria-pressed={!showStorage}
-            onClick={() => setShowStorage(false)}
-          >
-            CLUB <b className="num">{club.length}</b>
-          </button>
-          <button
-            aria-pressed={showStorage}
-            onClick={() => setShowStorage(true)}
-          >
-            DUPLICATE STORAGE <b className="num">{stored.length}</b>
-          </button>
-        </div>
-        <Club
-          key={showStorage ? 'storage' : 'club'}
-          club={showStorage ? stored : club}
-          storage={showStorage}
-          onInspect={setDetail}
-          onSell={quickSell}
-        />
-      </div>
-    );
+  else if (view === 'club' || view === 'storage')
+    body = <Club key={view} club={view === 'storage' ? stored : club} storage={view === 'storage'} onInspect={setDetail} onSell={quickSell} />;
   else if (view === 'gallery')
     body = (
       <CollectionGallery
@@ -1189,6 +1182,7 @@ export default function UltimateTeam(props: {
         done={sbcDone}
         club={inventory.filter((c) => !isLocked(ut, c.uid))}
         extra={<StreamlinedSection pool={pool} ut={ut} club={inventory} onSubmit={submitStreamCards} />}
+        onStandouts={() => go('standouts')}
         day={day}
         onSubmit={submitSbc}
         onToast={onToast}
@@ -1199,80 +1193,82 @@ export default function UltimateTeam(props: {
       <Hub
         sport={SPORT}
         day={day}
+        week={week}
         club={club}
         lineup={lineup}
         rating={rating}
         ut={ut}
-        sbcTodo={todo}
-        sbcs={sbcs}
-        onInspect={setDetail}
+        pool={pool}
         onGo={go}
         onStarter={claimStarter}
-        onDaily={() => go('daily')}
-        onInbox={() => go('inbox')}
-        inboxReady={inboxReady}
-        calendarReady={calendarStatus(ut, day).ready}
         onNewEra={claimNewEraBundle}
-        week={week}
-        pool={pool}
+        inboxReady={inboxReady}
+        onClaimAll={claimEverything}
+        calendarReady={calendarStatus(ut, day).ready}
       />
     );
 
-  // Codex: every competition belongs to Play, including the view restored after a match.
-  const playChild = ['battles', 'rivals', 'events', 'circuit', 'moments', 'league', 'draft'].includes(view);
-  const activeTab = playChild ? 'play' : view === 'gallery' || view === 'sets' ? 'club' : TABS.some(([tab]) => tab === view) ? view : 'hub';
+  // Claude (UI reorganisation): every view has one tab (highlighted), one title and one parent
+  // (nav.ts). Root views show no back button; Home's is EXIT; a sub-screen goes back to its parent,
+  // labelled with that parent's tab.
+  const info = viewInfo(view);
+  const activeTab = tabOf(view);
+  const segments = !info.parent ? SEGMENTS[activeTab] : undefined;
+  const h = hqOf(ut);
+  const packsWaiting = ut.packs.length + (contentOf(ut).picks?.length ?? 0) + (ut.starterClaimed ? 0 : 1);
+  const setsReady = clubReady.sets;
+  const collectionReady = clubReady.collection;
+  const devReady = (developmentReady(ut) ? 1 : 0) + readyEvos(ut).length;
+  const objReady = objectiveDeckReady(ut, day);
+  const passReady = Object.keys(h.seasons).reduce((n, k) => n + seasonReady(ut, k), 0);
+  const badges: Partial<Record<UtTab, number>> = pool
+    ? { hub: inboxReady, club: setsReady + collectionReady + devReady, sbc: readyRewards(ut, day), store: packsWaiting }
+    : { store: packsWaiting };
+  const segBadges: Partial<Record<UtView, number>> = { gallery: setsReady + collectionReady, development: devReady, objectives: objReady, season: passReady };
+  const back = view === 'hub' ? null : info.parent ?? null;
+  const backLabel = back ? tabLabel(tabOf(back)) : '';
+  // iOS-style: when a long title wouldn't fit next to the back label, the back button keeps only its chevron
+  const titleSize = view === 'circuit' || view === 'standouts' ? 19 : 21;
+  const backFits = !back || backLabel.length * 8.2 + 41 + info.title.length * titleSize * 0.5 <= 250;
 
   return (
-    <div className={'screen ut ut-v-' + view}>
-      <div className="topbar ut-top" {...(opening ? { inert: '' } : {})}>
-        <button
-          className="icon-btn pill-btn"
-          onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go(playChild ? 'play' : 'hub'))}
-          aria-label={view === 'hub' ? 'Leave Ultimate Team' : playChild ? 'Back to Play' : 'Back to the Ultimate Team home'}
-        >
-          <Back size={16} /> {view === 'hub' ? 'HOME' : playChild ? 'PLAY' : 'UT'}
-        </button>
-        <span className="ut-title disp">
-          {view === 'hub'
-            ? 'Ultimate Team'
-            : ((
-                {
-                  battles: 'Squad Battles',
-                  rivals: 'Rivals',
-                  gallery: 'Collection',
-                  events: 'Spotlight Events',
-                  play: 'Play',
-                  season: 'Season Rewards',
-                  objectives: 'Objectives',
-                  circuit: 'Champions Circuit',
-                  league: 'Club Season',
-                  moments: 'Moments',
-                  development: 'Development',
-                  records: 'Club Records',
-                  standouts: 'Weekly Standouts',
-                  sets: 'Set Collections',
-                  draft: 'UT Draft',
-                  daily: 'Daily',
-                  evolutions: 'Evolutions',
-                  inbox: 'Rewards'
-                } as Partial<Record<UtView, string>>
-              )[view] ??
-              TABS.find((t) => t[0] === view)?.[1] ??
-              'Ultimate Team')}
-        </span>
+    <div className={'screen ut ut-v-' + view + ' ut-t-' + activeTab + (info.parent ? ' ut-sub' : ' ut-root')}>
+      <div className={'topbar ut-top' + (view !== 'hub' && !back ? ' no-back' : '')} {...(opening ? { inert: '' } : {})}>
+        {view === 'hub' ? (
+          <button className="icon-btn pill-btn ut-back" onClick={() => (sfx.click(), (lastView = 'hub'), props.onExit())} aria-label="Leave Ultimate Team">
+            <IconExit size={16} /> EXIT
+          </button>
+        ) : back ? (
+          <button className={'icon-btn pill-btn ut-back' + (backFits ? '' : ' icon-only')} onClick={() => go(back)} aria-label={'Back to ' + backLabel[0] + backLabel.slice(1).toLowerCase()}>
+            <Back size={16} /> {backFits && backLabel}
+          </button>
+        ) : null}
+        <span className="ut-title disp">{info.title}</span>
         <CoinChip coins={profile.coins} />
       </div>
-      <div className="ut-body" {...(opening ? { inert: '' } : {})}>
+      {segments && (
+        <div className="ut-segbar" {...(opening ? { inert: '' } : {})}>
+          <Segmented label={tabLabel(activeTab) + ' sections'} items={segments} value={view} onChange={go} badges={segBadges} />
+        </div>
+      )}
+      <div className="ut-body" key={activeTab + ':' + (info.parent ? view : 'root')} {...(opening ? { inert: '' } : {})}>
         {body}
       </div>
       <nav className="ut-tabs" aria-label="Ultimate Team" {...(opening ? { inert: '' } : {})}>
-        {TABS.map(([k, label, icon]) => (
-          <button key={k} aria-current={activeTab === k ? 'page' : undefined} onClick={() => go(k)}>
-            {icon}
+        {UT_TABS.map(([k, label]) => (
+          <button
+            key={k}
+            aria-current={activeTab === k ? 'page' : undefined}
+            aria-label={label[0] + label.slice(1).toLowerCase() + (badges[k] ? ', ' + badges[k] + (k === 'store' ? ' to open' : ' ready') : '')}
+            onClick={() => {
+              // a tab opens on its last-used section; tapped from one of its own sub-screens, it goes back up
+              if (activeTab === k && !info.parent) return;
+              go(tabTarget(k));
+            }}
+          >
+            {TAB_ICON[k]}
             <span>{label}</span>
-            {k === 'sbc' && pool && todo > 0 && <i className="ut-dot num">{todo}</i>}
-            {k === 'hub' && inboxReady > 0 && <i className="ut-dot num">{inboxReady}</i>}
-            {k === 'store' && (ut.packs.length > 0 || !ut.starterClaimed) && <i className="ut-dot num">{ut.packs.length + (ut.starterClaimed ? 0 : 1)}</i>}
+            {(badges[k] ?? 0) > 0 && <i className="ut-dot num">{badges[k]}</i>}
           </button>
         ))}
       </nav>
@@ -1300,6 +1296,8 @@ export default function UltimateTeam(props: {
             onToast(was ? 'Unlocked. This copy can be sold or used in SBCs again.' : 'Locked as a favourite: never quick-sold, used in SBCs or swapped.');
           }}
           onClose={() => setDetail(null)}
+          onSquad={() => (setDetail(null), go('squad'))}
+          onDevelop={() => (setDetail(null), go('development'))}
         />
       )}
       {pool && pickOpen && contentOf(ut).picks?.some((x) => x.id === pickOpen) && !opening && (
@@ -1324,4 +1322,9 @@ export default function UltimateTeam(props: {
       )}
     </div>
   );
+}
+
+/** Objectives ready to claim (for the Objectives segment's count). */
+function objectiveDeckReady(ut: UtState, day: string): number {
+  return objectiveDeck(ut, day).filter((o) => !o.claimed && o.progress >= o.target).length;
 }

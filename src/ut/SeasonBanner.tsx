@@ -1,7 +1,7 @@
 // Claude, 2026-11-01 (wave 3): Home's "This Season" banner and "Coming next" teaser, from the Live
 // Calendar. Season name, tagline, days left and accent; the programs live now (tap: the Store); the
 // next three drops by name only (players are never revealed early) and, five days out, the next season.
-import React from 'react';
+import React, { useState } from 'react';
 import { daysBetween, nextSeason, per, promosOn, seasonOn, upcoming } from './calendar';
 import { HQArrow } from './Clubhouse';
 import { fcToDisplay } from './fc-scale';
@@ -12,7 +12,9 @@ const fmtDay = (d: string) => {
   return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 };
 
-export function SeasonBanner({ day, sport, onStore }: { day: string; sport: UtSport; onStore: () => void }) {
+// Claude, UI reorganisation: `compact` (Home) shows the first Coming-next line with a toggle for the rest.
+export function SeasonBanner({ day, sport, onStore, compact = false }: { day: string; sport: UtSport; onStore: () => void; compact?: boolean }) {
+  const [open, setOpen] = useState(false);
   const s = seasonOn(day);
   if (!s) return null;
   const left = daysBetween(day, s.end) + 1;
@@ -40,8 +42,15 @@ export function SeasonBanner({ day, sport, onStore }: { day: string; sport: UtSp
           ))}
         </span>
       )}
-      <span className="ut-season-next">
-        <i className="eyebrow">COMING NEXT</i>
+      <span className={'ut-season-next' + (compact && !open ? ' folded' : '')}>
+        <span className="ut-season-next-head">
+          <i className="eyebrow">COMING NEXT</i>
+          {compact && next.length + (soon ? 1 : 0) > 1 && (
+            <button className="ut-season-more" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+              {open ? 'LESS' : '+' + (next.length + (soon ? 1 : 0) - 1) + ' MORE'}
+            </button>
+          )}
+        </span>
         {next.map((u) => (
           <span key={u.date + u.title}>
             <b>{fmtDay(u.date)}</b> {u.title} <em>{band(u.band)}</em>
@@ -54,7 +63,7 @@ export function SeasonBanner({ day, sport, onStore }: { day: string; sport: UtSp
         )}
         {!next.length && !soon && <span>New programs drop on Fridays.</span>}
       </span>
-      {live.length > 0 && (
+      {live.length > 0 && !compact && (
         <button className="ut-season-store" onClick={onStore}>
           PROGRAM PACKS <HQArrow />
         </button>
