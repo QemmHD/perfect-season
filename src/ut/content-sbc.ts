@@ -68,6 +68,6 @@ export function contentSbcs(pool: Pool, week: string): Sbc[] {
 /** The content SBCs' done markers (merged into the classic `sbc.done` map for display). */
 export function contentDone(ut: UtState, sbcs: Sbc[]): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const s of sbcs) if ((s.kind === 'landmark' || s.kind === 'standout') && claimed(ut, 'sbc:' + s.id)) out[s.id] = 1;
+  for (const s of sbcs) if ((s.kind === 'landmark' || s.kind === 'standout' || s.kind === 'program') && claimed(ut, 'sbc:' + s.id)) out[s.id] = 1;
   return out;
 }

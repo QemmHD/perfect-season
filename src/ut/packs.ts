@@ -44,6 +44,7 @@ import { rareInfo } from './rare';
 import { weekOf } from './sbc';
 import { drawStandout } from './standouts';
 import { HOLO_CHANCE, HOLO_TIERS, holoId } from './variants';
+import { livePackName, openLivePack } from './live-packs';
 
 /** Claude 2026-11-01: daily (Daily Drop), scout (Scout's Choice, pick 1 of 3), elite (Elite Gold),
  * jumbo (Jumbo Premium), standout (Standout Guarantee) and lightning (its weekend discount copy). */
@@ -90,8 +91,11 @@ const dailyLast: Odds = { silver: 0.6, gold: 1 - 0.6 - STANDOUT_DAILY, standout:
 /** Claude: the new packs' prices. Football's 16-card Standout pack holds golds that sell for a third
  * as much, so its chase packs cost less; Lightning is always 25% off. */
 export const CONTENT_PRICES: Record<UtSport, { scout: number; elite: number; jumbo: number; standout: number; lightning: number }> = {
-  nba: { scout: 1500, elite: 3000, jumbo: 3200, standout: 4500, lightning: 3375 },
-  nfl: { scout: 1500, elite: 2500, jumbo: 3200, standout: 3300, lightning: 2475 },
+  // Claude wave 3: retuned so quick-sell EV is 45-60% of price (FC research target): Standout
+  // Guarantee NBA 4,500 → 3,600 and NFL 3,300 → 2,300, Elite Gold 3,000 → 2,800 and NFL 2,500 → 2,100.
+  // Recheck after the ratings rework lands (its scale moves quick-sell values).
+  nba: { scout: 1500, elite: 2800, jumbo: 3200, standout: 3600, lightning: 2700 },
+  nfl: { scout: 1500, elite: 2100, jumbo: 3200, standout: 2300, lightning: 1725 },
 };
 
 /**
@@ -218,6 +222,7 @@ export const STORE_ORDER: Exclude<PackKind, 'starter'>[] = ['spotlight', 'bronze
 export function packName(sport: UtSport, kind: string): string {
   if (kind.startsWith('event-spotlight:')) return 'Spotlight Reward';
   if (kind === 'standout-pick') return 'Standout Pick';
+  if (kind.startsWith('live')) return livePackName(sport, kind);
   if (kind === 'starter') return 'Starter Pack';
   if (kind.startsWith('position:')) return (positionChoices(sport).find((c) => c.key === kind.slice(9))?.label ?? kind.slice(9)) + ' Pack';
   return packDefs(sport)[kind as Exclude<PackKind, 'starter'>]?.name ?? 'Pack';
@@ -225,7 +230,7 @@ export function packName(sport: UtSport, kind: string): string {
 
 // ---------- drawing cards ----------
 
-const DRAW_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'promo', 'standout', 'rare', 'gold', 'silver', 'bronze'];
+const DRAW_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'rare', 'gold', 'silver', 'bronze'];
 
 function drawTier(o: Odds, rand: Rand): SlotTier {
   let x = rand();
@@ -327,14 +332,17 @@ function drawSlot(pool: Pool, tier: SlotTier, rand: Rand, mix: [string, number][
 }
 
 /** A pack's cards from its slots: no card twice in one pack. */
-function fill(pool: Pool, slots: Odds[], rand: Rand, mix?: [string, number][], week = currentWeek()): RatedCard[] {
+/** Claude wave 3: `program` draws a Live Calendar program slot (live-packs.ts). */
+export type ProgramDraw = (rand: Rand) => RatedCard | null;
+
+export function fill(pool: Pool, slots: Odds[], rand: Rand, mix?: [string, number][], week = currentWeek(), program?: ProgramDraw): RatedCard[] {
   const out: RatedCard[] = [];
   const ids = new Set<string>();
   for (const o of slots) {
     const tier = drawTier(o, rand);
     let c: RatedCard | null = null;
     for (let k = 0; k < 6; k++) {
-      c = drawSlot(pool, tier, rand, mix, week);
+      c = tier === 'program' && program ? (program(rand) ?? drawSlot(pool, 'standout', rand, mix, week)) : drawSlot(pool, tier, rand, mix, week);
       if (c && !ids.has(c.line.id) && !(tier === 'standout' && ids.has('pid:' + c.line.pid))) break;
     }
     if (!c) continue;
@@ -378,7 +386,9 @@ export const NFL_UNITS: [string, string, string[]][] = [
 export function openPack(pool: Pool, kind: string, seed?: string, week = currentWeek()): RatedCard[] {
   const rand = seed === undefined ? trueRand() : packRand(seed);
   // Claude: Scout's Choice is a pick of three, not a pack (content-packs.ts pickOptions)
-  if (kind === 'scout' || kind === 'standout-pick') throw new Error('This is a pick, not a pack.');
+  if (kind === 'scout' || kind === 'standout-pick' || kind.startsWith('live-pick:')) throw new Error('This is a pick, not a pack.');
+  // Claude wave 3: Live Calendar program packs (live-packs.ts)
+  if (kind.startsWith('live:') || kind.startsWith('live-plus:')) return openLivePack(pool, kind, rand, easternDateKey(), week);
   // The rare slot is rolled and numbered by the shared registry, never by this local RNG.
   if (kind === 'spotlight' || kind.startsWith('event-spotlight:')) throw new Error('This pack needs the shared card registry.');
   if (kind === 'starter') return starterCards(pool, rand);
@@ -445,6 +455,7 @@ export function quickSellValue(rc: RatedCard): number {
   else if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - onScale(90, sport));
   else if (rc.tier === 'landmark') v = 1200 + 60 * Math.max(0, o - onScale(84, sport));
   else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - onScale(78, sport));
+  else if (rc.tier === 'program') v = 700 + 60 * Math.max(0, o - onScale(84, sport));
   else if (rc.tier === 'standout') v = 400 + 40 * Math.max(0, o - onScale(78, sport));
   else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (99 - gold)), 1.5);
   else if (rc.tier === 'silver') v = 40 + 40 * clamp01((o - silver) / (gold - silver - 1));
@@ -465,8 +476,8 @@ export function revealOrder(cards: RatedCard[]): RatedCard[] {
 export function walkoutLevel(rc: RatedCard): 0 | 1 | 2 | 3 | 4 {
   if (rc.tier === 'goat') return 4;
   if (rc.tier === 'spotlight') return 3;
-  if (rc.tier === 'legend' || rc.tier === 'landmark') return 3;
-  if (rc.tier === 'promo' || rc.tier === 'standout' || (rc.tier === 'gold' && rc.ovr >= onScale(86, rc.line.sport))) return 2;
+  if (rc.tier === 'legend' || rc.tier === 'landmark' || (rc.tier === 'program' && rc.line.programKind === 'finale')) return 3;
+  if (rc.tier === 'promo' || rc.tier === 'standout' || rc.tier === 'program' || (rc.tier === 'gold' && rc.ovr >= onScale(86, rc.line.sport))) return 2;
   return rc.tier === 'gold' ? 1 : 0;
 }
 

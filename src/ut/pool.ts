@@ -8,6 +8,8 @@ import { rateCard } from './rate';
 import type { CardLine, OwnedCard, RatedCard, Tier, UtSport } from './types';
 import { deriveEditionLine, parseEditionId } from './editions';
 import { deriveVariantLine, isVariantId } from './variants';
+import { deriveLiveLine, parseLiveId } from './live-cards';
+import { loadSchedule, schedule } from './calendar';
 import { rareInfo } from './rare';
 
 /**
@@ -15,7 +17,7 @@ import { rareInfo } from './rare';
  * Landmark Season editions that older builds can't resolve, so its online queue must not pair with
  * them (`queueOf` in Match.tsx uses the fingerprint).
  */
-export const CONTENT_PRINT = 'ut-content-3';
+export const CONTENT_PRINT = 'ut-content-4';
 
 /**
  * Card lines by id that also resolve the derived editions (editions.ts) on demand: a Standout from
@@ -32,10 +34,10 @@ class EditionLines extends Map<string, CardLine> {
   }
   get(id: string): CardLine | undefined {
     const own = super.get(id);
-    if (own || (!isVariantId(id) && !parseEditionId(id))) return own;
+    if (own || (!isVariantId(id) && !parseEditionId(id) && !parseLiveId(id))) return own;
     let d = this.derived.get(id);
     if (d === undefined) {
-      d = isVariantId(id) ? deriveVariantLine(id, (k) => this.get(k)) : deriveEditionLine(id, (k) => super.get(k), this.lines);
+      d = isVariantId(id) ? deriveVariantLine(id, (k) => this.get(k)) : parseLiveId(id) ? deriveLiveLine(id, (k) => super.get(k)) : deriveEditionLine(id, (k) => super.get(k), this.lines);
       this.derived.set(id, d);
     }
     return d ?? undefined;
@@ -53,7 +55,7 @@ class EditionRatings extends Map<string, RatedCard> {
   }
   get(id: string): RatedCard | undefined {
     const own = super.get(id);
-    if (own || (!isVariantId(id) && !parseEditionId(id))) return own;
+    if (own || (!isVariantId(id) && !parseEditionId(id) && !parseLiveId(id))) return own;
     let d = this.derived.get(id);
     if (d === undefined) {
       const line = this.byId().get(id);
@@ -89,7 +91,7 @@ export function buildPool(sport: UtSport, lines: CardLine[], byId?: Map<string, 
 function poolBuilder(sport: UtSport, lines: CardLine[], byId?: Map<string, CardLine>) {
   let lookup: Map<string, CardLine> | null = null;
   const base = new EditionRatings(() => lookup!);
-  const buckets: Pool['buckets'] = { bronze: {}, silver: {}, gold: {}, promo: {}, spotlight: {}, legend: {}, goat: {}, standout: {}, landmark: {} };
+  const buckets: Pool['buckets'] = { bronze: {}, silver: {}, gold: {}, promo: {}, spotlight: {}, legend: {}, goat: {}, standout: {}, landmark: {}, program: {} };
   let h = 2166136261;
   return {
     add(l: CardLine) {
@@ -100,7 +102,7 @@ function poolBuilder(sport: UtSport, lines: CardLine[], byId?: Map<string, CardL
     },
     done: (): Pool => {
       lookup = new EditionLines(byId ?? lines.map((l) => [l.id, l]), lines);
-      return { sport, lines, byId: lookup, base, buckets, print: (Math.imul(h ^ hashString(CONTENT_PRINT), 16777619) >>> 0).toString(36) };
+      return { sport, lines, byId: lookup, base, buckets, print: (Math.imul(h ^ hashString(CONTENT_PRINT + ':' + String(schedule()?.version ?? '')), 16777619) >>> 0).toString(36) };
     },
   };
 }
@@ -126,8 +128,9 @@ let cache: Promise<Pool> | null = null;
 
 /** This page's sport's pool (cached). */
 export function getPool(): Promise<Pool> {
-  cache ??= loadCards(SPORT)
-    .then((s) => buildPoolInSlices(SPORT, s.lines, s.byId))
+  // Claude wave 3: the Live Calendar schedule loads with the cards (program cards resolve from it)
+  cache ??= Promise.all([loadCards(SPORT), loadSchedule()])
+    .then(([s]) => buildPoolInSlices(SPORT, s.lines, s.byId))
     .then((p) => (rareInfo(p), p));
   // a failed load can be tried again
   cache.catch(() => (cache = null));
@@ -165,7 +168,7 @@ export function shortSeason(line: Pick<CardLine, 'season'>): string {
   return '’' + String(line.season).slice(2);
 }
 
-export const TIER_RANK: Record<Tier, number> = { bronze: 0, silver: 1, gold: 2, standout: 2.5, promo: 3, landmark: 3.5, legend: 4, spotlight: 5, goat: 6 };
+export const TIER_RANK: Record<Tier, number> = { bronze: 0, silver: 1, gold: 2, standout: 2.5, program: 3, promo: 3, landmark: 3.5, legend: 4, spotlight: 5, goat: 6 };
 
 /** Best first: tier, then overall. */
 export function byValue(a: RatedCard, b: RatedCard): number {

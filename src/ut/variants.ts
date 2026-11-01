@@ -12,7 +12,7 @@ import { rateCard } from './rate';
 import type { CardLine, RatedCard } from './types';
 
 export const HOLO_CHANCE = 0.04;
-export const HOLO_TIERS = new Set(['standout', 'promo', 'landmark', 'legend']);
+export const HOLO_TIERS = new Set(['standout', 'promo', 'landmark', 'legend', 'program']);
 
 export const holoId = (cardId: string) => 'holo~' + cardId;
 export const isVariantId = (id: string) => id.startsWith('holo~') || id.startsWith('evo~');

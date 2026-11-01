@@ -5,10 +5,10 @@
 export type UtSport = 'nba' | 'nfl';
 
 /** What kind of card: a season, a boosted hot season, an all-time legend. */
-export type CardKind = 'season' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark';
+export type CardKind = 'season' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark' | 'live';
 
 /** Claude 2026-11-01: `standout` (Weekly Standouts) and `landmark` (Landmark Seasons) are derived editions. */
-export type Tier = 'bronze' | 'silver' | 'gold' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark';
+export type Tier = 'bronze' | 'silver' | 'gold' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark' | 'program';
 
 /**
  * One player-season as stored in src/data/cards-<sport>.json.
@@ -64,6 +64,12 @@ export interface CardLine {
   holo?: boolean;
   evo?: string[];
   variantOf?: CardLine;
+  /** Claude wave 3 (live-cards.ts): a Live Calendar program card's promo id, kind, band (reference
+   * scale) and its season's accent colours */
+  program?: string;
+  programKind?: string;
+  band?: [number, number];
+  accent?: string[];
 }
 
 /** Immutable edition issue number; activeAtPull is only a last-confirmed circulation snapshot. */

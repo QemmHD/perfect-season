@@ -25,6 +25,7 @@ export const ITEM_SILVER = 35;
 
 export const ITEM_MULT: Partial<Record<RatedCard['tier'], number>> = {
   standout: 1.25,
+  program: 1.3,
   promo: 1.25,
   landmark: 1.35,
   legend: 1.5,
