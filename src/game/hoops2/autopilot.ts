@@ -4,9 +4,13 @@
 // defender, move it out of a double team, and sprint (the stick at its edge) only on a drive. `skill` (0-1) is how sharp its
 // reads and its release timing are.
 import { hashString, rng } from '../../engine/rng';
-import { crossover, dist, jumpRebound, ballPos, pass, pressShoot, releaseShoot, RIM, shotValue, step } from './engine';
+import { callPlay, canOop, crossover, dist, isThree, jumpRebound, ballPos, pass, pressShoot, releaseShoot, RIM, shotValue, step, stepback } from './engine';
 import { afterPossession, type HoopsGame, startPossession } from './game';
 import type { Body, Possession, Pt } from './types';
+
+/** the most passes it makes in a possession before it plays with the ball */
+export const MAX_PASSES = 6;
+const rate01 = (r: number) => Math.max(0, Math.min(1, (r - 40) / 59));
 
 export interface Pilot {
   skill: number;
@@ -32,7 +36,9 @@ const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
 /** Its release timing's spread (seconds): a Legend's about as tight as a good person's thumb, a
  * Rookie's loose. */
 function releaseSd(pl: Pilot): number {
-  return 0.17 - 0.11 * pl.skill;
+  // Rookie 84 ms, Pro 66 ms, Legend 50 ms (a good thumb is about 45). It was 120/95/73 ms, which
+  // the rating-scaled shot curve punished far harder than any person's release.
+  return 0.12 - 0.08 * pl.skill;
 }
 
 /** Is there a lane to the rim: no defender in a cone between him and it. */
@@ -94,7 +100,7 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
     if (!tr || tr.p !== p || tr.handler !== h.idx || tr.trapper !== p.trapper)
       pl.trap = { p, handler: h.idx, trapper: p.trapper, at: p.t + 0.2 + (1 - pl.skill) * 0.7 + pl.rand() * 0.2 };
     const free = p.bodies[p.bodies[p.trapper].mark];
-    if (pl.trap && p.t >= pl.trap.at && free && free !== h && free.side === 'O' && p.passes < 6) {
+    if (pl.trap && p.t >= pl.trap.at && free && free !== h && free.side === 'O' && p.passes < MAX_PASSES) {
       pl.trap.at = Infinity;
       pass(p, free.idx);
       return null;
@@ -112,6 +118,16 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
   }
   // how picky: early in the clock only a good look, late anything decent
   const used = 14 - p.clock;
+  // the pick and roll: bring a big up to set a screen once a possession (a sharper player more
+  // often), come off it, and the roll man dives to the rim
+  if (p.callReadyAt === undefined && used > 0.8 && used < 5 && pl.rand() < 0.25 + 0.35 * pl.skill && callPlay(p, 'screen')) return null;
+  const call = p.playCall && p.playCall.kind === 'screen' && p.playCall.until > p.t ? p.playCall : null;
+  if (call && call.plantedAt !== undefined && !call.rolling) {
+    const s = p.bodies[call.actor];
+    const off = { cx: s.cx - h.cx, cz: s.cz - h.cz };
+    const l = Math.hypot(off.cx, off.cz) || 1;
+    pl.goal = { cx: s.cx + (off.cx / l) * 4, cz: s.cz + (off.cz / l) * 4 + (s.cz >= 0 ? -1.5 : 1.5) };
+  }
   // (a sharper player waits for a better look)
   const picky = 0.7 + 0.65 * pl.skill;
   const want = used < 2 ? picky + 0.15 : picky - Math.min(0.4, (used - 2) * 0.05) - pl.rand() * 0.08;
@@ -121,22 +137,29 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
   const man = p.bodies.find((o) => o.side === 'D' && o.mark === h.idx);
   const beaten = !!man && (p.t < man.stunUntil || (man.cx - h.cx) * (RIM.cx - h.cx) + (man.cz - h.cz) * (RIM.cz - h.cz) < 0);
   const drive = d > 32 ? 0 : laneOpen(p, h) || beaten ? 0.6 + (finisher - 50) / 50 : 0.25 + (finisher - 60) / 90;
-  // the open man: what his shot would be worth, a lob to a dunker on the cut most of all
+  // the open man: what his shot would be worth, a lob to a dunker on the cut most of all. A pass
+  // costs something (a beat of the clock, the risk in the lane, the defense recovering), more with
+  // each extra pass and less for a good passer; after MAX_PASSES the ball stops moving and he plays.
+  // (Without the cost an all-shooter five swung it around forever while everyone looked as good as
+  // the handler, and elite shooters scored less than average ones: see GAMEPLAY-RATINGS.md.)
   let best: Body | null = null;
   let bestVal = 0;
-  for (const m of p.bodies) {
-    if (m.side !== 'O' || m === h) continue;
-    const cutting = m.cutUntil > p.t;
-    const mm = p.bodies.find((o) => o.side === 'D' && o.mark === m.idx);
-    const behind = !!mm && dist(mm, RIM) > dist(m, RIM) + 1;
-    // (the lob to a cutter takes a sharp eye: a Rookie mostly misses it)
-    const sees = pl.rand() < 0.3 + 0.7 * pl.skill;
-    const v = sees && cutting && behind && m.p.ddk >= 74 && dist(m, RIM) < 14 ? 1.05 + (m.p.ddk - 74) / 100 : shotValue(p, m, sd).value - 0.08;
-    if (v > bestVal) {
-      bestVal = v;
-      best = m;
+  const tax = (0.15 + 0.05 * p.passes) * (1 - 0.4 * rate01(a.pas));
+  if (p.passes < MAX_PASSES)
+    for (const m of p.bodies) {
+      if (m.side !== 'O' || m === h) continue;
+      const cutting = m.cutUntil > p.t;
+      const mm = p.bodies.find((o) => o.side === 'D' && o.mark === m.idx);
+      const behind = !!mm && dist(mm, RIM) > dist(m, RIM) + 1;
+      // (the lob to a cutter takes a sharp eye: a Rookie mostly misses it)
+      const sees = pl.rand() < 0.3 + 0.7 * pl.skill;
+      const oop = canOop(m.p);
+      const v = sees && cutting && behind && oop && dist(m, RIM) < 14 ? 1.05 + (m.p.ddk - 74) / 100 : shotValue(p, m, sd).value - tax;
+      if (v > bestVal) {
+        bestVal = v;
+        best = m;
+      }
     }
-  }
   const top = Math.max(shot.value, drive, bestVal);
   if (top >= want || used > 9) {
     if (top === shot.value) {
@@ -147,10 +170,17 @@ export function decide(p: Possession, pl: Pilot): Pt | null {
       pl.driving = true;
       return dir;
     }
-    if (best && p.passes < 6) {
+    if (best) {
       pass(p, best.idx);
       return null;
     }
+  }
+  // a shooter crowded behind the arc: a step-back for room
+  const man0 = man && dist(man, h) < 4.2 && p.t >= man.stunUntil;
+  if (man0 && a.thr >= 72 && isThree(h) && dist(h, RIM) < 25.5 && p.t - (h.lastMoveAt ?? -9) > 1.3 && pl.rand() < 0.2 + 0.25 * pl.skill) {
+    stepback(p);
+    pl.nextThink = p.t + 0.3;
+    return null;
   }
   // a tight defender and a handle: cross him to make something
   if (man && dist(man, h) < 5 && a.hnd >= 62 && pl.crosses < 2 && pl.rand() < 0.25 + (a.hnd - 62) / 100) {
