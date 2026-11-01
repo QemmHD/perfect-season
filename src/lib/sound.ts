@@ -189,8 +189,8 @@ export const SAMPLES = {
   kick: { files: { arena: ['kick'], stadium: ['kick'], pitch: ['soccer-kick-1', 'soccer-kick-2'] }, gain: 0.6, only: ['stadium', 'pitch'], pitch: 0.04 },
   horn: { files: ['horn'], gain: 0.6, only: 'stadium', pitch: 0, vol: 0 },
   // soccer: the ball off the turf, and the referee's long whistle at full time
-  bounce: { files: ['soccer-bounce'], gain: 0.45, only: 'pitch', pitch: 0.08, vol: 0.2 },
-  fulltime: { files: ['soccer-whistle'], gain: 0.6, only: 'pitch', pitch: 0, vol: 0 },
+  bounce: { files: { arena: [], stadium: [], pitch: ['soccer-bounce'] }, gain: 0.45, only: 'pitch', pitch: 0.08, vol: 0.2 },
+  fulltime: { files: { arena: [], stadium: [], pitch: ['soccer-whistle'] }, gain: 0.6, only: 'pitch', pitch: 0, vol: 0 },
 } satisfies Record<string, SampleDef>;
 
 export type SampleName = keyof typeof SAMPLES;

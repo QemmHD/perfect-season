@@ -100,7 +100,15 @@ afterEach(() => {
 describe('the recordings', () => {
   const paths = Object.keys(import.meta.glob('../assets/sfx/*.mp3'));
   const onDisk = paths.map((p) => p.slice(p.lastIndexOf('/') + 1, -4));
-  const named = new Set((Object.keys(SAMPLES) as SampleName[]).flatMap((n) => [...filesOf(n, 'arena'), ...filesOf(n, 'stadium')]));
+  // (Claude 2026-11-01: and soccer's 'pitch' venue)
+  const named = new Set((Object.keys(SAMPLES) as SampleName[]).flatMap((n) => [...filesOf(n, 'arena'), ...filesOf(n, 'stadium'), ...filesOf(n, 'pitch')]));
+
+  it('keeps soccer’s recordings to soccer (basketball and football never name them)', () => {
+    const other = (Object.keys(SAMPLES) as SampleName[]).flatMap((n) => [...filesOf(n, 'arena'), ...filesOf(n, 'stadium')]);
+    expect(other.filter((f) => f.startsWith('soccer-'))).toEqual([]);
+    expect(filesOf('crowd', 'pitch')).toEqual(['soccer-chant']);
+    expect(filesOf('kick', 'pitch')).toEqual(['soccer-kick-1', 'soccer-kick-2']);
+  });
 
   it('has a file for every sound, and no file nothing plays', () => {
     for (const f of named) expect(onDisk, f).toContain(f);
