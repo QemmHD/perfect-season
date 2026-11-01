@@ -133,7 +133,7 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
     <span
       ref={ref}
       {...(tilt ? handlers : {})}
-      className={'utc t-' + rc.tier + (big ? ' big' : '') + (attrs ? ' with-attrs' : '') + (w < 52 ? ' xs' : w < 70 ? ' sm' : '') + (name.length > 9 ? ' long' : '') + (className ? ' ' + className : '')}
+      className={'utc t-' + rc.tier + (rc.tier === 'promo' ? ' th-' + (l.campaign ?? 'hot') : '') + (big ? ' big' : '') + (attrs ? ' with-attrs' : '') + (w < 52 ? ' xs' : w < 70 ? ' sm' : '') + (name.length > 9 ? ' long' : '') + (className ? ' ' + className : '')}
       style={{ '--w': w + 'px', '--c1': l.c1, '--c2': l.c2 } as React.CSSProperties}
       role="img"
       aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + TIER_NAMES[rc.tier]}
@@ -156,7 +156,9 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
             ))}
           </span>
         )}
+        {rc.tier === 'promo' && <i className="utc-ribbon">{(l.label ?? 'Promo').toUpperCase()}</i>}
         <span className="utc-plate">
+          {l.moment && attrs && <small className="utc-moment">{l.moment}</small>}
           <b className="utc-name">{name}</b>
           {attrs && (
             <span className="utc-attrs">

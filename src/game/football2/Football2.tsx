@@ -79,6 +79,8 @@ export function Football2({
   seed,
   drives = DRIVES,
   defIQ = 0,
+  start,
+  clock,
   rival,
   ourKit,
   theirKit,
@@ -99,6 +101,9 @@ export function Football2({
   drives?: number;
   /** how well the rival defends beyond its ratings (Squad Battles' difficulty; 0 standard) */
   defIQ?: number;
+  /** a Flashback's moment: the yard line the first drive starts on, and a one-drive game's clock */
+  start?: number;
+  clock?: number;
   rival: RivalLive | null;
   ourKit: FbKit;
   theirKit: FbKit;
@@ -121,7 +126,7 @@ export function Football2({
       live = false;
     };
   }, []);
-  const game = useMemo<Game | null>(() => (attrs ? newGame(offense ?? offenseOf(lineup!, attrs, seed), rivalDefense ?? defenseOf(rivalLineup!, attrs, 'def:' + seed), seed, drives, defIQ) : null), [attrs]);
+  const game = useMemo<Game | null>(() => (attrs ? newGame(offense ?? offenseOf(lineup!, attrs, seed), rivalDefense ?? defenseOf(rivalLineup!, attrs, 'def:' + seed), seed, drives, defIQ, { start, clock }) : null), [attrs]);
   const renderer = useMemo(() => new FootballRenderer(field, [ourKit, theirKit]), []);
   // the game's drawings and its canvas let go of their memory as it closes (Safari counts a dropped
   // canvas against the page's cap until it's collected, which can be a while)

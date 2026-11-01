@@ -141,7 +141,9 @@ export function rateNfl(x: FbInput): NflRating {
       set('MAC', 55 + 25 * acc + 12 * deep + 6 * p);
       set('DAC', 50 + 30 * deep + 10 * acc + 6 * p);
       set('TUP', 50 + 22 * pocket + 14 * careful + 12 * p);
-      set('SPD', 55 + 38 * clamp01(ry / 45) + 5 * light);
+      // a season's rushing yards: a scrambler's 700+ is top speed (Vick, Lamar), a pocket passer's
+      // few dozen a statue's
+      set('SPD', 55 + 38 * clamp01(ry / 700) + 5 * light);
       set('AWR', 55 + 28 * p + 14 * careful);
       break;
     }

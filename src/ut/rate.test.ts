@@ -2,7 +2,7 @@
 import { SPORT } from '../engine/sport';
 import { hooper } from '../game/hoops2/ratings';
 import { getPool } from './pool';
-import { levelBonus, NBA_KEYS, nbaLineOf, onScale, rateCard, tierOf, toHooper } from './rate';
+import { levelBonus, NBA_KEYS, nbaLineOf, onScale, promoLift, rateCard, squeeze, tierOf, toHooper } from './rate';
 import type { CardLine } from './types';
 
 describe('rating cards (' + SPORT + ')', () => {
@@ -36,11 +36,13 @@ describe('rating cards (' + SPORT + ')', () => {
     for (let i = 0; i < 6; i++) expect(five.key[i][2]).toBe(Math.min(99, one.key[i][2] + 4));
   });
 
-  it('applies a promo’s boost once, with its ability', () => {
-    const promo = lines.find((x) => x.kind === 'promo' && (x.boost ?? 0) > 0)!;
+  it('puts a promo well above the season it is made from, every rating up, with its ability', () => {
+    const promo = lines.find((x) => x.kind === 'promo' && (x.boost ?? 0) > 0 && rateCard({ ...x, kind: 'season', boost: undefined }).ovr < 85)!;
     const plain = rateCard({ ...promo, kind: 'season', boost: undefined });
     const rc = rateCard(promo);
-    expect(rc.ovr).toBe(Math.min(99, plain.ovr + promo.boost!));
+    expect(rc.ovr).toBe(Math.min(99, Math.round(squeeze(rateCard({ ...promo, kind: 'season', boost: undefined }).ovr, SPORT) + promoLift(promo.boost!, SPORT))));
+    expect(rc.ovr).toBeGreaterThanOrEqual(plain.ovr + (SPORT === 'nba' ? 5 : 2));
+    for (const c of Object.keys(plain.attrs)) expect(rc.attrs[c]).toBeGreaterThanOrEqual(Math.min(99, plain.attrs[c] + 1));
     expect(rc.tier).toBe('promo');
     expect(rc.abil).toContain('heat-check');
     const legend = lines.find((x) => x.kind === 'legend')!;
@@ -48,9 +50,22 @@ describe('rating cards (' + SPORT + ')', () => {
     expect(rateCard(legend).ovr).toBeGreaterThanOrEqual(90);
   });
 
+  it('leaves room at the top: no season above the squeeze, promos and legends over it', () => {
+    const seasons = lines.filter((x) => x.kind === 'season').map((x) => rateCard(x).ovr);
+    const best = Math.max(...seasons);
+    expect(best).toBe(SPORT === 'nba' ? 94 : 95);
+    // below the knee a season's overall is as rated
+    expect(squeeze(80, 'nba')).toBe(80);
+    expect(squeeze(99, 'nba')).toBe(94);
+    expect(squeeze(99, 'nfl')).toBe(95);
+    const promos = lines.filter((x) => x.kind === 'promo').map((x) => rateCard(x).ovr).sort((a, b) => a - b);
+    expect(promos[Math.floor(promos.length / 2)]).toBeGreaterThan(best);
+  });
+
   if (SPORT === 'nba')
     it('rates basketball with the game’s own hooper(), and gives the game its player back', () => {
-      const l = lines.find((x) => x.kind === 'season' && x.stats.fg3 !== null && rateCard(x).ovr > 80)!;
+      // (below the squeeze, where a card's overall is the game's own)
+      const l = lines.find((x) => x.kind === 'season' && x.stats.fg3 !== null && rateCard(x).ovr > 78 && rateCard(x).ovr < 84)!;
       const rc = rateCard(l);
       const h = hooper(nbaLineOf(l), l.pos[0], l.num);
       expect(rc.ovr).toBe(h.ovr);

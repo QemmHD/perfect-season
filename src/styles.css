@@ -8782,6 +8782,82 @@ button.friendcard:active {
   --ink: #fff7e8;
   --plate: rgba(20, 0, 6, 0.5);
 }
+/* Hot Season: black and ember, the card on fire */
+.utc.t-promo.th-hot {
+  --frame: linear-gradient(150deg, #ffd36b 0%, #ff5a1f 22%, #3a0508 46%, #12020a 58%, #ff6a2a 82%, #ffd36b 100%);
+  --face: radial-gradient(130% 85% at 50% 108%, #ff6a1f 0%, #b3122a 30%, #3a0712 62%, #12030a 100%);
+  --ink: #fff4e2;
+  --plate: rgba(16, 2, 4, 0.62);
+  box-shadow:
+    0 0 0 0.1em rgba(255, 120, 40, 0.75),
+    0 0 1.2em rgba(255, 70, 30, 0.45);
+}
+.t-promo.th-hot .utc-glow {
+  background:
+    radial-gradient(60% 42% at 50% 58%, color-mix(in srgb, var(--c1) 60%, #ff7a2f) 0%, transparent 70%),
+    radial-gradient(0.18em 0.18em at 22% 70%, #ffd36b 50%, transparent 51%),
+    radial-gradient(0.14em 0.14em at 78% 62%, #ffb347 50%, transparent 51%),
+    radial-gradient(0.12em 0.12em at 64% 84%, #ffd36b 50%, transparent 51%),
+    repeating-linear-gradient(-60deg, rgba(255, 140, 60, 0.12) 0 0.12em, transparent 0.12em 0.6em);
+}
+/* Moments: black and silver, a film strip down each side, gold on the ribbon */
+.utc.t-promo.th-moments {
+  --frame: linear-gradient(135deg, #ffffff 0%, #9aa5b1 18%, #20252d 38%, #07080b 58%, #b9c3ce 82%, #ffffff 100%);
+  --face: linear-gradient(172deg, #07090d 0%, #161c25 55%, #2a3442 100%);
+  --ink: #ffffff;
+  --plate: rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 0 0 0.1em rgba(230, 236, 244, 0.85),
+    0 0 1.3em rgba(190, 205, 225, 0.45);
+}
+.t-promo.th-moments .utc-glow {
+  background:
+    radial-gradient(55% 40% at 50% 52%, color-mix(in srgb, var(--c1) 55%, #9fb4cc) 0%, transparent 72%),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0 0.32em, transparent 0.32em 0.8em) left 0.2em top 0 / 0.36em 100% no-repeat,
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0 0.32em, transparent 0.32em 0.8em) right 0.2em top 0 / 0.36em 100% no-repeat,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 0.8em, transparent 0.8em calc(100% - 0.8em), rgba(0, 0, 0, 0.55) calc(100% - 0.8em));
+}
+.utc.t-promo.th-moments .utc-shine {
+  background: linear-gradient(115deg, transparent 34%, rgba(255, 255, 255, 0.7) 46%, rgba(200, 215, 235, 0.25) 52%, transparent 62%) 0 0 / 260% 100%;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+/* a promo's campaign, across the top */
+.utc-ribbon {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 0.55em;
+  transform: translateX(-50%);
+  padding: 0.12em 0.45em;
+  border-radius: 0.3em;
+  font-style: normal;
+  font-weight: 900;
+  font-size: 0.62em;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  color: #1a1206;
+  background: linear-gradient(180deg, #ffe08a, #e9a21f);
+  box-shadow: 0 0.08em 0.2em rgba(0, 0, 0, 0.45);
+}
+.th-hot .utc-ribbon {
+  color: #fff;
+  background: linear-gradient(180deg, #ff7a2f, #c4122a);
+}
+.utc.xs .utc-ribbon,
+.utc.sm .utc-ribbon {
+  display: none;
+}
+/* the moment, on a big card over the name */
+.utc-moment {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 0.72em;
+  letter-spacing: 0.04em;
+  color: #ffe08a;
+  text-transform: uppercase;
+  margin-bottom: 0.15em;
+}
 .utc.t-legend {
   --frame: linear-gradient(135deg, #fffaf0 0%, #f2cf6a 22%, #ffffff 45%, #e3b84c 70%, #fff6d8 100%);
   --face: radial-gradient(120% 90% at 50% 25%, #fffdf4 0%, #f3e3b4 55%, #d9b964 100%);
@@ -9912,6 +9988,113 @@ button.friendcard:active {
   text-shadow:
     0 0 26px rgba(255, 70, 50, 0.9),
     0 4px 0 #7d0b34;
+}
+/* a promo's walkout: its campaign first, in its own colors and effects */
+.th-hot .ut-walk {
+  background: radial-gradient(90% 60% at 50% 78%, #7a0f14 0%, #2a0407 48%, #060102 80%);
+}
+.th-moments .ut-walk {
+  background: radial-gradient(90% 60% at 50% 70%, #2a3442 0%, #0b0e13 55%, #000 85%);
+}
+.th-moments .ut-walk-beams i {
+  background: linear-gradient(0deg, rgba(220, 230, 245, 0.7) 0%, transparent 85%);
+}
+.ut-walk-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* embers rising */
+.th-hot .ut-walk-fx {
+  background:
+    radial-gradient(0.3em 0.3em at 12% 100%, #ffd36b 50%, transparent 51%),
+    radial-gradient(0.25em 0.25em at 28% 100%, #ff7a2f 50%, transparent 51%),
+    radial-gradient(0.35em 0.35em at 47% 100%, #ffb347 50%, transparent 51%),
+    radial-gradient(0.22em 0.22em at 63% 100%, #ffd36b 50%, transparent 51%),
+    radial-gradient(0.3em 0.3em at 81% 100%, #ff5a1f 50%, transparent 51%),
+    radial-gradient(0.25em 0.25em at 92% 100%, #ffd36b 50%, transparent 51%);
+  font-size: 16px;
+  animation: ut-embers 2.4s linear infinite;
+}
+@keyframes ut-embers {
+  from {
+    background-position: 0 0;
+    opacity: 1;
+  }
+  to {
+    background-position: 0 -110vh;
+    opacity: 0.6;
+  }
+}
+/* film running down both sides, and a flash */
+.th-moments .ut-walk-fx {
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0 14px, transparent 14px 34px) left 10px top 0 / 14px 200% repeat-y,
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0 14px, transparent 14px 34px) right 10px top 0 / 14px 200% repeat-y,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.85) 0 34px, transparent 34px calc(100% - 34px), rgba(0, 0, 0, 0.85) calc(100% - 34px));
+  animation: ut-film 1.2s linear infinite;
+}
+.th-moments.st-0 .ut-walk-fx::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  animation: ut-flash 0.9s ease-out both;
+}
+@keyframes ut-film {
+  to {
+    background-position:
+      left 10px top 34px,
+      right 10px top 34px,
+      0 0;
+  }
+}
+@keyframes ut-flash {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.ut-walk-promo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  animation: pull-slam 0.6s var(--ease-spring) both;
+}
+.ut-walk-promo .eyebrow {
+  font-style: normal;
+  letter-spacing: 6px;
+  color: rgba(255, 255, 255, 0.8);
+}
+.ut-walk-promo b {
+  font-size: 58px;
+  line-height: 0.95;
+  text-align: center;
+  letter-spacing: 1px;
+}
+.th-hot .ut-walk-promo b {
+  color: #ffd36b;
+  text-shadow:
+    0 0 28px rgba(255, 90, 31, 1),
+    0 0 60px rgba(255, 40, 40, 0.7),
+    0 5px 0 #7d0b34;
+}
+.th-moments .ut-walk-promo b {
+  color: #ffffff;
+  text-shadow:
+    0 0 26px rgba(200, 220, 245, 0.95),
+    0 5px 0 #3a4656;
+}
+.ut-walk-tier.th-moments,
+.th-moments .ut-walk-tier.t-promo {
+  color: #f4f7fb;
+  text-shadow:
+    0 0 26px rgba(200, 220, 245, 0.9),
+    0 4px 0 #3a4656;
 }
 .ut-walk-tier.t-legend {
   color: #fff6d8;

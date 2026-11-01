@@ -51,6 +51,11 @@ export interface CardLine {
   sparse?: boolean;
   /** promo/legend: the id of the season card it is made from */
   seasonId?: string;
+  /** a campaign's promo (src/ut/campaigns.ts): which campaign, and the moment it's for */
+  campaign?: string;
+  moment?: string;
+  /** a campaign card's signature rating (the moment's skill), 10 more on top */
+  perk?: string;
 }
 
 /** A card in a player's club. */

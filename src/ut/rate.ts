@@ -149,12 +149,32 @@ export function levelBonus(level: number): number {
 }
 
 /**
+ * Room at the top for promos and legends: a season's overall as rated up to the knee, squeezed
+ * above it so the best season there is tops out a few short of 99 (basketball 94, football 95).
+ * A promo of a season sits above it, and the legends above most of those.
+ */
+const KNEE: Record<UtSport, number> = { nba: 84, nfl: 91 };
+const TOP: Record<UtSport, number> = { nba: 94, nfl: 95 };
+export function squeeze(raw: number, sport: UtSport): number {
+  const k = KNEE[sport];
+  return raw <= k ? raw : k + ((raw - k) * (TOP[sport] - k)) / (99 - k);
+}
+
+/**
+ * What a promo adds over its season's (squeezed) overall: its own boost (+3 to +5 in the data, or a
+ * campaign's) and 2 more, every promo well above the season it's made from; football's scale runs
+ * at about half basketball's at the top.
+ */
+export function promoLift(boost: number, sport: UtSport): number {
+  return (boost + 2) * (sport === 'nfl' ? 0.5 : 1);
+}
+
+/**
  * A card, rated: overall, tier, its attributes (0-99 by card code), the six it shows, abilities.
  * `pos` rates it at another of its positions (basketball's overall doesn't move; football's may).
  */
 export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   const boost = Math.max(0, line.boost ?? 0);
-  const bonus = boost + levelBonus(level);
   let base: number;
   let at: string;
   let attrs: Record<string, number>;
@@ -177,12 +197,25 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
     if (!keys.length) keys = (NFL_KEYS[groupOf(at)] ?? NFL_KEYS.WR).map(([c, n]) => [c, n]);
     abil = r.abil.slice();
   }
-  // the boost and the levels go onto the key attributes
-  if (bonus) for (const [c] of keys) attrs[c] = cap((attrs[c] ?? base) + bonus);
+  const lv = levelBonus(level);
+  // a promo is better all over: every rating up, the six on the card more; a legend's six take his
+  // boost and the rest a little; the levels go onto the six
+  const lift = line.kind === 'promo' ? promoLift(boost, line.sport) : boost;
+  const keySet = new Set(keys.map(([c]) => c));
+  // (a campaign card made far above its season's, a role player's year, lifts no rating past +14,
+  // the rest +8: a shooter stays a shooter, not a 99 at everything)
+  if (line.kind === 'promo') for (const c of Object.keys(attrs)) attrs[c] = cap(attrs[c] + (keySet.has(c) ? Math.min(lift, 14) : Math.min(Math.ceil(lift * 0.6), 8)));
+  else if (line.kind === 'legend') for (const c of Object.keys(attrs)) attrs[c] = cap(attrs[c] + (keySet.has(c) ? boost : Math.min(2, boost)));
+  if (line.perk && attrs[line.perk] !== undefined) attrs[line.perk] = cap(attrs[line.perk] + 10);
+  if (lv) for (const c of keySet) attrs[c] = cap((attrs[c] ?? base) + lv);
+  for (const [c] of keys) if (attrs[c] === undefined) attrs[c] = cap(base + lift + lv);
   if (line.kind === 'promo' && !abil.includes(PROMO_ABILITY)) abil.push(PROMO_ABILITY);
   if (line.kind === 'legend' && !abil.includes(LEGEND_ABILITY)) abil.unshift(LEGEND_ABILITY);
-  const baseOvr = cap(base + boost);
-  const ovr = cap(base + bonus);
+  // a season and a promo on the squeezed scale (a promo's lift on top); a legend on the full one,
+  // a point higher, the top of the game
+  const top = line.kind === 'legend' ? base + boost + 1 : line.kind === 'promo' ? squeeze(base, line.sport) + lift : squeeze(base, line.sport);
+  const baseOvr = cap(top);
+  const ovr = cap(top + lv);
   // a season card's tier is its unlevelled overall's, so levelling never turns bronze into silver
   const tier: Tier = line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(baseOvr, line.sport);
   return { line, ovr, tier, pos: at, attrs, key: keys.map(([c, n]) => [c, n, attrs[c] ?? ovr]), abil };

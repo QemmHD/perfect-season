@@ -1,5 +1,6 @@
 // The card pool the mode plays with: every card line, rated once at level 1, and grouped by tier
 // and position for the packs. Loaded when Ultimate Team opens, never before.
+import { campaignLines } from './campaigns';
 import { hashString } from '../engine/rng';
 import { SPORT } from '../engine/sport';
 // the per-season card data (src/data/cards-<sport>.json, scripts/build_cards.py)
@@ -62,7 +63,11 @@ let cache: Promise<Pool> | null = null;
 
 /** This page's sport's pool (cached). */
 export function getPool(): Promise<Pool> {
-  cache ??= loadCards(SPORT).then((s) => buildPoolInSlices(SPORT, s.lines, s.byId));
+  // the cards, and the live promo campaigns' (src/ut/campaigns.ts)
+  cache ??= loadCards(SPORT).then((s) => {
+    const extra = campaignLines(SPORT, s.lines);
+    return buildPoolInSlices(SPORT, extra.length ? [...s.lines, ...extra] : s.lines, extra.length ? undefined : s.byId);
+  });
   // a failed load can be tried again
   cache.catch(() => (cache = null));
   return cache;

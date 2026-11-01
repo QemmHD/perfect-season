@@ -46,12 +46,15 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
     later(still ? 0 : 720, () => setPhase(level ? 'walkout' : 'reveal'));
   };
 
-  // the walkout, step by step: lights, position, team and season, the player
+  // the walkout, step by step: lights (a promo's campaign first, in its colors), position, team
+  // and season, the player
   const pace = level === 3 ? 1.25 : level === 2 ? 1 : 0.7;
+  const promo = star?.tier === 'promo';
   useEffect(() => {
     if (phase !== 'walkout' || still) return;
     sfx.heartbeat();
-    const at = [0, 800, 1650, 2600].map((t) => t * pace);
+    if (promo) sfx.whoosh();
+    const at = [0, 800, 1650, 2600].map((t, i) => t * pace + (promo && i ? 900 : 0));
     later(at[1], () => (setStep(1), sfx.stamp()));
     later(at[2], () => (setStep(2), sfx.stamp(), level >= 2 && sfx.heartbeat()));
     later(at[3], () => {
@@ -99,7 +102,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
 
   return (
     <div
-      className={'ut-open-screen ph-' + phase + (phase === 'walkout' ? ' wl-' + level + ' st-' + step + ' t-' + star.tier : '')}
+      className={'ut-open-screen ph-' + phase + (phase === 'walkout' ? ' wl-' + level + ' st-' + step + ' t-' + star.tier + (promo ? ' th-' + (star.line.campaign ?? 'hot') : '') : '')}
       style={l ? ({ '--c1': l.c1, '--c2': l.c2 } as React.CSSProperties) : undefined}
       role="dialog"
       aria-modal="true"
@@ -132,6 +135,13 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
             <i />
           </span>
           <span className="ut-walk-floor" aria-hidden="true" />
+          {promo && <span className="ut-walk-fx" aria-hidden="true" />}
+          {promo && step < 1 && (
+            <span className="ut-walk-promo" key="promo">
+              <i className="eyebrow">Promo</i>
+              <b className="disp">{(l.label ?? 'Hot Season').toUpperCase()}</b>
+            </span>
+          )}
           {step >= 1 && step < 3 && (
             <span className="ut-walk-pos" key="pos">
               <i className="eyebrow">Position</i>
@@ -147,7 +157,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
           )}
           {step >= 3 && (
             <>
-              <b className={'disp ut-walk-tier t-' + star.tier}>{star.tier === 'gold' ? (level >= 2 ? 'GOLD STAR' : 'GOLD') : TIER_NAMES[star.tier].toUpperCase()}</b>
+              <b className={'disp ut-walk-tier t-' + star.tier}>{star.tier === 'gold' ? (level >= 2 ? 'GOLD STAR' : 'GOLD') : promo ? (l.label ?? TIER_NAMES.promo).toUpperCase() : TIER_NAMES[star.tier].toUpperCase()}</b>
               <span className="ut-walk-card">
                 <UtCard rc={star} w={190} attrs pose={level >= 2 ? 'cheer' : 'stand'} tilt={step >= 4} />
               </span>
@@ -172,7 +182,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
       {phase === 'reveal' && (
         <div className="ut-reveal">
           <span className="eyebrow">{opening.title}</span>
-          <h2 className="disp">{!done ? 'Opening…' : star?.tier === 'legend' ? 'A Legend!' : star?.tier === 'promo' ? 'A Hot Season!' : golds ? golds + (golds === 1 ? ' gold' : ' golds') : order.length + ' new cards'}</h2>
+          <h2 className="disp">{!done ? 'Opening…' : star?.tier === 'legend' ? 'A Legend!' : star?.tier === 'promo' ? (star.line.campaign ? 'A ' + star.line.label + ' card!' : 'A Hot Season!') : golds ? golds + (golds === 1 ? ' gold' : ' golds') : order.length + ' new cards'}</h2>
           <div className="ut-reveal-grid" style={{ gridTemplateColumns: 'repeat(' + g.cols + ', ' + g.w + 'px)' }}>
             {order.map((rc, i) => (
               <span key={rc.line.id + i} className={'ut-flip' + (i < flipped ? ' on t-' + rc.tier : '')} style={{ width: g.w, height: Math.round(g.w * 1.4) }}>

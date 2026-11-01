@@ -51,8 +51,9 @@ export const FIRE_AT = 3;
 
 const RUNS: RunPlay[] = ['inside', 'outside', 'power'];
 
-export function newGame(off: Offense, def: Defense, seed: string, drives = DRIVES, defIQ = 0): Game {
-  const g: Game = { off, def, seed, drives, drive: 0, playNo: 0, down: 1, toGo: 10, ballOn: START, ballX: 26.67, score: 0, ends: [], over: false, concept: 'slants', conceptNo: 0, run: 'inside', plays: 0, streak: 0, fire: false, clock: drives <= 1 ? CLOCK : null, defIQ };
+/** `start`: the yard line the first drive starts on; `clock`: a one-drive game's clock (s). */
+export function newGame(off: Offense, def: Defense, seed: string, drives = DRIVES, defIQ = 0, opts: { start?: number; clock?: number } = {}): Game {
+  const g: Game = { off, def, seed, drives, drive: 0, playNo: 0, down: 1, toGo: 10, ballOn: opts.start ?? START, ballX: 26.67, score: 0, ends: [], over: false, concept: 'slants', conceptNo: 0, run: 'inside', plays: 0, streak: 0, fire: false, clock: drives <= 1 ? (opts.clock ?? CLOCK) : null, defIQ };
   g.concept = conceptFor(g, 0);
   g.run = runFor(g);
   return g;
