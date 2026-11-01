@@ -4,7 +4,7 @@ import { recordActivity } from './progression';
 import type { Profile } from '../lib/profile';
 import { registeredPack } from './packs';
 import type { Pool } from './pool';
-import { registryNamespace, type RegistryReceipt } from './registry';
+import { registryNamespace, TEST_PAGE, type RegistryReceipt } from './registry';
 import { organizeStorage } from './storage';
 import type { OwnedCard } from './types';
 import type { Opening } from './UltimateTeam';
@@ -28,7 +28,10 @@ export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryRecei
   if (pending.kind === 'spotlight' && pending.id !== receipt.id) throw new Error('The pack receipt has a different ID.');
   if (p.coins < pending.price) throw new Error('Your pack is reserved. Earn enough coins to complete it, then retry.');
   const cards = registeredPack(pool, receipt.kind, receipt.seed, receipt.cardId);
-  const rare = receipt.tier === 'goat' || receipt.tier === 'spotlight';
+  // Claude: test-page rolls (registry.ts `TEST_PAGE`) carry no worldwide serial; everywhere else a
+  // rare pull without one is still rejected.
+  const unnumbered = TEST_PAGE && receipt.serial === null;
+  const rare = !unnumbered && (receipt.tier === 'goat' || receipt.tier === 'spotlight');
   const chase = receipt.cardId ? pool.base.get(receipt.cardId) : null;
   if (
     (chase && chase.tier !== receipt.tier) ||

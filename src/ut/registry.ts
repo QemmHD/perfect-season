@@ -43,7 +43,35 @@ async function request(query: string, body?: unknown): Promise<any> {
     clearTimeout(timer);
   }
 }
+/**
+ * Claude: test-page builds only (`vite build --mode testpage`, the owner-private claude.ai page,
+ * whose sandbox blocks every outside connection). Spotlight packs and rewards roll on the device
+ * with the server's own contract odds (`chaseTier`) and chase catalog, but get no worldwide serial
+ * and never touch the registry. GitHub Pages and the Sites preview build in other modes, so this
+ * branch is removed from them at build time.
+ */
+export const TEST_PAGE = import.meta.env.MODE === 'testpage';
+async function testPageReceipt(sport: UtSport, id: string, kind: string): Promise<RegistryReceipt> {
+  const [{ default: catalog }, { chaseTier }] = await Promise.all([
+    import('../../supabase/functions/card-registry/catalog.json'),
+    import('../../supabase/functions/card-registry/contract'),
+  ]);
+  const tier = kind.startsWith('event-spotlight:') ? 'spotlight' : chaseTier(Math.floor(Math.random() * 1_000_000));
+  const list: string[] = tier === 'gold' ? [] : (catalog as Record<string, Record<string, string[]>>)[sport][tier] ?? [];
+  return {
+    id,
+    kind,
+    sport,
+    namespace: registryNamespace(),
+    tier,
+    cardId: list.length ? list[Math.floor(Math.random() * list.length)] : null,
+    seed: crypto.randomUUID(),
+    serial: null,
+    totalAtPull: null,
+  };
+}
 export async function openRegisteredPack(sport: UtSport, id: string, kind: string): Promise<RegistryReceipt> {
+  if (TEST_PAGE) return testPageReceipt(sport, id, kind);
   const content = JSON.stringify({ v: 1, sport, requestId: id, kind, namespace: registryNamespace() });
   return request('', {
     event: sign(

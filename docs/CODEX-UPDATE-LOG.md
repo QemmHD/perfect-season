@@ -462,7 +462,20 @@ Validation:
 - WebKitGTK on the restricted test build: starter, Gold and Silver open, and Silver opens while a Spotlight is reserved.
 - Codex's `scripts/qa/content.mjs` (failed Spotlight → reload recovery, inspect namespace), typecheck and both test suites: see the commit message.
 
-On the claude.ai test page the Spotlight pack can never complete, because the registry is blocked there. Every other pack works.
+### Spotlight packs on the test page — Claude, 2026-11-01
+
+The test page's sandbox blocks the card registry, so a Spotlight pack there could only stay reserved. The owner asked how to open it. Builds made with `vite build --mode testpage`, used only for the claude.ai test page, now roll Spotlight packs and Spotlight rewards on the device:
+
+- They use the server's own odds (`chaseTier` in `supabase/functions/card-registry/contract.ts`) and the same chase catalog.
+- The rare card gets **no worldwide serial**, and nothing is sent to the registry.
+- `registry.ts` exports `TEST_PAGE`, and `promo.ts` accepts an unnumbered rare pull only when `TEST_PAGE` is true. Pricing, charge-once and the reservation are unchanged.
+- Any other build mode, including GitHub Pages and the Sites preview, removes this path at build time. A production build was checked: no `testpage` code and no catalog chunk.
+
+Validation on the restricted test-page build:
+- Buying a Spotlight opened 8 cards and charged 3,500 once.
+- A reservation left over from the earlier build opened by itself on the next visit to Ultimate Team and was charged once.
+- No page errors.
+- Both suites still pass: 353 NBA / 320 NFL.
 
 ### Separate Claude test copy (owner-private claude.ai page)
 
@@ -473,6 +486,6 @@ What differs from the Sites preview:
 - The page sandbox blocks every outside connection: Nostr relays, the Supabase card registry and server saves, and the service worker. So it can't touch live boards, serial counts or saves, and online features, cloud save and offline install don't work there.
 - The only change from the branch build is the page title ("Perfect Season Test"), with `sw.js` and the launch images left out.
 
-Use it for offline checks: Club Season, Ultimate Team, packs, the sheet swipe and Ranks layout. Updated in place at the same URL to the build of `a171aeb` (`20261101.0629-a171aeb`) after the pack fix below. Saves on the page carry over.
+Use it for offline checks: Club Season, Ultimate Team, packs, the sheet swipe and Ranks layout. Updated in place at the same URL after each fix below. It is now built with `vite build --mode testpage`. Saves on the page carry over.
 
 Before publishing, the same build was booted locally under an equivalent policy (own files only, `connect-src 'self'`). The app loaded and onboarding worked with no page errors; the blocked connections only log console errors.
