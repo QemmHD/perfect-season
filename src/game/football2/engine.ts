@@ -10,7 +10,7 @@
 // bullet/touch/lob trajectory drives the real flight, lane defense, receiver lead and aim preview.
 // On a run the line drives its men away from the play's hole. A tackler winds up before he dives
 // (the runner can see it coming), and a juke as he leaves his feet fakes him out.
-import type { Act, Body, Call, Concept, Defense, FbPlayer, Job, Move, Offense, PassType, Play, PlayEnd, Pt, RunInput, RunPlay } from './types';
+import type { Act, Body, Call, Concept, Defense, FbPlayer, Flag, Job, Move, Offense, PassType, Play, PlayEnd, Pt, RunInput, RunPlay } from './types';
 
 export const FIELD_W = 53.33;
 const HASH_L = 23.58;
@@ -343,6 +343,27 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     }
     // the secondary plays the pass until it sees the handoff for what it is
     for (const db of [cb1, cb2, fs, ss]) db.readUntil = (0.3 + lerp(0.6, 0.2, rt(db.p.a.PRC)) + rand() * 0.25) * (1 - 0.2 * defIQ);
+  } else {
+    // A blown coverage (Claude 2026-11-01): now and then one man in coverage busts the call, the
+    // classic miscommunication. In man he thinks it's zone and squats short, leaving his man free;
+    // in Cover 3 a deep defender jumps the underneath route and vacates his third. Smarter
+    // secondaries (AWR, PRC) bust less, and so does a harder defense, but never not at all: it's a
+    // real source of big plays for any offense (the weaker one included), and the pilot or the
+    // player still has to see it and hit it.
+    const cover = zone ? [cb1, cb2, fs] : [cb1, cb2, ss, lbS, lbW];
+    const smarts = (b: Body) => 0.5 * rt(b.p.a.AWR, 45, 99) + 0.5 * rt(b.p.a.PRC, 45, 99);
+    const iq = cover.reduce((n, b) => n + smarts(b), 0) / cover.length;
+    if (rand() < clamp(lerp(0.075, 0.025, iq) * (1 - 0.4 * defIQ), 0.012, 0.1)) {
+      // the weakest reader is the likeliest to bust
+      const w = cover.map((b) => 1.25 - smarts(b));
+      let u = rand() * w.reduce((n, x) => n + x, 0);
+      let who = cover[cover.length - 1];
+      for (let i = 0; i < cover.length; i++) if ((u -= w[i]) <= 0) { who = cover[i]; break; }
+      who.job = 'zone';
+      who.mark = null;
+      who.zone = { x: clamp(zone ? who.x + (bx - who.x) * 0.4 : who.x, 4, FIELD_W - 4), y: los + (zone ? 8 : 7) };
+      play.bust = who.id;
+    }
   }
   return play;
 }
@@ -630,7 +651,34 @@ function move(b: Body, dt: number) {
   b.y += b.vy * dt;
 }
 
-function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string) {
+/**
+ * Flags (Claude 2026-11-01): the NFL calls about six accepted penalties a team a game (~65 snaps);
+ * a drive-killing hold or a free first down are some of the commonest ways a drive turns. Rates per
+ * snap here: offensive holding 2.2% on a pass (1.4% on a run), defensive holding / illegal contact
+ * 1.2% of passes, offside 0.8% of snaps, and pass interference on a contested incompletion down
+ * the field (arrive()). A disciplined unit (AWR) flags a little less (±20%). Never on a touchdown:
+ * a flag shouldn't take away the moment, and the AI and the player get the same rules.
+ */
+function flagFor(p: Play, kind: PlayEnd['kind']): Flag | undefined {
+  if (kind === 'td') return undefined;
+  const r = p.rand;
+  const pass = p.call === 'pass';
+  const awr = (side: 'O' | 'D', line: boolean) => {
+    const xs = p.bodies.filter((b) => b.side === side && (side === 'D' || isLine(b) === line));
+    return xs.reduce((n, b) => n + rt(b.p.a.AWR, 45, 99), 0) / Math.max(1, xs.length);
+  };
+  const pickOf = (xs: Body[]) => xs[Math.floor(r() * xs.length)] ?? xs[0];
+  const u = r();
+  const hold = (pass ? 0.022 : 0.014) * lerp(1.2, 0.8, awr('O', true));
+  if (u < hold) return { by: 'O', kind: 'holding', tag: pickOf(p.bodies.filter(isLine)).p.tag };
+  const dHold = pass ? 0.012 * lerp(1.2, 0.8, awr('D', false)) : 0;
+  const front = (b: Body) => b.slot === 'LE' || b.slot === 'LDT' || b.slot === 'RDT' || b.slot === 'RE';
+  if (u < hold + dHold) return { by: 'D', kind: 'def-holding', tag: pickOf(p.bodies.filter((b) => b.side === 'D' && !front(b))).p.tag };
+  if (u < hold + dHold + 0.008) return { by: 'D', kind: 'offside', tag: pickOf(p.bodies.filter(front)).p.tag };
+  return undefined;
+}
+
+function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string, flag?: Flag) {
   if (p.end) return;
   // brought down (or out) past the goal line: the ball broke the plane
   if ((kind === 'tackle' || kind === 'out' || kind === 'fumble') && at.y >= 100) {
@@ -639,6 +687,11 @@ function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string) {
   }
   const y = kind === 'td' ? 100 : at.y;
   p.end = { kind, x: at.x, y, gain: Math.round((y - p.los) * 10) / 10, text, caught: !!p.catcher && kind !== 'int', secs: p.t };
+  const f = flag ?? flagFor(p, kind);
+  if (f) {
+    p.end.flag = f;
+    p.events.push('flag:' + f.by + ':' + f.kind);
+  }
   p.phase = 'dead';
   p.events.push(kind === 'tackle' ? 'tackle' : kind);
 }
@@ -935,7 +988,7 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
         b.vx = b.dive.vx;
         b.vy = b.dive.vy;
         move(b, dt);
-        if (dist(b, carrier) < 1.15) tackle(p, b, carrier);
+        if (dist(b, carrier) < 1.0 + 0.4 * rt(b.p.a.TAK, 40, 99)) tackle(p, b, carrier);
         return;
       }
       // he dove at air: on the turf (faked out by a move timed against his dive, or just missed)
@@ -1083,7 +1136,7 @@ function tackle(p: Play, d: Body, c: Body) {
   const help = p.bodies.some((o) => o !== d && o.side === 'D' && p.t >= o.stunUntil && p.t >= o.heldUntil && dist(o, c) < 1.6);
   const tak = rt(d.p.a.TAK, 40, 99);
   const btk = rt(c.p.a.BTK, 40, 99);
-  let pt = 0.82 + 0.16 * tak - 0.24 * btk + (help ? 0.16 : 0) + 0.03 * p.defIQ;
+  let pt = 0.9 + 0.16 * tak - 0.2 * btk + (help ? 0.2 : 0) + 0.03 * p.defIQ;
   if (m) {
     const timed = m.at >= d.diveAt - FAKE && m.at <= d.diveAt + 0.15;
     const at = p.t <= m.until;
@@ -1108,6 +1161,15 @@ function tackle(p: Play, d: Body, c: Body) {
     const enforcer = on(d, 'enforcer');
     if (r() < 0.012 + 0.02 * hit - 0.02 * rt(c.p.a.CAR, 50, 99) + (enforcer ? 0.01 : 0)) {
       if (enforcer) used(p, d, 'enforcer');
+      // the ball's loose: who falls on it is close to a coin flip (the offense keeps about 45% of
+      // its fumbles), so a jarring hit isn't always a turnover (Claude 2026-11-01; it always was)
+      if (r() < 0.45) {
+        act(c, 'down', p.t);
+        act(d, 'tackle', p.t);
+        p.events.push('fumble-kept');
+        endPlay(p, 'tackle', c, 'FUMBLE! ' + c.p.tag + ' FALLS ON IT');
+        return;
+      }
       endPlay(p, 'fumble', c, 'FUMBLE! ' + d.p.tag + ' FORCES IT');
       return;
     }
@@ -1282,7 +1344,9 @@ function arrive(p: Play) {
       if (off.y >= 100) endPlay(p, 'td', off, 'TOUCHDOWN');
       return;
     }
-    endPlay(p, 'incomplete', at, def && rd < 1.6 ? 'BROKEN UP BY ' + def.p.tag : 'DROPPED');
+    // a defender all over him on a ball down the field: now and then the flag comes out
+    const dpi = def && rd < 1.3 && at.y - p.los >= 12 && r() < 0.14 ? ({ by: 'D', kind: 'dpi', tag: def.p.tag, spot: Math.min(99, at.y) } as Flag) : undefined;
+    endPlay(p, 'incomplete', at, def && rd < 1.6 ? 'BROKEN UP BY ' + def.p.tag : 'DROPPED', dpi);
     return;
   }
   if (def && rd <= dReach * 0.9 && r() < 0.2 + 0.25 * rt(def.p.a.CTH, 40, 99) + (on(def, 'ballhawk') ? 0.15 : 0)) {

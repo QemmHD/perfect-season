@@ -33,15 +33,18 @@ export function chooseCall(g: Game, pl: Pilot): 'pass' | 'run' {
   return pl.rand() < (short ? 0.55 : 0.3) ? 'run' : 'pass';
 }
 
-/** Fourth down: 'kick' in range, 'go' when it's short or there's no choice, else 'punt'. */
+/**
+ * Fourth down: 'kick' in range, otherwise 'go'. In this format a punt is worth nothing: the drive
+ * ends with no points either way and the other side's drives start from their own kickoff, so a
+ * turnover on downs costs exactly what a punt does (Claude 2026-11-01; the AI used to punt from its
+ * own half on fourth and long, which threw away the weaker side's last chance on ~40% of drives).
+ * ('punt' stays in the type for the player's button.)
+ */
 export function fourthDown(g: Game): 'kick' | 'go' | 'punt' {
   // the clock ran out in range: the last kick
   if (g.clock === 0) return 'kick';
   if (fgInRange(g) && (g.toGo > 1.5 || fgDistance(g) <= 30)) return 'kick';
-  if (g.toGo <= 2 || g.ballOn >= 60) return 'go';
-  // the last drive with nothing to lose: go for it
-  if (g.drive === g.drives - 1) return 'go';
-  return 'punt';
+  return 'go';
 }
 
 /** Where to throw to hit a receiver in stride, and how open he'll be when it gets there. */

@@ -485,6 +485,11 @@ export function Football2({
     } else if (a.timeUp) {
       sfx.buzzer();
       say('TIME’S UP', 'plain', 1500, 'ONE LAST KICK · ' + fgDistance(game) + ' YARDS');
+    } else if (a.flag) {
+      // a flag on the play (the play doesn't count): what it was, on whom, and where it leaves you
+      sfx.whistle();
+      vibrate(30);
+      say(a.flag.by === 'D' ? 'FLAG · DEFENSE' : 'FLAG · OFFENSE', a.flag.by === 'D' ? 'good' : 'bad', 1700, a.text.replace(/^FLAG · /, ''));
     } else if (e.text.startsWith('BIG HIT')) {
       say('BIG HIT!', 'big', 1500, e.text.slice(4) + ' · ' + gain);
     } else if (a.driveOver === 'DOWNS') {
