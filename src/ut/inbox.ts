@@ -48,7 +48,7 @@ export function inboxItems(pool: Pool, p: Wallet, day: string, week: string): In
   const seasons = seasonsReady(ut).reduce((a, s) => a + s.n, 0);
   if (seasons) out.push({ id: 'season', title: 'Season Pass', detail: seasons + (seasons === 1 ? ' tier' : ' tiers') + ' unlocked', claimable: true });
   const sets = setsFor(pool, ut).filter((s) => !s.claimed && s.have >= s.need).length;
-  if (sets) out.push({ id: 'sets', title: 'Set Collections', detail: sets + (sets === 1 ? ' set' : ' sets') + ' complete', claimable: true });
+  if (sets) out.push({ id: 'sets', title: 'Sets', detail: sets + (sets === 1 ? ' set' : ' sets') + ' complete', claimable: true });
   if (standoutWins(ut, week) >= STANDOUT_OBJECTIVE_WINS && !claimed(ut, standoutObjectiveId(week))) out.push({ id: 'standout', title: 'Weekly Standouts objective', detail: 'Standout pick', claimable: true });
   if (draftOf(ut)?.done) out.push({ id: 'draft', title: 'UT Draft', detail: 'Run rewards', claimable: true });
   const evos = readyEvos(ut).length;

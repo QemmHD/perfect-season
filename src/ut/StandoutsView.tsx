@@ -19,15 +19,9 @@ export function StandoutsView(props: { pool: Pool; ut: UtState; week: string; sb
   return (
     <div className="page ut-standouts">
       <div className="ut-so-hero">
-        <span className="eyebrow">WEEKLY STANDOUTS · {weekLabel(props.week)}</span>
-        <h1 className="disp">
-          THE WEEK’S
-          <br />
-          <em>STANDOUTS.</em>
-        </h1>
+        <span className="eyebrow">{weekLabel(props.week)} · THEME: THE {decadeOf(p.decade).toUpperCase()}</span>
         <p>
-          {p.cards.length} real seasons, boosted for one week: +3 overall, +5 for the Featured Standout (top 92, featured 93). Theme: the {decadeOf(p.decade)}. Owned copies keep their week
-          stamp forever.
+          {p.cards.length} real seasons, boosted for one week: +3 overall, +5 for the Featured Standout. Copies you own keep their week stamp forever.
         </p>
         {f && (
           <div className="ut-so-featured">

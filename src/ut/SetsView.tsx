@@ -59,7 +59,7 @@ export function SetsView(props: { pool: Pool; ut: UtState; onClaim: (id: string)
   const ready = sets.filter((s) => !s.claimed && s.have >= s.need).length;
   return (
     <div className="page ut-sets">
-      <p className="lead">Discover cards to complete sets. Every set pays once, and selling a card never undoes your progress.{ready ? ' ' + ready + ' ready to claim.' : ''}</p>
+      <p className="ut-lede">Discover cards to complete sets. Every set pays once, and selling a card never undoes your progress.{ready ? ' ' + ready + ' ready to claim.' : ''}</p>
       <div className="ut-seg" role="group" aria-label="Set type">
         {KIND.map(([k, label]) => (
           <button key={k} aria-pressed={tab === k} onClick={() => (setTab(k), setAll(false))}>
@@ -70,7 +70,7 @@ export function SetsView(props: { pool: Pool; ut: UtState; onClaim: (id: string)
       </div>
       {tab === 'landmarks' ? (
         <>
-          <p className="note">Landmark Seasons are real statistical landmarks from the record books: +5 overall (top 99), the landmark skill +6. Three Landmark SBCs each week.</p>
+          <p className="note">Landmark Seasons are real record-book seasons: a boosted overall (85–93) and +6 on the landmark skill. Three Landmark SBCs each week.</p>
           <button className="btn primary" onClick={props.onSbc}>
             THIS WEEK’S LANDMARK SBCS
           </button>

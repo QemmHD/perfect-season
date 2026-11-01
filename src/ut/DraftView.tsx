@@ -1,5 +1,6 @@
 // Claude, 2026-11-01: UT Draft (Play → Draft). Enter, pick a captain from five, then one of five per
 // spot, then play up to four real matches; a loss ends the run. Rewards by wins, claimed once.
+import { Lede } from './ui';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Coin } from '../ui/icons';
 import { UtCard } from './CardArt';
@@ -74,11 +75,7 @@ export function DraftView(props: {
   if (!run)
     return (
       <div className="page ut-draft">
-        <div className="hq-page-heading">
-          <span className="eyebrow">SOLO · DRAFT A SQUAD FROM SCRATCH</span>
-          <h1 className="disp">UT DRAFT.</h1>
-          <p>Pick a captain from five, then one of five for every spot. Then win up to {DRAFT_GAMES} straight. One loss ends the run. Your club is never touched.</p>
-        </div>
+        <Lede>Pick a captain from five, then one of five for every spot. Win up to {DRAFT_GAMES} in a row; one loss ends the run. Your club is never touched.</Lede>
         <div className="ut-draft-rewards">
           <span className="eyebrow">REWARDS BY WINS</span>
           {DRAFT_REWARDS.map((_, i) => (

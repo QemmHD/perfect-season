@@ -145,7 +145,7 @@ export function Rivals({
     >
       <div className="rivals-hero">
         <span className="eyebrow">
-          SEASON {week.split('W')[1]} · {SPORT.toUpperCase()}
+          RIVALS WEEK {week.split('W')[1]} · {SPORT.toUpperCase()}
         </span>
         <DivisionBadge division={division} large />
         <h1 className="disp">{d.name.toUpperCase()}</h1>
@@ -175,7 +175,7 @@ export function Rivals({
         </small>
       </div>
       <button className="big gold" onClick={onPlay}>
-        TAKE THE SPOTLIGHT <ArrowMark />
+        FIND MATCH <ArrowMark />
       </button>
       <p className="rivals-rules">
         +30 RP for a win · −12 for a loss · Real opponents only.
@@ -221,13 +221,15 @@ export function Rivals({
         .filter((x) => x.week !== week && !r.claimed.includes(x.id))
         .map((x) => (
           <button className="btn gold" key={x.id} onClick={() => claim(x.id)}>
-            CLAIM {x.week} {DIVISIONS[x.division].name.toUpperCase()} REWARD
+            CLAIM WEEK {x.week.split('W')[1] ?? x.week} {DIVISIONS[x.division].name.toUpperCase()} REWARD
           </button>
         ))}
       <div className="evo-section-label">
         <span>WEEKLY LEADERBOARD</span>
         <button onClick={load} aria-label="Refresh Rivals leaderboard">
-          ↻
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+          </svg>
         </button>
       </div>
       <p className="note" role="status">

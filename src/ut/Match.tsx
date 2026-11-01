@@ -637,7 +637,7 @@ export default function UtMatch(props: {
 
   if (promotion !== null && stage === 'result') return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
-  const title = req.draft ? 'UT Draft' : req.league ? 'Club Season' : req.circuit ? 'Champions Circuit' : req.event ? 'Spotlight Events' : req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
+  const title = req.draft ? 'UT Draft' : req.league ? 'Club Season' : req.circuit ? 'Champions Circuit' : req.event ? 'Legends Events' : req.mode === 'online' ? 'Rivals' : 'Squad Battles';
   return (
     <div className={'screen ut utm utm-s-' + stage}>
       <div className="topbar ut-top">
@@ -786,7 +786,7 @@ function SideCard({ side, you }: { side: Side; you: boolean }) {
 function VsView({ setup }: { setup: Setup }) {
   const r = setup.rung;
   const eyebrow = setup.league ? 'Club Season · '+(setup.level?.name ?? '') : setup.event
-    ? 'Spotlight Series · ' + setup.event.title
+    ? 'Legends Events · ' + setup.event.title
     : setup.online
       ? 'Head to head · online'
       : r && r.i >= 0

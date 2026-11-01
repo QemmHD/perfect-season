@@ -1,6 +1,5 @@
 // Codex (OpenAI): a full-season competition in the existing clubhouse materials.
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Trophy } from '../ui/icons';
 import { HQArrow } from './Clubhouse';
 import { LEVELS, LEVEL_NAME, type Level } from './battles';
 import {
@@ -20,7 +19,9 @@ import { rateCard } from './rate';
 import type { Pool } from './pool';
 import { slotsFor } from './squad';
 import type { UtState } from './state';
+import { Trophy } from '../ui/icons';
 import './league.css';
+import { Lede } from './ui';
 export function LeagueSeasonView({
   ut,
   pool,
@@ -58,40 +59,25 @@ export function LeagueSeasonView({
   if (!s || creating)
     return (
       <div ref={pageRef} className="page hq-page league-page">
-        <div className="hq-page-heading">
-          <span className="eyebrow">YOUR SQUAD. A WHOLE LEAGUE.</span>
-          <h1 className="disp">
-            MAKE THIS
-            <br />
-            YOUR SEASON.
-          </h1>
-          <p>
-            Take your Ultimate Team through a full schedule. Build a record.
-            Chase the championship.
-          </p>
-        </div>
-        <div className="league-intro hq-panel">
-          <Trophy size={38} />
-          <b className="disp">
-            {total} GAMES.
-            <br />
-            ONE DYNASTY.
-          </b>
-          <div className="league-intro-nums">
-            <span>
-              <b className="num">{pool.sport === 'nba' ? 30 : 32}</b> CLUBS
-            </span>
-            <span>
-              <b className="num">8</b> PLAYOFF SPOTS
-            </span>
-          </div>
-          <p>
-            AI clubs play each other after every game you finish. Follow their
-            records, roster form and league leaders all season.
-          </p>
+        <Lede>
+          Take your squad through a full schedule against {pool.sport === 'nba' ? 30 : 32} clubs. The top eight make the playoffs.
+        </Lede>
+        <div className="league-facts">
+          <span>
+            <b className="disp num">{total}</b>
+            <i>GAMES</i>
+          </span>
+          <span>
+            <b className="disp num">{pool.sport === 'nba' ? 30 : 32}</b>
+            <i>CLUBS</i>
+          </span>
+          <span>
+            <b className="disp num">8</b>
+            <i>PLAYOFF SPOTS</i>
+          </span>
         </div>
         <div>
-          <span className="eyebrow">CHOOSE YOUR STARTING DIFFICULTY</span>
+          <span className="eyebrow">STARTING DIFFICULTY</span>
           <div
             className="utb-levels"
             role="radiogroup"
@@ -110,22 +96,19 @@ export function LeagueSeasonView({
             ))}
           </div>
         </div>
-        <div className="hq-panel">
-          <h2 className="disp">A LEAGUE THAT EVOLVES.</h2>
+        <div className="hq-panel league-how">
+          <span className="eyebrow">HOW IT WORKS</span>
           <p>
-            Hot teams and breakout players improve. Struggling teams cool off.
-            The challenge follows your results gradually between games; your own
-            cards keep their ratings.
+            AI clubs play each other after every game you finish. Hot teams and breakout players improve; struggling teams cool off. Your own cards keep their ratings.
           </p>
           <p>
-            Top eight qualify.{' '}
             {pool.sport === 'nba'
-              ? 'Three rounds of best-of-seven series.'
-              : 'Three single-elimination playoff rounds.'}{' '}
-            Matches use the game’s existing arcade length. Difficulty is set for
-            this season.
+              ? 'Playoffs: three rounds of best-of-seven series.'
+              : 'Playoffs: three single-elimination rounds.'}{' '}
+            Matches use the normal match length. Difficulty is set for the whole season.
           </p>
         </div>
+        <div className="ut-cta-bar">
         <button
           className="btn primary"
           onClick={() => {
@@ -150,6 +133,7 @@ export function LeagueSeasonView({
             BACK TO SEASON RESULTS
           </button>
         )}
+        </div>
       </div>
     );
   const team = s.teams[0],
@@ -373,7 +357,7 @@ export function LeagueSeasonView({
             </p>
             <p>
               Regular-season ties in the table use point differential, then
-              points scored. Tied match scores use the existing match tiebreak.
+              points scored. Tied match scores go to the normal match tiebreak.
               The top eight qualify for this season’s championship bracket.
             </p>
           </details>
@@ -646,7 +630,7 @@ export function LeagueSeasonView({
       )}
       <p className="hq-footnote">
         Your played matches earn the usual coins, card XP and Season Points
-        within existing daily limits. AI-only games pay no rewards.{' '}
+        within the usual daily limits. AI-only games pay no rewards.{' '}
         {done
           ? 'Final place #' + summary.rank + '.'
           : 'Your season saves automatically.'}

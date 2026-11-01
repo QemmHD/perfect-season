@@ -54,14 +54,11 @@ export function CollectionGallery({ pool, ut, onClaim, onSets }: { pool: Pool; u
     <div className="page ut-gallery">
       {onSets && (
         <button className="ut-so-link" onClick={onSets}>
-          <b>Set Collections</b>
-          <small>Franchise eras, All-Decade teams, Standouts and Landmarks: each pays once</small>
+          <b>Sets</b>
+          <small>Franchise eras, All-Decade teams, programs and Landmarks · each pays once</small>
         </button>
       )}
-      <div className="ut-content-hero">
-        <span className="eyebrow">THE COLLECTION BOOK</span>
-        <h1 className="disp">Build your legacy.</h1>
-        <p>Every era. Every edition. Find the missing pieces.</p>
+      <div className="ut-content-hero ut-book-hero">
         <div className="ut-book-progress">
           <b className="num">
             {validSeen.toLocaleString()}

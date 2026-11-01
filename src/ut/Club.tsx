@@ -3,7 +3,9 @@
 // quick-sell it).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SPORT } from '../engine/sport';
-import { Confirm } from '../ui/common';
+import { Confirm, Sheet } from '../ui/common';
+import { IconBox, IconClub, IconSliders } from './icons';
+import { EmptyState, Lede } from './ui';
 import { UtCard } from './CardArt';
 import { quickSellValue } from './packs';
 import { NFL_KEYS } from '../game/football2/ratings';
@@ -34,6 +36,7 @@ export function Club({ club, storage = false, onInspect, onSell }: { club: ClubC
     setF(next);
   };
   const [sellDupes, setSellDupes] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const moreRef = useRef<HTMLDivElement>(null);
   const teams = useMemo(() => {
@@ -72,85 +75,126 @@ export function Club({ club, storage = false, onInspect, onSell }: { club: ClubC
   const byAttr = SORT_ATTRS.includes(f.sort);
   const filtered = f.pos !== 'all' || f.tier !== 'all' || f.team !== 'all' || f.dec !== 'all';
 
+  const nFilters = [f.pos, f.tier, f.team, f.dec].filter((x) => x !== 'all').length;
+  const sortName = f.sort === 'ovr' ? 'Overall' : f.sort === 'new' ? 'Newest' : f.sort === 'pos' ? 'Position' : attrName(f.sort);
+  // Claude (UI reorganisation): football's 13 positions grouped by unit in the filter sheet
+  const posGroups: [string, string[]][] = SPORT === 'nfl' ? [['Offense', ['QB', 'RB', 'WR', 'TE', 'OT', 'OG', 'C']], ['Defense', ['DE', 'DT', 'LB', 'CB', 'S']], ['Kicking', ['K']]] : [['Position', posOrder]];
+
   return (
     <div className="page ut-club">
-      {storage && <div className="ut-storage-intro">
-        <span className="eyebrow">ROOM FOR EVERY PULL</span>
-        <h2 className="disp">Duplicate Storage</h2>
-        <p>Extra copies go here automatically. Use them in SBCs, quick-sell them, or swap a copy into your club.</p>
-        <small>Every copy keeps its own level and XP. Different seasons and editions stay in your club.</small>
-      </div>}
-      <div className="ut-filters">
-        <div className="ut-chips" role="group" aria-label="Position">
-          {['all', ...posOrder].map((p) => (
-            <button key={p} className={'chip' + (f.pos === p ? ' on' : '')} aria-pressed={f.pos === p} onClick={() => set({ pos: p })}>
-              {p === 'all' ? 'ALL' : p}
-            </button>
-          ))}
-        </div>
-        <div className="ut-chips" role="group" aria-label="Tier">
-          {(['all', 'bronze', 'silver', 'gold', 'special', 'spotlight', 'goat'] as TierF[]).map((t) => (
-            <button key={t} className={'chip ut-tf tf-' + t + (f.tier === t ? ' on' : '')} aria-pressed={f.tier === t} onClick={() => set({ tier: t })}>
-              {t === 'all' ? 'ANY TIER' : t === 'special' ? 'SPECIAL' : t.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <div className="ut-selects">
-          <label className="ut-select">
-            <span className="eyebrow">Team</span>
-            <select value={f.team} onChange={(e) => set({ team: e.target.value })}>
-              <option value="all">All teams</option>
-              {teams.map(([fr, name]) => (
-                <option key={fr} value={fr}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ut-select">
-            <span className="eyebrow">Decade</span>
-            <select value={f.dec} onChange={(e) => set({ dec: e.target.value })}>
-              <option value="all">All</option>
-              {decades.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ut-select">
-            <span className="eyebrow">Sort</span>
-            <select value={f.sort} onChange={(e) => set({ sort: e.target.value })}>
-              <option value="ovr">Overall</option>
-              <option value="new">Newest</option>
-              <option value="pos">Position</option>
-              <optgroup label="Ratings">
-                {SORT_ATTRS.map((c) => (
-                  <option key={c} value={c}>
-                    {attrName(c)}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </label>
-        </div>
-      </div>
-      <div className="ut-club-head">
-        <span className="eyebrow">
-          {list.length} {list.length === 1 ? 'card' : 'cards'}
-          {filtered ? ' of ' + club.length : ''}
-        </span>
-        {filtered && (
-          <button className="ut-link" onClick={() => set({ pos: 'all', tier: 'all', team: 'all', dec: 'all' })}>
-            CLEAR FILTERS
+      {storage && <Lede>Spare copies land here automatically. Use them in SBCs and the Swap Desk, quick-sell them, or swap one into your club. Each copy keeps its own level.</Lede>}
+      {club.length > 0 && (
+        <div className="ut-club-bar">
+          <button className={'ut-filter-btn' + (nFilters ? ' on' : '')} onClick={() => setSheet(true)} aria-label={'Filter and sort' + (nFilters ? ', ' + nFilters + ' filters on' : '') + ', sorted by ' + sortName}>
+            <IconSliders size={18} />
+            <span>
+              <b>Filter &amp; Sort</b>
+              <small>{sortName}</small>
+            </span>
+            {nFilters > 0 && <i className="num">{nFilters}</i>}
           </button>
-        )}
-        {!filtered && dupes.length > 0 && (
-          <button className="ut-link" onClick={() => setSellDupes(true)}>
-            SELL {dupes.length} SPARE {dupes.length === 1 ? 'COPY' : 'COPIES'}
-          </button>
-        )}
-      </div>
+          <span className="ut-club-count num">
+            {list.length}
+            {filtered ? ' / ' + club.length : ''} <small>{list.length === 1 ? 'card' : 'cards'}</small>
+          </span>
+          {filtered ? (
+            <button className="ut-link ut-club-act" onClick={() => set({ pos: 'all', tier: 'all', team: 'all', dec: 'all' })}>
+              CLEAR
+            </button>
+          ) : (
+            dupes.length > 0 && (
+              <button className="ut-link ut-club-act" onClick={() => setSellDupes(true)}>
+                SELL {dupes.length} SPARE{dupes.length === 1 ? '' : 'S'}
+              </button>
+            )
+          )}
+        </div>
+      )}
+      {sheet && (
+        <Sheet label="Filter and sort" kind="bottom" onClose={() => setSheet(false)}>
+          {(close) => (
+            <div className="ut-filter-sheet">
+              <div className="ut-filter-head">
+                <h2 className="disp">Filter &amp; Sort</h2>
+                {nFilters > 0 && (
+                  <button className="ut-link" onClick={() => set({ pos: 'all', tier: 'all', team: 'all', dec: 'all' })}>
+                    CLEAR ALL
+                  </button>
+                )}
+              </div>
+              <label className="ut-select wide">
+                <span className="eyebrow">Sort by</span>
+                <select value={f.sort} onChange={(e) => set({ sort: e.target.value })}>
+                  <option value="ovr">Overall</option>
+                  <option value="new">Newest</option>
+                  <option value="pos">Position</option>
+                  <optgroup label="Ratings">
+                    {SORT_ATTRS.map((c) => (
+                      <option key={c} value={c}>
+                        {attrName(c)}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </label>
+              {posGroups.map(([g, ps]) => (
+                <div key={g} className="ut-filter-group">
+                  <span className="eyebrow">{g}</span>
+                  <div className="ut-chips wrap" role="group" aria-label={g}>
+                    {g === posGroups[0][0] && (
+                      <button className={'chip' + (f.pos === 'all' ? ' on' : '')} aria-pressed={f.pos === 'all'} onClick={() => set({ pos: 'all' })}>
+                        ALL
+                      </button>
+                    )}
+                    {ps.map((p) => (
+                      <button key={p} className={'chip' + (f.pos === p ? ' on' : '')} aria-pressed={f.pos === p} onClick={() => set({ pos: f.pos === p ? 'all' : p })}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="ut-filter-group">
+                <span className="eyebrow">Tier</span>
+                <div className="ut-chips wrap" role="group" aria-label="Tier">
+                  {(['all', 'bronze', 'silver', 'gold', 'special', 'spotlight', 'goat'] as TierF[]).map((t) => (
+                    <button key={t} className={'chip ut-tf tf-' + t + (f.tier === t ? ' on' : '')} aria-pressed={f.tier === t} onClick={() => set({ tier: t })}>
+                      {t === 'all' ? 'ANY' : t === 'special' ? 'SPECIAL' : t.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="ut-selects">
+                <label className="ut-select">
+                  <span className="eyebrow">Team</span>
+                  <select value={f.team} onChange={(e) => set({ team: e.target.value })}>
+                    <option value="all">All teams</option>
+                    {teams.map(([fr, name]) => (
+                      <option key={fr} value={fr}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ut-select">
+                  <span className="eyebrow">Decade</span>
+                  <select value={f.dec} onChange={(e) => set({ dec: e.target.value })}>
+                    <option value="all">All</option>
+                    {decades.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <button className="btn primary" onClick={() => close()}>
+                SHOW {list.length} {list.length === 1 ? 'CARD' : 'CARDS'}
+              </button>
+            </div>
+          )}
+        </Sheet>
+      )}
       {list.length ? (
         <div className="ut-grid">
           {list.slice(0, typeof IntersectionObserver === 'undefined' ? list.length : shown).map((c) => (
@@ -167,7 +211,19 @@ export function Club({ club, storage = false, onInspect, onSell }: { club: ClubC
           {shown < list.length && <div ref={moreRef} className="ut-more" aria-hidden="true" />}
         </div>
       ) : (
-        <div className="empty">{club.length ? 'No cards match these filters.' : storage ? 'All clear. Your next duplicate will be stored here automatically.' : 'No cards yet. Open your starter pack in the Store.'}</div>
+        club.length ? (
+          <EmptyState icon={<IconSliders size={24} />} title="No cards match">
+            Try fewer filters, or clear them.
+          </EmptyState>
+        ) : storage ? (
+          <EmptyState icon={<IconBox size={24} />} title="Storage is empty">
+            Your next duplicate is stored here automatically.
+          </EmptyState>
+        ) : (
+          <EmptyState icon={<IconClub size={24} />} title="No cards yet">
+            Open your starter pack in the Store.
+          </EmptyState>
+        )
       )}
       {sellDupes && (
         <Confirm

@@ -174,6 +174,7 @@ export interface UtCardProps {
   w: number;
   level?: number;
   mint?: CardMint;
+  /** kept for callers; 90+ copies show their stamp once numbered */
   numbered?: boolean;
   /** show the six key attributes (the bigger views) */
   attrs?: boolean;
@@ -185,7 +186,7 @@ export interface UtCardProps {
 }
 
 /** The card. */
-export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, className, mint, numbered }: UtCardProps) {
+export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, className, mint }: UtCardProps) {
   const { ref, handlers } = useTilt<HTMLSpanElement>(w > 150 ? 16 : 10);
   const l = rc.line;
   const name = plateName(l.name);
@@ -203,7 +204,7 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
         rc.tier +
         (big ? ' big' : '') +
         (attrs ? ' with-attrs' : '') +
-        (mint || (numbered && Math.round(rc.rawOvr ?? rc.ovr) >= 90) ? ' has-serial' : '') +
+        (mint ? ' has-serial' : '') +
         (w < 52 ? ' xs' : w < 70 ? ' sm' : '') +
         (name.length > 9 ? ' long' : '') +
         (rare ? ' is-rare' : '') +
@@ -262,7 +263,8 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
           </span>
         )}
         <span className="utc-plate">
-          {mint ? <CardStamp mint={mint} cardId={l.id} sport={l.sport} /> : numbered && Math.round(rc.rawOvr ?? rc.ovr) >= 90 ? <span className="utc-stamp pending">NUMBERING…</span> : null}
+          {/* Claude (UI reorganisation): no placeholder stamp while a 90+ copy waits for its number (card details says so) */}
+          {mint ? <CardStamp mint={mint} cardId={l.id} sport={l.sport} /> : null}
           {rc.tier === 'landmark' && l.landmark && <span className="utc-ticker">{l.landmark}</span>}
           <b className="utc-name">{name}</b>
           {attrs && (

@@ -17,6 +17,7 @@ import { contentOf } from './content-state';
 import { buysLeft, dailyStatus, LIMITS, lightningWindow, minutesToLightning, STREAK_DAYS, type LimitedKind } from './content-packs';
 import { marketBought, marketFor, SWAP_SIZE, swapCandidates } from './market';
 import { UtCard } from './CardArt';
+import { SectionHead, Segmented } from './ui';
 import type { CalPack } from './calendar';
 import { livePackDef, liveBuysLeft, livePacksOn } from './live-packs';
 import type { Pool } from './pool';
@@ -52,6 +53,9 @@ function pct(p: number): string {
         : (Math.round(p * 10000) / 100).toString() + '%';
 }
 
+/** Claude (UI reorganisation): the always-on packs, listed cheapest first. */
+const BY_PRICE = ['bronze', 'silver', 'position', 'gold', 'premium', 'spotlight'];
+
 const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'rare', 'gold', 'silver', 'bronze'];
 const slotName = (t: SlotTier) => (t === 'rare' ? 'Rare Gold' : TIER_NAMES[t]);
 
@@ -71,7 +75,7 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
       {(close) => (
         <div className="ut-odds">
           <h2 className="disp">{def.name}</h2>
-          <p>{def.blurb}.</p>
+          <p>{def.blurb.replace(/\.+$/, '')}.</p>
           <div className="ut-odds-rows">
             {Array.from(rows.values()).map(({ o, n }, i) => (
               <div key={i} className="ut-odds-row">
@@ -213,22 +217,23 @@ export function Store(props: {
 
   return (
     <div className="page ut-store">
-      <div className="ut-seg ut-store-seg" role="group" aria-label="Store section">
-        <button aria-pressed={tab === 'packs'} onClick={() => setTab('packs')}>
-          PACKS
-        </button>
-        <button aria-pressed={tab === 'market'} onClick={() => setTab('market')}>
-          SCOUT MARKET
-        </button>
-      </div>
+      <Segmented
+        label="Store sections"
+        className="ut-store-seg"
+        items={[
+          ['packs', 'PACKS'],
+          ['market', 'SCOUT MARKET'],
+        ]}
+        value={tab}
+        onChange={(v) => setTab(v)}
+      />
       {tab === 'market' ? (
         <Market {...props} />
       ) : (
         <>
-          <DailyDrop ut={props.ut} day={props.day} sport={props.sport} onClaim={() => props.onBuy('daily', 0)} />
           {(props.starter || props.pending.length > 0 || picks.length > 0) && (
             <>
-              <span className="eyebrow">Your packs</span>
+              <SectionHead title={'Your packs · ' + (props.pending.length + picks.length + (props.starter ? 1 : 0))} />
               <div className="ut-mine">
                 {props.starter && (
                   <button className="ut-mine-pack" onClick={props.onStarter} aria-label="Open your free starter pack">
@@ -254,6 +259,7 @@ export function Store(props: {
               </div>
             </>
           )}
+          <DailyDrop ut={props.ut} day={props.day} sport={props.sport} onClaim={() => props.onBuy('daily', 0)} />
           {(() => {
             // Claude wave 3: this season's program packs (Live Calendar)
             const live = livePacksOn(props.day);
@@ -261,7 +267,7 @@ export function Store(props: {
             const season = live[0] && (live[0] as { season?: { name: string; accent: string[] } }).season;
             return (
               <>
-                <span className="eyebrow">This Season{season ? ' · ' + season.name : ''}</span>
+                <SectionHead title={'This Season' + (season ? ' · ' + season.name : '')} />
                 <div className="ut-shop">
                   {live.map((p) => {
                     const d = livePackDef(props.sport, p);
@@ -289,27 +295,28 @@ export function Store(props: {
               </>
             );
           })()}
-          <span className="eyebrow">Featured</span>
-          <button className="ut-so-link" onClick={props.onStandouts}>
-            <b>Weekly Standouts</b>
-            <small>See this week’s Standouts and how to earn them</small>
-          </button>
+          <SectionHead title="Featured">
+            <button className="ut-link ut-so-mini" onClick={props.onStandouts}>
+              WEEKLY STANDOUTS
+            </button>
+          </SectionHead>
           <div className="ut-shop">
             {lw ? item('lightning', 'Lightning window · ' + hm(lw.minutesLeft) + ' left · ' + limitNote('lightning'), left('lightning') ? undefined : 'limit') : null}
             {item('standout', limitNote('standout'), left('standout') ? undefined : 'limit')}
             {!lw && <p className="ut-lightning-next">Lightning Standout (25% off) opens in {hm(minutesToLightning(now))}: weekends 12–2 pm and 8–10 pm Eastern.</p>}
             {item('elite', limitNote('elite'), left('elite') ? undefined : 'limit')}
             {item('jumbo', limitNote('jumbo'), left('jumbo') ? undefined : 'limit')}
-            {item('scout', limitNote('scout'), left('scout') ? undefined : 'limit')}
           </div>
+          <SectionHead title="Picks & previews" />
+          <div className="ut-shop">{item('scout', limitNote('scout'), left('scout') ? undefined : 'limit')}</div>
           {props.preview}
-          <span className="eyebrow">Gold</span>
-          <div className="ut-shop">{['gold', 'premium', 'position'].map((k) => item(k))}</div>
-          <span className="eyebrow">Bronze &amp; Silver</span>
-          <div className="ut-shop">{['bronze', 'silver'].map((k) => item(k))}</div>
-          <span className="eyebrow">Online · registered serials</span>
-          <div className="ut-shop">{item('spotlight')}</div>
-          <p className="note">Coins only, never real money. Every game, mission, the daily chest and the challenges pay coins.</p>
+          <SectionHead title="All packs · by price" />
+          <div className="ut-shop">
+            {BY_PRICE.slice()
+              .sort((a, b) => props.defs[a].price - props.defs[b].price)
+              .map((k) => item(k, k === 'spotlight' ? 'Every card gets a registered serial' : undefined))}
+          </div>
+          <p className="note">Coins only, never real money. Matches, objectives, SBCs and the daily chest all pay coins.</p>
         </>
       )}
       {odds && <OddsSheet def={odds} onClose={() => setOdds(null)} />}
@@ -348,7 +355,7 @@ function Market(props: { pool: Pool; ut: UtState; day: string; coins: number; st
   const swapsLeft = buysLeft(props.ut, 'swap', props.day, Date.now());
   return (
     <>
-      <p className="lead">Twelve scouted cards a day, the same for everyone, at fixed coin prices. Each can be bought once. New cards at midnight Eastern.</p>
+      <p className="ut-lede">Twelve scouted cards a day at fixed prices, the same for everyone. Each can be bought once; new cards at midnight Eastern.</p>
       <div className="ut-market">
         {items.map((it) => {
           const rc = props.pool.base.get(it.cardId);

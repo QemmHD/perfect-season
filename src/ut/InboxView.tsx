@@ -1,5 +1,7 @@
 // Claude, 2026-11-01 (wave 2): the Rewards inbox (Home → Rewards): every reward ready to claim, one
 // CLAIM ALL, and shortcuts to packs and picks waiting in the Store.
+import { EmptyState, Lede } from './ui';
+import { IconGift } from './icons';
 import React from 'react';
 import { HQArrow } from './Clubhouse';
 import type { InboxItem } from './inbox';
@@ -9,11 +11,7 @@ export function InboxView(props: { items: InboxItem[]; onClaimAll: () => void; o
   const rest = props.items.filter((i) => !i.claimable);
   return (
     <div className="page ut-inbox">
-      <div className="hq-page-heading">
-        <span className="eyebrow">REWARDS INBOX</span>
-        <h1 className="disp">{claimable.length ? claimable.length + ' READY.' : 'ALL CAUGHT UP.'}</h1>
-        <p>Everything you’ve earned, in one place. Coins land in your wallet; packs and picks wait in the Store.</p>
-      </div>
+      <Lede>Everything you’ve earned in one place. Coins go to your wallet; packs and picks wait in the Store.</Lede>
       {claimable.length > 0 && (
         <button className="btn gold ut-claim-all" onClick={props.onClaimAll}>
           CLAIM ALL ({claimable.length})
@@ -37,9 +35,13 @@ export function InboxView(props: { items: InboxItem[]; onClaimAll: () => void; o
           <HQArrow />
         </button>
       ))}
-      {!props.items.length && <p className="note">Nothing waiting. Play, open your Daily Drop and complete objectives to fill it.</p>}
+      {!props.items.length && (
+        <EmptyState icon={<IconGift size={24} />} title="All caught up">
+          Play matches, open your Daily Drop and finish objectives to fill it.
+        </EmptyState>
+      )}
       <button className="btn" onClick={props.onDaily}>
-        DAILY DROP, CALENDAR &amp; OBJECTIVES
+        OPEN DAILY
       </button>
     </div>
   );

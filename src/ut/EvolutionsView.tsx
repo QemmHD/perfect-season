@@ -1,6 +1,7 @@
 // Claude, 2026-11-01 (wave 2): the Evolutions lab (Home → Development → Evolutions, and a card's
 // details). Choose an evolution, see its eligibility caps and the whole chain's result on your card,
 // play matches with him, then apply the upgrade.
+import { Lede } from './ui';
 import React, { useMemo, useState } from 'react';
 import { Sheet } from '../ui/common';
 import { UtCard } from './CardArt';
@@ -37,13 +38,7 @@ export function EvolutionsView(props: {
   const sport = pool.sport;
   return (
     <div className="page ut-evos">
-      <div className="hq-page-heading">
-        <span className="eyebrow">DEVELOPMENT · EVOLUTIONS LAB</span>
-        <h1 className="disp">EVOLVE YOUR PLAYERS.</h1>
-        <p>
-          Pick an evolution, play matches with the card, then apply a permanent upgrade. Up to {MAX_ACTIVE_EVOS} at once. Every upgrade has a ceiling below the top promos.
-        </p>
-      </div>
+      <Lede>Pick an evolution, play matches with the card, then apply the upgrade for good. Up to {MAX_ACTIVE_EVOS} at once; each has a ceiling below the top promos.</Lede>
       {active.length > 0 && (
         <>
           <span className="eyebrow">IN PROGRESS</span>

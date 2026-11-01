@@ -150,13 +150,13 @@ export function SquadView(props: {
           <span className="bar ut-chembar">
             <i style={{ width: rating.chem + '%' }} className={rating.chem >= 70 ? 'full' : ''} />
           </span>
-          <small>+{((CHEM_BONUS * rating.chem) / 100).toFixed(1)} overall from chemistry · tap for how</small>
+          <small>+{((CHEM_BONUS * rating.chem) / 100).toFixed(1)} OVR from chemistry · how?</small>
         </button>
         <button className="icon-btn pill-btn ut-auto" onClick={auto}>
           <IconWand size={16} /> AUTO
         </button>
       </div>
-      {props.management && <div className="hq-squad-toolbar"><span className="eyebrow">ONE CLUB. THREE MATCHDAY LINEUPS.</span>{props.management}</div>}
+      {props.management && <div className="hq-squad-toolbar"><span className="eyebrow">Matchday squad · 3 saved lineups</span>{props.management}</div>}
       {!nba && (
         <span className="seg ut-unit" role="group" aria-label="Unit">
           {(['off', 'def'] as const).map((u) => (
