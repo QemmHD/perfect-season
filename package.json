@@ -6,9 +6,9 @@
   "scripts": {
     "data": "python3 scripts/build_nba_data.py && python3 scripts/build_nfl_data.py",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && NODE_OPTIONS=--max-old-space-size=4096 vite build",
     "preview": "vite preview --port 4173",
-    "test": "vitest run && PS_SPORT=nfl vitest run",
+    "test": "vitest run && PS_SPORT=nfl vitest run && PS_SPORT=soccer vitest run soccer sport-branches",
     "typecheck": "tsc --noEmit",
     "data:registry": "vite-node scripts/build_registry_catalog.ts",
     "audit:ratings": "vite-node scripts/audit_ut_ratings.ts",
