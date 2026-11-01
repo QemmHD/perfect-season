@@ -94,6 +94,10 @@ try {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.waitForTimeout(250);
     await shot(page, 'gameplay-' + sport + '-320');
+    // Claude final QA 2026-11-01: the score bug (with the clock) stays on a 320px screen
+    const bug = await page.locator('.hg2-bug').boundingBox();
+    if (!bug || bug.x < 0 || bug.x + bug.width > 320) throw Error('Score bug overflows a 320px screen: ' + JSON.stringify(bug));
+    console.log(JSON.stringify({ sport, bug320: bug }));
     await page.setViewportSize({ width: 844, height: 390 });
     await page.waitForTimeout(250);
     await shot(page, 'gameplay-' + sport + '-landscape');
