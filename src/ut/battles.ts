@@ -7,7 +7,8 @@ import { teamOf } from '../data/teams';
 import { hashString, pickOne, rng } from '../engine/rng';
 import { aiFavorite } from '../game/uniforms';
 import { type Pool, ratedOf } from './pool';
-import { onScale } from './rate';
+import { onScale, ratingStanding } from './rate';
+import { toDisplay } from './ut-scale';
 import { canPlay, rateSquad, slotsFor } from './squad';
 import type { UtState } from './state';
 import type { SquadWire } from './teams';
@@ -34,7 +35,8 @@ export const LEVEL: Record<Level, { ovr: Record<UtSport, number>; skill: number;
   rookie: { ovr: { nba: -6, nfl: -4 }, skill: -0.15, def: -0.5, pay: 0.6, packs: { 3: 'bronze', 7: 'silver' } },
   pro: { ovr: { nba: 0, nfl: 0 }, skill: 0, def: 0, pay: 1, packs: { 3: 'silver', 7: 'gold' } },
   allstar: { ovr: { nba: 5, nfl: 3 }, skill: 0.08, def: 0.5, pay: 1.5, packs: { 3: 'gold', 7: 'premium' } },
-  legend: { ovr: { nba: 9, nfl: 6 }, skill: 0.15, def: 1, pay: 2.2, packs: { 1: 'gold', 3: 'gold', 5: 'premium', 7: 'premium' } },
+  // Claude: NBA Legend +11 (was +9) on the rating scale — the displayed UT scale compresses the top
+  legend: { ovr: { nba: 11, nfl: 6 }, skill: 0.15, def: 1, pay: 2.2, packs: { 1: 'gold', 3: 'gold', 5: 'premium', 7: 'premium' } },
 };
 
 /** a saved difficulty, or Pro */
@@ -185,7 +187,8 @@ export function ladderFor(pool: Pool, week: string, round = 0, level: Level = 'p
   const picked = new Set<string>();
   let prev = 0;
   return TARGETS[sport].map((base, i) => {
-    const target = Math.min(sport === 'nba' ? 97 : 98, (sport === 'nba' ? onScale(base, 'nba') : base) + lv.ovr[sport]);
+    // rungs and difficulty steps are set on the rating scale, then shown on the UT scale (ut-scale.ts)
+    const target = Math.round(toDisplay(sport, Math.min(sport === 'nba' ? 97 : 98, (sport === 'nba' ? ratingStanding(base, 'nba') : base) + lv.ovr[sport])));
     const { theme, squad, ovr } = themedAround(pool, all, target, rand, key + ':' + i, picked, prev + 1);
     picked.add(theme.fr + theme.decade);
     prev = ovr;

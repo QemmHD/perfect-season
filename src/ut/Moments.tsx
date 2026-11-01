@@ -1,4 +1,5 @@
 // Codex: short manual scenarios played by the real NBA/NFL engines with the owner's existing squad.
+import { Lede } from './ui';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Back, Trophy } from '../ui/icons';
@@ -243,14 +244,7 @@ export function Moments({
   }
   return (
     <div className="page hq-page">
-      <div className="hq-page-heading">
-        <span className="eyebrow">SMALL STAGE. BIG STATEMENT.</span>
-        <h1 className="disp">MOMENTS</h1>
-        <p>
-          Put your own squad into short skill challenges. Earn every first-clear
-          reward once.
-        </p>
-      </div>
+      <Lede>Short skill challenges with your own squad. Each first clear pays once.</Lede>
       <div className="hq-moment-count">
         <b className="disp num">
           {cleared} / {list.length}

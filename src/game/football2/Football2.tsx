@@ -8,7 +8,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
 import { logError } from '../../lib/errlog';
-import { crowd, sfx, vibrate } from '../../lib/sound';
+import { crowd, sfx, tapHaptic, vibrate } from '../../lib/sound';
+import { Juice } from '../juice';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
 import { freeCanvas } from '../pixel/body';
@@ -37,7 +38,7 @@ import {
   startChoice,
   startPlay
 } from './drive';
-import { CONCEPTS, CONCEPT_NAMES, FIELD_W, flipPlay, maxThrow, moveWithBall, RUN_NAMES, scramble, setBurst, snap, step, throwTo, throwToReceiver } from './engine';
+import { CONCEPTS, CONCEPT_NAMES, dist, FIELD_W, flipPlay, maxThrow, moveEdge, moveWithBall, RUN_NAMES, scramble, setBurst, snap, step, throwTo, throwToReceiver } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, PassType, Play, Pt } from './types';
@@ -168,7 +169,7 @@ export function Football2({
   }, []);
   const playRef = useRef<Play | null>(null);
   const pilotRef = useRef(pilot(0.75, seed));
-  const fxRef = useRef({ shake: 0, flash: 0 });
+  const fxRef = useRef({ shake: 0, flash: 0, juice: new Juice({ reducedMotion: reducedMotion() }) });
   const slowUntil = useRef(0);
   // the slingshot: where the drag began and how far back it's pulled (css px)
   const dragRef = useRef<{ id: number; x0: number; y0: number; dx: number; dy: number } | null>(null);
@@ -342,7 +343,51 @@ export function Football2({
     }, wait);
   };
 
+  /** the ability names on the pop (Madden-style) */
+  const ABILITY_TEXT: Record<string, string> = {
+    cannon: 'CANNON', surgeon: 'SURGEON', scrambler: 'SCRAMBLER', 'truck-stick': 'TRUCK STICK', 'juke-box': 'JUKE BOX', 'deep-threat': 'DEEP THREAT', 'sure-hands': 'SURE HANDS', 'red-zone': 'RED ZONE',
+    'pocket-wall': 'PASS PRO', 'road-grader': 'ROAD GRADER', 'edge-threat': 'EDGE THREAT', 'run-stopper': 'RUN STOPPER', enforcer: 'ENFORCER', shutdown: 'SHUTDOWN', ballhawk: 'BALLHAWK', 'big-leg': 'BIG LEG'
+  };
   const handleEvents = (p: Play) => {
+    // juice (render only): hit-stop, the camera's kick, sweat and sparks
+    const J = fxRef.current.juice;
+    const nowMs = performance.now();
+    const at = (b: { x: number; y: number } | null | undefined, h = 1) => (b ? renderer.screenOf(b.x, b.y, h) : null);
+    for (const e of p.events) {
+      if (e === 'beat:truck') {
+        J.hitStop('truck', nowMs);
+        J.addTrauma(0.45);
+        J.punch(0.03);
+        const q = at(p.carrier, 1.2);
+        if (q) J.burst('sweat', q.x, q.y, 10, ['#ffffff', '#d8f0ff'], { speed: 90, size: Math.max(1, q.s * 0.1) });
+        if (p.carrier) J.kick(p.carrier.vx, -p.carrier.vy, 4);
+      } else if (e === 'beat:stiff') {
+        J.addTrauma(0.22);
+        J.kick(0, -1, 2);
+      } else if (e === 'bighit') {
+        J.hitStop('bighit', nowMs);
+        J.addTrauma(0.6);
+        J.punch(0.04);
+        const q = at(p.carrier, 1.2);
+        if (q) J.burst('sweat', q.x, q.y, 14, ['#ffffff', '#d8f0ff'], { speed: 110, size: Math.max(1, q.s * 0.1) });
+      } else if (e === 'int' || e === 'lane-int') {
+        J.hitStop('int', nowMs);
+        J.addTrauma(0.25);
+        const q = renderer.screenOf(p.end?.x ?? 0, p.end?.y ?? 0, 1.5);
+        if (q) J.burst('spark', q.x, q.y, 10, ['#ffe9a8', '#ffffff'], { speed: 80 });
+      } else if (e === 'catch-contested') {
+        J.addTrauma(0.16);
+        J.punch(0.015);
+      } else if (e === 'sack') {
+        J.addTrauma(0.35);
+        J.kick(0, 1, 3);
+      } else if (e === 'tackle') J.addTrauma(0.08);
+      else if (e.startsWith('ability:')) {
+        const [, id, bid] = e.split(':');
+        const b = p.bodies[Number(bid)];
+        if (b) renderer.pop(b.id, ABILITY_TEXT[id] ?? id.toUpperCase(), b.side, nowMs / 1000);
+      }
+    }
     for (const e of p.events) {
       if (e === 'snap') sfx.hit(0.15);
       else if (e === 'handoff') sfx.catch();
@@ -625,10 +670,12 @@ export function Football2({
       const fx = fxRef.current;
       const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
-      acc += now < slowUntil.current ? elapsed * 0.4 : elapsed;
+      // slow motion and hit-stop only hold back real time: the same fixed steps run, a beat later
+      fx.juice.update(elapsed);
+      acc += fx.juice.gameTime(now, now < slowUntil.current ? elapsed * 0.4 : elapsed);
       if (p && p.end) {
         // after the whistle: the hit lands, the tackled man slides, the pile settles
-        const vis = now < slowUntil.current ? elapsed * 0.4 : elapsed;
+        const vis = fx.juice.gameTime(now, now < slowUntil.current ? elapsed * 0.4 : elapsed);
         p.t += vis;
         for (const b of p.bodies) {
           if (Math.abs(b.vx) + Math.abs(b.vy) < 0.05) continue;
@@ -703,7 +750,8 @@ export function Football2({
             routes: p.phase === 'pre' && p.call === 'pass',
             open: openRings && !autoplayHook,
             shake: fx.shake,
-            flash: fx.flash
+            flash: fx.flash,
+            juice: fx.juice
           });
       } catch (e) {
         console.error('[draw]', e);
@@ -722,8 +770,13 @@ export function Football2({
   const move3 = (p: Play, kind: 'juke' | 'spin' | 'power', dir = 0) => {
     const c = p.carrier;
     if (!c || p.phase !== 'run') return;
-    if (kind === 'power') moveWithBall(p, (c.p.a.TRK ?? 50) >= (c.p.a.SFA ?? 50) ? 'truck' : 'stiff');
-    else moveWithBall(p, kind, dir);
+    // POWER: a truck or a stiff arm, whichever beats the nearest man (by the same ratings the
+    // tackle reads: trucking and weight against hit power, the stiff arm against tackling)
+    if (kind === 'power') {
+      const near = p.bodies.filter((b) => b.side === 'D').sort((a, b) => dist(a, c) - dist(b, c))[0];
+      moveWithBall(p, near ? (moveEdge('truck', c, near) >= moveEdge('stiff', c, near) ? 'truck' : 'stiff') : (c.p.a.TRK ?? 50) >= (c.p.a.SFA ?? 50) ? 'truck' : 'stiff');
+    } else moveWithBall(p, kind, dir);
+    tapHaptic(10);
   };
   const down = (e: React.PointerEvent) => {
     const p = playRef.current;
@@ -787,7 +840,10 @@ export function Football2({
     if (d && d.id === e.pointerId) {
       const aim = p ? aimNow(p) : null;
       dragRef.current = null;
-      if (p && aim && throwTo(p, aim)) setPhase(p.phase);
+      if (p && aim && throwTo(p, aim)) {
+        tapHaptic(10);
+        setPhase(p.phase);
+      }
       return;
     }
     const s = stickRef.current;
@@ -1016,6 +1072,7 @@ export function Football2({
                   onClick={() => {
                     const live = playRef.current;
                     if (live && receiver && throwToReceiver(live, receiver.id)) {
+                      tapHaptic(10);
                       dragRef.current = null;
                       setPhase(live.phase);
                     }

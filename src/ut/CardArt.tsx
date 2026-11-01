@@ -10,6 +10,8 @@ import { celebrate, idle } from '../game/pixel/poses';
 import { useTilt } from '../ui/Card';
 import { shortSeason } from './pool';
 import { TIER_NAMES } from './rate';
+import { isRare } from './rare';
+import { weekLabel } from './editions';
 import type { CardLine, RatedCard, CardMint } from './types';
 
 const lum = (hex: string): number => {
@@ -141,12 +143,38 @@ export function GoatCrown({ className }: { className?: string }) {
   );
 }
 
+/** Claude: the Landmark Seasons laurel (SVG, the shared card/reveal mark). */
+export function Laurel({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 30" fill="none" aria-hidden="true">
+      <path d="M24 27c-7-1-13-6-15-14M24 27c7-1 13-6 15-14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      {[0, 1, 2, 3].map((i) => (
+        <g key={i} fill="currentColor">
+          <ellipse cx={11 + i * 2.6} cy={20 - i * 3.6} rx="3.2" ry="1.4" transform={`rotate(${-40 - i * 12} ${11 + i * 2.6} ${20 - i * 3.6})`} />
+          <ellipse cx={37 - i * 2.6} cy={20 - i * 3.6} rx="3.2" ry="1.4" transform={`rotate(${40 + i * 12} ${37 - i * 2.6} ${20 - i * 3.6})`} />
+        </g>
+      ))}
+      <circle cx="24" cy="5" r="2" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Claude: the Weekly Standouts pulse line. */
+export function Pulse({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 100 20" preserveAspectRatio="none" fill="none" aria-hidden="true">
+      <path d="M0 12h30l4-8 5 14 5-12 3 6h53" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export interface UtCardProps {
   rc: RatedCard;
   /** the card's width in frame px; everything on it scales from that */
   w: number;
   level?: number;
   mint?: CardMint;
+  /** kept for callers; 90+ copies show their stamp once numbered */
   numbered?: boolean;
   /** show the six key attributes (the bigger views) */
   attrs?: boolean;
@@ -158,7 +186,7 @@ export interface UtCardProps {
 }
 
 /** The card. */
-export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, className, mint, numbered }: UtCardProps) {
+export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, className, mint }: UtCardProps) {
   const { ref, handlers } = useTilt<HTMLSpanElement>(w > 150 ? 16 : 10);
   const l = rc.line;
   const name = plateName(l.name);
@@ -166,23 +194,27 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
   // or grid as their turn comes
   const big = w >= 120;
   const src = usePortrait(l, pose, big);
+  const rare = isRare(rc);
   return (
     <span
       ref={ref}
-      {...(tilt ? handlers : {})}
+      {...(tilt || (l.holo && w >= 120) ? handlers : {})}
       className={
         'utc t-' +
         rc.tier +
         (big ? ' big' : '') +
         (attrs ? ' with-attrs' : '') +
-        (mint || (numbered && rc.ovr >= 90) ? ' has-serial' : '') +
+        (mint ? ' has-serial' : '') +
         (w < 52 ? ' xs' : w < 70 ? ' sm' : '') +
         (name.length > 9 ? ' long' : '') +
+        (rare ? ' is-rare' : '') +
+        (l.featured ? ' is-featured' : '') +
+        (l.holo ? ' is-holo' : '') +
         (className ? ' ' + className : '')
       }
-      style={{ '--w': w + 'px', '--c1': l.c1, '--c2': l.c2 } as React.CSSProperties}
+      style={{ '--w': w + 'px', '--c1': l.c1, '--c2': l.c2, ...(l.accent ? { '--pa': l.accent[0], '--pb': l.accent[1], '--pc': l.accent[2] ?? l.accent[0] } : {}) } as React.CSSProperties}
       role="img"
-      aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + TIER_NAMES[rc.tier] + (mint ? ', issue number ' + mint.serial : '')}
+      aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + (l.holo ? 'Holographic ' : '') + (rare ? 'Rare ' : '') + TIER_NAMES[rc.tier] + (l.evo?.length ? ', evolved' : '') + (l.landmark ? ', ' + l.landmark : '') + (l.week ? ', ' + weekLabel(l.week) : '') + (mint ? ', issue number ' + mint.serial : '')}
     >
       <span className="utc-face">
         <span className="utc-glow" aria-hidden="true" />
@@ -191,6 +223,28 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
           <span className="utc-edition" aria-hidden="true">
             {rc.tier === 'goat' ? 'GREATEST OF ALL TIME' : 'SPOTLIGHT'}
           </span>
+        )}
+        {rc.tier === 'standout' && (
+          <>
+            <Pulse className="utc-pulse" />
+            <span className="utc-wk" aria-hidden="true">
+              {l.week ? weekLabel(l.week) : 'STANDOUT'}
+            </span>
+          </>
+        )}
+        {rc.tier === 'program' && (
+          <span className="utc-ribbon" aria-hidden="true">
+            {l.label}
+          </span>
+        )}
+        {rc.tier === 'landmark' && (
+          <>
+            <span className="utc-grain" aria-hidden="true" />
+            <Laurel className="utc-laurel" />
+            <span className="utc-edition" aria-hidden="true">
+              LANDMARK
+            </span>
+          </>
         )}
         {src && <img className="utc-px" src={src} alt="" draggable={false} />}
         <span className="utc-top">
@@ -209,11 +263,13 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
           </span>
         )}
         <span className="utc-plate">
-          {mint ? <CardStamp mint={mint} cardId={l.id} sport={l.sport} /> : numbered && rc.ovr >= 90 ? <span className="utc-stamp pending">NUMBERING…</span> : null}
+          {/* Claude (UI reorganisation): no placeholder stamp while a 90+ copy waits for its number (card details says so) */}
+          {mint ? <CardStamp mint={mint} cardId={l.id} sport={l.sport} /> : null}
+          {rc.tier === 'landmark' && l.landmark && <span className="utc-ticker">{l.landmark}</span>}
           <b className="utc-name">{name}</b>
           {attrs && (
             <span className="utc-attrs">
-              {rc.key.map(([c, , v]) => (
+              {(rc.face ?? rc.key).map(([c, , v]) => (
                 <span key={c}>
                   <b>{v}</b>
                   <i>{c}</i>
@@ -223,6 +279,12 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
           )}
         </span>
       </span>
+      {l.holo && <span className="utc-holo" aria-hidden="true" />}
+      {!!l.evo?.length && (
+        <span className="utc-evo" aria-hidden="true">
+          EVO{l.evo.length > 1 ? ' ' + l.evo.length : ''}
+        </span>
+      )}
       <span className="utc-shine" aria-hidden="true" />
       <span className="tc-glare" aria-hidden="true" />
     </span>

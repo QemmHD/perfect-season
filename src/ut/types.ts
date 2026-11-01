@@ -5,9 +5,10 @@
 export type UtSport = 'nba' | 'nfl';
 
 /** What kind of card: a season, a boosted hot season, an all-time legend. */
-export type CardKind = 'season' | 'promo' | 'spotlight' | 'legend' | 'goat';
+export type CardKind = 'season' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark' | 'live';
 
-export type Tier = 'bronze' | 'silver' | 'gold' | 'promo' | 'spotlight' | 'legend' | 'goat';
+/** Claude 2026-11-01: `standout` (Weekly Standouts) and `landmark` (Landmark Seasons) are derived editions. */
+export type Tier = 'bronze' | 'silver' | 'gold' | 'promo' | 'spotlight' | 'legend' | 'goat' | 'standout' | 'landmark' | 'program';
 
 /**
  * One player-season as stored in src/data/cards-<sport>.json.
@@ -52,7 +53,30 @@ export interface CardLine {
   /** promo/legend: the id of the season card it is made from */
   seasonId?: string;
   /** Optional public same-era benchmark, attached before all edition copies are derived. */
-  ratingReference?: { source: string; snapshot: string; ovr: number; attrs: Record<string, number> };
+  ratingReference?: {
+    source: string;
+    snapshot: string;
+    ovr: number;
+    attrs: Record<string, number>;
+    /** absent for the original rows; 'preseason' and 'retro' are the marked fallbacks */
+    kind?: 'final' | 'next' | 'preseason' | 'retro';
+  };
+  /** Weekly Standout: its Eastern ISO week ("2026-W44") and whether it was that week's featured card */
+  week?: string;
+  featured?: boolean;
+  /** Landmark Season: what made it one, printed on the card ("31.4 PPG"), and its kind of landmark */
+  landmark?: string;
+  landmarkType?: string;
+  /** Claude wave 2 (variants.ts): a holographic copy of `variantOf`, or `variantOf` evolved by `evo` */
+  holo?: boolean;
+  evo?: string[];
+  variantOf?: CardLine;
+  /** Claude wave 3 (live-cards.ts): a Live Calendar program card's promo id, kind, band (reference
+   * scale) and its season's accent colours */
+  program?: string;
+  programKind?: string;
+  band?: [number, number];
+  accent?: string[];
 }
 
 /** Immutable edition issue number; activeAtPull is only a last-confirmed circulation snapshot. */
@@ -84,6 +108,10 @@ export interface OwnedCard {
 export interface RatedCard {
   line: CardLine;
   ovr: number;
+  /** Claude rework: the overall on the rating scale (before the displayed UT curve, ut-scale.ts) */
+  rawOvr?: number;
+  /** the same before rounding, unlevelled (fits the displayed curve: scripts/fit_ut_scale.ts) */
+  rawExact?: number;
   tier: Tier;
   /** the position it's rated at */
   pos: string;
@@ -91,6 +119,8 @@ export interface RatedCard {
   attrs: Record<string, number>;
   /** the six shown on the card, in order */
   key: [string, string, number][];
+  /** Claude rework: what the card face prints — basketball's six categories, football's key attributes */
+  face?: [string, string, number][];
   abil: string[];
   /** Public peak-reference source; season ratings remain estimates. */
   ratingSource?: string;

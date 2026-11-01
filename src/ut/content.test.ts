@@ -222,7 +222,9 @@ describe.skipIf(SPORT !== 'nba')('NBA player identity and above-99 gameplay', ()
     expect(shaq.attrs['3PT']).toBeLessThan(50);
     expect(player('Tim Duncan', 2003).attrs['3PT']).toBeLessThan(60);
     expect(rodman.attrs.REB).toBeGreaterThanOrEqual(95);
-    expect(rodman.ovr).toBeGreaterThanOrEqual(89);
+    // 2K26's own classic 1995-96 Bulls rates him 87 (same-season reference, docs/RATINGS-AUDIT.md);
+    // rating scale (2K-comparable), not the displayed UT scale
+    expect(rodman.rawOvr).toBeGreaterThanOrEqual(86);
     expect(player('Michael Jordan', 1985).attrs).not.toEqual(player('Michael Jordan', 2003).attrs);
   });
   it('above-99 speed and shooting improve real movement and timing windows without changing the 99 ceiling behavior', () => {

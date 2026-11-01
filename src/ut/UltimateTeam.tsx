@@ -26,7 +26,13 @@ import { CardDetail } from './CardDetail';
 import { Challenges } from './Challenges';
 import { Club } from './Club';
 import { Hub } from './Hub';
-import { IconClub, IconHub, IconPlay, IconSbc, IconSquad, IconStore } from './icons';
+import { IconChallenges, IconClub, IconExit, IconHome, IconPlay, IconSquad, IconStore } from './icons';
+import { rememberSegment, SEGMENTS, tabLabel, tabOf, tabTarget, UT_TABS, viewInfo, type UtTab } from './nav';
+import { Segmented } from './ui';
+import { developmentReady } from './club-management';
+import { readyEvos } from './evolutions';
+import { readyRewards, seasonReady } from './progression';
+import { setsFor } from './sets';
 import { PackOpening } from './PackOpening';
 import { openPack, packDefs, packName, quickSellValue } from './packs';
 import type { PlaySquad } from './play';
@@ -42,11 +48,47 @@ import './content.css';
 import { CollectionGallery } from './CollectionGallery';
 import { Events } from './Events';
 import { ownedCardsForPack } from './acquisition';
-import { claimCollection } from './collection';
+import { claimCollection, collectionRewards } from './collection';
 import { openRegisteredPack } from './registry';
 import { registeredOpening } from './promo';
 import { Store } from './Store';
 import type { OwnedCard, RatedCard, CardMint } from './types';
+// Claude 2026-11-01: UT content drop 2 (docs/UT-CONTENT-2.md)
+import { trueRand } from '../engine/rng';
+import { claimed, contentOf, isLocked, lockedSet, toggleLock, withClaim } from './content-state';
+import { addPick, buysLeft, claimDaily, dailyPackId, dailyStatus, keepPick, pickFor, recordBuy, type LimitedKind } from './content-packs';
+import { claimStandoutObjective, standoutObjectiveId } from './content-progress';
+import { contentDone, contentSbcs } from './content-sbc';
+import { autoDraft, chooseCaptain, claimDraft, DRAFT_PRICE, draftOf, draftPick, retireDraft, startDraft, tokenReady } from './draft-mode';
+import { buyMarket, SWAP_SIZE, swapCandidates, swapForPick } from './market';
+import { packTags, type HelperTag } from './pack-helper';
+import { FEATURED_STANDOUT } from './packs';
+import { claimSet } from './sets';
+import { drawStandout } from './standouts';
+import { PickSheet } from './PickSheet';
+import { StandoutsView } from './StandoutsView';
+import { SetsView } from './SetsView';
+import { DraftView } from './DraftView';
+import './content-ui.css';
+import { claimNewEra, newEraPickId } from './new-era';
+import { cancelEvo, claimEvo, playId, startEvo } from './evolutions';
+import { EvolutionsView } from './EvolutionsView';
+import { calendarStatus, claimCalendar, claimDailyBonus } from './daily-hub';
+import { DailyHubView } from './DailyHubView';
+import { claimAll, inboxCount, inboxItems } from './inbox';
+import { InboxView } from './InboxView';
+import { nextPreview, previewCards, previewId, PREVIEW_KIND, withPreviewSeed } from './preview-pack';
+import { PreviewPack } from './PreviewPack';
+import { submitStream } from './streamlined';
+import { StreamlinedSection } from './StreamlinedView';
+import { itemScore } from './item-score';
+import { claimObjective as claimObjectiveFn } from './progression';
+import { calendarSbcs } from './calendar-sbc';
+import type { CalPack } from './calendar';
+import { livePackDef, liveBuysLeft, livePick, recordLiveBuy } from './live-packs';
+import { programReward } from './live-cards';
+// Claude (UI reorganisation): last, so the shell and shared pieces win over older rules
+import './nav.css';
 
 /** An owned card with its rating and where it plays (if it's in the squad). */
 export interface ClubCard {
@@ -61,6 +103,7 @@ export type UtView =
   | 'hub'
   | 'squad'
   | 'club'
+  | 'storage'
   | 'store'
   | 'sbc'
   | 'battles'
@@ -74,19 +117,26 @@ export type UtView =
   | 'circuit'
   | 'moments'
   | 'development'
-  | 'records';
+  | 'records'
+  | 'standouts'
+  | 'sets'
+  | 'draft'
+  | 'daily'
+  | 'evolutions'
+  | 'inbox';
 
 /** the view to come back to after a match (the screen unmounts while it's played) */
 let lastView: UtView = 'hub';
 
-const TABS: [UtView, string, React.ReactNode][] = [
-  ['hub', 'HOME', <IconHub />],
-  ['play', 'PLAY', <IconPlay />],
-  ['squad', 'SQUAD', <IconSquad />],
-  ['club', 'CLUB', <IconClub />],
-  ['store', 'STORE', <IconStore />],
-  ['sbc', 'SBC', <IconSbc />]
-];
+// Claude (UI reorganisation): six tabs, FC-style order; names and parents live in nav.ts.
+const TAB_ICON: Record<UtTab, React.ReactNode> = {
+  hub: <IconHome />,
+  play: <IconPlay />,
+  squad: <IconSquad />,
+  club: <IconClub />,
+  sbc: <IconChallenges />,
+  store: <IconStore />,
+};
 
 export interface Opening {
   id: string;
@@ -95,6 +145,8 @@ export interface Opening {
   cards: { uid: string; rc: RatedCard; mint?: CardMint }[];
   stored?: number;
   mint?: { serial: number; total: number };
+  /** Claude: Pack Helper tags by copy uid (pack-helper.ts) */
+  tags?: Record<string, HelperTag[]>;
 }
 
 export default function UltimateTeam(props: {
@@ -112,10 +164,10 @@ export default function UltimateTeam(props: {
   const [view, setViewNow] = useState<UtView>(() => lastView);
   const setView = (v: UtView) => {
     lastView = v;
+    rememberSegment(v);
     setViewNow(v);
   };
   const [opening, setOpening] = useState<Opening | null>(null);
-  const [showStorage, setShowStorage] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
   const busy = useRef(false);
   const [promoBusy, setPromoBusy] = useState(false);
@@ -152,23 +204,37 @@ export default function UltimateTeam(props: {
     const stored = new Set(ut.duplicateStorage ?? []);
     for (const oc of ut.owned) {
       if (stored.has(oc.uid)) continue;
-      const rc = ratedOf(pool, oc);
+      // Claude wave 2: an evolved copy shows and plays as its evolved variant (evolutions.ts)
+      const rc = ratedOf(pool, { cardId: playId(ut, oc), level: oc.level });
       if (rc) out.push({ uid: oc.uid, oc, rc, slot: slotOf.get(oc.uid) ?? null });
     }
     return out;
-  }, [pool, ut.owned, ut.duplicateStorage, slotOf]);
+  }, [pool, ut.owned, ut.duplicateStorage, slotOf, ut.content?.evo]);
   const stored: ClubCard[] = useMemo(() => {
     if (!pool) return [];
     return storedCards(ut).flatMap((oc) => {
-      const rc = ratedOf(pool, oc);
+      const rc = ratedOf(pool, { cardId: playId(ut, oc), level: oc.level });
       return rc ? [{ uid: oc.uid, oc, rc, slot: null, storage: true }] : [];
     });
-  }, [pool, ut.owned, ut.duplicateStorage]);
+  }, [pool, ut.owned, ut.duplicateStorage, ut.content?.evo]);
   const inventory = useMemo(() => [...club, ...stored], [club, stored]);
   const byUid = useMemo(() => new Map(inventory.map((c) => [c.uid, c])), [inventory]);
   const lineup: Lineup = useMemo(() => Object.fromEntries(Object.entries(ut.squad).map(([s, u]) => [s, byUid.get(u)?.rc ?? null])), [ut.squad, byUid]);
   const rating = useMemo(() => rateSquad(SPORT, lineup), [lineup]);
-  const sbcs = useMemo(() => (pool ? sbcsFor(pool, day, ut.sbc.done) : []), [pool, day, ut.sbc.done]);
+  const sbcs = useMemo(() => (pool ? [...calendarSbcs(pool, ut, day), ...sbcsFor(pool, day, ut.sbc.done), ...contentSbcs(pool, weekOf(day))] : []), [pool, day, ut.sbc.done, ut.content?.claims]);
+  const sbcDone = useMemo(() => ({ ...ut.sbc.done, ...contentDone(ut, sbcs) }), [ut.sbc.done, ut.content?.claims, sbcs]);
+  const [pickOpen, setPickOpen] = useState<string | null>(null);
+  // Claude (UI reorganisation): claimables that live under Club (sets, collection milestones), for the badges
+  const clubReady = useMemo(
+    () =>
+      pool
+        ? {
+            sets: setsFor(pool, ut).filter((x) => !x.claimed && x.have >= x.need).length,
+            collection: collectionRewards(pool, ut).filter((g) => g.have >= g.need && !ut.collectionClaims?.includes(g.id)).length,
+          }
+        : { sets: 0, collection: 0 },
+    [pool, ut.owned, ut.collected, ut.collectionClaims, ut.content?.claims]
+  );
   const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
 
   const setUt = (fn: (u: UtState) => UtState) => update((p) => ({ ...p, ut: organizeStorage(fn(p.ut)) }));
@@ -237,7 +303,7 @@ export default function UltimateTeam(props: {
     sfx.coin();
     onToast(
       'Reward claimed. ' +
-        [rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }), shown.packCount ? shown.packCount + ' packs added to your Store' : '']
+        [rewardLabel({ coins: shown.coins, pack: shown.pack ?? undefined, sp: shown.sp }), shown.packCount ? shown.packCount + (shown.packCount === 1 ? ' pack' : ' packs') + ' added to your Store' : '']
           .filter(Boolean)
           .join(' · ')
     );
@@ -247,7 +313,7 @@ export default function UltimateTeam(props: {
 
   /** Open a pack now: its cards go into the club at once (closing the app mid-reveal keeps them).
    * `fill`: an empty squad is built from the club, these cards included (the starter pack). */
-  const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile, fill = false) => {
+  const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile, fill = false, guard?: (p: Profile) => boolean, preset?: RatedCard[]) => {
     // Claude: a reserved Spotlight pack only holds other packs while its registry request is in
     // flight. Before, one failed request (offline, a dropped connection) blocked every pack, the
     // starter and reward packs included, until the registry answered. The reservation itself, its
@@ -259,10 +325,13 @@ export default function UltimateTeam(props: {
     busy.current = true;
     window.setTimeout(() => (busy.current = false), 600);
     // truly random cards (`seed` only names the pack and its cards' ids)
-    const cards = openPack(pool, kind);
+    // Claude: a Preview Pack opens exactly the cards it showed
+    const cards = preset ?? openPack(pool, kind);
     const at = Date.now();
     const owned = ownedCardsForPack(cards, seed, at);
+    const helper = packTags(pool, ut, lineup, cards);
     update((p) => {
+      if (guard && !guard(p)) return p;
       const deposited = organizeStorage(recordActivity(p.ut, 'pack:' + seed, easternDateKey(), { packs: 1 }), owned);
       const empty = fill && !Object.keys(deposited.squad).length;
       const squad = empty
@@ -280,11 +349,259 @@ export default function UltimateTeam(props: {
       return also ? also(q) : q;
     });
     const stored = new Set(organizeStorage(ut, owned).duplicateStorage);
-    setOpening({ id: seed, title, kind, stored: owned.filter((c) => stored.has(c.uid)).length, cards: cards.map((rc, i) => ({ uid: owned[i].uid, rc })) });
+    setOpening({
+      id: seed,
+      title,
+      kind,
+      stored: owned.filter((c) => stored.has(c.uid)).length,
+      cards: cards.map((rc, i) => ({ uid: owned[i].uid, rc })),
+      tags: Object.fromEntries(owned.map((c, i) => [c.uid, helper[i]])),
+    });
+  };
+
+  // ---------- Claude: content drop 2 (Daily Drop, new packs, picks, market, sets, draft) ----------
+
+  const week = weekOf(day);
+  const LIMITED: LimitedKind[] = ['elite', 'jumbo', 'standout', 'lightning'];
+
+  const claimDailyDrop = () => {
+    const at = Date.now();
+    const shown = claimDaily(ut, day, at);
+    if (!shown) {
+      onToast('Today’s Daily Drop is claimed. A new one arrives at midnight Eastern.');
+      return;
+    }
+    sfx.coin();
+    openNow(
+      'daily',
+      dailyPackId(SPORT, day),
+      'Daily Drop · Day ' + shown.streak,
+      (p) => {
+        const r = claimDaily(p.ut, day, at);
+        return r ? { ...p, ut: r.ut } : p;
+      },
+      false,
+      (p) => dailyStatus(p.ut, day).ready
+    );
+    if (shown.gold) window.setTimeout(() => onToast('Day 7 streak! A Gold Pack is waiting in your Store.'), 400);
+  };
+
+  const buyLimited = (kind: LimitedKind, price: number) => {
+    const at = Date.now();
+    if (buysLeft(ut, kind, day, at) <= 0) {
+      sfx.nope();
+      onToast(kind === 'lightning' ? 'The Lightning window is closed. It opens on weekend afternoons and evenings.' : 'You’ve reached this pack’s limit. It resets ' + (kind === 'standout' || kind === 'scout' ? 'next week.' : 'tomorrow.'));
+      return;
+    }
+    if (profile.coins < price) {
+      sfx.nope();
+      onToast('Not enough coins yet: ' + (price - profile.coins).toLocaleString('en-US') + ' more.');
+      return;
+    }
+    sfx.coin();
+    openNow(
+      kind,
+      newId(),
+      packName(SPORT, kind),
+      (p) => ({ ...p, coins: p.coins - price, ut: recordBuy(p.ut, kind, day, at) }),
+      false,
+      (p) => p.coins >= price && buysLeft(p.ut, kind, day, at) > 0
+    );
+  };
+
+  const buyScout = (price: number) => {
+    if (!pool) return;
+    const at = Date.now();
+    if (buysLeft(ut, 'scout', day, at) <= 0) return onToast('Three Scout’s Choice picks a week. More next week.');
+    if (profile.coins < price) {
+      sfx.nope();
+      return onToast('Not enough coins yet: ' + (price - profile.coins).toLocaleString('en-US') + ' more.');
+    }
+    const id = 'scout:' + newId();
+    const pick = pickFor(pool, 'scout', id, week, at);
+    sfx.coin();
+    update((p) => (p.coins < price || buysLeft(p.ut, 'scout', day, at) <= 0 ? p : { ...p, coins: p.coins - price, ut: addPick(recordBuy(p.ut, 'scout', day, at), pick) }));
+    setPickOpen(id);
+  };
+
+  const keep = (id: string, index: number) => {
+    if (!pool) return;
+    const at = Date.now();
+    const pick = contentOf(latest.current.ut).picks?.find((x) => x.id === id);
+    const shown = keepPick(latest.current.ut, id, index, at);
+    if (!shown.card || !pick) return;
+    update((p) => ({ ...p, ut: keepPick(p.ut, id, index, at).ut }));
+    setPickOpen(null);
+    const rc = ratedOf(pool, shown.card);
+    sfx.levelUp();
+    if (rc) setOpening({ id: 'pick:' + id, title: pick.title, kind: 'reward', cards: [{ uid: shown.card.uid, rc }] });
+  };
+
+  const buyFromMarket = (i: number) => {
+    if (!pool) return;
+    const at = Date.now();
+    const shown = buyMarket(ut, pool, day, i, profile.coins, at);
+    if (!shown) {
+      sfx.nope();
+      return onToast('Not enough coins for this card yet.');
+    }
+    update((p) => {
+      const r = buyMarket(p.ut, pool, day, i, p.coins, at);
+      return r ? { ...p, coins: p.coins - r.price, ut: r.ut } : p;
+    });
+    sfx.coin();
+    const rc = ratedOf(pool, shown.card);
+    if (rc) setOpening({ id: shown.card.uid, title: 'Scout Market', kind: 'reward', cards: [{ uid: shown.card.uid, rc }] });
+  };
+
+  const swap = () => {
+    if (!pool) return;
+    const locked = lockedSet(ut);
+    const uids = swapCandidates(stored.filter((c) => !locked.has(c.uid)))
+      .slice(0, SWAP_SIZE)
+      .map((c) => c.uid);
+    const at = Date.now();
+    const id = newId();
+    if (!swapForPick(ut, pool, uids, id, day, at)) return onToast('The Swap Desk takes five duplicate golds from storage, three times a day.');
+    update((p) => {
+      const r = swapForPick(p.ut, pool, uids, id, day, at);
+      return r ? { ...p, ut: r } : p;
+    });
+    sfx.select();
+    setPickOpen('swap:' + id);
+  };
+
+  const claimSetReward = (id: string) => {
+    if (!pool) return;
+    const at = Date.now();
+    const shown = claimSet(pool, latest.current.ut, id, at);
+    if (!shown.coins && !shown.pack) return;
+    update((p) => {
+      const r = claimSet(pool, p.ut, id, at);
+      return { ...p, coins: p.coins + r.coins, ut: r.ut };
+    });
+    sfx.levelUp();
+    onToast('Set complete! +' + shown.coins.toLocaleString('en-US') + ' coins' + (shown.pack ? ' and a ' + packName(SPORT, shown.pack) + ' in your Store.' : '.'));
+  };
+
+  const claimNewEraBundle = () => {
+    if (!pool) return;
+    const at = Date.now();
+    const shown = claimNewEra(latest.current, pool, at);
+    if (shown === latest.current) return;
+    update((p) => claimNewEra(p, pool, at));
+    sfx.levelUp();
+    vibrate([20, 40, 20]);
+    if (shown.coins > latest.current.coins) onToast('+' + (shown.coins - latest.current.coins).toLocaleString('en-US') + ' coins. Now choose your Icon.');
+    setPickOpen(newEraPickId(SPORT));
+  };
+
+  // ---------- Claude wave 2: daily hub, preview pack, streams, evolutions, inbox ----------
+
+  const claimCalendarDay = () => {
+    if (!pool) return;
+    const at = Date.now();
+    const shown = claimCalendar(latest.current.ut, pool, day, at);
+    if (!shown) return;
+    update((p) => {
+      const r = claimCalendar(p.ut, pool, day, at);
+      return r ? { ...p, coins: p.coins + r.coins, ut: r.ut } : p;
+    });
+    sfx.coin();
+    if (shown.reward.pick) setPickOpen('calendar:' + SPORT + ':' + day);
+    else onToast('Login calendar day ' + shown.reward.day + ': ' + shown.reward.label + (shown.reward.pack ? ' (in your Store)' : '') + '.');
+  };
+
+  const claimBonus = () => {
+    const at = Date.now();
+    const shown = claimDailyBonus(latest.current.ut, SPORT, day, at);
+    if (!shown) return;
+    update((p) => {
+      const r = claimDailyBonus(p.ut, SPORT, day, at);
+      return r ? { ...p, coins: p.coins + r.coins, ut: r.ut } : p;
+    });
+    sfx.levelUp();
+    onToast('All three done! +' + shown.coins + ' coins and a Silver Pack in your Store.');
+  };
+
+  const startPreview = () => setUt((u) => withPreviewSeed(u, newId().replace(/-/g, '').slice(0, 12)));
+  const buyPreview = () => {
+    if (!pool) return;
+    const id = previewId(ut);
+    const price = packDefs(SPORT)[PREVIEW_KIND].price;
+    if (!id) return;
+    if (profile.coins < price) {
+      sfx.nope();
+      return onToast('Not enough coins yet: ' + (price - profile.coins).toLocaleString('en-US') + ' more.');
+    }
+    const cards = previewCards(pool, ut, week);
+    const at = Date.now();
+    sfx.coin();
+    openNow(PREVIEW_KIND, id, 'Preview Pack', (p) => ({ ...p, coins: p.coins - price, ut: nextPreview(p.ut, true, at) }), false, (p) => p.coins >= price && previewId(p.ut) === id, cards);
+  };
+  const skipPreview = () => {
+    const at = Date.now();
+    setUt((u) => nextPreview(u, false, at));
+    onToast('Skipped. Your next preview is ready in an hour.');
+  };
+
+  const submitStreamCards = (id: string, uids: string[]) => {
+    if (!pool) return;
+    const score = (uid: string) => {
+      const c = byUid.get(uid);
+      return c ? itemScore(c.rc) : null;
+    };
+    const at = Date.now();
+    const shown = submitStream(latest.current.ut, pool, id, uids, score, at);
+    if (!shown) return onToast('Those cards can’t go in (locked or playing in your squad).');
+    update((p) => {
+      const r = submitStream(p.ut, pool, id, uids, score, at);
+      return r ? { ...p, ut: r.ut } : p;
+    });
+    sfx.levelUp();
+    onToast('+' + shown.points.toLocaleString('en-US') + ' points.' + (shown.rewards ? ' ' + shown.rewards + (shown.rewards === 1 ? ' reward' : ' rewards') + ' in your Store!' : ''));
+  };
+
+  const inbox = pool ? inboxItems(pool, profile, day, week) : [];
+  const inboxReady = pool ? inboxCount(pool, profile, day, week) : 0;
+  const claimEverything = () => {
+    if (!pool) return;
+    const at = Date.now();
+    const shown = claimAll(pool, latest.current, day, week, at);
+    if (!shown.claimed) return;
+    update((p) => claimAll(pool, p, day, week, at).profile);
+    sfx.levelUp();
+    vibrate([20, 40, 20]);
+    onToast('Claimed ' + shown.claimed + (shown.claimed === 1 ? ' reward' : ' rewards') + (shown.coins ? ' · +' + shown.coins.toLocaleString('en-US') + ' coins' : '') + '. Packs and picks are in your Store.');
+  };
+
+  // ---------- Claude wave 3: Live Calendar program packs ----------
+
+  const buyLive = (pack: CalPack) => {
+    if (!pool) return;
+    const def = livePackDef(SPORT, pack);
+    if (liveBuysLeft(ut, pack, day) <= 0) return onToast('You’ve reached this pack’s limit for ' + (pack.tpl === 'guarantee' ? 'this week.' : 'today.'));
+    if (profile.coins < def.price) {
+      sfx.nope();
+      return onToast('Not enough coins yet: ' + (def.price - profile.coins).toLocaleString('en-US') + ' more.');
+    }
+    sfx.coin();
+    openNow(pack.id, newId(), def.name, (p) => ({ ...p, coins: p.coins - def.price, ut: recordLiveBuy(p.ut, pack, day) }), false, (p) => p.coins >= def.price && liveBuysLeft(p.ut, pack, day) > 0);
+  };
+
+  const claimObjectivePick = () => {
+    if (!pool) return;
+    const at = Date.now();
+    update((p) => ({ ...p, ut: claimStandoutObjective(p.ut, pool, week, at) }));
+    sfx.levelUp();
+    setPickOpen(standoutObjectiveId(week));
   };
 
   const buy = (kind: string, price: number) => {
     if (kind === 'spotlight') return startPromo(kind, packDefs(SPORT).spotlight.price);
+    if (kind === 'daily') return claimDailyDrop();
+    if (kind === 'scout') return buyScout(packDefs(SPORT).scout.price);
+    if ((LIMITED as string[]).includes(kind)) return buyLimited(kind as LimitedKind, packDefs(SPORT)[kind as LimitedKind & keyof ReturnType<typeof packDefs>].price);
     if (profile.coins < price) {
       sfx.nope();
       onToast('Not enough coins yet: ' + (price - profile.coins).toLocaleString('en-US') + ' more. Games, missions and challenges all pay.');
@@ -305,6 +622,23 @@ export default function UltimateTeam(props: {
     const pp = ut.packs.find((x) => x.id === id);
     if (!pp) return;
     if (pp.kind.startsWith('event-spotlight:') || pp.kind === 'spotlight') return startPromo(pp.kind, 0, pp.id);
+    // Claude: a reward Scout's Choice / Standout pick becomes a pick sheet (its id is the pack's)
+    // Claude wave 3: a Live Calendar program pick
+    if (pp.kind.startsWith('live-pick:') && pool) {
+      const pick = livePick(pool, pp.kind, pp.id, day, Date.now());
+      if (!pick) return onToast('This program’s cards haven’t been released yet. Try again when it starts.');
+      update((p) => (p.ut.packs.some((x) => x.id === id) ? { ...p, ut: addPick({ ...p.ut, packs: p.ut.packs.filter((x) => x.id !== id) }, pick) } : p));
+      sfx.click();
+      setPickOpen(pp.id);
+      return;
+    }
+    if ((pp.kind === 'scout' || pp.kind === 'standout-pick') && pool) {
+      const pick = pickFor(pool, pp.kind, pp.id, week, Date.now());
+      update((p) => (p.ut.packs.some((x) => x.id === id) ? { ...p, ut: addPick({ ...p.ut, packs: p.ut.packs.filter((x) => x.id !== id) }, pick) } : p));
+      sfx.click();
+      setPickOpen(pp.id);
+      return;
+    }
     sfx.click();
     openNow(pp.kind, pp.id, packName(SPORT, pp.kind), (p) => ({ ...p, ut: { ...p.ut, packs: p.ut.packs.filter((x) => x.id !== id) } }));
   };
@@ -312,13 +646,18 @@ export default function UltimateTeam(props: {
   // ---------- the club ----------
 
   const quickSell = (uids: string[]) => {
-    const cards = [...new Set(uids)].map((u) => byUid.get(u)).filter((c): c is ClubCard => !!c);
-    if (!cards.length) return;
+    // Claude: a locked (favourite) copy is never sold
+    const locked = lockedSet(ut);
+    const cards = [...new Set(uids)].filter((u) => !locked.has(u)).map((u) => byUid.get(u)).filter((c): c is ClubCard => !!c);
+    if (!cards.length) {
+      if (uids.some((u) => locked.has(u))) onToast('Locked cards can’t be sold. Unlock them in the card’s details first.');
+      return;
+    }
     const coins = cards.reduce((a, c) => a + quickSellValue(c.rc), 0);
     const gone = new Set(cards.map((c) => c.uid));
     update((p) => {
       const current = new Set(p.ut.owned.map((c) => c.uid));
-      const sold = cards.filter((c) => current.has(c.uid));
+      const sold = cards.filter((c) => current.has(c.uid) && !isLocked(p.ut, c.uid));
       if (!sold.length) return p;
       const proceeds = sold.reduce((sum, c) => sum + quickSellValue(c.rc), 0);
       return {
@@ -360,7 +699,7 @@ export default function UltimateTeam(props: {
   // ---------- challenges ----------
 
   const submitSbc = (s: Sbc, uids: string[]) => {
-    if (!pool || ut.sbc.done[s.id]) return;
+    if (!pool || sbcDone[s.id]) return;
     const selected = uids.map((uid) => byUid.get(uid));
     if (
       new Set(uids).size !== uids.length ||
@@ -373,12 +712,13 @@ export default function UltimateTeam(props: {
       return;
     const gone = new Set(uids);
     const week = weekOf(day);
-    const rc = s.reward.card ? rewardCard(pool, s.reward.card) : null;
+    const content = s.kind === 'standout' || s.kind === 'landmark' || s.kind === 'program';
+    const rc = s.reward.card ? rewardCard(pool, s.reward.card) : s.reward.standout ? drawStandout(pool, week, trueRand(), FEATURED_STANDOUT) : s.reward.cardId ? (pool.base.get(s.reward.cardId) ?? null) : s.reward.program ? programReward(pool, s.reward.program, !!s.reward.programFeatured, day) : null;
     const prize: OwnedCard | null = rc ? { uid: 'sbc' + newId().replace(/-/g, '').slice(0, 8), cardId: rc.line.id, level: 1, xp: 0, at: Date.now() } : null;
     const pack = s.reward.pack ? { id: newId(), kind: s.reward.pack, at: Date.now() } : null;
     update((p) => {
       const current = new Set(p.ut.owned.map((c) => c.uid));
-      if (p.ut.sbc.done[s.id] || uids.some((uid) => !current.has(uid))) return p;
+      if (p.ut.sbc.done[s.id] || (content && claimed(p.ut, 'sbc:' + s.id)) || uids.some((uid) => isLocked(p.ut, uid)) || uids.some((uid) => !current.has(uid))) return p;
       // only this day's and week's challenges need remembering
       const done = Object.fromEntries(Object.entries(p.ut.sbc.done).filter(([k]) => k.includes(day) || k.includes(week)));
       done[s.id] = Date.now();
@@ -386,7 +726,7 @@ export default function UltimateTeam(props: {
         ...p,
         coins: p.coins + (s.reward.coins ?? 0),
         ut: {
-          ...organizeStorage(removeCards(recordActivity(p.ut, 'sbc:' + s.id, easternDateKey(), { sbcs: 1 }, 50), gone, 'sbc'), prize ? [prize] : []),
+          ...organizeStorage(removeCards(recordActivity(content ? withClaim(p.ut, 'sbc:' + s.id) : p.ut, 'sbc:' + s.id, easternDateKey(), { sbcs: 1 }, 50), gone, 'sbc'), prize ? [prize] : []),
           sbc: { done },
           packs: pack ? [...p.ut.packs, pack] : p.ut.packs
         }
@@ -400,8 +740,6 @@ export default function UltimateTeam(props: {
   };
 
   const detailCard = detail ? (byUid.get(detail) ?? null) : null;
-  // (the upgrades and repeatables are always there: they don't count toward what's left to do)
-  const todo = sbcs.filter((s) => s.kind !== 'upgrade' && !ut.sbc.done[s.id]).length;
 
   let body: React.ReactNode;
   if (failed)
@@ -452,11 +790,13 @@ export default function UltimateTeam(props: {
     body = (
       <PlayHQ
         ut={ut}
+        pool={pool}
+        week={week}
         onGo={go}
         onOnline={() => {
           if (!props.onPlaySquad || !NET_ON) {
             sfx.nope();
-            onToast('Head to head needs a connection.');
+            onToast('Rivals needs a connection.');
             return;
           }
           if (!ready) {
@@ -603,6 +943,7 @@ export default function UltimateTeam(props: {
           );
         }}
         onSquad={() => go('squad')}
+        onEvolutions={() => go('evolutions')}
         onStart={(uid, path) => {
           const at = Date.now();
           setUt((u) => startDevelopment(u, uid, path, at));
@@ -625,41 +966,97 @@ export default function UltimateTeam(props: {
       />
     );
   else if (view === 'records') body = <ClubRecords ut={ut} />;
-  else if (view === 'club')
+  else if (view === 'daily')
     body = (
-      <div className="ut-collection-shell">
-        <div
-          className="ut-storage-tabs"
-          role="group"
-          aria-label="Card location"
-        >
-          <button
-            aria-pressed={!showStorage}
-            onClick={() => setShowStorage(false)}
-          >
-            CLUB <b className="num">{club.length}</b>
-          </button>
-          <button
-            aria-pressed={showStorage}
-            onClick={() => setShowStorage(true)}
-          >
-            DUPLICATE STORAGE <b className="num">{stored.length}</b>
-          </button>
-        </div>
-        <Club
-          key={showStorage ? 'storage' : 'club'}
-          club={showStorage ? stored : club}
-          storage={showStorage}
-          onInspect={setDetail}
-          onSell={quickSell}
-        />
-      </div>
+      <DailyHubView
+        ut={ut}
+        day={day}
+        sport={SPORT}
+        onDrop={claimDailyDrop}
+        onCalendar={claimCalendarDay}
+        onObjective={(id) => {
+          const at = Date.now();
+          claimPrize((u) => claimObjectiveFn(u, id, day, at));
+        }}
+        onBonus={claimBonus}
+      />
     );
+  else if (view === 'inbox') body = <InboxView items={inbox} onClaimAll={claimEverything} onStore={() => go('store')} onDaily={() => go('daily')} />;
+  else if (view === 'evolutions')
+    body = (
+      <EvolutionsView
+        pool={pool}
+        ut={ut}
+        club={inventory}
+        onInspect={setDetail}
+        onStart={(uid, evoId) => {
+          const c = byUid.get(uid);
+          if (!c) return;
+          const at = Date.now();
+          setUt((u) => startEvo(u, pool, uid, c.rc, evoId, at));
+          sfx.select();
+          onToast('Evolution started. Play matches with ' + c.rc.line.name + ' in your squad.');
+        }}
+        onCancel={(uid) => setUt((u) => cancelEvo(u, uid))}
+        onClaim={(uid) => {
+          setUt((u) => claimEvo(u, uid));
+          sfx.levelUp();
+          vibrate([20, 40, 20]);
+          onToast('Evolution applied. The upgrade is permanent.');
+        }}
+      />
+    );
+  else if (view === 'standouts')
+    body = <StandoutsView pool={pool} ut={ut} week={week} sbcDone={!!sbcDone['so:' + week]} onGo={go} onClaim={claimObjectivePick} />;
+  else if (view === 'sets') body = <SetsView pool={pool} ut={ut} onClaim={claimSetReward} onSbc={() => go('sbc')} />;
+  else if (view === 'draft')
+    body = (
+      <DraftView
+        pool={pool}
+        ut={ut}
+        week={week}
+        coins={profile.coins}
+        onStart={(paid) => {
+          if (draftOf(ut)) return;
+          if (paid === 'coins' && profile.coins < DRAFT_PRICE) {
+            sfx.nope();
+            return onToast('Not enough coins yet: ' + (DRAFT_PRICE - profile.coins) + ' more.');
+          }
+          if (paid === 'token' && !tokenReady(ut, week)) return;
+          const id = newId(),
+            at = Date.now();
+          sfx.coin();
+          update((p) => {
+            if (draftOf(p.ut) || (paid === 'coins' && p.coins < DRAFT_PRICE) || (paid === 'token' && !tokenReady(p.ut, week))) return p;
+            return { ...p, coins: p.coins - (paid === 'coins' ? DRAFT_PRICE : 0), ut: startDraft(p.ut, pool, id, at, week, paid) };
+          });
+        }}
+        onCaptain={(i) => (sfx.select(), setUt((u) => chooseCaptain(u, pool, i)))}
+        onPick={(i) => (sfx.select(), setUt((u) => draftPick(u, pool, i)))}
+        onAuto={() => (sfx.select(), setUt((u) => autoDraft(u, pool)))}
+        onRetire={() => setUt(retireDraft)}
+        onPlay={(runId, game) => props.onPlaySquad?.({ id: Date.now(), mode: 'ai', draft: { runId, game } })}
+        onClaim={() => {
+          const at = Date.now();
+          const shown = claimDraft(latest.current.ut, at);
+          if (!shown.coins && !shown.pack) return;
+          update((p) => {
+            const r = claimDraft(p.ut, at);
+            return { ...p, coins: p.coins + r.coins, ut: r.ut };
+          });
+          sfx.levelUp();
+          onToast('Draft rewards: ' + [shown.pack ? packName(SPORT, shown.pack) + ' in your Store' : '', shown.coins ? '+' + shown.coins + ' coins' : ''].filter(Boolean).join(' · '));
+        }}
+      />
+    );
+  else if (view === 'club' || view === 'storage')
+    body = <Club key={view} club={view === 'storage' ? stored : club} storage={view === 'storage'} onInspect={setDetail} onSell={quickSell} />;
   else if (view === 'gallery')
     body = (
       <CollectionGallery
         pool={pool}
         ut={ut}
+        onSets={() => go('sets')}
         onClaim={(id) => {
           update((p) => {
             const result = claimCollection(pool, p.ut, id, Date.now());
@@ -720,6 +1117,16 @@ export default function UltimateTeam(props: {
           onBuy={buy}
           onStarter={claimStarter}
           onPending={openPending}
+          pool={pool}
+          ut={ut}
+          day={day}
+          stored={stored.filter((c) => !isLocked(ut, c.uid))}
+          onPick={(id) => (sfx.click(), setPickOpen(id))}
+          onMarket={buyFromMarket}
+          onSwap={swap}
+          onStandouts={() => go('standouts')}
+          onLive={buyLive}
+          preview={<PreviewPack pool={pool} ut={ut} week={week} coins={profile.coins} now={Date.now()} onStart={startPreview} onBuy={buyPreview} onSkip={skipPreview} />}
         />
       </>
     );
@@ -772,8 +1179,10 @@ export default function UltimateTeam(props: {
       <Challenges
         pool={pool}
         sbcs={sbcs}
-        done={ut.sbc.done}
-        club={inventory}
+        done={sbcDone}
+        club={inventory.filter((c) => !isLocked(ut, c.uid))}
+        extra={<StreamlinedSection pool={pool} ut={ut} club={inventory} onSubmit={submitStreamCards} />}
+        onStandouts={() => go('standouts')}
         day={day}
         onSubmit={submitSbc}
         onToast={onToast}
@@ -784,66 +1193,82 @@ export default function UltimateTeam(props: {
       <Hub
         sport={SPORT}
         day={day}
+        week={week}
         club={club}
         lineup={lineup}
         rating={rating}
         ut={ut}
-        sbcTodo={todo}
-        sbcs={sbcs}
-        onInspect={setDetail}
+        pool={pool}
         onGo={go}
         onStarter={claimStarter}
+        onNewEra={claimNewEraBundle}
+        inboxReady={inboxReady}
+        onClaimAll={claimEverything}
+        calendarReady={calendarStatus(ut, day).ready}
       />
     );
 
-  // Codex: every competition belongs to Play, including the view restored after a match.
-  const playChild = ['battles', 'rivals', 'events', 'circuit', 'moments', 'league'].includes(view);
-  const activeTab = playChild ? 'play' : view === 'gallery' ? 'club' : TABS.some(([tab]) => tab === view) ? view : 'hub';
+  // Claude (UI reorganisation): every view has one tab (highlighted), one title and one parent
+  // (nav.ts). Root views show no back button; Home's is EXIT; a sub-screen goes back to its parent,
+  // labelled with that parent's tab.
+  const info = viewInfo(view);
+  const activeTab = tabOf(view);
+  const segments = !info.parent ? SEGMENTS[activeTab] : undefined;
+  const h = hqOf(ut);
+  const packsWaiting = ut.packs.length + (contentOf(ut).picks?.length ?? 0) + (ut.starterClaimed ? 0 : 1);
+  const setsReady = clubReady.sets;
+  const collectionReady = clubReady.collection;
+  const devReady = (developmentReady(ut) ? 1 : 0) + readyEvos(ut).length;
+  const objReady = objectiveDeckReady(ut, day);
+  const passReady = Object.keys(h.seasons).reduce((n, k) => n + seasonReady(ut, k), 0);
+  const badges: Partial<Record<UtTab, number>> = pool
+    ? { hub: inboxReady, club: setsReady + collectionReady + devReady, sbc: readyRewards(ut, day), store: packsWaiting }
+    : { store: packsWaiting };
+  const segBadges: Partial<Record<UtView, number>> = { gallery: setsReady + collectionReady, development: devReady, objectives: objReady, season: passReady };
+  const back = view === 'hub' ? null : info.parent ?? null;
+  const backLabel = back ? tabLabel(tabOf(back)) : '';
+  // iOS-style: when a long title wouldn't fit next to the back label, the back button keeps only its chevron
+  const titleSize = view === 'circuit' || view === 'standouts' ? 19 : 21;
+  const backFits = !back || backLabel.length * 8.2 + 41 + info.title.length * titleSize * 0.5 <= 250;
 
   return (
-    <div className={'screen ut ut-v-' + view}>
-      <div className="topbar ut-top" {...(opening ? { inert: '' } : {})}>
-        <button
-          className="icon-btn pill-btn"
-          onClick={() => (view === 'hub' ? (sfx.click(), (lastView = 'hub'), props.onExit()) : go(playChild ? 'play' : 'hub'))}
-          aria-label={view === 'hub' ? 'Leave Ultimate Team' : playChild ? 'Back to Play' : 'Back to the Ultimate Team home'}
-        >
-          <Back size={16} /> {view === 'hub' ? 'HOME' : playChild ? 'PLAY' : 'UT'}
-        </button>
-        <span className="ut-title disp">
-          {view === 'hub'
-            ? 'Ultimate Team'
-            : ((
-                {
-                  battles: 'Squad Battles',
-                  rivals: 'Rivals',
-                  gallery: 'Collection',
-                  events: 'Spotlight Events',
-                  play: 'Play',
-                  season: 'Season Rewards',
-                  objectives: 'Objectives',
-                  circuit: 'Champions Circuit',
-                  league: 'Club Season',
-                  moments: 'Moments',
-                  development: 'Development',
-                  records: 'Club Records'
-                } as Partial<Record<UtView, string>>
-              )[view] ??
-              TABS.find((t) => t[0] === view)?.[1] ??
-              'Ultimate Team')}
-        </span>
+    <div className={'screen ut ut-v-' + view + ' ut-t-' + activeTab + (info.parent ? ' ut-sub' : ' ut-root')}>
+      <div className={'topbar ut-top' + (view !== 'hub' && !back ? ' no-back' : '')} {...(opening ? { inert: '' } : {})}>
+        {view === 'hub' ? (
+          <button className="icon-btn pill-btn ut-back" onClick={() => (sfx.click(), (lastView = 'hub'), props.onExit())} aria-label="Leave Ultimate Team">
+            <IconExit size={16} /> EXIT
+          </button>
+        ) : back ? (
+          <button className={'icon-btn pill-btn ut-back' + (backFits ? '' : ' icon-only')} onClick={() => go(back)} aria-label={'Back to ' + backLabel[0] + backLabel.slice(1).toLowerCase()}>
+            <Back size={16} /> {backFits && backLabel}
+          </button>
+        ) : null}
+        <span className="ut-title disp">{info.title}</span>
         <CoinChip coins={profile.coins} />
       </div>
-      <div className="ut-body" {...(opening ? { inert: '' } : {})}>
+      {segments && (
+        <div className="ut-segbar" {...(opening ? { inert: '' } : {})}>
+          <Segmented label={tabLabel(activeTab) + ' sections'} items={segments} value={view} onChange={go} badges={segBadges} />
+        </div>
+      )}
+      <div className="ut-body" key={activeTab + ':' + (info.parent ? view : 'root')} {...(opening ? { inert: '' } : {})}>
         {body}
       </div>
       <nav className="ut-tabs" aria-label="Ultimate Team" {...(opening ? { inert: '' } : {})}>
-        {TABS.map(([k, label, icon]) => (
-          <button key={k} aria-current={activeTab === k ? 'page' : undefined} onClick={() => go(k)}>
-            {icon}
+        {UT_TABS.map(([k, label]) => (
+          <button
+            key={k}
+            aria-current={activeTab === k ? 'page' : undefined}
+            aria-label={label[0] + label.slice(1).toLowerCase() + (badges[k] ? ', ' + badges[k] + (k === 'store' ? ' to open' : ' ready') : '')}
+            onClick={() => {
+              // a tab opens on its last-used section; tapped from one of its own sub-screens, it goes back up
+              if (activeTab === k && !info.parent) return;
+              go(tabTarget(k));
+            }}
+          >
+            {TAB_ICON[k]}
             <span>{label}</span>
-            {k === 'sbc' && pool && todo > 0 && <i className="ut-dot num">{todo}</i>}
-            {k === 'store' && (ut.packs.length > 0 || !ut.starterClaimed) && <i className="ut-dot num">{ut.packs.length + (ut.starterClaimed ? 0 : 1)}</i>}
+            {(badges[k] ?? 0) > 0 && <i className="ut-dot num">{badges[k]}</i>}
           </button>
         ))}
       </nav>
@@ -863,8 +1288,20 @@ export default function UltimateTeam(props: {
               : undefined
           }
           onSell={() => quickSell([detailCard.uid])}
+          locked={isLocked(ut, detailCard.uid)}
+          onLock={() => {
+            const was = isLocked(ut, detailCard.uid);
+            setUt((u) => toggleLock(u, detailCard.uid));
+            sfx.click();
+            onToast(was ? 'Unlocked. This copy can be sold or used in SBCs again.' : 'Locked as a favourite: never quick-sold, used in SBCs or swapped.');
+          }}
           onClose={() => setDetail(null)}
+          onSquad={() => (setDetail(null), go('squad'))}
+          onDevelop={() => (setDetail(null), go('development'))}
         />
+      )}
+      {pool && pickOpen && contentOf(ut).picks?.some((x) => x.id === pickOpen) && !opening && (
+        <PickSheet pool={pool} pick={contentOf(ut).picks!.find((x) => x.id === pickOpen)!} onKeep={(i) => keep(pickOpen, i)} onLater={() => setPickOpen(null)} />
       )}
       {opening && (
         <PackOpening
@@ -874,8 +1311,20 @@ export default function UltimateTeam(props: {
             setOpening(null);
             if (to) setView(to);
           }}
+          dupes={(() => {
+            // Claude: this pack's spare copies (already in Duplicate Storage), gold and below
+            const st = new Set(ut.duplicateStorage ?? []);
+            const cards = opening.cards.filter((c) => st.has(c.uid) && !isLocked(ut, c.uid) && ['bronze', 'silver', 'gold'].includes(c.rc.tier) && byUid.has(c.uid));
+            return { uids: cards.map((c) => c.uid), coins: cards.reduce((a, c) => a + quickSellValue(c.rc), 0) };
+          })()}
+          onSellDupes={(uids) => quickSell(uids)}
         />
       )}
     </div>
   );
+}
+
+/** Objectives ready to claim (for the Objectives segment's count). */
+function objectiveDeckReady(ut: UtState, day: string): number {
+  return objectiveDeck(ut, day).filter((o) => !o.claimed && o.progress >= o.target).length;
 }

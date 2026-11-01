@@ -489,3 +489,128 @@ What differs from the Sites preview:
 Use it for offline checks: Club Season, Ultimate Team, packs, the sheet swipe and Ranks layout. Updated in place at the same URL after each fix below. It is now built with `vite build --mode testpage`. Saves on the page carry over.
 
 Before publishing, the same build was booted locally under an equivalent policy (own files only, `connect-src 'self'`). The app loaded and onboarding worked with no page errors; the blocked connections only log console errors.
+
+## Expanded game-rating references — Claude (Anthropic), 2026-11-01
+
+Branch `claude/ratings-refs` (not merged). Same-season game-rating references grow from 8,938 to 11,009 NBA and from 2,114 to 19,509 NFL player-seasons: season cards with a reference go from 44% to 55% (NBA; 96% from 1999) and from 7% to 63% (NFL; 99% from 2000). New `scripts/build_expanded_references.py` adds prioritised `sets` blocks (final / next / preseason / retro) to `src/data/season-references-<sport>.json`, keeping the original rows. `seasonReference()` in `src/ut/cards.ts` reads them; `ratingReference.kind` marks fallbacks; the card detail prints the snapshot label. No rating formula changed, but UT ratings move (UT queue splits via `pool.print`; draft queues stay NBA 8 / NFL 9). No save, card ID or backend change. Sources, terms, mapping and coverage: `docs/RATINGS-AUDIT.md` (last section) and `docs/CREDITS.md`. Tests: new `src/ut/season-references.test.ts`; Rodman 1995-96 floor 89 → 86 (2K26 rates him 87); pool-loading hooks get 60 s timeouts.
+
+## Ultimate Team ratings rework — Claude (Anthropic), 2026-11-01
+
+Branch `feature/season-evolution` (includes the merge of `claude/ratings-refs`); not deployed. Owner request: balance card overalls, make the stats match the overall, make it feel like real Ultimate Team. Full method, tables and numbers: [RATINGS-AUDIT.md, "Claude rework 2026-11-01"](RATINGS-AUDIT.md).
+
+What changed:
+- Estimate-path fixes A–G from the ratings audit (era-normalised NBA overall, 3PT ceiling/floor and Limitless, centre/PG bias, reference trust incl. down-weighted `preseason`/`retro` fallbacks, nearest-season borrowing, NFL group maps quantile-matched to 19.5k Madden ratings, career floor, attribute bias), plus NFL Combine athleticism (`src/data/nfl-combine.json`, credited in CREDITS.md).
+- Card face: NBA cards print six categories OUT/INS/PLY/ATH/DEF/REB weighed in the card's best role; football keeps position keys. `supportOverall()` moves the role's main skills so the overall sits within ~3 of the weighted face (gold median gap +7 → +1.7 NBA / +7.2 → +1.4 NFL).
+- Per-position (NBA per decade) gold balance; one isolated, configurable UT display scale (`src/ut/ut-scale.ts`) set to the EA FC 27-style pyramid: Bronze 40–64 / Silver 65–74 / Gold 75–99 (≈35/35/30%), base golds mostly 75–82, ~14 (NBA) / 25 (NFL) base cards at 90+, top 91; Hot Season 94–97 (no 99s), Legends 88–95; Spotlight/GOAT unchanged. Every threshold follows (tiers, `onScale`, SBC targets, Squad Battles rungs, quick-sell ranges, walkout 86+).
+- Levels: +1 overall at levels 3 and 5 only (max +2, was +4); +1 key attributes per level. XP/levels unchanged.
+- NBA shot curve (hoops2 engine): poor shooters' green window and off-green threes fall (open-three make% at 70 rating 78 → 69), elite unchanged.
+
+Before → after (season cards): NBA bronze/silver/gold 10,895/7,507/2,902 → 7,471/7,513/6,320; NFL 20,846/5,600/4,409 → 10,840/10,780/9,235. Hot Season at 99: 50% / 37% → 0. Legends at 99: 22 / 42 → 0. Out-of-sample estimate MAE / tier agreement: NBA 5.2 / 63% → 4.3 / 70% vs raw 2K (2.6 / 85% vs the final pipeline); NFL 6.0 / 66% → 4.0–4.4 / 76–77% on the original sample, 4.2 / 78% vs the final pipeline on the expanded one.
+
+Files: `src/ut/{ut-scale,card-face,nfl-combine}.ts` (new), `rate.ts`, `calibration.ts`, `season-reference.ts`, `cards.ts` (career lookup, combine load), `nfl-identity.ts`, `types.ts` (`face`, `rawOvr`, `rawExact`), `CardArt.tsx`, `CardDetail.tsx`, `league-form.ts`, `packs.ts`, `battles.ts`, `Match.tsx`, `src/net/match.ts`, `src/game/hoops2/engine.ts`, `src/styles.css`; scripts `fit_ut_scale.ts`, `fit_ut_balance.ts`, `build_nfl_combine.mjs`, `audit_ut_ratings.ts`; regenerated `docs/ratings-audit-summary.json`.
+
+Tests: `ratings-audit.test.ts` adds the scale pyramid, edition ranges, per-position/era balance, face consistency, level ≤ +2 and famous-season regressions (Curry 2022 3PT ≥ 95 + Limitless, Jokić, Mahomes 2024 rating ≥ 88 and gold, Tyreek Hill 2016/2018 SPD, Brady ≤ 66, Vick ≥ 93, Calvin Johnson ≥ 93, OL no longer dominating); identity tests compare `rawOvr` (2K/Madden-comparable); `rate.test.ts` levels/tiers/promo rules; pool-load hooks get 60 s. `npm run typecheck` and `npm test` pass (NBA 361 / NFL 328).
+
+Compatibility: draft queue NBA 8 → 9 (shot curve; NFL draft 9 unchanged); UT queue rules NBA 8 → 9, NFL 9 → 10, and the pool fingerprint changes. No profile/key/ID/serial/level/XP change; numbered eligibility files untouched (numbering still keys on the 2K/Madden-comparable 90+). Owned cards show new displayed overalls and tiers. Server `SPOTLIGHT_RATES` unchanged.
+
+
+### UT content drop 2 — Claude, 2026-11-01 (branch `claude/ut-content`, not deployed)
+
+Built by Claude from the research spec; the full record is in [UT-CONTENT-2.md](UT-CONTENT-2.md).
+
+What it adds:
+- **Five new packs:** Daily Drop (with a 7-day streak), Scout's Choice (pick 1 of 3), Elite Gold, Jumbo Premium, and Standout Guarantee with a weekend Lightning copy.
+- **Rare golds:** the top 35% of each position's golds. Gold, Premium and Position packs now guarantee some, and the cards get a shimmer.
+- **Two promos:** Weekly Standouts (`<sport>:standout:<week>:…`) and Landmark Seasons (`<sport>:landmark:…`). Both resolve lazily in `pool.ts`, so owned copies load forever. Each has its own card art and walkout flourish.
+- **New modes and screens:** Scout Market and Swap Desk; Pack Helper tags and a quick-sell-dupes bar on the reveal; Set Collections; UT Draft, which plays real `Match.tsx` games with exactly-once settlement; chemistry pips; and the one-time New Era bundle (an Icon pick plus 65,000 coins).
+
+Saves and connections:
+- New state lives only in optional `ut.content` (`content-state.ts`). `profile.ts` gains one hook that stamps New Era eligibility.
+- No key, ID, serial or backend changes. `SPOTLIGHT_RATES` and the registry are untouched.
+
+Online: `pool.print` mixes in `CONTENT_PRINT`, so this build's UT queue doesn't pair with older builds that can't resolve the new editions. `UT_RULES` stays NBA 8 / NFL 9, and no gameplay rule or existing rating changes.
+
+Tests:
+- New: `content2.test.ts` (both sports).
+- Changed: `economy.test.ts` now skips free and pick packs in its quick-sell bound.
+- Browser QA: `scripts/qa/ut-content.mjs` at 390 and 320 in both sports, with zero page errors.
+
+### UT content wave 2 (FC 27 mechanics) — Claude, 2026-11-01 (branch `claude/ut-content`, not deployed)
+
+Added:
+- Item Score and Streamlined SBCs.
+- A Daily hub: login calendar plus an all-three objectives bonus.
+- The Preview Pack.
+- Holographic variants (`holo~` ids).
+- The walkout clue sequence: era → conference/division → franchise, with promo stage colours.
+- An Evolutions lab: `evo~` play ids, while the owned copy's id stays unchanged.
+- A Rewards inbox with CLAIM ALL.
+
+Saves and online:
+- New state stays inside optional `ut.content`.
+- `CONTENT_PRINT` is now `ut-content-3`; no rule or base rating changes.
+
+Validation and details: the "Wave 2" section of [UT-CONTENT-2.md](UT-CONTENT-2.md), `content3.test.ts`, and `scripts/qa/ut-content.mjs`.
+
+### UT wave 3: Live Calendar — Claude, 2026-11-01 (branch `claude/ut-content`, not deployed)
+
+What it adds:
+- The 12-month schedule, with the owner's renames and Finale SBC-only decision applied.
+- A rule-based, deterministic selection of program cards. Ids `<sport>:live:<promo>[.f]:…` rebuild from the id forever.
+- A 364-day repeat after the scheduled year.
+- Program packs, guarantees and picks, built on the content-drop packs.
+- Season SBCs.
+- A Home "This Season" banner with "Coming next".
+- Standout Guarantee and Elite prices retuned to a 45–60% quick-sell EV.
+
+Saves and online:
+- `CONTENT_PRINT` is now `ut-content-4`, and the fingerprint includes the schedule version.
+- No new state field.
+
+Scope, what isn't built yet, and tests: "Wave 3" in [UT-CONTENT-2.md](UT-CONTENT-2.md) and `calendar.test.ts`.
+
+### Ratings rework merged into `claude/ut-content` — Claude, 2026-11-01
+
+`feature/season-evolution` d64921c is merged into the content branch.
+
+Changes on the content side:
+- Content thresholds use the new display scale (`fc-scale.ts`). Standouts land at ~80–93, Landmarks at 85–93, programs inside their bands, and the New Era Legends at 88+.
+- Edition faces follow the new card face.
+- Every paid pack is retuned to 45–60% quick-sell EV.
+- The Live Calendar selections are frozen in `src/data/live-editions.json` by `scripts/freeze_live_editions.ts`.
+
+Queues come from the rework (UT NBA 9 / NFL 10), plus this branch's `CONTENT_PRINT` fingerprint.
+
+Details: the "After the ratings rework" section of [UT-CONTENT-2.md](UT-CONTENT-2.md).
+## Gameplay ratings pass — Claude (Anthropic), 2026-11-01
+
+Branch `claude/gameplay` (from `feature/season-evolution` d64921c); not merged, not deployed. Owner request: make every rating matter in play and balanced, NBA 2K / Madden / EA FC as the reference for play and animation, and make the gameplay enjoyable. Full tables: [GAMEPLAY-RATINGS.md](GAMEPLAY-RATINGS.md).
+
+What changed:
+- NBA (`hoops2/autopilot.ts`, `engine.ts`, `game.ts`, `types.ts`, new `badges.ts`): autopilot pass cost and six-pass limit, pick and roll and step-backs, Pro release 66 ms (elite shooters 0.71 → 1.18 PPP; even teams 1.01 PPP); contact stonewall by STR/weight/PRD vs handle; shot curve with rating-scaled contest caps (open three 36/51/67/81/87% for 45/60/75/90/99), green window unchanged; PRD contest, closeout caps, driving-dunk rules, IND at the rim, PAS, and-one FT, defender stamina, ACC; 2K26-tiered badges (Deadeye per shot type); Lob City, Heat Check, Icon now work.
+- NFL (`football2/engine.ts`, `autopilot.ts`, `drive.ts`, `types.ts`): all 16 abilities (seeded ~50% zone, pop events); truck/stiff arm by TRK/SFA + STR + weight with contact timing, AI/POWER button pick the move that beats the man; accuracy now shows (receivers read the ball late), THP speed, route-break wins, contested catch/SPC, power/finesse rush, BCV, AWR, STR leverage; run game 7.75 → 4.53 ypc; cliffs removed (pancake, big hit, press, kick window); steep coverage spans halved.
+- Feel (render only): `src/game/juice.ts` (trauma shake, kick, zoom, hit-stop, pooled particles), dunk styles and rim hang (`pixel/poses.ts`, `hoops2/render.ts`), ball squash/stretch, SPD 92+ afterimage, badge/ability pops, weight gait and sprint lean (`pixel/style.ts`), NFL catch leap/bobble (`football2/render.ts`), haptics inside pointer handlers and gesture-gated iOS ticks (`lib/sound.ts`), `Hoops2.tsx`/`Football2.tsx` wiring.
+
+Compatibility: match rules bumped once — draft NBA 9 → 10, NFL 9 → 10; UT NBA 9 → 10, NFL 10 → 11 (`net/match.ts`, `ut/Match.tsx`, pinned in `net.test.ts`/`nfl-net.test.ts`). No profile, key, card ID, serial, level, XP, rating or backend change.
+
+Tests: new `hoops2/ratings-matter.test.ts` (offensive monotonicity, curve targets, contact, PRD, FT, stamina, tiers, Lob City/Heat Check/Icon), `football2/ratings-matter.test.ts` (move inversions, AI move choice, accuracy, rush, route wins, kick window, ability rolls/effects/events), `juice.test.ts` (seeded NBA/NFL games identical with and without juice); opt-in `balance.test.ts` (`BAL=1`). Existing gameplay tests unchanged and passing; typecheck, full `npm test` both sports, build and the gameplay/core-gameplay/rushing/joystick QA scripts pass.
+
+Open: NFL 90-vs-75 synthetic teams still win ~99% (adjacent real-lineup tiers are ~80%); NBA 90 v 75 is 89%. NBA draft "overall" (value rank) doesn't track attributes, so OVR-matched real NBA lineups aren't a fair balance check.
+
+## UI reorganisation — Claude (Anthropic), 2026-11-01 (branch `claude/ui-reorg`, not deployed)
+
+Purpose: organise the whole app like a current sports-game app (FC 26 "For You"/Play menu, FC 27 Campaign Hub, MUT/MyTEAM manage areas; sources in [UI-NAVIGATION.md](UI-NAVIGATION.md)), implement the UI/IA audit's P0–P2 items, and give every feature added since the audit one clear home.
+
+What changed:
+- Main tabs HOME · ULTIMATE TEAM · RANKS · PROFILE. The Daily is Home's Daily tile (result and countdown), Boosters are in Profile, the Gauntlet chip opens a sheet, and PLAY never leaves the screen (Home's content scrolls above it).
+- UT tabs HOME · PLAY · SQUAD · CLUB · CHALLENGES · STORE, mapped in `src/ut/nav.ts` (one title, tab and parent per view; root tabs have no back button; Home's is EXIT). Home is an action hub (Continue, Rewards with CLAIM ALL, This Season + Season Pass, Daily, Standouts, featured Store promo, squad, records). Play is Solo / Online with live status rows and one Rivals card. Club and Challenges use segments. Store is ordered Your packs → Daily Drop → This Season → Featured → Picks & previews → by price.
+- Shared pieces in `src/ut/ui.tsx` and `src/ut/nav.css`; per-mode status lines in `src/ut/play-status.ts`; new SVG icons in `src/ut/icons.tsx`.
+- Fixes: squashed buttons in scrolling columns (START SEASON, sheet buttons), tap targets ≥44 design px, truncation, the NUMBERING placeholder, dev-wording leaks, one name per thing (glossary in UI-NAVIGATION.md), badges count only claimables and things to open, card details keep their actions in a sticky bar.
+
+Connections and saves: none changed. No profile field, storage key, claim ID, card ID, price, odds, reward or queue changes. Only UI text changed in `progression.ts` (objective plurals) and `inbox.ts` (the Sets item title).
+
+Commits: `2d780ba` (UT navigation model, Home, Play), `2f505ef` (UT screens), `cd5b11a` (main tabs), then the QA and docs commits on `claude/ui-reorg`.
+
+Validation (Claude, 2026-11-01, before merging the gameplay pass): `npm run typecheck`; `npm test` both sports (NBA 415 passed, NFL 382 passed); `npm run build`. `scripts/qa/ui-reorg.mjs` (new): 204 screens — every main tab and sheet, every UT tab, segment and sub-screen, card details and the filter sheet, at 430×932, 390×844 and 320×568, NBA and NFL — with no horizontal overflow, clipped text, sub-44 targets, squeezed items, wrong tab/back/title or page errors (card name plates still ellipsize the longest surnames, by design). Updated and passing: `play-tab.mjs`, `ui-consistency.mjs`, `clubhouse.mjs`, `league-season.mjs`, `ut-content.mjs`. WebKit (WebKitGTK MiniBrowser over a `vite preview` build, both sports at 390 and 320): Home, Profile, all six UT tabs, card details, Season Pass and Club Season with no page errors or overflow.
+
+After merging `feature/season-evolution` 713c63f (gameplay ratings pass) into `claude/ui-reorg` (`5797e59`): typecheck, `npm test` (NBA 439 passed, NFL 406 passed), `npm run build`, the five navigation QA scripts, `ui-reorg.mjs` (204 screens clean) and the WebKit pass (44 screens clean) all re-run and pass.

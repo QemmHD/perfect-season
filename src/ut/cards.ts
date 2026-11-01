@@ -1,4 +1,5 @@
 import { specialEditions } from './specials';
+import { registerCombine, type CombineFile } from './nfl-combine';
 // Ultimate Team card data: every player-season as a CardLine, plus promo ("Hot Season") and legend
 // lines. Built by scripts/build_cards.py into src/data/cards-<sport>.json (stored column by
 // column; the script's header has every rule) and loaded only when Ultimate Team opens.
@@ -79,6 +80,50 @@ export interface SeasonReferences {
   source: string;
   columns: string[];
   rows: Record<string, (number | string | null)[]>;
+  /**
+   * Claude 2026-11-01: further same-season blocks in priority order (see docs/RATINGS-AUDIT.md,
+   * "Expanded game-rating references"). A key lives in one block only; `rows` above still wins.
+   * Each row is [snapshot label index, overall, ...columns].
+   */
+  sets?: { id: string; kind: SeasonReferenceKind; source: string; snapshots: string[]; rows: Record<string, (number | string | null)[]> }[];
+}
+
+export type SeasonReferenceKind = 'final' | 'next' | 'preseason' | 'retro';
+
+/** The season's game-rating reference for one player, or undefined. */
+export function seasonReference(references: SeasonReferences | undefined, pid: string, season: number): CardLine['ratingReference'] {
+  if (!references) return undefined;
+  const key = `${pid}:${season}`;
+  const attrsOf = (row: (number | string | null)[]) => {
+    const attrs: Record<string, number> = {};
+    references.columns.forEach((code, j) => {
+      const value = row[j + 2];
+      if (typeof value === 'number' && Number.isFinite(value) && value >= 1 && value <= 99) attrs[code] = value;
+    });
+    return attrs;
+  };
+  const ref = references.rows[key];
+  if (ref && typeof ref[1] === 'number') return { source: references.source, snapshot: String(ref[0]), ovr: ref[1], attrs: attrsOf(ref) };
+  for (const set of references.sets ?? []) {
+    const row = set.rows[key];
+    if (!row || typeof row[1] !== 'number') continue;
+    const label = typeof row[0] === 'number' ? set.snapshots[row[0]] : row[0];
+    return { source: set.source, snapshot: String(label ?? ''), ovr: row[1], attrs: attrsOf(row), kind: set.kind };
+  }
+  return undefined;
+}
+
+/**
+ * Claude ratings rework: each season line's same-player season lines (all stints, by season), so a
+ * card without its own same-era benchmark can borrow its nearest season's and a football card can be
+ * held to the player's own surrounding level. Keyed by the line's `stats` object, which every edition
+ * of that season shares (promos, legends, specials); a line with fresh stats is rated on its own.
+ */
+const CAREERS = new WeakMap<object, CardLine[]>();
+
+/** The player's season lines (sorted by season), when this line came from a loaded card file. */
+export function careerOf(line: Pick<CardLine, 'stats'>): CardLine[] | undefined {
+  return CAREERS.get(line.stats);
 }
 
 export function expandCards(f: CardsFile, references?: SeasonReferences): CardPool {
@@ -121,16 +166,15 @@ export function expandCards(f: CardsFile, references?: SeasonReferences): CardPo
       grp,
     };
     if (c.sparse[i]) line.sparse = true;
-    const ref = references?.rows[`${pid}:${line.season}`];
-    if (ref && typeof ref[1] === 'number') {
-      const attrs: Record<string, number> = {};
-      references!.columns.forEach((code, j) => {
-        const value = ref[j + 2];
-        if (typeof value === 'number' && Number.isFinite(value) && value >= 1 && value <= 99) attrs[code] = value;
-      });
-      line.ratingReference = { source: references!.source, snapshot: String(ref[0]), ovr: ref[1], attrs };
-    }
+    const ref = seasonReference(references, pid, line.season);
+    if (ref) line.ratingReference = ref;
     seasons.push(line);
+  }
+  const byPlayer = new Map<string, CardLine[]>();
+  for (const l of seasons) (byPlayer.get(l.pid) ?? byPlayer.set(l.pid, []).get(l.pid)!).push(l);
+  for (const career of byPlayer.values()) {
+    career.sort((a, b) => a.season - b.season);
+    for (const l of career) CAREERS.set(l.stats, career);
   }
   const derive = (kind: CardKind) => ([i, boost, label]: [number, number, string]): CardLine => {
     const base = seasons[i];
@@ -147,6 +191,7 @@ export function expandCards(f: CardsFile, references?: SeasonReferences): CardPo
 // left out so it is neither bundled nor precached until soccer is added (docs/SOCCER-DATA.md)
 const FILES = import.meta.glob<{ default: CardsFile }>(['../data/cards-*.json', '!../data/cards-soccer.json']);
 const REFERENCES = import.meta.glob<{ default: SeasonReferences }>('../data/season-references-*.json');
+const COMBINE = import.meta.glob<{ default: CombineFile }>('../data/nfl-combine.json');
 
 const pools = new Map<UtSport, Promise<CardPool>>();
 
@@ -156,7 +201,10 @@ export function loadCards(sport: UtSport): Promise<CardPool> {
   if (!p) {
     const key = Object.keys(FILES).find((k) => k.endsWith(`cards-${sport}.json`));
     p = key
-      ? Promise.all([FILES[key](), REFERENCES[`../data/season-references-${sport}.json`]?.()]).then(([m, r]) => expandCards(m.default, r?.default))
+      ? Promise.all([FILES[key](), REFERENCES[`../data/season-references-${sport}.json`]?.(), sport === 'nfl' ? COMBINE['../data/nfl-combine.json']?.() : undefined]).then(([m, r, c]) => {
+          registerCombine(c?.default);
+          return expandCards(m.default, r?.default);
+        })
       : Promise.resolve({ lines: [], byId: new Map(), promos: [], legends: [] });
     p.catch(() => pools.delete(sport));
     pools.set(sport, p);

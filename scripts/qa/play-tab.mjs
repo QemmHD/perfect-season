@@ -51,15 +51,18 @@ try {
           JSON.stringify({ width, height, tabs })
         );
         await shot(page, `play-${sport}-${width}`);
+        // Claude (UI reorganisation): Solo rows (.hq-mode) and one Rivals card (.up-rivals-top)
         for (const name of [
           /CLUB SEASON/,
           /CHAMPIONS CIRCUIT/,
           /MOMENTS/,
           /SQUAD BATTLES/,
-          /DIVISION RIVALS/,
-          /LEGENDS SERIES/
+          /LEGENDS EVENTS/,
+          /UT DRAFT/,
+          'RIVALS'
         ]) {
-          await page.locator('.hq-mode').filter({ hasText: name }).click();
+          if (name === 'RIVALS') await page.locator('.up-rivals-top').click();
+          else await page.locator('.hq-mode').filter({ hasText: name }).click();
           assert.equal(
             await page.locator('.ut-tabs [aria-current="page"]').innerText(),
             'PLAY'
@@ -67,9 +70,8 @@ try {
           await page
             .getByRole('button', { name: 'Back to Play', exact: true })
             .click();
-          await page
-            .getByRole('heading', { name: 'PLAY YOUR WAY.', exact: true })
-            .waitFor();
+          await page.locator('.ut-v-play .up-list').waitFor();
+          assert.equal(await page.locator('.ut-back').count(), 0, 'Play is a root tab: no back button');
         }
         report.push({
           sport,
@@ -90,7 +92,11 @@ try {
       await page
         .getByRole('button', { name: 'Back to Play', exact: true })
         .click();
-      await page.getByRole('button', { name: /CONTINUE YOUR CIRCUIT/ }).click();
+      await page
+        .locator('.hq-mode.live')
+        .filter({ hasText: /CHAMPIONS CIRCUIT/ })
+        .filter({ hasText: 'CONTINUE' })
+        .click();
       assert.equal((await current()).ut.hq.circuit.active.id, active.id);
       const after = await current();
       assert.equal(after.coins, original.coins);

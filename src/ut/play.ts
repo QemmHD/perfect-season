@@ -22,6 +22,8 @@ export interface UtMatchRequest {
   event?: { id: string; node: number };
   circuit?: { runId: string; round: number };
   league?: LeagueRequest;
+  /** Claude: a UT Draft game (draft-mode.ts) */
+  draft?: { runId: string; game: number };
 }
 
 export interface UtMatchResult {

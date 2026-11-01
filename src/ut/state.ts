@@ -7,6 +7,7 @@ import { type Level, levelOf } from './battles';
 import type { OwnedCard, CardRetirement } from './types';
 import { organizeStorage } from './storage';
 import { normalizeHQ, type ClubHQ } from './hq-state';
+import { normalizeContent, type ContentState } from './content-state';
 
 /** A pack waiting to be opened (a challenge reward, the starter). */
 export interface PendingPack {
@@ -19,6 +20,8 @@ export interface PendingPack {
 export interface UtState {
   v: 1;
   hq?: ClubHQ;
+  /** Claude 2026-11-01: UT content drop 2 (content-state.ts), optional and additive */
+  content?: ContentState;
   league?: LeagueState;
   rivals?: RivalsState;
   collected?: string[];
@@ -121,8 +124,10 @@ export function migrateUt(raw: unknown): UtState {
   const paid = r.paid as { day?: unknown; n?: unknown } | undefined;
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
   const league = normalizeLeague(r.league);
+  const content = normalizeContent(r.content);
   return organizeStorage({
     v: 1,
+    ...(content ? { content } : {}),
     ...(league ? { league } : {}),
     ...(r.hq && typeof r.hq === 'object' ? { hq: normalizeHQ(r.hq, owned) } : {}),
     ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),

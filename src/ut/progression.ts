@@ -318,10 +318,16 @@ export function objectiveDeck(ut: UtState, day: string): Objective[] {
           (counter === 'points'
             ? 'points'
             : counter === 'wins'
-              ? 'matches'
+              ? target === 1
+                ? 'match'
+                : 'matches'
               : counter === 'games'
-                ? 'UT matches'
-                : 'SBCs'),
+                ? target === 1
+                  ? 'UT match'
+                  : 'UT matches'
+                : target === 1
+                  ? 'SBC'
+                  : 'SBCs'),
         counter,
         target,
         progress: Math.min(progress, target),

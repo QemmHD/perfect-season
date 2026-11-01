@@ -108,7 +108,11 @@ export interface Body {
   lastMoveAt?: number;
   /** Brief planted-contact response, separate from a turnover or a stun. */
   contactAt?: number;
+  /** the last drive into a set defender: he bullied through it (true) or was walled off */
+  bullyWin?: boolean;
   lastCatchAt?: number;
+  /** the last pass he caught was a Dimer's (its tier share, 0-1): his catch-and-shoot window opens up */
+  dimed?: number;
   reboundAt?: number;
   shotTempo?: number;
   trail: Pt[];

@@ -2,7 +2,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { SPORT } from "../engine/sport";
 import { getPool, type Pool } from "./pool";
-import { rateCard } from "./rate";
+import { rateCard, TIER_CUTS } from "./rate";
+import { faceWeights } from "./card-face";
 import type { CardLine } from "./types";
 let pool: Pool;
 beforeAll(async () => {
@@ -36,11 +37,11 @@ describe("all-tier ratings corrections (" + SPORT + ")", () => {
       const brady=season('Tom Brady',2021), mahomes=season('Patrick Mahomes',2022);
       expect(brady.attrs.SPD).toBe(brady.line.ratingReference!.attrs.SPD);
       expect(mahomes.attrs.THP).toBe(mahomes.line.ratingReference!.attrs.THP);
-      expect(mahomes.ovr).toBeGreaterThanOrEqual(93);
+      expect(mahomes.rawOvr).toBeGreaterThanOrEqual(93); // rating scale (Madden-comparable)
       expect(brady.attrs.SPD).toBeLessThan(75);
     } else {
       const jokic=season('Nikola Jokić',2024), giannis=season('Giannis Antetokounmpo',2024);
-      expect(jokic.ovr).toBeGreaterThanOrEqual(95);
+      expect(jokic.rawOvr).toBeGreaterThanOrEqual(95); // rating scale (2K-comparable)
       expect(jokic.attrs.SPD).toBeLessThan(75);
       expect(jokic.attrs.PAS).toBeGreaterThan(90);
       expect(giannis.attrs.DNK).toBeGreaterThan(85);
@@ -49,14 +50,15 @@ describe("all-tier ratings corrections (" + SPORT + ")", () => {
   });
   if (SPORT === "nba") {
     it("ordinary overalls cannot turn a middling attribute profile into an all-time superstar", () => {
-      expect(season("Bob Rule", 1969).ovr).toBeLessThanOrEqual(85);
-      expect(season("Neal Walk", 1973).ovr).toBeLessThanOrEqual(85);
+      expect(season("Bob Rule", 1969).rawOvr).toBeLessThanOrEqual(85);
+      expect(season("Neal Walk", 1973).rawOvr).toBeLessThanOrEqual(85);
       const cards = [...pool.base.values()].filter(
         (c) => c.line.kind === "season",
       );
-      expect(cards.filter((c) => c.ovr === 99).length).toBeLessThan(95);
-      expect(season("Michael Jordan", 1996).ovr).toBeGreaterThanOrEqual(97);
-      expect(season("Larry Bird", 1986).ovr).toBeGreaterThanOrEqual(95);
+      expect(cards.filter((c) => c.rawOvr === 99).length).toBeLessThan(95);
+      expect(season("Michael Jordan", 1996).rawOvr).toBeGreaterThanOrEqual(97);
+      // Claude rework: the overall follows the face (Bird's 72 athleticism weighs on it), still a top-tier gold
+      expect(season("Larry Bird", 1986).rawOvr).toBeGreaterThanOrEqual(93);
     });
     it("keeps ordinary, legend and 99+ non-shooters distinct from actual shooters", () => {
       for (const c of pool.base.values()) {
@@ -122,8 +124,113 @@ describe("all-tier ratings corrections (" + SPORT + ")", () => {
         },
       };
       const r = rateCard(tiny);
-      expect(r.ovr).toBeLessThanOrEqual(76);
+      expect(r.rawOvr).toBeLessThanOrEqual(76);
       expect(r.attrs.SAC).toBeLessThan(90);
     });
   }
+});
+
+// Claude ratings rework (2026-11-01): distribution, consistency and famous-season regressions.
+// Displayed overalls use the FC-style UT scale (ut-scale.ts); 2K/Madden comparisons use rawOvr.
+describe("Ultimate Team ratings rework (" + SPORT + ")", () => {
+  const seasons = () => [...pool.base.values()].filter((c) => c.line.kind === "season");
+  const share = (xs: { tier: string }[]) => xs.filter((c) => c.tier === "gold").length / xs.length;
+  it("follows the UT scale: bronze/silver/gold ≈35/35/30%, a dozen-odd 90+ base cards, top 91", () => {
+    const all = seasons();
+    expect(share(all)).toBeGreaterThan(0.27);
+    expect(share(all)).toBeLessThan(0.33);
+    const silver = all.filter((c) => c.tier === "silver").length / all.length;
+    expect(silver).toBeGreaterThan(0.3);
+    expect(silver).toBeLessThan(0.4);
+    const n90 = all.filter((c) => c.ovr >= 90).length;
+    expect(n90).toBeGreaterThanOrEqual(8);
+    expect(n90).toBeLessThanOrEqual(25);
+    expect(Math.max(...all.map((c) => c.ovr))).toBeLessThanOrEqual(91);
+    for (const c of all) expect(c.tier).toBe(c.ovr >= TIER_CUTS[SPORT].gold ? "gold" : c.ovr >= TIER_CUTS[SPORT].silver ? "silver" : "bronze");
+    // each pair of overalls above 83 is rarer than the pair below (ties at one value can bunch a little)
+    const at = (a: number, b: number) => all.filter((c) => c.ovr >= a && c.ovr <= b).length;
+    for (let o = 83; o <= 87; o += 2) expect(at(o + 2, o + 3), String(o)).toBeLessThan(at(o, o + 1));
+  });
+  it("keeps Hot Season promos in 94–97, Legends in 88–95 (a few at 94+), specials above 99", () => {
+    const of = (t: string) => [...pool.base.values()].filter((c) => c.tier === t);
+    for (const c of of("promo")) {
+      expect(c.ovr).toBeGreaterThanOrEqual(94);
+      expect(c.ovr).toBeLessThanOrEqual(97);
+      expect(c.ovr).toBeGreaterThan(pool.base.get(c.line.seasonId!)!.ovr);
+    }
+    const legends = of("legend");
+    for (const c of legends) {
+      expect(c.ovr).toBeGreaterThanOrEqual(88);
+      expect(c.ovr).toBeLessThanOrEqual(95);
+    }
+    expect(legends.filter((c) => c.ovr >= 94).length).toBeLessThanOrEqual(6);
+    for (const c of of("spotlight")) expect(c.ovr).toBeGreaterThanOrEqual(100);
+    for (const c of of("goat")) expect(c.ovr).toBeGreaterThanOrEqual(106);
+  });
+  it("balances the gold share across positions (and NBA eras)", () => {
+    const all = seasons();
+    const group = (c: (typeof all)[number]) => (SPORT === "nba" ? c.line.pos[0] : ({ OT: "OL", OG: "OL", C: "OL", DE: "DL", DT: "DL" } as Record<string, string>)[c.pos] ?? c.pos);
+    for (const g of new Set(all.map(group))) {
+      const s = share(all.filter((c) => group(c) === g));
+      expect(s, g).toBeGreaterThanOrEqual(g === "K" || g === "SF" || g === "TE" ? 0.22 : 0.27);
+      expect(s, g).toBeLessThanOrEqual(0.35);
+    }
+    if (SPORT === "nba")
+      for (const [a, b] of [[1950, 1969], [1970, 1979], [1980, 1989], [1990, 1999], [2000, 2009], [2010, 2019], [2020, 2026]]) {
+        const s = share(all.filter((c) => c.line.season >= a && c.line.season <= b));
+        // the 1960s (small league, no same-season game ratings) sit a little lower
+        expect(s, a + "s").toBeGreaterThanOrEqual(a < 1970 ? 0.2 : 0.25);
+        expect(s, a + "s").toBeLessThanOrEqual(0.35);
+      }
+    else {
+      const per = new Map<number, number>();
+      for (const c of all) if (c.ovr >= 90) per.set(c.line.season, (per.get(c.line.season) ?? 0) + 1);
+      expect(Math.max(0, ...per.values())).toBeLessThanOrEqual(6);
+      // linemen no longer dominate the top: estimate-path OL never reach 99, and they are a minority of 90+
+      expect(all.filter((c) => group(c) === "OL" && !c.line.ratingReference && c.rawOvr! >= 99).length).toBe(0);
+      const top = all.filter((c) => c.ovr >= 90);
+      expect(top.filter((c) => group(c) === "OL").length / top.length).toBeLessThanOrEqual(0.3);
+    }
+  });
+  it("prints a face whose position-weighted mean matches the overall", () => {
+    for (const tier of ["silver", "gold", "promo", "legend"]) {
+      const gaps = [...pool.base.values()]
+        .filter((c) => c.tier === tier)
+        .map((c) => {
+          const w = faceWeights(SPORT, SPORT === "nba" ? c.line.pos[0] : c.pos, c.attrs);
+          let n = 0, t = 0;
+          for (const [k, , v] of c.face!) { n += (w[k] ?? 0) * v; t += w[k] ?? 0; }
+          return Math.abs(c.ovr - n / t);
+        })
+        .sort((a, b) => a - b);
+      expect(gaps[Math.floor(gaps.length / 2)], tier).toBeLessThanOrEqual(3);
+      expect(gaps[Math.floor(gaps.length * 0.9)], tier).toBeLessThanOrEqual(5);
+    }
+  });
+  it("levels add at most two overall", () => {
+    for (const c of seasons().filter((_, i) => i % 97 === 0)) {
+      const five = rateCard(c.line, 5);
+      expect(five.ovr - c.ovr).toBeLessThanOrEqual(2);
+      expect(five.tier).toBe(c.tier);
+    }
+  });
+  it("rates famous seasons near their real standing", () => {
+    if (SPORT === "nba") {
+      expect(season("Stephen Curry", 2022).attrs["3PT"]).toBeGreaterThanOrEqual(95);
+      expect(season("Stephen Curry", 2022).abil).toContain("limitless");
+      expect(season("Nikola Jokić", 2024).rawOvr).toBeGreaterThanOrEqual(95);
+      expect(season("Nikola Jokić", 2024).ovr).toBeGreaterThanOrEqual(86);
+      expect(season("Kyle Korver", 2015).attrs["3PT"]).toBeGreaterThanOrEqual(92);
+      expect(season("Russell Westbrook", 2017).attrs.SPD).toBeGreaterThanOrEqual(95);
+    } else {
+      expect(season("Patrick Mahomes", 2024).rawOvr).toBeGreaterThanOrEqual(88);
+      expect(season("Patrick Mahomes", 2024).tier).toBe("gold");
+      expect(season("Tyreek Hill", 2018).attrs.SPD).toBeGreaterThanOrEqual(96);
+      expect(season("Tyreek Hill", 2016).attrs.SPD).toBeGreaterThanOrEqual(94);
+      for (const y of [2007, 2016]) expect(season("Tom Brady", y).attrs.SPD).toBeLessThanOrEqual(66);
+      expect(season("Mike Vick", 2006).attrs.SPD).toBeGreaterThanOrEqual(93);
+      expect(season("Calvin Johnson", 2012).attrs.SPD).toBeGreaterThanOrEqual(93);
+      expect(season("Josh Allen", 2024).tier).toBe("gold");
+    }
+  });
 });

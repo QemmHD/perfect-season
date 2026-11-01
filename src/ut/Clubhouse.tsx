@@ -1,8 +1,14 @@
 // Codex: clubhouse progression and competition surfaces in the existing Ultimate Team materials.
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Sheet, Confirm } from '../ui/common';
-import { Coin, Trophy, Crown } from '../ui/icons';
-import { IconCheck, IconPlay, IconSquad } from './icons';
+import { Coin } from '../ui/icons';
+import { IconBattles, IconBolt, IconCheck, IconCrown, IconDraft, IconLeague, IconPass, IconPlay, IconRoute, IconSquad, IconChart } from './icons';
+import { playStatus, type ModeStatus } from './play-status';
+import { ModeRow, SectionHead, stagger, Lede, EmptyState } from './ui';
+import { DivisionBadge } from './Rivals';
+import { DIVISIONS, divisionOf, rivalsOf } from './rivals';
+import { weekKey } from '../net/leaderboard';
+import { easternDateKey } from '../engine/season';
 import { UtCard } from './CardArt';
 import { PackArt } from './PackArt';
 import type { Pool } from './pool';
@@ -82,32 +88,32 @@ export function SeasonRibbon({
     level = Math.min(SEASON_TIERS, Math.floor(s.xp / SEASON_STEP)),
     ready = Object.values(hqOf(ut).seasons).reduce(
       (n, v) =>
-        n + Math.max(0, Math.floor(v.xp / SEASON_STEP) - v.claimed.length),
+        n + Math.max(0, Math.min(SEASON_TIERS, Math.floor(v.xp / SEASON_STEP)) - v.claimed.length),
       0
     );
+  // Claude (UI reorganisation): one name, "Season Pass", for the free reward track everywhere.
   return (
     <button
       className="hq-season-ribbon"
       onClick={onOpen}
-      aria-label={season.title + ' rewards: ' + s.xp + ' season points'}
+      aria-label={'Season Pass: level ' + level + ' of ' + SEASON_TIERS + (ready ? ', ' + ready + ' rewards ready' : '')}
     >
-      <span className="hq-season-number disp">
-        {String(season.number).padStart(2, '0')}
+      <span className="hq-season-icon" aria-hidden="true">
+        <IconPass size={20} />
       </span>
       <span>
         <b>
-          {season.title.toUpperCase()} <i>FREE REWARDS</i>
+          SEASON PASS <i>LEVEL {level} / {SEASON_TIERS}</i>
         </b>
         <ProgressBar
-          label="Season points toward the next reward"
-          value={level === 25 ? 1 : s.xp % SEASON_STEP}
-          max={level === 25 ? 1 : SEASON_STEP}
+          label="Season Points toward the next reward"
+          value={level === SEASON_TIERS ? 1 : s.xp % SEASON_STEP}
+          max={level === SEASON_TIERS ? 1 : SEASON_STEP}
         />
         <small>
-          LEVEL {level} / 25 ·{' '}
-          {level === 25
+          {level === SEASON_TIERS
             ? 'TRACK COMPLETE'
-            : SEASON_STEP - (s.xp % SEASON_STEP) + ' SP TO NEXT REWARD'}
+            : SEASON_STEP - (s.xp % SEASON_STEP) + ' SP TO LEVEL ' + (level + 1)}
         </small>
       </span>
       <span className="hq-ribbon-end">
@@ -116,122 +122,81 @@ export function SeasonRibbon({
     </button>
   );
 }
+// Claude, 2026-11-01 (UI reorganisation): Play is two short lists, Solo and Online, in the FC 26
+// Play-menu order. Each mode is one compact row with its live status (play-status.ts); a run in
+// progress says CONTINUE. Head to Head and Division Rivals were the same online queue, so they are
+// one Rivals card with FIND MATCH.
 export function PlayHQ({
   ut,
+  pool,
+  week,
   onGo,
   onOnline
 }: {
   ut: UtState;
+  pool: Pool;
+  week: string;
   onGo: (v: UtView) => void;
   onOnline: () => void;
 }) {
-  const active = hqOf(ut).circuit.active;
+  const st = playStatus(pool, ut, week);
+  const row = (m: ModeStatus, title: string, icon: React.ReactNode, tone: 'teal' | 'gold' | 'violet' | 'blue' | 'red', k: number) => (
+    <ModeRow
+      key={m.view}
+      className={'hq-mode rise-in' + (m.live ? ' live' : '')}
+      style={stagger(k)}
+      icon={icon}
+      title={title}
+      status={m.line}
+      tone={tone}
+      live={m.live}
+      pill={m.live ? 'CONTINUE' : m.ready ? (m.view === 'draft' || m.view === 'circuit' ? 'FREE' : 'CLAIM') : undefined}
+      onClick={() => onGo(m.view)}
+    />
+  );
+  const r = rivalsOf(ut.rivals, weekKey(easternDateKey())),
+    division = divisionOf(r.points),
+    d = DIVISIONS[division],
+    next = DIVISIONS[division + 1];
   return (
-    <div className="page hq-page">
-      <div className="hq-page-heading">
-        <span className="eyebrow">YOUR CLUB. YOUR COMPETITION.</span>
-        <h1 className="disp">PLAY YOUR WAY.</h1>
-        <p>
-          Build a squad. Find your challenge. Bring home something worth
-          earning.
-        </p>
+    <div className="page hq-page up">
+      <SectionHead title="Solo · vs the AI" />
+      <div className="up-list">
+        {row(st.league, 'CLUB SEASON', <IconLeague size={24} />, 'gold', 0)}
+        {row(st.battles, 'SQUAD BATTLES', <IconBattles size={24} />, 'teal', 1)}
+        {row(st.circuit, 'CHAMPIONS CIRCUIT', <IconRoute size={24} />, 'gold', 2)}
+        {row(st.events, 'LEGENDS EVENTS', <IconCrown size={24} />, 'violet', 3)}
+        {row(st.moments, 'MOMENTS', <IconBolt size={24} />, 'blue', 4)}
+        {row(st.draft, 'UT DRAFT', <IconDraft size={24} />, 'teal', 5)}
       </div>
-      <button className="hq-mode hq-mode-gold" onClick={() => onGo('league')}>
-        <Trophy size={36} />
-        <span>
-          <i className="eyebrow">YOUR ULTIMATE TEAM · FULL SEASON</i>
-          <b className="disp">CLUB SEASON</b>
-          <small>
-            {ut.league && ut.league.active.phase !== 'complete'
-              ? `Continue season ${ut.league.active.number} · ${ut.league.active.teams[0].w}–${ut.league.active.teams[0].l}`
-              : 'A living league. Adaptive rivals. Your championship chase.'}
-          </small>
-        </span>
-        <HQArrow />
-      </button>
-      <button className="hq-mode hq-mode-gold" onClick={() => onGo('circuit')}>
-        <Trophy size={42} />
-        <span>
-          <i className="eyebrow">SOLO · SIX-MATCH ENTRIES</i>
-          <b className="disp">
-            {active ? 'CONTINUE YOUR CIRCUIT' : 'CHAMPIONS CIRCUIT'}
-          </b>
-          <small>
-            {active
-              ? `Match ${active.games + 1} / 6 · ${active.wins} wins so far`
-              : 'Climb through tougher squads. Earn weekly best-result rewards.'}
-          </small>
-        </span>
-        <HQArrow />
-      </button>
-      <div className="hq-mode-grid">
-        <button className="hq-mode" onClick={() => onGo('moments')}>
-          <span className="hq-mode-icon">
-            <IconPlay size={29} />
+      <SectionHead title="Online · vs real players" />
+      <div className="up-rivals rise-in" style={{ ...stagger(6), '--division': d.color } as React.CSSProperties}>
+        <button className="up-rivals-top" onClick={() => onGo('rivals')} aria-label={'Rivals: ' + st.rivals.line + '. Division and rewards'}>
+          <DivisionBadge division={division} />
+          <span>
+            <i className="eyebrow">RIVALS · WEEK {weekKey(easternDateKey()).split('W')[1]}</i>
+            <b className="disp">{d.name} division</b>
+            <small>
+              {r.points} RP · {r.w}W {r.l}L{next ? ' · ' + (next.at - r.points) + ' RP to ' + next.name : ''}
+            </small>
+            <span className="up-rivals-meter" aria-hidden="true">
+              <i style={{ width: next ? Math.min(100, (100 * (r.points - d.at)) / (next.at - d.at)) + '%' : '100%' }} />
+            </span>
           </span>
-          <i className="eyebrow">SHORT SCENARIOS</i>
-          <b className="disp">MOMENTS</b>
-          <small>
-            Take your own players into challenges that test your skill.
-          </small>
-          <span className="hq-action">
-            TAKE THE STAGE <HQArrow />
-          </span>
+          {st.rivals.ready ? <em className="ut-row-pill">CLAIM</em> : <HQArrow />}
         </button>
-        <button className="hq-mode" onClick={() => onGo('battles')}>
-          <span className="hq-mode-icon">
-            <IconSquad size={29} />
-          </span>
-          <i className="eyebrow">SOLO · FULL MATCHES</i>
-          <b className="disp">SQUAD BATTLES</b>
-          <small>
-            Choose your difficulty and climb the existing weekly ladder.
-          </small>
-          <span className="hq-action">
-            CLIMB THE LADDER <HQArrow />
-          </span>
+        <button className="btn primary up-find" onClick={onOnline}>
+          <IconPlay size={18} /> FIND MATCH
         </button>
       </div>
-      <button className="hq-mode hq-mode-online" onClick={onOnline}>
-        <span className="hq-online-dot" />
-        <span>
-          <i className="eyebrow">PLAYER MATCHMAKING</i>
-          <b className="disp">HEAD TO HEAD</b>
-          <small>
-            Your squad against another player. Legend defense online.
-          </small>
-        </span>
-        <HQArrow />
-      </button>
-      <button className="hq-mode" onClick={() => onGo('rivals')}>
-        <Trophy size={28} />
-        <span>
-          <i className="eyebrow">ONLINE PROGRESSION</i>
-          <b className="disp">DIVISION RIVALS</b>
-          <small>
-            Track your division, standings and earned weekly prizes.
-          </small>
-        </span>
-        <HQArrow />
-      </button>
-      <button className="hq-mode" onClick={() => onGo('events')}>
-        <Crown size={28} />
-        <span>
-          <i className="eyebrow">SOLO · SPOTLIGHT STORIES</i>
-          <b className="disp">LEGENDS SERIES</b>
-          <small>
-            Take on the greats in themed events and earn Spotlight rewards.
-          </small>
-        </span>
-        <HQArrow />
-      </button>
-      <div className="hq-footnote">
-        Coins and card XP retain the existing eight-game daily limit. Your first
-        sixteen UT matches can earn Season Points each day.
-      </div>
+      <p className="note">
+        Every mode plays your own squad. Each day your first eight UT matches pay coins and card XP, and your first sixteen earn Season Points.
+      </p>
     </div>
   );
 }
+// Claude, 2026-11-01 (UI reorganisation): the Season Pass as one compact horizontal track (was 25
+// tall rows, about five screens) that opens scrolled to your current level.
 export function SeasonView({
   ut,
   day,
@@ -252,7 +217,7 @@ export function SeasonView({
     [chosen, setChosen] = useState<string | null>(null),
     period = chosen && h.seasons[chosen] ? chosen : current.id,
     s = h.seasons[period] ?? { xp: 0, claimed: [] },
-    level = Math.min(25, Math.floor(s.xp / SEASON_STEP)),
+    level = Math.min(SEASON_TIERS, Math.floor(s.xp / SEASON_STEP)),
     ready = seasonReady(ut, period),
     previousReady = Object.keys(h.seasons).filter(
       (p) => p !== current.id && seasonReady(ut, p) > 0
@@ -263,150 +228,101 @@ export function SeasonView({
       .filter((k) => k !== current.id)
       .reverse()
   ];
+  const track = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    // open on the first unclaimed reward, or the next one to earn
+    const el = track.current;
+    if (!el) return;
+    const first = Array.from({ length: SEASON_TIERS }, (_, i) => i + 1).find((t) => !s.claimed.includes(t)) ?? SEASON_TIERS;
+    const target = el.querySelector<HTMLElement>('[data-tier="' + Math.min(first, level + 1, SEASON_TIERS) + '"]');
+    if (target) el.scrollLeft = Math.max(0, target.offsetLeft - (el.clientWidth - target.offsetWidth) / 2);
+  }, [period]);
+  const fmt = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   return (
-    <div className="page hq-page">
-      <div className="hq-season-hero">
-        <span className="eyebrow">
-          EVERY REWARD IS EARNED. EVERY TIER IS FREE.
-        </span>
-        <h1 className="disp">
-          YOUR SEASON.
-          <br />
-          YOUR LEGACY.
-        </h1>
-        <div className="hq-season-big">
+    <div className="page hq-page sp-page">
+      <div className="sp-head rise-in">
+        <span className="sp-level">
           <b className="disp num">{level}</b>
-          <span>
-            LEVEL / 25
-            <small>{s.xp.toLocaleString('en-US')} SEASON POINTS</small>
-          </span>
-          <Crown size={48} />
-        </div>
-        <ProgressBar
-          value={s.xp}
-          max={SEASON_TIERS * SEASON_STEP}
-          label="Season reward track"
-        />
-        <p>
-          {period === current.id
-            ? 'Season ' +
-              current.number +
-              ' · ' +
-              current.start +
-              ' — ' +
-              current.end
-            : 'Your previously earned rewards are kept here.'}
-        </p>
+          <i>/ {SEASON_TIERS}</i>
+        </span>
+        <span className="sp-head-txt">
+          <i className="eyebrow">
+            {period === current.id ? 'SEASON ' + String(current.number).padStart(2, '0') + ' · ' + fmt(current.start) + ' – ' + fmt(current.end) : 'SEASON ' + period.split(':')[1] + ' · EARLIER'}
+          </i>
+          <ProgressBar value={s.xp} max={SEASON_TIERS * SEASON_STEP} label="Season Pass progress" />
+          <small>
+            {s.xp.toLocaleString('en-US')} Season Points · {level === SEASON_TIERS ? 'track complete' : SEASON_STEP - (s.xp % SEASON_STEP) + ' SP to level ' + (level + 1)}
+          </small>
+        </span>
       </div>
+      {ready > 0 && (
+        <button className="btn gold hq-wide" onClick={() => onClaimReady(period)}>
+          CLAIM READY ({ready})
+        </button>
+      )}
       {period === current.id && previousReady.length > 0 && (
-        <button
-          className="hq-banked-season"
-          onClick={() => setChosen(previousReady[0])}
-        >
+        <button className="hq-banked-season" onClick={() => setChosen(previousReady[0])}>
           <span>
-            <b>EARNED REWARDS WAITING</b>
-            <small>Open your earlier season rewards. Nothing expired.</small>
+            <b>EARLIER REWARDS WAITING</b>
+            <small>Your earlier Season Pass rewards never expire.</small>
           </span>
           <HQArrow />
         </button>
       )}
-      {periods.length > 1 && (
-        <label className="hq-select-label">
-          REWARD TRACK
-          <select value={period} onChange={(e) => setChosen(e.target.value)}>
-            {periods.map((p) => (
-              <option key={p} value={p}>
-                {p === current.id ? 'CURRENT · ' : ''}SEASON {p.split(':')[1]}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {ready > 0 && (
-        <button
-          className="btn primary hq-wide"
-          onClick={() => onClaimReady(period)}
-        >
-          CLAIM READY ({ready}) <HQArrow />
-        </button>
-      )}
-      <div className="hq-section-head">
-        <span className="eyebrow">25 LEVELS. NO PREMIUM TRACK.</span>
-        <button className="chip" onClick={onStore}>
-          YOUR PACKS <HQArrow />
-        </button>
+      <div className="ut-sechead">
+        <h2 className="eyebrow">25 free levels</h2>
+        {periods.length > 1 && (
+          <label className="sp-select">
+            <span className="sr-only">Season</span>
+            <select value={period} onChange={(e) => setChosen(e.target.value)}>
+              {periods.map((p) => (
+                <option key={p} value={p}>
+                  {p === current.id ? 'This season' : 'Season ' + p.split(':')[1]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
-      <div className="hq-tier-list">
-        {Array.from({ length: 25 }, (_, i) => i + 1).map((tier) => {
+      <div className="sp-track" ref={track} role="list" aria-label="Season Pass levels">
+        {Array.from({ length: SEASON_TIERS }, (_, i) => i + 1).map((tier) => {
           const reward = seasonReward(tier),
             claimed = s.claimed.includes(tier),
             unlocked = s.xp >= tier * SEASON_STEP;
           return (
-            <div
-              key={tier}
-              className={
-                'hq-tier' + (claimed ? ' claimed' : unlocked ? ' ready' : '')
-              }
-            >
-              <span className="hq-tier-index disp num">
-                {claimed ? <IconCheck /> : String(tier).padStart(2, '0')}
+            <div key={tier} role="listitem" data-tier={tier} className={'sp-tier' + (claimed ? ' claimed' : unlocked ? ' ready' : '') + (tier === level + 1 ? ' next' : '') + (tier === SEASON_TIERS ? ' finale' : '')}>
+              <span className="sp-tier-n num">{tier}</span>
+              <span className="sp-tier-art">
+                {reward.pack ? <PackArt kind={reward.pack} label={reward.pack.toUpperCase()} sport={sport} small /> : <Coin size={28} />}
               </span>
-              <span className="hq-tier-art">
-                {reward.pack ? (
-                  <PackArt
-                    kind={reward.pack}
-                    label={reward.pack.toUpperCase()}
-                    sport={sport}
-                    small
-                  />
-                ) : (
-                  <Coin size={25} />
-                )}
-              </span>
-              <span className="hq-tier-copy">
-                <b>{rewardLabel(reward)}</b>
-                <small>
-                  {(tier * SEASON_STEP).toLocaleString('en-US')} SP
-                  {tier === 25 ? ' · THE SEASON FINALE' : ''}
-                </small>
-              </span>
+              <small>{rewardLabel(reward)}</small>
               <button
-                className={'chip' + (unlocked && !claimed ? ' primary' : '')}
+                className={'sp-tier-btn' + (unlocked && !claimed ? ' on' : '')}
                 disabled={!unlocked || claimed}
                 onClick={() => onClaim(period, tier)}
+                aria-label={claimed ? 'Level ' + tier + ' claimed' : unlocked ? 'CLAIM' : 'Level ' + tier + ' locked: ' + (tier * SEASON_STEP).toLocaleString('en-US') + ' SP'}
               >
-                {claimed ? (
-                  'CLAIMED'
-                ) : unlocked ? (
-                  'CLAIM'
-                ) : (
-                  <>
-                    <svg
-                      width="12"
-                      height="14"
-                      viewBox="0 0 16 20"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
-                      <rect x="2" y="9" width="12" height="9" rx="2" />
-                      <path d="M4 9V5a4 4 0 0 1 8 0v4" />
-                    </svg>
-                    <span className="sr-only">Locked</span>
-                  </>
-                )}
+                {claimed ? <IconCheck size={16} /> : unlocked ? 'CLAIM' : <span className="num">{(tier * SEASON_STEP).toLocaleString('en-US')}</span>}
               </button>
             </div>
           );
         })}
       </div>
+      <button className="hq-text-button sp-store" onClick={onStore}>
+        PACKS YOU’VE EARNED ARE IN THE STORE <HQArrow />
+      </button>
       <p className="note">
-        Unlocked rewards stay claimable when the next season begins. Spotlight
-        Packs retain their normal published odds; they do not guarantee a GOAT.
+        Every match, objective and SBC earns Season Points. Unlocked rewards stay claimable after the season ends. Spotlight Packs use their published odds and don’t guarantee a GOAT.
       </p>
     </div>
   );
+}
+/** "Today", "Week 44", or a short date for an earlier day (never a raw date key). */
+function periodLabel(group: string, period: string, day: string): string {
+  if (group === 'weekly') return 'WEEK ' + (period.split('W')[1] ?? period);
+  if (period === day) return 'TODAY';
+  const d = new Date(period + 'T12:00:00Z');
+  return isNaN(+d) ? period : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).toUpperCase();
 }
 export function ObjectivesView({
   ut,
@@ -438,14 +354,7 @@ export function ObjectivesView({
       : all.filter((o) => o.group === group && !banked.includes(o));
   return (
     <div className="page hq-page">
-      <div className="hq-page-heading">
-        <span className="eyebrow">A REASON FOR EVERY MATCH</span>
-        <h1 className="disp">OBJECTIVES</h1>
-        <p>
-          Follow your own path. Earn coins, packs and Season Points across
-          Ultimate Team.
-        </p>
-      </div>
+      <Lede>Daily, weekly and club goals. Each pays coins, packs and Season Points.</Lede>
       <div className="hq-objective-summary">
         <span>
           <b className="disp num">{ready.length}</b> REWARDS READY
@@ -480,7 +389,7 @@ export function ObjectivesView({
             }
           >
             <span className="eyebrow">
-              {o.group === 'lifetime' ? 'CLUB MILESTONE' : o.period}
+              {o.group === 'lifetime' ? 'CLUB MILESTONE' : periodLabel(o.group, o.period, day)}
             </span>
             <div className="hq-objective-title">
               <h3 className="disp">{o.title}</h3>
@@ -546,27 +455,18 @@ export function CircuitView({
     [ending, setEnding] = useState(false);
   return (
     <div className="page hq-page">
-      <div className="hq-circuit-hero">
-        <Trophy size={54} />
-        <span className="eyebrow">SOLO · WEEKLY COMPETITION</span>
-        <h1 className="disp">
-          CHAMPIONS
-          <br />
-          CIRCUIT
-        </h1>
-        <p>Six played matches. Tougher opponents. Make this your best run.</p>
-        <div className="hq-circuit-stats">
-          <span>
-            <b className="disp num">{a?.wins ?? c.best}</b>
-            <i>{a ? 'CURRENT WINS' : 'WEEKLY BEST'}</i>
-          </span>
-          <span>
-            <b className="disp num">
-              {c.entries} / {CIRCUIT_ENTRIES}
-            </b>
-            <i>FREE ENTRIES USED</i>
-          </span>
-        </div>
+      <Lede>Six matches against tougher squads. All six count; rewards at 2, 4 and 6 wins, once a week.</Lede>
+      <div className="hq-circuit-stats compact">
+        <span>
+          <b className="disp num">{a?.wins ?? c.best}</b>
+          <i>{a ? 'WINS THIS RUN' : 'WEEKLY BEST'}</i>
+        </span>
+        <span>
+          <b className="disp num">
+            {c.entries} / {CIRCUIT_ENTRIES}
+          </b>
+          <i>FREE ENTRIES USED</i>
+        </span>
       </div>
       {a ? (
         <div className="hq-panel">
@@ -620,10 +520,7 @@ export function CircuitView({
       ) : (
         <div className="hq-panel">
           <span className="eyebrow">A FRESH SHOT AT YOUR BEST</span>
-          <p>
-            All six matches count. A loss does not end the entry. Rewards are
-            earned at two, four and six wins, once each week.
-          </p>
+          <p>A loss doesn’t end the entry: play all six and keep your best result.</p>
           <button
             className="btn primary hq-wide"
             disabled={c.entries >= CIRCUIT_ENTRIES}
@@ -638,10 +535,7 @@ export function CircuitView({
           </button>
         </div>
       )}
-      <div className="hq-section-head">
-        <h2 className="disp">PLAY FOR SOMETHING.</h2>
-        <span className="eyebrow">BEST-RESULT REWARDS</span>
-      </div>
+      <SectionHead title="Best-result rewards" />
       <div className="hq-circuit-prizes">
         {CIRCUIT_PRIZES.map((p) => (
           <div
@@ -667,7 +561,7 @@ export function CircuitView({
               </p>
               <small>
                 {c.claimed.includes(p.wins)
-                  ? 'EARNED · DEPOSITED TO YOUR CLUB'
+                  ? 'EARNED · IN YOUR CLUB'
                   : 'Beat your weekly best to unlock'}
               </small>
             </div>
@@ -676,10 +570,8 @@ export function CircuitView({
         ))}
       </div>
       <p className="note">
-        Play all six matches on the court or field. Solo AI opponents rise
-        toward Legend difficulty in the finale. First-time weekly milestones
-        deposit automatically, including after reload. Your existing Squad
-        Battles and online records remain.
+        AI opponents rise toward Legend difficulty in the finale. Each weekly
+        milestone pays once and lands in your club automatically.
       </p>
       {ending && (
         <Confirm
@@ -704,7 +596,8 @@ export function DevelopmentView({
   onCancel,
   onClaim,
   onSquad,
-  onUseCopy
+  onUseCopy,
+  onEvolutions
 }: {
   ut: UtState;
   club: ClubCard[];
@@ -713,6 +606,8 @@ export function DevelopmentView({
   onClaim: () => void;
   onSquad: () => void;
   onUseCopy: (uid: string) => void;
+  /** Claude wave 2: the Evolutions lab (stat upgrades) next to these XP programs */
+  onEvolutions?: () => void;
 }) {
   const h = hqOf(ut),
     [query, setQuery] = useState(''),
@@ -733,14 +628,18 @@ export function DevelopmentView({
     ready = developmentReady(ut);
   return (
     <div className="page hq-page">
-      <div className="hq-page-heading">
-        <span className="eyebrow">BUILD A CLUB HERO</span>
-        <h1 className="disp">DEVELOPMENT LAB</h1>
-        <p>
-          Choose one owned copy. Play with it in your squad. Earn a focused
-          boost through the existing XP and level system.
-        </p>
-      </div>
+      <Lede>Pick one of your cards and play with it: a program pays card XP, an Evolution raises its ratings for good.</Lede>
+      {onEvolutions && (
+        <button className="hq-mode hq-mode-draft" onClick={onEvolutions}>
+          <IconSquad size={30} />
+          <span>
+            <i className="eyebrow">STAT UPGRADES · UP TO 3 AT ONCE</i>
+            <b className="disp">EVOLUTIONS LAB</b>
+            <small>Play with a card to raise its overall and attributes for good.</small>
+          </span>
+          <HQArrow />
+        </button>
+      )}
       {a && p ? (
         <div className="hq-development-active">
           <div className="hq-development-card">
@@ -1028,14 +927,7 @@ export function ClubRecords({ ut }: { ut: UtState }) {
     history = [...h.history].reverse();
   return (
     <div className="page hq-page">
-      <div className="hq-page-heading">
-        <span className="eyebrow">EVERY CLUB HAS A STORY</span>
-        <h1 className="disp">CLUB RECORDS</h1>
-        <p>
-          Your existing wins and losses are retained. Recent match details and
-          copy-level records begin with this clubhouse update.
-        </p>
-      </div>
+      <Lede>Every Ultimate Team result your club has played, newest first.</Lede>
       <div className="hq-record-totals">
         <span>
           <b className="disp num">{ut.record.w + ut.record.h2hW}</b>
@@ -1049,11 +941,12 @@ export function ClubRecords({ ut }: { ut: UtState }) {
           <b className="disp num">{ut.packsOpened}</b>
           <small>PACKS OPENED</small>
         </span>
+        <span>
+          <b className="disp num">{ut.sold.coins.toLocaleString('en-US')}</b>
+          <small>QUICK-SELL COINS</small>
+        </span>
       </div>
-      <div className="hq-section-head">
-        <h2 className="disp">RECENT FORM</h2>
-        <small>LAST 20 MATCHES</small>
-      </div>
+      <SectionHead title="Recent form" />
       <div className="hq-form">
         {history.slice(0, 10).map((m) => (
           <i key={m.id} className={m.won ? 'win' : 'loss'}>
@@ -1070,11 +963,11 @@ export function ClubRecords({ ut }: { ut: UtState }) {
             <b>{m.opponent}</b>
             <small>
               {m.mode === 'league' ? 'CLUB SEASON' : m.mode === 'online'
-                ? 'HEAD TO HEAD'
+                ? 'RIVALS'
                 : m.mode === 'circuit'
                   ? 'CHAMPIONS CIRCUIT'
                   : m.mode === 'event'
-                    ? 'SPOTLIGHT SERIES'
+                    ? 'LEGENDS EVENTS'
                     : 'SQUAD BATTLES'}{' '}
               · {new Date(m.at).toLocaleDateString()}
             </small>
@@ -1085,10 +978,9 @@ export function ClubRecords({ ut }: { ut: UtState }) {
         </div>
       ))}
       {!history.length && (
-        <div className="empty">
-          Your next settled Ultimate Team match starts this chapter. Existing
-          records above are already yours.
-        </div>
+        <EmptyState icon={<IconChart size={26} />} title="No matches yet">
+          Your next Ultimate Team result shows up here.
+        </EmptyState>
       )}
     </div>
   );

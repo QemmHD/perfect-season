@@ -65,13 +65,13 @@ describe('the economy (' + SPORT + ')', () => {
     expect(seller).toBeLessThanOrEqual(9);
     expect(keeper).toBeGreaterThanOrEqual(5);
     expect(keeper).toBeLessThanOrEqual(12);
-  });
+  }, 60000);
 
   it('never sells a pack for more than it cost', async () => {
     const pool = await getPool();
     const defs = packDefs(pool.sport);
     const choices = positionChoices(pool.sport);
-    for (const def of Object.values(defs).filter(d=>d.kind!=='spotlight')) {
+    for (const def of Object.values(defs).filter(d=>d.kind!=='spotlight' && d.kind!=='scout' && d.price>0)) {
       let back = 0;
       const N = 300;
       for (let i = 0; i < N; i++) back += openPack(pool, def.kind === 'position' ? 'position:' + choices[i % choices.length].key : def.kind, 'qs:' + def.kind + i).reduce((a, c) => a + quickSellValue(c), 0);

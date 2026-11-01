@@ -134,7 +134,7 @@ export function Recovery({ onClose }: { onClose: () => void }) {
             </button>
           )}
           <p className="note">
-            This save belongs to this game’s existing player identity. There is
+            This save belongs to your player identity on this phone. There is
             no username/password recovery yet; a fresh phone or different site
             starts with a different identity. Keep the original app installed.
           </p>

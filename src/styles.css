@@ -10360,6 +10360,9 @@ button.friendcard:active {
   background: var(--panel-2);
   border: 1px solid var(--line);
 }
+.ut-key.main {
+  border-color: rgba(25, 227, 201, 0.45);
+}
 .ut-key > b {
   min-width: 2ch;
   grid-row: span 2;
@@ -11468,4 +11471,275 @@ button.friendcard:active {
   font-size: 13px;
   font-weight: 700;
   color: var(--gold);
+}
+
+/* ========== Claude, 2026-11-01: UI reorganisation (docs/UI-NAVIGATION.md) ========== */
+/* Main tabs: HOME · ULTIMATE TEAM · RANKS · PROFILE */
+.tab-ind {
+  width: 25%;
+}
+.tabs button {
+  min-height: 48px;
+}
+.tabs button > span {
+  white-space: nowrap;
+}
+.tabs .tab-ut {
+  color: var(--gold);
+  font-stretch: 78%;
+  letter-spacing: 0.5px;
+}
+.tabs .tab-ut svg {
+  filter: drop-shadow(0 0 8px rgba(245, 184, 61, 0.35));
+}
+.tab-new {
+  position: absolute;
+  top: 5px;
+  left: calc(50% + 8px);
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font: 900 8.5px/1.1 var(--body);
+  font-style: normal;
+  letter-spacing: 0.5px;
+}
+
+/* Home: everything above PLAY scrolls when it must; PLAY stays put */
+.home-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.home-scroll::-webkit-scrollbar {
+  display: none;
+}
+.home-scroll > * {
+  flex-shrink: 0;
+}
+.home-scroll > .spacer {
+  flex: 1 0 0;
+}
+.home .playbar {
+  position: relative;
+  box-shadow: 0 -14px 18px -6px var(--bg);
+}
+.mode .livebadge.daily-new {
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+
+/* Profile: one header, the UT card, boosters */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line-2);
+  background:
+    radial-gradient(90% 140% at 0% 0%, rgba(25, 227, 201, 0.14), transparent 60%),
+    linear-gradient(160deg, var(--panel-3), var(--panel) 75%);
+}
+.level-ring.xl {
+  width: 60px;
+  height: 60px;
+}
+.level-ring.xl b {
+  font-size: 22px;
+}
+.profile-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-id b {
+  font-size: 26px;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-id small {
+  font-size: 12px;
+  color: var(--sub);
+}
+.profile-ut {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid #f5b83d55;
+  background:
+    radial-gradient(90% 140% at 100% 0%, rgba(245, 184, 61, 0.18), transparent 60%),
+    linear-gradient(160deg, #221f12, var(--panel) 75%);
+  color: var(--text);
+  text-align: left;
+}
+.profile-ut-mark {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+  background: rgba(245, 184, 61, 0.1);
+  border: 1px solid rgba(245, 184, 61, 0.3);
+  flex-shrink: 0;
+}
+.profile-ut-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-ut-txt .eyebrow {
+  font-style: normal;
+  color: var(--gold);
+  font-size: 10px;
+}
+.profile-ut-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--sub);
+}
+.profile-ut-stats b {
+  font-size: 15px;
+  color: var(--text);
+}
+.profile-ut .go {
+  font-style: normal;
+  font-size: 24px;
+  color: var(--gold);
+}
+.boosters-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sec-head small {
+  font-size: 11px;
+  color: var(--sub);
+}
+.boosters-sec .storeitem .btn {
+  flex: none;
+  min-width: 64px;
+  height: 44px;
+}
+
+/* the Legends Gauntlet sheet */
+.gauntlet-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gauntlet-sheet h2 {
+  margin: 0;
+  font-size: 28px;
+}
+.gauntlet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gauntlet-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.gauntlet-list li b {
+  color: var(--sub);
+}
+.gauntlet-list li small {
+  color: var(--gold);
+  font-weight: 800;
+}
+.gauntlet-list li.beaten {
+  opacity: 0.6;
+}
+.gauntlet-list li.beaten b {
+  color: var(--teal);
+}
+.gauntlet-list li.next {
+  border-color: var(--gold);
+}
+.gauntlet-list li:last-child span {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* 44pt hit areas. Real size where there's room; compact chips, pills and switches keep their look
+   and get an invisible ::before that extends the tap area to 44 (Apple HIG's minimum). */
+.topbar .icon-btn.round {
+  width: 44px;
+  height: 44px;
+}
+.topbar .level {
+  min-height: 44px;
+}
+.chip,
+.seg button,
+.sportswitch button,
+.utb-level,
+.hq-filter button,
+.ut-seg button,
+.ut-link {
+  position: relative;
+}
+:is(.chip, .statchip, .seg button, .toggle button, .sportswitch button, .utb-level, .hq-filter button, .ut-seg button, .ut-detail .note a)::before {
+  content: '';
+  position: absolute;
+  inset: -7px -1px;
+}
+.ut-detail .note a {
+  position: relative;
+  display: inline-block;
+}
+.ut-detail .note a::before {
+  inset: -15px -2px;
+}
+.settings-admin {
+  min-height: 44px;
+  padding: 0 12px;
+  align-self: center;
+}
+/* `.btn` grows inside a .btnrow; as a direct child of a scrolling column (a page or a sheet) its
+   flex-basis 0 squeezed it to its text height (the old START SEASON bug), so there it keeps its size */
+:is(.page, .sheet, .gauntlet-sheet, .ut-filter-sheet, .hq-preset-sheet, .page-view) > .btn {
+  flex: none;
+}
+.profile-edit {
+  flex-shrink: 0;
+  color: var(--sub);
+}
+.level-ring.xl {
+  width: 54px;
+  height: 54px;
 }

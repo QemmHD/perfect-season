@@ -22,6 +22,7 @@ export function withLeagueForm(rc: RatedCard, boost: number): RatedCard {
     ...rc,
     attrs,
     ovr,
-    key: rc.key.map(([code, label]) => [code, label, attrs[code] ?? ovr])
+    key: rc.key.map(([code, label]) => [code, label, attrs[code] ?? ovr]),
+    face: rc.face?.map(([code, label, v]) => [code, label, Math.max(1, Math.min(110, v + (ovr - rc.ovr)))])
   };
 }

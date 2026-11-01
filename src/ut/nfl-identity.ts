@@ -62,6 +62,10 @@ const PHYSICAL: Record<
   "Bruce Smith": { peak: 1990, attrs: { SPD: 84, ACC: 89, AGI: 84, STR: 95 } },
   "Aaron Donald": { peak: 2018, attrs: { SPD: 84, ACC: 89, AGI: 84, STR: 99 } },
 };
+/** A hand-set physical identity exists for this player (it wins over measured or estimated athleticism). */
+export function hasPhysicalIdentity(line: Pick<CardLine, 'name'>): boolean {
+  return !!PHYSICAL[line.name === "Mike Vick" ? "Michael Vick" : line.name];
+}
 export function nflIdentity(
   line: CardLine,
   attrs: Record<string, number>,

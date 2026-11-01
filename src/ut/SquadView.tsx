@@ -6,6 +6,7 @@ import { SPORT } from '../engine/sport';
 import { sfx } from '../lib/sound';
 import { Sheet } from '../ui/common';
 import { UtCard } from './CardArt';
+import { playerChem } from './chem-pips';
 import { IconWand } from './icons';
 import { type Pool, seasonText } from './pool';
 import { autoBuild, CHEM_BONUS, canPlay, FULL_LINK, type Lineup, rateSquad, type SlotDef, slotsFor, type SquadRating } from './squad';
@@ -78,6 +79,8 @@ export function SquadView(props: {
   }, []);
   const cw = Math.floor(nba ? Math.min(box.w * 0.22, (box.h * 0.36) / 1.4, 84) : Math.min(box.w * 0.165, (box.h * 0.235) / 1.4, 64));
 
+  // Claude: per-player chemistry pips (display only)
+  const pips = useMemo(() => playerChem(SPORT, props.lineup), [props.lineup]);
   const links = rating.links.filter((l) => pos.get(l.a)?.unit === onPitch[0]?.unit && pos.get(l.b)?.unit === onPitch[0]?.unit);
   const auto = () => {
     sfx.select();
@@ -118,7 +121,16 @@ export function SquadView(props: {
             <i>{s.pos ?? 'ANY'}</i>
           </span>
         )}
-        <i className="ut-slot-tag">{s.id}</i>
+        <i className="ut-slot-tag">
+          {s.id}
+          {c && s.weight > 0 && pips[s.id] !== undefined && (
+            <span className={'ut-pips p' + pips[s.id]} aria-label={pips[s.id] + ' of 3 chemistry'}>
+              <i />
+              <i />
+              <i />
+            </span>
+          )}
+        </i>
       </button>
     );
   };
@@ -138,13 +150,13 @@ export function SquadView(props: {
           <span className="bar ut-chembar">
             <i style={{ width: rating.chem + '%' }} className={rating.chem >= 70 ? 'full' : ''} />
           </span>
-          <small>+{((CHEM_BONUS * rating.chem) / 100).toFixed(1)} overall from chemistry · tap for how</small>
+          <small>+{((CHEM_BONUS * rating.chem) / 100).toFixed(1)} OVR from chemistry · how?</small>
         </button>
         <button className="icon-btn pill-btn ut-auto" onClick={auto}>
           <IconWand size={16} /> AUTO
         </button>
       </div>
-      {props.management && <div className="hq-squad-toolbar"><span className="eyebrow">ONE CLUB. THREE MATCHDAY LINEUPS.</span>{props.management}</div>}
+      {props.management && <div className="hq-squad-toolbar"><span className="eyebrow">Matchday squad · 3 saved lineups</span>{props.management}</div>}
       {!nba && (
         <span className="seg ut-unit" role="group" aria-label="Unit">
           {(['off', 'def'] as const).map((u) => (

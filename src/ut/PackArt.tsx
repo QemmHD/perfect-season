@@ -13,7 +13,8 @@ export function PackArt({
   sport: UtSport;
   small?: boolean;
 }) {
-  const k = kind.startsWith('position') ? 'position' : kind;
+  // Claude wave 3: Live Calendar packs share one wrapper per kind (live / live-plus / live-pick)
+  const k = kind.startsWith('position') ? 'position' : kind.startsWith('live') ? kind.split(':')[0] : kind;
   return (
     <span
       className={'ut-pack p-' + k + (small ? ' small' : '')}

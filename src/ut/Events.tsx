@@ -4,6 +4,7 @@ import { eventsFor, eventRung } from './events';
 import type { Pool } from './pool';
 import type { UtState } from './state';
 import { IconCheck, IconPlay } from './icons';
+import { Lede } from './ui';
 export function Events({ pool, ut, ready, onSquad, onPlay }: { pool: Pool; ut: UtState; ready: boolean; onSquad: () => void; onPlay: (id: string, node: number) => void }) {
   const [selected, setSelected] = useState('dynasty');
   const events = eventsFor(pool),
@@ -11,12 +12,7 @@ export function Events({ pool, ut, ready, onSquad, onPlay }: { pool: Pool; ut: U
   const cleared = ut.events?.[event.id] ?? 0;
   return (
     <div className="page ut-events">
-      <div className="ut-content-hero">
-        <span className="eyebrow">ULTIMATE TEAM · SPOTLIGHT SERIES</span>
-        <h1 className="disp">Legends are waiting.</h1>
-        <p>Bring your club. Beat themed squads. Earn a guaranteed 99+ Spotlight edition.</p>
-        <span className="ut-event-tag">3 SERIES · 9 MATCHUPS · UNIQUE FIRST-CLEAR REWARDS</span>
-      </div>
+      <Lede>Beat themed legend squads with your club. Each series ends in a boss match with a guaranteed Spotlight reward.</Lede>
       <div className="ut-chips" aria-label="Event series">
         {events.map((e) => (
           <button key={e.id} className={'chip' + (e.id === selected ? ' on' : '')} aria-pressed={e.id === selected} onClick={() => setSelected(e.id)}>
@@ -63,8 +59,7 @@ export function Events({ pool, ut, ready, onSquad, onPlay }: { pool: Pool; ut: U
         })}
       </div>
       <p className="note">
-        Full matches using your own squad. Play manually or use the existing Sim option. Each stage’s pack is earned once per sport; replaying never resets rewards. A Spotlight
-        Reward is not a GOAT guarantee.
+        Full matches with your own squad: play them or sim them. Each stage’s pack is earned once per sport, and replays never reset rewards. A Spotlight reward is not a GOAT guarantee.
       </p>
     </div>
   );

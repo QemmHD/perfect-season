@@ -44,6 +44,10 @@ import { rateSquad, CHEM_BONUS, type SquadRating, startersComplete } from './squ
 import { lineupOf, ratingOf, type SquadCards, squadFromWire, squadToWire, type SquadWire, teamsOf } from './teams';
 import type { UtState } from './state';
 import './match.css';
+// Claude 2026-11-01: UT Draft matches and the Weekly Standouts objective
+import { DRAFT_GAMES, draftOf, draftRung, draftWire, settleDraft } from './draft-mode';
+import { recordStandoutWin } from './content-progress';
+import { playId, recordEvoMatch } from './evolutions';
 
 /**
  * The queue of its own: Ultimate Team squads never pair with draft head to heads, nor with a build
@@ -51,7 +55,8 @@ import './match.css';
  * and plays the sim itself. Bump UT_RULES when teams.ts or play.ts change how a match comes out.
  */
 // Codex: NFL rushing execution differs from v4; NBA queues remain compatible.
-const UT_RULES = { nba: 8, nfl: 9 };
+// Claude ratings rework + NBA shot curve (2026-11-01): ratings, levels and jumpers changed.
+const UT_RULES = { nba: 10, nfl: 11 };
 const queueOf = (pool: Pool) => 'ut-' + UT_RULES[pool.sport] + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;
@@ -82,6 +87,7 @@ interface Setup {
   event?: { id: string; node: number; title: string };
   circuit?: { runId: string; round: number };
   league?: LeagueRequest;
+  draft?: { runId: string; game: number };
   /** Squad Battles: the difficulty's name and what it pays (times the coins) */
   level?: { name: string; pay: number; def: number };
 }
@@ -115,6 +121,8 @@ interface Outcome {
   capped: boolean;
   /** the top rung: the next ladder is up */
   refreshed: boolean;
+  /** Claude: a draft game: the run's wins after it, and whether the run is over */
+  draft?: { wins: number; done: boolean };
 }
 
 type Stage = 'load' | 'search' | 'found' | 'vs' | 'vote' | 'play' | 'result' | 'error';
@@ -131,7 +139,7 @@ function mySide(pool: Pool, ut: UtState, name: string): Side {
   const raw: SquadWire = [];
   for (const [slot, uid] of Object.entries(ut.squad)) {
     const o = byUid.get(uid);
-    if (o) raw.push([slot, o.cardId, o.level]);
+    if (o) raw.push([slot, playId(ut, o), o.level]);
   }
   const sq = squadFromWire(pool, raw);
   return { name, sq, wire: squadToWire(sq), rating: ratingOf(SPORT, sq), fav: favoriteFor(SPORT) };
@@ -196,7 +204,16 @@ export default function UtMatch(props: {
   // a new search each time the queue starts over (a match that never connected)
   const [searchNo, setSearchNo] = useState(0);
 
-  const me = useMemo(() => (pool ? mySide(pool, profile.ut, name) : null), [pool]);
+  const me = useMemo(() => {
+    if (!pool) return null;
+    // Claude: a draft game fields the drafted squad (never the club's cards)
+    if (req.draft) {
+      const run = draftOf(profile.ut);
+      const sq = squadFromWire(pool, run && run.id === req.draft.runId ? draftWire(run) : []);
+      return { name, sq, wire: squadToWire(sq), rating: ratingOf(SPORT, sq), fav: favoriteFor(SPORT) };
+    }
+    return mySide(pool, profile.ut, name);
+  }, [pool]);
 
   useEffect(() => {
     let live = true;
@@ -215,6 +232,19 @@ export default function UtMatch(props: {
   // what to play, once the cards are here
   useEffect(() => {
     if (!pool || !me || stage !== 'load') return;
+    if (req.draft) {
+      const run = draftOf(profileRef.current.ut);
+      const g = req.draft.game;
+      const rung = run && run.id === req.draft.runId && !run.done && run.games === g && startersComplete(SPORT, lineupOf(me.sq)) ? draftRung(pool, run, g) : null;
+      if (!rung) {
+        setError('This draft match is no longer active. Return to Play.');
+        setStage('error');
+        return;
+      }
+      setSetup({ seed: 'draft:' + req.draft.runId + ':' + g + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, draft: req.draft, level: { name: 'Draft · Game ' + (g + 1), pay: 1, def: g / DRAFT_GAMES } });
+      setStage('vs');
+      return;
+    }
     if (!startersComplete(SPORT, lineupOf(me.sq))) {
       setError('Fill every starting spot in your squad first.');
       setStage('error');
@@ -414,6 +444,20 @@ export default function UtMatch(props: {
     };
     const d = decide(us.score, them.score, s.me.rating.raw, s.rival.rating.raw, s.online ? coin : () => true);
     const ut = profileRef.current.ut;
+    if (s.draft) {
+      // Claude: a draft game settles on the run only (exactly once: active run, its game, a new match id)
+      const dIn = { runId: s.draft.runId, game: s.draft.game, won: d.won, us: us.score, them: them.score, matchId: 'ut-ai:' + req.id, at: Date.now(), day: easternDateKey(), how, opponent: s.rival.name };
+      const shownD = settleDraft(ut, dIn);
+      props.update((p) => ({ ...p, ut: settleDraft(p.ut, dIn).ut }));
+      const run = draftOf(shownD.ut);
+      setOut({ ...d, us: us.score, them: them.score, how, ends: [us.ends, them.ends], coins: 0, xp: 0, ups: [], climbed: false, pack: null, capped: false, refreshed: false, seasonXP: shownD.sp, draft: { wins: run?.wins ?? 0, done: !!run?.done } });
+      setStage('result');
+      if (d.won) {
+        sfx.seriesWin();
+        vibrate([30, 60, 30]);
+      } else sfx.nope();
+      return;
+    }
     const input = {
       matchId: s.online?.matchId ?? 'ut-ai:' + req.id,
       event: s.event,
@@ -439,9 +483,11 @@ export default function UtMatch(props: {
       afterDivision = divisionOf(rivalsOf(shown.ut.rivals, week).points);
     if (s.online && afterDivision > beforeDivision) setPromotion(afterDivision);
     if (s.online) void publishRivals({ ...profileRef.current, ut: shown.ut }, week);
+    const cardIds = s.me.wire.map((w) => w[1]);
     props.update((p) => {
       const r = settle(p.ut, input);
-      return { ...p, coins: p.coins + r.coins, ut: r.ut };
+      const evo = recordEvoMatch(r.ut, { matchId: input.matchId, won: d.won, played: input.played });
+      return { ...p, coins: p.coins + r.coins, ut: s.online ? evo : recordStandoutWin(evo, { matchId: input.matchId, week, won: d.won, cardIds }) };
     });
     // our final state lingers a while, for a phone still finishing
     connRef.current?.close(false, 30000);
@@ -567,6 +613,12 @@ export default function UtMatch(props: {
           sfx.click();
           const r = setup.rung;
           if (setup.league) { leave(); return; }
+          if (setup.draft) {
+            const run = draftOf(profileRef.current.ut);
+            if (run && run.id === setup.draft.runId && !run.done) props.onAgain({ id: Date.now(), mode: 'ai', draft: { runId: run.id, game: run.games } });
+            else leave();
+            return;
+          }
           if (setup.circuit) {
             const active = hqOf(profileRef.current.ut).circuit.active;
             if (active) props.onAgain({ id: Date.now(), mode: 'ai', circuit: { runId: active.id, round: active.games } });
@@ -585,7 +637,7 @@ export default function UtMatch(props: {
 
   if (promotion !== null && stage === 'result') return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
-  const title = req.league ? 'Club Season' : req.circuit ? 'Champions Circuit' : req.event ? 'Spotlight Events' : req.mode === 'online' ? 'Head to Head' : 'Squad Battles';
+  const title = req.draft ? 'UT Draft' : req.league ? 'Club Season' : req.circuit ? 'Champions Circuit' : req.event ? 'Legends Events' : req.mode === 'online' ? 'Rivals' : 'Squad Battles';
   return (
     <div className={'screen ut utm utm-s-' + stage}>
       <div className="topbar ut-top">
@@ -734,7 +786,7 @@ function SideCard({ side, you }: { side: Side; you: boolean }) {
 function VsView({ setup }: { setup: Setup }) {
   const r = setup.rung;
   const eyebrow = setup.league ? 'Club Season · '+(setup.level?.name ?? '') : setup.event
-    ? 'Spotlight Series · ' + setup.event.title
+    ? 'Legends Events · ' + setup.event.title
     : setup.online
       ? 'Head to head · online'
       : r && r.i >= 0
@@ -767,7 +819,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
   const r = setup.rung;
   const ladder = !!r && r.i >= 0;
   const top = ladder && out.climbed && r!.i + 1 >= RUNGS;
-  const again = setup.league ? 'SEASON HUB' : setup.circuit ? (setup.circuit.round < 5 ? 'NEXT CIRCUIT MATCH' : 'BACK TO CLUB') : setup.event
+  const again = setup.draft ? (out.draft && !out.draft.done ? 'NEXT DRAFT GAME' : 'DRAFT REWARDS') : setup.league ? 'SEASON HUB' : setup.circuit ? (setup.circuit.round < 5 ? 'NEXT CIRCUIT MATCH' : 'BACK TO CLUB') : setup.event
     ? out.won && setup.event.node < 2
       ? 'NEXT EVENT MATCH'
       : 'PLAY AGAIN'
@@ -782,7 +834,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
             : 'TRY AGAIN';
   return (
     <div className="page utm-result">
-      <span className="eyebrow wide">{setup.league ? 'Club Season · league results and standings updated' : setup.circuit ? 'Solo Champions Circuit · Match ' + (setup.circuit.round + 1) + ' / 6' : setup.event ? setup.event.title : ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
+      <span className="eyebrow wide">{setup.draft ? 'UT Draft · Game ' + (setup.draft.game + 1) + ' / ' + DRAFT_GAMES : setup.league ? 'Club Season · league results and standings updated' : setup.circuit ? 'Solo Champions Circuit · Match ' + (setup.circuit.round + 1) + ' / 6' : setup.event ? setup.event.title : ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
       <h1 className={'disp utm-verdict ' + (out.won ? 'win' : 'loss')}>{out.won ? 'WIN' : 'LOSS'}</h1>
       <div className="utm-score" aria-label={'You ' + out.us + ', ' + setup.rival.name + ' ' + out.them}>
         <span>
@@ -829,7 +881,13 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           )}
         </div>
       )}
-      {out.capped ? (
+      {out.draft && (
+        <div className="utm-climb rise-in">
+          <b className="disp">{out.draft.done ? (out.draft.wins >= DRAFT_GAMES ? 'PERFECT DRAFT!' : 'RUN OVER · ' + out.draft.wins + (out.draft.wins === 1 ? ' WIN' : ' WINS')) : out.draft.wins + ' / ' + DRAFT_GAMES + ' WINS'}</b>
+          <small>{out.draft.done ? 'Claim your rewards in Play → UT Draft.' : 'Win the next game to raise your reward.'}</small>
+        </div>
+      )}
+      {out.draft ? null : out.capped ? (
         <p className="utm-note">Today’s {PAID_GAMES_A_DAY} paid games are played: games pay coins and XP again tomorrow.</p>
       ) : (
         <div className="utm-rewards">

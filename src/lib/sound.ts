@@ -105,6 +105,29 @@ function iosTick() {
   }
 }
 
+/*
+ * iOS haptics need a user gesture (WebKit bug 285120: the switch-toggle tick is only played inside,
+ * or just after, a real touch). A tick asked for by the game loop with no touch in the last moment
+ * is kept and played on the next touch (within 400 ms), and iOS gets one tick, never a pattern
+ * (timers fire outside the gesture and are silently dropped). Claude, 2026-11-01.
+ */
+let lastGesture = -1e9;
+let pendingTick = -1e9;
+const GESTURE_MS = 900;
+function now() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+function onGesture() {
+  lastGesture = now();
+  if (hapticsOn && IOS && lastGesture - pendingTick < 400) {
+    pendingTick = -1e9;
+    iosTick();
+  }
+}
+if (typeof window !== 'undefined' && IOS) {
+  for (const type of ['pointerdown', 'pointerup', 'touchend'] as const) window.addEventListener(type, onGesture, { capture: true, passive: true });
+}
+
 export function vibrate(pattern: number | number[]) {
   if (!hapticsOn) return;
   try {
@@ -116,14 +139,15 @@ export function vibrate(pattern: number | number[]) {
     // not supported
   }
   if (!IOS) return;
-  // one tick per pulse of the pattern
-  const p = Array.isArray(pattern) ? pattern : [pattern];
-  let t = 0;
-  for (let i = 0; i < p.length; i += 2) {
-    if (t === 0) iosTick();
-    else window.setTimeout(iosTick, t);
-    t += p[i] + (p[i + 1] ?? 0);
-  }
+  // inside a touch (or right after one): tick now; otherwise on the next touch
+  if (now() - lastGesture < GESTURE_MS) iosTick();
+  else pendingTick = now();
+}
+
+/** A haptic for a control the player just touched: call it inside the pointer handler itself. */
+export function tapHaptic(ms = 10) {
+  lastGesture = now();
+  vibrate(ms);
 }
 
 /* ---------------------------------------------------------------------------------------------
