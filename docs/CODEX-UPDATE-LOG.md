@@ -568,3 +568,17 @@ Saves and online:
 - No new state field.
 
 Scope, what isn't built yet, and tests: "Wave 3" in [UT-CONTENT-2.md](UT-CONTENT-2.md) and `calendar.test.ts`.
+
+### Ratings rework merged into `claude/ut-content` — Claude, 2026-11-01
+
+`feature/season-evolution` d64921c is merged into the content branch.
+
+Changes on the content side:
+- Content thresholds use the new display scale (`fc-scale.ts`). Standouts land at ~80–93, Landmarks at 85–93, programs inside their bands, and the New Era Legends at 88+.
+- Edition faces follow the new card face.
+- Every paid pack is retuned to 45–60% quick-sell EV.
+- The Live Calendar selections are frozen in `src/data/live-editions.json` by `scripts/freeze_live_editions.ts`.
+
+Queues come from the rework (UT NBA 9 / NFL 10), plus this branch's `CONTENT_PRINT` fingerprint.
+
+Details: the "After the ratings rework" section of [UT-CONTENT-2.md](UT-CONTENT-2.md).

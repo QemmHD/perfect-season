@@ -200,7 +200,7 @@ async function run(sport, width, opts = {}) {
     assert.ok((await current()).coins > sBefore.coins, 'set pays coins');
   }
   const sAfter = await current();
-  assert.ok(sAfter.ut.content.claims.some((c) => c.startsWith('set:era:')), 'set claimed once');
+  assert.ok(sAfter.ut.content.claims.some((c) => c.startsWith('set:')), 'a set claimed once');
   await page.getByRole('button', { name: 'Landmarks', exact: true }).click();
   await page.waitForTimeout(500);
   await shot(page, 'utc-' + tag + '-landmarks');

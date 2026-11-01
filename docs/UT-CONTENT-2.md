@@ -509,3 +509,54 @@ These now give 45–60% quick-sell EV on the current scale. Recheck them after t
 - program pack EV
 
 Browser QA (`scripts/qa/ut-content.mjs`) moves the browser clock to Black Friday (2026-11-27), Honors (2027-01-15, at 320 wide) and Finale week (2027-06-23), in both sports. Each run: Home banner, Store row, buying a program pack, the SBC This Season section.
+
+---
+
+# After the ratings rework (merge of `feature/season-evolution` d64921c) — Claude, 2026-11-01
+
+## The display scale
+
+Displayed overalls are now on the FC 27-style scale (`ut-scale.ts`). Thresholds in this content are written on that scale and pass through `fcToDisplay` (`fc-scale.ts`, which is the identity while the tier cuts are 65/75). They no longer go through the legacy `onScale`.
+
+| Content | Range now |
+|---|---|
+| Weekly Standouts | base seasons 77–89 +3 (featured +5), capped 92 (featured 93). Measured: 80–93, median 83 |
+| Landmark Seasons | `clamp(base + 4, 85, 93)` (was +5, cap 99). Measured: 85–93 |
+| Live Calendar programs | inside their schedule bands. All 340 NBA / 542 NFL selected cards are in band |
+| New Era Icon pick | Legends at 88+ (measured 88–93) |
+| Scout's Choice | 84+ golds |
+| Calendar Day-4 pick | 78+ golds |
+
+- The Item Score knots and the Evolution caps are FC numbers, used directly.
+- The walkout uses `UT_SCALE.walkout` (86).
+
+**Edition faces and `rawOvr`:** an edition's printed face rises with its overall. That covers the NBA six categories from `card-face.ts` and NFL key attributes, via `liftShown` in `editions.ts`. `rawOvr` is the new overall read back on the rating scale, which numbering uses. This applies to Standouts, Landmarks, programs and Evolutions.
+
+## Prices: quick-sell EV 45–60% of price, measured on the new scale
+
+Values are NBA / NFL; the percentage is the average quick-sell value as a share of the price.
+
+| Pack | Old price | New price | EV now |
+|---|---|---|---|
+| Bronze | 150 / 150 | **250 / 175** | 54% / 54% |
+| Silver | 400 / 400 | 400 / **320** | 60% / 50% |
+| Gold | 900 / 900 | 900 / 900 | 57% / 50% |
+| Premium | 1,800 / 1,800 | 1,800 / **1,400** | 55% / 51% |
+| Position / Unit | 700 / 500 | unchanged | 56% / 54% |
+| Elite Gold | 2,800 / 2,100 | **2,200 / 1,500** | 50% / 48% |
+| Jumbo Premium | 3,200 / 3,200 | **3,600 / 2,700** | 56% / 50% |
+| Standout Guarantee | 3,600 / 2,300 | **3,000 / 1,800** | 50% / 50% |
+| Lightning (25% off) | 2,700 / 1,725 | 2,250 / 1,350 | 67% (a discount by design) |
+| Scout's Choice | 1,500 / 1,500 | **650 / 250** | priced on its best option's value (320 / 112) |
+| Program Pack, base (template ×0.6 / ×0.36) | | 3,000 / 1,800 | 53% / 51% |
+| Program Guarantee (×0.27 / ×0.155) | | 3,200 / 1,900 | 51% / 49% |
+
+Elite-tier program packs stay lower: Hot Season, Dream Teams and Ring Night land at 38–46% NBA and 36–45% NFL.
+
+## Frozen selections
+
+- `scripts/freeze_live_editions.ts` (`npx vite-node scripts/freeze_live_editions.ts`, with `--check` to verify only) wrote `src/data/live-editions.json`: 42 promos, 84 sport selections, each as `[card id, wave]`.
+- At runtime a frozen selection always wins over a fresh one. Rating tweaks therefore never reshuffle a program's players.
+- The script is append-only and refuses to change a frozen id.
+- `calendar.test.ts` checks that every scheduled promo is frozen, that the manifest equals today's fresh selection, and that every frozen id resolves.
+- Repeat cycles (`-y2`…) still select fresh from their seeded order.

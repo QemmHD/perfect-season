@@ -328,7 +328,7 @@
   border-radius: inherit;
   pointer-events: none;
   mix-blend-mode: color-dodge;
-  opacity: 0.55;
+  opacity: 0.7;
   background:
     radial-gradient(circle at var(--mx, 35%) var(--my, 30%), #ffffffb0 0%, #ffffff22 18%, transparent 45%),
     repeating-linear-gradient(115deg, #f5b83d26 0 0.35em, #19e3c926 0.35em 0.7em, #b79aea26 0.7em 1.05em, transparent 1.05em 1.4em),

@@ -26,7 +26,7 @@ export function StandoutsView(props: { pool: Pool; ut: UtState; week: string; sb
           <em>STANDOUTS.</em>
         </h1>
         <p>
-          {p.cards.length} real seasons, boosted for one week: +3 overall, +5 for the Featured Standout (top 97). Theme: the {decadeOf(p.decade)}. Owned copies keep their week
+          {p.cards.length} real seasons, boosted for one week: +3 overall, +5 for the Featured Standout (top 92, featured 93). Theme: the {decadeOf(p.decade)}. Owned copies keep their week
           stamp forever.
         </p>
         {f && (
