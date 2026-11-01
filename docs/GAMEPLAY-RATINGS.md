@@ -135,7 +135,69 @@ A badge that changes a play pops over the player's head in its tier colour (`bad
 
 Real rated lineups (`balance.test.ts`, NFL lineups matched by average overall): 90 v 75 95%, **90 v 82 79%, 82 v 75 80%**, 75 v 75 51%. The NBA real-lineup run is not a fair balance measure: the draft "overall" comes from a value rank, and the "90" five there (e.g. Cassell, D. Anderson, Bantom, A. Davis, R. Wallace) has weaker shooting and finishing attributes than the "82" five, so it loses; that's a draft-ratings issue for the ratings work, not the engine.
 
-Targets: **NBA 1.0–1.15 PPP for even teams on Pro — met (1.01).** NFL "20–28 points per game" is a full-length-game number; these games are four drives a side, so the comparable rate is about 2–3 points a drive (NFL average ~2.0): even teams score 10–12 per four drives (2.5–3/drive) with a realistic mix (≈30% runs at 4.5 ypc, 66% completions, 8.4 Y/att). **90 v 75 at 70–80% is met for adjacent real-lineup tiers in the NFL but not for the extreme synthetic teams** (every one of 37 attributes 15 higher): the per-play edges compound over a 4-down drive; compressing every rating by 35% still left 95%, so a fix there means flattening ratings, which contradicts the brief. NBA 90 v 75 is 89% (the rating-scaled shot curve separates shooters far more than before). Above 99 everything stays finite (+0.009–0.02 per point, at most 11 points).
+(Second pass below: NBA 90 v 75 87.5%, NFL real 90 v 75 80%.) Targets: **NBA 1.0–1.15 PPP for even teams on Pro — met (1.01; 1.065 after the second pass).** NFL "20–28 points per game" is a full-length-game number; these games are four drives a side, so the comparable rate is about 2–3 points a drive (NFL average ~2.0): even teams score 10–12 per four drives (2.5–3/drive) with a realistic mix (≈30% runs at 4.5 ypc, 66% completions, 8.4 Y/att). **90 v 75 at 70–80% is met for adjacent real-lineup tiers in the NFL but not for the extreme synthetic teams** (every one of 37 attributes 15 higher): the per-play edges compound over a 4-down drive; compressing every rating by 35% still left 95%, so a fix there means flattening ratings, which contradicts the brief. NBA 90 v 75 is 89% (the rating-scaled shot curve separates shooters far more than before). Above 99 everything stays finite (+0.009–0.02 per point, at most 11 points).
+
+## Second pass: rim attacks, spacing and football's variance (Claude, 2026-11-01)
+
+Same unreleased release, so the protocol numbers above stay (draft NBA 10 / NFL 10, UT NBA 10 / NFL 11). Engine and autopilot only (`hoops2/`, `football2/`); no ratings, saves or keys change. Measured with the same harnesses (100 games per row, Pro AI, synthetic all-X teams; NFL real lineups from `balance.test.ts`, 60 games).
+
+### NBA: shot selection that attacks the rim
+**Why the AI shot contested jumpers.** A drive was a flat number by the finish rating, it only started with no defender anywhere in the lane, and it was abandoned the moment anyone stepped in (checked every frame). Passes were valued at the receiver's room *now*, so the ball swung to "open" men who were contested by the release. Result: 87% of even-team shots were threes, 5% at the rim, 72% of releases heavily contested.
+
+| Change | Where |
+|---|---|
+| `attackValue`: getting by the man (SPD+ACC and HND against his quickness and PRD; square in front, the bump: `stonewallChance`; on the block, a post-up by STR/size), the help in the lane weighted by IND/BLK, the finish (DNK 75+ through traffic, else LAY), the crowd, the and-one (STR, then FT), the strip risk | `hoops2/autopilot.ts` |
+| A drive is committed: it finishes in stride, pulls out only when walled off (then a floater or a kick-out in the paint), and kicks to the open man when help comes | autopilot |
+| `catchValue`: the receiver's man closes out while the pass is in the air; own jumpers are read at the release (a man within 4 ft rises with him; pull-up mids from 9 ft); floaters and contested long twos are discounted (the NBA's worst shots, ~0.8 pts) | autopilot |
+| Driving dunk through a man: blocks+IND, size, bounce, a second man in the paint and a seeded read vs DNK − 4 (any 75 used to dunk over an even man); dunk contest heavy ×0.90, smothered ×0.80 | `hoops2/engine.ts` |
+| Rim: each other set defender within 6 ft ×0.9, and **spacing**: every teammate who can't shoot (THR < 72) is part of a helper (`spacingHelp`); STR vs STR on a contested finish ±10%; IND anchor block +(IND−60)/320, finish ×lerp(1.06, 0.80) | engine |
+| Help comes from ≤ 9 ft (+2·defIQ, +7 ft off a non-shooter); a better blocker is the first choice but no longer helps from further (more BLK had conceded more) | engine |
+| On-ball sag no longer gives a non-shooter a 2.2-ft cushion to drive into; help digs strip a careless driver; reach-in steals by STL less steeply (0.35 + 0.65·rate) | engine |
+
+| Even teams (all 75) | Before | After | NBA (Cleaning the Glass, league avg) |
+|---|---|---|---|
+| PPP | 1.016 | **1.065** | ~1.15 (ORtg 115) |
+| Shot mix rim / mid+close / three | 5% / 8% / 87% | **64% / 4% / 31%** | ~31% / ~30% / ~39% |
+| FG at the rim / three | 76% (79 att) / 37% | 60% / 43% | ~66% / ~36.5% |
+| and-ones per 1,600 trips | 1 | 54 | |
+
+The mix is rim-heavy rather than NBA-like: the arcade jump-shot curve (open threes 67% for a 75 with a good thumb) and the near-absent long two stay as designed; the AI now takes the shot that scores, and threes rise for shooters.
+
+| Variant (O = offense five, D = defense five, PPP) | Before | After |
+|---|---|---|
+| base | 1.016 | 1.065 |
+| O slashers (DNK/LAY 95, SPD/ACC/HND 90) | 1.172 (rim 15% of shots) | **1.465 (rim 84%)** |
+| O shooters THR/MID 90 / poor 60 | 1.167 / 0.988 | 1.131 (threes 84%) / **0.952** |
+| O HND / STR / FT / CLS 90 | 1.101 / 1.086 / 1.017 / 1.129 | 1.143 / 1.134 / 1.093 / 1.121 |
+| D PRD / IND / BLK / STR / STL 90 | 0.857 / 1.012 / 0.999 / 1.063 / 0.950 | 0.993 / **0.996** / 1.052 / 1.061 / 1.003 |
+| synthetic 90 v 75 / 99 v 90 / 60 v 75 (win %) | 89 / 71 / 9 (first pass) | **87.5** / 57.5 / 1.5 |
+
+D STR/BLK now show at the rim (rim FG 58% against them) but the AI shoots more threes instead, so their PPP effect stays small. New tests (`hoops2/ratings-matter.test.ts`, 60 games a point): no defensive attribute raised to 90 concedes more (PRD, IND, BLK, STL, STR, SPD, ACC, REB, VRT, and all of them together −0.15); CLS/SDK join the offensive monotonicity list; even teams take ≥25% rim and ≥25% threes at 0.95–1.18 PPP; slashers get ≥10 points more of their shots at the rim and score 0.1 more, shooters take ≥15 points more threes.
+
+### NFL: why 90 v 75 compounds, and realistic variance
+Investigation (synthetic all-90 vs all-75, before): the 90 offense scored a touchdown on 66% of drives, the 75 offense 4.6%. Not turnovers, sacks or kicking: per-play edges stack over ~37 attributes. Single groups at 90: RB +1.2 pts a drive, WR/TE +0.8, OL +0.7, DB −1.2; top speed alone (+5 SPD on the skill players) +44% YAC; missed tackles were 39% of attempts (NFL ~12–15%) and 20-yard plays averaged 17–29 yards after the catch. Saturating every head-to-head duel (tackle, moves, route break, rush, run block) still left 98–100%; only shrinking the whole gap gets there (synthetic 82 v 75 = 83%, 85 v 75 = 98%). The real lineups, where gaps differ by position, are where it now lands in range.
+
+| Variance / realism source (new) | Rule |
+|---|---|
+| Kickoff field position | `startSpot`: 45% touchbacks at the 25, the rest returned around it (±5 yd, ±3 by returner speed vs LB/S coverage), ~8% big returns to the 38–52; seeded by game and drive (both phones agree) |
+| Flags | offensive holding 2.2% of passes / 1.4% of runs (10 yd, replay the down), defensive holding/illegal contact 1.2% of passes (5 yd, first down), offside 0.8% (5 yd), DPI on 14% of contested incompletions 12+ yd downfield (spot, first down); AWR ±20%; the side that didn't foul declines when the play was better; never on a touchdown; shown as a FLAG banner |
+| Blown coverage | per pass play `lerp(7.5%, 2.5%)` by the secondary's AWR+PRC (×(1−0.4·defIQ), floor 1.2%): in man he squats short (thinks zone), in Cover 3 a deep defender jumps the underneath route; average gain ~20 yd when thrown at |
+| Loose balls | a forced fumble is recovered by the offense 45% of the time (always lost before) |
+| Tackling | tackle `0.90 + 0.16·TAK − 0.20·BTK (+0.20 help)`, wrap range 1.0 + 0.4·TAK yd: missed tackles 39% → 30% at 75 v 75 |
+| AI fourth down | kick in range, otherwise go: in this format a punt scores nothing and the next drive starts from a kickoff, so it equals a turnover on downs |
+
+| NFL result | Before | After |
+|---|---|---|
+| 75 v 75: pts / 4 drives, Y/att, Y/run, missed tackles | 11.7, 8.8, 4.60, 39% | 12.3, 7.8, 3.92, 30% |
+| synthetic 82 / 85 / 90 v 75 (win %) | 85.5 / 95 / 99.5 | 82.5 / 98.5 / 100 |
+| synthetic 99 v 90 / 60 v 75 | 95 / 1 | 98 / 0.5 |
+| **real lineups 90 v 75 / 90 v 82 / 82 v 75 / 75 v 75** (`BAL=1`, 60 games) | 95 / 79 / 80 / 51 | **80 / 82 / 72 / 57** |
+
+NFL references: 2024 per-drive TD rate 23.8%, turnovers 10.7% of drives, ~10.2 drives a game (Sharp Football Analysis); 22.9 points a team game (Pro-Football-Reference), so ~2.2–2.3 points a drive; completions 65.3%, INT 2.17% of attempts (2024, Sharp Football Analysis). Even teams here score 3.1 a drive (arcade four-drive game, as before) with 63% completions and 2.8% INT; penalties and busts make drive outcomes noisier for both sides.
+
+**A person against the AI** (`HUMAN=1` human-pace pilot, real rated lineups; pts / 4 drives, avg O v avg D): Rookie 14.6 → 14.9, Pro 9.5 → 12.8, Legend 9.3 → 8.7; good O v good D 12.1/8.9/4.8 → 12.0/11.6/8.5. Every cell now drops Rookie → Pro → Legend (Pro and Legend were nearly equal before); plays per drive 5.2 → 6.3 with the flags and fourth-down tries.
+
+Sources (second pass): Cleaning the Glass league shooting (cleaningtheglass.com/stats/league/shots); The Ringer on mid-range decline (2021); Sharp Football Analysis per-drive scoring/turnover tables and 2024 completion/INT rates; Pro-Football-Reference season team offense.
 
 ## Feel and animation (render only)
 - `src/game/juice.ts`: trauma² shake on smooth noise, directional kick, zoom punch, hit-stop (dunk 70 ms, block 60, truck 90, INT 50, green 40, posterize 90, big hit 80) through the same accumulator path as slow motion; pooled pixel particles (sweat, sparks, team-colour confetti) on their own PRNG. `juice.test.ts` plays a seeded NBA game and NFL game with and without it on uneven frame times: identical results. Reduced motion: no shake/zoom, hit-stop ≤ 30 ms, few confetti.

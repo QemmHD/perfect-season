@@ -111,8 +111,25 @@ export interface Ball {
 
 export type EndKind = 'tackle' | 'incomplete' | 'td' | 'int' | 'sack' | 'out' | 'fumble';
 
+/**
+ * A flag on the play (Claude 2026-11-01). The offense's holding costs ten yards and the down is
+ * played again; the defense's holding or illegal contact is five yards and a first down; offside is
+ * five yards and the down again; pass interference puts the ball at the spot with a first down.
+ * The side that didn't foul takes the play's result instead when that's better for it.
+ */
+export interface Flag {
+  by: 'O' | 'D';
+  kind: 'holding' | 'def-holding' | 'offside' | 'dpi';
+  /** who it's on (his tag), for the banner */
+  tag: string;
+  /** pass interference: the spot of the foul (yard line) */
+  spot?: number;
+}
+
 export interface PlayEnd {
   kind: EndKind;
+  /** a flag thrown on the play (the drive decides whether it's accepted) */
+  flag?: Flag;
   x: number;
   y: number;
   gain: number;
@@ -172,6 +189,8 @@ export interface Play {
   fire: boolean;
   /** ability pops already reported this play */
   fired?: string[];
+  /** the coverage defender who blew his assignment this play (a seeded roll at the snap), if any */
+  bust?: number;
   /** how the ball was caught (for the drawing only): how far he reached, a high ball, in traffic */
   catchInfo?: { ro: number; high: boolean; contested: boolean };
 }

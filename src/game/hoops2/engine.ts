@@ -401,7 +401,7 @@ export function shotChance(p: Possession, b: Body): number {
     const pp = b.p;
     let pm: number;
     if ((pp.ddk >= 68 && speed > 6 && d < 10.5) || (d < 5.5 && pp.sdk >= 72 && speed < 7))
-      pm = lerp(0.78, 0.97, rate(Math.max(pp.ddk, pp.sdk), 60, 99)) * (contest === 'smothered' ? 0.88 : contest === 'heavy' ? 0.95 : 1);
+      pm = lerp(0.78, 0.97, rate(Math.max(pp.ddk, pp.sdk), 60, 99)) * (contest === 'smothered' ? 0.8 : contest === 'heavy' ? 0.9 : 1);
     else {
       pm = ordinaryReleaseChance(p, b, 'layup', contest);
     }
@@ -451,7 +451,12 @@ export function pressShoot(p: Possession) {
     // a driving dunk with a man in the way takes a real dunker (75+); a lesser one needs an open rim
     if (pp.ddk >= 68 && speed > 6 && d < 11.5 && (!inWay || pp.ddk >= 75)) kind = 'dunk';
     if (kind !== 'layup' && inWay) {
-      const wall = def.p.blk + (def.p.ht - pp.ht) * 3 > pp.ddk + 8;
+      // a man set in the way: an elite dunker goes up through him, an ordinary one lays it in around
+      // him (shot blocking, interior defense, size and bounce against the dunk rating). Before, any
+      // 75 dunker threw it down over an even defender, so 60% of AI rim attempts were 93% dunks.
+      // (a second man in the paint makes it harder still; and it's a read, not a certainty)
+      const helpers = p.bodies.filter((o) => o.side === 'D' && o !== def && p.t >= o.stunUntil && dist(o, RIM) < 8).length;
+      const wall = 0.5 * def.p.blk + 0.5 * def.p.ind + (def.p.ht - pp.ht) * 3 + (def.p.vrt - pp.vrt) / 4 + helpers * 5 + (p.rand() - 0.5) * 12 > pp.ddk - 4;
       kind = has(pp, 'posterizer') ? 'contact' : wall ? 'layup' : kind;
     }
     // from further out he takes a step or two more before he goes up, from about 7 feet
@@ -591,7 +596,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   if (kind === 'oop') blockP *= 0.3;
   // interior defense at the rim: a set big within 3.5 feet blocks more and makes every finish harder
   const anchor = cr < 3.5 && set ? rate(cd.p.ind, 50, 99) : null;
-  if (anchor !== null) blockP = clamp(blockP + (cd.p.ind - 60) / 400, 0, 0.35);
+  if (anchor !== null) blockP = clamp(blockP + (cd.p.ind - 60) / 320, 0, 0.35);
   if (r() < blockP) {
     badgeEvent(p, cd, 'rim-protector');
     act(cd, 'block', p.t);
@@ -613,8 +618,17 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   } else if (kind === 'contact')
     pm = lerp(0.64, 0.91, rate(b.p.ddk, 80, 99)) * (0.8 + 0.2 * badgeMult(b.p, 'posterizer')) * (contest === 'smothered' ? lerp(0.65, 0.9, rate(b.p.str - cd.p.str, -25, 25)) : 1);
   else if (kind === 'oop') pm = lerp(0.82, 0.96, rate(b.p.ddk, 60, 99)) + (has(b.p, 'lob-city') ? 0.06 : 0);
-  else pm = lerp(0.78, 0.97, rate(kind === 'standdunk' ? b.p.sdk : b.p.ddk, 60, 99)) * (contest === 'smothered' ? 0.88 : contest === 'heavy' ? 0.95 : 1);
-  if (anchor !== null && kind !== 'oop') pm *= lerp(1.04, 0.86, anchor);
+  else pm = lerp(0.78, 0.97, rate(kind === 'standdunk' ? b.p.sdk : b.p.ddk, 60, 99)) * (contest === 'smothered' ? 0.8 : contest === 'heavy' ? 0.9 : 1);
+  if (anchor !== null && kind !== 'oop') pm *= lerp(1.06, 0.8, anchor);
+  // a crowded paint: every other set defender within six feet of him makes it harder (a packed
+  // paint against a team that can't shoot is a wall; spacing pays)
+  const crowd = p.bodies.filter((o) => o.side === 'D' && o !== cd && p.t >= o.stunUntil && dist(o, b) < 6).length;
+  // and spacing: the men guarding his teammates who can't shoot are free to sink in and help
+  // (each non-shooter on the floor is part of a man in the paint), so a five that can't shoot finishes
+  // into a crowd and shooters open the lane
+  if (kind !== 'oop') pm *= Math.pow(0.9, crowd + spacingHelp(p, b));
+  // finishing through a hand and a body: strength against strength (Claude 2026-11-01)
+  if ((contest === 'heavy' || contest === 'smothered') && kind !== 'oop' && kind !== 'contact') pm *= clamp(1 + (b.p.str - cd.p.str) / 250, 0.9, 1.1);
   pm = clamp(pm, 0.02, greened && contest === 'open' ? 1 : 0.99);
   const make = r() < pm;
   // an and-one: contact on the way up, more often the stronger he is; then he has to make the free
@@ -1275,7 +1289,9 @@ function defend(p: Possession, b: Body, handler: Body | null, ballAt: Pt, inside
   else {
     const toRim = unit({ cx: RIM.cx - seen.cx, cz: RIM.cz - seen.cz });
     // the cushion: a sagging defense plays off a man who can't shoot and packs the paint
-    const sagOff = p.scheme === 'sag' ? (onBall ? (man.p.thr < 72 ? 2.2 : 0.8) : 2.4) : 0;
+    // (on the ball a sag gives a non-shooter room to shoot, not a run at the rim: it's the help that
+    // packs the paint; a 2.2-foot cushion for him had sent every drive in at full speed)
+    const sagOff = p.scheme === 'sag' ? (onBall ? 0.8 : 2.4) : 0;
     const gap = Math.max(
       1.8,
       (onBall ? lerp(3.7, 2.15, rate(b.p.prd, 40, 99)) - 0.35 * iq : 3.2 + Math.min(2.5, dist(seen, ballAt) * 0.08) - iq - rate(man.p.thr, 65, 99)) + sagOff
@@ -1326,9 +1342,14 @@ function defend(p: Possession, b: Body, handler: Body | null, ballAt: Pt, inside
   } else act(b, 'defend', t);
   b.face = Math.atan2(ballAt.cz - b.cz, ballAt.cx - b.cx);
   // reaching in on the dribble: a thief against a loose handle
-  if ((onBall || trapping) && handler && !p.meter && !p.finish && !p.ball && dist(b, handler) < 2.6) {
-    // (0.13 a second before: reach-in steals ended one possession in six for even teams)
-    const chance = dt * (trapping ? 0.2 : 0.09) * rate(b.p.stl, 30, 99) * (1.15 - rate(handler.p.hnd, 30, 99)) * (1 + 0.6 * iq);
+  // (and the help, digging at a drive into the paint: a driver who barrels into traffic gives it up
+  // sometimes, Claude 2026-11-01)
+  if ((onBall || trapping || helper) && handler && !p.meter && !p.finish && !p.ball && dist(b, handler) < 2.6) {
+    // (0.13 a second before: reach-in steals ended one possession in six for even teams; 0.09 until
+    // the AI started driving, Claude 2026-11-01)
+    // (by steal rating, but not as steeply: a 90 thief against even handles took 1.7x a 75's
+    // steals; NBA teams range about 6.5-9.5 steals per 100 possessions)
+    const chance = dt * (trapping ? 0.17 : helper ? 0.034 : 0.068) * (0.35 + 0.65 * rate(b.p.stl, 30, 99)) * (1.15 - rate(handler.p.hnd, 30, 99)) * (1 + 0.6 * iq);
     if (r() < chance) end(p, 'steal', 0, 'STRIPPED BY ' + b.p.tag, handler.idx);
   }
 }
@@ -1352,20 +1373,34 @@ function switchMarks(p: Possession) {
     }
 }
 
+/** How much help the defense can spare because his teammates can't shoot (0 for shooters, about
+ * 0.4 a man for a 57-or-worse shooter, smooth between). */
+export function spacingHelp(p: Possession, b: Body): number {
+  let n = 0;
+  for (const o of p.bodies) if (o.side === 'O' && o !== b) n += clamp((72 - o.p.thr) / 15, 0, 1) * 0.4;
+  return n;
+}
+
 /** Who steps over to help on a drive: the nearest defender off the ball, shot blockers first. */
 function helpDefender(p: Possession, h: Body): Body | null {
   let best: Body | null = null;
   let score = 99;
   for (const d of p.bodies) {
     if (d.side !== 'D' || d.mark === h.idx || p.t < d.stunUntil || d.idx === p.trapper) continue;
-    const s = dist(d, h) - rate(d.p.blk, 40, 99) * 5;
+    // (a shot blocker is the first choice, but only from as far as anyone comes: help from further
+    // off for a better blocker left shooters open and made more BLK concede more. Spacing: the man
+    // guarding a non-shooter helps from further, and first; a sniper's man stays home. Claude
+    // 2026-11-01: once the AI attacked the rim, a five of 60 shooters outscored average ones.)
+    const leave = 1 - rate(p.bodies[d.mark]?.p.thr ?? 75, 55, 95);
+    if (dist(d, h) >= 9 + 2 * p.defIQ + 7 * leave) continue;
+    const s = dist(d, h) - rate(d.p.blk, 40, 99) * 5 - leave * 6;
     if (s < score) {
       score = s;
       best = d;
     }
   }
   // a smarter defense comes over from further
-  return score < 12 + 2 * p.defIQ ? best : null;
+  return best;
 }
 
 function nearestDrift(b: Body): Pt {

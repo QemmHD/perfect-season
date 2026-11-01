@@ -42,10 +42,10 @@ const mk = (pos: string, base = 75, o: Partial<Hooper> = {}): Hooper => ({
   ...o
 });
 
-/** Points per possession for five with `o` against an even 75 defense, fixed seeds, the Pro AI. */
-function ppp(o: Partial<Hooper>, games = 14): number {
+/** Points per possession for five with `o` against an even 75 defense (with `d`), fixed seeds, the Pro AI. */
+function ppp(o: Partial<Hooper>, games = 60, d: Partial<Hooper> = {}): number {
   const O = SP.map((s) => mk(s, 75, o));
-  const D = SP.map((s) => mk(s));
+  const D = SP.map((s) => mk(s, 75, d));
   let pts = 0,
     poss = 0;
   for (let i = 0; i < games; i++) {
@@ -82,10 +82,78 @@ describe('NBA: better offensive ratings never score less', () => {
   }, 120000);
   it('is monotone across the other offensive attributes (90 never clearly below 75)', () => {
     const base = ppp({});
-    for (const k of ['hnd', 'pas', 'lay', 'ddk', 'spd', 'acc', 'str', 'ft'] as const) {
+    for (const k of ['hnd', 'pas', 'lay', 'ddk', 'spd', 'acc', 'str', 'ft', 'cls', 'sdk'] as const) {
       const v = ppp({ [k]: 90 });
       expect(v, k).toBeGreaterThan(base - 0.06);
     }
+  }, 300000);
+});
+
+describe('NBA: better defensive ratings never concede more', () => {
+  // Claude, 2026-11-01 (second pass): with the AI attacking the rim, interior defense, strength and
+  // the rest show; raising any one of them on all five never raises the offense's PPP (beyond the
+  // noise of 60 fixed-seed games), and the sum of them clearly lowers it.
+  it('raising any defensive attribute to 90 never raises the opponent’s PPP', () => {
+    const base = ppp({});
+    for (const k of ['prd', 'ind', 'blk', 'stl', 'str', 'spd', 'acc', 'reb', 'vrt'] as const) {
+      const v = ppp({}, 60, { [k]: 90 });
+      expect(v, k).toBeLessThan(base + 0.05);
+    }
+    const all = ppp({}, 60, { prd: 90, ind: 90, blk: 90, stl: 90, str: 90, spd: 90, acc: 90, reb: 90, vrt: 90 });
+    expect(all).toBeLessThan(base - 0.15);
+  }, 600000);
+});
+
+describe('NBA shot selection (the AI attacks the rim with finishers, shoots with shooters)', () => {
+  // the shot mix of a five, Pro AI against an even 75 defense
+  function mix(o: Partial<Hooper>, games = 40) {
+    const O = SP.map((s) => mk(s, 75, o));
+    const D = SP.map((s) => mk(s));
+    const c = { rim: 0, three: 0, jump: 0, ppp: 0, poss: 0, and1: 0 };
+    for (let i = 0; i < games; i++) {
+      const g = newHoopsGame(O, D, 'mix' + i);
+      const pl = pilot(0.68, 'mx' + i);
+      while (!g.over) {
+        const p = startPossession(g);
+        pl.letGo = null;
+        pl.driving = false;
+        pl.goal = null;
+        pl.nextThink = 0;
+        pl.crosses = 0;
+        for (let k = 0; k < 60 * 40 && !p.end; k++) {
+          step(p, 1 / 60, decide(p, pl));
+          p.events.length = 0;
+        }
+        if (!p.end) p.end = { kind: 'clock', points: 0, text: '', who: -1 };
+        const k = p.lastShot?.kind;
+        if (k === 'three') c.three++;
+        else if (k === 'mid' || k === 'close') c.jump++;
+        else if (k) c.rim++;
+        if (p.lastShot?.and1) c.and1++;
+        afterPossession(g, p);
+        c.poss++;
+      }
+      c.ppp += g.score;
+    }
+    const shots = c.rim + c.three + c.jump;
+    return { rim: c.rim / shots, three: c.three / shots, ppp: c.ppp / c.poss, and1: c.and1 };
+  }
+  it('even teams take a real mix (not ~85% contested threes) and score 1.0-1.15 a trip', () => {
+    const m = mix({});
+    expect(m.rim).toBeGreaterThan(0.25);
+    expect(m.three).toBeGreaterThan(0.25);
+    expect(m.three).toBeLessThan(0.6);
+    expect(m.ppp).toBeGreaterThan(0.95);
+    expect(m.ppp).toBeLessThan(1.18);
+  }, 300000);
+  it('elite slashers attack the rim more and score more; elite shooters shoot more threes', () => {
+    const base = mix({});
+    const slash = mix({ ddk: 92, lay: 92, spd: 88, acc: 88, hnd: 88 });
+    const shoot = mix({ thr: 92, mid: 90 });
+    expect(slash.rim, 'slashers at the rim').toBeGreaterThan(base.rim + 0.1);
+    expect(slash.ppp, 'slashers score').toBeGreaterThan(base.ppp + 0.1);
+    expect(shoot.three, 'shooters shoot').toBeGreaterThan(base.three + 0.15);
+    expect(shoot.ppp, 'shooters score').toBeGreaterThan(base.ppp);
   }, 300000);
 });
 
