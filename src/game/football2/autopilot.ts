@@ -151,7 +151,9 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
         const moves = (['juke', 'spin', 'stiff', 'truck'] as Move[]).map((k) => [k, moveEdge(k, c, w) + timing[k] * (0.4 + 0.5 * pl.skill)] as [Move, number]);
         moves.sort((x, y) => y[1] - x[1]);
         const kind = moves[0][0];
-        const due = w.windAt + windupOf(w) + (kind === 'stiff' || kind === 'truck' ? 0.15 : -0.08);
+        // a juke just before he leaves his feet; a stiff arm or a truck as he leaves them, so it's
+        // still on when he arrives (it lasts half a second; 0.15 s after the dive was often too late)
+        const due = w.windAt + windupOf(w) + (kind === 'stiff' || kind === 'truck' ? -0.02 : -0.08);
         pl.plan = { at: due + gauss(pl.rand) * (0.26 - 0.2 * pl.skill), kind, dir: Math.sign(c.x - w.x) || Math.sign(best - c.x) || 1 };
       }
     }

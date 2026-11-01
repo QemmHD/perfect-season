@@ -745,7 +745,8 @@ export function step(p: Play, dt: number, steer: RunInput) {
       } else {
         const len = landmark ? Math.max(0.1, dist(b, landmark)) : 1;
         const wantX = landmark ? ((landmark.x - b.x) / len) * sp : aim === null ? 0 : clamp((aim - b.x) * 2.2, -sp * 0.65, sp * 0.65);
-        const wantY = (landmark ? Math.max(0, ((landmark.y - b.y) / len) * sp) : Math.sqrt(Math.max(0, sp * sp - wantX * wantX))) * (m ? 0.8 : 1);
+        // (a truck drives straight on through the man; the other moves give up a little speed)
+        const wantY = (landmark ? Math.max(0, ((landmark.y - b.y) / len) * sp) : Math.sqrt(Math.max(0, sp * sp - wantX * wantX))) * (m && m.kind !== 'truck' ? 0.8 : 1);
         const turn = lerp(11, 21, rt(b.p.a.AGI, 40, 99)) * dt;
         const acceleration = lerp(8, 15, rt(b.p.a.ACC, 40, 99)) * dt;
         b.vx += clamp(wantX - b.vx, -turn, turn);
