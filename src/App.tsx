@@ -32,7 +32,7 @@ import { Draft, type OnlineProps } from './ui/Draft';
 import { type LbStatus, NameSheet, openBoardNext, openOnlineNext } from './ui/Leaderboard';
 import { type Gift, watchGifts } from './net/gifts';
 import { AdminSheet, giftText, withGift } from './ui/Admin';
-import { BoostersPage, DailyPage, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, showGlobalRanks, type Tab, Tabs } from './ui/Pages';
+import { GauntletSheet, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, showGlobalRanks, type Tab, Tabs } from './ui/Pages';
 import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
 import { type Room, Search } from './ui/Search';
@@ -172,7 +172,7 @@ export function App() {
   const [utReq, setUtReq] = useState<UtMatchRequest | null>(null);
   /** the run whose head-to-head game has been watched */
   const [watched, setWatched] = useState<number | null>(null);
-  const [modal, setModal] = useState<'settings' | 'admin' | 'admingift' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | 'replace' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'admin' | 'admingift' | 'howto' | 'name' | 'missions' | 'reward' | 'binder' | 'fav' | 'gift' | 'replace' | 'gauntlet' | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number; out: boolean } | null>(null);
   const toastT = useRef<number[]>([]);
   const toastN = useRef(0);
@@ -841,28 +841,25 @@ export function App() {
   // ---------- screens ----------
 
   let page: React.ReactNode;
-  if (tab === 'daily') page = <DailyPage profile={profile} dailyNo={dailyNo} dailyKey={todayKey} onPlay={() => startRun('daily')} />;
-  else if (tab === 'ranks') page = <RanksPage profile={profile} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setModal('name'))} />;
-  else if (tab === 'boosters')
-    page = (
-      <BoostersPage
-        profile={profile}
-        onBuy={(b) => {
-          if (!spend(BOOSTER_PRICES[b])) {
-            showToast('Not enough coins yet. Each draft earns 20 to 100.');
-            sfx.nope();
-            return;
-          }
-          sfx.coin();
-          update((p) => ({ ...p, inventory: { ...p.inventory, [b]: p.inventory[b] + 1 } }));
-          showToast('Bought 1.');
-        }}
-      />
-    );
+  // Claude (UI reorganisation): Boosters moved into Profile, the Daily onto Home's Daily tile.
+  const buyBooster = (b: Booster) => {
+    if (!spend(BOOSTER_PRICES[b])) {
+      showToast('Not enough coins yet. Each draft earns 20 to 100.');
+      sfx.nope();
+      return;
+    }
+    sfx.coin();
+    update((p) => ({ ...p, inventory: { ...p.inventory, [b]: p.inventory[b] + 1 } }));
+    showToast('Bought 1.');
+  };
+  const openUltimate = () => (sfx.click(), setScreen('ut'));
+  if (tab === 'ranks') page = <RanksPage profile={profile} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setModal('name'))} />;
   else if (tab === 'profile')
     page = (
       <ProfilePage
         profile={profile}
+        onBuy={buyBooster}
+        onUltimate={openUltimate}
         onName={NET_ON ? () => (sfx.click(), setModal('name')) : undefined}
         onBinder={() => (sfx.click(), setModal('binder'))}
         onFavs={() => {
@@ -908,7 +905,8 @@ export function App() {
           showToast(c > 1 ? c + ' days in a row. Come back tomorrow for a ' + rewardFor(c + 1).coins + '-coin chest.' : 'Open the app every day: the daily chest grows for 7 days.');
         }}
         onSport={goSport}
-        onUltimate={() => (sfx.click(), setScreen('ut'))}
+        onGauntlet={() => (sfx.click(), setModal('gauntlet'))}
+        dailyResult={profile.daily && profile.daily.key === todayKey ? profile.daily.record : null}
       />
     );
 
@@ -1158,7 +1156,7 @@ export function App() {
             {page}
           </Transition>
         </div>
-        <Tabs tab={tab} onTab={goTab} />
+        <Tabs tab={tab} onTab={goTab} onUltimate={openUltimate} utNew={!profile.ut.starterClaimed} />
       </div>
     );
   }
@@ -1233,6 +1231,9 @@ export function App() {
             showToast('Your name is now ' + name + '.');
           }}
         />
+      )}
+      {modal === 'gauntlet' && (
+        <GauntletSheet teams={ladder.map((t) => t.year + ' ' + t.team)} best={gauntletBest} coins={RUNG_COINS} clear={CLEAR_COINS} onClose={() => setModal(null)} />
       )}
       {modal === 'missions' && <MissionsSheet profile={profile} day={todayKey} onClaim={claimMission} onClose={() => setModal(null)} />}
       {modal === 'gift' && (
