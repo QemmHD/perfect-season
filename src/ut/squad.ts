@@ -112,13 +112,16 @@ export const NFL_LINKS: [string, string][] = [
  */
 export const FORMATIONS = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2'] as const;
 export type Formation = (typeof FORMATIONS)[number];
-const back4 = [s('LB', 'FB', 12, 70, 'start', 1), s('LCB', 'CB', 37, 76, 'start', 1), s('RCB', 'CB', 63, 76, 'start', 1), s('RB', 'FB', 88, 70, 'start', 1)];
+const back4 = [s('LB', 'FB', 12, 70, 'start', 1), s('LCB', 'CB', 33, 76, 'start', 1), s('RCB', 'CB', 67, 76, 'start', 1), s('RB', 'FB', 88, 70, 'start', 1)];
 const gk = s('GK', 'GK', 50, 93, 'start', 1);
+// Claude, final QA 2026-11-01 (display only): the centre backs stand a little wider and 3-5-2's middle
+// CB/CDM a little higher. Straight above the keeper at 78%, 3-5-2's CB hid the GK's rating on every
+// phone; on a 320px phone the back four's cards and tags covered the keeper's top too.
 export const SOCCER_FORMATIONS: Record<Formation, SlotDef[]> = {
   '4-3-3': [gk, ...back4, s('LCM', 'CM', 26, 47, 'start', 1), s('CDM', 'DM', 50, 55, 'start', 1), s('RCM', 'CM', 74, 47, 'start', 1), s('LW', 'W', 14, 21, 'start', 1), s('ST', 'ST', 50, 13, 'start', 1), s('RW', 'W', 86, 21, 'start', 1)],
   '4-4-2': [gk, ...back4, s('LM', 'W', 11, 43, 'start', 1), s('LCM', 'CM', 37, 49, 'start', 1), s('RCM', 'CM', 63, 49, 'start', 1), s('RM', 'W', 89, 43, 'start', 1), s('LST', 'ST', 36, 15, 'start', 1), s('RST', 'ST', 64, 15, 'start', 1)],
-  '4-2-3-1': [gk, ...back4, s('LDM', 'DM', 36, 54, 'start', 1), s('RDM', 'DM', 64, 54, 'start', 1), s('LW', 'W', 13, 31, 'start', 1), s('CAM', 'AM', 50, 34, 'start', 1), s('RW', 'W', 87, 31, 'start', 1), s('ST', 'ST', 50, 11, 'start', 1)],
-  '3-5-2': [gk, s('LCB', 'CB', 24, 75, 'start', 1), s('CB', 'CB', 50, 78, 'start', 1), s('RCB', 'CB', 76, 75, 'start', 1), s('LWB', 'FB', 10, 46, 'start', 1), s('LCM', 'CM', 31, 47, 'start', 1), s('CDM', 'DM', 50, 56, 'start', 1), s('RCM', 'CM', 69, 47, 'start', 1), s('RWB', 'FB', 90, 46, 'start', 1), s('LST', 'ST', 36, 15, 'start', 1), s('RST', 'ST', 64, 15, 'start', 1)],
+  '4-2-3-1': [gk, ...back4, s('LDM', 'DM', 34, 54, 'start', 1), s('RDM', 'DM', 66, 54, 'start', 1), s('LW', 'W', 13, 31, 'start', 1), s('CAM', 'AM', 50, 34, 'start', 1), s('RW', 'W', 87, 31, 'start', 1), s('ST', 'ST', 50, 11, 'start', 1)],
+  '3-5-2': [gk, s('LCB', 'CB', 24, 75, 'start', 1), s('CB', 'CB', 50, 72, 'start', 1), s('RCB', 'CB', 76, 75, 'start', 1), s('LWB', 'FB', 10, 46, 'start', 1), s('LCM', 'CM', 31, 47, 'start', 1), s('CDM', 'DM', 50, 50, 'start', 1), s('RCM', 'CM', 69, 47, 'start', 1), s('RWB', 'FB', 90, 46, 'start', 1), s('LST', 'ST', 36, 15, 'start', 1), s('RST', 'ST', 64, 15, 'start', 1)],
 };
 /** Neighbours in each formation: the keeper and his back line, the lines up the pitch and across. */
 export const SOCCER_LINKS: Record<Formation, [string, string][]> = {
