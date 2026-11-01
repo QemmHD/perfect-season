@@ -1,6 +1,14 @@
 import { progressChanged } from './save-events';
 import { DATA_V } from '../engine/version';
-import { SPORT } from '../engine/sport';
+import { SPORT, type SportId } from '../engine/sport';
+
+/** Each sport's draft spots and season length, for checking a saved run (Claude 2026-11-01: soccer). */
+const CHECKPOINT_SLOTS: Record<SportId, string[]> = {
+  nba: ['PG', 'SG', 'SF', 'PF', 'C'],
+  nfl: ['QB', 'RB', 'WR', 'TE', 'FLEX', 'DL', 'LB', 'DB'],
+  soccer: ['GK', 'CB', 'FB', 'DM', 'AM', 'W', 'ST', 'FLEX'],
+};
+const SEASON_GAMES: Record<SportId, number> = { nba: 82, nfl: 17, soccer: 38 };
 import { getPublicKey } from 'nostr-tools/pure';
 
 export const SAVE_WARNING = 'ps:save-warning';
@@ -19,10 +27,7 @@ export interface Checkpoint<T> {
   run: T;
 }
 function checkpointShape(c: any, sport: string): boolean {
-  const slots =
-    sport === 'nfl'
-      ? ['QB', 'RB', 'WR', 'TE', 'FLEX', 'DL', 'LB', 'DB']
-      : ['PG', 'SG', 'SF', 'PF', 'C'];
+  const slots = CHECKPOINT_SLOTS[sport as SportId] ?? CHECKPOINT_SLOTS.nba;
   const r = c?.run,
     d = r?.draft;
   if (
@@ -62,7 +67,7 @@ function checkpointShape(c: any, sport: string): boolean {
     c.screen !== 'draft' &&
     (!r.season ||
       !Array.isArray(r.season.seq) ||
-      r.season.seq.length !== (sport === 'nfl' ? 17 : 82) ||
+      r.season.seq.length !== (SEASON_GAMES[sport as SportId] ?? 82) ||
       !Number.isFinite(r.season.wins))
   )
     return false;
@@ -70,6 +75,8 @@ function checkpointShape(c: any, sport: string): boolean {
     c.screen === 'playoffs' &&
     (!Array.isArray(r.bracket) ||
       r.bracket.length !== 4 ||
+      // soccer's bracket is one game a round
+      (sport === 'soccer' && !r.bracket.every((s: any) => s && Array.isArray(s.games) && s.games.length <= 1)) ||
       !r.bracket.every(
         (s: any) =>
           s && s.opp && typeof s.opp.team === 'string' && Array.isArray(s.games)
@@ -129,7 +136,19 @@ export const RECOVERY_KEYS = [
   'perfect-season:checkpoint:nfl',
   'perfect-season:training:nba',
   'perfect-season:training:nfl',
+  // Claude 2026-11-01: soccer's, after the original keys (whose order older code relies on)
+  'perfect-season:profile:soccer:v1',
+  'perfect-season:checkpoint:soccer',
+  'perfect-season:training:soccer',
 ];
+/** The three sports' profiles (basketball's holds the shared part). */
+export const PROFILE_STORAGE_KEYS = ['perfect-season:profile:v1', 'perfect-season:profile:nfl:v1', 'perfect-season:profile:soccer:v1'];
+/**
+ * Keys an older build's save never has: a save without them says nothing about them (they are
+ * neither required nor cleared on restore), and a save leaves them out while they are empty, so a
+ * save from a player who never played soccer stays exactly what older builds write and read.
+ */
+export const OPTIONAL_KEYS = ['perfect-season:profile:soccer:v1', 'perfect-season:checkpoint:soccer', 'perfect-season:training:soccer'];
 const enc = new TextEncoder();
 const b64 = (b: Uint8Array) =>
   btoa(Array.from(b, (n) => String.fromCharCode(n)).join(''));
@@ -162,7 +181,7 @@ export async function createBackup(password: string): Promise<string> {
     RECOVERY_KEYS.map((k) => [k, localStorage.getItem(k)])
   );
   // A backup is progress recovery, never a replay of a live online session.
-  for (const k of RECOVERY_KEYS.slice(0, 2)) {
+  for (const k of PROFILE_STORAGE_KEYS) {
     if (values[k]) {
       const p = JSON.parse(values[k]!);
       p.activeMatch = null;
@@ -220,12 +239,13 @@ export function validateSaveValues(data: Record<string, string | null>, at: numb
     !data ||
     typeof data !== 'object' ||
     Object.keys(data).some((k) => !RECOVERY_KEYS.includes(k)) ||
-    RECOVERY_KEYS.some((k) => data[k] !== null && typeof data[k] !== 'string')
+    RECOVERY_KEYS.some((k) => (data[k] === undefined ? !OPTIONAL_KEYS.includes(k) : data[k] !== null && typeof data[k] !== 'string'))
   )
     throw new Error('The backup is incomplete or invalid.');
   const nba = JSON.parse(data[RECOVERY_KEYS[0]] ?? 'null'),
-    nfl = JSON.parse(data[RECOVERY_KEYS[1]] ?? 'null');
-  for (const p of [nba, nfl])
+    nfl = JSON.parse(data[RECOVERY_KEYS[1]] ?? 'null'),
+    soccer = JSON.parse(data['perfect-season:profile:soccer:v1'] ?? 'null');
+  for (const p of [nba, nfl, soccer])
     if (
       p &&
       (p.v !== 1 ||
@@ -237,7 +257,7 @@ export function validateSaveValues(data: Record<string, string | null>, at: numb
     )
       throw new Error('The saved progress is invalid.');
   if (!nba) throw new Error('This backup has no player profile.');
-  for (const sport of ['nba', 'nfl']) {
+  for (const sport of ['nba', 'nfl', 'soccer']) {
     const raw = data['perfect-season:checkpoint:' + sport];
     if (raw && !checkpointShape(JSON.parse(raw), sport))
       throw new Error('The unfinished run in this backup is invalid.');
@@ -262,7 +282,7 @@ export function validateSaveValues(data: Record<string, string | null>, at: numb
     values: data,
     name: nba.name ?? 'Player',
     coins: nba.coins,
-    cards: (nba.ut?.owned.length ?? 0) + (nfl?.ut?.owned.length ?? 0),
+    cards: (nba.ut?.owned.length ?? 0) + (nfl?.ut?.owned.length ?? 0) + (soccer?.ut?.owned.length ?? 0),
     at,
   };
 }
@@ -272,6 +292,8 @@ export function restoreBackup(preview: BackupPreview) {
   try {
     for (const k of RECOVERY_KEYS) {
       const v = preview.values[k];
+      // a save without soccer's keys (an older build's) leaves this phone's soccer progress alone
+      if (v === undefined) continue;
       v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v);
     }
   } catch {

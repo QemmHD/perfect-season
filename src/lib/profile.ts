@@ -1,6 +1,6 @@
 import { progressChanged } from './save-events';
 import { saveWarning } from './recovery';
-import { NFL } from '../engine/sport';
+import { SPORT, SPORTS, type SportId } from '../engine/sport';
 import type { Booster, BotLevel, Mode, Slot } from '../engine/types';
 import type { EntryContent } from '../net/leaderboard';
 import { freshUt, migrateUt, type UtState } from '../ut/state';
@@ -109,6 +109,12 @@ export function newId(): string {
 const KEY = 'perfect-season:profile:v1';
 /** Football's own part: its drafts, records, boards, missions and matches. */
 const NFL_KEY = 'perfect-season:profile:nfl:v1';
+/** Soccer's own part (Claude 2026-11-01), like football's: additive, nothing else moves. */
+const SOCCER_KEY = 'perfect-season:profile:soccer:v1';
+/** Each sport's own profile key. Basketball's also holds the shared part. */
+export const PROFILE_KEYS: Record<SportId, string> = { nba: KEY, nfl: NFL_KEY, soccer: SOCCER_KEY };
+/** The sports this page doesn't play. */
+export const OTHER_SPORTS: SportId[] = SPORTS.filter((s) => s !== SPORT);
 /** One player across both sports: the same name, wallet, level, boosters, settings and daily chest. */
 const SHARED = ['coins', 'xp', 'inventory', 'settings', 'name', 'streak', 'rewardDay', 'botLevel', 'gifts'] as const;
 
@@ -173,9 +179,9 @@ function pick(p: Profile, keys: readonly string[], keep: boolean): Partial<Profi
 }
 
 export function loadProfile(): Profile {
-  if (!NFL) return loadFrom(read(KEY));
-  // football: its own part, with the shared part from the basketball profile
-  const own = read(NFL_KEY);
+  if (SPORT === 'nba') return loadFrom(read(KEY));
+  // football and soccer: its own part, with the shared part from the basketball profile
+  const own = read(PROFILE_KEYS[SPORT]);
   const shared = read(KEY);
   const merged = { ...(own ?? freshProfile()), ...(shared ? pick(shared, SHARED, true) : {}), v: 1 } as Profile;
   return loadFrom(own || shared ? merged : null);
@@ -205,7 +211,7 @@ function loadFrom(p: Profile | null): Profile {
 
 export function saveProfile(p: Profile): boolean {
   try {
-    if (!NFL) {
+    if (SPORT === 'nba') {
       localStorage.setItem(KEY, JSON.stringify(p));
       progressChanged();
       return true;
@@ -213,7 +219,7 @@ export function saveProfile(p: Profile): boolean {
     // the shared part goes back into the basketball profile, without touching basketball's own
     const base = read(KEY) ?? freshProfile();
     localStorage.setItem(KEY, JSON.stringify({ ...base, ...pick(p, SHARED, true) }));
-    localStorage.setItem(NFL_KEY, JSON.stringify({ ...pick(p, SHARED, false), v: 1 }));
+    localStorage.setItem(PROFILE_KEYS[SPORT], JSON.stringify({ ...pick(p, SHARED, false), v: 1 }));
     progressChanged();
     return true;
   } catch {
@@ -223,41 +229,52 @@ export function saveProfile(p: Profile): boolean {
 }
 
 /**
- * Reset the other sport's progress too (Settings → Reset progress erases both). Its name,
- * leaderboard entries and head-to-head record stay, like this sport's: those are public.
+ * Reset the other sports' progress too (Settings → Reset progress erases every sport). Their names,
+ * leaderboard entries and head-to-head records stay, like this sport's: those are public.
  */
 export function resetOtherSport(): void {
-  try {
-    const key = NFL ? KEY : NFL_KEY;
-    const other = read(key);
-    if (!other) return;
-    const kept: Partial<Profile> = { lb: other.lb, h2h: other.h2h };
-    const fresh = freshProfile();
-    // basketball's profile also carries the shared part, which this sport has just reset itself
-    const next = NFL ? { ...fresh, ...pick(other, SHARED, true), ...kept } : { ...pick(fresh, SHARED, false), ...kept, v: 1 };
-    localStorage.setItem(key, JSON.stringify(next));
-    progressChanged();
-  } catch {
-    // storage blocked
+  for (const sport of OTHER_SPORTS) {
+    try {
+      const key = PROFILE_KEYS[sport];
+      const other = read(key);
+      if (!other) continue;
+      const kept: Partial<Profile> = { lb: other.lb, h2h: other.h2h };
+      const fresh = freshProfile();
+      // basketball's profile also carries the shared part, which this sport has just reset itself
+      const holdsShared = sport === 'nba';
+      const next = holdsShared ? { ...fresh, ...pick(other, SHARED, true), ...kept } : { ...pick(fresh, SHARED, false), ...kept, v: 1 };
+      localStorage.setItem(key, JSON.stringify(next));
+      progressChanged();
+    } catch {
+      // storage blocked
+    }
   }
 }
 
 /**
- * The other sport's leaderboard entries. Its queued results and name changes go out from either
+ * The other sports' leaderboard entries. Their queued results and name changes go out from any
  * sport, so they don't wait (and expire) until that sport is opened again.
  */
-export function readOtherLb(): Profile['lb'] | null {
-  const other = read(NFL ? KEY : NFL_KEY);
-  return other ? loadFrom(other).lb : null;
+export function readOtherLbs(): { sport: SportId; lb: Profile['lb'] }[] {
+  const out: { sport: SportId; lb: Profile['lb'] }[] = [];
+  for (const sport of OTHER_SPORTS) {
+    const other = read(PROFILE_KEYS[sport]);
+    if (other) out.push({ sport, lb: loadFrom(other).lb });
+  }
+  return out;
 }
 
-export function updateOtherLb(fn: (lb: Profile['lb']) => Profile['lb']): void {
-  try {
-    const key = NFL ? KEY : NFL_KEY;
-    const other = read(key);
-    if (other) localStorage.setItem(key, JSON.stringify({ ...other, lb: fn(loadFrom(other).lb) }));
-  } catch {
-    // storage blocked
+/** Change the other sports' leaderboard entries (or one sport's, `only`). */
+export function updateOtherLb(fn: (lb: Profile['lb']) => Profile['lb'], only?: SportId): void {
+  for (const sport of OTHER_SPORTS) {
+    if (only && sport !== only) continue;
+    try {
+      const key = PROFILE_KEYS[sport];
+      const other = read(key);
+      if (other) localStorage.setItem(key, JSON.stringify({ ...other, lb: fn(loadFrom(other).lb) }));
+    } catch {
+      // storage blocked
+    }
   }
 }
 

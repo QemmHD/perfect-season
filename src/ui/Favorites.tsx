@@ -2,19 +2,26 @@
 // first launch (Welcome), once on the home screen for players who don't have them yet, and
 // changeable from Profile. Your players wear your team's colors in head to head.
 import React, { useState } from 'react';
-import { type TeamInfo, teamOf, teamsOf } from '../data/teams';
-import { SPORT, type SportId } from '../engine/sport';
+import { SOCCER_TEAMS, type TeamInfo, teamOf, teamsOf } from '../data/teams';
+import { pickFor, SOCCER_ON, SPORT, type SportId } from '../engine/sport';
 import { type Favorites, markFavoritesAsked, saveFavorites, useFavorites } from '../lib/favorites';
 import { sfx, vibrate } from '../lib/sound';
 import { hex, onColor, rgb } from '../game/pixel/color';
 import { Sheet } from './common';
-import { Football, Hoop } from './icons';
+import { Football, Hoop, SoccerBall } from './icons';
 import './favorites.css';
 
-const SPORT_NAME: Record<SportId, string> = { nba: 'NBA', nfl: 'NFL' };
+const SPORT_NAME: Record<SportId, string> = { nba: 'NBA', nfl: 'NFL', soccer: 'soccer' };
+/** Claude 2026-11-01: a favorite for each sport (soccer's club where the build has soccer) */
+const FAV_SPORTS: SportId[] = SOCCER_ON ? ['nba', 'nfl', 'soccer'] : ['nba', 'nfl'];
 
 /** "Golden State Warriors" → "Warriors", "Portland Trail Blazers" → "Blazers" */
 export function nickname(t: TeamInfo): string {
+  if (SOCCER_TEAMS.includes(t)) {
+    // a soccer club by its short name: "FC Barcelona" → "Barcelona", "Manchester United" → "United"
+    const name = t.name.replace(/^(FC|AC|SC) /, '');
+    return (name.length > 11 ? name.split(' ').pop() : name) ?? t.abbr;
+  }
   return t.name.split(' ').pop() ?? t.abbr;
 }
 
@@ -52,23 +59,23 @@ export function TeamGrid({ sport, value, onPick }: { sport: SportId; value: stri
 
 /** Both picks: a tab per sport, the grid, and the pick's full name. Picking one moves on to the other sport if it's still open. */
 export function FavPicker({ value, onChange }: { value: Favorites; onChange: (f: Favorites) => void }) {
-  const other: SportId = SPORT === 'nba' ? 'nfl' : 'nba';
-  const [tab, setTab] = useState<SportId>(() => (value[SPORT] || !value[other] ? SPORT : other));
+  const open = FAV_SPORTS.find((s) => s !== SPORT && !value[s]);
+  const [tab, setTab] = useState<SportId>(() => (value[SPORT] || !open ? SPORT : open));
   const pick = (abbr: string) => {
     sfx.select();
     vibrate(8);
     const next = { ...value, [tab]: abbr };
     onChange(next);
-    const rest: SportId = tab === 'nba' ? 'nfl' : 'nba';
-    if (!next[rest]) window.setTimeout(() => setTab(rest), 380);
+    const rest = FAV_SPORTS.find((s) => s !== tab && !next[s]);
+    if (rest) window.setTimeout(() => setTab(rest), 380);
   };
   const cur = teamOf(tab, value[tab]);
   return (
     <div className="favpick">
-      <div className="fav-tabs" role="tablist" aria-label="Sport">
-        {(['nba', 'nfl'] as SportId[]).map((s) => (
+      <div className={'fav-tabs' + (FAV_SPORTS.length === 3 ? ' three' : '')} role="tablist" aria-label="Sport">
+        {FAV_SPORTS.map((s) => (
           <button type="button" key={s} role="tab" aria-selected={tab === s} className={tab === s ? 'on' : ''} onClick={() => (sfx.click(), setTab(s))}>
-            {s === 'nba' ? <Hoop size={15} /> : <Football size={15} />}
+            {pickFor(s, { nba: <Hoop size={15} />, nfl: <Football size={15} />, soccer: <SoccerBall size={15} /> })}
             <span>{SPORT_NAME[s]}</span>
             <TeamBadge sport={s} abbr={value[s]} />
           </button>
@@ -86,7 +93,7 @@ export function FavPicker({ value, onChange }: { value: Favorites; onChange: (f:
 export function FavSheet({ onClose, first = false }: { onClose: () => void; first?: boolean }) {
   const saved = useFavorites();
   const [f, setF] = useState<Favorites>(saved);
-  const any = !!(f.nba || f.nfl);
+  const any = !!(f.nba || f.nfl || f.soccer);
   return (
     <Sheet
       label="Favorite teams"
@@ -127,16 +134,17 @@ export function FavSheet({ onClose, first = false }: { onClose: () => void; firs
 /** Profile: your two teams, tap to change. */
 export function FavoritesCard({ onEdit }: { onEdit: () => void }) {
   const f = useFavorites();
-  const names = (['nba', 'nfl'] as SportId[]).map((s) => teamOf(s, f[s]));
+  const names = FAV_SPORTS.map((s) => teamOf(s, f[s]));
   return (
     <button className="fav-card rise-in" onClick={onEdit} aria-label={'Favorite teams: ' + names.map((t) => t?.name ?? 'none').join(' and ') + '. Change'}>
       <span className="fav-pair" aria-hidden="true">
-        <TeamBadge sport="nba" abbr={f.nba} />
-        <TeamBadge sport="nfl" abbr={f.nfl} />
+        {FAV_SPORTS.map((s) => (
+          <TeamBadge key={s} sport={s} abbr={f[s]} />
+        ))}
       </span>
       <span className="txt">
         <b className="disp">FAVORITE TEAMS</b>
-        <small>{names.every((t) => !t) ? 'Pick your NBA and NFL teams' : names.map((t, i) => (t ? nickname(t) : 'no ' + (i ? 'NFL' : 'NBA') + ' team')).join(' · ')}</small>
+        <small>{names.every((t) => !t) ? 'Pick your teams' : names.map((t, i) => (t ? nickname(t) : 'no ' + SPORT_NAME[FAV_SPORTS[i]] + ' team')).join(' · ')}</small>
       </span>
       <span className="chip">CHANGE</span>
     </button>

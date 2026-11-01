@@ -32,7 +32,7 @@ afterEach(() => {
 describe('favorite teams', () => {
   it('starts with none and asks', () => {
     g.localStorage = fakeStorage();
-    expect(reloadFavorites()).toEqual({ nba: null, nfl: null });
+    expect(reloadFavorites()).toEqual({ nba: null, nfl: null, soccer: null });
     expect(shouldAskFavorites()).toBe(true);
   });
 
@@ -47,26 +47,26 @@ describe('favorite teams', () => {
     saveFavorites({ nfl: 'KC' });
     expect(JSON.parse(s.data.get(FAV_KEY)!)).toEqual({ nba: 'GSW', nfl: 'KC' });
     // a fresh launch reads them back
-    expect(reloadFavorites()).toEqual({ nba: 'GSW', nfl: 'KC' });
-    expect(readFavorites()).toEqual({ nba: 'GSW', nfl: 'KC' });
+    expect(reloadFavorites()).toEqual({ nba: 'GSW', nfl: 'KC', soccer: null });
+    expect(readFavorites()).toEqual({ nba: 'GSW', nfl: 'KC', soccer: null });
     expect(shouldAskFavorites()).toBe(false);
     // changed later, in Profile
     saveFavorites({ nba: 'BOS' });
-    expect(reloadFavorites()).toEqual({ nba: 'BOS', nfl: 'KC' });
+    expect(reloadFavorites()).toEqual({ nba: 'BOS', nfl: 'KC', soccer: null });
   });
 
   it('reads anything that isn’t a current team as no pick', () => {
     const s = fakeStorage();
     g.localStorage = s;
     s.data.set(FAV_KEY, '{not json');
-    expect(reloadFavorites()).toEqual({ nba: null, nfl: null });
+    expect(reloadFavorites()).toEqual({ nba: null, nfl: null, soccer: null });
     s.data.set(FAV_KEY, JSON.stringify({ nba: 'KC', nfl: 'SEA' }));
-    expect(reloadFavorites()).toEqual({ nba: null, nfl: 'SEA' });
+    expect(reloadFavorites()).toEqual({ nba: null, nfl: 'SEA', soccer: null });
     s.data.set(FAV_KEY, JSON.stringify(['GSW']));
-    expect(reloadFavorites()).toEqual({ nba: null, nfl: null });
+    expect(reloadFavorites()).toEqual({ nba: null, nfl: null, soccer: null });
     s.data.set(FAV_KEY, 'null');
-    expect(reloadFavorites()).toEqual({ nba: null, nfl: null });
-    expect(saveFavorites({ nba: 'XXX', nfl: 'DAL' })).toEqual({ nba: null, nfl: 'DAL' });
+    expect(reloadFavorites()).toEqual({ nba: null, nfl: null, soccer: null });
+    expect(saveFavorites({ nba: 'XXX', nfl: 'DAL' })).toEqual({ nba: null, nfl: 'DAL', soccer: null });
   });
 
   it('asks only once: a player who said not now isn’t asked again', () => {
@@ -80,7 +80,7 @@ describe('favorite teams', () => {
 
   it('keeps working when storage is blocked or missing', () => {
     g.localStorage = fakeStorage(true);
-    expect(reloadFavorites()).toEqual({ nba: null, nfl: null });
+    expect(reloadFavorites()).toEqual({ nba: null, nfl: null, soccer: null });
     expect(() => saveFavorites({ nba: 'MIA', nfl: 'MIA' })).not.toThrow();
     // kept for this visit
     expect(favoriteFor('nba')).toBe('MIA');
@@ -88,6 +88,22 @@ describe('favorite teams', () => {
     expect(() => markFavoritesAsked()).not.toThrow();
     expect(shouldAskFavorites()).toBe(false);
     g.localStorage = undefined;
-    expect(reloadFavorites()).toEqual({ nba: null, nfl: null });
+    expect(reloadFavorites()).toEqual({ nba: null, nfl: null, soccer: null });
+  });
+});
+
+describe('favorite teams: soccer (Claude 2026-11-01)', () => {
+  it('adds a soccer club without changing what the other two store', () => {
+    const s = fakeStorage();
+    g.localStorage = s;
+    reloadFavorites();
+    saveFavorites({ nba: 'GSW', nfl: 'KC' });
+    expect(JSON.parse(s.data.get(FAV_KEY)!)).toEqual({ nba: 'GSW', nfl: 'KC' });
+    saveFavorites({ soccer: 'BAR' });
+    expect(JSON.parse(s.data.get(FAV_KEY)!)).toEqual({ nba: 'GSW', nfl: 'KC', soccer: 'BAR' });
+    expect(reloadFavorites()).toEqual({ nba: 'GSW', nfl: 'KC', soccer: 'BAR' });
+    expect(favoriteFor('soccer')).toBe('BAR');
+    saveFavorites({ soccer: 'NOPE' });
+    expect(favoriteFor('soccer')).toBeNull();
   });
 });

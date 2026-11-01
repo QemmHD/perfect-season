@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
 import { type Favorites, markFavoritesAsked, readFavorites, saveFavorites } from '../lib/favorites';
 import { nameProblem, randomName } from '../lib/names';
 import { sfx } from '../lib/sound';
@@ -35,7 +35,7 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
       return;
     }
     // skipping keeps a pick already made; the rest can be picked in Profile
-    if (favs.nba || favs.nfl) saveFavorites(favs);
+    if (favs.nba || favs.nfl || favs.soccer) saveFavorites(favs);
     markFavoritesAsked();
     sfx.seriesWin();
     onDone(name.trim());
@@ -104,7 +104,7 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
       </div>
       <ul className="welcome-perks rise-in" style={{ animationDelay: '650ms' }}>
         <li>
-          <b>Draft</b> {NFL ? 'eight' : 'five'} players from random {NFL ? 'NFL' : 'NBA'} teams and decades
+          <b>Draft</b> {pick({ nba: 'five', nfl: 'eight', soccer: 'eight' })} players from random {pick({ nba: 'NBA teams', nfl: 'NFL teams', soccer: 'clubs' })} and decades
         </li>
         <li>
           <b>Climb</b> the daily, weekly and all-time leaderboards

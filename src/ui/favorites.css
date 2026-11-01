@@ -9,6 +9,16 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+/* Claude 2026-11-01: NBA · NFL · soccer */
+.fav-tabs.three {
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.fav-tabs.three button {
+  gap: 4px;
+  font-size: 11.5px;
+  letter-spacing: 0.4px;
+}
 .fav-tabs button {
   height: 42px;
   display: flex;

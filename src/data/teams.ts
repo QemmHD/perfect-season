@@ -91,8 +91,55 @@ export const NFL_TEAMS: TeamInfo[] = [
   t('WAS', 'Washington Commanders', '#5A1414', '#FFB612', W, { pants: '#FFB612' }),
 ];
 
+/**
+ * Claude 2026-11-01: soccer's forty draft clubs (src/data/soccer.json), identity colors only (no
+ * crests, no real kits): the shirt in `c1`, the trim in `c2`.
+ */
+export const SOCCER_TEAMS: TeamInfo[] = [
+  t('MUN', 'Manchester United', '#DA291C', '#FBE122'),
+  t('LIV', 'Liverpool', '#C8102E', '#00B2A9'),
+  t('ARS', 'Arsenal', '#EF0107', '#FFFFFF'),
+  t('CHE', 'Chelsea', '#034694', '#FFFFFF'),
+  t('MCI', 'Manchester City', '#6CABDD', '#1C2C5B'),
+  t('TOT', 'Tottenham Hotspur', '#132257', '#FFFFFF'),
+  t('EVE', 'Everton', '#003399', '#FFFFFF'),
+  t('NEW', 'Newcastle United', '#241F20', '#FFFFFF'),
+  t('AVL', 'Aston Villa', '#670E36', '#95BFE5'),
+  t('RMA', 'Real Madrid', '#00529F', '#FEBE10'),
+  t('BAR', 'FC Barcelona', '#A50044', '#004D98'),
+  t('ATM', 'Atlético Madrid', '#CB3524', '#272E61'),
+  t('VAL', 'Valencia', '#000000', '#EE7623'),
+  t('SEV', 'Sevilla', '#D8001E', '#FFFFFF'),
+  t('ATH', 'Athletic Club', '#EE2523', '#FFFFFF'),
+  t('VIL', 'Villarreal', '#FFE667', '#005187'),
+  t('JUV', 'Juventus', '#000000', '#FFFFFF'),
+  t('MIL', 'AC Milan', '#FB090B', '#000000'),
+  t('INT', 'Inter', '#0068A8', '#000000'),
+  t('ROM', 'Roma', '#8E1F2F', '#F0BC42'),
+  t('LAZ', 'Lazio', '#87D8F7', '#0B2240'),
+  t('NAP', 'Napoli', '#12A0D7', '#FFFFFF'),
+  t('FIO', 'Fiorentina', '#482E92', '#FFFFFF'),
+  t('FCB', 'Bayern Munich', '#DC052D', '#0066B2'),
+  t('BVB', 'Borussia Dortmund', '#FDE100', '#000000'),
+  t('B04', 'Bayer Leverkusen', '#E32221', '#000000'),
+  t('S04', 'Schalke 04', '#004D9D', '#FFFFFF'),
+  t('BMG', 'Borussia Mönchengladbach', '#000000', '#00A651'),
+  t('HSV', 'Hamburger SV', '#0A3F86', '#FFFFFF'),
+  t('PSG', 'Paris Saint-Germain', '#004170', '#DA291C'),
+  t('OM', 'Marseille', '#2FAEE0', '#FFFFFF'),
+  t('OL', 'Lyon', '#1B3F8B', '#DA001A'),
+  t('ASM', 'Monaco', '#E7001C', '#FFFFFF'),
+  t('LIL', 'Lille', '#E01E13', '#1A2D5A'),
+  t('AJA', 'Ajax', '#D2122E', '#FFFFFF'),
+  t('PSV', 'PSV Eindhoven', '#ED1C24', '#FFFFFF'),
+  t('FEY', 'Feyenoord', '#EE1C25', '#FFFFFF'),
+  t('SLB', 'Benfica', '#E83030', '#FFFFFF'),
+  t('FCP', 'FC Porto', '#0B3B8C', '#FFFFFF'),
+  t('SCP', 'Sporting CP', '#00A859', '#FFFFFF'),
+];
+
 export function teamsOf(sport: SportId): TeamInfo[] {
-  return sport === 'nfl' ? NFL_TEAMS : NBA_TEAMS;
+  return ({ nba: NBA_TEAMS, nfl: NFL_TEAMS, soccer: SOCCER_TEAMS } satisfies Record<SportId, TeamInfo[]>)[sport] ?? NBA_TEAMS;
 }
 
 /** A team by its abbreviation, or null for anything that isn't one (also what comes off the wire). */

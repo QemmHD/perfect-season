@@ -1,5 +1,5 @@
 // Implemented by Codex. Progress is encrypted on the device; signing keys/admin credentials stay off the server.
-import { RECOVERY_KEYS, validateSaveValues } from "./recovery";
+import { OPTIONAL_KEYS, PROFILE_STORAGE_KEYS, RECOVERY_KEYS, validateSaveValues } from "./recovery";
 
 export const CLOUD_KEYS = RECOVERY_KEYS.filter(
   (k) => k !== "perfect-season:key:v1",
@@ -28,8 +28,10 @@ export function checkedSnapshot(input: unknown): CloudSnapshot {
     s?.v !== 1 ||
     !s.values ||
     Object.keys(s.values).some((k) => !CLOUD_KEYS.includes(k)) ||
-    CLOUD_KEYS.some(
-      (k) => s.values[k] !== null && typeof s.values[k] !== "string",
+    CLOUD_KEYS.some((k) =>
+      s.values[k] === undefined
+        ? !OPTIONAL_KEYS.includes(k)
+        : s.values[k] !== null && typeof s.values[k] !== "string",
     )
   )
     throw Error(
@@ -44,11 +46,14 @@ export function checkedSnapshot(input: unknown): CloudSnapshot {
 export function captureProgress(
   storage: Pick<Storage, "getItem">,
 ): CloudSnapshot {
+  // soccer's keys only when there is soccer progress: a save without it stays the one older builds read
   const values = Object.fromEntries(
-    CLOUD_KEYS.map((k) => [k, storage.getItem(k)]),
+    CLOUD_KEYS.map((k) => [k, storage.getItem(k)] as const).filter(
+      ([k, v]) => v !== null || !OPTIONAL_KEYS.includes(k),
+    ),
   );
   // Restoring a save must never resume an already-settled online match.
-  for (const k of CLOUD_KEYS.slice(0, 2))
+  for (const k of PROFILE_STORAGE_KEYS)
     if (values[k]) {
       const profile = JSON.parse(values[k]!);
       profile.activeMatch = null;
@@ -66,6 +71,8 @@ export function applyProgress(
   try {
     for (const k of CLOUD_KEYS) {
       const v = snapshot.values[k];
+      // an older build's save has no soccer keys: this phone's soccer progress stays
+      if (v === undefined) continue;
       v === null ? storage.removeItem(k) : storage.setItem(k, v);
     }
   } catch {

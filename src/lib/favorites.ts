@@ -13,9 +13,11 @@ export const FAV_ASKED_KEY = 'perfect-season:fav:asked';
 export interface Favorites {
   nba: string | null;
   nfl: string | null;
+  /** Claude 2026-11-01: a soccer club (additive: older builds read only the other two) */
+  soccer: string | null;
 }
 
-const NONE: Favorites = { nba: null, nfl: null };
+const NONE: Favorites = { nba: null, nfl: null, soccer: null };
 
 function store(): Storage | null {
   try {
@@ -32,7 +34,7 @@ export function readFavorites(): Favorites {
     if (!raw) return NONE;
     const v = JSON.parse(raw) as Record<string, unknown> | null;
     if (!v || typeof v !== 'object') return NONE;
-    return { nba: teamOf('nba', v.nba)?.abbr ?? null, nfl: teamOf('nfl', v.nfl)?.abbr ?? null };
+    return { nba: teamOf('nba', v.nba)?.abbr ?? null, nfl: teamOf('nfl', v.nfl)?.abbr ?? null, soccer: teamOf('soccer', v.soccer)?.abbr ?? null };
   } catch {
     return NONE;
   }
@@ -52,10 +54,12 @@ export function saveFavorites(next: Partial<Favorites>): Favorites {
   const f: Favorites = {
     nba: 'nba' in next ? (teamOf('nba', next.nba)?.abbr ?? null) : prev.nba,
     nfl: 'nfl' in next ? (teamOf('nfl', next.nfl)?.abbr ?? null) : prev.nfl,
+    soccer: 'soccer' in next ? (teamOf('soccer', next.soccer)?.abbr ?? null) : prev.soccer,
   };
   cache = f;
   try {
-    store()?.setItem(FAV_KEY, JSON.stringify(f));
+    // without a soccer club the stored value is exactly what older builds write (and read)
+    store()?.setItem(FAV_KEY, JSON.stringify(f.soccer ? f : { nba: f.nba, nfl: f.nfl }));
   } catch {
     // storage blocked: kept for this visit
   }
