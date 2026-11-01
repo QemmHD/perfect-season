@@ -62,6 +62,7 @@ export function Soccer2({
   timeScale = 1,
   shootout: allowShootout = true,
   forceShootout = false,
+  fixedShootout,
   debug,
   onProgress,
   onDone,
@@ -83,6 +84,11 @@ export function Soccer2({
   shootout?: boolean;
   /** the lab: go straight to penalties */
   forceShootout?: boolean;
+  /**
+   * Online (Claude 2026-11-01): the shootout both phones agree on (arcade.ts agreedShootout), shown
+   * kick by kick instead of played, so the two phones can't settle a level match differently.
+   */
+  fixedShootout?: { first: Side; scored: boolean[] };
   /** the lab's QA hook: the live attack and match each frame */
   debug?: (a: Attack | null, m: Match, ui: string) => void;
   onProgress: (p: Progress) => void;
@@ -307,6 +313,7 @@ export function Soccer2({
 
   const endMatch = () => {
     const r = rivalRef.current;
+    sfx.fulltime();
     if (allowShootout && r && r.done && r.score === match.goals) {
       say('ALL SQUARE', 'big', 1700, 'PENALTIES');
       window.setTimeout(startShootout, 1500);
@@ -331,13 +338,35 @@ export function Soccer2({
   /* ---------- penalties ---------- */
   const startShootout = () => {
     if (soRef.current) return;
-    const first: Side = (seed.length + match.goals) % 2 ? 'them' : 'us';
+    const first: Side = fixedShootout ? fixedShootout.first : (seed.length + match.goals) % 2 ? 'them' : 'us';
     soRef.current = newShootout(us, them, seed + ':so', first);
     if (!finished.current && match.over) {
       finished.current = true;
       onDone(progress());
     }
-    nextPen();
+    if (fixedShootout) revealPens(fixedShootout.scored, 0);
+    else nextPen();
+  };
+  /** the agreed shootout, one kick at a time */
+  const revealPens = (scored: boolean[], i: number) => {
+    const so = soRef.current!;
+    if (so.done || i >= scored.length) {
+      nextPen();
+      return;
+    }
+    setUi('so-after');
+    const mine = nextKick(so).side === 'us';
+    const taker = nextKick(so).taker.tag;
+    recordKick(so, scored[i]);
+    viewSo();
+    if (scored[i]) {
+      (mine ? sfx.cheer : sfx.groan)(mine ? 0.9 : 0.6);
+      say(mine ? 'SCORED!' : 'THEY SCORE', mine ? 'good' : 'bad', 1000, taker);
+    } else {
+      (mine ? sfx.groan : sfx.roar)(0.9);
+      say(mine ? 'SAVED' : 'YOUR KEEPER SAVES!', mine ? 'bad' : 'big', 1000, taker);
+    }
+    window.setTimeout(() => revealPens(scored, i + 1), 1300);
   };
   const viewSo = () => {
     const so = soRef.current!;
