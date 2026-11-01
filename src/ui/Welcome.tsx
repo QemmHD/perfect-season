@@ -29,8 +29,12 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
     sfx.select();
     setStep('teams');
   };
+  // the teams the first launch asks for: basketball's and football's (a soccer player: his club)
+  const need = pick<(keyof Favorites)[]>({ nba: ['nba', 'nfl'], nfl: ['nba', 'nfl'], soccer: ['soccer'] });
+  const missing = need.find((k) => !favs[k]);
+  const PICK_TEXT: Record<keyof Favorites, string> = { nba: 'PICK AN NBA TEAM', nfl: 'PICK AN NFL TEAM', soccer: 'PICK A CLUB' };
   const finish = (skip: boolean) => {
-    if (!skip && (!favs.nba || !favs.nfl)) {
+    if (!skip && missing) {
       sfx.nope();
       return;
     }
@@ -57,8 +61,8 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
         </div>
         <div className="spacer" />
         <div className="actionbar">
-          <button type="submit" className="big shine" aria-disabled={!favs.nba || !favs.nfl}>
-            <Fit text={!favs.nba ? 'PICK AN NBA TEAM' : !favs.nfl ? 'PICK AN NFL TEAM' : 'LET’S GO'} />
+          <button type="submit" className="big shine" aria-disabled={!!missing}>
+            <Fit text={missing ? PICK_TEXT[missing] : 'LET’S GO'} />
           </button>
           <button type="button" className="fav-skip" onClick={() => finish(true)}>
             Skip for now
