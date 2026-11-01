@@ -58,6 +58,13 @@ MIXKIT = {
     2150: 'Impact of a blow',
     2182: 'Wood hard hit',
     2498: 'Body impact falling into the sand',
+    # soccer (Claude 2026-11-01): loaded only when soccer is played (src/lib/sound.ts venue 'pitch')
+    3022: 'Stadium joy shouting crowd',
+    438: 'Crowd chanting at stadium',
+    2108: 'Soccer ball quick kick',
+    2112: 'Hitting soccer ball',
+    2077: 'Ball bouncing in the ground',
+    614: 'Police whistle',
 }
 KENNEY_ZIP = 'https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip'
 KENNEY_PAGE = 'https://kenney.nl/assets/impact-sounds'
@@ -347,6 +354,30 @@ def r_thud():
     return peak_norm(fade(trim_tail(mix((body, 0, 0), (low, -4, 0.0)), -50), 0.002, 0.1))
 
 
+def r_soccer_roar():
+    # a goal: the stadium erupts and rides it out
+    x = load('mixkit:3022', 2.2, 8.6, af='highpass=f=70')
+    x = envelope(x, [(0, 0.6), (0.25, 1.0), (4.2, 0.85), (6.35, 0.0)])
+    return rms_norm(fade(x, 0.04, 0.3), -16)
+
+
+def r_soccer_chant():
+    # the terraces singing under the match, looped
+    # (10 s like the other loops, sound.ts LOOP_LEN; the recording is 11 s, so a 1 s crossfade)
+    x = load('mixkit:438', 0.0, 11.07, af='highpass=f=90,lowpass=f=8000')
+    return rms_norm(loopify(x, length=10.0, xfade=1.0), -20)
+
+
+def r_soccer_kick(i, start, end):
+    return lambda: peak_norm(fade(trim_tail(trim_head(load('mixkit:' + str(i), start, end)), -50), 0.002, 0.08))
+
+
+def r_soccer_whistle():
+    # the referee's long blast: full time
+    x = load('mixkit:614', 0.04, 1.3)
+    return peak_norm(fade(trim_tail(x, -45), 0.004, 0.2))
+
+
 RECIPES = {
     # name: (fn, kind, kbps, sources)
     'crowd-arena': (r_crowd_arena, 'loop', 64, ['mixkit:364', 'mixkit:2097']),
@@ -379,6 +410,12 @@ RECIPES = {
     'hit-2': (r_hit2, 'shot', 96, ['mixkit:2143', 'kenney:impactPunch_heavy_000']),
     'hit-3': (r_hit3, 'shot', 96, ['mixkit:2143', 'mixkit:2150', 'mixkit:2182', 'kenney:impactPunch_heavy_002']),
     'thud': (r_thud, 'shot', 96, ['mixkit:2498', 'kenney:impactSoft_heavy_000']),
+    'soccer-roar': (r_soccer_roar, 'crowd', 80, ['mixkit:3022']),
+    'soccer-chant': (r_soccer_chant, 'loop', 64, ['mixkit:438']),
+    'soccer-kick-1': (r_soccer_kick(2108, 0.0, 0.6), 'shot', 96, ['mixkit:2108']),
+    'soccer-kick-2': (r_soccer_kick(2112, 0.0, 0.7), 'shot', 96, ['mixkit:2112']),
+    'soccer-bounce': (r_soccer_kick(2077, 0.0, 0.45), 'shot', 96, ['mixkit:2077']),
+    'soccer-whistle': (r_soccer_whistle, 'shot', 96, ['mixkit:614']),
 }
 
 

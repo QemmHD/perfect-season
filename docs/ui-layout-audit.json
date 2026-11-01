@@ -1,0 +1,632 @@
+[
+  {
+    "sport": "nba",
+    "step": "01-home",
+    "back": {
+      "x": 16,
+      "w": 91
+    },
+    "title": {
+      "x": 115,
+      "w": 162,
+      "text": "Ultimate Team",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "02-play",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Play",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "03-season",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Season Rewards",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "04-objectives",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Objectives",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "05-development",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Development",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "06-moments",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Moments",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "07-records",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Club Records",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "08-events",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Spotlight Events",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "09-gallery",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Collection",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "CLUB",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "10-circuit-320",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Champions Circuit",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "wallet-stress-320",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 132,
+      "text": "Champions Circuit",
+      "clipped": true
+    },
+    "wallet": {
+      "x": 249,
+      "w": 125
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "10-circuit-390",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Champions Circuit",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "wallet-stress-390",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 132,
+      "text": "Champions Circuit",
+      "clipped": true
+    },
+    "wallet": {
+      "x": 249,
+      "w": 125
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "10-circuit-844",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Champions Circuit",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nba",
+    "step": "wallet-stress-844",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 132,
+      "text": "Champions Circuit",
+      "clipped": true
+    },
+    "wallet": {
+      "x": 249,
+      "w": 125
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "01-home",
+    "back": {
+      "x": 16,
+      "w": 91
+    },
+    "title": {
+      "x": 115,
+      "w": 162,
+      "text": "Ultimate Team",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "02-play",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Play",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "03-season",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Season Rewards",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "04-objectives",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Objectives",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "05-development",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Development",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "06-moments",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Moments",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "07-records",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Club Records",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "HOME",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "08-events",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Spotlight Events",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "09-gallery",
+    "back": {
+      "x": 16,
+      "w": 68
+    },
+    "title": {
+      "x": 92,
+      "w": 185,
+      "text": "Collection",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "CLUB",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "10-circuit-320",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Champions Circuit",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "wallet-stress-320",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 132,
+      "text": "Champions Circuit",
+      "clipped": true
+    },
+    "wallet": {
+      "x": 249,
+      "w": 125
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "10-circuit-390",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Champions Circuit",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "wallet-stress-390",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 132,
+      "text": "Champions Circuit",
+      "clipped": true
+    },
+    "wallet": {
+      "x": 249,
+      "w": 125
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "10-circuit-844",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 168,
+      "text": "Champions Circuit",
+      "clipped": false
+    },
+    "wallet": {
+      "x": 284,
+      "w": 90
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  },
+  {
+    "sport": "nfl",
+    "step": "wallet-stress-844",
+    "back": {
+      "x": 16,
+      "w": 85
+    },
+    "title": {
+      "x": 109,
+      "w": 132,
+      "text": "Champions Circuit",
+      "clipped": true
+    },
+    "wallet": {
+      "x": 249,
+      "w": 125
+    },
+    "active": "PLAY",
+    "horizontalOverflow": 0,
+    "font": "Archivo, \"Avenir Next Condensed\", \"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", sans-serif"
+  }
+]

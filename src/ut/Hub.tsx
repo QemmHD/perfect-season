@@ -1,33 +1,35 @@
-// Ultimate Team's home: the free starter (until it's opened), your squad at a glance, play, and the
-// way to the store, the club and the challenges.
+// Ultimate Team Home. Claude, 2026-11-01 (UI reorganisation, docs/UI-NAVIGATION.md): an action hub
+// in the FC 26 "For You" / FC 27 Campaign Hub spirit. It only shows what to do next — the run to
+// continue, rewards to claim, this season's drops and the daily loop, your squad — and every row
+// leads to the one place that thing lives (Play, Challenges, Club, Store). Card materials and the
+// Archivo / teal / gold look are Codex's clubhouse; nothing here changes state except CLAIM ALL.
 import React from 'react';
-import { Coin } from '../ui/icons';
-import { UtCard } from './CardArt';
-import { IconClub, IconSbc, IconStore } from './icons';
-import { packName } from './packs';
+import { UtCard, GoatCrown } from './CardArt';
 import { byValue } from './pool';
-import { rewardText, type Sbc } from './sbc';
 import { type Lineup, type SquadRating, slotsFor } from './squad';
 import type { UtState } from './state';
 import type { UtSport } from './types';
 import type { ClubCard, UtView } from './UltimateTeam';
+import { PackArt } from './PackArt';
+import { HQArrow, SeasonRibbon } from './Clubhouse';
+import { hqOf } from './progression';
+import { dailyStatus, lightningWindow, STREAK_DAYS } from './content-packs';
+import { standoutProgram } from './standouts';
+import { weekLabel } from './editions';
+import type { Pool } from './pool';
+import { NEW_ERA_COINS, newEraReady } from './new-era';
+import { SeasonBanner } from './SeasonBanner';
+import { continueRun, MODE_NAME, playStatus } from './play-status';
+import { IconBattles, IconChart, IconDraft, IconGift, IconLeague, IconPlay, IconRoute } from './icons';
+import { previewId } from './preview-pack';
+import { SectionHead, stagger } from './ui';
+export { PackArt } from './PackArt';
 
-/** A pack as a picture: foil, a tier's colors, the sport. */
-export function PackArt({ kind, label, sport, small }: { kind: string; label: string; sport: UtSport; small?: boolean }) {
-  const k = kind.startsWith('position') ? 'position' : kind;
-  return (
-    <span className={'ut-pack p-' + k + (small ? ' small' : '')} aria-hidden="true">
-      <span className="ut-pack-crimp" />
-      <span className="ut-pack-body">
-        <i className="ut-pack-sport">{sport === 'nfl' ? 'NFL' : 'NBA'}</i>
-        <b className="disp">UT</b>
-        <i className="ut-pack-label">{label}</i>
-      </span>
-      <span className="ut-pack-crimp bottom" />
-      <span className="ut-pack-foil" />
-    </span>
-  );
-}
+const CONTINUE_ICON: Partial<Record<UtView, React.ReactNode>> = {
+  league: <IconLeague size={30} />,
+  circuit: <IconRoute size={30} />,
+  draft: <IconDraft size={30} />,
+};
 
 export function Hub(props: {
   sport: UtSport;
@@ -35,133 +37,197 @@ export function Hub(props: {
   lineup: Lineup;
   rating: SquadRating;
   ut: UtState;
-  sbcTodo: number;
-  sbcs: Sbc[];
+  day: string;
+  week: string;
+  pool: Pool;
   onGo: (v: UtView) => void;
   onStarter: () => void;
-  onInspect: (uid: string) => void;
-  onPlay: (mode: 'ai' | 'online') => void;
+  onNewEra: () => void;
+  inboxReady: number;
+  onClaimAll: () => void;
+  calendarReady: boolean;
 }) {
-  const { ut, rating, lineup } = props;
-  // the squad's best five, fanned out
+  const { ut, rating, lineup, pool } = props;
+  const h = hqOf(ut);
+  const size = slotsFor(props.sport).length;
   const starters = slotsFor(props.sport)
     .filter((s) => s.weight > 0)
     .map((s) => lineup[s.id])
     .filter((x): x is NonNullable<typeof x> => !!x)
     .sort(byValue)
-    .slice(0, 5);
-  const best = props.club.slice().sort((a, b) => byValue(a.rc, b.rc))[0];
-  const fan = starters.length ? starters : best ? [best.rc] : [];
-  const size = slotsFor(props.sport).length;
+    .slice(0, 3);
+  const daily = dailyStatus(ut, props.day);
+  const program = standoutProgram(pool, props.week);
+  const status = playStatus(pool, ut, props.week);
+  const run = continueRun(status);
+  const lw = lightningWindow(Date.now());
+  const form = h.history.slice(-5);
+  let i = 0;
   return (
-    <div className="page ut-hub">
+    <div className="page ut-hub uh">
       {!ut.starterClaimed && (
-        <button className="ut-starter rise-in" onClick={props.onStarter}>
+        <button className="ut-starter rise-in" style={stagger(i++)} onClick={props.onStarter}>
           <PackArt kind="starter" label="STARTER" sport={props.sport} small />
           <span className="ut-starter-txt">
-            <span className="eyebrow">Free · once</span>
+            <span className="eyebrow">FREE · YOUR FIRST SQUAD</span>
             <b className="disp">Open your starter pack</b>
-            <small>A card for every spot in your squad, and one gold to start.</small>
+            <small>Every position filled, one gold to build around.</small>
           </span>
+          <HQArrow />
         </button>
       )}
-
-      <button className="ut-squadcard" onClick={() => props.onGo('squad')} aria-label={'Your squad: ' + rating.ovr + ' overall, ' + rating.chem + ' chemistry, ' + rating.filled + ' of ' + size + ' spots filled'}>
-        <span className="ut-sq-stats">
-          <span className="eyebrow">Your squad</span>
-          <span className="ut-sq-nums">
-            <span>
-              <b className="disp num">{rating.filled ? rating.ovr : '—'}</b>
-              <i>OVR</i>
-            </span>
-            <span>
-              <b className="disp num">{rating.filled ? rating.chem : '—'}</b>
-              <i>CHEM</i>
-            </span>
+      {newEraReady(ut) && (
+        <div className="ut-new-era rise-in" style={stagger(i++)}>
+          <GoatCrown className="ut-new-era-crown" />
+          <span className="eyebrow">THANK YOU FOR PLAYING</span>
+          <b className="disp">The New Era is here.</b>
+          <p>
+            Ratings are rebuilt and everything you own stays yours. As a thank-you: an Icon pick (1 of 3 Legends) and {NEW_ERA_COINS.toLocaleString('en-US')} coins.
+          </p>
+          <button className="btn gold" onClick={props.onNewEra}>
+            CLAIM YOUR NEW ERA BUNDLE
+          </button>
+          <small>One per player. The coins are paid once across both sports.</small>
+        </div>
+      )}
+      {run ? (
+        <button className="uh-continue rise-in" style={stagger(i++)} onClick={() => props.onGo(run.view)} aria-label={'Continue ' + MODE_NAME[run.view] + ': ' + run.line}>
+          <span className="uh-continue-icon" aria-hidden="true">
+            {CONTINUE_ICON[run.view]}
           </span>
-          <small>{rating.complete ? 'Full squad' : rating.filled + ' of ' + size + ' spots filled'}</small>
+          <span className="uh-continue-txt">
+            <i className="eyebrow">CONTINUE</i>
+            <b className="disp">{MODE_NAME[run.view]}</b>
+            <small>{run.line}</small>
+          </span>
+          <span className="uh-continue-go" aria-hidden="true">
+            <IconPlay size={20} />
+          </span>
+        </button>
+      ) : (
+        ut.starterClaimed && (
+          <button className="uh-continue idle rise-in" style={stagger(i++)} onClick={() => props.onGo('play')} aria-label="Play: choose a mode">
+            <span className="uh-continue-icon" aria-hidden="true">
+              <IconBattles size={30} />
+            </span>
+            <span className="uh-continue-txt">
+              <i className="eyebrow">READY WHEN YOU ARE</i>
+              <b className="disp">Play</b>
+              <small>{props.sport === 'soccer' ? 'Squad Battles, Champions Circuit, Rivals and more' : 'Club Season, Squad Battles, Rivals and more'}</small>
+            </span>
+            <span className="uh-continue-go" aria-hidden="true">
+              <IconPlay size={20} />
+            </span>
+          </button>
+        )
+      )}
+      <div className={'uh-inbox rise-in' + (props.inboxReady ? ' ready' : '')} style={stagger(i++)}>
+        <button className="ut-home-inbox" onClick={() => props.onGo('inbox')} aria-label={props.inboxReady ? 'Rewards: ' + props.inboxReady + ' ready to claim' : 'Rewards: all caught up'}>
+          <span className="uh-inbox-icon" aria-hidden="true">
+            <IconGift size={22} />
+            {props.inboxReady > 0 && <i className="num">{props.inboxReady}</i>}
+          </span>
+          <span className="uh-inbox-txt">
+            <b>Rewards</b>
+            <small>{props.inboxReady ? props.inboxReady + (props.inboxReady === 1 ? ' reward' : ' rewards') + ' ready to claim' : 'All caught up · packs and picks wait in the Store'}</small>
+          </span>
+          {!props.inboxReady && <HQArrow />}
+        </button>
+        {props.inboxReady > 0 && (
+          <button className="btn gold uh-claim" onClick={props.onClaimAll}>
+            CLAIM ALL
+          </button>
+        )}
+      </div>
+      <div className="uh-season rise-in" style={stagger(i++)}>
+        <SeasonBanner day={props.day} sport={props.sport} onStore={() => props.onGo('store')} compact />
+        <SeasonRibbon ut={ut} day={props.day} onOpen={() => props.onGo('season')} />
+      </div>
+      <div className="ut-home-drops rise-in" style={stagger(i++)}>
+        <button className={'ut-home-daily' + (daily.ready || props.calendarReady ? ' ready' : '')} onClick={() => props.onGo('daily')}>
+          <PackArt kind="daily" label="DAILY" sport={props.sport} small />
+          <span>
+            <i className="eyebrow">{daily.ready ? 'FREE TODAY' : 'DAILY'}</i>
+            <b className="disp">{daily.ready ? 'Open Day ' + daily.streak : 'Day ' + daily.streak + ' done'}</b>
+            <small>{daily.ready ? (daily.streak === STREAK_DAYS ? 'Day 7: plus a Gold Pack' : STREAK_DAYS - daily.streak + ' days to a Gold Pack') : props.calendarReady ? 'Calendar reward ready' : 'Calendar · 3 objectives'}</small>
+          </span>
+          {(daily.ready || props.calendarReady) && <i className="uh-dot" aria-hidden="true" />}
+        </button>
+        <button className="ut-home-so" onClick={() => props.onGo('standouts')}>
+          {program.featured && <UtCard rc={program.featured} w={44} />}
+          <span>
+            <i className="eyebrow">STANDOUTS · {weekLabel(props.week)}</i>
+            <b className="disp">{program.featured ? program.featured.line.name.split(' ').slice(-1)[0] + ' ' + program.featured.ovr : 'This week'}</b>
+            <small>+{Math.max(0, program.cards.length - 1)} more this week</small>
+          </span>
+        </button>
+      </div>
+      {lw ? (
+        <button className="uh-promo lightning rise-in" style={stagger(i++)} onClick={() => props.onGo('store')}>
+          <PackArt kind="lightning" label="LIGHTNING" sport={props.sport} small />
+          <span>
+            <i className="eyebrow">STORE · LIGHTNING · 25% OFF</i>
+            <b className="disp">Lightning Standout</b>
+            <small>A Weekly Standout guaranteed · {lw.minutesLeft >= 60 ? Math.floor(lw.minutesLeft / 60) + 'h ' : ''}{lw.minutesLeft % 60}m left</small>
+          </span>
+          <HQArrow />
+        </button>
+      ) : (
+        <button className="uh-promo rise-in" style={stagger(i++)} onClick={() => props.onGo('store')}>
+          <PackArt kind="premium" label="PREVIEW" sport={props.sport} small />
+          <span>
+            <i className="eyebrow">STORE · PREVIEW PACK</i>
+            <b className="disp">See it before you buy</b>
+            <small>{previewId(ut) ? 'Your preview is ready: buy it or skip it' : 'Peek at a Premium Gold pack’s exact cards'}</small>
+          </span>
+          <HQArrow />
+        </button>
+      )}
+      <SectionHead title="Your club" />
+      <button
+        className="uh-squad rise-in"
+        style={stagger(i++)}
+        onClick={() => props.onGo('squad')}
+        aria-label={'Your squad: ' + rating.ovr + ' overall, ' + rating.chem + ' chemistry, ' + rating.filled + ' of ' + size + ' spots filled'}
+      >
+        <span className="uh-squad-nums">
+          <span>
+            <b className="disp num">{rating.filled ? rating.ovr : '—'}</b>
+            <i>OVR</i>
+          </span>
+          <span>
+            <b className="disp num">{rating.filled ? rating.chem : '—'}</b>
+            <i>CHEM</i>
+          </span>
+          <small>{rating.complete ? 'Matchday squad ready' : rating.filled + ' of ' + size + ' spots filled'}</small>
         </span>
-        <span className={'ut-fan n' + fan.length} aria-hidden="true">
-          {fan.map((rc, i) => (
-            <span key={rc.line.id} className="ut-fan-card" style={{ '--i': i - (fan.length - 1) / 2 } as React.CSSProperties}>
-              <UtCard rc={rc} w={64} />
+        <span className={'uh-fan n' + starters.length} aria-hidden="true">
+          {starters.map((rc, k) => (
+            <span key={rc.line.id} style={{ '--i': k - (starters.length - 1) / 2 } as React.CSSProperties}>
+              <UtCard rc={rc} w={56} />
             </span>
           ))}
-          {!fan.length && <span className="ut-fan-empty">No cards yet</span>}
         </span>
       </button>
-
-      <div className="ut-play">
-        <button className="big shine" onClick={() => props.onPlay('ai')}>
-          <span>Squad Battles</span>
-        </button>
-        <button className="big ghost small" onClick={() => props.onPlay('online')}>
-          <span>Head to Head</span>
-        </button>
-      </div>
-
-      <div className="ut-tiles">
-        <button className="ut-tile" onClick={() => props.onGo('store')}>
-          <IconStore size={24} />
-          <b>Store</b>
-          <small>{ut.packs.length ? ut.packs.length + (ut.packs.length === 1 ? ' pack' : ' packs') + ' to open' : 'Packs from 150'}</small>
-          {ut.packs.length > 0 && <i className="ut-dot num">{ut.packs.length}</i>}
-        </button>
-        <button className="ut-tile" onClick={() => props.onGo('sbc')}>
-          <IconSbc size={24} />
-          <b>Challenges</b>
-          <small>{props.sbcTodo ? props.sbcTodo + ' to do' : 'All done'}</small>
-          {props.sbcTodo > 0 && <i className="ut-dot num">{props.sbcTodo}</i>}
-        </button>
-        <button className="ut-tile" onClick={() => props.onGo('club')}>
-          <IconClub size={24} />
-          <b>Club</b>
-          <small>{props.club.length} cards</small>
-        </button>
-      </div>
-
-      {props.sbcs.length > 0 && (
-        <div className="ut-hub-sec">
-          <span className="eyebrow">Today’s challenges</span>
-          {props.sbcs
-            .filter((s) => s.kind === 'daily')
-            // the ones still to do first, three of them
-            .sort((a, b) => Number(!!ut.sbc.done[a.id]) - Number(!!ut.sbc.done[b.id]))
-            .slice(0, 3)
-            .map((s) => (
-              <button key={s.id} className={'ut-hub-sbc' + (ut.sbc.done[s.id] ? ' done' : '')} onClick={() => props.onGo('sbc')}>
-                <b>{s.title}</b>
-                <small>{ut.sbc.done[s.id] ? 'Done' : rewardText(s.reward, props.sport, packName)}</small>
-              </button>
+      <button className="uh-form rise-in" style={stagger(i++)} onClick={() => props.onGo('records')}>
+        <IconChart size={20} />
+        <span className="uh-form-txt">
+          <b>Club Records</b>
+          <small>
+            {ut.record.w + ut.record.h2hW}W {ut.record.l + ut.record.h2hL}L · {ut.packsOpened} {ut.packsOpened === 1 ? 'pack' : 'packs'} opened
+          </small>
+        </span>
+        {form.length > 0 && (
+          <span className="uh-form-pips" aria-label={'Recent form: ' + form.map((m) => (m.won ? 'W' : 'L')).join(' ')}>
+            {form.map((m) => (
+              <i key={m.id} className={m.won ? 'win' : 'loss'}>
+                {m.won ? 'W' : 'L'}
+              </i>
             ))}
-        </div>
-      )}
-
-      {props.club.length > 0 && (
-        <div className="ut-hub-sec">
-          <span className="eyebrow">Best in your club</span>
-          <div className="ut-hub-best">
-            {props.club
-              .slice()
-              .sort((a, b) => byValue(a.rc, b.rc))
-              .slice(0, 8)
-              .map((c) => (
-                <button key={c.uid} className="ut-gridcard small" onClick={() => props.onInspect(c.uid)} aria-label={c.rc.line.name + ', ' + c.rc.ovr}>
-                  <UtCard rc={c.rc} w={66} level={c.oc.level} />
-                </button>
-              ))}
-          </div>
-        </div>
-      )}
-
-      <div className="ut-statline">
-        <span>
-          <b className="num">{ut.packsOpened}</b> packs opened
-        </span>
-        <span>
-          <Coin size={13} /> <b className="num">{ut.sold.coins.toLocaleString('en-US')}</b> from quick-sells
-        </span>
-      </div>
+          </span>
+        )}
+        <HQArrow />
+      </button>
     </div>
   );
 }

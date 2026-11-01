@@ -6,7 +6,8 @@ import { PLAYOFF_TEAMS } from './data';
 import { gameWinChance, playoffScore } from './playoffs';
 import { ratingForWins, type TeamRating } from './rating';
 import { hashString, rng } from './rng';
-import { NFL } from './sport';
+import { pick } from './sport';
+import { LEAGUE_GPG, soccerScore } from './season';
 import type { PlayoffTeam } from './types';
 
 export const GAUNTLET_SIZE = 8;
@@ -19,8 +20,19 @@ export const CLEAR_COINS = 60;
  * Where each rung draws from, by rank among every playoff team in the data (best first). The pools
  * are about the same in both sports as a share of the teams: from a very good team to the best.
  */
-const WINDOWS: [number, number][] = NFL
-  ? [
+const WINDOWS: [number, number][] = pick<[number, number][]>({
+  // soccer (Claude 2026-11-01): the 75 great sides of the data, champions all
+  soccer: [
+    [45, 75],
+    [30, 45],
+    [20, 30],
+    [12, 20],
+    [7, 12],
+    [4, 7],
+    [2, 4],
+    [0, 2],
+  ],
+  nfl: [
       [150, 230],
       [90, 150],
       [55, 90],
@@ -29,8 +41,8 @@ const WINDOWS: [number, number][] = NFL
       [8, 16],
       [2, 8],
       [0, 2],
-    ]
-  : [
+    ],
+  nba: [
       [80, 120],
       [50, 80],
       [30, 50],
@@ -39,7 +51,8 @@ const WINDOWS: [number, number][] = NFL
       [5, 10],
       [2, 5],
       [0, 2],
-    ];
+    ],
+});
 
 const RANKED = PLAYOFF_TEAMS.slice().sort((a, b) => b.wFull - a.wFull || b.w - b.l - (a.w - a.l) || a.year.localeCompare(b.year));
 
@@ -51,7 +64,7 @@ export function gauntletLadder(week: string): PlayoffTeam[] {
     const pool = RANKED.slice(lo, Math.min(hi, RANKED.length)).filter((t) => !out.some((o) => o.year === t.year && o.team === t.team));
     // football's pools hold many teams with the same record: a champion is the better story
     const champs = pool.filter((t) => t.champ);
-    const from = NFL && champs.length && rand() < 0.6 ? champs : pool;
+    const from = pick({ nba: false, nfl: true, soccer: false }) && champs.length && rand() < 0.6 ? champs : pool;
     out.push(from[Math.floor(rand() * from.length)] ?? RANKED[0]);
   }
   return out;
@@ -64,7 +77,7 @@ export interface GauntletGame {
   /** your chance to win it */
   chance: number;
   won: boolean;
-  /** football's final score, yours first (basketball's comes from the game itself) */
+  /** football's and soccer's final score, yours first (basketball's comes from the game itself) */
   score: [number, number] | null;
 }
 
@@ -96,7 +109,12 @@ export function climb(team: TeamRating & { pf?: number; pa?: number }, ladder: P
     const opp = ladder[rung];
     const chance = rungChance(team.rating, opp);
     const won = rand() < chance;
-    out.push({ rung, opp, chance, won, score: NFL ? playoffScore(won, team, opp, rand) : null });
+    const score = pick<() => [number, number] | null>({
+      nba: () => null,
+      nfl: () => playoffScore(won, team, opp, rand),
+      soccer: () => soccerScore(won ? 1 : 0, ((team.pf ?? LEAGUE_GPG) + (opp.pa ?? LEAGUE_GPG)) / 2, ((opp.pf ?? LEAGUE_GPG) + (team.pa ?? LEAGUE_GPG)) / 2, rand),
+    })();
+    out.push({ rung, opp, chance, won, score });
     if (won) rung++;
     else lives--;
   }

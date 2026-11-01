@@ -50,6 +50,31 @@ Notes on the data, for whoever rebuilds the clips:
   lengths.
 - Mirrored clips are made in the game at load time, not stored.
 
+## Game-rating references (Ultimate Team benchmarks)
+
+Ultimate Team uses the published video-game ratings of a player's season as numeric reference anchors (see
+[RATINGS-AUDIT.md](RATINGS-AUDIT.md), "Expanded game-rating references"). The ratings belong to their publishers:
+NBA 2K by 2K / Take-Two Interactive / Visual Concepts, Madden NFL by Electronic Arts. Perfect Season is not affiliated
+with or endorsed by them, the NBA or the NFL. Only numbers are used; no names, art, logos or game files are copied.
+They were collected by:
+
+| Source | What we read | Terms |
+| --- | --- | --- |
+| [2K Archive](https://2karchive.com/) | NBA 2K–2K27 rosters; Madden 27 launch roster | free fan site, provided as is |
+| [2KRatings](https://www.2kratings.com/), via [ReinerJasin/NBA2k25_Web_Scraping](https://github.com/ReinerJasin/NBA2k25_Web_Scraping) and [wkoverfield/nba2kapi](https://github.com/wkoverfield/nba2kapi) | NBA 2K25 and 2K26 rosters, 2K26 classic teams; all-time player profiles (`nba-rating-references.json`) | repositories say MIT (no licence file) |
+| [theedgepredictor/nfl-madden-data](https://github.com/theedgepredictor/nfl-madden-data) (from maddenratings.weebly.com) | Madden 2002–26 launch rosters | no licence file |
+| [nflscraPy MaddenRatings](https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings) | Madden 22–24 roster iterations | code MIT ([licence](NFLSCRAPY-LICENSE.txt)) |
+
+## NFL Combine measurements (Ultimate Team football athleticism)
+
+`src/data/nfl-combine.json` (40-yard dash, 3-cone, vertical, combine year for 4,029 card players) feeds UT football
+speed/acceleration/agility where no same-season Madden rating exists (`src/ut/nfl-combine.ts`; Claude, 2026-11-01).
+
+| Source | What we read | Terms |
+| --- | --- | --- |
+| [nflverse](https://github.com/nflverse/nflverse-data) combine data | 2000+ combine results | **nflverse (CC-BY 4.0), data from Pro-Football-Reference** |
+| nflcombineresults.com, via the josedv82 combine dataset | 1987–98 hand-timed results (facts used at build time; +0.06 s hand-timing correction) | facts only |
+
 ## Sounds
 
 The arcade games' sounds are real recordings: cut, layered, levelled and made mono by
@@ -64,16 +89,19 @@ The menus' clicks, coins and card sounds are still synthesized in `src/lib/sound
 | cheer-arena | "Stadium crowd light applause" (Mixkit #362) | Mixkit | https://mixkit.co/free-sound-effects/discover/stadium-crowd-light-applause-362/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | crowd-arena, crowd-stadium | "Big crowd talking loop" (Mixkit #364) | Mixkit | https://mixkit.co/free-sound-effects/discover/big-crowd-talking-loop-364/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | dribble-1, dribble-2 | "Basketball falling indoor" (Mixkit #394) | Mixkit | https://mixkit.co/free-sound-effects/discover/basketball-falling-indoor-394/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
+| soccer-chant | "Crowd chanting at stadium" (Mixkit #438) | Mixkit | https://mixkit.co/free-sound-effects/discover/crowd-chanting-at-stadium-438/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | cheer-arena | "Male crowd cheering short" (Mixkit #459) | Mixkit | https://mixkit.co/free-sound-effects/discover/male-crowd-cheering-short-459/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | roar-arena | "Huge crowd cheering victory" (Mixkit #462) | Mixkit | https://mixkit.co/free-sound-effects/discover/huge-crowd-cheering-victory-462/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | ooh | "Crowd disappointment long boo" (Mixkit #463) | Mixkit | https://mixkit.co/free-sound-effects/discover/crowd-disappointment-long-boo-463/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | groan | "People moaning sadly" (Mixkit #469) | Mixkit | https://mixkit.co/free-sound-effects/discover/people-moaning-sadly-469/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
+| soccer-whistle | "Police whistle" (Mixkit #614) | Mixkit | https://mixkit.co/free-sound-effects/discover/police-whistle-614/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | whistle | "Police short whistle" (Mixkit #615) | Mixkit | https://mixkit.co/free-sound-effects/discover/police-short-whistle-615/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | squeak-1, squeak-2, squeak-3 | "Rubber squeaking" (Mixkit #1009) | Mixkit | https://mixkit.co/free-sound-effects/discover/rubber-squeaking-1009/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | squeak-4 | "Rubber fast squeak" (Mixkit #1013) | Mixkit | https://mixkit.co/free-sound-effects/discover/rubber-fast-squeak-1013/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | buzzer | "Basketball buzzer" (Mixkit #1647) | Mixkit | https://mixkit.co/free-sound-effects/discover/basketball-buzzer-1647/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | horn | "Distant train horn" (Mixkit #1654) | Mixkit | https://mixkit.co/free-sound-effects/discover/distant-train-horn-1654/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | dribble-3 | "Basketball ball bouncing in the floor" (Mixkit #2076) | Mixkit | https://mixkit.co/free-sound-effects/discover/basketball-ball-bouncing-in-the-floor-2076/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
+| soccer-bounce | "Ball bouncing in the ground" (Mixkit #2077) | Mixkit | https://mixkit.co/free-sound-effects/discover/ball-bouncing-in-the-ground-2077/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | catch-1 | "Catching a basketball ball" (Mixkit #2081) | Mixkit | https://mixkit.co/free-sound-effects/discover/catching-a-basketball-ball-2081/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | swish, dunk | "Basketball ball hitting the net" (Mixkit #2084) | Mixkit | https://mixkit.co/free-sound-effects/discover/basketball-ball-hitting-the-net-2084/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | catch-2 | "Hand receiving a basketball" (Mixkit #2090) | Mixkit | https://mixkit.co/free-sound-effects/discover/hand-receiving-a-basketball-2090/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
@@ -81,13 +109,16 @@ The menus' clicks, coins and card sounds are still synthesized in `src/lib/sound
 | rim-1, backboard, dunk | "Basketball ball, hard hit" (Mixkit #2093) | Mixkit | https://mixkit.co/free-sound-effects/discover/basketball-ball-hard-hit-2093/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | crowd-arena, crowd-stadium | "Ambient sports crowd sound" (Mixkit #2097) | Mixkit | https://mixkit.co/free-sound-effects/discover/ambient-sports-crowd-sound-2097/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | kick | "Soccer ball kick" (Mixkit #2099) | Mixkit | https://mixkit.co/free-sound-effects/discover/soccer-ball-kick-2099/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
+| soccer-kick-1 | "Soccer ball quick kick" (Mixkit #2108) | Mixkit | https://mixkit.co/free-sound-effects/discover/soccer-ball-quick-kick-2108/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | roar-stadium | "Crowd yelling at stadium" (Mixkit #2110) | Mixkit | https://mixkit.co/free-sound-effects/discover/crowd-yelling-at-stadium-2110/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | cheer-stadium | "Crowd at the stadium" (Mixkit #2111) | Mixkit | https://mixkit.co/free-sound-effects/discover/crowd-at-the-stadium-2111/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
+| soccer-kick-2 | "Hitting soccer ball" (Mixkit #2112) | Mixkit | https://mixkit.co/free-sound-effects/discover/hitting-soccer-ball-2112/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | hit-2, hit-3 | "Hard and quick punch" (Mixkit #2143) | Mixkit | https://mixkit.co/free-sound-effects/discover/hard-and-quick-punch-2143/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | hit-3 | "Impact of a blow" (Mixkit #2150) | Mixkit | https://mixkit.co/free-sound-effects/discover/impact-of-a-blow-2150/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | hit-1 | "Body punch quick hit" (Mixkit #2153) | Mixkit | https://mixkit.co/free-sound-effects/discover/body-punch-quick-hit-2153/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | hit-3 | "Wood hard hit" (Mixkit #2182) | Mixkit | https://mixkit.co/free-sound-effects/discover/wood-hard-hit-2182/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | thud | "Body impact falling into the sand" (Mixkit #2498) | Mixkit | https://mixkit.co/free-sound-effects/discover/body-impact-falling-into-the-sand-2498/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
+| soccer-roar | "Stadium joy shouting crowd" (Mixkit #3022) | Mixkit | https://mixkit.co/free-sound-effects/discover/stadium-joy-shouting-crowd-3022/ | Mixkit Sound Effects Free License (https://mixkit.co/license/#sfxFree) |
 | rim-1, dunk | impactMetal_heavy_000.ogg from Impact Sounds | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) |
 | rim-2 | impactMetal_medium_000.ogg from Impact Sounds | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) |
 | backboard | impactPlate_heavy_000.ogg from Impact Sounds | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) |
@@ -97,3 +128,18 @@ The menus' clicks, coins and card sounds are still synthesized in `src/lib/sound
 | thud | impactSoft_heavy_000.ogg from Impact Sounds | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) |
 | hit-1 | impactSoft_heavy_001.ogg from Impact Sounds | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) |
 <!-- sounds:end -->
+
+## Soccer data (in the app since the soccer wiring, docs/SOCCER.md)
+
+`src/data/soccer.json` and `src/data/cards-soccer.json` (scripts `soccer_sources.py`,
+`build_soccer_cards.py`, `build_soccer_data.py`; details in [SOCCER-DATA.md](SOCCER-DATA.md)) are
+built from:
+
+| Source | What we use | License |
+| --- | --- | --- |
+| [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets) by dcaribou (facts scraped from transfermarkt.co.uk) | league games, minutes, goals, assists, cards, lineups, substitutions, heights, birth dates and caps, 2012-13 to 2025-26 | CC0 1.0 (the dataset). We ship facts and our own ratings only: no market values, agents or photos. |
+| [Wikidata](https://www.wikidata.org) | legends' and older players' club spells (games, goals), heights, birth dates, Transfermarkt ids, Ballon d'Or winners | CC0 1.0 |
+| [openfootball/football.json](https://github.com/openfootball/football.json) | league results, to cross-check champions | CC0 1.0 / public domain |
+
+All overall ratings and face stats are our own model and estimates. They are not taken from or
+fitted to any video game. Club colors are plain identity colors; no crests, kits or photos are used.

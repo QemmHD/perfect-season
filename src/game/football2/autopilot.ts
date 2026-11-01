@@ -2,7 +2,7 @@
 // tests. It reads who's open and throws him the ball in stride, picks the lane with room on a run,
 // uses the runner's best move against a tackler, kicks in range and punts when it must.
 import { hashString, rng } from '../../engine/rng';
-import { dist, FIELD_W, flightTime, isLine, maxThrow, moveWithBall, projectRoute, sight, snap, step, throwTo, windupOf } from './engine';
+import { dist, FIELD_W, flightTime, isLine, maxThrow, moveEdge, moveWithBall, projectRoute, rt, sight, snap, step, throwTo, windupOf } from './engine';
 import { afterPlay, fgDistance, fgInRange, type Game, kick, kickWindow, punt, startPlay } from './drive';
 import type { Body, Move, Play, Pt } from './types';
 
@@ -17,10 +17,13 @@ export interface Pilot {
   /** with the ball: the tacklers he's sized up already, and the move he's timed against one's dive */
   seen: Set<number>;
   plan: { at: number; kind: Move; dir: number } | null;
+  /** how the runner misjudges each lane right now (yards, by his ball-carrier vision), and when it's re-read */
+  laneNoise: number[];
+  laneAt: number;
 }
 
 export function pilot(skill: number, seed: string): Pilot {
-  return { skill, rand: rng(hashString('fpilot:' + seed)), readAt: 0, play: null, feel: 1, felt: Infinity, seen: new Set(), plan: null };
+  return { skill, rand: rng(hashString('fpilot:' + seed)), readAt: 0, play: null, feel: 1, felt: Infinity, seen: new Set(), plan: null, laneNoise: [], laneAt: -1 };
 }
 
 const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
@@ -30,15 +33,18 @@ export function chooseCall(g: Game, pl: Pilot): 'pass' | 'run' {
   return pl.rand() < (short ? 0.55 : 0.3) ? 'run' : 'pass';
 }
 
-/** Fourth down: 'kick' in range, 'go' when it's short or there's no choice, else 'punt'. */
+/**
+ * Fourth down: 'kick' in range, otherwise 'go'. In this format a punt is worth nothing: the drive
+ * ends with no points either way and the other side's drives start from their own kickoff, so a
+ * turnover on downs costs exactly what a punt does (Claude 2026-11-01; the AI used to punt from its
+ * own half on fourth and long, which threw away the weaker side's last chance on ~40% of drives).
+ * ('punt' stays in the type for the player's button.)
+ */
 export function fourthDown(g: Game): 'kick' | 'go' | 'punt' {
   // the clock ran out in range: the last kick
   if (g.clock === 0) return 'kick';
   if (fgInRange(g) && (g.toGo > 1.5 || fgDistance(g) <= 30)) return 'kick';
-  if (g.toGo <= 2 || g.ballOn >= 60) return 'go';
-  // the last drive with nothing to lose: go for it
-  if (g.drive === g.drives - 1) return 'go';
-  return 'punt';
+  return 'go';
 }
 
 /** Where to throw to hit a receiver in stride, and how open he'll be when it gets there. */
@@ -66,10 +72,12 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
     pl.felt = Infinity;
     pl.seen.clear();
     pl.plan = null;
+    pl.laneAt = -1;
   }
   if (p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) {
     if (p.pressure > pl.feel && pl.felt === Infinity) pl.felt = p.t;
-    if (!pl.readAt) pl.readAt = 0.85 + (1 - pl.skill) * 0.6 + pl.rand() * 0.4;
+    // an aware quarterback reads it sooner (up to 0.3 s)
+    if (!pl.readAt) pl.readAt = Math.max(0.5, 0.85 + (1 - pl.skill) * 0.6 + pl.rand() * 0.4 - 0.3 * rt(p.qb.p.a.AWR, 45, 99));
     if (p.t < pl.readAt) return null;
     const options = p.bodies
       .filter((b) => b.side === 'O' && b !== p.qb && !isLine(b))
@@ -99,8 +107,9 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
       // a little off by his skill, and a guess along the line where he can't see the arc land
       const len = Math.max(1, dist(p.qb, choice.at));
       const hidden = (1 - sight(p, len)) * len;
-      const along = gauss(pl.rand) * ((1 - pl.skill) * 2.6 + hidden * (0.2 - 0.12 * pl.skill));
-      const across = gauss(pl.rand) * ((1 - pl.skill) * 1.8 + hidden * 0.03);
+      // (its own aim is a little off by skill; the passer's ratings throw the real error in throwTo)
+      const along = gauss(pl.rand) * ((1 - pl.skill) * 1.6 + hidden * (0.2 - 0.12 * pl.skill));
+      const across = gauss(pl.rand) * ((1 - pl.skill) * 1.0 + hidden * 0.03);
       const ux = (choice.at.x - p.qb.x) / len;
       const uy = (choice.at.y - p.qb.y) / len;
       throwTo(p, { x: choice.at.x + ux * along - uy * across, y: choice.at.y + uy * along + ux * across });
@@ -117,10 +126,16 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
     const ahead = p.bodies.filter((b) => b.side === 'D' && b.y > c.y - 1 && p.t >= b.stunUntil && dist(b, c) < 9);
     let best = c.x;
     let bestRoom = -1;
+    // ball-carrier vision: a poor one misreads the lanes by up to 3 yards, a great one by half a yard
+    if (p.t >= pl.laneAt) {
+      const blur = 3 - 2.5 * rt(c.p.a.BCV ?? 60, 45, 99);
+      pl.laneNoise = Array.from({ length: 13 }, () => (pl.rand() * 2 - 1) * blur);
+      pl.laneAt = p.t + 0.3;
+    }
     for (let dx = -6; dx <= 6; dx += 1) {
       const x = Math.max(2, Math.min(FIELD_W - 2, c.x + dx));
       const spot = { x, y: c.y + 5 };
-      const room = Math.min(20, ...ahead.map((d) => dist(d, spot))) - Math.abs(dx) * 0.35;
+      const room = Math.min(20, ...ahead.map((d) => dist(d, spot))) - Math.abs(dx) * 0.35 + (pl.laneNoise[dx + 6] ?? 0);
       if (room > bestRoom) {
         bestRoom = room;
         best = x;
@@ -133,16 +148,15 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
     if (w) {
       pl.seen.add(w.id);
       if (pl.rand() < 0.3 + 0.5 * pl.skill) {
-        const a = c.p.a;
-        const moves: [Move, number][] = [
-          ['juke', (a.JKM ?? 50) + 6],
-          ['spin', a.SPM ?? 45],
-          ['stiff', a.SFA ?? 45],
-          ['truck', a.TRK ?? 45],
-        ];
+        // the move that beats this man: its edge against him plus what timing it right is worth
+        // (a juke against the dive the most, a spin, then a stiff arm or a truck at contact)
+        const timing: Record<Move, number> = { juke: 0.32, spin: 0.2, stiff: 0.18, truck: 0.18 };
+        const moves = (['juke', 'spin', 'stiff', 'truck'] as Move[]).map((k) => [k, moveEdge(k, c, w) + timing[k] * (0.4 + 0.5 * pl.skill)] as [Move, number]);
         moves.sort((x, y) => y[1] - x[1]);
         const kind = moves[0][0];
-        const due = w.windAt + windupOf(w) + (kind === 'stiff' || kind === 'truck' ? 0.15 : -0.08);
+        // a juke just before he leaves his feet; a stiff arm or a truck as he leaves them, so it's
+        // still on when he arrives (it lasts half a second; 0.15 s after the dive was often too late)
+        const due = w.windAt + windupOf(w) + (kind === 'stiff' || kind === 'truck' ? -0.02 : -0.08);
         pl.plan = { at: due + gauss(pl.rand) * (0.26 - 0.2 * pl.skill), kind, dir: Math.sign(c.x - w.x) || Math.sign(best - c.x) || 1 };
       }
     }

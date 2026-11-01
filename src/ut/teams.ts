@@ -9,7 +9,8 @@ import { hooper, SPOTS } from '../game/hoops2/ratings';
 import type { Hooper } from '../game/hoops2/types';
 import type { Pool } from './pool';
 import { rateCard, toHooper } from './rate';
-import { type Lineup, rateSquad, slotsFor, type SquadRating } from './squad';
+import { type Lineup, rateSquad, slotsFor, SOCCER_FORMATIONS, type SquadRating } from './squad';
+import type { CardForPitch } from '../game/soccer2/arcade';
 import type { CardLine, RatedCard, UtSport } from './types';
 
 /** A squad on the wire: [slot, card id, level] for every filled spot. */
@@ -22,7 +23,8 @@ export type SquadCards = Record<string, { line: CardLine; level: number }>;
 export function squadFromWire(pool: Pool, w: unknown): SquadCards {
   const out: SquadCards = {};
   if (!Array.isArray(w)) return out;
-  const slots = new Set(slotsFor(pool.sport).map((s) => s.id));
+  // soccer: the other phone's squad may be in another formation (any formation's slot is fine)
+  const slots = new Set(pool.sport === 'soccer' ? Object.values(SOCCER_FORMATIONS).flatMap((f) => f.map((s) => s.id)) : slotsFor(pool.sport).map((s) => s.id));
   for (const e of w.slice(0, 40)) {
     if (!Array.isArray(e) || e.length !== 3) continue;
     const [slot, id, level] = e;
@@ -132,9 +134,25 @@ export interface Teams {
   defense?: Defense;
   rivalOffense?: Offense;
   rivalDefense?: Defense;
+  /** soccer: both elevens' cards as they play (the Arcade turns them into the engine's elevens) */
+  soccerCards?: { us: CardForPitch[]; them: CardForPitch[] };
+}
+
+// ---------- soccer (Claude 2026-11-01) ----------
+
+/** A squad's cards as the soccer match plays them: rated at their level, in a fixed order (by slot). */
+export function pitchCardsOf(sq: SquadCards): CardForPitch[] {
+  return Object.entries(sq)
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([, c]) => {
+      const rc = rateCard(c.line, c.level);
+      const l = c.line;
+      return { pid: l.pid, name: l.name, pos: l.pos, ovr: rc.ovr, attrs: { ...rc.attrs }, ht: l.ht, num: l.num, season: l.season, fr: l.fr, abbr: l.abbr, teamName: l.teamName, c1: l.c1, c2: l.c2 };
+    });
 }
 
 export function teamsOf(sport: UtSport, mine: SquadCards, theirs: SquadCards, seed: string): Teams {
+  if (sport === 'soccer') return { soccerCards: { us: pitchCardsOf(mine), them: pitchCardsOf(theirs) } };
   if (sport === 'nba') {
     const a = fiveOfSquad(mine);
     const b = fiveOfSquad(theirs);

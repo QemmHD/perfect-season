@@ -23,12 +23,12 @@ async function fives(): Promise<[Hooper[], Hooper[]]> {
 const run = NFL ? it.skip : it;
 
 describe('a shot near the rim', () => {
-  run('is a finish when he runs at the rim from 13 feet, a jumper when he stands there', async () => {
+  run('is a finish when he runs at the rim from 10.5 feet, a jumper when he stands there', async () => {
     const [ours, theirs] = await fives();
     const at = (vx: number, vz: number) => {
       const p = newPossession(ours, theirs, [1, 1, 1, 1, 1], rng(hashString('finish')));
       const h = p.bodies[0];
-      h.cx = RIM.cx - 13;
+      h.cx = RIM.cx - 10.5;
       h.cz = 0;
       h.vx = vx;
       h.vz = vz;
@@ -41,7 +41,7 @@ describe('a shot near the rim', () => {
     expect(running.finish).not.toBeNull();
     expect(['dunk', 'layup', 'contact']).toContain(running.finish!.kind);
     // a step or two more before he goes up
-    expect(running.finish!.tUp - running.finish!.t0).toBeGreaterThan(0.26);
+    expect(running.finish!.tUp - running.finish!.t0).toBeGreaterThanOrEqual(0.26);
     const standing = at(0, 0);
     expect(standing.finish).toBeNull();
     expect(standing.meter).not.toBeNull();

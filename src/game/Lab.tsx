@@ -2,7 +2,7 @@
 // (?arcade&auto lets the autopilot play). Not reachable from the app's menus.
 import React, { useMemo, useState } from 'react';
 import { CELLS } from '../engine/data';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
 import type { Lineup, Player } from '../engine/types';
 import type { Progress } from './progress';
 import { fbKitsFor, Football2 } from './football2/Football2';
@@ -37,7 +37,9 @@ export default function Lab() {
   const level = Number(q.get('level') ?? 0.85);
   const s = useMemo(() => sample(level), [level]);
   const [prog, setProg] = useState<Progress | null>(null);
-  if (!NFL)
+  // soccer's bench is ?soccer-lab (dev server only)
+  if (pick({ nba: false, nfl: false, soccer: true })) return <div style={{ padding: 20, color: '#fff' }}>Soccer: open ?soccer-lab on the dev server.</div>;
+  if (pick({ nba: true, nfl: false, soccer: false }))
     return (
       <div className="screen" style={{ paddingTop: 0, paddingBottom: 0 }}>
         <Hoops2

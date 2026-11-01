@@ -1,0 +1,69 @@
+{
+  "implementedBy": "Codex",
+  "date": "2026-10-30",
+  "method": "Fixed-seed existing human-like strategy harness; diagnostic simulations, not human playtest or proof of enjoyment. Baseline pre-gameplay branch. NBA Pro=20 games per strategy/matchup; Legend=10. NFL Pro=40 per matchup; Legend=20. Changed decisions alter later PRNG consumption; matched seeds are reproducible, not paired identical shot opportunities.",
+  "nba": {
+    "before": [
+      "drive       good O vs good D  PPP 1.27 sec 2.8 reached rim 364/364 3PT 0.00/0 MID 0.00/0 CLS 0.00/3 LAY 0.61/306 DNK 0.83/6 CON 0.00/0 SDK 1.00/1",
+      "drive       avg O vs avg D    PPP 1.19 sec 2.9 reached rim 351/351 3PT 0.00/0 MID 0.00/0 CLS 0.50/4 LAY 0.54/290 DNK 0.00/0 CON 0.89/19 SDK 0.00/0",
+      "cross-drive good O vs good D  PPP 1.02 sec 2.9 reached rim 324/324 3PT 0.00/0 MID 0.00/0 CLS 1.00/1 LAY 0.50/298 DNK 1.00/3 CON 0.00/0 SDK 0.00/0",
+      "cross-drive avg O vs avg D    PPP 1.14 sec 3.0 reached rim 339/339 3PT 0.00/0 MID 0.00/0 CLS 0.33/3 LAY 0.54/287 DNK 0.00/0 CON 0.76/17 SDK 0.00/0",
+      "three       good O vs good D  PPP 1.03 sec 3.6 reached rim 0/0 3PT 0.34/285 MID 0.63/19 CLS 0.40/5 LAY 0.80/5 DNK 0.50/2 CON 0.00/0 SDK 0.00/0",
+      "three       avg O vs avg D    PPP 0.94 sec 3.7 reached rim 0/0 3PT 0.32/282 MID 0.33/24 CLS 0.50/4 LAY 0.50/2 DNK 1.00/1 CON 1.00/3 SDK 0.00/0",
+      "elbow       good O vs good D  PPP 0.82 sec 3.6 reached rim 0/0 3PT 0.00/0 MID 0.42/272 CLS 0.38/37 LAY 0.67/3 DNK 1.00/2 CON 0.00/0 SDK 0.00/0",
+      "elbow       avg O vs avg D    PPP 0.71 sec 3.6 reached rim 0/0 3PT 0.00/0 MID 0.37/263 CLS 0.25/40 LAY 0.00/2 DNK 1.00/4 CON 1.00/1 SDK 0.00/0",
+      "stepback    good O vs good D  PPP 0.86 sec 3.3 reached rim 0/0 3PT 0.00/0 MID 0.44/248 CLS 0.22/23 LAY 0.57/14 DNK 0.76/17 CON 0.00/0 SDK 0.00/0",
+      "stepback    avg O vs avg D    PPP 0.84 sec 3.4 reached rim 0/0 3PT 0.00/0 MID 0.39/258 CLS 0.39/23 LAY 0.57/7 DNK 1.00/6 CON 0.75/16 SDK 0.00/0",
+      "kick        good O vs good D  PPP 1.12 sec 4.0 reached rim 0/0 3PT 0.37/87 MID 0.64/184 CLS 0.21/29 LAY 0.33/3 DNK 1.00/2 CON 0.00/0 SDK 0.67/6",
+      "kick        avg O vs avg D    PPP 1.11 sec 4.3 reached rim 0/0 3PT 0.38/220 MID 0.68/31 CLS 0.42/45 LAY 0.38/8 DNK 0.00/0 CON 0.88/8 SDK 0.00/0"
+    ],
+    "pro": [
+      "drive       good O vs good D  PPP 0.86 sec 6.7 reached rim 227/303 3PT 0.50/2 MID 0.40/5 CLS 0.31/67 LAY 0.55/182 DNK 0.00/0 CON 0.00/0 SDK 1.00/5",
+      "drive       avg O vs avg D    PPP 0.48 sec 6.6 reached rim 159/293 3PT 0.00/0 MID 0.25/4 CLS 0.26/222 LAY 0.56/27 DNK 0.00/0 CON 0.75/4 SDK 0.00/0",
+      "cross-drive good O vs good D  PPP 1.04 sec 3.3 reached rim 343/344 3PT 0.00/0 MID 0.00/0 CLS 0.30/20 LAY 0.51/280 DNK 1.00/1 CON 0.00/0 SDK 0.86/7",
+      "cross-drive avg O vs avg D    PPP 0.92 sec 3.4 reached rim 327/333 3PT 0.00/0 MID 0.00/0 CLS 0.42/26 LAY 0.45/256 DNK 1.00/2 CON 0.78/9 SDK 0.00/0",
+      "three       good O vs good D  PPP 0.89 sec 3.8 reached rim 0/0 3PT 0.29/277 MID 0.57/21 CLS 0.27/11 LAY 0.50/2 DNK 1.00/2 CON 0.00/0 SDK 1.00/2",
+      "three       avg O vs avg D    PPP 0.95 sec 3.6 reached rim 0/0 3PT 0.31/279 MID 0.81/21 CLS 0.25/8 LAY 1.00/2 DNK 0.00/0 CON 0.00/0 SDK 0.00/0",
+      "elbow       good O vs good D  PPP 0.62 sec 5.5 reached rim 0/0 3PT 0.00/0 MID 0.27/228 CLS 0.45/42 LAY 0.80/5 DNK 0.00/0 CON 0.00/0 SDK 0.93/15",
+      "elbow       avg O vs avg D    PPP 0.55 sec 4.9 reached rim 0/0 3PT 0.00/0 MID 0.26/225 CLS 0.32/37 LAY 0.73/15 DNK 0.00/0 CON 1.00/4 SDK 0.00/0",
+      "stepback    good O vs good D  PPP 1.98 sec 3.9 reached rim 0/0 3PT 0.74/276 MID 0.00/0 CLS 0.25/8 LAY 0.75/4 DNK 0.00/0 CON 0.00/0 SDK 1.00/6",
+      "stepback    avg O vs avg D    PPP 1.74 sec 3.6 reached rim 0/0 3PT 0.65/273 MID 0.00/0 CLS 0.27/15 LAY 0.71/7 DNK 0.00/0 CON 0.75/4 SDK 0.00/0",
+      "kick        good O vs good D  PPP 1.42 sec 4.4 reached rim 0/0 3PT 0.55/215 MID 0.00/0 CLS 0.46/78 LAY 0.50/6 DNK 0.00/0 CON 0.00/0 SDK 1.00/8",
+      "kick        avg O vs avg D    PPP 1.35 sec 4.4 reached rim 0/0 3PT 0.54/210 MID 1.00/5 CLS 0.41/81 LAY 0.67/9 DNK 0.00/0 CON 0.67/3 SDK 0.00/0"
+    ],
+    "legend": [
+      "drive       good O vs good D  PPP 0.57 sec 6.2 reached rim 29/122 3PT 0.00/0 MID 0.00/1 CLS 0.32/62 LAY 0.55/42 DNK 0.00/0 CON 0.00/0 SDK 0.50/2",
+      "drive       avg O vs avg D    PPP 0.41 sec 6.4 reached rim 42/127 3PT 1.00/1 MID 0.50/2 CLS 0.25/102 LAY 0.67/3 DNK 0.00/0 CON 1.00/2 SDK 0.00/0",
+      "cross-drive good O vs good D  PPP 0.97 sec 3.4 reached rim 163/163 3PT 0.00/0 MID 0.00/0 CLS 0.32/25 LAY 0.53/120 DNK 0.00/0 CON 0.00/0 SDK 1.00/3",
+      "cross-drive avg O vs avg D    PPP 0.98 sec 3.2 reached rim 148/150 3PT 0.00/0 MID 0.00/0 CLS 0.29/14 LAY 0.57/126 DNK 0.00/0 CON 0.00/0 SDK 0.00/0",
+      "three       good O vs good D  PPP 0.58 sec 3.9 reached rim 0/0 3PT 0.18/132 MID 0.54/13 CLS 0.40/5 LAY 1.00/1 DNK 0.00/0 CON 0.00/0 SDK 0.00/0",
+      "three       avg O vs avg D    PPP 0.81 sec 3.6 reached rim 0/0 3PT 0.26/134 MID 0.80/10 CLS 0.80/5 LAY 0.00/1 DNK 0.00/0 CON 0.00/0 SDK 0.00/0",
+      "elbow       good O vs good D  PPP 0.46 sec 5.2 reached rim 0/0 3PT 0.17/6 MID 0.23/94 CLS 0.26/19 LAY 0.00/1 DNK 0.00/0 CON 0.00/0 SDK 1.00/7",
+      "elbow       avg O vs avg D    PPP 0.66 sec 4.9 reached rim 0/0 3PT 0.00/0 MID 0.35/104 CLS 0.42/19 LAY 0.86/7 DNK 0.00/0 CON 0.67/3 SDK 0.00/0",
+      "stepback    good O vs good D  PPP 1.49 sec 4.1 reached rim 0/0 3PT 0.56/131 MID 0.00/0 CLS 0.50/10 LAY 0.00/0 DNK 0.00/0 CON 0.00/0 SDK 1.00/5",
+      "stepback    avg O vs avg D    PPP 1.51 sec 3.9 reached rim 0/0 3PT 0.60/126 MID 0.00/0 CLS 0.45/11 LAY 0.67/3 DNK 0.00/0 CON 0.00/2 SDK 0.00/0",
+      "kick        good O vs good D  PPP 1.03 sec 4.4 reached rim 0/0 3PT 0.38/119 MID 0.00/0 CLS 0.48/27 LAY 0.00/1 DNK 0.00/0 CON 0.00/0 SDK 1.00/2",
+      "kick        avg O vs avg D    PPP 1.16 sec 4.5 reached rim 0/0 3PT 0.44/104 MID 0.00/0 CLS 0.46/37 LAY 0.83/6 DNK 0.00/0 CON 0.00/2 SDK 0.00/0"
+    ]
+  },
+  "nfl": {
+    "before": [
+      "good O   good D   pts/g 11.1 cmp% 0.72 Y/C 20.9 INT/att 0.012 sack/db 0.249 Y/run 3.5 plays/dr 4.8",
+      "good O   avg D    pts/g 16.7 cmp% 0.75 Y/C 21.5 INT/att 0.004 sack/db 0.170 Y/run 4.7 plays/dr 5.3",
+      "avg O    good D   pts/g 8.9 cmp% 0.67 Y/C 17.3 INT/att 0.007 sack/db 0.207 Y/run 3.6 plays/dr 5.2",
+      "avg O    avg D    pts/g 13.0 cmp% 0.73 Y/C 18.1 INT/att 0.002 sack/db 0.185 Y/run 4.6 plays/dr 5.6"
+    ],
+    "pro": [
+      "good O   good D   pts/g 7.9 cmp% 0.57 Y/C 16.3 INT/att 0.028 sack/db 0.105 Y/run 4.4 plays/dr 5.4",
+      "good O   avg D    pts/g 15.6 cmp% 0.65 Y/C 17.1 INT/att 0.011 sack/db 0.066 Y/run 5.5 plays/dr 6.2",
+      "avg O    good D   pts/g 7.3 cmp% 0.51 Y/C 15.0 INT/att 0.018 sack/db 0.109 Y/run 4.5 plays/dr 5.9",
+      "avg O    avg D    pts/g 13.1 cmp% 0.58 Y/C 16.1 INT/att 0.008 sack/db 0.100 Y/run 6.6 plays/dr 6.5"
+    ],
+    "legend": [
+      "good O   good D   pts/g 5.0 cmp% 0.54 Y/C 14.6 INT/att 0.023 sack/db 0.201 Y/run 3.4 plays/dr 5.4",
+      "good O   avg D    pts/g 13.1 cmp% 0.63 Y/C 16.6 INT/att 0.024 sack/db 0.070 Y/run 4.2 plays/dr 6.0",
+      "avg O    good D   pts/g 3.6 cmp% 0.48 Y/C 14.9 INT/att 0.021 sack/db 0.261 Y/run 4.1 plays/dr 4.9",
+      "avg O    avg D    pts/g 5.3 cmp% 0.58 Y/C 13.6 INT/att 0.025 sack/db 0.139 Y/run 4.4 plays/dr 5.3"
+    ]
+  }
+}

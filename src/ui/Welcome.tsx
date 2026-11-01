@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
 import { type Favorites, markFavoritesAsked, readFavorites, saveFavorites } from '../lib/favorites';
 import { nameProblem, randomName } from '../lib/names';
 import { sfx } from '../lib/sound';
@@ -29,13 +29,18 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
     sfx.select();
     setStep('teams');
   };
+  // the teams the first launch asks for: basketball's and football's (a soccer player: his club)
+  // this sport's first, matching the picker's open tab (Claude, final QA)
+  const need = pick<(keyof Favorites)[]>({ nba: ['nba', 'nfl'], nfl: ['nfl', 'nba'], soccer: ['soccer'] });
+  const missing = need.find((k) => !favs[k]);
+  const PICK_TEXT: Record<keyof Favorites, string> = { nba: 'PICK AN NBA TEAM', nfl: 'PICK AN NFL TEAM', soccer: 'PICK A CLUB' };
   const finish = (skip: boolean) => {
-    if (!skip && (!favs.nba || !favs.nfl)) {
+    if (!skip && missing) {
       sfx.nope();
       return;
     }
     // skipping keeps a pick already made; the rest can be picked in Profile
-    if (favs.nba || favs.nfl) saveFavorites(favs);
+    if (favs.nba || favs.nfl || favs.soccer) saveFavorites(favs);
     markFavoritesAsked();
     sfx.seriesWin();
     onDone(name.trim());
@@ -57,8 +62,8 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
         </div>
         <div className="spacer" />
         <div className="actionbar">
-          <button type="submit" className="big shine" aria-disabled={!favs.nba || !favs.nfl}>
-            <Fit text={!favs.nba ? 'PICK AN NBA TEAM' : !favs.nfl ? 'PICK AN NFL TEAM' : 'LET’S GO'} />
+          <button type="submit" className="big shine" aria-disabled={!!missing}>
+            <Fit text={missing ? PICK_TEXT[missing] : 'LET’S GO'} />
           </button>
           <button type="button" className="fav-skip" onClick={() => finish(true)}>
             Skip for now
@@ -104,7 +109,7 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
       </div>
       <ul className="welcome-perks rise-in" style={{ animationDelay: '650ms' }}>
         <li>
-          <b>Draft</b> {NFL ? 'eight' : 'five'} players from random {NFL ? 'NFL' : 'NBA'} teams and decades
+          <b>Draft</b> {pick({ nba: 'five', nfl: 'eight', soccer: 'eight' })} players from random {pick({ nba: 'NBA teams', nfl: 'NFL teams', soccer: 'clubs' })} and decades
         </li>
         <li>
           <b>Climb</b> the daily, weekly and all-time leaderboards

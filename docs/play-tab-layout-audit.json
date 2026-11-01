@@ -1,0 +1,44 @@
+[
+  {
+    "sport": "nba",
+    "width": 320,
+    "tabs": 6,
+    "minTarget": 48.4102783203125,
+    "allModeParents": "PLAY"
+  },
+  {
+    "sport": "nba",
+    "width": 390,
+    "tabs": 6,
+    "minTarget": 61,
+    "allModeParents": "PLAY"
+  },
+  {
+    "sport": "nba",
+    "width": 844,
+    "tabs": 6,
+    "minTarget": 44.25,
+    "allModeParents": "PLAY"
+  },
+  {
+    "sport": "nfl",
+    "width": 320,
+    "tabs": 6,
+    "minTarget": 48.4102783203125,
+    "allModeParents": "PLAY"
+  },
+  {
+    "sport": "nfl",
+    "width": 390,
+    "tabs": 6,
+    "minTarget": 61,
+    "allModeParents": "PLAY"
+  },
+  {
+    "sport": "nfl",
+    "width": 844,
+    "tabs": 6,
+    "minTarget": 44.25,
+    "allModeParents": "PLAY"
+  }
+]

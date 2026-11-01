@@ -1,3 +1,4 @@
+import { progressChanged } from './save-events';
 // Each player's favorite NBA and NFL team: stored once on the phone for both sports (the sport is
 // fixed per page load, the favorites aren't), asked for at first launch and changeable in Profile.
 // Their colors dress your players in a head to head.
@@ -12,9 +13,11 @@ export const FAV_ASKED_KEY = 'perfect-season:fav:asked';
 export interface Favorites {
   nba: string | null;
   nfl: string | null;
+  /** Claude 2026-11-01: a soccer club (additive: older builds read only the other two) */
+  soccer: string | null;
 }
 
-const NONE: Favorites = { nba: null, nfl: null };
+const NONE: Favorites = { nba: null, nfl: null, soccer: null };
 
 function store(): Storage | null {
   try {
@@ -31,7 +34,7 @@ export function readFavorites(): Favorites {
     if (!raw) return NONE;
     const v = JSON.parse(raw) as Record<string, unknown> | null;
     if (!v || typeof v !== 'object') return NONE;
-    return { nba: teamOf('nba', v.nba)?.abbr ?? null, nfl: teamOf('nfl', v.nfl)?.abbr ?? null };
+    return { nba: teamOf('nba', v.nba)?.abbr ?? null, nfl: teamOf('nfl', v.nfl)?.abbr ?? null, soccer: teamOf('soccer', v.soccer)?.abbr ?? null };
   } catch {
     return NONE;
   }
@@ -51,15 +54,28 @@ export function saveFavorites(next: Partial<Favorites>): Favorites {
   const f: Favorites = {
     nba: 'nba' in next ? (teamOf('nba', next.nba)?.abbr ?? null) : prev.nba,
     nfl: 'nfl' in next ? (teamOf('nfl', next.nfl)?.abbr ?? null) : prev.nfl,
+    soccer: 'soccer' in next ? (teamOf('soccer', next.soccer)?.abbr ?? null) : prev.soccer,
   };
   cache = f;
   try {
-    store()?.setItem(FAV_KEY, JSON.stringify(f));
+    // without a soccer club the stored value is exactly what older builds write (and read)
+    store()?.setItem(FAV_KEY, JSON.stringify(f.soccer ? f : { nba: f.nba, nfl: f.nfl }));
   } catch {
     // storage blocked: kept for this visit
   }
+  progressChanged();
   listeners.forEach((fn) => fn());
   return f;
+}
+
+/**
+ * The sport the team picker opens on (Claude, final QA 2026-11-01): this sport's teams until it has a
+ * pick, then the first other sport still missing one. (The soccer change had flipped this, so a new
+ * basketball player saw the football grid under "PICK AN NBA TEAM", and a soccer player the NBA's.)
+ */
+export function firstFavTab(sport: SportId, value: Favorites, sports: readonly SportId[]): SportId {
+  if (!value[sport]) return sport;
+  return sports.find((s) => s !== sport && !value[s]) ?? sport;
 }
 
 export function favoriteFor(sport: SportId): string | null {
@@ -69,6 +85,7 @@ export function favoriteFor(sport: SportId): string | null {
 export function markFavoritesAsked(): void {
   try {
     store()?.setItem(FAV_ASKED_KEY, '1');
+    progressChanged();
   } catch {
     // storage blocked
   }

@@ -9,3 +9,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Set by vite.config.ts: false in the single-file artifact build, which plays NBA/NFL only. */
+declare const __SOCCER__: boolean;

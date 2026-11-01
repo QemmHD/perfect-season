@@ -1,0 +1,34 @@
+[
+  {
+    "sport": "nba",
+    "clubs": 30,
+    "games": 82,
+    "startMs": 3245,
+    "totalQaMs": 69914,
+    "screenSizes": 3,
+    "layouts": 12,
+    "realGameOutcome": "LOSS",
+    "leagueRoundAfterRealMatch": 1,
+    "playedSeasonStored": true,
+    "championshipFixture": true,
+    "historyRetained": true,
+    "originalCopies": 56,
+    "errors": []
+  },
+  {
+    "sport": "nfl",
+    "clubs": 32,
+    "games": 17,
+    "startMs": 430,
+    "totalQaMs": 72742,
+    "screenSizes": 3,
+    "layouts": 12,
+    "realGameOutcome": "WIN",
+    "leagueRoundAfterRealMatch": 1,
+    "playedSeasonStored": true,
+    "championshipFixture": true,
+    "historyRetained": true,
+    "originalCopies": 69,
+    "errors": []
+  }
+]

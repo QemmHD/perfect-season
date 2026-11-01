@@ -25,7 +25,11 @@ export type Req =
   /** at least n from one decade (any) */
   | { k: 'sameDecade'; n: number }
   /** one card at each of these positions */
-  | { k: 'positions'; pos: string[] };
+  | { k: 'positions'; pos: string[] }
+  /** Claude wave 3: at least n cards from season `min` or later */
+  | { k: 'season'; min: number; n: number }
+  /** Claude wave 3: every card from a different franchise */
+  | { k: 'distinctFr' };
 
 export interface Reward {
   coins?: number;
@@ -33,12 +37,22 @@ export interface Reward {
   pack?: string;
   /** a card: a Hot Season, or a gold at least this good, from this franchise when there is one */
   card?: { tier: 'gold' | 'promo'; minOvr?: number; fr?: string };
+  /** Claude: a random one of this week's Weekly Standouts */
+  standout?: true;
+  /** Claude: this exact card (a Landmark Season) */
+  cardId?: string;
+  /** Claude: its display name, for the reward line */
+  cardName?: string;
+  /** Claude wave 3: a card of this Live Calendar promo (its featured card when `programFeatured`) */
+  program?: string;
+  programName?: string;
+  programFeatured?: boolean;
 }
 
 export interface Sbc {
   /** unique: the day or week it belongs to and its place in the list */
   id: string;
-  kind: 'daily' | 'weekly' | 'upgrade';
+  kind: 'daily' | 'weekly' | 'upgrade' | 'standout' | 'landmark' | 'program';
   /** an upgrade: how many more times it can be done today (counting this one); none: repeatable */
   left?: number;
   title: string;
@@ -49,7 +63,7 @@ export interface Sbc {
   reward: Reward;
 }
 
-const TIER_NAME: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', legend: 'Legend' };
+const TIER_NAME: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', spotlight: 'Spotlight', legend: 'Legend', goat: 'GOAT', standout: 'Standout', landmark: 'Landmark', program: 'Program' };
 
 export function reqText(r: Req): string {
   switch (r.k) {
@@ -69,6 +83,10 @@ export function reqText(r: Req): string {
       return r.n + ' from the same decade';
     case 'positions':
       return 'One each: ' + r.pos.join(' ');
+    case 'season':
+      return 'At least ' + r.n + ' from ' + r.min + ' or later';
+    case 'distinctFr':
+      return 'Every card from a different franchise';
   }
 }
 
@@ -76,6 +94,9 @@ export function rewardText(w: Reward, sport: UtSport, packName: (s: UtSport, k: 
   const parts: string[] = [];
   if (w.pack) parts.push(packName(sport, w.pack));
   if (w.card) parts.push(w.card.tier === 'promo' ? 'a Hot Season card' : w.card.minOvr ? (String(w.card.minOvr).startsWith('8') ? 'an ' : 'a ') + w.card.minOvr + '+ Gold card' : 'a Gold card');
+  if (w.standout) parts.push('a Weekly Standout');
+  if (w.program) parts.push(w.programFeatured ? 'the featured ' + (w.programName ?? 'program') + ' card' : 'a ' + (w.programName ?? 'program') + ' card');
+  if (w.cardId) parts.push(w.cardName ? w.cardName + ' (Landmark)' : 'a Landmark Season card');
   if (w.coins) parts.push(w.coins.toLocaleString('en-US') + ' coins');
   return parts.join(' + ');
 }
@@ -117,6 +138,14 @@ export function checkReq(r: Req, cards: RatedCard[]): { ok: boolean; have: strin
     case 'sameDecade': {
       const k = mostOf(cards.map((c) => decadeOf(c.line.season)));
       return { ok: k >= r.n, have: k + '/' + r.n };
+    }
+    case 'season': {
+      const k = cards.filter((c) => c.line.season >= r.min).length;
+      return { ok: k >= r.n, have: k + '/' + r.n };
+    }
+    case 'distinctFr': {
+      const k = new Set(cards.map((c) => c.line.fr)).size;
+      return { ok: n > 0 && k === n, have: k + '/' + n };
     }
     case 'positions': {
       // each listed position filled by a different card that plays it
@@ -356,6 +385,7 @@ export interface FillCard {
   uid: string;
   rc: RatedCard;
   slot: string | null;
+  storage?: boolean;
 }
 
 /**
@@ -387,7 +417,7 @@ export function cardFits(r: Req, c: RatedCard, size?: number): boolean {
  * do it. The first set that passes wins; null when none does.
  */
 export function autoFill<C extends FillCard>(s: Sbc, club: C[]): string[] | null {
-  const cheap = (a: C, b: C) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || quickSellValue(a.rc) - quickSellValue(b.rc) || a.rc.ovr - b.rc.ovr;
+  const cheap = (a: C, b: C) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || quickSellValue(a.rc) - quickSellValue(b.rc) || Number(!!b.storage) - Number(!!a.storage) || a.rc.ovr - b.rc.ovr;
   // only cards that meet what every card must (an overall floor, a tier for all, ...)
   const cands = club.filter((c) => s.reqs.every((r) => cardFits(r, c.rc, s.size))).sort(cheap);
   const has = (k: Req['k']) => s.reqs.some((r) => r.k === k);

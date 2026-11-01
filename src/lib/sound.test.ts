@@ -1,6 +1,6 @@
 // The game sounds: every recording is in place, each falls back to its synthesized stand-in until
 // it's decoded, sound off stays silent, and the crowd runs on the recorded loop once it's there.
-import { SAMPLES, _test, crowd, filesOf, sample, setFeedback, sfx, type SampleName } from './sound';
+import { SAMPLES, _test, crowd, filesOf, sample, setFeedback, packSound, sfx, type SampleName } from './sound';
 
 /** What a fake AudioContext was asked to make. */
 interface Made {
@@ -100,7 +100,15 @@ afterEach(() => {
 describe('the recordings', () => {
   const paths = Object.keys(import.meta.glob('../assets/sfx/*.mp3'));
   const onDisk = paths.map((p) => p.slice(p.lastIndexOf('/') + 1, -4));
-  const named = new Set((Object.keys(SAMPLES) as SampleName[]).flatMap((n) => [...filesOf(n, 'arena'), ...filesOf(n, 'stadium')]));
+  // (Claude 2026-11-01: and soccer's 'pitch' venue)
+  const named = new Set((Object.keys(SAMPLES) as SampleName[]).flatMap((n) => [...filesOf(n, 'arena'), ...filesOf(n, 'stadium'), ...filesOf(n, 'pitch')]));
+
+  it('keeps soccer’s recordings to soccer (basketball and football never name them)', () => {
+    const other = (Object.keys(SAMPLES) as SampleName[]).flatMap((n) => [...filesOf(n, 'arena'), ...filesOf(n, 'stadium')]);
+    expect(other.filter((f) => f.startsWith('soccer-'))).toEqual([]);
+    expect(filesOf('crowd', 'pitch')).toEqual(['soccer-chant']);
+    expect(filesOf('kick', 'pitch')).toEqual(['soccer-kick-1', 'soccer-kick-2']);
+  });
 
   it('has a file for every sound, and no file nothing plays', () => {
     for (const f of named) expect(onDisk, f).toContain(f);
@@ -244,5 +252,24 @@ describe('the crowd', () => {
     crowd.start(0.3, 'arena');
     setFeedback(false, true);
     expect(_test.bed()).toBeNull();
+  });
+});
+
+describe('Codex pack score', () => {
+  it('creates bounded cues that can be stopped repeatedly without recordings', () => {
+    setFeedback(true, false);
+    for (const cue of ['charge', 'surge', 'reveal'] as const) {
+      const stop = packSound(cue, true);
+      stop();
+      stop();
+    }
+    expect(FakeCtx.made.oscillators).toBeGreaterThan(0);
+    expect(recorded()).toHaveLength(0);
+  });
+  it('obeys sound-off before allocating any cue', () => {
+    setFeedback(false, false);
+    packSound('surge', true)();
+    packSound('reveal', true)();
+    expect(FakeCtx.made.oscillators).toBe(0);
   });
 });

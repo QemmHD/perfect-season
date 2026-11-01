@@ -2,15 +2,14 @@
 // and the team as a hand of trading cards drawn the way the game draws them (era frame, team
 // colors, rarity finish). A Daily shows the cards face down, each edged with its pick's grade,
 // so the day's teams aren't spoiled.
-import { GAMES } from '../engine/rating';
 import { rarityOf, type Rarity } from '../engine/rarity';
 import type { PickGrade } from '../engine/review';
-import { NFL } from '../engine/sport';
+import { pick, SPORT, SPORT_LABEL } from '../engine/sport';
 import { type Player, type Slot, SLOTS } from '../engine/types';
 import type { ResultInfo } from './Results';
 import { eraOf, type Era } from './Card';
 import { initials } from './common';
-import { cardName } from './sportui';
+import { cardName, record } from './sportui';
 
 const W = 1080;
 const H = 1350;
@@ -25,6 +24,8 @@ const GRADE_COLOR: Record<PickGrade, string> = { best: '#19e3c9', great: '#6fe8b
 const JERSEY = {
   nfl: ['M30 10 Q50 20 70 10 L92 22 L98 48 L80 52 L78 40 L78 94 H22 L22 40 L20 52 L2 48 L8 22 Z', 'M30 10 Q50 26 70 10', 'M86 30 L95 40 M14 30 L5 40'],
   nba: ['M30 6 L38 6 Q50 24 62 6 L70 6 Q72 22 84 30 L84 96 H16 L16 30 Q28 22 30 6 Z', 'M38 6 Q50 24 62 6 M30 6 Q28 22 16 30 M70 6 Q72 22 84 30'],
+  // Claude 2026-11-01: the soccer shirt of Card.tsx
+  soccer: ['M36 8 Q50 16 64 8 L88 20 L96 40 L80 46 L76 36 L76 94 H24 L24 36 L20 46 L4 40 L12 20 Z', 'M36 8 Q50 18 64 8', 'M81 41 L95 36 M19 41 L5 36'],
 };
 
 const disp = (size: number, weight = 900) => 'italic ' + weight + ' ' + size + "px 'Archivo', 'Arial Narrow', sans-serif";
@@ -62,11 +63,11 @@ export function drawPoster(info: ResultInfo): string | null {
     g.font = body(26, 700);
     fitText(g, where(), 64, 162, W - 128);
     condensed(true);
-    const tag = (NFL ? 'NFL · ' : 'NBA · ') + (daily && info.dailyNo ? 'DAILY #' + info.dailyNo : r.mode === '1v1' ? (r.online ? 'HEAD TO HEAD' : '1 VS 1') : r.mode.toUpperCase());
+    const tag = SPORT_LABEL[SPORT] + ' · ' + (daily && info.dailyNo ? 'DAILY #' + info.dailyNo : r.mode === '1v1' ? (r.online ? 'HEAD TO HEAD' : '1 VS 1') : r.mode.toUpperCase());
     pill(g, tag, W - 64, 86, 'right');
 
     // the record, and the grade beside it
-    const rec = r.wins + '–' + (GAMES - r.wins);
+    const rec = record(r.wins);
     // as big as it goes without running into the medal
     g.font = disp(290);
     const recSize = Math.min(290, Math.floor((290 * 640) / g.measureText(rec).width));
@@ -137,7 +138,7 @@ export function drawPoster(info: ResultInfo): string | null {
     g.fillStyle = INK;
     g.font = body(30, 800);
     g.textAlign = 'center';
-    g.fillText(NFL ? 'Can you go 17–0 and win the Super Bowl?' : 'Can you go 82–0, then 16–0?', W / 2, H - 32);
+    g.fillText(pick({ nba: 'Can you go 82–0, then 16–0?', nfl: 'Can you go 17–0 and win the Super Bowl?', soccer: 'Can you go 38–0 and win the cup?' }), W / 2, H - 32);
     g.textAlign = 'left';
     return c.toDataURL('image/png');
   } catch {
@@ -197,7 +198,7 @@ function backdrop(g: CanvasRenderingContext2D, glow: string, gold: boolean) {
   g.save();
   g.strokeStyle = 'rgba(25,227,201,0.10)';
   g.lineWidth = 5;
-  if (NFL) {
+  if (pick({ nba: false, nfl: true, soccer: false })) {
     for (let i = 0; i < 9; i++) {
       const y = 1010 + i * 34;
       g.globalAlpha = 0.25 + i * 0.08;
@@ -206,6 +207,15 @@ function backdrop(g: CanvasRenderingContext2D, glow: string, gold: boolean) {
       g.lineTo(W + 40 + i * 40, y);
       g.stroke();
     }
+  } else if (pick({ nba: false, nfl: false, soccer: true })) {
+    // a pitch: the halfway line and centre circle
+    g.beginPath();
+    g.moveTo(-20, H - 250);
+    g.lineTo(W + 20, H - 250);
+    g.stroke();
+    g.beginPath();
+    g.arc(W / 2, H - 250, 230, 0, Math.PI * 2);
+    g.stroke();
   } else {
     g.beginPath();
     g.arc(W / 2, H + 160, 560, 0, Math.PI * 2);
@@ -388,7 +398,7 @@ function card(g: CanvasRenderingContext2D, p: Player, slot: Slot, w: number, h: 
   g.shadowColor = 'rgba(0,0,0,0.5)';
   g.shadowBlur = 8;
   g.shadowOffsetY = 5;
-  const paths = NFL ? JERSEY.nfl : JERSEY.nba;
+  const paths = pick({ nba: JERSEY.nba, nfl: JERSEY.nfl, soccer: JERSEY.soccer });
   g.fillStyle = era === 'vintage' ? mix(p.c1, '#8a6b45', 0.15) : p.c1;
   g.fill(new Path2D(paths[0]));
   g.shadowColor = 'transparent';

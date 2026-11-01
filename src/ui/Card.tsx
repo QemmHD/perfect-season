@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
 import { primeVersion } from '../engine/data';
 import { RARITY_COLORS, RARITY_NAMES, rarityOf } from '../engine/rarity';
-import { NFL } from '../engine/sport';
-import type { Player, Slot } from '../engine/types';
+import { pick } from '../engine/sport';
+import { slotLabel, type Player, type Slot } from '../engine/types';
 import { initials, seasonLabel, Sheet, shortEra } from './common';
 import { reducedMotion } from './motion';
 import { cardName, isDefender, roleLabel, statCols } from './sportui';
@@ -49,6 +49,8 @@ export function useTilt<T extends HTMLElement>(max = 14) {
   const handlers = reducedMotion()
     ? {}
     : {
+        // Claude: marks a tiltable card so a bottom sheet's swipe-to-close leaves its drag alone.
+        'data-tilt': '',
         onPointerDown: (e: React.PointerEvent) => {
           on.current = true;
           set(e.clientX, e.clientY);
@@ -65,7 +67,19 @@ export function useTilt<T extends HTMLElement>(max = 14) {
 
 /** The art: the player's jersey in his team's colors, his initials for a number. */
 export function Jersey({ c1, c2, text }: { c1: string; c2: string; text: string }) {
-  if (NFL)
+  if (pick({ nba: false, nfl: false, soccer: true }))
+    // Claude 2026-11-01: a soccer shirt, short sleeves and a round collar, a band on each cuff
+    return (
+      <svg className="tc-jersey" viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M36 8 Q50 16 64 8 L88 20 L96 40 L80 46 L76 36 L76 94 H24 L24 36 L20 46 L4 40 L12 20 Z" fill={c1} stroke="rgba(0,0,0,0.35)" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M36 8 Q50 18 64 8" fill="none" stroke={c2} strokeWidth="4" />
+        <path d="M81 41 L95 36 M19 41 L5 36" stroke={c2} strokeWidth="4" />
+        <text x="50" y="72" textAnchor="middle" className="tc-num" fill="#fff" stroke={c2} strokeWidth="1.6" paintOrder="stroke" fontSize="34">
+          {text}
+        </text>
+      </svg>
+    );
+  if (pick({ nba: false, nfl: true, soccer: false }))
     // a football jersey: shoulder pads, short sleeves, a stripe on each sleeve
     return (
       <svg className="tc-jersey" viewBox="0 0 100 100" aria-hidden="true">
@@ -116,7 +130,7 @@ export function TradingCard({ p, slot, blind, big, tilt = true }: { p: Player; s
             {p.abbr} {shortEra(p.era)}
           </small>
         </span>
-        {slot && <span className="tc-slot">{slot}</span>}
+        {slot && <span className="tc-slot">{slotLabel(slot)}</span>}
         {!blind && <b className="tc-val num">{p.val.toFixed(0)}</b>}
       </span>
       {rar !== 'common' && <span className="tc-foil" aria-hidden="true" />}
@@ -149,8 +163,8 @@ export function CardSheet({ p, slot, blind, onClose }: { p: Player; slot?: Slot;
               {roleLabel(p)} · {p.teamName} · {years}
             </small>
             <small>
-              {NFL && p.est ? 'About ' : ''}
-              {p.g} games{p.seasons > 1 ? ' over ' + p.seasons + ' seasons' : ''}
+              {pick({ nba: false, nfl: true, soccer: false }) && p.est ? 'About ' : ''}
+              {p.g} {pick({ nba: 'games', nfl: 'games', soccer: 'league games' })}{p.seasons > 1 ? ' over ' + p.seasons + ' seasons' : ''}
               {p.primedFrom ? ' · primed to ' + p.primedFrom.abbr + ' ' + p.primedFrom.era : ''}
             </small>
             {!blind && (

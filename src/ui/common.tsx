@@ -90,21 +90,208 @@ export function TeamChips({ players, stagger, lit = -1, on = 99 }: { players: (P
  * Modal sheet. `bottom` slides up from the bottom edge like an iOS sheet;
  * `center` pops in like an alert. Both animate out before `onClose` runs.
  */
-export function Sheet({ label, kind = 'bottom', onClose, children }: { label: string; kind?: 'bottom' | 'center' | 'top'; onClose: () => void; children: (close: (after?: () => void) => void) => React.ReactNode }) {
+export function Sheet({
+  label,
+  kind = 'bottom',
+  onClose,
+  children
+}: {
+  label: string;
+  kind?: 'bottom' | 'center' | 'top';
+  onClose: () => void;
+  children: (close: (after?: () => void) => void) => React.ReactNode;
+}) {
   const [closing, setClosing] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const swiped = useRef(false);
   const done = useRef(false);
   const close = (after?: () => void) => {
     if (done.current) return;
     done.current = true;
     setClosing(true);
-    window.setTimeout(
-      () => (after ? after() : onClose()),
-      reducedMotion() ? 0 : 200
-    );
+    window.setTimeout(() => (after ? after() : onClose()), reducedMotion() ? 0 : 200);
   };
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  // A sheet that was dragged and let back keeps `animation: none` inline (so its opening slide
+  // doesn't replay); clear it as the closing class lands so X/scrim/Escape still slide it away.
+  useLayoutEffect(() => {
+    const sheet = sheetRef.current;
+    if (closing && sheet && !swiped.current) sheet.style.animation = '';
+  }, [closing]);
+  // Claude: the grab bar on bottom sheets now works. Pull the sheet down (from anywhere on it,
+  // once its content is scrolled to the top) and let go past ~a quarter of its height, or flick
+  // it, to close; otherwise it springs back. Horizontal drags, form controls, tiltable cards and
+  // elements that own their touches (touch-action: none) are left alone.
+  useEffect(() => {
+    const sheet = sheetRef.current,
+      scrim = dialogRef.current;
+    if (kind !== 'bottom' || !sheet || !scrim) return;
+    let start: { x: number; y: number } | null = null,
+      dragging = false,
+      dy = 0,
+      speed = 0,
+      last = { y: 0, at: 0 };
+    const ownsTouch = (target: EventTarget | null) => {
+      for (let el = target instanceof Element ? target : null; el && el !== sheet; el = el.parentElement) {
+        if (el.matches('input,textarea,select,[data-tilt],[data-sheet-noswipe]')) return true;
+        if (el.scrollTop > 0) return true;
+        if (getComputedStyle(el).touchAction === 'none') return true;
+      }
+      return sheet.scrollTop > 0;
+    };
+    const settle = (shut: boolean) => {
+      const quick = reducedMotion();
+      sheet.style.transition = quick ? 'none' : 'transform ' + (shut ? 0.2 : 0.26) + 's cubic-bezier(0.2, 0.8, 0.3, 1)';
+      scrim.style.transition = quick ? 'none' : 'background-color 0.2s ease';
+      if (shut) {
+        swiped.current = true;
+        sheet.style.transform = 'translateY(100%)';
+        closeRef.current();
+        return;
+      }
+      sheet.style.transform = '';
+      scrim.style.backgroundColor = '';
+      window.setTimeout(() => {
+        if (dragging) return;
+        sheet.style.transition = '';
+        sheet.style.willChange = '';
+        scrim.style.transition = '';
+      }, 300);
+    };
+    const begin = (e: TouchEvent) => {
+      start = null;
+      if (e.touches.length !== 1 || done.current || ownsTouch(e.target)) return;
+      const p = e.touches[0];
+      start = { x: p.clientX, y: p.clientY };
+      dragging = false;
+      dy = 0;
+      speed = 0;
+      last = { y: p.clientY, at: e.timeStamp };
+    };
+    const move = (e: TouchEvent) => {
+      if (!start) return;
+      if (e.touches.length !== 1) {
+        start = null;
+        if (dragging) {
+          dragging = false;
+          settle(false);
+        }
+        return;
+      }
+      const p = e.touches[0],
+        dx = p.clientX - start.x,
+        down = p.clientY - start.y;
+      if (!dragging) {
+        if (Math.abs(dx) + Math.abs(down) < 6) return;
+        // an upward or sideways start is a scroll or a carousel, not a dismiss
+        if (down <= 0 || Math.abs(dx) > down) {
+          start = null;
+          return;
+        }
+        dragging = true;
+        sheet.style.animation = 'none';
+        sheet.style.transition = 'none';
+        sheet.style.willChange = 'transform';
+        scrim.style.transition = 'none';
+      }
+      if (e.cancelable) e.preventDefault();
+      dy = Math.max(0, down);
+      const dt = e.timeStamp - last.at;
+      if (dt > 0) speed = speed * 0.4 + ((p.clientY - last.y) / dt) * 0.6;
+      last = { y: p.clientY, at: e.timeStamp };
+      sheet.style.transform = 'translateY(' + dy + 'px)';
+      const h = sheet.getBoundingClientRect().height || 1;
+      scrim.style.backgroundColor = 'rgba(2, 8, 12, ' + (0.78 * (1 - Math.min(1, dy / h) * 0.7)).toFixed(3) + ')';
+    };
+    const end = (e: TouchEvent) => {
+      if (!start) return;
+      start = null;
+      if (!dragging) return;
+      dragging = false;
+      // a lift after a drag is not a tap on whatever sits under the finger
+      const swallow = (ev: Event) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      sheet.addEventListener('click', swallow, true);
+      window.setTimeout(() => sheet.removeEventListener('click', swallow, true), 400);
+      const h = sheet.getBoundingClientRect().height,
+        // a finger that stopped before lifting isn't flicking
+        flick = e.timeStamp - last.at < 90 && speed > 0.45 && dy > 40;
+      settle(e.type === 'touchend' && (dy > Math.min(140, h * 0.25) || flick));
+    };
+    sheet.addEventListener('touchstart', begin, { passive: true });
+    sheet.addEventListener('touchmove', move, { passive: false });
+    sheet.addEventListener('touchend', end);
+    sheet.addEventListener('touchcancel', end);
+    return () => {
+      sheet.removeEventListener('touchstart', begin);
+      sheet.removeEventListener('touchmove', move);
+      sheet.removeEventListener('touchend', end);
+      sheet.removeEventListener('touchcancel', end);
+    };
+  }, [kind]);
+  useEffect(() => {
+    const root = dialogRef.current;
+    if (!root) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const top = () => {
+      const dialogs = Array.from(document.querySelectorAll('[aria-modal="true"]')).filter((el) => el.getClientRects().length);
+      return dialogs[dialogs.length - 1] === root;
+    };
+    const focusable = () =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])')
+      ).filter((el) => el.getClientRects().length && !el.closest('[inert]'));
+    // Focus the dialog, not an input: opening a sheet must not summon the phone keyboard.
+    root.focus({ preventScroll: true });
+    const keys = (event: KeyboardEvent) => {
+      if (!top() || event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const list = focusable(),
+        first = list[0],
+        last = list[list.length - 1];
+      if (!first) {
+        event.preventDefault();
+        root.focus({ preventScroll: true });
+      } else if (event.shiftKey && (document.activeElement === first || document.activeElement === root)) {
+        event.preventDefault();
+        last!.focus({ preventScroll: true });
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === root)) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    };
+    const focus = (event: FocusEvent) => {
+      if (top() && event.target instanceof Node && !root.contains(event.target)) root.focus({ preventScroll: true });
+    };
+    document.addEventListener('keydown', keys);
+    document.addEventListener('focusin', focus);
+    return () => {
+      document.removeEventListener('keydown', keys);
+      document.removeEventListener('focusin', focus);
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
   return (
-    <div className={'scrim ' + kind + (closing ? ' closing' : '')} role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className={'sheet ' + kind}>
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      className={'scrim ' + kind + (closing ? ' closing' : '')}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      onClick={(e) => e.target === e.currentTarget && close()}
+    >
+      <div ref={sheetRef} className={'sheet ' + kind}>
         {kind === 'bottom' && <span className="grip" aria-hidden="true" />}
         {children(close)}
       </div>

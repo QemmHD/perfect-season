@@ -28,6 +28,9 @@
   --rival-soft: #b9a4ff;
   --display: 'Archivo', 'Avenir Next Condensed', 'Arial Narrow', 'Roboto Condensed', 'Helvetica Neue', sans-serif;
   --body: 'Archivo', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --hud-surface: rgba(6, 24, 32, 0.94);
+  --hud-line: rgba(143, 166, 178, 0.28);
+  --hud-elevation: inset 0 1px rgba(255,255,255,.04), 0 4px 14px rgba(0,0,0,.3);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --ease-in: cubic-bezier(0.5, 0, 0.9, 0.5);
@@ -2244,6 +2247,25 @@ button:focus-visible {
   color: var(--sub);
   margin-top: 22px;
 }
+/* Claude 2026-11-01: soccer's W–D–L board */
+.board.three {
+  gap: 4px;
+}
+.board.three b {
+  min-width: 84px;
+  font-size: 80px;
+}
+.board.three .dash {
+  font-size: 44px;
+  margin-top: 16px;
+}
+.board b.d {
+  color: #c4d0d6;
+}
+.fit-compact .board.three b {
+  font-size: 60px;
+  min-width: 64px;
+}
 .board.tense {
   border-color: var(--gold);
   box-shadow:
@@ -2302,6 +2324,11 @@ button:focus-visible {
 }
 .dots i.l {
   background: #c8475b;
+  animation: dot-in 0.32s var(--ease-spring) both;
+}
+/* Claude 2026-11-01: a soccer draw */
+.dots i.d {
+  background: #8fa6b2;
   animation: dot-in 0.32s var(--ease-spring) both;
 }
 @keyframes dot-in {
@@ -3016,6 +3043,18 @@ button:focus-visible {
 .fit-compact .record b {
   font-size: 76px;
 }
+/* Claude 2026-11-01: soccer's W–D–L and league points */
+.record b:nth-of-type(3) ~ span,
+.record:has(b:nth-of-type(3)) b {
+  font-size: 80px;
+}
+.rec-points {
+  margin-top: -4px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--sub);
+}
 .gradeline.small .gradebadge {
   width: 48px;
   height: 48px;
@@ -3314,6 +3353,9 @@ button:focus-visible {
   background: rgba(2, 8, 12, 0.78);
   animation: fade-in 0.22s ease both;
 }
+/* Programmatic dialog focus is announced; action focus keeps the original gold ring. */
+.scrim[tabindex="-1"]:focus {outline:none;}
+
 .scrim.closing {
   animation: fade-out 0.2s ease both;
 }
@@ -4760,6 +4802,9 @@ button.friendcard:active {
 .spantoggle {
   align-self: flex-start;
   margin-left: 0;
+  /* Claude: a direct child of the scrolling .page column with overflow:hidden has min-height 0,
+     so a long board squeezed THIS WEEK / ALL TIME down to its 2px border. */
+  flex-shrink: 0;
 }
 
 /* ---------- rarity ---------- */
@@ -5140,6 +5185,23 @@ button.friendcard:active {
 .sportswitch button:active {
   transform: scale(0.95);
 }
+/* Claude 2026-11-01: three sports, NBA · NFL · SOCCER */
+.sportswitch.three .ind {
+  width: calc((100% - 6px) / 3);
+}
+.sportswitch.three button {
+  width: 88px;
+}
+.sportswitch.three.nfl .ind {
+  transform: translateX(100%);
+}
+.sportswitch.three.soccer .ind {
+  transform: translateX(200%);
+  box-shadow: inset 0 0 0 1px rgba(107, 227, 154, 0.45);
+}
+.sportswitch.soccer button[aria-pressed='true'] svg {
+  color: #6be39a;
+}
 .fit-tight .sportswitch,
 .fit-compact .sportswitch {
   margin-top: 4px;
@@ -5168,6 +5230,13 @@ button.friendcard:active {
 }
 .sportfade.nfl .ball {
   color: var(--gold);
+}
+/* Claude 2026-11-01: soccer's fade, a pitch green */
+.sportfade.soccer {
+  background: radial-gradient(circle 140px at 50% 46%, rgba(76, 214, 120, 0.14), rgba(76, 214, 120, 0)), var(--bg);
+}
+.sportfade.soccer .ball {
+  color: #6be39a;
 }
 .sportfade b {
   font-size: 40px;
@@ -5230,6 +5299,31 @@ button.friendcard:active {
   border-color: #c8475b;
   color: #fff;
   animation: dot-in 0.36s var(--ease-spring) both;
+}
+.sched span.d {
+  background: #5d7380;
+  border-color: #5d7380;
+  color: #fff;
+  animation: dot-in 0.36s var(--ease-spring) both;
+}
+/* soccer's 38 matchdays: eight across, smaller */
+.sched.soccer {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+}
+.sched.soccer span {
+  height: 30px;
+  border-radius: 6px;
+}
+.sched.soccer i {
+  font-size: 7.5px;
+}
+.sched.soccer b {
+  font-size: 9.5px;
+}
+.fit-tight .sched.soccer span,
+.fit-compact .sched.soccer span {
+  height: 24px;
 }
 .fit-tight .sched span {
   height: 32px;
@@ -5485,6 +5579,10 @@ button.friendcard:active {
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-top: 8px;
+}
+/* Claude 2026-11-01: soccer's two halves */
+.cast-quarters.halves {
+  grid-template-columns: repeat(2, 1fr);
 }
 .cast-quarters span {
   display: flex;
@@ -8232,8 +8330,13 @@ button.friendcard:active {
   color: #ff9a9a;
 }
 .fb2 .hg2-hint {
-  top: auto;
-  bottom: calc(var(--sab) + 196px);
+  /* Codex: intrinsic text height, never a top-to-bottom playfield overlay. */
+  height: fit-content;
+  width: max-content;
+  box-sizing: border-box;
+  /* Under scoreboard/drive/On Fire; clear of both pre-snap calls and run controls. */
+  top: calc(var(--sat) + 98px);
+  bottom: auto;
 }
 .fb2.wide .hg2-hint {
   bottom: auto;
@@ -8465,6 +8568,49 @@ button.friendcard:active {
 .fb2 .hg2-bug .mid {
   white-space: nowrap;
 }
+/* Claude, final QA 2026-11-01: on a 320px phone the score bug got wider than the screen (YOU and the
+   rival's name were cut off at both edges: football with its clock, basketball with two-digit scores
+   and an eight-letter rival), and basketball's sixteen possession marks were wider than the screen.
+   Tighten them like soccer's; football also drops the spot (the yard line is on the field). The game isn't in the scaled frame, so a width query is right here. */
+@media (max-width: 350px) {
+  .hg2 .hg2-bug > span {
+    padding: 4px 7px;
+    gap: 5px;
+  }
+  .hg2 .hg2-bug b {
+    font-size: 19px;
+  }
+  .hg2 .hg2-bug i {
+    font-size: 10px;
+    letter-spacing: 0.6px;
+  }
+  .hg2 .hg2-bug .mid {
+    gap: 4px;
+  }
+  .hg2 .hg2-bug .mid b {
+    font-size: 13px;
+  }
+  .hg2 .hg2-bug .mid small {
+    font-size: 11px;
+  }
+  .hg2 .hg2-bug .mid em {
+    font-size: 13px;
+    padding: 1px 4px;
+  }
+  .fb2 .hg2-bug .mid small {
+    display: none;
+  }
+  /* sixteen possession marks were 323px wide: the first and last were cut off */
+  .hg2-marks {
+    gap: 2px;
+  }
+  .hg2-marks i {
+    width: 14px;
+  }
+  .hg2-marks i.half {
+    margin-left: 4px;
+  }
+}
 /* sideways the play call sits at the right, clear of the formation */
 .fb2.wide .fb2-call,
 .fb2.wide .fb2-kick {
@@ -8611,19 +8757,28 @@ button.friendcard:active {
 .ut-top {
   position: relative;
   z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
 }
+/* Reserve real space for the back button and wallet, including long subpage names. */
 .ut-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
+  min-width: 0;
+  text-align: center;
   font-size: 24px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
   background: linear-gradient(180deg, #ffe7a8 0%, var(--gold) 60%, #c98a1d 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+.ut-v-circuit .ut-title,
+.ut-v-events .ut-title,
+.ut-v-season .ut-title {font-size:19px;}
 .ut-body {
   position: relative;
   flex: 1;
@@ -8636,6 +8791,7 @@ button.friendcard:active {
   display: flex;
   flex-shrink: 0;
   height: calc(var(--tabs-h) + var(--sab));
+  min-height: calc(60px + var(--sab));
   padding-bottom: var(--sab);
   box-sizing: border-box;
   background: var(--bg-2);
@@ -8644,6 +8800,8 @@ button.friendcard:active {
 .ut-tabs button {
   position: relative;
   flex: 1;
+  min-width: 0;
+  padding-inline: 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8654,7 +8812,7 @@ button.friendcard:active {
   color: var(--sub);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   transition: color 0.25s;
 }
 .ut-tabs button[aria-current='page'] {
@@ -10326,7 +10484,7 @@ button.friendcard:active {
 }
 .ut-key {
   display: grid;
-  grid-template-columns: 34px 1fr;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: 2px 8px;
   padding: 7px 10px;
@@ -10334,7 +10492,11 @@ button.friendcard:active {
   background: var(--panel-2);
   border: 1px solid var(--line);
 }
+.ut-key.main {
+  border-color: rgba(25, 227, 201, 0.45);
+}
 .ut-key > b {
+  min-width: 2ch;
   grid-row: span 2;
   font-size: 22px;
   font-weight: 900;
@@ -10543,6 +10705,15 @@ button.friendcard:active {
 }
 .seg.ut-unit button {
   padding: 0 16px;
+}
+/* Claude 2026-11-01: soccer's formations (4-3-3 · 4-4-2 · 4-2-3-1 · 3-5-2) and its pitch */
+.seg.ut-formations button {
+  padding: 0 11px;
+  font-variant-numeric: tabular-nums;
+}
+.ut-surface.ut-pitch-lines .ln {
+  stroke: rgba(255, 255, 255, 0.42);
+  stroke-width: 1.5;
 }
 .ut-pitch {
   position: relative;
@@ -11441,4 +11612,275 @@ button.friendcard:active {
   font-size: 13px;
   font-weight: 700;
   color: var(--gold);
+}
+
+/* ========== Claude, 2026-11-01: UI reorganisation (docs/UI-NAVIGATION.md) ========== */
+/* Main tabs: HOME · ULTIMATE TEAM · RANKS · PROFILE */
+.tab-ind {
+  width: 25%;
+}
+.tabs button {
+  min-height: 48px;
+}
+.tabs button > span {
+  white-space: nowrap;
+}
+.tabs .tab-ut {
+  color: var(--gold);
+  font-stretch: 78%;
+  letter-spacing: 0.5px;
+}
+.tabs .tab-ut svg {
+  filter: drop-shadow(0 0 8px rgba(245, 184, 61, 0.35));
+}
+.tab-new {
+  position: absolute;
+  top: 5px;
+  left: calc(50% + 8px);
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font: 900 8.5px/1.1 var(--body);
+  font-style: normal;
+  letter-spacing: 0.5px;
+}
+
+/* Home: everything above PLAY scrolls when it must; PLAY stays put */
+.home-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.home-scroll::-webkit-scrollbar {
+  display: none;
+}
+.home-scroll > * {
+  flex-shrink: 0;
+}
+.home-scroll > .spacer {
+  flex: 1 0 0;
+}
+.home .playbar {
+  position: relative;
+  box-shadow: 0 -14px 18px -6px var(--bg);
+}
+.mode .livebadge.daily-new {
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+
+/* Profile: one header, the UT card, boosters */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line-2);
+  background:
+    radial-gradient(90% 140% at 0% 0%, rgba(25, 227, 201, 0.14), transparent 60%),
+    linear-gradient(160deg, var(--panel-3), var(--panel) 75%);
+}
+.level-ring.xl {
+  width: 60px;
+  height: 60px;
+}
+.level-ring.xl b {
+  font-size: 22px;
+}
+.profile-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-id b {
+  font-size: 26px;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-id small {
+  font-size: 12px;
+  color: var(--sub);
+}
+.profile-ut {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid #f5b83d55;
+  background:
+    radial-gradient(90% 140% at 100% 0%, rgba(245, 184, 61, 0.18), transparent 60%),
+    linear-gradient(160deg, #221f12, var(--panel) 75%);
+  color: var(--text);
+  text-align: left;
+}
+.profile-ut-mark {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+  background: rgba(245, 184, 61, 0.1);
+  border: 1px solid rgba(245, 184, 61, 0.3);
+  flex-shrink: 0;
+}
+.profile-ut-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-ut-txt .eyebrow {
+  font-style: normal;
+  color: var(--gold);
+  font-size: 10px;
+}
+.profile-ut-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--sub);
+}
+.profile-ut-stats b {
+  font-size: 15px;
+  color: var(--text);
+}
+.profile-ut .go {
+  font-style: normal;
+  font-size: 24px;
+  color: var(--gold);
+}
+.boosters-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sec-head small {
+  font-size: 11px;
+  color: var(--sub);
+}
+.boosters-sec .storeitem .btn {
+  flex: none;
+  min-width: 64px;
+  height: 44px;
+}
+
+/* the Legends Gauntlet sheet */
+.gauntlet-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gauntlet-sheet h2 {
+  margin: 0;
+  font-size: 28px;
+}
+.gauntlet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gauntlet-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.gauntlet-list li b {
+  color: var(--sub);
+}
+.gauntlet-list li small {
+  color: var(--gold);
+  font-weight: 800;
+}
+.gauntlet-list li.beaten {
+  opacity: 0.6;
+}
+.gauntlet-list li.beaten b {
+  color: var(--teal);
+}
+.gauntlet-list li.next {
+  border-color: var(--gold);
+}
+.gauntlet-list li:last-child span {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* 44pt hit areas. Real size where there's room; compact chips, pills and switches keep their look
+   and get an invisible ::before that extends the tap area to 44 (Apple HIG's minimum). */
+.topbar .icon-btn.round {
+  width: 44px;
+  height: 44px;
+}
+.topbar .level {
+  min-height: 44px;
+}
+.chip,
+.seg button,
+.sportswitch button,
+.utb-level,
+.hq-filter button,
+.ut-seg button,
+.ut-link {
+  position: relative;
+}
+:is(.chip, .statchip, .seg button, .toggle button, .sportswitch button, .utb-level, .hq-filter button, .ut-seg button, .ut-detail .note a)::before {
+  content: '';
+  position: absolute;
+  inset: -7px -1px;
+}
+.ut-detail .note a {
+  position: relative;
+  display: inline-block;
+}
+.ut-detail .note a::before {
+  inset: -15px -2px;
+}
+.settings-admin {
+  min-height: 44px;
+  padding: 0 12px;
+  align-self: center;
+}
+/* `.btn` grows inside a .btnrow; as a direct child of a scrolling column (a page or a sheet) its
+   flex-basis 0 squeezed it to its text height (the old START SEASON bug), so there it keeps its size */
+:is(.page, .sheet, .gauntlet-sheet, .ut-filter-sheet, .hq-preset-sheet, .page-view) > .btn {
+  flex: none;
+}
+.profile-edit {
+  flex-shrink: 0;
+  color: var(--sub);
+}
+.level-ring.xl {
+  width: 54px;
+  height: 54px;
 }

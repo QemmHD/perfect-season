@@ -72,7 +72,7 @@ export interface FieldTex {
 const pack = (c: RGB) => (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
 
 /** A top-down picture as texture levels: full size, then two smaller copies for the distance. */
-function levels(canvas: HTMLCanvasElement, k: number): FieldTex['lv'] {
+export function levels(canvas: HTMLCanvasElement, k: number): FieldTex['lv'] {
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const lv = [{ px: new Uint32Array(img.data.buffer.slice(0)), w: canvas.width, h: canvas.height, k }];
@@ -104,7 +104,7 @@ function levels(canvas: HTMLCanvasElement, k: number): FieldTex['lv'] {
  * the bottom, the lower bowl, a facade, the upper deck in the dark, the roof's edge with its lights.
  * The tiers are given as heights (units): the ribbon's top, the facade's, the roof's.
  */
-function standsWall(h: number, k: number, tiers: { pad: number; ribbon: number; facade: number; facadeH: number; roof: number }, colors: { home: RGB; away: RGB; trim: RGB }) {
+export function standsWall(h: number, k: number, tiers: { pad: number; ribbon: number; facade: number; facadeH: number; roof: number }, colors: { home: RGB; away: RGB; trim: RGB }) {
   const wallW = 512;
   const wallH = Math.round(h * k);
   const wall = new Uint32Array(wallW * wallH);
@@ -139,7 +139,7 @@ function standsWall(h: number, k: number, tiers: { pad: number; ribbon: number; 
 }
 
 /** The night sky over the stadium, with a glow from the lights. */
-function skyRamp(): Uint32Array {
+export function skyRamp(): Uint32Array {
   const sky = new Uint32Array(256);
   for (let i = 0; i < 256; i++) sky[i] = pack(mix([10, 14, 30], [44, 54, 92], Math.pow(i / 255, 1.6)));
   return sky;

@@ -59,7 +59,7 @@ describe('the day’s challenges (' + SPORT + ')', () => {
   let pool: Pool;
   beforeAll(async () => {
     pool = await getPool();
-  });
+  }, 60000);
 
   it('are six daily, four weekly, and the upgrades and repeatables, the same for everyone on a day', () => {
     const a = sbcsFor(pool, '2026-10-27');
@@ -179,5 +179,15 @@ describe('the day’s challenges (' + SPORT + ')', () => {
       ids.add(c.line.id);
     }
     expect(ids.size).toBeGreaterThan(5);
+  });
+
+  it('prefers equally valued storage copies without sacrificing a valuable spare for a cheap challenge', () => {
+    const s: Sbc = { id: 'storage', kind: 'daily', title: 'Storage', blurb: '', size: 3, reqs: [], reward: { coins: 1 } };
+    const cards = bulls96(3, 65);
+    const club = cards.map((rc, i) => ({ uid: 'club' + i, rc, slot: null }));
+    const spares = cards.map((rc, i) => ({ uid: 'spare' + i, rc, slot: null, storage: true }));
+    expect(autoFill(s, [...club, ...spares])?.every(id => id.startsWith('spare'))).toBe(true);
+    const expensive = { uid: 'rare', rc: fakeCard({ pos: 'PG', ovr: 99 }), slot: null, storage: true };
+    expect(autoFill(s, [expensive, ...club])).not.toContain('rare');
   });
 });

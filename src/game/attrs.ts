@@ -4,7 +4,7 @@
 // (`cellId:pid`), and loaded only when a game starts. Anything a source doesn't say is missing,
 // and the games fall back to the player's main stats.
 /// <reference types="vite/client" />
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
 import type { Player } from '../engine/types';
 
 export interface Attrs {
@@ -66,7 +66,7 @@ let cache: Promise<(p: Player) => Attrs | null> | null = null;
 /** A lookup from player to attributes; resolves to one that returns null when there's no file. */
 export function loadAttrs(): Promise<(p: Player) => Attrs | null> {
   cache ??= (async () => {
-    const key = Object.keys(FILES).find((k) => k.endsWith((NFL ? 'nfl' : 'nba') + '-attrs.json'));
+    const key = Object.keys(FILES).find((k) => k.endsWith(pick({ nba: 'nba', nfl: 'nfl', soccer: 'soccer' }) + '-attrs.json'));
     if (!key) return () => null;
     try {
       const file = (await FILES[key]()).default;

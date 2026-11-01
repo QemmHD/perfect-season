@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { castGame } from '../engine/broadcast';
 import { climb, clearChance, CLEAR_COINS, coinsFor, defensiveStar, GAUNTLET_SIZE, type GauntletGame, LIVES, RUNG_COINS, rungsWon } from '../engine/gauntlet';
 import type { TeamRating } from '../engine/rating';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
 import type { Lineup, PlayoffTeam } from '../engine/types';
 import { copyText, nativeShare } from '../lib/share';
 import { sfx } from '../lib/sound';
@@ -121,7 +121,7 @@ export function Gauntlet({
     sfx.click();
     const boss = ladder[ladder.length - 1];
     const text =
-      'Perfect Season ' + (NFL ? 'NFL ' : '') + 'Gauntlet · Week ' + week.split('-W')[1] + '\n' +
+      'Perfect Season ' + pick({ nba: '', nfl: 'NFL ', soccer: 'Soccer ' }) + 'Gauntlet · Week ' + week.split('-W')[1] + '\n' +
       (cleared ? 'Beat all 8 legends' : won + ' of 8 legends beaten') + ' · ' + '❤️'.repeat(lives) + '🖤'.repeat(LIVES - lives) + '\n' +
       games.map((g) => (g.won ? '🟩' : '🟥')).join('') + '\n' +
       'Can you beat the ' + boss.year + ' ' + boss.team + '?';
@@ -150,7 +150,7 @@ export function Gauntlet({
     return { opp, i, plays, beat, castOf: (g: GauntletGame) => casts[games.indexOf(g)] };
   });
   const at = next ? next.rung : -1;
-  const label = NFL ? 'KICK OFF' : 'TIP OFF';
+  const label = pick({ nba: 'TIP OFF', nfl: 'KICK OFF', soccer: 'KICK OFF' });
 
   return (
     <div className="screen gauntlet">
@@ -209,9 +209,8 @@ export function Gauntlet({
                     {opp.year} {opp.team}
                   </strong>
                   <small>
-                    {opp.w}–{opp.l}
-                    {opp.t ? '–' + opp.t : ''} · {opp.star}
-                    {NFL && defensiveStar(opp) ? ' & ' + defensiveStar(opp) : ''}
+                    {pick({ nba: false, nfl: false, soccer: true }) ? opp.w + '–' + opp.t + '–' + opp.l : opp.w + '–' + opp.l + (opp.t ? '–' + opp.t : '')} · {opp.star}
+                    {pick({ nba: false, nfl: true, soccer: false }) && defensiveStar(opp) ? ' & ' + defensiveStar(opp) : ''}
                     {boss ? ' · THE GREATEST' : ''}
                   </small>
                 </span>
@@ -248,7 +247,7 @@ export function Gauntlet({
           <span className="g-stamp disp">{cleared ? 'LEGENDS BEATEN' : won + ' OF ' + GAUNTLET_SIZE}</span>
           <small>
             {cleared
-              ? 'You climbed all eight. ' + (NFL ? 'Nobody does that.' : 'Even the ’96 Bulls didn’t.')
+              ? 'You climbed all eight. ' + pick({ nba: 'Even the ’96 Bulls didn’t.', nfl: 'Nobody does that.', soccer: 'Not even the Invincibles did that.' })
               : won === 0
                 ? 'The legends were too much this time.'
                 : 'Out of lives against the ' + last!.opp.year + ' ' + last!.opp.team + '.'}

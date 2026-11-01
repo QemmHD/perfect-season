@@ -3,7 +3,7 @@ import type { BotLevel } from '../engine/types';
 import { copyText } from '../lib/share';
 import { sfx } from '../lib/sound';
 import { ROUNDS } from '../engine/draft';
-import { NFL, SPORT, switchSport } from '../engine/sport';
+import { pick, SPORT, SPORT_LABEL, switchSport } from '../engine/sport';
 import type { VsRecord } from '../lib/profile';
 import { cleanRoomCode, type Found, Matchmaker, newRoomCode, onCounts, type Rec, type RoomMismatch, setPresence } from '../net/match';
 import { Fit, initials } from './common';
@@ -172,7 +172,7 @@ export function Search(props: {
           <Back size={18} />
         </button>
         <div className="round">
-          <span>{NFL ? 'NFL · HEAD TO HEAD' : 'HEAD TO HEAD'}</span>
+          <span>{pick({ nba: 'HEAD TO HEAD', nfl: 'NFL · HEAD TO HEAD', soccer: 'SOCCER · HEAD TO HEAD' })}</span>
         </div>
         <span className="icon-btn" aria-hidden="true" style={{ visibility: 'hidden' }} />
       </div>
@@ -234,12 +234,12 @@ export function Search(props: {
               ) : room!.hosting ? (
                 // the one who joined switches, so the two of them never swap past each other
                 <span>
-                  <b>{mm.name}</b> joined from {mm.sport === 'nfl' ? 'NFL' : 'NBA'}. Their phone is offering to switch to {SPORT === 'nfl' ? 'NFL' : 'NBA'}.
+                  <b>{mm.name}</b> joined from {SPORT_LABEL[mm.sport]}. Their phone is offering to switch to {SPORT_LABEL[SPORT]}.
                 </span>
               ) : (
                 <>
                   <span>
-                    <b>{mm.name}</b> is in this room playing {mm.sport === 'nfl' ? 'NFL' : 'NBA'}.
+                    <b>{mm.name}</b> is in this room playing {SPORT_LABEL[mm.sport]}.
                   </span>
                   <button
                     className="btn gold"
@@ -248,7 +248,7 @@ export function Search(props: {
                       switchSport(mm.sport, room!.code);
                     }}
                   >
-                    SWITCH TO {mm.sport === 'nfl' ? 'NFL' : 'NBA'}
+                    SWITCH TO {SPORT_LABEL[mm.sport]}
                   </button>
                 </>
               )}

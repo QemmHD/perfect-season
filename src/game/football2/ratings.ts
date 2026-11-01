@@ -253,7 +253,7 @@ export function rateNfl(x: FbInput): NflRating {
   }
   const ovr = overall(g, a, p);
   const key = (NFL_KEYS[g] ?? NFL_KEYS.WR).map(([k, n]) => [k, n, a[k] ?? 50] as [string, string, number]);
-  return { ovr, pos: x.pos, attrs: a, key, abil: abilities(g, a) };
+  return { ovr, pos: x.pos, attrs: a, key, abil: nflAbilities(g, a) };
 }
 
 /** Overall by position weights, then spread so the league looks like a Madden roster. */
@@ -283,7 +283,7 @@ function overall(g: string, a: Record<string, number>, p: number): number {
   return r99(50 + (blended - 50) * 1.08);
 }
 
-function abilities(g: string, a: Record<string, number>): string[] {
+export function nflAbilities(g: string, a: Record<string, number>): string[] {
   const out: string[] = [];
   if (g === 'QB') {
     if (a.THP >= 92) out.push('cannon');
@@ -320,9 +320,44 @@ function abilities(g: string, a: Record<string, number>): string[] {
 /** A season card's rating (Ultimate Team): its own ranks, honors and size. */
 export function rateNflLine(line: CardLine, pos = line.pos[0]): NflRating {
   // the standing: the best of its main ranks, honors aside
-  const main = Object.values(line.rk).filter((v): v is number => typeof v === 'number');
-  const rank = main.length ? main.reduce((s, v) => s + v, 0) / main.length * 0.5 + Math.max(...main) * 0.5 : 0.35;
-  const r = rateNfl({ pos, ht: line.ht, wt: line.wt, rank, stats: line.stats, rk: line.rk, honors: line.honors });
+  // Actual role production, not draft selection, supplies the season standing.
+  const role = groupOf(pos);
+  const weights: Record<string,Record<string,number>> = {
+    QB:{yds:.2,td:.15,ypa:.15,cmpp:.15,intr:.1,rating:.15,aya:.1},
+    RB:{ry:.35,ypc:.2,rtd:.1,rec:.15,recy:.2}, WR:{rec:.2,recy:.3,rectd:.1,ypr:.1,cr:.15,tgt:.15}, TE:{rec:.2,recy:.3,rectd:.1,ypr:.1,cr:.15,tgt:.15},
+    DL:{sk:.35,tfl:.2,qbh:.2,tkl:.15,ff:.1}, LB:{tkl:.3,sk:.15,int:.1,tfl:.2,pd:.25}, CB:{int:.3,pd:.4,tkl:.15,ff:.15}, S:{int:.25,pd:.3,tkl:.3,ff:.15}, K:{fgp:.45,fgp50:.15,lng:.2,fgm:.15,xpp:.05},
+  };
+  const entries=Object.entries(weights[role]??{}).filter(([key])=>typeof line.rk[key]==='number');
+  const total=entries.reduce((n,[,w])=>n+w,0);
+  const rank=total?entries.reduce((n,[key,w])=>n+line.rk[key]!*w,0)/total:role==='OL'?.30+.30*Math.min(1,(line.starts??0)/Math.max(8,line.games??16))+.05*Math.min(1,(line.games??0)/14):.35;
+  // Card data are season totals; rateNfl expects per-game rates and efficiency fractions.
+  const stats = { ...line.stats };
+  const per = (key: string) => typeof stats[key] === 'number' && (line.games ?? 0) > 0 ? stats[key]! / line.games! : null;
+  const ratio = (a: string, b: string) => typeof stats[a] === 'number' && (stats[b] ?? 0) > 0 ? stats[a]! / stats[b]! : null;
+  const g = groupOf(pos);
+  if (g === 'QB') {
+    stats.ypa = ratio('yds', 'att'); stats.intr = ratio('int', 'att');
+    stats.cmp = ratio('cmp', 'att'); stats.sk = per('sk'); stats.ry = per('ry');
+    const sample=Math.min(1,(stats.att??0)/175);
+    if(stats.cmp!==null)stats.cmp=.60*(1-sample)+stats.cmp*sample;
+    if(stats.ypa!==null)stats.ypa=6.8*(1-sample)+stats.ypa*sample;
+    if(stats.intr!==null)stats.intr=.028*(1-sample)+stats.intr*sample;
+    // Missing interception fractions use the already-inverted good-decision percentile.
+    if (stats.intr === null && typeof line.rk.intr === 'number') stats.intr = .015 + (1 - line.rk.intr) * .035;
+  } else if (g === 'RB') { stats.ypc = ratio('ry', 'car'); stats.rec = per('rec');
+    const sample=Math.min(1,(stats.car??0)/100);if(stats.ypc!==null)stats.ypc=4*(1-sample)+stats.ypc*sample;
+  }
+  else if (g === 'WR' || g === 'TE') { stats.ypr = ratio('recy', 'rec'); stats.cr = ratio('rec', 'tgt');
+    const sample=Math.min(1,(stats.rec??0)/40);if(stats.ypr!==null)stats.ypr=12*(1-sample)+stats.ypr*sample;
+    const targets=Math.min(1,(stats.tgt??0)/60);if(stats.cr!==null)stats.cr=.62*(1-targets)+stats.cr*targets;
+  }
+  stats.starts = line.starts;
+  const r = rateNfl({ pos, ht: line.ht, wt: line.wt, rank, stats, rk: line.rk, honors: line.honors });
+  if(!line.honors.length){
+    const tiny = g==='QB'?(line.stats.att??0)<100:g==='RB'?(line.stats.car??0)<40&&(line.stats.rec??0)<20:['WR','TE'].includes(g)?(line.stats.rec??0)<15:g==='OL'?(line.starts??0)<4:false;
+    if(tiny)r.ovr=Math.min(r.ovr,76);
+  }
+  if (g === 'QB') { r.attrs.ACC = r99(r.attrs.SPD + 3); r.attrs.AGI = r99(r.attrs.SPD + 1); }
   if (line.boost) {
     r.ovr = Math.min(99, r.ovr + line.boost);
     for (const k of Object.keys(r.attrs)) r.attrs[k] = Math.min(99, r.attrs[k] + Math.round(line.boost * 0.8));

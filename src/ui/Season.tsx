@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { castGame, seasonHeadlines } from '../engine/broadcast';
 import { gameOdds, homeGame, isPerfect, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
 import { BALANCE_FLOOR, GAMES, gradeFor } from '../engine/rating';
-import { type GameScore, lineupKey, type Season } from '../engine/season';
-import { NFL } from '../engine/sport';
+import { DRAW, type GameScore, lineupKey, type Season } from '../engine/season';
+import { pick } from '../engine/sport';
 import { type Lineup, type Player, SLOTS } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { Confetti, Fit, TeamChips } from './common';
@@ -11,7 +11,7 @@ import { type CastGame, GameCast } from './GameCast';
 import { Flame } from './icons';
 import { CountUp, reducedMotion } from './motion';
 import { oppNames, Scout, teamBar } from './Scout';
-import { cardName, CHAMPS, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
+import { cardName, CHAMPS, FINAL_NAME, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
 
 /** Delay before each game of the reveal: quick through the middle, slower at the end, and
     one beat per game when an unbeaten season gets close. Football's 17 games each get a moment. */
@@ -20,7 +20,12 @@ function revealDelays(seq: number[]): number[] {
   let unbeaten = true;
   for (let i = 0; i < GAMES; i++) {
     let d: number;
-    if (NFL) {
+    if (SOCCER) {
+      // Claude 2026-11-01: soccer's 38 matchdays, between football's beats and basketball's ticker
+      d = i < 3 ? 220 - i * 25 : 105;
+      if (i >= 30) d = 150 + (i - 30) * 20;
+      if (unbeaten && i >= 30) d = 320 + (i - 30) * 60;
+    } else if (FOOTBALL) {
       d = i < 3 ? 300 - i * 30 : 190;
       if (i >= 13) d = 230 + (i - 13) * 30;
       if (unbeaten && i >= 13) d = 420 + (i - 13) * 90;
@@ -37,24 +42,31 @@ function revealDelays(seq: number[]): number[] {
 
 /** A milestone to pop after a win: the win that clinches the playoffs, and round numbers on the way. */
 function milestone(wins: number): { text: string; clinch: boolean } | null {
-  if (wins === PLAYOFF_MIN_WINS) return { text: 'PLAYOFFS CLINCHED', clinch: true };
-  if (NFL ? wins % 5 === 0 : wins % 10 === 0) return { text: wins + ' WINS', clinch: false };
+  if (wins === PLAYOFF_MIN_WINS) return { text: pick({ nba: 'PLAYOFFS CLINCHED', nfl: 'PLAYOFFS CLINCHED', soccer: 'CUP PLACE SECURED' }), clinch: true };
+  if (wins % pick({ nba: 10, nfl: 5, soccer: 10 }) === 0) return { text: wins + ' WINS', clinch: false };
   return null;
 }
+
+/** Claude 2026-11-01: soccer is the third sport; these name every sport's answer. */
+const SOCCER = pick({ nba: false, nfl: false, soccer: true });
+const FOOTBALL = pick({ nba: false, nfl: true, soccer: false });
+/** one game a round, with a score (football and soccer) */
+const ONE_GAME = pick({ nba: false, nfl: true, soccer: true });
 
 /** Football's season, game by game: result, score and opponent. */
 function Schedule({ scores, tick }: { scores: GameScore[]; tick: number }) {
   return (
-    <div className="sched" aria-hidden="true">
+    <div className={'sched' + (SOCCER ? ' soccer' : '')} aria-hidden="true">
       {scores.map((g, i) => {
         const shown = i < tick;
         const won = g.us > g.them;
+        const drew = g.us === g.them;
         return (
-          <span key={i} className={shown ? (won ? 'w' : 'l') : ''}>
+          <span key={i} className={shown ? (won ? 'w' : drew ? 'd' : 'l') : ''}>
             <i>
               {g.home ? 'vs' : '@'} {g.opp}
             </i>
-            <b className="num">{shown ? (won ? 'W ' : 'L ') + g.us + '–' + g.them : 'WK ' + (i + 1)}</b>
+            <b className="num">{shown ? (won ? 'W ' : drew ? 'D ' : 'L ') + g.us + '–' + g.them : pick({ nba: 'G ', nfl: 'WK ', soccer: 'MD ' }) + (i + 1)}</b>
           </span>
         );
       })}
@@ -62,7 +74,7 @@ function Schedule({ scores, tick }: { scores: GameScore[]; tick: number }) {
   );
 }
 /** A game slow enough to get a beat of its own: the close of an unbeaten season (football's every game is a beat, so only that finish). */
-const SLOW = NFL ? 420 : 200;
+const SLOW = pick({ nba: 200, nfl: 420, soccer: 320 });
 
 export function Reveal({ season, lineup, label, onDone }: { season: Season; lineup: Lineup; label: string; onDone: () => void }) {
   const [tick, setTick] = useState(0);
@@ -120,8 +132,8 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
         }
       }
       const h = headlines.find((x) => x.i === i - 1);
-      if (h) setHl({ text: h.text, until: Date.now() + (NFL ? 1300 : 1500) });
-      if (NFL || delays[i - 1] >= SLOW) (won ? sfx.gameWin : sfx.gameLoss)();
+      if (h) setHl({ text: h.text, until: Date.now() + pick({ nba: 1500, nfl: 1300, soccer: 1300 }) });
+      if (FOOTBALL || delays[i - 1] >= SLOW) (won ? sfx.gameWin : sfx.gameLoss)();
       else (won ? sfx.tickerWin : sfx.tickerLoss)();
       if (i >= GAMES) return;
       if (delays[i] >= SLOW) sfx.heartbeat();
@@ -143,7 +155,9 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
 
   const shown = season.seq.slice(0, tick);
   const w = shown.filter((x) => x === 1).length;
-  const l = shown.length - w;
+  // soccer's draws (Claude 2026-11-01): the board is W–D–L
+  const d = shown.filter((x) => x === DRAW).length;
+  const l = shown.length - w - d;
   let streak = 0;
   for (let i = shown.length - 1; i >= 0 && shown[i] === 1; i--) streak++;
   const slowBeat = tick > 0 && tick < GAMES && delays[tick - 1] >= SLOW;
@@ -174,7 +188,7 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
           </span>
         </div>
       ) : (
-      <div className={'board' + (slowBeat ? ' tense' : '') + (unbeaten ? ' gold' : '')} aria-live="polite" aria-label={'Record ' + w + ' and ' + l}>
+      <div className={'board' + (slowBeat ? ' tense' : '') + (unbeaten ? ' gold' : '') + (SOCCER ? ' three' : '')} aria-live="polite" aria-label={'Record ' + w + (SOCCER ? ', ' + d + ' draws' : '') + ' and ' + l}>
         {!done && streak >= 3 && (
           <span className={'winstreak' + (streak >= 10 ? ' hot' : '')} key={'s' + streak} aria-hidden="true">
             <Flame size={14} /> {streak} STRAIGHT
@@ -187,6 +201,15 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
           <span>WINS</span>
         </div>
         <span className="disp dash">–</span>
+        {SOCCER && (
+          <>
+            <div className="side">
+              <b className="disp num d">{d}</b>
+              <span>DRAWS</span>
+            </div>
+            <span className="disp dash">–</span>
+          </>
+        )}
         <div className="side">
           <b className={'disp num l' + (slowBeat && shown[shown.length - 1] === 0 ? ' beat' : '')} key={slowBeat ? 'l' + l : 'l'}>
             {l}
@@ -206,15 +229,19 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
         </span>
       ) : (
         <span className="eyebrow gameno">
-          {done ? 'Final record' : tick === 0 ? (NFL ? 'Kickoff' : 'Tip-off') : (NFL ? 'Week ' : 'Game ') + tick + ' of ' + GAMES + (streak >= 5 ? ' · ' + streak + ' straight wins' : '')}
+          {done
+            ? pick({ nba: 'Final record', nfl: 'Final record', soccer: 'Final record · ' + (season.points ?? 0) + ' points' })
+            : tick === 0
+              ? pick({ nba: 'Tip-off', nfl: 'Kickoff', soccer: 'Kickoff' })
+              : pick({ nba: 'Game ', nfl: 'Week ', soccer: 'Matchday ' }) + tick + ' of ' + GAMES + (streak >= 5 ? ' · ' + streak + ' straight wins' : '')}
         </span>
       )}
-      {NFL && season.scores ? (
+      {ONE_GAME && season.scores ? (
         <Schedule scores={season.scores} tick={tick} />
       ) : (
         <div className="dots" aria-hidden="true">
           {season.seq.map((x, i) => (
-            <i key={i} className={i < tick ? (x === 1 ? 'w' : 'l') : ''} />
+            <i key={i} className={i < tick ? (x === 1 ? 'w' : x === DRAW ? 'd' : 'l') : ''} />
           ))}
         </div>
       )}
@@ -236,7 +263,14 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
             <span className="pill rise-in" style={{ animationDelay: '380ms' }}>
               Longest win streak <b className="num">{season.longestWin}</b>
             </span>
-            {NFL ? (
+            {SOCCER ? (
+              <span className="pill rise-in" style={{ animationDelay: '460ms' }}>
+                Goals a game{' '}
+                <b className="num">
+                  {(season.pf ?? 0).toFixed(1)}–{(season.pa ?? 0).toFixed(1)}
+                </b>
+              </span>
+            ) : FOOTBALL ? (
               <span className="pill rise-in" style={{ animationDelay: '460ms' }}>
                 Points a game{' '}
                 <b className="num">
@@ -258,7 +292,7 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
           {/* an unbeaten season's banner already says it, and the screen needs the room */}
           {!unbeaten && (
             <span className={'qualify rise-in' + (madeIt ? ' in' : '')} style={{ animationDelay: '640ms' }}>
-              {madeIt ? 'Made the playoffs' : 'Missed the playoffs · ' + PLAYOFF_MIN_WINS + ' wins get you in'}
+              {madeIt ? pick({ nba: 'Made the playoffs', nfl: 'Made the playoffs', soccer: 'Into the cup' }) : pick({ nba: 'Missed the playoffs · ', nfl: 'Missed the playoffs · ', soccer: 'Missed the cup · ' }) + PLAYOFF_MIN_WINS + ' wins get you in'}
             </span>
           )}
         </div>
@@ -267,7 +301,7 @@ export function Reveal({ season, lineup, label, onDone }: { season: Season; line
       <div className="spacer" />
       <div className="actionbar">
         <button className={done ? (madeIt ? 'big gold shine' : 'big shine') : 'big ghost'} onClick={done ? onDone : skip}>
-          <Fit text={done ? (madeIt ? 'START THE PLAYOFFS' : 'SEE RESULTS') : 'SKIP'} />
+          <Fit text={done ? (madeIt ? pick({ nba: 'START THE PLAYOFFS', nfl: 'START THE PLAYOFFS', soccer: 'START THE CUP' }) : 'SEE RESULTS') : 'SKIP'} />
         </button>
       </div>
     </div>
@@ -308,13 +342,14 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
             lineup,
             opp: ser.opp,
             won: won === 1,
-            score: NFL && ser.scores ? ser.scores[j] : null,
+            score: ONE_GAME && ser.scores ? ser.scores[j] : null,
+            pens: ser.pens,
             pre: gameOdds(season.rating, season.wins, ser.opp, round, j),
             seed: key + ':' + round + ':' + j + ':' + ser.opp.year + ser.opp.team,
           }),
           n: j + 1,
-          where: NFL ? (round === 3 ? 'NEUTRAL' : highSeed ? 'HOME' : 'AWAY') : homeGame(j, highSeed) ? 'HOME' : 'AWAY',
-          decider: NFL || j === ser.games.length - 1,
+          where: ONE_GAME ? (round === 3 ? 'NEUTRAL' : highSeed ? 'HOME' : 'AWAY') : homeGame(j, highSeed) ? 'HOME' : 'AWAY',
+          decider: ONE_GAME || j === ser.games.length - 1,
         }));
       }),
     [bracket, lineup]
@@ -375,11 +410,13 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
   return (
     <div className="screen playoffs">
       <div className="po-head" {...under}>
-        <span className="disp po-title">PLAYOFFS</span>
+        <span className="disp po-title">{pick({ nba: 'PLAYOFFS', nfl: 'PLAYOFFS', soccer: 'THE CUP' })}</span>
         <span className="po-sub">
-          {NFL
-            ? 'Your ' + record(season.wins) + ' team vs the all-time greats. One game a round: win four for the Super Bowl.'
-            : 'Your ' + record(season.wins) + ' team vs the all-time greats. Go 16–0 for a Perfect Season.'}
+          {pick({
+            nba: 'Your ' + record(season.wins) + ' team vs the all-time greats. Go 16–0 for a Perfect Season.',
+            nfl: 'Your ' + record(season.wins) + ' team vs the all-time greats. One game a round: win four for the Super Bowl.',
+            soccer: 'Your ' + record(season.wins) + ' side vs the great champions. One game a round, penalties if level: win four for the cup.',
+          })}
         </span>
         <span className="po-rec num" aria-label={'Playoff record ' + pw + ' and ' + pl}>
           {pw}–{pl}
@@ -395,12 +432,14 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
           let status = 'LOCKED';
           let tone = 'sub';
           let dim = false;
-          const sc = NFL && b.scores && n > 0 ? b.scores[0] : null;
+          const sc = ONE_GAME && b.scores && n > 0 ? b.scores[0] : null;
+          // soccer: a level game's shootout, "1–1 · 4–3 PENS"
+          const pens = sc && b.pens ? ' · ' + b.pens[0] + '–' + b.pens[1] + ' PENS' : '';
           if (finished) {
-            status = (b.won ? 'WON ' : 'LOST ') + (sc ? sc[0] + '–' + sc[1] : w + '–' + l);
+            status = (b.won ? 'WON ' : 'LOST ') + (sc ? sc[0] + '–' + sc[1] + pens : w + '–' + l);
             tone = b.won ? 'teal' : 'red';
           } else if (isCur) {
-            status = n === 0 ? (NFL && running ? 'LIVE' : 'UP NEXT') : 'LIVE · ' + w + '–' + l;
+            status = n === 0 ? (ONE_GAME && running ? 'LIVE' : 'UP NEXT') : 'LIVE · ' + w + '–' + l;
             tone = 'gold';
           } else if (curDone && !cur.won) {
             status = 'ELIMINATED';
@@ -438,8 +477,7 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
                     {b.opp.year} {b.opp.team}
                   </strong>
                   <small>
-                    {b.opp.w}–{b.opp.l}
-                    {b.opp.t ? '–' + b.opp.t : ''}
+                    {SOCCER ? b.opp.w + '–' + b.opp.t + '–' + b.opp.l : b.opp.w + '–' + b.opp.l + (b.opp.t ? '–' + b.opp.t : '')}
                     {b.opp.star ? ' · led by ' + b.opp.star : ''}
                     {i === 3 ? ' · Final boss' : ''}
                   </small>
@@ -452,9 +490,9 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
                 </span>
               </div>
               {next && <div className="five">{oppNames(b)}</div>}
-              {NFL ? (
-                <div className={'games one' + (isCur && running ? ' live' : '')} aria-label={sc ? (b.won ? 'Won ' : 'Lost ') + sc[0] + ' to ' + sc[1] : 'Not played'}>
-                  <span className={sc ? (b.won ? 'w' : 'l') : ''}>{sc ? (b.won ? 'W ' : 'L ') + sc[0] + '–' + sc[1] : isCur && running ? 'IN PROGRESS' : i === 3 ? 'NEUTRAL SITE' : season.wins >= b.opp.wFull ? 'AT HOME' : 'ON THE ROAD'}</span>
+              {ONE_GAME ? (
+                <div className={'games one' + (isCur && running ? ' live' : '')} aria-label={sc ? (b.won ? 'Won ' : 'Lost ') + sc[0] + ' to ' + sc[1] + pens : 'Not played'}>
+                  <span className={sc ? (b.won ? 'w' : 'l') : ''}>{sc ? (b.won ? 'W ' : 'L ') + sc[0] + '–' + sc[1] + pens : isCur && running ? 'IN PROGRESS' : i === 3 ? 'NEUTRAL SITE' : season.wins >= b.opp.wFull ? 'AT HOME' : 'ON THE ROAD'}</span>
                 </div>
               ) : (
                 <div className="games" aria-label={'Games: ' + w + ' wins, ' + l + ' losses'}>
@@ -487,7 +525,8 @@ export function Playoffs({ season, bracket, lineup, ourName, onDone }: { season:
 function Champions({ season, bracket, onGo }: { season: Season; bracket: Series[]; onGo: () => void }) {
   const out = playoffOutcome(bracket);
   const perfect = isPerfect(season.wins, out);
-  const [w, l] = NFL && out.finals.scores ? out.finals.scores[0] : seriesScore(out.finals.games);
+  const [w, l] = ONE_GAME && out.finals.scores ? out.finals.scores[0] : seriesScore(out.finals.games);
+  const finalPens = out.finals.pens ? ' (' + out.finals.pens[0] + '–' + out.finals.pens[1] + ' on penalties)' : '';
   const total = bracket.reduce((acc, b) => {
     const [a, c] = seriesScore(b.games);
     return [acc[0] + a, acc[1] + c];
@@ -496,11 +535,12 @@ function Champions({ season, bracket, onGo }: { season: Season; bracket: Series[
     <div className={'champ' + (perfect ? ' perfect' : '')} role="dialog" aria-modal="true" aria-label={perfect ? 'Perfect Season' : 'Champions'}>
       <div className="rays" aria-hidden="true" />
       <div className="champ-body">
-        {NFL ? <LombardiArt /> : <TrophyArt />}
+        {pick({ nba: () => <TrophyArt />, nfl: () => <LombardiArt />, soccer: () => <TrophyArt /> })()}
         <span className="eyebrow champ-eyebrow">{perfect ? PERFECT_RECORD + ' · ' + PERFECT_PLAYOFFS : CHAMPS}</span>
-        <h1 className="disp champ-title">{perfect ? 'PERFECT SEASON' : NFL ? 'SUPER BOWL CHAMPS' : 'CHAMPIONS'}</h1>
+        <h1 className="disp champ-title">{perfect ? 'PERFECT SEASON' : pick({ nba: 'CHAMPIONS', nfl: 'SUPER BOWL CHAMPS', soccer: 'CUP WINNERS' })}</h1>
         <p className="champ-line">
-          Beat the {out.finals.opp.year} {out.finals.opp.team} {w}–{l} in the {NFL ? 'Super Bowl' : 'Finals'}
+          Beat the {out.finals.opp.year} {out.finals.opp.team} {w}–{l}
+          {finalPens} in the {FINAL_NAME}
         </p>
         <div className="champ-stats">
           <span>

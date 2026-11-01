@@ -1,7 +1,7 @@
 // Squad Building Challenges: the day's, the week's and the repeatables. Put cards in, watch each
 // requirement tick and the team overall move as you go, and trade them in for the reward.
 import React, { useEffect, useMemo, useState } from 'react';
-import { SPORT } from '../engine/sport';
+import { pickFor, SPORT } from '../engine/sport';
 import { sfx } from '../lib/sound';
 import { Confirm, Sheet } from '../ui/common';
 import { UtCard } from './CardArt';
@@ -10,6 +10,7 @@ import { packName, quickSellValue } from './packs';
 import { type Pool, seasonText } from './pool';
 import { autoFill, cardFits, checkSbc, type Req, rewardText, type Sbc, teamNeed } from './sbc';
 import { playsIn } from './squad';
+import { Lede } from './ui';
 import type { ClubCard } from './UltimateTeam';
 
 /** Time left until midnight Eastern, or until the end of the week (Sunday night). */
@@ -31,7 +32,7 @@ function timeLeft(week: boolean): string {
 
 function SbcCard({ s, done, onOpen }: { s: Sbc; done: boolean; onOpen: () => void }) {
   return (
-    <button className={'ut-sbc' + (done ? ' done' : '') + (s.kind === 'weekly' ? ' weekly' : s.kind === 'upgrade' ? ' upgrade' : '')} onClick={onOpen} disabled={done}>
+    <button className={'ut-sbc' + (done ? ' done' : '') + (s.kind === 'weekly' ? ' weekly' : s.kind === 'upgrade' ? ' upgrade' : s.kind === 'standout' ? ' weekly so' : s.kind === 'landmark' ? ' weekly lm' : s.kind === 'program' ? ' weekly prog' : '')} onClick={onOpen} disabled={done}>
       <span className="ut-sbc-top">
         <b className="disp">{s.title}</b>
         {done ? (
@@ -75,10 +76,14 @@ const reqLabel = (r: Req) => {
       return r.n + ' same decade';
     case 'positions':
       return r.pos.join(' ');
+    case 'season':
+      return r.n + '× ' + r.min + '+';
+    case 'distinctFr':
+      return 'all different teams';
   }
 };
 
-export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string, number>; club: ClubCard[]; day: string; onSubmit: (s: Sbc, uids: string[]) => void; onToast: (t: string) => void }) {
+export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string, number>; club: ClubCard[]; day: string; onSubmit: (s: Sbc, uids: string[]) => void; onToast: (t: string) => void; extra?: React.ReactNode; onStandouts?: () => void }) {
   const [open, setOpen] = useState<Sbc | null>(null);
   const [left, setLeft] = useState(() => [timeLeft(false), timeLeft(true)]);
   useEffect(() => {
@@ -90,7 +95,36 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
   const upgrades = props.sbcs.filter((s) => s.kind === 'upgrade');
   return (
     <div className="page ut-sbcs">
-      <p className="lead ut-sbc-lead">Trade in cards that meet the requirements. Everyone gets the same challenges.</p>
+      <Lede>Trade in cards that meet the requirements for a reward. Spare copies in Storage can go in too.</Lede>
+      {props.onStandouts && (
+        <button className="ut-so-link" onClick={props.onStandouts}>
+          <b>Weekly Standouts</b>
+          <small>This week’s Standouts, their SBC and objective</small>
+        </button>
+      )}
+      {/* Claude wave 3: the Live Calendar's season SBCs (calendar-sbc.ts) */}
+      {props.sbcs.some((s) => s.kind === 'program') && (
+        <div className="ut-sbc-group">
+          <span className="eyebrow">This Season</span>
+          {props.sbcs
+            .filter((s) => s.kind === 'program')
+            .map((s) => (
+              <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
+            ))}
+        </div>
+      )}
+      {/* Claude: Weekly Standouts and Landmark Seasons SBCs (content-sbc.ts) */}
+      {props.sbcs.some((s) => s.kind === 'standout' || s.kind === 'landmark') && (
+        <div className="ut-sbc-group">
+          <span className="eyebrow">Standouts &amp; Landmarks{left[1] ? ' · new in ' + left[1] : ''}</span>
+          {props.sbcs
+            .filter((s) => s.kind === 'standout' || s.kind === 'landmark')
+            .map((s) => (
+              <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
+            ))}
+        </div>
+      )}
+      {props.extra}
       <div className="ut-sbc-group">
         <span className="eyebrow">Daily{left[0] ? ' · new in ' + left[0] : ''}</span>
         {daily.map((s) => (
@@ -132,7 +166,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
     const got = autoFill(s, club.filter((c) => !playsIn(SPORT, c.slot)));
     if (!got) {
       sfx.nope();
-      onToast('Not enough cards outside your ' + (SPORT === 'nba' ? 'starters and first three off the bench' : 'squad') + ' meet all of this yet.');
+      onToast('Not enough cards outside your ' + pickFor(SPORT, { nba: 'starters and first three off the bench', nfl: 'squad', soccer: 'squad' }) + ' meet all of this yet.');
       return;
     }
     sfx.select();
@@ -183,7 +217,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
                 const c = u ? byUid.get(u) : undefined;
                 return (
                   <button key={i} className="ut-sbc-slot" onClick={() => (sfx.click(), setSlotAt(i))} aria-label={c ? c.rc.line.name + ', tap to change' : 'Empty, tap to add a card'}>
-                    {c ? <UtCard rc={c.rc} w={72} level={c.oc.level} /> : <span className="ut-slot-empty" style={{ width: 72, height: 101 }}><b>+</b></span>}
+                    {c ? <UtCard rc={c.rc} w={72} level={c.oc.level} mint={c.oc.mint} numbered /> : <span className="ut-slot-empty" style={{ width: 72, height: 101 }}><b>+</b></span>}
                     {c?.slot && <i className="ut-insquad">{c.slot}</i>}
                   </button>
                 );
@@ -246,7 +280,7 @@ function SbcPicker({ s, club, taken, current, teamOvr, onPick, onClose }: { s: S
     .filter((c) => !taken.includes(c.uid) && !takenPids.has(c.rc.line.pid))
     .filter((c) => !fits || s.reqs.every((r) => cardFits(r, c.rc, s.size)))
     // cheapest first: these cards are leaving; squad cards last
-    .sort((a, b) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || quickSellValue(a.rc) - quickSellValue(b.rc) || a.rc.ovr - b.rc.ovr)
+    .sort((a, b) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || Number(!!b.storage) - Number(!!a.storage) || quickSellValue(a.rc) - quickSellValue(b.rc) || a.rc.ovr - b.rc.ovr)
     .slice(0, 100);
   return (
     <Sheet label="Pick a card" kind="bottom" onClose={onClose}>
@@ -269,12 +303,12 @@ function SbcPicker({ s, club, taken, current, teamOvr, onPick, onClose }: { s: S
             <div className="ut-picker-list">
               {list.map((c) => (
                 <button key={c.uid} className="ut-pickrow" onClick={() => close(() => onPick(c.uid))}>
-                  <UtCard rc={c.rc} w={44} level={c.oc.level} />
+                  <UtCard rc={c.rc} w={44} level={c.oc.level} mint={c.oc.mint} numbered />
                   <span className="ut-pickrow-txt">
                     <b>{c.rc.line.name}</b>
                     <small>
                       {c.rc.line.pos.join('/')} · {seasonText(c.rc.line)} {c.rc.line.abbr}
-                      {c.slot ? ' · in squad at ' + c.slot : ''}
+                      {c.storage ? ' · Duplicate Storage' : c.slot ? ' · in squad at ' + c.slot : ''}
                     </small>
                   </span>
                   <span className="ut-pickrow-nums">

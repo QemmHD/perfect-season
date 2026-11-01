@@ -3,7 +3,7 @@
 import { CELL_BY_ID } from './data';
 import { dailyOrder, type PickLog } from './draft';
 import { rateTeam, rateTotals, type TeamRating, W, winsFromRating } from './rating';
-import { NFL } from './sport';
+import { pick } from './sport';
 import { type Line, type Lineup, type Player, type Slot, SLOTS, emptyLineup } from './types';
 
 export type PickGrade = 'best' | 'great' | 'good' | 'reach' | 'miss';
@@ -64,7 +64,7 @@ function reviewPick(e: PickLog): PickReview {
       if (!p.pos.includes(k)) continue;
       // never hold someone twice; in football a trade may swap a player for another season of his
       // (the same rule the draft uses)
-      if (held.has(p.pid) && !(NFL && e.trade && e.before[k]?.pid === p.pid && e.before[k]?.id !== p.id)) continue;
+      if (held.has(p.pid) && !(pick({ nba: false, nfl: true, soccer: false }) && e.trade && e.before[k]?.pid === p.pid && e.before[k]?.id !== p.id)) continue;
       const g = ratingOf({ ...e.before, [k]: p }) - base;
       if (g > bestGain + 1e-9) {
         bestGain = g;

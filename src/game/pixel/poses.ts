@@ -99,9 +99,33 @@ export function layup(phase: number): Pose {
  * A dunk. `kind`: 'two' two hands, 'one' one-handed tomahawk, 'contact' through a defender (the
  * same rise with knees tucked and both arms cocked back further).
  */
-export function dunk(phase: number, kind: 'one' | 'two' | 'contact'): Pose {
+export type DunkStyle = 'one' | 'two' | 'contact' | 'tomahawk' | 'windmill' | 'hang';
+export function dunk(phase: number, kind: DunkStyle): Pose {
   const t = clamp(phase);
   const load: Pose = { lean: 0.25, crouch: 0.12, lift: 0, hipL: 0.55, kneeL: 1.1, hipR: 0.5, kneeR: 1.05, shL: -0.4, elL: 0.6, shR: -0.45, elR: 0.6, abL: 0.2, abR: 0.2 };
+  if (kind === 'hang') {
+    // on the rim after the slam: both hands up on it, knees tucked, swinging a little
+    const sw = Math.sin(t * Math.PI * 2) * 0.12;
+    return { lean: -0.05 + sw * 0.3, crouch: 0, lift: 0.3, hipL: 0.7 + sw, kneeL: 1.3, hipR: 0.6 + sw, kneeR: 1.2, shL: 3.05, elL: 0.05, shR: 3.1, elR: 0.05, abL: 0.15, abR: 0.15, nod: 0.15 };
+  }
+  if (kind === 'tomahawk') {
+    // one hand, the ball cocked far back behind his head, then hammered down
+    const cock: Pose = { lean: -0.25, crouch: 0, lift: 0.4, hipL: 0.35, kneeL: 1.4, hipR: 0.6, kneeR: 1.7, shL: 1.6, elL: 0.8, shR: 3.95, elR: 1.6, abL: 0.5, abR: 0.1, nod: 0.3 };
+    const slam: Pose = { ...cock, lean: 0.2, shR: 2.0, elR: 0.1, shL: 1.0, nod: -0.15 };
+    if (t < 0.25) return blend(STAND, load, ease(t / 0.25));
+    if (t < 0.72) return blend(load, cock, ease((t - 0.25) / 0.47));
+    return blend(cock, slam, ease((t - 0.72) / 0.28));
+  }
+  if (kind === 'windmill') {
+    // the ball arm swings a full circle down, back and over the top on the way up
+    const base: Pose = { lean: -0.1, crouch: 0, lift: 0.4, hipL: 0.4, kneeL: 1.3, hipR: 0.5, kneeR: 1.5, shL: 1.2, elL: 0.9, shR: 0, elR: 0.1, abL: 0.5, abR: 0.25, nod: 0.25 };
+    if (t < 0.25) return blend(STAND, load, ease(t / 0.25));
+    const k = (t - 0.25) / 0.75;
+    const up = blend(load, base, ease(Math.min(1, k * 2)));
+    // the arm angle runs from at his side, back (negative), down, forward and up over the rim
+    const arm = -0.6 - 1.2 * Math.sin(Math.min(1, k) * Math.PI) + Math.min(1, k) * 3.2;
+    return { ...up, shR: k < 0.85 ? arm : 2.6 - (k - 0.85) * 4, elR: 0.1, twist: Math.sin(k * Math.PI) * 0.35 };
+  }
   const cock: Pose =
     kind === 'one'
       ? { lean: -0.12, crouch: 0, lift: 0.36, hipL: 0.2, kneeL: 1.1, hipR: 0.45, kneeR: 1.5, shL: 1.3, elL: 0.9, shR: 3.6, elR: 0.9, abL: 0.45, abR: 0.15, nod: 0.25 }

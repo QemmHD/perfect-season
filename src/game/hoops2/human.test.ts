@@ -11,6 +11,7 @@ import { hooper, lineOf, SPOTS } from './ratings';
 import type { Hooper, Possession, Pt } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const testEnv = (globalThis as { process?: { env?: Record<string, string> } }).process?.env ?? {};
 const run = (globalThis as any).process?.env?.HUMAN ? it : it.skip;
 
 type Strategy = 'drive' | 'cross-drive' | 'three' | 'elbow' | 'stepback' | 'kick';
@@ -47,8 +48,8 @@ run('a person playing simple strategies', async () => {
       const add = (k: string, n = 1) => (c[k] = (c[k] ?? 0) + n);
       let pts = 0;
       let poss = 0;
-      for (let gi = 0; gi < 20; gi++) {
-        const g = newHoopsGame(O, D, 'human' + gi + strat + lab);
+      for (let gi = 0; gi < Number(testEnv.HUMAN_GAMES ?? 20); gi++) {
+        const g = newHoopsGame(O, D, 'human' + gi + strat + lab, undefined, [], Number(testEnv.HUMAN_DEF_IQ ?? 0));
         const r = rng(hashString('hand' + gi + strat));
         while (!g.over) {
           const p = startPossession(g);

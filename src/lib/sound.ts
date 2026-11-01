@@ -7,7 +7,7 @@
    recording is ready, or if it can't be decoded, its synthesized stand-in plays instead. Each play
    wanders a little in pitch and volume so repeats don't sound canned. */
 
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
 
 let ctx: AudioContext | null = null;
 let soundOn = true;
@@ -105,6 +105,29 @@ function iosTick() {
   }
 }
 
+/*
+ * iOS haptics need a user gesture (WebKit bug 285120: the switch-toggle tick is only played inside,
+ * or just after, a real touch). A tick asked for by the game loop with no touch in the last moment
+ * is kept and played on the next touch (within 400 ms), and iOS gets one tick, never a pattern
+ * (timers fire outside the gesture and are silently dropped). Claude, 2026-11-01.
+ */
+let lastGesture = -1e9;
+let pendingTick = -1e9;
+const GESTURE_MS = 900;
+function now() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+function onGesture() {
+  lastGesture = now();
+  if (hapticsOn && IOS && lastGesture - pendingTick < 400) {
+    pendingTick = -1e9;
+    iosTick();
+  }
+}
+if (typeof window !== 'undefined' && IOS) {
+  for (const type of ['pointerdown', 'pointerup', 'touchend'] as const) window.addEventListener(type, onGesture, { capture: true, passive: true });
+}
+
 export function vibrate(pattern: number | number[]) {
   if (!hapticsOn) return;
   try {
@@ -116,28 +139,30 @@ export function vibrate(pattern: number | number[]) {
     // not supported
   }
   if (!IOS) return;
-  // one tick per pulse of the pattern
-  const p = Array.isArray(pattern) ? pattern : [pattern];
-  let t = 0;
-  for (let i = 0; i < p.length; i += 2) {
-    if (t === 0) iosTick();
-    else window.setTimeout(iosTick, t);
-    t += p[i] + (p[i + 1] ?? 0);
-  }
+  // inside a touch (or right after one): tick now; otherwise on the next touch
+  if (now() - lastGesture < GESTURE_MS) iosTick();
+  else pendingTick = now();
+}
+
+/** A haptic for a control the player just touched: call it inside the pointer handler itself. */
+export function tapHaptic(ms = 10) {
+  lastGesture = now();
+  vibrate(ms);
 }
 
 /* ---------------------------------------------------------------------------------------------
    Recordings */
 
-export type Venue = 'arena' | 'stadium';
+/** Claude 2026-11-01: 'pitch' is soccer's stadium (its chant, its roar, its kicks), loaded only there. */
+export type Venue = 'arena' | 'stadium' | 'pitch';
 
 interface SampleDef {
   /** file names in src/assets/sfx (no .mp3), one picked at random each play; or one list per venue */
   files: string[] | Record<Venue, string[]>;
   /** playback gain */
   gain: number;
-  /** loaded up front only for this venue (any sound still loads the first time it's asked for) */
-  only?: Venue;
+  /** loaded up front only for this venue, or these (any sound still loads the first time it's asked for) */
+  only?: Venue | Venue[];
   /** how far pitch and volume wander each play (a share, ±) */
   pitch?: number;
   vol?: number;
@@ -145,9 +170,9 @@ interface SampleDef {
 
 /** Every recording the games play. */
 export const SAMPLES = {
-  crowd: { files: { arena: ['crowd-arena'], stadium: ['crowd-stadium'] }, gain: 1, pitch: 0, vol: 0 },
-  cheer: { files: { arena: ['cheer-arena'], stadium: ['cheer-stadium'] }, gain: 0.3, pitch: 0.03 },
-  roar: { files: { arena: ['roar-arena'], stadium: ['roar-stadium'] }, gain: 0.6, pitch: 0.02 },
+  crowd: { files: { arena: ['crowd-arena'], stadium: ['crowd-stadium'], pitch: ['soccer-chant'] }, gain: 1, pitch: 0, vol: 0 },
+  cheer: { files: { arena: ['cheer-arena'], stadium: ['cheer-stadium'], pitch: ['cheer-stadium'] }, gain: 0.3, pitch: 0.03 },
+  roar: { files: { arena: ['roar-arena'], stadium: ['roar-stadium'], pitch: ['soccer-roar'] }, gain: 0.6, pitch: 0.02 },
   ooh: { files: ['ooh'], gain: 0.34, pitch: 0.05 },
   groan: { files: ['groan'], gain: 0.32, pitch: 0.04 },
   whistle: { files: ['whistle'], gain: 0.6, pitch: 0.02, vol: 0.08 },
@@ -159,10 +184,13 @@ export const SAMPLES = {
   rim: { files: ['rim-1', 'rim-2'], gain: 0.55, only: 'arena', pitch: 0.06 },
   backboard: { files: ['backboard'], gain: 0.55, only: 'arena', pitch: 0.05 },
   dunk: { files: ['dunk'], gain: 0.75, only: 'arena', pitch: 0.04 },
-  hit: { files: ['hit-1', 'hit-2', 'hit-3'], gain: 0.7, only: 'stadium', pitch: 0.06 },
-  thud: { files: ['thud'], gain: 0.55, only: 'stadium', pitch: 0.08 },
-  kick: { files: ['kick'], gain: 0.6, only: 'stadium', pitch: 0.04 },
+  hit: { files: ['hit-1', 'hit-2', 'hit-3'], gain: 0.7, only: ['stadium', 'pitch'], pitch: 0.06 },
+  thud: { files: ['thud'], gain: 0.55, only: ['stadium', 'pitch'], pitch: 0.08 },
+  kick: { files: { arena: ['kick'], stadium: ['kick'], pitch: ['soccer-kick-1', 'soccer-kick-2'] }, gain: 0.6, only: ['stadium', 'pitch'], pitch: 0.04 },
   horn: { files: ['horn'], gain: 0.6, only: 'stadium', pitch: 0, vol: 0 },
+  // soccer: the ball off the turf, and the referee's long whistle at full time
+  bounce: { files: { arena: [], stadium: [], pitch: ['soccer-bounce'] }, gain: 0.45, only: 'pitch', pitch: 0.08, vol: 0.2 },
+  fulltime: { files: { arena: [], stadium: [], pitch: ['soccer-whistle'] }, gain: 0.6, only: 'pitch', pitch: 0, vol: 0 },
 } satisfies Record<string, SampleDef>;
 
 export type SampleName = keyof typeof SAMPLES;
@@ -181,7 +209,7 @@ export function filesOf(name: SampleName, v: Venue = venue): string[] {
   return Array.isArray(f) ? f : f[v];
 }
 
-let venue: Venue = NFL ? 'stadium' : 'arena';
+let venue: Venue = pick<Venue>({ nba: 'arena', nfl: 'stadium', soccer: 'pitch' });
 const buffers = new Map<string, AudioBuffer>();
 const pending = new Map<string, Promise<void>>();
 // a file that wouldn't load (offline before it was cached) is tried again after a while
@@ -235,7 +263,7 @@ export function loadSamples(v: Venue = venue): Promise<void> {
   const jobs: Promise<void>[] = [];
   for (const n of order) {
     const d = SAMPLES[n] as SampleDef;
-    if (d.only && d.only !== v) continue;
+    if (d.only && !(Array.isArray(d.only) ? d.only.includes(v) : d.only === v)) continue;
     for (const f of filesOf(n, v)) jobs.push(loadFile(f));
   }
   return Promise.all(jobs).then(() => {});
@@ -410,6 +438,15 @@ export const sfx = {
   whoosh: () => noise(0.22, { gain: 0.05, freq: 1800 }),
   /** a value adding onto the team rating: each one a step higher */
   count: (i: number) => tone(523 * Math.pow(2, i / 6), 0.09, { type: 'triangle', gain: 0.07 }),
+  /** soccer's full time: the long whistle (the short one where it isn't loaded) */
+  fulltime: () => {
+    if (sample('fulltime')) return;
+    sfx.whistle();
+  },
+  /** soccer: the ball off the turf */
+  bounce: (at = 0) => {
+    sample('bounce', { at });
+  },
   /** the game is on: a referee's whistle */
   whistle: () => {
     if (sample('whistle')) return;
@@ -786,3 +823,47 @@ export const _test = {
   urls: URLS,
   bed: () => bed,
 };
+
+/** Codex: original, cancellable pack score. No downloads, loops or changes to game audio settings. */
+export function packSound(cue: 'charge' | 'surge' | 'reveal', premium = false): () => void {
+  const c = ac();
+  if (!c) return () => {};
+  const bus = c.createGain(),
+    filter = c.createBiquadFilter(),
+    nodes: OscillatorNode[] = [];
+  const now = c.currentTime,
+    duration = cue === 'charge' ? 0.78 : cue === 'surge' ? 1.05 : 0.95;
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(cue === 'reveal' ? 4200 : 900, now);
+  filter.frequency.exponentialRampToValueAtTime(cue === 'surge' ? 5200 : 3000, now + duration * 0.8);
+  bus.gain.setValueAtTime(0.0001, now);
+  bus.gain.exponentialRampToValueAtTime(premium ? 0.17 : 0.12, now + 0.04);
+  bus.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  filter.connect(bus).connect(c.destination);
+  const freqs = cue === 'reveal' ? [65.4, 130.8, 196, 261.6, 329.6] : cue === 'surge' ? [55, 110, 164.8] : [65.4, 98, 130.8];
+  for (const [i, f] of freqs.entries()) {
+    const o = c.createOscillator(),
+      gain = c.createGain();
+    o.type = i === 0 ? 'sine' : 'triangle';
+    o.frequency.setValueAtTime(cue === 'reveal' && i === 0 ? 100 : f, now);
+    o.frequency.exponentialRampToValueAtTime(cue === 'reveal' ? f : Math.min(1900, f * (cue === 'surge' ? 9 : 4)), now + duration * 0.9);
+    gain.gain.value = i === 0 ? 0.48 : 0.18;
+    o.connect(gain).connect(filter);
+    o.start(now);
+    o.stop(now + duration + 0.03);
+    nodes.push(o);
+  }
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    const at = c.currentTime;
+    bus.gain.cancelScheduledValues(at);
+    bus.gain.setValueAtTime(0.0001, at);
+    for (const n of nodes) {
+      try {
+        n.stop(at + 0.015);
+      } catch {}
+    }
+  };
+}
