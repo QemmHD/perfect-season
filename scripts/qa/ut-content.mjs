@@ -35,6 +35,8 @@ async function closeOpening(page) {
   await page.locator('.ut-open-screen').waitFor({ state: 'detached', timeout: 8000 });
 }
 const tab = (page, label) => page.locator('.ut-tabs button').filter({ hasText: new RegExp('^' + label + '[0-9]*$') }).click();
+// Claude (UI reorganisation): a tab's sections are a segmented control (role tab)
+const seg = (page, label) => page.getByRole('tab', { name: new RegExp('^' + label) }).click();
 
 async function run(sport, width, opts = {}) {
   const tag = sport + '-' + width + (opts.weekend ? '-weekend' : '');
@@ -68,7 +70,7 @@ async function run(sport, width, opts = {}) {
   }, sport);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-  await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor({ timeout: 60000 });
+  await page.locator('.uh-squad').waitFor({ timeout: 60000 });
   await page.waitForTimeout(500);
   await shot(page, 'utc-' + tag + '-home');
 
@@ -174,7 +176,7 @@ async function run(sport, width, opts = {}) {
   assert.equal(afterPick.ut.content.picks.length, 0, 'the pick closes');
 
   // ---- Scout Market ----
-  await page.getByRole('button', { name: 'SCOUT MARKET', exact: true }).click();
+  await page.getByRole('tab', { name: 'SCOUT MARKET', exact: true }).click();
   await page.waitForTimeout(400);
   await shot(page, 'utc-' + tag + '-market');
   const mBefore = await current();
@@ -187,7 +189,8 @@ async function run(sport, width, opts = {}) {
   assert.ok(await page.locator('.ut-market-item').nth(2).isDisabled(), 'bought once');
 
   // ---- a Set ----
-  await tab(page, 'HOME');
+  await tab(page, 'CLUB');
+  await seg(page, 'COLLECTION');
   await page.getByRole('button', { name: /^Sets/ }).click();
   await page.getByRole('button', { name: 'Franchise eras', exact: true }).click();
   await page.waitForTimeout(300);
@@ -210,7 +213,8 @@ async function run(sport, width, opts = {}) {
   await page.locator('.ut-home-so').click();
   await page.waitForTimeout(500);
   await shot(page, 'utc-' + tag + '-standouts');
-  await tab(page, 'SBC');
+  await tab(page, 'CHALLENGES');
+  await seg(page, 'SBCs');
   await page.locator('.ut-sbc.so').first().scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
   await shot(page, 'utc-' + tag + '-sbc');
@@ -223,7 +227,7 @@ async function run(sport, width, opts = {}) {
 
   // ---- Preview Pack (wave 2) ----
   await tab(page, 'STORE');
-  await page.getByRole('button', { name: 'PACKS', exact: true }).click();
+  await page.getByRole('tab', { name: 'PACKS', exact: true }).click();
   await page.getByRole('button', { name: 'PREVIEW A PACK', exact: true }).click();
   await page.locator('.ut-preview-cards').waitFor();
   const prev1 = await page.locator('.ut-preview-cards .utc').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
@@ -231,7 +235,7 @@ async function run(sport, width, opts = {}) {
   await shot(page, 'utc-' + tag + '-preview');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-  await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor({ timeout: 60000 });
+  await page.locator('.uh-squad').waitFor({ timeout: 60000 });
   await tab(page, 'STORE');
   await page.locator('.ut-preview-cards').waitFor();
   const prev2 = await page.locator('.ut-preview-cards .utc').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
@@ -247,7 +251,8 @@ async function run(sport, width, opts = {}) {
   await page.locator('.ut-preview-wait').waitFor();
 
   // ---- Streamlined SBC (wave 2) ----
-  await tab(page, 'SBC');
+  await tab(page, 'CHALLENGES');
+  await seg(page, 'SBCs');
   await page.locator('.ut-stream').first().click();
   await page.locator('.ut-stream-sheet').waitFor();
   await page.locator('.ut-stream-card').nth(0).click();
@@ -258,8 +263,8 @@ async function run(sport, width, opts = {}) {
   assert.ok((await current()).ut.content.streams.gold > 0, 'stream progress saved');
 
   // ---- Evolutions lab (wave 2) ----
-  await tab(page, 'HOME');
-  await page.getByRole('button', { name: /DEVELOPMENT/ }).click();
+  await tab(page, 'CLUB');
+  await seg(page, 'DEVELOPMENT');
   await page.getByRole('button', { name: /EVOLUTIONS LAB/ }).click();
   await page.locator('.ut-evos').waitFor();
   await shot(page, 'utc-' + tag + '-evolutions');
@@ -280,8 +285,9 @@ async function run(sport, width, opts = {}) {
   }, evoUid);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-  await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor({ timeout: 60000 });
-  await page.getByRole('button', { name: /DEVELOPMENT/ }).click();
+  await page.locator('.uh-squad').waitFor({ timeout: 60000 });
+  await tab(page, 'CLUB');
+  await seg(page, 'DEVELOPMENT');
   await page.getByRole('button', { name: /EVOLUTIONS LAB/ }).click();
   await page.getByRole('button', { name: 'APPLY', exact: true }).click();
   await page.waitForTimeout(400);
@@ -290,6 +296,7 @@ async function run(sport, width, opts = {}) {
 
   // ---- holographic card details (seeded holo legend) ----
   await tab(page, 'CLUB');
+  await seg(page, 'PLAYERS');
   await page.locator('.ut-gridcard', { has: page.locator('.utc.is-holo') }).first().click();
   await page.waitForTimeout(500);
   await shot(page, 'utc-' + tag + '-holo');
@@ -333,7 +340,7 @@ async function run(sport, width, opts = {}) {
   assert.equal(dAfter.ut.content.draft.active.games, 1, 'one game settled');
   assert.equal(dAfter.coins, dBefore.coins, 'draft games pay at the end');
   await page.getByRole('button', { name: 'DONE', exact: true }).click();
-  await page.getByRole('button', { name: /PLAY HQ|CLAIM REWARDS|END RUN NOW/ }).first().waitFor({ timeout: 30000 });
+  await page.getByRole('button', { name: /CLAIM REWARDS|END RUN NOW/ }).first().waitFor({ timeout: 30000 });
   const retire = page.getByRole('button', { name: /END RUN NOW/ });
   if (await retire.isVisible().catch(() => false)) await retire.click();
   await page.getByRole('button', { name: 'CLAIM REWARDS', exact: true }).click();
@@ -364,7 +371,7 @@ async function runCalendar(sport, width, iso, label) {
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-  await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor({ timeout: 60000 });
+  await page.locator('.uh-squad').waitFor({ timeout: 60000 });
   await page.locator('.ut-season-banner').waitFor();
   await page.waitForTimeout(400);
   await shot(page, 'cal-' + tag + '-home');
@@ -382,7 +389,8 @@ async function runCalendar(sport, width, iso, label) {
   const b1 = await current();
   assert.ok(b1.coins < b0.coins, 'program pack charged');
   // the SBC tab's This Season section
-  await tab(page, 'SBC');
+  await tab(page, 'CHALLENGES');
+  await seg(page, 'SBCs');
   await page.locator('.ut-sbc.prog').first().waitFor();
   await page.locator('.ut-sbc.prog').first().scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);

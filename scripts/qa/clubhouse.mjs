@@ -11,10 +11,11 @@ try {
     );
     const enter = async () => {
       await page.getByRole('button', { name: /Ultimate Team:/ }).click();
-      await page
-        .getByRole('button', { name: 'PLAY HQ', exact: true })
-        .waitFor();
+      await page.locator('.uh-squad').waitFor();
     };
+    // Claude (UI reorganisation): tabs and segments per docs/UI-NAVIGATION.md
+    const utTab = (t) => page.locator('.ut-tabs button').filter({ has: page.locator('span', { hasText: new RegExp('^' + t + '$') }) }).click();
+    const seg = (t) => page.getByRole('tab', { name: new RegExp('^' + t) }).click();
     const capture = async (_page, name) => {
       await page.waitForTimeout(400);
       await shot(page, name);
@@ -24,7 +25,7 @@ try {
     await enter();
     await page.waitForTimeout(500);
     await capture(page, 'clubhouse-' + sport + '-home');
-    await page.getByRole('button', { name: 'PLAY HQ', exact: true }).click();
+    await utTab('PLAY');
     assert.equal(
       (await current()).coins,
       original.coins,
@@ -43,10 +44,10 @@ try {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await enter();
     await page.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
-    await page.getByRole('button', { name: /CONTINUE YOUR CIRCUIT/ }).click();
+    await page.getByRole('button', { name: /CHAMPIONS CIRCUIT/ }).click();
     assert.equal((await current()).ut.hq.circuit.active.id, active.id);
-    await home();
-    await page.getByRole('button', { name: /DEVELOPMENT/ }).click();
+    await utTab('CLUB');
+    await seg('DEVELOPMENT');
     await page
       .getByRole('button', { name: /^Develop / })
       .first()
@@ -79,8 +80,8 @@ try {
       .first()
       .click();
     assert.deepEqual((await current()).ut.squad, saved.squad);
-    await home();
-    await page.getByRole('button', { name: /OBJECTIVES/ }).click();
+    await utTab('CHALLENGES');
+    await seg('OBJECTIVES');
     await page.getByRole('button', { name: 'LIFETIME', exact: true }).click();
     await capture(page, 'clubhouse-' + sport + '-objectives');
     const beforeClaim = await current();
@@ -92,7 +93,8 @@ try {
     assert.ok(claimed.ut.packs.length > beforeClaim.ut.packs.length);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await enter();
-    await page.getByRole('button', { name: /OBJECTIVES/ }).click();
+    await utTab('CHALLENGES');
+    await seg('OBJECTIVES');
     assert.equal(
       (await current()).ut.hq.claims.length,
       claimed.ut.hq.claims.length
@@ -103,7 +105,7 @@ try {
         .isDisabled()
     );
     await home();
-    await page.getByRole('button', { name: /SEASON PASS/ }).click();
+    await page.getByRole('button', { name: /^Season Pass/ }).click();
     await capture(page, 'clubhouse-' + sport + '-season');
     await page
       .getByRole('button', { name: 'CLAIM', exact: true })
@@ -235,7 +237,7 @@ try {
     );
     await home();
     await page.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
-    await page.getByRole('button', { name: /CONTINUE YOUR CIRCUIT/ }).click();
+    await page.getByRole('button', { name: /CHAMPIONS CIRCUIT/ }).click();
     await page
       .getByRole('button', { name: 'PLAY MATCH 1', exact: true })
       .click();
