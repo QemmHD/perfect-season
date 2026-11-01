@@ -15,14 +15,19 @@
 //             other attribute unchanged, so a specialist keeps his weaknesses.
 import { landmarkCatalog, landmarkFallback, LANDMARK_ATTRS, type Landmark, type LandmarkType } from './landmarks';
 import { rateCard } from './rate';
+import { fcToDisplay } from './fc-scale';
+import { fromDisplay } from './ut-scale';
 import type { CardLine, RatedCard, UtSport } from './types';
 
 export const STANDOUT_BOOST = 3;
 export const STANDOUT_FEATURED_BOOST = 5;
-export const STANDOUT_CAP = 97;
-export const LANDMARK_BOOST = 5;
+/** Caps on the FC-style display scale (fc-scale.ts): Standouts land ~80–92, Landmarks 85–93. */
+export const STANDOUT_CAP = 92;
+export const STANDOUT_FEATURED_CAP = 93;
+export const LANDMARK_BOOST = 4;
 export const LANDMARK_ATTR_BOOST = 6;
-export const LANDMARK_CAP = 99;
+export const LANDMARK_FLOOR = 85;
+export const LANDMARK_CAP = 93;
 
 const PHYSICAL = new Set(['SPD', 'ACC', 'STR', 'VRT', 'STA', 'AGI']);
 const WEEK = /^\d{4}-W\d{2}$/;
@@ -115,13 +120,25 @@ export function rateEdition(line: CardLine, level = 1, pos?: string): RatedCard 
     else if (face.has(code)) d = 1;
     if (d) attrs[code] = Math.max(1, Math.min(99, Math.round(attrs[code] + d)));
   }
-  const ovr = Math.max(base.ovr, Math.min(cap, base.ovr + delta));
+  const sport = line.sport;
+  const ovr = standout
+    ? Math.max(base.ovr, Math.min(fcToDisplay(line.featured ? STANDOUT_FEATURED_CAP : cap, sport), base.ovr + delta))
+    : Math.max(fcToDisplay(LANDMARK_FLOOR, sport), Math.min(fcToDisplay(cap, sport), base.ovr + delta));
+  return liftShown({ ...base, line, ovr, tier: standout ? 'standout' : 'landmark', attrs, key: base.key.map(([c, n]) => [c, n, attrs[c] ?? ovr]) }, base);
+}
+
+/**
+ * An edition's printed face and rating-scale overall follow its new displayed overall: the face
+ * (basketball's six categories, football's key attributes; card-face.ts) rises by the same amount,
+ * and `rawOvr` (numbering, comparisons) is the displayed overall read back on the rating scale.
+ */
+export function liftShown(rc: RatedCard, base: RatedCard): RatedCard {
+  const d = rc.ovr - base.ovr;
+  if (!d) return rc;
+  const sport = rc.line.sport;
   return {
-    ...base,
-    line,
-    ovr,
-    tier: standout ? 'standout' : 'landmark',
-    attrs,
-    key: base.key.map(([c, n]) => [c, n, attrs[c] ?? ovr]),
+    ...rc,
+    ...(base.face ? { face: base.face.map(([c, n, v]) => [c, n, Math.max(1, Math.min(99, v + d))] as [string, string, number]) } : {}),
+    ...(base.rawOvr !== undefined ? { rawOvr: Math.max(base.rawOvr, Math.min(99, Math.round(fromDisplay(sport, rc.ovr)))) } : {}),
   };
 }

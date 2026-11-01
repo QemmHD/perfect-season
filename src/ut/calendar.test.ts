@@ -10,7 +10,7 @@ import { liveId, parseLiveId, programReward, promoCards, PROGRAM_CAP, selectProm
 import { livePackDef, livePacksOn, livePick, liveBuysLeft, openLivePack, recordLiveBuy, resolvePackKind } from './live-packs';
 import { openPack, packRand } from './packs';
 import { getPool, type Pool } from './pool';
-import { onScale } from './rate';
+import { fcToDisplay as onScale } from './fc-scale';
 import { checkSbc } from './sbc';
 import { freshUt } from './state';
 import type { RatedCard } from './types';
@@ -221,5 +221,25 @@ describe('program pack economy (' + SPORT + ')', () => {
       expect(ratio).toBeGreaterThan(0.4);
       expect(ratio).toBeLessThan(0.65);
     }
+  });
+});
+
+describe('frozen promo selections (' + SPORT + ')', () => {
+  it('cover every scheduled promo and match a fresh selection today', async () => {
+    const { manifest, setManifest } = await import('./calendar');
+    const m = manifest();
+    for (const p of allPromos()) {
+      const need = (wavesOf(p, SPORT).length ? wavesOf(p, SPORT).reduce((a, w) => a + (per(w.count, SPORT) ?? 0), 0) : per(p.count, SPORT)) ?? 0;
+      if (need) expect(m[p.id]?.[SPORT]?.length).toBeGreaterThan(0);
+    }
+    const frozenIds = (id: string) => selectPromo(pool, id).map((x) => x.id);
+    setManifest({});
+    try {
+      for (const p of allPromos()) if (m[p.id]?.[SPORT]) expect(selectPromo({ ...pool } as Pool, p.id).map((x) => x.id)).toEqual(m[p.id][SPORT]!.map(([id]) => id));
+    } finally {
+      setManifest(m);
+    }
+    // every frozen id resolves to a program card
+    for (const p of allPromos()) for (const id of frozenIds(p.id)) expect(pool.base.get(id)?.tier).toBe('program');
   });
 });

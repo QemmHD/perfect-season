@@ -28,7 +28,7 @@ export const GUARANTEE_PRICE = 12000;
  * scales its scheduled price so a base program pack's quick-sell value lands near half its price
  * (FC research: 45-60%); the pricier elite-tier packs keep their relative premium (lower EV, rarer hits).
  */
-export const PRICE_FACTOR: Record<UtSport, Record<string, number>> = { nba: { program: 0.7, guarantee: 0.35 }, nfl: { program: 0.45, guarantee: 0.21 } };
+export const PRICE_FACTOR: Record<UtSport, Record<string, number>> = { nba: { program: 0.6, guarantee: 0.27 }, nfl: { program: 0.36, guarantee: 0.155 } };
 
 /** The pack's promo id (`live:s4-honors-y2` → `s4-honors-y2`). */
 export const promoOfPack = (kind: string) => kind.replace(/^live(-plus|-pick)?:/, '').split(':')[0];

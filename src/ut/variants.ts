@@ -9,6 +9,7 @@
 // Both rate their base edition, then add their own changes (rate.ts routes `variantOf` here).
 import { applyEvos } from './evolutions';
 import { rateCard } from './rate';
+import { liftShown } from './editions';
 import type { CardLine, RatedCard } from './types';
 
 export const HOLO_CHANCE = 0.04;
@@ -45,5 +46,5 @@ export function deriveVariantLine(id: string, lineOf: (id: string) => CardLine |
 export function rateVariant(line: CardLine, level = 1, pos?: string): RatedCard {
   const base = rateCard(line.variantOf!, level, pos);
   const rc: RatedCard = { ...base, line };
-  return line.evo?.length ? applyEvos(rc, line.evo) : rc;
+  return line.evo?.length ? liftShown(applyEvos(rc, line.evo), rc) : rc;
 }

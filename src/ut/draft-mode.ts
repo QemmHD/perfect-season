@@ -10,7 +10,8 @@ import { aiOpponent, type Rung } from './battles';
 import { contentOf, claimed, withClaim, type DraftRun } from './content-state';
 import type { Pool } from './pool';
 import { rareInfo } from './rare';
-import { onScale, TIER_CUTS } from './rate';
+import { TIER_CUTS } from './rate';
+import { fcToDisplay } from './fc-scale';
 import { recordMatchProgress } from './progression';
 import { canPlay, rateSquad, slotsFor, type SlotDef, type SquadRating } from './squad';
 import { standoutProgram } from './standouts';
@@ -217,5 +218,5 @@ export function claimDraft(ut: UtState, at: number): { ut: UtState; coins: numbe
   return { ut: next, coins: reward.coins, pack: reward.pack ?? null, wins: run.wins };
 }
 
-/** basketball's 84 on this sport's scale: a draft option this good gets a glow */
-export const draftStar = (sport: UtSport) => onScale(84, sport);
+/** an 84+ (FC scale) draft option gets a glow */
+export const draftStar = (sport: UtSport) => fcToDisplay(84, sport);

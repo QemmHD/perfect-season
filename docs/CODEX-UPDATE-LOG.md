@@ -490,6 +490,30 @@ Use it for offline checks: Club Season, Ultimate Team, packs, the sheet swipe an
 
 Before publishing, the same build was booted locally under an equivalent policy (own files only, `connect-src 'self'`). The app loaded and onboarding worked with no page errors; the blocked connections only log console errors.
 
+## Expanded game-rating references — Claude (Anthropic), 2026-11-01
+
+Branch `claude/ratings-refs` (not merged). Same-season game-rating references grow from 8,938 to 11,009 NBA and from 2,114 to 19,509 NFL player-seasons: season cards with a reference go from 44% to 55% (NBA; 96% from 1999) and from 7% to 63% (NFL; 99% from 2000). New `scripts/build_expanded_references.py` adds prioritised `sets` blocks (final / next / preseason / retro) to `src/data/season-references-<sport>.json`, keeping the original rows. `seasonReference()` in `src/ut/cards.ts` reads them; `ratingReference.kind` marks fallbacks; the card detail prints the snapshot label. No rating formula changed, but UT ratings move (UT queue splits via `pool.print`; draft queues stay NBA 8 / NFL 9). No save, card ID or backend change. Sources, terms, mapping and coverage: `docs/RATINGS-AUDIT.md` (last section) and `docs/CREDITS.md`. Tests: new `src/ut/season-references.test.ts`; Rodman 1995-96 floor 89 → 86 (2K26 rates him 87); pool-loading hooks get 60 s timeouts.
+
+## Ultimate Team ratings rework — Claude (Anthropic), 2026-11-01
+
+Branch `feature/season-evolution` (includes the merge of `claude/ratings-refs`); not deployed. Owner request: balance card overalls, make the stats match the overall, make it feel like real Ultimate Team. Full method, tables and numbers: [RATINGS-AUDIT.md, "Claude rework 2026-11-01"](RATINGS-AUDIT.md).
+
+What changed:
+- Estimate-path fixes A–G from the ratings audit (era-normalised NBA overall, 3PT ceiling/floor and Limitless, centre/PG bias, reference trust incl. down-weighted `preseason`/`retro` fallbacks, nearest-season borrowing, NFL group maps quantile-matched to 19.5k Madden ratings, career floor, attribute bias), plus NFL Combine athleticism (`src/data/nfl-combine.json`, credited in CREDITS.md).
+- Card face: NBA cards print six categories OUT/INS/PLY/ATH/DEF/REB weighed in the card's best role; football keeps position keys. `supportOverall()` moves the role's main skills so the overall sits within ~3 of the weighted face (gold median gap +7 → +1.7 NBA / +7.2 → +1.4 NFL).
+- Per-position (NBA per decade) gold balance; one isolated, configurable UT display scale (`src/ut/ut-scale.ts`) set to the EA FC 27-style pyramid: Bronze 40–64 / Silver 65–74 / Gold 75–99 (≈35/35/30%), base golds mostly 75–82, ~14 (NBA) / 25 (NFL) base cards at 90+, top 91; Hot Season 94–97 (no 99s), Legends 88–95; Spotlight/GOAT unchanged. Every threshold follows (tiers, `onScale`, SBC targets, Squad Battles rungs, quick-sell ranges, walkout 86+).
+- Levels: +1 overall at levels 3 and 5 only (max +2, was +4); +1 key attributes per level. XP/levels unchanged.
+- NBA shot curve (hoops2 engine): poor shooters' green window and off-green threes fall (open-three make% at 70 rating 78 → 69), elite unchanged.
+
+Before → after (season cards): NBA bronze/silver/gold 10,895/7,507/2,902 → 7,471/7,513/6,320; NFL 20,846/5,600/4,409 → 10,840/10,780/9,235. Hot Season at 99: 50% / 37% → 0. Legends at 99: 22 / 42 → 0. Out-of-sample estimate MAE / tier agreement: NBA 5.2 / 63% → 4.3 / 70% vs raw 2K (2.6 / 85% vs the final pipeline); NFL 6.0 / 66% → 4.0–4.4 / 76–77% on the original sample, 4.2 / 78% vs the final pipeline on the expanded one.
+
+Files: `src/ut/{ut-scale,card-face,nfl-combine}.ts` (new), `rate.ts`, `calibration.ts`, `season-reference.ts`, `cards.ts` (career lookup, combine load), `nfl-identity.ts`, `types.ts` (`face`, `rawOvr`, `rawExact`), `CardArt.tsx`, `CardDetail.tsx`, `league-form.ts`, `packs.ts`, `battles.ts`, `Match.tsx`, `src/net/match.ts`, `src/game/hoops2/engine.ts`, `src/styles.css`; scripts `fit_ut_scale.ts`, `fit_ut_balance.ts`, `build_nfl_combine.mjs`, `audit_ut_ratings.ts`; regenerated `docs/ratings-audit-summary.json`.
+
+Tests: `ratings-audit.test.ts` adds the scale pyramid, edition ranges, per-position/era balance, face consistency, level ≤ +2 and famous-season regressions (Curry 2022 3PT ≥ 95 + Limitless, Jokić, Mahomes 2024 rating ≥ 88 and gold, Tyreek Hill 2016/2018 SPD, Brady ≤ 66, Vick ≥ 93, Calvin Johnson ≥ 93, OL no longer dominating); identity tests compare `rawOvr` (2K/Madden-comparable); `rate.test.ts` levels/tiers/promo rules; pool-load hooks get 60 s. `npm run typecheck` and `npm test` pass (NBA 361 / NFL 328).
+
+Compatibility: draft queue NBA 8 → 9 (shot curve; NFL draft 9 unchanged); UT queue rules NBA 8 → 9, NFL 9 → 10, and the pool fingerprint changes. No profile/key/ID/serial/level/XP change; numbered eligibility files untouched (numbering still keys on the 2K/Madden-comparable 90+). Owned cards show new displayed overalls and tiers. Server `SPOTLIGHT_RATES` unchanged.
+
+
 ### UT content drop 2 — Claude, 2026-11-01 (branch `claude/ut-content`, not deployed)
 
 Built by Claude from the research spec; the full record is in [UT-CONTENT-2.md](UT-CONTENT-2.md).

@@ -55,7 +55,8 @@ import { playId, recordEvoMatch } from './evolutions';
  * and plays the sim itself. Bump UT_RULES when teams.ts or play.ts change how a match comes out.
  */
 // Codex: NFL rushing execution differs from v4; NBA queues remain compatible.
-const UT_RULES = { nba: 8, nfl: 9 };
+// Claude ratings rework + NBA shot curve (2026-11-01): ratings, levels and jumpers changed.
+const UT_RULES = { nba: 9, nfl: 10 };
 const queueOf = (pool: Pool) => 'ut-' + UT_RULES[pool.sport] + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;

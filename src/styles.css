@@ -10360,6 +10360,9 @@ button.friendcard:active {
   background: var(--panel-2);
   border: 1px solid var(--line);
 }
+.ut-key.main {
+  border-color: rgba(25, 227, 201, 0.45);
+}
 .ut-key > b {
   min-width: 2ch;
   grid-row: span 2;

@@ -9,7 +9,7 @@
 // phones rate it the same online.
 import { contentOf } from './content-state';
 import type { Pool } from './pool';
-import { onScale } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { UtState } from './state';
 import type { RatedCard, Tier, UtSport } from './types';
 
@@ -23,7 +23,7 @@ export interface EvoDef {
   id: string;
   title: string;
   blurb: string;
-  /** eligibility: overall at most this (reference scale, through onScale) */
+  /** eligibility: overall at most this (FC-style display scale, fc-scale.ts) */
   maxOvr: number;
   tiers: Tier[];
   /** only seasons before this year (Veteran) */
@@ -70,7 +70,7 @@ export function evoBlock(ut: UtState, uid: string, rc: RatedCard, def: EvoDef, s
   if (def.needs && !e.done.includes(def.needs)) return 'Needs ' + (evoById(def.needs)?.title ?? def.needs);
   const tier = rc.line.variantOf ? baseTier(rc) : rc.tier;
   if (!def.tiers.includes(tier)) return 'Wrong card type';
-  if (rc.ovr > onScale(def.maxOvr, sport)) return 'Overall above ' + onScale(def.maxOvr, sport);
+  if (rc.ovr > fcToDisplay(def.maxOvr, sport)) return 'Overall above ' + fcToDisplay(def.maxOvr, sport);
   if (def.before && rc.line.season >= def.before) return 'Seasons before ' + def.before;
   if (Object.values(contentOf(ut).evo ?? {}).filter((x) => x.active).length >= MAX_ACTIVE_EVOS) return MAX_ACTIVE_EVOS + ' evolutions already running';
   return null;
@@ -141,7 +141,7 @@ export function applyEvos(rc: RatedCard, ids: string[]): RatedCard {
   for (const id of ids) {
     const def = evoById(id);
     if (!def) continue;
-    const ceiling = onScale(def.cap, rc.line.sport);
+    const ceiling = fcToDisplay(def.cap, rc.line.sport);
     ovr = Math.max(ovr, Math.min(ceiling, ovr + def.upgrade.ovr));
     for (const a of def.upgrade.attrs) {
       const ranked = face.slice().sort((x, y) => (attrs[y] ?? 0) - (attrs[x] ?? 0));

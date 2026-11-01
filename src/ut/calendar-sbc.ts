@@ -1,12 +1,12 @@
 // Claude, 2026-11-01 (wave 3): the Live Calendar's SBCs on the SBC tab ("This Season"): each season
 // SBC whose window includes the day. Repeatable ones count their completions in ut.content.claims
 // (`sbc:cal:<id>:<k>`); the Finale ("The Perfect Season") is the only way to a 98–99 card. Overall
-// requirements are written on the reference scale and pass through onScale.
+// requirements are written on the FC-style scale (fc-scale.ts).
 import { per, promoById, sbcsOn } from './calendar';
 import { contentOf } from './content-state';
 import { resolvePackKind } from './live-packs';
 import type { Pool } from './pool';
-import { onScale } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { Req, Sbc } from './sbc';
 import type { UtState } from './state';
 
@@ -17,7 +17,7 @@ export function calendarSbcs(pool: Pool, ut: UtState, day: string): Sbc[] {
     const raw = (Array.isArray(b.reqs) ? b.reqs : per(b.reqs as Record<string, unknown[]>, sport)) as Req[] | undefined;
     const name = per(b.name, sport);
     if (!raw || !name) return [];
-    const reqs: Req[] = raw.map((r) => (r.k === 'teamOvr' || r.k === 'minOvr' ? { ...r, ovr: onScale(r.ovr, sport) } : r));
+    const reqs: Req[] = raw.map((r) => (r.k === 'teamOvr' || r.k === 'minOvr' ? { ...r, ovr: fcToDisplay(r.ovr, sport) } : r));
     const prefix = 'cal:' + b.id + ':';
     const done = claims.filter((c) => c.startsWith('sbc:' + prefix)).length;
     let key: string;

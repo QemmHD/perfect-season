@@ -7,7 +7,8 @@ import { claimed } from './content-state';
 import { landmarkId } from './editions';
 import { landmarkCatalog } from './landmarks';
 import { type Pool, seasonText } from './pool';
-import { onScale, TIER_CUTS } from './rate';
+import { TIER_CUTS } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { Sbc } from './sbc';
 import { standoutSbc } from './standouts';
 import type { UtState } from './state';
@@ -41,7 +42,7 @@ export function landmarkSbcs(pool: Pool, week: string): Sbc[] {
     const rc = pool.base.get(id);
     if (!rc) return [];
     const gold = TIER_CUTS[pool.sport].gold;
-    const team = Math.max(onScale(76, pool.sport), Math.min(onScale(84, pool.sport), rc.ovr - (pool.sport === 'nba' ? 8 : 5)));
+    const team = Math.max(fcToDisplay(80, pool.sport), Math.min(fcToDisplay(86, pool.sport), rc.ovr - 6));
     return [
       {
         id: 'lm:' + id,

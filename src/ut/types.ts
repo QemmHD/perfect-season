@@ -53,7 +53,14 @@ export interface CardLine {
   /** promo/legend: the id of the season card it is made from */
   seasonId?: string;
   /** Optional public same-era benchmark, attached before all edition copies are derived. */
-  ratingReference?: { source: string; snapshot: string; ovr: number; attrs: Record<string, number> };
+  ratingReference?: {
+    source: string;
+    snapshot: string;
+    ovr: number;
+    attrs: Record<string, number>;
+    /** absent for the original rows; 'preseason' and 'retro' are the marked fallbacks */
+    kind?: 'final' | 'next' | 'preseason' | 'retro';
+  };
   /** Weekly Standout: its Eastern ISO week ("2026-W44") and whether it was that week's featured card */
   week?: string;
   featured?: boolean;
@@ -101,6 +108,10 @@ export interface OwnedCard {
 export interface RatedCard {
   line: CardLine;
   ovr: number;
+  /** Claude rework: the overall on the rating scale (before the displayed UT curve, ut-scale.ts) */
+  rawOvr?: number;
+  /** the same before rounding, unlevelled (fits the displayed curve: scripts/fit_ut_scale.ts) */
+  rawExact?: number;
   tier: Tier;
   /** the position it's rated at */
   pos: string;
@@ -108,6 +119,8 @@ export interface RatedCard {
   attrs: Record<string, number>;
   /** the six shown on the card, in order */
   key: [string, string, number][];
+  /** Claude rework: what the card face prints — basketball's six categories, football's key attributes */
+  face?: [string, string, number][];
   abil: string[];
   /** Public peak-reference source; season ratings remain estimates. */
   ratingSource?: string;

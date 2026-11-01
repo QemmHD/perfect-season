@@ -5,6 +5,16 @@ import { rateCard } from "../src/ut/rate";
 import { hooper } from "../src/game/hoops2/ratings";
 import { nbaLineOf } from "../src/ut/rate";
 import references from "../src/data/nba-rating-references.json";
+import { faceWeights } from "../src/ut/card-face";
+import type { RatedCard } from "../src/ut/types";
+/** the displayed face's position-weighted mean (what the displayed overall must stay near) */
+const shownFace = (sport: "nba" | "nfl", r: RatedCard) => {
+  const w = faceWeights(sport, sport === "nba" ? r.line.pos[0] : r.pos, r.attrs);
+  let n = 0, t = 0;
+  for (const [k, , v] of r.face ?? r.key) { n += (w[k] ?? 0) * v; t += w[k] ?? 0; }
+  return t ? n / t : r.ovr;
+};
+import { groupOf } from "../src/game/football2/ratings";
 const cases: Record<string, [string, number][]> = {
   nba: [
     ["Michael Jordan", 1996],
@@ -40,7 +50,7 @@ const cases: Record<string, [string, number][]> = {
   ],
 };
 const report: Record<string, unknown> = {
-  implementedBy: "Codex",
+  implementedBy: "Codex; Claude ratings rework 2026-11-01",
   referenceSnapshot: references.checkedAt,
   publicPeakReferences: references.players.length,
   methodology: "docs/RATINGS-AUDIT.md",
@@ -61,7 +71,11 @@ for (const sport of ["nba", "nfl"] as const) {
         Object.values(r.attrs).some(
           (v) => !Number.isFinite(v) || v < 1 || v > cap,
         ) ||
-        r.ovr > profileQuality(sport, r.pos, r.attrs) + 10.51 ||
+        // Claude rework: standard editions must read like their face (levels deliberately lift the key
+        // attributes more than the overall); specials keep the Codex support bound
+        (r.tier === "spotlight" || r.tier === "goat"
+          ? r.ovr > profileQuality(sport, r.pos, r.attrs) + 10.51
+          : level === 1 && Math.abs(r.ovr - shownFace(sport, r)) > 8) ||
         (r.tier === "spotlight" && r.ovr < 100) ||
         (r.tier === "goat" && r.ovr < 106)
       )
@@ -90,9 +104,30 @@ for (const sport of ["nba", "nfl"] as const) {
         ],
       ]),
     ),
-    season99AtLevel1: seasons.filter((c) => c.ovr === 99).length,
-    season99AtLevel5: seasons.filter((c) => rateCard(c.line, 5).ovr === 99)
+    // rating scale (2K/Madden-comparable); the displayed UT scale tops out at 91 for season cards
+    season99AtLevel1: seasons.filter((c) => c.rawOvr === 99).length,
+    season99AtLevel5: seasons.filter((c) => rateCard(c.line, 5).rawOvr === 99)
       .length,
+    displayed90PlusSeasonCards: seasons.filter((c) => c.ovr >= 90).length,
+    displayedSeasonMax: Math.max(...seasons.map((c) => c.ovr)),
+    goldShareByPosition: Object.fromEntries(
+      [...new Set(seasons.map((c) => (sport === "nba" ? c.line.pos[0] : groupOf(c.pos))))].map((g) => {
+        const xs = seasons.filter((c) => (sport === "nba" ? c.line.pos[0] : groupOf(c.pos)) === g);
+        return [g, +((100 * xs.filter((c) => c.tier === "gold").length) / xs.length).toFixed(1)];
+      }),
+    ),
+    promoAt99: cards.filter((c) => c.tier === "promo" && c.ovr >= 99).length,
+    legendAt99: cards.filter((c) => c.tier === "legend" && c.ovr >= 99).length,
+    faceGapMedianByTier: Object.fromEntries(
+      ["bronze", "silver", "gold", "promo", "legend"].map((t) => {
+        const g = cards
+          .filter((c) => c.tier === t)
+          .map((c) => c.ovr - shownFace(sport, c))
+          .sort((a, b) => a - b);
+        return [t, +g[Math.floor(g.length / 2)].toFixed(1)];
+      }),
+    ),
+    maximumLevel5OverallGain: Math.max(...seasons.filter((_, i) => i % 25 === 0).map((c) => rateCard(c.line, 5).ovr - c.ovr)),
     maximumOverallAboveRoleQuality: Math.max(
       ...cards.map((c) => c.ovr - profileQuality(sport, c.pos, c.attrs)),
     ),
@@ -105,6 +140,7 @@ for (const sport of ["nba", "nfl"] as const) {
         name,
         season: year,
         ovr: rc.ovr,
+        face: rc.face,
         attrs: rc.attrs,
         source: rc.ratingSource,
         benchmark: rc.line.ratingReference,

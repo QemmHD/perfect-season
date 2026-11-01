@@ -6,7 +6,7 @@ import { hashString, rng, shuffle } from '../engine/rng';
 import { claimed, contentOf, withClaim, withContent, type PickState } from './content-state';
 import { packRand, SCOUT_STANDOUT } from './packs';
 import type { Pool } from './pool';
-import { onScale } from './rate';
+import { fcToDisplay } from './fc-scale';
 import { weekOf } from './sbc';
 import { standoutProgram } from './standouts';
 import type { UtState } from './state';
@@ -138,7 +138,7 @@ const NFL_GROUPS: [string, string[]][] = [
 /** Scout's Choice: three different players, golds at basketball's 84+, deterministic from the seed. */
 export function scoutOptions(pool: Pool, seed: string, week: string): { options: RatedCard[]; group: string } {
   const rand = packRand('scout:' + seed);
-  const floor = onScale(84, pool.sport);
+  const floor = fcToDisplay(84, pool.sport);
   let positions: string[] | null = null;
   let group = 'Any position';
   if (pool.sport === 'nfl') {

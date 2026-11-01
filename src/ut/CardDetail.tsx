@@ -8,6 +8,7 @@ import { UtCard } from './CardArt';
 import { quickSellValue } from './packs';
 import { seasonText } from './pool';
 import { ABILITY_HELP, abilityName, attrName, NBA_ATTRS, TIER_NAMES } from './rate';
+import { NBA_ROLES, faceWeights, nbaRole } from './card-face';
 import { MAX_LEVEL, xpToNext } from './state';
 import { cardStatLine as statLine } from './card-stats';
 import type { UtSport } from './types';
@@ -42,6 +43,11 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
   const value = quickSellValue(rc);
   const cap = rc.tier === 'goat' ? 110 : rc.tier === 'spotlight' ? 105 : 99;
   const keySet = new Set(rc.key.map(([c]) => c));
+  // Claude rework: the face is what the overall is weighed on (basketball: in the card's best role)
+  const face = rc.face ?? rc.key;
+  const facePos = sport === 'nba' ? l.pos[0] : rc.pos;
+  const weights = faceWeights(sport, facePos, rc.attrs);
+  const role = sport === 'nba' && rc.tier !== 'goat' && rc.tier !== 'spotlight' ? NBA_ROLES[nbaRole(facePos, rc.attrs)]?.label : null;
   const all = sport === 'nba' ? NBA_ATTRS.map(([c]) => c) : Object.keys(rc.attrs);
   const need = xpToNext(oc.level);
   const stats = statLine(l);
@@ -101,12 +107,13 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
                 </span>
               )}
             </div>
-            <p className="note ut-xpnote">Cards earn XP in games. Each level improves key attributes and adds up to 1 overall, within the edition’s rating cap.</p>
+            <p className="note ut-xpnote">Cards earn XP in games. Each level adds 1 to the key attributes marked below; levels 3 and 5 also add 1 overall, within the edition’s rating cap.</p>
 
             {(clubRecord || developed) && <div className="hq-card-record"><span className="eyebrow">YOUR CLUB STORY</span><b className="num">{clubRecord?.games ?? 0} squad appearances · {clubRecord?.wins ?? 0} wins</b><small>{developed ? 'CLUB HERO · Development program completed' : 'Recorded since the clubhouse update; squad selection includes the bench.'}</small></div>}
+            <span className="eyebrow">{role ? 'Card face · weighed as ' + role : 'Card face'}</span>
             <div className="ut-keys">
-              {rc.key.map(([c, n, v]) => (
-                <span key={c} className="ut-key">
+              {face.map(([c, n, v]) => (
+                <span key={c} className={'ut-key' + ((weights[c] ?? 0) >= 0.15 ? ' main' : '')}>
                   <b className="num">{v}</b>
                   <span>
                     <i>{c}</i>
@@ -149,7 +156,11 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
               {rc.ratingSource ? (
                 <>
                   <a href={rc.ratingSource} target="_blank" rel="noreferrer">
-                    {rc.line.ratingReference ? `${rc.line.sport === 'nba' ? '2K' : 'Madden'} ${rc.line.ratingReference.snapshot} benchmark` : 'Peak 2K reference'}
+                    {rc.line.ratingReference
+                      ? /^[A-Za-z]/.test(rc.line.ratingReference.snapshot)
+                        ? `${rc.line.ratingReference.snapshot} benchmark`
+                        : `${rc.line.sport === 'nba' ? '2K' : 'Madden'} ${rc.line.ratingReference.snapshot} benchmark`
+                      : 'Peak 2K reference'}
                   </a>{' '}
                   · Season-calibrated attributes, then edition and level boosts.
                 </>
@@ -157,7 +168,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
                 'Attributes estimated from this season’s statistics, honors and player role.'
               )}
             </p>
-            <span className="eyebrow">All attributes</span>
+            <span className="eyebrow">All attributes · key attributes (levels) highlighted</span>
             <div className="ut-allattrs">
               {all.map((c) => (
                 <span key={c} className={keySet.has(c) ? 'key' : ''}>

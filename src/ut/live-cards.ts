@@ -2,16 +2,18 @@
 // Id: `<sport>:live:<promoId>[.f]:<season>:<pid>:<fr>` (`.f` = the promo's featured card). A card
 // rebuilds from its id alone (the promo's band and delta + its season card), so an owned program card
 // resolves forever, after its promo ends and even if selection would no longer pick it.
-// Rating: OVR = clamp(base + delta, band) on the reference scale through onScale, capped at 97 for
+// Rating: OVR = clamp(base + delta, band) on the FC-style display scale (fc-scale.ts), capped at 97 for
 // every program except the Finale (the only 98–99 cards of the year; SBC-only).
 // Selection (which players a promo has) is deterministic per sport and promo id: rule → rating gate
 // → order (top by base, or a seeded shuffle) → take with distinct players, per-group caps, waves and
 // position slots → featured.
 import { hashString, rng, shuffle } from '../engine/rng';
 import { compileRule, ruleContext, type RuleLine } from './calendar-rules';
-import { per, promoById, wavesOf, type CalPromoOn, type CalWave } from './calendar';
+import { manifest, per, promoById, wavesOf, type CalPromoOn, type CalWave } from './calendar';
 import type { Pool } from './pool';
-import { onScale, rateCard } from './rate';
+import { rateCard } from './rate';
+import { liftShown } from './editions';
+import { fcToDisplay } from './fc-scale';
 import type { CardLine, RatedCard, UtSport } from './types';
 
 export const PROGRAM_CAP = 97;
@@ -63,8 +65,8 @@ export function rateLive(line: CardLine, level = 1, pos?: string): RatedCard {
   const base = rateCard({ ...line, id: line.seasonId ?? line.id, kind: 'season', boost: undefined, label: undefined }, level, pos);
   const band = line.band ?? [0, 99];
   const top = line.programKind === FINALE_KIND ? 99 : PROGRAM_CAP;
-  const lo = Math.min(top, onScale(band[0], line.sport));
-  const hi = Math.min(top, onScale(band[1], line.sport));
+  const lo = Math.min(top, fcToDisplay(band[0], line.sport));
+  const hi = Math.min(top, fcToDisplay(band[1], line.sport));
   const ovr = Math.max(lo, Math.min(hi, base.ovr + (line.boost ?? 0)));
   const d = Math.max(0, ovr - base.ovr);
   const face = new Set(base.key.map(([c]) => c));
@@ -74,7 +76,7 @@ export function rateLive(line: CardLine, level = 1, pos?: string): RatedCard {
     const add = face.has(code) ? (PHYSICAL.has(code) ? Math.min(2, d) : d) : Math.min(1, d);
     attrs[code] = Math.max(attrs[code], Math.min(99, attrs[code] + add));
   }
-  return { ...base, line, ovr, tier: 'program', attrs, key: base.key.map(([c, n]) => [c, n, attrs[c] ?? ovr]) };
+  return liftShown({ ...base, line, ovr, tier: 'program', attrs, key: base.key.map(([c, n]) => [c, n, attrs[c] ?? ovr]) }, base);
 }
 
 // ---------- selection ----------
@@ -106,9 +108,16 @@ export function selectPromo(pool: Pool, promoId: string): { id: string; wave: nu
   const promo = promoById(promoId);
   const sport = pool.sport;
   const out: { id: string; wave: number; featured: boolean }[] = [];
+  // a frozen selection (src/data/live-editions.json) always wins: ratings tweaks never reshuffle it
+  const fixed = manifest()[promoId]?.[sport];
+  if (fixed) {
+    for (const [id, wave] of fixed) out.push({ id, wave, featured: !!parseLiveId(id)?.featured });
+    m.set(promoId, out);
+    return out;
+  }
   if (promo && per(promo.count, sport)) {
-    const lo = onScale(promo.ovrBand[0], sport);
-    const hi = onScale(promo.ovrBand[1], sport);
+    const lo = fcToDisplay(promo.ovrBand[0], sport);
+    const hi = fcToDisplay(promo.ovrBand[1], sport);
     const baseOf = (l: CardLine) => pool.base.get(l.id)?.ovr ?? 0;
     const ws = wavesOf(promo, sport);
     const waves: CalWave[] = ws.length ? ws : [{ d: promo.start, count: promo.count, featured: promo.featured }];

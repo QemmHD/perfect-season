@@ -17,6 +17,7 @@ import { standoutProgram } from './standouts';
 import { weekLabel } from './editions';
 import type { Pool } from './pool';
 import { setsFor } from './sets';
+import { packDefs } from './packs';
 import { NEW_ERA_COINS, newEraReady } from './new-era';
 import { GoatCrown } from './CardArt';
 import { SeasonBanner } from './SeasonBanner';
@@ -233,7 +234,7 @@ export function Hub(props: {
           <small>
             {ut.packs.length
               ? ut.packs.length + ' packs to open'
-              : 'Packs from 150'}
+              : 'Packs from ' + Math.min(...Object.values(packDefs(props.sport)).map((d) => d.price).filter((x) => x > 0)).toLocaleString('en-US')}
           </small>
           {ut.packs.length > 0 && (
             <i className="ut-dot num">{ut.packs.length}</i>

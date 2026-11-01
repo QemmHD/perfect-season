@@ -6,7 +6,8 @@
 import { hashString, rng, shuffle } from '../engine/rng';
 import { standoutId, weekLabel } from './editions';
 import type { Pool } from './pool';
-import { onScale, TIER_CUTS } from './rate';
+import { TIER_CUTS } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { Sbc } from './sbc';
 import type { RatedCard, UtSport } from './types';
 
@@ -25,9 +26,10 @@ export interface StandoutProgram {
   cards: RatedCard[];
 }
 
-/** The base-overall band a Standout is drawn from (basketball's scale 70–86, never below gold). */
+/** The base-overall band a Standout is drawn from (FC scale 77–89, never below gold). */
 export function standoutBand(sport: UtSport): [number, number] {
-  return [Math.max(onScale(70, sport), TIER_CUTS[sport].gold), onScale(86, sport)];
+  // base seasons 77–89 on the FC-style scale: +3 (featured +5) lands the Standouts at ~80–92
+  return [Math.max(fcToDisplay(77, sport), TIER_CUTS[sport].gold), fcToDisplay(89, sport)];
 }
 
 const cache = new WeakMap<Pool, Map<string, StandoutProgram>>();
@@ -104,7 +106,7 @@ export function standoutSbc(pool: Pool, week: string): Sbc {
     size: 8,
     reqs: [
       { k: 'tier', tier: 'gold', n: 8 },
-      { k: 'teamOvr', ovr: onScale(78, pool.sport) },
+      { k: 'teamOvr', ovr: fcToDisplay(80, pool.sport) },
     ],
     reward: { standout: true },
   };

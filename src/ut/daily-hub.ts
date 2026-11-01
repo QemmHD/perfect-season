@@ -8,7 +8,7 @@ import { claimed, contentOf, withClaim } from './content-state';
 import { addPick } from './content-packs';
 import type { Pool } from './pool';
 import { addSeasonXP, objectiveDeck } from './progression';
-import { onScale } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { UtState } from './state';
 
 export const CALENDAR_DAYS = 5;
@@ -36,9 +36,9 @@ export function calendarStatus(ut: UtState, day: string): { ready: boolean; step
   return { ready: true, step: (done % CALENDAR_DAYS) + 1 };
 }
 
-/** Two different golds at basketball's 78+ (this sport's scale), deterministic from the id. */
+/** Two different golds at 78+ (FC-style scale), deterministic from the id. */
 export function calendarPickOptions(pool: Pool, id: string): string[] {
-  const floor = onScale(78, pool.sport);
+  const floor = fcToDisplay(78, pool.sport);
   const golds = Object.values(pool.buckets.gold)
     .flat()
     .filter((rc) => rc.line.kind === 'season' && rc.ovr >= floor)

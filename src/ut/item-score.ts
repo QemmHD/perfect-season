@@ -2,9 +2,9 @@
 // modelled on EA FC 27's curve (research notes FC27-RESEARCH.md): Bronze 20, Silver 35, then by
 // overall 75:90, 80:180, 83:410, 84:830, 85:2,100, 86:4,100, 88:8,300, 90:14,000, 92:20,000,
 // 95:40,000, 99:100,000 (roughly doubling per point above 83). The knots are written on the
-// reference scale and mapped through `onScale`, so the curve follows our final rating scale.
+// FC-style display scale (fc-scale.ts), so the curve follows the displayed UT scale.
 // Special editions multiply it (FC: TOTW/Hero +25%, Icon +50%, holographic more).
-import { onScale } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { RatedCard, UtSport } from './types';
 
 export const ITEM_KNOTS: [number, number][] = [
@@ -41,7 +41,7 @@ function knots(sport: UtSport): [number, number][] {
   if (!k) {
     k = [];
     for (const [x, pts] of ITEM_KNOTS) {
-      const o = onScale(x, sport);
+      const o = fcToDisplay(x, sport);
       if (!k.length || o > k[k.length - 1][0]) k.push([o, pts]);
       else k[k.length - 1][1] = pts;
     }

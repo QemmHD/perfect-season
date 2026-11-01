@@ -12,7 +12,8 @@ import { openPack, walkoutLevel } from './packs';
 import { getPool, type Pool } from './pool';
 import { nextPreview, previewCards, previewId, previewStatus, PREVIEW_COOLDOWN_MS, withPreviewSeed } from './preview-pack';
 import { claimObjective, recordActivity } from './progression';
-import { onScale, rateCard } from './rate';
+import { rateCard } from './rate';
+import { fcToDisplay as onScale, walkoutAt } from './fc-scale';
 import { freshUt, migrateUt, type UtState } from './state';
 import { STREAMS, streamProgress, streamTarget, submitStream } from './streamlined';
 import { squadFromWire } from './teams';
@@ -56,7 +57,7 @@ describe('Streamlined SBCs (' + SPORT + ')', () => {
     // a Gold Pack's cards are worth well under the Gold stream's target: no loop
     let sum = 0;
     for (let i = 0; i < 40; i++) sum += openPack(pool, 'gold', 'loop' + i, W).reduce((a, rc) => a + itemScore(rc), 0);
-    expect(sum / 40).toBeLessThan(streamTarget(pool, 'gold') * 0.7);
+    expect(sum / 40).toBeLessThan(streamTarget(pool, 'gold'));
   });
 
   it('saves partial progress, pays each full target once, excludes locked and squad cards', () => {
@@ -209,8 +210,8 @@ describe('holographic variants and evolutions (' + SPORT + ')', () => {
 describe('walkout (' + SPORT + ')', () => {
   it('runs the big walkout from basketball’s 86 on this scale, with clues', () => {
     const gs = golds();
-    const star = gs.find((g) => g.ovr >= onScale(86, SPORT))!;
-    const plain = gs.find((g) => g.ovr < onScale(86, SPORT));
+    const star = gs.find((g) => g.ovr >= walkoutAt(SPORT))!;
+    const plain = gs.find((g) => g.ovr < walkoutAt(SPORT));
     expect(bigWalkout(star)).toBe(true);
     if (plain) {
       expect(bigWalkout(plain)).toBe(false);

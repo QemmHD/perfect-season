@@ -9,7 +9,8 @@ import { Coin } from '../ui/icons';
 import { PackArt } from './Hub';
 import { IconInfo } from './icons';
 import { type Odds, type PackDef, packName, positionChoices, FEATURED_STANDOUT, type SlotTier } from './packs';
-import { onScale, TIER_NAMES } from './rate';
+import { TIER_NAMES } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { PendingPack, UtState } from './state';
 import type { UtSport } from './types';
 import { contentOf } from './content-state';
@@ -375,7 +376,7 @@ function Market(props: { pool: Pool; ut: UtState; day: string; coins: number; st
           <span className="eyebrow">SWAP DESK</span>
           <b className="disp">{SWAP_SIZE} duplicate golds → Scout’s Choice</b>
           <small>
-            Trades your cheapest {SWAP_SIZE} spare golds from Duplicate Storage (never squad cards) for a pick of three {onScale(84, props.pool.sport)}+ golds. You have {dupes.length}. {swapsLeft} of 3 swaps left today.
+            Trades your cheapest {SWAP_SIZE} spare golds from Duplicate Storage (never squad cards) for a pick of three {fcToDisplay(84, props.pool.sport)}+ golds. You have {dupes.length}. {swapsLeft} of 3 swaps left today.
           </small>
           {dupes.length > 0 && (
             <span className="ut-swap-cards" aria-hidden="true">

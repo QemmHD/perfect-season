@@ -1,7 +1,7 @@
 // Claude, 2026-11-01 (wave 2): the walkout's clue sequence for the big pulls (FC 27: nation, league,
 // club before the card). Ours: era (decade) → conference and division → franchise → the card, with a
 // stage colour for promo editions. Conferences/divisions are today's alignment of each franchise.
-import { onScale } from './rate';
+import { walkoutAt } from './fc-scale';
 import type { RatedCard } from './types';
 
 const NBA: Record<string, [string, string]> = {
@@ -21,10 +21,10 @@ const NFL: Record<string, [string, string]> = {
   SF: ['NFC', 'WEST'], SEA: ['NFC', 'WEST'],
 };
 
-/** The walkout threshold: basketball's 86 on this sport's scale (or any special edition). */
+/** The walkout threshold (ut-scale.ts: 86 on the displayed scale), or any special edition. */
 export function bigWalkout(rc: RatedCard): boolean {
   if (rc.tier === 'bronze' || rc.tier === 'silver') return false;
-  return rc.tier !== 'gold' || rc.ovr >= onScale(86, rc.line.sport);
+  return rc.tier !== 'gold' || rc.ovr >= walkoutAt(rc.line.sport);
 }
 
 export interface WalkoutClues {

@@ -36,7 +36,9 @@
 import { SPOTLIGHT_RATES } from '../../supabase/functions/card-registry/contract';
 import { hashString, rng, type Rand, trueRand } from '../engine/rng';
 import { type Pool, TIER_RANK } from './pool';
-import { onScale, TIER_CUTS } from './rate';
+import { TIER_CUTS } from './rate';
+import { UT_SCALE } from './ut-scale';
+import { fcToDisplay } from './fc-scale';
 import { positionMix } from './squad';
 import type { RatedCard, Tier, UtSport } from './types';
 import { easternDateKey } from '../engine/season';
@@ -91,11 +93,10 @@ const dailyLast: Odds = { silver: 0.6, gold: 1 - 0.6 - STANDOUT_DAILY, standout:
 /** Claude: the new packs' prices. Football's 16-card Standout pack holds golds that sell for a third
  * as much, so its chase packs cost less; Lightning is always 25% off. */
 export const CONTENT_PRICES: Record<UtSport, { scout: number; elite: number; jumbo: number; standout: number; lightning: number }> = {
-  // Claude wave 3: retuned so quick-sell EV is 45-60% of price (FC research target): Standout
-  // Guarantee NBA 4,500 → 3,600 and NFL 3,300 → 2,300, Elite Gold 3,000 → 2,800 and NFL 2,500 → 2,100.
-  // Recheck after the ratings rework lands (its scale moves quick-sell values).
-  nba: { scout: 1500, elite: 2800, jumbo: 3200, standout: 3600, lightning: 2700 },
-  nfl: { scout: 1500, elite: 2100, jumbo: 3200, standout: 2300, lightning: 1725 },
+  // Retuned on the reworked display scale so quick-sell EV is 45–60% of price (FC research target);
+  // Scout's Choice is priced on its best option's value. Lightning stays 25% off the Standout pack.
+  nba: { scout: 650, elite: 2200, jumbo: 3600, standout: 3000, lightning: 2250 },
+  nfl: { scout: 250, elite: 1500, jumbo: 2700, standout: 1800, lightning: 1350 },
 };
 
 /**
@@ -104,10 +105,13 @@ export const CONTENT_PRICES: Record<UtSport, { scout: number; elite: number; jum
  * Premium), golds (Position). `qs` scales quick-sell values.
  */
 export const PACK_SHAPE = {
-  nba: { price: { bronze: 150, silver: 400, gold: 900, premium: 1800, position: 700 }, bronze: [4, 1], silver: [1, 3, 1], gold: [2, 2, 1], premium: [2, 5, 1], position: 3, qs: 1, rare: { gold: 1, premium: 3, position: 1 } },
+  // Claude 2026-11-01 (after the ratings rework): every paid pack retuned so its average quick-sell
+  // value is 45–60% of the price on the new display scale (NBA Bronze 150 → 250; NFL Bronze 150 → 175,
+  // Silver 400 → 320, Premium 1,800 → 1,400). Gold and Position were already in range.
+  nba: { price: { bronze: 250, silver: 400, gold: 900, premium: 1800, position: 700 }, bronze: [4, 1], silver: [1, 3, 1], gold: [2, 2, 1], premium: [2, 5, 1], position: 3, qs: 1, rare: { gold: 1, premium: 3, position: 1 } },
   // football: 23 starters to fill, so two to three times the cards, each worth about a third as much sold
   nfl: {
-    price: { bronze: 150, silver: 400, gold: 900, premium: 1800, position: 500 },
+    price: { bronze: 175, silver: 320, gold: 900, premium: 1400, position: 500 },
     bronze: [8, 2],
     silver: [2, 6, 2],
     gold: [2, 9, 1],
@@ -180,7 +184,7 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       kind: 'scout',
       name: "Scout's Choice",
       price: CONTENT_PRICES[sport].scout,
-      blurb: 'Three ' + onScale(84, sport) + '+ golds face down' + (sport === 'nfl' ? ' from one position group' : '') + '. Keep one',
+      blurb: 'Three ' + fcToDisplay(84, sport) + '+ golds face down' + (sport === 'nfl' ? ' from one position group' : '') + '. Keep one',
       slots: rep(3, { gold: 1 - SCOUT_STANDOUT, standout: SCOUT_STANDOUT }),
     },
     elite: {
@@ -452,12 +456,16 @@ export function quickSellValue(rc: RatedCard): number {
   let v: number;
   if (rc.tier === 'goat') v = 5000 + 500 * Math.max(0, o - 106);
   else if (rc.tier === 'spotlight') v = 1400 + 100 * Math.max(0, o - 100);
-  else if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - onScale(90, sport));
-  else if (rc.tier === 'landmark') v = 1200 + 60 * Math.max(0, o - onScale(84, sport));
-  else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - onScale(78, sport));
-  else if (rc.tier === 'program') v = 700 + 60 * Math.max(0, o - onScale(84, sport));
-  else if (rc.tier === 'standout') v = 400 + 40 * Math.max(0, o - onScale(78, sport));
-  else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (99 - gold)), 1.5);
+  // Claude rework: values follow the displayed UT scale's own ranges (ut-scale.ts)
+  const scale = UT_SCALE[sport];
+  const top = scale.curve[scale.curve.length - 1][1];
+  if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - (scale.legend[0][1] + 1));
+  else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - (scale.promo[0][1] - 4));
+  // Claude content editions, on the same displayed scale: Landmark ~85–93, programs, Standouts ~80–92
+  else if (rc.tier === 'landmark') v = 1200 + 60 * Math.max(0, o - (scale.legend[0][1] - 3));
+  else if (rc.tier === 'program') v = 700 + 60 * Math.max(0, o - (scale.legend[0][1] - 4));
+  else if (rc.tier === 'standout') v = 400 + 40 * Math.max(0, o - (scale.promo[0][1] - 14));
+  else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (top - gold)), 1.5);
   else if (rc.tier === 'silver') v = 40 + 40 * clamp01((o - silver) / (gold - silver - 1));
   else v = 15 + 15 * clamp01((o - (silver - 15)) / 14);
   v *= PACK_SHAPE[sport].qs;
@@ -477,7 +485,7 @@ export function walkoutLevel(rc: RatedCard): 0 | 1 | 2 | 3 | 4 {
   if (rc.tier === 'goat') return 4;
   if (rc.tier === 'spotlight') return 3;
   if (rc.tier === 'legend' || rc.tier === 'landmark' || (rc.tier === 'program' && rc.line.programKind === 'finale')) return 3;
-  if (rc.tier === 'promo' || rc.tier === 'standout' || rc.tier === 'program' || (rc.tier === 'gold' && rc.ovr >= onScale(86, rc.line.sport))) return 2;
+  if (rc.tier === 'promo' || rc.tier === 'standout' || rc.tier === 'program' || (rc.tier === 'gold' && rc.ovr >= UT_SCALE[rc.line.sport].walkout)) return 2;
   return rc.tier === 'gold' ? 1 : 0;
 }
 

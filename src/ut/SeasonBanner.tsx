@@ -4,7 +4,7 @@
 import React from 'react';
 import { daysBetween, nextSeason, per, promosOn, seasonOn, upcoming } from './calendar';
 import { HQArrow } from './Clubhouse';
-import { onScale } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { UtSport } from './types';
 
 const fmtDay = (d: string) => {
@@ -20,7 +20,7 @@ export function SeasonBanner({ day, sport, onStore }: { day: string; sport: UtSp
   const next = upcoming(day, 3, sport);
   const ns = nextSeason(day);
   const soon = ns && daysBetween(day, ns.start) <= 5 ? ns : null;
-  const band = (b: [number, number]) => (b[0] === b[1] ? String(onScale(b[0], sport)) : onScale(b[0], sport) + '–' + onScale(b[1], sport));
+  const band = (b: [number, number]) => (b[0] === b[1] ? String(fcToDisplay(b[0], sport)) : fcToDisplay(b[0], sport) + '–' + fcToDisplay(b[1], sport));
   return (
     <div className="ut-season-banner" style={{ '--sa': s.accent[0], '--sb': s.accent[1], '--sc': s.accent[2] ?? s.accent[0] } as React.CSSProperties}>
       <span className="eyebrow">

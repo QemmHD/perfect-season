@@ -7,7 +7,7 @@ import { UtCard } from './CardArt';
 import { HQArrow } from './Clubhouse';
 import { applyEvos, EVOS, evoBlock, evoById, evoOf, evoReady, MAX_ACTIVE_EVOS, type EvoDef } from './evolutions';
 import type { Pool } from './pool';
-import { onScale } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { UtState } from './state';
 import type { ClubCard } from './UltimateTeam';
 
@@ -89,14 +89,14 @@ export function EvolutionsView(props: {
               <b className="disp">{def.title}</b>
               <small>{def.blurb}</small>
               <span className="ut-evo-reqs">
-                <i>max OVR {onScale(def.maxOvr, sport)}</i>
+                <i>max OVR {fcToDisplay(def.maxOvr, sport)}</i>
                 <i>{def.tiers.join(' / ')}</i>
                 {def.needs && <i>after {evoById(def.needs)?.title}</i>}
                 <i>
                   Play {def.games} · win {def.wins}
                 </i>
                 <i>
-                  +{def.upgrade.ovr} OVR · cap {onScale(def.cap, sport)}
+                  +{def.upgrade.ovr} OVR · cap {fcToDisplay(def.cap, sport)}
                 </i>
               </span>
               {chain.length > 1 && <small className="ut-evo-chain">Chain: {chain.map((d) => d.title).join(' → ')}</small>}

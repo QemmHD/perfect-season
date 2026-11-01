@@ -72,11 +72,25 @@ export interface Schedule {
 }
 
 let data: Schedule | null = null;
+/** Frozen promo selections (scripts/freeze_live_editions.ts): promo id → sport → [card id, wave]. */
+export type Manifest = Record<string, { nba?: [string, number][]; nfl?: [string, number][] }>;
+let frozen: Manifest = {};
 
-/** The schedule, loaded once (pool.ts loads it with the cards). */
+/** The schedule and the frozen selections, loaded once (pool.ts loads them with the cards). */
 export async function loadSchedule(): Promise<Schedule> {
-  if (!data) data = (await import('../data/live-calendar.json')).default as unknown as Schedule;
+  if (!data) {
+    const [s, m] = await Promise.all([import('../data/live-calendar.json'), import('../data/live-editions.json')]);
+    data = s.default as unknown as Schedule;
+    frozen = m.default as unknown as Manifest;
+  }
   return data;
+}
+export function manifest(): Manifest {
+  return frozen;
+}
+/** For tests and the freeze script. */
+export function setManifest(m: Manifest): void {
+  frozen = m;
 }
 /** For tests and tools: set the schedule directly. */
 export function setSchedule(s: Schedule): void {

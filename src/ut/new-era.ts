@@ -1,5 +1,5 @@
 // Claude, 2026-11-01: the one-time "New Era" thank-you bundle for players who were here before the
-// ratings rework: an Icon (Legend) pick (three Legends at basketball's 88+ or better, keep one) and
+// ratings rework: an Icon (Legend) pick (three Legends at 88+ on the FC-style scale, keep one) and
 // 65,000 coins. Nothing is reset: every card, coin and level stays.
 //
 // Eligibility is an additive marker, never a date: `ut.content.era.eligible` is stamped the first
@@ -12,7 +12,7 @@ import { hashString, rng, shuffle } from '../engine/rng';
 import { claimed, contentOf, withClaim, withContent } from './content-state';
 import { addPick } from './content-packs';
 import type { Pool } from './pool';
-import { onScale } from './rate';
+import { fcToDisplay } from './fc-scale';
 import type { UtState } from './state';
 
 export const NEW_ERA_ID = 'new-era-2026';
@@ -48,9 +48,9 @@ export function newEraReady(ut: UtState): boolean {
   return !!contentOf(ut).era?.eligible && !claimed(ut, NEW_ERA_ID);
 }
 
-/** Three different Legends at or above basketball's 88 on this sport's scale (deterministic). */
+/** Three different Legends at 88+ on the FC-style display scale (deterministic). */
 export function legendOptions(pool: Pool, seed: string): string[] {
-  const floor = onScale(88, pool.sport);
+  const floor = fcToDisplay(88, pool.sport);
   const all = Object.values(pool.buckets.legend)
     .flat()
     .sort((a, b) => (a.line.id < b.line.id ? -1 : 1));

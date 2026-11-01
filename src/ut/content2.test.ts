@@ -8,14 +8,15 @@ import { addPick, buysLeft, claimDaily, dailyPackId, dailyStatus, keepPick, LIMI
 import { claimStandoutObjective, recordStandoutWin, standoutWins } from './content-progress';
 import { contentSbcs, landmarkCards, landmarkSbcs } from './content-sbc';
 import { autoDraft, chooseCaptain, claimDraft, DRAFT_GAMES, draftComplete, draftOf, draftPick, draftRung, draftSlots, draftWire, retireDraft, settleDraft, startDraft, tokenReady } from './draft-mode';
-import { deriveEditionLine, landmarkId, LANDMARK_CAP, parseEditionId, standoutId, STANDOUT_CAP } from './editions';
+import { deriveEditionLine, landmarkId, LANDMARK_CAP, LANDMARK_FLOOR, parseEditionId, standoutId, STANDOUT_CAP, STANDOUT_FEATURED_CAP } from './editions';
 import { landmarkCatalog, LANDMARK_ATTRS, type LandmarkType } from './landmarks';
 import { buyMarket, marketBought, marketFor, MARKET_FLOOR, swapForPick } from './market';
 import { packTags } from './pack-helper';
 import { openPack, packDefs, quickSellValue } from './packs';
 import { getPool, type Pool } from './pool';
 import { isRare, rareInfo } from './rare';
-import { onScale, rateCard, TIER_CUTS } from './rate';
+import { rateCard, TIER_CUTS } from './rate';
+import { fcToDisplay as onScale } from './fc-scale';
 import { claimSet, setsFor } from './sets';
 import { playerChem } from './chem-pips';
 import { freshUt, migrateUt, type UtState } from './state';
@@ -60,20 +61,21 @@ describe('editions (' + SPORT + ')', () => {
     expect(pool.byId.get(`${SPORT}:standout:${W}:1800:nobody:XXX`)).toBeUndefined();
   });
 
-  it('rates Standouts +3 (featured +5) capped at 97, boosting the best face attributes and never FT', () => {
+  it('rates Standouts +3 (featured +5) capped at 92/93, boosting the best face attributes and never FT', () => {
     for (const rc of [...pool.base.values()].filter((x) => x.line.kind === 'season' && x.tier === 'gold').slice(0, 300)) {
       const base = rateCard(rc.line);
       const so = pool.base.get(standoutId(W, false, rc.line))!;
       const fe = pool.base.get(standoutId(W, true, rc.line))!;
       expect(so.ovr).toBe(Math.max(base.ovr, Math.min(STANDOUT_CAP, base.ovr + 3)));
-      expect(fe.ovr).toBe(Math.max(base.ovr, Math.min(STANDOUT_CAP, base.ovr + 5)));
+      expect(fe.ovr).toBe(Math.max(base.ovr, Math.min(STANDOUT_FEATURED_CAP, base.ovr + 5)));
+      if (base.face && so.face) expect(so.face[0][2] - base.face[0][2]).toBe(Math.min(99 - base.face[0][2], so.ovr - base.ovr));
       if (base.attrs.FT !== undefined) expect(so.attrs.FT).toBe(base.attrs.FT);
       for (const [c, v] of Object.entries(so.attrs)) expect(v - base.attrs[c]).toBeLessThanOrEqual(3);
       expect(Object.keys(so.attrs).some((c) => so.attrs[c] > base.attrs[c])).toBe(true);
     }
   });
 
-  it('rates Landmarks +5 capped at 99 with the landmark skills +6 and weak skills kept', () => {
+  it('rates Landmarks into 85–93 with the landmark skills +6 and weak skills kept', () => {
     const cat = [...landmarkCatalog(pool.lines).values()];
     expect(cat.length).toBeGreaterThan(30);
     for (const lm of cat.slice(0, 60)) {
@@ -82,7 +84,7 @@ describe('editions (' + SPORT + ')', () => {
       const rc = pool.base.get(landmarkId(season))!;
       expect(rc.tier).toBe('landmark');
       expect(rc.line.landmark).toBe(lm.text);
-      expect(rc.ovr).toBe(Math.max(base.ovr, Math.min(LANDMARK_CAP, base.ovr + 5)));
+      expect(rc.ovr).toBe(Math.max(LANDMARK_FLOOR, Math.min(LANDMARK_CAP, base.ovr + 4)));
       const face = new Set(base.key.map(([c]) => c));
       for (const [c, v] of Object.entries(rc.attrs)) {
         const d = v - base.attrs[c];
@@ -112,7 +114,7 @@ describe('Weekly Standouts (' + SPORT + ')', () => {
       const base = rateCard(pool.byId.get(c.line.seasonId!)!).ovr;
       expect(base).toBeGreaterThanOrEqual(lo);
       expect(base).toBeLessThanOrEqual(hi);
-      expect(c.ovr).toBeLessThanOrEqual(STANDOUT_CAP);
+      expect(c.ovr).toBeLessThanOrEqual(STANDOUT_FEATURED_CAP);
     }
     const again = standoutProgram({ ...pool } as Pool, W).cards.map((c) => c.line.id);
     expect(again).toEqual(a.cards.map((c) => c.line.id));
@@ -476,4 +478,21 @@ describe('Favourite / LOCK (' + SPORT + ')', () => {
     expect(isLocked(ut, stored[0])).toBe(false);
     expect(swapForPick(ut, pool, stored, 'x', DAY, 1)).not.toBeNull();
   });
+});
+
+describe('pack prices after the ratings rework (' + SPORT + ')', () => {
+  it('every paid pack returns 45–60% of its price in quick-sell value', async () => {
+    const { positionChoices } = await import('./packs');
+    const defs = packDefs(SPORT);
+    for (const d of Object.values(defs)) {
+      // spotlight is registry-rolled, scout a pick, daily free, lightning a 25% discount by design
+      if (['spotlight', 'scout', 'daily', 'lightning'].includes(d.kind)) continue;
+      let v = 0;
+      const N = 300;
+      for (let i = 0; i < N; i++) v += openPack(pool, d.kind === 'position' ? 'position:' + positionChoices(SPORT)[i % positionChoices(SPORT).length].key : d.kind, 'ev' + i, W).reduce((a, c) => a + quickSellValue(c), 0);
+      const r = v / N / d.price;
+      expect(r, d.kind).toBeGreaterThan(0.43);
+      expect(r, d.kind).toBeLessThan(0.63);
+    }
+  }, 120000);
 });
