@@ -7,7 +7,7 @@ import { type RGB, mix, onColor, outlineOf, ramp, rgb } from './color';
 import { type Joints, joints, type P2, type Pose, project, type Shape, shapeOf, type View } from './rig';
 
 export interface Look {
-  sport: 'nba' | 'nfl';
+  sport: 'nba' | 'nfl' | 'soccer';
   /** inches and pounds */
   ht: number;
   wt: number;
@@ -31,6 +31,8 @@ export interface Look {
   pads?: number;
   /** football sleeves: 'short' (most), 'long' */
   sleeves?: 'short' | 'long';
+  /** soccer: a keeper's gloves */
+  gloves?: string;
 }
 
 // palette slots
@@ -52,7 +54,8 @@ const BAND = 15;
 const SOLE = 16;
 const SKINDARK = 17;
 const BUZZ = 18;
-const SLOTS = 19;
+const GLOVE = 19;
+const SLOTS = 20;
 
 interface Buf {
   w: number;
@@ -309,6 +312,8 @@ function isJoints(p: Pose | Joints): p is Joints {
  */
 export function drawBody(look: Look, pose: Pose | Joints, view: View, px: number): Sprite {
   const nfl = look.sport === 'nfl';
+  // soccer (Claude, 2026-11-01): short sleeves, shorter shorts, socks to the knee, keeper's gloves
+  const soccer = look.sport === 'soccer';
   const s = shapeFor(look);
   const j = isJoints(pose) ? pose : joints(pose, s);
   const P = (k: keyof typeof j) => project(j[k], view, px);
@@ -345,10 +350,11 @@ export function drawBody(look: Look, pose: Pose | Joints, view: View, px: number
       capsule(b, ox, oy, knee, ankle, bulkR(s.rShin * 1.05), bulkR(s.rShin * 0.8), (t) => (t < 0.18 ? PANTS : SOCK), part, bias);
     } else {
       // shorts to just above the knee (longer from the 90s on would need the era; one length for all)
-      capsule(b, ox, oy, knee, ankle, bulkR(s.rShin), bulkR(s.rShin * 0.75), (t) => (t > 0.78 ? SOCK : SKIN), part, bias);
+      capsule(b, ox, oy, knee, ankle, bulkR(s.rShin * (soccer ? 1.08 : 1)), bulkR(s.rShin * 0.75), (t) => (t > (soccer ? 0.1 : 0.78) ? SOCK : SKIN), part, bias);
       capsule(b, ox, oy, hip, knee, bulkR(s.rThigh * 0.95), bulkR(s.rThigh * 0.72), () => SKIN, part, bias);
       // the shorts: a loose tube over the thigh, ending just above the knee with a trim hem
-      const hem = { x: hip.x + (knee.x - hip.x) * 0.8, y: hip.y + (knee.y - hip.y) * 0.8, d: hip.d + (knee.d - hip.d) * 0.8 + 0.6 };
+      const hl = soccer ? 0.6 : 0.8;
+      const hem = { x: hip.x + (knee.x - hip.x) * hl, y: hip.y + (knee.y - hip.y) * hl, d: hip.d + (knee.d - hip.d) * hl + 0.6 };
       capsule(b, ox, oy, { ...hip, d: hip.d + 0.6 }, hem, bulkR(s.rThigh * 1.32), bulkR(s.rThigh * 1.12), (t) => (t > 0.86 ? TRIM : SHORTS), part, bias);
     }
     // the shoe: a chunky toe
@@ -375,10 +381,10 @@ export function drawBody(look: Look, pose: Pose | Joints, view: View, px: number
     const el = P(side === 'L' ? 'elL' : 'elR');
     const wr = P(side === 'L' ? 'wrL' : 'wrR');
     const hd = P(side === 'L' ? 'handL' : 'handR');
-    const sleeve = nfl ? (look.sleeves === 'long' ? 2 : 0.45) : 0;
+    const sleeve = nfl || soccer ? (look.sleeves === 'long' ? 2 : soccer ? 0.5 : 0.45) : 0;
     capsule(b, ox, oy, sh, el, bulkR(s.rUpper * (nfl ? 1.15 : 1)), bulkR(s.rUpper * 0.85), (t) => (t < sleeve ? JERSEY : SKIN), part, bias);
     capsule(b, ox, oy, el, wr, bulkR(s.rFore), bulkR(s.rFore * 0.82), () => (sleeve > 1 ? JERSEY : SKIN), part, bias);
-    capsule(b, ox, oy, wr, hd, bulkR(s.rFore * 1.08), bulkR(s.rFore * 1.18), () => SKIN, part, bias + 0.05);
+    capsule(b, ox, oy, wr, hd, bulkR(s.rFore * (look.gloves ? 1.35 : 1.08)), bulkR(s.rFore * (look.gloves ? 1.5 : 1.18)), () => (look.gloves ? GLOVE : SKIN), part, bias + 0.05);
   };
   arms('L', biasL, 4);
   arms('R', biasR, 5);
@@ -508,6 +514,7 @@ function palette(look: Look): RGB[][] {
   set(MASK, rgb(look.mask ?? '#9aa0a6'));
   set(PANTS, rgb(look.pants ?? '#e8e8e8'));
   set(BAND, trim);
+  set(GLOVE, rgb(look.gloves ?? look.skin));
   const sk = ramp(skin);
   ramps[SKINDARK] = [mix(sk[0], [0, 0, 0], 0.15), sk[0], sk[0]];
   set(BUZZ, mix(rgb(look.hairColor), skin, 0.35));
