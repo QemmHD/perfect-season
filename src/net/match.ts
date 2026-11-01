@@ -15,7 +15,7 @@ import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_Q
 // 4: Codex defensive/shot/throw gameplay revision; old clients keep their records but cannot pair across rules.
 // 5 (NFL only): Codex run lanes, blocking assignments and touch steering; preserve board history.
 // 9 (NBA only): Claude shot curve — poor shooters' green window and off-green threes fall, elite unchanged.
-const DRAFT_RULES = NFL ? 9 : 9;
+const DRAFT_RULES = NFL ? 10 : 10;
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = 'ps1-' + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
 /** Everyone with the app open, whichever sport: the online count is the whole app's. */

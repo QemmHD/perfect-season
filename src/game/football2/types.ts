@@ -87,6 +87,10 @@ export interface Body {
   diveAt: number;
   dive: { vx: number; vy: number; until: number } | null;
   trail: Pt[];
+  /** his abilities in the zone this play (a seeded roll at the snap) */
+  on?: string[];
+  /** a man defender beaten on a route break: reacting late and slower until then */
+  brokenUntil?: number;
 }
 
 export type Call = 'pass' | 'run';
@@ -166,4 +170,8 @@ export interface Play {
   aim: Pt | null;
   /** the quarterback is On Fire: he sees the whole arc and throws it quicker */
   fire: boolean;
+  /** ability pops already reported this play */
+  fired?: string[];
+  /** how the ball was caught (for the drawing only): how far he reached, a high ball, in traffic */
+  catchInfo?: { ro: number; high: boolean; contested: boolean };
 }

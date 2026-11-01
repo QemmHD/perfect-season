@@ -7,7 +7,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
 import { logError } from '../../lib/errlog';
-import { crowd, sfx, vibrate } from '../../lib/sound';
+import { crowd, sfx, tapHaptic, vibrate } from '../../lib/sound';
+import { Juice } from '../juice';
+import { BADGE_NAMES } from './ratings';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
 import { freeCanvas } from '../pixel/body';
@@ -16,7 +18,7 @@ import type { Progress, RivalLive } from '../progress';
 import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
-import { aimPass, callPlay, cancelShoot, jumpRebound, crossover, pass, pressShoot, releaseShoot, RIM, spin, step, stepback } from './engine';
+import { aimPass, callPlay, cancelShoot, jumpRebound, crossover, pass, pressShoot, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
 import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
@@ -136,7 +138,7 @@ export function Hoops2({
   const possRef = useRef<Possession | null>(null);
   const stickRef = useRef<{ x: number; y: number } | null>(null);
   const pilotRef = useRef(pilot(0.75, seed));
-  const fxRef = useRef<Fx>({ swish: 0, shake: 0, crowd: 0, flash: 0 });
+  const fxRef = useRef<Fx>({ swish: 0, shake: 0, crowd: 0, flash: 0, juice: new Juice({ reducedMotion: reducedMotion() }) });
   const slowUntil = useRef(0);
   const [between, setBetween] = useState(true);
   const [boarding, setBoarding] = useState(false);
@@ -214,8 +216,51 @@ export function Hoops2({
     return renderer.cam?.mode === 'end' ? { cx: -s.y, cz: s.x } : { cx: s.x, cz: s.y };
   };
 
+  /** Juice (render only): sweat at the rim, confetti, the camera's kick and hit-stop. */
+  const juiceAt = (cx: number, cz: number, h: number) => renderer.screenOf(cx, cz, h);
   const handleEvents = (p: Possession) => {
     const fx = fxRef.current;
+    const J = fx.juice!;
+    const nowMs = performance.now();
+    for (const e of p.events) {
+      if (e === 'release-green') {
+        J.hitStop('green', nowMs);
+        J.addTrauma(0.1);
+        J.punch(0.012);
+      } else if (e.startsWith('finish:') && e.endsWith(':make') && !e.includes(':layup')) {
+        J.hitStop('dunk', nowMs);
+        J.addTrauma(e.includes('contact') ? 0.5 : 0.36);
+        J.kick(0, 1, 5);
+        J.punch(0.035);
+        const q = juiceAt(RIM.cx, RIM.cz, RIM_H - 1);
+        if (q) J.burst('sweat', q.x, q.y, 12, ['#ffffff', '#d8f0ff', '#a8d8ff'], { speed: 80, size: Math.max(1, q.s * 0.12) });
+      } else if (e.startsWith('posterized:')) {
+        J.hitStop('posterize', nowMs);
+        J.addTrauma(0.6);
+        J.punch(0.05);
+        const d = p.bodies[Number(e.slice(11))];
+        const q = d && juiceAt(d.cx, d.cz, 5);
+        if (q) J.burst('sweat', q.x, q.y, 18, ['#ffffff', '#d8f0ff'], { speed: 110, size: Math.max(1, q.s * 0.14) });
+      } else if (e.startsWith('blocked:')) {
+        J.hitStop('block', nowMs);
+        J.addTrauma(0.32);
+        const d = p.bodies[Number(e.slice(8))];
+        const sh = p.lastShot ? p.bodies.find((b) => b.side === 'O' && b.bumped) : null;
+        if (d && sh) {
+          const a = juiceAt(d.cx, d.cz, 8),
+            b = juiceAt(sh.cx, sh.cz, 8);
+          if (a && b) J.kick(b.x - a.x, b.y - a.y, 4);
+          if (a) J.burst('spark', a.x, a.y - 4, 8, ['#ffe9a8', '#ffffff'], { speed: 90 });
+        }
+      } else if (e.startsWith('bump-through:')) {
+        J.addTrauma(0.14);
+        J.kick(0, -1, 2);
+      } else if (e.startsWith('badge:')) {
+        const [, id, idx, tier] = e.split(':');
+        renderer.pop(Number(idx), (BADGE_NAMES[id] ?? id).toUpperCase(), Number(tier), nowMs / 1000);
+      } else if (e === 'clutch:icon') say('ICON TIME · CLUTCH', 'big', 1300);
+      else if (e === 'ft:miss') say('MISSED THE FREE THROW', 'plain', 900);
+    }
     for (const e of p.events) {
       if (e.startsWith('scheme:')) setLook({ scheme: e.slice(7) as Scheme, trapped: false });
       else if (e.startsWith('trap:')) {
@@ -328,6 +373,10 @@ export function Hoops2({
       fx.swish = 1;
       const ls = p.lastShot;
       const big = ls?.kind === 'three' || ls?.kind === 'dunk' || ls?.kind === 'contact' || ls?.kind === 'oop' || ls?.kind === 'standdunk';
+      if (big) {
+        const q = renderer.screenOf(RIM.cx, RIM.cz, RIM_H + 2);
+        if (q) fx.juice?.burst('confetti', q.x, q.y, ls?.kind === 'contact' ? 34 : 22, [ourKit.jersey, ourKit.trim, '#ffffff'], { speed: 120, size: Math.max(2, q.s * 0.16) });
+      }
       sfx.bucket(ls?.kind, !!big);
       crowd.swell(big ? 1 : 0.55);
       fx.crowd = big ? 1 : 0.5;
@@ -446,8 +495,11 @@ export function Hoops2({
       const fx = fxRef.current;
       const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
-      // the posterizer in slow motion
-      acc += now < slowUntil.current ? elapsed * 0.35 : elapsed;
+      // the posterizer in slow motion; a hit-stop holds the steps back (render only: the same steps
+      // still run with the same inputs, just a beat later)
+      const J = fx.juice!;
+      J.update(elapsed);
+      acc += J.gameTime(now, now < slowUntil.current ? elapsed * 0.35 : elapsed);
       // a play can end between the steps too: a crossover, a spin or a step-back stripped as you
       // swipe it ends the possession in the swipe itself, and unbooked the game would wait on it
       // forever (the court still drawn, the clock stopped)
@@ -460,7 +512,7 @@ export function Hoops2({
       }
       if (p && p.end) {
         // after the play: a posterized man still falls, the net still swings, the shooter lands
-        const vis = now < slowUntil.current ? elapsed * 0.35 : elapsed;
+        const vis = J.gameTime(now, now < slowUntil.current ? elapsed * 0.35 : elapsed);
         p.t += vis;
         for (const b of p.bodies) {
           if (b.h > 0 || b.vh > 0) {
@@ -596,7 +648,11 @@ export function Hoops2({
     if (shotPointer.current !== pointer) return;
     shotPointer.current = null;
     const p = possRef.current;
-    if (p && !p.end) releaseShoot(p, RELEASE_LAG);
+    if (p && !p.end) {
+      releaseShoot(p, RELEASE_LAG);
+      // the haptic inside the touch itself (iOS plays it only there): a firmer tick for a green
+      tapHaptic(p.meter?.greened || p.lastShot?.greened ? 18 : 8);
+    }
   };
   const cancelHeldShot = () => {
     if (shotPointer.current !== null && possRef.current) cancelShoot(possRef.current);
@@ -605,7 +661,10 @@ export function Hoops2({
   const doPass = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const p = possRef.current;
-    if (p && !p.end) pass(p, null);
+    if (p && !p.end) {
+      pass(p, null);
+      tapHaptic(8);
+    }
   };
   // moves by swipe, anywhere off the stick and the buttons: a flick across crosses over that way, a
   // flick back (down the screen) steps back, a flick up or a circle spins
