@@ -49,6 +49,8 @@ const V: Record<UtView, ViewInfo> = {
   development: { title: 'Club', tab: 'club' },
   sets: { title: 'Sets', tab: 'club', parent: 'gallery' },
   evolutions: { title: 'Evolutions', tab: 'club', parent: 'development' },
+  // Claude: the Pack Tracker (docs/PULL-TRACKER.md), also linked from the Store
+  tracker: { title: 'Pack Tracker', tab: 'club', parent: 'club' },
 
   sbc: { title: 'Challenges', tab: 'sbc' },
   objectives: { title: 'Challenges', tab: 'sbc' },

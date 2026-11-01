@@ -8,6 +8,7 @@ import { registryNamespace, TEST_PAGE, type RegistryReceipt } from './registry';
 import { organizeStorage } from './storage';
 import type { OwnedCard } from './types';
 import type { Opening } from './UltimateTeam';
+import { recordPull, sourceOfPending } from './pull-log';
 
 export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryReceipt): { profile: Profile; opening: Opening | null } {
   if (p.ut.registeredOpenings?.includes(receipt.id)) {
@@ -47,7 +48,10 @@ export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryRecei
     at: pending.at + i,
     ...(rare && i === cards.length - 1 ? { mint: { serial: receipt.serial!, totalAtPull: receipt.totalAtPull!, ...(Number.isSafeInteger(receipt.activeAtPull) && receipt.activeAtPull! >= 0 ? { activeAtPull: receipt.activeAtPull! } : {}), requestId: receipt.id, namespace: receipt.namespace } } : {}),
   }));
-  const ut = organizeStorage(recordActivity(p.ut, 'pack:' + receipt.id, easternDateKey(), { packs: 1 }), owned);
+  // Claude: the Pack Tracker logs the pack once, on the state before its cards land (pull-log.ts)
+  const title = pending.kind.startsWith('event-') ? 'Spotlight Reward' : 'Spotlight Pack';
+  const logged = recordPull(p.ut, { id: receipt.id, kind: receipt.kind, name: title, price: pending.price, source: pending.packId ? sourceOfPending(pending.packId) : 'store', at: pending.at, uid: 'registered:' + receipt.id + ':', cards });
+  const ut = organizeStorage(recordActivity(logged, 'pack:' + receipt.id, easternDateKey(), { packs: 1 }), owned);
   const stored = new Set(ut.duplicateStorage);
   return {
     profile: {
@@ -63,7 +67,7 @@ export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryRecei
     },
     opening: {
       id: receipt.id,
-      title: pending.kind.startsWith('event-') ? 'Spotlight Reward' : 'Spotlight Pack',
+      title,
       kind: pending.kind.startsWith('event-') ? 'reward' : 'spotlight',
       cards: cards.map((rc, i) => ({ uid: owned[i].uid, rc })),
       stored: owned.filter((c) => stored.has(c.uid)).length,

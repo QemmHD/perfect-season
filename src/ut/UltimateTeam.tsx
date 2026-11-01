@@ -87,6 +87,9 @@ import { calendarSbcs } from './calendar-sbc';
 import type { CalPack } from './calendar';
 import { livePackDef, liveBuysLeft, livePick, recordLiveBuy } from './live-packs';
 import { programReward } from './live-cards';
+import { recordPull, sourceOfPending } from './pull-log';
+import { PullTracker } from './PullTracker';
+import type { PickState } from './content-state';
 // Claude (UI reorganisation): last, so the shell and shared pieces win over older rules
 import './nav.css';
 
@@ -123,7 +126,8 @@ export type UtView =
   | 'draft'
   | 'daily'
   | 'evolutions'
-  | 'inbox';
+  | 'inbox'
+  | 'tracker';
 
 /** the view to come back to after a match (the screen unmounts while it's played) */
 let lastView: UtView = 'hub';
@@ -315,7 +319,17 @@ export default function UltimateTeam(props: {
 
   /** Open a pack now: its cards go into the club at once (closing the app mid-reveal keeps them).
    * `fill`: an empty squad is built from the club, these cards included (the starter pack). */
-  const openNow = (kind: string, seed: string, title: string, also?: (p: Profile) => Profile, fill = false, guard?: (p: Profile) => boolean, preset?: RatedCard[]) => {
+  const openNow = (
+    kind: string,
+    seed: string,
+    title: string,
+    also?: (p: Profile) => Profile,
+    fill = false,
+    guard?: (p: Profile) => boolean,
+    preset?: RatedCard[],
+    /** Claude: the Pack Tracker's record of it (pull-log.ts): coins paid and where it came from */
+    meta: { price: number; source: string } = { price: 0, source: 'reward' }
+  ) => {
     // Claude: a reserved Spotlight pack only holds other packs while its registry request is in
     // flight. Before, one failed request (offline, a dropped connection) blocked every pack, the
     // starter and reward packs included, until the registry answered. The reservation itself, its
@@ -334,7 +348,9 @@ export default function UltimateTeam(props: {
     const helper = packTags(pool, ut, lineup, cards);
     update((p) => {
       if (guard && !guard(p)) return p;
-      const deposited = organizeStorage(recordActivity(p.ut, 'pack:' + seed, easternDateKey(), { packs: 1 }), owned);
+      // Claude: logged once, on the state before the cards land (a replay finds them owned and skips)
+      const logged = recordPull(p.ut, { id: seed, kind, name: title, price: meta.price, source: meta.source, at, uid: 'pack:' + seed + ':', cards });
+      const deposited = organizeStorage(recordActivity(logged, 'pack:' + seed, easternDateKey(), { packs: 1 }), owned);
       const empty = fill && !Object.keys(deposited.squad).length;
       const squad = empty
         ? autoBuild(
@@ -383,7 +399,9 @@ export default function UltimateTeam(props: {
         return r ? { ...p, ut: r.ut } : p;
       },
       false,
-      (p) => dailyStatus(p.ut, day).ready
+      (p) => dailyStatus(p.ut, day).ready,
+      undefined,
+      { price: 0, source: 'daily' }
     );
     if (shown.gold) window.setTimeout(() => onToast('Day 7 streak! A Gold Pack is waiting in your Store.'), 400);
   };
@@ -407,7 +425,9 @@ export default function UltimateTeam(props: {
       packName(SPORT, kind),
       (p) => ({ ...p, coins: p.coins - price, ut: recordBuy(p.ut, kind, day, at) }),
       false,
-      (p) => p.coins >= price && buysLeft(p.ut, kind, day, at) > 0
+      (p) => p.coins >= price && buysLeft(p.ut, kind, day, at) > 0,
+      undefined,
+      { price, source: 'store' }
     );
   };
 
@@ -432,9 +452,17 @@ export default function UltimateTeam(props: {
     const pick = contentOf(latest.current.ut).picks?.find((x) => x.id === id);
     const shown = keepPick(latest.current.ut, id, index, at);
     if (!shown.card || !pick) return;
-    update((p) => ({ ...p, ut: keepPick(p.ut, id, index, at).ut }));
-    setPickOpen(null);
     const rc = ratedOf(pool, shown.card);
+    // Claude: the Pack Tracker logs the kept card as a one-card pick (pull-log.ts), with the coins a
+    // Store-bought Scout's Choice cost; reward and swap picks cost none
+    const meta = pickMeta(pick);
+    update((p) => {
+      const r = keepPick(p.ut, id, index, at);
+      if (!r.card) return p;
+      const logged = rc ? recordPull(p.ut, { id: 'pick:' + id, kind: meta.kind, name: pick.title, price: meta.price, source: meta.source, at, uid: 'pick:' + id, cards: [rc] }) : p.ut;
+      return { ...p, ut: keepPick(logged, id, index, at).ut };
+    });
+    setPickOpen(null);
     sfx.levelUp();
     if (rc) setOpening({ id: 'pick:' + id, title: pick.title, kind: 'reward', cards: [{ uid: shown.card.uid, rc }] });
   };
@@ -539,7 +567,7 @@ export default function UltimateTeam(props: {
     const cards = previewCards(pool, ut, week);
     const at = Date.now();
     sfx.coin();
-    openNow(PREVIEW_KIND, id, 'Preview Pack', (p) => ({ ...p, coins: p.coins - price, ut: nextPreview(p.ut, true, at) }), false, (p) => p.coins >= price && previewId(p.ut) === id, cards);
+    openNow(PREVIEW_KIND, id, 'Preview Pack', (p) => ({ ...p, coins: p.coins - price, ut: nextPreview(p.ut, true, at) }), false, (p) => p.coins >= price && previewId(p.ut) === id, cards, { price, source: 'preview' });
   };
   const skipPreview = () => {
     const at = Date.now();
@@ -588,7 +616,7 @@ export default function UltimateTeam(props: {
       return onToast('Not enough coins yet: ' + (def.price - profile.coins).toLocaleString('en-US') + ' more.');
     }
     sfx.coin();
-    openNow(pack.id, newId(), def.name, (p) => ({ ...p, coins: p.coins - def.price, ut: recordLiveBuy(p.ut, pack, day) }), false, (p) => p.coins >= def.price && liveBuysLeft(p.ut, pack, day) > 0);
+    openNow(pack.id, newId(), def.name, (p) => ({ ...p, coins: p.coins - def.price, ut: recordLiveBuy(p.ut, pack, day) }), false, (p) => p.coins >= def.price && liveBuysLeft(p.ut, pack, day) > 0, undefined, { price: def.price, source: 'store' });
   };
 
   const claimObjectivePick = () => {
@@ -610,14 +638,14 @@ export default function UltimateTeam(props: {
       return;
     }
     sfx.coin();
-    openNow(kind, newId(), packName(SPORT, kind), (p) => ({ ...p, coins: p.coins - price }));
+    openNow(kind, newId(), packName(SPORT, kind), (p) => ({ ...p, coins: p.coins - price }), false, undefined, undefined, { price, source: 'store' });
   };
 
   const claimStarter = () => {
     if (ut.starterClaimed) return;
     sfx.click();
     // a card for every spot: they go straight into the squad (if it's still empty)
-    openNow('starter', newId(), 'Starter Pack', (p) => ({ ...p, ut: { ...p.ut, starterClaimed: true } }), true);
+    openNow('starter', newId(), 'Starter Pack', (p) => ({ ...p, ut: { ...p.ut, starterClaimed: true } }), true, undefined, undefined, { price: 0, source: 'starter' });
   };
 
   const openPending = (id: string) => {
@@ -642,7 +670,7 @@ export default function UltimateTeam(props: {
       return;
     }
     sfx.click();
-    openNow(pp.kind, pp.id, packName(SPORT, pp.kind), (p) => ({ ...p, ut: { ...p.ut, packs: p.ut.packs.filter((x) => x.id !== id) } }));
+    openNow(pp.kind, pp.id, packName(SPORT, pp.kind), (p) => ({ ...p, ut: { ...p.ut, packs: p.ut.packs.filter((x) => x.id !== id) } }), false, undefined, undefined, { price: 0, source: sourceOfPending(pp.id) });
   };
 
   // ---------- the club ----------
@@ -1059,8 +1087,9 @@ export default function UltimateTeam(props: {
         }}
       />
     );
+  else if (view === 'tracker') body = <PullTracker pool={pool} ut={ut} sport={SPORT} day={day} week={week} byUid={byUid} onInspect={setDetail} onStore={() => go('store')} />;
   else if (view === 'club' || view === 'storage')
-    body = <Club key={view} club={view === 'storage' ? stored : club} storage={view === 'storage'} onInspect={setDetail} onSell={quickSell} />;
+    body = <Club key={view} club={view === 'storage' ? stored : club} storage={view === 'storage'} onInspect={setDetail} onSell={quickSell} onTracker={view === 'club' ? () => go('tracker') : undefined} />;
   else if (view === 'gallery')
     body = (
       <CollectionGallery
@@ -1135,6 +1164,7 @@ export default function UltimateTeam(props: {
           onMarket={buyFromMarket}
           onSwap={swap}
           onStandouts={() => go('standouts')}
+          onTracker={() => go('tracker')}
           onLive={buyLive}
           preview={<PreviewPack pool={pool} ut={ut} week={week} coins={profile.coins} now={Date.now()} onStart={startPreview} onBuy={buyPreview} onSkip={skipPreview} />}
         />
@@ -1337,4 +1367,12 @@ export default function UltimateTeam(props: {
 /** Objectives ready to claim (for the Objectives segment's count). */
 function objectiveDeckReady(ut: UtState, day: string): number {
   return objectiveDeck(ut, day).filter((o) => !o.claimed && o.progress >= o.target).length;
+}
+
+/** Claude: how the Pack Tracker records a kept pick: its kind, the coins a Store-bought Scout's
+ * Choice cost (its id is `scout:<id>`; reward scout picks keep their pack's id), and its source. */
+function pickMeta(pick: PickState): { kind: string; price: number; source: string } {
+  const bought = pick.kind === 'scout' && pick.id.startsWith('scout:');
+  const source = pick.kind === 'swap' ? 'swap' : pick.kind === 'new-era' ? 'bundle' : pick.kind === 'calendar' ? 'calendar' : sourceOfPending(pick.id);
+  return { kind: pick.kind, price: bought ? packDefs(SPORT).scout.price : 0, source };
 }

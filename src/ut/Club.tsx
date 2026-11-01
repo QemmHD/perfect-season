@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { pickFor, SPORT } from '../engine/sport';
 import { Confirm, Sheet } from '../ui/common';
-import { IconBox, IconClub, IconSliders } from './icons';
+import { IconBox, IconChart, IconClub, IconSliders } from './icons';
 import { EmptyState, Lede } from './ui';
 import { UtCard } from './CardArt';
 import { quickSellValue } from './packs';
@@ -32,7 +32,7 @@ const PAGE = 48;
 /** The filters stay as they were for the rest of the visit. */
 let saved: { pos: string; tier: TierF; team: string; dec: string; sort: Sort } = { pos: 'all', tier: 'all', team: 'all', dec: 'all', sort: 'ovr' };
 
-export function Club({ club, storage = false, onInspect, onSell }: { club: ClubCard[]; storage?: boolean; onInspect: (uid: string) => void; onSell: (uids: string[]) => void }) {
+export function Club({ club, storage = false, onInspect, onSell, onTracker }: { club: ClubCard[]; storage?: boolean; onInspect: (uid: string) => void; onSell: (uids: string[]) => void; onTracker?: () => void }) {
   const [f, setF] = useState(saved);
   const set = (k: Partial<typeof f>) => {
     const next = { ...f, ...k };
@@ -90,6 +90,15 @@ export function Club({ club, storage = false, onInspect, onSell }: { club: ClubC
 
   return (
     <div className="page ut-club">
+      {onTracker && (
+        <button className="ut-so-link ut-tracker-link" onClick={onTracker}>
+          <span>
+            <b>Pack Tracker</b>
+            <small>Every card you’ve pulled, and what each pack type gives back</small>
+          </span>
+          <IconChart size={20} />
+        </button>
+      )}
       {storage && <Lede>Spare copies land here automatically. Use them in SBCs and the Swap Desk, quick-sell them, or swap one into your club. Each copy keeps its own level.</Lede>}
       {club.length > 0 && (
         <div className="ut-club-bar">

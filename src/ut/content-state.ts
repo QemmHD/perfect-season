@@ -3,6 +3,7 @@
 // lives inside the profile's `ut`, so the encrypted automatic server save (cloud-data.ts captures
 // the whole profile keys) carries it with no backend change. Every reward is claimed under a stable
 // id in `claims` exactly once. See docs/UT-CONTENT-2.md.
+import { normalizePulls, type PullLog } from './pull-log-state';
 
 /** An open pick sheet: persisted until one card is kept, so closing the app never loses it. */
 export interface PickState {
@@ -63,6 +64,8 @@ export interface ContentState {
   calendar?: { day: string; n: number };
   /** wave 2: the Preview Pack (preview-pack.ts): a per-player seed, the preview number, a cooldown */
   preview?: { seed: string; n: number; until?: number };
+  /** Claude: the Pack Tracker (pull-log-state.ts, docs/PULL-TRACKER.md): recent packs and per-type totals */
+  pulls?: PullLog;
 }
 
 const str = (x: unknown): x is string => typeof x === 'string';
@@ -124,6 +127,10 @@ export function normalizeContent(raw: unknown): ContentState | undefined {
   if (rec(raw.calendar) && str(raw.calendar.day)) out.calendar = { day: raw.calendar.day, n: int(raw.calendar.n, 0, 1e6) };
   if (rec(raw.preview) && str(raw.preview.seed))
     out.preview = { seed: raw.preview.seed, n: int(raw.preview.n, 0, 1e9), ...(typeof raw.preview.until === 'number' ? { until: int(raw.preview.until, 0, Number.MAX_SAFE_INTEGER) } : {}) };
+  if (rec(raw.pulls)) {
+    const pulls = normalizePulls(raw.pulls);
+    if (pulls) out.pulls = pulls;
+  }
   if (Array.isArray(raw.locked)) out.locked = strs(raw.locked, 2000);
   if (rec(raw.era)) out.era = { eligible: raw.era.eligible === true };
   if (rec(raw.draft)) {
