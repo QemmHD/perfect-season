@@ -1,4 +1,4 @@
-import { FAV_ASKED_KEY, FAV_KEY, favoriteFor, markFavoritesAsked, readFavorites, reloadFavorites, saveFavorites, shouldAskFavorites } from './favorites';
+import { FAV_ASKED_KEY, FAV_KEY, favoriteFor, firstFavTab, markFavoritesAsked, readFavorites, reloadFavorites, saveFavorites, shouldAskFavorites } from './favorites';
 
 /** A phone's localStorage, in memory (optionally one that refuses everything, like a locked-down browser). */
 function fakeStorage(broken = false): Storage & { data: Map<string, string> } {
@@ -105,5 +105,22 @@ describe('favorite teams: soccer (Claude 2026-11-01)', () => {
     expect(favoriteFor('soccer')).toBe('BAR');
     saveFavorites({ soccer: 'NOPE' });
     expect(favoriteFor('soccer')).toBeNull();
+  });
+});
+
+describe('the team picker opens on the right sport (Claude, final QA 2026-11-01)', () => {
+  const all = ['nba', 'nfl', 'soccer'] as const;
+  const none = { nba: null, nfl: null, soccer: null };
+  it('opens on this sport until it has a pick', () => {
+    expect(firstFavTab('nba', none, all)).toBe('nba');
+    expect(firstFavTab('nfl', none, all)).toBe('nfl');
+    expect(firstFavTab('soccer', none, all)).toBe('soccer');
+    expect(firstFavTab('nfl', { ...none, nba: 'GSW' }, all)).toBe('nfl');
+  });
+  it('then on the first other sport still missing one, or this sport when all are picked', () => {
+    expect(firstFavTab('nba', { ...none, nba: 'GSW' }, all)).toBe('nfl');
+    expect(firstFavTab('nba', { ...none, nba: 'GSW', nfl: 'KC' }, all)).toBe('soccer');
+    expect(firstFavTab('nba', { nba: 'GSW', nfl: 'KC', soccer: 'BAR' }, all)).toBe('nba');
+    expect(firstFavTab('nfl', { ...none, nba: 'GSW', nfl: 'KC' }, ['nba', 'nfl'])).toBe('nfl');
   });
 });

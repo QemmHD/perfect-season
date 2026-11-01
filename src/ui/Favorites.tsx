@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { SOCCER_TEAMS, type TeamInfo, teamOf, teamsOf } from '../data/teams';
 import { pickFor, SOCCER_ON, SPORT, type SportId } from '../engine/sport';
-import { type Favorites, markFavoritesAsked, saveFavorites, useFavorites } from '../lib/favorites';
+import { type Favorites, firstFavTab, markFavoritesAsked, saveFavorites, useFavorites } from '../lib/favorites';
 import { sfx, vibrate } from '../lib/sound';
 import { hex, onColor, rgb } from '../game/pixel/color';
 import { Sheet } from './common';
@@ -59,8 +59,7 @@ export function TeamGrid({ sport, value, onPick }: { sport: SportId; value: stri
 
 /** Both picks: a tab per sport, the grid, and the pick's full name. Picking one moves on to the other sport if it's still open. */
 export function FavPicker({ value, onChange }: { value: Favorites; onChange: (f: Favorites) => void }) {
-  const open = FAV_SPORTS.find((s) => s !== SPORT && !value[s]);
-  const [tab, setTab] = useState<SportId>(() => (value[SPORT] || !open ? SPORT : open));
+  const [tab, setTab] = useState<SportId>(() => firstFavTab(SPORT, value, FAV_SPORTS));
   const pick = (abbr: string) => {
     sfx.select();
     vibrate(8);
@@ -76,7 +75,7 @@ export function FavPicker({ value, onChange }: { value: Favorites; onChange: (f:
         {FAV_SPORTS.map((s) => (
           <button type="button" key={s} role="tab" aria-selected={tab === s} className={tab === s ? 'on' : ''} onClick={() => (sfx.click(), setTab(s))}>
             {pickFor(s, { nba: <Hoop size={15} />, nfl: <Football size={15} />, soccer: <SoccerBall size={15} /> })}
-            <span>{SPORT_NAME[s]}</span>
+            <span>{SPORT_NAME[s].toUpperCase()}</span>
             <TeamBadge sport={s} abbr={value[s]} />
           </button>
         ))}

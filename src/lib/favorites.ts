@@ -68,6 +68,16 @@ export function saveFavorites(next: Partial<Favorites>): Favorites {
   return f;
 }
 
+/**
+ * The sport the team picker opens on (Claude, final QA 2026-11-01): this sport's teams until it has a
+ * pick, then the first other sport still missing one. (The soccer change had flipped this, so a new
+ * basketball player saw the football grid under "PICK AN NBA TEAM", and a soccer player the NBA's.)
+ */
+export function firstFavTab(sport: SportId, value: Favorites, sports: readonly SportId[]): SportId {
+  if (!value[sport]) return sport;
+  return sports.find((s) => s !== sport && !value[s]) ?? sport;
+}
+
 export function favoriteFor(sport: SportId): string | null {
   return current()[sport];
 }

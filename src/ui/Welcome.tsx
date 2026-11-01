@@ -30,7 +30,8 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
     setStep('teams');
   };
   // the teams the first launch asks for: basketball's and football's (a soccer player: his club)
-  const need = pick<(keyof Favorites)[]>({ nba: ['nba', 'nfl'], nfl: ['nba', 'nfl'], soccer: ['soccer'] });
+  // this sport's first, matching the picker's open tab (Claude, final QA)
+  const need = pick<(keyof Favorites)[]>({ nba: ['nba', 'nfl'], nfl: ['nfl', 'nba'], soccer: ['soccer'] });
   const missing = need.find((k) => !favs[k]);
   const PICK_TEXT: Record<keyof Favorites, string> = { nba: 'PICK AN NBA TEAM', nfl: 'PICK AN NFL TEAM', soccer: 'PICK A CLUB' };
   const finish = (skip: boolean) => {
