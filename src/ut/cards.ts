@@ -143,7 +143,9 @@ export function expandCards(f: CardsFile, references?: SeasonReferences): CardPo
 }
 
 // the files may not exist (an older build): a glob finds whatever is there
-const FILES = import.meta.glob<{ default: CardsFile }>('../data/cards-*.json');
+// cards-soccer.json (scripts/build_soccer_cards.py) has its own layout and isn't wired in yet:
+// left out so it is neither bundled nor precached until soccer is added (docs/SOCCER-DATA.md)
+const FILES = import.meta.glob<{ default: CardsFile }>(['../data/cards-*.json', '!../data/cards-soccer.json']);
 const REFERENCES = import.meta.glob<{ default: SeasonReferences }>('../data/season-references-*.json');
 
 const pools = new Map<UtSport, Promise<CardPool>>();

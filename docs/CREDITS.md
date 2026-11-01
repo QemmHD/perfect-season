@@ -97,3 +97,18 @@ The menus' clicks, coins and card sounds are still synthesized in `src/lib/sound
 | thud | impactSoft_heavy_000.ogg from Impact Sounds | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) |
 | hit-1 | impactSoft_heavy_001.ogg from Impact Sounds | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) |
 <!-- sounds:end -->
+
+## Soccer data (not yet in the app)
+
+`src/data/soccer.json` and `src/data/cards-soccer.json` (scripts `soccer_sources.py`,
+`build_soccer_cards.py`, `build_soccer_data.py`; details in [SOCCER-DATA.md](SOCCER-DATA.md)) are
+built from:
+
+| Source | What we use | License |
+| --- | --- | --- |
+| [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets) by dcaribou (facts scraped from transfermarkt.co.uk) | league games, minutes, goals, assists, cards, lineups, substitutions, heights, birth dates and caps, 2012-13 to 2025-26 | CC0 1.0 (the dataset). We ship facts and our own ratings only: no market values, agents or photos. |
+| [Wikidata](https://www.wikidata.org) | legends' and older players' club spells (games, goals), heights, birth dates, Transfermarkt ids, Ballon d'Or winners | CC0 1.0 |
+| [openfootball/football.json](https://github.com/openfootball/football.json) | league results, to cross-check champions | CC0 1.0 / public domain |
+
+All overall ratings and face stats are our own model and estimates. They are not taken from or
+fitted to any video game. Club colors are plain identity colors; no crests, kits or photos are used.
