@@ -129,7 +129,7 @@ The menus' clicks, coins and card sounds are still synthesized in `src/lib/sound
 | hit-1 | impactSoft_heavy_001.ogg from Impact Sounds | Kenney (kenney.nl) | https://kenney.nl/assets/impact-sounds | CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/) |
 <!-- sounds:end -->
 
-## Soccer data (not yet in the app)
+## Soccer data (in the app since the soccer wiring, docs/SOCCER.md)
 
 `src/data/soccer.json` and `src/data/cards-soccer.json` (scripts `soccer_sources.py`,
 `build_soccer_cards.py`, `build_soccer_data.py`; details in [SOCCER-DATA.md](SOCCER-DATA.md)) are

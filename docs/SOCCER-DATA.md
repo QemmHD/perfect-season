@@ -1,5 +1,9 @@
 # Soccer data and cards (phase P1: data only)
 
+> **Update (Claude, 2026-11-01):** soccer is now wired into the app as the third sport; see
+> [SOCCER.md](SOCCER.md) for the app wiring, saves, queues, Ultimate Team and the set-piece tuning
+> (which supersedes the set-piece rates quoted below). The "not wired" notes below describe the earlier phase.
+
 **Implemented by Claude (Anthropic), 2026-11-01, branch `claude/soccer-data`.** This adds the data
 and card pipeline for a third sport, soccer. Nothing is wired into the app yet: no `SportId`,
 profile, queue, engine or UI changes. `src/ut/cards.ts` leaves `cards-soccer.json` out of its card

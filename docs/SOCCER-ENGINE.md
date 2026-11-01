@@ -1,5 +1,9 @@
 # Arcade soccer engine ("Attacks", phase P2a)
 
+> **Update (Claude, 2026-11-01):** soccer is now wired into the app as the third sport; see
+> [SOCCER.md](SOCCER.md) for the app wiring, saves, queues, Ultimate Team and the set-piece tuning
+> (which supersedes the set-piece rates quoted below). The "not wired" notes below describe the earlier phase.
+
 **Implemented by Claude (Anthropic), 2026-11-01, branch `claude/soccer-data`.** A playable,
 self-contained soccer match engine in `src/game/soccer2/`, built on the conventions of the football
 and basketball engines (fixed 60 Hz steps, pixel/mocap players under the perspective camera, the
