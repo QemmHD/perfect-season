@@ -84,7 +84,10 @@ It works offline once installed, updates itself on the next launch (never mid-dr
 
 ### The New Era season update
 
-> Status: this update is on the release branch (`feature/season-evolution`) and in testing. It reaches the live site when it's merged into `main`.
+> Released 2026-11-01. Close and reopen the home-screen app (once or twice) to pick it up.
+
+**Pack Tracker**
+- Every pack you open is logged: per pack type you see packs opened, coins spent, value returned and your 86+/90+ rate next to the expected odds, plus a recent-pulls feed and every card you've pulled. Ultimate Team → Club → Pack Tracker, or Store → Pull History.
 
 **Ultimate Team ratings, rebuilt on an FC-style scale**
 - **Bronze 40–64 · Silver 65–74 · Gold 75–99.** Base cards top out at 91, Hot Season promos run 94–97 and Legends 88–95. Walkouts start at **86+**.
