@@ -489,3 +489,24 @@ What differs from the Sites preview:
 Use it for offline checks: Club Season, Ultimate Team, packs, the sheet swipe and Ranks layout. Updated in place at the same URL after each fix below. It is now built with `vite build --mode testpage`. Saves on the page carry over.
 
 Before publishing, the same build was booted locally under an equivalent policy (own files only, `connect-src 'self'`). The app loaded and onboarding worked with no page errors; the blocked connections only log console errors.
+
+### UT content drop 2 — Claude, 2026-11-01 (branch `claude/ut-content`, not deployed)
+
+Built by Claude from the research spec; the full record is in [UT-CONTENT-2.md](UT-CONTENT-2.md).
+
+What it adds:
+- **Five new packs:** Daily Drop (with a 7-day streak), Scout's Choice (pick 1 of 3), Elite Gold, Jumbo Premium, and Standout Guarantee with a weekend Lightning copy.
+- **Rare golds:** the top 35% of each position's golds. Gold, Premium and Position packs now guarantee some, and the cards get a shimmer.
+- **Two promos:** Weekly Standouts (`<sport>:standout:<week>:…`) and Landmark Seasons (`<sport>:landmark:…`). Both resolve lazily in `pool.ts`, so owned copies load forever. Each has its own card art and walkout flourish.
+- **New modes and screens:** Scout Market and Swap Desk; Pack Helper tags and a quick-sell-dupes bar on the reveal; Set Collections; UT Draft, which plays real `Match.tsx` games with exactly-once settlement; chemistry pips; and the one-time New Era bundle (an Icon pick plus 65,000 coins).
+
+Saves and connections:
+- New state lives only in optional `ut.content` (`content-state.ts`). `profile.ts` gains one hook that stamps New Era eligibility.
+- No key, ID, serial or backend changes. `SPOTLIGHT_RATES` and the registry are untouched.
+
+Online: `pool.print` mixes in `CONTENT_PRINT`, so this build's UT queue doesn't pair with older builds that can't resolve the new editions. `UT_RULES` stays NBA 8 / NFL 9, and no gameplay rule or existing rating changes.
+
+Tests:
+- New: `content2.test.ts` (both sports).
+- Changed: `economy.test.ts` now skips free and pick packs in its quick-sell bound.
+- Browser QA: `scripts/qa/ut-content.mjs` at 390 and 320 in both sports, with zero page errors.

@@ -2,6 +2,8 @@
 
 Latest feature **designed and implemented by Codex (OpenAI), 2026-10-31**: [Ultimate Team Club Season](docs/UT-CLUB-SEASON.md), under **Play → Club Season**. Optional `ut.league` keeps 30-club/82-game NBA and 32-club/17-game NFL seasons, deterministic AI schedules/records/box scores, bounded performance form and challenge, real AI attribute copies, top-eight playoffs and ten season-history summaries. It uses actual UT squad matches, normal reward caps and the existing encrypted server-save profile. Keep it separate from the Season Rewards pass (`ut.hq.seasons`). Preserve season fixture/cursor validation before rewards and the current bracket/rosters on every save. Original inventory/coins/identity/serials and all other modes stay intact; online queues remain NBA 8 / NFL 9. See `league.test.ts` and `scripts/qa/league-season.mjs` before changing settlement.
 
+UT content drop 2 **implemented by Claude (Anthropic), 2026-11-01** (branch `claude/ut-content`): [docs/UT-CONTENT-2.md](docs/UT-CONTENT-2.md). New packs (Daily Drop, Scout's Choice, Elite Gold, Jumbo Premium, Standout Guarantee/Lightning), rare golds, Weekly Standouts and Landmark Seasons editions (lazily resolved in `pool.ts`; never rename their IDs), Scout Market/Swap Desk, Pack Helper, Set Collections, UT Draft, chemistry pips and the one-time New Era bundle. All new state is optional `ut.content` with stable claim IDs; `pool.print` mixes in `CONTENT_PRINT` so older builds don't share the online UT queue.
+
 Latest follow-up **implemented by Claude (Anthropic), 2026-11-01**, after an independent review of Codex's Club Season branch (see the final section of `docs/CODEX-UPDATE-LOG.md`):
 - NFL AI season games can no longer finish tied with a recorded winner.
 - The season hub opens at the top.
