@@ -31,7 +31,7 @@ function timeLeft(week: boolean): string {
 
 function SbcCard({ s, done, onOpen }: { s: Sbc; done: boolean; onOpen: () => void }) {
   return (
-    <button className={'ut-sbc' + (done ? ' done' : '') + (s.kind === 'weekly' ? ' weekly' : s.kind === 'upgrade' ? ' upgrade' : '')} onClick={onOpen} disabled={done}>
+    <button className={'ut-sbc' + (done ? ' done' : '') + (s.kind === 'weekly' ? ' weekly' : s.kind === 'upgrade' ? ' upgrade' : s.kind === 'standout' ? ' weekly so' : s.kind === 'landmark' ? ' weekly lm' : '')} onClick={onOpen} disabled={done}>
       <span className="ut-sbc-top">
         <b className="disp">{s.title}</b>
         {done ? (
@@ -103,6 +103,17 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
           <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
         ))}
       </div>
+      {/* Claude: Weekly Standouts and Landmark Seasons SBCs (content-sbc.ts) */}
+      {props.sbcs.some((s) => s.kind === 'standout' || s.kind === 'landmark') && (
+        <div className="ut-sbc-group">
+          <span className="eyebrow">Weekly Standouts &amp; Landmark Seasons{left[1] ? ' · new in ' + left[1] : ''}</span>
+          {props.sbcs
+            .filter((s) => s.kind === 'standout' || s.kind === 'landmark')
+            .map((s) => (
+              <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
+            ))}
+        </div>
+      )}
       {upgrades.length > 0 && (
         <div className="ut-sbc-group">
           <span className="eyebrow">Upgrades and repeatables</span>

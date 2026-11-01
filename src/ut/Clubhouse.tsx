@@ -164,6 +164,22 @@ export function PlayHQ({
         </span>
         <HQArrow />
       </button>
+      {/* Claude: UT Draft (draft-mode.ts) */}
+      <button className="hq-mode hq-mode-draft" onClick={() => onGo('draft')}>
+        <IconSquad size={34} />
+        <span>
+          <i className="eyebrow">SOLO · DRAFT FROM SCRATCH · UP TO 4 WINS</i>
+          <b className="disp">{ut.content?.draft?.active ? 'CONTINUE YOUR DRAFT' : 'UT DRAFT'}</b>
+          <small>
+            {ut.content?.draft?.active
+              ? ut.content.draft.active.done
+                ? 'Run over · claim your rewards'
+                : ut.content.draft.active.results.length + ' played · ' + ut.content.draft.active.wins + ' wins'
+              : 'Captain 1 of 5, then 1 of 5 per spot. Elite Gold for a perfect run.'}
+          </small>
+        </span>
+        <HQArrow />
+      </button>
       <div className="hq-mode-grid">
         <button className="hq-mode" onClick={() => onGo('moments')}>
           <span className="hq-mode-icon">

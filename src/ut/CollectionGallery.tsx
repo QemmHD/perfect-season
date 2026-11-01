@@ -10,7 +10,7 @@ import { TIER_NAMES, TIER_ORDER } from './rate';
 import type { UtState } from './state';
 import type { RatedCard, Tier } from './types';
 
-export function CollectionGallery({ pool, ut, onClaim }: { pool: Pool; ut: UtState; onClaim: (id: string) => void }) {
+export function CollectionGallery({ pool, ut, onClaim, onSets }: { pool: Pool; ut: UtState; onClaim: (id: string) => void; onSets?: () => void }) {
   const [tier, setTier] = useState<Tier | 'all'>('all');
   const [status, setStatus] = useState('all');
   const [query, setQuery] = useState('');
@@ -52,6 +52,12 @@ export function CollectionGallery({ pool, ut, onClaim }: { pool: Pool; ut: UtSta
   };
   return (
     <div className="page ut-gallery">
+      {onSets && (
+        <button className="ut-so-link" onClick={onSets}>
+          <b>Set Collections</b>
+          <small>Franchise eras, All-Decade teams, Standouts and Landmarks: each pays once</small>
+        </button>
+      )}
       <div className="ut-content-hero">
         <span className="eyebrow">THE COLLECTION BOOK</span>
         <h1 className="disp">Build your legacy.</h1>

@@ -12,6 +12,13 @@ import type { ClubCard, UtView } from './UltimateTeam';
 import { PackArt } from './PackArt';
 import { HQArrow, SeasonRibbon } from './Clubhouse';
 import { hqOf, objectiveDeck } from './progression';
+import { dailyStatus, STREAK_DAYS } from './content-packs';
+import { standoutProgram } from './standouts';
+import { weekLabel } from './editions';
+import type { Pool } from './pool';
+import { setsFor } from './sets';
+import { NEW_ERA_COINS, newEraReady } from './new-era';
+import { GoatCrown } from './CardArt';
 export { PackArt } from './PackArt';
 export function Hub(props: {
   sport: UtSport;
@@ -25,6 +32,11 @@ export function Hub(props: {
   onGo: (v: UtView) => void;
   onStarter: () => void;
   onInspect: (uid: string) => void;
+  // Claude: content drop 2
+  onDaily: () => void;
+  onNewEra: () => void;
+  week: string;
+  pool: Pool;
 }) {
   const { ut, rating, lineup } = props,
     h = hqOf(ut),
@@ -40,6 +52,9 @@ export function Hub(props: {
     rewards = objectiveDeck(ut, props.day).filter(
       (o) => !o.claimed && o.progress >= o.target
     ).length;
+  const daily = dailyStatus(ut, props.day);
+  const program = standoutProgram(props.pool, props.week);
+  const setsReady = setsFor(props.pool, ut).filter((s) => !s.claimed && s.have >= s.need).length;
   return (
     <div className="page ut-hub hq-home">
       <SeasonRibbon
@@ -58,6 +73,38 @@ export function Hub(props: {
           <HQArrow />
         </button>
       )}
+      {newEraReady(ut) && (
+        <div className="ut-new-era rise-in">
+          <GoatCrown className="ut-new-era-crown" />
+          <span className="eyebrow">THANK YOU FOR PLAYING</span>
+          <b className="disp">The New Era is here.</b>
+          <p>
+            Ratings are rebuilt. Every card, coin and level you own stays yours. As a thank-you: an Icon pick (choose 1 of 3 Legends) and {NEW_ERA_COINS.toLocaleString('en-US')} coins.
+          </p>
+          <button className="btn gold" onClick={props.onNewEra}>
+            CLAIM YOUR NEW ERA BUNDLE
+          </button>
+          <small>One per player. The coins are paid once across both sports.</small>
+        </div>
+      )}
+      <div className="ut-home-drops">
+        <button className={'ut-home-daily' + (daily.ready ? ' ready' : '')} onClick={() => (daily.ready ? props.onDaily() : props.onGo('store'))}>
+          <PackArt kind="daily" label="DAILY" sport={props.sport} small />
+          <span>
+            <i className="eyebrow">{daily.ready ? 'FREE DAILY DROP' : 'DAILY DROP'}</i>
+            <b className="disp">{daily.ready ? 'Open Day ' + daily.streak : 'Day ' + daily.streak + ' claimed'}</b>
+            <small>{daily.ready ? (daily.streak === STREAK_DAYS ? 'Day 7: plus a Gold Pack' : STREAK_DAYS - daily.streak + ' days to a Gold Pack') : 'Back tomorrow'}</small>
+          </span>
+        </button>
+        <button className="ut-home-so" onClick={() => props.onGo('standouts')}>
+          {program.featured && <UtCard rc={program.featured} w={46} />}
+          <span>
+            <i className="eyebrow">STANDOUTS · {weekLabel(props.week)}</i>
+            <b className="disp">{program.featured ? program.featured.line.name.split(' ').slice(-1)[0] + ' ' + program.featured.ovr : 'This week'}</b>
+            <small>+{program.cards.length - 1} more this week</small>
+          </span>
+        </button>
+      </div>
       <div className="hq-home-hero">
         <span className="eyebrow">PERFECT SEASON · ULTIMATE TEAM</span>
         <h1 className="disp">
@@ -184,6 +231,12 @@ export function Hub(props: {
           <IconSbc size={24} />
           <b>Challenges</b>
           <small>{props.sbcTodo ? props.sbcTodo + ' to do' : 'All done'}</small>
+        </button>
+        <button className="ut-tile" onClick={() => props.onGo('sets')}>
+          <IconClub size={24} />
+          <b>Sets</b>
+          <small>{setsReady ? setsReady + ' ready to claim' : 'Collect. Complete. Claim.'}</small>
+          {setsReady > 0 && <i className="ut-dot num">{setsReady}</i>}
         </button>
         <button className="ut-tile" onClick={() => props.onGo('records')}>
           <Trophy size={24} />

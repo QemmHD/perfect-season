@@ -9,7 +9,8 @@ import './pack-reveal.css';
 import './pack-cinema.css';
 import { PackAtmosphere } from './PackAtmosphere';
 import { packSequence } from './pack-sequence';
-import { GoatCrown, UtCard, UtCardBack } from './CardArt';
+import { GoatCrown, Laurel, Pulse, UtCard, UtCardBack } from './CardArt';
+import { weekLabel } from './editions';
 import { PackArt } from './Hub';
 import { revealOrder, walkoutLevel } from './packs';
 import { seasonText } from './pool';
@@ -27,7 +28,19 @@ function gridFor(n: number): { cols: number; w: number } {
   return { cols: 5, w: 60 };
 }
 
-export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to?: UtView) => void }) {
+export function PackOpening({
+  opening,
+  onDone,
+  dupes,
+  onSellDupes,
+}: {
+  opening: Opening;
+  onDone: (to?: UtView) => void;
+  /** Claude: this pack's spare copies in Duplicate Storage, and quick-selling them */
+  dupes?: { uids: string[]; coins: number };
+  onSellDupes?: (uids: string[]) => void;
+}) {
+  const [sellStep, setSellStep] = useState<0 | 1 | 2>(0);
   const modal = useRef<HTMLDivElement>(null);
   const invoker = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
   useLayoutEffect(() => {
@@ -46,6 +59,8 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
   const starCopy = copies[copies.length - 1];
   const star = order[order.length - 1];
   const special = star?.tier === 'goat' || star?.tier === 'spotlight';
+  // Claude: the two content-drop promos get their own walkout flourish
+  const promoEdition = star?.tier === 'standout' || star?.tier === 'landmark' ? star.tier : null;
   const level = star ? walkoutLevel(star) : 0;
   const sequence = packSequence(star?.tier, level);
   const [surge, setSurge] = useState(false);
@@ -149,6 +164,7 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
         'ut-open-screen ut-cinema' +
         (surge ? ' is-surge' : '') +
         (special ? ' ut-rare-reveal edition-' + star.tier : '') +
+        (promoEdition ? ' ut-promo-reveal edition-' + promoEdition : '') +
         (walkoutSkipped.current ? ' is-skipped' : '') +
         ' ph-' +
         phase +
@@ -245,6 +261,24 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
               <span className="ut-rare-scan" />
             </div>
           )}
+          {promoEdition === 'standout' && (
+            <div className="ut-so-scenery" aria-hidden="true">
+              <Pulse className="ut-so-pulse a" />
+              <Pulse className="ut-so-pulse b" />
+              <span className="ut-so-stamp">{surge || step >= 1 ? 'WEEKLY STANDOUT · ' + (l.week ? weekLabel(l.week) : '') : 'SOMEONE HAD A WEEK'}</span>
+            </div>
+          )}
+          {promoEdition === 'landmark' && (
+            <div className="ut-lm-scenery" aria-hidden="true">
+              <span className="ut-lm-ticker">
+                <i>
+                  {Array.from({ length: 6 }, () => (step >= 2 ? (l.landmark ?? 'LANDMARK SEASON') + ' · ' + seasonText(l) + ' · ' : 'FROM THE RECORD BOOKS · ')).join('')}
+                </i>
+              </span>
+              <Laurel className="ut-lm-laurel" />
+              <span className="ut-lm-grain" />
+            </div>
+          )}
           {step < 3 && (
             <div className="ut-cinema-mystery" aria-hidden="true">
               <UtCardBack w={156} />
@@ -289,6 +323,11 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
             <>
               {special && (
                 <span className="ut-rare-edition eyebrow">{star.tier === 'goat' ? 'GREATEST OF ALL TIME' : 'SPOTLIGHT EDITION'}</span>
+              )}
+              {promoEdition && (
+                <span className={'ut-rare-edition eyebrow ut-promo-edition t-' + promoEdition}>
+                  {promoEdition === 'standout' ? (l.featured ? 'FEATURED STANDOUT · ' : 'WEEKLY STANDOUT · ') + (l.week ? weekLabel(l.week) : '') : 'LANDMARK SEASON · ' + (l.landmark ?? '')}
+                </span>
               )}
               <b className={'disp ut-walk-tier t-' + star.tier}>
                 {star.tier === 'gold' ? (level >= 2 ? 'GOLD STAR' : 'GOLD') : TIER_NAMES[star.tier].toUpperCase()}
@@ -364,6 +403,10 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
                   ? 'In the Spotlight!'
                   : star?.tier === 'legend'
                     ? 'A Legend!'
+                    : star?.tier === 'landmark'
+                      ? 'A Landmark Season!'
+                      : star?.tier === 'standout'
+                        ? 'A Weekly Standout!'
                     : star?.tier === 'promo'
                       ? 'A Hot Season!'
                       : golds
@@ -390,8 +433,8 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
           )}
           <div className="ut-reveal-grid" style={{ gridTemplateColumns: 'repeat(' + g.cols + ', ' + g.w + 'px)' }}>
             {order.map((rc, i) => (
+              <span key={rc.line.id + i} className="ut-reveal-cell">
               <span
-                key={rc.line.id + i}
                 className={'ut-flip' + (i < flipped ? ' on t-' + rc.tier : '')}
                 style={{ width: g.w, height: Math.round(g.w * 1.4) }}
               >
@@ -404,8 +447,38 @@ export function PackOpening({ opening, onDone }: { opening: Opening; onDone: (to
                   </span>
                 </span>
               </span>
+              {i < flipped && !!opening.tags?.[copies[i]?.uid]?.length && (
+                <span className="ut-helper" style={{ width: g.w }}>
+                  {opening.tags[copies[i].uid].slice(0, 2).map((t) => (
+                    <i key={t.k} className={'ut-helper-tag h-' + t.k}>
+                      {t.text}
+                    </i>
+                  ))}
+                </span>
+              )}
+              </span>
             ))}
           </div>
+          {done && dupes && dupes.uids.length > 0 && onSellDupes && sellStep < 2 && (
+            <div className="ut-dupes-bar rise-in">
+              <span>
+                <b className="num">{dupes.uids.length}</b> {dupes.uids.length === 1 ? 'duplicate' : 'duplicates'} sent to storage
+              </span>
+              <button
+                className={'btn' + (sellStep ? ' gold' : '')}
+                onClick={() => {
+                  sfx.click();
+                  if (sellStep === 0) setSellStep(1);
+                  else {
+                    onSellDupes(dupes.uids);
+                    setSellStep(2);
+                  }
+                }}
+              >
+                {sellStep ? 'CONFIRM +' + dupes.coins.toLocaleString('en-US') : 'QUICK SELL DUPES'}
+              </button>
+            </div>
+          )}
           {done && (
             <div className="ut-reveal-btns rise-in">
               <button className="btn" onClick={() => (sfx.click(), onDone('club'))}>

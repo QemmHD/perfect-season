@@ -119,3 +119,195 @@
 .utc.xs .utc-stamp{font-size:5px;margin:0;padding:.15em .3em}
 
 .utc-stamp.cached{opacity:.72}
+
+/* ---------- Claude 2026-11-01: Weekly Standouts, Landmark Seasons, rare golds ---------- */
+.utc.t-standout {
+  --frame: linear-gradient(150deg, #8ff5e6 0%, #0e3a5c 26%, #19e3c9 52%, #0a2440 78%, #6fd8ff 100%);
+  --face: radial-gradient(ellipse at 50% 42%, #173e66 0%, #0b1f3a 58%, #050d1c 100%);
+  --ink: #eafffb;
+  --plate: linear-gradient(180deg, #04111fd0, #071a2ef2);
+  box-shadow:
+    0 0 0 0.1em #19e3c970,
+    0 0 1.3em #19e3c933;
+}
+.utc.t-standout.is-featured {
+  --frame: linear-gradient(150deg, #ffe7a3 0%, #0e3a5c 24%, #19e3c9 50%, #0a2440 76%, #f5b83d 100%);
+  box-shadow:
+    0 0 0 0.12em #f5b83d90,
+    0 0 1.6em #19e3c955;
+}
+.t-standout .utc-glow {
+  background:
+    radial-gradient(58% 40% at 50% 54%, color-mix(in srgb, var(--c1) 60%, #19e3c9) 0%, transparent 72%),
+    repeating-linear-gradient(0deg, transparent 0 0.9em, #19e3c914 0.9em 0.96em);
+}
+.utc-pulse {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 38%;
+  width: 100%;
+  height: 2.2em;
+  color: #19e3c9;
+  opacity: 0.55;
+  filter: drop-shadow(0 0 0.3em #19e3c9);
+  stroke-dasharray: 140;
+}
+.utc.big .utc-pulse {
+  animation: utc-pulse 2.6s ease-in-out infinite;
+}
+@keyframes utc-pulse {
+  0% {
+    stroke-dashoffset: 140;
+    opacity: 0.2;
+  }
+  50% {
+    stroke-dashoffset: 0;
+    opacity: 0.7;
+  }
+  100% {
+    stroke-dashoffset: -140;
+    opacity: 0.2;
+  }
+}
+.utc-wk {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 0.55em;
+  transform: translateX(-50%);
+  padding: 0.12em 0.45em;
+  border-radius: 0.2em;
+  font-size: max(0.62em, 5px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: #04111f;
+  background: linear-gradient(110deg, #19e3c9, #8ff5e6);
+}
+.is-featured .utc-wk {
+  background: linear-gradient(110deg, #f5b83d, #ffe7a3);
+}
+.utc.t-standout .utc-ovr {
+  text-shadow: 0 0 0.35em #19e3c9aa;
+}
+.utc.t-standout .utc-shine {
+  background: linear-gradient(115deg, transparent 32%, #8ff5e655 46%, transparent 60%) 0 0 / 260% 100%;
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  animation: foil-sweep 4s ease-in-out infinite;
+}
+.utc.t-landmark {
+  --frame: linear-gradient(140deg, #f7e7c1 0%, #9a7440 22%, #f3dcae 46%, #5d4223 70%, #d9b77a 100%);
+  --face: radial-gradient(ellipse at 50% 40%, #8a6a3e 0%, #4a3519 55%, #1f150a 100%);
+  --ink: #fff3da;
+  --plate: linear-gradient(180deg, #1c1308d8, #2a1d0cf4);
+  box-shadow:
+    0 0 0 0.12em #e8cf9a90,
+    0 0 1.5em #d9b77a40;
+}
+.t-landmark .utc-glow {
+  background:
+    radial-gradient(58% 40% at 50% 54%, color-mix(in srgb, var(--c1) 35%, #d9b77a) 0%, transparent 72%),
+    repeating-linear-gradient(90deg, transparent 0 1.1em, #fff2d00c 1.1em 1.16em);
+}
+.utc-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.32;
+  mix-blend-mode: overlay;
+  background:
+    repeating-radial-gradient(circle at 30% 20%, #fff8 0 0.04em, transparent 0.05em 0.23em),
+    repeating-radial-gradient(circle at 70% 80%, #0006 0 0.05em, transparent 0.06em 0.31em);
+  pointer-events: none;
+}
+.utc-laurel {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 0.4em;
+  width: 3.4em;
+  height: 2.1em;
+  transform: translateX(-50%);
+  color: #f0d390;
+  filter: drop-shadow(0 0 0.35em #f5d88d66);
+}
+.t-landmark .utc-edition {
+  color: #f0d9a8;
+}
+.utc-ticker {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 0.2em;
+  padding: 0.1em 0.4em;
+  border-top: 1px solid #f0d39066;
+  border-bottom: 1px solid #f0d39066;
+  font-size: max(0.6em, 5px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f7e2b0;
+  background: repeating-linear-gradient(90deg, #00000033 0 0.3em, transparent 0.3em 0.6em);
+}
+.utc.xs .utc-ticker,
+.utc.xs .utc-wk,
+.utc.xs .utc-laurel,
+.utc.sm .utc-laurel {
+  display: none;
+}
+.utc.sm .utc-wk {
+  font-size: 5px;
+}
+.utc.t-landmark .utc-shine {
+  background: linear-gradient(120deg, transparent 30%, #fff1cc4d 46%, transparent 62%) 0 0 / 280% 100%;
+  mix-blend-mode: soft-light;
+  opacity: 0.7;
+  animation: foil-sweep 7s ease-in-out infinite;
+}
+.utc.t-gold.is-rare {
+  box-shadow:
+    0 0 0 0.08em #fff4bd99,
+    0 0.25em 0.8em rgba(0, 0, 0, 0.45);
+}
+.utc.t-gold.is-rare .utc-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(135deg, transparent 0 0.8em, #fff8d622 0.8em 0.9em, transparent 0.9em 1.6em);
+}
+.utc.big.t-gold.is-rare .utc-glow::after {
+  animation: rare-drift 6s linear infinite;
+}
+@keyframes rare-drift {
+  to {
+    background-position: 3.2em 0;
+  }
+}
+.ut-tierchip.t-standout {
+  background: #19e3c92b;
+  color: #8ff5e6;
+}
+.ut-tierchip.t-landmark {
+  background: #d9b77a33;
+  color: #f0d9a8;
+}
+.ut-tierchip.t-rare {
+  background: #f5b83d26;
+  color: #ffe58c;
+}
+.ut-tiername.t-standout,
+.ut-walk-tier.t-standout {
+  color: #19e3c9;
+}
+.ut-tiername.t-landmark,
+.ut-walk-tier.t-landmark {
+  color: #f0d390;
+}
+@media (prefers-reduced-motion: reduce) {
+  .utc.big .utc-pulse,
+  .utc.big.t-gold.is-rare .utc-glow::after {
+    animation: none !important;
+  }
+}
