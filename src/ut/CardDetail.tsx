@@ -35,7 +35,7 @@ function Bar({ v, max = 99 }: { v: number; max?: number }) {
   );
 }
 
-export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, developed }: { cc: ClubCard; sport: UtSport; onUse?: () => void; onSell: () => void; onClose: () => void; clubRecord?: { games:number; wins:number }; developed?: boolean }) {
+export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, developed, locked, onLock }: { cc: ClubCard; sport: UtSport; onUse?: () => void; onSell: () => void; onClose: () => void; clubRecord?: { games:number; wins:number }; developed?: boolean; locked?: boolean; onLock?: () => void }) {
   const [selling, setSelling] = useState(false);
   const { rc, oc } = cc;
   const l = rc.line;
@@ -173,11 +173,20 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
                 USE THIS COPY IN CLUB
               </button>
             )}
+            {onLock && (
+              <button className={'btn ut-lock-btn' + (locked ? ' on' : '')} aria-pressed={!!locked} onClick={onLock}>
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+                  <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+                  <path d={locked ? 'M5 7V5a3 3 0 0 1 6 0v2' : 'M5 7V5a3 3 0 0 1 5.8-1'} stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+                {locked ? 'LOCKED FAVOURITE · TAP TO UNLOCK' : 'LOCK AS FAVOURITE'}
+              </button>
+            )}
             <div className="btnrow ut-detail-btns">
               <button className="btn" onClick={() => close()}>
                 CLOSE
               </button>
-              <button className="btn danger withicon" onClick={() => setSelling(true)}>
+              <button className="btn danger withicon" disabled={!!locked} onClick={() => setSelling(true)}>
                 QUICK SELL <Coin size={14} /> <span className="num">{value.toLocaleString('en-US')}</span>
               </button>
             </div>

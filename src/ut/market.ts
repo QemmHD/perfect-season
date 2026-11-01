@@ -4,7 +4,7 @@
 // 1,500), each buyable once per player per day. Coins only.
 // Swap Desk: five duplicate golds from Duplicate Storage for a Scout's Choice pick (3 a day).
 import { hashString, rng, type Rand } from '../engine/rng';
-import { contentOf } from './content-state';
+import { contentOf, lockedSet } from './content-state';
 import { addPick, buysLeft, pickFor, recordBuy } from './content-packs';
 import { quickSellValue } from './packs';
 import type { Pool } from './pool';
@@ -101,8 +101,9 @@ export function swapCandidates<C extends { uid: string; rc: RatedCard; storage?:
 export function swapForPick(ut: UtState, pool: Pool, uids: string[], id: string, day: string, at: number): UtState | null {
   const stored = new Set(ut.duplicateStorage ?? []);
   const squad = new Set(Object.values(ut.squad));
+  const locked = lockedSet(ut);
   const cards = uids.map((u) => ut.owned.find((o) => o.uid === u));
-  if (new Set(uids).size !== SWAP_SIZE || cards.some((c) => !c || !stored.has(c.uid) || squad.has(c.uid) || pool.base.get(c.cardId)?.tier !== 'gold')) return null;
+  if (new Set(uids).size !== SWAP_SIZE || cards.some((c) => !c || !stored.has(c.uid) || squad.has(c.uid) || locked.has(c.uid) || pool.base.get(c.cardId)?.tier !== 'gold')) return null;
   if (buysLeft(ut, 'swap', day, at) <= 0) return null;
   const after = recordBuy(removeCards(ut, uids, 'sbc'), 'swap', day, at);
   return addPick(after, pickFor(pool, 'swap', 'swap:' + id, weekOf(day), at));

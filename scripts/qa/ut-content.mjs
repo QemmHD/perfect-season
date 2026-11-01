@@ -192,6 +192,17 @@ async function run(sport, width, opts = {}) {
   assert.ok((await page.locator('.ut-pips').count()) > 0, 'chemistry pips show');
   await shot(page, 'utc-' + tag + '-squad');
 
+  // ---- Favourite / LOCK from the card details ----
+  await tab(page, 'CLUB');
+  await page.locator('.ut-gridcard').first().click();
+  await page.getByRole('button', { name: 'LOCK AS FAVOURITE', exact: true }).click();
+  await page.waitForTimeout(300);
+  await shot(page, 'utc-' + tag + '-locked');
+  assert.equal((await current()).ut.content.locked.length, 1, 'card locked');
+  assert.ok(await page.locator('.ut-detail-btns .btn.danger').isDisabled(), 'locked card cannot be sold');
+  await page.getByRole('button', { name: 'CLOSE', exact: true }).click();
+  await page.waitForTimeout(400);
+
   // ---- UT Draft: free entry, captain, auto-draft, one real (simmed) match ----
   await tab(page, 'PLAY');
   await page.getByRole('button', { name: /UT DRAFT/ }).click();

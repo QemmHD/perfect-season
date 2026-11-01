@@ -49,7 +49,7 @@ import { Store } from './Store';
 import type { OwnedCard, RatedCard, CardMint } from './types';
 // Claude 2026-11-01: UT content drop 2 (docs/UT-CONTENT-2.md)
 import { trueRand } from '../engine/rng';
-import { claimed, contentOf, withClaim } from './content-state';
+import { claimed, contentOf, isLocked, lockedSet, toggleLock, withClaim } from './content-state';
 import { addPick, buysLeft, claimDaily, dailyPackId, dailyStatus, keepPick, pickFor, recordBuy, type LimitedKind } from './content-packs';
 import { claimStandoutObjective, standoutObjectiveId } from './content-progress';
 import { contentDone, contentSbcs } from './content-sbc';
@@ -414,7 +414,8 @@ export default function UltimateTeam(props: {
 
   const swap = () => {
     if (!pool) return;
-    const uids = swapCandidates(stored)
+    const locked = lockedSet(ut);
+    const uids = swapCandidates(stored.filter((c) => !locked.has(c.uid)))
       .slice(0, SWAP_SIZE)
       .map((c) => c.uid);
     const at = Date.now();
@@ -501,13 +502,18 @@ export default function UltimateTeam(props: {
   // ---------- the club ----------
 
   const quickSell = (uids: string[]) => {
-    const cards = [...new Set(uids)].map((u) => byUid.get(u)).filter((c): c is ClubCard => !!c);
-    if (!cards.length) return;
+    // Claude: a locked (favourite) copy is never sold
+    const locked = lockedSet(ut);
+    const cards = [...new Set(uids)].filter((u) => !locked.has(u)).map((u) => byUid.get(u)).filter((c): c is ClubCard => !!c);
+    if (!cards.length) {
+      if (uids.some((u) => locked.has(u))) onToast('Locked cards can’t be sold. Unlock them in the card’s details first.');
+      return;
+    }
     const coins = cards.reduce((a, c) => a + quickSellValue(c.rc), 0);
     const gone = new Set(cards.map((c) => c.uid));
     update((p) => {
       const current = new Set(p.ut.owned.map((c) => c.uid));
-      const sold = cards.filter((c) => current.has(c.uid));
+      const sold = cards.filter((c) => current.has(c.uid) && !isLocked(p.ut, c.uid));
       if (!sold.length) return p;
       const proceeds = sold.reduce((sum, c) => sum + quickSellValue(c.rc), 0);
       return {
@@ -568,7 +574,7 @@ export default function UltimateTeam(props: {
     const pack = s.reward.pack ? { id: newId(), kind: s.reward.pack, at: Date.now() } : null;
     update((p) => {
       const current = new Set(p.ut.owned.map((c) => c.uid));
-      if (p.ut.sbc.done[s.id] || (content && claimed(p.ut, 'sbc:' + s.id)) || uids.some((uid) => !current.has(uid))) return p;
+      if (p.ut.sbc.done[s.id] || (content && claimed(p.ut, 'sbc:' + s.id)) || uids.some((uid) => isLocked(p.ut, uid)) || uids.some((uid) => !current.has(uid))) return p;
       // only this day's and week's challenges need remembering
       const done = Object.fromEntries(Object.entries(p.ut.sbc.done).filter(([k]) => k.includes(day) || k.includes(week)));
       done[s.id] = Date.now();
@@ -957,7 +963,7 @@ export default function UltimateTeam(props: {
           pool={pool}
           ut={ut}
           day={day}
-          stored={stored}
+          stored={stored.filter((c) => !isLocked(ut, c.uid))}
           onPick={(id) => (sfx.click(), setPickOpen(id))}
           onMarket={buyFromMarket}
           onSwap={swap}
@@ -1015,7 +1021,7 @@ export default function UltimateTeam(props: {
         pool={pool}
         sbcs={sbcs}
         done={sbcDone}
-        club={inventory}
+        club={inventory.filter((c) => !isLocked(ut, c.uid))}
         day={day}
         onSubmit={submitSbc}
         onToast={onToast}
@@ -1112,6 +1118,13 @@ export default function UltimateTeam(props: {
               : undefined
           }
           onSell={() => quickSell([detailCard.uid])}
+          locked={isLocked(ut, detailCard.uid)}
+          onLock={() => {
+            const was = isLocked(ut, detailCard.uid);
+            setUt((u) => toggleLock(u, detailCard.uid));
+            sfx.click();
+            onToast(was ? 'Unlocked. This copy can be sold or used in SBCs again.' : 'Locked as a favourite: never quick-sold, used in SBCs or swapped.');
+          }}
           onClose={() => setDetail(null)}
         />
       )}
@@ -1129,7 +1142,7 @@ export default function UltimateTeam(props: {
           dupes={(() => {
             // Claude: this pack's spare copies (already in Duplicate Storage), gold and below
             const st = new Set(ut.duplicateStorage ?? []);
-            const cards = opening.cards.filter((c) => st.has(c.uid) && ['bronze', 'silver', 'gold'].includes(c.rc.tier) && byUid.has(c.uid));
+            const cards = opening.cards.filter((c) => st.has(c.uid) && !isLocked(ut, c.uid) && ['bronze', 'silver', 'gold'].includes(c.rc.tier) && byUid.has(c.uid));
             return { uids: cards.map((c) => c.uid), coins: cards.reduce((a, c) => a + quickSellValue(c.rc), 0) };
           })()}
           onSellDupes={(uids) => quickSell(uids)}

@@ -22,6 +22,7 @@ Nothing is reset: owned copies, edition IDs, serials, levels, XP, squads, coins 
 | 12 | **Set Collections**: Programs, All-Decade, Franchise eras, Landmarks | Home → Sets; Collection Gallery → Set Collections | `sets.ts`, `SetsView.tsx` |
 | 13 | **UT Draft**: pick a captain from 5, then 1 of 5 per spot; win up to 4 real matches | Play → UT Draft | `draft-mode.ts`, `DraftView.tsx`, `Match.tsx` |
 | 14 | **Chemistry pips** (0–3) per starter | Squad (beside each slot tag) | `chem-pips.ts`, `SquadView.tsx` |
+| 16 | **Favourite / LOCK**: a locked copy is never quick-sold (single or bulk), traded in SBCs, used by the Swap Desk or offered in the dupes bar | Card details → LOCK AS FAVOURITE | `content-state.ts` (`toggleLock`, `isLocked`), `CardDetail.tsx`, `UltimateTeam.tsx`, `market.ts` |
 | 15 | **New Era thank-you bundle**, one time: an Icon pick (choose 1 of 3 Legends) plus 65,000 coins | Home (shown only to eligible players) | `new-era.ts`, `profile.ts` hook, `Hub.tsx` |
 
 ## Packs and odds
@@ -149,6 +150,7 @@ The tier union gains `standout` and `landmark`:
 | `soWins {week, ids[]}` | Standout objective match IDs |
 | `draft {active?, tokenWeek?, history?}` | UT Draft |
 | `era {eligible}` | New Era eligibility marker |
+| `locked []` | Favourite / LOCK copy uids |
 
 `migrateUt` keeps `content` when it is present and adds nothing otherwise. Old saves come back byte-identical, which `content2.test.ts` checks.
 

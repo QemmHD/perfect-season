@@ -1181,3 +1181,22 @@
   flex: none;
   min-height: 44px;
 }
+
+/* ---------- Favourite / LOCK ---------- */
+.btn.ut-lock-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  font-size: 11px;
+}
+.btn.ut-lock-btn.on {
+  color: var(--gold);
+  border-color: #f5b83d88;
+  background: #f5b83d14;
+}
+.ut-detail-btns .btn:disabled {
+  opacity: 0.45;
+}

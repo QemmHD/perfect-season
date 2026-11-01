@@ -52,6 +52,8 @@ export interface ContentState {
   draft?: DraftState;
   /** New Era bundle eligibility, stamped once when this build first loads the save (new-era.ts) */
   era?: { eligible: boolean };
+  /** Favourite / LOCK: owned copy uids that are never quick-sold, traded in SBCs or swapped */
+  locked?: string[];
 }
 
 const str = (x: unknown): x is string => typeof x === 'string';
@@ -98,6 +100,7 @@ export function normalizeContent(raw: unknown): ContentState | undefined {
   if (rec(raw.market) && str(raw.market.day))
     out.market = { day: raw.market.day, bought: Array.isArray(raw.market.bought) ? [...new Set(raw.market.bought.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 64))] : [] };
   if (rec(raw.soWins) && str(raw.soWins.week)) out.soWins = { week: raw.soWins.week, ids: strs(raw.soWins.ids, 50) };
+  if (Array.isArray(raw.locked)) out.locked = strs(raw.locked, 2000);
   if (rec(raw.era)) out.era = { eligible: raw.era.eligible === true };
   if (rec(raw.draft)) {
     const d = raw.draft;
@@ -134,4 +137,19 @@ export function withClaim<T extends WithContent>(ut: T, id: string): T {
 
 export function withContent<T extends WithContent>(ut: T, fn: (c: ContentState) => ContentState): T {
   return { ...ut, content: fn(contentOf(ut)) };
+}
+
+/** A locked (favourite) copy: quick-sell, SBCs, the Swap Desk and dupe bars all leave it alone. */
+export function isLocked(ut: WithContent, uid: string): boolean {
+  return !!ut.content?.locked?.includes(uid);
+}
+
+export function lockedSet(ut: WithContent): Set<string> {
+  return new Set(ut.content?.locked ?? []);
+}
+
+export function toggleLock<T extends WithContent>(ut: T, uid: string): T {
+  const c = contentOf(ut);
+  const locked = c.locked ?? [];
+  return { ...ut, content: { ...c, locked: locked.includes(uid) ? locked.filter((u) => u !== uid) : [...locked, uid] } };
 }

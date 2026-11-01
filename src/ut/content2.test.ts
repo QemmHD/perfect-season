@@ -461,3 +461,19 @@ describe('New Era bundle (' + SPORT + ')', () => {
     expect(claimNewEra(none, pool, 7)).toBe(none);
   });
 });
+
+describe('Favourite / LOCK (' + SPORT + ')', () => {
+  it('toggles, survives migration and keeps a locked copy out of the Swap Desk', async () => {
+    const { isLocked, toggleLock } = await import('./content-state');
+    const golds = Object.values(pool.buckets.gold).flat().filter((x) => x.line.kind === 'season').slice(0, 5);
+    let ut: UtState = migrateUt({ ...freshUt(), owned: golds.flatMap((g, i) => [owned(g.line.id, 'a' + i), owned(g.line.id, 'b' + i)]) });
+    const stored = ut.duplicateStorage!;
+    ut = toggleLock(ut, stored[0]);
+    expect(isLocked(ut, stored[0])).toBe(true);
+    expect(isLocked(migrateUt(JSON.parse(JSON.stringify(ut))), stored[0])).toBe(true);
+    expect(swapForPick(ut, pool, stored, 'x', DAY, 1)).toBeNull();
+    ut = toggleLock(ut, stored[0]);
+    expect(isLocked(ut, stored[0])).toBe(false);
+    expect(swapForPick(ut, pool, stored, 'x', DAY, 1)).not.toBeNull();
+  });
+});
