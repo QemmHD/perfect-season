@@ -54,6 +54,15 @@ export interface ContentState {
   era?: { eligible: boolean };
   /** Favourite / LOCK: owned copy uids that are never quick-sold, traded in SBCs or swapped */
   locked?: string[];
+  /** wave 2: Evolutions per owned copy uid (evolutions.ts), and the match ids already counted */
+  evo?: Record<string, { done: string[]; active?: { id: string; games: number; wins: number; at: number } }>;
+  evoSeen?: string[];
+  /** wave 2: Streamlined SBC points carried between submissions (streamlined.ts) */
+  streams?: Record<string, number>;
+  /** wave 2: the login calendar (daily-hub.ts): days claimed so far in the cycle and the last day */
+  calendar?: { day: string; n: number };
+  /** wave 2: the Preview Pack (preview-pack.ts): a per-player seed, the preview number, a cooldown */
+  preview?: { seed: string; n: number; until?: number };
 }
 
 const str = (x: unknown): x is string => typeof x === 'string';
@@ -100,6 +109,21 @@ export function normalizeContent(raw: unknown): ContentState | undefined {
   if (rec(raw.market) && str(raw.market.day))
     out.market = { day: raw.market.day, bought: Array.isArray(raw.market.bought) ? [...new Set(raw.market.bought.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 64))] : [] };
   if (rec(raw.soWins) && str(raw.soWins.week)) out.soWins = { week: raw.soWins.week, ids: strs(raw.soWins.ids, 50) };
+  if (rec(raw.evo)) {
+    const evo: NonNullable<ContentState['evo']> = {};
+    for (const [uid, e] of Object.entries(raw.evo)) {
+      if (!rec(e)) continue;
+      const done = strs(e.done, 20);
+      const a = rec(e.active) && str(e.active.id) ? { id: e.active.id, games: int(e.active.games, 0, 99), wins: int(e.active.wins, 0, 99), at: int(e.active.at, 0, Number.MAX_SAFE_INTEGER) } : undefined;
+      evo[uid] = { done, ...(a ? { active: a } : {}) };
+    }
+    out.evo = evo;
+  }
+  if (Array.isArray(raw.evoSeen)) out.evoSeen = strs(raw.evoSeen, 60);
+  if (rec(raw.streams)) out.streams = Object.fromEntries(Object.entries(raw.streams).filter(([, v]) => typeof v === 'number').map(([k, v]) => [k, int(v, 0, 1e9)]));
+  if (rec(raw.calendar) && str(raw.calendar.day)) out.calendar = { day: raw.calendar.day, n: int(raw.calendar.n, 0, 1e6) };
+  if (rec(raw.preview) && str(raw.preview.seed))
+    out.preview = { seed: raw.preview.seed, n: int(raw.preview.n, 0, 1e9), ...(typeof raw.preview.until === 'number' ? { until: int(raw.preview.until, 0, Number.MAX_SAFE_INTEGER) } : {}) };
   if (Array.isArray(raw.locked)) out.locked = strs(raw.locked, 2000);
   if (rec(raw.era)) out.era = { eligible: raw.era.eligible === true };
   if (rec(raw.draft)) {

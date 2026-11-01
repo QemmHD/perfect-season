@@ -43,6 +43,7 @@ import { easternDateKey } from '../engine/season';
 import { rareInfo } from './rare';
 import { weekOf } from './sbc';
 import { drawStandout } from './standouts';
+import { HOLO_CHANCE, HOLO_TIERS, holoId } from './variants';
 
 /** Claude 2026-11-01: daily (Daily Drop), scout (Scout's Choice, pick 1 of 3), elite (Elite Gold),
  * jumbo (Jumbo Premium), standout (Standout Guarantee) and lightning (its weekend discount copy). */
@@ -339,6 +340,8 @@ function fill(pool: Pool, slots: Odds[], rand: Rand, mix?: [string, number][], w
     if (!c) continue;
     ids.add(c.line.id);
     ids.add('pid:' + c.line.pid);
+    // Claude wave 2: a special edition from a pack is sometimes its holographic variant (variants.ts)
+    if (HOLO_TIERS.has(c.tier) && rand() < HOLO_CHANCE) c = pool.base.get(holoId(c.line.id)) ?? c;
     out.push(c);
   }
   return out;
@@ -456,14 +459,14 @@ export function revealOrder(cards: RatedCard[]): RatedCard[] {
 }
 
 /**
- * How big a walkout a pull gets: 0 none (bronze, silver), 1 a gold, 2 a star (an 85+ gold on
+ * How big a walkout a pull gets: 0 none (bronze, silver), 1 a gold, 2 a star (Claude: an 86+ gold on
  * basketball's scale, or a Hot Season), 3 a legend.
  */
 export function walkoutLevel(rc: RatedCard): 0 | 1 | 2 | 3 | 4 {
   if (rc.tier === 'goat') return 4;
   if (rc.tier === 'spotlight') return 3;
   if (rc.tier === 'legend' || rc.tier === 'landmark') return 3;
-  if (rc.tier === 'promo' || rc.tier === 'standout' || (rc.tier === 'gold' && rc.ovr >= onScale(85, rc.line.sport))) return 2;
+  if (rc.tier === 'promo' || rc.tier === 'standout' || (rc.tier === 'gold' && rc.ovr >= onScale(86, rc.line.sport))) return 2;
   return rc.tier === 'gold' ? 1 : 0;
 }
 

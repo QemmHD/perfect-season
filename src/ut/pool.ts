@@ -7,6 +7,7 @@ import { loadCards } from './cards';
 import { rateCard } from './rate';
 import type { CardLine, OwnedCard, RatedCard, Tier, UtSport } from './types';
 import { deriveEditionLine, parseEditionId } from './editions';
+import { deriveVariantLine, isVariantId } from './variants';
 import { rareInfo } from './rare';
 
 /**
@@ -14,7 +15,7 @@ import { rareInfo } from './rare';
  * Landmark Season editions that older builds can't resolve, so its online queue must not pair with
  * them (`queueOf` in Match.tsx uses the fingerprint).
  */
-export const CONTENT_PRINT = 'ut-content-2';
+export const CONTENT_PRINT = 'ut-content-3';
 
 /**
  * Card lines by id that also resolve the derived editions (editions.ts) on demand: a Standout from
@@ -31,10 +32,10 @@ class EditionLines extends Map<string, CardLine> {
   }
   get(id: string): CardLine | undefined {
     const own = super.get(id);
-    if (own || !parseEditionId(id)) return own;
+    if (own || (!isVariantId(id) && !parseEditionId(id))) return own;
     let d = this.derived.get(id);
     if (d === undefined) {
-      d = deriveEditionLine(id, (k) => super.get(k), this.lines);
+      d = isVariantId(id) ? deriveVariantLine(id, (k) => this.get(k)) : deriveEditionLine(id, (k) => super.get(k), this.lines);
       this.derived.set(id, d);
     }
     return d ?? undefined;
@@ -52,7 +53,7 @@ class EditionRatings extends Map<string, RatedCard> {
   }
   get(id: string): RatedCard | undefined {
     const own = super.get(id);
-    if (own || !parseEditionId(id)) return own;
+    if (own || (!isVariantId(id) && !parseEditionId(id))) return own;
     let d = this.derived.get(id);
     if (d === undefined) {
       const line = this.byId().get(id);

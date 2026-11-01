@@ -60,6 +60,10 @@ export interface CardLine {
   /** Landmark Season: what made it one, printed on the card ("31.4 PPG"), and its kind of landmark */
   landmark?: string;
   landmarkType?: string;
+  /** Claude wave 2 (variants.ts): a holographic copy of `variantOf`, or `variantOf` evolved by `evo` */
+  holo?: boolean;
+  evo?: string[];
+  variantOf?: CardLine;
 }
 
 /** Immutable edition issue number; activeAtPull is only a last-confirmed circulation snapshot. */

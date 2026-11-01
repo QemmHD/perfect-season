@@ -85,7 +85,8 @@ export function drawStandout(pool: Pool, week: string, rand: () => number, featu
 
 /** How many Standouts (any week) a squad fields. */
 export function standoutsIn(cardIds: string[]): number {
-  return cardIds.filter((id) => id.split(':')[1] === 'standout').length;
+  // (holo~ and evo~ variants of a Standout count too)
+  return cardIds.filter((id) => id.includes(':standout:')).length;
 }
 
 // ---------- the weekly SBC and objective ----------

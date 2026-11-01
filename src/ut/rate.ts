@@ -1,5 +1,6 @@
 import { nflIdentity } from './nfl-identity';
 import { rateEdition } from './editions';
+import { rateVariant } from './variants';
 import { calibrateNflReference } from './season-reference';
 import { editionAttributes, profileQuality, supportEdition } from './rating-quality';
 // Ultimate Team ratings: a card line becomes a rated card with the same code the played games use,
@@ -171,6 +172,7 @@ export function levelBonus(level: number): number {
  */
 export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   // Claude: Weekly Standout / Landmark Season editions rate their season card, then add their boost (editions.ts).
+  if (line.variantOf) return rateVariant(line, level, pos);
   if (line.kind === 'standout' || line.kind === 'landmark') return rateEdition(line, level, pos);
   const boost = Math.max(0, line.boost ?? 0);
   const bonus = boost + levelBonus(level);
