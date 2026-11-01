@@ -169,6 +169,8 @@ export function Store(props: {
   onMarket: (i: number) => void;
   onSwap: () => void;
   onStandouts: () => void;
+  /** Claude: open the Pack Tracker (Club → Pack Tracker) */
+  onTracker?: () => void;
   /** Claude wave 2: the Preview Pack card */
   preview?: React.ReactNode;
   /** Claude wave 3: buy a Live Calendar program pack */
@@ -215,6 +217,12 @@ export function Store(props: {
   const per = (k: LimitedKind) => (LIMITS[k].per === 'day' ? 'today' : LIMITS[k].per === 'week' ? 'this week' : 'this window');
   const limitNote = (k: LimitedKind) => (left(k) ? left(k) + ' of ' + LIMITS[k].n + ' left ' + per(k) : 'Limit reached ' + per(k));
   const lw = lightningWindow(now);
+  // Claude: the Pack Tracker, next to Your packs (or the pack list when nothing is waiting)
+  const history = props.onTracker ? (
+    <button className="ut-link ut-so-mini ut-pull-history" onClick={props.onTracker}>
+      PULL HISTORY
+    </button>
+  ) : null;
 
   return (
     <div className="page ut-store">
@@ -234,7 +242,7 @@ export function Store(props: {
         <>
           {(props.starter || props.pending.length > 0 || picks.length > 0) && (
             <>
-              <SectionHead title={'Your packs · ' + (props.pending.length + picks.length + (props.starter ? 1 : 0))} />
+              <SectionHead title={'Your packs · ' + (props.pending.length + picks.length + (props.starter ? 1 : 0))}>{history}</SectionHead>
               <div className="ut-mine">
                 {props.starter && (
                   <button className="ut-mine-pack" onClick={props.onStarter} aria-label="Open your free starter pack">
@@ -311,7 +319,7 @@ export function Store(props: {
           <SectionHead title="Picks & previews" />
           <div className="ut-shop">{item('scout', limitNote('scout'), left('scout') ? undefined : 'limit')}</div>
           {props.preview}
-          <SectionHead title="All packs · by price" />
+          <SectionHead title="All packs · by price">{!(props.starter || props.pending.length > 0 || picks.length > 0) && history}</SectionHead>
           <div className="ut-shop">
             {BY_PRICE.filter((k) => k !== 'spotlight' || props.sport !== 'soccer') /* soccer has no Spotlight (no registered serials) */
               .sort((a, b) => props.defs[a].price - props.defs[b].price)
