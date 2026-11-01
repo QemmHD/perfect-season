@@ -10,6 +10,10 @@ import './styles.css';
 // the arcade games' test bench (?arcade), loaded only when asked for
 const Lab = React.lazy(() => import('./game/Lab'));
 const LAB = new URLSearchParams(location.search).has('arcade');
+// arcade soccer's test bench (?soccer-lab), dev server only: the import is dropped from production
+// builds, so the soccer engine and card data stay out of the shipped bundle until the sport is wired in
+const SOCCER_LAB = import.meta.env.DEV && new URLSearchParams(location.search).has('soccer-lab');
+const SoccerLab = import.meta.env.DEV ? React.lazy(() => import('./game/soccer2/Lab')) : null;
 // the pixel-art test sheet (?pixel)
 const PIXEL = new URLSearchParams(location.search).get('pixel');
 const Gallery = React.lazy(() => (PIXEL === 'court' ? import('./game/pixel/Scene') : import('./game/pixel/Gallery')));
@@ -66,7 +70,7 @@ function Root() {
   }, [ready]);
   return (
     <Stage>
-      {ready && (LAB ? <React.Suspense fallback={null}><Lab /></React.Suspense> : <App />)}
+      {ready && (SOCCER_LAB && SoccerLab ? <React.Suspense fallback={null}><SoccerLab /></React.Suspense> : LAB ? <React.Suspense fallback={null}><Lab /></React.Suspense> : <App />)}
       {splash && <Splash leaving={ready} />}
     </Stage>
   );

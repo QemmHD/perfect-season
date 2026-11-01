@@ -1,0 +1,317 @@
+/* Soccer v2 (Claude, 2026-11-01): the court/field HUD materials (hg2-*, fb2-burst) for the pitch. */
+.sc2 {
+  background: #0f1712;
+}
+.sc2 .hg2-bug .mid b {
+  font-size: 14px;
+}
+.sc2 .hg2-bug .mid small {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc2-marks i {
+  width: 22px;
+  font-size: 10px;
+}
+.sc2-marks i.half {
+  margin-left: 6px;
+}
+.sc2-marks i.stop {
+  margin-left: 6px;
+  border-style: dashed;
+}
+.sc2-marks i.now {
+  color: var(--gold);
+}
+.sc2-marks i.e-G {
+  background: var(--gold);
+  color: var(--gold-ink);
+  border-color: transparent;
+}
+.sc2-marks i.e-S,
+.sc2-marks i.e-B {
+  background: #1d2a3a;
+  color: #9fc4ff;
+}
+.sc2-marks i.e-L,
+.sc2-marks i.e-O {
+  background: #5a1420;
+  color: #ff9a9a;
+}
+.sc2-marks i.e-W,
+.sc2-marks i.e-T {
+  color: rgba(255, 255, 255, 0.7);
+}
+.sc2 .hg2-pop {
+  /* under the goal mouth, over the empty middle of the pitch */
+  top: 52%;
+}
+.sc2 .sc2-hint {
+  height: fit-content;
+  width: max-content;
+  box-sizing: border-box;
+  top: calc(var(--sat) + 76px);
+}
+/* the attack's card, before the whistle */
+.sc2-intro {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab) + 16px);
+  transform: translateX(-50%);
+  width: min(400px, calc(100% - 24px - var(--sal) - var(--sar)));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  background: var(--hud-surface);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  animation: fb2-up 0.28s var(--ease-spring) both;
+}
+.sc2-intro small {
+  font: 800 11px var(--display);
+  letter-spacing: 2px;
+  color: var(--teal);
+}
+.sc2-intro b {
+  font: italic 900 28px/1.05 var(--display);
+  font-stretch: 80%;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #fff;
+}
+.sc2-intro span {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.78);
+  margin-bottom: 6px;
+}
+.sc2-go {
+  width: 100%;
+  height: 54px;
+  border-radius: 14px;
+  font: italic 900 19px var(--display);
+  letter-spacing: 0.5px;
+  color: var(--gold-ink);
+  background: linear-gradient(180deg, #ffd97a, #e9a21f);
+  box-shadow: 0 4px 0 #9b6a10;
+  touch-action: manipulation;
+}
+.sc2-go:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #9b6a10;
+}
+.sc2-go:focus-visible,
+.sc2-dive button:focus-visible,
+.sc2-bend button:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+}
+/* the controls: stick and sprint on the left, PASS / THRU / SHOOT on the right */
+.sc2-pad {
+  align-items: flex-end;
+}
+.sc2-left {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+.sc2 .sc2-stick {
+  width: 118px;
+  height: 118px;
+}
+.sc2 .sc2-sprint {
+  position: absolute;
+  left: auto;
+  right: 10px;
+  top: -52px;
+  bottom: auto;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  font-size: 12px;
+  pointer-events: auto;
+}
+.sc2-btns button small {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 1.2px;
+  opacity: 0.7;
+  font-style: normal;
+}
+.sc2 .hg2-shoot.held {
+  transform: translateY(4px);
+  filter: brightness(1.12);
+  box-shadow:
+    0 2px 0 #9b6a10,
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+.sc2-thru {
+  font-size: 13px;
+}
+/* a free kick's bend, over the buttons */
+.sc2-bend {
+  position: absolute;
+  right: 0;
+  bottom: 166px;
+  display: flex;
+  gap: 5px;
+  pointer-events: auto;
+}
+.sc2-bend button,
+.sc2-dive button {
+  min-width: 46px;
+  min-height: 40px;
+  padding: 0 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(6, 12, 18, 0.82);
+  color: #fff;
+  font: italic 900 11px var(--display);
+  letter-spacing: 0.6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  touch-action: manipulation;
+}
+.sc2-bend button[aria-pressed='true'],
+.sc2-dive button[aria-pressed='true'] {
+  color: var(--teal-ink);
+  background: var(--teal);
+  border-color: var(--teal);
+}
+/* a shootout: the dive (their kick) and the tally */
+.sc2-dive {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab) + 26px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+.sc2-dive button {
+  min-width: 92px;
+  min-height: 56px;
+  font-size: 14px;
+}
+.sc2-pentally {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat) + 48px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: rgba(6, 10, 20, 0.78);
+  pointer-events: none;
+}
+.sc2-pentally span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sc2-pentally small {
+  width: 64px;
+  font: 800 10px var(--display);
+  letter-spacing: 1px;
+  color: var(--teal);
+}
+.sc2-pentally .them small {
+  color: var(--rival-soft);
+}
+.sc2-pentally i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+}
+.sc2-pentally i.in {
+  background: #3ef07a;
+  border-color: #3ef07a;
+}
+.sc2-pentally i.out {
+  background: #ff5a5a;
+  border-color: #ff5a5a;
+}
+.sc2-final .sc2-pens {
+  color: var(--gold);
+}
+@media (max-width: 350px), (max-height: 600px) {
+  .sc2 .sc2-stick {
+    width: 104px;
+    height: 104px;
+  }
+  .sc2 .sc2-sprint {
+    width: 54px;
+    height: 54px;
+    top: -46px;
+    font-size: 11px;
+  }
+  .sc2 .hg2-btns {
+    width: 168px;
+    height: 132px;
+  }
+  .sc2 .hg2-shoot {
+    width: 84px;
+    height: 84px;
+    font-size: 18px;
+  }
+  .sc2 .hg2-pass {
+    right: 82px;
+    width: 60px;
+    height: 60px;
+    font-size: 13px;
+  }
+  .sc2 .hg2-cross {
+    width: 54px;
+    height: 54px;
+    font-size: 11px;
+  }
+  .sc2-bend {
+    bottom: 140px;
+  }
+  .sc2-intro b {
+    font-size: 23px;
+  }
+  .sc2-dive button {
+    min-width: 80px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sc2-intro {
+    animation: none;
+  }
+}
+@media (max-width: 350px) {
+  .sc2 .hg2-bug > span {
+    padding: 4px 7px;
+    gap: 5px;
+  }
+  .sc2 .hg2-bug b {
+    font-size: 19px;
+  }
+  .sc2 .hg2-bug .mid small {
+    display: none;
+  }
+  .sc2 .hg2-bug i {
+    font-size: 10px;
+    letter-spacing: 0.6px;
+  }
+  .sc2-marks i {
+    width: 18px;
+  }
+}
