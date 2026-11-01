@@ -1,6 +1,6 @@
 // Claude ratings rework (2026-11-01): fits OVR_BALANCE in src/ut/rate.ts so every basketball
 // position × decade and every football position group has a similar share of gold season cards.
-// Shifts are bounded to ±4 (kickers +6) so no season moves far from its same-era benchmark.
+// Shifts are bounded to ±4 (kickers and pre-1990 basketball ±6) so no season moves far from its same-era benchmark.
 // Read-only: prints the table to paste into rate.ts. Run: npx vite-node scripts/fit_ut_balance.ts [nba|nfl]
 import { loadCards } from '../src/ut/cards';
 import { OVR_BALANCE, balanceKey, rateCard, TIER_CUTS } from '../src/ut/rate';
@@ -13,7 +13,9 @@ const lines = (await loadCards(sport)).lines.filter((l) => l.kind === 'season');
 const keys = [...new Set(lines.map((l) => balanceKey(l)))].sort();
 const lo: Record<string, number> = {},
   hi: Record<string, number> = {};
-for (const k of keys) [lo[k], hi[k]] = [-4, k === 'K' ? 6 : 4];
+// pre-1990 basketball has almost no same-season game ratings to stay near: it may move up to 6
+const bound = (k: string) => (k === 'K' || (sport === 'nba' && +k.split(':')[1] < 1990) ? 6 : 4);
+for (const k of keys) [lo[k], hi[k]] = [-bound(k), bound(k)];
 const table = OVR_BALANCE[sport];
 for (const k of Object.keys(table)) delete table[k];
 const share = () => {

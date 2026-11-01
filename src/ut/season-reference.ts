@@ -6,6 +6,15 @@ import { combineAthleticism } from './nfl-combine';
 import { hasPhysicalIdentity } from './nfl-identity';
 import type { CardLine } from './types';
 
+/**
+ * How much a same-season game rating counts: the edition that rated season X after it was played
+ * (original rows, `final`, `next`) fully; the fallbacks less — `preseason` is a projection made before
+ * the season, `retro` a modern retrospective scale (docs/RATINGS-AUDIT.md, expanded references).
+ */
+export function referenceTrust(ref: CardLine['ratingReference']): number {
+  return !ref ? 0 : ref.kind === 'preseason' ? 0.7 : ref.kind === 'retro' ? 0.6 : 1;
+}
+
 /** Analysis switch for the out-of-sample audit scripts: rate a card from its own season only. */
 export const RATING_CONTEXT = { borrow: true, support: true };
 
@@ -95,10 +104,11 @@ export function calibrateNflReference(line: CardLine, pos: string, overall: numb
     for (const [code, value] of Object.entries(ref.attrs)) {
       if (!(code in attrs)) continue;
       // Physical measurements must not be inferred from yards/TDs. Position skills keep a small season-stat contribution.
-      const weight = NFL_PHYSICAL.includes(code) ? 1 : 0.95;
+      const weight = (NFL_PHYSICAL.includes(code) ? 1 : 0.95) * (referenceTrust(ref) === 1 ? 1 : 0.85);
       attrs[code] = Math.max(1, Math.min(99, Math.round(value * weight + attrs[code] * (1 - weight))));
     }
-    if (g === groupOf(line.pos[0])) overall = ref.ovr * 0.9 + overall * 0.1;
+    const w = 0.9 * referenceTrust(ref);
+    if (g === groupOf(line.pos[0])) overall = ref.ovr * w + overall * (1 - w);
   } else {
     const bias = { ...(NFL_BIAS[g] ?? {}) };
     if (g === 'QB' && !pocketPasser(line)) Object.assign(bias, { SPD: 8, ACC: 5, AGI: 5 });

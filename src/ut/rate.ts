@@ -9,7 +9,7 @@ import { shownFaceMean, faceOf, levelAttrBonus, levelOvrBonus, nflFaceKeys, supp
 // season's own ranks), football through football2's `rateNflLine()`. On top of the base rating:
 // standard promo/legend boosts and levels affect the six key attributes. Codex Spotlight/GOAT
 // editions improve the full profile, retain signature weaknesses, and support 100–110 gameplay. See docs/ULTIMATE-TEAM.md.
-import { calibrateNba, nbaRosterScale } from './calibration';
+import { calibrateNba, piecewise } from './calibration';
 import type { Attrs } from '../game/attrs';
 import { groupOf, NFL_KEYS, rateNflLine, nflAbilities } from '../game/football2/ratings';
 export { faceWeights } from './card-face';
@@ -47,13 +47,9 @@ export function onScale(x: number, sport: UtSport): number {
 
 /** The same standing on the rating scale (before the displayed UT curve, ut-scale.ts). */
 export function ratingStanding(x: number, sport: UtSport): number {
-  if (sport === 'nba') return nbaRosterScale(x);
-  for (let i = 1; i < SCALE.length; i++) {
-    const [a0, b0] = SCALE[i - 1];
-    const [a1, b1] = SCALE[i];
-    if (x <= a1 || i === SCALE.length - 1) return Math.round(b0 + ((Math.max(a0, Math.min(a1, x)) - a0) * (b1 - b0)) / (a1 - a0));
-  }
-  return x;
+  // unrounded, so neighbouring legacy numbers stay apart on a compressed displayed scale
+  if (sport === 'nba') return piecewise(x, [[40, 40], [56, 60], [65, 75], [75, 85], [85, 92], [95, 97], [99, 99]]);
+  return piecewise(Math.min(99, x), SCALE);
 }
 
 export const TIER_NAMES: Record<Tier, string> = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', promo: 'Hot Season', spotlight: 'Spotlight', legend: 'Legend', goat: 'GOAT' };
@@ -201,6 +197,12 @@ function nflCareerFloor(line: CardLine, pos: string, ovr: number): number {
   return Math.max(ovr, 0.55 * ovr + 0.45 * (rep - 2));
 }
 
+/** Football estimate path → same-season Madden level by position group (quantile-matched, 2026-11-01). */
+const NFL_ESTIMATE_LEVEL: Record<string, [number, number]> = {
+  QB: [0.33, 1.044], RB: [9.23, 0.923], WR: [-4.1, 1.061], TE: [-3.71, 1.076], OL: [-0.19, 1.034],
+  DL: [-3.02, 1.068], LB: [-6.71, 1.106], CB: [-13.72, 1.183], S: [-28.62, 1.345], K: [-40.87, 1.582],
+};
+
 /**
  * The overall a level adds: one at level 3 and one more at level 5 (the rest of a level's value goes to
  * the key attributes, +1 each per level). Kept under its old name for callers.
@@ -216,8 +218,8 @@ export function levelBonus(level: number): number {
  * Stars and deep-bench seasons are untouched. The attributes follow through supportOverall().
  */
 export const OVR_BALANCE: Record<UtSport, Record<string, number>> = {
-  nba: { 'C:1960': 3.998, 'C:1970': -2.287, 'C:1980': -0.811, 'C:1990': 0.49, 'C:2000': 2.453, 'C:2010': -0.074, 'C:2020': -2.508, 'PF:1960': 3.998, 'PF:1970': 0.975, 'PF:1980': -0.805, 'PF:1990': -0.531, 'PF:2000': 2.232, 'PF:2010': 1.053, 'PF:2020': -1.191, 'PG:1960': 1.318, 'PG:1970': -1.717, 'PG:1980': -1.348, 'PG:1990': -1.414, 'PG:2000': -0.178, 'PG:2010': -0.463, 'PG:2020': -3.824, 'SF:1960': 3.998, 'SF:1970': 3.998, 'SF:1980': 3.998, 'SF:1990': 1.25, 'SF:2000': 0.301, 'SF:2010': 2.539, 'SF:2020': -1.275, 'SG:1960': 2.811, 'SG:1970': 0.789, 'SG:1980': -0.09, 'SG:1990': -1.209, 'SG:2000': -0.816, 'SG:2010': 0.738, 'SG:2020': -1.152 },
-  nfl: { 'CB': -1.475, 'DL': 0.992, 'K': 4.013, 'LB': -1.59, 'OL': 3.998, 'QB': 2.463, 'RB': -0.184, 'S': -1.965, 'TE': -0.186, 'WR': -2.771 },
+  nba: { 'C:1960': 5.997, 'C:1970': -3.568, 'C:1980': -1.825, 'C:1990': -0.566, 'C:2000': 1.285, 'C:2010': -1.527, 'C:2020': -4, 'PF:1960': 5.997, 'PF:1970': 2.276, 'PF:1980': -1.195, 'PF:1990': 0.203, 'PF:2000': 2.402, 'PF:2010': 1.125, 'PF:2020': -1.937, 'PG:1960': 5.997, 'PG:1970': -2.938, 'PG:1980': -2.183, 'PG:1990': -2.785, 'PG:2000': -1.555, 'PG:2010': -1.803, 'PG:2020': -4, 'SF:1960': 5.997, 'SF:1970': 5.997, 'SF:1980': 5.997, 'SF:1990': 3.998, 'SF:2000': 1.344, 'SF:2010': 3.998, 'SF:2020': -2.691, 'SG:1960': 5.997, 'SG:1970': 0.141, 'SG:1980': -1.189, 'SG:1990': -2.441, 'SG:2000': -1.57, 'SG:2010': -0.439, 'SG:2020': -2.645 },
+  nfl: { 'CB': -3.428, 'DL': 1.17, 'K': -3.627, 'LB': -3.529, 'OL': -3.828, 'QB': -1.729, 'RB': -2.746, 'S': -1.662, 'TE': 3.998, 'WR': -3.631 },
 };
 export function balanceKey(line: Pick<CardLine, 'sport' | 'season' | 'pos'>, pos = line.pos[0]): string {
   if (line.sport === 'nfl') return groupOf(pos);
@@ -263,6 +265,16 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
       r = { ...calibrateNflReference(line, raw.pos, raw.ovr, nflIdentity(line, raw.attrs)), pos: raw.pos, abil: raw.abil };
     }
     base = nflCareerFloor(line, r.pos, r.exact);
+    // Without a same-season Madden rating (football before 2000 and a few gaps) the box-score estimate
+    // cannot tell a great season from an all-time one: its top end is compressed (99 → 96).
+    if (!line.ratingReference && base > 92) base = 92 + (base - 92) * 0.6;
+    // ...then matched, quantile by quantile, to the 19,500 same-season Madden ratings (2000–2025)
+    if (!line.ratingReference) {
+      const [a, b] = NFL_ESTIMATE_LEVEL[groupOf(r.pos)] ?? [0, 1];
+      const level = Math.min(99, a + b * base);
+      // a barely-used backup is not lifted (his tiny sample is already the generous reading)
+      base = (line.starts ?? 0) >= 4 || line.sparse ? level : Math.min(base, level);
+    }
     at = r.pos;
     attrs = { ...r.attrs };
     ratingSource = r.source;
@@ -280,7 +292,7 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   let exact: number;
   // The season profile: attributes and overall brought together, so the face reads like the number.
   // Every edition of the season starts from this same profile.
-  const fit = RATING_CONTEXT.support ? supportOverall(line.sport, facePos, attrs, base, { referenced: Object.keys(line.ratingReference?.attrs ?? {}) }) : { attrs, ovr: base };
+  const fit = RATING_CONTEXT.support ? supportOverall(line.sport, facePos, attrs, base, { referenced: Object.keys(line.ratingReference?.attrs ?? {}), signature: (line.games ?? 0) >= 10 }) : { attrs, ovr: base };
   attrs = fit.attrs;
   if (special) {
     // Spotlight/GOAT: unchanged Codex model (signature skills raised to support 100–110).
@@ -294,7 +306,7 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
     baseOvr = cap(exact);
   }
   // What the card shows: its overall and face on the displayed UT scale (ut-scale.ts); levels add on top.
-  let shownBase = special ? baseOvr : cap(toDisplay(line.sport, exact));
+  let shownBase = special ? baseOvr : Math.max(40, cap(toDisplay(line.sport, exact)));
   let faceLift = 0;
   if (line.kind === 'promo' || line.kind === 'legend') {
     // Hot Season (Team-of-the-Year analog) / Legend: the displayed overall comes from the edition's own

@@ -167,6 +167,8 @@ export interface SupportOptions {
   referenced?: Iterable<string>;
   /** the most any attribute moves */
   limit?: number;
+  /** a real sample (10+ games): 85+ signature skills give way at most 4 */
+  signature?: boolean;
 }
 
 /**
@@ -196,6 +198,8 @@ export function supportOverall(sport: UtSport, pos: string, attrs: Record<string
       const v = attrs[c];
       let d = sign * Math.min(s, ref.has(c) ? Math.min(3, limit) : limit);
       if (d > 0) d *= v >= 75 ? 1 : v >= 65 ? 0.5 : 0.2;
+      // a proven signature skill (85+) is the card's identity: it gives way at most 4 (a bench sharpshooter stays one)
+      else if (v >= 85 && opts.signature) d = Math.max(d, -4);
       moved[c] = Math.max(1, Math.min(99, Math.round(v + d)));
     }
   };

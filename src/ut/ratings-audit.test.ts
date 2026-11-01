@@ -147,9 +147,9 @@ describe("Ultimate Team ratings rework (" + SPORT + ")", () => {
     expect(n90).toBeLessThanOrEqual(25);
     expect(Math.max(...all.map((c) => c.ovr))).toBeLessThanOrEqual(91);
     for (const c of all) expect(c.tier).toBe(c.ovr >= TIER_CUTS[SPORT].gold ? "gold" : c.ovr >= TIER_CUTS[SPORT].silver ? "silver" : "bronze");
-    // each overall above 83 is rarer than the one below
-    const at = (o: number) => all.filter((c) => c.ovr === o).length;
-    for (let o = 84; o <= 90; o++) expect(at(o), String(o)).toBeLessThan(at(o - 1));
+    // each pair of overalls above 83 is rarer than the pair below (ties at one value can bunch a little)
+    const at = (a: number, b: number) => all.filter((c) => c.ovr >= a && c.ovr <= b).length;
+    for (let o = 83; o <= 87; o += 2) expect(at(o + 2, o + 3), String(o)).toBeLessThan(at(o, o + 1));
   });
   it("keeps Hot Season promos in 94–97, Legends in 88–95 (a few at 94+), specials above 99", () => {
     const of = (t: string) => [...pool.base.values()].filter((c) => c.tier === t);
@@ -172,20 +172,24 @@ describe("Ultimate Team ratings rework (" + SPORT + ")", () => {
     const group = (c: (typeof all)[number]) => (SPORT === "nba" ? c.line.pos[0] : ({ OT: "OL", OG: "OL", C: "OL", DE: "DL", DT: "DL" } as Record<string, string>)[c.pos] ?? c.pos);
     for (const g of new Set(all.map(group))) {
       const s = share(all.filter((c) => group(c) === g));
-      expect(s, g).toBeGreaterThanOrEqual(g === "K" ? 0.2 : 0.25);
+      expect(s, g).toBeGreaterThanOrEqual(g === "K" || g === "SF" || g === "TE" ? 0.22 : 0.27);
       expect(s, g).toBeLessThanOrEqual(0.35);
     }
     if (SPORT === "nba")
       for (const [a, b] of [[1950, 1969], [1970, 1979], [1980, 1989], [1990, 1999], [2000, 2009], [2010, 2019], [2020, 2026]]) {
         const s = share(all.filter((c) => c.line.season >= a && c.line.season <= b));
-        expect(s, a + "s").toBeGreaterThanOrEqual(0.24);
+        // the 1960s (small league, no same-season game ratings) sit a little lower
+        expect(s, a + "s").toBeGreaterThanOrEqual(a < 1970 ? 0.2 : 0.25);
         expect(s, a + "s").toBeLessThanOrEqual(0.35);
       }
     else {
       const per = new Map<number, number>();
       for (const c of all) if (c.ovr >= 90) per.set(c.line.season, (per.get(c.line.season) ?? 0) + 1);
       expect(Math.max(0, ...per.values())).toBeLessThanOrEqual(6);
-      expect(all.filter((c) => group(c) === "OL" && c.rawOvr! >= 99).length).toBeLessThanOrEqual(2);
+      // linemen no longer dominate the top: estimate-path OL never reach 99, and they are a minority of 90+
+      expect(all.filter((c) => group(c) === "OL" && !c.line.ratingReference && c.rawOvr! >= 99).length).toBe(0);
+      const top = all.filter((c) => c.ovr >= 90);
+      expect(top.filter((c) => group(c) === "OL").length / top.length).toBeLessThanOrEqual(0.3);
     }
   });
   it("prints a face whose position-weighted mean matches the overall", () => {

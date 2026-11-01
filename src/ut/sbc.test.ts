@@ -59,7 +59,7 @@ describe('the day’s challenges (' + SPORT + ')', () => {
   let pool: Pool;
   beforeAll(async () => {
     pool = await getPool();
-  }, 60_000);
+  }, 60000);
 
   it('are six daily, four weekly, and the upgrades and repeatables, the same for everyone on a day', () => {
     const a = sbcsFor(pool, '2026-10-27');

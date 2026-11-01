@@ -156,7 +156,11 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
               {rc.ratingSource ? (
                 <>
                   <a href={rc.ratingSource} target="_blank" rel="noreferrer">
-                    {rc.line.ratingReference ? `${rc.line.sport === 'nba' ? '2K' : 'Madden'} ${rc.line.ratingReference.snapshot} benchmark` : 'Peak 2K reference'}
+                    {rc.line.ratingReference
+                      ? /^[A-Za-z]/.test(rc.line.ratingReference.snapshot)
+                        ? `${rc.line.ratingReference.snapshot} benchmark`
+                        : `${rc.line.sport === 'nba' ? '2K' : 'Madden'} ${rc.line.ratingReference.snapshot} benchmark`
+                      : 'Peak 2K reference'}
                   </a>{' '}
                   · Season-calibrated attributes, then edition and level boosts.
                 </>

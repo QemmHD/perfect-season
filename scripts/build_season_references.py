@@ -55,6 +55,8 @@ for sport in ['nba','nfl']:
  inputs=[CACHE/'nba.html']if sport=='nba'else files
  hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest()for p in inputs}
  out={'sha256':hashes,'checkedAt':date.today().isoformat(),'source':source,'basis':basis,'columns':columns,'rows':rows}
+ # Claude 2026-11-01: the expanded `sets` are regenerated from these rows by build_expanded_references.py; run it next.
+ print(f'{sport}: now run scripts/build_expanded_references.py {sport} to rebuild the expanded sets')
  (ROOT/f'src/data/season-references-{sport}.json').write_text(json.dumps(out,separators=(',',':'))+'\n')
  summary[sport]={'matchedPlayerSeasons':len(rows),'uniquePlayers':len({k.rsplit(':',1)[0]for k in rows}),'ambiguousRejected':ambiguous,'source':source}
 print(json.dumps(summary,indent=2))

@@ -2,7 +2,7 @@
 import references from "../data/nba-rating-references.json";
 import type { CardLine } from "./types";
 import { profileQuality } from "./rating-quality";
-import { borrowNeighbour } from "./season-reference";
+import { borrowNeighbour, referenceTrust } from "./season-reference";
 const refs = new Map(references.players.map((p) => [p.name, p]));
 const clamp = (v: number, a = 25, b = 99) =>
   Math.max(a, Math.min(b, Math.round(v)));
@@ -123,13 +123,16 @@ export function calibrateNba(
   }
   // A same-era roster is stronger evidence than a player's all-time peak. These are public
   // release/update benchmarks, blended with actual season performance; never claimed as an exact roster clone.
+  const trust = referenceTrust(seasonRef);
   if (seasonRef) for (const [code, value] of Object.entries(seasonRef.attrs)) {
-    if (code in attrs) attrs[code] = clamp(value * 0.95 + raw[code] * 0.05);
+    const w = trust === 1 ? 0.95 : 0.8;
+    if (code in attrs) attrs[code] = clamp(value * w + raw[code] * (1 - w));
   }
   // Percentages alone are noisy: shrink toward 34% with a 75-attempt prior, using the actual season sample.
   const attempts = (s.a3 ?? 0) * (line.games ?? s.g ?? 0),
     pct = s.fg3;
-  const ref3 = seasonRef?.attrs["3PT"];
+  // a fallback (pre-season or retrospective) grade still passes through the season's own shooting check
+  const ref3 = trust === 1 ? seasonRef?.attrs["3PT"] : undefined;
   if (line.season < 1980) {
     // No measured three-point season exists. Touch is an estimate and cannot invent elite modern range.
     attrs["3PT"] = Math.min(
@@ -187,7 +190,7 @@ export function calibrateNba(
   else if (honors.has("DPOY")) ovr = Math.max(ovr, 88);
   const mpg = s.mpg ?? 24;
   if (!honors.size && mpg < 15) ovr = Math.min(ovr, 68 + Math.max(0, mpg - 8));
-  if (seasonRef) ovr = 0.88 * seasonRef.ovr + 0.12 * ovr;
+  if (seasonRef) ovr = 0.88 * trust * seasonRef.ovr + (1 - 0.88 * trust) * ovr;
   return {
     ovr: clamp(Math.min(ovr, quality + 8), 40),
     /** the same before rounding (the gold-share balance needs the fraction) */

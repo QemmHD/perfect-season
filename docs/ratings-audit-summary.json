@@ -5,17 +5,17 @@
   "methodology": "docs/RATINGS-AUDIT.md",
   "nba": {
     "seasonCards": 21304,
-    "seasonBenchmarkedCards": 9419,
-    "benchmarkedEditions": 9739,
-    "seasonBenchmarkPlayers": 1771,
-    "seasonBenchmarkPlayerSeasons": 8938,
-    "estimateOnlySeasonCards": 11885,
-    "peakAnchoredSeasonCards": 2508,
+    "seasonBenchmarkedCards": 11608,
+    "benchmarkedEditions": 11980,
+    "seasonBenchmarkPlayers": 2071,
+    "seasonBenchmarkPlayerSeasons": 11009,
+    "estimateOnlySeasonCards": 9696,
+    "peakAnchoredSeasonCards": 2178,
     "allEditions": 22082,
     "tiers": {
-      "bronze": 7418,
-      "silver": 8070,
-      "gold": 5816,
+      "bronze": 7471,
+      "silver": 7513,
+      "gold": 6320,
       "promo": 518,
       "legend": 120,
       "spotlight": 120,
@@ -25,59 +25,59 @@
       "0": 40,
       "10": 58,
       "25": 62,
-      "50": 68,
+      "50": 69,
       "75": 75,
-      "90": 79,
+      "90": 80,
       "100": 91
     },
-    "season99AtLevel1": 2,
-    "season99AtLevel5": 124,
-    "displayed90PlusSeasonCards": 20,
+    "season99AtLevel1": 1,
+    "season99AtLevel5": 122,
+    "displayed90PlusSeasonCards": 14,
     "displayedSeasonMax": 91,
     "goldShareByPosition": {
-      "SG": 28.4,
-      "C": 29.1,
-      "SF": 23.3,
-      "PG": 29.7,
-      "PF": 26
+      "SG": 30.3,
+      "C": 30.6,
+      "SF": 26.6,
+      "PG": 30.9,
+      "PF": 29.9
     },
     "promoAt99": 0,
     "legendAt99": 0,
     "faceGapMedianByTier": {
-      "bronze": -0.9,
-      "silver": 0.8,
-      "gold": 1.8,
+      "bronze": -1.1,
+      "silver": 0.7,
+      "gold": 1.7,
       "promo": 0.4,
       "legend": 0
     },
     "maximumLevel5OverallGain": 2,
-    "maximumOverallAboveRoleQuality": 18.272833333333338,
+    "maximumOverallAboveRoleQuality": 15.218333333333334,
     "invalid": [],
     "spotChecks": [
       {
         "name": "Michael Jordan",
         "season": 1996,
-        "ovr": 90,
+        "ovr": 89,
         "face": [
           [
             "OUT",
             "Outside scoring",
-            89
+            87
           ],
           [
             "INS",
             "Inside scoring",
-            89
+            85
           ],
           [
             "PLY",
             "Playmaking",
-            87
+            84
           ],
           [
             "ATH",
             "Athleticism",
-            82
+            81
           ],
           [
             "DEF",
@@ -92,26 +92,53 @@
         ],
         "attrs": {
           "SPD": 84,
-          "ACC": 96,
-          "HND": 96,
-          "PAS": 98,
-          "3PT": 99,
+          "ACC": 95,
+          "HND": 91,
+          "PAS": 92,
+          "3PT": 95,
           "MID": 99,
-          "CLS": 99,
-          "LAY": 99,
+          "CLS": 95,
+          "LAY": 96,
           "FT": 86,
-          "DNK": 99,
-          "SDK": 70,
-          "STR": 68,
-          "VRT": 94,
+          "DNK": 96,
+          "SDK": 67,
+          "STR": 66,
+          "VRT": 93,
           "STA": 98,
-          "PRD": 97,
-          "IND": 76,
+          "PRD": 96,
+          "IND": 75,
           "STL": 87,
-          "BLK": 48,
+          "BLK": 47,
           "REB": 63
         },
-        "source": "https://www.2kratings.com/michael-jordan-all-time-chicago-bulls",
+        "source": "https://github.com/wkoverfield/nba2kapi",
+        "benchmark": {
+          "source": "https://github.com/wkoverfield/nba2kapi",
+          "snapshot": "2K26 classic 1995-96",
+          "ovr": 99,
+          "attrs": {
+            "3PT": 84,
+            "MID": 99,
+            "LAY": 97,
+            "DNK": 95,
+            "SPD": 85,
+            "HND": 88,
+            "PRD": 98,
+            "IND": 79,
+            "ACC": 98,
+            "PAS": 92,
+            "CLS": 97,
+            "FT": 83,
+            "SDK": 70,
+            "STR": 71,
+            "VRT": 96,
+            "STA": 99,
+            "STL": 86,
+            "BLK": 50,
+            "REB": 63
+          },
+          "kind": "retro"
+        },
         "originalOverall": 97
       },
       {
@@ -208,12 +235,12 @@
           [
             "DEF",
             "Defense",
-            79
+            80
           ],
           [
             "REB",
             "Rebounding",
-            45
+            44
           ]
         ],
         "attrs": {
@@ -254,56 +281,83 @@
           [
             "OUT",
             "Outside scoring",
-            83
+            81
           ],
           [
             "INS",
             "Inside scoring",
-            82
+            80
           ],
           [
             "PLY",
             "Playmaking",
-            79
+            81
           ],
           [
             "ATH",
             "Athleticism",
-            81
+            82
           ],
           [
             "DEF",
             "Defense",
-            86
+            83
           ],
           [
             "REB",
             "Rebounding",
-            79
+            62
           ]
         ],
         "attrs": {
-          "SPD": 82,
-          "ACC": 93,
-          "HND": 85,
-          "PAS": 81,
-          "3PT": 92,
-          "MID": 93,
-          "CLS": 87,
-          "LAY": 87,
-          "FT": 69,
-          "DNK": 91,
-          "SDK": 68,
-          "STR": 70,
-          "VRT": 91,
+          "SPD": 85,
+          "ACC": 94,
+          "HND": 80,
+          "PAS": 88,
+          "3PT": 89,
+          "MID": 85,
+          "CLS": 81,
+          "LAY": 85,
+          "FT": 68,
+          "DNK": 88,
+          "SDK": 56,
+          "STR": 78,
+          "VRT": 85,
           "STA": 99,
-          "PRD": 99,
-          "IND": 88,
-          "STL": 99,
-          "BLK": 63,
-          "REB": 83
+          "PRD": 97,
+          "IND": 80,
+          "STL": 82,
+          "BLK": 68,
+          "REB": 68
         },
-        "source": "https://www.2kratings.com/scottie-pippen-all-time-chicago-bulls",
+        "source": "https://github.com/wkoverfield/nba2kapi",
+        "benchmark": {
+          "source": "https://github.com/wkoverfield/nba2kapi",
+          "snapshot": "2K26 classic 1995-96",
+          "ovr": 96,
+          "attrs": {
+            "3PT": 87,
+            "MID": 84,
+            "LAY": 88,
+            "DNK": 91,
+            "SPD": 87,
+            "HND": 80,
+            "PRD": 98,
+            "IND": 79,
+            "ACC": 98,
+            "PAS": 89,
+            "CLS": 83,
+            "FT": 67,
+            "SDK": 55,
+            "STR": 80,
+            "VRT": 84,
+            "STA": 98,
+            "STL": 79,
+            "BLK": 70,
+            "REB": 69
+          },
+          "kind": "retro"
+        },
         "originalOverall": 92
       },
       {
@@ -319,7 +373,7 @@
           [
             "INS",
             "Inside scoring",
-            79
+            80
           ],
           [
             "PLY",
@@ -329,7 +383,7 @@
           [
             "ATH",
             "Athleticism",
-            75
+            76
           ],
           [
             "DEF",
@@ -339,7 +393,7 @@
           [
             "REB",
             "Rebounding",
-            45
+            44
           ]
         ],
         "attrs": {
@@ -387,7 +441,7 @@
           [
             "OUT",
             "Outside scoring",
-            36
+            35
           ],
           [
             "INS",
@@ -453,7 +507,7 @@
           [
             "OUT",
             "Outside scoring",
-            76
+            77
           ],
           [
             "INS",
@@ -463,12 +517,12 @@
           [
             "PLY",
             "Playmaking",
-            59
+            58
           ],
           [
             "ATH",
             "Athleticism",
-            75
+            76
           ],
           [
             "DEF",
@@ -514,17 +568,17 @@
       {
         "name": "Larry Bird",
         "season": 1986,
-        "ovr": 87,
+        "ovr": 85,
         "face": [
           [
             "OUT",
             "Outside scoring",
-            91
+            87
           ],
           [
             "INS",
             "Inside scoring",
-            82
+            80
           ],
           [
             "PLY",
@@ -534,57 +588,84 @@
           [
             "ATH",
             "Athleticism",
-            66
+            68
           ],
           [
             "DEF",
             "Defense",
-            77
+            79
           ],
           [
             "REB",
             "Rebounding",
-            79
+            76
           ]
         ],
         "attrs": {
-          "SPD": 66,
-          "ACC": 84,
+          "SPD": 68,
+          "ACC": 86,
           "HND": 79,
-          "PAS": 93,
-          "3PT": 99,
-          "MID": 99,
-          "CLS": 99,
-          "LAY": 76,
+          "PAS": 92,
+          "3PT": 97,
+          "MID": 97,
+          "CLS": 95,
+          "LAY": 75,
           "FT": 93,
-          "DNK": 52,
+          "DNK": 54,
           "SDK": 46,
           "STR": 64,
-          "VRT": 53,
+          "VRT": 55,
           "STA": 97,
-          "PRD": 84,
-          "IND": 83,
+          "PRD": 87,
+          "IND": 82,
           "STL": 76,
           "BLK": 46,
-          "REB": 83
+          "REB": 78
         },
-        "source": "https://www.2kratings.com/larry-bird-all-time-boston-celtics",
+        "source": "https://github.com/wkoverfield/nba2kapi",
+        "benchmark": {
+          "source": "https://github.com/wkoverfield/nba2kapi",
+          "snapshot": "2K26 classic 1985-86",
+          "ovr": 98,
+          "attrs": {
+            "3PT": 96,
+            "MID": 96,
+            "LAY": 72,
+            "DNK": 45,
+            "SPD": 67,
+            "HND": 79,
+            "PRD": 88,
+            "IND": 85,
+            "ACC": 88,
+            "PAS": 94,
+            "CLS": 96,
+            "FT": 89,
+            "SDK": 40,
+            "STR": 65,
+            "VRT": 50,
+            "STA": 97,
+            "STL": 75,
+            "BLK": 47,
+            "REB": 77
+          },
+          "kind": "retro"
+        },
         "originalOverall": 98
       },
       {
         "name": "Magic Johnson",
         "season": 1987,
-        "ovr": 89,
+        "ovr": 87,
         "face": [
           [
             "OUT",
             "Outside scoring",
-            82
+            79
           ],
           [
             "INS",
             "Inside scoring",
-            86
+            83
           ],
           [
             "PLY",
@@ -594,12 +675,12 @@
           [
             "ATH",
             "Athleticism",
-            81
+            79
           ],
           [
             "DEF",
             "Defense",
-            79
+            76
           ],
           [
             "REB",
@@ -608,58 +689,85 @@
           ]
         ],
         "attrs": {
-          "SPD": 91,
-          "ACC": 84,
+          "SPD": 84,
+          "ACC": 79,
           "HND": 99,
           "PAS": 99,
-          "3PT": 64,
-          "MID": 98,
-          "CLS": 99,
-          "LAY": 96,
+          "3PT": 63,
+          "MID": 90,
+          "CLS": 96,
+          "LAY": 93,
           "FT": 87,
-          "DNK": 84,
-          "SDK": 62,
-          "STR": 77,
-          "VRT": 87,
+          "DNK": 79,
+          "SDK": 34,
+          "STR": 72,
+          "VRT": 83,
           "STA": 97,
-          "PRD": 85,
-          "IND": 82,
-          "STL": 75,
-          "BLK": 74,
-          "REB": 80
+          "PRD": 80,
+          "IND": 76,
+          "STL": 70,
+          "BLK": 57,
+          "REB": 79
         },
-        "source": "https://www.2kratings.com/magic-johnson-all-time-los-angeles-lakers",
+        "source": "https://github.com/wkoverfield/nba2kapi",
+        "benchmark": {
+          "source": "https://github.com/wkoverfield/nba2kapi",
+          "snapshot": "2K26 classic 1986-87",
+          "ovr": 96,
+          "attrs": {
+            "3PT": 79,
+            "MID": 87,
+            "LAY": 93,
+            "DNK": 75,
+            "SPD": 86,
+            "HND": 97,
+            "PRD": 80,
+            "IND": 80,
+            "ACC": 80,
+            "PAS": 99,
+            "CLS": 97,
+            "FT": 84,
+            "SDK": 25,
+            "STR": 76,
+            "VRT": 84,
+            "STA": 98,
+            "STL": 69,
+            "BLK": 62,
+            "REB": 84
+          },
+          "kind": "retro"
+        },
         "originalOverall": 96
       },
       {
         "name": "Dennis Rodman",
         "season": 1996,
-        "ovr": 83,
+        "ovr": 82,
         "face": [
           [
             "OUT",
             "Outside scoring",
-            53
+            51
           ],
           [
             "INS",
             "Inside scoring",
-            72
+            70
           ],
           [
             "PLY",
             "Playmaking",
-            50
+            62
           ],
           [
             "ATH",
             "Athleticism",
-            75
+            70
           ],
           [
             "DEF",
             "Defense",
-            79
+            77
           ],
           [
             "REB",
@@ -668,33 +776,60 @@
           ]
         ],
         "attrs": {
-          "SPD": 74,
-          "ACC": 74,
-          "HND": 46,
-          "PAS": 61,
-          "3PT": 56,
-          "MID": 63,
+          "SPD": 77,
+          "ACC": 58,
+          "HND": 54,
+          "PAS": 74,
+          "3PT": 49,
+          "MID": 64,
           "CLS": 79,
-          "LAY": 59,
+          "LAY": 57,
           "FT": 51,
-          "DNK": 65,
-          "SDK": 80,
-          "STR": 74,
-          "VRT": 78,
-          "STA": 94,
-          "PRD": 69,
-          "IND": 97,
-          "STL": 47,
-          "BLK": 44,
+          "DNK": 63,
+          "SDK": 75,
+          "STR": 76,
+          "VRT": 77,
+          "STA": 90,
+          "PRD": 68,
+          "IND": 91,
+          "STL": 52,
+          "BLK": 55,
           "REB": 98
         },
-        "source": "https://www.2kratings.com/dennis-rodman-all-time-chicago-bulls",
+        "source": "https://github.com/wkoverfield/nba2kapi",
+        "benchmark": {
+          "source": "https://github.com/wkoverfield/nba2kapi",
+          "snapshot": "2K26 classic 1995-96",
+          "ovr": 87,
+          "attrs": {
+            "3PT": 50,
+            "MID": 65,
+            "LAY": 55,
+            "DNK": 65,
+            "SPD": 79,
+            "HND": 55,
+            "PRD": 70,
+            "IND": 95,
+            "ACC": 55,
+            "PAS": 77,
+            "CLS": 80,
+            "FT": 52,
+            "SDK": 80,
+            "STR": 82,
+            "VRT": 82,
+            "STA": 91,
+            "STL": 57,
+            "BLK": 60,
+            "REB": 95
+          },
+          "kind": "retro"
+        },
         "originalOverall": 73
       },
       {
         "name": "Bob Rule",
         "season": 1969,
-        "ovr": 69,
+        "ovr": 70,
         "face": [
           [
             "OUT",
@@ -704,17 +839,17 @@
           [
             "INS",
             "Inside scoring",
-            69
+            70
           ],
           [
             "PLY",
             "Playmaking",
-            30
+            29
           ],
           [
             "ATH",
             "Athleticism",
-            59
+            58
           ],
           [
             "DEF",
@@ -724,7 +859,7 @@
           [
             "REB",
             "Rebounding",
-            72
+            74
           ]
         ],
         "attrs": {
@@ -758,7 +893,7 @@
           [
             "OUT",
             "Outside scoring",
-            70
+            72
           ],
           [
             "INS",
@@ -768,7 +903,7 @@
           [
             "PLY",
             "Playmaking",
-            50
+            49
           ],
           [
             "ATH",
@@ -812,7 +947,7 @@
       {
         "name": "Steve Nash",
         "season": 2006,
-        "ovr": 84,
+        "ovr": 83,
         "face": [
           [
             "OUT",
@@ -832,7 +967,7 @@
           [
             "ATH",
             "Athleticism",
-            76
+            77
           ],
           [
             "DEF",
@@ -842,7 +977,7 @@
           [
             "REB",
             "Rebounding",
-            52
+            51
           ]
         ],
         "attrs": {
@@ -888,7 +1023,7 @@
           [
             "INS",
             "Inside scoring",
-            86
+            85
           ],
           [
             "PLY",
@@ -903,12 +1038,12 @@
           [
             "DEF",
             "Defense",
-            72
+            74
           ],
           [
             "REB",
             "Rebounding",
-            52
+            51
           ]
         ],
         "attrs": {
@@ -944,7 +1079,7 @@
       {
         "name": "Kobe Bryant",
         "season": 2016,
-        "ovr": 77,
+        "ovr": 76,
         "face": [
           [
             "OUT",
@@ -954,17 +1089,17 @@
           [
             "INS",
             "Inside scoring",
-            79
+            77
           ],
           [
             "PLY",
             "Playmaking",
-            76
+            77
           ],
           [
             "ATH",
             "Athleticism",
-            67
+            66
           ],
           [
             "DEF",
@@ -974,20 +1109,20 @@
           [
             "REB",
             "Rebounding",
-            39
+            38
           ]
         ],
         "attrs": {
-          "SPD": 73,
+          "SPD": 71,
           "ACC": 80,
           "HND": 81,
           "PAS": 75,
-          "3PT": 70,
-          "MID": 83,
+          "3PT": 69,
+          "MID": 76,
           "CLS": 84,
-          "LAY": 91,
+          "LAY": 87,
           "FT": 85,
-          "DNK": 54,
+          "DNK": 46,
           "SDK": 38,
           "STR": 57,
           "VRT": 64,
@@ -998,7 +1133,21 @@
           "BLK": 31,
           "REB": 48
         },
-        "source": "https://www.2kratings.com/kobe-bryant-all-time-los-angeles-lakers",
+        "source": "https://2karchive.com/",
+        "benchmark": {
+          "source": "https://2karchive.com/",
+          "snapshot": "2K16 launch",
+          "ovr": 85,
+          "attrs": {
+            "3PT": 77,
+            "MID": 75,
+            "LAY": 86,
+            "DNK": 45,
+            "SPD": 70,
+            "HND": 83
+          },
+          "kind": "preseason"
+        },
         "originalOverall": 78
       },
       {
@@ -1009,56 +1158,83 @@
           [
             "OUT",
             "Outside scoring",
-            84
+            83
           ],
           [
             "INS",
             "Inside scoring",
-            86
+            85
           ],
           [
             "PLY",
             "Playmaking",
-            85
+            83
           ],
           [
             "ATH",
             "Athleticism",
-            62
+            66
           ],
           [
             "DEF",
             "Defense",
-            67
+            74
           ],
           [
             "REB",
             "Rebounding",
-            89
+            91
           ]
         ],
         "attrs": {
           "SPD": 63,
-          "ACC": 50,
-          "HND": 81,
-          "PAS": 99,
-          "3PT": 82,
-          "MID": 98,
+          "ACC": 62,
+          "HND": 79,
+          "PAS": 96,
+          "3PT": 80,
+          "MID": 94,
           "CLS": 99,
-          "LAY": 96,
-          "FT": 84,
-          "DNK": 75,
-          "SDK": 93,
-          "STR": 93,
+          "LAY": 94,
+          "FT": 83,
+          "DNK": 76,
+          "SDK": 92,
+          "STR": 96,
           "VRT": 63,
-          "STA": 96,
+          "STA": 97,
           "PRD": 62,
-          "IND": 79,
-          "STL": 56,
-          "BLK": 57,
-          "REB": 98
+          "IND": 83,
+          "STL": 60,
+          "BLK": 61,
+          "REB": 99
         },
-        "source": "https://www.2kratings.com/nikola-jokic-all-time-denver-nuggets",
+        "source": "https://github.com/ReinerJasin/NBA2k25_Web_Scraping",
+        "benchmark": {
+          "source": "https://github.com/ReinerJasin/NBA2k25_Web_Scraping",
+          "snapshot": "2K25 launch",
+          "ovr": 97,
+          "attrs": {
+            "3PT": 80,
+            "MID": 94,
+            "LAY": 91,
+            "DNK": 75,
+            "SPD": 63,
+            "HND": 76,
+            "PRD": 61,
+            "IND": 83,
+            "ACC": 62,
+            "PAS": 93,
+            "CLS": 99,
+            "FT": 79,
+            "SDK": 90,
+            "STR": 96,
+            "VRT": 63,
+            "STA": 97,
+            "STL": 59,
+            "BLK": 61,
+            "REB": 96
+          },
+          "kind": "next"
+        },
         "originalOverall": 98
       },
       {
@@ -1079,7 +1255,7 @@
           [
             "PLY",
             "Playmaking",
-            81
+            80
           ],
           [
             "ATH",
@@ -1094,31 +1270,58 @@
           [
             "REB",
             "Rebounding",
-            87
+            83
           ]
         ],
         "attrs": {
-          "SPD": 89,
-          "ACC": 86,
+          "SPD": 88,
+          "ACC": 85,
           "HND": 86,
-          "PAS": 85,
-          "3PT": 62,
-          "MID": 73,
-          "CLS": 95,
+          "PAS": 84,
+          "3PT": 67,
+          "MID": 72,
+          "CLS": 99,
           "LAY": 99,
           "FT": 66,
-          "DNK": 97,
-          "SDK": 91,
-          "STR": 89,
+          "DNK": 94,
+          "SDK": 88,
+          "STR": 93,
           "VRT": 85,
-          "STA": 97,
-          "PRD": 88,
-          "IND": 89,
-          "STL": 66,
-          "BLK": 77,
-          "REB": 97
+          "STA": 98,
+          "PRD": 86,
+          "IND": 90,
+          "STL": 75,
+          "BLK": 79,
+          "REB": 91
         },
-        "source": "https://www.2kratings.com/giannis-antetokounmpo-all-time-milwaukee-bucks",
+        "source": "https://github.com/ReinerJasin/NBA2k25_Web_Scraping",
+        "benchmark": {
+          "source": "https://github.com/ReinerJasin/NBA2k25_Web_Scraping",
+          "snapshot": "2K25 launch",
+          "ovr": 97,
+          "attrs": {
+            "3PT": 68,
+            "MID": 72,
+            "LAY": 98,
+            "DNK": 91,
+            "SPD": 89,
+            "HND": 87,
+            "PRD": 87,
+            "IND": 90,
+            "ACC": 86,
+            "PAS": 84,
+            "CLS": 96,
+            "FT": 67,
+            "SDK": 85,
+            "STR": 94,
+            "VRT": 85,
+            "STA": 98,
+            "STL": 76,
+            "BLK": 80,
+            "REB": 88
+          },
+          "kind": "next"
+        },
         "originalOverall": 98
       },
       {
@@ -1144,17 +1347,17 @@
           [
             "ATH",
             "Athleticism",
-            73
+            75
           ],
           [
             "DEF",
             "Defense",
-            75
+            76
           ],
           [
             "REB",
             "Rebounding",
-            37
+            36
           ]
         ],
         "attrs": {
@@ -1191,53 +1394,53 @@
   },
   "nfl": {
     "seasonCards": 30855,
-    "seasonBenchmarkedCards": 2120,
-    "benchmarkedEditions": 2186,
-    "seasonBenchmarkPlayers": 1135,
-    "seasonBenchmarkPlayerSeasons": 2114,
-    "estimateOnlySeasonCards": 28735,
+    "seasonBenchmarkedCards": 19520,
+    "benchmarkedEditions": 20197,
+    "seasonBenchmarkPlayers": 5018,
+    "seasonBenchmarkPlayerSeasons": 19509,
+    "estimateOnlySeasonCards": 11335,
     "peakAnchoredSeasonCards": 0,
     "allEditions": 32242,
     "tiers": {
-      "bronze": 10900,
-      "silver": 10870,
-      "gold": 9085,
+      "bronze": 10840,
+      "silver": 10780,
+      "gold": 9235,
       "promo": 1106,
       "legend": 130,
       "spotlight": 131,
       "goat": 20
     },
     "seasonOverallPercentiles": {
-      "0": 41,
-      "10": 56,
-      "25": 62,
-      "50": 68,
+      "0": 40,
+      "10": 60,
+      "25": 63,
+      "50": 69,
       "75": 75,
       "90": 80,
       "100": 91
     },
-    "season99AtLevel1": 17,
-    "season99AtLevel5": 169,
-    "displayed90PlusSeasonCards": 17,
+    "season99AtLevel1": 65,
+    "season99AtLevel5": 439,
+    "displayed90PlusSeasonCards": 25,
     "displayedSeasonMax": 91,
     "goldShareByPosition": {
-      "QB": 29.7,
-      "RB": 30,
-      "WR": 31.6,
-      "TE": 28,
-      "OL": 26.2,
+      "QB": 30.1,
+      "RB": 30.8,
+      "WR": 30.3,
+      "TE": 28.9,
+      "OL": 30.1,
       "LB": 30.3,
-      "CB": 31.6,
-      "S": 30.2,
-      "K": 26.6,
+      "CB": 30.1,
+      "S": 30.1,
+      "K": 25.1,
       "DL": 30.1
     },
     "promoAt99": 0,
     "legendAt99": 0,
     "faceGapMedianByTier": {
-      "bronze": -1,
-      "silver": -0.6,
-      "gold": 1.3,
+      "bronze": -1.5,
+      "silver": -1.6,
+      "gold": 1.4,
       "promo": 0.4,
       "legend": 0
     },
@@ -1248,22 +1451,22 @@
       {
         "name": "Tom Brady",
         "season": 2007,
-        "ovr": 85,
+        "ovr": 91,
         "face": [
           [
             "THP",
             "Throw power",
-            86
+            91
           ],
           [
             "SAC",
             "Short accuracy",
-            86
+            91
           ],
           [
             "MAC",
             "Medium accuracy",
-            85
+            91
           ],
           [
             "DAC",
@@ -1273,31 +1476,48 @@
           [
             "TUP",
             "Throw under pressure",
-            87
+            86
           ],
           [
             "SPD",
             "Speed",
-            41
+            54
           ]
         ],
         "attrs": {
-          "SPD": 58,
-          "ACC": 60,
-          "AGI": 58,
+          "SPD": 64,
+          "ACC": 64,
+          "AGI": 62,
           "STR": 65,
           "AWR": 97,
-          "THP": 96,
-          "SAC": 96,
-          "MAC": 95,
+          "THP": 99,
+          "SAC": 99,
+          "MAC": 99,
           "DAC": 99,
           "TUP": 97
+        },
+        "source": "https://github.com/theedgepredictor/nfl-madden-data",
+        "benchmark": {
+          "source": "https://github.com/theedgepredictor/nfl-madden-data",
+          "snapshot": "Madden 09 launch",
+          "ovr": 99,
+          "attrs": {
+            "SPD": 64,
+            "ACC": 64,
+            "AGI": 62,
+            "STR": 65,
+            "THP": 99,
+            "SAC": 99,
+            "MAC": 99,
+            "DAC": 99
+          },
+          "kind": "next"
         }
       },
       {
         "name": "Jerry Rice",
         "season": 1995,
-        "ovr": 87,
+        "ovr": 85,
         "face": [
           [
             "SPD",
@@ -1308,58 +1528,6 @@
             "CTH",
             "Catching",
             91
-          ],
-          [
-            "RTE",
-            "Route running",
-            86
-          ],
-          [
-            "CIT",
-            "Catch in traffic",
-            85
-          ],
-          [
-            "SPC",
-            "Spectacular catch",
-            91
-          ],
-          [
-            "REL",
-            "Release",
-            81
-          ]
-        ],
-        "attrs": {
-          "SPD": 89,
-          "ACC": 91,
-          "AGI": 90,
-          "STR": 61,
-          "AWR": 94,
-          "CTH": 99,
-          "RTE": 96,
-          "CIT": 95,
-          "SPC": 99,
-          "REL": 91,
-          "RBK": 48,
-          "BTK": 78,
-          "JKM": 78
-        }
-      },
-      {
-        "name": "Randy Moss",
-        "season": 2007,
-        "ovr": 86,
-        "face": [
-          [
-            "SPD",
-            "Speed",
-            86
-          ],
-          [
-            "CTH",
-            "Catching",
-            85
           ],
           [
             "RTE",
@@ -1369,7 +1537,7 @@
           [
             "CIT",
             "Catch in traffic",
-            85
+            82
           ],
           [
             "SPC",
@@ -1383,35 +1551,108 @@
           ]
         ],
         "attrs": {
-          "SPD": 96,
-          "ACC": 95,
-          "AGI": 92,
-          "STR": 64,
+          "SPD": 89,
+          "ACC": 91,
+          "AGI": 90,
+          "STR": 61,
           "AWR": 94,
-          "CTH": 95,
-          "RTE": 92,
-          "CIT": 95,
+          "CTH": 99,
+          "RTE": 94,
+          "CIT": 93,
           "SPC": 99,
           "REL": 89,
-          "RBK": 51,
-          "BTK": 81,
-          "JKM": 74
+          "RBK": 48,
+          "BTK": 78,
+          "JKM": 78
+        }
+      },
+      {
+        "name": "Randy Moss",
+        "season": 2007,
+        "ovr": 88,
+        "face": [
+          [
+            "SPD",
+            "Speed",
+            87
+          ],
+          [
+            "CTH",
+            "Catching",
+            91
+          ],
+          [
+            "RTE",
+            "Route running",
+            86
+          ],
+          [
+            "CIT",
+            "Catch in traffic",
+            80
+          ],
+          [
+            "SPC",
+            "Spectacular catch",
+            91
+          ],
+          [
+            "REL",
+            "Release",
+            91
+          ]
+        ],
+        "attrs": {
+          "SPD": 98,
+          "ACC": 92,
+          "AGI": 93,
+          "STR": 56,
+          "AWR": 93,
+          "CTH": 99,
+          "RTE": 97,
+          "CIT": 91,
+          "SPC": 99,
+          "REL": 99,
+          "RBK": 29,
+          "BTK": 74,
+          "JKM": 84
+        },
+        "source": "https://github.com/theedgepredictor/nfl-madden-data",
+        "benchmark": {
+          "source": "https://github.com/theedgepredictor/nfl-madden-data",
+          "snapshot": "Madden 09 launch",
+          "ovr": 99,
+          "attrs": {
+            "SPD": 98,
+            "ACC": 92,
+            "AGI": 93,
+            "STR": 56,
+            "AWR": 93,
+            "JKM": 85,
+            "CTH": 97,
+            "CIT": 88,
+            "SPC": 99,
+            "REL": 97,
+            "RBK": 28,
+            "RTE": 94
+          },
+          "kind": "next"
         }
       },
       {
         "name": "Barry Sanders",
         "season": 1997,
-        "ovr": 89,
+        "ovr": 87,
         "face": [
           [
             "SPD",
             "Speed",
-            85
+            83
           ],
           [
             "ACC",
             "Acceleration",
-            89
+            87
           ],
           [
             "BTK",
@@ -1453,113 +1694,152 @@
       {
         "name": "Peyton Manning",
         "season": 2013,
-        "ovr": 85,
+        "ovr": 88,
         "face": [
           [
             "THP",
             "Throw power",
-            81
+            77
           ],
           [
             "SAC",
             "Short accuracy",
-            85
+            91
           ],
           [
             "MAC",
             "Medium accuracy",
-            85
+            91
           ],
           [
             "DAC",
             "Deep accuracy",
-            91
+            80
           ],
           [
             "TUP",
             "Throw under pressure",
-            89
+            91
           ],
           [
             "SPD",
             "Speed",
-            31
+            50
           ]
         ],
         "attrs": {
-          "SPD": 48,
-          "ACC": 50,
-          "AGI": 47,
-          "STR": 66,
-          "AWR": 97,
-          "THP": 91,
-          "SAC": 95,
-          "MAC": 95,
-          "DAC": 99,
-          "TUP": 98
+          "SPD": 60,
+          "ACC": 55,
+          "AGI": 52,
+          "STR": 63,
+          "AWR": 99,
+          "THP": 86,
+          "SAC": 99,
+          "MAC": 99,
+          "DAC": 91,
+          "TUP": 99
+        },
+        "source": "https://github.com/theedgepredictor/nfl-madden-data",
+        "benchmark": {
+          "source": "https://github.com/theedgepredictor/nfl-madden-data",
+          "snapshot": "Madden 15 launch",
+          "ovr": 98,
+          "attrs": {
+            "SPD": 60,
+            "ACC": 55,
+            "AGI": 52,
+            "STR": 63,
+            "AWR": 99,
+            "THP": 86,
+            "SAC": 99,
+            "MAC": 96,
+            "DAC": 88
+          },
+          "kind": "next"
         }
       },
       {
         "name": "Rob Gronkowski",
         "season": 2011,
-        "ovr": 87,
+        "ovr": 83,
         "face": [
           [
             "CTH",
             "Catching",
-            91
+            83
           ],
           [
             "RBK",
             "Run block",
-            78
+            63
           ],
           [
             "SPD",
             "Speed",
-            81
+            75
           ],
           [
             "CIT",
             "Catch in traffic",
-            84
+            91
           ],
           [
             "RTE",
             "Route running",
-            87
+            80
           ],
           [
             "STR",
             "Strength",
-            80
+            78
           ]
         ],
         "attrs": {
-          "SPD": 91,
-          "ACC": 94,
-          "AGI": 80,
-          "STR": 90,
-          "AWR": 94,
-          "CTH": 99,
-          "RTE": 97,
-          "CIT": 94,
-          "SPC": 92,
-          "REL": 84,
-          "RBK": 88,
+          "SPD": 83,
+          "ACC": 87,
+          "AGI": 86,
+          "STR": 87,
+          "AWR": 83,
+          "CTH": 95,
+          "RTE": 91,
+          "CIT": 99,
+          "SPC": 88,
+          "REL": 92,
+          "RBK": 74,
           "BTK": 75,
-          "JKM": 65
+          "JKM": 75
+        },
+        "source": "https://github.com/theedgepredictor/nfl-madden-data",
+        "benchmark": {
+          "source": "https://github.com/theedgepredictor/nfl-madden-data",
+          "snapshot": "Madden 13 launch",
+          "ovr": 97,
+          "attrs": {
+            "SPD": 83,
+            "ACC": 87,
+            "AGI": 86,
+            "STR": 87,
+            "AWR": 82,
+            "JKM": 75,
+            "CTH": 92,
+            "CIT": 98,
+            "SPC": 88,
+            "REL": 92,
+            "RBK": 71,
+            "RTE": 88
+          },
+          "kind": "next"
         }
       },
       {
         "name": "Patrick Mahomes",
         "season": 2022,
-        "ovr": 89,
+        "ovr": 88,
         "face": [
           [
             "THP",
             "Throw power",
-            87
+            86
           ],
           [
             "SAC",
@@ -1569,12 +1849,12 @@
           [
             "MAC",
             "Medium accuracy",
-            85
+            83
           ],
           [
             "DAC",
             "Deep accuracy",
-            83
+            82
           ],
           [
             "TUP",
@@ -1584,7 +1864,7 @@
           [
             "SPD",
             "Speed",
-            75
+            76
           ]
         ],
         "attrs": {
@@ -1648,7 +1928,7 @@
       {
         "name": "Josh Allen",
         "season": 2023,
-        "ovr": 82,
+        "ovr": 80,
         "face": [
           [
             "THP",
@@ -1658,7 +1938,7 @@
           [
             "SAC",
             "Short accuracy",
-            82
+            81
           ],
           [
             "MAC",
@@ -1668,12 +1948,12 @@
           [
             "DAC",
             "Deep accuracy",
-            77
+            78
           ],
           [
             "TUP",
             "Throw under pressure",
-            81
+            80
           ],
           [
             "SPD",
@@ -1742,12 +2022,12 @@
       {
         "name": "Tom Brady",
         "season": 2021,
-        "ovr": 90,
+        "ovr": 89,
         "face": [
           [
             "THP",
             "Throw power",
-            82
+            81
           ],
           [
             "SAC",
@@ -1767,12 +2047,12 @@
           [
             "TUP",
             "Throw under pressure",
-            80
+            79
           ],
           [
             "SPD",
             "Speed",
-            59
+            60
           ]
         ],
         "attrs": {
@@ -1836,7 +2116,7 @@
       {
         "name": "Aaron Donald",
         "season": 2022,
-        "ovr": 89,
+        "ovr": 87,
         "face": [
           [
             "PMV",
@@ -1846,12 +2126,12 @@
           [
             "FMV",
             "Finesse moves",
-            86
+            84
           ],
           [
             "BSH",
             "Block shedding",
-            89
+            87
           ],
           [
             "STR",
@@ -1861,12 +2141,12 @@
           [
             "SPD",
             "Speed",
-            73
+            74
           ],
           [
             "TAK",
             "Tackle",
-            84
+            82
           ]
         ],
         "attrs": {
