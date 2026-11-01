@@ -2,6 +2,14 @@
 
 Latest feature **designed and implemented by Codex (OpenAI), 2026-10-31**: [Ultimate Team Club Season](docs/UT-CLUB-SEASON.md), under **Play → Club Season**. Optional `ut.league` keeps 30-club/82-game NBA and 32-club/17-game NFL seasons, deterministic AI schedules/records/box scores, bounded performance form and challenge, real AI attribute copies, top-eight playoffs and ten season-history summaries. It uses actual UT squad matches, normal reward caps and the existing encrypted server-save profile. Keep it separate from the Season Rewards pass (`ut.hq.seasons`). Preserve season fixture/cursor validation before rewards and the current bracket/rosters on every save. Original inventory/coins/identity/serials and all other modes stay intact; online queues remain NBA 8 / NFL 9. See `league.test.ts` and `scripts/qa/league-season.mjs` before changing settlement.
 
+Latest follow-up **implemented by Claude (Anthropic), 2026-11-01**, after an independent review of Codex's Club Season branch (see the final section of `docs/CODEX-UPDATE-LOG.md`):
+- NFL AI season games can no longer finish tied with a recorded winner.
+- The season hub opens at the top.
+- Shared bottom `Sheet`s close with a swipe down.
+- The Ranks THIS WEEK / ALL TIME toggle no longer collapses on long boards.
+
+No saves, keys, queues or backend connections change. When adding a gesture inside a bottom sheet, mark it `data-sheet-noswipe` (or `touch-action: none`) so the swipe-to-close leaves it alone. Children of the scrolling `.page` column that use `overflow: hidden` need `flex-shrink: 0`.
+
 Latest navigation/overlay update **implemented by Codex (OpenAI)**: [Play tab and football hint fix](docs/PLAY-TAB-AND-FOOTBALL-HINT.md). All UT competitions now live under the sixth **Play** tab, with mode/back/return selection and saved Circuit continuation. Home keeps club/progression management. Basketball-only hint CSS previously stretched normal football tips into a 487px black panel; football now has compact top-anchored hints below the scoreboard. Preserve this sport scoping. No game rules, saves, accounts or backend links change; queues remain NBA 8 / NFL 9. Normal-match (not practice) hint QA is in `scripts/qa/play-tab.mjs`.
 
 The latest visual/flow polish is **implemented by Codex (OpenAI)** in `docs/UI-CONSISTENCY.md`: shared original-game HUD materials, readable clubhouse labels/actions, non-overlapping header/wallet and 100+ stat columns, correct parent tabs, a visible lineup Close action and shared Sheet keyboard/focus handling. It preserves gameplay, odds, transactions and progress; queues stay NBA 8 / NFL 9. `scripts/qa/ui-consistency.mjs` checks real layouts/modal flows and exact-copy/wallet preservation. Use the documented existing Archivo/teal/gold theme for future UI.

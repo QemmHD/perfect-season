@@ -179,6 +179,21 @@ describe('full club season ' + SPORT, () => {
     expect(next.packs).toEqual(started.packs);
     expect(JSON.stringify(ut.league).length).toBeLessThan(500000);
   }, 30000);
+  // Claude: AI box scores must agree with the recorded winner (NFL drive totals could tie).
+  it('records every simulated AI game with the winner outscoring the loser', () => {
+    let ut = started,
+      n = 0;
+    while (ut.league!.active.phase !== 'complete' && n < 120) {
+      ut = advance(ut, n % 3 !== 0);
+      n++;
+    }
+    const ai = ut.league!.active.results.filter((g) => g.h !== 0 && g.a !== 0);
+    expect(ai.length).toBeGreaterThan(100);
+    for (const g of ai) {
+      expect(g.hs).not.toBe(g.as);
+      expect(g.winner).toBe(g.hs > g.as ? g.h : g.a);
+    }
+  }, 30000);
   it('finishes the AI championship when the club misses the playoffs', () => {
     let ut = started;
     for (let i = 0; i < seasonGames(SPORT); i++) ut = advance(ut, false);

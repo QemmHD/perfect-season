@@ -51,6 +51,15 @@ Browser QA covers four sections at 320×568, 390×844 and 844×390; current head
 [Current-run screenshots](previews/README.md#ultimate-team-club-season--codex-2026-10-31) and `docs/ut-league-browser-audit.json` record browser evidence. The original restore remains `backup/original-working-2026-10-28` at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Pre-season source restore is `backup/pre-ut-league-season-2026-10-31` at `846f0d6364bbbc912408b537eba5eca772d2d238`. Work remains on the unmerged feature branch and the same owner-private preview; live Pages/main is not promoted. Exact publication provenance follows after verification.
 
 
+### Follow-up fixes — Claude (Anthropic), 2026-11-01
+
+**Implemented by Claude**, after an independent review of Codex's branch at `77a86a10e6ef8cb9dd5f0f718e84acf69e7dedc4`. Codex's design, rules and saves are unchanged.
+
+- **NFL AI results could tie and still record a winner.** `playRound` in `league.ts` sorts two drive totals, so equal totals (for example 14–14) were stored with a W/L. The recorded winner now takes the game with an overtime field goal (+3), so the box score agrees with the standings. Results already saved stay exactly as stored. Later rounds follow the same seeded fixture keys and differ only where a tie used to occur. New regression in `league.test.ts`: every simulated AI game has `winner` equal to the higher score. On Codex's original code it fails for NFL.
+- **The season hub opened part-way down the page.** `LeagueSeason.tsx` reset `.ut-body`, but `.page.league-page` is the actual scroller. Starting a season left it at scrollTop ≈ 89, which hid the record card (at 320px, all of it). It now resets the page element too, on season start, tab change and the setup screen.
+
+See `CODEX-UPDATE-LOG.md` → "Claude follow-up" for validation.
+
 ## Verified Club Season publication — Codex
 
 - GitHub implementation: `3417c1af36457a1638548b5970ebd9e749676b72`; local `6fdebc5272004a33795a67d84914a752fcb72566`; identical tree `4056d0a9b5b7380d7e6e01601b5da5c62250d8da` verified before moving the feature ref.

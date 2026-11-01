@@ -429,6 +429,12 @@ function playRound(
         const scores = [score(), score()].sort((a, b) => a - b);
         hs = homeWin ? scores[1] : scores[0];
         as = homeWin ? scores[0] : scores[1];
+        // Claude: equal drive totals used to record a tied score with a winner. The
+        // winner takes it with an overtime field goal, so the box score agrees with W/L.
+        if (hs === as) {
+          if (homeWin) hs += 3;
+          else as += 3;
+        }
       }
       winner = homeWin ? f.h : f.a;
     }

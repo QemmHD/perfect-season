@@ -379,3 +379,61 @@ This provenance follow-up is documentation only. The deployed runtime is the exa
 - Main/original restore remain at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Pre-season source restore: `backup/pre-ut-league-season-2026-10-31` at `846f0d6364bbbc912408b537eba5eca772d2d238`.
 
 This release-record follow-up changes documentation only; the deployed runtime is the exact verified implementation above. No live Pages/main promotion, account reset, backend migration, queue change or transfer of live player saves into preview. Physical installed-iPhone playtesting remains an owner check.
+
+## Claude follow-up: independent review and fixes — Claude (Anthropic), 2026-11-01
+
+**Implemented by Claude (Anthropic) via Claude Code.** The owner asked Claude to independently verify Codex's work on `feature/season-evolution` (handoff commit `77a86a10e6ef8cb9dd5f0f718e84acf69e7dedc4`) and fix concrete bugs without removing features. Everything above this section remains **implemented by Codex (OpenAI)**. This section covers only the Claude commit whose subject starts "Claude:" (see git history on this branch).
+
+### Independent verification of Codex's release (before any change)
+
+- Branch head matched the handoff commit. `npm ci`, `npm run typecheck` and `npm test` all passed: **671 tests (352 NBA / 319 NFL)**, matching Codex's record.
+- Codex's `scripts/qa/league-season.mjs` was re-run against a local dev server and relay and passed in both sports:
+  - NBA: 30 clubs, 82 games, season start 347 ms.
+  - NFL: 32 clubs, 17 games, season start 751 ms.
+  - Each sport: a real match settled, the round advanced once, the season survived reload, the championship fixture and history were kept, all 56 NBA / 69 NFL original copies remained, and there were no page errors.
+- Code review of settlement found the replay, duplicate and malformed guards sound. `settle()` rejects a league result that is online, simulated, from a stale fixture, out of range, inconsistent with `won`, or a repeated `matchId` before paying anything. League games use the normal 8-a-day paid cap.
+
+### Fixes (Claude)
+
+| Area | Bug found | Fix | Files |
+| --- | --- | --- | --- |
+| Club Season sim | NFL AI-vs-AI games could finish tied (equal drive totals) yet record a winner and W/L. | The recorded winner takes it with an overtime field goal (+3). Saved results are untouched; later seeded rounds differ only where a tie would have occurred. | `src/ut/league.ts`, `src/ut/league.test.ts` |
+| Club Season UI | Starting a season, or switching hub tabs, left the hub scrolled ~89px down, hiding the record card (fully at 320px). The reset targeted `.ut-body`, but `.page.league-page` is the scroller. | Also reset the page element. | `src/ut/LeagueSeason.tsx` |
+| Shared sheets (owner report) | Bottom sheets show a grab bar but couldn't be swiped down; only X or a scrim tap closed them. | Native touch swipe-to-close in the shared `Sheet` (details below). | `src/ui/common.tsx`, `src/ui/Card.tsx` |
+| Ranks (owner screenshot) | THIS WEEK / ALL TIME vanished when a board was long. `.spantoggle` (overflow hidden) is a flex child of the scrolling `.page` column, so it shrank to its 2px border. | `flex-shrink: 0`. A probe of every main tab, UT tab and Club Season tab in both sports found no other squeezed elements. | `src/styles.css` |
+
+How the swipe-to-close works:
+- The drag works anywhere on the sheet once its content is scrolled to the top. It follows the finger and dims the scrim.
+- Releasing past about a quarter of the sheet's height (at most 140px), or a downward flick, closes it through the existing `close()`. Anything else springs back.
+- Horizontal drags, form controls, tiltable cards (`data-tilt`), `touch-action: none` regions and scrolled content keep their own gestures. A lift after a drag doesn't click what's underneath.
+- Escape, X and scrim tap still slide the sheet away after a snap-back. Reduced motion skips the transitions.
+
+Connections: `Sheet` is used by Settings, Cloud Save, Store, card details, SBC, Clubhouse, Leaderboard, Results, Binder and other modals. Their content, focus trap and keyboard handling are unchanged. Codex's Draft drawer has its own grip drag and isn't affected.
+
+### Validation (Claude)
+
+**Automated checks:**
+- `npm run typecheck` and `npm run build` pass. The existing chunk-size warning remains.
+- `npm test`: **673 passed (353 NBA / 320 NFL**; skips unchanged at 31 / 63). The one new test per sport is the no-tie regression, which fails on Codex's original `league.ts` for NFL and passes with the fix.
+- Codex's `scripts/qa/ui-consistency.mjs` passes in both sports: 0 header or card-stat collisions, modal keyboard/return OK, 56 / 69 original copies, wallet and squad preserved, no page errors.
+- Codex's `scripts/qa/play-tab.mjs` passes at 320, 390 and 844px. Football tips stay clear of the call and the score.
+- Codex's `scripts/qa/league-season.mjs` passed in both sports before the fixes (see above).
+
+**Real-touch Chromium checks (CDP touch events, 390px, normal and reduced motion):**
+- A short pull springs back and a sideways drag is ignored.
+- A long pull, a flick and a mid-drag release past the threshold all close the sheet.
+- Escape after a snap-back still closes it.
+- No page errors.
+
+**Layout probes (390px; 320px for the hub):**
+- With 80 rows injected into the Ranks board, the toggle now measures 32px. It was 2px before the fix.
+- Started season hub: scrollTop 0 (was 89).
+- No flex item is squeezed on any main tab (Home, Daily, Ranks, Boosters, Profile), any UT tab (Home, Play, Squad, Club, Store, SBC) or any Club Season tab, in either sport.
+- A 3× capture at 320px confirmed the standings OVR column isn't clipped.
+
+### Not changed / boundaries
+
+- No storage keys, profile version, account, identity, wallet, owned copy IDs, serials, levels, XP, squads or saved seasons changed. No reset or migration.
+- Nostr and Supabase connections are untouched. No downloadable backup workflow was added.
+- Online queues stay NBA 8 / NFL 9.
+- Work is pushed only to `feature/season-evolution`. **Not merged to main, not deployed to live Pages**, and the owner-private Sites preview has **not** been redeployed with these fixes: that deployment is controlled from Codex's/the owner's OpenAI Sites project. Physical installed-iPhone checks of the swipe gesture and season flow remain owner checks.

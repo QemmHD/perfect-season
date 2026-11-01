@@ -45,7 +45,11 @@ export function LeagueSeasonView({
     [shown, setShown] = useState(10);
   const pageRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const body = pageRef.current?.closest('.ut-body');
+    // Claude: `.page` is the element that scrolls here (flex column, overflow-y auto);
+    // resetting only `.ut-body` left a new season opened part-way down the page.
+    const page = pageRef.current;
+    if (page) page.scrollTop = 0;
+    const body = page?.closest('.ut-body');
     if (body) body.scrollTop = 0;
   }, [ut.league?.active.id, tab, creating]);
   const s = ut.league?.active,

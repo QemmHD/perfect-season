@@ -49,6 +49,8 @@ export function useTilt<T extends HTMLElement>(max = 14) {
   const handlers = reducedMotion()
     ? {}
     : {
+        // Claude: marks a tiltable card so a bottom sheet's swipe-to-close leaves its drag alone.
+        'data-tilt': '',
         onPointerDown: (e: React.PointerEvent) => {
           on.current = true;
           set(e.clientX, e.clientY);

@@ -4766,6 +4766,9 @@ button.friendcard:active {
 .spantoggle {
   align-self: flex-start;
   margin-left: 0;
+  /* Claude: a direct child of the scrolling .page column with overflow:hidden has min-height 0,
+     so a long board squeezed THIS WEEK / ALL TIME down to its 2px border. */
+  flex-shrink: 0;
 }
 
 /* ---------- rarity ---------- */
