@@ -8570,8 +8570,8 @@ button.friendcard:active {
 }
 /* Claude, final QA 2026-11-01: on a 320px phone the score bug got wider than the screen (YOU and the
    rival's name were cut off at both edges: football with its clock, basketball with two-digit scores
-   and an eight-letter rival). Tighten it like soccer's; football also drops the spot (the yard line is
-   on the field). The game isn't in the scaled frame, so a width query is right here. */
+   and an eight-letter rival), and basketball's sixteen possession marks were wider than the screen.
+   Tighten them like soccer's; football also drops the spot (the yard line is on the field). The game isn't in the scaled frame, so a width query is right here. */
 @media (max-width: 350px) {
   .hg2 .hg2-bug > span {
     padding: 4px 7px;
@@ -8599,6 +8599,16 @@ button.friendcard:active {
   }
   .fb2 .hg2-bug .mid small {
     display: none;
+  }
+  /* sixteen possession marks were 323px wide: the first and last were cut off */
+  .hg2-marks {
+    gap: 2px;
+  }
+  .hg2-marks i {
+    width: 14px;
+  }
+  .hg2-marks i.half {
+    margin-left: 4px;
   }
 }
 /* sideways the play call sits at the right, clear of the formation */
