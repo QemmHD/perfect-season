@@ -38,13 +38,14 @@ relay.on('connection', (socket) => {
 });
 const browser = await launch();
 try {
-  for (const sport of ['nba', 'nfl']) {
+  // Claude 2026-11-01: `node scripts/qa/online.mjs soccer` runs soccer's online UT queue the same way
+  for (const sport of process.argv.slice(2).length ? process.argv.slice(2) : ['nba', 'nfl']) {
     const a = await fixture(browser, sport, 'Codex QA A'),
       b = await fixture(browser, sport, 'Codex QA B');
     for (const p of [a.page, b.page]) {
       await p.getByRole('button', { name: /Ultimate Team:/ }).click();
       await p.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();
-      await p.getByRole('button', { name: /HEAD TO HEAD/ }).click();
+      await p.getByRole('button', { name: /HEAD TO HEAD|FIND MATCH/ }).first().click();
     }
     await Promise.all(
       [a.page, b.page].map(async (p) => {

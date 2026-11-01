@@ -70,7 +70,7 @@ export function CardDetail({ cc, sport, onUse, onSell, onClose, clubRecord, deve
                 <small>
                   {l.pos.join(' / ')}
                   {l.num !== null ? ' · #' + l.num : ''}
-                  {l.ht ? ' · ' + height(l.ht) : ''}
+                  {l.ht ? ' · ' + (l.sport === 'soccer' ? l.ht + ' cm' : height(l.ht)) : ''}
                   {l.wt ? ' ' + l.wt + ' lb' : ''}
                 </small>
                 {l.honors.length > 0 && (
