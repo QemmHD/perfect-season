@@ -263,7 +263,7 @@ const RIM_MAKE: Record<Contest, number> = { open: 1, light: 0.93, heavy: 0.8, sm
 /** A jumper's chance released just outside the green, open (timing and the contest come off it). */
 function offGreenBase(b: Body, kind: ShotKind, d: number): number {
   const rt = shotRating(b, kind);
-  if (kind === 'three') return lerp(0.2, 0.47, rate(rt, 40, 97)) * (d > 26 ? (has(b.p, 'limitless') ? 0.92 : lerp(1, 0.5, (d - 26) / 6)) : 1);
+  if (kind === 'three') return lerp(0.16, 0.5, rate(rt, 40, 97)) * (d > 26 ? (has(b.p, 'limitless') ? 0.92 : lerp(1, 0.5, (d - 26) / 6)) : 1);
   if (kind === 'mid') return lerp(0.28, 0.53, rate(rt, 40, 97));
   if (kind === 'close') return lerp(0.32, 0.6, rate(rt, 40, 97));
   return lerp(0.42, 0.82, rate(rt, 40, 97));
@@ -293,7 +293,7 @@ export function greenWindow(p: Possession, b: Body, kind: ShotKind, contest: Con
   const r = shotRating(b, kind);
   // Difficulty scales timing tolerance, never the underlying card. An open perfect release is
   // rewarded; perfect timing through a set defender still has to beat the contest.
-  let w = GREEN_W * (0.22 + 0.78 * Math.pow(rate(r, 45, 97), 1.15));
+  let w = GREEN_W * (0.12 + 0.88 * Math.pow(rate(r, 45, 97), 1.6));
   if (kind === 'layup') w = 0.07 * Math.pow(rate(r, 40, 97), 1.2);
   const d = dist(b, RIM);
   if (kind === 'three' && d > 26) w *= has(b.p, 'limitless') ? 0.92 : lerp(1, 0.4, (d - 26) / 6);

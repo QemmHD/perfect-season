@@ -36,7 +36,8 @@
 import { SPOTLIGHT_RATES } from '../../supabase/functions/card-registry/contract';
 import { hashString, rng, type Rand, trueRand } from '../engine/rng';
 import { type Pool, TIER_RANK } from './pool';
-import { onScale, TIER_CUTS } from './rate';
+import { TIER_CUTS } from './rate';
+import { UT_SCALE } from './ut-scale';
 import { positionMix } from './squad';
 import type { RatedCard, Tier, UtSport } from './types';
 
@@ -333,9 +334,12 @@ export function quickSellValue(rc: RatedCard): number {
   let v: number;
   if (rc.tier === 'goat') v = 5000 + 500 * Math.max(0, o - 106);
   else if (rc.tier === 'spotlight') v = 1400 + 100 * Math.max(0, o - 100);
-  else if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - onScale(90, sport));
-  else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - onScale(78, sport));
-  else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (99 - gold)), 1.5);
+  // Claude rework: values follow the displayed UT scale's own ranges (ut-scale.ts)
+  const scale = UT_SCALE[sport];
+  const top = scale.curve[scale.curve.length - 1][1];
+  if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - (scale.legend[0][1] + 1));
+  else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - (scale.promo[0][1] - 4));
+  else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (top - gold)), 1.5);
   else if (rc.tier === 'silver') v = 40 + 40 * clamp01((o - silver) / (gold - silver - 1));
   else v = 15 + 15 * clamp01((o - (silver - 15)) / 14);
   v *= PACK_SHAPE[sport].qs;
@@ -355,7 +359,7 @@ export function walkoutLevel(rc: RatedCard): 0 | 1 | 2 | 3 | 4 {
   if (rc.tier === 'goat') return 4;
   if (rc.tier === 'spotlight') return 3;
   if (rc.tier === 'legend') return 3;
-  if (rc.tier === 'promo' || (rc.tier === 'gold' && rc.ovr >= onScale(85, rc.line.sport))) return 2;
+  if (rc.tier === 'promo' || (rc.tier === 'gold' && rc.ovr >= UT_SCALE[rc.line.sport].walkout)) return 2;
   return rc.tier === 'gold' ? 1 : 0;
 }
 

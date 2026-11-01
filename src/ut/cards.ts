@@ -1,4 +1,5 @@
 import { specialEditions } from './specials';
+import { registerCombine, type CombineFile } from './nfl-combine';
 // Ultimate Team card data: every player-season as a CardLine, plus promo ("Hot Season") and legend
 // lines. Built by scripts/build_cards.py into src/data/cards-<sport>.json (stored column by
 // column; the script's header has every rule) and loaded only when Ultimate Team opens.
@@ -81,6 +82,19 @@ export interface SeasonReferences {
   rows: Record<string, (number | string | null)[]>;
 }
 
+/**
+ * Claude ratings rework: each season line's same-player season lines (all stints, by season), so a
+ * card without its own same-era benchmark can borrow its nearest season's and a football card can be
+ * held to the player's own surrounding level. Keyed by the line's `stats` object, which every edition
+ * of that season shares (promos, legends, specials); a line with fresh stats is rated on its own.
+ */
+const CAREERS = new WeakMap<object, CardLine[]>();
+
+/** The player's season lines (sorted by season), when this line came from a loaded card file. */
+export function careerOf(line: Pick<CardLine, 'stats'>): CardLine[] | undefined {
+  return CAREERS.get(line.stats);
+}
+
 export function expandCards(f: CardsFile, references?: SeasonReferences): CardPool {
   const c = f.cols;
   const seen: Record<string, number> = {};
@@ -132,6 +146,12 @@ export function expandCards(f: CardsFile, references?: SeasonReferences): CardPo
     }
     seasons.push(line);
   }
+  const byPlayer = new Map<string, CardLine[]>();
+  for (const l of seasons) (byPlayer.get(l.pid) ?? byPlayer.set(l.pid, []).get(l.pid)!).push(l);
+  for (const career of byPlayer.values()) {
+    career.sort((a, b) => a.season - b.season);
+    for (const l of career) CAREERS.set(l.stats, career);
+  }
   const derive = (kind: CardKind) => ([i, boost, label]: [number, number, string]): CardLine => {
     const base = seasons[i];
     return { ...base, id: cardId(f.sport, kind, base.season, base.pid, base.fr), kind, boost, label, seasonId: base.id };
@@ -145,6 +165,7 @@ export function expandCards(f: CardsFile, references?: SeasonReferences): CardPo
 // the files may not exist (an older build): a glob finds whatever is there
 const FILES = import.meta.glob<{ default: CardsFile }>('../data/cards-*.json');
 const REFERENCES = import.meta.glob<{ default: SeasonReferences }>('../data/season-references-*.json');
+const COMBINE = import.meta.glob<{ default: CombineFile }>('../data/nfl-combine.json');
 
 const pools = new Map<UtSport, Promise<CardPool>>();
 
@@ -154,7 +175,10 @@ export function loadCards(sport: UtSport): Promise<CardPool> {
   if (!p) {
     const key = Object.keys(FILES).find((k) => k.endsWith(`cards-${sport}.json`));
     p = key
-      ? Promise.all([FILES[key](), REFERENCES[`../data/season-references-${sport}.json`]?.()]).then(([m, r]) => expandCards(m.default, r?.default))
+      ? Promise.all([FILES[key](), REFERENCES[`../data/season-references-${sport}.json`]?.(), sport === 'nfl' ? COMBINE['../data/nfl-combine.json']?.() : undefined]).then(([m, r, c]) => {
+          registerCombine(c?.default);
+          return expandCards(m.default, r?.default);
+        })
       : Promise.resolve({ lines: [], byId: new Map(), promos: [], legends: [] });
     p.catch(() => pools.delete(sport));
     pools.set(sport, p);

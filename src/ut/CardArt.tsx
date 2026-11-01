@@ -175,7 +175,7 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
         rc.tier +
         (big ? ' big' : '') +
         (attrs ? ' with-attrs' : '') +
-        (mint || (numbered && rc.ovr >= 90) ? ' has-serial' : '') +
+        (mint || (numbered && Math.round(rc.rawOvr ?? rc.ovr) >= 90) ? ' has-serial' : '') +
         (w < 52 ? ' xs' : w < 70 ? ' sm' : '') +
         (name.length > 9 ? ' long' : '') +
         (className ? ' ' + className : '')
@@ -209,11 +209,11 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
           </span>
         )}
         <span className="utc-plate">
-          {mint ? <CardStamp mint={mint} cardId={l.id} sport={l.sport} /> : numbered && rc.ovr >= 90 ? <span className="utc-stamp pending">NUMBERING…</span> : null}
+          {mint ? <CardStamp mint={mint} cardId={l.id} sport={l.sport} /> : numbered && Math.round(rc.rawOvr ?? rc.ovr) >= 90 ? <span className="utc-stamp pending">NUMBERING…</span> : null}
           <b className="utc-name">{name}</b>
           {attrs && (
             <span className="utc-attrs">
-              {rc.key.map(([c, , v]) => (
+              {(rc.face ?? rc.key).map(([c, , v]) => (
                 <span key={c}>
                   <b>{v}</b>
                   <i>{c}</i>
