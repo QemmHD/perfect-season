@@ -223,7 +223,7 @@ export class SoccerRenderer {
     const sp = a.setPiece;
     let y = at.y + 2.5;
     // a corner: back from the box, toward the flag, so the taker and the box both show
-    if (sp?.kind === 'corner') return { x: GX + (a.ball.x - GX) * 0.42, y: PL - 23 };
+    if (sp?.kind === 'corner') return { x: GX + (a.ball.x - GX) * 0.42, y: PL - 17 };
     else if (sp?.kind === 'penalty') y = PL - 13.5;
     else if (sp) y = sp.spot.y + 2;
     y = Math.max(44, Math.min(y, PL - 12.5));
@@ -564,7 +564,9 @@ export class SoccerRenderer {
 
   draw(ctx: CanvasRenderingContext2D, a: Attack, o: SoccerOverlay, kitOf: (b: Body) => 'us' | 'them', cone: number) {
     ctx.imageSmoothingEnabled = false;
-    this.zoomK += ((this.replay ? 1.3 : 1) - this.zoomK) * 0.08;
+    // a corner pulls out wide enough for the taker and the whole box; a replay pushes in
+    const zt = this.replay ? 1.3 : a.setPiece?.kind === 'corner' ? 0.68 : 1;
+    this.zoomK += (zt - this.zoomK) * 0.08;
     const want = this.target(a);
     if (!this.follow) this.follow = want;
     this.follow = { x: this.follow.x + (want.x - this.follow.x) * 0.07, y: this.follow.y + (want.y - this.follow.y) * 0.08 };
