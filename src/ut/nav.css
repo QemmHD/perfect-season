@@ -1371,3 +1371,10 @@
 .ut-body .scrim {
   position: fixed;
 }
+/* the squad fan stays inside its card */
+.uh-fan > span {
+  transform: translateX(calc(var(--i) * 27px)) rotate(calc(var(--i) * 8deg)) translateY(calc(var(--i) * var(--i) * 4px));
+}
+.uh-squad {
+  padding-right: 16px;
+}
