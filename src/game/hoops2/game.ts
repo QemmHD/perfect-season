@@ -31,14 +31,29 @@ export interface HoopsGame {
   benchEnergy: number[];
   /** how well the other side defends beyond its ratings (Squad Battles' difficulty; 0 standard) */
   defIQ: number;
+  /** how fresh the five defending are (they tire too, by their stamina); optional for old saves */
+  theirEnergy?: number[];
 }
+
+/** the last possessions of a game: Icon cards play their best (+3 on every rating) */
+export const CLUTCH = 4;
+const RATING_KEYS = ['spd', 'acc', 'hnd', 'pas', 'thr', 'mid', 'cls', 'lay', 'ft', 'ddk', 'sdk', 'str', 'vrt', 'sta', 'prd', 'ind', 'stl', 'blk', 'reb'] as const;
+/** An Icon in the clutch: every rating +3 (above 99 stays finite: the engine caps the extra). */
+export function clutchOf(h: Hooper): Hooper {
+  if (!h.abil.includes('icon')) return h;
+  const out = { ...h };
+  for (const k of RATING_KEYS) out[k] = h[k] + 3;
+  return out;
+}
+/** three straight makes put a man on fire; a Heat Check card two */
+export const fireAt = (h: Hooper | undefined) => (h?.abil.includes('heat-check') ? 2 : 3);
 
 /** a starter this tired comes off, when someone on the bench is fresh */
 export const SUB_AT = 0.65;
 const FRESH = 0.85;
 
 export function newHoopsGame(ours: Hooper[], theirs: Hooper[], seed: string, total = POSSESSIONS, bench: Hooper[] = [], defIQ = 0): HoopsGame {
-  return { ours: ours.slice(), theirs, seed, total, done: 0, score: 0, marks: [], energy: ours.map(() => 1), streak: ours.map(() => 0), fire: -1, box: ours.map(() => 0), over: false, bench: bench.slice(), benchEnergy: bench.map(() => 1), defIQ };
+  return { ours: ours.slice(), theirs, seed, total, done: 0, score: 0, marks: [], energy: ours.map(() => 1), streak: ours.map(() => 0), fire: -1, box: ours.map(() => 0), over: false, bench: bench.slice(), benchEnergy: bench.map(() => 1), defIQ, theirEnergy: theirs.map(() => 1) };
 }
 
 /**
@@ -65,7 +80,11 @@ function substitute(g: HoopsGame): void {
 }
 
 export function startPossession(g: HoopsGame): Possession {
-  const p = newPossession(g.ours, g.theirs, g.energy, rng(hashString('h2:' + g.seed + ':' + g.done)), g.defIQ);
+  const clutch = g.done >= g.total - CLUTCH;
+  const ours = clutch ? g.ours.map(clutchOf) : g.ours;
+  const theirs = clutch ? g.theirs.map(clutchOf) : g.theirs;
+  const p = newPossession(ours, theirs, g.energy, rng(hashString('h2:' + g.seed + ':' + g.done)), g.defIQ, g.theirEnergy);
+  if (clutch && [...ours, ...theirs].some((h) => h.abil.includes('icon'))) p.events.push('clutch:icon');
   p.fire = g.fire;
   return p;
 }
@@ -86,7 +105,7 @@ export function afterPossession(g: HoopsGame, p: Possession): Mark {
   if (e.kind === 'make' && e.who >= 0 && e.who < 5) {
     g.box[e.who] += MARK_POINTS[mark];
     g.streak[e.who]++;
-    if (g.streak[e.who] >= 3) g.fire = e.who;
+    if (g.streak[e.who] >= fireAt(g.ours[e.who])) g.fire = e.who;
   }
   const shooter = p.lastShot && !p.lastShot.make ? p.bodies.find((b) => b.side === 'O' && p.events.includes('release')) : null;
   void shooter;
@@ -95,14 +114,18 @@ export function afterPossession(g: HoopsGame, p: Possession): Mark {
     for (let i = 0; i < 5; i++) if (i === e.who || e.kind === 'miss') g.streak[i] = Math.min(g.streak[i], 0);
     if (g.fire >= 0 && (e.kind === 'miss' || e.who === g.fire)) g.fire = -1;
   }
-  // tiring: everyone a little, the ball handler and the scorer more, less for great stamina
+  // tiring: everyone a little, the ball handler and the scorer more, much less for great stamina
+  // (a 50 drains about 2.7 times a 99); the defense tires by its own stamina too
   for (let i = 0; i < 5; i++) {
-    const drain = 0.03 * (1.25 - g.ours[i].sta / 140) * (i === e.who ? 1.4 : 1);
-    g.energy[i] = Math.max(0.55, g.energy[i] - drain);
+    const drain = 0.03 * (1.6 - g.ours[i].sta / 80) * (i === e.who ? 1.4 : 1);
+    g.energy[i] = Math.max(0.55, g.energy[i] - Math.max(0.004, drain));
   }
+  g.theirEnergy ??= g.theirs.map(() => 1);
+  for (let i = 0; i < g.theirs.length; i++) g.theirEnergy[i] = Math.max(0.55, g.theirEnergy[i] - Math.max(0.004, 0.03 * (1.6 - g.theirs[i].sta / 80) * 0.9));
   g.done++;
   if (g.done === g.total / 2) {
     for (let i = 0; i < 5; i++) g.energy[i] = Math.min(1, g.energy[i] + 0.3);
+    for (let i = 0; i < g.theirEnergy.length; i++) g.theirEnergy[i] = Math.min(1, g.theirEnergy[i] + 0.3);
     for (let j = 0; j < g.bench.length; j++) g.benchEnergy[j] = Math.min(1, g.benchEnergy[j] + 0.3);
   }
   if (g.bench.length) substitute(g);

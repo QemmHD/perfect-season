@@ -582,3 +582,18 @@ Changes on the content side:
 Queues come from the rework (UT NBA 9 / NFL 10), plus this branch's `CONTENT_PRINT` fingerprint.
 
 Details: the "After the ratings rework" section of [UT-CONTENT-2.md](UT-CONTENT-2.md).
+## Gameplay ratings pass — Claude (Anthropic), 2026-11-01
+
+Branch `claude/gameplay` (from `feature/season-evolution` d64921c); not merged, not deployed. Owner request: make every rating matter in play and balanced, NBA 2K / Madden / EA FC as the reference for play and animation, and make the gameplay enjoyable. Full tables: [GAMEPLAY-RATINGS.md](GAMEPLAY-RATINGS.md).
+
+What changed:
+- NBA (`hoops2/autopilot.ts`, `engine.ts`, `game.ts`, `types.ts`, new `badges.ts`): autopilot pass cost and six-pass limit, pick and roll and step-backs, Pro release 66 ms (elite shooters 0.71 → 1.18 PPP; even teams 1.01 PPP); contact stonewall by STR/weight/PRD vs handle; shot curve with rating-scaled contest caps (open three 36/51/67/81/87% for 45/60/75/90/99), green window unchanged; PRD contest, closeout caps, driving-dunk rules, IND at the rim, PAS, and-one FT, defender stamina, ACC; 2K26-tiered badges (Deadeye per shot type); Lob City, Heat Check, Icon now work.
+- NFL (`football2/engine.ts`, `autopilot.ts`, `drive.ts`, `types.ts`): all 16 abilities (seeded ~50% zone, pop events); truck/stiff arm by TRK/SFA + STR + weight with contact timing, AI/POWER button pick the move that beats the man; accuracy now shows (receivers read the ball late), THP speed, route-break wins, contested catch/SPC, power/finesse rush, BCV, AWR, STR leverage; run game 7.75 → 4.53 ypc; cliffs removed (pancake, big hit, press, kick window); steep coverage spans halved.
+- Feel (render only): `src/game/juice.ts` (trauma shake, kick, zoom, hit-stop, pooled particles), dunk styles and rim hang (`pixel/poses.ts`, `hoops2/render.ts`), ball squash/stretch, SPD 92+ afterimage, badge/ability pops, weight gait and sprint lean (`pixel/style.ts`), NFL catch leap/bobble (`football2/render.ts`), haptics inside pointer handlers and gesture-gated iOS ticks (`lib/sound.ts`), `Hoops2.tsx`/`Football2.tsx` wiring.
+
+Compatibility: match rules bumped once — draft NBA 9 → 10, NFL 9 → 10; UT NBA 9 → 10, NFL 10 → 11 (`net/match.ts`, `ut/Match.tsx`, pinned in `net.test.ts`/`nfl-net.test.ts`). No profile, key, card ID, serial, level, XP, rating or backend change.
+
+Tests: new `hoops2/ratings-matter.test.ts` (offensive monotonicity, curve targets, contact, PRD, FT, stamina, tiers, Lob City/Heat Check/Icon), `football2/ratings-matter.test.ts` (move inversions, AI move choice, accuracy, rush, route wins, kick window, ability rolls/effects/events), `juice.test.ts` (seeded NBA/NFL games identical with and without juice); opt-in `balance.test.ts` (`BAL=1`). Existing gameplay tests unchanged and passing; typecheck, full `npm test` both sports, build and the gameplay/core-gameplay/rushing/joystick QA scripts pass.
+
+Open: NFL 90-vs-75 synthetic teams still win ~99% (adjacent real-lineup tiers are ~80%); NBA 90 v 75 is 89%. NBA draft "overall" (value rank) doesn't track attributes, so OVR-matched real NBA lineups aren't a fair balance check.
+
