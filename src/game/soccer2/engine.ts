@@ -571,7 +571,9 @@ export function pressShoot(a: Attack): boolean {
   let green = greenHalf(c.p);
   const near = nearestDefender(a, c).d;
   if (!sp && near < 2) green *= 0.75;
-  if (sp?.kind === 'penalty') green *= 1.15;
+  // set-piece tuning (Claude 2026-11-01, docs/SOCCER.md): penalties about 75%, not 79%
+  if (sp?.kind === 'penalty') green *= SP_TUNE.penGreen;
+  if (sp?.kind === 'freekick') green *= SP_TUNE.fkGreen;
   if (Math.hypot(c.vx, c.vy) > topSpeed(c.p) * 0.9) green *= 0.88;
   green *= 1 - 0.12 * a.defIQ;
   a.meter = { t0: a.t, top: TOP, green: Math.max(0.012, green), first: !!incoming };
@@ -640,8 +642,10 @@ function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: nu
   if (pressed) cone *= 1.3;
   if (kind === 'header') cone *= 2.4;
   if (kind === 'volley') cone *= 1.3;
-  if (kind === 'pen') cone *= 0.8;
-  if (kind === 'fk') cone *= 1.35;
+  if (kind === 'pen') cone *= SP_TUNE.penCone;
+  if (kind === 'fk') cone *= SP_TUNE.fkCone;
+  // a header from a corner: under a crowd of bodies, a worse contact than an open-play cross
+  if (kind === 'header' && a.scenario === 'corner') cone *= SP_TUNE.cornerHeaderCone;
   const from = { x: a.ball.x, y: a.ball.y, h: Math.max(0.11, a.ball.h) };
   // a free kick is struck with topspin: it gets up over the wall and comes down again
   const dip = kind === 'fk' ? 5 : 0;
@@ -662,6 +666,26 @@ function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: nu
 }
 
 /* ---------- the keeper ---------- */
+
+/**
+ * Set-piece tuning (Claude 2026-11-01): the autopilot scored about a third of corners and free kicks
+ * and 79% of penalties. Targets (docs/SOCCER.md): corners 8-12%, direct free kicks 10-15%, penalties
+ * about 75%. Measured by src/game/soccer2/setpieces.test.ts.
+ */
+export const SP_TUNE = {
+  penGreen: 1.06,
+  penCone: 0.95,
+  penRead: 0.15,
+  fkGreen: 0.7,
+  fkCone: 4.2,
+  fkReact: 0.55,
+  fkRead: 0.4,
+  cornerHeaderCone: 3.8,
+  cornerDuel: 0.8,
+  /** how close a marker has to be to go up with the header (open-play crosses 1.5 m) */
+  cornerMark: 3.2,
+  cornerClaimDepth: 9.5,
+};
 
 /** Where the keeper stands: on the bisector of the angle the posts make from the ball, off his line by how far away it is. */
 export function keeperSpot(a: Attack, _gk: Body, err: number): Pt {
@@ -695,15 +719,16 @@ function planKeeper(a: Attack) {
   const cross = at ?? path[path.length - 1] ?? { t: 1, x: GX, y: PL, h: 1, v: 20 };
   if (a.setPiece?.kind === 'penalty' || a.lastShot?.kind === 'pen') {
     const real = Math.abs(cross.x - GX) < 0.9 ? 0 : Math.sign(cross.x - GX);
-    const right = a.rand() < gkPenaltyRead(gk.p);
+    const right = a.rand() < gkPenaltyRead(gk.p) + SP_TUNE.penRead;
     const others = [-1, 0, 1].filter((g) => g !== real);
     const guess = a.guess ?? (right ? real : others[Math.floor(a.rand() * others.length)]);
     a.gkPlan = { react: a.t + 0.1, x0: gk.x, tx: GX + guess * 2.1, th: 0.4 + a.rand() * 1.2, at: cross.t + a.t };
     return;
   }
-  const mis = gkMisread(gk.p) * (1 + 0.6 * Math.max(0, (cross.v - 22) / 10));
+  const mis = gkMisread(gk.p) * (1 + 0.6 * Math.max(0, (cross.v - 22) / 10)) * (a.lastShot?.kind === 'fk' ? SP_TUNE.fkRead : 1);
   a.gkPlan = {
-    react: a.t + gkReaction(gk.p) * (1 - 0.15 * a.defIQ) + a.rand() * 0.04,
+    // a direct free kick: the keeper is set and sees it struck (he reacts a little sooner)
+    react: a.t + gkReaction(gk.p) * (1 - 0.15 * a.defIQ) * (a.lastShot?.kind === 'fk' ? SP_TUNE.fkReact : 1) + a.rand() * 0.04,
     x0: gk.x,
     tx: cross.x + gauss(a.rand) * mis,
     th: clamp(cross.h + gauss(a.rand) * mis * 0.6, 0.1, 2.5),
@@ -1151,10 +1176,12 @@ function contact(a: Attack) {
     // in the air, a defender close by goes up with him
     if (air) {
       const rival = nearestDefender(a, q);
-      if (rival.b && rival.d < (f?.kind === 'cross' ? 1.5 : 0.9)) {
+      if (rival.b && rival.d < (f?.kind === 'cross' ? (a.scenario === 'corner' ? SP_TUNE.cornerMark : 1.5) : 0.9)) {
         const att = rt(q.p.a.PHY) + 0.15 * rt(q.p.a.SHO);
         const def = rt(rival.b.p.a.PHY) * 0.7 + rt(rival.b.p.a.DEF) * 0.45 + 0.06 * a.defIQ;
-        if (a.rand() < clamp(0.42 + (def - att) * 0.8, 0.15, 0.8)) {
+        // a corner: the box is marked man for man, so the defenders win more of them
+        const base = a.scenario === 'corner' ? SP_TUNE.cornerDuel : 0.42;
+        if (a.rand() < clamp(base + (def - att) * 0.8, 0.15, 0.85)) {
           b.owner = null;
           b.last = rival.b.id;
           b.vx = (a.rand() - 0.5) * 9;
@@ -1616,7 +1643,9 @@ function keeper(a: Attack, gk: Body, dt: number) {
   // a cross or through ball he can reach first: claim it
   if (f && (f.kind === 'cross' || f.kind === 'lofted' || f.kind === 'through') && a.path) {
     const m = meetPoint(a, gk, 2.5);
-    if (m && m.y > PL - 7.5 && Math.abs(m.x - GX) < 10) {
+    // from a corner he commands a little more of his box
+    const corner = a.scenario === 'corner';
+    if (m && m.y > PL - (corner ? SP_TUNE.cornerClaimDepth : 7.5) && Math.abs(m.x - GX) < (corner ? 11 : 10)) {
       const rivals = a.bodies.filter((q) => q.side === 'A').map((q) => meetPoint(a, q, 2.4)?.t ?? 9);
       const mine = Math.max(0, dist(gk, m) - 1) / topSpeed(gk.p);
       if (mine < Math.min(...rivals) - 0.05) {
