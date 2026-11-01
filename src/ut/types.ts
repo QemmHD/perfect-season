@@ -52,7 +52,14 @@ export interface CardLine {
   /** promo/legend: the id of the season card it is made from */
   seasonId?: string;
   /** Optional public same-era benchmark, attached before all edition copies are derived. */
-  ratingReference?: { source: string; snapshot: string; ovr: number; attrs: Record<string, number> };
+  ratingReference?: {
+    source: string;
+    snapshot: string;
+    ovr: number;
+    attrs: Record<string, number>;
+    /** absent for the original rows; 'preseason' and 'retro' are the marked fallbacks */
+    kind?: 'final' | 'next' | 'preseason' | 'retro';
+  };
 }
 
 /** Immutable edition issue number; activeAtPull is only a last-confirmed circulation snapshot. */

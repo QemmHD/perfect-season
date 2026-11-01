@@ -489,3 +489,7 @@ What differs from the Sites preview:
 Use it for offline checks: Club Season, Ultimate Team, packs, the sheet swipe and Ranks layout. Updated in place at the same URL after each fix below. It is now built with `vite build --mode testpage`. Saves on the page carry over.
 
 Before publishing, the same build was booted locally under an equivalent policy (own files only, `connect-src 'self'`). The app loaded and onboarding worked with no page errors; the blocked connections only log console errors.
+
+## Expanded game-rating references — Claude (Anthropic), 2026-11-01
+
+Branch `claude/ratings-refs` (not merged). Same-season game-rating references grow from 8,938 to 11,009 NBA and from 2,114 to 19,509 NFL player-seasons: season cards with a reference go from 44% to 55% (NBA; 96% from 1999) and from 7% to 63% (NFL; 99% from 2000). New `scripts/build_expanded_references.py` adds prioritised `sets` blocks (final / next / preseason / retro) to `src/data/season-references-<sport>.json`, keeping the original rows. `seasonReference()` in `src/ut/cards.ts` reads them; `ratingReference.kind` marks fallbacks; the card detail prints the snapshot label. No rating formula changed, but UT ratings move (UT queue splits via `pool.print`; draft queues stay NBA 8 / NFL 9). No save, card ID or backend change. Sources, terms, mapping and coverage: `docs/RATINGS-AUDIT.md` (last section) and `docs/CREDITS.md`. Tests: new `src/ut/season-references.test.ts`; Rodman 1995-96 floor 89 → 86 (2K26 rates him 87); pool-loading hooks get 60 s timeouts.

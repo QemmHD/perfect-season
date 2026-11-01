@@ -65,7 +65,7 @@ describe('the economy (' + SPORT + ')', () => {
     expect(seller).toBeLessThanOrEqual(9);
     expect(keeper).toBeGreaterThanOrEqual(5);
     expect(keeper).toBeLessThanOrEqual(12);
-  });
+  }, 60000);
 
   it('never sells a pack for more than it cost', async () => {
     const pool = await getPool();

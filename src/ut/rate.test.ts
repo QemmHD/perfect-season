@@ -8,7 +8,7 @@ describe('rating cards (' + SPORT + ')', () => {
   let lines: CardLine[];
   beforeAll(async () => {
     lines = (await getPool()).lines;
-  });
+  }, 60000);
 
   it('gives tiers by overall: bronze under 75, silver to 84, gold 85 and up (football on its own scale)', () => {
     expect([50, 74, 75, 84, 85, 99].map((o) => tierOf(o))).toEqual(['bronze', 'bronze', 'silver', 'silver', 'gold', 'gold']);

@@ -50,6 +50,21 @@ Notes on the data, for whoever rebuilds the clips:
   lengths.
 - Mirrored clips are made in the game at load time, not stored.
 
+## Game-rating references (Ultimate Team benchmarks)
+
+Ultimate Team uses the published video-game ratings of a player's season as numeric reference anchors (see
+[RATINGS-AUDIT.md](RATINGS-AUDIT.md), "Expanded game-rating references"). The ratings belong to their publishers:
+NBA 2K by 2K / Take-Two Interactive / Visual Concepts, Madden NFL by Electronic Arts. Perfect Season is not affiliated
+with or endorsed by them, the NBA or the NFL. Only numbers are used; no names, art, logos or game files are copied.
+They were collected by:
+
+| Source | What we read | Terms |
+| --- | --- | --- |
+| [2K Archive](https://2karchive.com/) | NBA 2K–2K27 rosters; Madden 27 launch roster | free fan site, provided as is |
+| [2KRatings](https://www.2kratings.com/), via [ReinerJasin/NBA2k25_Web_Scraping](https://github.com/ReinerJasin/NBA2k25_Web_Scraping) and [wkoverfield/nba2kapi](https://github.com/wkoverfield/nba2kapi) | NBA 2K25 and 2K26 rosters, 2K26 classic teams; all-time player profiles (`nba-rating-references.json`) | repositories say MIT (no licence file) |
+| [theedgepredictor/nfl-madden-data](https://github.com/theedgepredictor/nfl-madden-data) (from maddenratings.weebly.com) | Madden 2002–26 launch rosters | no licence file |
+| [nflscraPy MaddenRatings](https://github.com/blnkpagelabs/nflscraPy/releases/tag/MaddenRatings) | Madden 22–24 roster iterations | code MIT ([licence](NFLSCRAPY-LICENSE.txt)) |
+
 ## Sounds
 
 The arcade games' sounds are real recordings: cut, layered, levelled and made mono by

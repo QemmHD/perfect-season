@@ -11,7 +11,7 @@ import type { RatedCard, Tier } from './types';
 let pool: Pool;
 beforeAll(async () => {
   pool = await getPool();
-});
+}, 60000);
 
 const count = (cards: RatedCard[], t: Tier) => cards.filter((c) => c.tier === t).length;
 const atLeast = (cards: RatedCard[], t: Tier) => cards.filter((c) => TIER_RANK[c.tier] >= TIER_RANK[t]).length;
