@@ -351,7 +351,54 @@ async function run(sport, width, opts = {}) {
   }
 }
 
+/** Wave 3: the Live Calendar on a given Eastern date (the clock is moved; no app-side override). */
+async function runCalendar(sport, width, iso, label) {
+  const tag = sport + '-' + width + '-' + label;
+  const { page, context, current, errors } = await fixture(browser, sport, 'Claude Calendar', width);
+  await context.clock.setSystemTime(new Date(iso));
+  await page.evaluate(async () => {
+    const { saveProfile, loadProfile } = await import('/src/lib/profile.ts');
+    const p = loadProfile();
+    p.coins = 40000;
+    saveProfile(p);
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /Ultimate Team:/ }).click();
+  await page.getByRole('button', { name: 'PLAY HQ', exact: true }).waitFor({ timeout: 60000 });
+  await page.locator('.ut-season-banner').waitFor();
+  await page.waitForTimeout(400);
+  await shot(page, 'cal-' + tag + '-home');
+  // the Store's This Season row: buy the first program pack
+  await tab(page, 'STORE');
+  await page.locator('.s-live').first().waitFor();
+  await page.locator('.s-live').first().scrollIntoViewIfNeeded();
+  await shot(page, 'cal-' + tag + '-store');
+  const b0 = await current();
+  await page.locator('.s-live .ut-buy').first().click();
+  await finishOpening(page);
+  await page.waitForTimeout(300);
+  await shot(page, 'cal-' + tag + '-program-pack');
+  await closeOpening(page);
+  const b1 = await current();
+  assert.ok(b1.coins < b0.coins, 'program pack charged');
+  // the SBC tab's This Season section
+  await tab(page, 'SBC');
+  await page.locator('.ut-sbc.prog').first().waitFor();
+  await page.locator('.ut-sbc.prog').first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await shot(page, 'cal-' + tag + '-sbc');
+  assert.deepEqual(errors, [], tag + ' page errors');
+  await context.close();
+  log(tag, 'ok');
+}
+
 try {
+  for (const [iso, label] of [
+    ['2026-11-27T17:00:00Z', 'black-friday'],
+    ['2027-01-15T17:00:00Z', 'honors'],
+    ['2027-06-23T17:00:00Z', 'finale'],
+  ])
+    for (const sport of ['nba', 'nfl']) await runCalendar(sport, label === 'honors' ? 320 : 390, iso, label);
   for (const sport of ['nba', 'nfl']) for (const width of [390, 320]) await run(sport, width);
   for (const sport of ['nba', 'nfl']) await run(sport, 390, { weekend: true });
   log('all ok');

@@ -31,7 +31,7 @@ function timeLeft(week: boolean): string {
 
 function SbcCard({ s, done, onOpen }: { s: Sbc; done: boolean; onOpen: () => void }) {
   return (
-    <button className={'ut-sbc' + (done ? ' done' : '') + (s.kind === 'weekly' ? ' weekly' : s.kind === 'upgrade' ? ' upgrade' : s.kind === 'standout' ? ' weekly so' : s.kind === 'landmark' ? ' weekly lm' : '')} onClick={onOpen} disabled={done}>
+    <button className={'ut-sbc' + (done ? ' done' : '') + (s.kind === 'weekly' ? ' weekly' : s.kind === 'upgrade' ? ' upgrade' : s.kind === 'standout' ? ' weekly so' : s.kind === 'landmark' ? ' weekly lm' : s.kind === 'program' ? ' weekly prog' : '')} onClick={onOpen} disabled={done}>
       <span className="ut-sbc-top">
         <b className="disp">{s.title}</b>
         {done ? (
@@ -75,6 +75,10 @@ const reqLabel = (r: Req) => {
       return r.n + ' same decade';
     case 'positions':
       return r.pos.join(' ');
+    case 'season':
+      return r.n + '× ' + r.min + '+';
+    case 'distinctFr':
+      return 'all different teams';
   }
 };
 
@@ -91,6 +95,17 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
   return (
     <div className="page ut-sbcs">
       <p className="lead ut-sbc-lead">Trade in cards that meet the requirements. Everyone gets the same challenges. Duplicate Storage cards are available here and auto-fill prefers equally valued spares.</p>
+      {/* Claude wave 3: the Live Calendar's season SBCs (calendar-sbc.ts) */}
+      {props.sbcs.some((s) => s.kind === 'program') && (
+        <div className="ut-sbc-group">
+          <span className="eyebrow">This Season</span>
+          {props.sbcs
+            .filter((s) => s.kind === 'program')
+            .map((s) => (
+              <SbcCard key={s.id} s={s} done={!!props.done[s.id]} onOpen={() => (sfx.click(), setOpen(s))} />
+            ))}
+        </div>
+      )}
       {props.extra}
       <div className="ut-sbc-group">
         <span className="eyebrow">Daily{left[0] ? ' · new in ' + left[0] : ''}</span>

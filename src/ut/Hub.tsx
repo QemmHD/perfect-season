@@ -19,6 +19,7 @@ import type { Pool } from './pool';
 import { setsFor } from './sets';
 import { NEW_ERA_COINS, newEraReady } from './new-era';
 import { GoatCrown } from './CardArt';
+import { SeasonBanner } from './SeasonBanner';
 export { PackArt } from './PackArt';
 export function Hub(props: {
   sport: UtSport;
@@ -60,6 +61,7 @@ export function Hub(props: {
   const setsReady = setsFor(props.pool, ut).filter((s) => !s.claimed && s.have >= s.need).length;
   return (
     <div className="page ut-hub hq-home">
+      <SeasonBanner day={props.day} sport={props.sport} onStore={() => props.onGo('store')} />
       <SeasonRibbon
         ut={ut}
         day={props.day}

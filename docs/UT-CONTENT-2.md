@@ -383,3 +383,129 @@ New `ut.content` fields (optional; `normalizeContent` validates them):
 - a Streamlined submission
 - starting and applying an Evolution
 - a holo card's details
+
+---
+
+# Wave 3: Live Calendar — Claude, 2026-11-01
+
+This is the 12-month calendar from the content plan (`content-plan/CALENDAR.md`, `schedule.json`, `IMPLEMENTATION.md`). It was regenerated and validated with `content-plan-tools/build.sh` after the owner's decisions:
+
+- **Seasons renamed:**
+  - "All-Star Break" is now **Midseason Stars**.
+  - "Summer League" is now **Summer Run**.
+- **No league marks in UI text:** "NBA Cup", "Super Bowl" and "Pro Bowl" appear only in the real-world notes, which the UI never shows. A test checks this.
+- **The Perfect Season Finale (98–99) is SBC-only.** Its 0.2% pack slot was removed, and the objective that offered a 98 pick now pays a Ring Night pick.
+- **Summer Heat's featured card is capped at 97**, so no 98–99 card exists outside the Finale.
+- **The card pool stays frozen:** no new-season data rebuild.
+- **The packs it references map to this build's packs** (`resolvePackKind`):
+
+  | Schedule name | Pack here |
+  |---|---|
+  | `scout-choice` | Scout's Choice |
+  | `elite-gold` | Elite Gold |
+  | `jumbo-premium` | Jumbo Premium |
+  | `standout-guarantee` | Standout Guarantee |
+  | `daily-drop` | Daily Drop |
+  | `season-program-*` | the season's program pack or pick |
+
+## Delivered
+
+**Data**
+- `src/data/live-calendar.json` is a copy of the regenerated schedule (12 seasons, 2026-10-26 to 2027-11-21). It loads with the card pool (`getPool`), never in the main chunk.
+
+**`calendar-rules.ts`**
+- The selection grammar (franchise, era, season, pos/anypos, group, honor, stat, rk, career, careerYear, kind, years, games, starts, num, traded, franchises, dense, base), ported from `rules.js`.
+- Career facts are computed once per pool.
+- Unknown keys throw.
+
+**`calendar.ts`**
+- `seasonOn(day)`.
+- After the scheduled year, a **364-day repeat** of seasons 2–12: ids continue `season:13…`, and promo/SBC/pack ids get `-y<cycle>`.
+- Also: `promoById` (any cycle), `promosOn`, `packsOn`, `sbcsOn`, `upcoming` (names only), `nextSeason`, and per-sport waves.
+
+**`live-cards.ts`: program cards**
+- Id: `<sport>:live:<promoId>[.f]:<season>:<pid>:<fr>`.
+- **Rebuilt from the id alone** (the promo's band and delta + the season card), so an owned program card resolves after its promo ends, in any later week or cycle, even if selection would no longer pick it.
+- Rating: `clamp(base + delta, onScale(band))`, capped at 97 except the Finale. Face attributes get the delta, physicals at most +2, FT unchanged. The new tier is `program`, ranked with Hot Season for SBC requirements.
+- Selection is deterministic per sport and promo id:
+  1. the rule
+  2. a rating gate (widened up to 3 times)
+  3. order: top by base, or seeded
+  4. take with distinct players, `maxPer` caps and wave position slots; a second pass relaxes the caps and slots only when a promo would otherwise ship short
+  5. the featured card (`.f`)
+- Waves release on their dates.
+
+**`live-packs.ts`: program packs**
+
+| Pack | NBA | NFL |
+|---|---|---|
+| `live:<promo>` (Program Pack) | 3 rare golds, 4 golds + 1 program slot | 6 rare golds, 9 golds + 1 program slot |
+| `live-plus:<promo>` (Program Guarantee) | 5 rare golds + 1 program card | 11 rare golds + 1 program card |
+
+- The program slot uses the schedule's `programOdds` (30% for base packs) plus its non-Finale `extraOdds`; otherwise it gives a current Weekly Standout.
+- `live-pick:<promo>:<n>` is a pick sheet.
+- Limits: 3 a day (program), 1 a week (guarantee).
+- **Prices:** the schedule's prices were planned on a larger coin scale, so each template's price is scaled per sport:
+
+  | Template | NBA | NFL |
+  |---|---|---|
+  | Program | ×0.7 | ×0.45 |
+  | Guarantee | ×0.35 | ×0.21 |
+
+  A base Program Pack and Guarantee then return 41–52% of their price in quick-sell value (tested). Elite-tier packs (Hot Season, Ring Night, Dream Teams, Summer Heat) keep their planned premium, so their EV is lower (about 33–41%).
+- A program card quick-sells for 700 + 60 per overall point above `onScale(84)` (×0.35 in NFL).
+
+**`calendar-sbc.ts`: season SBCs**
+- They appear on the SBC tab under **This Season**, at the top.
+- Repeatable ones count completions in `ut.content.claims` (`sbc:cal:<id>:<k>`).
+- Overall requirements go through `onScale`.
+- New requirement kinds: `season` (n from season ≥ min) and `distinctFr`.
+- The reward is a released card of the promo; "The Perfect Season" pays the featured Finale card.
+
+**UI**
+- Home **This Season** banner: season number and name, tagline, days left, the season's accent, live program chips (band and end date; tap opens the Store), and **Coming next** (the next three drops by name only, plus the next season five days before it starts).
+- Store **This Season** row with odds sheets.
+- Program card art `t-program` in the season's accent colours, with a program ribbon.
+
+## Online and saves
+
+- `CONTENT_PRINT` is now `ut-content-4`, and the pool fingerprint mixes in the schedule version, so builds that can't rate each other's program cards don't share the UT queue.
+- No existing card's rating changes. `UT_RULES` is unchanged.
+- No new state field: purchase limits live in `ut.content.buys`, and SBC completions in `ut.content.claims`.
+
+## Retuned prices
+
+These now give 45–60% quick-sell EV on the current scale. Recheck them after the ratings rework lands.
+
+| Pack | NBA | NFL |
+|---|---|---|
+| Standout Guarantee | 4,500 → **3,600** | 3,300 → **2,300** |
+| Lightning (25% off) | 3,375 → **2,700** | 2,475 → **1,725** |
+| Elite Gold | 3,000 → **2,800** | 2,500 → **2,100** |
+
+## Not built yet (IMPLEMENTATION.md steps 4, 6, 8, parts of 5 and 7)
+
+- Calendar-driven Season Pass changes: per-season 20/25/30 tiers, extra rewards, renaming. The pass keeps its existing 28-day seasons and 25 tiers; season 2's dates match.
+- Season objectives, the Season Path, the check-in card, `winsWith`.
+- Live Events, Moments reskins, Circuit themes, the Squad Battles curve.
+- Flash Windows from the schedule. The existing weekend Lightning windows remain.
+- Season-specific Standout bands and features.
+- The Gallery "Programs" tab.
+- The frozen-manifest script. Today no promo has started yet, so the manifest would be empty; it should be added before the first promo (2026-11-06) if ratings may still change, because `top` selection depends on base ratings.
+
+## Tests and QA
+
+`calendar.test.ts` (both sports) covers:
+- schedule shape (contiguous Mon–Sun seasons, season 1 untouched, unique ids, every rule compiles, unknown keys throw)
+- the owner decisions
+- date → season, including 364/728-day repeats and `-y` ids
+- deterministic selection near full count
+- bands (98–99 only in the Finale, everything else ≤97)
+- owned and synthetic ids resolving after the promo and in later cycles
+- wave release
+- pack shapes and odds (the Finale never in a pack)
+- limits, seeded picks with keep-exactly-one
+- season SBCs, including repeats and the Finale paying 98+
+- program pack EV
+
+Browser QA (`scripts/qa/ut-content.mjs`) moves the browser clock to Black Friday (2026-11-27), Honors (2027-01-15, at 320 wide) and Finale week (2027-06-23), in both sports. Each run: Home banner, Store row, buying a program pack, the SBC This Season section.

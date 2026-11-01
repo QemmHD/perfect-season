@@ -527,3 +527,20 @@ Saves and online:
 - `CONTENT_PRINT` is now `ut-content-3`; no rule or base rating changes.
 
 Validation and details: the "Wave 2" section of [UT-CONTENT-2.md](UT-CONTENT-2.md), `content3.test.ts`, and `scripts/qa/ut-content.mjs`.
+
+### UT wave 3: Live Calendar — Claude, 2026-11-01 (branch `claude/ut-content`, not deployed)
+
+What it adds:
+- The 12-month schedule, with the owner's renames and Finale SBC-only decision applied.
+- A rule-based, deterministic selection of program cards. Ids `<sport>:live:<promo>[.f]:…` rebuild from the id forever.
+- A 364-day repeat after the scheduled year.
+- Program packs, guarantees and picks, built on the content-drop packs.
+- Season SBCs.
+- A Home "This Season" banner with "Coming next".
+- Standout Guarantee and Elite prices retuned to a 45–60% quick-sell EV.
+
+Saves and online:
+- `CONTENT_PRINT` is now `ut-content-4`, and the fingerprint includes the schedule version.
+- No new state field.
+
+Scope, what isn't built yet, and tests: "Wave 3" in [UT-CONTENT-2.md](UT-CONTENT-2.md) and `calendar.test.ts`.

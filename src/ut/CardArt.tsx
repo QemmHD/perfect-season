@@ -211,7 +211,7 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
         (l.holo ? ' is-holo' : '') +
         (className ? ' ' + className : '')
       }
-      style={{ '--w': w + 'px', '--c1': l.c1, '--c2': l.c2 } as React.CSSProperties}
+      style={{ '--w': w + 'px', '--c1': l.c1, '--c2': l.c2, ...(l.accent ? { '--pa': l.accent[0], '--pb': l.accent[1], '--pc': l.accent[2] ?? l.accent[0] } : {}) } as React.CSSProperties}
       role="img"
       aria-label={l.name + ', ' + rc.ovr + ' overall ' + rc.pos + ', ' + l.season + ' ' + l.teamName + ', ' + (l.holo ? 'Holographic ' : '') + (rare ? 'Rare ' : '') + TIER_NAMES[rc.tier] + (l.evo?.length ? ', evolved' : '') + (l.landmark ? ', ' + l.landmark : '') + (l.week ? ', ' + weekLabel(l.week) : '') + (mint ? ', issue number ' + mint.serial : '')}
     >
@@ -230,6 +230,11 @@ export function UtCard({ rc, w, level = 1, attrs, pose = 'stand', tilt, slot, cl
               {l.week ? weekLabel(l.week) : 'STANDOUT'}
             </span>
           </>
+        )}
+        {rc.tier === 'program' && (
+          <span className="utc-ribbon" aria-hidden="true">
+            {l.label}
+          </span>
         )}
         {rc.tier === 'landmark' && (
           <>

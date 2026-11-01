@@ -16,6 +16,8 @@ import { contentOf } from './content-state';
 import { buysLeft, dailyStatus, LIMITS, lightningWindow, minutesToLightning, STREAK_DAYS, type LimitedKind } from './content-packs';
 import { marketBought, marketFor, SWAP_SIZE, swapCandidates } from './market';
 import { UtCard } from './CardArt';
+import type { CalPack } from './calendar';
+import { livePackDef, liveBuysLeft, livePacksOn } from './live-packs';
 import type { Pool } from './pool';
 import type { ClubCard } from './UltimateTeam';
 
@@ -34,6 +36,9 @@ const SHORT: Record<string, string> = {
   jumbo: 'JUMBO',
   standout: 'STANDOUT',
   lightning: 'LIGHTNING',
+  live: 'PROGRAM',
+  'live-plus': 'GUARANTEE',
+  'live-pick': 'PICK',
 };
 
 function pct(p: number): string {
@@ -46,7 +51,7 @@ function pct(p: number): string {
         : (Math.round(p * 10000) / 100).toString() + '%';
 }
 
-const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'promo', 'standout', 'rare', 'gold', 'silver', 'bronze'];
+const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'rare', 'gold', 'silver', 'bronze'];
 const slotName = (t: SlotTier) => (t === 'rare' ? 'Rare Gold' : TIER_NAMES[t]);
 
 /** What a pack holds, slot by slot, and the chance of a promo or a legend in the whole pack. */
@@ -100,6 +105,7 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
               forever.
             </p>
           )}
+          {any('program') > 0 && <p className="note">A program card is one of this program’s cards released so far, all equally likely. The program’s cards are the same for everyone.</p>}
           {any('rare') > 0 && <p className="note">Rare golds are the top 35% of golds at each position; a rare slot is always a gold.</p>}
           <p className="note">Within a tier, lower overalls are more common: each point above the tier’s floor is a little rarer.</p>
           <button className="btn" onClick={() => close()}>
@@ -159,6 +165,8 @@ export function Store(props: {
   onStandouts: () => void;
   /** Claude wave 2: the Preview Pack card */
   preview?: React.ReactNode;
+  /** Claude wave 3: buy a Live Calendar program pack */
+  onLive?: (pack: CalPack) => void;
 }) {
   const [odds, setOdds] = useState<PackDef | null>(null);
   const [choose, setChoose] = useState(false);
@@ -245,6 +253,41 @@ export function Store(props: {
               </div>
             </>
           )}
+          {(() => {
+            // Claude wave 3: this season's program packs (Live Calendar)
+            const live = livePacksOn(props.day);
+            if (!live.length || !props.onLive) return null;
+            const season = live[0] && (live[0] as { season?: { name: string; accent: string[] } }).season;
+            return (
+              <>
+                <span className="eyebrow">This Season{season ? ' · ' + season.name : ''}</span>
+                <div className="ut-shop">
+                  {live.map((p) => {
+                    const d = livePackDef(props.sport, p);
+                    const left = liveBuysLeft(props.ut, p, props.day);
+                    const short = props.coins < d.price;
+                    return (
+                      <div key={p.id} className={'ut-shopitem s-live' + (p.tpl === 'guarantee' ? ' s-live-plus' : '')} style={season ? ({ '--sa': season.accent[0], '--sb': season.accent[1] } as React.CSSProperties) : undefined}>
+                        <PackArt kind={p.tpl === 'guarantee' ? 'live-plus' : 'live'} label={p.tpl === 'guarantee' ? 'GUARANTEE' : 'PROGRAM'} sport={props.sport} small />
+                        <div className="ut-shop-txt">
+                          <strong>{d.name}</strong>
+                          <small>{d.blurb}</small>
+                          <small className="ut-limit">{(left ? left + ' left ' : 'Limit reached ') + (p.tpl === 'guarantee' ? 'this week' : 'today') + ' · until ' + p.end.slice(5).replace('-', '/')}</small>
+                          <button className="ut-oddsbtn" onClick={() => setOdds(d)} aria-label={d.name + ' odds'}>
+                            <IconInfo size={13} /> Odds
+                          </button>
+                        </div>
+                        <button className={'btn ut-buy' + (short || !left ? ' short' : ' gold')} aria-disabled={short || !left} aria-label={'Buy ' + d.name + ' for ' + d.price + ' coins'} onClick={() => props.onLive!(p)}>
+                          <Coin size={14} />
+                          <span className="num">{d.price.toLocaleString('en-US')}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
           <span className="eyebrow">Featured</span>
           <button className="ut-so-link" onClick={props.onStandouts}>
             <b>Weekly Standouts</b>

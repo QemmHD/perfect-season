@@ -77,6 +77,10 @@ import { submitStream } from './streamlined';
 import { StreamlinedSection } from './StreamlinedView';
 import { itemScore } from './item-score';
 import { claimObjective as claimObjectiveFn } from './progression';
+import { calendarSbcs } from './calendar-sbc';
+import type { CalPack } from './calendar';
+import { livePackDef, liveBuysLeft, livePick, recordLiveBuy } from './live-packs';
+import { programReward } from './live-cards';
 
 /** An owned card with its rating and where it plays (if it's in the squad). */
 export interface ClubCard {
@@ -207,7 +211,7 @@ export default function UltimateTeam(props: {
   const byUid = useMemo(() => new Map(inventory.map((c) => [c.uid, c])), [inventory]);
   const lineup: Lineup = useMemo(() => Object.fromEntries(Object.entries(ut.squad).map(([s, u]) => [s, byUid.get(u)?.rc ?? null])), [ut.squad, byUid]);
   const rating = useMemo(() => rateSquad(SPORT, lineup), [lineup]);
-  const sbcs = useMemo(() => (pool ? [...sbcsFor(pool, day, ut.sbc.done), ...contentSbcs(pool, weekOf(day))] : []), [pool, day, ut.sbc.done]);
+  const sbcs = useMemo(() => (pool ? [...calendarSbcs(pool, ut, day), ...sbcsFor(pool, day, ut.sbc.done), ...contentSbcs(pool, weekOf(day))] : []), [pool, day, ut.sbc.done, ut.content?.claims]);
   const sbcDone = useMemo(() => ({ ...ut.sbc.done, ...contentDone(ut, sbcs) }), [ut.sbc.done, ut.content?.claims, sbcs]);
   const [pickOpen, setPickOpen] = useState<string | null>(null);
   const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
@@ -550,6 +554,20 @@ export default function UltimateTeam(props: {
     onToast('Claimed ' + shown.claimed + (shown.claimed === 1 ? ' reward' : ' rewards') + (shown.coins ? ' · +' + shown.coins.toLocaleString('en-US') + ' coins' : '') + '. Packs and picks are in your Store.');
   };
 
+  // ---------- Claude wave 3: Live Calendar program packs ----------
+
+  const buyLive = (pack: CalPack) => {
+    if (!pool) return;
+    const def = livePackDef(SPORT, pack);
+    if (liveBuysLeft(ut, pack, day) <= 0) return onToast('You’ve reached this pack’s limit for ' + (pack.tpl === 'guarantee' ? 'this week.' : 'today.'));
+    if (profile.coins < def.price) {
+      sfx.nope();
+      return onToast('Not enough coins yet: ' + (def.price - profile.coins).toLocaleString('en-US') + ' more.');
+    }
+    sfx.coin();
+    openNow(pack.id, newId(), def.name, (p) => ({ ...p, coins: p.coins - def.price, ut: recordLiveBuy(p.ut, pack, day) }), false, (p) => p.coins >= def.price && liveBuysLeft(p.ut, pack, day) > 0);
+  };
+
   const claimObjectivePick = () => {
     if (!pool) return;
     const at = Date.now();
@@ -584,6 +602,15 @@ export default function UltimateTeam(props: {
     if (!pp) return;
     if (pp.kind.startsWith('event-spotlight:') || pp.kind === 'spotlight') return startPromo(pp.kind, 0, pp.id);
     // Claude: a reward Scout's Choice / Standout pick becomes a pick sheet (its id is the pack's)
+    // Claude wave 3: a Live Calendar program pick
+    if (pp.kind.startsWith('live-pick:') && pool) {
+      const pick = livePick(pool, pp.kind, pp.id, day, Date.now());
+      if (!pick) return onToast('This program’s cards haven’t been released yet. Try again when it starts.');
+      update((p) => (p.ut.packs.some((x) => x.id === id) ? { ...p, ut: addPick({ ...p.ut, packs: p.ut.packs.filter((x) => x.id !== id) }, pick) } : p));
+      sfx.click();
+      setPickOpen(pp.id);
+      return;
+    }
     if ((pp.kind === 'scout' || pp.kind === 'standout-pick') && pool) {
       const pick = pickFor(pool, pp.kind, pp.id, week, Date.now());
       update((p) => (p.ut.packs.some((x) => x.id === id) ? { ...p, ut: addPick({ ...p.ut, packs: p.ut.packs.filter((x) => x.id !== id) }, pick) } : p));
@@ -664,8 +691,8 @@ export default function UltimateTeam(props: {
       return;
     const gone = new Set(uids);
     const week = weekOf(day);
-    const content = s.kind === 'standout' || s.kind === 'landmark';
-    const rc = s.reward.card ? rewardCard(pool, s.reward.card) : s.reward.standout ? drawStandout(pool, week, trueRand(), FEATURED_STANDOUT) : s.reward.cardId ? (pool.base.get(s.reward.cardId) ?? null) : null;
+    const content = s.kind === 'standout' || s.kind === 'landmark' || s.kind === 'program';
+    const rc = s.reward.card ? rewardCard(pool, s.reward.card) : s.reward.standout ? drawStandout(pool, week, trueRand(), FEATURED_STANDOUT) : s.reward.cardId ? (pool.base.get(s.reward.cardId) ?? null) : s.reward.program ? programReward(pool, s.reward.program, !!s.reward.programFeatured, day) : null;
     const prize: OwnedCard | null = rc ? { uid: 'sbc' + newId().replace(/-/g, '').slice(0, 8), cardId: rc.line.id, level: 1, xp: 0, at: Date.now() } : null;
     const pack = s.reward.pack ? { id: newId(), kind: s.reward.pack, at: Date.now() } : null;
     update((p) => {
@@ -1105,6 +1132,7 @@ export default function UltimateTeam(props: {
           onMarket={buyFromMarket}
           onSwap={swap}
           onStandouts={() => go('standouts')}
+          onLive={buyLive}
           preview={<PreviewPack pool={pool} ut={ut} week={week} coins={profile.coins} now={Date.now()} onStart={startPreview} onBuy={buyPreview} onSkip={skipPreview} />}
         />
       </>

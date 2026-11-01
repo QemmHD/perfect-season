@@ -1714,3 +1714,108 @@
   letter-spacing: 1px;
   color: var(--text);
 }
+
+/* ======================= Claude wave 3: Live Calendar ======================= */
+.ut-season-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sc) 60%, transparent);
+  background:
+    radial-gradient(90% 80% at 100% 0%, color-mix(in srgb, var(--sa) 40%, transparent), transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, var(--sb) 85%, #071820), #071820);
+  flex-shrink: 0;
+}
+.ut-season-banner .eyebrow {
+  color: var(--sc);
+}
+.ut-season-banner > b {
+  font-size: 26px;
+  line-height: 1;
+}
+.ut-season-banner > small {
+  color: var(--soft);
+  font-size: 12px;
+}
+.ut-season-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.ut-season-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--sc) 55%, transparent);
+  background: color-mix(in srgb, var(--sa) 20%, #071820);
+  color: var(--text);
+  text-align: left;
+}
+.ut-season-chip b {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ut-season-chip i {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--soft);
+  white-space: nowrap;
+}
+.ut-season-next {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 6px;
+  border-top: 1px solid #ffffff14;
+  font-size: 11.5px;
+  color: var(--soft);
+}
+.ut-season-next b {
+  color: var(--text);
+  font-weight: 800;
+}
+.ut-season-next em {
+  font-style: normal;
+  font-weight: 800;
+  color: var(--sc);
+}
+.ut-season-store {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--sc);
+  font: 900 11px/1 var(--body);
+  letter-spacing: 1px;
+}
+.ut-shopitem.s-live {
+  border-color: color-mix(in srgb, var(--sa, #ff3d00) 55%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--sb, #1a0b2e) 70%, var(--panel)), var(--panel) 75%);
+}
+.ut-pack.p-live,
+.ut-pack.p-live-plus,
+.ut-pack.p-live-pick {
+  --pk1: #ff6a3d;
+  --pk2: #1a0b2e;
+  --pkink: #fff1c2;
+}
+.ut-pack.p-live-plus .ut-pack-body {
+  box-shadow: inset 0 0 0 0.25em #ffc94a;
+}
+.ut-sbc.prog {
+  border-color: #ff6a3d88;
+  background: linear-gradient(160deg, #2a1208, var(--panel) 75%);
+}
