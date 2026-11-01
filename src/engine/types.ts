@@ -1,13 +1,19 @@
-import { NFL } from './sport';
+import { pick } from './sport';
 
 /**
  * A spot in the lineup. Basketball: PG, SG, SF, PF, C. Football: QB, RB, WR, TE, FLEX on offense,
- * and three defenders: DL (a lineman), LB (a linebacker), DB (a corner or a safety).
+ * and three defenders: DL (a lineman), LB (a linebacker), DB (a corner or a safety). Soccer
+ * (Claude 2026-11-01): GK, CB, FB, DM (shown DM/CM: a holder or a central midfielder), AM (shown
+ * CM/AM), W, ST and an outfield FLEX.
  */
 export type Slot = string;
-export const SLOTS: Slot[] = NFL ? ['QB', 'RB', 'WR', 'TE', 'FLEX', 'DL', 'LB', 'DB'] : ['PG', 'SG', 'SF', 'PF', 'C'];
+export const SLOTS: Slot[] = pick({ nba: ['PG', 'SG', 'SF', 'PF', 'C'], nfl: ['QB', 'RB', 'WR', 'TE', 'FLEX', 'DL', 'LB', 'DB'], soccer: ['GK', 'CB', 'FB', 'DM', 'AM', 'W', 'ST', 'FLEX'] });
 /** Football's defensive spots: each takes one real defender. */
-export const DEF_SLOTS: Slot[] = NFL ? ['DL', 'LB', 'DB'] : [];
+export const DEF_SLOTS: Slot[] = pick({ nba: [], nfl: ['DL', 'LB', 'DB'], soccer: [] });
+/** How a spot is printed (soccer's two midfield spots take two positions each). */
+export function slotLabel(s: Slot): string {
+  return pick({ nba: s, nfl: s, soccer: s === 'DM' ? 'DM/CM' : s === 'AM' ? 'CM/AM' : s });
+}
 
 export type Mode = 'classic' | 'blind' | 'daily' | '1v1';
 export type BotLevel = 'rookie' | 'pro' | 'legend';
@@ -29,8 +35,13 @@ export interface Player {
   name: string;
   /** the spots he can fill (a football running back: RB and FLEX) */
   pos: Slot[];
-  /** football defenders: the position he played, finer than the spot (DE, DT, OLB, CB, FS...) */
+  /** football defenders: the position he played, finer than the spot (DE, DT, OLB, CB, FS...);
+      soccer: his main position (GK CB FB DM CM AM W ST) */
   role?: string;
+  /** soccer: every position he played, main first */
+  roles?: string[];
+  /** soccer: his 0-99 attack, creation and defence sub-ratings (a keeper's def is his shot-stopping) */
+  sub?: { att: number; mid: number; def: number };
   g: number;
   seasons: number;
   from: number;
@@ -103,6 +114,8 @@ export interface PlayoffTeam {
   pf?: number;
   pa?: number;
   champ?: boolean;
+  /** soccer: won the Champions League that season */
+  ucl?: boolean;
 }
 
 export type Lineup = Record<Slot, Player | null>;

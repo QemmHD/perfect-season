@@ -5,7 +5,7 @@ import { CELL_BY_ID, primeVersion } from '../engine/data';
 import { dailyOrder, ROUNDS } from '../engine/draft';
 import { PLAYOFF_MIN_WINS } from '../engine/playoffs';
 import { GAMES, rateTeam } from '../engine/rating';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
 import { DATA_V } from '../engine/version';
 import { type Player, type Slot, SLOTS } from '../engine/types';
 import { displayName } from '../lib/names';
@@ -13,7 +13,8 @@ import type { RunRecord } from '../lib/profile';
 import { type Event, KIND_APP, myPubkey, NET_ON, NS_SUFFIX, pool, query, sign, tagValue } from './nostr';
 
 /** Each sport keeps its own boards (basketball's are where they always were). */
-const NS = (NFL ? 'perfect-season/nfl/v1' : 'perfect-season/v1') + NS_SUFFIX;
+// soccer's boards are their own (Claude 2026-11-01)
+const NS = pick({ nba: 'perfect-season/v1', nfl: 'perfect-season/nfl/v1', soccer: 'perfect-season/soccer/v1' }) + NS_SUFFIX;
 
 export type BoardKind = 'daily' | 'classic' | 'blind' | 'h2h';
 export type Span = 'week' | 'all';

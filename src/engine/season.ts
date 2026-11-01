@@ -1,6 +1,6 @@
 import { type Rand, hashString, rng, shuffle } from './rng';
-import { GAMES, rateTeam, type TeamRating } from './rating';
-import { NFL } from './sport';
+import { GAMES, rateTeam, soccerDraws, soccerPoints, type TeamRating } from './rating';
+import { pick } from './sport';
 import { type Lineup, SLOTS } from './types';
 
 /** One football game: our score, theirs, the other team and whether we were home. */
@@ -11,9 +11,15 @@ export interface GameScore {
   home: boolean;
 }
 
+/** Soccer: a draw in a season's sequence (1 a win, 0 a defeat). */
+export const DRAW = 2;
+
 export interface Season extends TeamRating {
-  /** the season's results in order, 1 = win. Same lineup -> same sequence. */
+  /** the season's results in order, 1 = win, 0 = defeat, DRAW (2) a soccer draw. Same lineup -> same sequence. */
   seq: number[];
+  /** soccer: draws and league points */
+  draws?: number;
+  points?: number;
   longestWin: number;
   firstHalfWins: number;
   /** football: every game's score, and points for and against per game */
@@ -29,21 +35,38 @@ export function lineupKey(l: Lineup): string {
 export function playSeason(l: Lineup): Season {
   const r = rateTeam(SLOTS.map((s) => l[s]));
   const rand = rng(hashString('season:' + lineupKey(l)));
-  const seq = seasonSequence(r.wins, rand);
+  const draws = pick({ nba: 0, nfl: 0, soccer: soccerDraws(r.wins) });
+  const seq = seasonSequence(r.wins, rand, draws);
   const out: Season = { ...r, seq, longestWin: longestRun(seq, 1), firstHalfWins: seq.slice(0, Math.floor(GAMES / 2)).filter((x) => x === 1).length };
-  if (NFL) {
-    const { pf, pa } = expectedScores(r);
+  const scored = pick({ nba: false, nfl: true, soccer: true });
+  if (scored) {
+    const { pf, pa } = pick({ nba: expectedScores, nfl: expectedScores, soccer: expectedGoals })(r);
     out.scores = gameScores(seq, pf, pa, rand);
     out.pf = out.scores.reduce((a, g) => a + g.us, 0) / GAMES;
     out.pa = out.scores.reduce((a, g) => a + g.them, 0) / GAMES;
   }
+  if (pick({ nba: false, nfl: false, soccer: true })) {
+    out.draws = draws;
+    out.points = soccerPoints(r.wins, draws);
+  }
   return out;
 }
 
-export function seasonSequence(wins: number, rand: Rand): number[] {
+export function seasonSequence(wins: number, rand: Rand, draws = 0): number[] {
   const a: number[] = [];
-  for (let i = 0; i < GAMES; i++) a.push(i < wins ? 1 : 0);
+  for (let i = 0; i < GAMES; i++) a.push(i < wins ? 1 : i < wins + draws ? DRAW : 0);
   return shuffle(a, rand);
+}
+
+/** A season's record as W-L (W-D-L in soccer). */
+export function recordOf(seq: number[]): { w: number; d: number; l: number } {
+  let w = 0;
+  let d = 0;
+  for (const x of seq) {
+    if (x === 1) w++;
+    else if (x === DRAW) d++;
+  }
+  return { w, d, l: seq.length - w - d };
 }
 
 export function longestRun(seq: number[], v: number): number {
@@ -58,13 +81,56 @@ export function longestRun(seq: number[], v: number): number {
   return best;
 }
 
+// ---------- soccer scores (Claude 2026-11-01) ----------
+
+/** A league's goals per side per game. */
+export const LEAGUE_GPG = 1.4;
+
+/**
+ * Goals for and against per game that go with a record: about 0.68 points a game per goal of
+ * difference a game (a 38-0 side scores about three more than it lets in), split between attack
+ * and defense by how strong each is on this team.
+ */
+export function expectedGoals(r: TeamRating): { pf: number; pa: number } {
+  const winRate = r.wins / GAMES;
+  const margin = Math.max(-1.6, Math.min(3, (winRate - 0.36) / 0.21));
+  const off = (r.ratios[0] + r.ratios[1]) / 2;
+  const def = (r.ratios[2] + r.ratios[3]) / 2;
+  const share = Math.max(0.3, Math.min(0.7, 0.5 + 0.6 * (off - def)));
+  return { pf: Math.max(0.4, LEAGUE_GPG + margin * share), pa: Math.max(0.2, LEAGUE_GPG - margin * (1 - share)) };
+}
+
+/** Goals for a side that scores `mean` a game on average (Poisson). */
+export function sampleGoals(mean: number, rand: Rand): number {
+  const L = Math.exp(-Math.max(0.05, mean));
+  let k = 0;
+  let p = 1;
+  do {
+    k++;
+    p *= rand();
+  } while (p > L && k < 12);
+  return k - 1;
+}
+
+/** A soccer score that agrees with the result: 1 win, 0 defeat, DRAW a draw. */
+export function soccerScore(result: number, gf: number, ga: number, rand: Rand): [number, number] {
+  for (let i = 0; i < 30; i++) {
+    const us = sampleGoals(gf, rand);
+    const them = sampleGoals(ga, rand);
+    if (result === DRAW ? us === them : result === 1 ? us > them : us < them) return [us, them];
+  }
+  const a = sampleGoals((gf + ga) / 2, rand);
+  if (result === DRAW) return [a, a];
+  return result === 1 ? [a + 1, a] : [a, a + 1];
+}
+
 // ---------- football scores ----------
 
 /** Scores a football team actually puts up: touchdowns and field goals, most often. */
 const SCORES = [0, 3, 6, 7, 9, 10, 13, 14, 16, 17, 19, 20, 21, 23, 24, 26, 27, 28, 30, 31, 33, 34, 35, 37, 38, 41, 42, 44, 45, 48, 49, 52, 55];
 /** A season's league average, points per team per game. */
 export const LEAGUE_PPG = 22;
-const TEAMS = ['ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE', 'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC', 'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG', 'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS'];
+const NFL_TEAMS = ['ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE', 'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC', 'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG', 'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS'];
 
 /**
  * Points for and against per game that go with a record: the margin a real team needs for that
@@ -111,11 +177,15 @@ export function gameScore(won: boolean, pf: number, pa: number, rand: Rand): [nu
   return won ? [top, lo] : [lo, top];
 }
 
+/** Soccer's league: nineteen other clubs, each played home and away. */
+const SOCCER_TEAMS = ['ARS', 'AVL', 'CHE', 'EVE', 'LIV', 'MCI', 'MUN', 'NEW', 'TOT', 'BAR', 'RMA', 'ATM', 'SEV', 'JUV', 'MIL', 'INT', 'FCB', 'BVB', 'PSG'];
+
 function gameScores(seq: number[], pf: number, pa: number, rand: Rand): GameScore[] {
-  const opps = shuffle(TEAMS, rand);
+  const opps = shuffle(pick({ nba: NFL_TEAMS, nfl: NFL_TEAMS, soccer: SOCCER_TEAMS }), rand);
   const start = rand() < 0.5 ? 0 : 1;
+  const soccer = pick({ nba: false, nfl: false, soccer: true });
   return seq.map((x, i) => {
-    const [us, them] = gameScore(x === 1, pf, pa, rand);
+    const [us, them] = soccer ? soccerScore(x, pf, pa, rand) : gameScore(x === 1, pf, pa, rand);
     return { us, them, opp: opps[i % opps.length], home: (i + start) % 2 === 0 };
   });
 }

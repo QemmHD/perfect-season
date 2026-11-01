@@ -1,13 +1,14 @@
 import { GAMES } from '../engine/rating';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
+import { record } from '../ui/sportui';
 import type { RunRecord } from './profile';
 
 const PICK_EMOJI: Record<string, string> = { b: '🟩', g: '🟩', o: '🟨', r: '🟧', m: '🟥' };
 
 export function shareText(r: RunRecord, dailyNo: number | null): string {
-  const game = NFL ? 'Perfect Season NFL' : 'Perfect Season';
+  const game = pick({ nba: 'Perfect Season', nfl: 'Perfect Season NFL', soccer: 'Perfect Season Soccer' });
   const head = r.mode === 'daily' && dailyNo ? game + ' Daily #' + dailyNo : game;
-  const rec = r.wins + '–' + (GAMES - r.wins);
+  const rec = pick({ nba: () => r.wins + '–' + (GAMES - r.wins), nfl: () => r.wins + '–' + (GAMES - r.wins), soccer: () => record(r.wins) })();
   const names = r.lineup.map((p) => lastName(p.name)).join(' · ');
   // the picks, Wordle style: no spoilers for a Daily someone hasn't played
   const d = r.draft;

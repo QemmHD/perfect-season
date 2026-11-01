@@ -5,7 +5,7 @@
 // (src/net/gifts.ts): the page's code is public, so only the matching public key is kept in it.
 import React, { useEffect, useState } from 'react';
 import { BOOSTER_NAMES, levelInfo } from '../engine/economy';
-import { NFL, SPORT } from '../engine/sport';
+import { pickFor, SPORT, SPORT_NAME } from '../engine/sport';
 import { BOOSTERS } from '../engine/types';
 import { newId, type Profile } from '../lib/profile';
 import { sfx } from '../lib/sound';
@@ -212,7 +212,7 @@ export function AdminSheet({ profile, update, onToast, onClose }: { profile: Pro
 
             <section className="admin-sec">
               <span className="eyebrow">
-                Your Ultimate Team ({NFL ? 'football' : 'basketball'}) · {pending} {pending === 1 ? 'pack' : 'packs'} waiting in the Store
+                Your Ultimate Team ({SPORT_NAME[SPORT]}) · {pending} {pending === 1 ? 'pack' : 'packs'} waiting in the Store
               </span>
               <div className="admin-row">
                 {packs.map((d) => (
@@ -361,7 +361,7 @@ function GiftComposer({ sk, onSelf, onToast }: { sk: Uint8Array; onSelf: (g: Gif
               >
                 <b>{o.name}</b>
                 <small>
-                  {o.sport === 'nfl' ? 'Football' : 'Basketball'} · {o.st === 'match' ? 'in a match' : o.st === 'queue' ? 'searching' : 'in the menus'}
+                  {pickFor(o.sport, { nba: 'Basketball', nfl: 'Football', soccer: 'Soccer' })} · {o.st === 'match' ? 'in a match' : o.st === 'queue' ? 'searching' : 'in the menus'}
                 </small>
               </button>
             ))}

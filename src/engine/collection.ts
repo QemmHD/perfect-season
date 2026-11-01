@@ -3,7 +3,7 @@
 // finishing one pays out. Cosmetic: nothing here changes how a team is rated or ranked.
 import { CELL_BY_ID, CELLS } from './data';
 import { rarityOf } from './rarity';
-import { NFL } from './sport';
+import { pick } from './sport';
 import { type Cell, DEF_SLOTS, type Player } from './types';
 
 /** card id (a player's line on one team-decade) -> times drafted */
@@ -15,7 +15,13 @@ export const SET_REWARD = 40;
 /** A team-decade's core set: its five best players (football: its five best on offense and its best DL, LB and DB). */
 export function coreSet(cell: Cell): Player[] {
   const byVal = cell.players.slice().sort((a, b) => b.val - a.val);
-  if (!NFL) return byVal.slice(0, 5);
+  // soccer: its best keeper and its seven best outfielders (a draft lineup's worth)
+  if (pick({ nba: false, nfl: false, soccer: true })) {
+    const gk = byVal.find((p) => p.role === 'GK');
+    const out = byVal.filter((p) => p.role !== 'GK').slice(0, gk ? 7 : 8);
+    return gk ? [gk, ...out] : out;
+  }
+  if (pick({ nba: true, nfl: false, soccer: false })) return byVal.slice(0, 5);
   const offense = byVal.filter((p) => !DEF_SLOTS.includes(p.pos[0])).slice(0, 5);
   const defense = DEF_SLOTS.map((k) => byVal.find((p) => p.pos[0] === k)).filter((p): p is Player => !!p);
   return [...offense, ...defense];

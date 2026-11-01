@@ -1,8 +1,9 @@
 import nbaRaw from '../data/nba.json';
 import nflRaw from '../data/nfl.json';
-import { NFL } from './sport';
+import { pick } from './sport';
+import { SOCCER_RAW } from './soccer-raw';
 import type { Cell, Line, OppPlayer, Player, PlayoffTeam, Slot } from './types';
-import { lineValue } from './rating';
+import { lineValue, soccerParts } from './rating';
 
 interface RawTeam<P> {
   id: string;
@@ -52,6 +53,54 @@ interface NflData {
     five: NflOpp[];
     def: NflDefOpp[];
   }[];
+}
+
+// soccer: see scripts/build_soccer_data.py (and docs/SOCCER-DATA.md). Claude 2026-11-01.
+// name pos apps seasons from to est prime pid g a cs min (per season, -1 not known) ovr att mid def
+type SoccerRow = [string, string, number, number, number, number, number, string | null, string, number, number, number, number, number, number, number, number];
+type SoccerXi = [string, string, number, number, number, number];
+interface SoccerData {
+  source: string;
+  built: number;
+  teams: RawTeam<SoccerRow>[];
+  playoff: { year: string; team: string; abbr: string; gp: number; w: number; d: number; l: number; pts: number; wFull: number; c1: string; c2: string; star: string; gf: number; ga: number; champ: boolean; ucl: boolean; xi: SoccerXi[] }[];
+}
+
+/**
+ * Where each soccer position can play in the draft: the keeper in goal, everyone else at his own
+ * spot or the FLEX. The two midfield spots overlap: DM/CM takes a holder or a central midfielder,
+ * CM/AM a central or an attacking midfielder.
+ */
+export const SOCCER_SPOTS: Record<string, Slot[]> = { GK: ['GK'], CB: ['CB', 'FLEX'], FB: ['FB', 'FLEX'], DM: ['DM', 'FLEX'], CM: ['DM', 'AM', 'FLEX'], AM: ['AM', 'FLEX'], W: ['W', 'FLEX'], ST: ['ST', 'FLEX'] };
+
+function soccerPlayer(t: RawTeam<SoccerRow>, p: SoccerRow): Player {
+  const roles = p[1].split('/');
+  const spots: Slot[] = [];
+  for (const r of roles) for (const x of SOCCER_SPOTS[r] ?? []) if (!spots.includes(x)) spots.push(x);
+  // the FLEX fills last, after the real spots
+  spots.sort((a, b) => Number(a === 'FLEX') - Number(b === 'FLEX'));
+  const player: Player = {
+    id: t.id + ':' + p[8],
+    pid: p[8],
+    name: p[0],
+    pos: spots.length ? spots : ['FLEX'],
+    role: roles[0],
+    roles,
+    g: p[2],
+    seasons: p[3],
+    from: p[4],
+    to: p[5],
+    // pre-2012 lines: spell totals from Wikidata and an estimated rating
+    est: p[6] === 1,
+    primeRef: p[7],
+    ...cellBase(t),
+    s: { g: p[9], a: p[10], cs: p[11], min: p[12], ovr: p[13] },
+    r: soccerParts(roles[0], p[13]),
+    val: 0,
+    sub: { att: p[14], mid: p[15], def: p[16] },
+  };
+  player.val = lineValue(player.r);
+  return player;
 }
 
 const NFL_STATS = ['passYds', 'passTd', 'int', 'rushYds', 'rushTd', 'rec', 'recYds', 'recTd'] as const;
@@ -126,26 +175,57 @@ function nflDefOpp([name, pos, g, sacks, tkl, int, hon]: NflDefOpp): OppPlayer {
 
 const nba = nbaRaw as unknown as NbaData;
 const nfl = nflRaw as unknown as NflData;
+const soccer = SOCCER_RAW as SoccerData | null;
 
-export const DATA_SOURCE = NFL ? nfl.source : nba.source;
-export const LATEST_SEASON = NFL ? nfl.built : nba.built;
+export const DATA_SOURCE = pick({ nba: () => nba.source, nfl: () => nfl.source, soccer: () => soccer!.source })();
+export const LATEST_SEASON = pick({ nba: () => nba.built, nfl: () => nfl.built, soccer: () => soccer!.built })();
 
-export const CELLS: Cell[] = NFL
-  ? nfl.teams.map((t) => ({ id: t.id, fr: t.fr, abbr: t.abbr, name: t.name, era: t.era, c1: t.c1, c2: t.c2, from: t.from, to: t.to, players: t.players.map((p) => nflPlayer(t, p)) }))
-  : nba.teams.map((t) => ({ id: t.id, fr: t.fr, abbr: t.abbr, name: t.name, era: t.era, c1: t.c1, c2: t.c2, from: t.from, to: t.to, players: t.players.map((p) => nbaPlayer(t, p)) }));
+const cellOf = <P,>(t: RawTeam<P>, f: (t: RawTeam<P>, p: P) => Player): Cell => ({ id: t.id, fr: t.fr, abbr: t.abbr, name: t.name, era: t.era, c1: t.c1, c2: t.c2, from: t.from, to: t.to, players: t.players.map((p) => f(t, p)) });
+
+export const CELLS: Cell[] = pick({
+  nba: () => nba.teams.map((t) => cellOf(t, nbaPlayer)),
+  nfl: () => nfl.teams.map((t) => cellOf(t, nflPlayer)),
+  // a cell's players best first, as the other sports' files have them
+  soccer: () => soccer!.teams.map((t) => cellOf(t, soccerPlayer)).map((c) => ({ ...c, players: c.players.sort((a, b) => b.val - a.val) })),
+})();
 
 /** Cells by id. No prototype, so ids that arrive over the network ("constructor", "toString") find nothing. */
 export const CELL_BY_ID: Record<string, Cell> = Object.assign(Object.create(null) as Record<string, Cell>, Object.fromEntries(CELLS.map((c) => [c.id, c])));
-export const ERAS = NFL ? ['1970s', '1980s', '1990s', '2000s', '2010s', '2020s'] : ['1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s'];
+export const ERAS = pick({
+  nba: ['1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s'],
+  nfl: ['1970s', '1980s', '1990s', '2000s', '2010s', '2020s'],
+  soccer: ['1950s', '1960s', '1970s', '1980s', '1990s', '2000s', '2010s', '2020s'],
+});
 export const TEAM_ABBRS = Array.from(new Set(CELLS.map((c) => c.abbr))).sort();
-export const PLAYOFF_TEAMS: PlayoffTeam[] = NFL
-  ? nfl.playoff.map(({ w17, five, def, ...t }) => ({ ...t, wFull: w17, five: five.map(nflOpp), def: def.map(nflDefOpp) }))
-  : nba.playoff.map(({ w82, five, ...t }) => ({
+export const PLAYOFF_TEAMS: PlayoffTeam[] = pick<() => PlayoffTeam[]>({
+  nfl: () => nfl.playoff.map(({ w17, five, def, ...t }) => ({ ...t, wFull: w17, five: five.map(nflOpp), def: def.map(nflDefOpp) })),
+  nba: () =>
+    nba.playoff.map(({ w82, five, ...t }) => ({
       ...t,
       t: 0,
       wFull: w82,
       five: five.map(([name, pos, pts, reb, ast, stl, blk, g, est]) => ({ name, pos, g, s: { pts, reb, ast, stl, blk }, est: est === 1 })),
-    }));
+    })),
+  // the great sides: W-D-L (draws as `t`), goals for and against per game, the eleven by overall
+  soccer: () =>
+    soccer!.playoff.map((t) => ({
+      year: t.year,
+      team: t.team,
+      abbr: t.abbr,
+      w: t.w,
+      l: t.l,
+      t: t.d,
+      wFull: t.wFull,
+      c1: t.c1,
+      c2: t.c2,
+      star: t.star,
+      pf: t.gf,
+      pa: t.ga,
+      champ: t.champ,
+      ucl: t.ucl,
+      five: t.xi.map(([name, pos, g, goals, a, ovr]) => ({ name, pos, g, s: { g: goals, a, ovr }, est: false })),
+    })),
+})();
 
 /** The player's best team-decade line, as a copy that keeps his current cell identity. */
 export function primeVersion(p: Player): Player | null {

@@ -17,10 +17,10 @@ import { asOpponent, castGame, matchScore, mirrorCast } from './engine/broadcast
 import { CLEAR_COINS, clearChance, GAUNTLET_SIZE, gauntletLadder, RUNG_COINS, rungChance, rungsWon } from './engine/gauntlet';
 import { GAMES, gradeFor, rateTeam, type TeamRating } from './engine/rating';
 import { hashString, rng } from './engine/rng';
-import { clearSportParam, NFL, SPORT, type SportId, switchSport } from './engine/sport';
+import { clearSportParam, pick, pickFor, SPORT, SPORT_LABEL, type SportId, switchSport } from './engine/sport';
 import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from './engine/season';
 import { type Booster, type BotLevel, type Mode, type Player, type PlayoffTeam, type Slot, SLOTS } from './engine/types';
-import { addVs, freshProfile, type H2HStats, loadProfile, newId, type Profile, readOtherLb, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
+import { addVs, freshProfile, type H2HStats, loadProfile, newId, type Profile, OTHER_SPORTS, readOtherLbs, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
 import { setFeedback, sfx, vibrate } from './lib/sound';
 import { applyUpdate, justUpdated, newerVersionLive, reloadForMissingFiles } from './lib/update';
 import { type BoardKind, boardTag, fetchBoard, prune, publishEntry, renamed, type Span, weekKey, withH2H, withRun } from './net/leaderboard';
@@ -39,7 +39,7 @@ import { type Room, Search } from './ui/Search';
 import { Binder } from './ui/Binder';
 import { GameCast } from './ui/GameCast';
 import { Gauntlet } from './ui/Gauntlet';
-import { Arcade, arcadeAvailable } from './game/Arcade';
+import { Arcade, arcadeAvailable, type Pens } from './game/Arcade';
 import { aiFavorite, kitsFor } from './game/uniforms';
 import { favoriteFor, shouldAskFavorites } from './lib/favorites';
 import { NO_VOTE, type VoteWire, voteWireOf } from './net/vote';
@@ -49,7 +49,7 @@ import { Vote } from './ui/Vote';
 /** tests: ?autoplay lets the autopilot play the arcade game */
 const AUTOPLAY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('autoplay');
 import { Playoffs, Reveal } from './ui/Season';
-import { Coin, Football, Hoop } from './ui/icons';
+import { Coin, Football, Hoop, SoccerBall } from './ui/icons';
 import { Welcome } from './ui/Welcome';
 import type { UtMatchRequest } from './ut/play';
 
@@ -124,18 +124,25 @@ const RIVAL: [string, string] = ['#9B7BFF', '#5B3FD1'];
 
 /** A round's score: the series, or in football the game. */
 function roundScore(s: Series): [number, number] {
-  return NFL && s.scores ? s.scores[0] : seriesScore(s.games);
+  return pick({ nba: false, nfl: true, soccer: true }) && s.scores ? s.scores[0] : seriesScore(s.games);
+}
+/** A round's score as text: "2–1", and soccer's shootout ("1–1, 4–3 on penalties"). */
+function roundText(s: Series): string {
+  const [w, l] = roundScore(s);
+  return w + '–' + l + (s.pens ? ', ' + s.pens[0] + '–' + s.pens[1] + ' on penalties' : '');
 }
 
 function playoffLine(bracket: Series[]): { text: string; title: boolean; perfect: boolean } {
   const out = playoffOutcome(bracket);
   if (out.title) {
-    const [w, l] = roundScore(out.finals);
-    return { text: (NFL ? 'Super Bowl champions' : 'Champions') + ': beat the ' + out.finals.opp.year + ' ' + out.finals.opp.team + ' ' + w + '–' + l + (NFL ? ' in the Super Bowl' : ' in the Finals'), title: true, perfect: out.sweeps === 4 };
+    return {
+      text: pick({ nba: 'Champions', nfl: 'Super Bowl champions', soccer: 'Cup winners' }) + ': beat the ' + out.finals.opp.year + ' ' + out.finals.opp.team + ' ' + roundText(out.finals) + pick({ nba: ' in the Finals', nfl: ' in the Super Bowl', soccer: ' in the Final' }),
+      title: true,
+      perfect: out.sweeps === 4,
+    };
   }
   const lost = out.lostTo!;
-  const [w, l] = roundScore(lost);
-  return { text: 'Lost in the ' + ROUND_NAMES[lost.round] + ' ' + w + '–' + l + ' to the ' + lost.opp.year + ' ' + lost.opp.team, title: false, perfect: false };
+  return { text: 'Lost in the ' + ROUND_NAMES[lost.round] + ' ' + roundText(lost) + ' to the ' + lost.opp.year + ' ' + lost.opp.team, title: false, perfect: false };
 }
 
 /** A head-to-head result against a real player, all-time and this week. */
@@ -204,7 +211,8 @@ export function App() {
       setSaved(null);
     }
   }, [profile]);
-  useEffect(() => startNumberedSync(SPORT, () => persistedProfileRef.current.ut, (fn) => setProfile(p => ({...p,ut:fn(p.ut)}))), []);
+  // soccer cards have no registered serials (the card registry keeps basketball's and football's only)
+  useEffect(() => (pick({ nba: true, nfl: true, soccer: false }) ? startNumberedSync(SPORT, () => persistedProfileRef.current.ut, (fn) => setProfile(p => ({...p,ut:fn(p.ut)}))) : undefined), []);
   useEffect(() => {
     if (!run || run.mode === '1v1' || !run.draft || !['draft', 'reveal', 'playoffs'].includes(screen)) return;
     if (writeCheckpoint(run, screen as 'draft' | 'reveal' | 'playoffs')) setSaved(readCheckpoint<Run>());
@@ -267,8 +275,8 @@ export function App() {
   const flushing = useRef(false);
   const flushLb = async () => {
     const p = profileRef.current;
-    const other = readOtherLb();
-    if (!NET_ON || !p.name || flushing.current || (!p.lb.dirty.length && !other?.dirty.length)) return;
+    const others = readOtherLbs().filter((o) => o.lb.dirty.length);
+    if (!NET_ON || !p.name || flushing.current || (!p.lb.dirty.length && !others.length)) return;
     flushing.current = true;
     const send = async (lb: Profile['lb']) => {
       const sent: [string, unknown][] = [];
@@ -280,14 +288,22 @@ export function App() {
       return { sent, ok: true };
     };
     const ours = await send(p.lb);
-    const theirs = ours.ok && other?.dirty.length ? await send(other) : null;
+    const theirs: { sport: (typeof others)[number]['sport']; sent: [string, unknown][] }[] = [];
+    let ok = ours.ok;
+    for (const o of others) {
+      if (!ok) break;
+      const r = await send(o.lb);
+      ok = r.ok;
+      theirs.push({ sport: o.sport, sent: r.sent });
+    }
     flushing.current = false;
     if (ours.sent.length)
       // only clear an entry that didn't change again while it was being sent
       update((q) => ({ ...q, lb: { ...q.lb, dirty: q.lb.dirty.filter((d) => !ours.sent.some(([sd, sc]) => sd === d && q.lb.entries[d] === sc)) } }));
-    if (theirs?.sent.length) {
+    for (const t of theirs) {
+      if (!t.sent.length) continue;
       const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-      updateOtherLb((lb) => ({ ...lb, dirty: lb.dirty.filter((d) => !theirs.sent.some(([sd, sc]) => sd === d && same(lb.entries[d], sc))) }));
+      updateOtherLb((lb) => ({ ...lb, dirty: lb.dirty.filter((d) => !t.sent.some(([sd, sc]) => sd === d && same(lb.entries[d], sc))) }), t.sport);
     }
   };
   useEffect(() => {
@@ -586,7 +602,7 @@ export function App() {
     season: TeamRating,
     bracket: Series[] | null,
     bot: { lineup: DraftState['botLineup']; rating: TeamRating } | null,
-    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean }
+    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; pens?: Pens }
   ) => {
     const draft = r.draft!;
     const p0 = profileRef.current;
@@ -599,7 +615,8 @@ export function App() {
     const forfeit = r.online && droppedRef.current && !noContest ? ('them' as const) : undefined;
     const byRating = bot ? (season.rating > bot.rating.rating ? true : season.rating < bot.rating.rating ? false : null) : null;
     // a played game: the score decides, a tie goes to the better team
-    const byGame = arcade ? (arcade.us > arcade.them ? true : arcade.us < arcade.them ? false : byRating) : null;
+    // soccer (Claude 2026-11-01): a level match was settled on penalties
+    const byGame = arcade ? (arcade.us > arcade.them ? true : arcade.us < arcade.them ? false : arcade.pens ? arcade.pens.won : byRating) : null;
     const vsWon = noContest ? null : forfeit ? true : arcade ? byGame : byRating;
     const g = gradeFor(season.wins);
     const out = bracket ? playoffOutcome(bracket) : null;
@@ -616,7 +633,7 @@ export function App() {
       const [la, lb, ra, rb, na, nb] = host ? [draft.lineup, bot.lineup, season, bot.rating, me, them] : [bot.lineup, draft.lineup, bot.rating, season, them, me];
       const aWins = ra.rating > rb.rating;
       const seed = 'h2h:' + (r.online ? r.online.found.matchId : r.id + ':' + lineupKey(draft.lineup));
-      const told = castGame({ lineup: la, opp: asOpponent(lb, nb, abbr(nb), RIVAL), won: aWins, score: NFL ? matchScore(aWins, ra, rb, seed) : null, pre: gameWinChance(ra.rating, rb.rating), seed, ourTeam: na });
+      const told = castGame({ lineup: la, opp: asOpponent(lb, nb, abbr(nb), RIVAL), won: aWins, score: pick({ nba: false, nfl: true, soccer: true }) ? matchScore(aWins, ra, rb, seed) : null, pre: gameWinChance(ra.rating, rb.rating), seed, ourTeam: na });
       showdown = { cast: host ? told : mirrorCast(told), opp: asOpponent(bot.lineup, them, abbr(them), RIVAL) };
     }
     // the cards go into the binder: new ones, and team-decade sets they finish
@@ -1062,12 +1079,14 @@ export function App() {
           tookMe={r.online ? (opp?.arcadeTook ?? null) : null}
           autoplay={AUTOPLAY}
           kits={kits}
+          soccerFavs={{ mine, theirs: r.online ? (opp?.fav ?? null) : aiFavorite(seed, SPORT, mine) }}
+          host={r.online ? r.online.found.host : true}
           onProgress={(p) => matchRef.current?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => matchRef.current?.update((s) => ({ ...s, arcadeTook: k }))}
-          onFinish={(us, them, how, took) => {
+          onFinish={(us, them, how, took, pens) => {
             const season = playSeason(d.lineup);
             const botRating = rateTeam(SLOTS.map((s) => d.botLineup[s]));
-            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us });
+            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us, pens });
           }}
         />
       </div>
@@ -1182,7 +1201,7 @@ export function App() {
             // keep your name, and your entries on the boards stay yours (in both sports)
             setProfile({ ...freshProfile(), name: profile.name, lb: profile.lb, h2h: profile.h2h, streak: profile.streak, rewardDay: profile.rewardDay });
             clearCheckpoint(); setSaved(null);
-            try { localStorage.removeItem('perfect-season:checkpoint:' + (NFL ? 'nba' : 'nfl')); } catch {}
+            for (const other of OTHER_SPORTS) try { localStorage.removeItem('perfect-season:checkpoint:' + other); } catch {}
             resetOtherSport();
             setModal(null);
             showToast('Progress erased.');
@@ -1298,9 +1317,9 @@ export function App() {
       )}
       {toast && <Toast key={toast.id} text={toast.text} out={toast.out} />}
       {sportTo && (
-        <div className={'sportfade ' + sportTo.to} role="status" aria-label={'Switching to ' + (sportTo.to === 'nfl' ? 'NFL' : 'NBA')}>
-          <span className="ball">{sportTo.to === 'nfl' ? <Football size={64} /> : <Hoop size={64} />}</span>
-          <b className="disp">{sportTo.to === 'nfl' ? 'NFL' : 'NBA'}</b>
+        <div className={'sportfade ' + sportTo.to} role="status" aria-label={'Switching to ' + SPORT_LABEL[sportTo.to]}>
+          <span className="ball">{pickFor(sportTo.to, { nba: <Hoop size={64} />, nfl: <Football size={64} />, soccer: <SoccerBall size={64} /> })}</span>
+          <b className="disp">{SPORT_LABEL[sportTo.to]}</b>
           {sportTo.late && <small>Sending your match’s last picks first…</small>}
         </div>
       )}

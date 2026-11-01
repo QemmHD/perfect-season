@@ -1,7 +1,12 @@
 import React from 'react';
 import { matchupOdds, ROUND_NAMES, type Series, seriesScore, seriesWinChance } from '../engine/playoffs';
 import { GAMES } from '../engine/rating';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
+
+/** Claude 2026-11-01: soccer's cup ties are one game, like football's; each branch names all three. */
+const ONE_GAME = pick({ nba: false, nfl: true, soccer: true });
+const SOCCER = pick({ nba: false, nfl: false, soccer: true });
+const SOCCER_ORDER = ['GK', 'CB', 'FB', 'DM', 'CM', 'AM', 'W', 'ST'];
 import { type OppPlayer, type PlayoffTeam, SLOTS } from '../engine/types';
 import { Sheet, lastName } from './common';
 import { honorLabel, oppCols, record } from './sportui';
@@ -13,13 +18,21 @@ export const teamBar = (t: PlayoffTeam) => 'linear-gradient(180deg,' + t.c1 + ' 
 
 /** The five names of a playoff opponent, guards first, for one-line summaries. */
 export function oppNames(s: Series): string {
+  // soccer: the eleven's five best, a line can't hold eleven
+  if (SOCCER)
+    return s.opp.five
+      .slice()
+      .sort((a, b) => (b.s.ovr ?? 0) - (a.s.ovr ?? 0))
+      .slice(0, 5)
+      .map((p) => lastName(p.name))
+      .join(' · ');
   return sortedFive(s)
     .map((p) => lastName(p.name))
     .join(' · ');
 }
 
 function sortedFive(s: Series) {
-  const order = (pos: string) => (SLOTS.indexOf(pos as never) + SLOTS.length) % SLOTS.length;
+  const order = (pos: string) => (SOCCER ? SOCCER_ORDER.indexOf(pos.split('/')[0]) : (SLOTS.indexOf(pos as never) + SLOTS.length) % SLOTS.length);
   return s.opp.five.slice().sort((a, b) => order(a.pos) - order(b.pos));
 }
 
@@ -73,18 +86,37 @@ export function Scout({ series, gamesShown, ours, onClose }: { series: Series; g
                 {t.year} {t.team}
               </h2>
               <small className="num">
-                {t.w}–{t.l}
-                {t.t ? '–' + t.t : ''} in the regular season{played !== GAMES ? ' · ' + record(t.wFull) + ' over ' + GAMES + ' games' : ''}
+                {SOCCER ? t.w + '–' + t.t + '–' + t.l + ' in the league' : t.w + '–' + t.l + (t.t ? '–' + t.t : '') + ' in the regular season'}
+                {played !== GAMES ? ' · ' + record(t.wFull) + ' over ' + GAMES + ' games' : ''}
               </small>
-              {NFL && (
-                <small className="num">
-                  Scored {t.pf?.toFixed(1)}, allowed {t.pa?.toFixed(1)} a game{t.champ ? ' · won the Super Bowl' : ''}
-                </small>
-              )}
+              {pick({
+                nba: null,
+                nfl: (
+                  <small className="num">
+                    Scored {t.pf?.toFixed(1)}, allowed {t.pa?.toFixed(1)} a game{t.champ ? ' · won the Super Bowl' : ''}
+                  </small>
+                ),
+                soccer: (
+                  <small className="num">
+                    {t.pf?.toFixed(2)} goals for, {t.pa?.toFixed(2)} against a game{t.champ ? ' · league champions' : ''}
+                    {t.ucl ? ' · won the Champions League' : ''}
+                  </small>
+                ),
+              })}
             </div>
           </div>
 
-          {NFL ? (
+          {SOCCER ? (
+            <div className="scout-five nfl">
+              <div className="scout-row hd">
+                <span>Their eleven</span>
+              </div>
+              {sortedFive(series).map((p) => (
+                <KeyRow p={p} key={p.name} />
+              ))}
+              <p className="note">Goals and assists in that league season, and each player’s rating.</p>
+            </div>
+          ) : ONE_GAME ? (
             <div className="scout-five nfl">
               <div className="scout-row hd">
                 <span>Their key players</span>
@@ -134,31 +166,33 @@ export function Scout({ series, gamesShown, ours, onClose }: { series: Series; g
           <div className="scout-odds">
             <div>
               <b className="disp num">{pct(odds.home)}</b>
-              <span>{NFL ? 'At home' : 'Each home game'}</span>
+              <span>{ONE_GAME ? 'At home' : 'Each home game'}</span>
             </div>
             <div>
-              <b className="disp num">{pct(NFL && series.round === 3 ? odds.neutral : odds.road)}</b>
-              <span>{NFL ? (series.round === 3 ? 'Neutral site' : 'On the road') : 'Each road game'}</span>
+              <b className="disp num">{pct(ONE_GAME && series.round === 3 ? odds.neutral : odds.road)}</b>
+              <span>{ONE_GAME ? (series.round === 3 ? 'Neutral site' : 'On the road') : 'Each road game'}</span>
             </div>
             <div className={chance >= 0.5 ? 'fav' : 'dog'}>
               <b className="disp num">{pct(chance)}</b>
-              <span>{NFL ? 'To win this game' : 'To win the series'}</span>
+              <span>{pick({ nba: 'To win the series', nfl: 'To win this game', soccer: 'To go through' })}</span>
             </div>
           </div>
           <p className="note">
-            {NFL
+            {ONE_GAME
               ? series.round === 3
-                ? 'The Super Bowl is on neutral ground: ' + pct(odds.neutral) + ' to win it.'
-                : 'Your ' + record(ours.wins) + ' team ' + (ours.wins >= t.wFull ? 'has home field: the game is at your place.' : 'is on the road: the game is at their place.')
+                ? 'The ' + pick({ nba: 'Finals are', nfl: 'Super Bowl is', soccer: 'Final is' }) + ' on neutral ground: ' + pct(odds.neutral) + ' to win it' + (SOCCER ? ', penalties included.' : '.')
+                : 'Your ' + record(ours.wins) + ' team ' + (ours.wins >= t.wFull ? 'has home field: the game is at your place.' : 'is on the road: the game is at their place.') + (SOCCER ? ' Level after 90 minutes: penalties.' : '')
               : 'Your ' + record(ours.wins) + ' team ' + (ours.wins >= t.wFull ? 'has home court: games 1, 2, 5 and 7 are at home.' : 'starts on the road: games 3, 4 and 6 are at home.')}
           </p>
 
-          {games.length > 0 && NFL && series.scores && (
+          {games.length > 0 && ONE_GAME && series.scores && (
             <div className="scout-result">
-              <span className={'status ' + (series.won ? 'teal' : 'red')}>{(series.won ? 'You won ' : 'You lost ') + series.scores[0][0] + '–' + series.scores[0][1]}</span>
+              <span className={'status ' + (series.won ? 'teal' : 'red')}>
+                {(series.won ? 'You won ' : 'You lost ') + series.scores[0][0] + '–' + series.scores[0][1] + (series.pens ? ', ' + series.pens[0] + '–' + series.pens[1] + ' on penalties' : '')}
+              </span>
             </div>
           )}
-          {games.length > 0 && !NFL && (
+          {games.length > 0 && !ONE_GAME && (
             <div className="scout-result">
               <span className={'status ' + (finished ? (series.won ? 'teal' : 'red') : 'gold')}>
                 {finished ? (series.won ? 'You won ' : 'You lost ') + w + '–' + l : 'Series ' + w + '–' + l}

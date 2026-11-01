@@ -4,7 +4,7 @@ import { summarize } from '../engine/collection';
 import { BOOSTER_HELP, BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, levelInfo } from '../engine/economy';
 import { ROUNDS } from '../engine/draft';
 import { gradeFor } from '../engine/rating';
-import { NFL, type SportId } from '../engine/sport';
+import { pick, SOCCER_ON, SPORT, SPORT_LABEL, SPORT_NAME, type SportId } from '../engine/sport';
 import { type Booster, BOOSTERS, type BotLevel, type Mode } from '../engine/types';
 import { bestRuns, type Profile, type RunRecord } from '../lib/profile';
 import { sfx } from '../lib/sound';
@@ -19,20 +19,21 @@ import { usePulse } from './motion';
 import { GlobalBoard } from './Leaderboard';
 import { StreakChip } from './Rewards';
 import { FavoritesCard } from './Favorites';
-import { Crown, Football, Home as HomeIcon, Hoop, Lock, Ranks as RanksIcon, Target, User } from './icons';
-import { PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
+import { Crown, Football, Home as HomeIcon, Hoop, Lock, Ranks as RanksIcon, SoccerBall, Target, User } from './icons';
+import { FLOOR, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
 
 const SPELLED = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
 
-/** Basketball or football: the other one reloads the app into that sport. */
+/** Basketball, football or soccer (Claude 2026-11-01): another one reloads the app into that sport. */
 function SportSwitch({ onSport }: { onSport: (s: SportId) => void }) {
   const items: [SportId, string, React.ReactNode][] = [
     ['nba', 'NBA', <Hoop size={16} />],
     ['nfl', 'NFL', <Football size={16} />],
+    ...(SOCCER_ON ? [['soccer', 'SOCCER', <SoccerBall size={16} />] as [SportId, string, React.ReactNode]] : []),
   ];
-  const cur: SportId = NFL ? 'nfl' : 'nba';
+  const cur: SportId = SPORT;
   return (
-    <div className={'sportswitch ' + cur} role="group" aria-label="Sport">
+    <div className={'sportswitch ' + cur + (items.length === 3 ? ' three' : '')} role="group" aria-label="Sport">
       <span className="ind" aria-hidden="true" />
       {items.map(([k, label, icon]) => (
         <button key={k} aria-pressed={cur === k} onClick={() => cur !== k && onSport(k)}>
@@ -64,7 +65,7 @@ export function Tabs({ tab, onTab, onUltimate, utNew }: { tab: Tab; onTab: (t: T
         .filter(([k]) => k !== 'ut' || onUltimate)
         .map(([k, label, icon]) =>
           k === 'ut' ? (
-            <button key={k} className="tab-ut" onClick={onUltimate} aria-label={'Ultimate Team: ' + (NFL ? 'football' : 'basketball') + ' packs, squads and challenges'}>
+            <button key={k} className="tab-ut" onClick={onUltimate} aria-label={'Ultimate Team: ' + SPORT_NAME[SPORT] + ' packs, squads and challenges'}>
               {icon}
               <span>{label}</span>
               {utNew && <i className="tab-new">FREE</i>}
@@ -186,14 +187,14 @@ export function HomePage(props: {
               <b className="disp" style={{ color: 'var(--teal)' }}>
                 {PERFECT_RECORD}
               </b>
-              <span className="eyebrow">Regular season</span>
+              <span className="eyebrow">{pick({ nba: 'Regular season', nfl: 'Regular season', soccer: 'League season' })}</span>
             </div>
             <span className="disp plus">+</span>
             <div className="rec">
               <b className="disp" style={{ color: 'var(--gold)' }}>
                 {PERFECT_PLAYOFFS}
               </b>
-              <span className="eyebrow">Playoffs</span>
+              <span className="eyebrow">{pick({ nba: 'Playoffs', nfl: 'Playoffs', soccer: 'Cup' })}</span>
             </div>
           </div>
         </ArenaHero>
@@ -212,8 +213,8 @@ export function HomePage(props: {
           </button>
         </div>
         <div className="evo-home-actions">
-          {props.checkpoint && <button className="continue-card" onClick={props.onResume} aria-label="Continue saved run"><span className="continue-orbit" aria-hidden="true"><ArrowMark/></span><span><small className="eyebrow">YOUR RUN IS WAITING</small><b className="disp">PICK UP THE LEGACY</b><em>{props.checkpoint.screen === 'draft' ? props.checkpoint.count + '/' + ROUNDS + ' drafted' : props.checkpoint.wins + ' wins · ' + (props.checkpoint.screen === 'playoffs' ? 'Playoffs' : 'Season')} · {props.checkpoint.mode}</em></span><i>›</i></button>}
-          <button className="training-entry" onClick={props.onTraining}><span className="training-crosshair" aria-hidden="true"><DrillMark drill="shoot"/></span><span><b className="disp">TRAINING CAMP</b><small>Find your rhythm. Own the game.</small></span><i><ArrowMark/></i></button>
+          {props.checkpoint && <button className="continue-card" onClick={props.onResume} aria-label="Continue saved run"><span className="continue-orbit" aria-hidden="true"><ArrowMark/></span><span><small className="eyebrow">YOUR RUN IS WAITING</small><b className="disp">PICK UP THE LEGACY</b><em>{props.checkpoint.screen === 'draft' ? props.checkpoint.count + '/' + ROUNDS + ' drafted' : props.checkpoint.wins + ' wins · ' + (props.checkpoint.screen === 'playoffs' ? pick({ nba: 'Playoffs', nfl: 'Playoffs', soccer: 'Cup' }) : 'Season')} · {props.checkpoint.mode}</em></span><i>›</i></button>}
+          {pick({ nba: true, nfl: true, soccer: false }) && <button className="training-entry" onClick={props.onTraining}><span className="training-crosshair" aria-hidden="true"><DrillMark drill="shoot"/></span><span><b className="disp">TRAINING CAMP</b><small>Find your rhythm. Own the game.</small></span><i><ArrowMark/></i></button>}
         </div>
         <div className="modes" role="group" aria-label="Game mode">
           {MODES.map((m) => (
@@ -274,7 +275,7 @@ function HistRow({ r, i = 0 }: { r: RunRecord; i?: number }) {
       <div>
         <strong className="num">
           {record(r.wins)}
-          {r.title ? (NFL ? ' · Super Bowl' : ' · Champions') : ''}
+          {r.title ? pick({ nba: ' · Champions', nfl: ' · Super Bowl', soccer: ' · Cup' }) : ''}
           {r.vs ? (r.vs.won ? ' · beat ' + (r.online ? r.online.opp : 'AI') : r.vs.won === false ? ' · lost to ' + (r.online ? r.online.opp : 'AI') : ' · tied') : ''}
         </strong>
         <small>{r.lineup.map((x) => lastName(x.name)).join(' · ')}</small>
@@ -319,7 +320,7 @@ export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: 
     <div className="page-view">
       <div className="page">
         <div className="ranks-head">
-          <h1 className="disp">{NET_ON ? (NFL ? 'NFL Ranks' : 'Ranks') : 'Your best'}</h1>
+          <h1 className="disp">{NET_ON ? pick({ nba: 'Ranks', nfl: 'NFL Ranks', soccer: 'Soccer Ranks' }) : 'Your best'}</h1>
           {NET_ON && (
             <span className="seg" role="group" aria-label="Leaderboard">
               {(['global', 'yours'] as const).map((v) => (
@@ -399,7 +400,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
   const stats: [string, string | number][] = [
     ['Drafts', p.stats.games],
     ['Best record', best ? record(best.wins) : '—'],
-    [NFL ? 'Super Bowls' : 'Titles', p.stats.titles],
+    [pick({ nba: 'Titles', nfl: 'Super Bowls', soccer: 'Cups' }), p.stats.titles],
     [PERFECT_RECORD + ' seasons', p.stats.undefeated],
     ['Perfect seasons', p.stats.perfect],
     ['Legends drafted', p.stats.legends],
@@ -448,7 +449,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
               <UtMark />
             </span>
             <span className="profile-ut-txt">
-              <i className="eyebrow">ULTIMATE TEAM · {NFL ? 'NFL' : 'NBA'}</i>
+              <i className="eyebrow">ULTIMATE TEAM · {SPORT_LABEL[SPORT]}</i>
               <span className="profile-ut-stats">
                 <span>
                   <b className="num">{p.ut.owned.length}</b> cards
@@ -530,9 +531,11 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
             </button>
           )}
           <p className="note">
-            {NFL
-              ? 'Every NFL quarterback, running back, receiver and tight end from 1970 through ' + props.latest + ', and every team’s best defensive linemen, linebackers and defensive backs, from ' + props.source + '. Defenders’ stats run from 1999, and before that where a career table kept them; an earlier defender is judged by his All-Pro and Pro Bowl years, his career and those stats.'
-              : 'Every NBA player from 1959–60 through ' + (props.latest - 1) + '–' + String(props.latest).slice(2) + ', from ' + props.source + '. Steals and blocks before 1973–74 weren’t recorded and are estimated.'}
+            {pick({
+              soccer: 'Forty big clubs of the Premier League, LaLiga, Serie A, Bundesliga, Ligue 1, Eredivisie and Primeira Liga, 1950s to ' + props.latest + ': ' + props.source + '. From 2012–13 every player with 900+ league minutes, with real goals and assists; earlier lines are club spells and estimated ratings.',
+              nfl: 'Every NFL quarterback, running back, receiver and tight end from 1970 through ' + props.latest + ', and every team’s best defensive linemen, linebackers and defensive backs, from ' + props.source + '. Defenders’ stats run from 1999, and before that where a career table kept them; an earlier defender is judged by his All-Pro and Pro Bowl years, his career and those stats.',
+              nba: 'Every NBA player from 1959–60 through ' + (props.latest - 1) + '–' + String(props.latest).slice(2) + ', from ' + props.source + '. Steals and blocks before 1973–74 weren’t recorded and are estimated.',
+            })}
           </p>
           <p className="note num">
             Version {APP_VERSION} · {viewportInfo()}
@@ -569,7 +572,8 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
       {(close) => (
         <>
           <h2 className="disp">How to play</h2>
-          {NFL ? (
+          {pick({
+            nfl: (
             <>
               <p>
                 <b>Spin</b> for a random NFL team and decade. Pick anyone who played for them then: a quarterback, running back, receiver or tight end, or a defender. Eight rounds fill QB, RB, WR, TE, FLEX (any back, receiver or tight end) and the defense: DL (a lineman), LB (a linebacker) and DB (a corner or a safety).
@@ -587,7 +591,8 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
                 Then the <b>17-game season</b> plays out, every score on the schedule. Win 10 or more to make the playoffs: four one-game rounds against real playoff teams, the better record at home and the Super Bowl on neutral ground. Tap any round to scout the other team. Go 17–0, then win all four, for a <b>Perfect Season</b>.
               </p>
             </>
-          ) : (
+            ),
+            nba: (
             <>
               <p>
                 <b>Spin</b> for a random NBA team and decade. Pick any player who played for them then, and place him at a position he actually played. Five rounds fill PG, SG, SF, PF and C.
@@ -605,7 +610,27 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
                 Then the <b>82-game season</b> plays out. Win 50 or more to make the playoffs: four best-of-7 series against real all-time great teams, each game a little more likely to go to the better team, with home court to the better record. Tap any series to scout the other team’s five and your odds. Go 82–0, then 16–0, for a <b>Perfect Season</b>.
               </p>
             </>
-          )}
+            ),
+            soccer: (
+            <>
+              <p>
+                <b>Spin</b> for a random club and decade. Pick anyone who played for them then, at a position he actually played. Eight rounds fill GK, CB, FB, DM/CM (a holder or a central midfielder), CM/AM, W, ST and a FLEX (any outfielder).
+              </p>
+              <p>
+                Each player brings his goals and assists a season (a keeper his clean sheets) and his rating for that club in that decade. Your team is scored on attack, midfield, defense and goalkeeping against a near-perfect lineup, and a weak area drags the whole team down.
+              </p>
+              <p>
+                <b>Every era counts the same.</b> Ratings compare each player with his league in his own seasons. From 2012–13 the stats are real league numbers; before that a line is the player’s club spell and an estimated rating.
+              </p>
+              <p>
+                You get <b>1 free club respin and 1 free decade respin</b> per draft. Tap two players on the pitch to swap their spots.
+              </p>
+              <p>
+                Then the <b>38-game league season</b> plays out: three points a win, one a draw. Win 22 or more to reach the cup: four one-game knockout rounds against the great sides of the last fourteen years, level after 90 minutes goes to penalties, and the Final on neutral ground. Go 38–0, then win all four inside 90 minutes, for a <b>Perfect Season</b>.
+              </p>
+            </>
+            ),
+          })}
           {NET_ON ? (
             <>
               <p>
@@ -621,13 +646,13 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
             </p>
           )}
           <p>
-            <b>Rarity:</b> the best player lines are Rare, Epic or Legendary{NFL ? '' : ' (about 1 in 200)'}. Draft a Legendary for the big moment.
+            <b>Rarity:</b> the best player lines are Rare, Epic or Legendary{pick({ nba: ' (about 1 in 200)', nfl: '', soccer: '' })}. Draft a Legendary for the big moment.
           </p>
           <p>
             <b>After the season:</b> the draft report grades every pick against the best one there was. Then take the same team into the <b>Legends Gauntlet</b>: eight of the greatest teams ever, one live game at a time, with three lives. A new eight every week.
           </p>
           <p>
-            <b>Binder:</b> every player you draft is a card you keep. Finish a team-decade’s set (its {NFL ? 'five best on offense and best DL, LB and DB' : 'five best players'}) for coins. Press and hold a card on the {NFL ? 'field' : 'court'} to look closer.
+            <b>Binder:</b> every player you draft is a card you keep. Finish a team-decade’s set (its {pick({ nba: 'five best players', nfl: 'five best on offense and best DL, LB and DB', soccer: 'best keeper and seven best outfielders' })}) for coins. Press and hold a card on the {FLOOR} to look closer.
           </p>
           <p>
             <b>Every day:</b> open the daily chest (it grows for 7 days in a row) and finish three missions for coins and XP.

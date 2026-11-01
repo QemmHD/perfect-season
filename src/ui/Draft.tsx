@@ -23,8 +23,8 @@ import { BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, leve
 import { bestPickFor, onlineOrder, redrawCell, SHOT_CLOCK } from '../engine/online';
 import { bestRarity, RARITY_NAMES, type Rarity, rarityOf } from '../engine/rarity';
 import { rateTeam } from '../engine/rating';
-import { NFL } from '../engine/sport';
-import { type Booster, BOOSTERS, type BotLevel, type Mode, type Player, type Slot, SLOTS } from '../engine/types';
+import { pick } from '../engine/sport';
+import { type Booster, BOOSTERS, type BotLevel, type Mode, type Player, type Slot, SLOTS, slotLabel } from '../engine/types';
 import { sfx, vibrate } from '../lib/sound';
 import type { OnlinePick } from '../net/match';
 import { frameY, useLayout } from '../stage';
@@ -41,11 +41,18 @@ const COURT_X: Record<Slot, number> = { C: 70, PF: 236, SF: 26, SG: 280, PG: 153
  * receivers (WR, TE, FLEX), and the backfield (QB, RB). Card centers across the 390 frame.
  */
 const FIELD_CX: Record<Slot, number> = { DL: 62, LB: 195, DB: 328, WR: 62, TE: 195, FLEX: 328, QB: 128.5, RB: 261.5 };
-const COURT_ORDER: Slot[] = NFL ? ['DL', 'LB', 'DB', 'WR', 'TE', 'FLEX', 'QB', 'RB'] : ['C', 'PF', 'SF', 'SG', 'PG'];
+/**
+ * Soccer's pitch (Claude 2026-11-01), attacking up the screen: the front three (W, ST, FLEX), the
+ * two midfield spots, and the back (FB, GK, CB). Card centers across the 390 frame.
+ */
+const PITCH_CX: Record<Slot, number> = { W: 62, ST: 195, FLEX: 328, DM: 128.5, AM: 261.5, FB: 62, GK: 195, CB: 328 };
+const COURT_ORDER: Slot[] = pick({ nba: ['C', 'PF', 'SF', 'SG', 'PG'], nfl: ['DL', 'LB', 'DB', 'WR', 'TE', 'FLEX', 'QB', 'RB'], soccer: ['W', 'ST', 'FLEX', 'AM', 'DM', 'FB', 'GK', 'CB'] });
+/** three rows of cards (football and soccer) rather than the court's five */
+const ROWS3 = pick({ nba: false, nfl: true, soccer: true });
 const CARD_W = 84;
 /** a football card's height before it's scaled down to fit three rows on a short field */
 const FIELD_CH = 104;
-const BAR_LABELS = NFL ? ['PASSING', 'RUSHING', 'RECEIVING', 'DEFENSE'] : ['SCORING', 'BOARDS', 'PASSING', 'DEFENSE'];
+const BAR_LABELS = pick({ nba: ['SCORING', 'BOARDS', 'PASSING', 'DEFENSE'], nfl: ['PASSING', 'RUSHING', 'RECEIVING', 'DEFENSE'], soccer: ['ATTACK', 'MIDFIELD', 'DEFENSE', 'KEEPER'] });
 const MODE_NAMES: Record<Mode, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
 const TEAM_MS = 1150;
 const ERA_MS = 1550;
@@ -160,7 +167,7 @@ function Reel({ label, caption, era, reel, ms, tint }: { label: string; caption:
 
 /** What the bot (or the other player) did, for the toast. A pick from their own redraw names the team-decade drawn. */
 function botLine(pick: BotPick, roundCell: string, lead: string, who = 'the AI'): string {
-  if (pick.cellId === roundCell) return lead + pick.player.name + ' for ' + pick.slot + '.';
+  if (pick.cellId === roundCell) return lead + pick.player.name + ' for ' + slotLabel(pick.slot) + '.';
   const c = CELL_BY_ID[pick.cellId];
   return 'Nobody here fit ' + who + ', so they drew the ' + c.era + ' ' + c.name + ' and took ' + pick.player.name + '.';
 }
@@ -178,7 +185,26 @@ interface CourtLayout {
 
 /** The spots' cards, fitted to the court's (or field's) height. */
 function courtLayout(h: number, ch: number): CourtLayout {
-  if (NFL) {
+  if (pick({ nba: false, nfl: false, soccer: true })) {
+    // three rows like football's: the front three, the midfield two, the back three
+    const pad = 8;
+    const gap = 12;
+    const k = Math.max(0.5, Math.min(1, (h - 2 * pad - 2 * gap) / (3 * ch)));
+    const vh = ch * k;
+    const slack = Math.max(0, h - (2 * pad + 2 * gap + 3 * vh));
+    const y0 = pad + slack * 0.2;
+    const y1 = y0 + vh + gap + slack * 0.35;
+    const y2 = y1 + vh + gap + slack * 0.35;
+    const top: Record<Slot, number> = { W: y0, ST: y0, FLEX: y0, DM: y1, AM: y1, FB: y2, GK: y2, CB: y2 };
+    const x: Record<Slot, number> = {};
+    const y: Record<Slot, number> = {};
+    for (const sl of COURT_ORDER) {
+      x[sl] = PITCH_CX[sl] - CARD_W / 2;
+      y[sl] = top[sl] - (ch * (1 - k)) / 2;
+    }
+    return { x, y, k, los: y1 + vh / 2, first: 0 };
+  }
+  if (pick({ nba: false, nfl: true, soccer: false })) {
     // three rows: full size when they fit, else scaled down together (each card about its center)
     const pad = 8;
     const los = 18;
@@ -240,6 +266,44 @@ function CourtLines({ h, ys, ch }: { h: number; ys: Record<Slot, number>; ch: nu
       </g>
       <line x1="165" y1="16" x2="225" y2="16" stroke="#F2F6F7" strokeOpacity="0.55" strokeWidth="3" strokeLinecap="round" />
       <circle cx="195" cy="28" r="10" fill="none" stroke="#F5B83D" strokeWidth="2.5" />
+    </svg>
+  );
+}
+
+/** Soccer's pitch under the eight cards (Claude 2026-11-01): mowed stripes, the halfway line and
+    centre circle at the top, the penalty box and goal at the bottom. */
+function PitchLines({ h }: { h: number }) {
+  const step = 40;
+  const stripes: number[] = [];
+  for (let y = 0; y < h; y += step * 2) stripes.push(y);
+  const box = Math.min(96, h * 0.24);
+  return (
+    <svg className="court-lines field pitch" width="390" height={h} viewBox={'0 0 390 ' + h} aria-hidden="true">
+      <defs>
+        <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0D3322" />
+          <stop offset="100%" stopColor="#072117" />
+        </linearGradient>
+        <radialGradient id="spot" cx="50%" cy="0%" r="75%">
+          <stop offset="0%" stopColor="#6BE39A" stopOpacity="0.14" />
+          <stop offset="60%" stopColor="#6BE39A" stopOpacity="0.03" />
+          <stop offset="100%" stopColor="#6BE39A" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect x="0" y="0" width="390" height={h} fill="url(#grass)" />
+      {stripes.map((y) => (
+        <rect key={y} x="0" y={y} width="390" height={step} fill="#ffffff" fillOpacity="0.022" />
+      ))}
+      <rect x="0" y="0" width="390" height={h} fill="url(#spot)" />
+      <g fill="none" stroke="#F2F6F7" strokeOpacity="0.2" strokeWidth="1.6">
+        <rect x="12" y="-2" width="366" height={h} />
+        <line x1="12" y1="2" x2="378" y2="2" />
+        <path d={'M139 2 A56 56 0 0 0 251 2'} />
+        <rect x="95" y={h - box} width="200" height={box + 2} />
+        <rect x="150" y={h - box * 0.42} width="90" height={box * 0.42 + 2} />
+        <path d={'M163 ' + (h - box) + ' A44 44 0 0 1 227 ' + (h - box)} />
+      </g>
+      <line x1="170" y1={h - 1.5} x2="220" y2={h - 1.5} stroke="#F2F6F7" strokeOpacity="0.55" strokeWidth="3" strokeLinecap="round" />
     </svg>
   );
 }
@@ -521,7 +585,7 @@ export function Draft(props: DraftProps) {
       }
       placePick(best.player.id, best.slot);
       burst(best.slot, best.player.c2);
-      props.onToast('Time! You got ' + best.player.name + ' at ' + best.slot + '.');
+      props.onToast('Time! You got ' + best.player.name + ' at ' + slotLabel(best.slot) + '.');
     }
     sfx.place();
     setSelected(null);
@@ -874,13 +938,14 @@ export function Draft(props: DraftProps) {
                     {rar !== 'common' && <i className={'rar ' + rar}>{RARITY_NAMES[rar].toUpperCase()}</i>}
                   </b>
                   <span>
-                    {roleLabel(p)} · {NFL && p.est ? '~' : ''}
-                    {p.g} G{p.seasons > 1 ? ' · ' + p.seasons + ' seasons' : ''}
-                    {!NFL && p.est && !blind ? ' · est.' : ''}
+                    {roleLabel(p)} · {pick({ nba: false, nfl: true, soccer: false }) && p.est ? '~' : ''}
+                    {p.g} {pick({ nba: 'G', nfl: 'G', soccer: 'apps' })}
+                    {p.seasons > 1 ? ' · ' + p.seasons + ' seasons' : ''}
+                    {pick({ nba: true, nfl: false, soccer: true }) && p.est && !blind ? ' · est.' : ''}
                   </span>
                   {tag && <em>{tag}</em>}
                 </span>
-                <span className={'stats' + (NFL ? ' n' + cols.length + (isDefender(p) ? ' def' : '') : '')}>
+                <span className={'stats' + (pick({ nba: false, nfl: true, soccer: true }) ? ' n' + cols.length + (isDefender(p) ? ' def' : '') : '')}>
                   {cols.map((c) => (
                     <span key={c.key}>
                       <i>{c.label}</i>
@@ -956,7 +1021,7 @@ export function Draft(props: DraftProps) {
       </div>
     ) : null;
 
-  const ch = NFL ? FIELD_CH : courtH < 250 ? 96 : 104;
+  const ch = ROWS3 ? FIELD_CH : courtH < 250 ? 96 : 104;
   const lay = courtLayout(courtH, ch);
   const ys = lay.y;
   const xs = lay.x;
@@ -1023,7 +1088,11 @@ export function Draft(props: DraftProps) {
       )}
 
       <div className={'court' + (wave ? ' wave' : '')} ref={courtRef}>
-        {NFL ? <FieldLines h={courtH} los={lay.los} first={lay.first} /> : <CourtLines h={courtH} ys={ys} ch={ch} />}
+        {pick({
+          nba: () => <CourtLines h={courtH} ys={ys} ch={ch} />,
+          nfl: () => <FieldLines h={courtH} los={lay.los} first={lay.first} />,
+          soccer: () => <PitchLines h={courtH} />,
+        })()}
         {COURT_ORDER.map((k) => {
           const glow = !!selectedP && targets.includes(k) && !s.lineup[k];
           const moverOk = !!swapFrom && swapFrom !== k && !s.lineup[k] && canMove(s.lineup, swapFrom, k);
@@ -1033,11 +1102,11 @@ export function Draft(props: DraftProps) {
               className={'slot-empty' + (glow || moverOk ? ' glow' : '') + (s.lineup[k] ? ' filled' : '')}
               style={{ left: xs[k], top: ys[k], height: ch, ...(lay.k < 1 ? { scale: String(lay.k) } : {}) }}
               onClick={() => tapSlot(k)}
-              aria-label={k + ': empty' + (glow ? ', tap to place' : '')}
+              aria-label={slotLabel(k) + ': empty' + (glow ? ', tap to place' : '')}
               aria-hidden={!!s.lineup[k]}
               tabIndex={s.lineup[k] ? -1 : 0}
             >
-              <span className="key">{k}</span>
+              <span className="key">{slotLabel(k)}</span>
               <span className="plus" aria-hidden="true">
                 +
               </span>

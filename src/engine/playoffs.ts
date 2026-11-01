@@ -1,27 +1,43 @@
 import { PLAYOFF_TEAMS } from './data';
 import { GAMES, ratingForWins, type TeamRating } from './rating';
 import { type Rand, pickOne } from './rng';
-import { gameScore, LEAGUE_PPG } from './season';
-import { NFL } from './sport';
+import { DRAW, gameScore, LEAGUE_GPG, LEAGUE_PPG, soccerScore } from './season';
+import { pick } from './sport';
 import type { PlayoffTeam } from './types';
 
-export const ROUND_NAMES = NFL ? ['Wild Card', 'Divisional Round', 'Conference Championship', 'Super Bowl'] : ['First Round', 'Conference Semifinals', 'Conference Finals', 'NBA Finals'];
+/** Soccer (Claude 2026-11-01): a knockout cup after the league, one game a round, level after 90 minutes goes to penalties. */
+const SOCCER = pick({ nba: false, nfl: false, soccer: true });
+/** One game a round (football and soccer) rather than a series. */
+const ONE_GAME = pick({ nba: false, nfl: true, soccer: true });
+
+export const ROUND_NAMES = pick({
+  nba: ['First Round', 'Conference Semifinals', 'Conference Finals', 'NBA Finals'],
+  nfl: ['Wild Card', 'Divisional Round', 'Conference Championship', 'Super Bowl'],
+  soccer: ['Round of 16', 'Quarter-final', 'Semi-final', 'Final'],
+});
 /** Opponent strength by round, in wins over a full season */
-export const ROUND_POOLS: [number, number][] = NFL
-  ? [
-      [10, 11],
-      [11, 12],
-      [12, 14],
-      [14, 17],
-    ]
-  : [
-      [50, 55],
-      [55, 59],
-      [59, 63],
-      [64, 82],
-    ];
-/** Wins that take a round: best of 7 in basketball, one game in football. */
-export const SERIES_WINS = NFL ? 1 : 4;
+export const ROUND_POOLS: [number, number][] = pick<[number, number][]>({
+  nfl: [
+    [10, 11],
+    [11, 12],
+    [12, 14],
+    [14, 17],
+  ],
+  nba: [
+    [50, 55],
+    [55, 59],
+    [59, 63],
+    [64, 82],
+  ],
+  soccer: [
+    [19, 26],
+    [26, 28],
+    [28, 30],
+    [30, 33],
+  ],
+});
+/** Wins that take a round: best of 7 in basketball, one game in football and soccer. */
+export const SERIES_WINS = pick({ nba: 4, nfl: 1, soccer: 1 });
 /**
  * Spread of the per-game win chance, in rating points; higher = more upsets. Basketball, at 12:
  * a typical 62-win team wins the title about 12% of the time, a 70-win team 45%, an 82-0 team 88%,
@@ -29,12 +45,12 @@ export const SERIES_WINS = NFL ? 1 : 4;
  * round: a 14-win team wins it all about 28% of the time and a 17-0 team 64-73%
  * (src/engine/engine.test.ts and nfl.test.ts check these).
  */
-export const SERIES_K = NFL ? 10 : 12;
-/** Fewest wins that make the playoffs: the "C · Playoff Team" grade. Below it a team is in the lottery. */
-export const PLAYOFF_MIN_WINS = NFL ? 10 : 50;
-export const HOME_EDGE = NFL ? 0.06 : 0.04;
-/** The football final is on neutral ground. */
-const NEUTRAL_FINAL = NFL;
+export const SERIES_K = pick({ nba: 12, nfl: 10, soccer: 30 });
+/** Fewest wins that make the playoffs: the "C · Playoff Team" grade (soccer "C · Cup Places"). Below it a team is in the lottery. */
+export const PLAYOFF_MIN_WINS = pick({ nba: 50, nfl: 10, soccer: 22 });
+export const HOME_EDGE = pick({ nba: 0.04, nfl: 0.06, soccer: 0.05 });
+/** The football and soccer finals are on neutral ground. */
+const NEUTRAL_FINAL = pick({ nba: false, nfl: true, soccer: true });
 
 export interface Series {
   round: number;
@@ -42,8 +58,10 @@ export interface Series {
   oppRating: number;
   /** 1 = we won that game */
   games: number[];
-  /** football: each game's score, ours first */
+  /** football and soccer: each game's score, ours first (soccer: after 90 minutes) */
   scores?: [number, number][];
+  /** soccer: level after 90 minutes, the penalty shootout's score (ours first) */
+  pens?: [number, number];
   played: boolean;
   won: boolean;
 }
@@ -69,7 +87,7 @@ export function homeGame(g: number, highSeed: boolean): boolean {
 export function gameOdds(ourRating: number, ourWins: number, opp: PlayoffTeam, round: number, g: number): number {
   const odds = matchupOdds(ourRating, opp);
   const highSeed = ourWins >= opp.wFull;
-  if (NFL) return NEUTRAL_FINAL && round === 3 ? odds.neutral : highSeed ? odds.home : odds.road;
+  if (ONE_GAME) return NEUTRAL_FINAL && round === 3 ? odds.neutral : highSeed ? odds.home : odds.road;
   return homeGame(g, highSeed) ? odds.home : odds.road;
 }
 
@@ -122,15 +140,57 @@ export function playoffScore(won: boolean, season: TeamRating & { pf?: number; p
   return gameScore(won, (ourPf + (opp.pa ?? LEAGUE_PPG)) / 2, ((opp.pf ?? LEAGUE_PPG) + ourPa) / 2, rand);
 }
 
+/**
+ * Soccer: how a knockout game with chance `p` of going through splits into a win in 90 minutes, a
+ * draw (penalties) and the chance of winning those. Even games are drawn about a quarter of the time.
+ */
+export function soccerTieOdds(p: number): { win: number; draw: number; pens: number } {
+  const draw = 0.27 * (1 - Math.pow(Math.abs(2 * p - 1), 1.5));
+  const pens = 0.5 + 0.2 * (p - 0.5);
+  return { win: Math.max(0, p - draw * pens), draw, pens };
+}
+
+/** A shootout's score, winner first: five kicks each, or sudden death after. */
+export function shootoutScore(rand: Rand): [number, number] {
+  if (rand() < 0.22) {
+    const extra = 1 + Math.floor(rand() * 3);
+    return [4 + extra, 3 + extra];
+  }
+  const lo = 2 + Math.floor(rand() * 3);
+  return [Math.min(5, lo + 1 + (rand() < 0.25 ? 1 : 0)), lo];
+}
+
+/** Soccer: one knockout game played out: through or out, the score after 90 minutes, penalties if level. */
+export function soccerTie(season: TeamRating & { pf?: number; pa?: number }, opp: PlayoffTeam, rand: Rand, round: number): { won: boolean; score: [number, number]; pens?: [number, number] } {
+  const odds = soccerTieOdds(gameOdds(season.rating, season.wins, opp, round, 0));
+  const gf = ((season.pf ?? LEAGUE_GPG) + (opp.pa ?? LEAGUE_GPG)) / 2;
+  const ga = ((opp.pf ?? LEAGUE_GPG) + (season.pa ?? LEAGUE_GPG)) / 2;
+  const x = rand();
+  if (x < odds.win) return { won: true, score: soccerScore(1, gf, ga, rand) };
+  if (x < odds.win + odds.draw) {
+    const won = rand() < odds.pens;
+    const [a, b] = shootoutScore(rand);
+    return { won, score: soccerScore(DRAW, gf, ga, rand), pens: won ? [a, b] : [b, a] };
+  }
+  return { won: false, score: soccerScore(0, gf, ga, rand) };
+}
+
 export function buildBracket(season: TeamRating & { pf?: number; pa?: number }, rand: Rand): Series[] {
   const opps = pickOpponents(rand);
   let alive = true;
   return opps.map((opp, round) => {
     const s: Series = { round, opp, oppRating: ratingForWins(opp.wFull), games: [], played: alive, won: false };
-    if (alive) {
+    if (alive && SOCCER) {
+      const t = soccerTie(season, opp, rand, round);
+      s.games = [t.won ? 1 : 0];
+      s.won = t.won;
+      s.scores = [t.score];
+      if (t.pens) s.pens = t.pens;
+      if (!s.won) alive = false;
+    } else if (alive) {
       s.games = simSeries(season.rating, season.wins, opp, rand, round);
       s.won = s.games.filter((x) => x === 1).length === SERIES_WINS;
-      if (NFL) s.scores = s.games.map((g) => playoffScore(g === 1, season, opp, rand));
+      if (pick({ nba: false, nfl: true, soccer: true })) s.scores = s.games.map((g) => playoffScore(g === 1, season, opp, rand));
       if (!s.won) alive = false;
     }
     return s;
@@ -140,7 +200,7 @@ export function buildBracket(season: TeamRating & { pf?: number; pa?: number }, 
 export interface PlayoffOutcome {
   seriesWon: number;
   title: boolean;
-  /** rounds won without losing a game (in football, every round won) */
+  /** rounds won without losing a game (in football, every round won; in soccer, every round won inside 90 minutes) */
   sweeps: number;
   lostTo: Series | null;
   finals: Series;
@@ -151,7 +211,7 @@ export function playoffOutcome(bracket: Series[]): PlayoffOutcome {
   return {
     seriesWon: played.filter((b) => b.won).length,
     title: played.length === 4 && played.every((b) => b.won),
-    sweeps: played.filter((b) => b.won && b.games.length === SERIES_WINS).length,
+    sweeps: played.filter((b) => b.won && b.games.length === SERIES_WINS && !b.pens).length,
     lostTo: played.find((b) => !b.won) ?? null,
     finals: bracket[3],
   };

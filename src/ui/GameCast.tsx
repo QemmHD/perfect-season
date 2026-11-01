@@ -1,13 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CastEvent, GameCast as Cast } from '../engine/broadcast';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
+
+/** Claude 2026-11-01: soccer is told in two halves of goals; each branch names all three sports. */
+const SOCCER = pick({ nba: false, nfl: false, soccer: true });
+/** a sport whose every score is a moment (football's touchdowns, soccer's goals) */
+const EVERY_SCORE = pick({ nba: false, nfl: true, soccer: true });
+const HOOPS = pick({ nba: true, nfl: false, soccer: false });
 import type { PlayoffTeam } from '../engine/types';
 import { crowd, sfx } from '../lib/sound';
 import { Fit } from './common';
 import { reducedMotion } from './motion';
 
 /** How long a game takes to watch, in ms, at normal speed. */
-const GAME_MS = NFL ? 17000 : 5200;
+const GAME_MS = pick({ nba: 5200, nfl: 17000, soccer: 15000 });
 /** a series-deciding basketball game gets the full treatment */
 const DECIDER_MS = 10500;
 
@@ -58,7 +64,7 @@ export function GameCast({
   onDone: () => void;
 }) {
   // a basketball playoff round is a series; a single game (head to head) isn't
-  const series = !NFL && games.length > 1;
+  const series = HOOPS && games.length > 1;
   const reduced = reducedMotion();
   const [gi, setGi] = useState(0);
   const [p, setP] = useState(0);
@@ -83,7 +89,7 @@ export function GameCast({
     sfx.whistle();
     crowd.start(0.3);
     let heard = 0.3;
-    const total = reduced ? 1200 : !NFL && g.decider ? DECIDER_MS : GAME_MS;
+    const total = reduced ? 1200 : HOOPS && g.decider ? DECIDER_MS : GAME_MS;
     let last = performance.now();
     let pos = 0;
     let raf = 0;
@@ -94,8 +100,8 @@ export function GameCast({
       const shown = cast.events.filter((e) => e.t <= pos);
       const lastE = shown[shown.length - 1];
       const lead = lastE ? lastE.us - lastE.them : 0;
-      const close = Math.abs(lead) <= (NFL ? 8 : 5);
-      const slow = pos > (NFL ? 0.9 : 0.9) && close && !fastRef.current && !reduced;
+      const close = Math.abs(lead) <= pick({ nba: 5, nfl: 8, soccer: 1 });
+      const slow = pos > 0.9 && close && !fastRef.current && !reduced;
       const rate = (fastRef.current ? 4 : 1) * (slow ? 0.45 : 1);
       pos = Math.min(1, pos + (dt / total) * rate);
       if (slow && now - beat > 1300) {
@@ -103,7 +109,7 @@ export function GameCast({
         sfx.heartbeat();
       }
       // the crowd: on edge late in a close game, quiet in a blowout
-      const want = close ? 0.3 + Math.max(0, pos - 0.7) * 2.2 : Math.abs(lead) > (NFL ? 21 : 18) ? 0.16 : 0.26;
+      const want = close ? 0.3 + Math.max(0, pos - 0.7) * 2.2 : Math.abs(lead) > pick({ nba: 18, nfl: 21, soccer: 2 }) ? 0.16 : 0.26;
       if (Math.abs(want - heard) > 0.06) {
         heard = want;
         crowd.level(want);
@@ -127,14 +133,22 @@ export function GameCast({
     if (scoring.length) {
       const ours = scoring.some((e) => e.side === 'us');
       // basketball scores constantly: only the big plays get a sound
-      if (NFL || headline) ours ? sfx.scoreUs(!!headline?.clutch || (NFL && scoring.some((e) => e.pts >= 6))) : sfx.scoreThem();
+      if (EVERY_SCORE || headline) ours ? sfx.scoreUs(!!headline?.clutch || SOCCER || (EVERY_SCORE && scoring.some((e) => e.pts >= 6))) : sfx.scoreThem();
       // whose crowd it is decides who gets the roar
-      const big = !!headline?.clutch || scoring.some((e) => e.pts >= 6) || !!headline?.big;
+      const big = !!headline?.clutch || scoring.some((e) => e.pts >= 6) || !!headline?.big || SOCCER;
       const home = g.where === 'HOME' ? ours : g.where === 'AWAY' ? !ours : true;
-      if (NFL || big) crowd.swell((big ? 0.9 : 0.45) * (home ? 1 : 0.35));
+      if (EVERY_SCORE || big) crowd.swell((big ? 0.9 : 0.45) * (home ? 1 : 0.35));
     }
-    if (headline && (NFL ? headline.pts >= 6 || headline.clutch : headline.clutch)) {
-      const text = headline.clutch ? (headline.side === 'us' ? (NFL ? 'GAME-WINNER!' : 'BUZZER-BEATER!') : 'DAGGER') : headline.pts >= 6 ? 'TOUCHDOWN' : headline.pts === 2 ? 'SAFETY' : 'SCORE';
+    if (headline && pick({ nba: headline.clutch, nfl: headline.pts >= 6 || headline.clutch, soccer: !!headline.side })) {
+      const text = SOCCER
+        ? headline.clutch
+          ? headline.pts === 0
+            ? headline.side === 'us' ? 'SHOOTOUT WON!' : 'SHOOTOUT LOST'
+            : headline.side === 'us' ? 'LATE WINNER!' : 'DAGGER'
+          : 'GOAL!'
+        : headline.clutch
+          ? headline.side === 'us' ? pick({ nba: 'BUZZER-BEATER!', nfl: 'GAME-WINNER!', soccer: 'LATE WINNER!' }) : 'DAGGER'
+          : headline.pts >= 6 ? 'TOUCHDOWN' : headline.pts === 2 ? 'SAFETY' : 'SCORE';
       setFlash({ id: ++flashId.current, text, side: headline.side ?? 'us' });
       // the screen jolts, harder for a game-winner
       const k = headline.clutch ? 7 : 4;
@@ -209,9 +223,11 @@ export function GameCast({
   const lastE: CastEvent | undefined = visible[visible.length - 1];
   const us = phase === 'live' ? (lastE?.us ?? 0) : cast.us;
   const them = phase === 'live' ? (lastE?.them ?? 0) : cast.them;
-  const period = Math.min(4, Math.floor(Math.min(0.9999, p) * 4) + 1);
-  const left = Math.max(0, (period - Math.min(1, p) * 4) * (NFL ? 15 : 12));
-  const clock = p >= 1 ? 'FINAL' : Math.floor(left) + ':' + String(Math.floor((left % 1) * 60)).padStart(2, '0');
+  const periods = SOCCER ? 2 : 4;
+  const period = Math.min(periods, Math.floor(Math.min(0.9999, p) * periods) + 1);
+  const left = Math.max(0, (period - Math.min(1, p) * 4) * pick({ nba: 12, nfl: 15, soccer: 0 }));
+  // soccer's clock counts the minutes up; the others count a quarter down
+  const clock = p >= 1 ? (cast.pens ? 'PENS' : 'FINAL') : SOCCER ? Math.min(90, Math.floor(p * 90) + 1) + "'" : Math.floor(left) + ':' + String(Math.floor((left % 1) * 60)).padStart(2, '0');
   const wpNow = lastE ? lastE.wp : (cast.wp[0]?.[1] ?? 0.5);
   const wpShown = p >= 1 ? (cast.won ? 1 : 0) : wpNow;
 
@@ -253,7 +269,7 @@ export function GameCast({
                 : 'HEARTBREAKER'
               : null;
 
-  const feed = visible.filter((e) => e.big || (NFL && e.side)).slice(-4).reverse();
+  const feed = visible.filter((e) => e.big || (EVERY_SCORE && e.side)).slice(-4).reverse();
   const last = gi === games.length - 1;
   const ourAbbr = shortName(ourName);
   const ourStar = cast.stars.find((s) => s.side === 'us');
@@ -296,15 +312,15 @@ export function GameCast({
         </div>
       </div>
 
-      <div className="cast-quarters num" aria-hidden="true">
-        {[0, 1, 2, 3].map((q) => {
+      <div className={"cast-quarters num" + (SOCCER ? " halves" : "")} aria-hidden="true">
+        {Array.from({ length: periods }, (_, q) => q).map((q) => {
           const live = q + 1 <= period || p >= 1;
           const qs = visible.filter((e) => e.period === q + 1);
           const a = qs.reduce((x, e) => x + (e.side === 'us' ? e.pts : 0), 0);
           const b = qs.reduce((x, e) => x + (e.side === 'them' ? e.pts : 0), 0);
           return (
             <span key={q} className={live ? '' : 'off'}>
-              <i>Q{q + 1}</i>
+              <i>{SOCCER ? (q ? '2ND' : '1ST') : 'Q' + (q + 1)}</i>
               {live ? a + '–' + b : '–'}
             </span>
           );
@@ -327,7 +343,7 @@ export function GameCast({
               <rect x="0" y="50" width="300" height="50" />
             </clipPath>
           </defs>
-          {[75, 150, 225].map((x) => (
+          {(SOCCER ? [150] : [75, 150, 225]).map((x) => (
             <line key={x} x1={x} y1="0" x2={x} y2="100" className="qline" />
           ))}
           <line x1="0" y1="50" x2="300" y2="50" className="midline" />
@@ -341,9 +357,7 @@ export function GameCast({
       <ol className="cast-feed" aria-live="polite">
         {feed.map((e) => (
           <li key={e.t + e.text} className={(e.side ?? '') + (e.clutch ? ' clutch' : '')}>
-            <span className="when num">
-              Q{e.period} {e.clock}
-            </span>
+            <span className="when num">{SOCCER ? e.clock : 'Q' + e.period + ' ' + e.clock}</span>
             <span className="what">{e.text}</span>
             {e.side && (
               <b className="num">
@@ -352,7 +366,7 @@ export function GameCast({
             )}
           </li>
         ))}
-        {!feed.length && <li className="pre">{NFL ? 'Kickoff. Your offense takes the field.' : 'Tip-off. Here we go.'}</li>}
+        {!feed.length && <li className="pre">{pick({ nba: 'Tip-off. Here we go.', nfl: 'Kickoff. Your offense takes the field.', soccer: 'Kick-off. Here we go.' })}</li>}
       </ol>
 
       {flash && phase === 'live' && (
@@ -364,6 +378,7 @@ export function GameCast({
       {phase !== 'live' && (
         <div className={'cast-final ' + (cast.won ? 'won' : 'lost')}>
           <span className="stamp disp">{cast.won ? 'WIN' : 'LOSS'}</span>
+          {cast.pens && <span className="tag">{'PENALTIES ' + cast.pens[0] + '–' + cast.pens[1]}</span>}
           {tag && <span className="tag">{tag}</span>}
           {ourStar && (
             <div className="star">

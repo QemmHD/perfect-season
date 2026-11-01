@@ -1,10 +1,17 @@
 // Player rarity, from the value the game scores (`val`, era-adjusted): about the top 0.5% of
 // player lines are Legendary, the top 3% Epic, the top 10% Rare.
+import { pick } from './sport';
 import type { Player } from './types';
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 
-export const RARITY_MIN: Record<Exclude<Rarity, 'common'>, number> = { legendary: 20, epic: 16.3, rare: 12.6 };
+// soccer's values are on their own convex scale (rating.ts soccerValue): the same shares, about
+// overall 90.5+, 86+ and 83+ (Claude 2026-11-01)
+export const RARITY_MIN: Record<Exclude<Rarity, 'common'>, number> = pick({
+  nba: { legendary: 20, epic: 16.3, rare: 12.6 },
+  nfl: { legendary: 20, epic: 16.3, rare: 12.6 },
+  soccer: { legendary: 37.8, epic: 28.8, rare: 23.3 },
+});
 export const RARITY_NAMES: Record<Rarity, string> = { common: 'Common', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' };
 export const RARITY_COLORS: Record<Rarity, string> = { common: '#8FA6B2', rare: '#4FA3FF', epic: '#B07BFF', legendary: '#F5B83D' };
 

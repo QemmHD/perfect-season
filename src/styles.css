@@ -2247,6 +2247,25 @@ button:focus-visible {
   color: var(--sub);
   margin-top: 22px;
 }
+/* Claude 2026-11-01: soccer's W–D–L board */
+.board.three {
+  gap: 4px;
+}
+.board.three b {
+  min-width: 84px;
+  font-size: 80px;
+}
+.board.three .dash {
+  font-size: 44px;
+  margin-top: 16px;
+}
+.board b.d {
+  color: #c4d0d6;
+}
+.fit-compact .board.three b {
+  font-size: 60px;
+  min-width: 64px;
+}
 .board.tense {
   border-color: var(--gold);
   box-shadow:
@@ -2305,6 +2324,11 @@ button:focus-visible {
 }
 .dots i.l {
   background: #c8475b;
+  animation: dot-in 0.32s var(--ease-spring) both;
+}
+/* Claude 2026-11-01: a soccer draw */
+.dots i.d {
+  background: #8fa6b2;
   animation: dot-in 0.32s var(--ease-spring) both;
 }
 @keyframes dot-in {
@@ -3018,6 +3042,18 @@ button:focus-visible {
 }
 .fit-compact .record b {
   font-size: 76px;
+}
+/* Claude 2026-11-01: soccer's W–D–L and league points */
+.record b:nth-of-type(3) ~ span,
+.record:has(b:nth-of-type(3)) b {
+  font-size: 80px;
+}
+.rec-points {
+  margin-top: -4px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--sub);
 }
 .gradeline.small .gradebadge {
   width: 48px;
@@ -5149,6 +5185,23 @@ button.friendcard:active {
 .sportswitch button:active {
   transform: scale(0.95);
 }
+/* Claude 2026-11-01: three sports, NBA · NFL · SOCCER */
+.sportswitch.three .ind {
+  width: calc((100% - 6px) / 3);
+}
+.sportswitch.three button {
+  width: 88px;
+}
+.sportswitch.three.nfl .ind {
+  transform: translateX(100%);
+}
+.sportswitch.three.soccer .ind {
+  transform: translateX(200%);
+  box-shadow: inset 0 0 0 1px rgba(107, 227, 154, 0.45);
+}
+.sportswitch.soccer button[aria-pressed='true'] svg {
+  color: #6be39a;
+}
 .fit-tight .sportswitch,
 .fit-compact .sportswitch {
   margin-top: 4px;
@@ -5177,6 +5230,13 @@ button.friendcard:active {
 }
 .sportfade.nfl .ball {
   color: var(--gold);
+}
+/* Claude 2026-11-01: soccer's fade, a pitch green */
+.sportfade.soccer {
+  background: radial-gradient(circle 140px at 50% 46%, rgba(76, 214, 120, 0.14), rgba(76, 214, 120, 0)), var(--bg);
+}
+.sportfade.soccer .ball {
+  color: #6be39a;
 }
 .sportfade b {
   font-size: 40px;
@@ -5239,6 +5299,31 @@ button.friendcard:active {
   border-color: #c8475b;
   color: #fff;
   animation: dot-in 0.36s var(--ease-spring) both;
+}
+.sched span.d {
+  background: #5d7380;
+  border-color: #5d7380;
+  color: #fff;
+  animation: dot-in 0.36s var(--ease-spring) both;
+}
+/* soccer's 38 matchdays: eight across, smaller */
+.sched.soccer {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+}
+.sched.soccer span {
+  height: 30px;
+  border-radius: 6px;
+}
+.sched.soccer i {
+  font-size: 7.5px;
+}
+.sched.soccer b {
+  font-size: 9.5px;
+}
+.fit-tight .sched.soccer span,
+.fit-compact .sched.soccer span {
+  height: 24px;
 }
 .fit-tight .sched span {
   height: 32px;
@@ -5494,6 +5579,10 @@ button.friendcard:active {
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-top: 8px;
+}
+/* Claude 2026-11-01: soccer's two halves */
+.cast-quarters.halves {
+  grid-template-columns: repeat(2, 1fr);
 }
 .cast-quarters span {
   display: flex;
@@ -10573,6 +10662,15 @@ button.friendcard:active {
 }
 .seg.ut-unit button {
   padding: 0 16px;
+}
+/* Claude 2026-11-01: soccer's formations (4-3-3 · 4-4-2 · 4-2-3-1 · 3-5-2) and its pitch */
+.seg.ut-formations button {
+  padding: 0 11px;
+  font-variant-numeric: tabular-nums;
+}
+.ut-surface.ut-pitch-lines .ln {
+  stroke: rgba(255, 255, 255, 0.42);
+  stroke-width: 1.5;
 }
 .ut-pitch {
   position: relative;

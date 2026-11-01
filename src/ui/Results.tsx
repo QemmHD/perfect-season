@@ -1,11 +1,14 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BOOSTER_NAMES, LEVEL_UP_COINS, levelInfo, type Rewards } from '../engine/economy';
 import { playoffOutcome, ROUND_NAMES, type Series, seriesScore } from '../engine/playoffs';
-import { CATEGORY_LABELS, GAMES, gradeFor, type TeamRating } from '../engine/rating';
+import { CATEGORY_LABELS, GAMES, gradeFor, soccerDraws, type TeamRating } from '../engine/rating';
 import { type DraftReview, GRADE_LABEL } from '../engine/review';
 import { SET_REWARD } from '../engine/collection';
 import { CELL_BY_ID } from '../engine/data';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
+
+/** Claude 2026-11-01: soccer's record is W–D–L (its draws follow from its wins: rating.ts soccerDraws) */
+const SOCCER_DRAWS = pick({ nba: false, nfl: false, soccer: true });
 import type { Booster, Lineup, Player, PlayoffTeam } from '../engine/types';
 import type { GameCast as GameCastData } from '../engine/broadcast';
 import { SLOTS } from '../engine/types';
@@ -49,7 +52,7 @@ export interface ResultInfo {
   /** a head-to-head played out as a game, before the results */
   showdown?: { cast: GameCastData; opp: PlayoffTeam };
   /** a head-to-head played on the field: each side's points, and whether a tie went to the better team */
-  arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; tiebreak: boolean };
+  arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; tiebreak: boolean; pens?: { us: number; them: number; won: boolean } };
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
@@ -196,7 +199,7 @@ export function Results({
         </span>
       </div>
       <div className="results-body">
-        {r.perfect && <div className="perfect disp">PERFECT SEASON · {GAMES + (NFL ? 4 : 16)}–0</div>}
+        {r.perfect && <div className="perfect disp">PERFECT SEASON · {GAMES + pick({ nba: 16, nfl: 4, soccer: 4 })}–0</div>}
         {info.newBest && !r.perfect && (
           <div className="newbest disp" role="status">
             <span>NEW PERSONAL BEST</span>
@@ -244,9 +247,10 @@ export function Results({
                 <small>Rating {vs.rating.rating.toFixed(1)}</small>
               </div>
             </div>
-            {info.arcade?.tiebreak && <span className="note arc-tie">Tied on points: the better team (by rating) takes it.</span>}
-            {info.arcade?.takenOver && <span className="note arc-tie">{r.online?.opp ?? 'They'} stopped playing; the AI finished their {NFL ? 'drives' : 'possessions'}.</span>}
-            {info.arcade?.tookMe && <span className="note arc-tie">You were away too long; the AI finished your {NFL ? 'drives' : 'possessions'}.</span>}
+            {info.arcade?.tiebreak && !info.arcade.pens && <span className="note arc-tie">Tied on points: the better team (by rating) takes it.</span>}
+            {info.arcade?.pens && <span className="note arc-tie">{'Level after the attacks: ' + (info.arcade.pens.won ? 'you won ' : 'you lost ') + info.arcade.pens.us + '–' + info.arcade.pens.them + ' on penalties.'}</span>}
+            {info.arcade?.takenOver && <span className="note arc-tie">{r.online?.opp ?? 'They'} stopped playing; the AI finished their {pick({ nba: 'possessions', nfl: 'drives', soccer: 'attacks' })}.</span>}
+            {info.arcade?.tookMe && <span className="note arc-tie">You were away too long; the AI finished your {pick({ nba: 'possessions', nfl: 'drives', soccer: 'attacks' })}.</span>}
           </>
         ) : (
           <div className="headline" ref={headRef}>
@@ -255,10 +259,23 @@ export function Results({
                 <CountUp value={r.wins} from={0} ms={900} />
               </b>
               <span className="disp">–</span>
-              <b className="disp num">
-                <CountUp value={GAMES - r.wins} from={0} ms={900} />
-              </b>
+              {SOCCER_DRAWS ? (
+                <>
+                  <b className="disp num">
+                    <CountUp value={soccerDraws(r.wins)} from={0} ms={900} />
+                  </b>
+                  <span className="disp">–</span>
+                  <b className="disp num">
+                    <CountUp value={GAMES - r.wins - soccerDraws(r.wins)} from={0} ms={900} />
+                  </b>
+                </>
+              ) : (
+                <b className="disp num">
+                  <CountUp value={GAMES - r.wins} from={0} ms={900} />
+                </b>
+              )}
             </div>
+            {SOCCER_DRAWS && <small className="rec-points num">{3 * r.wins + soccerDraws(r.wins)} points</small>}
             <div className="gradeline small">
               <span className="gradebadge disp stamp delayed" style={{ borderColor: g.color, color: g.color }}>
                 {g.letter}
@@ -421,7 +438,7 @@ function PlayoffRun({ bracket, onScout }: { bracket: Series[]; onScout: (s: Seri
     <div className="card po-run rise-in" style={{ animationDelay: '260ms' }}>
       <span className="eyebrow">Playoff run · tap a team to scout</span>
       {played.map((b) => {
-        const [w, l] = NFL && b.scores ? b.scores[0] : seriesScore(b.games);
+        const [w, l] = pick({ nba: false, nfl: true, soccer: true }) && b.scores ? b.scores[0] : seriesScore(b.games);
         const ko = out.lostTo === b;
         return (
           <button key={b.round} className={'po-row' + (ko ? ' ko' : '')} onClick={() => (sfx.click(), onScout(b))}>

@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
+
+/** Claude 2026-11-01: football's field and soccer's pitch are both grass */
+const GRASS = pick({ nba: false, nfl: true, soccer: true });
 import { useLayout } from '../stage';
 import { reducedMotion } from './motion';
 
@@ -49,14 +52,43 @@ export function ArenaHero({ children }: { children: React.ReactNode }) {
       b.lineTo(W * 0.02, H + 2);
       b.closePath();
       const fl = b.createLinearGradient(0, H * 0.74, 0, H);
-      fl.addColorStop(0, NFL ? 'rgba(46,204,113,0.13)' : 'rgba(25,227,201,0.10)');
-      fl.addColorStop(1, NFL ? 'rgba(46,204,113,0.03)' : 'rgba(25,227,201,0.02)');
+      fl.addColorStop(0, GRASS ? 'rgba(46,204,113,0.13)' : 'rgba(25,227,201,0.10)');
+      fl.addColorStop(1, GRASS ? 'rgba(46,204,113,0.03)' : 'rgba(25,227,201,0.02)');
       b.fillStyle = fl;
       b.fill();
-      b.strokeStyle = NFL ? 'rgba(242,246,247,0.32)' : 'rgba(25,227,201,0.30)';
+      b.strokeStyle = GRASS ? 'rgba(242,246,247,0.32)' : 'rgba(25,227,201,0.30)';
       b.lineWidth = 1.2;
       b.stroke();
-      if (NFL) {
+      if (pick({ nba: false, nfl: false, soccer: true })) {
+        // the far penalty box, its arc and the goal
+        const y0 = H * 0.74;
+        const bh = H * 0.06;
+        b.beginPath();
+        b.moveTo(W / 2 - W * 0.16, y0);
+        b.lineTo(W / 2 - W * 0.17, y0 + bh);
+        b.lineTo(W / 2 + W * 0.17, y0 + bh);
+        b.lineTo(W / 2 + W * 0.16, y0);
+        b.stroke();
+        b.beginPath();
+        b.ellipse(W / 2, y0 + bh, W * 0.06, H * 0.018, 0, 0, Math.PI);
+        b.stroke();
+        b.beginPath();
+        b.moveTo(W * 0.08, H * 0.95);
+        b.lineTo(W * 0.92, H * 0.95);
+        b.stroke();
+        b.beginPath();
+        b.ellipse(W / 2, H * 0.95, W * 0.09, H * 0.03, 0, Math.PI, Math.PI * 2);
+        b.stroke();
+        b.strokeStyle = 'rgba(242,246,247,0.7)';
+        b.lineWidth = 2;
+        b.beginPath();
+        b.moveTo(W / 2 - W * 0.05, y0);
+        b.lineTo(W / 2 - W * 0.05, y0 - H * 0.045);
+        b.lineTo(W / 2 + W * 0.05, y0 - H * 0.045);
+        b.lineTo(W / 2 + W * 0.05, y0);
+        b.stroke();
+        b.lineWidth = 1.2;
+      } else if (pick({ nba: false, nfl: true, soccer: false })) {
         // yard lines, closer together toward the far end zone, and the goalposts
         for (let i = 1; i < 6; i++) {
           const f = Math.pow(i / 6, 1.6);

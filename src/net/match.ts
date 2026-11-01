@@ -1,6 +1,6 @@
 // Head-to-head over Nostr: who's online, the matchmaking queue (or a private room), and the
 // live channel two players draft through.
-import { NFL, SPORT, type SportId } from '../engine/sport';
+import { isSport, pick, SPORT, type SportId } from '../engine/sport';
 import { DATA_V } from '../engine/version';
 import type { Slot } from '../engine/types';
 import { displayName } from '../lib/names';
@@ -15,12 +15,13 @@ import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_Q
 // 4: Codex defensive/shot/throw gameplay revision; old clients keep their records but cannot pair across rules.
 // 5 (NFL only): Codex run lanes, blocking assignments and touch steering; preserve board history.
 // 9 (NBA only): Claude shot curve — poor shooters' green window and off-green threes fall, elite unchanged.
-const DRAFT_RULES = NFL ? 10 : 10;
+// Soccer (Claude 2026-11-01): its own queue from 1, apart from the other two by name and data.
+const DRAFT_RULES = pick({ nba: 10, nfl: 10, soccer: 1 });
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
-export const NET_V = 'ps1-' + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
+export const NET_V = pick({ nba: 'ps1-', nfl: 'ps1-', soccer: 'ps1-soccer-' }) + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
 /** Everyone with the app open, whichever sport: the online count is the whole app's. */
 const ONLINE_TAG = 'ps1-online' + NS_SUFFIX;
-const STORE_NS = (NFL ? 'perfect-season/nfl/v1' : 'perfect-season/v1') + NS_SUFFIX + '/match/';
+const STORE_NS = pick({ nba: 'perfect-season/v1', nfl: 'perfect-season/nfl/v1', soccer: 'perfect-season/soccer/v1' }) + NS_SUFFIX + '/match/';
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -197,7 +198,7 @@ export function startPresence(name: string): void {
     }
     seenOnline.set(e.pubkey, Date.now());
     const st: Status = c.st === 'queue' || c.st === 'match' ? c.st : 'menu';
-    roster.set(e.pubkey, { name: displayName(c.name), sport: c.sp === 'nfl' ? 'nfl' : 'nba', st, rec: recOf(c.rec), at: Date.now() });
+    roster.set(e.pubkey, { name: displayName(c.name), sport: isSport(c.sp) ? c.sp : 'nba', st, rec: recOf(c.rec), at: Date.now() });
     // apps from before football don't say their sport: basketball
     if ((c.sp ?? 'nba') === SPORT) seenHere.set(e.pubkey, Date.now());
     else seenHere.delete(e.pubkey);
@@ -391,7 +392,7 @@ export class Matchmaker {
     if (e.pubkey === this.me || tagValue(e, 't') !== this.lobby) return;
     const c = parse(e);
     if (!c || typeof c.v !== 'string' || c.v === NET_V) return;
-    const sport: SportId | null = c.sport === 'nba' || c.sport === 'nfl' ? c.sport : null;
+    const sport: SportId | null = isSport(c.sport) ? c.sport : null;
     if (!sport) return;
     this.onMismatch?.({ name: displayName(c.name), sport, sameSport: sport === SPORT });
   }

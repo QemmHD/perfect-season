@@ -1,5 +1,5 @@
 import { gradeFor } from './rating';
-import { NFL } from './sport';
+import { pick } from './sport';
 import type { Booster, BotLevel, Mode } from './types';
 
 export const RESPIN_PRICE = 25;
@@ -40,12 +40,13 @@ export function rewardsFor(r: RewardInput): Rewards {
   if (r.seriesWon) {
     coins += 10 * r.seriesWon;
     xp += 10 * r.seriesWon;
-    lines.push(r.seriesWon + (NFL ? (r.seriesWon === 1 ? ' playoff win' : ' playoff wins') : ' series won') + ': +' + 10 * r.seriesWon);
+    const one = r.seriesWon === 1;
+    lines.push(r.seriesWon + pick({ nba: ' series won', nfl: one ? ' playoff win' : ' playoff wins', soccer: one ? ' cup tie won' : ' cup ties won' }) + ': +' + 10 * r.seriesWon);
   }
   if (r.title) {
     coins += 25;
     xp += 20;
-    lines.push((NFL ? 'Super Bowl' : 'Championship') + ': +25');
+    lines.push(pick({ nba: 'Championship', nfl: 'Super Bowl', soccer: 'Cup final' }) + ': +25');
   }
   if (r.vsWon) {
     const c = r.vsName ? BOT_WIN_COINS.legend : BOT_WIN_COINS[r.botLevel];

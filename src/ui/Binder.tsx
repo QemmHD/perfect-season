@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { type Collection, coreSet, franchises, SET_REWARD, setProgress, summarize } from '../engine/collection';
 import { RARITY_COLORS, RARITY_NAMES, type Rarity } from '../engine/rarity';
-import { NFL } from '../engine/sport';
+import { pick, SPORT_LABEL, SPORT } from '../engine/sport';
 import type { Player } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { TradingCard, CardSheet } from './Card';
@@ -34,7 +34,7 @@ export function Binder({ collection, onClose }: { collection: Collection; onClos
               <Back />
             </button>
             <h2 className="disp">BINDER</h2>
-            <span className="binder-sport">{NFL ? 'NFL' : 'NBA'}</span>
+            <span className="binder-sport">{SPORT_LABEL[SPORT]}</span>
           </div>
           <div className="binder-sum">
             <span>
@@ -54,7 +54,7 @@ export function Binder({ collection, onClose }: { collection: Collection; onClos
               </span>
             ))}
           </div>
-          <p className="note">Every player you draft goes in. Finish a team-decade's core set, its {NFL ? 'five best on offense and its best DL, LB and DB' : 'five best players'}, for {SET_REWARD} coins.</p>
+          <p className="note">Every player you draft goes in. Finish a team-decade's core set, its {pick({ nba: 'five best players', nfl: 'five best on offense and its best DL, LB and DB', soccer: 'best keeper and seven best outfielders' })}, for {SET_REWARD} coins.</p>
           <div className="binder-list">
             {all.map((f) => {
               const isOpen = open === f.fr;

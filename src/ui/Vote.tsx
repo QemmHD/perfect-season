@@ -3,7 +3,7 @@
 // coin toss read off the match does (src/net/vote.ts has the rule and how two phones agree on it).
 // Against the AI there's nothing to settle: it goes with your pick (no pick: play).
 import React, { useEffect, useRef, useState } from 'react';
-import { NFL } from '../engine/sport';
+import { pick as bySport } from '../engine/sport';
 import { sfx, vibrate } from '../lib/sound';
 import { type Ballot, byToss, type Choice, RESEND_MS, VOTE_MS, VoteMachine, type VoteWire } from '../net/vote';
 import { initials } from './common';
@@ -195,7 +195,7 @@ export function Vote({
   return (
     <div className={'screen vote' + (phase !== 'vote' ? ' decided' : '')}>
       <div className="vote-head">
-        <span className="eyebrow wide">Head to head · {NFL ? 'kickoff' : 'tip-off'}</span>
+        <span className="eyebrow wide">Head to head · {bySport({ nba: 'tip-off', nfl: 'kickoff', soccer: 'kick-off' })}</span>
         <h1 className="disp">SIM OR PLAY?</h1>
         <p>
           {online ? 'You and ' + rivalName + ' vote. The same vote decides it; a split goes to a coin toss.' : 'Your pick decides it.'}
@@ -214,7 +214,7 @@ export function Vote({
           <button key={c} className={'vote-opt ' + c + (m.mine === c ? ' on' : '') + (rv === c ? ' theirs' : '')} aria-pressed={m.mine === c} aria-disabled={locked} onClick={() => pick(c)}>
             <span className="vote-ico">{c === 'play' ? <PadIcon /> : <CastIcon />}</span>
             <b className="disp">{label(c)}</b>
-            <small>{c === 'play' ? 'Run your offense ' + (NFL ? 'down the field' : 'on the court') + ', live' : simText}</small>
+            <small>{c === 'play' ? bySport({ nba: 'Run your offense on the court, live', nfl: 'Run your offense down the field, live', soccer: 'Play your attacks on the pitch, live' }) : simText}</small>
             <span className="vote-who" aria-hidden="true">
               {m.mine === c && <i className="you">YOU</i>}
               {rv === c && <i className="them">{online ? initials(rivalName) || '?' : 'AI'}</i>}
@@ -247,7 +247,7 @@ export function Vote({
       {d && !byToss(d) && phase === 'result' && (
         <div className="vote-toss agreed" role="status">
           <h2 className="disp">{d.how === 'none' ? 'NO VOTES: PLAY' : (online ? 'YOU BOTH SAID ' : 'YOU PICKED ') + label(d.outcome)}</h2>
-          <p>{d.outcome === 'play' ? (NFL ? 'Grab the ball: you’re on offense.' : 'Take the floor: you’re on offense.') : 'To the broadcast booth.'}</p>
+          <p>{d.outcome === 'play' ? bySport({ nba: 'Take the floor: you’re on offense.', nfl: 'Grab the ball: you’re on offense.', soccer: 'Boots on: you’re attacking.' }) : 'To the broadcast booth.'}</p>
         </div>
       )}
     </div>

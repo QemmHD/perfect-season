@@ -1,6 +1,6 @@
 // Daily missions and the daily reward streak.
 import { hashString, rng, shuffle } from './rng';
-import { NFL } from './sport';
+import { pick } from './sport';
 
 /** What a finished game tells the missions. */
 export interface GameEvent {
@@ -15,7 +15,7 @@ export interface GameEvent {
   vsWon: boolean | null;
   /** against a real player */
   online: boolean;
-  /** football: the biggest winning margin in a playoff game (0 for none) */
+  /** football and soccer: the biggest winning margin in a playoff game (0 for none) */
   margin?: number;
 }
 
@@ -67,16 +67,31 @@ const NFL_HARD: Mission[] = [
   { id: 'legend2', text: 'Draft 2 Legendary players in one team', goal: 1, coins: 80, xp: 80, step: (e) => (e.legends >= 2 ? 1 : 0) },
   { id: 'realwin', text: 'Beat a real player in Head to Head', goal: 1, coins: 80, xp: 80, step: (e) => (e.online && e.vsWon === true ? 1 : 0) },
 ];
+// soccer (Claude 2026-11-01): a 38-game league with draws, then a one-game-a-round knockout cup
+const SOCCER_MEDIUM: Mission[] = [
+  { id: 'playoffs2', text: 'Reach the cup twice', goal: 2, coins: 50, xp: 50, step: (e) => (season(e) && e.wins >= 22 ? 1 : 0) },
+  { id: 'series', text: 'Win a cup tie', goal: 1, coins: 50, xp: 50, step: (e) => (e.series > 0 ? 1 : 0) },
+  { id: 'legend', text: 'Draft a Legendary player', goal: 1, coins: 50, xp: 50, step: (e) => (e.legends > 0 ? 1 : 0) },
+  { id: 'h2hwin', text: 'Win a Head to Head match', goal: 1, coins: 50, xp: 50, step: (e) => (e.vsWon === true ? 1 : 0) },
+  { id: 'balance', text: 'Finish a season with 90%+ balance', goal: 1, coins: 50, xp: 50, step: (e) => (season(e) && e.balance >= 0.9 ? 1 : 0) },
+];
+const SOCCER_HARD: Mission[] = [
+  { id: 'wins30', text: 'Win 30+ league games', goal: 1, coins: 80, xp: 80, step: (e) => (season(e) && e.wins >= 30 ? 1 : 0) },
+  { id: 'title', text: 'Win the cup final', goal: 1, coins: 80, xp: 80, step: (e) => (e.title ? 1 : 0) },
+  { id: 'blowout', text: 'Win a cup tie by 3+ goals', goal: 1, coins: 80, xp: 80, step: (e) => ((e.margin ?? 0) >= 3 ? 1 : 0) },
+  { id: 'legend2', text: 'Draft 2 Legendary players in one team', goal: 1, coins: 80, xp: 80, step: (e) => (e.legends >= 2 ? 1 : 0) },
+  { id: 'realwin', text: 'Beat a real player in Head to Head', goal: 1, coins: 80, xp: 80, step: (e) => (e.online && e.vsWon === true ? 1 : 0) },
+];
 const EASY = NBA_EASY;
-const MEDIUM = NFL ? NFL_MEDIUM : NBA_MEDIUM;
-const HARD = NFL ? NFL_HARD : NBA_HARD;
+const MEDIUM = pick({ nba: NBA_MEDIUM, nfl: NFL_MEDIUM, soccer: SOCCER_MEDIUM });
+const HARD = pick({ nba: NBA_HARD, nfl: NFL_HARD, soccer: SOCCER_HARD });
 
 /** Finishing all three missions pays this on top. */
 export const ALL_MISSIONS_BONUS = 60;
 
 /** The day's three missions: one easy, one medium, one hard, the same for everyone. */
 export function missionsFor(day: string): Mission[] {
-  const r = rng(hashString((NFL ? 'perfect-season-nfl-missions:' : 'perfect-season-missions:') + day));
+  const r = rng(hashString(pick({ nba: 'perfect-season-missions:', nfl: 'perfect-season-nfl-missions:', soccer: 'perfect-season-soccer-missions:' }) + day));
   return [shuffle(EASY, r)[0], shuffle(MEDIUM, r)[0], shuffle(HARD, r)[0]];
 }
 

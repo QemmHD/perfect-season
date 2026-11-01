@@ -3,7 +3,11 @@ import { ArrowMark, DrillMark, MedalMark } from './Marks';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CELLS } from '../engine/data';
-import { NFL, SPORT } from '../engine/sport';
+import { pick, SPORT, SPORT_LABEL } from '../engine/sport';
+
+// Training Camp is basketball's and football's (its drills run their engines): Home doesn't offer it
+// in soccer (Claude 2026-11-01), so soccer never reaches the football branches below.
+const FOOTBALL = pick({ nba: false, nfl: true, soccer: false });
 import { SLOTS, type Lineup } from '../engine/types';
 import { Hoops2, kitsFor } from '../game/hoops2/Hoops2';
 import { Football2, fbKitsFor } from '../game/football2/Football2';
@@ -14,7 +18,6 @@ import { Confetti } from '../ui/common';
 import { getPool } from '../ut/pool';
 import { lineupOf, teamsOf, type Teams } from '../ut/teams';
 import { startersComplete } from '../ut/squad';
-import { NFL as IS_NFL } from '../engine/sport';
 import {
   HOOPS_DRILLS,
   FOOTBALL_DRILLS,
@@ -22,7 +25,7 @@ import {
   type DrillDef,
 } from './training';
 
-const DRILLS = IS_NFL ? FOOTBALL_DRILLS : HOOPS_DRILLS;
+const DRILLS = FOOTBALL ? FOOTBALL_DRILLS : HOOPS_DRILLS;
 const STORE = 'perfect-season:training:' + SPORT;
 function bests(): Record<string, number> {
   try {
@@ -125,7 +128,7 @@ export function Training({
   const attempt = (a: Attempt) =>
     setResults((r) => (r.length < 10 ? [...r, a] : r));
   if (brief && drill) {
-    const tips = NFL
+    const tips = FOOTBALL
       ? drill.id === 'kick'
         ? [
             'Tap KICK to start the meter.',
@@ -202,7 +205,7 @@ export function Training({
     };
     return (
       <>
-        {NFL ? (
+        {FOOTBALL ? (
           <Football2
             key={round}
             {...common}
@@ -326,7 +329,7 @@ export function Training({
           ← HOME
         </button>
         <span>THE WORK BEFORE THE WIN</span>
-        <b>{NFL ? 'NFL' : 'NBA'}</b>
+        <b>{SPORT_LABEL[SPORT]}</b>
       </header>
       <div className="evo-scroll">
         <ArenaHero>
@@ -382,7 +385,7 @@ export function Training({
               style={{ '--drill-index': i } as React.CSSProperties}
             >
               <div className="drill-visual" aria-hidden="true">
-                <div className={'drill-court ' + (NFL ? 'football' : '')} />
+                <div className={'drill-court ' + (FOOTBALL ? 'football' : '')} />
                 <b>
                   <DrillMark drill={d.id} />
                 </b>

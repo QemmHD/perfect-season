@@ -1,5 +1,5 @@
 // Player names for the leaderboard and head-to-head: the rules, and a few random suggestions.
-import { NFL } from '../engine/sport';
+import { pick } from '../engine/sport';
 
 /** Why a name can't be used, or null when it's fine. */
 export function nameProblem(name: string): string | null {
@@ -21,12 +21,16 @@ export function displayName(name: unknown): string {
   return typeof name === 'string' && !nameProblem(name) ? name.trim() : 'Player';
 }
 
-const FIRST = NFL
-  ? ['Clutch', 'Blitz', 'Gridiron', 'Endzone', 'Hailmary', 'Redzone', 'Shotgun', 'Pylon', 'Audible', 'Pocket', 'Fourth', 'Fast', 'Ice', 'Primetime', 'Twominute', 'Goalline', 'Spiral', 'Sack', 'Turf', 'Kickoff']
-  : ['Clutch', 'Splash', 'Swish', 'Dunk', 'Fadeaway', 'Hoop', 'Buzzer', 'Triple', 'Fast', 'Ice', 'Showtime', 'Rim', 'Glass', 'Downtown', 'Posterize', 'Alley', 'Crossover', 'Baseline', 'Paint', 'Sixth'];
-const SECOND = NFL
-  ? ['King', 'Cobra', 'Wizard', 'Legend', 'Machine', 'Hawk', 'Dragon', 'Gunslinger', 'Boss', 'Phantom', 'Rocket', 'Titan', 'Ghost', 'Maestro', 'Jet', 'Bulldozer', 'Ace', 'Comet', 'Bandit', 'Express']
-  : ['King', 'Cobra', 'Wizard', 'Legend', 'Machine', 'Hawk', 'Dragon', 'Mamba', 'Shooter', 'Boss', 'Phantom', 'Rocket', 'Titan', 'Ghost', 'Maestro', 'Jet', 'Vandal', 'Ace', 'Comet', 'Bandit'];
+const FIRST = pick({
+  soccer: ['Clutch', 'Volley', 'Nutmeg', 'Rabona', 'Panenka', 'Bicycle', 'Topbin', 'Hattrick', 'Fast', 'Ice', 'Golazo', 'Header', 'Curler', 'Rocket', 'Libero', 'Tiki', 'Counter', 'Overlap', 'Number', 'False'],
+  nfl: ['Clutch', 'Blitz', 'Gridiron', 'Endzone', 'Hailmary', 'Redzone', 'Shotgun', 'Pylon', 'Audible', 'Pocket', 'Fourth', 'Fast', 'Ice', 'Primetime', 'Twominute', 'Goalline', 'Spiral', 'Sack', 'Turf', 'Kickoff'],
+  nba: ['Clutch', 'Splash', 'Swish', 'Dunk', 'Fadeaway', 'Hoop', 'Buzzer', 'Triple', 'Fast', 'Ice', 'Showtime', 'Rim', 'Glass', 'Downtown', 'Posterize', 'Alley', 'Crossover', 'Baseline', 'Paint', 'Sixth'],
+});
+const SECOND = pick({
+  soccer: ['King', 'Cobra', 'Wizard', 'Legend', 'Machine', 'Hawk', 'Dragon', 'Maestro', 'Striker', 'Boss', 'Phantom', 'Rocket', 'Titan', 'Ghost', 'Keeper', 'Jet', 'Magician', 'Ace', 'Comet', 'Nine'],
+  nfl: ['King', 'Cobra', 'Wizard', 'Legend', 'Machine', 'Hawk', 'Dragon', 'Gunslinger', 'Boss', 'Phantom', 'Rocket', 'Titan', 'Ghost', 'Maestro', 'Jet', 'Bulldozer', 'Ace', 'Comet', 'Bandit', 'Express'],
+  nba: ['King', 'Cobra', 'Wizard', 'Legend', 'Machine', 'Hawk', 'Dragon', 'Mamba', 'Shooter', 'Boss', 'Phantom', 'Rocket', 'Titan', 'Ghost', 'Maestro', 'Jet', 'Vandal', 'Ace', 'Comet', 'Bandit'],
+});
 
 /** A suggestion in the sport's own slang. */
 export function randomName(): string {

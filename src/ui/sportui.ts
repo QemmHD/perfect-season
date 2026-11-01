@@ -1,18 +1,32 @@
 // What the screens say and show differently for each sport.
-import { GAMES } from '../engine/rating';
-import { NFL } from '../engine/sport';
+import { GAMES, soccerDraws } from '../engine/rating';
+import { pick } from '../engine/sport';
+
+/** Claude 2026-11-01: soccer is the third sport; each branch below names all three. */
+const SOCCER = pick({ nba: false, nfl: false, soccer: true });
+const FOOTBALL = pick({ nba: false, nfl: true, soccer: false });
 import { DEF_SLOTS, type Line, type OppPlayer, type Player } from '../engine/types';
 import { lastName } from '../lib/share';
 
 /** "82–0" / "17–0" */
 export const PERFECT_RECORD = GAMES + '–0';
 /** the playoff part of a perfect run: four sweeps, or four wins */
-export const PERFECT_PLAYOFFS = NFL ? '4–0' : '16–0';
-export const CHAMPS = NFL ? 'Super Bowl champions' : 'NBA champions';
+export const PERFECT_PLAYOFFS = pick({ nba: '16–0', nfl: '4–0', soccer: '4–0' });
+export const CHAMPS = pick({ nba: 'NBA champions', nfl: 'Super Bowl champions', soccer: 'Cup winners' });
+/** the final, as a word */
+export const FINAL_NAME = pick({ nba: 'Finals', nfl: 'Super Bowl', soccer: 'Final' });
 /** where the lineup stands */
-export const FLOOR = NFL ? 'field' : 'court';
+export const FLOOR = pick({ nba: 'court', nfl: 'field', soccer: 'pitch' });
 
 export function record(wins: number, games = GAMES): string {
+  // soccer: W–D–L, its draws as the season model has them for that many wins
+  if (SOCCER && games === GAMES) return recordOf(wins, soccerDraws(wins), games);
+  return wins + '–' + (games - wins);
+}
+
+/** A season's record: W–L, or soccer's W–D–L (when its draws are known). */
+export function recordOf(wins: number, draws?: number, games = GAMES): string {
+  if (SOCCER && draws !== undefined) return wins + '–' + draws + '–' + Math.max(0, games - wins - draws);
   return wins + '–' + (games - wins);
 }
 
@@ -23,12 +37,12 @@ export function isDefender(p: { pos: string[] }): boolean {
 
 /** Basketball "1989–90", football "1989". */
 export function seasonLabel(year: number): string {
-  return NFL ? String(year) : year - 1 + '–' + String(year).slice(2);
+  return pick({ nba: () => year - 1 + '–' + String(year).slice(2), nfl: () => String(year), soccer: () => year - 1 + '–' + String(year).slice(2) })();
 }
 
-/** "PG • SG" in basketball; a football player's own position (a RB is "RB", not "RB • FLEX"). */
+/** "PG • SG" in basketball; a football player's own position (a RB is "RB", not "RB • FLEX"); soccer's positions ("W • ST"). */
 export function posLabel(p: Player): string {
-  return NFL ? p.pos[0] : p.pos.join(' • ');
+  return pick({ nba: () => p.pos.join(' • '), nfl: () => p.pos[0], soccer: () => (p.roles ?? [p.role ?? p.pos[0]]).join(' • ') })();
 }
 
 export interface StatCol {
@@ -57,7 +71,14 @@ export function honorLabel(p: OppPlayer): string | null {
 export function statCols(p: { pos: string[]; s: Line }): StatCol[] {
   const s = p.s;
   const col = (key: string, label: string, text: (x: number) => string): StatCol => ({ key, label, value: s[key] ?? 0, text: text(s[key] ?? 0) });
-  if (!NFL) return ['pts', 'reb', 'ast', 'stl', 'blk'].map((k) => col(k, k.toUpperCase(), one));
+  if (SOCCER) {
+    // per season: goals and assists (a keeper's clean sheets), and the line's overall
+    const role = (p as { role?: string }).role ?? p.pos[0];
+    const ovr = col('ovr', 'OVR', (x) => String(Math.round(x)));
+    if (role === 'GK') return [col('cs', 'CS', kept(one)), ovr];
+    return [col('g', 'GLS', kept(one)), col('a', 'AST', kept(one)), ovr];
+  }
+  if (!FOOTBALL) return ['pts', 'reb', 'ast', 'stl', 'blk'].map((k) => col(k, k.toUpperCase(), one));
   if (isDefender(p)) {
     const sacks = col('sacks', 'SACKS', kept(one));
     const tkl = col('tkl', 'TKL', kept(count));
@@ -88,15 +109,22 @@ export type SortKey = string;
  * row shows lights up), the touchdowns in the row's TD column, and the defenders first, by value
  * (their main stat lights up).
  */
-export const SORTS: [SortKey, string][] = NFL
-  ? [
+export const SORTS: [SortKey, string][] = pick<[SortKey, string][]>({
+  soccer: [
+    ['val', 'VALUE'],
+    ['g', 'GOALS'],
+    ['a', 'ASSISTS'],
+    ['ovr', 'OVR'],
+    ['apps', 'GAMES'],
+  ],
+  nfl: [
       ['val', 'VALUE'],
       ['yds', 'YARDS'],
       ['td', 'TDS'],
       ['def', 'DEFENSE'],
       ['g', 'GAMES'],
-    ]
-  : [
+    ],
+  nba: [
       ['val', 'VALUE'],
       ['pts', 'PTS'],
       ['reb', 'REB'],
@@ -104,12 +132,18 @@ export const SORTS: [SortKey, string][] = NFL
       ['stl', 'STL'],
       ['blk', 'BLK'],
       ['g', 'GAMES'],
-    ];
+    ],
+});
 
 export function sortValue(p: Player, key: SortKey): number {
   if (key === 'val') return p.val;
-  if (key === 'g') return p.g;
-  if (NFL) {
+  if (key === 'g' && !SOCCER) return p.g;
+  if (SOCCER) {
+    if (key === 'apps') return p.g;
+    // goals and assists are per season (-1 not known: last)
+    return p.s[key] ?? -1;
+  }
+  if (FOOTBALL) {
     const s = p.s;
     // the defenders first, the best on top; then everyone else, the same way
     if (key === 'def') return isDefender(p) ? 100 + p.val : p.val - 100;
@@ -125,7 +159,7 @@ export function sortValue(p: Player, key: SortKey): number {
 
 /** Which of a row's stats light up for a sort. */
 export function hotFor(key: SortKey, col: StatCol, p: { pos: string[] }): boolean {
-  if (!NFL) return col.key === key;
+  if (!FOOTBALL) return col.key === key;
   // a defender's main stat: sacks, tackles or interceptions, the first a row shows
   if (isDefender(p)) return key === 'def' && statCols({ pos: p.pos, s: {} })[0].key === col.key;
   if (key === 'yds') return col.key === 'passYds' || col.key === 'recYds' || col.key === 'rushYds';

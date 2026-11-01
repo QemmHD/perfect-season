@@ -120,6 +120,14 @@ export const Hoop = (p: P) => (
     <path d="M3 12h18M12 3v18M5.6 5.6c3.2 3.2 3.2 9.6 0 12.8M18.4 5.6c-3.2 3.2-3.2 9.6 0 12.8" />
   </S>
 );
+/** Claude 2026-11-01: a soccer ball, the centre pentagon and its seams. */
+export const SoccerBall = (p: P) => (
+  <S {...p} stroke={2}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 8.2l3.6 2.6-1.4 4.2H9.8l-1.4-4.2z" />
+    <path d="M12 8.2V3.4M15.6 10.8l4.4-1.6M14.2 15l2.8 3.8M9.8 15L7 18.8M8.4 10.8L4 9.2" />
+  </S>
+);
 export const Football = (p: P) => (
   <S {...p} stroke={2}>
     <path d="M4.5 19.5C3 15 4.4 9.8 7.6 7.1S16.2 3 19.5 4.5c1.5 4.5.1 9.7-3.1 12.4S7.8 21 4.5 19.5z" />
