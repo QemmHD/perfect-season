@@ -136,8 +136,18 @@ interface Outcome {
 type Stage = 'load' | 'search' | 'found' | 'vs' | 'vote' | 'play' | 'result' | 'error';
 
 /** how each drive or possession ended, on the result screen */
-const END_LABEL: Record<string, string> = { A: '2+1', X: '·', TO: 'TO', MISS: 'FG✕', DOWNS: 'DWN' };
-const END_POINTS: Record<string, number> = { TD: 7, FG: 3, '2': 2, '3': 3, A: 3 };
+// Claude, final QA 2026-11-01: soccer's attacks end in one-letter codes (soccer2/match.ts END_TEXT), which
+// showed as a row of bare letters with goals not highlighted; they get short words and goals score
+const HOOPS_FOOTBALL_LABEL: Record<string, string> = { A: '2+1', X: '·', TO: 'TO', MISS: 'FG✕', DOWNS: 'DWN' };
+const HOOPS_FOOTBALL_POINTS: Record<string, number> = { TD: 7, FG: 3, '2': 2, '3': 3, A: 3 };
+const END_LABEL: Record<string, string> = pick({
+  nba: HOOPS_FOOTBALL_LABEL,
+  nfl: HOOPS_FOOTBALL_LABEL,
+  soccer: { G: 'GOAL', S: 'SAVE', W: 'WIDE', B: 'BLK', L: 'LOST', O: 'OFF', T: '·' }
+});
+const END_POINTS: Record<string, number> = pick({ nba: HOOPS_FOOTBALL_POINTS, nfl: HOOPS_FOOTBALL_POINTS, soccer: { G: 1 } });
+/** read aloud: soccer's words (its letters mean nothing alone), the other sports' codes as before */
+const endSpoken = (e: string) => pick({ nba: e, nfl: e, soccer: END_LABEL[e] === '·' ? 'time' : (END_LABEL[e] ?? e).toLowerCase() });
 
 const clock = (s: number) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
@@ -873,7 +883,7 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           <small>{setup.rival.name}</small>
         </span>
       </div>
-      <div className="utm-ends" aria-label={pick({ nba: 'Possessions', nfl: 'Drives', soccer: 'Attacks' }) + ': yours ' + out.ends[0].join(', ') + '; theirs ' + out.ends[1].join(', ')}>
+      <div className="utm-ends" aria-label={pick({ nba: 'Possessions', nfl: 'Drives', soccer: 'Attacks' }) + ': yours ' + out.ends[0].map(endSpoken).join(', ') + '; theirs ' + out.ends[1].map(endSpoken).join(', ')}>
         {out.ends.map((ends, k) => (
           <span key={k} className={(k ? 'them' : 'us') + (ends.length > 8 ? ' many' : '')}>
             {ends.map((e, i) => (
