@@ -582,3 +582,19 @@ Changes on the content side:
 Queues come from the rework (UT NBA 9 / NFL 10), plus this branch's `CONTENT_PRINT` fingerprint.
 
 Details: the "After the ratings rework" section of [UT-CONTENT-2.md](UT-CONTENT-2.md).
+
+## UI reorganisation — Claude (Anthropic), 2026-11-01 (branch `claude/ui-reorg`, not deployed)
+
+Purpose: organise the whole app like a current sports-game app (FC 26 "For You"/Play menu, FC 27 Campaign Hub, MUT/MyTEAM manage areas; sources in [UI-NAVIGATION.md](UI-NAVIGATION.md)), implement the UI/IA audit's P0–P2 items, and give every feature added since the audit one clear home.
+
+What changed:
+- Main tabs HOME · ULTIMATE TEAM · RANKS · PROFILE. The Daily is Home's Daily tile (result and countdown), Boosters are in Profile, the Gauntlet chip opens a sheet, and PLAY never leaves the screen (Home's content scrolls above it).
+- UT tabs HOME · PLAY · SQUAD · CLUB · CHALLENGES · STORE, mapped in `src/ut/nav.ts` (one title, tab and parent per view; root tabs have no back button; Home's is EXIT). Home is an action hub (Continue, Rewards with CLAIM ALL, This Season + Season Pass, Daily, Standouts, featured Store promo, squad, records). Play is Solo / Online with live status rows and one Rivals card. Club and Challenges use segments. Store is ordered Your packs → Daily Drop → This Season → Featured → Picks & previews → by price.
+- Shared pieces in `src/ut/ui.tsx` and `src/ut/nav.css`; per-mode status lines in `src/ut/play-status.ts`; new SVG icons in `src/ut/icons.tsx`.
+- Fixes: squashed buttons in scrolling columns (START SEASON, sheet buttons), tap targets ≥44 design px, truncation, the NUMBERING placeholder, dev-wording leaks, one name per thing (glossary in UI-NAVIGATION.md), badges count only claimables and things to open, card details keep their actions in a sticky bar.
+
+Connections and saves: none changed. No profile field, storage key, claim ID, card ID, price, odds, reward or queue changes. Only UI text changed in `progression.ts` (objective plurals) and `inbox.ts` (the Sets item title).
+
+Commits: `2d780ba` (UT navigation model, Home, Play), `2f505ef` (UT screens), `cd5b11a` (main tabs), then the QA and docs commits on `claude/ui-reorg`.
+
+Validation (Claude, 2026-11-01, before merging the gameplay pass): `npm run typecheck`; `npm test` both sports (NBA 415 passed, NFL 382 passed); `npm run build`. `scripts/qa/ui-reorg.mjs` (new): 204 screens — every main tab and sheet, every UT tab, segment and sub-screen, card details and the filter sheet, at 430×932, 390×844 and 320×568, NBA and NFL — with no horizontal overflow, clipped text, sub-44 targets, squeezed items, wrong tab/back/title or page errors (card name plates still ellipsize the longest surnames, by design). Updated and passing: `play-tab.mjs`, `ui-consistency.mjs`, `clubhouse.mjs`, `league-season.mjs`, `ut-content.mjs`. WebKit (WebKitGTK MiniBrowser over a `vite preview` build, both sports at 390 and 320): Home, Profile, all six UT tabs, card details, Season Pass and Club Season with no page errors or overflow.
