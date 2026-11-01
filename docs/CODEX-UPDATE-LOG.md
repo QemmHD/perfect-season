@@ -437,3 +437,16 @@ Connections: `Sheet` is used by Settings, Cloud Save, Store, card details, SBC, 
 - Nostr and Supabase connections are untouched. No downloadable backup workflow was added.
 - Online queues stay NBA 8 / NFL 9.
 - Work is pushed only to `feature/season-evolution`. **Not merged to main, not deployed to live Pages**, and the owner-private Sites preview has **not** been redeployed with these fixes: that deployment is controlled from Codex's/the owner's OpenAI Sites project. Physical installed-iPhone checks of the swipe gesture and season flow remain owner checks.
+
+### Separate Claude test copy (owner-private claude.ai page)
+
+At the owner's request, Claude published the production build of `02ccdbc` (`npm run build`, version `20261101.0606-02ccdbc`) as an owner-private claude.ai page: https://claude.ai/artifact/38vSryyQVZLARkNKvq1g6W . It is **not** the Sites preview, and it doesn't replace it.
+
+What differs from the Sites preview:
+- It starts with its own fresh local save, separate from both the live game and the Sites preview.
+- The page sandbox blocks every outside connection: Nostr relays, the Supabase card registry and server saves, and the service worker. So it can't touch live boards, serial counts or saves, and online features, cloud save and offline install don't work there.
+- The only change from the branch build is the page title ("Perfect Season Test"), with `sw.js` and the launch images left out.
+
+Use it for offline checks: Club Season, Ultimate Team, packs, the sheet swipe and Ranks layout.
+
+Before publishing, the same build was booted locally under an equivalent policy (own files only, `connect-src 'self'`). The app loaded and onboarding worked with no page errors; the blocked connections only log console errors.
