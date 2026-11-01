@@ -139,7 +139,7 @@ export function soccerFormationNow(): Formation {
  * he can play it), the rest go to the open slots they can play (the most constrained first), and
  * anyone left over stays in the club.
  */
-export function refitSquad(squad: Record<string, string>, to: Formation, posOf: (uid: string) => string[] | undefined): Record<string, string> {
+export function refitSquad(squad: Record<string, string>, to: Formation, posOf: (uid: string) => string[] | undefined, club: Candidate[] = []): Record<string, string> {
   const slots = SOCCER_FORMATIONS[to];
   const out: Record<string, string> = {};
   const left: string[] = [];
@@ -152,6 +152,19 @@ export function refitSquad(squad: Record<string, string>, to: Formation, posOf: 
     const pos = posOf(uid) ?? [];
     const open = slots.find((x) => !out[x.id] && pos.includes(x.pos!));
     if (open) out[open.id] = uid;
+  }
+  // a spot the old shape had no one for (a 4-4-2 has no holding midfielder): the club's best who can
+  // play it, never a second copy of a player already in the eleven
+  const used = new Set(Object.values(out));
+  const pids = new Set(club.filter((c) => used.has(c.uid)).map((c) => c.rc.line.pid));
+  const ranked = club.slice().sort((a, b) => b.rc.ovr - a.rc.ovr);
+  for (const sl of slots) {
+    if (out[sl.id]) continue;
+    const c = ranked.find((x) => !used.has(x.uid) && !pids.has(x.rc.line.pid) && canPlay(sl, x.rc));
+    if (!c) continue;
+    out[sl.id] = c.uid;
+    used.add(c.uid);
+    pids.add(c.rc.line.pid);
   }
   return out;
 }

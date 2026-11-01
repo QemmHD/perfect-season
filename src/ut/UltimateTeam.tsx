@@ -776,7 +776,8 @@ export default function UltimateTeam(props: {
         onFormation={(f) =>
           setUt((u) => {
             const posOf = (uid: string) => byUid.get(uid)?.rc.line.pos;
-            return { ...u, formation: f, squad: refitSquad(u.squad, f, posOf) };
+            // the club's cards outside storage can fill a spot the old shape didn't have
+            return { ...u, formation: f, squad: refitSquad(u.squad, f, posOf, club.map((c) => ({ uid: c.uid, rc: c.rc }))) };
           })
         }
         management={
