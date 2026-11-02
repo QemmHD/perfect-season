@@ -777,9 +777,9 @@ export function aimPoint(a: Attack, shooter: Body, aim: Pt | null): { x: number;
   return { x: GX + clamp(v.x, -1, 1) * AIM_X, h: 0.3 + clamp((v.y + 1) / 2, 0, 1) * 1.75 };
 }
 
-/** Range makes a shot harder to place: the cone grows from 12 m (x1.5 at 19 m, at most x2 at 26 m). */
+/** Range makes a shot harder to place: the cone grows from 12 m (x2 at 20 m, at most x2.25 from 22 m). */
 export function rangeCone(d: number): number {
-  return 1 + clamp((d - 12) / 14, 0, 1);
+  return 1 + clamp((d - 12) / 8, 0, 1.25);
 }
 
 /** A release's distance from the green's centre in green half-widths (0 dead centre, 1 the slice's edge). */
@@ -903,7 +903,7 @@ export const SP_TUNE = {
  * Keeper tuning for the aim-assist update (Claude 2026-11-02): with shots no longer going at him by
  * default, he narrows tight angles and gets across on a long shot he has time for.
  */
-export const KEEP = { tightDepth: 1.3, shuffle: 3.2, tightX: 9, chargeAt: 6, narrow: 0.3, setSlow: 0.8, rushFrom: 18, spreadIn: 8, spread: [1.05, 1.25] as [number, number] };
+export const KEEP = { tightDepth: 1.3, shuffle: 3.2, tightX: 9, chargeAt: 6, narrow: 0.3, setSlow: 0.8, rushFrom: 18, spreadIn: 8, spread: [1.0, 1.12] as [number, number] };
 
 /** Where the keeper stands: on the bisector of the angle the posts make from the ball, off his line by how far away it is. */
 export function keeperSpot(a: Attack, _gk: Body, err: number): Pt {

@@ -277,3 +277,13 @@ neither the engine nor `cards-soccer.json` (verified: no soccer chunk or card da
 - Optional extra sounds (Mixkit goal roar 3022, chant bed 438, kicks 2108/2112, bounce 2077, long
   whistle 614) through `scripts/build_sfx.py`.
 - Physical iPhone feel (two-thumb play, meter timing) needs an owner playtest; Chromium can't judge it.
+
+### Release tuning (Claude, 2026-11-02)
+
+Before merging, elite ratings swung too far: a 93 keeper stopped 91% of one-on-ones and a 95
+finisher scored 85% from the edge of the box. Changed: `shotCone` floor 1.3° → 1.6° (SHO 99),
+`gkMisread` floor 0.18 → 0.30 m, `gkPositionError` floor 0.12 → 0.35 m, the close-range spread
+`KEEP.spread` [1.05, 1.25] → [1.0, 1.12], and `rangeCone` now grows faster (x2 at 20 m, capped at
+x2.25). `scripts/audit_soccer_shots.ts 200 shots` (75 sides unless noted): 1v1 running 62%, edge
+running/aimed 38/44%, 1v1 vs keeper 52/75/93 = 81/60/27%, 1v1 by SHO 55/75/95 = 44/62/68%.
+Soccer tests 74/74.

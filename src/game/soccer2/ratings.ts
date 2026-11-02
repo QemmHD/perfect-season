@@ -87,9 +87,9 @@ export function accelOf(p: SoccerPlayer): number {
 export function passError(p: SoccerPlayer): number {
   return Math.max(0.5, lin(7, 1.5, rt(p.keeper ? p.a.KIC : p.a.PAS)));
 }
-/** A shot's error cone, degrees (1 sd) on a green release: SHO 40 → 5.5°, SHO 99 → 1.3°. */
+/** A shot's error cone, degrees (1 sd) on a green release: SHO 40 → 5.5°, SHO 99 → 1.6°. */
 export function shotCone(p: SoccerPlayer): number {
-  return Math.max(0.4, lin(5.5, 1.3, rt(p.keeper ? 40 : p.a.SHO)));
+  return Math.max(0.4, lin(5.5, 1.6, rt(p.keeper ? 40 : p.a.SHO)));
 }
 /** Half the green window on the power meter (seconds): SHO 40 → 0.028, SHO 99 → 0.085. */
 export function greenHalf(p: SoccerPlayer): number {
@@ -143,11 +143,11 @@ export function gkArm(p: SoccerPlayer): number {
 }
 /** Misreading where the shot goes (m, 1 sd): sharp reflexes read it truer. */
 export function gkMisread(p: SoccerPlayer): number {
-  return Math.max(0.05, lin(0.7, 0.18, rt(p.a.REF)));
+  return Math.max(0.05, lin(0.7, 0.3, rt(p.a.REF)));
 }
 /** Standing off his angle (m, 1 sd): POS. */
 export function gkPositionError(p: SoccerPlayer): number {
-  return Math.max(0.05, lin(1.3, 0.12, rt(p.a.POS)));
+  return Math.max(0.05, lin(1.3, 0.35, rt(p.a.POS)));
 }
 /** Holding a save rather than parrying it: HAN, less for a hard shot or one at full stretch. */
 export function gkCatch(p: SoccerPlayer, speed: number, stretch: number, high: boolean): number {
