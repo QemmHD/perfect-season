@@ -5,15 +5,17 @@
 // players in their kits playing the motion-capture clips (the CMU kick for passes and shots, the dive
 // for a keeper's save and a slide tackle), the ball and its shadow, and the HUD drawn in the world:
 // the ring on the man you control, his stamina, the pass he'd play, the power meter's arch with its
-// green slice and the aim in the goal mouth with the shot's error cone.
+// green slice and the aim in the goal mouth with the shot's error cone. Claude 2026-11-02: the pass
+// line, the aim reticle and a small goal over the meter (where it's going, past the keeper), a ring
+// that tightens as the meter nears the green, and the release read-out (PERFECT / GOOD / EARLY / LATE).
 import { DEFAULT_HAIR, DEFAULT_SKIN, drawBody, freeCanvas, hairFor, beardFor, type Look, type Sprite, SpriteCache, CanvasOut } from '../pixel/body';
 import { clipMeta, frameAt, getClip, legScale, loadClips, mocapJoints, mocapKey, warp } from '../pixel/mocap';
 import { drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { pitchTexture, type PitchTheme } from '../pixel/pitch';
 import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
-import { aimPoint, GH, GHALF, GX, METER, PL, PW, ctrlOf } from './engine';
-import { topSpeed } from './ratings';
+import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
+import { shotCone, topSpeed } from './ratings';
 import type { Attack, Body, Pt } from './types';
 
 export interface SoccerKit {
@@ -29,8 +31,8 @@ export interface SoccerKit {
 export interface SoccerOverlay {
   /** the teammate a pass would go to now (the stick's choice) */
   target: number | null;
-  /** the stick's aim in the goal while SHOOT is held (x, y -1..1), or null (assisted) */
-  aim: Pt | null;
+  /** the pass the stick would play now (its line on the grass) */
+  pass?: PassPlan | null;
   shake: number;
   flash: number;
   /** names over everyone (before kick-off) */
@@ -494,67 +496,189 @@ export class SoccerRenderer {
     }
   }
 
-  /** The power meter: an arch over the shooter, filling as SHOOT is held, the green slice at its top. */
+  /** The power meter: an arch over the shooter, filling as SHOOT is held, the green slice at its
+   * top and a fainter "good" band around it (closer to the green is truer); after the strike it stays
+   * a moment with a tick where it was let go and the word for it. */
   private meter(ctx: CanvasRenderingContext2D, a: Attack, head: { x: number; y: number }) {
     const m = a.meter;
-    if (!m) return;
+    const r = a.release;
+    const ghost = !m && r && a.t - r.at < 0.9 ? r : null;
+    if (!m && !ghost) return;
+    const top = m ? m.top : ghost!.top;
+    const green = m ? m.green : ghost!.green;
+    const held = m ? a.t - m.t0 : ghost!.top + ghost!.off;
     const span = METER * 1.3;
-    const frac = Math.min(1, (a.t - m.t0) / span);
+    const frac = Math.min(1, Math.max(0, held / span));
     const R = Math.max(24, Math.round(Math.min(this.W, this.H) * 0.085));
     const th = Math.max(7, Math.round(R * 0.27));
     const cx = head.x;
-    const cy = Math.max(R + th + 30, head.y + Math.round(R * 0.25));
+    const cy = Math.max(R + th + 64, head.y + Math.round(R * 0.25));
     const A0 = Math.PI + 0.36;
     const SW = Math.PI - 0.72;
-    const band = (a0: number, a1: number, r: number, w: number, color: string) => {
+    const band = (a0: number, a1: number, rr: number, w: number, color: string) => {
       if (a1 <= a0) return;
       ctx.strokeStyle = color;
       ctx.lineWidth = w;
       ctx.beginPath();
-      ctx.arc(cx, cy, r, a0, a1);
+      ctx.arc(cx, cy, rr, a0, a1);
       ctx.stroke();
     };
+    const at = (t: number) => A0 + Math.min(1, Math.max(0, t / span)) * SW;
     ctx.save();
+    if (ghost) ctx.globalAlpha = Math.max(0, Math.min(1, (0.9 - (a.t - ghost.at)) / 0.3));
     ctx.lineCap = 'butt';
     band(A0 - 0.05, A0 + SW + 0.05, R, th + 5, '#05070d');
     band(A0 - 0.03, A0 + SW + 0.03, R, th + 2, '#e8ecf5');
     band(A0, A0 + SW, R, th, '#1a2235');
-    const gc = A0 + (m.top / span) * SW;
-    const gw = Math.max(0.006, (m.green / span) * SW);
-    const glow = Math.max(0, 1 - Math.abs(frac * span - m.top) / 0.12);
-    band(Math.max(A0, gc - gw), Math.min(A0 + SW, gc + gw), R, th, glow > 0 ? mixHex('#1f9e4c', '#7dffab', glow) : '#1f9e4c');
-    band(gc - gw, gc + gw, R + th / 2 + 2, 2, '#3ef07a');
-    band(gc - gw, gc + gw, R - th / 2 - 2, 2, '#3ef07a');
+    // the good band (accuracy falls off smoothly away from the green: 2.2 greens is still GOOD)
+    band(at(top - green * 2.2), at(top + green * 2.2), R, th, '#33618f');
+    const glow = m ? Math.max(0, 1 - Math.abs(held - top) / 0.12) : 0;
+    band(at(top - green), at(top + green), R, th, glow > 0 ? mixHex('#1f9e4c', '#7dffab', glow) : '#1f9e4c');
+    band(at(top - green), at(top + green), R + th / 2 + 2, 2, '#3ef07a');
+    band(at(top - green), at(top + green), R - th / 2 - 2, 2, '#3ef07a');
     const fillTo = A0 + frac * SW;
-    const over = frac * span > m.top + m.green;
-    band(A0, fillTo, R, th - 2, over ? '#ff7a4a' : '#ffd35a');
+    const u = timingMiss(held - top, green);
+    const fill = held > top + green ? (u > 2.2 ? '#ff7a4a' : '#ffb04a') : u <= 1 ? '#7dffab' : '#ffd35a';
+    band(A0, fillTo, R, th - 2, fill);
     band(A0, fillTo, R - th / 2 + 2, 1, 'rgba(255,255,255,0.55)');
     if (frac > 0.01) band(fillTo - 0.035, fillTo, R, th + 4, '#ffffff');
     ctx.restore();
-    label(ctx, m.first ? 'FIRST TIME' : a.setPiece?.kind === 'penalty' ? 'PENALTY' : a.setPiece ? 'FREE KICK' : 'POWER', cx, cy - R - th - 16, '#d6e5ed', this.W);
+    if (ghost) {
+      const w = timingWord(ghost.off, ghost.green);
+      const col = w === 'PERFECT' ? '#3ef07a' : w === 'GOOD' ? '#d6e5ed' : '#ffb04a';
+      label(ctx, w, cx, cy - R - th - 16, col, this.W);
+      return;
+    }
+    label(ctx, m!.first ? 'FIRST TIME' : a.setPiece?.kind === 'penalty' ? 'PENALTY' : a.setPiece ? 'FREE KICK' : 'POWER', cx, cy - R - th - 16, '#d6e5ed', this.W);
+    this.miniGoal(ctx, a, cx, cy - R - th - 30);
   }
 
-  /** Where the shot is going: a ring in the goal mouth as big as his error cone (a finisher's is tight). */
-  private aim(ctx: CanvasRenderingContext2D, a: Attack, aim: Pt | null, cone: number) {
+  /** The cone (degrees, 1 sd) a release now would have: it tightens toward the green and opens past it. */
+  private liveCone(a: Attack): number {
+    const m = a.meter;
     const c = ctrlOf(a);
-    const tp = aimPoint(a, c, aim);
-    const p = this.lens(tp.x, PL, tp.h);
-    const dist = Math.hypot(tp.x - a.ball.x, PL - a.ball.y);
-    const rM = Math.max(0.25, dist * Math.tan((cone * 0.55 * Math.PI) / 180) * 1.6);
-    const r = Math.max(4, Math.round(rM * p.s));
+    if (!m) return shotCone(c.p);
+    return shotCone(c.p) * coneMult(a.t - m.t0 - m.top, m.green);
+  }
+
+  /** A small goal over the meter: the keeper, and where the shot is going (a dot, AUTO when it's the assist). */
+  private miniGoal(ctx: CanvasRenderingContext2D, a: Attack, cx: number, bottom: number) {
+    const m = a.meter;
+    if (!m) return;
+    const c = ctrlOf(a);
+    const tp = aimPoint(a, c, m.aim ?? null);
+    const gk = a.bodies.find((b) => b.role === 'gk');
+    const W = Math.max(66, Math.round(this.W * 0.2));
+    const H = Math.round((W * GH) / (GHALF * 2));
+    const x0 = Math.round(Math.max(6, Math.min(this.W - W - 6, cx - W / 2)));
+    const y0 = Math.round(Math.max(4, bottom - H));
+    const sx = (x: number) => x0 + ((x - (GX - GHALF)) / (GHALF * 2)) * W;
+    const sy = (h: number) => y0 + H - (h / GH) * H;
     ctx.save();
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = 4;
+    ctx.fillStyle = 'rgba(6,10,8,0.72)';
+    ctx.fillRect(x0 - 4, y0 - 4, W + 8, H + 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(x0, y0, W, H);
+    ctx.strokeStyle = '#f4f6fb';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(Math.round(p.x), Math.round(p.y), r, 0, Math.PI * 2);
+    ctx.moveTo(x0, y0 + H);
+    ctx.lineTo(x0, y0);
+    ctx.lineTo(x0 + W, y0);
+    ctx.lineTo(x0 + W, y0 + H);
     ctx.stroke();
+    // the keeper: as the shooter sees him across the goal (his angle, not his place on the line)
+    if (gk) {
+      const sh = { x: a.ball.x, y: a.ball.y };
+      const k = (gk.x - sh.x) / Math.max(0.5, gk.y - sh.y);
+      const kx = Math.max(GX - GHALF - 0.5, Math.min(GX + GHALF + 0.5, sh.x + k * (PL - sh.y)));
+      const kw = Math.max(5, Math.round(W * 0.09));
+      ctx.fillStyle = '#ff9d3a';
+      ctx.fillRect(Math.round(sx(kx) - kw / 2), Math.round(sy(1.85)), kw, Math.round(H * 0.76));
+    }
+    // the aim: the dot, and the ring the timing gives it right now
+    const px = Math.round(sx(tp.x));
+    const py = Math.round(sy(tp.h));
+    const d = Math.hypot(tp.x - a.ball.x, PL - a.ball.y);
+    const rr = Math.max(3, Math.round(((d * Math.tan((this.liveCone(a) * Math.PI) / 180)) / (GHALF * 2)) * W * 1.3));
+    ctx.beginPath();
+    ctx.rect(x0 - 4, y0 - 4, W + 8, H + 6);
+    ctx.clip();
     ctx.strokeStyle = '#ffe08a';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(Math.round(p.x), Math.round(p.y), r, 0, Math.PI * 2);
+    ctx.arc(px, py, Math.min(rr, W * 0.45), 0, Math.PI * 2);
     ctx.stroke();
     ctx.fillStyle = '#ffe08a';
-    ctx.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 3, 3);
+    ctx.fillRect(px - 2, py - 2, 5, 5);
+    ctx.restore();
+    if (!m.aim) label(ctx, 'AUTO', x0 + W / 2, y0 - 16, '#7ff5d6', this.W);
+  }
+
+  /** Where the shot is going: a reticle in the goal mouth, its ring the error cone a release now would
+   * have (tight at the green, wide off it). */
+  private aim(ctx: CanvasRenderingContext2D, a: Attack) {
+    const m = a.meter;
+    if (!m) return;
+    const c = ctrlOf(a);
+    const tp = aimPoint(a, c, m.aim ?? null);
+    const p = this.lens(tp.x, PL, tp.h);
+    const dist = Math.hypot(tp.x - a.ball.x, PL - a.ball.y);
+    const rM = Math.max(0.2, dist * Math.tan((this.liveCone(a) * Math.PI) / 180) * 1.3);
+    const r = Math.max(5, Math.round(rM * p.s));
+    const x = Math.round(p.x);
+    const y = Math.round(p.y);
+    ctx.save();
+    for (const [w, col] of [
+      [4, 'rgba(0,0,0,0.55)'],
+      [2, '#ffe08a'],
+    ] as const) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.moveTo(x - r - 5, y);
+      ctx.lineTo(x - Math.max(2, r - 3), y);
+      ctx.moveTo(x + Math.max(2, r - 3), y);
+      ctx.lineTo(x + r + 5, y);
+      ctx.moveTo(x, y - r - 5);
+      ctx.lineTo(x, y - Math.max(2, r - 3));
+      ctx.moveTo(x, y + Math.max(2, r - 3));
+      ctx.lineTo(x, y + r + 5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#ffe08a';
+    ctx.fillRect(x - 1, y - 1, 3, 3);
+    ctx.restore();
+  }
+
+  /** The pass the stick would play: a dashed line on the grass to where it's going, a ring on the man it's for. */
+  private passLine(ctx: CanvasRenderingContext2D, a: Attack, plan: PassPlan) {
+    const f = this.lens(a.ball.x, a.ball.y);
+    const t = this.lens(plan.spot.x, plan.spot.y);
+    const col = plan.to ? 'rgba(62,240,192,0.9)' : 'rgba(240,244,250,0.75)';
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(f.x, f.y);
+    ctx.lineTo(t.x, t.y);
+    ctx.stroke();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // the arrowhead at the far end
+    const ang = Math.atan2(t.y - f.y, t.x - f.x);
+    const L = 8;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(t.x, t.y);
+    ctx.lineTo(t.x - Math.cos(ang - 0.45) * L, t.y - Math.sin(ang - 0.45) * L);
+    ctx.lineTo(t.x - Math.cos(ang + 0.45) * L, t.y - Math.sin(ang + 0.45) * L);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
 
@@ -562,7 +686,7 @@ export class SoccerRenderer {
     this.goalAt = t;
   }
 
-  draw(ctx: CanvasRenderingContext2D, a: Attack, o: SoccerOverlay, kitOf: (b: Body) => 'us' | 'them', cone: number) {
+  draw(ctx: CanvasRenderingContext2D, a: Attack, o: SoccerOverlay, kitOf: (b: Body) => 'us' | 'them') {
     ctx.imageSmoothingEnabled = false;
     // a corner pulls out wide enough for the taker and the whole box; a replay pushes in
     const zt = this.replay ? 1.3 : a.setPiece?.kind === 'corner' ? 0.68 : 1;
@@ -652,10 +776,9 @@ export class SoccerRenderer {
       label(ctx, t.p.tag, heads[o.target].x, heads[o.target].y - 15, '#7ff5d6', this.W);
     }
     if (o.names) for (const b of a.bodies) if (b.side === 'A' && b !== c && heads[b.id]) label(ctx, b.p.tag, heads[b.id].x, heads[b.id].y - 15, '#ffffff', this.W);
-    if (a.meter && h) {
-      this.aim(ctx, a, o.aim, cone);
-      this.meter(ctx, a, h);
-    }
+    if (o.pass && !a.meter && !a.end) this.passLine(ctx, a, o.pass);
+    if (a.meter) this.aim(ctx, a);
+    if (h && !a.end) this.meter(ctx, a, h);
     // a free kick's bend: an arrow over the ball the way it will swing
     if (a.setPiece?.kind === 'freekick' && Math.abs(a.curl) > 0.05 && !a.end) {
       const p0 = this.lens(a.ball.x, a.ball.y, 1.6);

@@ -1,6 +1,8 @@
 // Claude, 2026-11-01: browser QA for the dev-only soccer lab (?soccer-lab). Portrait phones, real
 // touch input through CDP (Input.dispatchTouchEvent), screenshots of each stage, page errors and
 // frame time. Needs the dev server: PS_QA_URL=http://localhost:5187/ node scripts/qa/soccer-lab.mjs
+// 2026-11-02: SHOOT is held and dragged to aim (the stick keeps running); the report has the aim the
+// drag set, whether the shot was assisted, and the run speed while the meter was up.
 import { launch, base, artifacts } from './browser.mjs';
 import fs from 'node:fs';
 const out = process.env.PS_QA_SOCCER_OUT || artifacts + '/soccer';
@@ -22,7 +24,7 @@ async function open(width, height, params) {
   const cdp = await context.newCDPSession(page);
   return { context, page, errors, cdp };
 }
-const state = (page) => page.evaluate(() => { const s = window.__soccer; const a = s.a; const c = a.bodies[a.ctrl]; return { ui: s.ui, t: a.t, used: a.used, end: a.end, ctrl: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, tag: c.p.tag }, ball: { x: a.ball.x, y: a.ball.y, h: a.ball.h, owner: a.ball.owner }, meter: !!a.meter, setPiece: a.setPiece?.kind ?? null, goals: s.m.goals, ends: s.m.ends.slice(), i: s.m.i }; });
+const state = (page) => page.evaluate(() => { const s = window.__soccer; const a = s.a; const c = a.bodies[a.ctrl]; return { ui: s.ui, t: a.t, used: a.used, end: a.end, ctrl: { x: c.x, y: c.y, vx: c.vx, vy: c.vy, tag: c.p.tag }, ball: { x: a.ball.x, y: a.ball.y, h: a.ball.h, owner: a.ball.owner }, meter: !!a.meter, aim: a.meter ? (a.meter.aim ?? null) : null, assisted: a.lastShot ? !!a.lastShot.assisted : null, setPiece: a.setPiece?.kind ?? null, goals: s.m.goals, ends: s.m.ends.slice(), i: s.m.i }; });
 async function touch(cdp, type, points) {
   const touchPoints = points.map((p, i) => ({ x: Math.round(p.x), y: Math.round(p.y), id: p.id ?? i }));
   try { await cdp.send("Input.dispatchTouchEvent", { type, touchPoints }); } catch (e) { throw new Error(type + " " + JSON.stringify(touchPoints) + " " + e.message); }
@@ -70,17 +72,21 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     if ((await page.locator('.hg2-shoot').count()) && s4.ball.owner !== null && !s4.end) {
       const shoot = await center(page, '.hg2-shoot');
       await touch(cdp, 'touchStart', [{ ...shoot, id: 3 }]);
-      await page.waitForTimeout(450);
+      // drag on SHOOT: right and up (the top right corner)
+      for (let k = 1; k <= 4; k++) await touch(cdp, 'touchMove', [{ x: shoot.x + 10 * k, y: shoot.y - 9 * k, id: 3 }]);
+      await page.waitForTimeout(330);
       await page.screenshot({ path: `${out}/${tag}-shot-meter.png` });
-      await page.waitForTimeout(270);
+      s4 = await state(page);
+      await page.waitForTimeout(180);
       await touch(cdp, 'touchEnd', []);
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${out}/${tag}-shot.png` });
     }
+    const metered = s4;
     s4 = await state(page);
     await page.waitForTimeout(2000);
     await page.screenshot({ path: `${out}/${tag}-after.png` });
-    report.push({ tag, step: 'touch', start: s0.ctrl, forward: s1.ctrl, right: s2.ctrl, released: s3.ctrl, shot: s4, frame: ft, errors });
+    report.push({ tag, step: 'touch', start: s0.ctrl, forward: s1.ctrl, right: s2.ctrl, released: s3.ctrl, dragAim: metered.aim, shot: s4, frame: ft, errors });
     errorsAll.push(...errors);
     await context.close();
   }
@@ -170,13 +176,15 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
       const s = await state(page);
       if (s.ui === 'final') break;
       if (s.ui === 'so-intro' && (await page.locator('.sc2-go').count())) {
-        await page.locator('.sc2-go').tap();
+        await page.locator('.sc2-go').tap({ timeout: 1500 }).catch(() => {});
         await page.waitForTimeout(300);
         continue;
       }
       if (s.ui === 'so-kick' && (await page.locator('.hg2-shoot').count()) && !s.meter && !s.end) {
-        const st = await center(page, '.sc2-stick');
-        const sh = await center(page, '.hg2-shoot');
+        const st = await center(page, '.sc2-stick').catch(() => null);
+        const sh = await center(page, '.hg2-shoot').catch(() => null);
+        // the kick's controls can go between the check and here (the kick taken, their turn)
+        if (!st || !sh) continue;
         const side = kicks % 2 ? -1 : 1;
         await touch(cdp, 'touchStart', [{ ...st, id: 1 }]);
         await touch(cdp, 'touchMove', [{ x: st.x + side * 45, y: st.y - 10, id: 1 }]);
@@ -190,7 +198,8 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
         continue;
       }
       if (s.ui === 'so-kick' && (await page.locator('.sc2-dive button').count()) && !s.end) {
-        await page.locator('.sc2-dive button').nth(kicks % 3).tap();
+        // (the buttons go when the kick is taken: a tap that misses that moment is skipped)
+        await page.locator('.sc2-dive button').nth(kicks % 3).tap({ timeout: 1500 }).catch(() => {});
         await page.waitForTimeout(400);
       }
       await page.waitForTimeout(200);

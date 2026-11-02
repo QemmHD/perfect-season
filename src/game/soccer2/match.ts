@@ -29,8 +29,8 @@ export const SCENARIO_HINTS: Record<Scenario, string> = {
   counter: '3 on 2 · sprint at them before they get back',
   wide: 'Overload the flank · beat your man or cross it',
   corner: 'Pick your target · hold PASS to whip it in',
-  freekick: 'Swipe to bend it · hold SHOOT and let go in the green',
-  penalty: 'Aim with the stick · hold SHOOT, let go in the green',
+  freekick: 'Swipe to bend it · hold SHOOT, drag to aim, let go in the green',
+  penalty: 'Hold SHOOT and drag to aim (or the stick) · let go in the green',
 };
 
 export interface Match {

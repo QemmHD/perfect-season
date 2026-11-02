@@ -314,8 +314,8 @@ export function Arcade({
           </div>
         )}
         <div className="arc-how">
-          <span>Stick: run · SPRINT · PASS (hold to cross) · THRU into a runner</span>
-          <span>Hold SHOOT and let go in the green · the stick aims in the goal</span>
+          <span>Stick: run · SPRINT · PASS goes where you point (hold to cross) · THRU into a runner</span>
+          <span>Hold SHOOT, drag it to aim (or let it pick the open side) · let go in the green</span>
         </div>
         {online && rivalLive?.done && (
           <p className="arc-wait">

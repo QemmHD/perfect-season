@@ -52,9 +52,10 @@ export const BALL_R = 0.11;
 /** the attack's clock (seconds of open play), and stoppage time's */
 export const CLOCK = 30;
 export const STOPPAGE_CLOCK = 15;
-/** the power meter: fills in METER s, the green sits at TOP */
-export const METER = 1.0;
-export const TOP = 0.72;
+/** the power meter: fills in METER s, the green sits at TOP (0.72 s until 2026-11-02: a quicker
+ * wind-up gets the shot off before the man closing you down arrives) */
+export const METER = 0.86;
+export const TOP = 0.62;
 
 const G = 9.81;
 /** air drag, per metre: a = DRAG v² (a match ball, about 0.013) */
@@ -498,37 +499,129 @@ export function passTarget(a: Attack, dir: Pt | null, kind: PassKind = 'ground')
   return best;
 }
 
+/** How long a pass of `kind` takes to cover `d` metres (the lead on a moving receiver). */
+function passTime(kind: PassKind | 'cross', d: number, box = false): number {
+  if (kind === 'lofted' || kind === 'cross') return box ? lerp(1.15, 1.85, d / 40) : lerp(0.95, 1.6, d / 40);
+  const v0 = Math.min(26, groundSpeedFor(d, kind === 'through' ? 6 : 9));
+  return (2 * d) / (v0 + (kind === 'through' ? 6 : 9));
+}
+
+/**
+ * Where a pass to `to` should arrive: a through ball into the space ahead of him, the rest where his
+ * run takes him by the time it gets there (solved twice: the lead changes the distance), a cross a
+ * yard short of him so he attacks it.
+ */
+function passSpot(a: Attack, from: Pt, to: Body, kind: PassKind): Pt {
+  const sp = a.setPiece;
+  const lead = Math.hypot(to.vx, to.vy) > 1 ? { x: to.vx, y: to.vy } : { x: 0, y: 0 };
+  const lofted = kind === 'lofted' || (sp?.kind === 'corner' && kind !== 'ground');
+  if (kind === 'through') {
+    const ahead = norm(GX - to.x, PL - to.y);
+    const fwd = norm(ahead.x * 0.35, 1);
+    return { x: clamp(to.x + fwd.x * 8 + lead.x * 0.4, 2, PW - 2), y: clamp(to.y + 8 + Math.max(0, lead.y) * 0.4, 0, PL - 3.5) };
+  }
+  const box = sp?.kind === 'corner' || inBox(to);
+  let spot: Pt = { x: to.x, y: to.y };
+  for (let i = 0; i < 2; i++) {
+    const T = lofted ? lerp(0.95, 1.55, dist(from, to) / 40) * 0.8 : passTime(kind, dist(from, spot)) * 0.9;
+    spot = { x: to.x + lead.x * T, y: to.y + lead.y * T };
+  }
+  if (lofted) {
+    spot = { x: clamp(spot.x, 1, PW - 1), y: clamp(spot.y, 1, PL - 1.5) };
+    // a cross aims at his head, a yard short of where he is, so he attacks it
+    if (box) spot = { x: spot.x + (from.x < GX ? -0.6 : 0.6), y: spot.y - 0.8 };
+  }
+  return spot;
+}
+
+/** Free passing (Claude 2026-11-02): how wide (degrees) the gentle pull toward a teammate reaches. */
+export const PASS_ASSIST = { ground: 22, lofted: 18, through: 30, centred: 32 };
+
+export interface PassPlan {
+  /** the teammate it's meant for (null: into space) */
+  to: Body | null;
+  /** where it's played to (before the passer's error) */
+  spot: Pt;
+  /** the stick's way (unit) */
+  dir: Pt;
+  /** how much the assist bent it toward him (0 none, 1 dead on) */
+  w: number;
+}
+
+/**
+ * A person's pass (free and directional: no lock-on). It goes the way the stick points; a teammate
+ * whose run is within a narrow cone of that way pulls it gently toward him (fully when aimed right at
+ * him, not at all at the cone's edge); nobody there and it goes into space along the stick, weighted
+ * to be level with the nearest man that way, for whoever gets to it. Deterministic (the HUD draws it).
+ */
+export function passPlan(a: Attack, kind: PassKind, dir: Pt | null): PassPlan | null {
+  const c = ownerOf(a) ?? (a.taker !== null ? a.bodies[a.taker] : null);
+  if (!c) return null;
+  const from = { x: a.ball.x, y: a.ball.y };
+  const on = !!dir && Math.hypot(dir.x, dir.y) > 0.2;
+  const d = on ? norm(dir!.x, dir!.y) : facingOf(c);
+  const cone = ((on ? PASS_ASSIST[kind] : PASS_ASSIST.centred) * Math.PI) / 180;
+  let best: { q: Body; spot: Pt; ang: number; s: number } | null = null;
+  for (const q of a.bodies) {
+    if (q.side !== 'A' || q === c) continue;
+    const L = dist(c, q);
+    if (L < 3 || L > 48) continue;
+    if (kind === 'through' && q.y < c.y - 2) continue;
+    const spot = passSpot(a, from, q, kind);
+    const v = norm(spot.x - from.x, spot.y - from.y);
+    // the nearer of his spot and where he stands now (aiming at the man counts as aiming at his run)
+    const vNow = norm(q.x - from.x, q.y - from.y);
+    const ang = Math.min(Math.acos(clamp(v.x * d.x + v.y * d.y, -1, 1)), Math.acos(clamp(vNow.x * d.x + vNow.y * d.y, -1, 1)));
+    if (ang > cone) continue;
+    const s = ang / cone + dist(from, spot) / 90;
+    if (!best || s < best.s) best = { q, spot, ang, s };
+  }
+  if (best) {
+    const w = 1 - (best.ang / cone) ** 2;
+    const L = dist(from, best.spot);
+    const to = norm(best.spot.x - from.x, best.spot.y - from.y);
+    const bent = norm(d.x + (to.x - d.x) * w, d.y + (to.y - d.y) * w);
+    return { to: best.q, spot: { x: from.x + bent.x * L, y: from.y + bent.y * L }, dir: d, w };
+  }
+  // into space: level with the nearest teammate that way, or a sensible length for the pass
+  let L = kind === 'lofted' ? 24 : kind === 'through' ? 18 : 14;
+  let near = Infinity;
+  for (const q of a.bodies) {
+    if (q.side !== 'A' || q === c) continue;
+    const rx = q.x - from.x;
+    const ry = q.y - from.y;
+    const along = rx * d.x + ry * d.y;
+    const off = Math.abs(rx * d.y - ry * d.x);
+    if (along < 5 || off > along * 0.9) continue;
+    if (off < near) {
+      near = off;
+      L = clamp(along + (kind === 'through' ? 5 : 1), 6, 34);
+    }
+  }
+  const spot = { x: clamp(from.x + d.x * L, 0.5, PW - 0.5), y: clamp(from.y + d.y * L, 1, PL - 1) };
+  return { to: null, spot, dir: d, w: 0 };
+}
+
 /** Start a pass. ground: along the grass to his feet; lofted: in the air (a cross from wide, or
- * from a corner); through: into the space ahead of a runner. */
-export function pass(a: Attack, kind: PassKind, dir: Pt | null): boolean {
+ * from a corner); through: into the space ahead of a runner. `free` (a person's pass, Claude
+ * 2026-11-02): it goes the stick's way with a gentle assist (passPlan) instead of to the teammate
+ * nearest that way; the autopilot and a corner's "stick picks the man" keep the teammate pick. */
+export function pass(a: Attack, kind: PassKind, dir: Pt | null, free = false): boolean {
   if (a.end || a.phase !== 'live' || a.strike || a.kick || a.meter) return false;
   const sp = a.setPiece;
   const c = ownerOf(a) ?? (sp && a.taker !== null ? a.bodies[a.taker] : null);
   if (!c || (sp && sp.kind === 'penalty')) return false;
   if (sp && dist(c, sp.spot) > 1.8) return false;
-  const to = passTarget(a, dir, kind);
-  if (!to) return false;
   const p = c.p;
   const from = { x: a.ball.x, y: a.ball.y };
-  // where he'll be: a through ball goes into the space ahead of him, the rest to his run
-  let spot: Pt;
+  const corner = sp?.kind === 'corner';
+  const plan = free && !corner ? passPlan(a, kind, dir) : null;
+  const to = plan ? plan.to : passTarget(a, dir, kind);
+  if (!plan && !to) return false;
+  const lofted = kind === 'lofted' || (corner && kind !== 'ground');
+  const spot = plan ? plan.spot : passSpot(a, from, to!, kind);
+  if (kind === 'through' && to) to.run = { ...spot };
   let vx: number, vy: number, vh: number;
-  const lead = Math.hypot(to.vx, to.vy) > 1 ? { x: to.vx, y: to.vy } : { x: 0, y: 0 };
-  const lofted = kind === 'lofted' || (sp && sp.kind === 'corner' && kind !== 'ground');
-  if (kind === 'through') {
-    const ahead = norm(GX - to.x, PL - to.y);
-    const fwd = norm(ahead.x * 0.35 + 0 * 0.65, 1);
-    spot = { x: clamp(to.x + fwd.x * 8 + lead.x * 0.4, 2, PW - 2), y: clamp(to.y + 8 + Math.max(0, lead.y) * 0.4, 0, PL - 3.5) };
-    to.run = { ...spot };
-  } else if (lofted) {
-    const T0 = lerp(0.95, 1.55, dist(from, to) / 40);
-    spot = { x: clamp(to.x + lead.x * T0 * 0.8, 1, PW - 1), y: clamp(to.y + lead.y * T0 * 0.8, 1, PL - 1.5) };
-    // a cross aims at his head, a yard short of where he is, so he attacks it
-    if (sp?.kind === 'corner' || inBox(to)) spot = { x: spot.x + (from.x < GX ? -0.6 : 0.6), y: spot.y - 0.8 };
-  } else {
-    const T0 = dist(from, to) / 14;
-    spot = { x: to.x + lead.x * T0, y: to.y + lead.y * T0 };
-  }
   // the passer's error: off line by PAS (worse on the run and under pressure)
   const pressed = nearestDefender(a, c).d < 2.2;
   const err = (passError(p) * (pressed ? 1.35 : 1) * (a.sprinting ? 1.15 : 1) * Math.PI) / 180;
@@ -538,23 +631,27 @@ export function pass(a: Attack, kind: PassKind, dir: Pt | null): boolean {
   const ca = Math.cos(ang);
   const sa = Math.sin(ang);
   const rd = { x: dirv.x * ca - dirv.y * sa, y: dirv.x * sa + dirv.y * ca };
+  const box = corner || (!!to && inBox(to));
   if (lofted) {
     const dd = d * (1 + gauss(a.rand) * err * 0.6);
     const tgt = { x: from.x + rd.x * dd, y: from.y + rd.y * dd };
-    const v = loftVelocity(from, tgt, sp?.kind === 'corner' || inBox(to) ? lerp(1.15, 1.85, d / 40) : lerp(0.95, 1.6, d / 40));
+    const v = loftVelocity(from, tgt, passTime('lofted', d, box));
     vx = v.vx;
     vy = v.vy;
     vh = v.vh;
   } else {
-    const v0 = Math.min(26, groundSpeedFor(d, kind === 'through' ? 6 : 9));
+    // and the weight: a person's pass is over- or under-hit by PAS too (about 11% at PAS 40, 2.5% at 99)
+    const dw = free ? d * (1 + gauss(a.rand) * passError(p) * 0.016 * (pressed ? 1.3 : 1)) : d;
+    const v0 = Math.min(26, groundSpeedFor(Math.max(2, dw), kind === 'through' ? 6 : 9));
     vx = rd.x * v0;
     vy = rd.y * v0;
     vh = kind === 'through' && d > 22 ? 0.6 : 0;
   }
-  const curl = lofted && a.setPiece?.kind === 'corner' ? (from.x < GX ? -1 : 1) * 0.12 : 0;
-  a.kick = { at: a.t + 0.1, by: c.id, to: to.id, kind: lofted ? (inBox(to) ? 'cross' : 'lofted') : kind, vx, vy, vh, curl };
+  const curl = lofted && corner ? (from.x < GX ? -1 : 1) * 0.12 : 0;
+  a.kick = { at: a.t + 0.1, by: c.id, to: to ? to.id : null, kind: lofted ? (box ? 'cross' : 'lofted') : kind, vx, vy, vh, curl };
   act(c, 'kick', a.t);
-  a.ctrl = to.id;
+  if (to) a.ctrl = to.id;
+  a.passStick = free && dir && Math.hypot(dir.x, dir.y) > 0.2 ? { x: dir.x, y: dir.y } : free ? null : undefined;
   a.events.push('windup-pass');
   return true;
 }
@@ -576,14 +673,15 @@ export function pressShoot(a: Attack): boolean {
   if (sp?.kind === 'freekick') green *= SP_TUNE.fkGreen;
   if (Math.hypot(c.vx, c.vy) > topSpeed(c.p) * 0.9) green *= 0.88;
   green *= 1 - 0.12 * a.defIQ;
-  a.meter = { t0: a.t, top: TOP, green: Math.max(0.012, green), first: !!incoming };
+  a.meter = { t0: a.t, top: TOP, green: Math.max(0.012, green), first: !!incoming, assist: assistAim(a, c) };
   a.events.push('meter');
   return true;
 }
 
-/** Let go of SHOOT: the strike, timed against the green. `aim` is the stick (x across the goal,
- * -1 left post to 1 right; y -1 low to 1 high), or null to aim at the far side from the keeper.
- * `lag` (s) comes off a person's release (the screen shows the meter a beat behind). */
+/** Let go of SHOOT: the strike, timed against the green. `aim` is where in the goal (x -1 left post
+ * to 1 right, y -1 low to 1 high: the drag on SHOOT, or the stick at a set piece), or null for aim
+ * assist (the open side, low). `lag` (s) comes off a person's release (the screen shows the meter a
+ * beat behind). */
 export function releaseShoot(a: Attack, aim: Pt | null, lag = 0): boolean {
   const m = a.meter;
   if (!m || a.end) return false;
@@ -593,14 +691,23 @@ export function releaseShoot(a: Attack, aim: Pt | null, lag = 0): boolean {
   const greened = Math.abs(off) <= m.green;
   const power = clamp(held / m.top, 0.3, 1.35);
   a.meter = null;
+  a.release = { at: a.t, off, green: m.green, top: m.top };
+  if (!aim && m.aim) aim = m.aim;
+  const want = aim ?? m.assist ?? null;
   if (m.first && a.ball.owner !== c.id) {
     a.first = { off, greened, power, aim, green: m.green };
     a.events.push(greened ? 'release-green' : 'release');
     return true;
   }
-  strikeShot(a, c, off, greened, power, aim, m.green);
+  strikeShot(a, c, off, greened, power, want, m.green, false, !aim);
   a.events.push(greened ? 'release-green' : 'release');
   return true;
+}
+
+/** The aim while SHOOT is held (the drag on SHOOT, already snapped; null: aim assist). A first-time
+ * hit still held when the ball arrives goes where this points. */
+export function setAim(a: Attack, aim: Pt | null) {
+  if (a.meter) a.meter.aim = aim ? { x: clamp(aim.x, -1, 1), y: clamp(aim.y, -1, 1) } : null;
 }
 
 export function cancelShoot(a: Attack) {
@@ -612,33 +719,129 @@ export function setCurl(a: Attack, k: number) {
   a.curl = clamp(k, -1, 1);
 }
 
-/** Where in the goal the aim points (x across, h up), and the shot's speed and error cone. */
-export function aimPoint(a: Attack, shooter: Body, aim: Pt | null): { x: number; h: number } {
-  const gk = keeperOf(a);
-  if (!aim || Math.hypot(aim.x, aim.y) < 0.15) {
-    // the far side from the keeper, low: the side with more of the goal showing
-    const s = Math.abs(gk.x - GX) > 0.25 ? Math.sign(GX - gk.x) : shooter.x < GX ? 1 : -1;
-    return { x: GX + s * 2.7, h: 0.45 };
-  }
-  return { x: GX + clamp(aim.x, -1, 1) * 3.3, h: 0.3 + clamp((aim.y + 1) / 2, 0, 1) * 1.85 };
+/* ---------- aiming (Claude 2026-11-02, docs/SOCCER-ENGINE.md "Aim and shoot") ---------- */
+
+/** Half the goal's width the aim spans: full aim is 0.56 m inside the post. */
+export const AIM_X = 3.1;
+/** Aim assist's height (aim space: low); how far across it goes depends on the range and his SHO. */
+export const ASSIST = { y: -0.75 };
+
+/**
+ * Aim assist (no drag): the side of the goal the keeper leaves open, with a little preference for
+ * the far post, low, and as far inside the post as his accuracy needs. Returned in aim space.
+ */
+export function assistAim(a: Attack, shooter: Body, was?: Pt): Pt {
+  // how fine it can cut it: two of his error cones (at a good release) inside the post, so a
+  // finisher's assist goes nearer the corner than a defender's
+  const d = Math.hypot(GX - shooter.x, PL - shooter.y);
+  const margin = clamp(2 * d * Math.tan((shotCone(shooter.p) * 0.6 * rangeCone(d) * Math.PI) / 180), 0.7, 1.6);
+  const ax = clamp((GHALF - margin) / AIM_X, 0.45, 0.95);
+  const o = openSide(a, shooter);
+  let side = o.side;
+  // hold the side it picked unless the other opens up clearly (the reticle doesn't flicker)
+  if (was && Math.sign(was.x) !== side && o.edge < 0.06) side = Math.sign(was.x) || side;
+  return { x: side * ax, y: ASSIST.y };
 }
 
-function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: number, aim: Pt | null, green: number, header = false) {
+/**
+ * The side of the goal the keeper leaves open as the shooter sees it: the bigger angle between the
+ * keeper and a post (a keeper off his line covers more than his place across the goal suggests),
+ * with a slight lean to the far post. `edge`: how much bigger, in radians.
+ */
+export function openSide(a: Attack, shooter: Pt): { side: number; edge: number } {
+  const gk = keeperOf(a);
+  const ang = (x: number, y: number) => Math.atan2(x - shooter.x, Math.max(0.3, y - shooter.y));
+  const k = ang(gk.x, gk.y);
+  const right = ang(GX + GHALF, PL) - k + (shooter.x < GX ? 0.03 : 0);
+  const left = k - ang(GX - GHALF, PL) + (shooter.x >= GX ? 0.03 : 0);
+  return { side: right >= left ? 1 : -1, edge: Math.abs(right - left) };
+}
+
+/** A gentle pull toward the corners (low/high, inside each post): an area-cursor style magnet, so
+ * a rough drag lands on a sensible spot. Deterministic; the HUD shows the snapped aim. */
+export function snapAim(v: Pt): Pt {
+  const pull = (x: number, marks: number[]) => {
+    let best = marks[0];
+    for (const m of marks) if (Math.abs(m - x) < Math.abs(best - x)) best = m;
+    const d = Math.abs(best - x);
+    return d < 0.45 ? x + (best - x) * 0.55 * (1 - d / 0.45) : x;
+  };
+  const x = clamp(v.x, -1, 1);
+  const y = clamp(v.y, -1, 1);
+  return { x: pull(x, [-0.85, 0.85]), y: pull(y, [-0.75, 0.75]) };
+}
+
+/** Where in the goal an aim points (x across, h up). null: the assist. */
+export function aimPoint(a: Attack, shooter: Body, aim: Pt | null): { x: number; h: number } {
+  const v = aim ?? a.meter?.assist ?? assistAim(a, shooter);
+  return { x: GX + clamp(v.x, -1, 1) * AIM_X, h: 0.3 + clamp((v.y + 1) / 2, 0, 1) * 1.75 };
+}
+
+/** Range makes a shot harder to place: the cone grows from 12 m (x1.5 at 19 m, at most x2 at 26 m). */
+export function rangeCone(d: number): number {
+  return 1 + clamp((d - 12) / 14, 0, 1);
+}
+
+/** A release's distance from the green's centre in green half-widths (0 dead centre, 1 the slice's edge). */
+export function timingMiss(off: number, green: number): number {
+  return Math.abs(off) / Math.max(0.015, green);
+}
+/**
+ * The error cone's multiplier for a release: tightest dead in the middle of the green and growing
+ * smoothly the further off it you let go (no step at the slice's edge): 0.5 at the centre, 0.85 at
+ * the slice's edge, 1.3 at twice that, 1.75 at three times, capped at 3.2.
+ */
+export function coneMult(off: number, green: number): number {
+  return Math.min(3.2, 0.5 + 0.35 * Math.pow(timingMiss(off, green), 1.15));
+}
+/** The read-out word for a release. */
+export function timingWord(off: number, green: number): 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE' {
+  const u = timingMiss(off, green);
+  return u <= 1 ? 'PERFECT' : u <= 2.2 ? 'GOOD' : off < 0 ? 'EARLY' : 'LATE';
+}
+
+/** Why a shot didn't go in, in a few words for the HUD (null: nothing worth saying). */
+export function shotVerdict(a: Attack): string | null {
+  const s = a.lastShot;
+  const e = a.end;
+  if (!s || !e || e.kind === 'G') return null;
+  const w = timingWord(s.off, s.green ?? 0.05);
+  const at = s.cross ?? s.aim;
+  if (e.kind === 'W') {
+    if (w === 'LATE') return at.h > GH ? 'LATE RELEASE · IT ROSE OVER' : 'LATE RELEASE · DRAGGED WIDE';
+    if (w === 'EARLY') return 'EARLY RELEASE · SCUFFED WIDE';
+    if (!s.assisted && Math.abs(s.aim.x - GX) > GHALF - 0.75) return 'TOO FINE · AIM INSIDE THE POST';
+    return at.h > GH ? 'JUST OVER' : 'JUST WIDE';
+  }
+  if (e.kind === 'S') {
+    if (s.gkX !== undefined && Math.abs(s.aim.x - s.gkX) < 1.3 && s.kind !== 'pen') return 'STRAIGHT AT HIM · AIM FOR THE GAP';
+    if (w === 'EARLY') return 'EARLY RELEASE · NOT ENOUGH ON IT';
+    if (s.kind === 'pen') return null;
+    return 'GOOD SAVE';
+  }
+  if (e.kind === 'B' && s.kind !== 'fk') return 'BLOCKED · GET A YARD OF SPACE';
+  return null;
+}
+
+function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: number, aim: Pt | null, green: number, header = false, assisted = false) {
   const sp = a.setPiece;
   const kind: ShotInfo['kind'] = header ? 'header' : sp?.kind === 'penalty' ? 'pen' : sp?.kind === 'freekick' ? 'fk' : a.ball.h > 0.4 ? 'volley' : 'shot';
   let tgt = aimPoint(a, c, aim);
   // a header without an aim goes where his head sends it: one side or the other, any height
   if (header && (!aim || Math.hypot(aim.x, aim.y) < 0.15)) tgt = { x: GX + (a.rand() < 0.5 ? -1 : 1) * (1 + a.rand() * 1.9), h: 0.3 + a.rand() * 1.4 };
   let th = tgt.h;
-  // over-hit: it rises; under-hit: it's weak and low
-  const miss = Math.max(0, Math.abs(off) - green);
-  if (off > green) th += miss * 9;
-  if (off < -green) th = Math.max(0.15, th - miss * 2);
+  // the further from the green's centre, the worse the contact (continuous, Claude 2026-11-02): late
+  // gets under it and it rises; early is weak and low
+  const slack = 0.3 * green;
+  const late = Math.max(0, off - slack);
+  const early = Math.max(0, -off - slack);
+  th += late * 8;
+  if (early > 0) th = Math.max(0.15, th - early * 2);
   const base = header ? headerSpeed(c.p) : shotSpeed(c.p);
-  const pf = greened ? 1 : power < 1 ? lerp(0.62, 0.97, (power - 0.3) / 0.7) : Math.min(1.08, 1 + (power - 1) * 0.3);
+  const pf = power < 1 ? lerp(0.62, 1, (power - 0.3) / 0.7) : Math.min(1.08, 1 + (power - 1) * 0.3);
   const speed = base * pf * (kind === 'volley' ? 0.92 : 1) * (kind === 'pen' ? 0.95 : 1) * (kind === 'fk' ? 0.92 : 1);
   const pressed = !sp && nearestDefender(a, c).d < 1.6;
-  let cone = shotCone(c.p) * (greened ? 0.55 : 1 + Math.min(2.2, miss / 0.1) * 0.9);
+  let cone = shotCone(c.p) * coneMult(off, green);
   if (pressed) cone *= 1.3;
   if (kind === 'header') cone *= 2.4;
   if (kind === 'volley') cone *= 1.3;
@@ -647,6 +850,15 @@ function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: nu
   // a header from a corner: under a crowd of bodies, a worse contact than an open-play cross
   if (kind === 'header' && a.scenario === 'corner') cone *= SP_TUNE.cornerHeaderCone;
   const from = { x: a.ball.x, y: a.ball.y, h: Math.max(0.11, a.ball.h) };
+  // across his body: a shot well away from the way he's running is harder to keep true; and from
+  // range it's harder to place (Claude 2026-11-02)
+  if (kind === 'shot' || kind === 'volley') {
+    cone *= rangeCone(dist(from, goalC));
+    const f = facingOf(c);
+    const to = norm(tgt.x - from.x, PL - from.y);
+    const ang = (Math.acos(clamp(f.x * to.x + f.y * to.y, -1, 1)) * 180) / Math.PI;
+    cone *= 1 + clamp((ang - 55) / 90, 0, 1) * 0.5;
+  }
   // a free kick is struck with topspin: it gets up over the wall and comes down again
   const dip = kind === 'fk' ? 5 : 0;
   const v = shotVelocity(from, tgt.x, th, speed, dip);
@@ -659,7 +871,7 @@ function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: nu
   const vh = v.vh + ev * speed;
   // open play: a touch of finesse bend back toward the far post; a free kick: the swipe's curl
   const curl = kind === 'fk' ? a.curl * 0.3 : kind === 'shot' && greened ? -Math.sign(tgt.x - from.x) * 0.04 : 0;
-  const info: ShotInfo = { by: c.id, greened, off, power, speed, aim: { x: tgt.x, h: tgt.h }, cross: null, cone, kind };
+  const info: ShotInfo = { by: c.id, greened, off, power, speed, aim: { x: tgt.x, h: tgt.h }, cross: null, cone, kind, green, assisted, gkX: keeperOf(a).x };
   a.strike = { at: a.t + (header ? 0.04 : 0.11), by: c.id, vx, vy, vh, curl, dip, info };
   act(c, header ? 'header' : 'kick', a.t);
   a.shotBy = c.id;
@@ -675,9 +887,9 @@ function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: nu
 export const SP_TUNE = {
   penGreen: 1.06,
   penCone: 0.95,
-  penRead: 0.15,
+  penRead: 0.07,
   fkGreen: 0.7,
-  fkCone: 4.2,
+  fkCone: 3.0,
   fkReact: 0.55,
   fkRead: 0.4,
   cornerHeaderCone: 3.8,
@@ -686,6 +898,12 @@ export const SP_TUNE = {
   cornerMark: 3.2,
   cornerClaimDepth: 9.5,
 };
+
+/**
+ * Keeper tuning for the aim-assist update (Claude 2026-11-02): with shots no longer going at him by
+ * default, he narrows tight angles and gets across on a long shot he has time for.
+ */
+export const KEEP = { tightDepth: 1.3, shuffle: 3.2, tightX: 9, chargeAt: 6, narrow: 0.3, setSlow: 0.8, rushFrom: 18, spreadIn: 8, spread: [1.05, 1.25] as [number, number] };
 
 /** Where the keeper stands: on the bisector of the angle the posts make from the ball, off his line by how far away it is. */
 export function keeperSpot(a: Attack, _gk: Body, err: number): Pt {
@@ -696,7 +914,9 @@ export function keeperSpot(a: Attack, _gk: Body, err: number): Pt {
   const u2 = norm(GX + GHALF - bx, PL - by);
   const bis = norm(u1.x + u2.x, u1.y + u2.y);
   const far = dist({ x: bx, y: by }, goalC);
-  const depth = a.setPiece ? 0.7 : clamp(far * 0.065, 0.5, 3.6);
+  // off his line with the range, and further at a tight angle close in (he narrows it: Claude 2026-11-02)
+  const tight = clamp((Math.atan2(Math.abs(bx - GX), Math.max(0.5, PL - by)) - 0.55) / 0.6, 0, 1) * clamp((24 - far) / 10, 0, 1);
+  const depth = a.setPiece ? 0.7 : clamp(far * 0.065, 0.5, 3.6) + tight * KEEP.tightDepth;
   const yk = PL - depth;
   const s = bis.y > 0.05 ? (yk - by) / bis.y : 0;
   let x = clamp(bx + bis.x * s, GX - GHALF - 0.6, GX + GHALF + 0.6);
@@ -709,13 +929,17 @@ export function keeperSpot(a: Attack, _gk: Body, err: number): Pt {
 function planKeeper(a: Attack) {
   const gk = keeperOf(a);
   const path = a.path ?? [];
-  // where the shot crosses his line
+  // where the shot passes him: the nearest point of its path (his line for a shot up the pitch)
   let at: PathPt | null = null;
-  for (const q of path)
-    if (q.y >= gk.y) {
+  let best = Infinity;
+  for (const q of path) {
+    const d = Math.hypot(q.x - gk.x, q.y - gk.y);
+    if (d < best) {
+      best = d;
       at = q;
-      break;
     }
+    if (q.y > PL + 0.5) break;
+  }
   const cross = at ?? path[path.length - 1] ?? { t: 1, x: GX, y: PL, h: 1, v: 20 };
   if (a.setPiece?.kind === 'penalty' || a.lastShot?.kind === 'pen') {
     const real = Math.abs(cross.x - GX) < 0.9 ? 0 : Math.sign(cross.x - GX);
@@ -726,11 +950,18 @@ function planKeeper(a: Attack) {
     return;
   }
   const mis = gkMisread(gk.p) * (1 + 0.6 * Math.max(0, (cross.v - 22) / 10)) * (a.lastShot?.kind === 'fk' ? SP_TUNE.fkRead : 1);
+  // he goes for the point where it passes him, misread across its line (Claude 2026-11-02: across
+  // the pitch as well as along his line, for a shot from near the byline)
+  const s0 = path[0] ?? cross;
+  const across = norm(-(cross.y - s0.y), cross.x - s0.x);
+  const e = gauss(a.rand) * mis;
   a.gkPlan = {
     // a direct free kick: the keeper is set and sees it struck (he reacts a little sooner)
     react: a.t + gkReaction(gk.p) * (1 - 0.15 * a.defIQ) * (a.lastShot?.kind === 'fk' ? SP_TUNE.fkReact : 1) + a.rand() * 0.04,
     x0: gk.x,
-    tx: cross.x + gauss(a.rand) * mis,
+    y0: gk.y,
+    tx: cross.x + across.x * e,
+    ty: Math.min(PL - 0.2, cross.y + across.y * e),
     th: clamp(cross.h + gauss(a.rand) * mis * 0.6, 0.1, 2.5),
     at: a.t + cross.t,
   };
@@ -744,15 +975,21 @@ function keeperInFlight(a: Attack, gk: Body) {
   gk.vy = 0;
   if (a.t < plan.react) return;
   const dv = gkDive(gk.p);
-  const want = plan.tx - plan.x0;
+  const y0 = plan.y0 ?? gk.y;
+  const wx = plan.tx - plan.x0;
+  const wy = (plan.ty ?? y0) - y0;
+  const want = Math.hypot(wx, wy);
   const tau = a.t - plan.react;
   // the dive, and a quick shuffle across first if there's time for it
-  const reach = dv.reach * Math.pow(Math.min(1, tau / dv.time), 0.8) + Math.max(0, tau - dv.time) * 1.5;
-  const move = Math.sign(want) * Math.min(Math.abs(want) - (Math.abs(want) > 0.9 ? 0.55 : 0), reach);
-  const nx = plan.x0 + (Math.abs(want) > 0.25 ? move : 0);
+  const reach = dv.reach * Math.pow(Math.min(1, tau / dv.time), 0.8) + Math.max(0, tau - dv.time) * KEEP.shuffle;
+  const move = want > 0.25 ? Math.min(want - (want > 0.9 ? 0.55 : 0), reach) / want : 0;
+  const nx = plan.x0 + wx * move;
+  const ny = y0 + wy * move;
   gk.vx = (nx - gk.x) * 60;
+  gk.vy = (ny - gk.y) * 60;
   gk.x = nx;
-  if (Math.abs(want) > 0.9) {
+  gk.y = ny;
+  if (want > 0.9) {
     act(gk, 'dive', plan.react);
     gk.h = Math.min(plan.th, 1.6) * 0.5 * Math.sin(Math.min(1, tau / dv.time) * Math.PI);
   } else if (plan.th > 1.9) {
@@ -764,18 +1001,27 @@ function keeperInFlight(a: Attack, gk: Body) {
 /** The ball reaches the keeper's line during a shot: does he get to it? */
 function keeperSave(a: Attack, gk: Body, prev: Pt & { h: number }) {
   const b = a.ball;
-  const k = (gk.y - prev.y) / Math.max(1e-6, b.y - prev.y);
-  const bx = prev.x + (b.x - prev.x) * k;
+  // where the ball passes him: the nearest point of this step's travel (Claude 2026-11-02: it used to
+  // be where it crossed his y, wrong for a shot from near the byline that runs across him)
+  const ux = b.x - prev.x;
+  const uy = b.y - prev.y;
+  const k = clamp(((gk.x - prev.x) * ux + (gk.y - prev.y) * uy) / Math.max(1e-9, ux * ux + uy * uy), 0, 1);
+  const bx = prev.x + ux * k;
+  const by = prev.y + uy * k;
   const bh = prev.h + (b.h - prev.h) * k;
   if (Math.abs(bx - GX) > GHALF + 1.6 || bh > GH + 0.6) return false;
   const plan = a.gkPlan;
   const diving = gk.act === 'dive';
   const arm = gkArm(gk.p);
-  const ax = diving ? arm + 0.15 : 0.9;
-  const cy = diving ? clamp(plan?.th ?? 0.8, 0.35, 1.7) : 1.2;
-  const ay = diving ? 0.9 : 1.4;
+  // close in (struck within 9 m of him) he spreads himself, big, rather than diving (Claude
+  // 2026-11-02): a one-on-one he's come out for isn't an open goal either side of him
+  const o = a.path?.[0];
+  const spread = !diving && !!o && Math.hypot(o.x - gk.x, o.y - gk.y) < KEEP.spreadIn && a.lastShot?.kind !== 'pen';
+  const ax = diving ? arm + 0.15 : spread ? lerp(KEEP.spread[0], KEEP.spread[1], rt(gk.p.a.DIV)) : 0.9;
+  const cy = diving ? clamp(plan?.th ?? 0.8, 0.35, 1.7) : spread ? 0.75 : 1.2;
+  const ay = diving ? 0.9 : spread ? 1.1 : 1.4;
   // he had no time to move at all: only what comes at him
-  const dx = bx - gk.x;
+  const dx = (Math.sign(bx - gk.x) || 1) * Math.hypot(bx - gk.x, by - gk.y);
   const q = Math.sqrt((dx / ax) ** 2 + ((bh - cy) / ay) ** 2);
   if (q > 1) return false;
   const margin = 1 - q;
@@ -912,6 +1158,8 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
 
   // the meter held too long: it goes anyway (and goes over)
   if (a.meter && t - a.meter.t0 > METER * 1.3) releaseShoot(a, null);
+  // aim assist follows the keeper while SHOOT is held (it keeps its side unless the other opens up)
+  if (a.meter) a.meter.assist = assistAim(a, ctrlOf(a), a.meter.assist);
 
   const owner = ownerOf(a);
   for (const b of a.bodies) {
@@ -925,7 +1173,7 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
     if (b.act === 'tackle' || b.act === 'down' || b.act === 'dive') act(b, 'idle', t);
     if (b.role === 'gk') keeper(a, b, dt);
     else if (b.side === 'D') defend(a, b, dt);
-    else if (b.id === a.ctrl && stick && !(Math.hypot(stick.x, stick.y) < 0.12 && ball.owner !== b.id && ball.flight?.to === b.id)) human(a, b, stick, sprint, dt);
+    else if (b.id === a.ctrl && stick && !receiving(a, b, stick)) human(a, b, stick, sprint, dt);
     else attackOffBall(a, b, dt, b.id === a.ctrl ? sprint : false);
     // nobody leaves the pitch by much (the touchline, the goal line)
     b.x = clamp(b.x + b.vx * dt, -1.5, PW + 1.5);
@@ -972,6 +1220,22 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
   else if (t > a.clock * 3 + 30) endAttack(a, 'T', 'TIME UP');
 }
 
+/**
+ * The pass is coming to the man the stick is on: he runs onto it himself (the meet point) while the
+ * stick is centred or still held the way the pass went; moving the stick off that way takes him over
+ * (Claude 2026-11-02: before, a thumb still on the stick after the pass ran the receiver off the ball).
+ */
+function receiving(a: Attack, b: Body, stick: Pt): boolean {
+  const f = a.ball.flight;
+  if (a.ball.owner === b.id || !f || f.to !== b.id || f.kind === 'shot' || f.kind === 'clear' || f.kind === 'parry') return false;
+  if (Math.hypot(stick.x, stick.y) < 0.12) return true;
+  const ps = a.passStick;
+  if (!ps) return false;
+  if (Math.hypot(stick.x - ps.x, stick.y - ps.y) < 0.6) return true;
+  a.passStick = null;
+  return false;
+}
+
 function launchPass(a: Attack) {
   const k = a.kick!;
   a.kick = null;
@@ -994,9 +1258,25 @@ function launchPass(a: Attack) {
     for (const q of a.bodies) if (q.act === 'wall') act(q, 'idle', a.t);
   }
   for (const q of a.bodies) q.tried = -1;
+  const maxH = k.kind === 'ground' || k.kind === 'through' ? 0.9 : 2.4;
+  // a pass into space: it's for whichever teammate gets to it first (he runs onto it)
+  if (k.to === null) {
+    let bt = Infinity;
+    for (const q of a.bodies) {
+      if (q.side !== 'A' || q.id === by.id) continue;
+      const m = meetPoint(a, q, maxH);
+      if (m && m.t < bt) {
+        bt = m.t;
+        k.to = q.id;
+      }
+    }
+    if (k.to !== null) {
+      b.flight.to = k.to;
+      a.ctrl = k.to;
+    }
+  }
   // the defender (if any) who can get to the pass before the man it's for
   const recv = k.to !== null ? a.bodies[k.to] : null;
-  const maxH = k.kind === 'ground' || k.kind === 'through' ? 0.9 : 2.4;
   const theirs = recv ? (meetPoint(a, recv, maxH)?.t ?? 9) : 9;
   a.chaser = null;
   let bestT = theirs - 0.1;
@@ -1085,7 +1365,11 @@ function duringFlight(a: Attack, prev: Pt & { h: number }) {
     const gk = keeperOf(a);
     if (f.kind === 'shot') {
       keeperInFlight(a, gk);
-      if ((prev.y - gk.y) * (b.y - gk.y) <= 0 && gk.tried !== 1) {
+      // the ball passes him (its travel this step goes by his position along its line)
+      const ux = b.x - prev.x;
+      const uy = b.y - prev.y;
+      const passes = (gk.x - prev.x) * ux + (gk.y - prev.y) * uy >= 0 && (gk.x - b.x) * ux + (gk.y - b.y) * uy <= 0;
+      if (passes && gk.tried !== 1) {
         gk.tried = 1;
         if (keeperSave(a, gk, prev)) return;
       }
@@ -1170,6 +1454,9 @@ function contact(a: Attack) {
       endAttack(a, 'L', loose ? 'CLEARED BY ' + q.p.tag : b.h > 0.9 ? 'HEADED CLEAR' : 'INTERCEPTED BY ' + q.p.tag);
       return;
     }
+    // a teammate it isn't for lets a pass that's still moving run on to the man it is for (Claude
+    // 2026-11-02: a cross used to stop at the first head on its line)
+    if (f && f.to !== null && f.to !== q.id && f.kind !== 'clear' && f.kind !== 'parry' && speed > 7 && a.bodies[f.to]?.side === 'A') continue;
     // an attacker: in reach, at a height he can play
     const air = b.h > 1.0;
     if (d > (air ? 0.95 : 0.8) || b.h > (air ? jumpReach(q.p) : 1.0)) continue;
@@ -1207,7 +1494,8 @@ function contact(a: Attack) {
       if (!fs && a.meter) {
         const m = a.meter;
         const held = a.t - m.t0;
-        fs = { off: held - m.top, greened: Math.abs(held - m.top) <= m.green, power: clamp(held / m.top, 0.3, 1.35), aim: null, green: m.green };
+        fs = { off: held - m.top, greened: Math.abs(held - m.top) <= m.green, power: clamp(held / m.top, 0.3, 1.35), aim: m.aim ?? null, green: m.green };
+        a.release = { at: a.t, off: fs.off, green: m.green, top: m.top };
         a.meter = null;
       }
       a.first = null;
@@ -1215,7 +1503,7 @@ function contact(a: Attack) {
         b.vx *= 0.2;
         b.vy *= 0.2;
         b.owner = null;
-        strikeShot(a, q, fs.off, fs.greened, fs.power, fs.aim, fs.green, b.h > 1.2);
+        strikeShot(a, q, fs.off, fs.greened, fs.power, fs.aim, fs.green, b.h > 1.2, !fs.aim);
         b.flight = { kind: 'shot', from: q.id, to: null, at: a.t };
         b.vx = 0;
         b.vy = 0;
@@ -1264,7 +1552,8 @@ function human(a: Attack, b: Body, stick: Pt, sprint: boolean, dt: number) {
   const kicking = b.act === 'kick' && a.t - b.actAt < 0.3;
   let top = topSpeed(b.p) * (sprint ? 1 : JOG) * lerp(0.88, 1, a.stamina);
   if (owner) top *= dribblePace(b.p);
-  if (a.meter) top *= 0.75;
+  // winding up a shot slows him a little (0.75 until 2026-11-02, when the stick still aimed)
+  if (a.meter) top *= 0.85;
   if (kicking) top *= 0.4;
   const dir = mag > 0.01 ? { x: stick.x / Math.max(1, mag), y: stick.y / Math.max(1, mag) } : { x: 0, y: 0 };
   accelTo(b, dir.x * top, dir.y * top, dt, owner ? 1 : 1.1);
@@ -1629,13 +1918,29 @@ function keeper(a: Attack, gk: Body, dt: number) {
     return;
   }
   const owner = ownerOf(a);
-  // a one-on-one: no defender between the man on the ball and the goal, inside 20 m: come out
-  if (owner && owner.side === 'A' && dist(owner, goalC) < 20 && !a.setPiece) {
+  // a one-on-one: no defender between the man on the ball and the goal, inside 18 m (20 before
+  // 2026-11-02): come out. From
+  // a tight angle (Claude 2026-11-02) he narrows it along the angle's bisector instead of running at
+  // the ball, which left the far side of the goal open.
+  const far = owner ? dist(owner, goalC) : 99;
+  if (owner && owner.side === 'A' && far < KEEP.rushFrom && !a.setPiece) {
     const toGoal = norm(GX - owner.x, PL - owner.y);
     const blocked = a.bodies.some((d) => d.role === 'def' && a.t >= d.stunUntil && (d.x - owner.x) * toGoal.x + (d.y - owner.y) * toGoal.y > 0.5 && Math.abs((d.x - owner.x) * toGoal.y - (d.y - owner.y) * toGoal.x) < 2.2);
     if (!blocked && Math.abs(owner.x - GX) < 18) {
       const lead = 0.35;
-      steer(gk, owner.x + owner.vx * lead, owner.y + owner.vy * lead + 0.9, topSpeed(gk.p), dt);
+      let tx = owner.x + owner.vx * lead;
+      let ty = owner.y + owner.vy * lead + 0.9;
+      if (far > KEEP.chargeAt && Math.abs(owner.x - GX) > KEEP.tightX) {
+        const u1 = norm(GX - GHALF - owner.x, PL - owner.y);
+        const u2 = norm(GX + GHALF - owner.x, PL - owner.y);
+        const bis = norm(u1.x + u2.x, u1.y + u2.y);
+        const along = bis.y > 0.05 ? (PL - owner.y) / bis.y : far;
+        const out = clamp(far * KEEP.narrow, 1.2, 5);
+        tx = owner.x + bis.x * (along - out);
+        ty = owner.y + bis.y * (along - out);
+      }
+      // he sees the backlift (SHOOT held) and gets set rather than running into the shot
+      steer(gk, tx, ty, topSpeed(gk.p) * (a.meter ? KEEP.setSlow : 1), dt);
       gk.y = Math.min(gk.y, PL - 0.3);
       return;
     }

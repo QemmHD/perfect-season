@@ -31,9 +31,15 @@ are unchanged.
 ### Head to head: the match
 
 After a 1 vs 1 draft you play your **attacks** on the real engine (six and one in stoppage time) while
-the rival plays theirs: most goals wins, **level goes to penalties**. Controls: the joystick runs,
-SPRINT (stamina), PASS (tap; hold to cross or loft), THRU (a through ball), hold SHOOT and let go in the
-green (the stick aims in the goal). Against the AI a level match is settled by a shootout you take and
+the rival plays theirs: most goals wins, **level goes to penalties**. Controls (updated 2026-11-02):
+the joystick runs, and only runs, so you keep your stride while you shoot. SPRINT uses stamina. PASS
+goes where the stick points, with a light pull toward a teammate near that line and none toward anyone
+else. A dashed line shows where it's going, and the man you find runs onto it. Tap to play it along the
+grass, or hold to loft it or cross. THRU plays a through ball. To shoot, hold SHOOT. While you hold it,
+drag your thumb on the button to aim: left or right across the goal, up for high, down for low. If you
+don't drag, the game aims at the corner the keeper leaves open, low. Let go in the green: the closer to
+its middle, the truer the shot. The meter tells you PERFECT, GOOD, EARLY or LATE, and a miss tells you
+why (straight at him, it rose over, too fine). In a penalty you can also aim with the stick. Against the AI a level match is settled by a shootout you take and
 keep goal in; online both phones show the same agreed shootout. SIM MY ATTACKS lets the autopilot play
 them. Your favorite club (Profile → Favorite teams now has a soccer tab) is your kit.
 
@@ -122,9 +128,11 @@ overall and sub-ratings, plus squad players for the three spots a draft doesn't 
 `agreedShootout` (the host's eleven kicks first, `simShootout` on the match seed) and `Soccer2` shows it
 kick by kick (`fixedShootout`); against the AI the shootout is played on the pitch.
 
-**Online queues**: soccer draft head to head `NET_V = 'ps1-soccer-' + DATA_V + '-1'`, its own match
-namespace `perfect-season/soccer/v1`; UT soccer `UT_RULES.soccer = 1`. NBA (draft 10 / UT 10) and NFL
-(draft 10 / UT 11) are unchanged. Leaderboards: `perfect-season/soccer/v1`.
+**Online queues**: soccer draft head to head `NET_V = 'ps1-soccer-' + DATA_V + '-2'`, its own match
+namespace `perfect-season/soccer/v1`; UT soccer `UT_RULES.soccer = 2` (both 1 until 2026-11-02, when the
+aim/shoot, keeper and passing update changed how attacks and the agreed shootout come out, so old and
+new soccer clients don't pair). NBA (draft 10 / UT 10) and NFL (draft 10 / UT 11) are unchanged.
+Leaderboards: `perfect-season/soccer/v1` (unchanged).
 
 ### Set pieces (tuned 2026-11-01)
 
@@ -137,6 +145,11 @@ kicks and 79% of penalties. Now (300 attacks each, three real matchups, `setpiec
 | Free-kick attacks (direct free kicks ~10% of shots) | 28.3% | 12.9% | 10–15% |
 | Penalties | 79.0% | 74.9% | ~75% |
 | Build-up / counter / wide (unchanged) | 14.0 / 11.3 / 12.7% | 14.4 / 11.3 / 12.4% | |
+
+After the aim/shoot update (2026-11-02; same three matchups, 300 each, before → after): corners 13.0 →
+11.7%, free-kick attacks 14.0 → 14.7%, penalties 74.7 → 73.3%, build-up / counter / wide 13.7 / 10.7 /
+12.0 → 13.3 / 10.3 / 9.7%. `SP_TUNE.penRead` 0.15 → 0.07 and `fkCone` 4.2 → 3.0 put the set pieces back in
+range after the keeper changes (SOCCER-ENGINE.md, "Aim and shoot").
 
 Levers: a corner's box is marked (a defender within 3.2 m goes up, wins from 0.8 base), its headers are
 worse contacts (cone ×3.8) and the keeper commands more of his box; a direct free kick has a narrower
@@ -165,7 +178,7 @@ football never load them, and they are not precached (above). Credits table in C
 
 ### Known limits
 
-- The phone-feel of the soccer controls (two thumbs, meter timing) needs an owner playtest on an iPhone.
+- The phone-feel of the soccer controls (two thumbs, the drag on SHOOT, meter timing) needs an owner playtest on an iPhone (the 2026-11-02 aim/shoot update was tuned in Chromium with simulated timing).
 - An offline-installed app needs one online soccer visit per deploy before soccer plays offline.
 - Hidden for now (above): Club Season (it needs a 20-club/38-game season with draws), Legends Events,
   Moments, Spotlight/GOAT and serials (the registry's sport CHECK allows nba/nfl only: an owner

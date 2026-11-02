@@ -34,14 +34,112 @@ serials or NBA/NFL ratings change; online queues stay NBA 8 / NFL 9. Card data c
 
 | Control | What it does |
 | --- | --- |
-| Joystick (left, fixed) | Two-axis run, screen-relative (up the screen is up the pitch), radial dead zone and release-to-stop: the NFL direct-control contract (`football2/controls.ts` reused). While SHOOT is held it aims: left/right across the goal, up high, down low; centred = the far side from the keeper, low. At a corner it picks the target; at a set piece it aims. |
+| Joystick (left, fixed) | Two-axis run, screen-relative (up the screen is up the pitch), radial dead zone and release-to-stop: the NFL direct-control contract (`football2/controls.ts` reused). **Since 2026-11-02 it only runs in open play** (it no longer aims while SHOOT is held, so you keep your run). At a corner it picks the target; a free-kick or penalty taker (who can't run) can also aim with it. |
 | SPRINT (hold) | Top speed instead of 80 %; drains shared stamina (bar under the player), refills when you jog. Sprinting with the ball costs 6 points of dribble control in tackles. |
-| PASS (tap / hold) | Tap: along the grass to the teammate the stick points at (ring + name shown). Hold ≥ 0.22 s: lofted ball, a cross into the box from wide or from a corner. |
-| THRU | Through ball into the space ahead of a runner; he runs onto it. Forwards time runs in behind on their own; a pass to a man already past the second-last defender is offside. |
-| SHOOT (hold, let go) | The power meter arches over the shooter; the **green slice** sits at 0.72 s. Let go in it for a perfect strike (tight cone, full power); early is weak and low, late rises over the bar. Pressed while a pass is on its way, it is a first-time volley or header. The ring in the goal mouth is the shot's error cone. |
+| PASS (tap / hold) | Free and directional (2026-11-02): the ball goes the way the stick points. A teammate whose run is within 22° of that way (18° lofted, 30° through, 32° with the stick centred = the way he faces) pulls it gently toward him (fully when aimed right at him, not at all at the cone's edge); nobody there and it goes into space along the stick, weighted to be level with the nearest man that way, for whoever reaches it first. A dashed line on the grass shows where it's going (teal: a man's on it). Hold ≥ 0.22 s: lofted ball, a cross into the box from wide. The receiver runs onto the ball himself while the stick is centred or still held the way of the pass; move the stick off that way to take him over. |
+| THRU | Through ball into the space ahead of a runner in the stick's way (the same gentle assist); he runs onto it. Forwards time runs in behind on their own; a pass to a man already past the second-last defender is offside. |
+| SHOOT (hold, drag, let go) | The power meter arches over the shooter; the **green slice** sits at **0.62 s** (0.72 s before 2026-11-02). **Drag your thumb on SHOOT to aim**: left/right across the goal, up high, down low, a gentle snap toward the four corners (inside the posts); no drag = **aim assist**: the side the keeper leaves open as you see it, low, as far inside the post as your SHO allows. Accuracy is **continuous in the release**: tightest dead in the middle of the green, a little looser at its edge (PERFECT), looser again within 2.2 greens (GOOD), then EARLY (weak and low) or LATE (rises); no step at the slice's edge. A small goal over the meter shows the keeper and your aim dot with the ring a release now would have (it tightens toward the green); the reticle in the goal mouth is the same ring. Pressed while a pass is on its way it's a first-time volley or header (the drag counts). |
+| After the shot | The meter stays a moment with the word for the release (PERFECT / GOOD / EARLY / LATE), and a miss says why: "STRAIGHT AT HIM · AIM FOR THE GAP", "LATE RELEASE · IT ROSE OVER", "EARLY RELEASE · NOT ENOUGH ON IT", "TOO FINE · AIM INSIDE THE POST", "BLOCKED · GET A YARD OF SPACE". |
 | Field | Tap a teammate to pass to him; at a free kick swipe across to bend it (or use the BEND buttons). |
 | Shootout, their kick | DIVE ◀ / STAY / DIVE ▶ before the kick (or trust your keeper's read). |
-| Keyboard (QA) | Arrows/WASD, Space shoot (hold), J pass (hold: lob), K through, Shift sprint. |
+| Keyboard (QA) | Arrows/WASD run, Space shoot (hold; the arrows aim while it's held, centred = assist), J pass (hold: lob), K through, Shift sprint. |
+
+## Aim and shoot, and free passing (Claude, 2026-11-02)
+
+The owner's playtest of the live build: "the aiming and shooting needs touched up", then "the closer to
+green the more accurate it is" and a passing touch-up that keeps passes free (no lock-on).
+
+**What was wrong (measured, before):** while SHOOT was held the run stick also aimed, so the natural
+input, still running at goal, aimed at the top centre of the goal, at the keeper: **0 %** of 300
+one-on-ones went in that way (the browser playtest showed the same: `aim (34, 2.15)` on every run-in
+shot). Aiming meant pulling the stick sideways or back, which steered the runner off his line or
+stopped him; centring it stopped him dead. The 0.72 s wind-up at 75 % pace let a man closing down
+tackle **47 %** of edge-of-box shooters before the strike. The aim ring sat tiny on the crossbar 30 m
+away. From a tight angle the keeper ran straight at the ball and left the far post open (**68–83 %** of
+wide-angle shots scored); keeper saves were judged where the ball crossed his y line, wrong for a shot
+across him from near the byline. Accuracy was a step: ×0.55 inside the green, ×1.0 just outside. A miss
+said only WIDE or SAVED. Passing locked onto the teammate nearest the stick's way: aimed 35° off a man,
+**95 %** still went to *someone* (69 % to a different man), a through ball went to a different runner a
+third of the time even when aimed at the right one, and a thumb still on the stick after the pass ran
+the receiver away from a lofted ball (8 % cut out vs 2.5 % with the stick let go).
+
+**Sources and the choice.** EA FC Mobile's Elite Shooting rests on manual aim, shot context and
+attributes, keeps power shots "fully assisted" and gives finesse/chip as swipes *from the SHOOT
+button* ([EA deep dive](https://www.ea.com/games/ea-sports-fc/fc-mobile/news/fc-mobile-gameplay-deep-dive),
+[FIFA Mobile controls guide](https://www.fifamobileguide.com/gameplay-controls)); EA removed console
+Timed Finishing in FC 26 as a binary press that "lacked meaningful skill depth"
+([Insider Gaming](https://insider-gaming.com/is-timed-finishing-in-ea-fc-26/)); Retro Goal's quick
+shot trades aim for speed and its players complain the runner stops while they swipe
+([Defector](https://defector.com/this-little-soccer-game-on-my-phone-is-fun-as-hell),
+[user reviews](https://justuseapp.com/en/app/1535765855/retro-goal/reviews)); Score! Hero shows the
+shot's path before it goes ([Pocket Gamer](https://www.pocketgamer.com/score-hero/review/)); console
+aim assist uses magnetism/friction toward targets ([Insomniac, GDC](https://www.gdcvault.com/play/1017942/Techniques-for-Building-Aim-Assist))
+and area-cursor/magnetism assists work best in studies (Vicencio-Moreira et al., CHI 2014); FIFA's
+semi-assisted passing assists the power and only slightly the direction
+([EA accessibility](https://www.ea.com/able/resources/fifa/fifa-22/ps4/customise-controls-settings)).
+For one stick + buttons that gives: **aim on the SHOOT thumb (a drag), never on the run stick**; a
+**visible assist** (the open side, low) when you don't drag, with a gentle area-cursor snap when you
+do; **continuous timing**; a small goal by the meter and a reticle in the goal; **reasons** for misses;
+passes **free** with a narrow, fading pull (semi-assisted style), a pass line, and receivers that run on.
+
+**Engine changes** (`engine.ts`): `assistAim` / `openSide` (the angular gap the keeper leaves, slight
+far-post lean, hysteresis so the reticle doesn't flicker; how fine it cuts it comes from SHO and range),
+`snapAim`, `setAim` (the live drag; a first-time hit held at contact uses it), `AIM_X` 3.1 m,
+`coneMult` / `timingMiss` / `timingWord` (continuous accuracy; late rises `8 × (off − 0.3·green)` m,
+early drops and loses power continuously), `rangeCone`, a cone penalty for shooting across the body,
+`shotVerdict` (the miss reason), `TOP` 0.62 s (wind-up pace 0.85, was 0.75). Keeper (`KEEP`): from a
+tight angle (> 9 m wide) he narrows along the bisector instead of running at the ball; he gets set
+(60 % pace) when he sees the backlift; he spreads (DIV) for a shot struck within 8 m; he dives toward
+where the ball passes him (2-D, misread across its line) and saves are judged at that point; a long shot
+he has time for he shuffles across faster; one-on-ones from 18 m (was 20). Passing: `passPlan` (free pass
+with `PASS_ASSIST` cones), `pass(…, free)` (a person's; the autopilot and a corner's "stick picks the
+man" keep the old pick), a PAS-scaled weight error on free ground passes, the lead solved from the
+pass's own travel time, a pass into space goes to whoever reaches it first, a moving pass runs past a
+teammate it isn't for, and the receiver runs onto it while the stick is centred or still held the way
+of the pass (`receiving`). `SP_TUNE`: `penRead` 0.15 → 0.07, `fkCone` 4.2 → 3.0 (back in range after
+the keeper changes). The autopilot aims in the old 3.3 m scale.
+
+**Measured** with `npx vite-node scripts/audit_soccer_shots.ts 300` (seeded drills, a simulated
+person: release timing spread 0.06 s, the thumbs as described; 75-rated sides; the same drills run on
+the old engine with the old controls for "before"). 1v1 = through from 22–25 m, the keeper set, a
+sprint in to 13–16 m; edge = 18.5–21.5 m with a man closing from 4 m; wide = 11–15 m off centre, 7–11 m
+out; cross = a lofted ball from the wing met first time.
+
+| Drill | Before | After |
+| --- | --- | --- |
+| 1v1, still running at goal (before: that aimed top centre; after: aim assist) | 0.0 % | 50.3 % |
+| 1v1, aimed at the open corner (before: stick pulled him sideways) | 50.7 % | 49.0 % |
+| 1v1, aimed at the keeper's side | 38.0 % | 17.3 % |
+| Edge of the box, running / aimed | 5.0 % / 19.7 % (47 % tackled in the wind-up) | 32.3 % / 50.7 % (14–21 % tackled) |
+| Wide angle, running / aimed | 67.7 % / 83.0 % | 13.7 % / 14.3 % |
+| Cross met first time (stick still / aimed) | 25.3 % / 26.3 % | 25.0 % / 29.3 % |
+| 1v1 by SHO 55 / 75 / 95 (aimed) | 35.7 / 51.3 / 66.0 % | 39.7 / 55.7 / 61.0 % |
+| Edge by SHO 55 / 75 / 95 | 11.3 / 17.3 / 25.7 % | 28.7 / 50.7 / 81.7 % |
+| 1v1 against keepers 52 / 75 / 93 | 71.7 / 51.3 / 38.0 % | 77.3 / 52.0 / 8.0 % |
+| Edge against keepers 52 / 75 / 93 | 26.0 / 20.0 / 9.0 % | 65.7 / 46.0 / 4.7 % |
+| 1v1 by timing spread 0 / 0.06 / 0.15 s | 56.7 / 52.3 / 38.7 % | 57.7 / 48.7 / 32.7 % |
+
+Notes: the edge drill is a clean look (one man closing, nobody else); in matches the whole-attack rates
+below are what counts. Elite keepers (all six stats 93) now dominate one-on-ones and long shots more
+than before; a 93 is the top of the card range. Aim assist is about as good as a manual corner from
+close in (it adapts to range and SHO), clearly worse from range; the drag's main job is choosing the
+side and the height.
+
+The autopilot's whole attacks (skill 0.75, 300 per scenario over three real matchups, before → after):
+build-up 13.7 → 13.3 %, counter 10.7 → 10.3 %, wide 12.0 → 9.7 %, corners 13.0 → 11.7 %, free kicks
+14.0 → 14.7 %, penalties 74.7 → 73.3 % (`setpieces.test.ts` keeps corners 6–14 %, free kicks 8–17 % with
+direct ones 5–15 %, penalties 70–80 %).
+
+Passing (build-up, the stick aimed at a teammate N° off his line, 200 each, before → after: to him /
+to any teammate): 0° 99.5 / 99.5 → 98.5 / 98.5 %; 10° 98.0 / 98.0 → 81.0 / 96.5 %; 20° 80.5 / 98.0 →
+56.5 / 96.0 %; 35° 26.5 / 95.0 → 9.5 / 67.5 % (it now goes where you pointed: 18 % cut out, 14.5 %
+loose); a through ball aimed at a runner reaches him 67.0 → 97.5 %; a lofted ball with the thumb still on
+the stick is cut out 8.0 → 2.5 %; PAS 50 / 75 / 95 cut out 4.0 / 1.5 / 0.0 → 4.0 / 3.5 / 0.5 %.
+
+Tests: `shooting.test.ts` (assist and snap deterministic and on the open side; cone, miss distance and
+goal rate monotone in |release − green|; higher SHO scores more, a better keeper concedes fewer; free
+passes go the stick's way with a fading pull; the receiver runs on; a shootout kick goes where it's
+dragged), plus the existing `soccer.test.ts` and `setpieces.test.ts`.
 
 ## Physics (`engine.ts`)
 
@@ -65,7 +163,8 @@ and a lerp between two marks. All effects are exported and the tests use the sam
 | PAC·DRI | acceleration | 9 → 15 m/s² |
 | DRI | pace kept with the ball; first touch on hard passes; tackles against | 0.88 → 0.97 of top speed |
 | PAS | pass direction error (1 sd; ×1.35 under pressure, ×1.15 sprinting) | 7° → 1.5° |
-| SHO | shot error cone on a green release (×0.55 green, up to ×3 off it) | 5.5° → 1.3° |
+| SHO | shot error cone (1 sd); since 2026-11-02 × `coneMult`: 0.5 dead centre, 0.85 at the green's edge, 1.3 at two greens, ≤ 3.2; × `rangeCone` 1 → 2 from 12 to 26 m; ×1 → 1.5 across the body | 5.5° → 1.3° |
+| SHO | how far inside the post aim assist goes (two cones' worth, 0.7–1.6 m) | wider → finer |
 | SHO | green window half-width | 0.028 → 0.085 s |
 | SHO·PHY | shot speed at full power | 21 → 31 m/s |
 | PHY·SHO | header speed, jump reach, aerial duels | 10 → 17 m/s; height + 0.35 → 0.75 m |
@@ -75,6 +174,7 @@ and a lerp between two marks. All effects are exported and the tests use the sam
 | GK DIV | dive carry and time; hands beyond the body | 1.05 → 1.85 m in 0.60 → 0.42 s; 0.85 → 1.15 m |
 | GK HAN | hold rather than parry (less for hard, stretched, high shots) | 38 → 86 % base |
 | GK POS | standing off the angle's bisector (1 sd) | 1.3 → 0.12 m |
+| GK DIV | spreading himself, a shot struck within 8 m of him (2026-11-02) | 1.05 → 1.25 m half-width |
 | GK SPD | coming off the line, smothering one-on-ones | 5.6 → 7.6 m/s |
 | GK REF·POS | reading a penalty | 36 → 50 % right way |
 
@@ -132,7 +232,8 @@ van Dijk) on 7–9 % of open-play attacks. A good human gets more than the autop
 | `src/game/soccer2/Soccer2.tsx` | the component (Football2.tsx conventions: `onProgress`/`onDone`, `rival`, `autoplayHook`, `timeScale`) |
 | `src/game/soccer2/Lab.tsx` | dev-only lab |
 | `src/game/pixel/pitch.ts` | pitch texture |
-| `src/game/soccer2/soccer.test.ts` | tests |
+| `src/game/soccer2/soccer.test.ts`, `setpieces.test.ts`, `shooting.test.ts` | tests |
+| `scripts/audit_soccer_shots.ts` | the shooting/passing audit (drills with a simulated person, autopilot rates) |
 | `scripts/qa/soccer-lab.mjs` | browser QA |
 
 Small additive changes outside: `pixel/body.ts` (`soccer` look, gloves slot), `pixel/persp.ts`

@@ -159,6 +159,59 @@
 .sc2-thru {
   font-size: 13px;
 }
+/* SHOOT held: a drag on it aims (Claude 2026-11-02). Chevrons show the four ways; the dot follows the
+   thumb (no dot: aim assist). The button keeps the pointer (captured), so the drag can leave it. */
+.sc2 .hg2-shoot {
+  touch-action: none;
+  overflow: visible;
+}
+.sc2-aimpad {
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 224, 138, 0.75);
+  pointer-events: none;
+}
+.sc2-aimpad i {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+.sc2-aimpad .u {
+  top: 1px;
+  left: calc(50% - 6px);
+  border-bottom-color: #ffe08a;
+}
+.sc2-aimpad .d {
+  bottom: 1px;
+  left: calc(50% - 6px);
+  border-top-color: #ffe08a;
+}
+.sc2-aimpad .l {
+  left: 1px;
+  top: calc(50% - 6px);
+  border-right-color: #ffe08a;
+}
+.sc2-aimpad .r {
+  right: 1px;
+  top: calc(50% - 6px);
+  border-left-color: #ffe08a;
+}
+.sc2-aimpad b {
+  position: absolute;
+  left: calc(50% - 7px);
+  top: calc(50% - 7px);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+}
+.sc2-aimpad b.on {
+  background: #ffe08a;
+  border-color: #05070d;
+}
 /* a free kick's bend, over the buttons */
 .sc2-bend {
   position: absolute;

@@ -64,7 +64,8 @@ import type { UtSport } from './types';
 // Codex: NFL rushing execution differs from v4; NBA queues remain compatible.
 // Claude ratings rework + NBA shot curve (2026-11-01): ratings, levels and jumpers changed.
 // Soccer (Claude 2026-11-01): its own queue, from 1.
-const UT_RULES: Record<UtSport, number> = { nba: 10, nfl: 11, soccer: 1 };
+// soccer 2 (Claude 2026-11-02): the aim/shoot, keeper and passing update changes how a match comes out
+const UT_RULES: Record<UtSport, number> = { nba: 10, nfl: 11, soccer: 2 };
 const queueOf = (pool: Pool) => 'ut-' + UT_RULES[pool.sport] + '-' + pool.print;
 /** Seconds of searching before an AI squad steps in: the window is at its widest (10) from 40. */
 export const UT_AI_AFTER = 50;

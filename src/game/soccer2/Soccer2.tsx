@@ -4,7 +4,10 @@
 // dealt scenario with a 30-second clock: a build-up, a counter, a wide overload, a corner, a free
 // kick (and a penalty when they foul you in the box). Joystick to run, SPRINT on stamina; PASS
 // (tap along the grass, hold for a lofted ball or a cross), THRU into a runner's path; hold SHOOT
-// and let go in the green, the stick aiming in the goal. Level with the rival at the end: penalties.
+// and let go in the green. Level with the rival at the end: penalties. Claude 2026-11-02: the stick
+// only runs; drag your thumb on SHOOT to aim (no drag: aim assist picks the open side, low), passes
+// go where the stick points with a gentle pull toward a teammate there, and every release and miss
+// says why.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { crowd, loadSamples, sfx, vibrate } from '../../lib/sound';
@@ -16,10 +19,9 @@ import { frameAt, Recorder, type Replay, REPLAY_SPEED, replayTime, REPLAYS_IN_AU
 import { useInputInterrupt } from '../useInputInterrupt';
 import { WaitLine } from '../Wait';
 import { decide, pilot } from './autopilot';
-import { cancelShoot, ctrlOf, kickOff, pass, passTarget, pressShoot, releaseShoot, setCurl, setSprint, settle, step } from './engine';
+import { cancelShoot, ctrlOf, kickOff, pass, passPlan, passTarget, pressShoot, releaseShoot, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step, timingWord } from './engine';
 import type { SoccerKits } from './kits';
 import { attackFor, ATTACKS, END_TEXT, minuteOf, newMatch, recordAttack, SCENARIO_HINTS, SCENARIO_NAMES, totalOf, type Match } from './match';
-import { shotCone } from './ratings';
 import { SoccerRenderer } from './render';
 import { kickAttack, newShootout, nextKick, recordKick, score as soScore, type Shootout, type Side } from './shootout';
 import type { Attack, AttackEnd, Body, Pt, Scenario, Squad } from './types';
@@ -30,6 +32,10 @@ type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
 
 const DT = 1 / 60;
 const RELEASE_LAG = 0.03;
+/** how far (CSS px) a drag on SHOOT goes for full aim across or up */
+const AIM_DRAG = 46;
+/** a drag shorter than this (of AIM_DRAG) is no aim: the assist */
+const AIM_DEAD = 0.28;
 /** PASS held this long (s) is a lofted ball, a cross */
 const LOFT_HOLD = 0.22;
 
@@ -121,6 +127,9 @@ export function Soccer2({
   const keys = useRef(new Set<string>());
   const passDown = useRef<{ id: number | 'key'; t: number } | null>(null);
   const shotPointer = useRef<number | 'key' | null>(null);
+  /** the drag on SHOOT: where the thumb went down, and the aim it gives (null: assist) */
+  const shotDrag = useRef<{ x0: number; y0: number; aim: Pt | null } | null>(null);
+  const [aimDot, setAimDot] = useState<Pt | null>(null);
   const sprintPointer = useRef<number | 'key' | null>(null);
   const swipe = useRef<{ id: number; x0: number; y0: number; t0: number } | null>(null);
   const [ui, setUi] = useState<Ui>('loading');
@@ -165,6 +174,8 @@ export function Soccer2({
     keys.current.clear();
     passDown.current = null;
     shotPointer.current = null;
+    shotDrag.current = null;
+    setAimDot(null);
     sprintPointer.current = null;
     swipe.current = null;
     setKnob({ x: 0, y: 0 });
@@ -203,15 +214,15 @@ export function Soccer2({
     if (uiRef.current === 'so-intro') {
       setUi('so-kick');
       setGuess(null);
-      if (usKicking.current) tip('pen', 'Aim with the stick · hold SHOOT, let go in the green');
+      if (usKicking.current) tip('pen', 'Hold SHOOT and drag it to aim (or use the stick) · let go in the green');
       else tip('keep', 'Their kick · pick a way to dive, or trust your keeper');
       return;
     }
     setUi('live');
     const sc = a.scenario;
     if (sc === 'corner') tip('corner', 'Stick picks the man · hold PASS to whip it in');
-    else if (sc === 'freekick') tip('fk', 'Swipe or BEND to curl it · hold SHOOT, let go in the green');
-    else tip('move', 'Stick to run · SPRINT · PASS (hold: cross) · THRU · hold SHOOT');
+    else if (sc === 'freekick') tip('fk', 'BEND to curl it · hold SHOOT, drag to aim, let go in the green');
+    else tip('move', 'Stick runs · PASS where you point · hold SHOOT, drag to aim');
   };
 
   // the autopilot kicks off in tests
@@ -229,6 +240,10 @@ export function Soccer2({
         sfx.kick();
         crowd.swell(0.5);
       } else if (e === 'release-green') say('PERFECT!', 'green', 700);
+      else if (e === 'release' && a.release) {
+        const w = timingWord(a.release.off, a.release.green);
+        say(w === 'GOOD' ? 'GOOD' : w === 'EARLY' ? 'EARLY' : 'LATE', w === 'GOOD' ? 'plain' : 'bad', 650);
+      }
       else if (e === 'control' || e === 'chest') sfx.catch();
       else if (e === 'save-catch' || e === 'claim' || e === 'smother') {
         sfx.catch();
@@ -260,7 +275,7 @@ export function Soccer2({
       } else if (e === 'freekick') {
         say('FREE KICK', 'good', 1300, 'FOULED');
         clearInput();
-        tip('fk', 'Swipe or BEND to curl it · hold SHOOT, let go in the green');
+        tip('fk', 'BEND to curl it · hold SHOOT, drag to aim, let go in the green');
       } else if (e === 'advantage') say('ADVANTAGE', 'plain', 800);
       else if (e === 'goal') {
         fxRef.current.flash = 0.45;
@@ -287,10 +302,12 @@ export function Soccer2({
     setUi('after');
     const text = a.end?.text ?? END_TEXT[e];
     const by = a.shotBy !== null ? a.bodies[a.shotBy].p.tag : '';
+    // why it didn't go in (late, early, straight at him...), else what happened
+    const why = shotVerdict(a);
     if (e === 'G') say('GOAL!', 'big', 2200, by + (a.lastShot?.greened ? ' · PERFECT STRIKE' : ''));
-    else if (e === 'S') say('SAVED', 'bad', 1500, text);
-    else if (e === 'W') say(text === 'OVER THE BAR' ? 'OVER THE BAR' : 'WIDE', 'bad', 1400);
-    else if (e === 'B') say('BLOCKED', 'bad', 1400, text);
+    else if (e === 'S') say('SAVED', 'bad', 1700, why ?? text);
+    else if (e === 'W') say(text === 'OVER THE BAR' ? 'OVER THE BAR' : 'WIDE', 'bad', 1700, why ?? undefined);
+    else if (e === 'B') say('BLOCKED', 'bad', 1500, why ?? text);
     else if (e === 'O') say('OFFSIDE', 'bad', 1500, text.replace('OFFSIDE · ', ''));
     else if (e === 'T') say('TIME UP', 'plain', 1400, 'ATTACK OVER');
     else say('LOST IT', 'bad', 1400, text);
@@ -449,10 +466,11 @@ export function Soccer2({
     const s = stickScreen();
     return screenRunInput(s.x, s.y, 'end');
   };
-  /** the stick as an aim in the goal (null: centred, the game aims for you) */
-  const aimNow = (): Pt | null => {
+  /** the stick (or the keys) as an aim in the goal: a set-piece taker aims with it, and the keyboard
+   * (no drag) aims with the arrows while Space is held. null: centred (aim assist). */
+  const stickAim = (): Pt | null => {
     const s = stickScreen();
-    return Math.hypot(s.x, s.y) > 0.2 ? { x: Math.max(-1, Math.min(1, s.x)), y: Math.max(-1, Math.min(1, -s.y)) } : null;
+    return Math.hypot(s.x, s.y) > 0.2 ? snapAim({ x: Math.max(-1, Math.min(1, s.x)), y: Math.max(-1, Math.min(1, -s.y)) }) : null;
   };
   const passDir = (): Pt | null => {
     const v = steerNow();
@@ -499,26 +517,45 @@ export function Soccer2({
     const a = atkRef.current;
     if (!a || !live()) return;
     const held = (performance.now() - d.t) / 1000;
-    if (pass(a, held >= LOFT_HOLD ? 'lofted' : 'ground', passDir())) sfx.click();
+    const corner = a.setPiece?.kind === 'corner';
+    // a person's pass is free: the stick's way, a gentle pull toward a teammate there (a corner: the stick picks the man)
+    if (pass(a, held >= LOFT_HOLD ? 'lofted' : 'ground', passDir(), !corner)) sfx.click();
   };
   const doThru = () => {
     const a = atkRef.current;
-    if (a && live() && pass(a, 'through', passDir())) sfx.click();
+    if (a && live() && pass(a, 'through', passDir(), true)) sfx.click();
   };
-  const shootDown = (id: number | 'key') => {
+  const shootDown = (id: number | 'key', x = 0, y = 0) => {
     const a = atkRef.current;
     if (!a || !live() || shotPointer.current !== null) return false;
     if (!pressShoot(a)) return false;
     shotPointer.current = id;
+    shotDrag.current = { x0: x, y0: y, aim: null };
+    setAimDot(null);
     setShooting(true);
     return true;
+  };
+  /** the thumb slides on SHOOT: aim (left/right across the goal, up high, down low), snapped toward the corners */
+  const shootDrag = (id: number, x: number, y: number) => {
+    const d = shotDrag.current;
+    const a = atkRef.current;
+    if (shotPointer.current !== id || !d || !a) return;
+    const v = { x: (x - d.x0) / AIM_DRAG, y: -(y - d.y0) / AIM_DRAG };
+    const l = Math.hypot(v.x, v.y);
+    const aim = l < AIM_DEAD ? null : snapAim(l > 1 ? { x: v.x / l, y: v.y / l } : v);
+    d.aim = aim;
+    setAim(a, aim);
+    setAimDot(l < AIM_DEAD ? null : { x: Math.max(-1, Math.min(1, v.x)), y: Math.max(-1, Math.min(1, -v.y)) });
   };
   const shootUp = (id: number | 'key') => {
     if (shotPointer.current !== id) return;
     shotPointer.current = null;
+    shotDrag.current = null;
+    setAimDot(null);
     setShooting(false);
     const a = atkRef.current;
-    if (a && !a.end) releaseShoot(a, aimNow(), RELEASE_LAG);
+    // the aim is already on the meter (the drag, the stick at a set piece, the keys); none: assist
+    if (a && !a.end) releaseShoot(a, null, RELEASE_LAG);
   };
   const sprintOn = (id: number | 'key') => {
     const a = atkRef.current;
@@ -592,7 +629,8 @@ export function Soccer2({
       const c = a.ball.owner !== null ? a.bodies[a.ball.owner] : a.taker !== null ? a.bodies[a.taker] : null;
       if (id !== null && c && id !== c.id) {
         const to = a.bodies[id];
-        if (pass(a, a.setPiece?.kind === 'corner' ? 'lofted' : 'ground', { x: to.x - c.x, y: to.y - c.y })) sfx.click();
+        const corner = a.setPiece?.kind === 'corner';
+        if (pass(a, corner ? 'lofted' : 'ground', { x: to.x - c.x, y: to.y - c.y }, !corner)) sfx.click();
       }
     }
   };
@@ -627,6 +665,8 @@ export function Soccer2({
         while (acc >= DT) {
           acc -= DT;
           const ai = autoplayHook || (u === 'so-kick' && !usKicking.current);
+          // no drag on SHOOT: a set-piece taker aims with the stick, the keyboard with the arrows
+          if (!ai && a.meter && shotPointer.current !== null && !shotDrag.current?.aim && (shotPointer.current === 'key' || (a.setPiece && a.taker === a.ctrl))) setAim(a, stickAim());
           step(a, DT, ai ? decide(a, pilotRef.current) : steerNow());
           handleEvents(a);
           if (a.end) {
@@ -661,13 +701,17 @@ export function Soccer2({
           const rt = replayTime(rp, now);
           const sn = rt === null ? null : frameAt(rp.frames, rt);
           if (rt === null || !sn) endReplay();
-          else renderer.draw(ctx, { ...a, t: sn.t, bodies: sn.bodies, ball: sn.ball, meter: null, end: a.end }, { target: null, aim: null, shake: 0, flash: 0, names: false }, kitOf, 2);
+          else renderer.draw(ctx, { ...a, t: sn.t, bodies: sn.bodies, ball: sn.ball, meter: null, release: undefined, end: a.end }, { target: null, shake: 0, flash: 0, names: false }, kitOf);
         } else {
           const c = ctrlOf(a);
           const onBall = a.ball.owner === c.id || (a.setPiece && a.taker === c.id);
           const dir = passDir();
-          const target = !autoplayHook && onBall && !a.meter && (dir || a.setPiece?.kind === 'corner') && a.setPiece?.kind !== 'penalty' ? (passTarget(a, dir, a.setPiece?.kind === 'corner' ? 'lofted' : 'ground')?.id ?? null) : null;
-          renderer.draw(ctx, a, { target, aim: autoplayHook ? null : aimNow(), shake: fx.shake, flash: fx.flash, names: u === 'intro' }, kitOf, shotCone(c.p) * (a.meter ? 0.8 : 1));
+          const corner = a.setPiece?.kind === 'corner';
+          const show = !autoplayHook && onBall && !a.meter && a.setPiece?.kind !== 'penalty';
+          // the pass the stick would play: its line, and the man the gentle assist would find (a corner: the man the stick picks)
+          const plan = show && dir && !corner ? passPlan(a, passDown.current && (performance.now() - passDown.current.t) / 1000 >= LOFT_HOLD ? 'lofted' : 'ground', dir) : null;
+          const target = show && corner ? (passTarget(a, dir, 'lofted')?.id ?? null) : (plan?.to?.id ?? null);
+          renderer.draw(ctx, a, { target, pass: plan, shake: fx.shake, flash: fx.flash, names: u === 'intro' }, kitOf);
         }
       } catch (err) {
         console.error('[soccer draw]', err);
@@ -760,7 +804,7 @@ export function Soccer2({
             <>
               <small>{usKicking.current ? 'YOUR KICK' : 'THEIR KICK'}</small>
               <b>{a.bodies[a.ctrl].p.name}</b>
-              <span>{usKicking.current ? 'Aim with the stick · hold SHOOT, let go in the green' : 'Pick a way to dive before the kick'}</span>
+              <span>{usKicking.current ? 'Hold SHOOT and drag to aim (or the stick) · let go in the green' : 'Pick a way to dive before the kick'}</span>
             </>
           )}
           <button className="sc2-go" onClick={kickOffNow}>
@@ -847,17 +891,29 @@ export function Soccer2({
                 className={'hg2-shoot' + (shooting ? ' held' : '')}
                 onPointerDown={(e) => {
                   e.preventDefault();
-                  if (shootDown(e.pointerId)) e.currentTarget.setPointerCapture?.(e.pointerId);
+                  if (shootDown(e.pointerId, e.clientX, e.clientY)) e.currentTarget.setPointerCapture?.(e.pointerId);
                 }}
+                onPointerMove={(e) => shootDrag(e.pointerId, e.clientX, e.clientY)}
                 onPointerUp={(e) => shootUp(e.pointerId)}
                 onPointerCancel={() => {
                   shotPointer.current = null;
+                  shotDrag.current = null;
+                  setAimDot(null);
                   setShooting(false);
                   if (atkRef.current) cancelShoot(atkRef.current);
                 }}
-                aria-label="Shoot: hold, and let go in the green"
+                aria-label="Shoot: hold, drag to aim, and let go in the green"
               >
                 SHOOT
+                {shooting && (
+                  <span className="sc2-aimpad" aria-hidden="true">
+                    <i className="u" />
+                    <i className="d" />
+                    <i className="l" />
+                    <i className="r" />
+                    <b style={aimDot ? { transform: 'translate(' + Math.round(aimDot.x * 26) + 'px,' + Math.round(aimDot.y * 26) + 'px)' } : undefined} className={aimDot ? 'on' : ''} />
+                  </span>
+                )}
               </button>
             )}
           </div>

@@ -16,7 +16,9 @@ import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_Q
 // 5 (NFL only): Codex run lanes, blocking assignments and touch steering; preserve board history.
 // 9 (NBA only): Claude shot curve — poor shooters' green window and off-green threes fall, elite unchanged.
 // Soccer (Claude 2026-11-01): its own queue from 1, apart from the other two by name and data.
-const DRAFT_RULES = pick({ nba: 10, nfl: 10, soccer: 1 });
+// Soccer 2 (Claude 2026-11-02): drag-to-aim with aim assist, continuous shot timing, keeper and free
+// passing changes (the agreed shootout and both sides' attacks come out differently).
+const DRAFT_RULES = pick({ nba: 10, nfl: 10, soccer: 2 });
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = pick({ nba: 'ps1-', nfl: 'ps1-', soccer: 'ps1-soccer-' }) + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
 /** Everyone with the app open, whichever sport: the online count is the whole app's. */

@@ -128,6 +128,10 @@ export interface Meter {
   green: number;
   /** a first-time shot or header on an arriving ball */
   first: boolean;
+  /** aim assist's target while SHOOT is held (aim space: x -1..1 across, y -1 low..1 high) */
+  assist?: Pt;
+  /** the person's aim while SHOOT is held (the drag on SHOOT; null: assist) */
+  aim?: Pt | null;
 }
 
 /** The last shot, for the HUD and the replay. */
@@ -145,6 +149,12 @@ export interface ShotInfo {
   /** the error cone's half angle (degrees, 1 sd) */
   cone: number;
   kind: 'shot' | 'header' | 'volley' | 'pen' | 'fk';
+  /** the green's half-width at the release (s), for the timing read-out */
+  green?: number;
+  /** aim assist chose the target (no drag) */
+  assisted?: boolean;
+  /** where the keeper stood (x across) when it was struck, for the miss read-out */
+  gkX?: number;
 }
 
 export interface Attack {
@@ -191,13 +201,18 @@ export interface Attack {
   /** attackers in an offside position when the last pass was played */
   offIds: number[];
   /** the keeper's read of a shot: when he goes, from where, to where */
-  gkPlan: null | { react: number; x0: number; tx: number; th: number; at: number };
+  gkPlan: null | { react: number; x0: number; tx: number; th: number; at: number; y0?: number; ty?: number };
   /** a first-time hit let go before the ball arrived */
   first: null | { off: number; greened: boolean; power: number; aim: Pt | null; green: number };
   /** the set-piece taker */
   taker: number | null;
   /** who struck the last shot */
   shotBy: number | null;
+  /** the last release of SHOOT, for the meter's read-out after the strike */
+  release?: { at: number; off: number; green: number; top: number };
+  /** a pass the person played: the stick's way when it went (the receiver runs onto the ball until
+   * the stick moves off it) */
+  passStick?: Pt | null;
   /** a penalty's keeper told which way to go (a person keeping in a shootout): -1 left, 0 stay, 1 right */
   guess?: number;
 }

@@ -5,7 +5,7 @@
 // who's onside), crosses from wide and shoots when it has the angle. Its skill (0-1) is how
 // sharp those reads are and how close to the green it lets the meter go.
 import { hashString, rng } from '../../engine/rng';
-import { ctrlOf, dist, GX, inBox, kickOff, nearestDefender, offsideLine, ownerOf, pass, PL, pressShoot, releaseShoot, setCurl, setSprint, step, TOP } from './engine';
+import { AIM_X, ctrlOf, dist, GX, inBox, kickOff, nearestDefender, offsideLine, ownerOf, pass, PL, pressShoot, releaseShoot, setCurl, setSprint, step, TOP } from './engine';
 import { rt } from './ratings';
 import type { Attack, Body, PassKind, Pt } from './types';
 
@@ -140,7 +140,8 @@ function think(a: Attack, pl: Pilot, c: Body) {
   if (shotOn(a, c) && (dist(c, goal) < 13 || r() < lerp(0.45, 0.8, pl.skill))) {
     const gk = a.bodies.find((b) => b.role === 'gk')!;
     const s = Math.abs(gk.x - GX) > 0.3 ? Math.sign(GX - gk.x) : c.x < GX ? 1 : -1;
-    beginShot(a, pl, { x: s * lerp(0.55, 0.85, r()), y: -0.9 + r() * lerp(1.4, 1.0, pl.skill) });
+    // (x in the old 3.3 m aim scale, so its shots go where they did before the 2026-11-02 aim change)
+    beginShot(a, pl, { x: Math.min(1, (s * lerp(0.55, 0.85, r()) * 3.3) / AIM_X), y: -0.9 + r() * lerp(1.4, 1.0, pl.skill) });
     pl.run = { x: 0, y: 0.4 };
     return;
   }
