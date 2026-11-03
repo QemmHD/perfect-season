@@ -52,7 +52,7 @@
   color: var(--text);
   font: 500 16px var(--body);
 }
-.admin-studio label.admin-recipe {
+.admin-recipe {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
