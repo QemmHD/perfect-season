@@ -30,9 +30,9 @@ export function AdminHome({
       <div className="adm-hero">
         <span className="eyebrow">PERFECT SEASON · OWNER ACCESS</span>
         <h3 className="disp">
-          BEHIND
+          ADMIN
           <br />
-          THE GAME.
+          TOOLS.
         </h3>
         <div className="adm-fan" aria-hidden="true">
           <PackArt kind="gold" label="CAPTAINS" sport={SPORT} />
@@ -51,21 +51,21 @@ export function AdminHome({
       </div>
       {[
         {
-          tab: "packs",
-          title: "Pack Studio",
-          sub: "Create the next drop.",
-          Icon: IconStore,
-        },
-        {
           tab: "players",
-          title: "Player Rewards",
-          sub: "Cards, packs, XP and more.",
+          title: "Send Gifts",
+          sub: "Give packs, cards, coins and boosts.",
           Icon: IconSquad,
         },
         {
+          tab: "packs",
+          title: "Store Packs",
+          sub: "Edit pack contents, prices and availability.",
+          Icon: IconStore,
+        },
+        {
           tab: "local",
-          title: "My Club",
-          sub: "Manage your cards and progress.",
+          title: "My Account",
+          sub: "Your balance, cards and replay tools.",
           Icon: IconClub,
         },
       ].map(({ tab, title, sub, Icon }) => (
@@ -128,10 +128,10 @@ export function PackStudio({
         <span className="eyebrow">{SPORT_NAME[SPORT]} · PACK STUDIO</span>
         <h3 className="disp">
           {review
-            ? "READY TO DROP."
+            ? "REVIEW STORE PACKS"
             : editing
-              ? "MAKE IT YOURS."
-              : "THE NEXT DROP."}
+              ? "EDIT PACK"
+              : "STORE PACKS"}
         </h3>
       </div>
       {review ? (

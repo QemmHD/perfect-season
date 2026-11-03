@@ -572,3 +572,39 @@
   font-size: 11px;
   overflow-wrap: anywhere;
 }
+
+/* Codex (OpenAI): task navigation, staged gifting and preserved in-session drafts. */
+.admin [hidden] { display: none !important; }
+.adm-chrome { position: sticky; top: -1px; z-index: 4; background: var(--panel); padding: 8px 0 1px; }
+.adm-chrome .admin-nav { margin: 14px 0 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.adm-chrome .admin-nav button { min-height: 42px; font-size: 10px; }
+.adm-page-title { font-size: 27px; line-height: 1.1; margin: 10px 0 16px; color: var(--text); }
+.admin-gift { border-top: 0; padding-top: 0; }
+.adm-step-title { font-size: 16px; margin: 20px 0 14px; color: var(--text); }
+.adm-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-bottom: 16px; }
+.adm-steps button { display: flex; flex-direction: column; align-items: center; gap: 7px; min-height: 62px; padding: 7px 2px; color: var(--sub); background: transparent; border: 0; border-bottom: 2px solid var(--line); font: 700 10px var(--body); }
+.adm-steps button b { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; background: var(--bg-2); border: 1px solid var(--line); }
+.adm-steps button[aria-current=step] { color: var(--teal); border-bottom-color: var(--teal); }
+.adm-steps button[aria-current=step] b { border-color: var(--teal); }
+.adm-steps button:disabled { opacity: .4; }
+.admin .seg.admin-to { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; background: none; padding: 0; border: 0; }
+.admin .seg.admin-to button { min-height: 46px; border: 1px solid var(--line); border-radius: 10px; font-size: 10px; padding: 9px 4px; }
+.admin .seg.admin-to button.on { color: var(--teal); border-color: var(--teal); background: #19e3c910; }
+.adm-categories { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 14px 0; }
+.adm-categories button { min-height: 46px; font: 700 12px var(--body); color: var(--sub); background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px; }
+.adm-categories button[aria-pressed=true] { color: var(--gold); border-color: var(--gold); background: #f5b83d12; }
+.adm-context { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--sub); font-size: 12px; border-bottom: 1px solid var(--line); padding: 7px 0; }
+.adm-context span { min-width: 0; overflow-wrap: anywhere; }
+.adm-context b { color: var(--text); }
+.adm-context button { flex: none; min-height: 44px; padding: 8px; color: var(--teal); font: 700 10px var(--body); background: transparent; border: 0; }
+.adm-gift-review { padding: 16px; margin-bottom: 16px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--bg-2); display: flex; flex-direction: column; gap: 10px; overflow-wrap: anywhere; }
+.adm-gift-review ul, .adm-selection ul { padding-left: 20px; margin: 0; color: var(--text); font-size: 13px; line-height: 1.7; }
+.adm-gift-review .eyebrow { color: var(--sub); }
+.adm-selection ul { padding-top: 12px; padding-bottom: 12px; }
+.adm-input-label { display: block; font-size: 12px; margin: 15px 0 7px; color: var(--sub); }
+.adm-success { color: var(--teal) !important; font-size: 13px; line-height: 1.6; }
+.adm-account > .adm-details { margin: 12px 0; }
+.admin-gift > div > .btn { width: 100%; margin-top: 14px; }
+.admin-gift > div > .adm-quiet { min-height: 44px; }
+.admin-gift .admin-num { box-sizing: border-box; width: 100%; }
+.admin-gift > div > .adm-quiet { display: inline-flex; align-items: center; }

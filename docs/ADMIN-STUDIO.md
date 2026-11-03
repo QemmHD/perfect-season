@@ -4,12 +4,12 @@ Designed and implemented by **Codex (OpenAI), 2026-11-03**, on `feature/admin-st
 
 ## Access and navigation
 
-Settings → ADMIN uses the **original password, key derivation, public key, session and lock behavior**. The Control Room follows the game's Archivo type, teal/gold palette, pack art and sheet layout. Four sections:
+Settings → ADMIN uses the **original password, key derivation, public key, session and lock behavior**. The Control Room follows the game's Archivo type, teal/gold palette, pack art and sheet layout. Four clearly named sections (navigation polish by Codex, 2026-11-03):
 
 - **Home:** pack/reward/club shortcuts and current wallet/inventory counts.
-- **Packs:** edit three Club Collection templates, review all changes, then publish an owner-signed store update.
-- **Players:** the original **ME / PICK / RANDOM / EVERYONE** modes, plus the expanded reward toolbox.
-- **Club:** all previous local controls, plus exact-copy card-level editing and special pack shortcuts.
+- **Store Packs:** edit three Club Collection templates, review all changes, then publish an owner-signed store update.
+- **Send Gifts:** the original **ME / PICK / RANDOM / EVERYONE** modes, plus the expanded reward toolbox.
+- **My Account:** all previous local controls, plus exact-copy card-level editing and special pack shortcuts.
 
 Preserved local controls: add/set coins, account level/XP, boosters, all normal pending packs, paid-game reset, SBC replay, Squad Battles ladder restart, Daily replay, missions reset and daily reward reset. The original self/online/multiple/random/everyone gift abilities remain. A player search and a full hexadecimal public-key field additionally allow offline recipients. Random selection uses the existing unbiased shuffle.
 
@@ -118,3 +118,17 @@ Targeted checks: NFL 62 passed (admin rewards/catalog, original gift tests, cont
 `npm test` completed successfully: NBA **537 passed / 46 skipped**, NFL **505 passed / 78 skipped**, Soccer **74 passed**. Skips are the existing sport-specific/manual/tuning cases. The additional GOAT deposit test was then verified separately with all **9 admin reward tests passing for each NBA/NFL**. Ratings audit, main/preview builds and typecheck passed. Final three-sport browser rerun also passes, including 320px XP/booster grid layout, with zero page errors. Specific-player recipients receive the same Store guidance as other pack awards. GitHub Actions review CI is a separate remote run; its current status is visible in PR #2.
 
 Final private refresh succeeded on 2026-11-03: pushed source `ca5701f67bbc4e04844d95f8c809fedadeb63cda`, version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_30d563a251f481919dade4cdcb54692e`, deployment `appgdep_6aea5eb0e3a8819189ad8fb9c9efc549`. This includes the final mobile booster layout, specific-player Store guidance and GOAT replay tests. Final build and static boot/namespace smoke pass; only hosting identity and release-note bookkeeping differ from the GitHub review source.
+
+## Navigation clarity follow-up — Codex (OpenAI), 2026-11-03
+
+The admin navigation now reads **Home / Send Gifts / Store Packs / My Account**, in readable two-column buttons that stay available while scrolling. Home shortcuts state exactly what each section does. Store headings say “Store Packs”, “Edit Pack” and “Review Store Packs”. The close action reads “Close Admin”.
+
+**Send Gifts** now follows **Recipients → Rewards → Review**. It starts with Myself, while Choose Players, Random Online and Everyone retain their original behavior. The offline public-key field is behind “Send to an offline player”. Rewards have four categories: **Packs / Player cards / Coins, XP & boosters / Reward bundles**. Selection is cumulative across categories. The review shows recipients and a readable item-by-item reward list, plus the optional note; only this screen can send. Successful sends show completion feedback and replace the send button with an explicit edit/send-another action.
+
+Top-level sections stay mounted during the unlocked visit, preserving gift selection, recipient choices, pack-editor drafts and card-editor input when navigating. Closing/locking retains the original session behavior; this does not create a new cloud-save format or persist an unfinished gift to another browser session.
+
+**My Account** groups the original abilities into Coins/level/boosters, Card levels, Give myself packs, and Replay/reset tools. The first group is open; the others expand on demand. No existing action, owner access, gift signature, backend endpoint, public pack odds, player progress or online queue changes. No Supabase deployment or database operation is required for this navigation update.
+
+Validation: three-sport Chromium flows pass with zero page errors, including recipient gating, review-before-send, post-send guard, cross-tab draft retention, all recipient modes and reset tools, exact-copy edits and real store purchases. Responsive checks include 320px and 390px widths. Admin/gift tests: NBA 21 passed, NFL 16 passed; Soccer 15 passed / 1 skipped (the NBA/NFL-only GOAT case). Production build and typecheck pass. The private-preview release reference is recorded after publication. These targeted checks cover the UI-only change; the earlier full gameplay suite remains documented above.
+
+Navigation preview publication succeeded: source `c99cff26d4957318c0dff2b87e59f7c4503db82d`, version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_9cb01154f2e48191b657b4b00ae1b369`, deployment `appgdep_6aea629dc6fc819182c0605f519bee8d`. Owner-private URL remains https://perfect-season-private-preview.qem.chatgpt.site . Both production builds and final static boot/namespace smoke pass. Main remains `7db37b6`; this follow-up stays in PR #2. No backend or player-data changes.

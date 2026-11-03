@@ -684,3 +684,10 @@ Admin Studio review/preview: [PR #2](https://github.com/QemmHD/perfect-season/pu
 Completed local Admin Studio verification: full `npm test` NBA 537 passed/46 skipped, NFL 505 passed/78 skipped, Soccer 74 passed; additional registered GOAT deposit/replay admin tests 9/9 for NBA and NFL; ratings audit, production builds, typecheck and final three-sport phone QA pass. No main deployment.
 
 Final owner-private Admin Studio deployment: source `ca5701f67bbc4e04844d95f8c809fedadeb63cda`, Sites version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_30d563a251f481919dade4cdcb54692e`, deployment `appgdep_6aea5eb0e3a8819189ad8fb9c9efc549`; succeeded 2026-11-03. Main remains `7db37b6`; actual owner-signed delivery/catalog publication is the remaining phone acceptance check.
+
+
+### Admin navigation clarity — Codex (OpenAI), 2026-11-03
+
+Explicit section names, Recipients → Rewards → Review gifting, four reward categories, preserved cross-tab drafts, post-send feedback and grouped local tools. Existing access/actions/protocols/progress remain; no backend changes. Files: `src/ui/Admin.tsx`, `src/admin/AdminStudio.tsx`, `src/admin/admin-studio.css`; updated three-sport UI QA in `scripts/qa/admin-studio.mjs`. Current screenshots and full behavior/verification: [Admin Studio](ADMIN-STUDIO.md#navigation-clarity-follow-up--codex-openai-2026-11-03).
+
+Navigation preview deployed successfully from `c99cff26d4957318c0dff2b87e59f7c4503db82d`: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_9cb01154f2e48191b657b4b00ae1b369`, deployment `appgdep_6aea629dc6fc819182c0605f519bee8d`. NBA 21 / NFL 16 / Soccer 15 focused tests pass (one Soccer GOAT-only skip); three-sport phone flows, typecheck, builds and static namespace smoke pass. Full release notes and screenshots are in ADMIN-STUDIO.md; main and the backend are unchanged by this follow-up.

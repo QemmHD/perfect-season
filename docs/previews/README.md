@@ -128,3 +128,8 @@ Real game components on isolated Chromium profiles, 390px wide, with the existin
 - [Soccer collection packs](admin-soccer-packs.png)
 
 [Abilities, new rewards, source/backend connections, compatibility, preservation and final validation](../ADMIN-STUDIO.md).
+
+
+## Clearer admin navigation — Codex (OpenAI), 2026-11-03
+
+Latest navigation replaces the initial admin layout above: [Home and section shortcuts](admin-nav-home.png), [gift recipients and reward review](admin-gift-review.png). Actual current components in isolated 390px Chromium profiles; no live owner gift was issued. [Flow and verification](../ADMIN-STUDIO.md#navigation-clarity-follow-up--codex-openai-2026-11-03).
