@@ -15,6 +15,9 @@ export function PackArt({
   small?: boolean;
 }) {
   // Claude wave 3: Live Calendar packs share one wrapper per kind (live / live-plus / live-pick)
+  const base = kind.startsWith('studio:') ? kind.split(':')[1] : kind.startsWith('admin-card:')?'admin-card':kind;
+  const kindForArt = ({roster:'silver',captains:'gold',dynasty:'premium','admin-goat':'premium','admin-icon':'premium','admin-squad':'gold','admin-icon-team':'premium','admin-card':'gold'} as Record<string,string>)[base] ?? base;
+  kind=kindForArt;
   const k = kind.startsWith('position') ? 'position' : kind.startsWith('live') ? kind.split(':')[0] : kind;
   return (
     <span

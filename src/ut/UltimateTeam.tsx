@@ -1,3 +1,5 @@
+import { adminPackId } from '../../supabase/functions/card-registry/admin-packs';
+import { useCatalog, studioKind, catalogOf, snapshotPack } from '../admin/catalog';
 import { LeagueSeasonView } from './LeagueSeason';
 import { startLeague } from './league';
 import { favoriteFor } from '../lib/favorites';
@@ -162,6 +164,7 @@ export default function UltimateTeam(props: {
   onPlaySquad?: PlaySquad;
 }) {
   const { profile, update, onToast } = props;
+  useCatalog();
   const ut = profile.ut;
   // soccer: the squad's formation, read by every squad rating on this page (squad.ts)
   setSoccerFormation(ut.formation);
@@ -252,7 +255,7 @@ export default function UltimateTeam(props: {
   };
 
   // A pending request is persisted before contact. Retries recover the same server receipt.
-  const startPromo = (kind: string, price: number, packId?: string) => {
+  const startPromo = async (kind: string, price: number, packId?: string) => {
     if (busy.current || promoBusy || ut.pendingPromo) {
       onToast('Finish your reserved pack in the Store first.');
       return;
@@ -262,7 +265,12 @@ export default function UltimateTeam(props: {
       return;
     }
     busy.current = true;
-    const pending = { id: newId(), kind, price, at: Date.now(), ...(packId ? { packId } : {}) };
+    const voucher=kind==='admin-goat'?ut.packs.find(p=>p.id===packId)?.voucher:undefined;
+    if(kind==='admin-goat'&&!voucher){busy.current=false;onToast('This GOAT pack is missing its admin award.');return;}
+    let requestId:string;
+    try { requestId=voucher?await adminPackId(voucher):newId(); }
+    catch { busy.current=false;onToast('Could not prepare the GOAT award. Your pack is still waiting.');return; }
+    const pending = { id: requestId, kind, price, at: Date.now(), ...(voucher?{voucher}:{}), ...(packId ? { packId } : {}) };
     const next = { ...profile, ut: { ...ut, pendingPromo: pending } };
     if (!saveProfile(next)) {
       busy.current = false;
@@ -278,7 +286,7 @@ export default function UltimateTeam(props: {
     let live = true;
     setPromoBusy(true);
     setPromoError('');
-    void openRegisteredPack(SPORT, pending.id, pending.kind)
+    void openRegisteredPack(SPORT, pending.id, pending.kind, pending.voucher)
       .then((receipt) => {
         if (!live) return;
         const preview = registeredOpening(pool, latest.current, receipt);
@@ -628,6 +636,11 @@ export default function UltimateTeam(props: {
   };
 
   const buy = (kind: string, price: number) => {
+    if(studioKind(kind)){
+      if(!catalogOf(SPORT)[kind].enabled)return onToast('This pack is currently unavailable.');
+      price=packDefs(SPORT)[kind].price;
+      kind=snapshotPack(SPORT,kind);
+    }
     if (kind === 'spotlight') return startPromo(kind, packDefs(SPORT).spotlight.price);
     if (kind === 'daily') return claimDailyDrop();
     if (kind === 'scout') return buyScout(packDefs(SPORT).scout.price);
@@ -651,7 +664,7 @@ export default function UltimateTeam(props: {
   const openPending = (id: string) => {
     const pp = ut.packs.find((x) => x.id === id);
     if (!pp) return;
-    if (pp.kind.startsWith('event-spotlight:') || pp.kind === 'spotlight') return startPromo(pp.kind, 0, pp.id);
+    if (pp.kind.startsWith('event-spotlight:') || pp.kind === 'spotlight' || pp.kind === 'admin-goat') return startPromo(pp.kind, 0, pp.id);
     // Claude: a reward Scout's Choice / Standout pick becomes a pick sheet (its id is the pack's)
     // Claude wave 3: a Live Calendar program pick
     if (pp.kind.startsWith('live-pick:') && pool) {

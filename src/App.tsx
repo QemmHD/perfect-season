@@ -1,3 +1,4 @@
+import { watchCatalog } from './admin/catalog-net';
 import { startNumberedSync } from './ut/numbered-sync';
 import { startCloudSaving } from './lib/cloud-save';
 import { clearCheckpoint, readCheckpoint, writeCheckpoint, SAVE_WARNING } from './lib/recovery';
@@ -200,6 +201,7 @@ export function App() {
   const needsName = NET_ON && !profile.name;
   const cloudCanRestore = useRef(true);
   cloudCanRestore.current = screen === 'tab' && !utReq && !run;
+  useEffect(() => watchCatalog(), []);
   useEffect(() => startCloudSaving(() => cloudCanRestore.current, () => location.reload()), []);
 
   useEffect(() => {

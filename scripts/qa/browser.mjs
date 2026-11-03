@@ -71,7 +71,10 @@ export async function fixture(browser, sport = 'nba', name = 'Codex QA', width =
   const current = () =>
     page.evaluate((sport) => {
       const p = JSON.parse(localStorage.getItem({ nba: 'perfect-season:profile:v1', nfl: 'perfect-season:profile:nfl:v1', soccer: 'perfect-season:profile:soccer:v1' }[sport]));
-      p.coins = JSON.parse(localStorage.getItem('perfect-season:profile:v1')).coins;
+      const shared = JSON.parse(localStorage.getItem('perfect-season:profile:v1'));
+      p.coins = shared.coins;
+      p.xp = shared.xp;
+      p.inventory = shared.inventory;
       return p;
     }, sport);
   return { page, context, current, errors, original: await current() };

@@ -116,3 +116,15 @@ Real current components from isolated QA profiles. Designed and implemented by C
 - [NFL playoffs](league-nfl-playoffs.png): knockout fixture presentation.
 
 [Rules, save connections, full file map, verification and fixture limits](../UT-CLUB-SEASON.md). Full matches use the existing QA autopilot and an 8× test-only simulation speed; seeded later-season captures are not actual player achievements.
+
+
+## Admin Studio — Codex (OpenAI), 2026-11-03
+
+Real game components on isolated Chromium profiles, 390px wide, with the existing game typography/palette/pack art. Synthetic admin sessions inspect the interface but cannot publish real owner updates or issue registered GOATs. No player save was imported or reset.
+
+- [Control Room](admin-control-room.png)
+- [Pack library](admin-pack-library.png) / [recipe editor](admin-pack-editor.png)
+- [Player reward toolbox and original recipient modes](admin-reward-toolbox.png)
+- [Soccer collection packs](admin-soccer-packs.png)
+
+[Abilities, new rewards, source/backend connections, compatibility, preservation and final validation](../ADMIN-STUDIO.md).

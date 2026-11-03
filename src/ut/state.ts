@@ -1,3 +1,4 @@
+import type { AdminPackVoucher } from '../../supabase/functions/card-registry/admin-packs';
 import { normalizeLeague, type LeagueState } from './league-state';
 import { rivalsOf, type RivalsState } from './rivals';
 // Ultimate Team: what the profile keeps, per sport (the basketball and football profiles each have
@@ -11,6 +12,7 @@ import { normalizeContent, type ContentState } from './content-state';
 
 /** A pack waiting to be opened (a challenge reward, the starter). */
 export interface PendingPack {
+  voucher?: AdminPackVoucher;
   /** unique, and the seed its contents come from */
   id: string;
   kind: string;
@@ -28,7 +30,7 @@ export interface UtState {
   collectionClaims?: string[];
   events?: Record<string, number>;
   registeredOpenings?: string[];
-  pendingPromo?: { id: string; kind: string; price: number; packId?: string; at: number };
+  pendingPromo?: { id: string; kind: string; price: number; packId?: string; at: number; voucher?: AdminPackVoucher };
   /** Persisted before removal; safe to retry until the server acknowledges retirement. */
   retirements?: CardRetirement[];
   settled?: string[];
@@ -118,7 +120,7 @@ export function migrateUt(raw: unknown): UtState {
   const sbc = r.sbc as { done?: unknown } | undefined;
   if (sbc && sbc.done && typeof sbc.done === 'object') for (const [k, v] of Object.entries(sbc.done as Record<string, unknown>)) if (typeof v === 'number') done[k] = v;
   const packs: PendingPack[] = Array.isArray(r.packs)
-    ? (r.packs as PendingPack[]).filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string').map((p) => ({ id: p.id, kind: p.kind, at: num(p.at, 0) }))
+    ? (r.packs as PendingPack[]).filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string').map((p) => ({ id: p.id, kind: p.kind, at: num(p.at, 0), ...(p.voucher && typeof p.voucher.event?.id==='string' && Number.isInteger(p.voucher.index) ? {voucher:p.voucher} : {}) }))
     : [];
   const sold = r.sold as { cards?: unknown; coins?: unknown } | undefined;
   const bt = r.battles as { week?: unknown; cleared?: unknown; best?: unknown; round?: unknown; level?: unknown } | undefined;
