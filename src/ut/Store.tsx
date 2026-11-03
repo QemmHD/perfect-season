@@ -1,3 +1,4 @@
+import { catalogOf, STUDIO_PACKS, studioKind, useCatalog } from '../admin/catalog';
 import { pickFor } from '../engine/sport';
 // The store: packs to buy with coins (never real money), packs you've earned waiting to be opened,
 // the free starter, and every pack's odds.
@@ -184,15 +185,17 @@ export function Store(props: {
     const t = window.setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(t);
   }, []);
+  useCatalog();
   const pos = props.defs.position;
   const picks = contentOf(props.ut).picks ?? [];
 
   const item = (k: string, note?: string, disabled?: string) => {
     const d = props.defs[k];
+    if(studioKind(k)&&!catalogOf(props.sport)[k].enabled)return null;
     const short = props.coins < d.price;
     return (
       <div key={k} className={'ut-shopitem s-' + k}>
-        <PackArt kind={k} label={SHORT[k]} sport={props.sport} small />
+        <PackArt kind={k} label={SHORT[k]??k.toUpperCase()} sport={props.sport} small />
         <div className="ut-shop-txt">
           <strong>{props.sport === 'nfl' && k === 'position' ? 'Unit Pack' : d.name}</strong>
           <small>{props.sport === 'nfl' && k === 'position' ? d.slots.length + ' golds (2 rare) from the unit you pick' : d.blurb}</small>
@@ -269,6 +272,7 @@ export function Store(props: {
             </>
           )}
           <DailyDrop ut={props.ut} day={props.day} sport={props.sport} onClaim={() => props.onBuy('daily', 0)} />
+          {STUDIO_PACKS.some(k=>catalogOf(props.sport)[k].enabled)&&<><SectionHead title="Club Collection"/><div className="ut-shop">{STUDIO_PACKS.map(k=>item(k))}</div></>}
           {(() => {
             // Claude wave 3: this season's program packs (Live Calendar)
             const live = livePacksOn(props.day);

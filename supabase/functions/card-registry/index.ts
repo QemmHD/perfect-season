@@ -1,3 +1,4 @@
+import { verifyAdminPack } from './admin-packs.ts';
 import { verifyEvent } from 'nostr-tools/pure';
 import catalog from './catalog.json' with { type: 'json' };
 import numbered from './numbered.json' with { type: 'json' };
@@ -80,23 +81,27 @@ Deno.serve(async (req: Request) => {
       !/^[a-f0-9-]{36}$/.test(p.requestId)
     )
       return answer({ error: 'Invalid pack request' }, 400);
+    const admin = p.kind === 'admin-goat';
+    if(admin && await verifyAdminPack(p.voucher,event.pubkey,p.sport,p.namespace)!==p.requestId)return answer({error:'A valid admin GOAT award is required.'},403);
     const reward = p.kind.startsWith('event-spotlight:');
-    if (p.kind !== 'spotlight' && (!reward || !EVENT_IDS.includes(p.kind.slice(16)))) return answer({ error: 'Unknown pack' }, 400);
-    const tier = reward ? 'spotlight' : chaseTier(randomInt(1_000_000));
+    if (!admin && p.kind !== 'spotlight' && (!reward || !EVENT_IDS.includes(p.kind.slice(16)))) return answer({ error: 'Unknown pack' }, 400);
+    const tier = admin ? 'goat' : reward ? 'spotlight' : chaseTier(randomInt(1_000_000));
     const lists = catalog[p.sport as 'nba' | 'nfl'];
     const list = tier === 'gold' ? [] : lists[tier];
-    const cardId = list.length ? list[randomInt(list.length)] : null;
+    const chosen=admin?JSON.parse(p.voucher.event.content).goatCardId:undefined;
+    if(chosen&&!list.includes(chosen))return answer({error:'This GOAT edition is unavailable.'},400);
+    const cardId = chosen ?? (list.length ? list[randomInt(list.length)] : null);
     const receipt = await database('rpc/ps_registry_open', {
       p_actor: event.pubkey,
       p_namespace: p.namespace,
       p_sport: p.sport,
       p_request: p.requestId,
-      p_kind: p.kind,
+      p_kind: admin ? 'spotlight' : p.kind,
       p_card: cardId,
       p_tier: tier,
       p_seed: crypto.randomUUID(),
     });
-    return answer(receipt);
+    return answer(admin ? {...receipt,kind:'admin-goat'} : receipt);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Invalid request';
     return answer({ error: message }, message.includes('limit reached') ? 429 : 503);

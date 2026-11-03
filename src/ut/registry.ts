@@ -1,3 +1,4 @@
+import type { AdminPackVoucher } from '../../supabase/functions/card-registry/admin-packs';
 // Implemented by Codex. See docs/CODEX-UPDATE-LOG.md for ownership, connections and validation.
 import { NS_SUFFIX, sign } from '../net/nostr';
 import type { UtSport } from './types';
@@ -56,7 +57,7 @@ async function testPageReceipt(sport: UtSport, id: string, kind: string): Promis
     import('../../supabase/functions/card-registry/catalog.json'),
     import('../../supabase/functions/card-registry/contract'),
   ]);
-  const tier = kind.startsWith('event-spotlight:') ? 'spotlight' : chaseTier(Math.floor(Math.random() * 1_000_000));
+  const tier = kind==='admin-goat' ? 'goat' : kind.startsWith('event-spotlight:') ? 'spotlight' : chaseTier(Math.floor(Math.random() * 1_000_000));
   const list: string[] = tier === 'gold' ? [] : (catalog as Record<string, Record<string, string[]>>)[sport][tier] ?? [];
   return {
     id,
@@ -70,9 +71,9 @@ async function testPageReceipt(sport: UtSport, id: string, kind: string): Promis
     totalAtPull: null,
   };
 }
-export async function openRegisteredPack(sport: UtSport, id: string, kind: string): Promise<RegistryReceipt> {
+export async function openRegisteredPack(sport: UtSport, id: string, kind: string, voucher?: AdminPackVoucher): Promise<RegistryReceipt> {
   if (TEST_PAGE) return testPageReceipt(sport, id, kind);
-  const content = JSON.stringify({ v: 1, sport, requestId: id, kind, namespace: registryNamespace() });
+  const content = JSON.stringify({ v: 1, sport, requestId: id, kind, namespace: registryNamespace(), ...(voucher?{voucher}:{}) });
   return request('', {
     event: sign(
       27235,

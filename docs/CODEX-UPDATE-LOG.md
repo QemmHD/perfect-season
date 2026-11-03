@@ -673,3 +673,21 @@ What changed (soccer only):
 Measured (`scripts/audit_soccer_shots.ts`, 300 each): a run-in one-on-one 0 % → 50 %; wide-angle shots 68–83 % → 14 %; SHO and keeper ratings monotone; autopilot whole attacks within about a point per scenario (corners 11.7 %, free kicks 14.7 %, penalties 73.3 %; wide overloads 12.0 → 9.7 % the largest drop).
 
 Validation (Claude, 2026-11-02): `npx tsc --noEmit -p .`; `PS_SPORT=soccer npx vitest run soccer sport-branches` (9 files, 74 passed, new `shooting.test.ts` 10); the full NBA (518 passed, 46 skipped) and NFL (485 passed, 78 skipped) suites, since `Arcade.tsx`, `net/match.ts` and `ut/Match.tsx` are shared files (soccer-only text and constants changed there). Browser (Chromium, real CDP touch, 390×844 and 320×568): `scripts/qa/soccer-lab.mjs` (run, drag-aim shot, buttons, a whole autopilot match with a goal, set-piece set-ups, a 13-kick shootout; 0 page errors, 60 fps median), `scripts/qa/soccer-app.mjs arcade` (draft → autopilot match → result), and a HUD pass (pass line, assisted and dragged meters, release word, miss reasons, penalty drag). Not yet: an iPhone playtest (thumb feel of the drag, meter timing).
+
+
+## Implemented by Codex (OpenAI) — Admin Studio, 2026-11-03
+
+Review branch `feature/admin-studio`, based on current main `7db37b6`, source restore branch `backup/pre-admin-studio-2026-11-03`. Full feature list, file/connection map, compatibility, server entitlement design, progress protections and final QA/deployment record: [ADMIN-STUDIO.md](ADMIN-STUDIO.md). Original owner access and all giving/local controls remain. Added native Control Room, GOAT/Icon/team/exact-player rewards, XP/booster gifts, preset bundles/history, precise card-copy levels and three signed configurable store packs. No main deployment/account reset or download-backup workflow is part of this review update. Claude's current New Era/Soccer/rating/gameplay work is retained.
+
+Admin Studio review/preview: [PR #2](https://github.com/QemmHD/perfect-season/pull/2), initial implementation `4a6c569b9c26c484e4c06a87a5845214cdf7b20c`; [owner-private preview](https://perfect-season-private-preview.qem.chatgpt.site), deployed source `6dc57f3b75ad84dca8ae369db60a229ba7451785`. Existing card-registry function ACTIVE v4; no schema/data reset; live count/authentication/rejection smoke passes. Final validation and exact Sites release IDs are in [ADMIN-STUDIO.md](ADMIN-STUDIO.md).
+
+Completed local Admin Studio verification: full `npm test` NBA 537 passed/46 skipped, NFL 505 passed/78 skipped, Soccer 74 passed; additional registered GOAT deposit/replay admin tests 9/9 for NBA and NFL; ratings audit, production builds, typecheck and final three-sport phone QA pass. No main deployment.
+
+Final owner-private Admin Studio deployment: source `ca5701f67bbc4e04844d95f8c809fedadeb63cda`, Sites version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_30d563a251f481919dade4cdcb54692e`, deployment `appgdep_6aea5eb0e3a8819189ad8fb9c9efc549`; succeeded 2026-11-03. Main remains `7db37b6`; actual owner-signed delivery/catalog publication is the remaining phone acceptance check.
+
+
+### Admin navigation clarity — Codex (OpenAI), 2026-11-03
+
+Explicit section names, Recipients → Rewards → Review gifting, four reward categories, preserved cross-tab drafts, post-send feedback and grouped local tools. Existing access/actions/protocols/progress remain; no backend changes. Files: `src/ui/Admin.tsx`, `src/admin/AdminStudio.tsx`, `src/admin/admin-studio.css`; updated three-sport UI QA in `scripts/qa/admin-studio.mjs`. Current screenshots and full behavior/verification: [Admin Studio](ADMIN-STUDIO.md#navigation-clarity-follow-up--codex-openai-2026-11-03).
+
+Navigation preview deployed successfully from `c99cff26d4957318c0dff2b87e59f7c4503db82d`: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_9cb01154f2e48191b657b4b00ae1b369`, deployment `appgdep_6aea629dc6fc819182c0605f519bee8d`. NBA 21 / NFL 16 / Soccer 15 focused tests pass (one Soccer GOAT-only skip); three-sport phone flows, typecheck, builds and static namespace smoke pass. Full release notes and screenshots are in ADMIN-STUDIO.md; main and the backend are unchanged by this follow-up.

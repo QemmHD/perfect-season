@@ -26,7 +26,7 @@ export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryRecei
     typeof receipt.id !== 'string'
   )
     throw new Error('The pack receipt does not match your pending pack.');
-  if (pending.kind === 'spotlight' && pending.id !== receipt.id) throw new Error('The pack receipt has a different ID.');
+  if ((pending.kind === 'spotlight' || pending.kind === 'admin-goat') && pending.id !== receipt.id) throw new Error('The pack receipt has a different ID.');
   if (p.coins < pending.price) throw new Error('Your pack is reserved. Earn enough coins to complete it, then retry.');
   const cards = registeredPack(pool, receipt.kind, receipt.seed, receipt.cardId);
   // Claude: test-page rolls (registry.ts `TEST_PAGE`) carry no worldwide serial; everywhere else a
@@ -49,7 +49,7 @@ export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryRecei
     ...(rare && i === cards.length - 1 ? { mint: { serial: receipt.serial!, totalAtPull: receipt.totalAtPull!, ...(Number.isSafeInteger(receipt.activeAtPull) && receipt.activeAtPull! >= 0 ? { activeAtPull: receipt.activeAtPull! } : {}), requestId: receipt.id, namespace: receipt.namespace } } : {}),
   }));
   // Claude: the Pack Tracker logs the pack once, on the state before its cards land (pull-log.ts)
-  const title = pending.kind.startsWith('event-') ? 'Spotlight Reward' : 'Spotlight Pack';
+  const title = pending.kind==='admin-goat' ? 'GOAT Pack' : pending.kind.startsWith('event-') ? 'Spotlight Reward' : 'Spotlight Pack';
   const logged = recordPull(p.ut, { id: receipt.id, kind: receipt.kind, name: title, price: pending.price, source: pending.packId ? sourceOfPending(pending.packId) : 'store', at: pending.at, uid: 'registered:' + receipt.id + ':', cards });
   const ut = organizeStorage(recordActivity(logged, 'pack:' + receipt.id, easternDateKey(), { packs: 1 }), owned);
   const stored = new Set(ut.duplicateStorage);

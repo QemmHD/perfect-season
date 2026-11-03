@@ -1,3 +1,4 @@
+import { catalogOf, readPackSnapshot, studioKind, snapshotPack, STUDIO_PACKS, STUDIO_TIERS } from '../admin/catalog';
 // Packs: what's in the store, the odds of every slot, deterministic contents from a seed, the free
 // starter, and quick-sell values.
 //
@@ -39,7 +40,7 @@ import { type Pool, TIER_RANK } from './pool';
 import { TIER_CUTS } from './rate';
 import { UT_SCALE } from './ut-scale';
 import { fcToDisplay } from './fc-scale';
-import { positionMix } from './squad';
+import { slotsFor, canPlay, positionMix } from './squad';
 import type { RatedCard, Tier, UtSport } from './types';
 import { easternDateKey } from '../engine/season';
 import { rareInfo } from './rare';
@@ -50,7 +51,7 @@ import { livePackName, openLivePack } from './live-packs';
 
 /** Claude 2026-11-01: daily (Daily Drop), scout (Scout's Choice, pick 1 of 3), elite (Elite Gold),
  * jumbo (Jumbo Premium), standout (Standout Guarantee) and lightning (its weekend discount copy). */
-export type PackKind = 'bronze' | 'silver' | 'gold' | 'premium' | 'position' | 'spotlight' | 'starter' | 'daily' | 'scout' | 'elite' | 'jumbo' | 'standout' | 'lightning';
+export type PackKind = 'bronze' | 'silver' | 'gold' | 'premium' | 'position' | 'spotlight' | 'starter' | 'daily' | 'scout' | 'elite' | 'jumbo' | 'standout' | 'lightning' | 'roster' | 'captains' | 'dynasty';
 /** A slot's odds by tier, plus `rare` (a rare gold, rare.ts: always a gold). They add up to 1. */
 export type SlotTier = Tier | 'rare';
 export type Odds = Partial<Record<SlotTier, number>>;
@@ -149,7 +150,7 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
   const [ps, pg, pr] = k.premium;
   const c = CONTENT_SHAPE[sport];
   const standoutSlots = [...rep(c.standout.gold, G), ...rep(c.standout.rare, R), { standout: 1 }];
-  return {
+  const defs = {
     bronze: {
       kind: 'bronze',
       name: 'Bronze Pack',
@@ -229,7 +230,9 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       blurb: 'The Standout Guarantee, 25% off, in short weekend windows',
       slots: standoutSlots,
     },
-  };
+  } as Record<Exclude<PackKind, 'starter'>, PackDef>;
+  for(const kind of STUDIO_PACKS){const p=catalogOf(sport)[kind];defs[kind]={kind,name:p.name,price:p.price,blurb:STUDIO_TIERS.filter(t=>p.counts[t]).map(t=>p.counts[t]+' '+(t==='rare'?'rare gold':t)).join(' · ')+' guaranteed',slots:STUDIO_TIERS.flatMap(t=>rep(p.counts[t],{[t]:1}))};}
+  return defs;
 }
 
 /** Claude: chance that one Scout's Choice option is a Weekly Standout. */
@@ -244,9 +247,15 @@ export function storeOrder(sport: UtSport): Exclude<PackKind, 'starter'>[] {
 }
 
 export function packName(sport: UtSport, kind: string): string {
+  const snapshot=readPackSnapshot(kind);if(snapshot)return snapshot.pack.name;
   if (kind.startsWith('event-spotlight:')) return 'Spotlight Reward';
   if (kind === 'standout-pick') return 'Standout Pick';
   if (kind.startsWith('live')) return livePackName(sport, kind);
+  if (kind === 'admin-goat') return 'GOAT Pack';
+  if (kind === 'admin-icon') return 'Icon Pack';
+  if(kind==='admin-squad')return 'Gold Squad Pack';
+  if(kind==='admin-icon-team')return 'All-Time Squad Pack';
+  if(kind.startsWith('admin-card:')){try{return decodeURIComponent(kind.split(':')[2]??'Player Award')+' Pack';}catch{return 'Player Award Pack';}}
   if (kind === 'starter') return 'Starter Pack';
   if (kind.startsWith('position:')) return (positionChoices(sport).find((c) => c.key === kind.slice(9))?.label ?? kind.slice(9)) + ' Pack';
   return packDefs(sport)[kind as Exclude<PackKind, 'starter'>]?.name ?? 'Pack';
@@ -424,7 +433,14 @@ export function openPack(pool: Pool, kind: string, seed?: string, week = current
   if (kind.startsWith('live:') || kind.startsWith('live-plus:')) return openLivePack(pool, kind, rand, easternDateKey(), week);
   // The rare slot is rolled and numbered by the shared registry, never by this local RNG.
   if (kind === 'spotlight' || kind.startsWith('event-spotlight:')) throw new Error('This pack needs the shared card registry.');
+  if (kind === 'admin-goat') throw new Error('This pack needs an admin award and the card registry.');
+  if(kind==='admin-squad'||kind==='admin-icon-team'){const used=new Set<string>();return slotsFor(pool.sport).filter(s=>s.weight>0).map(slot=>{const matching=[...pool.base.values()].filter(c=>canPlay(slot,c)&&!used.has(c.line.pid));const preferred=matching.filter(c=>c.tier===(kind==='admin-icon-team'?'legend':'gold')),options=preferred.length?preferred:matching.filter(c=>c.tier==='gold');if(!options.length)throw new Error('The team pack is unavailable for this position.');const c=options[Math.floor(rand()*options.length)];used.add(c.line.pid);return c;});}
+  if(kind.startsWith('admin-card:')){const id=decodeURIComponent(kind.split(':')[1]);if(!/^(nba|nfl|soccer):(season|promo|legend|standout|landmark):/.test(id))throw new Error('This player award requires a registered pack.');const c=pool.base.get(id);if(!c||c.line.sport!==pool.sport)throw new Error('This card is unavailable in this sport.');return [c];}
+  if (kind === 'admin-icon') return fill(pool, [{legend:1}], rand, undefined, week);
   if (kind === 'starter') return starterCards(pool, rand);
+  const snapshot=readPackSnapshot(studioKind(kind)?snapshotPack(pool.sport,kind):kind);
+  if(kind.startsWith('studio:')&&!snapshot)throw Error('Invalid saved pack recipe.');
+  if(snapshot)return fill(pool,STUDIO_TIERS.flatMap(t=>rep(snapshot.pack.counts[t],{[t]:1})),rand,undefined,week);
   const defs = packDefs(pool.sport);
   if (kind.startsWith('position:')) {
     const ch = positionChoices(pool.sport).find((c) => c.key === kind.slice(9));
@@ -528,7 +544,8 @@ export function registeredPack(pool: Pool, kind: string, seed: string, chaseId: 
     if (chase?.tier !== 'spotlight') throw new Error('Invalid event reward.');
     return [chase];
   }
-  if (kind !== 'spotlight') throw new Error('Unknown registered pack.');
+  if (kind === 'admin-goat' && chase?.tier !== 'goat') throw new Error('Invalid GOAT award receipt.');
+  if (kind !== 'spotlight' && kind !== 'admin-goat') throw new Error('Unknown registered pack.');
   const common = fill(pool, rep(SPOTLIGHT_COMMON[pool.sport], G), packRand(seed));
   const rand = packRand(seed + ':chase');
   let last = chase;

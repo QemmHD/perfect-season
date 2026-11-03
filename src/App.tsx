@@ -1,3 +1,4 @@
+import { watchCatalog } from './admin/catalog-net';
 import { startNumberedSync } from './ut/numbered-sync';
 import { startCloudSaving } from './lib/cloud-save';
 import { clearCheckpoint, readCheckpoint, writeCheckpoint, SAVE_WARNING } from './lib/recovery';
@@ -148,7 +149,7 @@ function playoffLine(bracket: Series[]): { text: string; title: boolean; perfect
 /** A head-to-head result against a real player, all-time and this week. */
 /** A thank-you to everyone testing the game: these coins once, for players already here and new ones. */
 const TESTER_GIFT = { id: 'testers-2026-10', coins: 9000 };
-const GIFT_HAS_PACKS = (g: Gift) => Object.values(g.packs).some((n) => (n ?? 0) > 0);
+const GIFT_HAS_PACKS = (g: Gift) => !!g.player || Object.values(g.packs).some((n) => (n ?? 0) > 0);
 
 function addH2H(h: H2HStats, won: boolean, week: string): H2HStats {
   const b = h.week === week ? h : { ...h, week, ww: 0, wl: 0, wstreak: 0 };
@@ -200,6 +201,7 @@ export function App() {
   const needsName = NET_ON && !profile.name;
   const cloudCanRestore = useRef(true);
   cloudCanRestore.current = screen === 'tab' && !utReq && !run;
+  useEffect(() => watchCatalog(), []);
   useEffect(() => startCloudSaving(() => cloudCanRestore.current, () => location.reload()), []);
 
   useEffect(() => {
