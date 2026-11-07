@@ -1,3 +1,5 @@
+import type { UtState } from './state';
+import type { UtSport } from './types';
 export interface RivalsReward {
   id: string;
   week: string;
@@ -70,7 +72,7 @@ export function divisionOf(points: number) {
 }
 export function rivalsOf(
   raw: Partial<RivalsState> | undefined,
-  week: string
+  week: string,
 ): RivalsState {
   const same = raw?.week === week;
   return {
@@ -92,7 +94,7 @@ export function rivalsOf(
               Number.isInteger(r.division) &&
               r.division >= 0 &&
               r.division < 5 &&
-              typeof r.week === 'string'
+              typeof r.week === 'string',
           )
           .map((r) => ({
             ...r,
@@ -109,7 +111,7 @@ export function rivalsMatch(
   raw: RivalsState | undefined,
   week: string,
   id: string,
-  won: boolean
+  won: boolean,
 ): RivalsState {
   const r = rivalsOf(raw, week);
   if (r.seen.includes(id)) return r;
@@ -143,4 +145,29 @@ export function rivalsMatch(
       });
   });
   return next;
+}
+
+/** Codex: shared Rivals receipt used by its own screen and the unified Rewards inbox. */
+export function claimRivals(
+  ut: UtState,
+  sport: UtSport,
+  week: string,
+  id: string,
+  at: number,
+): { ut: UtState; coins: number; pack: string | null } {
+  const r = rivalsOf(ut.rivals, week),
+    reward = r.rewards.find((x) => x.id === id);
+  if (!reward || r.claimed.includes(id)) return { ut, coins: 0, pack: null };
+  const packId = 'rivals:' + sport + ':' + id;
+  return {
+    ut: {
+      ...ut,
+      rivals: { ...r, claimed: [...r.claimed, id] },
+      packs: ut.packs.some((p) => p.id === packId)
+        ? ut.packs
+        : [...ut.packs, { id: packId, kind: reward.pack, at }],
+    },
+    coins: reward.coins,
+    pack: reward.pack,
+  };
 }

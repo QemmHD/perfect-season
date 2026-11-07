@@ -691,3 +691,14 @@ Final owner-private Admin Studio deployment: source `ca5701f67bbc4e04844d95f8c80
 Explicit section names, Recipients → Rewards → Review gifting, four reward categories, preserved cross-tab drafts, post-send feedback and grouped local tools. Existing access/actions/protocols/progress remain; no backend changes. Files: `src/ui/Admin.tsx`, `src/admin/AdminStudio.tsx`, `src/admin/admin-studio.css`; updated three-sport UI QA in `scripts/qa/admin-studio.mjs`. Current screenshots and full behavior/verification: [Admin Studio](ADMIN-STUDIO.md#navigation-clarity-follow-up--codex-openai-2026-11-03).
 
 Navigation preview deployed successfully from `c99cff26d4957318c0dff2b87e59f7c4503db82d`: `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_9cb01154f2e48191b657b4b00ae1b369`, deployment `appgdep_6aea629dc6fc819182c0605f519bee8d`. NBA 21 / NFL 16 / Soccer 15 focused tests pass (one Soccer GOAT-only skip); three-sport phone flows, typecheck, builds and static namespace smoke pass. Full release notes and screenshots are in ADMIN-STUDIO.md; main and the backend are unchanged by this follow-up.
+
+
+## Game overhaul and screen-fit audit — Codex (OpenAI), 2026-11-07
+
+Implementation branch `feature/perfect-season-next`, based on current main `7db37b6` plus the preserved admin branch `ea03347`. Source restore: `backup/pre-overhaul-2026-11-07`. Full verified findings, shipped changes, priorities and release status: [OVERHAUL-AUDIT.md](OVERHAUL-AUDIT.md).
+
+Added own-club Open/Silver/Chemistry Cups across three sports, recent-run Play recommendations/filters, NBA direct move buttons and actual Last Play feedback, observed match debriefs with NBA/NFL practice and earned-pack Store routes, complete canonical reward claims, lazy per-sport startup/first-offline ratings cache and actual visible-viewport sizing. No account reset, canonical card/copy rename, mint change, backend deployment or gameplay-queue change. All prior Claude New Era/rating/engine/admin progress is retained.
+
+Detailed source/connection maps and validation: [Cups](OVERHAUL-CUP.md), [Gameplay](OVERHAUL-GAMEPLAY.md), [UX](OVERHAUL-UX.md), [Performance](OVERHAUL-PERFORMANCE.md), [Rewards](OVERHAUL-REWARDS.md), [Screen fit](OVERHAUL-SCREEN-FIT.md), [Integration QA](OVERHAUL-QA.md). Final publication references and checks are recorded in the audit release section.
+
+Overhaul owner-private publication succeeded: source `d4c7a01a44b9075f91dac99ce6e4655122e387c7`, version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_05b8c909ff188191b6e1cd74bbb80aa6`, deployment `appgdep_6aef8bc1d7248191b7b3600e1af404ad`. Full tests: NBA 571/46 skipped, NFL 551/78 skipped, Soccer 74 passed; new focused25eachsport and13viewportgeometry cases pass. Real Cup, control, reward, admin and offline-worker browser regressions pass with zero page errors. Main remains `7db37b6`; review branch includes the preserved admin changes. Complete artifact/device limits and final file map: OVERHAUL-AUDIT.md.

@@ -18,6 +18,18 @@ export function registerServiceWorker(): void {
     .register('./sw.js')
     .then((r) => {
       registration = r;
+      // Codex: the first page's modules can finish before the worker controls it. Preserve those
+      // already-used hashed assets too, so excluding other sports from install never loses this
+      // sport on the next offline launch. Static assets only: no profiles, API requests or secrets.
+      return navigator.serviceWorker.ready.then(async () => {
+        const assets = [...new Set(performance.getEntriesByType('resource').map(entry => entry.name))]
+          .filter(name => {
+            const url = new URL(name);
+            return url.origin === location.origin && /\/assets\/[^/]+-[\w-]+\.(?:js|css)$/.test(url.pathname);
+          });
+        const cache = await caches.open('ps-app-' + APP_VERSION);
+        await Promise.all(assets.map(url => cache.add(new Request(url, { cache: 'force-cache' }))));
+      });
     })
     .catch(() => {
       // no worker (private mode, blocked storage): the game still works online

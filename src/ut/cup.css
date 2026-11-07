@@ -1,0 +1,224 @@
+/* Codex: original UT Archivo, teal/gold, pack foil and readable phone controls. */
+.cup-page {
+  gap: 14px;
+}
+.cup-page > * {
+  flex-shrink: 0;
+}
+.cup-trophies {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--gold);
+}
+.cup-trophies > span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.cup-trophies b {
+  font-size: 29px;
+}
+.cup-trophies small {
+  font-size: 8px;
+  line-height: 1.5;
+  color: var(--sub);
+  letter-spacing: 0.7px;
+}
+.cup-trophies > small {
+  margin-left: auto;
+  text-align: right;
+  max-width: 115px;
+}
+.cup-feature {
+  padding: 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(130deg, #f5b83d0d, var(--panel));
+}
+.cup-feature h2 {
+  margin: 9px 0;
+  font-size: 28px;
+  color: var(--gold);
+}
+.cup-feature p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sub);
+  margin: 0;
+}
+.cup-eligibility {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 13px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sub);
+}
+.cup-eligibility.ready {
+  color: var(--teal);
+}
+.cup-eligibility svg {
+  flex: none;
+}
+.cup-path {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.cup-path > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 15px 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--sub);
+}
+.cup-path b {
+  font-size: 20px;
+}
+.cup-path small {
+  font-size: 9px;
+}
+.cup-path span {
+  font-size: 10px;
+}
+.cup-path .won {
+  border-color: #13dac933;
+  color: var(--teal);
+}
+.cup-path .lost {
+  border-color: #ed6a7a55;
+  color: #ed8895;
+}
+.cup-path .next {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.cup-difficulty {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  color: var(--sub);
+  font-size: 12px;
+}
+.cup-difficulty select {
+  min-height: 44px;
+  padding: 9px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font: 600 16px var(--body);
+}
+.cup-opponent {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.cup-opponent b {
+  font-size: 14px;
+}
+.cup-opponent small {
+  font-size: 11px;
+  color: var(--sub);
+  line-height: 1.5;
+}
+.cup-prize {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.cup-prize > .ut-pack {
+  width: 42px;
+  height: 61px;
+  font-size: 3.5px;
+  flex: none;
+}
+.cup-prize > span:not(.ut-pack) {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.cup-prize b {
+  font-size: 12px;
+}
+.cup-prize small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--sub);
+}
+.cup-text {
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--teal);
+  font: 800 10px var(--body);
+  letter-spacing: 0.4px;
+  text-decoration: underline;
+}
+.cup-finish {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  padding: 20px 14px;
+  border: 1px solid #f5b83d55;
+  border-radius: 12px;
+  text-align: center;
+  color: var(--gold);
+}
+.cup-finish h3 {
+  margin: 0;
+  font-size: 24px;
+}
+.cup-finish p {
+  color: var(--sub);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cup-finish > .btn {
+  width: 100%;
+}
+.cup-history > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+.cup-history svg {
+  flex: none;
+  color: var(--gold);
+}
+.cup-history span {
+  flex: 1;
+  min-width: 0;
+}
+.cup-history b {
+  display: block;
+  font-size: 12px;
+}
+.cup-history small {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--sub);
+}

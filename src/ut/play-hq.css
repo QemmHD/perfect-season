@@ -1,0 +1,163 @@
+/* Codex (OpenAI): Play discovery uses the existing sports-card materials and design frame. */
+.play-discovery > * {
+  flex-shrink: 0;
+}
+.play-discovery .play-filter {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+.play-discovery .play-filter button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 3px;
+  background: var(--bg-2);
+  color: var(--sub);
+  font: 800 10px var(--body);
+  letter-spacing: 0.3px;
+}
+.play-discovery .play-filter button[aria-pressed='true'] {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: #19e3c910;
+}
+.play-discovery .play-next {
+  padding: 17px;
+  border-radius: 17px;
+  border: 1px solid #f4be4b66;
+  background:
+    radial-gradient(100% 150% at 0 0, #f5b83d14, transparent),
+    linear-gradient(135deg, #17303b, #081c25);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.play-discovery .play-next > b {
+  font-size: 25px;
+  line-height: 1.05;
+  color: var(--gold);
+}
+.play-discovery .play-next > p {
+  color: var(--sub);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+.play-discovery .play-next > .btn {
+  min-height: 46px;
+  flex: none;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.play-discovery .play-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.play-discovery .play-mode {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 18px;
+  gap: 10px;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 12px;
+  text-align: left;
+  border-radius: 15px;
+  border: 1px solid var(--line-2);
+  color: var(--text);
+  background: linear-gradient(155deg, #102e39, #081c25 75%);
+}
+.play-discovery .play-mode:active {
+  transform: scale(0.99);
+}
+.play-discovery .play-mode-icon {
+  --mode-tone: var(--teal);
+  width: 38px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  align-self: start;
+  color: var(--mode-tone);
+  border: 1px solid color-mix(in srgb, var(--mode-tone) 35%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--mode-tone) 9%, transparent);
+}
+.play-discovery .play-mode.tone-gold .play-mode-icon {
+  --mode-tone: var(--gold);
+}
+.play-discovery .play-mode.tone-violet .play-mode-icon {
+  --mode-tone: #b48cff;
+}
+.play-discovery .play-mode.tone-blue .play-mode-icon {
+  --mode-tone: #5cb8ff;
+}
+.play-discovery .play-mode-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.play-discovery .play-mode-copy > b {
+  font-size: 19px;
+  line-height: 1.05;
+}
+.play-discovery .play-mode-purpose {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.play-discovery .play-mode-meta {
+  color: var(--sub);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.play-discovery .play-mode-status {
+  color: var(--gold);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.play-discovery .play-mode.live {
+  border-color: #19e3c955;
+}
+.play-discovery .play-mode.live .play-mode-status {
+  color: var(--teal);
+}
+.play-discovery .play-mode > svg {
+  color: var(--sub);
+}
+.play-discovery .play-online-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sub);
+  margin: 0;
+}
+.play-discovery .play-reward-guide {
+  border-top: 1px solid var(--line);
+  margin-top: 7px;
+}
+.play-discovery .play-reward-guide summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--sub);
+  font-size: 12px;
+  cursor: pointer;
+}
+.play-discovery .play-reward-guide p {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--sub);
+  margin: 0 0 12px;
+}
+
+/* Retain legacy mode selectors for existing journeys while overriding their old wall layout. */
+.play-discovery .play-mode.hq-mode > .play-mode-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}

@@ -1,3 +1,5 @@
+import { PlayReadout } from '../PlayReadout';
+import { basketballFeedback, type PlayFeedback } from '../play-feedback';
 import type { Practice } from '../../evolution/training';
 // Arcade basketball, the way it's played: your five on offense against the rival's five. Left thumb
 // on the stick moves the man with the ball; PASS throws to the man the stick points at (a lob to a
@@ -111,6 +113,7 @@ export function Hoops2({
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
 }) {
+  const [lastReadout,setLastReadout] = useState<PlayFeedback|null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [attrs, setAttrs] = useState<((p: Player) => Attrs | null) | null>(null);
@@ -199,7 +202,7 @@ export function Hoops2({
     if (!game) return;
     crowd.start(0.24);
     const t = window.setTimeout(() => next(game), 700);
-    const moves = window.setTimeout(() => !practice && setHint('Stick edge: sprint · flick ← → cross, ↓ step-back, ↑ spin'), 3800);
+    const moves = window.setTimeout(() => !practice && setHint('Stick edge: sprint · use skill buttons or flick the stick for moves'), 3800);
     const h = window.setTimeout(() => setHint(null), 7600);
     return () => {
       clearTimeout(t);
@@ -354,6 +357,7 @@ export function Hoops2({
   const finish = (p: Possession) => {
     if (!game || booked.current === p) return;
     booked.current = p;
+    setLastReadout(basketballFeedback(p));
     const e = p.end!;
     const wasFire = game.fire;
     const mark = afterPossession(game, p);
@@ -753,6 +757,18 @@ export function Hoops2({
   return createPortal(
     <div className={'arcade-full hg2' + (wide ? ' wide' : '')} ref={wrapRef}>
       <canvas ref={canvasRef} className="hg2-canvas" />
+      {!autoplayHook && <PlayReadout readout={lastReadout} live={!between && !g?.over} resetKey={g?.done ?? 0} />}
+      {g && !g.over && !autoplayHook && !boarding && <div className="hg2-skills" aria-label="Dribble skills" onPointerDown={e=>e.stopPropagation()}>
+       {(['cross','stepback','spin'] as const).map(kind=><button key={kind} disabled={between||replaying||!p||!!p.end||!!p.ball||!!p.meter||!!p.finish||p.handler===null} onClick={()=>{
+         const q=possRef.current;if(!q||q.handler===null||q.end||q.ball||q.meter||q.finish||replaying)return;
+         const h=q.bodies[q.handler],before=h.lastMoveAt;
+         const direction=Math.sign(stickOnCourt()?.cz??0)||(h.cz>0?-1:1);
+         if(kind==='cross')crossover(q,direction);else if(kind==='spin')spin(q,direction);else stepback(q);
+         handleEvents(q);
+         if(before===h.lastMoveAt)say('MOVE RECHARGING · KEEP YOUR DRIBBLE', 'plain',650);
+       }} aria-label={kind==='cross'?'Cross over':kind==='spin'?'Spin move':'Step back'}>{kind==='cross'?'CROSS':kind==='spin'?'SPIN':'STEP BACK'}</button>)}
+      </div>}
+
       <div className="hg2-bug" aria-label="Score">
         <span className="us">
           <i>YOU</i>

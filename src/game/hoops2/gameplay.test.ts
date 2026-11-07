@@ -54,6 +54,26 @@ describe('basketball decision and motion quality', () => {
     expect(p.clock).toBeLessThan(clock);
     expect(JSON.stringify(p.bodies.map((b) => b.p))).toBe(ratings);
   });
+  it('records the actual layup release offset without changing its timing decision', () => {
+    const p = possession();
+    p.scheme = 'man';
+    const b=p.bodies[0];b.cx=RIM.cx-3;b.cz=0;
+    for(const d of p.bodies.filter(d=>d.side==='D')){d.cx=0;d.cz=20;d.stunUntil=100;}
+    pressShoot(p);expect(p.meter?.kind).toBe('layup');
+    p.t=p.meter!.t0+p.meter!.top-0.08;releaseShoot(p);
+    const actual=p.meter!.off;
+    for(let i=0;i<90&&!p.lastShot;i++)step(p,1/60,null);
+    expect(p.lastShot?.kind).toBe('layup');expect(p.lastShot?.off).toBeCloseTo(actual!);
+    expect(p.lastShot?.greened).toBe(false);
+  });
+  it('keeps a blocked layup’s measured green timing instead of calling it an un-timed release',()=>{
+    const p=possession();p.scheme='man';p.rand=()=>0;
+    const b=p.bodies[0];b.cx=RIM.cx-3;b.cz=0;
+    for(const d of p.bodies.filter(d=>d.side==='D')){d.cx=RIM.cx-2.5;d.cz=0;d.p.blk=99;d.p.ind=99;}
+    pressShoot(p);p.t=p.meter!.t0+p.meter!.top;releaseShoot(p);
+    for(let i=0;i<90&&!p.lastShot;i++)step(p,1/60,null);
+    expect(p.lastShot?.make).toBe(false);expect(p.lastShot?.greened).toBe(true);expect(p.lastShot?.off).toBe(0);
+  });
   it('does not cancel a committed shot or a finish after the player actually released', () => {
     const p = possession();
     pressShoot(p);

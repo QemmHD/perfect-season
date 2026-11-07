@@ -30,18 +30,18 @@ function pwa(version: string): Plugin {
     apply: 'build',
     enforce: 'post',
     generateBundle(_options, bundle) {
-      // launch images are fetched by iOS when the app is added to the home screen; no need to cache them
-      // Claude 2026-11-01: soccer's chunks (its draft data, cards, engine) and sounds are not precached
-      // at install: the worker caches them the first time soccer loads them (cacheFirst), so an
-      // NBA/NFL install doesn't download them
-      const soccerModule = /[\\/](game[\\/]soccer2[\\/]|game[\\/]pixel[\\/]pitch\.ts|data[\\/](cards-)?soccer\.json)/;
-      const soccerOnly = (f: string) => {
+      // Codex: large sport-only data is fetched on first use, not downloaded for every sport at
+      // install. Runtime cacheFirst retains used files; update.ts also warms pre-worker startup assets.
+      // Keep NBA/NFL attrs in install: a first offline draft match must retain its real ratings.
+      // Classify using Rollup's source module IDs, never the emitted filename/chunk name.
+      const onDemandModule = /[\\/](?:game[\\/]soccer2[\\/]|game[\\/]pixel[\\/]pitch\.ts|data[\\/](?:cards-)?(?:nba|nfl|soccer)\.json)/;
+      const onDemand = (f: string) => {
         const o = bundle[f];
         if (o.type === 'asset') return /(^|[\\/])soccer-[^\\/]*\.mp3$/.test(f);
-        return o.moduleIds.length > 0 && o.moduleIds.every((id) => soccerModule.test(id));
+        return o.moduleIds.length > 0 && o.moduleIds.every((id) => onDemandModule.test(id));
       };
-      const soccer = Object.keys(bundle).filter(soccerOnly);
-      const own = Object.keys(bundle).filter((f) => f !== 'index.html' && !f.endsWith('.map') && !soccer.includes(f));
+      const optional = new Set(Object.keys(bundle).filter(onDemand));
+      const own = Object.keys(bundle).filter((f) => f !== 'index.html' && !f.endsWith('.map') && !optional.has(f));
       const shell = ['manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
       const precache = ['./', ...own, ...shell].map((f) => (f === './' ? f : './' + f));
       const sw = readFileSync('pwa/sw.js', 'utf8').replace('__VERSION__', version).replace('__PRECACHE__', JSON.stringify(precache));
@@ -63,6 +63,7 @@ export default defineConfig(({ mode }) => {
     resolve: artifact
       ? {
           alias: [
+            { find: /^\.\/sport-raw$/, replacement: fileURLToPath(new URL('./src/engine/sport-raw.artifact.ts', import.meta.url)) },
             { find: /^\.\/soccer-raw$/, replacement: fileURLToPath(new URL('./src/engine/soccer-raw.artifact.ts', import.meta.url)) },
             { find: /^(\.\.?\/)+soccer-lazy$/, replacement: fileURLToPath(new URL('./src/soccer-lazy.artifact.ts', import.meta.url)) },
           ],

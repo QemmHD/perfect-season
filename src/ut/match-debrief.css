@@ -1,0 +1,7 @@
+.match-debrief { flex-shrink:0; border:1px solid var(--line); border-radius:14px; padding:16px; text-align:left; background:linear-gradient(120deg,#19e3c908,var(--panel)); }
+.match-debrief-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:16px 0; }
+.match-debrief-metrics b { display:block; font-size:23px; color:var(--teal); }
+.match-debrief-metrics small { display:block; font-size:10px; color:var(--sub); line-height:1.5; margin-top:5px; }
+.match-debrief h3 { font-size:14px; margin:12px 0 6px; }
+.match-debrief p { font-size:12px; color:var(--sub); line-height:1.65; margin:0; }
+.match-debrief > .btn { margin-top:14px; width:100%; }

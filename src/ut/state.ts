@@ -1,3 +1,4 @@
+import { normalizeCup, type CupState } from './cup-state';
 import type { AdminPackVoucher } from '../../supabase/functions/card-registry/admin-packs';
 import { normalizeLeague, type LeagueState } from './league-state';
 import { rivalsOf, type RivalsState } from './rivals';
@@ -25,6 +26,8 @@ export interface UtState {
   /** Claude 2026-11-01: UT content drop 2 (content-state.ts), optional and additive */
   content?: ContentState;
   league?: LeagueState;
+  /** Codex: additive, persistent own-club knockout Cups. */
+  cup?: CupState;
   rivals?: RivalsState;
   collected?: string[];
   collectionClaims?: string[];
@@ -129,11 +132,13 @@ export function migrateUt(raw: unknown): UtState {
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
   const league = normalizeLeague(r.league);
   const content = normalizeContent(r.content);
+  const cup = normalizeCup(r.cup);
   return organizeStorage({
     v: 1,
     ...(typeof r.formation === 'string' && r.formation.length <= 8 ? { formation: r.formation } : {}),
     ...(content ? { content } : {}),
     ...(league ? { league } : {}),
+    ...(cup ? { cup } : {}),
     ...(r.hq && typeof r.hq === 'object' ? { hq: normalizeHQ(r.hq, owned) } : {}),
     ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),
     ...(Array.isArray(r.settled) ? { settled: r.settled.filter((x) => typeof x === 'string').slice(-1000) } : {}),

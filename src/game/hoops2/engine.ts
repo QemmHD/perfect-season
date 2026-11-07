@@ -581,6 +581,9 @@ function shoot(p: Possession, b: Body, kind: ShotKind, greened: boolean, off: nu
 
 /** the finish at the rim, at the top of his jump */
 function finishNow(p: Possession, b: Body, kind: ShotKind) {
+  // Codex: preserve measured layup timing for the HUD; the accuracy calculation below is unchanged.
+  const releaseOff = kind === 'layup' ? (p.meter?.off ?? 0.8) : 0;
+  const releaseGreened = kind === 'layup' && !!p.meter?.greened;
   const r = p.rand;
   const contest = contestOf(p, b);
   const { d: cd, r: cr } = closest(p, b);
@@ -604,7 +607,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
     cd.h = 0.01;
     b.bumped = true;
     loose(p, b, false);
-    p.lastShot = { kind, contest, greened: false, off: 0, make: false, p: 0, and1: false };
+    p.lastShot = { kind, contest, greened: releaseGreened, off: releaseOff, make: false, p: 0, and1: false };
     p.events.push('blocked:' + cd.idx);
     return;
   }
@@ -637,7 +640,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   const fouled = make && contact && r() < (kind === 'contact' ? 0.42 : lerp(0.1, 0.28, rate(b.p.str)));
   const and1 = fouled && r() < freeThrow(b.p);
   if (fouled) p.events.push(and1 ? 'ft:make' : 'ft:miss');
-  p.lastShot = { kind, contest, greened, off: 0, make, p: pm, and1 };
+  p.lastShot = { kind, contest, greened, off: releaseOff, make, p: pm, and1 };
   const dunk = kind !== 'layup';
   p.ball = {
     kind: 'shot',

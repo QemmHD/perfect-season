@@ -1,3 +1,5 @@
+import { PlayReadout } from '../PlayReadout';
+import { footballFeedback, type PlayFeedback } from '../play-feedback';
 import type { Practice } from '../../evolution/training';
 // Arcade football, Retro Bowl style: your offense against the rival's defense, eleven on eleven.
 // Before the snap pick one of three play cards (its routes are drawn on the field) and SNAP. On a
@@ -143,6 +145,7 @@ export function Football2({
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
 }) {
+  const [lastReadout,setLastReadout] = useState<PlayFeedback|null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [attrs, setAttrs] = useState<((p: Player) => Attrs | null) | null>(null);
@@ -449,6 +452,7 @@ export function Football2({
     runKeys.current.clear();
     setPhase('dead');
     const a = afterPlay(game, e);
+    setLastReadout(footballFeedback(p,a));
     practice?.onAttempt({ points: a.points, success: practice.drill === 'run' ? e.gain >= 5 : e.caught, yards: Math.round(e.gain), detail: e.text });
     setUi('after');
     if (a.fire === 'lit') {
@@ -911,6 +915,8 @@ export function Football2({
       onLostPointerCapture={cancel}
     >
       <canvas ref={canvasRef} className="hg2-canvas" />
+      {!autoplayHook && <PlayReadout readout={lastReadout} live={ui==='live'} resetKey={g?.plays ?? 0} />}
+
       <div className="hg2-bug" aria-label="Score">
         <span className="us">
           <i>YOU</i>

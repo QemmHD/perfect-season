@@ -5,13 +5,23 @@ import { IconGift } from './icons';
 import React from 'react';
 import { HQArrow } from './Clubhouse';
 import type { InboxItem } from './inbox';
+import type { UtView } from './UltimateTeam';
 
-export function InboxView(props: { items: InboxItem[]; onClaimAll: () => void; onStore: () => void; onDaily: () => void }) {
+export function InboxView(props: {
+  items: InboxItem[];
+  onClaimAll: () => void;
+  onStore: () => void;
+  onDaily: () => void;
+  onOpen?: (view: UtView) => void;
+}) {
   const claimable = props.items.filter((i) => i.claimable);
   const rest = props.items.filter((i) => !i.claimable);
   return (
     <div className="page ut-inbox">
-      <Lede>Everything you’ve earned in one place. Coins go to your wallet; packs and picks wait in the Store.</Lede>
+      <Lede>
+        Everything you’ve earned in one place. Coins go to your wallet; packs
+        and picks wait in the Store.
+      </Lede>
       {claimable.length > 0 && (
         <button className="btn gold ut-claim-all" onClick={props.onClaimAll}>
           CLAIM ALL ({claimable.length})
@@ -27,7 +37,13 @@ export function InboxView(props: { items: InboxItem[]; onClaimAll: () => void; o
         </div>
       ))}
       {rest.map((i) => (
-        <button key={i.id} className="ut-inbox-item" onClick={props.onStore}>
+        <button
+          key={i.id}
+          className="ut-inbox-item"
+          onClick={() =>
+            i.view && props.onOpen ? props.onOpen(i.view) : props.onStore()
+          }
+        >
           <span>
             <b>{i.title}</b>
             <small>{i.detail}</small>

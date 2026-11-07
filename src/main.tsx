@@ -95,4 +95,6 @@ createRoot(document.getElementById('root')!).render(
     <Root />
   )
 );
-window.addEventListener('load', registerServiceWorker);
+// Codex: async sport data may settle after window.load has already fired.
+if (document.readyState === 'complete') registerServiceWorker();
+else window.addEventListener('load', registerServiceWorker, { once: true });

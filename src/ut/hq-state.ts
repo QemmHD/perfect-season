@@ -8,14 +8,14 @@ export const COUNTERS = [
   'packs',
   'sbcs',
   'moments',
-  'development'
+  'development',
 ] as const;
 export type Counter = (typeof COUNTERS)[number];
 export type Totals = Record<Counter, number>;
 export interface ClubMatch {
   id: string;
   at: number;
-  mode: 'battle' | 'online' | 'event' | 'circuit' | 'league' | 'draft';
+  mode: 'battle' | 'online' | 'event' | 'circuit' | 'league' | 'draft' | 'cup';
   won: boolean;
   us: number;
   them: number;
@@ -91,7 +91,7 @@ export const freshHQ = (): ClubHQ => ({
   presets: [],
   development: { completed: {} },
   moments: {},
-  circuit: { week: '', entries: 0, best: 0, claimed: [] }
+  circuit: { week: '', entries: 0, best: 0, claimed: [] },
 });
 const obj = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v)
@@ -106,8 +106,8 @@ const strs = (v: unknown) =>
   Array.isArray(v)
     ? [
         ...new Set(
-          v.filter((x): x is string => typeof x === 'string' && x.length < 200)
-        )
+          v.filter((x): x is string => typeof x === 'string' && x.length < 200),
+        ),
       ]
     : [];
 const totals = (v: unknown): Totals =>
@@ -117,9 +117,9 @@ const numbers = (v: unknown, max: number) =>
     ? [
         ...new Set(
           v.filter(
-            (x): x is number => Number.isInteger(x) && x >= 1 && x <= max
-          )
-        )
+            (x): x is number => Number.isInteger(x) && x >= 1 && x <= max,
+          ),
+        ),
       ]
     : [];
 export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
@@ -129,20 +129,20 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
   const days = Object.fromEntries(
     Object.entries(obj(r.days))
       .filter(([k]) => /^\d{4}-\d{2}-\d{2}$/.test(k))
-      .map(([k, v]) => [k, totals(v)])
+      .map(([k, v]) => [k, totals(v)]),
   );
   const weeks = Object.fromEntries(
     Object.entries(obj(r.weeks))
       .filter(([k]) => k.length < 40)
-      .map(([k, v]) => [k, totals(v)])
+      .map(([k, v]) => [k, totals(v)]),
   );
   const seasons = Object.fromEntries(
     Object.entries(obj(r.seasons))
       .filter(([k]) => /^season:\d+$/.test(k))
       .map(([k, v]) => [
         k,
-        { xp: nat(obj(v).xp, 7500), claimed: numbers(obj(v).claimed, 25) }
-      ])
+        { xp: nat(obj(v).xp, 7500), claimed: numbers(obj(v).claimed, 25) },
+      ]),
   );
   const presets = (Array.isArray(r.presets) ? r.presets : []).flatMap((v) => {
     const p = obj(v);
@@ -160,7 +160,7 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
           return false;
         seen.add(uid);
         return true;
-      })
+      }),
     ) as Record<string, string>;
     return [
       {
@@ -170,8 +170,8 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
             ? p.name.slice(0, 22)
             : 'Squad ' + (Number(p.id) + 1),
         squad,
-        at: timestamp(p.at)
-      }
+        at: timestamp(p.at),
+      },
     ];
   });
   const dev = obj(r.development),
@@ -186,7 +186,7 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
             games: nat(a.games),
             wins: nat(a.wins),
             points: nat(a.points),
-            at: timestamp(a.at)
+            at: timestamp(a.at),
           }
         : undefined;
   const completed = Object.fromEntries(
@@ -194,8 +194,8 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
       .filter(([uid, v]) => uids.has(uid) && typeof obj(v).path === 'string')
       .map(([uid, v]) => [
         uid,
-        { path: String(obj(v).path).slice(0, 30), at: timestamp(obj(v).at) }
-      ])
+        { path: String(obj(v).path).slice(0, 30), at: timestamp(obj(v).at) },
+      ]),
   );
   const circuit = obj(r.circuit),
     run = obj(circuit.active),
@@ -217,7 +217,15 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
         const h = obj(v);
         if (
           typeof h.id !== 'string' ||
-          !['battle', 'online', 'event', 'circuit', 'league', 'draft'].includes(String(h.mode))
+          ![
+            'battle',
+            'online',
+            'event',
+            'circuit',
+            'league',
+            'draft',
+            'cup',
+          ].includes(String(h.mode))
         )
           return [];
         return [
@@ -233,8 +241,8 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
                 ? h.opponent.slice(0, 60)
                 : 'Opponent',
             coins: nat(h.coins),
-            xp: nat(h.xp)
-          }
+            xp: nat(h.xp),
+          },
         ];
       })
       .slice(-20),
@@ -243,11 +251,11 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
         .filter(([uid]) => uids.has(uid))
         .map(([uid, v]) => [
           uid,
-          { games: nat(obj(v).games), wins: nat(obj(v).wins) }
-        ])
+          { games: nat(obj(v).games), wins: nat(obj(v).wins) },
+        ]),
     ),
     presets: presets.filter(
-      (p, i) => presets.findIndex((x) => x.id === p.id) === i
+      (p, i) => presets.findIndex((x) => x.id === p.id) === i,
     ),
     development: { ...(active ? { active } : {}), completed },
     moments: Object.fromEntries(
@@ -260,9 +268,9 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
             ...(timestamp(obj(v).completedAt)
               ? { completedAt: timestamp(obj(v).completedAt) }
               : {}),
-            ...(obj(v).claimed === true ? { claimed: true } : {})
-          }
-        ])
+            ...(obj(v).claimed === true ? { claimed: true } : {}),
+          },
+        ]),
     ),
     ...(r.circuitHistory
       ? {
@@ -274,10 +282,10 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
                 {
                   entries: nat(obj(value).entries, 3),
                   best: nat(obj(value).best, 6),
-                  claimed: numbers(obj(value).claimed, 6)
-                }
-              ])
-          )
+                  claimed: numbers(obj(value).claimed, 6),
+                },
+              ]),
+          ),
         }
       : {}),
     circuit: {
@@ -292,10 +300,10 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
               games: results.length,
               wins: results.filter(Boolean).length,
               results,
-              at: timestamp(run.at)
-            }
+              at: timestamp(run.at),
+            },
           }
-        : {})
-    }
+        : {}),
+    },
   };
 }

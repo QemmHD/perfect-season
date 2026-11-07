@@ -1,3 +1,6 @@
+import { cupOpponent, CUP_ROUNDS, cupOf, type CupRequest } from './cup';
+import { MatchDebrief } from './MatchDebrief';
+import { rememberUtReturn } from './return-view';
 import { leagueOpponent, type LeagueRequest } from './league';
 import { applyLeagueTeams } from './league-match';
 import { withLeagueForm } from './league-form';
@@ -30,14 +33,33 @@ import { kitsFor } from '../game/uniforms';
 import { favoriteFor } from '../lib/favorites';
 import { newId, type Profile } from '../lib/profile';
 import { sfx, vibrate } from '../lib/sound';
-import { type ArcadeState, type Found, MatchConn, type MatchState, Matchmaker, setPresence, squadWindow } from '../net/match';
+import {
+  type ArcadeState,
+  type Found,
+  MatchConn,
+  type MatchState,
+  Matchmaker,
+  setPresence,
+  squadWindow,
+} from '../net/match';
 import { NET_ON } from '../net/nostr';
 import { NO_VOTE, type VoteWire, voteWireOf } from '../net/vote';
 import { CoinChip, initials } from '../ui/common';
 import { Back, Coin } from '../ui/icons';
 import { Sparks } from '../ui/motion';
 import { Vote } from '../ui/Vote';
-import { aiOpponent, battlesThisWeek, LEVEL, LEVEL_NAME, levelOf, type Rung, RUNGS, shortName, skillName, weekLadder } from './battles';
+import {
+  aiOpponent,
+  battlesThisWeek,
+  LEVEL,
+  LEVEL_NAME,
+  levelOf,
+  type Rung,
+  RUNGS,
+  shortName,
+  skillName,
+  weekLadder,
+} from './battles';
 import { UtCard } from './CardArt';
 import { packName } from './packs';
 import { eventRung } from './events';
@@ -46,12 +68,32 @@ import { hqOf } from './progression';
 import { decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
 import { byValue, getPool, type Pool } from './pool';
 import { weekOf } from './sbc';
-import { rateSquad, CHEM_BONUS, setSoccerFormation, type SquadRating, startersComplete } from './squad';
-import { lineupOf, ratingOf, type SquadCards, squadFromWire, squadToWire, type SquadWire, teamsOf } from './teams';
+import {
+  rateSquad,
+  CHEM_BONUS,
+  setSoccerFormation,
+  type SquadRating,
+  startersComplete,
+} from './squad';
+import {
+  lineupOf,
+  ratingOf,
+  type SquadCards,
+  squadFromWire,
+  squadToWire,
+  type SquadWire,
+  teamsOf,
+} from './teams';
 import type { UtState } from './state';
 import './match.css';
 // Claude 2026-11-01: UT Draft matches and the Weekly Standouts objective
-import { DRAFT_GAMES, draftOf, draftRung, draftWire, settleDraft } from './draft-mode';
+import {
+  DRAFT_GAMES,
+  draftOf,
+  draftRung,
+  draftWire,
+  settleDraft,
+} from './draft-mode';
 import { recordStandoutWin } from './content-progress';
 import { playId, recordEvoMatch } from './evolutions';
 import type { UtSport } from './types';
@@ -96,6 +138,7 @@ interface Setup {
   event?: { id: string; node: number; title: string };
   circuit?: { runId: string; round: number };
   league?: LeagueRequest;
+  cup?: CupRequest;
   draft?: { runId: string; game: number };
   /** Squad Battles: the difficulty's name and what it pays (times the coins) */
   level?: { name: string; pay: number; def: number };
@@ -118,6 +161,7 @@ interface Outcome {
   them: number;
   how: 'played' | 'sim';
   eventCleared?: boolean;
+  cupDone?: boolean;
   seasonXP?: number;
   circuitPrizes?: string[];
   ends: [string[], string[]];
@@ -134,23 +178,54 @@ interface Outcome {
   draft?: { wins: number; done: boolean };
 }
 
-type Stage = 'load' | 'search' | 'found' | 'vs' | 'vote' | 'play' | 'result' | 'error';
+type Stage =
+  'load' | 'search' | 'found' | 'vs' | 'vote' | 'play' | 'result' | 'error';
 
 /** how each drive or possession ended, on the result screen */
 // Claude, final QA 2026-11-01: soccer's attacks end in one-letter codes (soccer2/match.ts END_TEXT), which
 // showed as a row of bare letters with goals not highlighted; they get short words and goals score
-const HOOPS_FOOTBALL_LABEL: Record<string, string> = { A: '2+1', X: '·', TO: 'TO', MISS: 'FG✕', DOWNS: 'DWN' };
-const HOOPS_FOOTBALL_POINTS: Record<string, number> = { TD: 7, FG: 3, '2': 2, '3': 3, A: 3 };
+const HOOPS_FOOTBALL_LABEL: Record<string, string> = {
+  A: '2+1',
+  X: '·',
+  TO: 'TO',
+  MISS: 'FG✕',
+  DOWNS: 'DWN',
+};
+const HOOPS_FOOTBALL_POINTS: Record<string, number> = {
+  TD: 7,
+  FG: 3,
+  '2': 2,
+  '3': 3,
+  A: 3,
+};
 const END_LABEL: Record<string, string> = pick({
   nba: HOOPS_FOOTBALL_LABEL,
   nfl: HOOPS_FOOTBALL_LABEL,
-  soccer: { G: 'GOAL', S: 'SAVE', W: 'WIDE', B: 'BLK', L: 'LOST', O: 'OFF', T: '·' }
+  soccer: {
+    G: 'GOAL',
+    S: 'SAVE',
+    W: 'WIDE',
+    B: 'BLK',
+    L: 'LOST',
+    O: 'OFF',
+    T: '·',
+  },
 });
-const END_POINTS: Record<string, number> = pick({ nba: HOOPS_FOOTBALL_POINTS, nfl: HOOPS_FOOTBALL_POINTS, soccer: { G: 1 } });
+const END_POINTS: Record<string, number> = pick({
+  nba: HOOPS_FOOTBALL_POINTS,
+  nfl: HOOPS_FOOTBALL_POINTS,
+  soccer: { G: 1 },
+});
 /** read aloud: soccer's words (its letters mean nothing alone), the other sports' codes as before */
-const endSpoken = (e: string) => pick({ nba: e, nfl: e, soccer: END_LABEL[e] === '·' ? 'time' : (END_LABEL[e] ?? e).toLowerCase() });
+const endSpoken = (e: string) =>
+  pick({
+    nba: e,
+    nfl: e,
+    soccer: END_LABEL[e] === '·' ? 'time' : (END_LABEL[e] ?? e).toLowerCase(),
+  });
 
-const clock = (s: number) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+const clock = (s: number) =>
+  Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
 /** Your squad as it is in the profile, read the way the other phone reads it off the wire. */
 function mySide(pool: Pool, ut: UtState, name: string): Side {
@@ -161,19 +236,31 @@ function mySide(pool: Pool, ut: UtState, name: string): Side {
     if (o) raw.push([slot, playId(ut, o), o.level]);
   }
   const sq = squadFromWire(pool, raw);
-  return { name, sq, wire: squadToWire(sq), rating: ratingOf(SPORT, sq), fav: favoriteFor(SPORT) };
+  return {
+    name,
+    sq,
+    wire: squadToWire(sq),
+    rating: ratingOf(SPORT, sq),
+    fav: favoriteFor(SPORT),
+  };
 }
 
 function aiSide(pool: Pool, r: Rung): Side {
   const sq = squadFromWire(pool, r.squad);
-  return { name: shortName(r), sq, wire: squadToWire(sq), rating: ratingOf(SPORT, sq), fav: r.fav };
+  return {
+    name: shortName(r),
+    sq,
+    wire: squadToWire(sq),
+    rating: ratingOf(SPORT, sq),
+    fav: r.fav,
+  };
 }
 
 /** a squad's best cards, for the VS screen */
 function bestOf(sq: SquadCards, n: number, form?: Record<string, number>) {
   return Object.values(lineupOf(sq))
     .filter((x): x is NonNullable<typeof x> => !!x)
-    .map(rc => form ? withLeagueForm(rc, form[rc.line.id] ?? 0) : rc)
+    .map((rc) => (form ? withLeagueForm(rc, form[rc.line.id] ?? 0) : rc))
     .sort(byValue)
     .slice(0, n);
 }
@@ -197,6 +284,7 @@ export default function UtMatch(props: {
   onToast: (t: string) => void;
   /** back to Ultimate Team */
   onExit: () => void;
+  onPractice?: () => void;
   /** another match: the next rung, the same one again, or another head to head */
   onAgain: (req: UtMatchRequest) => void;
   /** tests: straight into the game, the autopilot playing it */
@@ -230,8 +318,17 @@ export default function UtMatch(props: {
     // Claude: a draft game fields the drafted squad (never the club's cards)
     if (req.draft) {
       const run = draftOf(profile.ut);
-      const sq = squadFromWire(pool, run && run.id === req.draft.runId ? draftWire(run) : []);
-      return { name, sq, wire: squadToWire(sq), rating: ratingOf(SPORT, sq), fav: favoriteFor(SPORT) };
+      const sq = squadFromWire(
+        pool,
+        run && run.id === req.draft.runId ? draftWire(run) : [],
+      );
+      return {
+        name,
+        sq,
+        wire: squadToWire(sq),
+        rating: ratingOf(SPORT, sq),
+        fav: favoriteFor(SPORT),
+      };
     }
     return mySide(pool, profile.ut, name);
   }, [pool]);
@@ -256,13 +353,32 @@ export default function UtMatch(props: {
     if (req.draft) {
       const run = draftOf(profileRef.current.ut);
       const g = req.draft.game;
-      const rung = run && run.id === req.draft.runId && !run.done && run.games === g && startersComplete(SPORT, lineupOf(me.sq)) ? draftRung(pool, run, g) : null;
+      const rung =
+        run &&
+        run.id === req.draft.runId &&
+        !run.done &&
+        run.games === g &&
+        startersComplete(SPORT, lineupOf(me.sq))
+          ? draftRung(pool, run, g)
+          : null;
       if (!rung) {
         setError('This draft match is no longer active. Return to Play.');
         setStage('error');
         return;
       }
-      setSetup({ seed: 'draft:' + req.draft.runId + ':' + g + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, draft: req.draft, level: { name: 'Draft · Game ' + (g + 1), pay: 1, def: g / DRAFT_GAMES } });
+      setSetup({
+        seed: 'draft:' + req.draft.runId + ':' + g + ':' + req.id,
+        me,
+        rival: aiSide(pool, rung),
+        online: null,
+        rung,
+        draft: req.draft,
+        level: {
+          name: 'Draft · Game ' + (g + 1),
+          pay: 1,
+          def: g / DRAFT_GAMES,
+        },
+      });
       setStage('vs');
       return;
     }
@@ -280,6 +396,27 @@ export default function UtMatch(props: {
       setStage('search');
       return;
     }
+    if (req.cup) {
+      const rival = cupOpponent(pool, profileRef.current.ut, req.cup);
+      if (!rival) {
+        setError(
+          'This Cup match is no longer active, or your squad does not meet its rules. Return to Club Cups to check.',
+        );
+        setStage('error');
+        return;
+      }
+      setSetup({
+        seed: 'cup:' + req.cup.runId + ':' + req.cup.round,
+        me,
+        rival: aiSide(pool, rival.rung),
+        online: null,
+        rung: rival.rung,
+        cup: req.cup,
+        level: { name: rival.name, pay: 1, def: rival.def },
+      });
+      setStage('vs');
+      return;
+    }
     if (req.league) {
       const season = leagueOpponent(pool, profileRef.current.ut, req.league);
       if (!season) {
@@ -291,8 +428,8 @@ export default function UtMatch(props: {
       const rated = Object.fromEntries(
         Object.entries(lineupOf(sq)).map(([slot, rc]) => [
           slot,
-          rc ? withLeagueForm(rc, season.form[rc.line.id] ?? 0) : null
-        ])
+          rc ? withLeagueForm(rc, season.form[rc.line.id] ?? 0) : null,
+        ]),
       );
       setSetup({
         seed: 'league:' + req.league.game,
@@ -303,7 +440,7 @@ export default function UtMatch(props: {
           wire: season.squad,
           rating: rateSquad(SPORT, rated),
           fav: season.team.abbr,
-          form: season.form
+          form: season.form,
         },
         online: null,
         rung: {
@@ -316,7 +453,7 @@ export default function UtMatch(props: {
           squad: season.squad,
           skill: season.skill,
           fav: season.team.abbr,
-          pack: null
+          pack: null,
         },
         league: req.league,
         level: {
@@ -324,17 +461,46 @@ export default function UtMatch(props: {
             'Season · ' +
             LEVEL_NAME[profileRef.current.ut.league!.active.level],
           pay: 1,
-          def: season.def
-        }
+          def: season.def,
+        },
       });
       setStage('vs');
       return;
     }
     if (req.circuit) {
-      const rung = circuitRung(pool, profileRef.current.ut, req.circuit.runId, req.circuit.round, me.rating.ovr);
-      if (!rung) { setError('This Circuit match is no longer active. Return to Play HQ.'); setStage('error'); return; }
-      setSetup({ seed: 'circuit:' + req.circuit.runId + ':' + req.circuit.round + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, circuit: req.circuit, level: { name: req.circuit.round === 5 ? 'Legend' : 'Circuit', pay: 1, def: req.circuit.round / 5 } });
-      setStage('vs'); return;
+      const rung = circuitRung(
+        pool,
+        profileRef.current.ut,
+        req.circuit.runId,
+        req.circuit.round,
+        me.rating.ovr,
+      );
+      if (!rung) {
+        setError('This Circuit match is no longer active. Return to Play HQ.');
+        setStage('error');
+        return;
+      }
+      setSetup({
+        seed:
+          'circuit:' +
+          req.circuit.runId +
+          ':' +
+          req.circuit.round +
+          ':' +
+          req.id,
+        me,
+        rival: aiSide(pool, rung),
+        online: null,
+        rung,
+        circuit: req.circuit,
+        level: {
+          name: req.circuit.round === 5 ? 'Legend' : 'Circuit',
+          pay: 1,
+          def: req.circuit.round / 5,
+        },
+      });
+      setStage('vs');
+      return;
     }
     if (req.event) {
       const e = req.event;
@@ -349,7 +515,14 @@ export default function UtMatch(props: {
         setStage('error');
         return;
       }
-      setSetup({ seed: 'event:' + SPORT + ':' + e.id + ':' + e.node + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung, event: { ...e, title: rung.title } });
+      setSetup({
+        seed: 'event:' + SPORT + ':' + e.id + ':' + e.node + ':' + req.id,
+        me,
+        rival: aiSide(pool, rung),
+        online: null,
+        rung,
+        event: { ...e, title: rung.title },
+      });
       setStage('vs');
       return;
     }
@@ -362,12 +535,28 @@ export default function UtMatch(props: {
       return;
     }
     setSetup({
-      seed: 'ut:' + SPORT + ':' + week + ':' + (bt.round ?? 0) + ':' + level + ':' + rung.i + ':' + req.id,
+      seed:
+        'ut:' +
+        SPORT +
+        ':' +
+        week +
+        ':' +
+        (bt.round ?? 0) +
+        ':' +
+        level +
+        ':' +
+        rung.i +
+        ':' +
+        req.id,
       me,
       rival: aiSide(pool, rung),
       online: null,
       rung,
-      level: { name: LEVEL_NAME[level], pay: LEVEL[level].pay, def: LEVEL[level].def },
+      level: {
+        name: LEVEL_NAME[level],
+        pay: LEVEL[level].pay,
+        def: LEVEL[level].def,
+      },
     });
     setStage('vs');
   }, [pool, me, stage]);
@@ -379,7 +568,7 @@ export default function UtMatch(props: {
       connRef.current = null;
       setPresence('menu');
     },
-    []
+    [],
   );
 
   // ---------- online ----------
@@ -394,11 +583,17 @@ export default function UtMatch(props: {
     const conn: MatchConn = new MatchConn(f, (theirs, gone) => {
       if (connRef.current !== conn) return;
       const next = oppOf(theirs, gone);
-      setOpp((prev) => (prev && JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+      setOpp((prev) =>
+        prev && JSON.stringify(prev) === JSON.stringify(next) ? prev : next,
+      );
     });
     connRef.current = conn;
     conn.start();
-    conn.update((s) => ({ ...s, fav: me.fav, ut: { squad: me.wire, ovr: me.rating.ovr } }));
+    conn.update((s) => ({
+      ...s,
+      fav: me.fav,
+      ut: { squad: me.wire, ovr: me.rating.ovr },
+    }));
     setStage('found');
     // their squad never came (their phone missed the start): back to the queue
     window.setTimeout(() => {
@@ -419,10 +614,22 @@ export default function UtMatch(props: {
     const t = window.setTimeout(
       () => {
         const sq = squadFromWire(pool, opp.ut!.squad);
-        setSetup({ seed: found.matchId, me, rival: { name: found.opp.name, sq, wire: squadToWire(sq), rating: ratingOf(SPORT, sq), fav: opp.fav }, online: found, rung: null });
+        setSetup({
+          seed: found.matchId,
+          me,
+          rival: {
+            name: found.opp.name,
+            sq,
+            wire: squadToWire(sq),
+            rating: ratingOf(SPORT, sq),
+            fav: opp.fav,
+          },
+          online: found,
+          rung: null,
+        });
         setStage('vs');
       },
-      Math.max(0, foundAt.current + FOUND_MS - Date.now())
+      Math.max(0, foundAt.current + FOUND_MS - Date.now()),
     );
     return () => clearTimeout(t);
   }, [stage, !!opp?.ut, found]);
@@ -432,7 +639,13 @@ export default function UtMatch(props: {
     if (!pool || !me || stage !== 'search') return;
     sfx.click();
     const rung = aiOpponent(pool, me.rating.ovr, week + ':' + req.id);
-    setSetup({ seed: 'ut-ai:' + SPORT + ':' + req.id, me, rival: aiSide(pool, rung), online: null, rung });
+    setSetup({
+      seed: 'ut-ai:' + SPORT + ':' + req.id,
+      me,
+      rival: aiSide(pool, rung),
+      online: null,
+      rung,
+    });
     setStage('vs');
   };
 
@@ -441,19 +654,37 @@ export default function UtMatch(props: {
   const teams = useMemo(() => {
     if (!setup) return null;
     const base = teamsOf(SPORT, setup.me.sq, setup.rival.sq, setup.seed);
-    return setup.league && pool ? applyLeagueTeams(base, pool, setup.rival.form ?? {}) : base;
+    return setup.league && pool
+      ? applyLeagueTeams(base, pool, setup.rival.form ?? {})
+      : base;
   }, [setup, pool]);
-  const kits = useMemo(() => (setup ? kitsFor(setup.me.fav, setup.rival.fav, SPORT) : undefined), [setup]);
+  const kits = useMemo(
+    () => (setup ? kitsFor(setup.me.fav, setup.rival.fav, SPORT) : undefined),
+    [setup],
+  );
   const aiSkill = setup?.rung ? setup.rung.skill : AI_SKILL.pro;
   const defenseIQ = setup?.online ? 1 : (setup?.level?.def ?? 0);
 
   useEffect(() => {
     if (stage !== 'vs') return;
-    const t = window.setTimeout(() => setStage(props.autoplay || setup?.circuit || setup?.league ? 'play' : 'vote'), props.autoplay ? 400 : VS_MS);
+    const t = window.setTimeout(
+      () =>
+        setStage(
+          props.autoplay || setup?.circuit || setup?.league || setup?.cup
+            ? 'play'
+            : 'vote',
+        ),
+      props.autoplay ? 400 : VS_MS,
+    );
     return () => clearTimeout(t);
   }, [stage]);
 
-  const finish = (us: Progress, them: Progress, how: 'played' | 'sim', pens?: Pens) => {
+  const finish = (
+    us: Progress,
+    them: Progress,
+    how: 'played' | 'sim',
+    pens?: Pens,
+  ) => {
     if (done.current || !setup || !pool) return;
     done.current = true;
     const s = setup;
@@ -464,15 +695,50 @@ export default function UtMatch(props: {
       return a !== b ? a > b : !!s.online?.host;
     };
     // soccer: a level match was settled on penalties (Arcade.tsx)
-    const d = pens && us.score === them.score ? { won: pens.won, tiebreak: true } : decide(us.score, them.score, s.me.rating.raw, s.rival.rating.raw, s.online ? coin : () => true);
+    const d =
+      pens && us.score === them.score
+        ? { won: pens.won, tiebreak: true }
+        : decide(
+            us.score,
+            them.score,
+            s.me.rating.raw,
+            s.rival.rating.raw,
+            s.online ? coin : () => true,
+          );
     const ut = profileRef.current.ut;
     if (s.draft) {
       // Claude: a draft game settles on the run only (exactly once: active run, its game, a new match id)
-      const dIn = { runId: s.draft.runId, game: s.draft.game, won: d.won, us: us.score, them: them.score, matchId: 'ut-ai:' + req.id, at: Date.now(), day: easternDateKey(), how, opponent: s.rival.name };
+      const dIn = {
+        runId: s.draft.runId,
+        game: s.draft.game,
+        won: d.won,
+        us: us.score,
+        them: them.score,
+        matchId: 'ut-ai:' + req.id,
+        at: Date.now(),
+        day: easternDateKey(),
+        how,
+        opponent: s.rival.name,
+      };
       const shownD = settleDraft(ut, dIn);
       props.update((p) => ({ ...p, ut: settleDraft(p.ut, dIn).ut }));
       const run = draftOf(shownD.ut);
-      setOut({ ...d, us: us.score, them: them.score, how, ends: [us.ends, them.ends], coins: 0, xp: 0, ups: [], climbed: false, pack: null, capped: false, refreshed: false, seasonXP: shownD.sp, draft: { wins: run?.wins ?? 0, done: !!run?.done } });
+      setOut({
+        ...d,
+        us: us.score,
+        them: them.score,
+        how,
+        ends: [us.ends, them.ends],
+        coins: 0,
+        xp: 0,
+        ups: [],
+        climbed: false,
+        pack: null,
+        capped: false,
+        refreshed: false,
+        seasonXP: shownD.sp,
+        draft: { wins: run?.wins ?? 0, done: !!run?.done },
+      });
       setStage('result');
       if (d.won) {
         sfx.seriesWin();
@@ -485,6 +751,7 @@ export default function UtMatch(props: {
       event: s.event,
       circuit: s.circuit,
       league: s.league,
+      cup: s.cup,
       clubOvr: s.me.rating.ovr,
       opponent: s.rival.name,
       how,
@@ -504,23 +771,45 @@ export default function UtMatch(props: {
     const beforeDivision = divisionOf(rivalsOf(ut.rivals, week).points),
       afterDivision = divisionOf(rivalsOf(shown.ut.rivals, week).points);
     if (s.online && afterDivision > beforeDivision) setPromotion(afterDivision);
-    if (s.online) void publishRivals({ ...profileRef.current, ut: shown.ut }, week);
+    if (s.online)
+      void publishRivals({ ...profileRef.current, ut: shown.ut }, week);
     const cardIds = s.me.wire.map((w) => w[1]);
     props.update((p) => {
       const r = settle(p.ut, input);
-      const evo = recordEvoMatch(r.ut, { matchId: input.matchId, won: d.won, played: input.played });
-      return { ...p, coins: p.coins + r.coins, ut: s.online ? evo : recordStandoutWin(evo, { matchId: input.matchId, week, won: d.won, cardIds }) };
+      const evo = recordEvoMatch(r.ut, {
+        matchId: input.matchId,
+        won: d.won,
+        played: input.played,
+      });
+      return {
+        ...p,
+        coins: p.coins + r.coins,
+        ut: s.online
+          ? evo
+          : recordStandoutWin(evo, {
+              matchId: input.matchId,
+              week,
+              won: d.won,
+              cardIds,
+            }),
+      };
     });
     // our final state lingers a while, for a phone still finishing
     connRef.current?.close(false, 30000);
     connRef.current = null;
     setPresence('menu');
     const cardOf = new Map(ut.owned.map((o) => [o.uid, o.cardId]));
-    const ups = shown.ups.map((u) => ({ name: pool.byId.get(cardOf.get(u.uid) ?? '')?.name ?? 'A card', level: u.level }));
+    const ups = shown.ups.map((u) => ({
+      name: pool.byId.get(cardOf.get(u.uid) ?? '')?.name ?? 'A card',
+      level: u.level,
+    }));
     setOut({
+      cupDone: !!s.cup && !!cupOf(shown.ut).active?.done,
       seasonXP: shown.seasonXP,
       circuitPrizes: shown.circuitPrizes,
-      eventCleared: !!s.event && (shown.ut.events?.[s.event.id] ?? 0) > (ut.events?.[s.event.id] ?? 0),
+      eventCleared:
+        !!s.event &&
+        (shown.ut.events?.[s.event.id] ?? 0) > (ut.events?.[s.event.id] ?? 0),
       ...d,
       us: us.score,
       them: them.score,
@@ -546,26 +835,90 @@ export default function UtMatch(props: {
   const simBoth = () => {
     if (!setup || !teams) return;
     const t = teams;
-    const key = (w: SquadWire) => setup.seed + ':sim:' + hashString(JSON.stringify(w));
+    const key = (w: SquadWire) =>
+      setup.seed + ':sim:' + hashString(JSON.stringify(w));
     const mine = 0.6;
     const theirs = setup.online ? 0.6 : aiSkill;
     if (SOCCER) {
       // soccer's engine loads on first use; both phones work out the same attacks and penalties
       void loadSoccerGame().then((sg) => {
         const c = t.soccerCards!;
-        const a = sg.cardSquad(c.us, { name: 'You', abbr: 'YOU', c1: '#19E3C9', c2: '#0B2631' });
-        const b = sg.cardSquad(c.them, { name: setup.rival.name, abbr: 'OPP', c1: '#9B7BFF', c2: '#5B3FD1' });
+        const a = sg.cardSquad(c.us, {
+          name: 'You',
+          abbr: 'YOU',
+          c1: '#19E3C9',
+          c2: '#0B2631',
+        });
+        const b = sg.cardSquad(c.them, {
+          name: setup.rival.name,
+          abbr: 'OPP',
+          c1: '#9B7BFF',
+          c2: '#5B3FD1',
+        });
         const us = sg.aiProgress(a, b, key(setup.me.wire), mine, defenseIQ);
-        const them = sg.aiProgress(b, a, key(setup.rival.wire), theirs, defenseIQ);
-        const so = us.score === them.score ? sg.agreedShootout(a, b, 'arc:' + setup.seed, setup.online ? !!setup.online.host : true) : null;
-        finish(us, them, 'sim', so ? { us: so.us, them: so.them, won: so.winner === 'us' } : undefined);
+        const them = sg.aiProgress(
+          b,
+          a,
+          key(setup.rival.wire),
+          theirs,
+          defenseIQ,
+        );
+        const so =
+          us.score === them.score
+            ? sg.agreedShootout(
+                a,
+                b,
+                'arc:' + setup.seed,
+                setup.online ? !!setup.online.host : true,
+              )
+            : null;
+        finish(
+          us,
+          them,
+          'sim',
+          so
+            ? { us: so.us, them: so.them, won: so.winner === 'us' }
+            : undefined,
+        );
       });
       return;
     }
-    const us = FOOTBALL ? aiDrivesOf(t.offense!, t.rivalDefense!, key(setup.me.wire), mine, DRIVES, defenseIQ) : aiPossessionsOf(t.five!, t.rivalFive!, key(setup.me.wire), mine, POSSESSIONS, t.bench, defenseIQ);
+    const us = FOOTBALL
+      ? aiDrivesOf(
+          t.offense!,
+          t.rivalDefense!,
+          key(setup.me.wire),
+          mine,
+          DRIVES,
+          defenseIQ,
+        )
+      : aiPossessionsOf(
+          t.five!,
+          t.rivalFive!,
+          key(setup.me.wire),
+          mine,
+          POSSESSIONS,
+          t.bench,
+          defenseIQ,
+        );
     const them = FOOTBALL
-      ? aiDrivesOf(t.rivalOffense!, t.defense!, key(setup.rival.wire), theirs, DRIVES, defenseIQ)
-      : aiPossessionsOf(t.rivalFive!, t.five!, key(setup.rival.wire), theirs, POSSESSIONS, t.rivalBench, defenseIQ);
+      ? aiDrivesOf(
+          t.rivalOffense!,
+          t.defense!,
+          key(setup.rival.wire),
+          theirs,
+          DRIVES,
+          defenseIQ,
+        )
+      : aiPossessionsOf(
+          t.rivalFive!,
+          t.five!,
+          key(setup.rival.wire),
+          theirs,
+          POSSESSIONS,
+          t.rivalBench,
+          defenseIQ,
+        );
     finish(us, them, 'sim');
   };
 
@@ -587,7 +940,7 @@ export default function UtMatch(props: {
           rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
           tookMe={setup.online ? (opp?.arcadeTook ?? null) : null}
           autoplay={props.autoplay}
-          manualOnly={!!setup.circuit || !!setup.league}
+          manualOnly={!!setup.circuit || !!setup.league || !!setup.cup}
           kits={kits}
           soccerFavs={{ mine: setup.me.fav, theirs: setup.rival.fav }}
           host={setup.online ? !!setup.online.host : true}
@@ -609,7 +962,14 @@ export default function UtMatch(props: {
         rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
         waitFor="to get here"
         simText="Skip to the final: both sides simmed"
-        onWire={(w) => connRef.current?.update((s) => ({ ...s, vote: w.vote, voteAt: w.at, voteSaw: w.saw }))}
+        onWire={(w) =>
+          connRef.current?.update((s) => ({
+            ...s,
+            vote: w.vote,
+            voteAt: w.at,
+            voteSaw: w.saw,
+          }))
+        }
         onDone={(o) => (o === 'play' ? setStage('play') : simBoth())}
       />
     );
@@ -638,7 +998,17 @@ export default function UtMatch(props: {
       </div>
     );
   else if (stage === 'search' || stage === 'found')
-    body = <SearchView key={searchNo} me={me} queue={pool ? queueOf(pool) : 'ut'} level={levelInfo(profile.xp).level} found={found} onFound={onFound} onAI={goAI} />;
+    body = (
+      <SearchView
+        key={searchNo}
+        me={me}
+        queue={pool ? queueOf(pool) : 'ut'}
+        level={levelInfo(profile.xp).level}
+        found={found}
+        onFound={onFound}
+        onAI={goAI}
+      />
+    );
   else if (stage === 'vs' && setup) body = <VsView setup={setup} />;
   else if (stage === 'result' && setup && out)
     body = (
@@ -646,40 +1016,101 @@ export default function UtMatch(props: {
         setup={setup}
         out={out}
         onDone={leave}
+        onStore={() => {
+          rememberUtReturn('store');
+          leave();
+        }}
+        onPractice={SOCCER ? undefined : props.onPractice}
         onAgain={() => {
           sfx.click();
           const r = setup.rung;
-          if (setup.league) { leave(); return; }
+          if (setup.cup) {
+            const a = cupOf(profileRef.current.ut).active;
+            if (a && !a.done)
+              props.onAgain({
+                id: Date.now(),
+                mode: 'ai',
+                cup: { runId: a.id, round: a.round },
+              });
+            else leave();
+            return;
+          }
+          if (setup.league) {
+            leave();
+            return;
+          }
           if (setup.draft) {
             const run = draftOf(profileRef.current.ut);
-            if (run && run.id === setup.draft.runId && !run.done) props.onAgain({ id: Date.now(), mode: 'ai', draft: { runId: run.id, game: run.games } });
+            if (run && run.id === setup.draft.runId && !run.done)
+              props.onAgain({
+                id: Date.now(),
+                mode: 'ai',
+                draft: { runId: run.id, game: run.games },
+              });
             else leave();
             return;
           }
           if (setup.circuit) {
             const active = hqOf(profileRef.current.ut).circuit.active;
-            if (active) props.onAgain({ id: Date.now(), mode: 'ai', circuit: { runId: active.id, round: active.games } });
+            if (active)
+              props.onAgain({
+                id: Date.now(),
+                mode: 'ai',
+                circuit: { runId: active.id, round: active.games },
+              });
             else leave();
             return;
           }
           if (setup.event) {
-            props.onAgain({ id: Date.now(), mode: 'ai', event: { id: setup.event.id, node: out.won ? Math.min(2, setup.event.node + 1) : setup.event.node } });
+            props.onAgain({
+              id: Date.now(),
+              mode: 'ai',
+              event: {
+                id: setup.event.id,
+                node: out.won
+                  ? Math.min(2, setup.event.node + 1)
+                  : setup.event.node,
+              },
+            });
             return;
           }
-          if (setup.online || !r || r.i < 0) props.onAgain({ id: Date.now(), mode: req.mode });
-          else props.onAgain({ id: Date.now(), mode: 'ai', rung: out.refreshed ? 0 : out.climbed ? r.i + 1 : r.i });
+          if (setup.online || !r || r.i < 0)
+            props.onAgain({ id: Date.now(), mode: req.mode });
+          else
+            props.onAgain({
+              id: Date.now(),
+              mode: 'ai',
+              rung: out.refreshed ? 0 : out.climbed ? r.i + 1 : r.i,
+            });
         }}
       />
     );
 
-  if (promotion !== null && stage === 'result') return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
+  if (promotion !== null && stage === 'result')
+    return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
-  const title = req.draft ? 'UT Draft' : req.league ? 'Club Season' : req.circuit ? 'Champions Circuit' : req.event ? 'Legends Events' : req.mode === 'online' ? 'Rivals' : 'Squad Battles';
+  const title = req.cup
+    ? 'Club Cups'
+    : req.draft
+      ? 'UT Draft'
+      : req.league
+        ? 'Club Season'
+        : req.circuit
+          ? 'Champions Circuit'
+          : req.event
+            ? 'Legends Events'
+            : req.mode === 'online'
+              ? 'Rivals'
+              : 'Squad Battles';
   return (
     <div className={'screen ut utm utm-s-' + stage}>
       <div className="topbar ut-top">
         {canLeave ? (
-          <button className="icon-btn pill-btn" onClick={leave} aria-label="Back to Ultimate Team">
+          <button
+            className="icon-btn pill-btn"
+            onClick={leave}
+            aria-label="Back to Ultimate Team"
+          >
             <Back size={16} /> UT
           </button>
         ) : (
@@ -694,7 +1125,14 @@ export default function UtMatch(props: {
 }
 
 /** Waiting in the queue: the window of overalls it takes, widening, and the AI after UT_AI_AFTER. */
-function SearchView(props: { me: Side; queue: string; level: number; found: Found | null; onFound: (f: Found) => void; onAI: () => void }) {
+function SearchView(props: {
+  me: Side;
+  queue: string;
+  level: number;
+  found: Found | null;
+  onFound: (f: Found) => void;
+  onAI: () => void;
+}) {
   const { me, found } = props;
   const [t0] = useState(Date.now());
   const [now, setNow] = useState(Date.now());
@@ -713,11 +1151,19 @@ function SearchView(props: { me: Side; queue: string; level: number; found: Foun
 
   useEffect(() => {
     let got = false;
-    const mm = new Matchmaker({ name: me.name, level: props.level, queue: props.queue, ovr: me.rating.ovr }, (f) => {
-      if (got) return;
-      got = true;
-      foundRef.current(f);
-    });
+    const mm = new Matchmaker(
+      {
+        name: me.name,
+        level: props.level,
+        queue: props.queue,
+        ovr: me.rating.ovr,
+      },
+      (f) => {
+        if (got) return;
+        got = true;
+        foundRef.current(f);
+      },
+    );
     mm.start();
     mmRef.current = mm;
     return () => {
@@ -755,15 +1201,24 @@ function SearchView(props: { me: Side; queue: string; level: number; found: Foun
         </div>
         <div className="ai-meter">
           <span className="track">
-            <i style={{ transform: 'scaleX(' + Math.min(1, elapsed / UT_AI_AFTER) + ')' }} />
+            <i
+              style={{
+                transform: 'scaleX(' + Math.min(1, elapsed / UT_AI_AFTER) + ')',
+              }}
+            />
           </span>
-          <small>{elapsed < UT_AI_AFTER ? 'An AI squad at your level steps in at ' + clock(UT_AI_AFTER) : 'An AI squad is stepping in…'}</small>
+          <small>
+            {elapsed < UT_AI_AFTER
+              ? 'An AI squad at your level steps in at ' + clock(UT_AI_AFTER)
+              : 'An AI squad is stepping in…'}
+          </small>
         </div>
       </div>
       <div className="utm-mine">
         <span className="eyebrow">Your squad</span>
         <span className="utm-mine-nums">
-          <b className="disp num">{me.rating.ovr}</b> OVR <b className="disp num">{me.rating.chem}</b> CHEM
+          <b className="disp num">{me.rating.ovr}</b> OVR{' '}
+          <b className="disp num">{me.rating.chem}</b> CHEM
         </span>
       </div>
       <div className="spacer" />
@@ -773,7 +1228,11 @@ function SearchView(props: { me: Side; queue: string; level: number; found: Foun
         </button>
       </div>
       {found && (
-        <div className="vs-splash" role="dialog" aria-label={'Match found: ' + me.name + ' versus ' + found.opp.name}>
+        <div
+          className="vs-splash"
+          role="dialog"
+          aria-label={'Match found: ' + me.name + ' versus ' + found.opp.name}
+        >
           <span className="eyebrow wide">Match found</span>
           <div className="vs-names">
             <div className="vs-a">
@@ -785,7 +1244,11 @@ function SearchView(props: { me: Side; queue: string; level: number; found: Foun
             <div className="vs-b">
               <b className="disp">{initials(found.opp.name)}</b>
               <strong>{found.opp.name}</strong>
-              <small>{typeof found.opp.ovr === 'number' ? found.opp.ovr + ' OVR' : 'Level ' + found.opp.level}</small>
+              <small>
+                {typeof found.opp.ovr === 'number'
+                  ? found.opp.ovr + ' OVR'
+                  : 'Level ' + found.opp.level}
+              </small>
             </div>
           </div>
           <small className="vs-note">Swapping squads…</small>
@@ -804,7 +1267,10 @@ function SideCard({ side, you }: { side: Side; you: boolean }) {
     <div className={'utm-side' + (you ? ' utm-me' : ' utm-them')}>
       <span className="utm-fan" aria-hidden="true">
         {best.map((rc, i) => (
-          <span key={rc.line.id} style={{ '--i': i - (best.length - 1) / 2 } as React.CSSProperties}>
+          <span
+            key={rc.line.id}
+            style={{ '--i': i - (best.length - 1) / 2 } as React.CSSProperties}
+          >
             <UtCard rc={rc} w={54} />
           </span>
         ))}
@@ -822,15 +1288,28 @@ function SideCard({ side, you }: { side: Side; you: boolean }) {
 
 function VsView({ setup }: { setup: Setup }) {
   const r = setup.rung;
-  const eyebrow = setup.league ? 'Club Season · '+(setup.level?.name ?? '') : setup.event
-    ? 'Legends Events · ' + setup.event.title
-    : setup.online
-      ? 'Head to head · online'
-      : r && r.i >= 0
-        ? 'Squad Battles · ' + (setup.level ? setup.level.name + ' · ' : '') + 'rung ' + (r.i + 1) + ' of ' + RUNGS
-        : 'No one near your squad right now';
+  const eyebrow = setup.cup
+    ? 'Club Cups · ' + CUP_ROUNDS[setup.cup.round]
+    : setup.league
+      ? 'Club Season · ' + (setup.level?.name ?? '')
+      : setup.event
+        ? 'Legends Events · ' + setup.event.title
+        : setup.online
+          ? 'Head to head · online'
+          : r && r.i >= 0
+            ? 'Squad Battles · ' +
+              (setup.level ? setup.level.name + ' · ' : '') +
+              'rung ' +
+              (r.i + 1) +
+              ' of ' +
+              RUNGS
+            : 'No one near your squad right now';
   return (
-    <div className="utm-vs rise-in" role="status" aria-label={setup.me.name + ' versus ' + setup.rival.name}>
+    <div
+      className="utm-vs rise-in"
+      role="status"
+      aria-label={setup.me.name + ' versus ' + setup.rival.name}
+    >
       <span className="eyebrow wide">{eyebrow}</span>
       <div className="utm-vs-row">
         <SideCard side={setup.me} you />
@@ -838,42 +1317,98 @@ function VsView({ setup }: { setup: Setup }) {
         <SideCard side={setup.rival} you={false} />
       </div>
       <small className="utm-vs-note">
-        {setup.league
-          ? (setup.level?.name ?? 'Season') + ' · ' + skillName(r!.skill) + ' AI'
-          : setup.event
-          ? setup.event.title
-          : r
-            ? r.i >= 0
-              ? r.title + ' · ' + skillName(r.skill) + ' AI'
-              : 'An AI squad of the ' + r.title + ', at your level'
-            : 'Each of you plays your offense against the other’s defense.'}
+        {setup.cup
+          ? (setup.level?.name ?? 'Cup knockout')
+          : setup.league
+            ? (setup.level?.name ?? 'Season') +
+              ' · ' +
+              skillName(r!.skill) +
+              ' AI'
+            : setup.event
+              ? setup.event.title
+              : r
+                ? r.i >= 0
+                  ? r.title + ' · ' + skillName(r.skill) + ' AI'
+                  : 'An AI squad of the ' + r.title + ', at your level'
+                : 'Each of you plays your offense against the other’s defense.'}
       </small>
     </div>
   );
 }
 
-function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcome; onDone: () => void; onAgain: () => void }) {
+function ResultView({
+  setup,
+  out,
+  onDone,
+  onAgain,
+  onStore,
+  onPractice,
+}: {
+  setup: Setup;
+  out: Outcome;
+  onDone: () => void;
+  onAgain: () => void;
+  onStore: () => void;
+  onPractice?: () => void;
+}) {
   const r = setup.rung;
   const ladder = !!r && r.i >= 0;
   const top = ladder && out.climbed && r!.i + 1 >= RUNGS;
-  const again = setup.draft ? (out.draft && !out.draft.done ? 'NEXT DRAFT GAME' : 'DRAFT REWARDS') : setup.league ? 'SEASON HUB' : setup.circuit ? (setup.circuit.round < 5 ? 'NEXT CIRCUIT MATCH' : 'BACK TO CLUB') : setup.event
-    ? out.won && setup.event.node < 2
-      ? 'NEXT EVENT MATCH'
-      : 'PLAY AGAIN'
-    : setup.online || (r && r.i < 0)
-      ? 'PLAY AGAIN'
-      : out.refreshed
-        ? 'NEW LADDER'
-        : out.climbed && !top
-          ? 'NEXT RUNG'
-          : out.won
-            ? 'PLAY IT AGAIN'
-            : 'TRY AGAIN';
+  const again = setup.cup
+    ? out.cupDone
+      ? 'VIEW CUP RESULT'
+      : 'NEXT CUP ROUND'
+    : setup.draft
+      ? out.draft && !out.draft.done
+        ? 'NEXT DRAFT GAME'
+        : 'DRAFT REWARDS'
+      : setup.league
+        ? 'SEASON HUB'
+        : setup.circuit
+          ? setup.circuit.round < 5
+            ? 'NEXT CIRCUIT MATCH'
+            : 'BACK TO CLUB'
+          : setup.event
+            ? out.won && setup.event.node < 2
+              ? 'NEXT EVENT MATCH'
+              : 'PLAY AGAIN'
+            : setup.online || (r && r.i < 0)
+              ? 'PLAY AGAIN'
+              : out.refreshed
+                ? 'NEW LADDER'
+                : out.climbed && !top
+                  ? 'NEXT RUNG'
+                  : out.won
+                    ? 'PLAY IT AGAIN'
+                    : 'TRY AGAIN';
   return (
     <div className="page utm-result">
-      <span className="eyebrow wide">{setup.draft ? 'UT Draft · Game ' + (setup.draft.game + 1) + ' / ' + DRAFT_GAMES : setup.league ? 'Club Season · league results and standings updated' : setup.circuit ? 'Solo Champions Circuit · Match ' + (setup.circuit.round + 1) + ' / 6' : setup.event ? setup.event.title : ladder ? 'Squad Battles · rung ' + (r!.i + 1) : setup.online ? 'Head to head' : 'Vs an AI squad'}</span>
-      <h1 className={'disp utm-verdict ' + (out.won ? 'win' : 'loss')}>{out.won ? 'WIN' : 'LOSS'}</h1>
-      <div className="utm-score" aria-label={'You ' + out.us + ', ' + setup.rival.name + ' ' + out.them}>
+      <span className="eyebrow wide">
+        {setup.cup
+          ? 'Club Cups · ' + CUP_ROUNDS[setup.cup.round]
+          : setup.draft
+            ? 'UT Draft · Game ' + (setup.draft.game + 1) + ' / ' + DRAFT_GAMES
+            : setup.league
+              ? 'Club Season · league results and standings updated'
+              : setup.circuit
+                ? 'Solo Champions Circuit · Match ' +
+                  (setup.circuit.round + 1) +
+                  ' / 6'
+                : setup.event
+                  ? setup.event.title
+                  : ladder
+                    ? 'Squad Battles · rung ' + (r!.i + 1)
+                    : setup.online
+                      ? 'Head to head'
+                      : 'Vs an AI squad'}
+      </span>
+      <h1 className={'disp utm-verdict ' + (out.won ? 'win' : 'loss')}>
+        {out.won ? 'WIN' : 'LOSS'}
+      </h1>
+      <div
+        className="utm-score"
+        aria-label={'You ' + out.us + ', ' + setup.rival.name + ' ' + out.them}
+      >
         <span>
           <b className="disp num">{out.us}</b>
           <small>{setup.me.name}</small>
@@ -884,9 +1419,21 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           <small>{setup.rival.name}</small>
         </span>
       </div>
-      <div className="utm-ends" aria-label={pick({ nba: 'Possessions', nfl: 'Drives', soccer: 'Attacks' }) + ': yours ' + out.ends[0].map(endSpoken).join(', ') + '; theirs ' + out.ends[1].map(endSpoken).join(', ')}>
+      <div
+        className="utm-ends"
+        aria-label={
+          pick({ nba: 'Possessions', nfl: 'Drives', soccer: 'Attacks' }) +
+          ': yours ' +
+          out.ends[0].map(endSpoken).join(', ') +
+          '; theirs ' +
+          out.ends[1].map(endSpoken).join(', ')
+        }
+      >
         {out.ends.map((ends, k) => (
-          <span key={k} className={(k ? 'them' : 'us') + (ends.length > 8 ? ' many' : '')}>
+          <span
+            key={k}
+            className={(k ? 'them' : 'us') + (ends.length > 8 ? ' many' : '')}
+          >
             {ends.map((e, i) => (
               <i key={i} className={'e-' + (END_POINTS[e] ? 'pts' : 'none')}>
                 {END_LABEL[e] ?? e}
@@ -898,34 +1445,77 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
       {(out.tiebreak || out.how === 'sim') && (
         <p className="utm-note">
           {out.how === 'sim' ? 'Simmed. ' : ''}
-          {out.tiebreak ? 'A tie goes to the better squad: ' + (out.won ? 'yours.' : 'theirs.') : ''}
+          {out.tiebreak
+            ? 'A tie goes to the better squad: ' +
+              (out.won ? 'yours.' : 'theirs.')
+            : ''}
         </p>
       )}
+      <MatchDebrief
+        sport={SPORT}
+        ends={out.ends[0]}
+        simulated={out.how === 'sim'}
+        onPractice={onPractice}
+      />
       {setup.event && out.won && (
         <div className="utm-climb rise-in">
-          <b className="disp">{out.eventCleared ? (setup.event.node === 2 ? 'SERIES COMPLETE' : 'EVENT MATCH WON') : 'REPLAY COMPLETE'}</b>
-          <small>{out.eventCleared ? 'Your first-clear reward is waiting in the Store.' : 'This stage’s first-clear reward has already been earned.'}</small>
+          <b className="disp">
+            {out.eventCleared
+              ? setup.event.node === 2
+                ? 'SERIES COMPLETE'
+                : 'EVENT MATCH WON'
+              : 'REPLAY COMPLETE'}
+          </b>
+          <small>
+            {out.eventCleared
+              ? 'Your first-clear reward is waiting in the Store.'
+              : 'This stage’s first-clear reward has already been earned.'}
+          </small>
         </div>
       )}
       {out.climbed && (
         <div className="utm-climb rise-in">
-          <b className="disp">{top ? 'LADDER CLEARED!' : 'RUNG ' + (r!.i + 1) + ' CLEARED'}</b>
-          {out.pack ? <small>Your {packName(SPORT, out.pack)} is waiting in the Store.</small> : !top && <small>Next up: rung {r!.i + 2}.</small>}
+          <b className="disp">
+            {top ? 'LADDER CLEARED!' : 'RUNG ' + (r!.i + 1) + ' CLEARED'}
+          </b>
+          {out.pack ? (
+            <small>
+              Your {packName(SPORT, out.pack)} is waiting in the Store.
+            </small>
+          ) : (
+            !top && <small>Next up: rung {r!.i + 2}.</small>
+          )}
           {out.refreshed && (
             <small>
-              A new ladder of {RUNGS} squads is up{setup.level ? ' on ' + setup.level.name : ''}.
+              A new ladder of {RUNGS} squads is up
+              {setup.level ? ' on ' + setup.level.name : ''}.
             </small>
           )}
         </div>
       )}
       {out.draft && (
         <div className="utm-climb rise-in">
-          <b className="disp">{out.draft.done ? (out.draft.wins >= DRAFT_GAMES ? 'PERFECT DRAFT!' : 'RUN OVER · ' + out.draft.wins + (out.draft.wins === 1 ? ' WIN' : ' WINS')) : out.draft.wins + ' / ' + DRAFT_GAMES + ' WINS'}</b>
-          <small>{out.draft.done ? 'Claim your rewards in Play → UT Draft.' : 'Win the next game to raise your reward.'}</small>
+          <b className="disp">
+            {out.draft.done
+              ? out.draft.wins >= DRAFT_GAMES
+                ? 'PERFECT DRAFT!'
+                : 'RUN OVER · ' +
+                  out.draft.wins +
+                  (out.draft.wins === 1 ? ' WIN' : ' WINS')
+              : out.draft.wins + ' / ' + DRAFT_GAMES + ' WINS'}
+          </b>
+          <small>
+            {out.draft.done
+              ? 'Claim your rewards in Play → UT Draft.'
+              : 'Win the next game to raise your reward.'}
+          </small>
         </div>
       )}
       {out.draft ? null : out.capped ? (
-        <p className="utm-note">Today’s {PAID_GAMES_A_DAY} paid games are played: games pay coins and XP again tomorrow.</p>
+        <p className="utm-note">
+          Today’s {PAID_GAMES_A_DAY} paid games are played: games pay coins and
+          XP again tomorrow.
+        </p>
       ) : (
         <div className="utm-rewards">
           <span>
@@ -936,18 +1526,49 @@ function ResultView({ setup, out, onDone, onAgain }: { setup: Setup; out: Outcom
           </span>
         </div>
       )}
-      {!!out.seasonXP && <div className="utm-climb rise-in"><b className="disp">+{out.seasonXP} SEASON POINTS</b><small>Your free reward track moves forward. Claim unlocked tiers in the clubhouse.</small></div>}
-      {!!out.circuitPrizes?.length && <div className="utm-climb rise-in"><b className="disp">CIRCUIT REWARD UNLOCKED</b>{out.circuitPrizes.map(p => <small key={p}>{p} · waiting in your Store</small>)}</div>}
+      {!!out.seasonXP && (
+        <div className="utm-climb rise-in">
+          <b className="disp">+{out.seasonXP} SEASON POINTS</b>
+          <small>
+            Your free reward track moves forward. Claim unlocked tiers in
+            Challenges → Season Pass.
+          </small>
+        </div>
+      )}
+      {!!out.circuitPrizes?.length && (
+        <div className="utm-climb rise-in">
+          <b className="disp">CIRCUIT REWARD UNLOCKED</b>
+          {out.circuitPrizes.map((p) => (
+            <small key={p}>{p} · waiting in your Store</small>
+          ))}
+        </div>
+      )}
       {out.ups.length > 0 && (
         <div className="utm-ups">
-          <span className="eyebrow">{out.ups.length === 1 ? 'Level up' : out.ups.length + ' level-ups'}</span>
+          <span className="eyebrow">
+            {out.ups.length === 1 ? 'Level up' : out.ups.length + ' level-ups'}
+          </span>
           {out.ups.slice(0, out.ups.length > 4 ? 3 : 4).map((u, i) => (
-            <span key={i} className="utm-up rise-in" style={{ animationDelay: 300 + i * 120 + 'ms' }}>
+            <span
+              key={i}
+              className="utm-up rise-in"
+              style={{ animationDelay: 300 + i * 120 + 'ms' }}
+            >
               <b>{u.name}</b> <i className="num">LV {u.level}</i>
             </span>
           ))}
-          {out.ups.length > 4 && <span className="utm-up utm-more">and {out.ups.length - 3} more: every card plays at its new level from your next game</span>}
+          {out.ups.length > 4 && (
+            <span className="utm-up utm-more">
+              and {out.ups.length - 3} more: every card plays at its new level
+              from your next game
+            </span>
+          )}
         </div>
+      )}
+      {(out.pack || out.eventCleared || !!out.circuitPrizes?.length) && (
+        <button className="btn gold" onClick={onStore}>
+          VIEW REWARD PACKS
+        </button>
       )}
       <div className="spacer" />
       <div className="btnrow utm-btns">

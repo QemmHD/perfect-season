@@ -1,6 +1,6 @@
 import { ArrowMark } from '../evolution/Marks';
 import React, { useEffect, useState } from 'react';
-import { DIVISIONS, divisionOf, rivalsOf } from './rivals';
+import { DIVISIONS, divisionOf, rivalsOf, claimRivals } from './rivals';
 import { weekKey } from '../net/leaderboard';
 import { easternDateKey } from '../engine/season';
 import { SPORT } from '../engine/sport';
@@ -87,11 +87,11 @@ export function Rivals({
         setStatus(
           rows.length
             ? 'Live this week'
-            : 'No entries received yet. Be the first on the board.'
+            : 'No entries received yet. Be the first on the board.',
         );
       })
       .catch(() =>
-        setStatus('Board unavailable. Your progress is saved on this phone.')
+        setStatus('Board unavailable. Your progress is saved on this phone.'),
       );
   };
   useEffect(() => {
@@ -110,26 +110,12 @@ export function Rivals({
     const available =
       r.rewards.some((x) => x.id === id) && !r.claimed.includes(id);
     if (!available) return;
+    const at = Date.now();
     update((p) => {
-      const now = rivalsOf(p.ut.rivals, week),
-        reward = now.rewards.find((x) => x.id === id);
-      if (!reward || now.claimed.includes(id)) return p;
-      return {
-        ...p,
-        coins: p.coins + reward.coins,
-        ut: {
-          ...p.ut,
-          rivals: { ...now, claimed: [...now.claimed, id] },
-          packs: [
-            ...p.ut.packs,
-            {
-              id: 'rivals:' + SPORT + ':' + id,
-              kind: reward.pack,
-              at: Date.now(),
-            },
-          ],
-        },
-      };
+      const result = claimRivals(p.ut, SPORT, week, id, at);
+      return result.ut === p.ut
+        ? p
+        : { ...p, coins: p.coins + result.coins, ut: result.ut };
     });
     if (available) {
       setCelebrate(true);
@@ -189,7 +175,7 @@ export function Rivals({
       <div className="rivals-ladder">
         {DIVISIONS.map((v, i) => {
           const reward = r.rewards.find(
-              (x) => x.week === week && x.division === i
+              (x) => x.week === week && x.division === i,
             ),
             claimed = reward && r.claimed.includes(reward.id);
           return (
@@ -221,13 +207,24 @@ export function Rivals({
         .filter((x) => x.week !== week && !r.claimed.includes(x.id))
         .map((x) => (
           <button className="btn gold" key={x.id} onClick={() => claim(x.id)}>
-            CLAIM WEEK {x.week.split('W')[1] ?? x.week} {DIVISIONS[x.division].name.toUpperCase()} REWARD
+            CLAIM WEEK {x.week.split('W')[1] ?? x.week}{' '}
+            {DIVISIONS[x.division].name.toUpperCase()} REWARD
           </button>
         ))}
       <div className="evo-section-label">
         <span>WEEKLY LEADERBOARD</span>
         <button onClick={load} aria-label="Refresh Rivals leaderboard">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
           </svg>
         </button>

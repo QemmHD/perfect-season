@@ -23,9 +23,18 @@ export interface ModeStatus {
   live?: boolean;
   /** something to claim or a free entry waiting */
   ready?: boolean;
+  /** Read-only recency from existing active-run and match-history timestamps. */
+  lastPlayedAt?: number;
 }
 
-export function playStatus(pool: Pool, ut: UtState, week: string): Record<'league' | 'battles' | 'circuit' | 'events' | 'moments' | 'draft' | 'rivals', ModeStatus> {
+export function playStatus(
+  pool: Pool,
+  ut: UtState,
+  week: string,
+): Record<
+  'league' | 'battles' | 'circuit' | 'events' | 'moments' | 'draft' | 'rivals',
+  ModeStatus
+> {
   const s = ut.league?.active;
   const leagueLive = !!s && s.phase !== 'complete';
   const me = s?.teams[0];
@@ -34,51 +43,170 @@ export function playStatus(pool: Pool, ut: UtState, week: string): Record<'leagu
     view: 'league',
     live: leagueLive,
     line: !s
-      ? 'Full ' + seasonGames(pool.sport) + '-game season · top 8 make the playoffs'
+      ? 'Full ' +
+        seasonGames(pool.sport) +
+        '-game season · top 8 make the playoffs'
       : s.phase === 'complete'
         ? 'Season ' + s.number + ' complete · start the next one'
         : s.phase === 'playoffs'
           ? 'Season ' + s.number + ' playoffs · ' + me!.w + '–' + me!.l
-          : 'Season ' + s.number + ' · ' + me!.w + '–' + me!.l + ' · game ' + (games + 1) + ' of ' + seasonGames(pool.sport),
+          : 'Season ' +
+            s.number +
+            ' · ' +
+            me!.w +
+            '–' +
+            me!.l +
+            ' · game ' +
+            (games + 1) +
+            ' of ' +
+            seasonGames(pool.sport),
   };
   const b = battlesThisWeek(ut.battles, week);
   const battles: ModeStatus = {
     view: 'battles',
-    line: LEVEL_NAME[levelOf(b.level)] + ' ladder · ' + Math.min(b.cleared, RUNGS) + ' of ' + RUNGS + ' beaten this week',
+    line:
+      LEVEL_NAME[levelOf(b.level)] +
+      ' ladder · ' +
+      Math.min(b.cleared, RUNGS) +
+      ' of ' +
+      RUNGS +
+      ' beaten this week',
   };
   const c = circuitOf(ut, week);
   const circuit: ModeStatus = c.active
-    ? { view: 'circuit', live: true, line: 'Match ' + (c.active.games + 1) + ' of ' + CIRCUIT_GAMES + ' · ' + c.active.wins + (c.active.wins === 1 ? ' win' : ' wins') + ' so far' }
+    ? {
+        view: 'circuit',
+        live: true,
+        line:
+          'Match ' +
+          (c.active.games + 1) +
+          ' of ' +
+          CIRCUIT_GAMES +
+          ' · ' +
+          c.active.wins +
+          (c.active.wins === 1 ? ' win' : ' wins') +
+          ' so far',
+      }
     : {
         view: 'circuit',
         ready: c.entries < CIRCUIT_ENTRIES,
-        line: c.entries < CIRCUIT_ENTRIES ? CIRCUIT_ENTRIES - c.entries + ' free ' + (CIRCUIT_ENTRIES - c.entries === 1 ? 'entry' : 'entries') + ' left · best ' + c.best + ' wins' : 'Entries used · best ' + c.best + ' wins this week',
+        line:
+          c.entries < CIRCUIT_ENTRIES
+            ? CIRCUIT_ENTRIES -
+              c.entries +
+              ' free ' +
+              (CIRCUIT_ENTRIES - c.entries === 1 ? 'entry' : 'entries') +
+              ' left · best ' +
+              c.best +
+              ' wins'
+            : 'Entries used · best ' + c.best + ' wins this week',
       };
   const evs = eventsFor(pool);
-  const cleared = evs.reduce((n, e) => n + Math.min(3, ut.events?.[e.id] ?? 0), 0);
-  const events: ModeStatus = { view: 'events', line: evs.length + ' series · ' + cleared + ' of ' + evs.length * 3 + ' stages cleared' };
+  const cleared = evs.reduce(
+    (n, e) => n + Math.min(3, ut.events?.[e.id] ?? 0),
+    0,
+  );
+  const events: ModeStatus = {
+    view: 'events',
+    line:
+      evs.length +
+      ' series · ' +
+      cleared +
+      ' of ' +
+      evs.length * 3 +
+      ' stages cleared',
+  };
   const ms = momentsFor(pool.sport);
   const h = hqOf(ut);
   const done = ms.filter((m) => h.moments[m.id]?.completedAt).length;
-  const unclaimed = ms.filter((m) => h.moments[m.id]?.completedAt && !h.moments[m.id]?.claimed).length;
-  const moments: ModeStatus = { view: 'moments', ready: unclaimed > 0, line: unclaimed ? unclaimed + ' reward' + (unclaimed === 1 ? '' : 's') + ' ready · ' + done + ' of ' + ms.length + ' cleared' : done + ' of ' + ms.length + ' cleared' };
+  const unclaimed = ms.filter(
+    (m) => h.moments[m.id]?.completedAt && !h.moments[m.id]?.claimed,
+  ).length;
+  const moments: ModeStatus = {
+    view: 'moments',
+    ready: unclaimed > 0,
+    line: unclaimed
+      ? unclaimed +
+        ' reward' +
+        (unclaimed === 1 ? '' : 's') +
+        ' ready · ' +
+        done +
+        ' of ' +
+        ms.length +
+        ' cleared'
+      : done + ' of ' + ms.length + ' cleared',
+  };
   const run = draftOf(ut);
   const draft: ModeStatus = run
-    ? { view: 'draft', live: !run.done, ready: !!run.done, line: run.done ? 'Run over · ' + run.wins + (run.wins === 1 ? ' win' : ' wins') + ' · claim rewards' : run.results.length ? run.results.length + ' played · ' + run.wins + ' wins · game ' + (run.results.length + 1) + ' of ' + DRAFT_GAMES : 'Drafting your squad' }
-    : { view: 'draft', ready: tokenReady(ut, week), line: tokenReady(ut, week) ? 'Free weekly entry ready' : 'Draft a squad, win up to ' + DRAFT_GAMES + ' in a row' };
+    ? {
+        view: 'draft',
+        live: !run.done,
+        ready: !!run.done,
+        line: run.done
+          ? 'Run over · ' +
+            run.wins +
+            (run.wins === 1 ? ' win' : ' wins') +
+            ' · claim rewards'
+          : run.results.length
+            ? run.results.length +
+              ' played · ' +
+              run.wins +
+              ' wins · game ' +
+              (run.results.length + 1) +
+              ' of ' +
+              DRAFT_GAMES
+            : 'Drafting your squad',
+      }
+    : {
+        view: 'draft',
+        ready: tokenReady(ut, week),
+        line: tokenReady(ut, week)
+          ? 'Free weekly entry ready'
+          : 'Draft a squad, win up to ' + DRAFT_GAMES + ' in a row',
+      };
   const r = rivalsOf(ut.rivals, weekKey(easternDateKey()));
   const d = divisionOf(r.points);
   const ready = r.rewards.some((x) => !r.claimed.includes(x.id));
-  const rivals: ModeStatus = { view: 'rivals', ready, line: DIVISIONS[d].name + ' · ' + r.points + ' RP · ' + r.w + 'W ' + r.l + 'L' + (ready ? ' · reward ready' : '') };
+  const rivals: ModeStatus = {
+    view: 'rivals',
+    ready,
+    line:
+      DIVISIONS[d].name +
+      ' · ' +
+      r.points +
+      ' RP · ' +
+      r.w +
+      'W ' +
+      r.l +
+      'L' +
+      (ready ? ' · reward ready' : ''),
+  };
+  const lastPlayed = (mode: 'league' | 'circuit' | 'draft', started: number) =>
+    Math.max(
+      started,
+      ...h.history
+        .filter((m) => m.mode === mode && m.at >= started)
+        .map((m) => m.at),
+    );
+  if (league.live) league.lastPlayedAt = lastPlayed('league', s?.at ?? 0);
+  if (c.active) circuit.lastPlayedAt = lastPlayed('circuit', c.active.at);
+  if (run && !run.done) draft.lastPlayedAt = lastPlayed('draft', run.at);
   return { league, battles, circuit, events, moments, draft, rivals };
 }
 
-/** The run to pick back up, most involved first: a Club Season, a Circuit entry, a UT Draft. */
-export function continueRun(st: ReturnType<typeof playStatus>): ModeStatus | null {
-  return [st.league, st.circuit, st.draft].find((m) => m.live) ?? null;
+/** Resume the most recently started/played active run; old fixed order remains the tie fallback. */
+export function continueRun(
+  st: ReturnType<typeof playStatus>,
+): ModeStatus | null {
+  return (
+    [st.league, st.circuit, st.draft]
+      .filter((m) => m.live)
+      .sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0))[0] ?? null
+  );
 }
 
 export const MODE_NAME: Record<string, string> = {
+  cup: 'Club Cups',
   league: 'Club Season',
   battles: 'Squad Battles',
   circuit: 'Champions Circuit',

@@ -133,3 +133,16 @@ Real game components on isolated Chromium profiles, 390px wide, with the existin
 ## Clearer admin navigation — Codex (OpenAI), 2026-11-03
 
 Latest navigation replaces the initial admin layout above: [Home and section shortcuts](admin-nav-home.png), [gift recipients and reward review](admin-gift-review.png). Actual current components in isolated 390px Chromium profiles; no live owner gift was issued. [Flow and verification](../ADMIN-STUDIO.md#navigation-clarity-follow-up--codex-openai-2026-11-03).
+
+
+## Game overhaul and screen fit — Codex (OpenAI), 2026-11-07
+
+Latest real components, isolated test profiles. [Audit and release record](../OVERHAUL-AUDIT.md).
+
+- [Play discovery](next-play.png)
+- [Soccer Club Cups](next-soccer-cup.png)
+- [Real played-match debrief](next-match-debrief.png) — autoplay integration fixture, not a player achievement.
+- [NBA moves and Last Play](next-gameplay.png) — testbench engine, no live accounts or boards.
+- [393×852 screen fit](next-screen-fit.png) — explicit 59/34 safe-area simulation; this is Chromium, not a claim of physical iOS verification.
+
+Full Cup titles in the integration captures are explicitly seeded UI fixtures; normal game settlements, once-only claims and persistence are tested separately.

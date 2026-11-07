@@ -33,6 +33,7 @@ const V: Record<UtView, ViewInfo> = {
   records: { title: 'Club Records', tab: 'hub', parent: 'hub' },
 
   play: { title: 'Play', tab: 'play' },
+  cup: { title: 'Club Cups', tab: 'play', parent: 'play' },
   league: { title: 'Club Season', tab: 'play', parent: 'play' },
   battles: { title: 'Squad Battles', tab: 'play', parent: 'play' },
   circuit: { title: 'Champions Circuit', tab: 'play', parent: 'play' },

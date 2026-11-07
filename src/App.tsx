@@ -3,7 +3,6 @@ import { startNumberedSync } from './ut/numbered-sync';
 import { startCloudSaving } from './lib/cloud-save';
 import { clearCheckpoint, readCheckpoint, writeCheckpoint, SAVE_WARNING } from './lib/recovery';
 import { Recovery } from './evolution/Recovery';
-import { Training } from './evolution/Training';
 import './evolution/evolution.css';
 import React, { useEffect, useRef, useState } from 'react';
 import { DATA_SOURCE, LATEST_SEASON } from './engine/data';
@@ -32,7 +31,7 @@ import { Transition } from './ui/motion';
 import { Draft, type OnlineProps } from './ui/Draft';
 import { type LbStatus, NameSheet, openBoardNext, openOnlineNext } from './ui/Leaderboard';
 import { type Gift, watchGifts } from './net/gifts';
-import { AdminSheet, giftText, withGift } from './ui/Admin';
+import { giftText, withGift } from './net/gift-apply';
 import { GauntletSheet, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, showGlobalRanks, type Tab, Tabs } from './ui/Pages';
 import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
@@ -40,7 +39,7 @@ import { type Room, Search } from './ui/Search';
 import { Binder } from './ui/Binder';
 import { GameCast } from './ui/GameCast';
 import { Gauntlet } from './ui/Gauntlet';
-import { Arcade, arcadeAvailable, type Pens } from './game/Arcade';
+import type { Pens } from './game/Arcade';
 import { aiFavorite, kitsFor } from './game/uniforms';
 import { favoriteFor, shouldAskFavorites } from './lib/favorites';
 import { NO_VOTE, type VoteWire, voteWireOf } from './net/vote';
@@ -83,6 +82,17 @@ function ScreenMissing() {
 /** Ultimate Team, loaded (with its cards) only when it's opened */
 const UltimateTeam = lazyScreen(() => import('./ut/UltimateTeam'));
 const UtMatch = lazyScreen(() => import('./ut/Match'));
+// Codex (OpenAI): evaluate gameplay/owner tools only when entered; gifts still collect in the shell.
+const Arcade = lazyScreen(() => import('./game/Arcade').then(m => ({ default: m.Arcade })));
+const Training = lazyScreen(() => import('./evolution/Training').then(m => ({ default: m.Training })));
+const AdminSheet = lazyScreen(() => import('./ui/Admin').then(m => ({ default: m.AdminSheet })));
+
+function ScreenLoading({ label }: { label: string }) {
+  return <div className="screen ut-loading" role="status" aria-live="polite"><span className="ut-spinner" aria-hidden="true" /><p>{label}</p></div>;
+}
+function AdminLoading({ onClose }: { onClose: () => void }) {
+  return <Sheet label="Admin" onClose={onClose}>{close => <><h2 className="disp">ADMIN</h2><p role="status">Loading your tools…</p><button className="btn" onClick={() => close()}>CANCEL</button></>}</Sheet>;
+}
 
 interface Run {
   saveId?: string;
@@ -802,7 +812,7 @@ export function App() {
     if (r.mode === '1v1') {
       // sim or play, then played out on the field (or simmed), unless the other player already
       // dropped out of the draft (tests: ?autoplay goes straight to the game)
-      if (arcadeAvailable() && !droppedRef.current) {
+      if (!droppedRef.current) {
         setRun(r);
         setScreen(AUTOPLAY ? 'arcade' : 'vote');
         return;
@@ -965,12 +975,12 @@ export function App() {
     );
   } else if (screen === 'training') {
     viewId = 'training'; enter = 'up';
-    body = <Training profile={profile} autoplay={AUTOPLAY} onExit={() => goTab('home')} />;
+    body = <React.Suspense fallback={<ScreenLoading label="Opening Training Camp…" />}><Training profile={profile} autoplay={AUTOPLAY} onExit={() => goTab('home')} /></React.Suspense>;
   } else if (screen === 'ut') {
     viewId = 'ut';
     enter = 'up';
     body = (
-      <React.Suspense fallback={<div className="screen ut" />}>
+      <React.Suspense fallback={<ScreenLoading label="Preparing your club…" />}>
         <UltimateTeam
           profile={profile}
           update={update}
@@ -987,8 +997,8 @@ export function App() {
     viewId = 'utmatch:' + utReq.id;
     enter = 'zoom';
     body = (
-      <React.Suspense fallback={<div className="screen ut" />}>
-        <UtMatch key={utReq.id} req={utReq} profile={profile} update={update} onToast={showToast} onExit={() => setScreen('ut')} onAgain={setUtReq} autoplay={AUTOPLAY} />
+      <React.Suspense fallback={<ScreenLoading label="Preparing your match…" />}>
+        <UtMatch key={utReq.id} req={utReq} profile={profile} update={update} onToast={showToast} onExit={() => setScreen('ut')} onAgain={setUtReq} onPractice={() => setScreen('training')} autoplay={AUTOPLAY} />
       </React.Suspense>
     );
   } else if (screen === 'search') {
@@ -1069,7 +1079,7 @@ export function App() {
     enter = 'zoom';
     body = (
       <div className="screen arcade">
-        <Arcade
+        <React.Suspense fallback={<ScreenLoading label="Preparing the game…" />}><Arcade
           lineup={d.lineup}
           rivalLineup={d.botLineup}
           rivalName={r.online ? r.online.found.opp.name : 'AI ' + r.botLevel.toUpperCase()}
@@ -1090,7 +1100,7 @@ export function App() {
             const botRating = rateTeam(SLOTS.map((s) => d.botLineup[s]));
             finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us, pens });
           }}
-        />
+        /></React.Suspense>
       </div>
     );
   } else if (screen === 'reveal' && run?.season && run.draft) {
@@ -1210,7 +1220,7 @@ export function App() {
           }}
         />
       )}
-      {modal === 'admin' && <AdminSheet profile={profile} update={update} onToast={showToast} onClose={() => setModal(null)} />}
+      {modal === 'admin' && <React.Suspense fallback={<AdminLoading onClose={() => setModal(null)} />}><AdminSheet profile={profile} update={update} onToast={showToast} onClose={() => setModal(null)} /></React.Suspense>}
       {modal === 'admingift' && adminGift && (
         <Sheet label="A gift for you" kind="center" onClose={() => (collectAdminGift(adminGift), setModal(null))}>
           {(close) => (

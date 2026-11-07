@@ -1,3 +1,5 @@
+import { PlayReadout } from '../PlayReadout';
+import { soccerFeedback, type PlayFeedback } from '../play-feedback';
 // Arcade soccer, "Attacks": implemented by Claude (Anthropic), 2026-11-01, on the conventions of
 // Football2.tsx (fixed-step loop, portal over the app, scoreboard, marks, pops, hints, replays).
 // Your eleven attacks the rival's goal seven times (six attacks and one in stoppage time), each a
@@ -101,6 +103,7 @@ export function Soccer2({
   onDone: (p: Progress) => void;
   onShootout?: (r: ShootoutResult) => void;
 }) {
+  const [lastReadout,setLastReadout] = useState<PlayFeedback|null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const match = useMemo(() => {
@@ -296,6 +299,7 @@ export function Soccer2({
 
   /** An attack's whistle: count it, show it, then the next (or the end). */
   const finishAttack = (a: Attack) => {
+    setLastReadout(soccerFeedback(a));
     const e = recordAttack(match, a);
     clearInput();
     onProgress(progress());
@@ -736,6 +740,8 @@ export function Soccer2({
   return createPortal(
     <div className={'arcade-full hg2 sc2' + (wide ? ' wide' : '')} ref={wrapRef} onPointerDown={fieldDown} onPointerUp={fieldUp} onPointerCancel={() => (swipe.current = null)}>
       <canvas ref={canvasRef} className="hg2-canvas" />
+      {!autoplayHook && <PlayReadout readout={lastReadout} live={playing} resetKey={match.i} />}
+
       <div className="hg2-bug" aria-label="Score">
         <span className="us">
           <i>YOU</i>

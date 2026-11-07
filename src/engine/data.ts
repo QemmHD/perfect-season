@@ -1,5 +1,4 @@
-import nbaRaw from '../data/nba.json';
-import nflRaw from '../data/nfl.json';
+import { NBA_RAW as nbaRaw, NFL_RAW as nflRaw } from './sport-raw';
 import { pick } from './sport';
 import { SOCCER_RAW } from './soccer-raw';
 import type { Cell, Line, OppPlayer, Player, PlayoffTeam, Slot } from './types';
