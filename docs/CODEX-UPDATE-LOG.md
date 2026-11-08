@@ -702,3 +702,51 @@ Added own-club Open/Silver/Chemistry Cups across three sports, recent-run Play r
 Detailed source/connection maps and validation: [Cups](OVERHAUL-CUP.md), [Gameplay](OVERHAUL-GAMEPLAY.md), [UX](OVERHAUL-UX.md), [Performance](OVERHAUL-PERFORMANCE.md), [Rewards](OVERHAUL-REWARDS.md), [Screen fit](OVERHAUL-SCREEN-FIT.md), [Integration QA](OVERHAUL-QA.md). Final publication references and checks are recorded in the audit release section.
 
 Overhaul owner-private publication succeeded: source `d4c7a01a44b9075f91dac99ce6e4655122e387c7`, version `appgprj_6ae3270ad3608191af6024b57d2c2939~appgver_05b8c909ff188191b6e1cd74bbb80aa6`, deployment `appgdep_6aef8bc1d7248191b7b3600e1af404ad`. Full tests: NBA 571/46 skipped, NFL 551/78 skipped, Soccer 74 passed; new focused25eachsport and13viewportgeometry cases pass. Real Cup, control, reward, admin and offline-worker browser regressions pass with zero page errors. Main remains `7db37b6`; review branch includes the preserved admin changes. Complete artifact/device limits and final file map: OVERHAUL-AUDIT.md.
+
+
+## Claude review of the Codex overhaul and Admin Studio — Claude (Anthropic), 2026-11-08
+
+Branch `claude/next-review`, from `feature/perfect-season-next` (`6461f8a`); diff reviewed: `git diff origin/main...6461f8a` (main `7db37b6`). Not deployed.
+
+Fixed:
+- **Offline sport switch booted to a blank screen** (`ee2f635`, medium). The overhaul made the NBA/NFL draft datasets on-demand, but the page awaits its sport's dataset (`sport-raw.ts` top-level await) before anything renders. Switching NBA ↔ NFL offline to a sport not yet opened on the new build left `#root` empty, and the choice is persisted, so every offline launch stayed blank. Reproduced with real production service workers (7db37b6 renders; the new build failed with "Failed to fetch dynamically imported module"), for both a fresh install and an installed 7db37b6 user upgrading. `vite.config.ts` now keeps the NBA/NFL draft datasets in the install list (precache 8.79 MB → 11.45 MB, still well under main's 17.6 MB). Each page still imports and parses only its own sport. UT card datasets and Soccer stay on demand. `scripts/qa/startup.mjs` now asserts this and boots the other sport offline.
+- **Club Collection gifts used the sender's sport recipe** (`73b0a5b`, low). An NBA-sent Roster Builder collected in NFL opened with NBA counts (6 silver / 3 gold instead of NFL's 12 / 6). `giftOf` now drops a frozen recipe from another sport so the receiver's own recipe is frozen. There is a regression test in `src/admin/catalog.test.ts`. The `scripts/qa/soccer-app.mjs` selector is also updated for the new Play hub, which now has two "SQUAD BATTLES" buttons.
+
+Checked and found sound:
+- Cups: `settle` rejects sim, stale, replayed and mixed (cup + league/circuit/rung/online) requests before coins, XP or records. Title receipts `cup:<sport>:<week>:<kind>` survive history trimming and late claims. CupView, the inbox and Claim All cannot double-pay. Retiring a run or entering again pays nothing. Daily paid-game caps still apply. Settlement and normalisation also hold across a sport switch, since each sport has its own profile.
+- Profile and cloud save: `ut.cup` is additive and travels in the raw cloud snapshot. No keys, UIDs, levels or XP change.
+- The Pack Tracker runs on every new opening path: Cup prizes and admin/studio packs through `openNow`, admin GOATs through `registeredOpening`.
+- Gameplay and protocols:
+  - Soccer2/Football2 only gain the read-only `PlayReadout`.
+  - The Hoops2 engine change only writes HUD telemetry. No engine logic reads `lastShot.off` or `greened`.
+  - The NBA CROSS/STEP BACK/SPIN buttons call the existing engine moves.
+  - Queue and protocol constants, `pool.print`, ratings and ut-scale are unchanged.
+- Admin:
+  - None of the 11,836 distinct strings in the diff, commit messages and docs derives the owner key, so the owner password is not in any of them.
+  - Legacy gifts keep their legacy tags, and older clients ignore studio gifts.
+  - The registry route validates the owner signature, recipient, namespace, sport, index and edition. Its receipts are per-actor.
+- Service-worker upgrade from 7db37b6: an online upgrade, then offline NBA, renders. Old caches are deleted on activation. Missing old chunks still use the existing reload recovery.
+
+Not fixed. These are noted for the owner:
+- The iOS 26 WebKit 301108 JS workaround and the `styles.css` standalone rules were removed, but the same `min-height` rule still exists inline in `index.html`. This needs a physical installed iPhone check.
+- These problems already exist on main:
+  - A first offline visit to Soccer (or to a UT card set never opened on this build) cannot load. Soccer is a blank screen; UT shows its retry/reload state.
+  - The Live Calendar chip on UT Home is 43 px tall, which `ui-reorg.mjs` flags as a small target.
+  - Killing the app mid-match lets a Cup, Circuit or Season round be replayed.
+
+Validation (Claude, 2026-11-08):
+- `npm run typecheck` and `npm run build` pass.
+- `npm test`: NBA 585 passed / 46 skipped, NFL 552 passed / 78 skipped, Soccer 74 passed.
+- Browser QA passes with zero page errors. All runs used isolated `ns=inspect` profiles, and every non-localhost request was routed to a dead proxy (the registry was verified unreachable):
+  - overhaul (all three sports)
+  - play-discovery
+  - play-feedback
+  - admin-studio
+  - soccer-app
+  - pull-tracker
+  - screen-fit
+  - startup (production build)
+  - a 7db37b6 → new upgrade/offline script
+  - a 320×568 / 390×844 / 430×932 sweep of Home, UT, Play, Cups, Store and Rewards (63 screens, no overflow)
+- `ui-reorg` passes except the existing chip noted above.
+- `admin-registry.mjs`, `cloud*.mjs` and anything that writes to live services were not run.
