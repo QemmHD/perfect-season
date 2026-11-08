@@ -17,6 +17,7 @@ import {
 } from './icons';
 import { continueRun, playStatus, type ModeStatus } from './play-status';
 import './play-hq.css';
+import { ModeArt, SquadFan, useSquadCards } from './play-art';
 import { pickFor } from '../engine/sport';
 import { SectionHead, stagger, Lede, EmptyState } from './ui';
 import { DivisionBadge } from './Rivals';
@@ -177,9 +178,13 @@ export function PlayHQ({
   );
   const st = playStatus(pool, ut, week),
     recent = continueRun(st);
+  const topCards = useSquadCards(pool, ut, 3),
+    stars = topCards.slice(0, 2).map((rc) => rc.line);
   const modes: {
     id: string;
     title: string;
+    /** Claude UI pass: the few words a tile shows (the purpose stays in its accessible name) */
+    tag: string;
     purpose: string;
     session: string;
     team: string;
@@ -192,6 +197,7 @@ export function PlayHQ({
   }[] = [
     {
       id: 'battles',
+      tag: 'Climb the weekly AI ladder',
       title: 'Squad Battles',
       purpose: 'Pick your difficulty and climb the weekly AI ladder.',
       session: 'One match at a time',
@@ -207,6 +213,7 @@ export function PlayHQ({
       ? [
           {
             id: 'cup',
+            tag: 'Three-round knockout',
             title: 'Club Cups',
             purpose:
               'Win three knockout rounds to lift a trophy. A loss ends the run.',
@@ -227,6 +234,11 @@ export function PlayHQ({
       ? [
           {
             id: 'league',
+            tag: pickFor(pool.sport, {
+              nba: '82 games · playoffs',
+              nfl: '17 games · playoffs',
+              soccer: 'Full season',
+            }),
             title: 'Club Season',
             purpose: 'Build a record, scout opponents and chase the playoffs.',
             session: pickFor(pool.sport, {
@@ -244,6 +256,7 @@ export function PlayHQ({
           },
           {
             id: 'events',
+            tag: 'Beat all-time teams',
             title: 'Legends Events',
             purpose: 'Beat themed all-time teams for first-clear pack rewards.',
             session: '3-stage series',
@@ -257,6 +270,7 @@ export function PlayHQ({
           },
           {
             id: 'moments',
+            tag: 'Quick skill scenarios',
             title: 'Moments',
             purpose:
               'Practice a skill in a short scenario and earn its reward.',
@@ -273,6 +287,7 @@ export function PlayHQ({
       : []),
     {
       id: 'circuit',
+      tag: 'Six-game weekly run',
       title: 'Champions Circuit',
       purpose: 'Play all six games; wins build toward weekly milestone prizes.',
       session: '6-match run',
@@ -286,6 +301,7 @@ export function PlayHQ({
     },
     {
       id: 'draft',
+      tag: 'Draft stars · win to keep going',
       title: 'UT Draft',
       purpose: 'Pick a temporary team from star cards. A loss ends the run.',
       session: 'Up to 4 matches',
@@ -304,6 +320,7 @@ export function PlayHQ({
     (!recent || (cupStatus.lastPlayedAt ?? 0) > (recent.lastPlayedAt ?? 0));
   const recommendation = !ut.starterClaimed
     ? {
+        art: 'starter',
         title: 'Start with your free squad',
         line: 'Open the Starter Pack, then build your lineup before your first match.',
         action: 'OPEN STARTER PACK',
@@ -311,6 +328,7 @@ export function PlayHQ({
       }
     : cupResume
       ? {
+          art: 'cup',
           title: 'Continue Club Cups',
           line: cupStatus!.line,
           action: 'CONTINUE BRACKET',
@@ -318,6 +336,7 @@ export function PlayHQ({
         }
       : recent
         ? {
+            art: recent.view,
             title:
               'Continue ' +
               (modes.find((m) => m.id === recent.view)?.title ?? 'your run'),
@@ -327,6 +346,7 @@ export function PlayHQ({
           }
         : onCup && cupStatus?.ready
           ? {
+              art: 'cup',
               title: 'Your Cup result is ready',
               line: cupStatus.line,
               action: 'VIEW CUP RESULT',
@@ -334,12 +354,14 @@ export function PlayHQ({
             }
           : st.draft.ready && st.draft.line.startsWith('Run over')
             ? {
+                art: 'draft',
                 title: 'Your draft rewards are ready',
                 line: st.draft.line,
                 action: 'CLAIM DRAFT REWARDS',
                 go: () => onGo('draft'),
               }
             : {
+                art: 'battles',
                 title: 'Find your rhythm',
                 line: 'Squad Battles is a single match with a difficulty you choose. Start here, then try a run.',
                 action: 'PLAY SQUAD BATTLES',
@@ -350,14 +372,17 @@ export function PlayHQ({
     d = DIVISIONS[division],
     next = DIVISIONS[division + 1];
   const visible = modes.filter((m) => filter === 'all' || m.group === filter);
+  const filters = ['all', 'quick', 'runs', 'online'] as const;
   return (
     <div className="page hq-page up play-discovery">
       <div
         className="play-filter"
         role="group"
         aria-label="Choose a play session"
+        style={{ '--i': filters.indexOf(filter) } as React.CSSProperties}
       >
-        {(['all', 'quick', 'runs', 'online'] as const).map((id) => (
+        <span className="play-filter-ind" aria-hidden="true" />
+        {filters.map((id) => (
           <button
             key={id}
             aria-pressed={filter === id}
@@ -375,10 +400,23 @@ export function PlayHQ({
         ))}
       </div>
       {filter === 'all' && (
-        <div className="play-next">
-          <span className="eyebrow">YOUR NEXT PLAY</span>
-          <b className="disp">{recommendation.title}</b>
-          <p>{recommendation.line}</p>
+        <div className={'play-next rise-in art-' + recommendation.art}>
+          <span className="play-next-art" aria-hidden="true">
+            {recommendation.art === 'battles' && topCards.length ? (
+              <SquadFan cards={topCards} />
+            ) : (
+              <ModeArt
+                id={recommendation.art}
+                stars={stars}
+                sport={pool.sport}
+              />
+            )}
+          </span>
+          <span className="play-next-copy">
+            <span className="eyebrow">YOUR NEXT PLAY</span>
+            <b className="disp">{recommendation.title}</b>
+            <p>{recommendation.line}</p>
+          </span>
           <button className="btn gold" onClick={recommendation.go}>
             <IconPlay size={17} />
             {recommendation.action}
@@ -396,14 +434,17 @@ export function PlayHQ({
                   : 'Solo · against the AI'
             }
           />
-          <div className="play-mode-list">
+          <div className="play-mode-list up-list">
             {visible.map((m, i) => (
               <button
                 key={m.id}
                 className={
                   'hq-mode ut-row play-mode rise-in tone-' +
                   m.tone +
-                  (m.status.live ? ' live' : '')
+                  ' m-' +
+                  m.id +
+                  (m.status.live ? ' live' : '') +
+                  (m.status.ready ? ' ready' : '')
                 }
                 style={stagger(i)}
                 onClick={m.go}
@@ -421,6 +462,9 @@ export function PlayHQ({
                   m.status.line
                 }
               >
+                <span className="play-mode-art" aria-hidden="true">
+                  <ModeArt id={m.id} stars={stars} sport={pool.sport} />
+                </span>
                 <span
                   className="play-mode-icon hq-mode-icon"
                   aria-hidden="true"
@@ -428,25 +472,24 @@ export function PlayHQ({
                   {m.icon}
                 </span>
                 <span className="play-mode-copy">
-                  <b className="disp">{m.title.toUpperCase()}</b>
-                  <span className="play-mode-purpose">{m.purpose}</span>
-                  <span className="play-mode-meta">
-                    {m.session} · {m.team} · {m.difficulty}
-                  </span>
                   {(m.status.live || m.status.ready) && (
-                    <small className="play-mode-status">
+                    <em className="play-mode-flag">
                       {m.status.live
-                        ? 'CONTINUE · '
+                        ? 'CONTINUE'
                         : m.id === 'draft' &&
                             m.status.line.startsWith('Run over')
-                          ? 'CLAIM · '
+                          ? 'CLAIM'
                           : m.id === 'cup'
-                            ? 'RESULT READY · '
+                            ? 'RESULT READY'
                             : m.id === 'draft' || m.id === 'circuit'
-                              ? 'FREE ENTRY · '
-                              : 'REWARD READY · '}
-                      {m.status.line}
-                    </small>
+                              ? 'FREE ENTRY'
+                              : 'REWARD READY'}
+                    </em>
+                  )}
+                  <b className="disp">{m.title.toUpperCase()}</b>
+                  <span className="play-mode-tag">{m.tag}</span>
+                  {(m.status.live || m.status.ready) && (
+                    <small className="play-mode-status">{m.status.line}</small>
                   )}
                 </span>
                 <HQArrow />

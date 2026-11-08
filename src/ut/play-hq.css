@@ -1,144 +1,372 @@
-/* Codex (OpenAI): Play discovery uses the existing sports-card materials and design frame. */
+/* Play hub. Codex (OpenAI) built the discovery structure; Claude (Anthropic), 2026-11-08, restyled it
+   as FC / 2K-style mode tiles: art per mode (play-art.tsx), a featured next-play banner, a sliding
+   session switch and fewer words. Every selector QA relies on (.play-mode, .hq-mode, .ut-row,
+   .up-rivals-top, the filter buttons) is kept. */
+.play-discovery {
+  gap: 12px;
+}
 .play-discovery > * {
   flex-shrink: 0;
 }
+
+/* ---------- session switch: one track, a sliding pill ---------- */
 .play-discovery .play-filter {
+  --i: 0;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 5px;
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(180deg, #071820, #0a222c);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.play-discovery .play-filter-ind {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: calc((100% - 8px) / 4);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #3ff0d9, var(--teal-2));
+  box-shadow:
+    0 4px 14px rgba(25, 227, 201, 0.32),
+    inset 0 1px rgba(255, 255, 255, 0.45);
+  transform: translateX(calc(var(--i) * 100%));
+  transition: transform 0.28s var(--ease-spring);
 }
 .play-discovery .play-filter button {
+  position: relative;
   min-height: 44px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 10px;
-  padding: 8px 3px;
-  background: var(--bg-2);
+  padding: 6px 2px;
+  background: none;
   color: var(--sub);
-  font: 800 10px var(--body);
-  letter-spacing: 0.3px;
+  font: italic 900 11px var(--display);
+  letter-spacing: 0.4px;
+  transition: color 0.2s;
 }
 .play-discovery .play-filter button[aria-pressed='true'] {
-  border-color: var(--teal);
-  color: var(--teal);
-  background: #19e3c910;
+  color: var(--teal-ink);
 }
+
+/* ---------- featured: your next play ---------- */
 .play-discovery .play-next {
-  padding: 17px;
-  border-radius: 17px;
-  border: 1px solid #f4be4b66;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  min-height: 176px;
+  padding: 16px 14px 14px 16px;
+  box-sizing: border-box;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--gold) 65%, transparent);
   background:
-    radial-gradient(100% 150% at 0 0, #f5b83d14, transparent),
-    linear-gradient(135deg, #17303b, #081c25);
+    radial-gradient(90% 120% at 100% 0%, rgba(245, 184, 61, 0.24), transparent 60%),
+    radial-gradient(60% 90% at 85% 55%, rgba(25, 227, 201, 0.14), transparent 70%),
+    linear-gradient(150deg, #2a2410, #0c1f24 62%);
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 12px 30px rgba(0, 0, 0, 0.38);
+}
+.play-discovery .play-next::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 231, 168, 0.13) 45%, transparent 60%);
+  transform: translateX(-100%);
+  animation: uh-sheen 4.5s 0.6s var(--ease-out) infinite;
+  pointer-events: none;
+}
+.play-discovery .play-next-art {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  min-height: 108px;
+  margin: -8px -6px 0 0;
+}
+.play-discovery .play-next-copy {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
+  min-width: 0;
+  align-self: center;
 }
-.play-discovery .play-next > b {
-  font-size: 25px;
-  line-height: 1.05;
+.play-discovery .play-next .eyebrow {
+  font-style: normal;
+  font-size: 10px;
   color: var(--gold);
 }
-.play-discovery .play-next > p {
-  color: var(--sub);
+.play-discovery .play-next-copy > b {
+  font-size: 27px;
+  line-height: 0.95;
+  color: #fff3d1;
+  text-shadow: 0 2px 14px rgba(245, 184, 61, 0.25);
+}
+.play-discovery .play-next-copy > p {
+  margin: 2px 0 0;
+  color: var(--soft);
   font-size: 12px;
-  line-height: 1.5;
-  margin: 0;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .play-discovery .play-next > .btn {
-  min-height: 46px;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-height: 48px;
   flex: none;
-  margin-top: 5px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  font-style: italic;
+  letter-spacing: 0.6px;
+  box-shadow:
+    0 5px 0 #9b6a10,
+    0 10px 20px rgba(0, 0, 0, 0.35);
 }
+.play-discovery .play-next > .btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 2px 0 #9b6a10,
+    0 6px 14px rgba(0, 0, 0, 0.35);
+}
+.play-discovery .play-next > .btn svg {
+  fill: currentColor;
+}
+
+/* ---------- mode tiles ---------- */
 .play-discovery .play-mode-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.play-discovery .play-mode.hq-mode.ut-row {
+  --tone: var(--teal);
+  --tone-bg: #0d2f35;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-.play-discovery .play-mode {
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 0;
   width: 100%;
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 18px;
-  gap: 10px;
-  align-items: center;
+  min-height: 178px;
+  padding: 0;
   box-sizing: border-box;
-  padding: 12px;
-  text-align: left;
-  border-radius: 15px;
-  border: 1px solid var(--line-2);
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--tone) 38%, transparent);
+  background:
+    radial-gradient(110% 80% at 50% 0%, color-mix(in srgb, var(--tone) 20%, transparent), transparent 70%),
+    linear-gradient(170deg, var(--tone-bg), #071a22 72%);
   color: var(--text);
-  background: linear-gradient(155deg, #102e39, #081c25 75%);
+  text-align: left;
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.07),
+    0 8px 20px rgba(0, 0, 0, 0.3);
 }
-.play-discovery .play-mode:active {
-  transform: scale(0.99);
+.play-discovery .play-mode.tone-gold {
+  --tone: var(--gold);
+  --tone-bg: #2a2512;
 }
-.play-discovery .play-mode-icon {
-  --mode-tone: var(--teal);
-  width: 38px;
-  height: 42px;
+.play-discovery .play-mode.tone-violet {
+  --tone: #9b7bff;
+  --tone-bg: #1d1838;
+}
+.play-discovery .play-mode.tone-blue {
+  --tone: #5cb8ff;
+  --tone-bg: #0f2740;
+}
+.play-discovery .play-mode.hq-mode.ut-row:active {
+  transform: scale(0.98);
+  filter: brightness(1.1);
+}
+.play-discovery .play-mode.hq-mode > .play-mode-art {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 116px;
+  display: block;
+  z-index: -1;
+  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
+  mask-image: linear-gradient(180deg, #000 62%, transparent);
+}
+.play-discovery .play-mode.hq-mode > .play-mode-icon {
+  position: absolute;
+  left: 9px;
+  top: 9px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  align-self: start;
-  color: var(--mode-tone);
-  border: 1px solid color-mix(in srgb, var(--mode-tone) 35%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--mode-tone) 9%, transparent);
+  color: var(--tone);
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent);
+  background: rgba(4, 18, 26, 0.6);
 }
-.play-discovery .play-mode.tone-gold .play-mode-icon {
-  --mode-tone: var(--gold);
+.play-discovery .play-mode-icon svg {
+  width: 17px;
+  height: 17px;
 }
-.play-discovery .play-mode.tone-violet .play-mode-icon {
-  --mode-tone: #b48cff;
-}
-.play-discovery .play-mode.tone-blue .play-mode-icon {
-  --mode-tone: #5cb8ff;
-}
-.play-discovery .play-mode-copy {
-  min-width: 0;
+.play-discovery .play-mode.hq-mode > .play-mode-copy {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
+  flex: none;
+  min-width: 0;
+  padding: 0 12px 12px;
 }
-.play-discovery .play-mode-copy > b {
-  font-size: 19px;
-  line-height: 1.05;
+.play-discovery .play-mode.hq-mode .play-mode-copy > b {
+  font-size: 20px;
+  line-height: 0.95;
+  font-style: italic;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
-.play-discovery .play-mode-purpose {
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.35;
+.play-discovery .play-mode-tag {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--soft);
 }
-.play-discovery .play-mode-meta {
-  color: var(--sub);
-  font-size: 10px;
-  line-height: 1.4;
+.play-discovery .play-mode.hq-mode .play-mode-status {
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--tone);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.play-discovery .play-mode-status {
-  color: var(--gold);
-  font-size: 10px;
-  line-height: 1.4;
+.play-discovery .play-mode-flag {
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font: italic 900 10px/1 var(--display);
+  letter-spacing: 0.6px;
+  color: var(--gold-ink);
+  background: var(--gold);
+  box-shadow: 0 0 14px rgba(245, 184, 61, 0.45);
 }
 .play-discovery .play-mode.live {
-  border-color: #19e3c955;
+  border-color: var(--teal);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.07),
+    0 0 0 1px rgba(25, 227, 201, 0.25),
+    0 8px 24px rgba(25, 227, 201, 0.18);
+}
+.play-discovery .play-mode.live .play-mode-flag {
+  color: var(--teal-ink);
+  background: var(--teal);
+  box-shadow: 0 0 14px var(--teal-glow);
+  animation: livepulse 1.8s ease-in-out infinite;
 }
 .play-discovery .play-mode.live .play-mode-status {
   color: var(--teal);
 }
-.play-discovery .play-mode > svg {
-  color: var(--sub);
+.play-discovery .play-mode.hq-mode > svg:last-child {
+  display: none;
+}
+/* An odd count leads with one wide tile (art on the right), so the grid never ends on a hole. */
+.play-discovery .play-mode.hq-mode.ut-row:first-child:nth-last-child(odd) {
+  grid-column: 1 / -1;
+  min-height: 132px;
+  justify-content: center;
+}
+.play-discovery .play-mode.hq-mode:first-child:nth-last-child(odd) > .play-mode-art {
+  left: auto;
+  width: 60%;
+  height: 100%;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 34%);
+  mask-image: linear-gradient(90deg, transparent, #000 34%);
+}
+.play-discovery .play-mode.hq-mode:first-child:nth-last-child(odd) > .play-mode-copy {
+  max-width: 54%;
+  padding: 44px 0 14px 14px;
+}
+.play-discovery .play-mode.hq-mode:first-child:nth-last-child(odd) .play-mode-copy > b {
+  font-size: 25px;
+}
+.play-discovery .play-mode.hq-mode:first-child:nth-last-child(odd) .play-mode-flag {
+  right: auto;
+  left: 46px;
+  top: 12px;
+}
+
+/* ---------- online: Rivals ---------- */
+.play-discovery .up-rivals {
+  position: relative;
+  padding: 14px;
+  border-radius: 20px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(80% 110% at 0% 0%, color-mix(in srgb, var(--division, var(--rival)) 30%, transparent), transparent 62%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 14px),
+    linear-gradient(160deg, #18183a, #081a22 75%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.07),
+    0 10px 26px rgba(0, 0, 0, 0.32);
+}
+.play-discovery .up-rivals-top .division-badge {
+  width: 56px;
+  height: 64px;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--division, var(--rival)) 55%, transparent));
+}
+.play-discovery .up-rivals-top b {
+  font-size: 24px;
+  font-style: italic;
+}
+.play-discovery .up-rivals-top .eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red);
+  vertical-align: 1px;
+  animation: livepulse 1.8s ease-in-out infinite;
 }
 .play-discovery .play-online-note {
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 11.5px;
+  line-height: 1.45;
   color: var(--sub);
   margin: 0;
 }
+.play-discovery .up-find {
+  height: 52px;
+  font-style: italic;
+  font-weight: 900;
+  box-shadow:
+    0 5px 0 #0a7d6e,
+    0 10px 20px rgba(0, 0, 0, 0.35);
+}
+.play-discovery .up-find:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 2px 0 #0a7d6e,
+    0 6px 14px rgba(0, 0, 0, 0.35);
+}
 .play-discovery .play-reward-guide {
   border-top: 1px solid var(--line);
-  margin-top: 7px;
+  margin-top: 4px;
 }
 .play-discovery .play-reward-guide summary {
   min-height: 44px;
@@ -154,10 +382,8 @@
   color: var(--sub);
   margin: 0 0 12px;
 }
-
-/* Retain legacy mode selectors for existing journeys while overriding their old wall layout. */
-.play-discovery .play-mode.hq-mode > .play-mode-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+@media (prefers-reduced-motion: reduce) {
+  .play-discovery .play-next::after {
+    display: none;
+  }
 }

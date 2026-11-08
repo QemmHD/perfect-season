@@ -608,3 +608,56 @@
 .admin-gift > div > .adm-quiet { min-height: 44px; }
 .admin-gift .admin-num { box-sizing: border-box; width: 100%; }
 .admin-gift > div > .adm-quiet { display: inline-flex; align-items: center; }
+
+/* Claude (Anthropic), 2026-11-08, light consistency pass: the Control Room uses the Play hub's
+   materials (solid teal selected pill, beveled tone tiles, italic display labels). */
+.admin-nav {
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(180deg, #071820, #0a222c);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.admin-nav button {
+  border: 0;
+  border-radius: 10px;
+  font: italic 900 10.5px var(--display);
+  letter-spacing: 0.5px;
+}
+.admin-nav button[aria-pressed="true"] {
+  color: var(--teal-ink);
+  background: linear-gradient(180deg, #3ff0d9, var(--teal-2));
+  box-shadow:
+    0 4px 14px rgba(25, 227, 201, 0.28),
+    inset 0 1px rgba(255, 255, 255, 0.45);
+}
+.adm-launch {
+  border-radius: 16px;
+  border-color: var(--line-2);
+  background:
+    radial-gradient(80% 120% at 0% 0%, rgba(25, 227, 201, 0.12), transparent 60%),
+    linear-gradient(160deg, #0f2c38, #081c25 70%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.06),
+    0 8px 20px rgba(0, 0, 0, 0.28);
+}
+.adm-launch > svg:first-child {
+  flex: none;
+  box-sizing: content-box;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(25, 227, 201, 0.35);
+  background: rgba(25, 227, 201, 0.09);
+}
+.adm-launch:active {
+  transform: scale(0.98);
+}
+.adm-arrow {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(25, 227, 201, 0.1);
+}

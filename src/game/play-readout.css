@@ -1,23 +1,34 @@
-/* Codex: optional corner feedback using the existing glass, Archivo and teal HUD tokens. */
+/* Codex: optional corner feedback. Claude (Anthropic), 2026-11-08, UI pass: the same glass, border
+   and Archivo italic as the in-game score bug (.hg2-bug), a compact card that leaves the play and
+   the controls clear, and the NBA dribble moves in the existing beveled violet CROSS material. */
 .play-readout { position:absolute; left:calc(var(--sal) + 12px); bottom:calc(var(--sab) + 173px); z-index:18; pointer-events:auto; }
-.play-readout-toggle { min-height:44px; padding:9px 12px; border:1px solid var(--hud-line); background:var(--hud-surface); border-radius:10px; color:var(--soft); font:800 10px var(--display); letter-spacing:.7px; touch-action:manipulation; }
-.play-readout-toggle span { color:var(--teal); padding-left:7px; }
-.play-readout-card { position:absolute; left:0; bottom:51px; width:min(245px,calc(100vw - 42px)); max-height:min(335px,calc(100vh - 250px)); overflow:auto; box-sizing:border-box; padding:13px; border:1px solid var(--hud-line); border-radius:12px; background:var(--panel); box-shadow:var(--hud-elevation); }
-.play-readout-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.play-readout-heading button { min-width:44px; min-height:44px; color:var(--sub); font:700 24px var(--body); border:0; background:transparent; }
-.play-readout-card > b { display:block; color:var(--gold); font-size:19px; line-height:1.15; overflow-wrap:anywhere; }
-.play-readout-card dl { margin:12px 0; }
-.play-readout-card dl > div { display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line); padding:6px 0; font-size:10px; line-height:1.4; }
-.play-readout-card dt { color:var(--sub); }
-.play-readout-card dd { margin:0; text-align:right; color:var(--text); font-weight:700; }
-.play-readout-card p { font-size:11px; line-height:1.55; margin:9px 0; color:var(--text); }
-.play-readout-card > small { display:block; color:var(--sub); font-size:10px; }
+.play-readout-toggle { display:flex; align-items:center; gap:7px; min-height:44px; padding:8px 12px; border:1px solid rgba(255,255,255,.14); background:rgba(6,10,20,.82); border-radius:22px; color:#fff; font:italic 900 11px var(--display); letter-spacing:.8px; box-shadow:0 6px 18px rgba(0,0,0,.4); touch-action:manipulation; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+.play-readout-mark { color:var(--teal); flex:none; }
+.play-readout-chev { color:var(--sub); flex:none; }
+.play-readout-toggle[aria-expanded='true'] { border-color:rgba(25,227,201,.55); }
+.play-readout-toggle:active { transform:translateY(1px); }
+.play-readout-card { position:absolute; left:0; bottom:52px; width:min(232px,calc(100vw - 42px)); max-height:min(300px,calc(100vh - 260px)); overflow:auto; box-sizing:border-box; padding:4px 6px 10px 12px; border:1px solid rgba(255,255,255,.12); border-top:2px solid var(--teal); border-radius:12px; background:rgba(6,10,20,.9); box-shadow:0 10px 26px rgba(0,0,0,.5); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); animation:pop-in .22s var(--ease-out) both; transform-origin:0 100%; }
+.play-readout-heading { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.play-readout-heading .eyebrow { font-size:9.5px; letter-spacing:1.6px; color:var(--teal); }
+.play-readout-heading button { display:grid; place-items:center; min-width:44px; min-height:44px; margin-right:-4px; color:var(--sub); border:0; background:transparent; }
+.play-readout-card > b { display:block; margin:-4px 6px 0 0; color:var(--gold); font-size:18px; line-height:1.1; overflow-wrap:anywhere; }
+.play-readout-card dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; margin:9px 6px 8px 0; }
+.play-readout-card dl > div { display:flex; flex-direction:column; gap:2px; min-width:0; padding:5px 7px; border-radius:7px; background:rgba(255,255,255,.05); }
+.play-readout-card dt { color:var(--sub); font-size:9px; font-weight:700; line-height:1.25; }
+.play-readout-card dd { margin:0; color:#fff; font:italic 900 12px/1.15 var(--display); overflow-wrap:anywhere; }
+.play-readout-card p { font-size:11px; line-height:1.45; margin:0 6px 0 0; color:var(--soft); }
+.play-readout-card > small { display:block; margin-top:6px; color:var(--sub); font-size:9.5px; }
+/* football between plays: the play-call panel fills the bottom, so the toggle sits under the score bug */
+.arcade-full.fb2:not(.wide):has(.fb2-call) .play-readout { top:calc(var(--sat) + 50px); bottom:auto; }
+.arcade-full.fb2:not(.wide):has(.fb2-call) .play-readout-toggle { padding:8px 11px; }
+.arcade-full.fb2:not(.wide):has(.fb2-call) .play-readout-chev { display:none; }
+.arcade-full.fb2:not(.wide):has(.fb2-call) .play-readout-card { top:52px; bottom:auto; transform-origin:0 0; }
 .arcade-full.wide .play-readout { top:calc(var(--sat) + 84px); bottom:auto; }
-.arcade-full.wide .play-readout-card { left:124px; top:0; bottom:auto; max-height:calc(100vh - 100px - var(--sat) - var(--sab)); }
-.hg2-skills { position:absolute; right:calc(var(--sar) + 14px); bottom:calc(var(--sab) + 184px); display:flex; gap:5px; z-index:12; }
-.hg2-skills button { min-width:49px; min-height:44px; padding:7px; border:1px solid var(--hud-line); background:var(--hud-surface); border-radius:10px; color:var(--soft); font:800 9px var(--display); letter-spacing:.4px; touch-action:manipulation; }
-.hg2-skills button:disabled { opacity:.4; }
-.hg2-skills button:active { color:var(--teal); border-color:var(--teal); }
+.arcade-full.wide .play-readout-card { left:124px; top:0; bottom:auto; max-height:calc(100vh - 100px - var(--sat) - var(--sab)); transform-origin:0 0; }
+.hg2-skills { position:absolute; right:calc(var(--sar) + 14px); bottom:calc(var(--sab) + 184px); display:flex; gap:6px; z-index:12; }
+.hg2-skills button { min-width:52px; min-height:44px; padding:6px 11px; border:0; border-radius:22px; color:#fff; background:radial-gradient(circle at 40% 30%, #8a7cff, #5442d6); box-shadow:0 4px 0 #352a96, 0 7px 14px rgba(0,0,0,.4), inset 0 1px rgba(255,255,255,.3); font:italic 900 10px var(--display); letter-spacing:.5px; text-shadow:0 1px 0 rgba(0,0,0,.35); touch-action:manipulation; }
+.hg2-skills button:disabled { opacity:.42; filter:saturate(.35); }
+.hg2-skills button:active:not(:disabled) { transform:translateY(3px); box-shadow:0 1px 0 #352a96, 0 4px 10px rgba(0,0,0,.4); }
 
 .play-readout button:focus-visible,.hg2-skills button:focus-visible { outline:2px solid var(--teal); outline-offset:2px; }
 
