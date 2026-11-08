@@ -220,7 +220,8 @@ if (run('ut')) {
   // a match: Squad Battles, the first rung (?autoplay plays it)
   await page.locator('.ut-tabs button', { hasText: 'PLAY' }).first().click();
   await wait(page, 800);
-  await page.getByRole('button', { name: /SQUAD BATTLES/ }).click();
+  // Claude review: the overhaul Play hub also has a PLAY SQUAD BATTLES recommendation; open the mode row
+  await page.locator('.play-mode').filter({ hasText: 'SQUAD BATTLES' }).first().click();
   await wait(page, 1200);
   await shot(page, 'soccer-ut-battles');
   await page.getByRole('button', { name: /^Rung 1:/ }).click();

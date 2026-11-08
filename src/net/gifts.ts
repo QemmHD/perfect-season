@@ -220,9 +220,15 @@ export function giftOf(e: Event, admin = ADMIN_PUBKEY): Gift | null {
   const g = contentOf(c);
   if ((g?.packs.goat || g?.player) && (c as { sport?: string }).sport !== SPORT)
     return null;
+  // Claude review 2026-11-08: frozen Club Collection recipes come from the sender's sport catalog
+  // (NFL doubles silver/gold). In another sport the receiver's own recipe is frozen on collection.
+  const sport = (c as { sport?: unknown }).sport;
+  const foreign = typeof sport === "string" && sport !== SPORT;
+  const { recipes, ...rest } = g ?? ({} as GiftContent);
   return (
     g && {
-      ...g,
+      ...rest,
+      ...(recipes && !foreign ? { recipes } : {}),
       ...(g.packs.goat ? { voucherEvent: e } : {}),
       id: "admin:" + id,
       at: e.created_at,

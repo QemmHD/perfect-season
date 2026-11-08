@@ -121,6 +121,38 @@ describe("Codex admin studio " + SPORT, () => {
     expect(g.packs.captains).toBe(1);
     expect(readPackSnapshot(g.recipes!.captains!)?.base).toBe("captains");
   });
+  // Claude review 2026-11-08: a Club Collection recipe frozen in another sport's catalog (NFL doubles
+  // the silver/gold counts) must not be applied to this sport's pack; the receiver's own recipe is used.
+  it("ignores another sport's frozen Club Collection recipe in a shared gift", () => {
+    const sk = new Uint8Array(32).fill(5),
+      pub = getPublicKey(sk),
+      other = SPORT === "nfl" ? "nba" : "nfl",
+      foreign = snapshotPack(other as typeof SPORT, "roster").replace(
+        /:[\d,]+:/,
+        ":" + (SPORT === "nfl" ? "6,3,1,0" : "12,6,1,0") + ":",
+      ),
+      e = finalizeEvent(
+        {
+          kind: KIND_APP,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [["t", "ps1-gift-studio" + NS_SUFFIX]],
+          content: JSON.stringify({
+            id: "foreign123",
+            coins: 0,
+            packs: { roster: 1 },
+            note: "",
+            sport: other,
+            recipes: { roster: foreign },
+          }),
+        },
+        sk,
+      ),
+      g = giftOf(e, pub)!;
+    expect(g.packs.roster).toBe(1);
+    expect(g.recipes?.roster).toBeUndefined();
+    const p = withGift(freshProfile(), g, g.id);
+    expect(p.ut.packs[0].kind).toBe(snapshotPack(SPORT, "roster"));
+  });
   it("adds new gift packs exactly once while preserving every existing profile field", () => {
     const p = freshProfile();
     p.ut.owned = [{ uid: "old", cardId: "old-id", level: 3, xp: 42, at: 1 }];
