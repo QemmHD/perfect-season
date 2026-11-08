@@ -1,167 +1,733 @@
-/* Codex: original UT Archivo, teal/gold, pack foil and readable phone controls. */
+/* Club Cups. Codex (OpenAI) built the screen; Claude (Anthropic), 2026-11-08, restyled it: a trophy
+   per Cup in its own colour (--cup: gold Open, silver Silver, teal Chemistry), a real QF → SF → Final
+   bracket, clear entry rules, pack-art prize and a title moment. Archivo, teal/gold, existing pack art. */
 .cup-page {
-  gap: 14px;
+  --cup: var(--gold);
+  gap: 12px;
 }
 .cup-page > * {
   flex-shrink: 0;
 }
+.cup-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- trophy cabinet ---------- */
 .cup-trophies {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
-  color: var(--gold);
+  gap: 8px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(90deg, #0d2630, #071820);
 }
-.cup-trophies > span {
+.cup-cab-total {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  margin-right: auto;
 }
-.cup-trophies b {
-  font-size: 29px;
-}
-.cup-trophies small {
-  font-size: 8px;
-  line-height: 1.5;
-  color: var(--sub);
-  letter-spacing: 0.7px;
-}
-.cup-trophies > small {
-  margin-left: auto;
-  text-align: right;
-  max-width: 115px;
-}
-.cup-feature {
-  padding: 18px 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: linear-gradient(130deg, #f5b83d0d, var(--panel));
-}
-.cup-feature h2 {
-  margin: 9px 0;
-  font-size: 28px;
+.cup-cab-total b {
+  font-size: 30px;
+  line-height: 1;
   color: var(--gold);
 }
-.cup-feature p {
-  font-size: 12px;
-  line-height: 1.6;
+.cup-cab-total small {
+  font: 800 9px/1.2 var(--body);
+  letter-spacing: 1.2px;
   color: var(--sub);
-  margin: 0;
+  max-width: 64px;
 }
-.cup-eligibility {
+.cup-cab {
   display: flex;
-  gap: 8px;
   align-items: center;
-  margin-top: 13px;
-  font-size: 11px;
-  line-height: 1.5;
+  gap: 3px;
+  min-width: 46px;
+  padding: 3px 6px 3px 3px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.cup-cab b {
+  font-size: 13px;
   color: var(--sub);
 }
-.cup-eligibility.ready {
-  color: var(--teal);
+.cup-cab:not(.won) .cup-trophy {
+  opacity: 0.38;
+  filter: grayscale(0.7);
 }
-.cup-eligibility svg {
-  flex: none;
+.cup-cab.won b {
+  color: var(--text);
 }
-.cup-path {
+
+/* ---------- choose a Cup ---------- */
+.cup-picker {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
-.cup-path > div {
+.cup-pick {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 7px;
-  padding: 15px 4px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 11px;
+  gap: 4px;
+  min-height: 112px;
+  padding: 10px 4px 9px;
+  border-radius: 15px;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(170deg, #0f2a35, #071820 75%);
+  color: var(--sub);
+  transition:
+    transform 0.15s var(--ease-out),
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.cup-pick b {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--soft);
+}
+.cup-pick small {
+  font: 800 8.5px/1.2 var(--body);
+  letter-spacing: 0.8px;
+}
+.cup-pick .cup-trophy {
+  opacity: 0.6;
+  transition:
+    opacity 0.2s,
+    transform 0.25s var(--ease-spring);
+}
+.cup-pick.on {
+  border-color: var(--cup);
+  background:
+    radial-gradient(90% 70% at 50% 25%, color-mix(in srgb, var(--cup) 26%, transparent), transparent 75%),
+    linear-gradient(170deg, #12303a, #071820 75%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cup) 35%, transparent),
+    0 8px 22px color-mix(in srgb, var(--cup) 20%, transparent);
+}
+.cup-pick.on b {
+  color: var(--cup);
+}
+.cup-pick.on small {
+  color: var(--soft);
+}
+.cup-pick.on .cup-trophy {
+  opacity: 1;
+  transform: translateY(-2px) scale(1.08);
+}
+.cup-pick:active {
+  transform: scale(0.97);
+}
+
+/* ---------- featured Cup ---------- */
+.cup-feature {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  align-items: center;
+  column-gap: 6px;
+  padding: 16px 14px 14px 16px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--cup) 55%, transparent);
+  background:
+    radial-gradient(70% 110% at 100% 20%, color-mix(in srgb, var(--cup) 22%, transparent), transparent 65%),
+    linear-gradient(150deg, #15303a, #081b24 70%);
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.07),
+    0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.cup-feature-rays {
+  position: absolute;
+  right: -80px;
+  top: -70px;
+  width: 260px;
+  height: 260px;
+  z-index: -1;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--cup) 16%, transparent) 0deg 8deg, transparent 8deg 22deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 18%, transparent 72%);
+  mask-image: radial-gradient(closest-side, #000 18%, transparent 72%);
+  animation: spin 40s linear infinite;
+}
+.cup-feature-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cup-feature .eyebrow {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--cup);
+}
+.cup-feature h2 {
+  margin: 2px 0 6px;
+  font-size: 29px;
+  line-height: 0.95;
+  color: #fff;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--cup) 45%, transparent);
+}
+.cup-rule-label {
+  font: 900 9px/1 var(--body);
+  letter-spacing: 1.4px;
   color: var(--sub);
 }
-.cup-path b {
-  font-size: 20px;
+.cup-feature p {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--soft);
+  margin: 0;
 }
-.cup-path small {
-  font-size: 9px;
+.cup-feature .cup-feature-trophy {
+  justify-self: center;
+  animation: trophy-in 0.7s var(--ease-spring) both;
 }
-.cup-path span {
-  font-size: 10px;
+.cup-feature > .note {
+  grid-column: 1 / -1;
+  margin: 10px 0 0;
 }
-.cup-path .won {
-  border-color: #13dac933;
+.cup-eligibility {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 8px;
+  margin-top: 12px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 122, 122, 0.4);
+  background: rgba(255, 122, 122, 0.08);
+  color: var(--red);
+}
+.cup-eligibility.ready {
+  border-color: rgba(25, 227, 201, 0.4);
+  background: rgba(25, 227, 201, 0.08);
   color: var(--teal);
 }
-.cup-path .lost {
-  border-color: #ed6a7a55;
-  color: #ed8895;
+.cup-elig-mark {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: currentColor;
 }
-.cup-path .next {
+.cup-elig-mark svg {
+  color: var(--bg);
+  stroke-width: 3;
+}
+.cup-elig-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cup-elig-txt b {
+  font: italic 900 12px/1.1 var(--display);
+  letter-spacing: 0.6px;
+}
+.cup-elig-txt span {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--soft);
+}
+.cup-elig-meter {
+  grid-column: 1 / -1;
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.cup-elig-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: currentColor;
+}
+
+/* ---------- the rules at a glance ---------- */
+.cup-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cup-facts li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 8px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+}
+.cup-facts svg {
+  flex: none;
+  color: var(--cup);
+}
+.cup-facts span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cup-facts b {
+  font: italic 900 10.5px/1.1 var(--display);
+  letter-spacing: 0.3px;
+}
+.cup-facts small {
+  font-size: 9.5px;
+  line-height: 1.25;
+  color: var(--sub);
+}
+
+/* ---------- the bracket: QF (yours + the other one) → SF → Final ---------- */
+.cup-bracket {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) 14px minmax(0, 1fr);
+  padding: 12px 10px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px) 0 0 / 100% 22px,
+    linear-gradient(180deg, #0a222c, #061820);
+}
+.cb-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 22px;
+}
+.cb-round {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font: italic 900 10px/1 var(--display);
+  letter-spacing: 1.2px;
+  color: var(--sub);
+}
+.cb-col.final .cb-round {
+  color: var(--cup);
+}
+.cb-match {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 58px;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: #0b2530;
+}
+.cb-team {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  height: 23px;
+  padding: 0 6px 0 3px;
+  border-radius: 6px;
+  color: var(--sub);
+}
+.cb-crest {
+  width: 4px;
+  height: 15px;
+  border-radius: 2px;
+  background: rgba(155, 123, 255, 0.55);
+}
+.cb-team.cb-you .cb-crest {
+  background: var(--teal);
+  box-shadow: 0 0 6px var(--teal-glow);
+}
+.cb-team em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cb-team b {
+  font: italic 900 14px/1 var(--display);
+}
+.cb-team.cb-you {
+  color: var(--text);
+}
+.cb-team.cb-win {
+  background: rgba(25, 227, 201, 0.1);
+}
+.cb-team.cb-win b {
+  color: var(--teal);
+}
+.cb-team.cb-opp.cb-win {
+  background: rgba(255, 122, 122, 0.1);
+}
+.cb-team.cb-opp.cb-win b {
+  color: var(--red);
+}
+.cb-match.won {
+  border-color: rgba(25, 227, 201, 0.55);
+}
+.cb-match.lost {
+  border-color: rgba(255, 122, 122, 0.55);
+}
+.cb-match.lost .cb-team.cb-you {
+  opacity: 0.6;
+}
+.cb-match.next {
   border-color: var(--gold);
+  box-shadow: 0 0 14px rgba(245, 184, 61, 0.3);
+  animation: cb-next 2.2s ease-in-out infinite;
+}
+@keyframes cb-next {
+  50% {
+    box-shadow: 0 0 22px rgba(245, 184, 61, 0.5);
+  }
+}
+.cb-next {
+  position: absolute;
+  right: -4px;
+  top: -8px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  font: italic 900 8px/1.1 var(--display);
+  letter-spacing: 0.6px;
+  color: var(--gold-ink);
+  background: var(--gold);
+}
+.cb-match.tbd {
+  opacity: 0.55;
+}
+.cb-match.ghost {
+  opacity: 0.32;
+  border-style: dashed;
+  background: transparent;
+}
+.cb-match.ghost .cb-team {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 55%, transparent 55%) 6px 50% / 70% 5px no-repeat;
+}
+.cup-bracket.champion .cb-col.final .cb-match {
+  border-color: var(--cup);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--cup) 45%, transparent);
+}
+/* connectors: the two quarterfinals join into a semifinal, which meets the other half in the Final */
+.cb-link {
+  position: relative;
+}
+.cb-link::before,
+.cb-link::after {
+  content: '';
+  position: absolute;
+}
+.cb-link.qf::before {
+  left: 0;
+  width: 7px;
+  top: 51px;
+  height: 68px;
+  border: 2px solid var(--line-2);
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  box-sizing: border-box;
+}
+.cb-link.qf::after {
+  left: 7px;
+  right: 0;
+  top: 84px;
+  height: 2px;
+  background: var(--line-2);
+}
+.cb-link.sf::before {
+  left: 0;
+  right: 0;
+  top: 84px;
+  height: 2px;
+  background: var(--line-2);
+}
+.cb-link.sf::after {
+  left: 6px;
+  width: 0;
+  top: 86px;
+  height: 44px;
+  border-left: 2px dashed var(--line-2);
+}
+.cup-path:has(.cb-match.won) .cb-link.qf::after,
+.cup-path:has(.cb-col:nth-child(3) .cb-match.won) .cb-link.sf::before {
+  background: var(--teal);
+}
+
+/* ---------- up next: your club vs the round's opponent ---------- */
+.cup-opponent {
+  position: relative;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 92px;
+  align-items: end;
+  min-height: 132px;
+  padding: 12px 6px 10px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  border: 1px solid var(--line-2);
+  background:
+    linear-gradient(105deg, rgba(25, 227, 201, 0.16), transparent 38%, transparent 62%, rgba(155, 123, 255, 0.2)),
+    linear-gradient(180deg, #0d2833, #071820);
+  overflow: hidden;
+}
+.cup-vs-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.cup-vs-side .px-player {
+  width: 96px;
+  height: 104px;
+  margin-bottom: -6px;
+}
+.cup-vs-side.cv-you .px-player {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+}
+.cup-vs-side b {
+  font: italic 900 11px/1 var(--display);
+  letter-spacing: 0.6px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(4, 18, 26, 0.8);
+}
+.cup-vs-side.cv-you b {
+  color: var(--teal);
+}
+.cup-vs-side.cv-them b {
+  color: var(--rival-soft);
+}
+.cup-crest {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  font: italic 900 15px/1 var(--display);
+  background: rgba(255, 255, 255, 0.06);
+}
+.cup-vs-mid {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  min-width: 0;
+}
+.cup-vs-mid .eyebrow {
+  font-style: normal;
+  font-size: 9px;
   color: var(--gold);
 }
+.cup-vs-mid > b {
+  font-size: 19px;
+  line-height: 1;
+}
+.cup-vs-mid > i {
+  font-size: 34px;
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 14px var(--teal-glow),
+    0 2px 0 #032027;
+}
+.cup-vs-mid small {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--sub);
+}
+.cup-go {
+  flex: none;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+}
+.cup-go.primary {
+  box-shadow:
+    0 5px 0 #0a7d6e,
+    0 10px 20px rgba(0, 0, 0, 0.35);
+}
+.cup-go.gold {
+  box-shadow:
+    0 5px 0 #9b6a10,
+    0 10px 20px rgba(0, 0, 0, 0.35);
+}
+.cup-go:active {
+  transform: translateY(3px);
+}
+.cup-go svg {
+  fill: currentColor;
+}
+
+/* ---------- difficulty ---------- */
 .cup-difficulty {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
+  padding: 10px 10px 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.cup-difficulty > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cup-difficulty b {
+  font: italic 900 13px/1 var(--display);
+  letter-spacing: 0.6px;
+}
+.cup-difficulty small {
+  font-size: 10.5px;
   color: var(--sub);
-  font-size: 12px;
 }
 .cup-difficulty select {
   min-height: 44px;
+  min-width: 128px;
   padding: 9px 14px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
+  background: #0d2a35;
+  border: 1px solid var(--line-2);
   border-radius: 10px;
   color: var(--text);
-  font: 600 16px var(--body);
+  font: italic 900 16px var(--display);
 }
-.cup-opponent {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-.cup-opponent b {
-  font-size: 14px;
-}
-.cup-opponent small {
-  font-size: 11px;
-  color: var(--sub);
-  line-height: 1.5;
-}
+
+/* ---------- the prize ---------- */
 .cup-prize {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  padding: 12px 14px 12px 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+  background:
+    radial-gradient(60% 120% at 0% 50%, rgba(245, 184, 61, 0.18), transparent 70%),
+    linear-gradient(150deg, #1d2414, #081b24 70%);
+  overflow: hidden;
 }
-.cup-prize > .ut-pack {
-  width: 42px;
-  height: 61px;
-  font-size: 3.5px;
+.cup-prize-art {
+  position: relative;
   flex: none;
+  width: 66px;
+  display: grid;
+  place-items: center;
 }
-.cup-prize > span:not(.ut-pack) {
+.cup-prize-glow {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(245, 184, 61, 0.2) 0deg 8deg, transparent 8deg 22deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 20%, transparent 70%);
+  mask-image: radial-gradient(closest-side, #000 20%, transparent 70%);
+  animation: spin 30s linear infinite;
+}
+.cup-prize .ut-pack {
+  position: relative;
+  transform: rotate(-6deg);
+}
+.cup-prize-txt {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
 }
-.cup-prize b {
-  font-size: 12px;
+.cup-prize .eyebrow {
+  font-style: normal;
+  font-size: 9.5px;
+  color: var(--gold);
+}
+.cup-prize-txt > b {
+  font: italic 900 17px/1 var(--display);
+}
+.cup-prize-chips,
+.cup-finish-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.cup-prize-chips i,
+.cup-finish-chips i {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--soft);
+  background: rgba(255, 255, 255, 0.06);
+}
+.cup-prize-chips b,
+.cup-finish-chips b {
+  color: var(--text);
 }
 .cup-prize small {
   font-size: 10px;
-  line-height: 1.5;
+  line-height: 1.4;
   color: var(--sub);
+}
+.cup-prize.paid {
+  border-color: rgba(25, 227, 201, 0.4);
+  background: linear-gradient(150deg, #0e2a30, #081b24 70%);
+}
+.cup-prize.paid .eyebrow {
+  color: var(--teal);
+}
+.cup-prize.paid .cup-prize-glow {
+  display: none;
+}
+.cup-prize.paid .ut-pack {
+  filter: saturate(0.5) brightness(0.8);
+}
+.cup-prize-check {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--teal);
+  color: var(--teal-ink);
 }
 .cup-text {
   min-height: 44px;
@@ -173,39 +739,161 @@
   letter-spacing: 0.4px;
   text-decoration: underline;
 }
+
+/* ---------- the result: a title moment, or the next run ---------- */
 .cup-finish {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
   align-items: center;
-  padding: 20px 14px;
-  border: 1px solid #f5b83d55;
-  border-radius: 12px;
+  padding: 18px 16px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(180deg, #0d2630, #071820);
   text-align: center;
-  color: var(--gold);
+  overflow: hidden;
+  isolation: isolate;
+}
+.cup-finish.champion {
+  border-color: var(--cup);
+  background:
+    radial-gradient(80% 55% at 50% 28%, color-mix(in srgb, var(--cup) 34%, transparent), transparent 75%),
+    linear-gradient(180deg, #2a230e, #0a1d24 70%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cup) 30%, transparent),
+    0 14px 36px color-mix(in srgb, var(--cup) 22%, transparent);
+}
+.cup-finish-rays {
+  position: absolute;
+  left: 50%;
+  top: 92px;
+  width: 520px;
+  height: 520px;
+  margin: -260px 0 0 -260px;
+  z-index: -1;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--cup) 22%, transparent) 0deg 7deg, transparent 7deg 20deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 15%, transparent 70%);
+  mask-image: radial-gradient(closest-side, #000 15%, transparent 70%);
+  animation: spin 30s linear infinite;
+}
+.cup-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.cup-finish-stage {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 84px;
+}
+.cup-finish.champion .cup-finish-stage {
+  min-height: 132px;
+}
+.cup-finish-trophy {
+  animation: trophy-in 0.85s var(--ease-spring) 0.1s both;
+}
+.cup-finish.out .cup-finish-trophy {
+  opacity: 0.35;
+  filter: grayscale(0.85);
+}
+.cup-finish-hero {
+  position: absolute;
+  left: -86px;
+  bottom: -8px;
+  width: 104px;
+  height: 113px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.55));
+  animation: rise 0.5s var(--ease-out) 0.45s both;
+}
+.cup-finish .eyebrow {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--sub);
+}
+.cup-finish.champion .eyebrow {
+  color: color-mix(in srgb, var(--cup) 70%, #fff);
 }
 .cup-finish h3 {
   margin: 0;
-  font-size: 24px;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--soft);
+}
+.cup-finish.champion h3 {
+  font-size: 40px;
+  line-height: 0.92;
+  background: linear-gradient(180deg, #fff 10%, color-mix(in srgb, var(--cup) 85%, #fff) 55%, color-mix(in srgb, var(--cup) 80%, #000));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 14px color-mix(in srgb, var(--cup) 45%, transparent));
+  animation: pop-in 0.5s var(--ease-spring) 0.25s both;
 }
 .cup-finish p {
-  color: var(--sub);
+  margin: 0;
+  max-width: 300px;
+  color: var(--soft);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.5;
+}
+.cup-finish-prize {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 2px;
+  padding: 8px 16px 8px 10px;
+  border-radius: 14px;
+  background: rgba(4, 18, 26, 0.55);
+  border: 1px solid rgba(245, 184, 61, 0.35);
+  animation: rise 0.45s var(--ease-out) 0.55s both;
+}
+.cup-finish-prize .ut-pack {
+  width: 62px;
+  height: 88px;
+  font-size: 5.2px;
+  transform: rotate(-6deg);
+  filter: drop-shadow(0 0 12px rgba(245, 184, 61, 0.55));
+}
+.cup-finish-chips {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.cup-finish-chips i {
+  font-size: 13px;
+  padding: 5px 9px;
 }
 .cup-finish > .btn {
   width: 100%;
+  min-height: 52px;
+  flex: none;
+  font-style: italic;
+  font-weight: 900;
 }
+.cup-finish > .btn.gold {
+  box-shadow:
+    0 5px 0 #9b6a10,
+    0 10px 20px rgba(0, 0, 0, 0.35);
+}
+.cup-finish > .btn:active {
+  transform: translateY(3px);
+}
+
+/* ---------- history ---------- */
 .cup-history > div {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 13px 0;
+  padding: 11px 0;
   border-bottom: 1px solid var(--line);
 }
-.cup-history svg {
-  flex: none;
-  color: var(--gold);
+.cup-history > div:not(.o-champion) .cup-trophy {
+  opacity: 0.4;
+  filter: grayscale(0.8);
 }
 .cup-history span {
   flex: 1;
@@ -217,8 +905,47 @@
 }
 .cup-history small {
   display: block;
-  margin-top: 6px;
+  margin-top: 5px;
   font-size: 10px;
   line-height: 1.5;
   color: var(--sub);
+}
+.cup-history strong {
+  font: italic 900 15px var(--display);
+}
+.cup-history .o-champion strong {
+  color: var(--gold);
+}
+.cup-page > .note {
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cup-feature-rays,
+  .cup-finish-rays,
+  .cup-prize-glow,
+  .cup-confetti {
+    display: none;
+  }
+}
+/* the main action stays in reach while the bracket and prize scroll */
+.cup-page > .cup-go {
+  position: sticky;
+  bottom: 6px;
+  z-index: 4;
+}
+.cup-elig-meter i {
+  background: var(--gold);
+}
+.cup-page > .cup-go.primary {
+  box-shadow:
+    0 5px 0 #0a7d6e,
+    0 10px 20px rgba(0, 0, 0, 0.35),
+    0 -6px 18px 8px rgba(4, 18, 26, 0.7);
+}
+.cup-page > .cup-go.gold {
+  box-shadow:
+    0 5px 0 #9b6a10,
+    0 10px 20px rgba(0, 0, 0, 0.35),
+    0 -6px 18px 8px rgba(4, 18, 26, 0.7);
 }

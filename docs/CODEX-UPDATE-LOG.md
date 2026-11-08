@@ -750,3 +750,15 @@ Validation (Claude, 2026-11-08):
   - a 320×568 / 390×844 / 430×932 sweep of Home, UT, Play, Cups, Store and Rewards (63 screens, no overflow)
 - `ui-reorg` passes except the existing chip noted above.
 - `admin-registry.mjs`, `cloud*.mjs` and anything that writes to live services were not run.
+
+## Claude UI pass on the overhaul screens — Claude (Anthropic), 2026-11-08 (branch `claude/next-ui` from `6461f8a`, not deployed)
+
+Owner request: make Codex's new screens feel like the rest of the game (FC / 2K Ultimate Team menus). Presentation only: no reward, settlement, save, odds, physics or queue changes; every button label, route, `aria-*` name and QA selector is kept.
+
+- **Play hub** (`Clubhouse.tsx` PlayHQ markup, `play-hq.css`, new `play-art.tsx`/`play-art.css`): mode tiles with art per mode (your squad's pixel players vs a rival silhouette, the Cup trophy on a bracket, a league table, legend card backs, a stopwatch, the Circuit route, draft card backs), a short tagline instead of three text lines (the full purpose stays in each tile's accessible name), CONTINUE / FREE ENTRY flags, a sliding session switch and a featured next-play banner (your top three cards fanned in real card art). An odd tile count leads with one wide tile. The list keeps `.play-mode.hq-mode.ut-row` and gains `up-list`, which `play-tab.mjs` already waited for.
+- **Club Cups** (`CupView.tsx`, `cup.css`): a trophy SVG per Cup (Open gold, Silver silver, Chemistry teal) in a cabinet and picker, the entry rule and an ELIGIBLE / NOT ELIGIBLE YET badge with a progress bar, three rule chips, a QF → SF → Final bracket built from the saved run (other quarterfinal/semifinal drawn as ghosts), a your-club-vs-rival card, the prize as pack art, a sticky main action, and a title moment (rays, cheering pixel player, the shared `Confetti`, prize pack) that shows first when a run is done.
+- **Match result** (`match-debrief.css`, `MatchDebrief.tsx`; `Match.tsx` only moves the breakdown below the rewards): a broadcast FINAL scoreboard in the score-bug materials, gold WIN with rays, reward tiles that pop in, stat tiles with fill bars for real ratios, a coach's note.
+- **Last Play / NBA moves** (`PlayReadout.tsx` SVG marks instead of text glyphs, `play-readout.css`): the score bug's glass and type, a compact two-column card, football's toggle moves under the score bug while the play-call panel is up; CROSS / STEP BACK / SPIN use the beveled violet CROSS material.
+- **Admin Control Room** (`admin-studio.css`, SVG arrow in `AdminStudio.tsx`): the Play hub's selected pill and tile materials.
+
+Checks: typecheck, `npm test`, build; QA `play-discovery`, `overhaul`, `play-feedback`, `admin-studio`, `ui-consistency`, `league-season` pass; `ui-reorg` reports only the UT Home Season-banner target that fails the same way on `6461f8a`; `play-tab` now passes its 320/390 loops and stops at the 844×390 tab-bar size check (it stopped earlier, on the removed `.up-list`, before this pass). No QA script changed.

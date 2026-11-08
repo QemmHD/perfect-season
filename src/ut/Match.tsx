@@ -1451,12 +1451,6 @@ function ResultView({
             : ''}
         </p>
       )}
-      <MatchDebrief
-        sport={SPORT}
-        ends={out.ends[0]}
-        simulated={out.how === 'sim'}
-        onPractice={onPractice}
-      />
       {setup.event && out.won && (
         <div className="utm-climb rise-in">
           <b className="disp">
@@ -1570,6 +1564,12 @@ function ResultView({
           VIEW REWARD PACKS
         </button>
       )}
+      <MatchDebrief
+        sport={SPORT}
+        ends={out.ends[0]}
+        simulated={out.how === 'sim'}
+        onPractice={onPractice}
+      />
       <div className="spacer" />
       <div className="btnrow utm-btns">
         <button className="btn" onClick={onDone}>
