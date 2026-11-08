@@ -34,7 +34,10 @@ function pwa(version: string): Plugin {
       // install. Runtime cacheFirst retains used files; update.ts also warms pre-worker startup assets.
       // Keep NBA/NFL attrs in install: a first offline draft match must retain its real ratings.
       // Classify using Rollup's source module IDs, never the emitted filename/chunk name.
-      const onDemandModule = /[\\/](?:game[\\/]soccer2[\\/]|game[\\/]pixel[\\/]pitch\.ts|data[\\/](?:cards-)?(?:nba|nfl|soccer)\.json)/;
+      // Claude review 2026-11-08: the NBA/NFL draft datasets stay in install too. The page awaits its
+      // sport's dataset before anything renders, so an offline switch to a sport not yet opened on this
+      // build was a blank screen (main precached both). Only the selected one is still parsed at startup.
+      const onDemandModule = /[\\/](?:game[\\/]soccer2[\\/]|game[\\/]pixel[\\/]pitch\.ts|data[\\/](?:cards-(?:nba|nfl|soccer)|soccer)\.json)/;
       const onDemand = (f: string) => {
         const o = bundle[f];
         if (o.type === 'asset') return /(^|[\\/])soccer-[^\\/]*\.mp3$/.test(f);

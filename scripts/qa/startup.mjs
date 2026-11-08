@@ -27,7 +27,9 @@ try {
     for (const other of ['nba','nfl','soccer'].filter(s => s !== sport)) {
       const file = manifest['src/data/' + other + '.json'].file;
       assert.ok(!loaded.some(p => p.endsWith('/' + file)), 'unused sport not fetched by page');
-      assert.equal(await page.evaluate(async file => !!(await caches.match(new URL(file, location.href).href)), file), false, 'unused sport not precached');
+      // Claude review: NBA/NFL draft data is install-cached so an offline sport switch never boots blank;
+      // soccer's stays on demand (as on main). Neither is parsed by another sport's page.
+      assert.equal(await page.evaluate(async file => !!(await caches.match(new URL(file, location.href).href)), file), other !== 'soccer', other === 'soccer' ? 'soccer data not precached' : 'NBA/NFL draft data precached');
     }
     const admin = manifest['src/ui/Admin.tsx'].file;
     assert.ok(!loaded.some(p => p.endsWith('/' + admin)), 'owner UI not executed at startup');
@@ -45,6 +47,16 @@ try {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'NEXT', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => localStorage.getItem('perfect-season:sport')), sport);
+    // Claude review: switching to the other NBA/NFL sport while offline must still boot the app.
+    if (sport !== 'soccer') {
+      const other = sport === 'nba' ? 'nfl' : 'nba';
+      const plain = new URL(base);
+      plain.search = new URLSearchParams({ ns: 'inspect', relay: 'ws://localhost:7777' });
+      await page.evaluate(s => localStorage.setItem('perfect-season:sport', s), other);
+      await page.goto(plain.href, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: 'NEXT', exact: true }).waitFor();
+      assert.equal(await page.evaluate(() => localStorage.getItem('perfect-season:sport')), other);
+    }
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ sport, selectedOnly: true, initialAdminDeferred: true, offlineAttrs: !!attrs, offlineRelaunch: true, errors }));
     await context.close();
