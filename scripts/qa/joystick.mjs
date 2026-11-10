@@ -89,10 +89,21 @@ try {
     const stick = page.getByRole('group', { name: /Run joystick:/ });
     await stick.waitFor();
     await page.waitForFunction(() => window.__joy.frame?.phase === 'run').catch(async e=>{console.log(JSON.stringify({diagnostic:await frame(),errors,screen:(await page.locator('.arcade-full').innerText()).slice(0,700)}));await shot(page,'joystick-failure-'+width);throw e;});
-    // Starting centered means stopped; only the scripted handoff precedes human control.
+    // Claude (nfl-1): the back takes the handoff and runs on (the momentum carry) until the stick is
+    // touched; the old "untouched means stopped" check was the C-1 bug. A touched, centred stick
+    // still stops him: that is human control.
     await page.waitForTimeout(450);
     let state = await frame();
-    assert.ok(Math.hypot(state.vx, state.vy) < 0.1);
+    assert.ok(Math.hypot(state.vx, state.vy) > 2, 'An untouched carrier keeps running: ' + JSON.stringify(state));
+    {
+      const b = await stick.boundingBox();
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+      await page.mouse.down();
+      await page.waitForTimeout(450);
+      state = await frame();
+      assert.ok(Math.hypot(state.vx, state.vy) < 0.1, 'A touched, centred stick stops the runner: ' + JSON.stringify(state));
+      await page.mouse.up();
+    }
     const boxes = await page.locator('.fb2-stick,.fb2-burst,.fb2-mv').evaluateAll((els) =>
       els.map((el) => {
         const r = el.getBoundingClientRect();

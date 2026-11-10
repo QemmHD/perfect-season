@@ -43,7 +43,12 @@ export interface Pt {
   y: number;
 }
 
-/** Human input is a normalized field vector; numeric/null input retains the AI's lane following. */
+/**
+ * Human input is a normalized field vector (a touched, centred stick is {0,0} and brakes). A number
+ * is the AI's lane. `null` is "nobody is steering": a designed run follows its lane, and any other
+ * carrier (a receiver, a scrambling quarterback) carries his momentum and turns upfield. The screen
+ * sends it for a carrier the player hasn't touched the stick for since he got the ball (nfl-1).
+ */
 export type RunInput = Pt | number | null;
 
 export type Job = 'block' | 'route' | 'rush' | 'man' | 'zone' | 'spy' | 'carry' | 'pursue' | 'qb' | 'idle' | 'track' | 'handoff';
@@ -183,6 +188,8 @@ export interface Play {
   events: string[];
   catcher: Body | null;
   caughtAt: Pt | null;
+  /** when the ball last changed hands (a handoff, a catch, a scramble), for the momentum carry */
+  carrierAt?: number;
   /** where the throw lands (the slingshot's aim), for the HUD */
   aim: Pt | null;
   /** the quarterback is On Fire: he sees the whole arc and throws it quicker */

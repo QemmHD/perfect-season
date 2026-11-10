@@ -1,0 +1,2624 @@
+{
+ "rule": "Per UT slot, a unique-named card at level 1: silver and gold take the 60th-percentile card of that tier by overall, elite the 97th-percentile gold; promo takes the best GOAT, Spotlight, Legend or promo card for the slot (attributes up to 110), falling back to the elite pick where none plays it.",
+ "pinnedFrom": "5745ed6",
+ "tiers": {
+  "silver": {
+   "cards": {
+    "WR1": "nfl:season:2007:00-0011795:CHI",
+    "WR3": "nfl:season:2006:00-0023470:PHI",
+    "TE": "nfl:season:2000:00-0009842:PHI",
+    "WR2": "nfl:season:2006:00-0021191:SF",
+    "LT": "nfl:season:2014:00-0026814:TB",
+    "LG": "nfl:season:2002:00-0011905:JAX",
+    "C": "nfl:season:2007:00-0023461:SEA",
+    "RG": "nfl:season:2002:00-0012991:TEN",
+    "RT": "nfl:season:2014:00-0026984:BAL",
+    "QB": "nfl:season:1997:00-0011434:DET",
+    "RB": "nfl:season:2020:00-0033948:GB",
+    "K": "nfl:season:2018:00-0030098:WAS",
+    "CB1": "nfl:season:2008:00-0022123:CHI",
+    "FS": "nfl:season:2015:00-0027416:DAL",
+    "SS": "nfl:season:2014:00-0030548:SF",
+    "CB2": "nfl:season:2008:00-0022008:BUF",
+    "LB1": "nfl:season:2024:00-0037819:KC",
+    "LB2": "nfl:season:2025:00-0035262:KC",
+    "LB3": "nfl:season:2024:00-0035680:NYJ",
+    "DE1": "nfl:season:1978:SEL679563:TB",
+    "DT1": "nfl:season:1998:00-0001566:MIA",
+    "DT2": "nfl:season:1981:BAU652597:MIA",
+    "DE2": "nfl:season:1978:BAK226054:DET"
+   },
+   "offense": {
+    "qb": {
+     "id": "nfl:season:1997:00-0011434:DET",
+     "name": "Scott Mitchell",
+     "tag": "MITCHELL",
+     "num": null,
+     "ht": 78,
+     "wt": 240,
+     "pos": "QB",
+     "ovr": 70,
+     "a": {
+      "SPD": 43,
+      "ACC": 44,
+      "AGI": 47,
+      "STR": 56,
+      "AWR": 78,
+      "THP": 81,
+      "SAC": 79,
+      "MAC": 77,
+      "DAC": 77,
+      "TUP": 79
+     },
+     "abil": []
+    },
+    "rb": {
+     "id": "nfl:season:2020:00-0033948:GB",
+     "name": "Jamaal Williams",
+     "tag": "WILLIAMS",
+     "num": 30,
+     "ht": 72,
+     "wt": 224,
+     "pos": "RB",
+     "ovr": 70,
+     "a": {
+      "SPD": 88,
+      "ACC": 90,
+      "AGI": 86,
+      "STR": 76,
+      "AWR": 80,
+      "BTK": 77,
+      "TRK": 83,
+      "JKM": 75,
+      "SPM": 78,
+      "SFA": 84,
+      "CAR": 93,
+      "BCV": 78,
+      "CTH": 67
+     },
+     "abil": []
+    },
+    "wr": [
+     {
+      "id": "nfl:season:2007:00-0011795:CHI",
+      "name": "Muhsin Muhammad",
+      "tag": "MUHAMMAD",
+      "num": 87,
+      "ht": 74,
+      "wt": 215,
+      "pos": "WR",
+      "ovr": 70,
+      "a": {
+       "SPD": 85,
+       "ACC": 82,
+       "AGI": 80,
+       "STR": 70,
+       "AWR": 87,
+       "CTH": 86,
+       "RTE": 86,
+       "CIT": 81,
+       "SPC": 77,
+       "REL": 72,
+       "RBK": 45,
+       "BTK": 66,
+       "JKM": 79
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2006:00-0021191:SF",
+      "name": "Antonio Bryant",
+      "tag": "BRYANT",
+      "num": 81,
+      "ht": 73,
+      "wt": 205,
+      "pos": "WR",
+      "ovr": 70,
+      "a": {
+       "SPD": 91,
+       "ACC": 92,
+       "AGI": 90,
+       "STR": 65,
+       "AWR": 77,
+       "CTH": 82,
+       "RTE": 73,
+       "CIT": 73,
+       "SPC": 87,
+       "REL": 76,
+       "RBK": 45,
+       "BTK": 67,
+       "JKM": 82
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2006:00-0023470:PHI",
+      "name": "Reggie Brown",
+      "tag": "BROWN",
+      "num": 86,
+      "ht": 73,
+      "wt": 197,
+      "pos": "WR",
+      "ovr": 70,
+      "a": {
+       "SPD": 90,
+       "ACC": 92,
+       "AGI": 92,
+       "STR": 58,
+       "AWR": 73,
+       "CTH": 83,
+       "RTE": 78,
+       "CIT": 79,
+       "SPC": 82,
+       "REL": 77,
+       "RBK": 31,
+       "BTK": 63,
+       "JKM": 87
+      },
+      "abil": []
+     }
+    ],
+    "te": {
+     "id": "nfl:season:2000:00-0009842:PHI",
+     "name": "Chad Lewis",
+     "tag": "LEWIS",
+     "num": 89,
+     "ht": 78,
+     "wt": 252,
+     "pos": "TE",
+     "ovr": 72,
+     "a": {
+      "SPD": 66,
+      "ACC": 68,
+      "AGI": 67,
+      "STR": 74,
+      "AWR": 81,
+      "CTH": 82,
+      "RTE": 90,
+      "CIT": 88,
+      "SPC": 74,
+      "REL": 82,
+      "RBK": 62,
+      "BTK": 64,
+      "JKM": 64
+     },
+     "abil": []
+    },
+    "ol": [
+     {
+      "id": "nfl:season:2014:00-0026814:TB",
+      "name": "Demar Dotson",
+      "tag": "DOTSON",
+      "num": 69,
+      "ht": 81,
+      "wt": 315,
+      "pos": "OT",
+      "ovr": 70,
+      "a": {
+       "SPD": 49,
+       "ACC": 64,
+       "AGI": 53,
+       "STR": 87,
+       "AWR": 79,
+       "PBK": 88,
+       "RBK": 76,
+       "IBL": 83
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2002:00-0011905:JAX",
+      "name": "Chris Naeole",
+      "tag": "NAEOLE",
+      "num": 65,
+      "ht": 75,
+      "wt": 313,
+      "pos": "OG",
+      "ovr": 70,
+      "a": {
+       "SPD": 42,
+       "ACC": 58,
+       "AGI": 40,
+       "STR": 86,
+       "AWR": 77,
+       "PBK": 83,
+       "RBK": 84,
+       "IBL": 63
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2007:00-0023461:SEA",
+      "name": "Chris Spencer",
+      "tag": "SPENCER",
+      "num": 65,
+      "ht": 75,
+      "wt": 309,
+      "pos": "C",
+      "ovr": 70,
+      "a": {
+       "SPD": 60,
+       "ACC": 77,
+       "AGI": 60,
+       "STR": 88,
+       "AWR": 64,
+       "PBK": 85,
+       "RBK": 84,
+       "IBL": 81
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2002:00-0012991:TEN",
+      "name": "Zach Piller",
+      "tag": "PILLER",
+      "num": 69,
+      "ht": 77,
+      "wt": 330,
+      "pos": "OG",
+      "ovr": 70,
+      "a": {
+       "SPD": 47,
+       "ACC": 71,
+       "AGI": 49,
+       "STR": 89,
+       "AWR": 75,
+       "PBK": 83,
+       "RBK": 85,
+       "IBL": 67
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2014:00-0026984:BAL",
+      "name": "Eugene Monroe",
+      "tag": "MONROE",
+      "num": 60,
+      "ht": 77,
+      "wt": 320,
+      "pos": "OT",
+      "ovr": 70,
+      "a": {
+       "SPD": 62,
+       "ACC": 78,
+       "AGI": 68,
+       "STR": 89,
+       "AWR": 84,
+       "PBK": 87,
+       "RBK": 73,
+       "IBL": 82
+      },
+      "abil": []
+     }
+    ],
+    "k": {
+     "id": "nfl:season:2018:00-0030098:WAS",
+     "name": "Dustin Hopkins",
+     "tag": "HOPKINS",
+     "num": 3,
+     "ht": 74,
+     "wt": 193,
+     "pos": "K",
+     "ovr": 72,
+     "a": {
+      "SPD": 76,
+      "ACC": 82,
+      "AGI": 67,
+      "STR": 61,
+      "AWR": 58,
+      "KAC": 80,
+      "KPW": 91
+     },
+     "abil": []
+    }
+   },
+   "defense": {
+    "dl": [
+     {
+      "id": "nfl:season:1978:SEL679563:TB",
+      "name": "Lee Roy Selmon",
+      "tag": "ROY SELMON",
+      "num": 63,
+      "ht": 75,
+      "wt": 250,
+      "pos": "DE",
+      "ovr": 72,
+      "a": {
+       "SPD": 86,
+       "ACC": 86,
+       "AGI": 84,
+       "STR": 81,
+       "AWR": 92,
+       "PMV": 74,
+       "FMV": 86,
+       "BSH": 72,
+       "TAK": 84,
+       "PUR": 87,
+       "PRC": 95,
+       "HIT": 71
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:1998:00-0001566:MIA",
+      "name": "Tim Bowens",
+      "tag": "BOWENS",
+      "num": 95,
+      "ht": 76,
+      "wt": 317,
+      "pos": "DT",
+      "ovr": 71,
+      "a": {
+       "SPD": 56,
+       "ACC": 69,
+       "AGI": 53,
+       "STR": 90,
+       "AWR": 88,
+       "PMV": 81,
+       "FMV": 62,
+       "BSH": 83,
+       "TAK": 85,
+       "PUR": 70,
+       "PRC": 91,
+       "HIT": 88
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:1981:BAU652597:MIA",
+      "name": "Bob Baumhower",
+      "tag": "BAUMHOWER",
+      "num": 73,
+      "ht": 77,
+      "wt": 258,
+      "pos": "DT",
+      "ovr": 71,
+      "a": {
+       "SPD": 79,
+       "ACC": 85,
+       "AGI": 84,
+       "STR": 81,
+       "AWR": 92,
+       "PMV": 77,
+       "FMV": 77,
+       "BSH": 75,
+       "TAK": 88,
+       "PUR": 89,
+       "PRC": 96,
+       "HIT": 71
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:1978:BAK226054:DET",
+      "name": "Al Baker",
+      "tag": "BAKER",
+      "num": 60,
+      "ht": 78,
+      "wt": 260,
+      "pos": "DE",
+      "ovr": 72,
+      "a": {
+       "SPD": 85,
+       "ACC": 85,
+       "AGI": 84,
+       "STR": 81,
+       "AWR": 94,
+       "PMV": 74,
+       "FMV": 87,
+       "BSH": 73,
+       "TAK": 84,
+       "PUR": 87,
+       "PRC": 97,
+       "HIT": 72
+      },
+      "abil": []
+     }
+    ],
+    "lb": [
+     {
+      "id": "nfl:season:2024:00-0037819:KC",
+      "name": "Leo Chenal",
+      "tag": "CHENAL",
+      "num": 54,
+      "ht": 75,
+      "wt": 261,
+      "pos": "LB",
+      "ovr": 69,
+      "a": {
+       "SPD": 88,
+       "ACC": 93,
+       "AGI": 82,
+       "STR": 82,
+       "AWR": 82,
+       "TAK": 83,
+       "PUR": 85,
+       "PRC": 78,
+       "ZCV": 68,
+       "MCV": 63,
+       "BSH": 80,
+       "PMV": 61,
+       "FMV": 52,
+       "HIT": 89
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2025:00-0035262:KC",
+      "name": "Drue Tranquill",
+      "tag": "TRANQUILL",
+      "num": 23,
+      "ht": 74,
+      "wt": 234,
+      "pos": "LB",
+      "ovr": 69,
+      "a": {
+       "SPD": 87,
+       "ACC": 88,
+       "AGI": 83,
+       "STR": 80,
+       "AWR": 95,
+       "TAK": 79,
+       "PUR": 81,
+       "PRC": 73,
+       "ZCV": 65,
+       "MCV": 59,
+       "BSH": 77,
+       "PMV": 59,
+       "FMV": 61,
+       "HIT": 74
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2024:00-0035680:NYJ",
+      "name": "Quincy Williams",
+      "tag": "WILLIAMS",
+      "num": 56,
+      "ht": 71,
+      "wt": 225,
+      "pos": "LB",
+      "ovr": 69,
+      "a": {
+       "SPD": 88,
+       "ACC": 89,
+       "AGI": 77,
+       "STR": 67,
+       "AWR": 85,
+       "TAK": 86,
+       "PUR": 88,
+       "PRC": 81,
+       "ZCV": 73,
+       "MCV": 64,
+       "BSH": 66,
+       "PMV": 46,
+       "FMV": 55,
+       "HIT": 88
+      },
+      "abil": []
+     }
+    ],
+    "cb": [
+     {
+      "id": "nfl:season:2008:00-0022123:CHI",
+      "name": "Charles Tillman",
+      "tag": "TILLMAN",
+      "num": 33,
+      "ht": 73,
+      "wt": 207,
+      "pos": "CB",
+      "ovr": 70,
+      "a": {
+       "SPD": 82,
+       "ACC": 88,
+       "AGI": 87,
+       "STR": 63,
+       "AWR": 88,
+       "MCV": 86,
+       "ZCV": 76,
+       "PRS": 81,
+       "CTH": 74,
+       "TAK": 81,
+       "HIT": 68,
+       "PRC": 83,
+       "PUR": 86
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2008:00-0022008:BUF",
+      "name": "Terrence McGee",
+      "tag": "MCGEE",
+      "num": 24,
+      "ht": 69,
+      "wt": 195,
+      "pos": "CB",
+      "ovr": 70,
+      "a": {
+       "SPD": 92,
+       "ACC": 95,
+       "AGI": 92,
+       "STR": 59,
+       "AWR": 84,
+       "MCV": 86,
+       "ZCV": 75,
+       "PRS": 77,
+       "CTH": 72,
+       "TAK": 74,
+       "HIT": 62,
+       "PRC": 80,
+       "PUR": 84
+      },
+      "abil": []
+     }
+    ],
+    "s": [
+     {
+      "id": "nfl:season:2015:00-0027416:DAL",
+      "name": "Barry Church",
+      "tag": "CHURCH",
+      "num": 42,
+      "ht": 74,
+      "wt": 218,
+      "pos": "S",
+      "ovr": 70,
+      "a": {
+       "SPD": 86,
+       "ACC": 88,
+       "AGI": 81,
+       "STR": 65,
+       "AWR": 77,
+       "MCV": 61,
+       "ZCV": 73,
+       "PRS": 60,
+       "CTH": 70,
+       "TAK": 86,
+       "HIT": 90,
+       "PRC": 80,
+       "PUR": 87
+      },
+      "abil": [
+       "enforcer"
+      ]
+     },
+     {
+      "id": "nfl:season:2014:00-0030548:SF",
+      "name": "Eric Reid",
+      "tag": "REID",
+      "num": 35,
+      "ht": 73,
+      "wt": 213,
+      "pos": "S",
+      "ovr": 70,
+      "a": {
+       "SPD": 87,
+       "ACC": 94,
+       "AGI": 85,
+       "STR": 63,
+       "AWR": 67,
+       "MCV": 67,
+       "ZCV": 82,
+       "PRS": 69,
+       "CTH": 72,
+       "TAK": 78,
+       "HIT": 92,
+       "PRC": 67,
+       "PUR": 77
+      },
+      "abil": [
+       "enforcer"
+      ]
+     }
+    ]
+   }
+  },
+  "gold": {
+   "cards": {
+    "WR1": "nfl:season:1971:GRI660660:MIN",
+    "WR3": "nfl:season:1971:GIL516304:ARI",
+    "TE": "nfl:season:1991:00-0007753:LV",
+    "WR2": "nfl:season:2025:00-0037238:ATL",
+    "LT": "nfl:season:1992:00-0017094:SF",
+    "LG": "nfl:season:1997:00-0010790:MIN",
+    "C": "nfl:season:1981:FIE766692:NYJ",
+    "RG": "nfl:season:1996:00-0010550:TEN",
+    "RT": "nfl:season:1991:00-0001990:DET",
+    "QB": "nfl:season:1998:00-0005106:GB",
+    "RB": "nfl:season:2010:00-0026195:BAL",
+    "K": "nfl:season:2014:00-0026003:BUF",
+    "CB1": "nfl:season:2009:00-0022914:CAR",
+    "FS": "nfl:season:2012:00-0027762:MIA",
+    "SS": "nfl:season:2012:00-0025513:SF",
+    "CB2": "nfl:season:2009:00-0026156:ARI",
+    "LB1": "nfl:season:2004:00-0012085:DAL",
+    "LB2": "nfl:season:2004:00-0012871:JAX",
+    "LB3": "nfl:season:2004:00-0005082:PIT",
+    "DE1": "nfl:season:2012:00-0027868:TEN",
+    "DT1": "nfl:season:2011:00-0022930:ARI",
+    "DT2": "nfl:season:2011:00-0022073:MIN",
+    "DE2": "nfl:season:2012:00-0027774:CAR"
+   },
+   "offense": {
+    "qb": {
+     "id": "nfl:season:1998:00-0005106:GB",
+     "name": "Brett Favre",
+     "tag": "FAVRE",
+     "num": null,
+     "ht": 74,
+     "wt": 222,
+     "pos": "QB",
+     "ovr": 79,
+     "a": {
+      "SPD": 54,
+      "ACC": 54,
+      "AGI": 62,
+      "STR": 62,
+      "AWR": 87,
+      "THP": 99,
+      "SAC": 89,
+      "MAC": 88,
+      "DAC": 90,
+      "TUP": 73
+     },
+     "abil": [
+      "cannon"
+     ]
+    },
+    "rb": {
+     "id": "nfl:season:2010:00-0026195:BAL",
+     "name": "Ray Rice",
+     "tag": "RICE",
+     "num": 27,
+     "ht": 68,
+     "wt": 206,
+     "pos": "RB",
+     "ovr": 79,
+     "a": {
+      "SPD": 90,
+      "ACC": 98,
+      "AGI": 96,
+      "STR": 84,
+      "AWR": 81,
+      "BTK": 82,
+      "TRK": 76,
+      "JKM": 80,
+      "SPM": 72,
+      "SFA": 72,
+      "CAR": 83,
+      "BCV": 90,
+      "CTH": 87
+     },
+     "abil": []
+    },
+    "wr": [
+     {
+      "id": "nfl:season:1971:GRI660660:MIN",
+      "name": "Bob Grim",
+      "tag": "GRIM",
+      "num": 27,
+      "ht": 72,
+      "wt": 200,
+      "pos": "WR",
+      "ovr": 80,
+      "a": {
+       "SPD": 91,
+       "ACC": 91,
+       "AGI": 91,
+       "STR": 61,
+       "AWR": 89,
+       "CTH": 95,
+       "RTE": 87,
+       "CIT": 84,
+       "SPC": 93,
+       "REL": 82,
+       "RBK": 48,
+       "BTK": 73,
+       "JKM": 79
+      },
+      "abil": [
+       "sure-hands"
+      ]
+     },
+     {
+      "id": "nfl:season:2025:00-0037238:ATL",
+      "name": "Drake London",
+      "tag": "LONDON",
+      "num": 5,
+      "ht": 76,
+      "wt": 215,
+      "pos": "WR",
+      "ovr": 79,
+      "a": {
+       "SPD": 88,
+       "ACC": 92,
+       "AGI": 88,
+       "STR": 77,
+       "AWR": 94,
+       "CTH": 84,
+       "RTE": 86,
+       "CIT": 89,
+       "SPC": 86,
+       "REL": 82,
+       "RBK": 53,
+       "BTK": 76,
+       "JKM": 61
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:1971:GIL516304:ARI",
+      "name": "John Gilliam",
+      "tag": "GILLIAM",
+      "num": null,
+      "ht": 73,
+      "wt": 195,
+      "pos": "WR",
+      "ovr": 80,
+      "a": {
+       "SPD": 93,
+       "ACC": 93,
+       "AGI": 92,
+       "STR": 59,
+       "AWR": 83,
+       "CTH": 93,
+       "RTE": 86,
+       "CIT": 85,
+       "SPC": 99,
+       "REL": 82,
+       "RBK": 46,
+       "BTK": 73,
+       "JKM": 85
+      },
+      "abil": [
+       "deep-threat",
+       "sure-hands"
+      ]
+     }
+    ],
+    "te": {
+     "id": "nfl:season:1991:00-0007753:LV",
+     "name": "Ethan Horton",
+     "tag": "HORTON",
+     "num": 88,
+     "ht": 76,
+     "wt": 240,
+     "pos": "TE",
+     "ovr": 79,
+     "a": {
+      "SPD": 84,
+      "ACC": 85,
+      "AGI": 85,
+      "STR": 74,
+      "AWR": 89,
+      "CTH": 96,
+      "RTE": 94,
+      "CIT": 87,
+      "SPC": 80,
+      "REL": 82,
+      "RBK": 71,
+      "BTK": 62,
+      "JKM": 72
+     },
+     "abil": [
+      "sure-hands"
+     ]
+    },
+    "ol": [
+     {
+      "id": "nfl:season:1992:00-0017094:SF",
+      "name": "Steve Wallace",
+      "tag": "WALLACE",
+      "num": 74,
+      "ht": 76,
+      "wt": 276,
+      "pos": "OT",
+      "ovr": 79,
+      "a": {
+       "SPD": 68,
+       "ACC": 69,
+       "AGI": 72,
+       "STR": 84,
+       "AWR": 91,
+       "PBK": 92,
+       "RBK": 87,
+       "IBL": 78
+      },
+      "abil": [
+       "pocket-wall"
+      ]
+     },
+     {
+      "id": "nfl:season:1997:00-0010790:MIN",
+      "name": "Randall McDaniel",
+      "tag": "MCDANIEL",
+      "num": null,
+      "ht": 75,
+      "wt": 271,
+      "pos": "OG",
+      "ovr": 79,
+      "a": {
+       "SPD": 63,
+       "ACC": 65,
+       "AGI": 48,
+       "STR": 93,
+       "AWR": 93,
+       "PBK": 91,
+       "RBK": 88,
+       "IBL": 78
+      },
+      "abil": [
+       "pocket-wall"
+      ]
+     },
+     {
+      "id": "nfl:season:1981:FIE766692:NYJ",
+      "name": "Joe Fields",
+      "tag": "FIELDS",
+      "num": 65,
+      "ht": 74,
+      "wt": 250,
+      "pos": "C",
+      "ovr": 79,
+      "a": {
+       "SPD": 70,
+       "ACC": 71,
+       "AGI": 72,
+       "STR": 84,
+       "AWR": 91,
+       "PBK": 91,
+       "RBK": 87,
+       "IBL": 78
+      },
+      "abil": [
+       "pocket-wall"
+      ]
+     },
+     {
+      "id": "nfl:season:1996:00-0010550:TEN",
+      "name": "Bruce Matthews",
+      "tag": "MATTHEWS",
+      "num": 74,
+      "ht": 77,
+      "wt": 276,
+      "pos": "OG",
+      "ovr": 79,
+      "a": {
+       "SPD": 43,
+       "ACC": 54,
+       "AGI": 47,
+       "STR": 90,
+       "AWR": 92,
+       "PBK": 91,
+       "RBK": 89,
+       "IBL": 78
+      },
+      "abil": [
+       "pocket-wall"
+      ]
+     },
+     {
+      "id": "nfl:season:1991:00-0001990:DET",
+      "name": "Lomas Brown",
+      "tag": "BROWN",
+      "num": 75,
+      "ht": 76,
+      "wt": 282,
+      "pos": "OT",
+      "ovr": 79,
+      "a": {
+       "SPD": 68,
+       "ACC": 69,
+       "AGI": 72,
+       "STR": 84,
+       "AWR": 91,
+       "PBK": 92,
+       "RBK": 87,
+       "IBL": 78
+      },
+      "abil": [
+       "pocket-wall"
+      ]
+     }
+    ],
+    "k": {
+     "id": "nfl:season:2014:00-0026003:BUF",
+     "name": "Dan Carpenter",
+     "tag": "CARPENTER",
+     "num": 2,
+     "ht": 74,
+     "wt": 220,
+     "pos": "K",
+     "ovr": 77,
+     "a": {
+      "SPD": 58,
+      "ACC": 58,
+      "AGI": 52,
+      "STR": 50,
+      "AWR": 77,
+      "KAC": 90,
+      "KPW": 93
+     },
+     "abil": [
+      "big-leg"
+     ]
+    }
+   },
+   "defense": {
+    "dl": [
+     {
+      "id": "nfl:season:2012:00-0027868:TEN",
+      "name": "Derrick Morgan",
+      "tag": "MORGAN",
+      "num": 91,
+      "ht": 75,
+      "wt": 278,
+      "pos": "DE",
+      "ovr": 79,
+      "a": {
+       "SPD": 75,
+       "ACC": 76,
+       "AGI": 74,
+       "STR": 83,
+       "AWR": 77,
+       "PMV": 99,
+       "FMV": 78,
+       "BSH": 86,
+       "TAK": 79,
+       "PUR": 86,
+       "PRC": 78,
+       "HIT": 75
+      },
+      "abil": [
+       "edge-threat"
+      ]
+     },
+     {
+      "id": "nfl:season:2011:00-0022930:ARI",
+      "name": "Darnell Dockett",
+      "tag": "DOCKETT",
+      "num": 90,
+      "ht": 76,
+      "wt": 301,
+      "pos": "DT",
+      "ovr": 79,
+      "a": {
+       "SPD": 73,
+       "ACC": 88,
+       "AGI": 70,
+       "STR": 91,
+       "AWR": 80,
+       "PMV": 94,
+       "FMV": 85,
+       "BSH": 87,
+       "TAK": 82,
+       "PUR": 89,
+       "PRC": 71,
+       "HIT": 69
+      },
+      "abil": [
+       "edge-threat"
+      ]
+     },
+     {
+      "id": "nfl:season:2011:00-0022073:MIN",
+      "name": "Kevin Williams",
+      "tag": "WILLIAMS",
+      "num": 93,
+      "ht": 77,
+      "wt": 304,
+      "pos": "DT",
+      "ovr": 79,
+      "a": {
+       "SPD": 70,
+       "ACC": 86,
+       "AGI": 68,
+       "STR": 91,
+       "AWR": 92,
+       "PMV": 90,
+       "FMV": 76,
+       "BSH": 93,
+       "TAK": 87,
+       "PUR": 80,
+       "PRC": 85,
+       "HIT": 67
+      },
+      "abil": [
+       "edge-threat",
+       "run-stopper"
+      ]
+     },
+     {
+      "id": "nfl:season:2012:00-0027774:CAR",
+      "name": "Greg Hardy",
+      "tag": "HARDY",
+      "num": 76,
+      "ht": 76,
+      "wt": 277,
+      "pos": "DE",
+      "ovr": 79,
+      "a": {
+       "SPD": 76,
+       "ACC": 77,
+       "AGI": 78,
+       "STR": 84,
+       "AWR": 78,
+       "PMV": 98,
+       "FMV": 76,
+       "BSH": 84,
+       "TAK": 86,
+       "PUR": 88,
+       "PRC": 80,
+       "HIT": 64
+      },
+      "abil": [
+       "edge-threat"
+      ]
+     }
+    ],
+    "lb": [
+     {
+      "id": "nfl:season:2004:00-0012085:DAL",
+      "name": "Dat Nguyen",
+      "tag": "NGUYEN",
+      "num": 59,
+      "ht": 71,
+      "wt": 243,
+      "pos": "LB",
+      "ovr": 78,
+      "a": {
+       "SPD": 81,
+       "ACC": 85,
+       "AGI": 79,
+       "STR": 75,
+       "AWR": 91,
+       "TAK": 91,
+       "PUR": 87,
+       "PRC": 84,
+       "ZCV": 84,
+       "MCV": 74,
+       "BSH": 81,
+       "PMV": 58,
+       "FMV": 57,
+       "HIT": 79
+      },
+      "abil": []
+     },
+     {
+      "id": "nfl:season:2004:00-0012871:JAX",
+      "name": "Mike Peterson",
+      "tag": "PETERSON",
+      "num": 54,
+      "ht": 74,
+      "wt": 229,
+      "pos": "LB",
+      "ovr": 78,
+      "a": {
+       "SPD": 85,
+       "ACC": 88,
+       "AGI": 87,
+       "STR": 72,
+       "AWR": 88,
+       "TAK": 95,
+       "PUR": 95,
+       "PRC": 86,
+       "ZCV": 70,
+       "MCV": 61,
+       "BSH": 76,
+       "PMV": 72,
+       "FMV": 77,
+       "HIT": 73
+      },
+      "abil": [
+       "run-stopper"
+      ]
+     },
+     {
+      "id": "nfl:season:2004:00-0005082:PIT",
+      "name": "James Farrior",
+      "tag": "FARRIOR",
+      "num": 51,
+      "ht": 74,
+      "wt": 239,
+      "pos": "LB",
+      "ovr": 78,
+      "a": {
+       "SPD": 79,
+       "ACC": 82,
+       "AGI": 80,
+       "STR": 80,
+       "AWR": 86,
+       "TAK": 91,
+       "PUR": 83,
+       "PRC": 87,
+       "ZCV": 88,
+       "MCV": 78,
+       "BSH": 83,
+       "PMV": 69,
+       "FMV": 70,
+       "HIT": 81
+      },
+      "abil": []
+     }
+    ],
+    "cb": [
+     {
+      "id": "nfl:season:2009:00-0022914:CAR",
+      "name": "Chris Gamble",
+      "tag": "GAMBLE",
+      "num": 20,
+      "ht": 73,
+      "wt": 181,
+      "pos": "CB",
+      "ovr": 78,
+      "a": {
+       "SPD": 92,
+       "ACC": 94,
+       "AGI": 95,
+       "STR": 65,
+       "AWR": 80,
+       "MCV": 94,
+       "ZCV": 88,
+       "PRS": 87,
+       "CTH": 73,
+       "TAK": 54,
+       "HIT": 46,
+       "PRC": 74,
+       "PUR": 77
+      },
+      "abil": [
+       "shutdown"
+      ]
+     },
+     {
+      "id": "nfl:season:2009:00-0026156:ARI",
+      "name": "Dominique Rodgers-Cromartie",
+      "tag": "RODGERS-CROM",
+      "num": 29,
+      "ht": 74,
+      "wt": 182,
+      "pos": "CB",
+      "ovr": 78,
+      "a": {
+       "SPD": 98,
+       "ACC": 98,
+       "AGI": 98,
+       "STR": 51,
+       "AWR": 76,
+       "MCV": 96,
+       "ZCV": 87,
+       "PRS": 62,
+       "CTH": 78,
+       "TAK": 49,
+       "HIT": 50,
+       "PRC": 79,
+       "PUR": 66
+      },
+      "abil": [
+       "shutdown"
+      ]
+     }
+    ],
+    "s": [
+     {
+      "id": "nfl:season:2012:00-0027762:MIA",
+      "name": "Reshad Jones",
+      "tag": "JONES",
+      "num": 20,
+      "ht": 73,
+      "wt": 214,
+      "pos": "S",
+      "ovr": 78,
+      "a": {
+       "SPD": 86,
+       "ACC": 89,
+       "AGI": 85,
+       "STR": 72,
+       "AWR": 76,
+       "MCV": 73,
+       "ZCV": 93,
+       "PRS": 53,
+       "CTH": 68,
+       "TAK": 87,
+       "HIT": 91,
+       "PRC": 78,
+       "PUR": 91
+      },
+      "abil": [
+       "enforcer"
+      ]
+     },
+     {
+      "id": "nfl:season:2012:00-0025513:SF",
+      "name": "Dashon Goldson",
+      "tag": "GOLDSON",
+      "num": 38,
+      "ht": 74,
+      "wt": 200,
+      "pos": "S",
+      "ovr": 78,
+      "a": {
+       "SPD": 87,
+       "ACC": 95,
+       "AGI": 88,
+       "STR": 67,
+       "AWR": 83,
+       "MCV": 72,
+       "ZCV": 91,
+       "PRS": 57,
+       "CTH": 80,
+       "TAK": 78,
+       "HIT": 98,
+       "PRC": 84,
+       "PUR": 82
+      },
+      "abil": [
+       "enforcer"
+      ]
+     }
+    ]
+   }
+  },
+  "elite": {
+   "cards": {
+    "WR1": "nfl:season:2014:00-0027793:PIT",
+    "WR3": "nfl:season:1990:00-0013639:SF",
+    "TE": "nfl:season:2025:00-0033288:SF",
+    "WR2": "nfl:season:1981:JEN129775:ATL",
+    "LT": "nfl:season:1998:00-0000217:DAL",
+    "LG": "nfl:season:2014:00-0026275:GB",
+    "C": "nfl:season:2003:00-0010577:NYJ",
+    "RG": "nfl:season:2013:00-0023514:PHI",
+    "RT": "nfl:season:1997:00-0012322:BAL",
+    "QB": "nfl:season:2022:00-0033873:KC",
+    "RB": "nfl:season:1988:00-0003602:SF",
+    "K": "nfl:season:2000:00-0006223:TB",
+    "CB1": "nfl:season:1989:00-0000204:PHI",
+    "FS": "nfl:season:1985:00-0015146:DEN",
+    "SS": "nfl:season:2015:00-0030459:ARI",
+    "CB2": "nfl:season:1987:00-0011042:DET",
+    "LB1": "nfl:season:1984:00-0016128:NYG",
+    "LB2": "nfl:season:1978:BRA809796:TEN",
+    "LB3": "nfl:season:2024:00-0034815:SF",
+    "DE1": "nfl:season:1996:00-0015111:BUF",
+    "DT1": "nfl:season:2010:00-0024227:BAL",
+    "DT2": "nfl:season:2007:00-0022073:MIN",
+    "DE2": "nfl:season:1998:00-0017567:GB"
+   },
+   "offense": {
+    "qb": {
+     "id": "nfl:season:2022:00-0033873:KC",
+     "name": "Patrick Mahomes",
+     "tag": "MAHOMES",
+     "num": 15,
+     "ht": 74,
+     "wt": 225,
+     "pos": "QB",
+     "ovr": 88,
+     "a": {
+      "SPD": 84,
+      "ACC": 87,
+      "AGI": 88,
+      "STR": 70,
+      "AWR": 99,
+      "THP": 97,
+      "SAC": 99,
+      "MAC": 95,
+      "DAC": 93,
+      "TUP": 99
+     },
+     "abil": [
+      "cannon",
+      "surgeon"
+     ]
+    },
+    "rb": {
+     "id": "nfl:season:1988:00-0003602:SF",
+     "name": "Roger Craig",
+     "tag": "CRAIG",
+     "num": 33,
+     "ht": 72,
+     "wt": 222,
+     "pos": "RB",
+     "ovr": 86,
+     "a": {
+      "SPD": 88,
+      "ACC": 89,
+      "AGI": 87,
+      "STR": 73,
+      "AWR": 95,
+      "BTK": 92,
+      "TRK": 84,
+      "JKM": 93,
+      "SPM": 83,
+      "SFA": 80,
+      "CAR": 99,
+      "BCV": 99,
+      "CTH": 91
+     },
+     "abil": [
+      "juke-box"
+     ]
+    },
+    "wr": [
+     {
+      "id": "nfl:season:2014:00-0027793:PIT",
+      "name": "Antonio Brown",
+      "tag": "BROWN",
+      "num": 84,
+      "ht": 70,
+      "wt": 185,
+      "pos": "WR",
+      "ovr": 86,
+      "a": {
+       "SPD": 90,
+       "ACC": 91,
+       "AGI": 97,
+       "STR": 49,
+       "AWR": 96,
+       "CTH": 99,
+       "RTE": 99,
+       "CIT": 97,
+       "SPC": 92,
+       "REL": 86,
+       "RBK": 49,
+       "BTK": 64,
+       "JKM": 94
+      },
+      "abil": [
+       "sure-hands",
+       "red-zone"
+      ]
+     },
+     {
+      "id": "nfl:season:1981:JEN129775:ATL",
+      "name": "Alfred Jenkins",
+      "tag": "JENKINS",
+      "num": 84,
+      "ht": 70,
+      "wt": 170,
+      "pos": "WR",
+      "ovr": 86,
+      "a": {
+       "SPD": 79,
+       "ACC": 79,
+       "AGI": 99,
+       "STR": 52,
+       "AWR": 94,
+       "CTH": 99,
+       "RTE": 99,
+       "CIT": 87,
+       "SPC": 99,
+       "REL": 97,
+       "RBK": 38,
+       "BTK": 67,
+       "JKM": 95
+      },
+      "abil": [
+       "sure-hands"
+      ]
+     },
+     {
+      "id": "nfl:season:1990:00-0013639:SF",
+      "name": "Jerry Rice",
+      "tag": "RICE",
+      "num": 80,
+      "ht": 74,
+      "wt": 200,
+      "pos": "WR",
+      "ovr": 86,
+      "a": {
+       "SPD": 92,
+       "ACC": 94,
+       "AGI": 93,
+       "STR": 61,
+       "AWR": 94,
+       "CTH": 99,
+       "RTE": 96,
+       "CIT": 96,
+       "SPC": 99,
+       "REL": 89,
+       "RBK": 48,
+       "BTK": 78,
+       "JKM": 78
+      },
+      "abil": [
+       "sure-hands",
+       "red-zone"
+      ]
+     }
+    ],
+    "te": {
+     "id": "nfl:season:2025:00-0033288:SF",
+     "name": "George Kittle",
+     "tag": "KITTLE",
+     "num": 85,
+     "ht": 76,
+     "wt": 250,
+     "pos": "TE",
+     "ovr": 83,
+     "a": {
+      "SPD": 87,
+      "ACC": 86,
+      "AGI": 83,
+      "STR": 82,
+      "AWR": 96,
+      "CTH": 99,
+      "RTE": 97,
+      "CIT": 88,
+      "SPC": 71,
+      "REL": 84,
+      "RBK": 76,
+      "BTK": 68,
+      "JKM": 65
+     },
+     "abil": [
+      "sure-hands"
+     ]
+    },
+    "ol": [
+     {
+      "id": "nfl:season:1998:00-0000217:DAL",
+      "name": "Larry Allen",
+      "tag": "ALLEN",
+      "num": null,
+      "ht": 75,
+      "wt": 325,
+      "pos": "OT",
+      "ovr": 87,
+      "a": {
+       "SPD": 58,
+       "ACC": 60,
+       "AGI": 54,
+       "STR": 98,
+       "AWR": 96,
+       "PBK": 96,
+       "RBK": 98,
+       "IBL": 91
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     },
+     {
+      "id": "nfl:season:2014:00-0026275:GB",
+      "name": "Josh Sitton",
+      "tag": "SITTON",
+      "num": 71,
+      "ht": 75,
+      "wt": 322,
+      "pos": "OG",
+      "ovr": 86,
+      "a": {
+       "SPD": 61,
+       "ACC": 77,
+       "AGI": 61,
+       "STR": 92,
+       "AWR": 95,
+       "PBK": 99,
+       "RBK": 91,
+       "IBL": 87
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     },
+     {
+      "id": "nfl:season:2003:00-0010577:NYJ",
+      "name": "Kevin Mawae",
+      "tag": "MAWAE",
+      "num": 68,
+      "ht": 76,
+      "wt": 288,
+      "pos": "C",
+      "ovr": 85,
+      "a": {
+       "SPD": 57,
+       "ACC": 87,
+       "AGI": 53,
+       "STR": 90,
+       "AWR": 98,
+       "PBK": 97,
+       "RBK": 93,
+       "IBL": 84
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     },
+     {
+      "id": "nfl:season:2013:00-0023514:PHI",
+      "name": "Evan Mathis",
+      "tag": "MATHIS",
+      "num": 69,
+      "ht": 77,
+      "wt": 304,
+      "pos": "OG",
+      "ovr": 86,
+      "a": {
+       "SPD": 67,
+       "ACC": 79,
+       "AGI": 65,
+       "STR": 85,
+       "AWR": 94,
+       "PBK": 91,
+       "RBK": 99,
+       "IBL": 93
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     },
+     {
+      "id": "nfl:season:1997:00-0012322:BAL",
+      "name": "Jonathan Ogden",
+      "tag": "OGDEN",
+      "num": 75,
+      "ht": 80,
+      "wt": 318,
+      "pos": "OT",
+      "ovr": 87,
+      "a": {
+       "SPD": 62,
+       "ACC": 67,
+       "AGI": 57,
+       "STR": 98,
+       "AWR": 97,
+       "PBK": 97,
+       "RBK": 97,
+       "IBL": 89
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     }
+    ],
+    "k": {
+     "id": "nfl:season:2000:00-0006223:TB",
+     "name": "Martin Gramatica",
+     "tag": "GRAMATICA",
+     "num": 7,
+     "ht": 68,
+     "wt": 170,
+     "pos": "K",
+     "ovr": 85,
+     "a": {
+      "SPD": 50,
+      "ACC": 50,
+      "AGI": 42,
+      "STR": 10,
+      "AWR": 91,
+      "KAC": 92,
+      "KPW": 97
+     },
+     "abil": [
+      "big-leg"
+     ]
+    }
+   },
+   "defense": {
+    "dl": [
+     {
+      "id": "nfl:season:1996:00-0015111:BUF",
+      "name": "Bruce Smith",
+      "tag": "SMITH",
+      "num": null,
+      "ht": 76,
+      "wt": 275,
+      "pos": "DE",
+      "ovr": 85,
+      "a": {
+       "SPD": 80,
+       "ACC": 91,
+       "AGI": 80,
+       "STR": 95,
+       "AWR": 96,
+       "PMV": 95,
+       "FMV": 99,
+       "BSH": 92,
+       "TAK": 97,
+       "PUR": 95,
+       "PRC": 99,
+       "HIT": 77
+      },
+      "abil": [
+       "edge-threat",
+       "run-stopper"
+      ]
+     },
+     {
+      "id": "nfl:season:2010:00-0024227:BAL",
+      "name": "Haloti Ngata",
+      "tag": "NGATA",
+      "num": 92,
+      "ht": 76,
+      "wt": 340,
+      "pos": "DT",
+      "ovr": 85,
+      "a": {
+       "SPD": 68,
+       "ACC": 81,
+       "AGI": 70,
+       "STR": 99,
+       "AWR": 92,
+       "PMV": 99,
+       "FMV": 86,
+       "BSH": 98,
+       "TAK": 95,
+       "PUR": 79,
+       "PRC": 96,
+       "HIT": 90
+      },
+      "abil": [
+       "edge-threat",
+       "run-stopper",
+       "enforcer"
+      ]
+     },
+     {
+      "id": "nfl:season:2007:00-0022073:MIN",
+      "name": "Kevin Williams",
+      "tag": "WILLIAMS",
+      "num": 93,
+      "ht": 77,
+      "wt": 304,
+      "pos": "DT",
+      "ovr": 85,
+      "a": {
+       "SPD": 71,
+       "ACC": 88,
+       "AGI": 68,
+       "STR": 92,
+       "AWR": 79,
+       "PMV": 97,
+       "FMV": 96,
+       "BSH": 97,
+       "TAK": 81,
+       "PUR": 80,
+       "PRC": 83,
+       "HIT": 67
+      },
+      "abil": [
+       "edge-threat",
+       "run-stopper"
+      ]
+     },
+     {
+      "id": "nfl:season:1998:00-0017567:GB",
+      "name": "Reggie White",
+      "tag": "WHITE",
+      "num": null,
+      "ht": 77,
+      "wt": 285,
+      "pos": "DE",
+      "ovr": 85,
+      "a": {
+       "SPD": 74,
+       "ACC": 84,
+       "AGI": 68,
+       "STR": 99,
+       "AWR": 95,
+       "PMV": 98,
+       "FMV": 97,
+       "BSH": 92,
+       "TAK": 92,
+       "PUR": 84,
+       "PRC": 99,
+       "HIT": 81
+      },
+      "abil": [
+       "edge-threat",
+       "run-stopper"
+      ]
+     }
+    ],
+    "lb": [
+     {
+      "id": "nfl:season:1984:00-0016128:NYG",
+      "name": "Lawrence Taylor",
+      "tag": "TAYLOR",
+      "num": 56,
+      "ht": 75,
+      "wt": 237,
+      "pos": "LB",
+      "ovr": 86,
+      "a": {
+       "SPD": 90,
+       "ACC": 94,
+       "AGI": 87,
+       "STR": 90,
+       "AWR": 94,
+       "TAK": 99,
+       "PUR": 99,
+       "PRC": 95,
+       "ZCV": 83,
+       "MCV": 74,
+       "BSH": 89,
+       "PMV": 74,
+       "FMV": 75,
+       "HIT": 85
+      },
+      "abil": [
+       "run-stopper"
+      ]
+     },
+     {
+      "id": "nfl:season:1978:BRA809796:TEN",
+      "name": "Robert Brazile",
+      "tag": "BRAZILE",
+      "num": 52,
+      "ht": 76,
+      "wt": 235,
+      "pos": "LB",
+      "ovr": 86,
+      "a": {
+       "SPD": 85,
+       "ACC": 85,
+       "AGI": 85,
+       "STR": 76,
+       "AWR": 94,
+       "TAK": 99,
+       "PUR": 99,
+       "PRC": 96,
+       "ZCV": 84,
+       "MCV": 75,
+       "BSH": 89,
+       "PMV": 75,
+       "FMV": 79,
+       "HIT": 84
+      },
+      "abil": [
+       "run-stopper"
+      ]
+     },
+     {
+      "id": "nfl:season:2024:00-0034815:SF",
+      "name": "Fred Warner",
+      "tag": "WARNER",
+      "num": 54,
+      "ht": 75,
+      "wt": 230,
+      "pos": "LB",
+      "ovr": 85,
+      "a": {
+       "SPD": 88,
+       "ACC": 91,
+       "AGI": 83,
+       "STR": 80,
+       "AWR": 99,
+       "TAK": 93,
+       "PUR": 99,
+       "PRC": 99,
+       "ZCV": 88,
+       "MCV": 77,
+       "BSH": 81,
+       "PMV": 52,
+       "FMV": 62,
+       "HIT": 85
+      },
+      "abil": [
+       "run-stopper"
+      ]
+     }
+    ],
+    "cb": [
+     {
+      "id": "nfl:season:1989:00-0000204:PHI",
+      "name": "Eric Allen",
+      "tag": "ALLEN",
+      "num": 21,
+      "ht": 70,
+      "wt": 181,
+      "pos": "CB",
+      "ovr": 86,
+      "a": {
+       "SPD": 89,
+       "ACC": 89,
+       "AGI": 99,
+       "STR": 54,
+       "AWR": 94,
+       "MCV": 99,
+       "ZCV": 96,
+       "PRS": 86,
+       "CTH": 94,
+       "TAK": 73,
+       "HIT": 60,
+       "PRC": 95,
+       "PUR": 89
+      },
+      "abil": [
+       "shutdown",
+       "ballhawk"
+      ]
+     },
+     {
+      "id": "nfl:season:1987:00-0011042:DET",
+      "name": "Bruce McNorton",
+      "tag": "MCNORTON",
+      "num": null,
+      "ht": 71,
+      "wt": 175,
+      "pos": "CB",
+      "ovr": 86,
+      "a": {
+       "SPD": 95,
+       "ACC": 95,
+       "AGI": 99,
+       "STR": 53,
+       "AWR": 93,
+       "MCV": 99,
+       "ZCV": 95,
+       "PRS": 84,
+       "CTH": 92,
+       "TAK": 74,
+       "HIT": 57,
+       "PRC": 94,
+       "PUR": 93
+      },
+      "abil": [
+       "shutdown",
+       "ballhawk"
+      ]
+     }
+    ],
+    "s": [
+     {
+      "id": "nfl:season:1985:00-0015146:DEN",
+      "name": "Dennis Smith",
+      "tag": "SMITH",
+      "num": 49,
+      "ht": 75,
+      "wt": 200,
+      "pos": "S",
+      "ovr": 85,
+      "a": {
+       "SPD": 91,
+       "ACC": 92,
+       "AGI": 94,
+       "STR": 64,
+       "AWR": 93,
+       "MCV": 91,
+       "ZCV": 99,
+       "PRS": 77,
+       "CTH": 89,
+       "TAK": 94,
+       "HIT": 84,
+       "PRC": 96,
+       "PUR": 91
+      },
+      "abil": [
+       "shutdown",
+       "ballhawk"
+      ]
+     },
+     {
+      "id": "nfl:season:2015:00-0030459:ARI",
+      "name": "Tyrann Mathieu",
+      "tag": "MATHIEU",
+      "num": 32,
+      "ht": 69,
+      "wt": 186,
+      "pos": "S",
+      "ovr": 84,
+      "a": {
+       "SPD": 90,
+       "ACC": 93,
+       "AGI": 94,
+       "STR": 44,
+       "AWR": 87,
+       "MCV": 99,
+       "ZCV": 98,
+       "PRS": 86,
+       "CTH": 81,
+       "TAK": 75,
+       "HIT": 87,
+       "PRC": 90,
+       "PUR": 93
+      },
+      "abil": [
+       "shutdown"
+      ]
+     }
+    ]
+   }
+  },
+  "promo": {
+   "cards": {
+    "WR1": "nfl:goat:2007:00-0011754:NE",
+    "WR3": "nfl:goat:1993:00-0013639:SF",
+    "TE": "nfl:goat:2011:00-0027656:NE",
+    "WR2": "nfl:spotlight:2012:00-0025389:DET",
+    "LT": "nfl:spotlight:2005:00-0008894:SEA",
+    "LG": "nfl:spotlight:2001:00-0000217:DAL",
+    "C": "nfl:spotlight:2008:00-0010577:TEN",
+    "RG": "nfl:spotlight:2022:00-0031402:DAL",
+    "RT": "nfl:spotlight:2021:00-0027857:SF",
+    "QB": "nfl:goat:2007:00-0019596:NE",
+    "RB": "nfl:goat:1997:00-0014313:DET",
+    "K": "nfl:spotlight:2002:00-0016919:NE",
+    "CB1": "nfl:goat:1994:00-0014324:SF",
+    "FS": "nfl:goat:1989:00-0010088:SF",
+    "SS": "nfl:goat:2004:00-0021377:BAL",
+    "CB2": "nfl:spotlight:2006:00-0000585:DEN",
+    "LB1": "nfl:goat:2000:00-0009889:BAL",
+    "LB2": "nfl:goat:1986:00-0016128:NYG",
+    "LB3": "nfl:spotlight:2009:00-0025398:SF",
+    "DE1": "nfl:goat:1990:00-0015111:BUF",
+    "DT1": "nfl:goat:2018:00-0031388:LAR",
+    "DT2": "nfl:spotlight:2022:00-0032762:KC",
+    "DE2": "nfl:goat:1987:00-0017567:PHI"
+   },
+   "offense": {
+    "qb": {
+     "id": "nfl:goat:2007:00-0019596:NE",
+     "name": "Tom Brady",
+     "tag": "BRADY",
+     "num": 12,
+     "ht": 76,
+     "wt": 225,
+     "pos": "QB",
+     "ovr": 110,
+     "a": {
+      "SPD": 66,
+      "ACC": 66,
+      "AGI": 64,
+      "STR": 72,
+      "AWR": 110,
+      "THP": 110,
+      "SAC": 110,
+      "MAC": 110,
+      "DAC": 110,
+      "TUP": 110
+     },
+     "abil": [
+      "icon",
+      "cannon",
+      "surgeon"
+     ]
+    },
+    "rb": {
+     "id": "nfl:goat:1997:00-0014313:DET",
+     "name": "Barry Sanders",
+     "tag": "SANDERS",
+     "num": 20,
+     "ht": 68,
+     "wt": 200,
+     "pos": "RB",
+     "ovr": 108,
+     "a": {
+      "SPD": 101,
+      "ACC": 104,
+      "AGI": 105,
+      "STR": 73,
+      "AWR": 109,
+      "BTK": 99,
+      "TRK": 77,
+      "JKM": 110,
+      "SPM": 107,
+      "SFA": 79,
+      "CAR": 110,
+      "BCV": 110,
+      "CTH": 73
+     },
+     "abil": [
+      "icon",
+      "juke-box"
+     ]
+    },
+    "wr": [
+     {
+      "id": "nfl:goat:2007:00-0011754:NE",
+      "name": "Randy Moss",
+      "tag": "MOSS",
+      "num": 81,
+      "ht": 76,
+      "wt": 210,
+      "pos": "WR",
+      "ovr": 110,
+      "a": {
+       "SPD": 104,
+       "ACC": 98,
+       "AGI": 99,
+       "STR": 58,
+       "AWR": 107,
+       "CTH": 110,
+       "RTE": 110,
+       "CIT": 105,
+       "SPC": 110,
+       "REL": 110,
+       "RBK": 31,
+       "BTK": 81,
+       "JKM": 98
+      },
+      "abil": [
+       "icon",
+       "deep-threat",
+       "sure-hands",
+       "red-zone"
+      ]
+     },
+     {
+      "id": "nfl:spotlight:2012:00-0025389:DET",
+      "name": "Calvin Johnson",
+      "tag": "JOHNSON",
+      "num": 81,
+      "ht": 77,
+      "wt": 237,
+      "pos": "WR",
+      "ovr": 105,
+      "a": {
+       "SPD": 99,
+       "ACC": 93,
+       "AGI": 100,
+       "STR": 82,
+       "AWR": 99,
+       "CTH": 105,
+       "RTE": 105,
+       "CIT": 104,
+       "SPC": 105,
+       "REL": 105,
+       "RBK": 69,
+       "BTK": 88,
+       "JKM": 98
+      },
+      "abil": [
+       "deep-threat",
+       "sure-hands",
+       "red-zone"
+      ]
+     },
+     {
+      "id": "nfl:goat:1993:00-0013639:SF",
+      "name": "Jerry Rice",
+      "tag": "RICE",
+      "num": 80,
+      "ht": 74,
+      "wt": 200,
+      "pos": "WR",
+      "ovr": 108,
+      "a": {
+       "SPD": 97,
+       "ACC": 99,
+       "AGI": 98,
+       "STR": 63,
+       "AWR": 109,
+       "CTH": 110,
+       "RTE": 109,
+       "CIT": 107,
+       "SPC": 110,
+       "REL": 106,
+       "RBK": 50,
+       "BTK": 85,
+       "JKM": 86
+      },
+      "abil": [
+       "icon",
+       "deep-threat",
+       "sure-hands",
+       "red-zone"
+      ]
+     }
+    ],
+    "te": {
+     "id": "nfl:goat:2011:00-0027656:NE",
+     "name": "Rob Gronkowski",
+     "tag": "GRONKOWSKI",
+     "num": 87,
+     "ht": 78,
+     "wt": 265,
+     "pos": "TE",
+     "ovr": 107,
+     "a": {
+      "SPD": 89,
+      "ACC": 93,
+      "AGI": 92,
+      "STR": 101,
+      "AWR": 97,
+      "CTH": 109,
+      "RTE": 105,
+      "CIT": 110,
+      "SPC": 102,
+      "REL": 106,
+      "RBK": 81,
+      "BTK": 82,
+      "JKM": 82
+     },
+     "abil": [
+      "icon",
+      "sure-hands",
+      "red-zone"
+     ]
+    },
+    "ol": [
+     {
+      "id": "nfl:spotlight:2005:00-0008894:SEA",
+      "name": "Walter Jones",
+      "tag": "JONES",
+      "num": 71,
+      "ht": 77,
+      "wt": 300,
+      "pos": "OT",
+      "ovr": 105,
+      "a": {
+       "SPD": 53,
+       "ACC": 84,
+       "AGI": 56,
+       "STR": 105,
+       "AWR": 105,
+       "PBK": 105,
+       "RBK": 105,
+       "IBL": 105
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     },
+     {
+      "id": "nfl:spotlight:2001:00-0000217:DAL",
+      "name": "Larry Allen",
+      "tag": "ALLEN",
+      "num": 73,
+      "ht": 75,
+      "wt": 325,
+      "pos": "OG",
+      "ovr": 105,
+      "a": {
+       "SPD": 55,
+       "ACC": 55,
+       "AGI": 60,
+       "STR": 103,
+       "AWR": 105,
+       "PBK": 105,
+       "RBK": 105,
+       "IBL": 102
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     },
+     {
+      "id": "nfl:spotlight:2008:00-0010577:TEN",
+      "name": "Kevin Mawae",
+      "tag": "MAWAE",
+      "num": 68,
+      "ht": 76,
+      "wt": 288,
+      "pos": "C",
+      "ovr": 101,
+      "a": {
+       "SPD": 70,
+       "ACC": 72,
+       "AGI": 76,
+       "STR": 92,
+       "AWR": 102,
+       "PBK": 105,
+       "RBK": 100,
+       "IBL": 88
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     },
+     {
+      "id": "nfl:spotlight:2022:00-0031402:DAL",
+      "name": "Zack Martin",
+      "tag": "MARTIN",
+      "num": 70,
+      "ht": 76,
+      "wt": 310,
+      "pos": "OG",
+      "ovr": 104,
+      "a": {
+       "SPD": 72,
+       "ACC": 74,
+       "AGI": 65,
+       "STR": 103,
+       "AWR": 105,
+       "PBK": 105,
+       "RBK": 105,
+       "IBL": 103
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     },
+     {
+      "id": "nfl:spotlight:2021:00-0027857:SF",
+      "name": "Trent Williams",
+      "tag": "WILLIAMS",
+      "num": 71,
+      "ht": 77,
+      "wt": 315,
+      "pos": "OT",
+      "ovr": 104,
+      "a": {
+       "SPD": 80,
+       "ACC": 87,
+       "AGI": 78,
+       "STR": 105,
+       "AWR": 105,
+       "PBK": 102,
+       "RBK": 105,
+       "IBL": 105
+      },
+      "abil": [
+       "pocket-wall",
+       "road-grader"
+      ]
+     }
+    ],
+    "k": {
+     "id": "nfl:spotlight:2002:00-0016919:NE",
+     "name": "Adam Vinatieri",
+     "tag": "VINATIERI",
+     "num": 4,
+     "ht": 72,
+     "wt": 200,
+     "pos": "K",
+     "ovr": 105,
+     "a": {
+      "SPD": 39,
+      "ACC": 29,
+      "AGI": 40,
+      "STR": 41,
+      "AWR": 101,
+      "KAC": 105,
+      "KPW": 105
+     },
+     "abil": [
+      "big-leg"
+     ]
+    }
+   },
+   "defense": {
+    "dl": [
+     {
+      "id": "nfl:goat:1990:00-0015111:BUF",
+      "name": "Bruce Smith",
+      "tag": "SMITH",
+      "num": null,
+      "ht": 76,
+      "wt": 275,
+      "pos": "DE",
+      "ovr": 108,
+      "a": {
+       "SPD": 90,
+       "ACC": 101,
+       "AGI": 90,
+       "STR": 109,
+       "AWR": 109,
+       "PMV": 109,
+       "FMV": 110,
+       "BSH": 106,
+       "TAK": 110,
+       "PUR": 109,
+       "PRC": 110,
+       "HIT": 84
+      },
+      "abil": [
+       "icon",
+       "edge-threat",
+       "run-stopper"
+      ]
+     },
+     {
+      "id": "nfl:goat:2018:00-0031388:LAR",
+      "name": "Aaron Donald",
+      "tag": "DONALD",
+      "num": 99,
+      "ht": 73,
+      "wt": 285,
+      "pos": "DT",
+      "ovr": 110,
+      "a": {
+       "SPD": 89,
+       "ACC": 96,
+       "AGI": 92,
+       "STR": 110,
+       "AWR": 110,
+       "PMV": 110,
+       "FMV": 110,
+       "BSH": 110,
+       "TAK": 109,
+       "PUR": 110,
+       "PRC": 110,
+       "HIT": 99
+      },
+      "abil": [
+       "icon",
+       "edge-threat",
+       "run-stopper",
+       "enforcer"
+      ]
+     },
+     {
+      "id": "nfl:spotlight:2022:00-0032762:KC",
+      "name": "Chris Jones",
+      "tag": "JONES",
+      "num": 95,
+      "ht": 77,
+      "wt": 308,
+      "pos": "DT",
+      "ovr": 102,
+      "a": {
+       "SPD": 73,
+       "ACC": 83,
+       "AGI": 76,
+       "STR": 103,
+       "AWR": 105,
+       "PMV": 105,
+       "FMV": 100,
+       "BSH": 98,
+       "TAK": 104,
+       "PUR": 103,
+       "PRC": 105,
+       "HIT": 92
+      },
+      "abil": [
+       "edge-threat",
+       "run-stopper",
+       "enforcer"
+      ]
+     },
+     {
+      "id": "nfl:goat:1987:00-0017567:PHI",
+      "name": "Reggie White",
+      "tag": "WHITE",
+      "num": 92,
+      "ht": 77,
+      "wt": 285,
+      "pos": "DE",
+      "ovr": 108,
+      "a": {
+       "SPD": 90,
+       "ACC": 100,
+       "AGI": 84,
+       "STR": 110,
+       "AWR": 109,
+       "PMV": 109,
+       "FMV": 108,
+       "BSH": 106,
+       "TAK": 110,
+       "PUR": 106,
+       "PRC": 110,
+       "HIT": 95
+      },
+      "abil": [
+       "icon",
+       "edge-threat",
+       "run-stopper",
+       "enforcer"
+      ]
+     }
+    ],
+    "lb": [
+     {
+      "id": "nfl:goat:2000:00-0009889:BAL",
+      "name": "Ray Lewis",
+      "tag": "LEWIS",
+      "num": 52,
+      "ht": 73,
+      "wt": 235,
+      "pos": "LB",
+      "ovr": 108,
+      "a": {
+       "SPD": 79,
+       "ACC": 91,
+       "AGI": 90,
+       "STR": 98,
+       "AWR": 110,
+       "TAK": 110,
+       "PUR": 110,
+       "PRC": 110,
+       "ZCV": 106,
+       "MCV": 83,
+       "BSH": 106,
+       "PMV": 75,
+       "FMV": 77,
+       "HIT": 94
+      },
+      "abil": [
+       "icon",
+       "run-stopper",
+       "enforcer"
+      ]
+     },
+     {
+      "id": "nfl:goat:1986:00-0016128:NYG",
+      "name": "Lawrence Taylor",
+      "tag": "TAYLOR",
+      "num": 56,
+      "ht": 75,
+      "wt": 237,
+      "pos": "LB",
+      "ovr": 107,
+      "a": {
+       "SPD": 96,
+       "ACC": 100,
+       "AGI": 93,
+       "STR": 104,
+       "AWR": 109,
+       "TAK": 110,
+       "PUR": 110,
+       "PRC": 110,
+       "ZCV": 72,
+       "MCV": 62,
+       "BSH": 104,
+       "PMV": 84,
+       "FMV": 85,
+       "HIT": 99
+      },
+      "abil": [
+       "icon",
+       "run-stopper",
+       "enforcer"
+      ]
+     },
+     {
+      "id": "nfl:spotlight:2009:00-0025398:SF",
+      "name": "Patrick Willis",
+      "tag": "WILLIS",
+      "num": 52,
+      "ht": 73,
+      "wt": 242,
+      "pos": "LB",
+      "ovr": 105,
+      "a": {
+       "SPD": 94,
+       "ACC": 100,
+       "AGI": 92,
+       "STR": 96,
+       "AWR": 99,
+       "TAK": 105,
+       "PUR": 105,
+       "PRC": 103,
+       "ZCV": 82,
+       "MCV": 64,
+       "BSH": 105,
+       "PMV": 88,
+       "FMV": 83,
+       "HIT": 103
+      },
+      "abil": [
+       "run-stopper",
+       "enforcer"
+      ]
+     }
+    ],
+    "cb": [
+     {
+      "id": "nfl:goat:1994:00-0014324:SF",
+      "name": "Deion Sanders",
+      "tag": "SANDERS",
+      "num": null,
+      "ht": 73,
+      "wt": 187,
+      "pos": "CB",
+      "ovr": 108,
+      "a": {
+       "SPD": 105,
+       "ACC": 104,
+       "AGI": 105,
+       "STR": 58,
+       "AWR": 109,
+       "MCV": 110,
+       "ZCV": 108,
+       "PRS": 99,
+       "CTH": 103,
+       "TAK": 73,
+       "HIT": 64,
+       "PRC": 108,
+       "PUR": 94
+      },
+      "abil": [
+       "icon",
+       "shutdown",
+       "ballhawk"
+      ]
+     },
+     {
+      "id": "nfl:spotlight:2006:00-0000585:DEN",
+      "name": "Champ Bailey",
+      "tag": "BAILEY",
+      "num": 24,
+      "ht": 73,
+      "wt": 184,
+      "pos": "CB",
+      "ovr": 105,
+      "a": {
+       "SPD": 102,
+       "ACC": 102,
+       "AGI": 102,
+       "STR": 60,
+       "AWR": 104,
+       "MCV": 105,
+       "ZCV": 105,
+       "PRS": 105,
+       "CTH": 92,
+       "TAK": 70,
+       "HIT": 52,
+       "PRC": 105,
+       "PUR": 98
+      },
+      "abil": [
+       "shutdown",
+       "ballhawk"
+      ]
+     }
+    ],
+    "s": [
+     {
+      "id": "nfl:goat:1989:00-0010088:SF",
+      "name": "Ronnie Lott",
+      "tag": "LOTT",
+      "num": 42,
+      "ht": 72,
+      "wt": 199,
+      "pos": "S",
+      "ovr": 108,
+      "a": {
+       "SPD": 95,
+       "ACC": 97,
+       "AGI": 91,
+       "STR": 98,
+       "AWR": 108,
+       "MCV": 106,
+       "ZCV": 110,
+       "PRS": 84,
+       "CTH": 105,
+       "TAK": 105,
+       "HIT": 98,
+       "PRC": 110,
+       "PUR": 102
+      },
+      "abil": [
+       "icon",
+       "shutdown",
+       "ballhawk",
+       "enforcer"
+      ]
+     },
+     {
+      "id": "nfl:goat:2004:00-0021377:BAL",
+      "name": "Ed Reed",
+      "tag": "REED",
+      "num": 20,
+      "ht": 71,
+      "wt": 205,
+      "pos": "S",
+      "ovr": 107,
+      "a": {
+       "SPD": 99,
+       "ACC": 99,
+       "AGI": 99,
+       "STR": 62,
+       "AWR": 109,
+       "MCV": 108,
+       "ZCV": 110,
+       "PRS": 80,
+       "CTH": 97,
+       "TAK": 80,
+       "HIT": 101,
+       "PRC": 110,
+       "PUR": 94
+      },
+      "abil": [
+       "icon",
+       "shutdown",
+       "ballhawk",
+       "enforcer"
+      ]
+     }
+    ]
+   }
+  }
+ }
+}

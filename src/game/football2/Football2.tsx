@@ -43,9 +43,10 @@ import {
 import { CONCEPTS, CONCEPT_NAMES, dist, FIELD_W, flipPlay, maxThrow, moveEdge, moveWithBall, RUN_NAMES, scramble, setBurst, snap, step, throwTo, throwToReceiver } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
-import type { Body, Defense, Offense, PassType, Play, Pt } from './types';
+import type { Body, Defense, Offense, PassType, Play, Pt, RunInput } from './types';
 import './rushing-controls.css';
-import { screenRunInput } from './controls';
+import { CarryGate, screenRunInput } from './controls';
+import { AUTO_KICK_AIM, AUTO_PICK, KICK_RESULT, KICK_TO_TRAY, LONG_TD_REPLAY, PUNT_TO_TRAY, REPLAY_LEAD, REPLAY_TAIL, SLOWMO, SLOWMO_RATE, WHISTLE_TO_TRAY } from './pacing';
 import './playbook.css';
 import { PlaybookDialog } from './PlaybookDialog';
 import { useInputInterrupt } from '../useInputInterrupt';
@@ -187,7 +188,17 @@ export function Football2({
   const [hint, setHint] = useState<string | null>(null);
   const hinted = useRef(new Set<string>());
   const [wide, setWide] = useState(false);
-  const [knob, setKnob] = useState({ x: 0, y: 0 });
+  // the stick's knob and its held state are drawn straight onto the element (a React render per
+  // pointer move re-rendered the whole game at the touch rate)
+  const stickElRef = useRef<HTMLDivElement>(null);
+  const knobRef = useRef<HTMLElement>(null);
+  const drawKnob = (x: number, y: number) => {
+    const k = knobRef.current;
+    if (k) k.style.transform = x || y ? 'translate(' + x * 28 + 'px,' + y * 28 + 'px)' : '';
+  };
+  const markHeld = (held: boolean) => stickElRef.current?.classList.toggle('held', held);
+  // the momentum carry: a new carrier runs on until the player takes him (controls.ts)
+  const gate = useRef(new CarryGate());
   const [phase, setPhase] = useState<Play['phase']>('pre');
   const [passType, setPassType] = useState<PassType>('touch');
   const [bursting, setBursting] = useState(false);
@@ -244,7 +255,9 @@ export function Football2({
     playRef.current = startChoice(g, cs[0]);
     dragRef.current = null;
     stickRef.current = null;
-    setKnob({ x: 0, y: 0 });
+    drawKnob(0, 0);
+    markHeld(false);
+    gate.current.reset();
     runKeys.current.clear();
     setPhase('pre');
     setUi(g.down === 4 ? 'fourth' : 'pre');
@@ -326,6 +339,7 @@ export function Football2({
     else tip('run', 'Joystick to run in any direction · hold BURST for speed');
   };
 
+  /** Report the play, then line up the next one `wait` seconds later. */
   const nextUp = (g: Game, driveOver: boolean, wait: number) => {
     onProgress(progress(g));
     window.setTimeout(() => {
@@ -343,7 +357,7 @@ export function Football2({
         tip('clock', 'The clock runs between plays · an incompletion or going out of bounds stops it');
       } else if (driveOver) say('DRIVE ' + (g.drive + 1) + ' OF ' + g.drives, 'plain', 1100);
       lineUpNext(g);
-    }, wait);
+    }, wait * 1000);
   };
 
   /** the ability names on the pop (Madden-style) */
@@ -414,7 +428,7 @@ export function Football2({
         vibrate([20, 30, 20]);
         crowd.swell(0.8);
         shake(kind === 'truck' ? 4 : 2);
-        if (kind === 'truck') slowUntil.current = performance.now() + 450;
+        if (kind === 'truck') slowUntil.current = performance.now() + SLOWMO.truck * 1000;
         say(kind === 'juke' ? 'JUKED!' : kind === 'spin' ? 'SPIN MOVE!' : kind === 'truck' ? 'TRUCKED!' : 'STIFF ARM!', 'big', 900);
       } else if (e === 'whiff') {
         sfx.whoosh();
@@ -426,7 +440,7 @@ export function Football2({
       } else if (e === 'bighit') {
         if (p.carrier) highlight.current = { t: p.t, x: p.carrier.x, y: p.carrier.y, before: REPLAY_BEFORE };
         // the hit lands in slow motion
-        slowUntil.current = performance.now() + 750;
+        slowUntil.current = performance.now() + SLOWMO.bighit * 1000;
         sfx.hit(1);
         sfx.thud(0.12);
         shake(6);
@@ -448,7 +462,8 @@ export function Football2({
     const e = p.end!;
     dragRef.current = null;
     stickRef.current = null;
-    setKnob({ x: 0, y: 0 });
+    drawKnob(0, 0);
+    markHeld(false);
     runKeys.current.clear();
     setPhase('dead');
     const a = afterPlay(game, e);
@@ -508,9 +523,9 @@ export function Football2({
       say(e.text, 'plain', 1100);
     } else if (e.kind === 'sack') say(e.text, 'bad', 1300, gain);
     else say(gain, yds > 0 ? 'good' : 'plain', 1000, e.kind === 'out' ? 'OUT OF BOUNDS' : undefined);
-    if (a.points && yds >= 25 && !highlight.current) {
+    if (a.points && yds >= LONG_TD_REPLAY.yards && !highlight.current) {
       const c = p.carrier ?? p.catcher;
-      if (c) highlight.current = { t: p.t, x: c.x, y: c.y - 6, before: 2.4 };
+      if (c) highlight.current = { t: p.t, x: c.x, y: c.y - 6, before: LONG_TD_REPLAY.before };
     }
     // the whistle: the play's dead (a touchdown has its horn)
     if (!a.points) window.setTimeout(() => sfx.whistle(), 220);
@@ -519,8 +534,8 @@ export function Football2({
     // (not the game's last play: it's reported done, and the results come next)
     if (hl && !game.over && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) {
       onProgress(progress(game));
-      window.setTimeout(() => startReplay(hl, () => nextUp(game, !!a.driveOver, 250)), a.points ? 1500 : 1100);
-    } else nextUp(game, !!a.driveOver, a.points ? 2300 : a.driveOver ? 1900 : 1350);
+      window.setTimeout(() => startReplay(hl, () => nextUp(game, !!a.driveOver, REPLAY_TAIL)), (a.points ? REPLAY_LEAD.score : REPLAY_LEAD.play) * 1000);
+    } else nextUp(game, !!a.driveOver, a.points ? WHISTLE_TO_TRAY.score : a.driveOver ? WHISTLE_TO_TRAY.drive : WHISTLE_TO_TRAY.play);
   };
 
   /** Play the highlight again, slower, from closer; then on with the drive. */
@@ -591,8 +606,8 @@ export function Football2({
         sfx.groan(1);
         say('NO GOOD', 'bad', 1500, side < 0 ? 'WIDE LEFT' : 'WIDE RIGHT');
       }
-      nextUp(game, true, 1700);
-    }, 1000);
+      nextUp(game, true, KICK_TO_TRAY);
+    }, KICK_RESULT * 1000);
     window.setTimeout(() => {
       kickRef.current = null;
       kickAnim.current = null;
@@ -606,7 +621,7 @@ export function Football2({
     punt(game);
     say('PUNT', 'plain', 1100, 'DRIVE OVER');
     setUi('after');
-    nextUp(game, true, 1300);
+    nextUp(game, true, PUNT_TO_TRAY);
   };
 
   // the autopilot calls the plays in tests
@@ -625,7 +640,7 @@ export function Football2({
           else snapNow();
         } else if (ui === 'kick') kickNow();
       },
-      ui === 'kick' ? 700 : 450
+      (ui === 'kick' ? AUTO_KICK_AIM : AUTO_PICK) * 1000
     );
     return () => clearTimeout(t);
   }, [ui, autoplayHook, game]);
@@ -645,13 +660,18 @@ export function Football2({
     return { x: p.qb.x + v.x * k, y: p.qb.y + v.y * k };
   };
 
-  /** Both screen axes reach the simulation. An untouched/released human stick means stop. */
-  const steerNow = (): Pt => {
+  /**
+   * Both screen axes reach the simulation. A touched stick is direct control (centred or let go, it
+   * stops the runner); a new carrier the player hasn't touched the stick for runs on his momentum.
+   */
+  const steerNow = (p: Play): RunInput => {
     const s = stickRef.current;
     const keys = runKeys.current;
+    const held = !!s || keys.size > 0;
     const x = s?.x ?? Number(keys.has('arrowright') || keys.has('d')) - Number(keys.has('arrowleft') || keys.has('a'));
     const y = s?.y ?? Number(keys.has('arrowdown') || keys.has('s')) - Number(keys.has('arrowup') || keys.has('w'));
-    return screenRunInput(x, y, renderer.mode);
+    const carrier = p.phase === 'run' ? p.carrier : null;
+    return gate.current.input(carrier ? carrier.id : null, p.call === 'run' && carrier === p.rb, held ? screenRunInput(x, y, renderer.mode) : null);
   };
 
   // the loop: fixed steps for the play, a draw every frame
@@ -681,10 +701,10 @@ export function Football2({
       last = now;
       // slow motion and hit-stop only hold back real time: the same fixed steps run, a beat later
       fx.juice.update(elapsed);
-      acc += fx.juice.gameTime(now, now < slowUntil.current ? elapsed * 0.4 : elapsed);
+      acc += fx.juice.gameTime(now, now < slowUntil.current ? elapsed * SLOWMO_RATE : elapsed);
       if (p && p.end) {
         // after the whistle: the hit lands, the tackled man slides, the pile settles
-        const vis = fx.juice.gameTime(now, now < slowUntil.current ? elapsed * 0.4 : elapsed);
+        const vis = fx.juice.gameTime(now, now < slowUntil.current ? elapsed * SLOWMO_RATE : elapsed);
         p.t += vis;
         for (const b of p.bodies) {
           if (Math.abs(b.vx) + Math.abs(b.vy) < 0.05) continue;
@@ -706,7 +726,7 @@ export function Football2({
         while (acc >= DT) {
           acc -= DT;
           const was: Play['phase'] = p.phase;
-          const steer = autoplayHook ? decide(p, game, pilotRef.current) : steerNow();
+          const steer = autoplayHook ? decide(p, game, pilotRef.current) : steerNow(p);
           step(p, DT, steer);
           handleEvents(p);
           if (p.phase !== was) setPhase(p.phase);
@@ -797,7 +817,9 @@ export function Football2({
       dragRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 };
     } else if (p.phase === 'run' || p.phase === 'air' || (p.phase === 'drop' && p.call === 'run')) {
       stickRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: 0, y: 0, radius: 46 };
-      setKnob({ x: 0, y: 0 });
+      gate.current.touch();
+      drawKnob(0, 0);
+      markHeld(true);
     }
   };
   const move = (e: React.PointerEvent) => {
@@ -819,7 +841,7 @@ export function Football2({
     }
     s.x = x;
     s.y = y;
-    setKnob({ x, y });
+    drawKnob(x, y);
   };
   const stickDown = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -828,6 +850,8 @@ export function Football2({
     const r = e.currentTarget.getBoundingClientRect();
     runKeys.current.clear();
     stickRef.current = { id: e.pointerId, x0: r.left + r.width / 2, y0: r.top + r.height / 2, x: 0, y: 0, radius: r.width / 2 - 27 };
+    gate.current.touch();
+    markHeld(true);
     e.currentTarget.setPointerCapture(e.pointerId);
     move(e);
   };
@@ -835,13 +859,15 @@ export function Football2({
     const key = e.key.toLowerCase();
     if (!['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) return;
     e.preventDefault();
+    if (held && !e.repeat) gate.current.touch();
     if (held) runKeys.current.add(key);
     else runKeys.current.delete(key);
     const keys = runKeys.current;
     const x = Number(keys.has('arrowright') || keys.has('d')) - Number(keys.has('arrowleft') || keys.has('a'));
     const y = Number(keys.has('arrowdown') || keys.has('s')) - Number(keys.has('arrowup') || keys.has('w'));
     const length = Math.max(1, Math.hypot(x, y));
-    setKnob({ x: x / length, y: y / length });
+    drawKnob(x / length, y / length);
+    markHeld(keys.size > 0 || !!stickRef.current);
   };
   const up = (e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -858,7 +884,8 @@ export function Football2({
     const s = stickRef.current;
     if (s && s.id === e.pointerId) {
       stickRef.current = null;
-      setKnob({ x: 0, y: 0 });
+      drawKnob(0, 0);
+      markHeld(false);
       runKeys.current.clear();
     }
   };
@@ -868,14 +895,16 @@ export function Football2({
     const s = stickRef.current;
     if (s && s.id === e.pointerId) {
       stickRef.current = null;
-      setKnob({ x: 0, y: 0 });
+      drawKnob(0, 0);
+      markHeld(false);
       runKeys.current.clear();
     }
   };
   useInputInterrupt(() => {
     dragRef.current = null;
     stickRef.current = null;
-    setKnob({ x: 0, y: 0 });
+    drawKnob(0, 0);
+    markHeld(false);
     runKeys.current.clear();
     stopBurst();
   });
@@ -973,6 +1002,7 @@ export function Football2({
       {ui === 'loading' && <div className="fg-loading">Taking the field…</div>}
       {steering && !autoplayHook && (
         <div
+          ref={stickElRef}
           className="hg2-stick fb2-stick"
           role="group"
           aria-label="Run joystick: drag in any direction. Arrow keys or WASD."
@@ -986,10 +1016,18 @@ export function Football2({
           onKeyUp={(e) => keyRun(e, false)}
           onBlur={() => {
             runKeys.current.clear();
-            if (!stickRef.current) setKnob({ x: 0, y: 0 });
+            if (!stickRef.current) {
+              drawKnob(0, 0);
+              markHeld(false);
+            }
           }}
         >
-          <i style={{ transform: 'translate(' + knob.x * 28 + 'px,' + knob.y * 28 + 'px)' }} />
+          <i ref={knobRef} />
+          {phase === 'air' && (
+            <span className="fb2-ghost" aria-hidden="true">
+              <b>HOLD TO RUN</b>
+            </span>
+          )}
         </div>
       )}
       {(ui === 'pre' || ui === 'fourth') && g && p && !autoplayHook && (

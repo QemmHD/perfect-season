@@ -558,6 +558,11 @@ export function isLine(b: Body) {
   return b.slot === 'LT' || b.slot === 'LG' || b.slot === 'C' || b.slot === 'RG' || b.slot === 'RT';
 }
 
+/** the momentum carry: how long a new carrier nobody is steering turns gently (s), and how gently
+ * (a share of his turn rate) */
+const CARRY_HOLD = 0.35;
+const CARRY_TURN = 0.6;
+
 /** what each move takes out of the runner, and how fast it comes back (a second's running) */
 const DRAIN: Record<Move, number> = { juke: 0.28, spin: 0.34, stiff: 0.3, truck: 0.36 };
 const STAMINA_BACK = 0.1;
@@ -625,6 +630,7 @@ export function scramble(p: Play) {
   const qb = p.qb;
   qb.job = 'carry';
   p.phase = 'run';
+  p.carrierAt = p.t;
   act(qb, 'carry', p.t);
   for (const b of p.bodies) if (b.side === 'D') b.job = 'pursue';
   p.events.push('scramble');
@@ -698,7 +704,8 @@ function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string, flag?: Fl
 
 /**
  * Advance the play by dt. A vector directly controls both field axes, including stopping/backward.
- * A numeric across-field target or null retains the existing simulation/pilot lane behavior.
+ * A numeric across-field target is the pilot's lane. Null follows a designed run's lane, and carries
+ * any other ball carrier on his momentum (see RunInput).
  */
 export function step(p: Play, dt: number, steer: RunInput) {
   if (p.phase === 'pre' || p.phase === 'dead') return;
@@ -737,6 +744,7 @@ export function step(p: Play, dt: number, steer: RunInput) {
     steerTo(qb, p.bx - 0.4 * direction, p.los - 3.7, 4, dt);
     if (t > 0.42 && dist(rb, qb) < 1.8) {
       p.carrier = rb;
+      p.carrierAt = t;
       rb.job = 'carry';
       qb.job = 'idle';
       p.phase = 'run';
@@ -795,6 +803,27 @@ export function step(p: Play, dt: number, steer: RunInput) {
         const amount = Math.min(1, (acceleration * dt) / Math.max(0.001, delta));
         b.vx += dx * amount;
         b.vy += dy * amount;
+      } else if (steer === null && !(p.call === 'run' && b === p.rb)) {
+        // The momentum carry (nfl-1): a receiver or a scrambling quarterback nobody is steering yet
+        // keeps his speed and bends his run upfield. For the first moment of the carry he turns at
+        // CARRY_TURN of his rate (nobody snaps square the instant he has the ball); drifting back
+        // toward his own goal, he plants and comes back.
+        const early = t - (p.carrierAt ?? 0) < CARRY_HOLD;
+        const want = sp * (m && m.kind !== 'truck' ? 0.8 : 1);
+        const acceleration = lerp(8, 15, rt(b.p.a.ACC, 40, 99)) * dt;
+        if (b.vy < 0) {
+          const plant = lerp(26, 38, rt(b.p.a.AGI, 40, 99)) * dt;
+          b.vx += clamp(-b.vx, -plant * 0.5, plant * 0.5);
+          b.vy += plant;
+        } else {
+          const heading = Math.atan2(b.vx, b.vy);
+          const rate = lerp(2.4, 3.8, rt(b.p.a.AGI, 40, 99)) * (early ? CARRY_TURN : 1) * dt;
+          const turned = heading - clamp(heading, -rate, rate);
+          const speed = Math.hypot(b.vx, b.vy);
+          const v = speed + clamp(want - speed, -acceleration * 2, acceleration);
+          b.vx = Math.sin(turned) * v;
+          b.vy = Math.cos(turned) * v;
+        }
       } else {
         const len = landmark ? Math.max(0.1, dist(b, landmark)) : 1;
         const wantX = landmark ? ((landmark.x - b.x) / len) * sp : aim === null ? 0 : clamp((aim - b.x) * 2.2, -sp * 0.65, sp * 0.65);
@@ -1327,6 +1356,7 @@ function arrive(p: Play) {
     }
     if (roll < pi + clamp(pc, 0.08, 0.97 - pi)) {
       p.carrier = off;
+      p.carrierAt = p.t;
       off.job = 'carry';
       p.catcher = off;
       p.catchInfo = { ro, high, contested };
