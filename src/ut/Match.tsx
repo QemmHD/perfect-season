@@ -855,13 +855,14 @@ export default function UtMatch(props: {
           c1: '#9B7BFF',
           c2: '#5B3FD1',
         });
-        const us = sg.aiProgress(a, b, key(setup.me.wire), mine, defenseIQ);
-        const them = sg.aiProgress(
+        const us = sg.aiProgressFor(a, b, key(setup.me.wire), mine, defenseIQ, { rival: false, online: !!setup.online });
+        const them = sg.aiProgressFor(
           b,
           a,
           key(setup.rival.wire),
           theirs,
           defenseIQ,
+          { rival: true, online: !!setup.online },
         );
         const so =
           us.score === them.score

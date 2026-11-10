@@ -21,7 +21,7 @@ import { frameAt, Recorder, type Replay, REPLAY_SPEED, replayTime, REPLAYS_IN_AU
 import { useInputInterrupt } from '../useInputInterrupt';
 import { WaitLine } from '../Wait';
 import { decide, pilot } from './autopilot';
-import { cancelShoot, ctrlOf, kickOff, pass, passPlan, passTarget, pressShoot, releaseShoot, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step, timingWord } from './engine';
+import { cancelShoot, ctrlOf, kickOff, pass, passPlan, passTarget, PL, PW, pressShoot, releaseShoot, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step, timingWord } from './engine';
 import type { SoccerKits } from './kits';
 import { attackFor, ATTACKS, END_TEXT, minuteOf, newMatch, recordAttack, SCENARIO_HINTS, SCENARIO_NAMES, totalOf, type Match } from './match';
 import { SoccerRenderer } from './render';
@@ -72,6 +72,7 @@ export function Soccer2({
   forceShootout = false,
   fixedShootout,
   debug,
+  start,
   onProgress,
   onDone,
   onShootout,
@@ -99,6 +100,8 @@ export function Soccer2({
   fixedShootout?: { first: Side; scored: boolean[] };
   /** the lab's QA hook: the live attack and match each frame */
   debug?: (a: Attack | null, m: Match, ui: string) => void;
+  /** the lab's drills and screenshots: the man on the ball starts here (pitch metres; open play only) */
+  start?: Pt;
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
   onShootout?: (r: ShootoutResult) => void;
@@ -195,6 +198,7 @@ export function Soccer2({
   /** Line up attack i (the whistle hasn't gone). */
   const lineUp = (i: number) => {
     const a = attackFor(match, i);
+    if (start && !a.setPiece) placeCarrier(a, start);
     atkRef.current = a;
     rec.current.clear();
     clearInput();
@@ -956,6 +960,16 @@ export function Soccer2({
     </div>,
     document.body
   );
+}
+
+/** The lab's start=x,y: the man on the ball (and the ball) moved to a spot before the whistle. */
+function placeCarrier(a: Attack, at: Pt) {
+  const c = a.bodies[a.ctrl];
+  c.x = Math.max(1, Math.min(PW - 1, at.x));
+  c.y = Math.max(31, Math.min(PL - 1, at.y));
+  c.home = { x: c.x, y: c.y };
+  a.ball.x = c.x;
+  a.ball.y = c.y + 0.5;
 }
 
 function Arrow({ dir }: { dir: number }) {

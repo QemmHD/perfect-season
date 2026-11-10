@@ -176,3 +176,21 @@ export function soccerKitsFor(myFav: string | null, rivalFav: string | null): So
 export function aiProgress(attack: Squad, defense: Squad, seed: string, skill: number, defIQ: number) {
   return aiAttacksOf(attack, defense, seed, skill, ATTACKS, defIQ);
 }
+
+/** Who a simulation is for: the rival's attacks against your defence (`rival`), or yours; a match
+ * between two phones (`online`). */
+export interface SimFor {
+  rival: boolean;
+  online: boolean;
+}
+
+/**
+ * The one door to the AI's simulations (Claude 2026-11-10, studio overhaul soccer-1): the Arcade's
+ * AI attacks, takeovers and SIM, and Ultimate Team's simBoth all call it. Today it plays exactly as
+ * aiProgress, whoever it is for. Online, phone A works out B's attacks as the rival's while B works
+ * out the same attacks as its own, so anything that reads `ctx` (the solo difficulty ladder) must
+ * apply only when !ctx.online, or the two phones disagree on the score. agreement.test.ts holds it.
+ */
+export function aiProgressFor(attack: Squad, defense: Squad, seed: string, skill: number, defIQ: number, _ctx: SimFor) {
+  return aiProgress(attack, defense, seed, skill, defIQ);
+}

@@ -1,25 +1,31 @@
 // Claude, 2026-11-01: browser QA for the dev-only soccer lab (?soccer-lab). Portrait phones, real
 // touch input through CDP (Input.dispatchTouchEvent), screenshots of each stage, page errors and
-// frame time. Needs the dev server: PS_QA_URL=http://localhost:5187/ node scripts/qa/soccer-lab.mjs
+// frame time. Needs the dev server: PS_QA_URL=http://localhost:5187/ node scripts/qa/soccer-lab.mjs [part]
 // 2026-11-02: SHOOT is held and dragged to aim (the stick keeps running); the report has the aim the
 // drag set, whether the shot was assisted, and the run speed while the meter was up.
+// Studio overhaul soccer-1 (2026-11-10): every context goes through scripts/soccer/qa-isolate.mjs
+// (live hosts aborted and counted, the safe-area insets injected, ?ns=inspect&relay=ws://localhost:7777).
+// The play parts run on the owner's phone (393x852, Dynamic Island 59/34) and the smallest (320x568);
+// `smoke` opens the lab on all six presets (page errors, the computed --sat, a live-host probe that
+// must be blocked). Parts: all | smoke | play | buttons | auto | sets | pens.
 import { launch, base, artifacts } from './browser.mjs';
+import { blocked, blockedLine, computedSat, phone, PRESETS, urlFor } from '../soccer/qa-isolate.mjs';
 import fs from 'node:fs';
 const out = process.env.PS_QA_SOCCER_OUT || artifacts + '/soccer';
 fs.mkdirSync(out, { recursive: true });
 const only = process.argv[2] ?? 'all';
+const part = (k) => only === 'all' || only === k;
 const browser = await launch();
 const report = [];
 const errorsAll = [];
-async function open(width, height, params) {
-  const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+const preset = (tag) => PRESETS.find((p) => p.tag === tag);
+async function open(p, params, opts = {}) {
+  const context = await phone(browser, p, { dpr: 2, ...opts });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()));
-  const url = new URL(base);
-  url.search = new URLSearchParams({ 'soccer-lab': '1', qa: '1', ...params }).toString();
-  await page.goto(url.href, { waitUntil: 'domcontentloaded' });
+  page.on('console', (m) => m.type() === 'error' && !/ERR_BLOCKED_BY_CLIENT|QA isolation/.test(m.text()) && errors.push('console: ' + m.text()));
+  await page.goto(urlFor(base, { 'soccer-lab': '1', qa: '1', ...params }), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__soccer && window.__soccer.a, null, { timeout: 30000 });
   const cdp = await context.newCDPSession(page);
   return { context, page, errors, cdp };
@@ -36,11 +42,39 @@ async function center(page, sel) {
 async function frameTime(page, ms = 2000) {
   return page.evaluate((ms) => new Promise((res) => { const ts = []; const t0 = performance.now(); const f = (t) => { ts.push(t); if (t - t0 < ms) requestAnimationFrame(f); else { const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b); res({ frames: d.length, median: d[Math.floor(d.length / 2)], p95: d[Math.floor(d.length * 0.95)] }); } }; requestAnimationFrame(f); }), ms);
 }
-for (const [width, height] of [[390, 844], [320, 568]]) {
-  const tag = width + 'x' + height;
-  if (only === 'all' || only === 'play') {
+if (part('smoke')) {
+  // every preset: the lab loads with no page error, the injected insets reach .arcade-full, and a
+  // request and a WebSocket to a live host from the page are both stopped (and counted)
+  for (const p of PRESETS) {
+    const before = blocked.count;
+    const { context, page, errors } = await open(p, { seed: 'qa-smoke', scenario: 'freekick' });
+    await page.waitForSelector('.sc2-go');
+    const sat = await computedSat(page);
+    const probe = await page.evaluate(async () => {
+      const fetched = await fetch('https://example.com/ps-qa-isolation-probe').then(() => 'reached', () => 'blocked');
+      const socket = await new Promise((res) => {
+        const ws = new WebSocket('wss://example.com/ps-qa-isolation-probe');
+        ws.onopen = () => res('reached');
+        ws.onclose = () => res('blocked');
+        ws.onerror = () => res('blocked');
+        setTimeout(() => res('timeout'), 5000);
+      });
+      return { fetched, socket };
+    });
+    await page.screenshot({ path: `${out}/${p.tag}-smoke.png` });
+    const row = { tag: p.tag, step: 'smoke', sat, wantSat: p.insets[0], probe, blockedHere: blocked.count - before, errors };
+    report.push(row);
+    errorsAll.push(...errors);
+    if (sat !== p.insets[0]) errorsAll.push(p.tag + ': --sat ' + sat + ' (wanted ' + p.insets[0] + ')');
+    if (probe.fetched !== 'blocked' || probe.socket !== 'blocked' || row.blockedHere < 2) errorsAll.push(p.tag + ': live-host probe not blocked ' + JSON.stringify(probe));
+    await context.close();
+  }
+}
+for (const p of [preset('393x852-sat59'), preset('320x568')]) {
+  const tag = p.tag;
+  if (part('play')) {
     // 1. kickoff card, then a real touch match: stick forward with SPRINT held (two fingers), pass, shoot
-    const { context, page, errors, cdp } = await open(width, height, { seed: 'qa1', home: 'BAR', hs: '2015', away: 'RMA', as: '2017' });
+    const { context, page, errors, cdp } = await open(p, { seed: 'qa1', home: 'BAR', hs: '2015', away: 'RMA', as: '2017' });
     await page.waitForSelector('.sc2-go');
     await page.waitForTimeout(900);
     await page.screenshot({ path: `${out}/${tag}-kickoff.png` });
@@ -90,9 +124,9 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     errorsAll.push(...errors);
     await context.close();
   }
-  if (only === 'all' || only === 'buttons') {
+  if (part('buttons')) {
     // PASS (tap: along the grass), the receiver takes it; THRU; then SHOOT held and let go in the box
-    const { context, page, errors, cdp } = await open(width, height, { seed: 'qa-btn', scenario: 'build', home: 'BAR', hs: '2015', away: 'EVE', as: '2016' });
+    const { context, page, errors, cdp } = await open(p, { seed: 'qa-btn', scenario: 'build', home: 'BAR', hs: '2015', away: 'EVE', as: '2016' });
     await page.locator('.sc2-go').tap();
     await page.waitForSelector('.hg2-pass');
     const before = await state(page);
@@ -131,9 +165,9 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     errorsAll.push(...errors);
     await context.close();
   }
-  if (only === 'all' || only === 'auto') {
+  if (part('auto')) {
     // 2. the autopilot plays a whole match at normal speed: goal, final
-    const { context, page, errors } = await open(width, height, { seed: 'qa-auto', auto: '1', home: 'BAR', hs: '2015', away: 'EVE', as: '2016' });
+    const { context, page, errors } = await open(p, { seed: 'qa-auto', auto: '1', home: 'BAR', hs: '2015', away: 'EVE', as: '2016' });
     let shotGoal = false;
     const t0 = Date.now();
     while (Date.now() - t0 < 240000) {
@@ -152,9 +186,9 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     errorsAll.push(...errors);
     await context.close();
   }
-  if (only === 'all' || only === 'sets') {
+  if (part('sets')) {
     for (const sc of ['corner', 'freekick', 'counter', 'wide']) {
-      const { context, page, errors } = await open(width, height, { seed: 'qa-' + sc, scenario: sc, home: 'LIV', hs: '2019', away: 'MCI', as: '2019' });
+      const { context, page, errors } = await open(p, { seed: 'qa-' + sc, scenario: sc, home: 'LIV', hs: '2019', away: 'MCI', as: '2019' });
       await page.waitForSelector('.sc2-go');
       await page.waitForTimeout(700);
       await page.locator('.sc2-go').tap();
@@ -165,8 +199,8 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
       await context.close();
     }
   }
-  if (only === 'all' || only === 'pens') {
-    const { context, page, errors, cdp } = await open(width, height, { seed: 'qa-pens', pens: '1' });
+  if (part('pens')) {
+    const { context, page, errors, cdp } = await open(p, { seed: 'qa-pens', pens: '1' });
     await page.waitForSelector('.sc2-go');
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${out}/${tag}-shootout.png` });
@@ -215,4 +249,6 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
 await browser.close();
 fs.writeFileSync(out + '/report.json', JSON.stringify(report, null, 1));
 console.log(JSON.stringify(report, null, 1).slice(0, 6000));
+console.log(blockedLine());
 console.log('errors', errorsAll.length, errorsAll.slice(0, 5));
+process.exitCode = errorsAll.length ? 1 : 0;

@@ -1,5 +1,5 @@
-// Soccer in the app, end to end in Chromium (Claude, 2026-11-01). Needs the dev server and the local
-// relay (docs/BROWSER-QA.md):
+// Soccer in the app, end to end in Chromium (Claude, 2026-11-01). Needs the dev server (the local
+// relay runs in this process):
 //   PS_QA_URL=http://localhost:5193/ node scripts/qa/soccer-app.mjs [all|switch|draft|arcade|ut|widths]
 // - switch: an NBA player switches to SOCCER on Home (the reload model), the other sports' saves untouched
 // - draft:  a Classic soccer draft (eight spots on the pitch) → the 38-game W-D-L season → the cup (simulated
@@ -8,14 +8,20 @@
 //           (?autoplay), to the result
 // - ut:     a fresh Ultimate Team: starter pack → squad on the pitch (formation switch) → a Squad Battles
 //           match (autoplay) → Store (no Spotlight)
-// - widths: Home, draft, UT Home/Squad/Store at 430, 390 and 320
+// - widths: Home, draft, UT Home/Squad/Store on the six soccer presets (scripts/soccer/qa-isolate.mjs)
 // Every flow fails on a page error. Screenshots go to PS_QA_ARTIFACTS (default /tmp/perfect-season-qa).
+// Studio overhaul soccer-1 (2026-11-10): every context is isolated (live hosts aborted and counted)
+// and the head-to-head relay runs in this process on 7777 (scripts/soccer/relay.mjs: it waits for a
+// busy port, never falls back to a live relay).
 import assert from 'node:assert/strict';
 import { base, fixture, launch, shot } from './browser.mjs';
+import { blockedLine, insets, isolateBrowser, PRESETS } from '../soccer/qa-isolate.mjs';
+import { startRelay } from '../soccer/relay.mjs';
 
 const which = process.argv[2] ?? 'all';
 const run = (k) => which === 'all' || which === k;
-const browser = await launch();
+const relay = await startRelay();
+const browser = isolateBrowser(await launch());
 const report = {};
 const wait = (page, ms) => page.waitForTimeout(ms);
 const noErrors = (errors, what) => assert.deepEqual(errors, [], what + ': page errors');
@@ -250,8 +256,11 @@ if (run('ut')) {
 }
 
 if (run('widths')) {
-  for (const width of [430, 390, 320]) {
-    const { page, errors, context } = await fixture(browser, 'soccer', 'Claude QA', width, width === 320 ? { viewport: { width: 320, height: 568 } } : width === 430 ? { viewport: { width: 430, height: 932 } } : {});
+  for (const p of PRESETS) {
+    const width = p.tag;
+    const { page, errors, context } = await fixture(browser, 'soccer', 'Claude QA', p.w, { viewport: { width: p.w, height: p.h }, hasTouch: true, isMobile: true });
+    await insets(context, p.insets);
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await wait(page, 1500);
     await shot(page, 'soccer-w' + width + '-home');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
@@ -281,4 +290,6 @@ if (run('widths')) {
 }
 
 await browser.close();
-console.log(JSON.stringify({ base, ...report }, null, 1));
+await relay.close();
+console.log(JSON.stringify({ base, ...report, relay: relay.stats }, null, 1));
+console.log(blockedLine());

@@ -182,7 +182,7 @@ export function Arcade({
   const aiPlay = (rival: boolean, s: string, skill: number, a: (p: Player) => Attrs | null): Progress => {
     if (SOCCER) {
       const q = squads!;
-      return rival ? sg!.aiProgress(q.them, q.us, s, skill, defenseIQ) : sg!.aiProgress(q.us, q.them, s, skill, defenseIQ);
+      return rival ? sg!.aiProgressFor(q.them, q.us, s, skill, defenseIQ, { rival, online }) : sg!.aiProgressFor(q.us, q.them, s, skill, defenseIQ, { rival, online });
     }
     if (teams) {
       const t = teams;
