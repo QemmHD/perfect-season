@@ -21,7 +21,7 @@ import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPE
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
 import { aimPass, callPlay, cancelShoot, jumpRebound, crossover, pass, pressShoot, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
-import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
+import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, practiceStart, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
 import type { Body, Hooper, Possession, Pt, Scheme } from './types';
@@ -173,19 +173,7 @@ export function Hoops2({
 
   const next = (g: HoopsGame) => {
     possRef.current = startPossession(g);
-    if (practice) {
-      const p = possRef.current,
-        h = p.bodies[0];
-      const at = practice.drill === 'finish' ? { cx: RIM.cx - 13, cz: 0 } : { cx: RIM.cx - 24.5, cz: 0 };
-      Object.assign(h, at);
-      h.home = { ...at };
-      const d = p.bodies[5];
-      Object.assign(d, { cx: at.cx + 7, cz: at.cz + 2 });
-      if (practice.drill === 'pass') {
-        p.scheme = 'trap';
-        p.events = ['scheme:trap'];
-      }
-    }
+    if (practice) practiceStart(possRef.current, practice.drill);
     const pl = pilotRef.current;
     pl.letGo = null;
     pl.driving = false;

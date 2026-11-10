@@ -2,7 +2,8 @@
 // Players tire as they go (less by stamina, back up at the half); three straight buckets put a man
 // on fire (a wider green window until he misses).
 import { hashString, rng } from '../../engine/rng';
-import { newPossession } from './engine';
+import type { Drill } from '../../evolution/training';
+import { newPossession, RIM } from './engine';
 import type { Hooper, Possession } from './types';
 
 export const PER_HALF = 8;
@@ -87,6 +88,22 @@ export function startPossession(g: HoopsGame): Possession {
   if (clutch && [...ours, ...theirs].some((h) => h.abil.includes('icon'))) p.events.push('clutch:icon');
   p.fire = g.fire;
   return p;
+}
+
+/**
+ * A practice drill's set-up (Training Camp and Moments): the handler on his spot (the top of the
+ * arc, or the elbow extended to finish), his man a step off; the passing drill faces a trap.
+ */
+export function practiceStart(p: Possession, drill: Drill): void {
+  const h = p.bodies[0];
+  const at = drill === 'finish' ? { cx: RIM.cx - 13, cz: 0 } : { cx: RIM.cx - 24.5, cz: 0 };
+  Object.assign(h, at);
+  h.home = { ...at };
+  Object.assign(p.bodies[5], { cx: at.cx + 7, cz: at.cz + 2 });
+  if (drill === 'pass') {
+    p.scheme = 'trap';
+    p.events = ['scheme:trap'];
+  }
 }
 
 export function half(g: HoopsGame): 1 | 2 {
