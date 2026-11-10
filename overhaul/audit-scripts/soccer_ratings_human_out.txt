@@ -1,0 +1,16 @@
+== person, no-skill beeline (sprint, SHOOT at 16 m, no aim), vs a 78-rated defence and keeper ==
+counter  att 60: 0.7%   att 70: 1.7%   att 80: 32.7%   att 90: 92.3%   att 99: 99.3%
+build    att 60: 0.0%   att 70: 0.7%   att 80: 21.7%   att 90: 70.0%   att 99: 88.7%
+wide     att 60: 4.3%   att 70: 6.7%   att 80: 27.3%   att 90: 60.7%   att 99: 81.3%
+== same, attackers 80 vs keeper 55 / 78 / 95 (defence 78) ==
+counter  gk 55: 37.7%   gk 78: 38.0%   gk 95: 23.7%
+build    gk 55: 22.7%   gk 78: 21.3%   gk 95: 18.7%
+== the autopilot (0.68) for comparison, att 60 / 80 / 99 vs 78 ==
+counter  att 60: 7.0%   att 80: 14.7%   att 99: 33.7%
+build    att 60: 10.3%   att 80: 19.0%   att 99: 30.0%
+== attacks that end on the 120 s hard stop with a dead "shot" (autopilot 0.68, 75 v 75) ==
+build    2 of 900 0.22%
+counter  3 of 900 0.33%
+wide     4 of 900 0.44%
+corner   2 of 900 0.22%
+freekick 0 of 900 0.00%

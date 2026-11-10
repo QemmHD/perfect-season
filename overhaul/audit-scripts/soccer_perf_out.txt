@@ -1,0 +1,6 @@
+390x844 cpu 1x {"frames":480,"fps":60,"median":16.7,"p95":16.8,"p99":16.8,"max":16.8,"over20ms":0,"longtasks":0,"heapMB":86.4}
+390x844 cpu 4x {"frames":472,"fps":59,"median":16.7,"p95":16.8,"p99":33.3,"max":50.1,"over20ms":6,"longtasks":1,"heapMB":97.4}
+390x844 cpu 6x {"frames":425,"fps":53.1,"median":16.7,"p95":33.3,"p99":50.1,"max":100,"over20ms":41,"longtasks":4,"heapMB":86.4}
+844x390 cpu 1x {"frames":480,"fps":60,"median":16.7,"p95":16.8,"p99":16.8,"max":16.8,"over20ms":0,"longtasks":0,"heapMB":116}
+844x390 cpu 4x {"frames":455,"fps":56.9,"median":16.7,"p95":16.8,"p99":50,"max":83.4,"over20ms":14,"longtasks":5,"heapMB":60.3}
+844x390 cpu 6x {"frames":369,"fps":46.1,"median":16.7,"p95":50,"p99":66.7,"max":150,"over20ms":76,"longtasks":9,"heapMB":109}

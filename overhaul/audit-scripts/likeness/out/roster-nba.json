@@ -1,0 +1,1157 @@
+{
+ "sport": "nba",
+ "cards": 22082,
+ "players": 3587,
+ "tiers": {
+  "silver": 7513,
+  "bronze": 7471,
+  "gold": 6320,
+  "promo": 518,
+  "legend": 120,
+  "spotlight": 120,
+  "goat": 20
+ },
+ "htCoverage": 1,
+ "wtCoverage": 1,
+ "numMissingCards": 20,
+ "ht": {
+  "min": 63,
+  "p10": 74,
+  "p50": 79,
+  "p90": 83,
+  "max": 91
+ },
+ "wt": {
+  "min": 133,
+  "p10": 180,
+  "p50": 210,
+  "p90": 250,
+  "max": 330
+ },
+ "top": [
+  {
+   "name": "Larry Bird",
+   "ovr": 110,
+   "tier": "goat",
+   "pos": "SF",
+   "editions": 24,
+   "ht": [
+    81
+   ],
+   "wt": [
+    220
+   ],
+   "num": [
+    33
+   ]
+  },
+  {
+   "name": "Kevin Garnett",
+   "ovr": 110,
+   "tier": "goat",
+   "pos": "PF",
+   "editions": 31,
+   "ht": [
+    83
+   ],
+   "wt": [
+    240
+   ],
+   "num": [
+    21,
+    5,
+    2
+   ]
+  },
+  {
+   "name": "Tim Duncan",
+   "ovr": 110,
+   "tier": "goat",
+   "pos": "PF",
+   "editions": 32,
+   "ht": [
+    83
+   ],
+   "wt": [
+    250
+   ],
+   "num": [
+    21
+   ]
+  },
+  {
+   "name": "Kareem Abdul-Jabbar",
+   "ovr": 109,
+   "tier": "goat",
+   "pos": "C",
+   "editions": 35,
+   "ht": [
+    86
+   ],
+   "wt": [
+    225
+   ],
+   "num": [
+    33
+   ]
+  },
+  {
+   "name": "Michael Jordan",
+   "ovr": 109,
+   "tier": "goat",
+   "pos": "SG",
+   "editions": 26,
+   "ht": [
+    78
+   ],
+   "wt": [
+    198
+   ],
+   "num": [
+    23
+   ]
+  },
+  {
+   "name": "Shaquille O'Neal",
+   "ovr": 109,
+   "tier": "goat",
+   "pos": "C",
+   "editions": 32,
+   "ht": [
+    85
+   ],
+   "wt": [
+    325
+   ],
+   "num": [
+    32,
+    34,
+    33,
+    36
+   ]
+  },
+  {
+   "name": "Wilt Chamberlain",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "C",
+   "editions": 30,
+   "ht": [
+    85
+   ],
+   "wt": [
+    275
+   ],
+   "num": [
+    13
+   ]
+  },
+  {
+   "name": "Hakeem Olajuwon",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "C",
+   "editions": 29,
+   "ht": [
+    84
+   ],
+   "wt": [
+    255
+   ],
+   "num": [
+    34
+   ]
+  },
+  {
+   "name": "Scottie Pippen",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "SF",
+   "editions": 23,
+   "ht": [
+    80
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    33
+   ]
+  },
+  {
+   "name": "LeBron James",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "SF",
+   "editions": 39,
+   "ht": [
+    81
+   ],
+   "wt": [
+    250
+   ],
+   "num": [
+    23,
+    6
+   ]
+  },
+  {
+   "name": "Giannis Antetokounmpo",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "PF",
+   "editions": 23,
+   "ht": [
+    83
+   ],
+   "wt": [
+    243
+   ],
+   "num": [
+    34
+   ]
+  },
+  {
+   "name": "Bill Russell",
+   "ovr": 107,
+   "tier": "goat",
+   "pos": "C",
+   "editions": 18,
+   "ht": [
+    82
+   ],
+   "wt": [
+    215
+   ],
+   "num": [
+    6
+   ]
+  },
+  {
+   "name": "Oscar Robertson",
+   "ovr": 107,
+   "tier": "goat",
+   "pos": "PG",
+   "editions": 26,
+   "ht": [
+    77
+   ],
+   "wt": [
+    205
+   ],
+   "num": [
+    14,
+    1
+   ]
+  },
+  {
+   "name": "Kobe Bryant",
+   "ovr": 107,
+   "tier": "goat",
+   "pos": "SG",
+   "editions": 33,
+   "ht": [
+    78
+   ],
+   "wt": [
+    212
+   ],
+   "num": [
+    8,
+    24
+   ]
+  },
+  {
+   "name": "Dirk Nowitzki",
+   "ovr": 107,
+   "tier": "goat",
+   "pos": "PF",
+   "editions": 28,
+   "ht": [
+    84
+   ],
+   "wt": [
+    245
+   ],
+   "num": [
+    41
+   ]
+  },
+  {
+   "name": "Dwyane Wade",
+   "ovr": 107,
+   "tier": "goat",
+   "pos": "SG",
+   "editions": 22,
+   "ht": [
+    76
+   ],
+   "wt": [
+    220
+   ],
+   "num": [
+    3,
+    9
+   ]
+  },
+  {
+   "name": "Jerry West",
+   "ovr": 106,
+   "tier": "goat",
+   "pos": "PG",
+   "editions": 27,
+   "ht": [
+    75
+   ],
+   "wt": [
+    175
+   ],
+   "num": [
+    44
+   ]
+  },
+  {
+   "name": "Magic Johnson",
+   "ovr": 106,
+   "tier": "goat",
+   "pos": "SG",
+   "editions": 27,
+   "ht": [
+    81
+   ],
+   "wt": [
+    215
+   ],
+   "num": [
+    32
+   ]
+  },
+  {
+   "name": "Kevin Durant",
+   "ovr": 106,
+   "tier": "goat",
+   "pos": "SF",
+   "editions": 27,
+   "ht": [
+    83
+   ],
+   "wt": [
+    240
+   ],
+   "num": [
+    35,
+    7
+   ]
+  },
+  {
+   "name": "Stephen Curry",
+   "ovr": 106,
+   "tier": "goat",
+   "pos": "PG",
+   "editions": 24,
+   "ht": [
+    74
+   ],
+   "wt": [
+    185
+   ],
+   "num": [
+    30
+   ]
+  },
+  {
+   "name": "Nikola Jokić",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 19,
+   "ht": [
+    83
+   ],
+   "wt": [
+    284
+   ],
+   "num": [
+    15
+   ]
+  },
+  {
+   "name": "Shai Gilgeous-Alexander",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 13,
+   "ht": [
+    78
+   ],
+   "wt": [
+    195
+   ],
+   "num": [
+    2
+   ]
+  },
+  {
+   "name": "Moses Malone",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 25,
+   "ht": [
+    82
+   ],
+   "wt": [
+    215
+   ],
+   "num": [
+    21,
+    24,
+    2,
+    4,
+    8
+   ]
+  },
+  {
+   "name": "Karl Malone",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 32,
+   "ht": [
+    81
+   ],
+   "wt": [
+    250
+   ],
+   "num": [
+    32,
+    11
+   ]
+  },
+  {
+   "name": "Gary Payton",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 23,
+   "ht": [
+    76
+   ],
+   "wt": [
+    180
+   ],
+   "num": [
+    2,
+    20
+   ]
+  },
+  {
+   "name": "Luka Dončić",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 17,
+   "ht": [
+    80
+   ],
+   "wt": [
+    230
+   ],
+   "num": [
+    77
+   ]
+  },
+  {
+   "name": "Dave Cowens",
+   "ovr": 102,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 14,
+   "ht": [
+    81
+   ],
+   "wt": [
+    230
+   ],
+   "num": [
+    18,
+    36
+   ]
+  },
+  {
+   "name": "Julius Erving",
+   "ovr": 102,
+   "tier": "spotlight",
+   "pos": "SF",
+   "editions": 18,
+   "ht": [
+    79
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    6
+   ]
+  },
+  {
+   "name": "Allen Iverson",
+   "ovr": 102,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 21,
+   "ht": [
+    72
+   ],
+   "wt": [
+    165
+   ],
+   "num": [
+    3,
+    1
+   ]
+  },
+  {
+   "name": "Tracy McGrady",
+   "ovr": 102,
+   "tier": "spotlight",
+   "pos": "SG",
+   "editions": 20,
+   "ht": [
+    80
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    1,
+    3
+   ]
+  },
+  {
+   "name": "Kawhi Leonard",
+   "ovr": 102,
+   "tier": "spotlight",
+   "pos": "SF",
+   "editions": 19,
+   "ht": [
+    78
+   ],
+   "wt": [
+    225
+   ],
+   "num": [
+    2
+   ]
+  },
+  {
+   "name": "Joel Embiid",
+   "ovr": 102,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 13,
+   "ht": [
+    84
+   ],
+   "wt": [
+    280
+   ],
+   "num": [
+    21
+   ]
+  },
+  {
+   "name": "Elgin Baylor",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "SF",
+   "editions": 22,
+   "ht": [
+    77
+   ],
+   "wt": [
+    225
+   ],
+   "num": [
+    22
+   ]
+  },
+  {
+   "name": "John Havlicek",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "SF",
+   "editions": 22,
+   "ht": [
+    77
+   ],
+   "wt": [
+    203
+   ],
+   "num": [
+    17
+   ]
+  },
+  {
+   "name": "Walt Frazier",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 17,
+   "ht": [
+    76
+   ],
+   "wt": [
+    200
+   ],
+   "num": [
+    10,
+    11
+   ]
+  },
+  {
+   "name": "Bill Walton",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 12,
+   "ht": [
+    83
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    32,
+    5
+   ]
+  },
+  {
+   "name": "Isiah Thomas",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 18,
+   "ht": [
+    73
+   ],
+   "wt": [
+    180
+   ],
+   "num": [
+    11
+   ]
+  },
+  {
+   "name": "Patrick Ewing",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 20,
+   "ht": [
+    84
+   ],
+   "wt": [
+    240
+   ],
+   "num": [
+    33,
+    6
+   ]
+  },
+  {
+   "name": "David Robinson",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 20,
+   "ht": [
+    85
+   ],
+   "wt": [
+    235
+   ],
+   "num": [
+    50
+   ]
+  },
+  {
+   "name": "Chris Webber",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 18,
+   "ht": [
+    82
+   ],
+   "wt": [
+    245
+   ],
+   "num": [
+    4,
+    2,
+    84
+   ]
+  },
+  {
+   "name": "James Harden",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 28,
+   "ht": [
+    77
+   ],
+   "wt": [
+    220
+   ],
+   "num": [
+    13,
+    1
+   ]
+  },
+  {
+   "name": "Jayson Tatum",
+   "ovr": 101,
+   "tier": "spotlight",
+   "pos": "SF",
+   "editions": 14,
+   "ht": [
+    80
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    0
+   ]
+  },
+  {
+   "name": "Bob Pettit",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 13,
+   "ht": [
+    81
+   ],
+   "wt": [
+    205
+   ],
+   "num": [
+    9
+   ]
+  },
+  {
+   "name": "Bob Cousy",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 8,
+   "ht": [
+    73
+   ],
+   "wt": [
+    175
+   ],
+   "num": [
+    14
+   ]
+  },
+  {
+   "name": "Tom Heinsohn",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 8,
+   "ht": [
+    79
+   ],
+   "wt": [
+    218
+   ],
+   "num": [
+    15
+   ]
+  },
+  {
+   "name": "Hal Greer",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "SG",
+   "editions": 16,
+   "ht": [
+    74
+   ],
+   "wt": [
+    175
+   ],
+   "num": [
+    15
+   ]
+  },
+  {
+   "name": "Dave DeBusschere",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 14,
+   "ht": [
+    78
+   ],
+   "wt": [
+    220
+   ],
+   "num": [
+    22
+   ]
+  },
+  {
+   "name": "Jerry Lucas",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 16,
+   "ht": [
+    80
+   ],
+   "wt": [
+    230
+   ],
+   "num": [
+    16,
+    32
+   ]
+  },
+  {
+   "name": "Gus Johnson",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 12,
+   "ht": [
+    78
+   ],
+   "wt": [
+    230
+   ],
+   "num": [
+    25,
+    13
+   ]
+  },
+  {
+   "name": "Willis Reed",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 11,
+   "ht": [
+    82
+   ],
+   "wt": [
+    235
+   ],
+   "num": [
+    19
+   ]
+  },
+  {
+   "name": "Rick Barry",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "SF",
+   "editions": 17,
+   "ht": [
+    79
+   ],
+   "wt": [
+    205
+   ],
+   "num": [
+    24,
+    2
+   ]
+  },
+  {
+   "name": "Billy Cunningham",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "SF",
+   "editions": 14,
+   "ht": [
+    78
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    32
+   ]
+  },
+  {
+   "name": "Dave Bing",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 16,
+   "ht": [
+    75
+   ],
+   "wt": [
+    180
+   ],
+   "num": [
+    21,
+    44
+   ]
+  },
+  {
+   "name": "Elvin Hayes",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 24,
+   "ht": [
+    81
+   ],
+   "wt": [
+    235
+   ],
+   "num": [
+    11,
+    44
+   ]
+  },
+  {
+   "name": "Wes Unseld",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "C",
+   "editions": 17,
+   "ht": [
+    79
+   ],
+   "wt": [
+    245
+   ],
+   "num": [
+    41
+   ]
+  },
+  {
+   "name": "Norm Van Lier",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "SG",
+   "editions": 13,
+   "ht": [
+    73
+   ],
+   "wt": [
+    173
+   ],
+   "num": [
+    23,
+    2,
+    4
+   ]
+  },
+  {
+   "name": "Pete Maravich",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "SG",
+   "editions": 14,
+   "ht": [
+    77
+   ],
+   "wt": [
+    197
+   ],
+   "num": [
+    44,
+    7
+   ]
+  },
+  {
+   "name": "Spencer Haywood",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PF",
+   "editions": 17,
+   "ht": [
+    80
+   ],
+   "wt": [
+    225
+   ],
+   "num": [
+    24,
+    42,
+    31
+   ]
+  },
+  {
+   "name": "Tiny Archibald",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 18,
+   "ht": [
+    73
+   ],
+   "wt": [
+    150
+   ],
+   "num": [
+    10,
+    1,
+    7
+   ]
+  },
+  {
+   "name": "Paul Westphal",
+   "ovr": 100,
+   "tier": "spotlight",
+   "pos": "PG",
+   "editions": 16,
+   "ht": [
+    76
+   ],
+   "wt": [
+    195
+   ],
+   "num": [
+    44
+   ]
+  }
+ ],
+ "mostEditions": [
+  {
+   "name": "LeBron James",
+   "editions": 39,
+   "best": 108
+  },
+  {
+   "name": "Kareem Abdul-Jabbar",
+   "editions": 35,
+   "best": 109
+  },
+  {
+   "name": "Kobe Bryant",
+   "editions": 33,
+   "best": 107
+  },
+  {
+   "name": "Karl Malone",
+   "editions": 32,
+   "best": 103
+  },
+  {
+   "name": "Shaquille O'Neal",
+   "editions": 32,
+   "best": 109
+  },
+  {
+   "name": "Tim Duncan",
+   "editions": 32,
+   "best": 110
+  },
+  {
+   "name": "Kevin Garnett",
+   "editions": 31,
+   "best": 110
+  },
+  {
+   "name": "Wilt Chamberlain",
+   "editions": 30,
+   "best": 108
+  },
+  {
+   "name": "John Stockton",
+   "editions": 30,
+   "best": 100
+  },
+  {
+   "name": "Chris Paul",
+   "editions": 30,
+   "best": 100
+  },
+  {
+   "name": "Hakeem Olajuwon",
+   "editions": 29,
+   "best": 108
+  },
+  {
+   "name": "Jason Kidd",
+   "editions": 29,
+   "best": 100
+  },
+  {
+   "name": "Dirk Nowitzki",
+   "editions": 28,
+   "best": 107
+  },
+  {
+   "name": "James Harden",
+   "editions": 28,
+   "best": 101
+  },
+  {
+   "name": "Jerry West",
+   "editions": 27,
+   "best": 106
+  },
+  {
+   "name": "Magic Johnson",
+   "editions": 27,
+   "best": 106
+  },
+  {
+   "name": "Kevin Durant",
+   "editions": 27,
+   "best": 106
+  },
+  {
+   "name": "Russell Westbrook",
+   "editions": 27,
+   "best": 100
+  },
+  {
+   "name": "Oscar Robertson",
+   "editions": 26,
+   "best": 107
+  },
+  {
+   "name": "Michael Jordan",
+   "editions": 26,
+   "best": 109
+  },
+  {
+   "name": "Moses Malone",
+   "editions": 25,
+   "best": 103
+  },
+  {
+   "name": "Dikembe Mutombo",
+   "editions": 25,
+   "best": 100
+  },
+  {
+   "name": "Dwight Howard",
+   "editions": 25,
+   "best": 100
+  },
+  {
+   "name": "Elvin Hayes",
+   "editions": 24,
+   "best": 100
+  },
+  {
+   "name": "Larry Bird",
+   "editions": 24,
+   "best": 110
+  }
+ ]
+}

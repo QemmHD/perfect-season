@@ -1,0 +1,236 @@
+{
+ "nba": {
+  "fast": {
+   "cold": {
+    "ttfb": 8,
+    "domContentLoaded": 108,
+    "load": 108,
+    "fcp": 288,
+    "requests": 50,
+    "jsFiles": 42,
+    "jsTransfer": 785336,
+    "jsDecoded": 2338298,
+    "longTasks": 1,
+    "longTaskMs": 62,
+    "longest": 62,
+    "heapMB": 23.4,
+    "welcomeInteractive": 1389,
+    "wallMs": 1392
+   }
+  },
+  "warm": {
+   "ttfb": 12,
+   "domContentLoaded": 85,
+   "load": 85,
+   "fcp": 300,
+   "requests": 49,
+   "jsFiles": 42,
+   "jsTransfer": 0,
+   "jsDecoded": 2338298,
+   "longTasks": 2,
+   "longTaskMs": 123,
+   "longest": 66,
+   "heapMB": 23.4,
+   "homeReady": 1027,
+   "wallMs": 1034
+  },
+  "offline": {
+   "ok": true,
+   "homeReady": 3965,
+   "wallMs": 3967,
+   "utText": "EXIT ULTIMATE TEAM 9075 The cards didn’t load. TRY AGAIN HOME PLAY SQUAD CLUB CHALLENGES STORE 1"
+  },
+  "ut": {
+   "x1": {
+    "utReadyMs": 2123,
+    "longTasks": 2,
+    "longTaskMs": 220,
+    "longest": 167,
+    "jsDecoded": 4564337,
+    "heapMB": 23.4
+   },
+   "x4": {
+    "utReadyMs": 7395,
+    "longTasks": 6,
+    "longTaskMs": 1089,
+    "longest": 385,
+    "jsDecoded": 4564337,
+    "heapMB": 23.4
+   }
+  },
+  "slow": {
+   "cold": {
+    "ttfb": 6,
+    "domContentLoaded": 590,
+    "load": 590,
+    "fcp": 1572,
+    "requests": 50,
+    "jsFiles": 42,
+    "jsTransfer": 785336,
+    "jsDecoded": 2338298,
+    "longTasks": 3,
+    "longTaskMs": 494,
+    "longest": 295,
+    "heapMB": 20.7,
+    "welcomeInteractive": 2612,
+    "wallMs": 2617
+   }
+  }
+ },
+ "nfl": {
+  "fast": {
+   "cold": {
+    "ttfb": 6,
+    "domContentLoaded": 123,
+    "load": 123,
+    "fcp": 276,
+    "requests": 50,
+    "jsFiles": 42,
+    "jsTransfer": 657321,
+    "jsDecoded": 2042807,
+    "longTasks": 2,
+    "longTaskMs": 106,
+    "longest": 53,
+    "heapMB": 15.4,
+    "welcomeInteractive": 1385,
+    "wallMs": 1387
+   }
+  },
+  "warm": {
+   "ttfb": 6,
+   "domContentLoaded": 60,
+   "load": 64,
+   "fcp": 212,
+   "requests": 49,
+   "jsFiles": 42,
+   "jsTransfer": 0,
+   "jsDecoded": 2042807,
+   "longTasks": 0,
+   "longTaskMs": 0,
+   "longest": 0,
+   "heapMB": 15.4,
+   "homeReady": 927,
+   "wallMs": 935
+  },
+  "offline": {
+   "ok": true,
+   "homeReady": 3942,
+   "wallMs": 3944,
+   "utText": "EXIT ULTIMATE TEAM 9075 The cards didn’t load. TRY AGAIN HOME PLAY SQUAD CLUB CHALLENGES STORE 1"
+  },
+  "ut": {
+   "x1": {
+    "utReadyMs": 2092,
+    "longTasks": 2,
+    "longTaskMs": 219,
+    "longest": 167,
+    "jsDecoded": 6259569,
+    "heapMB": 15.4
+   },
+   "x4": {
+    "utReadyMs": 8974,
+    "longTasks": 5,
+    "longTaskMs": 1135,
+    "longest": 669,
+    "jsDecoded": 6259569,
+    "heapMB": 15.4
+   }
+  },
+  "slow": {
+   "cold": {
+    "ttfb": 4,
+    "domContentLoaded": 556,
+    "load": 557,
+    "fcp": 1260,
+    "requests": 50,
+    "jsFiles": 42,
+    "jsTransfer": 657321,
+    "jsDecoded": 2042807,
+    "longTasks": 3,
+    "longTaskMs": 415,
+    "longest": 214,
+    "heapMB": 15.4,
+    "welcomeInteractive": 2206,
+    "wallMs": 2211
+   }
+  }
+ },
+ "soccer": {
+  "fast": {
+   "cold": {
+    "ttfb": 6,
+    "domContentLoaded": 104,
+    "load": 104,
+    "fcp": 248,
+    "requests": 50,
+    "jsFiles": 42,
+    "jsTransfer": 602576,
+    "jsDecoded": 1855815,
+    "longTasks": 1,
+    "longTaskMs": 58,
+    "longest": 58,
+    "heapMB": 16.3,
+    "welcomeInteractive": 1344,
+    "wallMs": 1345
+   }
+  },
+  "warm": {
+   "ttfb": 8,
+   "domContentLoaded": 85,
+   "load": 85,
+   "fcp": 212,
+   "requests": 49,
+   "jsFiles": 42,
+   "jsTransfer": 0,
+   "jsDecoded": 1855815,
+   "longTasks": 0,
+   "longTaskMs": 0,
+   "longest": 0,
+   "heapMB": 16.3,
+   "homeReady": 940,
+   "wallMs": 945
+  },
+  "offline": {
+   "ok": true,
+   "homeReady": 3974,
+   "wallMs": 3976,
+   "utText": "EXIT ULTIMATE TEAM 9075 The cards didn’t load. TRY AGAIN HOME PLAY SQUAD CLUB CHALLENGES STORE 1"
+  },
+  "ut": {
+   "x1": {
+    "utReadyMs": 679,
+    "longTasks": 1,
+    "longTaskMs": 125,
+    "longest": 125,
+    "jsDecoded": 4229231,
+    "heapMB": 16.3
+   },
+   "x4": {
+    "utReadyMs": 1834,
+    "longTasks": 5,
+    "longTaskMs": 902,
+    "longest": 431,
+    "jsDecoded": 4229231,
+    "heapMB": 16.3
+   }
+  },
+  "slow": {
+   "cold": {
+    "ttfb": 4,
+    "domContentLoaded": 616,
+    "load": 616,
+    "fcp": 1284,
+    "requests": 50,
+    "jsFiles": 42,
+    "jsTransfer": 602576,
+    "jsDecoded": 1855815,
+    "longTasks": 3,
+    "longTaskMs": 463,
+    "longest": 232,
+    "heapMB": 14.5,
+    "welcomeInteractive": 2284,
+    "wallMs": 2288
+   }
+  }
+ }
+}

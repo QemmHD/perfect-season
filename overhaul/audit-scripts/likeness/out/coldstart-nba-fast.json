@@ -1,0 +1,59 @@
+{
+ "nba": {
+  "fast": {
+   "cold": {
+    "ttfb": 9,
+    "domContentLoaded": 107,
+    "load": 107,
+    "fcp": 312,
+    "requests": 50,
+    "jsFiles": 42,
+    "jsTransfer": 785336,
+    "jsDecoded": 2338298,
+    "longTasks": 2,
+    "longTaskMs": 113,
+    "longest": 63,
+    "heapMB": 17.4,
+    "welcomeInteractive": 1410,
+    "wallMs": 1413
+   }
+  },
+  "warm": {
+   "ttfb": 9,
+   "domContentLoaded": 85,
+   "load": 85,
+   "fcp": 280,
+   "requests": 49,
+   "jsFiles": 42,
+   "jsTransfer": 0,
+   "jsDecoded": 2338298,
+   "longTasks": 2,
+   "longTaskMs": 113,
+   "longest": 61,
+   "heapMB": 17.4,
+   "homeReady": 996,
+   "wallMs": 1002
+  },
+  "offline": {
+   "ok": true,
+   "homeReady": 4001,
+   "wallMs": 4002,
+   "utText": "EXIT ULTIMATE TEAM 9075 The cards didn’t load. TRY AGAIN HOME PLAY SQUAD CLUB CHALLENGES STORE 1"
+  },
+  "ut": {
+   "utReadyMs4xCpu": 6817,
+   "ttfb": 13,
+   "domContentLoaded": 127,
+   "load": 133,
+   "fcp": 324,
+   "requests": 31,
+   "jsFiles": 15,
+   "jsTransfer": 0,
+   "jsDecoded": 4564337,
+   "longTasks": 5,
+   "longTaskMs": 878,
+   "longest": 488,
+   "heapMB": 17.4
+  }
+ }
+}

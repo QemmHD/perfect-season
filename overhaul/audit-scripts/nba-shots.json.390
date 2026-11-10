@@ -1,0 +1,121 @@
+{
+ "390": {
+  "tDom": 2350,
+  "tCanvas": 4312,
+  "tPad": 5051,
+  "tPlay": 5885,
+  "layout": {
+   ".hg2-bug": {
+    "x": 58,
+    "y": 8,
+    "w": 274,
+    "h": 34
+   },
+   ".hg2-marks": {
+    "x": 34,
+    "y": 48,
+    "w": 323,
+    "h": 17
+   },
+   ".hg2-look": {
+    "x": 93,
+    "y": 70,
+    "w": 204,
+    "h": 22
+   },
+   ".hg2-hint": {
+    "x": 98,
+    "y": 161,
+    "w": 195,
+    "h": 42
+   },
+   ".hg2-coach": {
+    "x": 78,
+    "y": 104,
+    "w": 235,
+    "h": 54
+   },
+   ".hg2-skills": {
+    "x": 168,
+    "y": 616,
+    "w": 208,
+    "h": 44
+   },
+   ".hg2-stick": {
+    "x": 14,
+    "y": 704,
+    "w": 128,
+    "h": 128
+   },
+   ".hg2-pass": {
+    "x": 208,
+    "y": 676,
+    "w": 70,
+    "h": 70
+   },
+   ".hg2-shoot": {
+    "x": 276,
+    "y": 732,
+    "w": 100,
+    "h": 100
+   },
+   ".play-readout-toggle": {
+    "x": 12,
+    "y": 627,
+    "w": 135,
+    "h": 44
+   }
+  },
+  "skillButtons": [
+   {
+    "t": "CROSS",
+    "w": 60,
+    "h": 44,
+    "x": 168,
+    "y": 616,
+    "disabled": true
+   },
+   {
+    "t": "STEP BACK",
+    "w": 84,
+    "h": 44,
+    "x": 234,
+    "y": 616,
+    "disabled": true
+   },
+   {
+    "t": "SPIN",
+    "w": 52,
+    "h": 44,
+    "x": 324,
+    "y": 616,
+    "disabled": true
+   }
+  ],
+  "overlaps": [
+   ".hg2-pass x .hg2-shoot"
+  ],
+  "frames1x": {
+   "frames": 300,
+   "p50": 16.7,
+   "p95": 16.7,
+   "p99": 16.8,
+   "max": 16.8,
+   "over20": 0,
+   "over33": 0
+  },
+  "frames4x": {
+   "frames": 287,
+   "p50": 16.7,
+   "p95": 16.8,
+   "p99": 33.4,
+   "max": 116.7,
+   "over20": 6,
+   "over33": 4
+  },
+  "heap": "57 MB",
+  "errors": [
+   "console: Failed to load resource: net::ERR_FAILED"
+  ]
+ }
+}

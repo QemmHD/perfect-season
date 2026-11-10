@@ -1,0 +1,108 @@
+
+===== rookie (400 matches, 5600 attacks, 4161 shots) =====
+goals/match total 2.33  per side 1.17  draws 26.0%  0-0 8.0%
+per-side goal distribution {"0":243,"1":291,"2":174,"3":75,"4":17}
+|dOvr|>=4: better wins 59.6%  draw 24.8%  worse wins 15.6%  n 250
+|dOvr|>=8: better wins 66.4%  draw 19.3%  worse wins 14.3%  n 140
+attack ends W 24.5%  G 16.6%  O 2.3%  B 8.4%  L 33.6%  S 14.2%  T 0.4%
+  build      goal  20.8%  shot in  69.3%  shots/att 0.77  clock used 7.6s  pens won 1.3%  passes/att 3.69  lost 32.9%  offside 0.8%  time 0.1%
+  freekick   goal  11.1%  shot in 100.0%  shots/att 1.10  clock used 0.1s  pens won 0.0%  passes/att 0.03  lost 3.8%  offside 0.0%  time 0.0%
+  corner     goal   4.3%  shot in  30.0%  shots/att 0.31  clock used 2.5s  pens won 0.0%  passes/att 1.10  lost 70.0%  offside 0.1%  time 1.9%
+  counter    goal  20.3%  shot in  66.0%  shots/att 0.75  clock used 7.4s  pens won 2.2%  passes/att 2.54  lost 33.9%  offside 5.0%  time 0.1%
+  wide       goal  19.5%  shot in  69.6%  shots/att 0.76  clock used 4.8s  pens won 0.5%  passes/att 2.40  lost 29.9%  offside 4.7%  time 0.5%
+shots per side per match 5.20
+shot results S 31.0%  W 32.6%  P 4.1%  G 20.3%  B 11.2%  T 0.6%  L 0.2%  on target (G+S) 51.3%  save% of on-target 60.4%
+  open-play 0-6 m      shots    50  share   1.2%  goal  48.0%  green 62.0%
+  open-play 6-11 m     shots   613  share  14.7%  goal  40.6%  green 49.8%
+  open-play 11-16.5 m  shots  1519  share  36.5%  goal  24.9%  green 47.7%
+  open-play 16.5-22 m  shots  1010  share  24.3%  goal  13.1%  green 52.2%
+  open-play 22-30 m    shots    61  share   1.5%  goal   8.2%  green 47.5%
+  open-play 30-99 m    shots    43  share   1.0%  goal   2.3%  green 34.9%
+  kind shot            shots  2484  goal  26.4%  mean dist 14.8
+  kind header          shots   762  goal  16.5%  mean dist 14.6
+  kind volley          shots    50  goal  16.0%  mean dist 16.0
+  kind fk              shots   829  goal   3.4%  mean dist 23.5
+  kind pen             shots    36  goal  77.8%  mean dist 10.6
+  share of non-pen shots in box 63.0%
+  end texts GOAL 16.6% | WIDE 13.9% | INTERCEPTED BY x 13.3% | SAVED · x 11.5% | OVER THE BAR 10.6% | WON IN THE AIR BY x 8.5% | BLOCKED BY x 8.4% | TACKLED BY x 6.3% | OFFSIDE · x 2.3% | OUT OF PLAY 2.2% | HEADED CLEAR 2.1% | KEEPER COLLECTS 2.0% | CLEARED BY x 1.1% | KEEPER CLAIMS 0.6%
+
+===== pro (400 matches, 5600 attacks, 4167 shots) =====
+goals/match total 2.33  per side 1.17  draws 26.8%  0-0 7.8%
+per-side goal distribution {"0":250,"1":296,"2":168,"3":51,"4":28,"5":6,"6":1}
+|dOvr|>=4: better wins 60.8%  draw 25.6%  worse wins 13.6%  n 250
+|dOvr|>=8: better wins 69.3%  draw 23.6%  worse wins 7.1%  n 140
+attack ends L 33.7%  G 16.7%  W 22.5%  B 8.4%  S 15.2%  O 3.0%  T 0.6%
+  corner     goal   5.4%  shot in  31.6%  shots/att 0.33  clock used 2.4s  pens won 0.6%  passes/att 1.05  lost 69.8%  offside 0.0%  time 2.4%
+  freekick   goal  10.6%  shot in 100.0%  shots/att 1.10  clock used 0.1s  pens won 0.4%  passes/att 0.01  lost 5.3%  offside 0.0%  time 0.0%
+  build      goal  21.6%  shot in  69.5%  shots/att 0.77  clock used 7.1s  pens won 1.1%  passes/att 3.35  lost 34.0%  offside 0.9%  time 0.4%
+  wide       goal  18.9%  shot in  69.7%  shots/att 0.76  clock used 4.3s  pens won 0.8%  passes/att 1.92  lost 26.2%  offside 7.7%  time 0.7%
+  counter    goal  19.4%  shot in  64.4%  shots/att 0.73  clock used 7.2s  pens won 1.4%  passes/att 2.48  lost 35.9%  offside 5.1%  time 0.1%
+shots per side per match 5.21
+shot results S 33.3%  G 20.4%  W 29.8%  B 11.3%  T 0.8%  P 4.2%  L 0.2%  on target (G+S) 53.7%  save% of on-target 61.9%
+  open-play 0-6 m      shots    42  share   1.0%  goal  59.5%  green 57.1%
+  open-play 6-11 m     shots   565  share  13.6%  goal  45.0%  green 56.8%
+  open-play 11-16.5 m  shots  1410  share  33.8%  goal  23.4%  green 56.1%
+  open-play 16.5-22 m  shots  1130  share  27.1%  goal  15.8%  green 60.9%
+  open-play 22-30 m    shots    73  share   1.8%  goal   5.5%  green 64.4%
+  open-play 30-99 m    shots    64  share   1.5%  goal   3.1%  green 59.4%
+  kind shot            shots  2481  goal  26.0%  mean dist 15.5
+  kind header          shots   750  goal  18.3%  mean dist 14.6
+  kind volley          shots    53  goal  18.9%  mean dist 16.4
+  kind fk              shots   840  goal   2.3%  mean dist 23.6
+  kind pen             shots    43  goal  93.0%  mean dist 10.6
+  share of non-pen shots in box 60.0%
+  end texts GOAL 16.7% | INTERCEPTED BY x 13.2% | WIDE 12.7% | SAVED · x 12.1% | OVER THE BAR 9.8% | WON IN THE AIR BY x 8.4% | BLOCKED BY x 8.4% | TACKLED BY x 6.4% | OFFSIDE · x 3.0% | HEADED CLEAR 2.8% | KEEPER COLLECTS 2.5% | OUT OF PLAY 2.0% | CLEARED BY x 0.9% |  0.6%
+
+===== legend (400 matches, 5600 attacks, 3705 shots) =====
+goals/match total 1.98  per side 0.99  draws 31.0%  0-0 14.5%
+per-side goal distribution {"0":310,"1":276,"2":144,"3":55,"4":12,"5":2,"6":1}
+|dOvr|>=4: better wins 58.0%  draw 26.8%  worse wins 15.2%  n 250
+|dOvr|>=8: better wins 67.1%  draw 20.7%  worse wins 12.1%  n 140
+attack ends W 19.8%  O 3.0%  G 14.2%  L 40.8%  S 14.7%  B 7.2%  T 0.4%
+  freekick   goal  14.8%  shot in 100.0%  shots/att 1.11  clock used 0.1s  pens won 0.0%  passes/att 0.02  lost 6.8%  offside 0.0%  time 0.0%
+  wide       goal  16.3%  shot in  65.4%  shots/att 0.72  clock used 4.1s  pens won 0.7%  passes/att 1.81  lost 28.9%  offside 9.0%  time 0.3%
+  build      goal  15.3%  shot in  54.5%  shots/att 0.61  clock used 5.9s  pens won 1.2%  passes/att 2.90  lost 48.4%  offside 0.4%  time 0.3%
+  counter    goal  14.5%  shot in  54.9%  shots/att 0.60  clock used 6.9s  pens won 1.2%  passes/att 2.51  lost 45.9%  offside 4.4%  time 0.4%
+  corner     goal   7.6%  shot in  30.6%  shots/att 0.32  clock used 2.4s  pens won 0.4%  passes/att 1.04  lost 69.6%  offside 0.0%  time 1.4%
+shots per side per match 4.63
+shot results W 29.5%  S 36.1%  G 18.8%  B 10.9%  P 3.9%  T 0.6%  L 0.2%  on target (G+S) 54.9%  save% of on-target 65.8%
+  open-play 0-6 m      shots    40  share   1.1%  goal  50.0%  green 57.5%
+  open-play 6-11 m     shots   500  share  13.5%  goal  38.0%  green 69.2%
+  open-play 11-16.5 m  shots  1133  share  30.6%  goal  21.2%  green 63.3%
+  open-play 16.5-22 m  shots  1032  share  27.9%  goal  15.3%  green 71.2%
+  open-play 22-30 m    shots    57  share   1.5%  goal  12.3%  green 78.9%
+  open-play 30-99 m    shots    69  share   1.9%  goal  14.5%  green 66.7%
+  kind shot            shots  2070  goal  23.6%  mean dist 15.8
+  kind header          shots   718  goal  17.7%  mean dist 14.3
+  kind volley          shots    43  goal  23.3%  mean dist 15.6
+  kind fk              shots   836  goal   4.3%  mean dist 23.5
+  kind pen             shots    38  goal  89.5%  mean dist 10.6
+  share of non-pen shots in box 56.0%
+  end texts INTERCEPTED BY x 18.5% | GOAL 14.2% | WIDE 12.0% | SAVED · x 11.6% | WON IN THE AIR BY x 8.3% | TACKLED BY x 8.3% | OVER THE BAR 7.7% | BLOCKED BY x 7.2% | OFFSIDE · x 3.0% | HEADED CLEAR 2.9% | KEEPER COLLECTS 2.3% | OUT OF PLAY 2.0% | KEEPER CLAIMS 0.8% | CLEARED BY x 0.7%
+
+===== sim0.6 (400 matches, 5600 attacks, 4057 shots) =====
+goals/match total 2.27  per side 1.14  draws 23.0%  0-0 7.8%
+per-side goal distribution {"0":255,"1":293,"2":171,"3":56,"4":20,"5":5}
+|dOvr|>=4: better wins 58.4%  draw 22.0%  worse wins 19.6%  n 250
+|dOvr|>=8: better wins 64.3%  draw 24.3%  worse wins 11.4%  n 140
+attack ends B 8.2%  S 14.6%  L 34.8%  G 16.2%  W 23.3%  T 0.4%  O 2.5%
+  wide       goal  17.4%  shot in  69.4%  shots/att 0.74  clock used 4.4s  pens won 0.7%  passes/att 2.07  lost 28.6%  offside 6.1%  time 0.2%
+  freekick   goal  15.0%  shot in 100.0%  shots/att 1.11  clock used 0.1s  pens won 0.0%  passes/att 0.02  lost 4.5%  offside 0.0%  time 0.0%
+  counter    goal  18.5%  shot in  64.4%  shots/att 0.72  clock used 7.3s  pens won 2.1%  passes/att 2.57  lost 34.8%  offside 4.5%  time 0.2%
+  build      goal  19.0%  shot in  65.6%  shots/att 0.72  clock used 7.1s  pens won 1.1%  passes/att 3.38  lost 37.2%  offside 0.7%  time 0.3%
+  corner     goal   6.6%  shot in  30.9%  shots/att 0.33  clock used 2.5s  pens won 0.6%  passes/att 1.11  lost 69.3%  offside 0.1%  time 1.9%
+shots per side per match 5.07
+shot results B 11.4%  S 32.4%  G 19.7%  P 4.0%  W 31.8%  T 0.6%  L 0.2%  on target (G+S) 52.2%  save% of on-target 62.2%
+  open-play 0-6 m      shots    41  share   1.0%  goal  58.5%  green 65.9%
+  open-play 6-11 m     shots   535  share  13.2%  goal  43.9%  green 52.5%
+  open-play 11-16.5 m  shots  1404  share  34.6%  goal  20.9%  green 50.7%
+  open-play 16.5-22 m  shots  1065  share  26.3%  goal  14.6%  green 55.6%
+  open-play 22-30 m    shots    64  share   1.6%  goal  14.1%  green 70.3%
+  open-play 30-99 m    shots    60  share   1.5%  goal   5.0%  green 58.3%
+  kind shot            shots  2445  goal  24.9%  mean dist 15.3
+  kind header          shots   679  goal  14.0%  mean dist 14.7
+  kind volley          shots    45  goal  31.1%  mean dist 15.6
+  kind fk              shots   838  goal   4.5%  mean dist 23.4
+  kind pen             shots    50  goal  86.0%  mean dist 10.6
+  share of non-pen shots in box 59.9%
+  end texts GOAL 16.2% | WIDE 13.8% | INTERCEPTED BY x 13.4% | SAVED · x 11.5% | OVER THE BAR 9.5% | WON IN THE AIR BY x 8.7% | BLOCKED BY x 8.2% | TACKLED BY x 7.2% | HEADED CLEAR 2.8% | OFFSIDE · x 2.5% | KEEPER COLLECTS 2.3% | OUT OF PLAY 1.9% | CLEARED BY x 0.8% | KEEPER CLAIMS 0.6%

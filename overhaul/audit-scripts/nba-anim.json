@@ -1,0 +1,86 @@
+{
+ "slotNames": [
+  "PG(1)",
+  "SG(2)",
+  "SF(3)",
+  "PF(4)",
+  "C(5)"
+ ],
+ "ptsShareBySlot": [
+  0.244,
+  0.236,
+  0.227,
+  0.169,
+  0.124
+ ],
+ "fgaShareBySlot": [
+  0.258,
+  0.18,
+  0.247,
+  0.185,
+  0.13
+ ],
+ "ballTimeShareBySlot": [
+  0.736,
+  0.06,
+  0.048,
+  0.114,
+  0.041
+ ],
+ "avgStarSlot": 0.75,
+ "slidingShareOfGroundFrames": 0.291,
+ "counts": {
+  "frames": 1129920,
+  "ok:idle": 273966,
+  "ok:defend-stand": 146379,
+  "ok:jog": 136974,
+  "ok:run": 117807,
+  "slide:static-defend-pose-while-moving": 116207,
+  "ok:shuffle": 95831,
+  "slide:tooslow:jog": 74251,
+  "slide:tooslow:shuffle": 46494,
+  "slide:toofast:backpedal": 27417,
+  "slide:idle-while-moving:idle": 27086,
+  "ok:sprint": 12254,
+  "slide:idle-while-moving:run": 10468,
+  "slide:handkeyed-pose-while-moving:pass": 8709,
+  "slide:handkeyed-pose-while-moving:cross": 7572,
+  "ok:backpedal": 6158,
+  "ok:screen": 5601,
+  "slide:toofast:shuffle": 4686,
+  "ok:dribble-stand": 1701,
+  "slide:handkeyed-pose-while-moving:stumble": 1590,
+  "ok:stumble": 1532,
+  "slide:handkeyed-pose-while-moving:catch": 1385,
+  "slide:static-dribble-pose-while-moving": 1070,
+  "ok:pass": 915,
+  "slide:handkeyed-pose-while-moving:rebound": 842,
+  "slide:handkeyed-pose-while-moving:contest": 762,
+  "ok:catch": 699,
+  "other:fall": 572,
+  "slide:handkeyed-pose-while-moving:stepback": 275,
+  "other:layup": 247,
+  "other:dunk": 164,
+  "other:standdunk": 96,
+  "other:contact": 87,
+  "ok:rebound": 53,
+  "ok:cross": 47,
+  "ok:contest": 21,
+  "other:shoot": 1,
+  "slide:handkeyed-pose-while-moving:block": 1
+ },
+ "clipGroundSpeedFtPerS_for_6ft6_215": {
+  "jog": 9.16,
+  "run": 15.79,
+  "sprint": 21.9,
+  "shuffle": 9.34,
+  "backpedal": 2.08
+ },
+ "bodySpeedQuantiles": {
+  "p25": 0.3,
+  "p50": 2.4,
+  "p75": 9.2,
+  "p90": 14.2,
+  "p99": 18
+ }
+}

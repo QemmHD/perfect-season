@@ -1,0 +1,1177 @@
+{
+ "sport": "soccer",
+ "cards": 30352,
+ "players": 9008,
+ "tiers": {
+  "silver": 14980,
+  "gold": 8321,
+  "bronze": 6642,
+  "promo": 277,
+  "legend": 132
+ },
+ "htCoverage": 0.9894538188277087,
+ "wtCoverage": 0,
+ "numMissingCards": 2352,
+ "ht": {
+  "min": 159,
+  "p10": 174,
+  "p50": 183,
+  "p90": 191,
+  "max": 206
+ },
+ "wt": null,
+ "top": [
+  {
+   "name": "Luis Suárez",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 14,
+   "ht": [
+    182
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    7,
+    9
+   ]
+  },
+  {
+   "name": "Lionel Messi",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 21,
+   "ht": [
+    170
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    10,
+    30
+   ]
+  },
+  {
+   "name": "Karim Benzema",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 12,
+   "ht": [
+    185
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    9
+   ]
+  },
+  {
+   "name": "Cristiano Ronaldo",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 19,
+   "ht": [
+    185
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    7
+   ]
+  },
+  {
+   "name": "Robert Lewandowski",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 25,
+   "ht": [
+    186
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    9
+   ]
+  },
+  {
+   "name": "Kevin De Bruyne",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "CM",
+   "editions": 21,
+   "ht": [
+    181
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    14,
+    17,
+    11
+   ]
+  },
+  {
+   "name": "Harry Kane",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 18,
+   "ht": [
+    188
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    18,
+    10,
+    9
+   ]
+  },
+  {
+   "name": "Mohamed Salah",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 17,
+   "ht": [
+    175
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    74,
+    11
+   ]
+  },
+  {
+   "name": "Rodri",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "DM",
+   "editions": 9,
+   "ht": [
+    190
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    16,
+    14
+   ]
+  },
+  {
+   "name": "Erling Haaland",
+   "ovr": 97,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 10,
+   "ht": [
+    195
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    17,
+    9
+   ]
+  },
+  {
+   "name": "Pelé",
+   "ovr": 97,
+   "tier": "legend",
+   "pos": "ST",
+   "editions": 2,
+   "ht": [
+    173
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Diego Maradona",
+   "ovr": 97,
+   "tier": "legend",
+   "pos": "AM",
+   "editions": 2,
+   "ht": [
+    165
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Virgil van Dijk",
+   "ovr": 96,
+   "tier": "promo",
+   "pos": "CB",
+   "editions": 13,
+   "ht": [
+    195
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    17,
+    4
+   ]
+  },
+  {
+   "name": "Luka Modrić",
+   "ovr": 96,
+   "tier": "promo",
+   "pos": "CM",
+   "editions": 15,
+   "ht": [
+    172
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    19,
+    10,
+    14
+   ]
+  },
+  {
+   "name": "Ousmane Dembélé",
+   "ovr": 96,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 13,
+   "ht": [
+    179
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    23,
+    7,
+    11,
+    10
+   ]
+  },
+  {
+   "name": "Phil Foden",
+   "ovr": 96,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 7,
+   "ht": [
+    171
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    47
+   ]
+  },
+  {
+   "name": "Johan Cruyff",
+   "ovr": 96,
+   "tier": "legend",
+   "pos": "AM",
+   "editions": 2,
+   "ht": [
+    178
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Michael Olise",
+   "ovr": 95,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 7,
+   "ht": [
+    180
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    7,
+    17
+   ]
+  },
+  {
+   "name": "Lamine Yamal",
+   "ovr": 95,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 5,
+   "ht": [
+    183
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    27,
+    19,
+    10
+   ]
+  },
+  {
+   "name": "Alfredo Di Stéfano",
+   "ovr": 95,
+   "tier": "legend",
+   "pos": "ST",
+   "editions": 2,
+   "ht": [
+    178
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Franz Beckenbauer",
+   "ovr": 95,
+   "tier": "legend",
+   "pos": "CB",
+   "editions": 2,
+   "ht": [
+    181
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Ronaldo",
+   "ovr": 95,
+   "tier": "legend",
+   "pos": "ST",
+   "editions": 2,
+   "ht": [
+    183
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Zinedine Zidane",
+   "ovr": 95,
+   "tier": "legend",
+   "pos": "AM",
+   "editions": 2,
+   "ht": [
+    185
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Yaya Touré",
+   "ovr": 94,
+   "tier": "promo",
+   "pos": "CM",
+   "editions": 6,
+   "ht": [
+    188
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    42
+   ]
+  },
+  {
+   "name": "Philipp Lahm",
+   "ovr": 94,
+   "tier": "promo",
+   "pos": "FB",
+   "editions": 7,
+   "ht": [
+    170
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    21
+   ]
+  },
+  {
+   "name": "Franck Ribéry",
+   "ovr": 94,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 10,
+   "ht": [
+    170
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    7
+   ]
+  },
+  {
+   "name": "Ferenc Puskás",
+   "ovr": 94,
+   "tier": "legend",
+   "pos": "ST",
+   "editions": 2,
+   "ht": [
+    172
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Eusébio",
+   "ovr": 94,
+   "tier": "legend",
+   "pos": "ST",
+   "editions": 2,
+   "ht": [
+    175
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Michel Platini",
+   "ovr": 94,
+   "tier": "legend",
+   "pos": "AM",
+   "editions": 2,
+   "ht": [
+    179
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Gerd Müller",
+   "ovr": 94,
+   "tier": "legend",
+   "pos": "ST",
+   "editions": 2,
+   "ht": [
+    176
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Marco van Basten",
+   "ovr": 94,
+   "tier": "legend",
+   "pos": "ST",
+   "editions": 2,
+   "ht": [
+    188
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Zlatan Ibrahimović",
+   "ovr": 93,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 12,
+   "ht": [
+    195
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    10,
+    9,
+    21,
+    11
+   ]
+  },
+  {
+   "name": "Cesc Fàbregas",
+   "ovr": 93,
+   "tier": "promo",
+   "pos": "CM",
+   "editions": 9,
+   "ht": [
+    179
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    4,
+    44
+   ]
+  },
+  {
+   "name": "David Alaba",
+   "ovr": 93,
+   "tier": "promo",
+   "pos": "FB",
+   "editions": 13,
+   "ht": [
+    180
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    27,
+    4
+   ]
+  },
+  {
+   "name": "Neymar",
+   "ovr": 93,
+   "tier": "legend",
+   "pos": "W",
+   "editions": 12,
+   "ht": [
+    175
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    11,
+    10
+   ]
+  },
+  {
+   "name": "N'Golo Kanté",
+   "ovr": 93,
+   "tier": "promo",
+   "pos": "DM",
+   "editions": 9,
+   "ht": [
+    168
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    17,
+    14,
+    7
+   ]
+  },
+  {
+   "name": "Riyad Mahrez",
+   "ovr": 93,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 10,
+   "ht": [
+    179
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    26
+   ]
+  },
+  {
+   "name": "Kylian Mbappé",
+   "ovr": 93,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 18,
+   "ht": [
+    180
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    29,
+    7,
+    9,
+    10
+   ]
+  },
+  {
+   "name": "Alejandro Grimaldo",
+   "ovr": 93,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 12,
+   "ht": [
+    171
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    3,
+    20
+   ]
+  },
+  {
+   "name": "Trent Alexander-Arnold",
+   "ovr": 93,
+   "tier": "promo",
+   "pos": "FB",
+   "editions": 10,
+   "ht": [
+    180
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    66,
+    12
+   ]
+  },
+  {
+   "name": "Paolo Maldini",
+   "ovr": 93,
+   "tier": "legend",
+   "pos": "FB",
+   "editions": 2,
+   "ht": [
+    186
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Franco Baresi",
+   "ovr": 93,
+   "tier": "legend",
+   "pos": "CB",
+   "editions": 2,
+   "ht": [
+    176
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Ronaldinho",
+   "ovr": 93,
+   "tier": "legend",
+   "pos": "AM",
+   "editions": 2,
+   "ht": [
+    182
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Lev Yashin",
+   "ovr": 93,
+   "tier": "legend",
+   "pos": "GK",
+   "editions": 2,
+   "ht": [
+    189
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Garrincha",
+   "ovr": 93,
+   "tier": "legend",
+   "pos": "W",
+   "editions": 2,
+   "ht": [
+    170
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Xavi",
+   "ovr": 92,
+   "tier": "legend",
+   "pos": "CM",
+   "editions": 5,
+   "ht": [
+    169
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    6
+   ]
+  },
+  {
+   "name": "Robin van Persie",
+   "ovr": 92,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 5,
+   "ht": [
+    183
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    20,
+    32
+   ]
+  },
+  {
+   "name": "Thomas Müller",
+   "ovr": 92,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 16,
+   "ht": [
+    185
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    25
+   ]
+  },
+  {
+   "name": "Raheem Sterling",
+   "ovr": 92,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 13,
+   "ht": [
+    170
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    31,
+    7,
+    17
+   ]
+  },
+  {
+   "name": "Gianluigi Buffon",
+   "ovr": 92,
+   "tier": "legend",
+   "pos": "GK",
+   "editions": 9,
+   "ht": [
+    192
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    1
+   ]
+  },
+  {
+   "name": "Bruno Fernandes",
+   "ovr": 92,
+   "tier": "promo",
+   "pos": "AM",
+   "editions": 15,
+   "ht": [
+    183
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    32,
+    8,
+    10,
+    18
+   ]
+  },
+  {
+   "name": "Vinicius Junior",
+   "ovr": 92,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 7,
+   "ht": [
+    176
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    25,
+    20,
+    7
+   ]
+  },
+  {
+   "name": "Federico Dimarco",
+   "ovr": 92,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 7,
+   "ht": [
+    175
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    3,
+    32
+   ]
+  },
+  {
+   "name": "George Best",
+   "ovr": 92,
+   "tier": "legend",
+   "pos": "W",
+   "editions": 2,
+   "ht": [
+    176
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Bobby Charlton",
+   "ovr": 92,
+   "tier": "legend",
+   "pos": "AM",
+   "editions": 2,
+   "ht": [
+    173
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Thierry Henry",
+   "ovr": 92,
+   "tier": "legend",
+   "pos": "ST",
+   "editions": 2,
+   "ht": [
+    188
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Zico",
+   "ovr": 92,
+   "tier": "legend",
+   "pos": "AM",
+   "editions": 2,
+   "ht": [
+    172
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null
+   ]
+  },
+  {
+   "name": "Sergio Agüero",
+   "ovr": 91,
+   "tier": "promo",
+   "pos": "ST",
+   "editions": 9,
+   "ht": [
+    173
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    16,
+    10
+   ]
+  },
+  {
+   "name": "Juan Mata",
+   "ovr": 91,
+   "tier": "promo",
+   "pos": "AM",
+   "editions": 8,
+   "ht": [
+    170
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    8
+   ]
+  },
+  {
+   "name": "Eden Hazard",
+   "ovr": 91,
+   "tier": "promo",
+   "pos": "W",
+   "editions": 10,
+   "ht": [
+    175
+   ],
+   "wt": [
+    null
+   ],
+   "num": [
+    null,
+    17,
+    10,
+    7
+   ]
+  }
+ ],
+ "mostEditions": [
+  {
+   "name": "Robert Lewandowski",
+   "editions": 25,
+   "best": 97
+  },
+  {
+   "name": "Lionel Messi",
+   "editions": 21,
+   "best": 97
+  },
+  {
+   "name": "Kevin De Bruyne",
+   "editions": 21,
+   "best": 97
+  },
+  {
+   "name": "Cristiano Ronaldo",
+   "editions": 19,
+   "best": 97
+  },
+  {
+   "name": "Harry Kane",
+   "editions": 18,
+   "best": 97
+  },
+  {
+   "name": "Kylian Mbappé",
+   "editions": 18,
+   "best": 93
+  },
+  {
+   "name": "Dušan Tadić",
+   "editions": 17,
+   "best": 89
+  },
+  {
+   "name": "Mohamed Salah",
+   "editions": 17,
+   "best": 97
+  },
+  {
+   "name": "Pierre-Emerick Aubameyang",
+   "editions": 16,
+   "best": 88
+  },
+  {
+   "name": "Ángel Di María",
+   "editions": 16,
+   "best": 89
+  },
+  {
+   "name": "Thomas Müller",
+   "editions": 16,
+   "best": 92
+  },
+  {
+   "name": "Ciro Immobile",
+   "editions": 16,
+   "best": 87
+  },
+  {
+   "name": "Nemanja Matić",
+   "editions": 16,
+   "best": 86
+  },
+  {
+   "name": "José Fonte",
+   "editions": 15,
+   "best": 86
+  },
+  {
+   "name": "Christian Eriksen",
+   "editions": 15,
+   "best": 86
+  },
+  {
+   "name": "João Moutinho",
+   "editions": 15,
+   "best": 85
+  },
+  {
+   "name": "Luuk de Jong",
+   "editions": 15,
+   "best": 85
+  },
+  {
+   "name": "Luka Modrić",
+   "editions": 15,
+   "best": 96
+  },
+  {
+   "name": "Kevin Vogt",
+   "editions": 15,
+   "best": 79
+  },
+  {
+   "name": "Bruno Fernandes",
+   "editions": 15,
+   "best": 92
+  },
+  {
+   "name": "Alexandre Lacazette",
+   "editions": 14,
+   "best": 86
+  },
+  {
+   "name": "Lucas Digne",
+   "editions": 14,
+   "best": 81
+  },
+  {
+   "name": "Dimitri Payet",
+   "editions": 14,
+   "best": 87
+  },
+  {
+   "name": "Benjamin André",
+   "editions": 14,
+   "best": 78
+  },
+  {
+   "name": "Jens Toornstra",
+   "editions": 14,
+   "best": 77
+  }
+ ]
+}

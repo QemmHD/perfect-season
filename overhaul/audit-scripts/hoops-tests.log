@@ -1,0 +1,15 @@
+   ✓ juice is render only > a seeded football game is identical with and without hit-stop/shake/particles 945ms
+ ✓ src/game/hoops2/finish.test.ts  (1 test) 839ms
+   ✓ a shot near the rim > is a finish when he runs at the rim from 10.5 feet, a jumper when he stands there 838ms
+ ✓ src/game/hoops2/ratings-matter.test.ts  (15 tests) 169764ms
+   ✓ NBA: better offensive ratings never score less > elite shooters score more than average ones, and average more than poor (the autopilot stall) 17329ms
+   ✓ NBA: better offensive ratings never score less > is monotone across the other offensive attributes (90 never clearly below 75) 68272ms
+   ✓ NBA: better defensive ratings never concede more > raising any defensive attribute to 90 never raises the opponent’s PPP 71249ms
+   ✓ NBA shot selection (the AI attacks the rim with finishers, shoots with shooters) > even teams take a real mix (not ~85% contested threes) and score 1.0-1.15 a trip 4259ms
+   ✓ NBA shot selection (the AI attacks the rim with finishers, shoots with shooters) > elite slashers attack the rim more and score more; elite shooters shoot more threes 8644ms
+
+ Test Files  5 passed | 2 skipped (7)
+      Tests  41 passed | 2 skipped (43)
+   Start at  21:29:39
+   Duration  171.17s (transform 2.29s, setup 0ms, collect 5.27s, tests 172.27s, environment 1ms, prepare 496ms)
+

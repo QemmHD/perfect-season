@@ -1,0 +1,988 @@
+{
+  "../ps-codex/node_modules/@supabase/supabase-js/dist/index.mjs": {
+    "file": "assets/index-Cvs1FVwy.js",
+    "name": "index",
+    "src": "../ps-codex/node_modules/@supabase/supabase-js/dist/index.mjs",
+    "isDynamicEntry": true
+  },
+  "_Card-DF3Pc-eV.js": {
+    "file": "assets/Card-DF3Pc-eV.js",
+    "name": "Card",
+    "imports": [
+      "_preload-helper-C1FmrZbK.js",
+      "_color-CzAXAyWi.js",
+      "_names-Bd6rJ-in.js",
+      "_state-1QPoFo30.js",
+      "_ratings-GjchP5Jx.js",
+      "_sound-Byy6VNix.js",
+      "_sport-CKm__E-o.js"
+    ],
+    "dynamicImports": [
+      "../ps-codex/node_modules/@supabase/supabase-js/dist/index.mjs"
+    ]
+  },
+  "_CardArt-!~{00C}~.js": {
+    "file": "assets/CardArt-DZ5uQo38.css",
+    "src": "_CardArt-!~{00C}~.js"
+  },
+  "_CardArt-BTxQ8-wK.js": {
+    "file": "assets/CardArt-BTxQ8-wK.js",
+    "name": "CardArt",
+    "imports": [
+      "_sport-CKm__E-o.js",
+      "_color-CzAXAyWi.js",
+      "_Card-DF3Pc-eV.js",
+      "_poses-DHz5H5pI.js",
+      "_state-1QPoFo30.js"
+    ],
+    "css": [
+      "assets/CardArt-DZ5uQo38.css"
+    ]
+  },
+  "_Football2-!~{00w}~.js": {
+    "file": "assets/Football2-CFbTp2Dy.css",
+    "src": "_Football2-!~{00w}~.js"
+  },
+  "_Football2-CsAt2-ZZ.js": {
+    "file": "assets/Football2-CsAt2-ZZ.js",
+    "name": "Football2",
+    "imports": [
+      "_persp-BIZ8YPqQ.js",
+      "_color-CzAXAyWi.js",
+      "_index-ITRcDHAa.js",
+      "_errlog-UOTLg4p3.js",
+      "_sound-Byy6VNix.js",
+      "_ratings-GjchP5Jx.js",
+      "_poses-DHz5H5pI.js",
+      "_mocap-RC-YIXU0.js",
+      "_preload-helper-C1FmrZbK.js",
+      "_sport-CKm__E-o.js"
+    ],
+    "dynamicImports": [
+      "src/data/nba-attrs.json",
+      "src/data/nfl-attrs.json"
+    ],
+    "css": [
+      "assets/Football2-CFbTp2Dy.css"
+    ]
+  },
+  "_Hero-CnyOli2N.js": {
+    "file": "assets/Hero-CnyOli2N.js",
+    "name": "Hero",
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_sport-CKm__E-o.js",
+      "_state-1QPoFo30.js",
+      "_sound-Byy6VNix.js"
+    ]
+  },
+  "_Marks-B2PkUnY4.js": {
+    "file": "assets/Marks-B2PkUnY4.js",
+    "name": "Marks",
+    "imports": [
+      "_color-CzAXAyWi.js"
+    ]
+  },
+  "_PackArt-!~{00B}~.js": {
+    "file": "assets/PackArt-LGZaQvGh.css",
+    "src": "_PackArt-!~{00B}~.js"
+  },
+  "_PackArt-B_5doUX4.js": {
+    "file": "assets/PackArt-B_5doUX4.js",
+    "name": "PackArt",
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_sport-CKm__E-o.js"
+    ],
+    "css": [
+      "assets/PackArt-LGZaQvGh.css"
+    ]
+  },
+  "_Vote-!~{00t}~.js": {
+    "file": "assets/Vote-BJrDjKis.css",
+    "src": "_Vote-!~{00t}~.js"
+  },
+  "_Vote-a5QduWLO.js": {
+    "file": "assets/Vote-a5QduWLO.js",
+    "name": "Vote",
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_sport-CKm__E-o.js",
+      "_sound-Byy6VNix.js",
+      "_match-ik1Tdgnk.js",
+      "_state-1QPoFo30.js"
+    ],
+    "css": [
+      "assets/Vote-BJrDjKis.css"
+    ]
+  },
+  "_color-CzAXAyWi.js": {
+    "file": "assets/color-CzAXAyWi.js",
+    "name": "color"
+  },
+  "_content-progress-!~{00D}~.js": {
+    "file": "assets/content-progress-s91sf_kV.css",
+    "src": "_content-progress-!~{00D}~.js"
+  },
+  "_content-progress-B0N_6FRx.js": {
+    "file": "assets/content-progress-B0N_6FRx.js",
+    "name": "content-progress",
+    "imports": [
+      "_sport-CKm__E-o.js",
+      "_Card-DF3Pc-eV.js",
+      "_state-1QPoFo30.js",
+      "_Marks-B2PkUnY4.js",
+      "_color-CzAXAyWi.js",
+      "_rivals-Bvnp6fU9.js",
+      "_favorites-CXYDQFNV.js",
+      "_sound-Byy6VNix.js",
+      "src/ut/rivals-net.ts",
+      "_Football2-CsAt2-ZZ.js",
+      "_uniforms-CS3vZgGv.js"
+    ],
+    "css": [
+      "assets/content-progress-s91sf_kV.css"
+    ]
+  },
+  "_court-DVUx9xts.js": {
+    "file": "assets/court-DVUx9xts.js",
+    "name": "court",
+    "imports": [
+      "_color-CzAXAyWi.js"
+    ]
+  },
+  "_errlog-UOTLg4p3.js": {
+    "file": "assets/errlog-UOTLg4p3.js",
+    "name": "errlog"
+  },
+  "_favorites-CXYDQFNV.js": {
+    "file": "assets/favorites-CXYDQFNV.js",
+    "name": "favorites",
+    "imports": [
+      "_ratings-GjchP5Jx.js",
+      "_sound-Byy6VNix.js",
+      "_sport-CKm__E-o.js",
+      "_Card-DF3Pc-eV.js",
+      "_names-Bd6rJ-in.js",
+      "_state-1QPoFo30.js",
+      "_color-CzAXAyWi.js",
+      "_uniforms-CS3vZgGv.js"
+    ]
+  },
+  "_gift-apply-dfvAKpqf.js": {
+    "file": "assets/gift-apply-dfvAKpqf.js",
+    "name": "gift-apply",
+    "imports": [
+      "_names-Bd6rJ-in.js",
+      "_Card-DF3Pc-eV.js",
+      "_state-1QPoFo30.js",
+      "_sport-CKm__E-o.js",
+      "_sound-Byy6VNix.js"
+    ]
+  },
+  "_index-ITRcDHAa.js": {
+    "file": "assets/index-ITRcDHAa.js",
+    "name": "index",
+    "imports": [
+      "_color-CzAXAyWi.js"
+    ]
+  },
+  "_match-ik1Tdgnk.js": {
+    "file": "assets/match-ik1Tdgnk.js",
+    "name": "match",
+    "imports": [
+      "_sport-CKm__E-o.js",
+      "_Card-DF3Pc-eV.js",
+      "_names-Bd6rJ-in.js",
+      "_uniforms-CS3vZgGv.js",
+      "_sound-Byy6VNix.js"
+    ]
+  },
+  "_mocap-RC-YIXU0.js": {
+    "file": "assets/mocap-RC-YIXU0.js",
+    "name": "mocap",
+    "imports": [
+      "_preload-helper-C1FmrZbK.js",
+      "_poses-DHz5H5pI.js"
+    ],
+    "dynamicImports": [
+      "src/data/mocap/backpedal.json",
+      "src/data/mocap/block.json",
+      "src/data/mocap/catch.json",
+      "src/data/mocap/catch_run.json",
+      "src/data/mocap/celebrate.json",
+      "src/data/mocap/crossover.json",
+      "src/data/mocap/cut.json",
+      "src/data/mocap/dive.json",
+      "src/data/mocap/dribble.json",
+      "src/data/mocap/fall_back.json",
+      "src/data/mocap/fall_forward.json",
+      "src/data/mocap/getup.json",
+      "src/data/mocap/getup_front.json",
+      "src/data/mocap/jog.json",
+      "src/data/mocap/jump.json",
+      "src/data/mocap/jumpshot.json",
+      "src/data/mocap/kick.json",
+      "src/data/mocap/layup.json",
+      "src/data/mocap/ready.json",
+      "src/data/mocap/run.json",
+      "src/data/mocap/shuffle.json",
+      "src/data/mocap/slip.json",
+      "src/data/mocap/sprint.json",
+      "src/data/mocap/stiff_arm.json",
+      "src/data/mocap/stumble.json",
+      "src/data/mocap/throw.json"
+    ]
+  },
+  "_names-Bd6rJ-in.js": {
+    "file": "assets/names-Bd6rJ-in.js",
+    "name": "names",
+    "imports": [
+      "_sport-CKm__E-o.js"
+    ]
+  },
+  "_persp-!~{00x}~.js": {
+    "file": "assets/persp-hYMmNyQh.css",
+    "src": "_persp-!~{00x}~.js"
+  },
+  "_persp-BIZ8YPqQ.js": {
+    "file": "assets/persp-BIZ8YPqQ.js",
+    "name": "persp",
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_court-DVUx9xts.js",
+      "_poses-DHz5H5pI.js"
+    ],
+    "css": [
+      "assets/persp-hYMmNyQh.css"
+    ]
+  },
+  "_poses-DHz5H5pI.js": {
+    "file": "assets/poses-DHz5H5pI.js",
+    "name": "poses",
+    "imports": [
+      "_color-CzAXAyWi.js"
+    ]
+  },
+  "_preload-helper-C1FmrZbK.js": {
+    "file": "assets/preload-helper-C1FmrZbK.js",
+    "name": "preload-helper"
+  },
+  "_ratings-GjchP5Jx.js": {
+    "file": "assets/ratings-GjchP5Jx.js",
+    "name": "ratings",
+    "imports": [
+      "_preload-helper-C1FmrZbK.js",
+      "_sport-CKm__E-o.js"
+    ],
+    "dynamicImports": [
+      "src/data/nba.json",
+      "src/data/nfl.json",
+      "src/data/soccer.json"
+    ]
+  },
+  "_rivals-Bvnp6fU9.js": {
+    "file": "assets/rivals-Bvnp6fU9.js",
+    "name": "rivals"
+  },
+  "_soccer-lazy-BRk2L95Z.js": {
+    "file": "assets/soccer-lazy-BRk2L95Z.js",
+    "name": "soccer-lazy",
+    "imports": [
+      "_preload-helper-C1FmrZbK.js"
+    ],
+    "dynamicImports": [
+      "src/game/soccer2/arcade.ts",
+      "src/data/cards-soccer.json"
+    ]
+  },
+  "_sound-Byy6VNix.js": {
+    "file": "assets/sound-Byy6VNix.js",
+    "name": "sound",
+    "imports": [
+      "_sport-CKm__E-o.js",
+      "_color-CzAXAyWi.js"
+    ],
+    "assets": [
+      "assets/backboard-CA5EV4VD.mp3",
+      "assets/buzzer-DsBbim5F.mp3",
+      "assets/cheer-arena-BVahyW4a.mp3",
+      "assets/cheer-stadium-DyLSn9wp.mp3",
+      "assets/crowd-arena-GQNnD_m4.mp3",
+      "assets/crowd-stadium-ByxrXYSs.mp3",
+      "assets/dunk-ghFC0nok.mp3",
+      "assets/groan-PD_ZbDO0.mp3",
+      "assets/hit-1-CzI6hhLG.mp3",
+      "assets/hit-2-Bj6jd9zU.mp3",
+      "assets/hit-3-BpVUe9jf.mp3",
+      "assets/horn-BMdZ_gWo.mp3",
+      "assets/kick-DXkNl8dA.mp3",
+      "assets/ooh-kKo8txVT.mp3",
+      "assets/roar-arena-CPZWdcmm.mp3",
+      "assets/roar-stadium-CL7uX0Qb.mp3",
+      "assets/soccer-chant-s8Fg-6hl.mp3",
+      "assets/soccer-kick-1-_ySwvouq.mp3",
+      "assets/soccer-kick-2-DvqpcyZp.mp3",
+      "assets/soccer-roar-Cfr1I5iR.mp3",
+      "assets/soccer-whistle-BHs_tfzE.mp3",
+      "assets/swish-BkcM1oS_.mp3",
+      "assets/thud-B39yxcZH.mp3",
+      "assets/whistle-DeTbXNJj.mp3"
+    ]
+  },
+  "_sport-CKm__E-o.js": {
+    "file": "assets/sport-CKm__E-o.js",
+    "name": "sport"
+  },
+  "_state-1QPoFo30.js": {
+    "file": "assets/state-1QPoFo30.js",
+    "name": "state",
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_ratings-GjchP5Jx.js",
+      "_sport-CKm__E-o.js",
+      "_sound-Byy6VNix.js",
+      "_rivals-Bvnp6fU9.js",
+      "_uniforms-CS3vZgGv.js",
+      "_preload-helper-C1FmrZbK.js",
+      "_soccer-lazy-BRk2L95Z.js"
+    ],
+    "dynamicImports": [
+      "src/data/cards-nba.json",
+      "src/data/cards-nfl.json",
+      "src/data/season-references-nba.json",
+      "src/data/season-references-nfl.json",
+      "src/data/nfl-combine.json",
+      "src/data/live-calendar.json",
+      "src/data/live-editions.json"
+    ]
+  },
+  "_teams-DCcpuG8_.js": {
+    "file": "assets/teams-DCcpuG8_.js",
+    "name": "teams",
+    "imports": [
+      "_sound-Byy6VNix.js",
+      "_Football2-CsAt2-ZZ.js",
+      "_ratings-GjchP5Jx.js",
+      "_state-1QPoFo30.js"
+    ]
+  },
+  "_uniforms-CS3vZgGv.js": {
+    "file": "assets/uniforms-CS3vZgGv.js",
+    "name": "uniforms",
+    "imports": [
+      "_sound-Byy6VNix.js",
+      "_color-CzAXAyWi.js"
+    ]
+  },
+  "index.html": {
+    "file": "assets/index-Br4J7UAU.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "imports": [
+      "_preload-helper-C1FmrZbK.js",
+      "_color-CzAXAyWi.js",
+      "_index-ITRcDHAa.js",
+      "_gift-apply-dfvAKpqf.js",
+      "_state-1QPoFo30.js",
+      "_Card-DF3Pc-eV.js",
+      "_names-Bd6rJ-in.js",
+      "_ratings-GjchP5Jx.js",
+      "_favorites-CXYDQFNV.js",
+      "_sound-Byy6VNix.js",
+      "_sport-CKm__E-o.js",
+      "_errlog-UOTLg4p3.js",
+      "_match-ik1Tdgnk.js",
+      "_Marks-B2PkUnY4.js",
+      "_Hero-CnyOli2N.js",
+      "_uniforms-CS3vZgGv.js",
+      "_Vote-a5QduWLO.js",
+      "_rivals-Bvnp6fU9.js",
+      "_soccer-lazy-BRk2L95Z.js"
+    ],
+    "dynamicImports": [
+      "src/data/numbered-nba.json",
+      "src/data/numbered-nfl.json",
+      "src/ut/UltimateTeam.tsx",
+      "src/ut/Match.tsx",
+      "src/game/Arcade.tsx",
+      "src/evolution/Training.tsx",
+      "src/ui/Admin.tsx",
+      "src/ut/rivals-net.ts",
+      "src/game/Lab.tsx",
+      "src/game/pixel/Scene.tsx",
+      "src/game/pixel/Gallery.tsx"
+    ],
+    "css": [
+      "assets/index-BC0n-Ozt.css"
+    ]
+  },
+  "src/assets/sfx/backboard.mp3": {
+    "file": "assets/backboard-CA5EV4VD.mp3",
+    "src": "src/assets/sfx/backboard.mp3"
+  },
+  "src/assets/sfx/buzzer.mp3": {
+    "file": "assets/buzzer-DsBbim5F.mp3",
+    "src": "src/assets/sfx/buzzer.mp3"
+  },
+  "src/assets/sfx/cheer-arena.mp3": {
+    "file": "assets/cheer-arena-BVahyW4a.mp3",
+    "src": "src/assets/sfx/cheer-arena.mp3"
+  },
+  "src/assets/sfx/cheer-stadium.mp3": {
+    "file": "assets/cheer-stadium-DyLSn9wp.mp3",
+    "src": "src/assets/sfx/cheer-stadium.mp3"
+  },
+  "src/assets/sfx/crowd-arena.mp3": {
+    "file": "assets/crowd-arena-GQNnD_m4.mp3",
+    "src": "src/assets/sfx/crowd-arena.mp3"
+  },
+  "src/assets/sfx/crowd-stadium.mp3": {
+    "file": "assets/crowd-stadium-ByxrXYSs.mp3",
+    "src": "src/assets/sfx/crowd-stadium.mp3"
+  },
+  "src/assets/sfx/dunk.mp3": {
+    "file": "assets/dunk-ghFC0nok.mp3",
+    "src": "src/assets/sfx/dunk.mp3"
+  },
+  "src/assets/sfx/groan.mp3": {
+    "file": "assets/groan-PD_ZbDO0.mp3",
+    "src": "src/assets/sfx/groan.mp3"
+  },
+  "src/assets/sfx/hit-1.mp3": {
+    "file": "assets/hit-1-CzI6hhLG.mp3",
+    "src": "src/assets/sfx/hit-1.mp3"
+  },
+  "src/assets/sfx/hit-2.mp3": {
+    "file": "assets/hit-2-Bj6jd9zU.mp3",
+    "src": "src/assets/sfx/hit-2.mp3"
+  },
+  "src/assets/sfx/hit-3.mp3": {
+    "file": "assets/hit-3-BpVUe9jf.mp3",
+    "src": "src/assets/sfx/hit-3.mp3"
+  },
+  "src/assets/sfx/horn.mp3": {
+    "file": "assets/horn-BMdZ_gWo.mp3",
+    "src": "src/assets/sfx/horn.mp3"
+  },
+  "src/assets/sfx/kick.mp3": {
+    "file": "assets/kick-DXkNl8dA.mp3",
+    "src": "src/assets/sfx/kick.mp3"
+  },
+  "src/assets/sfx/ooh.mp3": {
+    "file": "assets/ooh-kKo8txVT.mp3",
+    "src": "src/assets/sfx/ooh.mp3"
+  },
+  "src/assets/sfx/roar-arena.mp3": {
+    "file": "assets/roar-arena-CPZWdcmm.mp3",
+    "src": "src/assets/sfx/roar-arena.mp3"
+  },
+  "src/assets/sfx/roar-stadium.mp3": {
+    "file": "assets/roar-stadium-CL7uX0Qb.mp3",
+    "src": "src/assets/sfx/roar-stadium.mp3"
+  },
+  "src/assets/sfx/soccer-chant.mp3": {
+    "file": "assets/soccer-chant-s8Fg-6hl.mp3",
+    "src": "src/assets/sfx/soccer-chant.mp3"
+  },
+  "src/assets/sfx/soccer-kick-1.mp3": {
+    "file": "assets/soccer-kick-1-_ySwvouq.mp3",
+    "src": "src/assets/sfx/soccer-kick-1.mp3"
+  },
+  "src/assets/sfx/soccer-kick-2.mp3": {
+    "file": "assets/soccer-kick-2-DvqpcyZp.mp3",
+    "src": "src/assets/sfx/soccer-kick-2.mp3"
+  },
+  "src/assets/sfx/soccer-roar.mp3": {
+    "file": "assets/soccer-roar-Cfr1I5iR.mp3",
+    "src": "src/assets/sfx/soccer-roar.mp3"
+  },
+  "src/assets/sfx/soccer-whistle.mp3": {
+    "file": "assets/soccer-whistle-BHs_tfzE.mp3",
+    "src": "src/assets/sfx/soccer-whistle.mp3"
+  },
+  "src/assets/sfx/swish.mp3": {
+    "file": "assets/swish-BkcM1oS_.mp3",
+    "src": "src/assets/sfx/swish.mp3"
+  },
+  "src/assets/sfx/thud.mp3": {
+    "file": "assets/thud-B39yxcZH.mp3",
+    "src": "src/assets/sfx/thud.mp3"
+  },
+  "src/assets/sfx/whistle.mp3": {
+    "file": "assets/whistle-DeTbXNJj.mp3",
+    "src": "src/assets/sfx/whistle.mp3"
+  },
+  "src/data/cards-nba.json": {
+    "file": "assets/cards-nba-CJFC09LV.js",
+    "name": "cards-nba",
+    "src": "src/data/cards-nba.json",
+    "isDynamicEntry": true
+  },
+  "src/data/cards-nfl.json": {
+    "file": "assets/cards-nfl-CCdM29PJ.js",
+    "name": "cards-nfl",
+    "src": "src/data/cards-nfl.json",
+    "isDynamicEntry": true
+  },
+  "src/data/cards-soccer.json": {
+    "file": "assets/cards-soccer-C0rxpsrr.js",
+    "name": "cards-soccer",
+    "src": "src/data/cards-soccer.json",
+    "isDynamicEntry": true
+  },
+  "src/data/live-calendar.json": {
+    "file": "assets/live-calendar-DBCIMbmX.js",
+    "name": "live-calendar",
+    "src": "src/data/live-calendar.json",
+    "isDynamicEntry": true
+  },
+  "src/data/live-editions.json": {
+    "file": "assets/live-editions-EoYkD0fd.js",
+    "name": "live-editions",
+    "src": "src/data/live-editions.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/backpedal.json": {
+    "file": "assets/backpedal-PVlsMGIb.js",
+    "name": "backpedal",
+    "src": "src/data/mocap/backpedal.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/block.json": {
+    "file": "assets/block-Bi5j-tfS.js",
+    "name": "block",
+    "src": "src/data/mocap/block.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/catch.json": {
+    "file": "assets/catch-D5l5OnTe.js",
+    "name": "catch",
+    "src": "src/data/mocap/catch.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/catch_run.json": {
+    "file": "assets/catch_run-Dqgq_2pu.js",
+    "name": "catch_run",
+    "src": "src/data/mocap/catch_run.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/celebrate.json": {
+    "file": "assets/celebrate-w6DoVLrc.js",
+    "name": "celebrate",
+    "src": "src/data/mocap/celebrate.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/crossover.json": {
+    "file": "assets/crossover-4pV7BQoE.js",
+    "name": "crossover",
+    "src": "src/data/mocap/crossover.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/cut.json": {
+    "file": "assets/cut-DNWbD7de.js",
+    "name": "cut",
+    "src": "src/data/mocap/cut.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/dive.json": {
+    "file": "assets/dive-5W5Q4AMr.js",
+    "name": "dive",
+    "src": "src/data/mocap/dive.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/dribble.json": {
+    "file": "assets/dribble-Ov7vI57q.js",
+    "name": "dribble",
+    "src": "src/data/mocap/dribble.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/fall_back.json": {
+    "file": "assets/fall_back-BNo-os7n.js",
+    "name": "fall_back",
+    "src": "src/data/mocap/fall_back.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/fall_forward.json": {
+    "file": "assets/fall_forward-BBo6RfM2.js",
+    "name": "fall_forward",
+    "src": "src/data/mocap/fall_forward.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/getup.json": {
+    "file": "assets/getup-mcLF4BT9.js",
+    "name": "getup",
+    "src": "src/data/mocap/getup.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/getup_front.json": {
+    "file": "assets/getup_front-D5U_scM8.js",
+    "name": "getup_front",
+    "src": "src/data/mocap/getup_front.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/jog.json": {
+    "file": "assets/jog-Dyu_EzwS.js",
+    "name": "jog",
+    "src": "src/data/mocap/jog.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/jump.json": {
+    "file": "assets/jump-lKa3K-At.js",
+    "name": "jump",
+    "src": "src/data/mocap/jump.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/jumpshot.json": {
+    "file": "assets/jumpshot-CE0sGWAc.js",
+    "name": "jumpshot",
+    "src": "src/data/mocap/jumpshot.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/kick.json": {
+    "file": "assets/kick-CC2O803y.js",
+    "name": "kick",
+    "src": "src/data/mocap/kick.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/layup.json": {
+    "file": "assets/layup-DAFT4Yuz.js",
+    "name": "layup",
+    "src": "src/data/mocap/layup.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/ready.json": {
+    "file": "assets/ready-BQ2bHO6l.js",
+    "name": "ready",
+    "src": "src/data/mocap/ready.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/run.json": {
+    "file": "assets/run-Dck5V8Ph.js",
+    "name": "run",
+    "src": "src/data/mocap/run.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/shuffle.json": {
+    "file": "assets/shuffle-teI2so5o.js",
+    "name": "shuffle",
+    "src": "src/data/mocap/shuffle.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/slip.json": {
+    "file": "assets/slip-Crmjv0ka.js",
+    "name": "slip",
+    "src": "src/data/mocap/slip.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/sprint.json": {
+    "file": "assets/sprint-D30qwyS_.js",
+    "name": "sprint",
+    "src": "src/data/mocap/sprint.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/stiff_arm.json": {
+    "file": "assets/stiff_arm-DXsMbVuQ.js",
+    "name": "stiff_arm",
+    "src": "src/data/mocap/stiff_arm.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/stumble.json": {
+    "file": "assets/stumble-BHIgi8eG.js",
+    "name": "stumble",
+    "src": "src/data/mocap/stumble.json",
+    "isDynamicEntry": true
+  },
+  "src/data/mocap/throw.json": {
+    "file": "assets/throw-BnUJE21V.js",
+    "name": "throw",
+    "src": "src/data/mocap/throw.json",
+    "isDynamicEntry": true
+  },
+  "src/data/nba-attrs.json": {
+    "file": "assets/nba-attrs-DKRoNbFg.js",
+    "name": "nba-attrs",
+    "src": "src/data/nba-attrs.json",
+    "isDynamicEntry": true
+  },
+  "src/data/nba.json": {
+    "file": "assets/nba-DviJ8aqN.js",
+    "name": "nba",
+    "src": "src/data/nba.json",
+    "isDynamicEntry": true
+  },
+  "src/data/nfl-attrs.json": {
+    "file": "assets/nfl-attrs-DE7t5FmR.js",
+    "name": "nfl-attrs",
+    "src": "src/data/nfl-attrs.json",
+    "isDynamicEntry": true
+  },
+  "src/data/nfl-combine.json": {
+    "file": "assets/nfl-combine-DVgvoZvk.js",
+    "name": "nfl-combine",
+    "src": "src/data/nfl-combine.json",
+    "isDynamicEntry": true
+  },
+  "src/data/nfl.json": {
+    "file": "assets/nfl-B_EpJfsL.js",
+    "name": "nfl",
+    "src": "src/data/nfl.json",
+    "isDynamicEntry": true
+  },
+  "src/data/numbered-nba.json": {
+    "file": "assets/numbered-nba-fsWjzbzI.js",
+    "name": "numbered-nba",
+    "src": "src/data/numbered-nba.json",
+    "isDynamicEntry": true
+  },
+  "src/data/numbered-nfl.json": {
+    "file": "assets/numbered-nfl-DcL6EucY.js",
+    "name": "numbered-nfl",
+    "src": "src/data/numbered-nfl.json",
+    "isDynamicEntry": true
+  },
+  "src/data/season-references-nba.json": {
+    "file": "assets/season-references-nba-Bzg-HacI.js",
+    "name": "season-references-nba",
+    "src": "src/data/season-references-nba.json",
+    "isDynamicEntry": true
+  },
+  "src/data/season-references-nfl.json": {
+    "file": "assets/season-references-nfl-BO23FFZx.js",
+    "name": "season-references-nfl",
+    "src": "src/data/season-references-nfl.json",
+    "isDynamicEntry": true
+  },
+  "src/data/soccer.json": {
+    "file": "assets/soccer-B_-zwYVc.js",
+    "name": "soccer",
+    "src": "src/data/soccer.json",
+    "isDynamicEntry": true
+  },
+  "src/evolution/Training.tsx": {
+    "file": "assets/Training-VCy6TLKH.js",
+    "name": "Training",
+    "src": "src/evolution/Training.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_state-1QPoFo30.js",
+      "_Marks-B2PkUnY4.js",
+      "_color-CzAXAyWi.js",
+      "_index-ITRcDHAa.js",
+      "_ratings-GjchP5Jx.js",
+      "_sport-CKm__E-o.js",
+      "_sound-Byy6VNix.js",
+      "_Football2-CsAt2-ZZ.js",
+      "_Hero-CnyOli2N.js",
+      "_teams-DCcpuG8_.js",
+      "_rivals-Bvnp6fU9.js",
+      "_uniforms-CS3vZgGv.js",
+      "_preload-helper-C1FmrZbK.js",
+      "_soccer-lazy-BRk2L95Z.js",
+      "_persp-BIZ8YPqQ.js",
+      "_court-DVUx9xts.js",
+      "_poses-DHz5H5pI.js",
+      "_errlog-UOTLg4p3.js",
+      "_mocap-RC-YIXU0.js"
+    ]
+  },
+  "src/game/Arcade.tsx": {
+    "file": "assets/Arcade-C9jmqNLt.js",
+    "name": "Arcade",
+    "src": "src/game/Arcade.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_sport-CKm__E-o.js",
+      "_soccer-lazy-BRk2L95Z.js",
+      "_sound-Byy6VNix.js",
+      "_Football2-CsAt2-ZZ.js",
+      "_persp-BIZ8YPqQ.js",
+      "_uniforms-CS3vZgGv.js",
+      "_preload-helper-C1FmrZbK.js",
+      "_index-ITRcDHAa.js",
+      "_errlog-UOTLg4p3.js",
+      "_ratings-GjchP5Jx.js",
+      "_poses-DHz5H5pI.js",
+      "_mocap-RC-YIXU0.js",
+      "_court-DVUx9xts.js"
+    ]
+  },
+  "src/game/Lab.tsx": {
+    "file": "assets/Lab-CMPDPUCw.js",
+    "name": "Lab",
+    "src": "src/game/Lab.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_ratings-GjchP5Jx.js",
+      "_sport-CKm__E-o.js",
+      "_Football2-CsAt2-ZZ.js",
+      "_preload-helper-C1FmrZbK.js",
+      "_persp-BIZ8YPqQ.js",
+      "_court-DVUx9xts.js",
+      "_poses-DHz5H5pI.js",
+      "_index-ITRcDHAa.js",
+      "_errlog-UOTLg4p3.js",
+      "_sound-Byy6VNix.js",
+      "_mocap-RC-YIXU0.js"
+    ]
+  },
+  "src/game/pixel/Gallery.tsx": {
+    "file": "assets/Gallery-7MBlP8Tx.js",
+    "name": "Gallery",
+    "src": "src/game/pixel/Gallery.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_poses-DHz5H5pI.js",
+      "_mocap-RC-YIXU0.js",
+      "_preload-helper-C1FmrZbK.js"
+    ]
+  },
+  "src/game/pixel/Scene.tsx": {
+    "file": "assets/Scene-C4OCVXll.js",
+    "name": "Scene",
+    "src": "src/game/pixel/Scene.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_poses-DHz5H5pI.js",
+      "_court-DVUx9xts.js"
+    ]
+  },
+  "src/game/soccer2/arcade.ts": {
+    "file": "assets/arcade-CTwEIzpK.js",
+    "name": "arcade",
+    "src": "src/game/soccer2/arcade.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "_uniforms-CS3vZgGv.js",
+      "_sound-Byy6VNix.js",
+      "_color-CzAXAyWi.js",
+      "_persp-BIZ8YPqQ.js",
+      "_index-ITRcDHAa.js",
+      "_poses-DHz5H5pI.js",
+      "_mocap-RC-YIXU0.js",
+      "_court-DVUx9xts.js",
+      "_sport-CKm__E-o.js",
+      "_preload-helper-C1FmrZbK.js"
+    ],
+    "css": [
+      "assets/arcade-BipQX95B.css"
+    ]
+  },
+  "src/ui/Admin.tsx": {
+    "file": "assets/Admin-BxnNmBvL.js",
+    "name": "Admin",
+    "src": "src/ui/Admin.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_gift-apply-dfvAKpqf.js",
+      "_color-CzAXAyWi.js",
+      "_state-1QPoFo30.js",
+      "_CardArt-BTxQ8-wK.js",
+      "_names-Bd6rJ-in.js",
+      "_sport-CKm__E-o.js",
+      "_sound-Byy6VNix.js",
+      "_PackArt-B_5doUX4.js",
+      "_Card-DF3Pc-eV.js",
+      "_match-ik1Tdgnk.js",
+      "_ratings-GjchP5Jx.js",
+      "_preload-helper-C1FmrZbK.js",
+      "_rivals-Bvnp6fU9.js",
+      "_uniforms-CS3vZgGv.js",
+      "_soccer-lazy-BRk2L95Z.js",
+      "_poses-DHz5H5pI.js"
+    ],
+    "css": [
+      "assets/Admin-DpeKhE0Q.css"
+    ]
+  },
+  "src/ut/Match.tsx": {
+    "file": "assets/Match-OHG4VfNv.js",
+    "name": "Match",
+    "src": "src/ut/Match.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_content-progress-B0N_6FRx.js",
+      "_color-CzAXAyWi.js",
+      "_state-1QPoFo30.js",
+      "_rivals-Bvnp6fU9.js",
+      "src/ut/rivals-net.ts",
+      "_sound-Byy6VNix.js",
+      "_Card-DF3Pc-eV.js",
+      "_sport-CKm__E-o.js",
+      "_soccer-lazy-BRk2L95Z.js",
+      "src/game/Arcade.tsx",
+      "_Football2-CsAt2-ZZ.js",
+      "_uniforms-CS3vZgGv.js",
+      "_favorites-CXYDQFNV.js",
+      "_match-ik1Tdgnk.js",
+      "_names-Bd6rJ-in.js",
+      "_Vote-a5QduWLO.js",
+      "_CardArt-BTxQ8-wK.js",
+      "_teams-DCcpuG8_.js",
+      "_Marks-B2PkUnY4.js",
+      "_ratings-GjchP5Jx.js",
+      "_preload-helper-C1FmrZbK.js",
+      "_persp-BIZ8YPqQ.js",
+      "_court-DVUx9xts.js",
+      "_poses-DHz5H5pI.js",
+      "_index-ITRcDHAa.js",
+      "_errlog-UOTLg4p3.js",
+      "_mocap-RC-YIXU0.js"
+    ],
+    "css": [
+      "assets/Match-BF3lg7FK.css"
+    ]
+  },
+  "src/ut/UltimateTeam.tsx": {
+    "file": "assets/UltimateTeam-BQu_usxD.js",
+    "name": "UltimateTeam",
+    "src": "src/ut/UltimateTeam.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_color-CzAXAyWi.js",
+      "_state-1QPoFo30.js",
+      "_PackArt-B_5doUX4.js",
+      "_Card-DF3Pc-eV.js",
+      "_CardArt-BTxQ8-wK.js",
+      "_content-progress-B0N_6FRx.js",
+      "_favorites-CXYDQFNV.js",
+      "_uniforms-CS3vZgGv.js",
+      "_sport-CKm__E-o.js",
+      "_rivals-Bvnp6fU9.js",
+      "_index-ITRcDHAa.js",
+      "_Football2-CsAt2-ZZ.js",
+      "_teams-DCcpuG8_.js",
+      "_errlog-UOTLg4p3.js",
+      "_sound-Byy6VNix.js",
+      "_names-Bd6rJ-in.js",
+      "_ratings-GjchP5Jx.js",
+      "_preload-helper-C1FmrZbK.js",
+      "_soccer-lazy-BRk2L95Z.js",
+      "_poses-DHz5H5pI.js",
+      "_Marks-B2PkUnY4.js",
+      "src/ut/rivals-net.ts",
+      "_persp-BIZ8YPqQ.js",
+      "_court-DVUx9xts.js",
+      "_mocap-RC-YIXU0.js"
+    ],
+    "css": [
+      "assets/UltimateTeam-CheHnW97.css"
+    ]
+  },
+  "src/ut/rivals-net.ts": {
+    "file": "assets/rivals-net-CccZ_9Hk.js",
+    "name": "rivals-net",
+    "src": "src/ut/rivals-net.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "_sport-CKm__E-o.js",
+      "_names-Bd6rJ-in.js",
+      "_rivals-Bvnp6fU9.js"
+    ]
+  }
+}

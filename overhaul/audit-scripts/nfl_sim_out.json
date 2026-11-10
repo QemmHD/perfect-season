@@ -1,0 +1,2655 @@
+[
+ {
+  "label": "ai-rookie-silver",
+  "off": "silver",
+  "def": "silver",
+  "skill": 0.45,
+  "defIQ": -0.5,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 10.35,
+  "ptsPerDrive": 2.59,
+  "playsPerDrive": 7.12,
+  "tdPerDrive": 0.294,
+  "fgPerDrive": 0.177,
+  "toPerDrive": 0.142,
+  "downsPerDrive": 0.269,
+  "timePerDrive": 0.023,
+  "missPerDrive": 0.096,
+  "safPerDrive": 0,
+  "passShare": 0.686,
+  "cmpPct": 0.657,
+  "ypa": 8.15,
+  "ypc": 12.4,
+  "anyA": 6.02,
+  "intPct": 0.025,
+  "laneIntShare": 0,
+  "sackPct": 0.073,
+  "sackTime": 2.97,
+  "timeToThrow": 1.59,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 8.99,
+  "yacPerCmp": 3.41,
+  "pass20PerAtt": 0.078,
+  "pass40PerAtt": 0.024,
+  "depth": {
+   "s": {
+    "att": 1440,
+    "cmp": 0.725,
+    "int": 0.028
+   },
+   "m": {
+    "att": 493,
+    "cmp": 0.57,
+    "int": 0.016
+   },
+   "d": {
+    "att": 239,
+    "cmp": 0.431,
+    "int": 0.025
+   }
+  },
+  "targetsCaught": {
+   "X": 0.162,
+   "Z": 0.066,
+   "SL": 0.242,
+   "TE": 0.166,
+   "RB": 0.364
+  },
+  "cmpManVsZone": {
+   "man": 0.628,
+   "zone": 0.579
+  },
+  "ypcRun": 3.87,
+  "runMedian": 3.3,
+  "runP10": 1.5,
+  "runP25": 2.1,
+  "runP75": 5.6,
+  "runP90": 7.8,
+  "runP99": 9.5,
+  "stuffPct": 0.066,
+  "run10Pct": 0.007,
+  "run20Pct": 0.001,
+  "runByPlay": {
+   "inside": {
+    "n": 411,
+    "ypc": 3.82
+   },
+   "outside": {
+    "n": 324,
+    "ypc": 3.87
+   },
+   "power": {
+    "n": 339,
+    "ypc": 3.92
+   }
+  },
+  "brokenPerRun": 0.224,
+  "brokenPerPlay": 0.158,
+  "whiffPerPlay": 0.099,
+  "missedTacklePct": 0.259,
+  "fumLostPerPlay": 0.0038,
+  "fumKeptPerPlay": 0.0035,
+  "flagsPerPlay": 0.045,
+  "bustPerPass": 0.044,
+  "bigHitPerPlay": 0.063,
+  "third": {
+   "att": 619,
+   "conv": 0.396
+  },
+  "fourth": {
+   "att": 245,
+   "conv": 0.433
+  },
+  "fg": {
+   "att": 131,
+   "pct": 0.649,
+   "u40": 0.889,
+   "40s": 0.622,
+   "50+": 0.35,
+   "n50": 40
+  },
+  "tdSharePass": 0.901,
+  "tdLenMedian": 12.7,
+  "tdLen20plus": 0.411,
+  "avgPlaySecs": 2.65,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.93,
+   "plays": 5.92,
+   "time": 0.092
+  },
+  "ends": {
+   "TD": 141,
+   "FG": 85,
+   "MISS": 46,
+   "INT": 55,
+   "DOWNS": 129,
+   "PUNT": 0,
+   "FUM": 13,
+   "SAF": 0,
+   "TIME": 11
+  },
+  "abilityPopsPerPlay": 0.012,
+  "scoreHist": {
+   "0": 10,
+   "3": 9,
+   "6": 9,
+   "7": 25,
+   "9": 2,
+   "10": 19,
+   "13": 8,
+   "14": 12,
+   "17": 12,
+   "20": 1,
+   "21": 10,
+   "24": 3
+  }
+ },
+ {
+  "label": "ai-rookie-gold",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.45,
+  "defIQ": -0.5,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 15.13,
+  "ptsPerDrive": 3.78,
+  "playsPerDrive": 6.45,
+  "tdPerDrive": 0.465,
+  "fgPerDrive": 0.177,
+  "toPerDrive": 0.142,
+  "downsPerDrive": 0.142,
+  "timePerDrive": 0.013,
+  "missPerDrive": 0.063,
+  "safPerDrive": 0,
+  "passShare": 0.675,
+  "cmpPct": 0.715,
+  "ypa": 10.26,
+  "ypc": 14.35,
+  "anyA": 8.01,
+  "intPct": 0.026,
+  "laneIntShare": 0.039,
+  "sackPct": 0.068,
+  "sackTime": 3.19,
+  "timeToThrow": 1.56,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 8.94,
+  "yacPerCmp": 5.41,
+  "pass20PerAtt": 0.105,
+  "pass40PerAtt": 0.05,
+  "depth": {
+   "s": {
+    "att": 1251,
+    "cmp": 0.807,
+    "int": 0.026
+   },
+   "m": {
+    "att": 521,
+    "cmp": 0.564,
+    "int": 0.027
+   },
+   "d": {
+    "att": 173,
+    "cmp": 0.503,
+    "int": 0.023
+   }
+  },
+  "targetsCaught": {
+   "X": 0.188,
+   "Z": 0.056,
+   "SL": 0.214,
+   "TE": 0.241,
+   "RB": 0.301
+  },
+  "cmpManVsZone": {
+   "man": 0.703,
+   "zone": 0.613
+  },
+  "ypcRun": 4.63,
+  "runMedian": 3.1,
+  "runP10": -1.3,
+  "runP25": 2.1,
+  "runP75": 6.3,
+  "runP90": 8.1,
+  "runP99": 50,
+  "stuffPct": 0.115,
+  "run10Pct": 0.029,
+  "run20Pct": 0.019,
+  "runByPlay": {
+   "inside": {
+    "n": 321,
+    "ypc": 4.67
+   },
+   "outside": {
+    "n": 357,
+    "ypc": 3.94
+   },
+   "power": {
+    "n": 329,
+    "ypc": 5.34
+   }
+  },
+  "brokenPerRun": 0.329,
+  "brokenPerPlay": 0.223,
+  "whiffPerPlay": 0.198,
+  "missedTacklePct": 0.352,
+  "fumLostPerPlay": 0.0061,
+  "fumKeptPerPlay": 0.0048,
+  "flagsPerPlay": 0.044,
+  "bustPerPass": 0.05,
+  "bigHitPerPlay": 0.052,
+  "third": {
+   "att": 476,
+   "conv": 0.454
+  },
+  "fourth": {
+   "att": 143,
+   "conv": 0.49
+  },
+  "fg": {
+   "att": 115,
+   "pct": 0.739,
+   "u40": 0.895,
+   "40s": 0.781,
+   "50+": 0.578,
+   "n50": 45
+  },
+  "tdSharePass": 0.789,
+  "tdLenMedian": 14.9,
+  "tdLen20plus": 0.444,
+  "avgPlaySecs": 2.7,
+  "lastDrive": {
+   "n": 120,
+   "pts": 2.88,
+   "plays": 5.18,
+   "time": 0.05
+  },
+  "ends": {
+   "TD": 223,
+   "FG": 85,
+   "MISS": 30,
+   "INT": 49,
+   "DOWNS": 68,
+   "PUNT": 0,
+   "FUM": 19,
+   "SAF": 0,
+   "TIME": 6
+  },
+  "abilityPopsPerPlay": 0.739,
+  "scoreHist": {
+   "0": 3,
+   "3": 9,
+   "7": 8,
+   "10": 15,
+   "13": 9,
+   "14": 16,
+   "17": 21,
+   "20": 6,
+   "21": 17,
+   "24": 10,
+   "28": 6
+  }
+ },
+ {
+  "label": "ai-rookie-elite",
+  "off": "elite",
+  "def": "elite",
+  "skill": 0.45,
+  "defIQ": -0.5,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 7.96,
+  "ptsPerDrive": 1.99,
+  "playsPerDrive": 6.48,
+  "tdPerDrive": 0.208,
+  "fgPerDrive": 0.177,
+  "toPerDrive": 0.242,
+  "downsPerDrive": 0.279,
+  "timePerDrive": 0.015,
+  "missPerDrive": 0.079,
+  "safPerDrive": 0,
+  "passShare": 0.681,
+  "cmpPct": 0.638,
+  "ypa": 7.32,
+  "ypc": 11.47,
+  "anyA": 4.14,
+  "intPct": 0.052,
+  "laneIntShare": 0.039,
+  "sackPct": 0.072,
+  "sackTime": 3.01,
+  "timeToThrow": 1.52,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 8.75,
+  "yacPerCmp": 2.72,
+  "pass20PerAtt": 0.051,
+  "pass40PerAtt": 0.018,
+  "depth": {
+   "s": {
+    "att": 1300,
+    "cmp": 0.694,
+    "int": 0.038
+   },
+   "m": {
+    "att": 554,
+    "cmp": 0.547,
+    "int": 0.083
+   },
+   "d": {
+    "att": 114,
+    "cmp": 0.447,
+    "int": 0.07
+   }
+  },
+  "targetsCaught": {
+   "X": 0.207,
+   "Z": 0.049,
+   "SL": 0.183,
+   "TE": 0.293,
+   "RB": 0.268
+  },
+  "cmpManVsZone": {
+   "man": 0.583,
+   "zone": 0.608
+  },
+  "ypcRun": 3.14,
+  "runMedian": 2.9,
+  "runP10": 1,
+  "runP25": 1.9,
+  "runP75": 4.4,
+  "runP90": 6.4,
+  "runP99": 8.4,
+  "stuffPct": 0.098,
+  "run10Pct": 0.003,
+  "run20Pct": 0.002,
+  "runByPlay": {
+   "inside": {
+    "n": 350,
+    "ypc": 2.83
+   },
+   "outside": {
+    "n": 345,
+    "ypc": 3.15
+   },
+   "power": {
+    "n": 297,
+    "ypc": 3.49
+   }
+  },
+  "brokenPerRun": 0.335,
+  "brokenPerPlay": 0.197,
+  "whiffPerPlay": 0.067,
+  "missedTacklePct": 0.267,
+  "fumLostPerPlay": 0.0051,
+  "fumKeptPerPlay": 0.0032,
+  "flagsPerPlay": 0.043,
+  "bustPerPass": 0.032,
+  "bigHitPerPlay": 0.066,
+  "third": {
+   "att": 573,
+   "conv": 0.373
+  },
+  "fourth": {
+   "att": 233,
+   "conv": 0.373
+  },
+  "fg": {
+   "att": 123,
+   "pct": 0.691,
+   "u40": 0.957,
+   "40s": 0.808,
+   "50+": 0.392,
+   "n50": 51
+  },
+  "tdSharePass": 0.84,
+  "tdLenMedian": 9.4,
+  "tdLen20plus": 0.32,
+  "avgPlaySecs": 2.42,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.25,
+   "plays": 5.3,
+   "time": 0.058
+  },
+  "ends": {
+   "TD": 100,
+   "FG": 85,
+   "MISS": 38,
+   "INT": 100,
+   "DOWNS": 134,
+   "PUNT": 0,
+   "FUM": 16,
+   "SAF": 0,
+   "TIME": 7
+  },
+  "abilityPopsPerPlay": 2.443,
+  "scoreHist": {
+   "0": 18,
+   "3": 19,
+   "6": 6,
+   "7": 20,
+   "9": 2,
+   "10": 27,
+   "13": 5,
+   "14": 11,
+   "17": 11,
+   "28": 1
+  }
+ },
+ {
+  "label": "ai-pro-silver",
+  "off": "silver",
+  "def": "silver",
+  "skill": 0.68,
+  "defIQ": 0,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 10.86,
+  "ptsPerDrive": 2.71,
+  "playsPerDrive": 6.99,
+  "tdPerDrive": 0.308,
+  "fgPerDrive": 0.185,
+  "toPerDrive": 0.16,
+  "downsPerDrive": 0.244,
+  "timePerDrive": 0.04,
+  "missPerDrive": 0.063,
+  "safPerDrive": 0,
+  "passShare": 0.673,
+  "cmpPct": 0.664,
+  "ypa": 7.65,
+  "ypc": 11.52,
+  "anyA": 5.84,
+  "intPct": 0.03,
+  "laneIntShare": 0.015,
+  "sackPct": 0.035,
+  "sackTime": 2.92,
+  "timeToThrow": 1.55,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 8.35,
+  "yacPerCmp": 3.17,
+  "pass20PerAtt": 0.05,
+  "pass40PerAtt": 0.02,
+  "depth": {
+   "s": {
+    "att": 1460,
+    "cmp": 0.744,
+    "int": 0.034
+   },
+   "m": {
+    "att": 604,
+    "cmp": 0.533,
+    "int": 0.017
+   },
+   "d": {
+    "att": 115,
+    "cmp": 0.339,
+    "int": 0.052
+   }
+  },
+  "targetsCaught": {
+   "X": 0.148,
+   "Z": 0.044,
+   "SL": 0.272,
+   "TE": 0.171,
+   "RB": 0.365
+  },
+  "cmpManVsZone": {
+   "man": 0.687,
+   "zone": 0.574
+  },
+  "ypcRun": 3.38,
+  "runMedian": 3,
+  "runP10": 1.2,
+  "runP25": 2,
+  "runP75": 4.8,
+  "runP90": 6.9,
+  "runP99": 8.8,
+  "stuffPct": 0.076,
+  "run10Pct": 0.004,
+  "run20Pct": 0,
+  "runByPlay": {
+   "inside": {
+    "n": 368,
+    "ypc": 3.46
+   },
+   "outside": {
+    "n": 366,
+    "ypc": 3.23
+   },
+   "power": {
+    "n": 364,
+    "ypc": 3.47
+   }
+  },
+  "brokenPerRun": 0.209,
+  "brokenPerPlay": 0.154,
+  "whiffPerPlay": 0.102,
+  "missedTacklePct": 0.253,
+  "fumLostPerPlay": 0.0039,
+  "fumKeptPerPlay": 0.0039,
+  "flagsPerPlay": 0.049,
+  "bustPerPass": 0.039,
+  "bigHitPerPlay": 0.079,
+  "third": {
+   "att": 575,
+   "conv": 0.397
+  },
+  "fourth": {
+   "att": 234,
+   "conv": 0.449
+  },
+  "fg": {
+   "att": 119,
+   "pct": 0.748,
+   "u40": 0.957,
+   "40s": 0.675,
+   "50+": 0.545,
+   "n50": 33
+  },
+  "tdSharePass": 0.811,
+  "tdLenMedian": 6.7,
+  "tdLen20plus": 0.331,
+  "avgPlaySecs": 2.54,
+  "lastDrive": {
+   "n": 120,
+   "pts": 2.06,
+   "plays": 6.02,
+   "time": 0.158
+  },
+  "ends": {
+   "TD": 148,
+   "FG": 89,
+   "MISS": 30,
+   "INT": 64,
+   "DOWNS": 117,
+   "PUNT": 0,
+   "FUM": 13,
+   "SAF": 0,
+   "TIME": 19
+  },
+  "abilityPopsPerPlay": 0.015,
+  "scoreHist": {
+   "0": 6,
+   "3": 11,
+   "6": 5,
+   "7": 20,
+   "10": 27,
+   "13": 9,
+   "14": 17,
+   "16": 2,
+   "17": 13,
+   "20": 1,
+   "21": 6,
+   "24": 2,
+   "28": 1
+  }
+ },
+ {
+  "label": "ai-pro-gold",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.68,
+  "defIQ": 0,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 14.99,
+  "ptsPerDrive": 3.75,
+  "playsPerDrive": 6.62,
+  "tdPerDrive": 0.442,
+  "fgPerDrive": 0.219,
+  "toPerDrive": 0.142,
+  "downsPerDrive": 0.123,
+  "timePerDrive": 0.015,
+  "missPerDrive": 0.06,
+  "safPerDrive": 0,
+  "passShare": 0.662,
+  "cmpPct": 0.701,
+  "ypa": 10,
+  "ypc": 14.25,
+  "anyA": 8.35,
+  "intPct": 0.027,
+  "laneIntShare": 0.143,
+  "sackPct": 0.027,
+  "sackTime": 3.06,
+  "timeToThrow": 1.52,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 10.04,
+  "yacPerCmp": 4.21,
+  "pass20PerAtt": 0.085,
+  "pass40PerAtt": 0.054,
+  "depth": {
+   "s": {
+    "att": 1260,
+    "cmp": 0.799,
+    "int": 0.033
+   },
+   "m": {
+    "att": 633,
+    "cmp": 0.543,
+    "int": 0.017
+   },
+   "d": {
+    "att": 152,
+    "cmp": 0.546,
+    "int": 0.02
+   }
+  },
+  "targetsCaught": {
+   "X": 0.172,
+   "Z": 0.059,
+   "SL": 0.276,
+   "TE": 0.241,
+   "RB": 0.252
+  },
+  "cmpManVsZone": {
+   "man": 0.728,
+   "zone": 0.614
+  },
+  "ypcRun": 3.76,
+  "runMedian": 3.1,
+  "runP10": 1,
+  "runP25": 2,
+  "runP75": 5.6,
+  "runP90": 7.3,
+  "runP99": 9.7,
+  "stuffPct": 0.097,
+  "run10Pct": 0.007,
+  "run20Pct": 0.003,
+  "runByPlay": {
+   "inside": {
+    "n": 359,
+    "ypc": 3.55
+   },
+   "outside": {
+    "n": 373,
+    "ypc": 3.74
+   },
+   "power": {
+    "n": 342,
+    "ypc": 4
+   }
+  },
+  "brokenPerRun": 0.322,
+  "brokenPerPlay": 0.202,
+  "whiffPerPlay": 0.125,
+  "missedTacklePct": 0.293,
+  "fumLostPerPlay": 0.0044,
+  "fumKeptPerPlay": 0.0035,
+  "flagsPerPlay": 0.041,
+  "bustPerPass": 0.043,
+  "bigHitPerPlay": 0.051,
+  "third": {
+   "att": 505,
+   "conv": 0.493
+  },
+  "fourth": {
+   "att": 134,
+   "conv": 0.515
+  },
+  "fg": {
+   "att": 134,
+   "pct": 0.784,
+   "u40": 0.979,
+   "40s": 0.837,
+   "50+": 0.512,
+   "n50": 43
+  },
+  "tdSharePass": 0.858,
+  "tdLenMedian": 14.8,
+  "tdLen20plus": 0.453,
+  "avgPlaySecs": 2.55,
+  "lastDrive": {
+   "n": 120,
+   "pts": 2.98,
+   "plays": 5.48,
+   "time": 0.058
+  },
+  "ends": {
+   "TD": 212,
+   "FG": 105,
+   "MISS": 29,
+   "INT": 55,
+   "DOWNS": 59,
+   "PUNT": 0,
+   "FUM": 13,
+   "SAF": 0,
+   "TIME": 7
+  },
+  "abilityPopsPerPlay": 0.717,
+  "scoreHist": {
+   "3": 4,
+   "6": 3,
+   "7": 12,
+   "9": 2,
+   "10": 19,
+   "13": 15,
+   "14": 11,
+   "17": 13,
+   "20": 9,
+   "21": 19,
+   "24": 9,
+   "28": 4
+  }
+ },
+ {
+  "label": "ai-pro-elite",
+  "off": "elite",
+  "def": "elite",
+  "skill": 0.68,
+  "defIQ": 0,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 7.53,
+  "ptsPerDrive": 1.88,
+  "playsPerDrive": 6.53,
+  "tdPerDrive": 0.181,
+  "fgPerDrive": 0.204,
+  "toPerDrive": 0.273,
+  "downsPerDrive": 0.233,
+  "timePerDrive": 0.017,
+  "missPerDrive": 0.092,
+  "safPerDrive": 0,
+  "passShare": 0.688,
+  "cmpPct": 0.617,
+  "ypa": 6.37,
+  "ypc": 10.33,
+  "anyA": 3.5,
+  "intPct": 0.058,
+  "laneIntShare": 0.099,
+  "sackPct": 0.027,
+  "sackTime": 2.95,
+  "timeToThrow": 1.48,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 8.24,
+  "yacPerCmp": 2.09,
+  "pass20PerAtt": 0.029,
+  "pass40PerAtt": 0.014,
+  "depth": {
+   "s": {
+    "att": 1382,
+    "cmp": 0.682,
+    "int": 0.046
+   },
+   "m": {
+    "att": 665,
+    "cmp": 0.495,
+    "int": 0.078
+   },
+   "d": {
+    "att": 53,
+    "cmp": 0.472,
+    "int": 0.113
+   }
+  },
+  "targetsCaught": {
+   "X": 0.19,
+   "Z": 0.038,
+   "SL": 0.198,
+   "TE": 0.302,
+   "RB": 0.272
+  },
+  "cmpManVsZone": {
+   "man": 0.604,
+   "zone": 0.595
+  },
+  "ypcRun": 3.05,
+  "runMedian": 2.7,
+  "runP10": 0.5,
+  "runP25": 1.8,
+  "runP75": 4.1,
+  "runP90": 5.9,
+  "runP99": 7.9,
+  "stuffPct": 0.094,
+  "run10Pct": 0.004,
+  "run20Pct": 0.003,
+  "runByPlay": {
+   "inside": {
+    "n": 321,
+    "ypc": 2.95
+   },
+   "outside": {
+    "n": 338,
+    "ypc": 2.73
+   },
+   "power": {
+    "n": 319,
+    "ypc": 3.47
+   }
+  },
+  "brokenPerRun": 0.335,
+  "brokenPerPlay": 0.179,
+  "whiffPerPlay": 0.05,
+  "missedTacklePct": 0.24,
+  "fumLostPerPlay": 0.0045,
+  "fumKeptPerPlay": 0.0045,
+  "flagsPerPlay": 0.044,
+  "bustPerPass": 0.029,
+  "bigHitPerPlay": 0.063,
+  "third": {
+   "att": 601,
+   "conv": 0.393
+  },
+  "fourth": {
+   "att": 224,
+   "conv": 0.415
+  },
+  "fg": {
+   "att": 142,
+   "pct": 0.69,
+   "u40": 0.956,
+   "40s": 0.784,
+   "50+": 0.433,
+   "n50": 60
+  },
+  "tdSharePass": 0.839,
+  "tdLenMedian": 8.4,
+  "tdLen20plus": 0.31,
+  "avgPlaySecs": 2.31,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.51,
+   "plays": 5.36,
+   "time": 0.067
+  },
+  "ends": {
+   "TD": 87,
+   "FG": 98,
+   "MISS": 44,
+   "INT": 117,
+   "DOWNS": 112,
+   "PUNT": 0,
+   "FUM": 14,
+   "SAF": 0,
+   "TIME": 8
+  },
+  "abilityPopsPerPlay": 2.401,
+  "scoreHist": {
+   "0": 18,
+   "3": 20,
+   "6": 13,
+   "7": 23,
+   "9": 2,
+   "10": 17,
+   "13": 7,
+   "14": 10,
+   "16": 1,
+   "17": 4,
+   "20": 4,
+   "21": 1
+  }
+ },
+ {
+  "label": "ai-legend-silver",
+  "off": "silver",
+  "def": "silver",
+  "skill": 0.88,
+  "defIQ": 1,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 9.2,
+  "ptsPerDrive": 2.3,
+  "playsPerDrive": 7.35,
+  "tdPerDrive": 0.237,
+  "fgPerDrive": 0.212,
+  "toPerDrive": 0.212,
+  "downsPerDrive": 0.271,
+  "timePerDrive": 0.027,
+  "missPerDrive": 0.04,
+  "safPerDrive": 0,
+  "passShare": 0.684,
+  "cmpPct": 0.623,
+  "ypa": 6.69,
+  "ypc": 10.74,
+  "anyA": 5.17,
+  "intPct": 0.033,
+  "laneIntShare": 0.138,
+  "sackPct": 0.002,
+  "sackTime": 2.77,
+  "timeToThrow": 1.45,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 9.29,
+  "yacPerCmp": 1.45,
+  "pass20PerAtt": 0.03,
+  "pass40PerAtt": 0.014,
+  "depth": {
+   "s": {
+    "att": 1524,
+    "cmp": 0.704,
+    "int": 0.038
+   },
+   "m": {
+    "att": 809,
+    "cmp": 0.473,
+    "int": 0.026
+   },
+   "d": {
+    "att": 75,
+    "cmp": 0.6,
+    "int": 0.013
+   }
+  },
+  "targetsCaught": {
+   "X": 0.12,
+   "Z": 0.064,
+   "SL": 0.359,
+   "TE": 0.161,
+   "RB": 0.296
+  },
+  "cmpManVsZone": {
+   "man": 0.669,
+   "zone": 0.552
+  },
+  "ypcRun": 2.74,
+  "runMedian": 2.5,
+  "runP10": 1,
+  "runP25": 1.7,
+  "runP75": 3.8,
+  "runP90": 5.1,
+  "runP99": 8,
+  "stuffPct": 0.088,
+  "run10Pct": 0.003,
+  "run20Pct": 0.002,
+  "runByPlay": {
+   "inside": {
+    "n": 327,
+    "ypc": 2.57
+   },
+   "outside": {
+    "n": 398,
+    "ypc": 2.85
+   },
+   "power": {
+    "n": 388,
+    "ypc": 2.77
+   }
+  },
+  "brokenPerRun": 0.137,
+  "brokenPerPlay": 0.087,
+  "whiffPerPlay": 0.042,
+  "missedTacklePct": 0.148,
+  "fumLostPerPlay": 0.0062,
+  "fumKeptPerPlay": 0.0043,
+  "flagsPerPlay": 0.048,
+  "bustPerPass": 0.022,
+  "bigHitPerPlay": 0.073,
+  "third": {
+   "att": 661,
+   "conv": 0.439
+  },
+  "fourth": {
+   "att": 251,
+   "conv": 0.446
+  },
+  "fg": {
+   "att": 121,
+   "pct": 0.843,
+   "u40": 1,
+   "40s": 0.806,
+   "50+": 0.581,
+   "n50": 31
+  },
+  "tdSharePass": 0.781,
+  "tdLenMedian": 6.7,
+  "tdLen20plus": 0.202,
+  "avgPlaySecs": 2.32,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.26,
+   "plays": 5.79,
+   "time": 0.108
+  },
+  "ends": {
+   "TD": 114,
+   "FG": 102,
+   "MISS": 19,
+   "INT": 80,
+   "DOWNS": 130,
+   "PUNT": 0,
+   "FUM": 22,
+   "SAF": 0,
+   "TIME": 13
+  },
+  "abilityPopsPerPlay": 0.021,
+  "scoreHist": {
+   "0": 11,
+   "3": 19,
+   "6": 12,
+   "7": 13,
+   "9": 2,
+   "10": 23,
+   "13": 7,
+   "14": 14,
+   "16": 1,
+   "17": 12,
+   "21": 5,
+   "24": 1
+  }
+ },
+ {
+  "label": "ai-legend-gold",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.88,
+  "defIQ": 1,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 11.86,
+  "ptsPerDrive": 2.96,
+  "playsPerDrive": 6.7,
+  "tdPerDrive": 0.308,
+  "fgPerDrive": 0.269,
+  "toPerDrive": 0.188,
+  "downsPerDrive": 0.181,
+  "timePerDrive": 0.004,
+  "missPerDrive": 0.05,
+  "safPerDrive": 0,
+  "passShare": 0.687,
+  "cmpPct": 0.615,
+  "ypa": 7.7,
+  "ypc": 12.52,
+  "anyA": 6.16,
+  "intPct": 0.034,
+  "laneIntShare": 0.187,
+  "sackPct": 0.001,
+  "sackTime": 3.16,
+  "timeToThrow": 1.42,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 9.88,
+  "yacPerCmp": 2.64,
+  "pass20PerAtt": 0.052,
+  "pass40PerAtt": 0.035,
+  "depth": {
+   "s": {
+    "att": 1307,
+    "cmp": 0.731,
+    "int": 0.041
+   },
+   "m": {
+    "att": 792,
+    "cmp": 0.422,
+    "int": 0.027
+   },
+   "d": {
+    "att": 106,
+    "cmp": 0.632,
+    "int": 0.009
+   }
+  },
+  "targetsCaught": {
+   "X": 0.144,
+   "Z": 0.035,
+   "SL": 0.307,
+   "TE": 0.251,
+   "RB": 0.264
+  },
+  "cmpManVsZone": {
+   "man": 0.669,
+   "zone": 0.53
+  },
+  "ypcRun": 3.49,
+  "runMedian": 2.8,
+  "runP10": 1,
+  "runP25": 1.9,
+  "runP75": 4.9,
+  "runP90": 6.3,
+  "runP99": 8.2,
+  "stuffPct": 0.094,
+  "run10Pct": 0.006,
+  "run20Pct": 0.006,
+  "runByPlay": {
+   "inside": {
+    "n": 359,
+    "ypc": 2.9
+   },
+   "outside": {
+    "n": 320,
+    "ypc": 3.41
+   },
+   "power": {
+    "n": 327,
+    "ypc": 4.21
+   }
+  },
+  "brokenPerRun": 0.343,
+  "brokenPerPlay": 0.166,
+  "whiffPerPlay": 0.076,
+  "missedTacklePct": 0.247,
+  "fumLostPerPlay": 0.0053,
+  "fumKeptPerPlay": 0.0037,
+  "flagsPerPlay": 0.044,
+  "bustPerPass": 0.027,
+  "bigHitPerPlay": 0.055,
+  "third": {
+   "att": 589,
+   "conv": 0.43
+  },
+  "fourth": {
+   "att": 193,
+   "conv": 0.497
+  },
+  "fg": {
+   "att": 153,
+   "pct": 0.843,
+   "u40": 1,
+   "40s": 0.909,
+   "50+": 0.656,
+   "n50": 61
+  },
+  "tdSharePass": 0.851,
+  "tdLenMedian": 11.7,
+  "tdLen20plus": 0.426,
+  "avgPlaySecs": 2.35,
+  "lastDrive": {
+   "n": 120,
+   "pts": 2.29,
+   "plays": 6.03,
+   "time": 0.017
+  },
+  "ends": {
+   "TD": 148,
+   "FG": 129,
+   "MISS": 24,
+   "INT": 73,
+   "DOWNS": 87,
+   "PUNT": 0,
+   "FUM": 17,
+   "SAF": 0,
+   "TIME": 2
+  },
+  "abilityPopsPerPlay": 0.649,
+  "scoreHist": {
+   "0": 4,
+   "3": 17,
+   "6": 5,
+   "7": 9,
+   "9": 5,
+   "10": 18,
+   "13": 13,
+   "14": 13,
+   "16": 4,
+   "17": 14,
+   "20": 5,
+   "21": 5,
+   "24": 7,
+   "28": 1
+  }
+ },
+ {
+  "label": "ai-legend-elite",
+  "off": "elite",
+  "def": "elite",
+  "skill": 0.88,
+  "defIQ": 1,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 4.88,
+  "ptsPerDrive": 1.22,
+  "playsPerDrive": 6.04,
+  "tdPerDrive": 0.083,
+  "fgPerDrive": 0.212,
+  "toPerDrive": 0.308,
+  "downsPerDrive": 0.333,
+  "timePerDrive": 0.008,
+  "missPerDrive": 0.054,
+  "safPerDrive": 0,
+  "passShare": 0.678,
+  "cmpPct": 0.51,
+  "ypa": 5.24,
+  "ypc": 10.26,
+  "anyA": 2.12,
+  "intPct": 0.069,
+  "laneIntShare": 0.163,
+  "sackPct": 0.003,
+  "sackTime": 2.97,
+  "timeToThrow": 1.39,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 8.87,
+  "yacPerCmp": 1.4,
+  "pass20PerAtt": 0.017,
+  "pass40PerAtt": 0.01,
+  "depth": {
+   "s": {
+    "att": 1168,
+    "cmp": 0.539,
+    "int": 0.06
+   },
+   "m": {
+    "att": 760,
+    "cmp": 0.463,
+    "int": 0.083
+   },
+   "d": {
+    "att": 35,
+    "cmp": 0.6,
+    "int": 0.057
+   }
+  },
+  "targetsCaught": {
+   "X": 0.213,
+   "Z": 0.044,
+   "SL": 0.239,
+   "TE": 0.262,
+   "RB": 0.243
+  },
+  "cmpManVsZone": {
+   "man": 0.476,
+   "zone": 0.56
+  },
+  "ypcRun": 2.68,
+  "runMedian": 2.5,
+  "runP10": 0.1,
+  "runP25": 1.7,
+  "runP75": 3.5,
+  "runP90": 4.6,
+  "runP99": 7,
+  "stuffPct": 0.1,
+  "run10Pct": 0.004,
+  "run20Pct": 0.004,
+  "runByPlay": {
+   "inside": {
+    "n": 300,
+    "ypc": 2.51
+   },
+   "outside": {
+    "n": 315,
+    "ypc": 2.35
+   },
+   "power": {
+    "n": 318,
+    "ypc": 3.18
+   }
+  },
+  "brokenPerRun": 0.242,
+  "brokenPerPlay": 0.11,
+  "whiffPerPlay": 0.03,
+  "missedTacklePct": 0.173,
+  "fumLostPerPlay": 0.0052,
+  "fumKeptPerPlay": 0.0021,
+  "flagsPerPlay": 0.041,
+  "bustPerPass": 0.013,
+  "bigHitPerPlay": 0.061,
+  "third": {
+   "att": 589,
+   "conv": 0.272
+  },
+  "fourth": {
+   "att": 282,
+   "conv": 0.355
+  },
+  "fg": {
+   "att": 128,
+   "pct": 0.797,
+   "u40": 1,
+   "40s": 0.882,
+   "50+": 0.585,
+   "n50": 53
+  },
+  "tdSharePass": 0.825,
+  "tdLenMedian": 9,
+  "tdLen20plus": 0.3,
+  "avgPlaySecs": 2.14,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.23,
+   "plays": 5.34,
+   "time": 0.033
+  },
+  "ends": {
+   "TD": 40,
+   "FG": 102,
+   "MISS": 26,
+   "INT": 133,
+   "DOWNS": 160,
+   "PUNT": 0,
+   "FUM": 15,
+   "SAF": 0,
+   "TIME": 4
+  },
+  "abilityPopsPerPlay": 2.015,
+  "scoreHist": {
+   "0": 28,
+   "3": 37,
+   "6": 18,
+   "7": 14,
+   "9": 3,
+   "10": 13,
+   "13": 2,
+   "14": 2,
+   "17": 2,
+   "24": 1
+  }
+ },
+ {
+  "label": "human-rookie-gold",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.35,
+  "defIQ": -0.5,
+  "human": true,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 16.11,
+  "ptsPerDrive": 4.03,
+  "playsPerDrive": 5.75,
+  "tdPerDrive": 0.521,
+  "fgPerDrive": 0.127,
+  "toPerDrive": 0.102,
+  "downsPerDrive": 0.15,
+  "timePerDrive": 0.019,
+  "missPerDrive": 0.081,
+  "safPerDrive": 0,
+  "passShare": 0.677,
+  "cmpPct": 0.677,
+  "ypa": 13.06,
+  "ypc": 19.3,
+  "anyA": 10.08,
+  "intPct": 0.022,
+  "laneIntShare": 0.028,
+  "sackPct": 0.108,
+  "sackTime": 3,
+  "timeToThrow": 2.26,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 13.83,
+  "yacPerCmp": 5.47,
+  "pass20PerAtt": 0.199,
+  "pass40PerAtt": 0.08,
+  "depth": {
+   "s": {
+    "att": 752,
+    "cmp": 0.798,
+    "int": 0.012
+   },
+   "m": {
+    "att": 490,
+    "cmp": 0.557,
+    "int": 0.029
+   },
+   "d": {
+    "att": 425,
+    "cmp": 0.6,
+    "int": 0.031
+   }
+  },
+  "targetsCaught": {
+   "X": 0.108,
+   "Z": 0.075,
+   "SL": 0.283,
+   "TE": 0.317,
+   "RB": 0.216
+  },
+  "cmpManVsZone": {
+   "man": 0.582,
+   "zone": 0.638
+  },
+  "ypcRun": 4.37,
+  "runMedian": 3.2,
+  "runP10": -1.3,
+  "runP25": 2.1,
+  "runP75": 6.2,
+  "runP90": 8.1,
+  "runP99": 34,
+  "stuffPct": 0.123,
+  "run10Pct": 0.021,
+  "run20Pct": 0.012,
+  "runByPlay": {
+   "inside": {
+    "n": 302,
+    "ypc": 4.1
+   },
+   "outside": {
+    "n": 308,
+    "ypc": 3.79
+   },
+   "power": {
+    "n": 283,
+    "ypc": 5.31
+   }
+  },
+  "brokenPerRun": 0.32,
+  "brokenPerPlay": 0.191,
+  "whiffPerPlay": 0.189,
+  "missedTacklePct": 0.342,
+  "fumLostPerPlay": 0.0058,
+  "fumKeptPerPlay": 0.0047,
+  "flagsPerPlay": 0.043,
+  "bustPerPass": 0.051,
+  "bigHitPerPlay": 0.047,
+  "third": {
+   "att": 447,
+   "conv": 0.445
+  },
+  "fourth": {
+   "att": 148,
+   "conv": 0.486
+  },
+  "fg": {
+   "att": 100,
+   "pct": 0.61,
+   "u40": 0.848,
+   "40s": 0.6,
+   "50+": 0.294,
+   "n50": 34
+  },
+  "tdSharePass": 0.888,
+  "tdLenMedian": 36.5,
+  "tdLen20plus": 0.636,
+  "avgPlaySecs": 3.24,
+  "lastDrive": {
+   "n": 120,
+   "pts": 3.56,
+   "plays": 4.98,
+   "time": 0.075
+  },
+  "ends": {
+   "TD": 250,
+   "FG": 61,
+   "MISS": 39,
+   "INT": 34,
+   "DOWNS": 72,
+   "PUNT": 0,
+   "FUM": 15,
+   "SAF": 0,
+   "TIME": 9
+  },
+  "abilityPopsPerPlay": 0.737,
+  "scoreHist": {
+   "3": 3,
+   "6": 2,
+   "7": 8,
+   "10": 14,
+   "13": 6,
+   "14": 30,
+   "17": 14,
+   "20": 4,
+   "21": 24,
+   "24": 6,
+   "28": 9
+  }
+ },
+ {
+  "label": "human-pro-gold",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.35,
+  "defIQ": 0,
+  "human": true,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 13.95,
+  "ptsPerDrive": 3.49,
+  "playsPerDrive": 5.95,
+  "tdPerDrive": 0.431,
+  "fgPerDrive": 0.156,
+  "toPerDrive": 0.079,
+  "downsPerDrive": 0.219,
+  "timePerDrive": 0.017,
+  "missPerDrive": 0.098,
+  "safPerDrive": 0,
+  "passShare": 0.688,
+  "cmpPct": 0.666,
+  "ypa": 11.81,
+  "ypc": 17.74,
+  "anyA": 8.88,
+  "intPct": 0.017,
+  "laneIntShare": 0.033,
+  "sackPct": 0.123,
+  "sackTime": 3.07,
+  "timeToThrow": 2.24,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 13.58,
+  "yacPerCmp": 4.16,
+  "pass20PerAtt": 0.19,
+  "pass40PerAtt": 0.058,
+  "depth": {
+   "s": {
+    "att": 840,
+    "cmp": 0.758,
+    "int": 0.018
+   },
+   "m": {
+    "att": 457,
+    "cmp": 0.538,
+    "int": 0.015
+   },
+   "d": {
+    "att": 426,
+    "cmp": 0.62,
+    "int": 0.019
+   }
+  },
+  "targetsCaught": {
+   "X": 0.107,
+   "Z": 0.067,
+   "SL": 0.298,
+   "TE": 0.3,
+   "RB": 0.228
+  },
+  "cmpManVsZone": {
+   "man": 0.531,
+   "zone": 0.666
+  },
+  "ypcRun": 4.01,
+  "runMedian": 3,
+  "runP10": 0.1,
+  "runP25": 2.1,
+  "runP75": 5.4,
+  "runP90": 7.3,
+  "runP99": 34.8,
+  "stuffPct": 0.1,
+  "run10Pct": 0.018,
+  "run20Pct": 0.012,
+  "runByPlay": {
+   "inside": {
+    "n": 295,
+    "ypc": 3.88
+   },
+   "outside": {
+    "n": 308,
+    "ypc": 4.17
+   },
+   "power": {
+    "n": 289,
+    "ypc": 3.97
+   }
+  },
+  "brokenPerRun": 0.315,
+  "brokenPerPlay": 0.173,
+  "whiffPerPlay": 0.129,
+  "missedTacklePct": 0.298,
+  "fumLostPerPlay": 0.0032,
+  "fumKeptPerPlay": 0.0053,
+  "flagsPerPlay": 0.04,
+  "bustPerPass": 0.049,
+  "bigHitPerPlay": 0.042,
+  "third": {
+   "att": 505,
+   "conv": 0.404
+  },
+  "fourth": {
+   "att": 191,
+   "conv": 0.403
+  },
+  "fg": {
+   "att": 122,
+   "pct": 0.615,
+   "u40": 0.979,
+   "40s": 0.538,
+   "50+": 0.292,
+   "n50": 48
+  },
+  "tdSharePass": 0.865,
+  "tdLenMedian": 23.6,
+  "tdLen20plus": 0.536,
+  "avgPlaySecs": 3.15,
+  "lastDrive": {
+   "n": 120,
+   "pts": 3.03,
+   "plays": 5.38,
+   "time": 0.067
+  },
+  "ends": {
+   "TD": 207,
+   "FG": 75,
+   "MISS": 47,
+   "INT": 29,
+   "DOWNS": 105,
+   "PUNT": 0,
+   "FUM": 9,
+   "SAF": 0,
+   "TIME": 8
+  },
+  "abilityPopsPerPlay": 0.73,
+  "scoreHist": {
+   "0": 2,
+   "3": 5,
+   "6": 5,
+   "7": 17,
+   "9": 2,
+   "10": 15,
+   "13": 1,
+   "14": 25,
+   "17": 20,
+   "20": 4,
+   "21": 11,
+   "24": 9,
+   "28": 4
+  }
+ },
+ {
+  "label": "human-legend-gold",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.35,
+  "defIQ": 1,
+  "human": true,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 8.31,
+  "ptsPerDrive": 2.08,
+  "playsPerDrive": 5.78,
+  "tdPerDrive": 0.233,
+  "fgPerDrive": 0.148,
+  "toPerDrive": 0.085,
+  "downsPerDrive": 0.4,
+  "timePerDrive": 0.025,
+  "missPerDrive": 0.108,
+  "safPerDrive": 0,
+  "passShare": 0.683,
+  "cmpPct": 0.631,
+  "ypa": 11.25,
+  "ypc": 17.84,
+  "anyA": 5.86,
+  "intPct": 0.02,
+  "laneIntShare": 0,
+  "sackPct": 0.266,
+  "sackTime": 3.11,
+  "timeToThrow": 2.24,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 13.95,
+  "yacPerCmp": 3.89,
+  "pass20PerAtt": 0.185,
+  "pass40PerAtt": 0.062,
+  "depth": {
+   "s": {
+    "att": 710,
+    "cmp": 0.721,
+    "int": 0.021
+   },
+   "m": {
+    "att": 297,
+    "cmp": 0.488,
+    "int": 0.03
+   },
+   "d": {
+    "att": 383,
+    "cmp": 0.574,
+    "int": 0.01
+   }
+  },
+  "targetsCaught": {
+   "X": 0.082,
+   "Z": 0.067,
+   "SL": 0.316,
+   "TE": 0.333,
+   "RB": 0.202
+  },
+  "cmpManVsZone": {
+   "man": 0.367,
+   "zone": 0.609
+  },
+  "ypcRun": 3.36,
+  "runMedian": 2.8,
+  "runP10": 1.4,
+  "runP25": 2,
+  "runP75": 4.7,
+  "runP90": 6.4,
+  "runP99": 8.4,
+  "stuffPct": 0.082,
+  "run10Pct": 0.005,
+  "run20Pct": 0.003,
+  "runByPlay": {
+   "inside": {
+    "n": 258,
+    "ypc": 2.93
+   },
+   "outside": {
+    "n": 310,
+    "ypc": 3.63
+   },
+   "power": {
+    "n": 313,
+    "ypc": 3.44
+   }
+  },
+  "brokenPerRun": 0.278,
+  "brokenPerPlay": 0.122,
+  "whiffPerPlay": 0.087,
+  "missedTacklePct": 0.248,
+  "fumLostPerPlay": 0.005,
+  "fumKeptPerPlay": 0.0025,
+  "flagsPerPlay": 0.04,
+  "bustPerPass": 0.023,
+  "bigHitPerPlay": 0.051,
+  "third": {
+   "att": 574,
+   "conv": 0.265
+  },
+  "fourth": {
+   "att": 284,
+   "conv": 0.282
+  },
+  "fg": {
+   "att": 123,
+   "pct": 0.577,
+   "u40": 0.806,
+   "40s": 0.588,
+   "50+": 0.415,
+   "n50": 53
+  },
+  "tdSharePass": 0.911,
+  "tdLenMedian": 42,
+  "tdLen20plus": 0.634,
+  "avgPlaySecs": 3.02,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.8,
+   "plays": 5.28,
+   "time": 0.1
+  },
+  "ends": {
+   "TD": 112,
+   "FG": 71,
+   "MISS": 52,
+   "INT": 27,
+   "DOWNS": 192,
+   "PUNT": 0,
+   "FUM": 14,
+   "SAF": 0,
+   "TIME": 12
+  },
+  "abilityPopsPerPlay": 0.637,
+  "scoreHist": {
+   "0": 21,
+   "3": 14,
+   "6": 5,
+   "7": 23,
+   "9": 1,
+   "10": 28,
+   "13": 2,
+   "14": 12,
+   "17": 4,
+   "20": 3,
+   "21": 5,
+   "24": 2
+  }
+ },
+ {
+  "label": "human-pro-stick0",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.35,
+  "defIQ": 0,
+  "human": true,
+  "stickDelay": 0,
+  "neverStick": false,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 13.94,
+  "ptsPerDrive": 3.49,
+  "playsPerDrive": 5.6,
+  "tdPerDrive": 0.435,
+  "fgPerDrive": 0.146,
+  "toPerDrive": 0.085,
+  "downsPerDrive": 0.24,
+  "timePerDrive": 0.008,
+  "missPerDrive": 0.085,
+  "safPerDrive": 0,
+  "passShare": 0.673,
+  "cmpPct": 0.656,
+  "ypa": 12.58,
+  "ypc": 19.17,
+  "anyA": 9.25,
+  "intPct": 0.021,
+  "laneIntShare": 0.03,
+  "sackPct": 0.131,
+  "sackTime": 3.01,
+  "timeToThrow": 2.27,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 13.51,
+  "yacPerCmp": 5.66,
+  "pass20PerAtt": 0.195,
+  "pass40PerAtt": 0.078,
+  "depth": {
+   "s": {
+    "att": 762,
+    "cmp": 0.781,
+    "int": 0.009
+   },
+   "m": {
+    "att": 413,
+    "cmp": 0.506,
+    "int": 0.044
+   },
+   "d": {
+    "att": 397,
+    "cmp": 0.574,
+    "int": 0.02
+   }
+  },
+  "targetsCaught": {
+   "X": 0.099,
+   "Z": 0.061,
+   "SL": 0.284,
+   "TE": 0.334,
+   "RB": 0.222
+  },
+  "cmpManVsZone": {
+   "man": 0.558,
+   "zone": 0.589
+  },
+  "ypcRun": 3.91,
+  "runMedian": 3.1,
+  "runP10": 1,
+  "runP25": 2,
+  "runP75": 5.6,
+  "runP90": 7.5,
+  "runP99": 9.5,
+  "stuffPct": 0.094,
+  "run10Pct": 0.008,
+  "run20Pct": 0.006,
+  "runByPlay": {
+   "inside": {
+    "n": 291,
+    "ypc": 3.43
+   },
+   "outside": {
+    "n": 292,
+    "ypc": 4.31
+   },
+   "power": {
+    "n": 296,
+    "ypc": 3.99
+   }
+  },
+  "brokenPerRun": 0.286,
+  "brokenPerPlay": 0.156,
+  "whiffPerPlay": 0.172,
+  "missedTacklePct": 0.316,
+  "fumLostPerPlay": 0.003,
+  "fumKeptPerPlay": 0.0045,
+  "flagsPerPlay": 0.041,
+  "bustPerPass": 0.05,
+  "bigHitPerPlay": 0.042,
+  "third": {
+   "att": 469,
+   "conv": 0.42
+  },
+  "fourth": {
+   "att": 174,
+   "conv": 0.316
+  },
+  "fg": {
+   "att": 111,
+   "pct": 0.631,
+   "u40": 0.884,
+   "40s": 0.667,
+   "50+": 0.316,
+   "n50": 38
+  },
+  "tdSharePass": 0.885,
+  "tdLenMedian": 31.5,
+  "tdLen20plus": 0.598,
+  "avgPlaySecs": 3.2,
+  "lastDrive": {
+   "n": 120,
+   "pts": 3.12,
+   "plays": 4.99,
+   "time": 0.033
+  },
+  "ends": {
+   "TD": 209,
+   "FG": 70,
+   "MISS": 41,
+   "INT": 33,
+   "DOWNS": 115,
+   "PUNT": 0,
+   "FUM": 8,
+   "SAF": 0,
+   "TIME": 4
+  },
+  "abilityPopsPerPlay": 0.709,
+  "scoreHist": {
+   "0": 4,
+   "3": 5,
+   "6": 2,
+   "7": 21,
+   "10": 13,
+   "13": 7,
+   "14": 18,
+   "16": 1,
+   "17": 17,
+   "20": 4,
+   "21": 17,
+   "24": 6,
+   "28": 5
+  }
+ },
+ {
+  "label": "human-pro-stick0.35",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.35,
+  "defIQ": 0,
+  "human": true,
+  "stickDelay": 0.35,
+  "neverStick": false,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 9.14,
+  "ptsPerDrive": 2.29,
+  "playsPerDrive": 6.12,
+  "tdPerDrive": 0.242,
+  "fgPerDrive": 0.198,
+  "toPerDrive": 0.106,
+  "downsPerDrive": 0.354,
+  "timePerDrive": 0.015,
+  "missPerDrive": 0.085,
+  "safPerDrive": 0,
+  "passShare": 0.661,
+  "cmpPct": 0.674,
+  "ypa": 10.42,
+  "ypc": 15.47,
+  "anyA": 7.23,
+  "intPct": 0.024,
+  "laneIntShare": 0.024,
+  "sackPct": 0.132,
+  "sackTime": 3.03,
+  "timeToThrow": 2.26,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 13.5,
+  "yacPerCmp": 1.97,
+  "pass20PerAtt": 0.166,
+  "pass40PerAtt": 0.029,
+  "depth": {
+   "s": {
+    "att": 813,
+    "cmp": 0.776,
+    "int": 0.022
+   },
+   "m": {
+    "att": 452,
+    "cmp": 0.562,
+    "int": 0.024
+   },
+   "d": {
+    "att": 420,
+    "cmp": 0.595,
+    "int": 0.029
+   }
+  },
+  "targetsCaught": {
+   "X": 0.115,
+   "Z": 0.063,
+   "SL": 0.276,
+   "TE": 0.307,
+   "RB": 0.239
+  },
+  "cmpManVsZone": {
+   "man": 0.556,
+   "zone": 0.625
+  },
+  "ypcRun": 1.17,
+  "runMedian": 0.9,
+  "runP10": -3,
+  "runP25": 0.4,
+  "runP75": 1.8,
+  "runP90": 3.1,
+  "runP99": 7,
+  "stuffPct": 0.151,
+  "run10Pct": 0.004,
+  "run20Pct": 0.004,
+  "runByPlay": {
+   "inside": {
+    "n": 330,
+    "ypc": 0.68
+   },
+   "outside": {
+    "n": 351,
+    "ypc": 1.71
+   },
+   "power": {
+    "n": 314,
+    "ypc": 1.08
+   }
+  },
+  "brokenPerRun": 0.273,
+  "brokenPerPlay": 0.163,
+  "whiffPerPlay": 0.074,
+  "missedTacklePct": 0.247,
+  "fumLostPerPlay": 0.0037,
+  "fumKeptPerPlay": 0.0048,
+  "flagsPerPlay": 0.042,
+  "bustPerPass": 0.042,
+  "bigHitPerPlay": 0.054,
+  "third": {
+   "att": 591,
+   "conv": 0.294
+  },
+  "fourth": {
+   "att": 277,
+   "conv": 0.343
+  },
+  "fg": {
+   "att": 136,
+   "pct": 0.699,
+   "u40": 0.934,
+   "40s": 0.692,
+   "50+": 0.408,
+   "n50": 49
+  },
+  "tdSharePass": 0.905,
+  "tdLenMedian": 15.9,
+  "tdLen20plus": 0.44,
+  "avgPlaySecs": 3.04,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.93,
+   "plays": 5.56,
+   "time": 0.058
+  },
+  "ends": {
+   "TD": 116,
+   "FG": 95,
+   "MISS": 41,
+   "INT": 40,
+   "DOWNS": 170,
+   "PUNT": 0,
+   "FUM": 11,
+   "SAF": 0,
+   "TIME": 7
+  },
+  "abilityPopsPerPlay": 0.715,
+  "scoreHist": {
+   "0": 12,
+   "3": 15,
+   "6": 10,
+   "7": 24,
+   "10": 22,
+   "12": 1,
+   "13": 6,
+   "14": 10,
+   "16": 1,
+   "17": 12,
+   "20": 2,
+   "21": 2,
+   "24": 3
+  }
+ },
+ {
+  "label": "human-pro-stick0.7",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.35,
+  "defIQ": 0,
+  "human": true,
+  "stickDelay": 0.7,
+  "neverStick": false,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 6.83,
+  "ptsPerDrive": 1.71,
+  "playsPerDrive": 5.83,
+  "tdPerDrive": 0.175,
+  "fgPerDrive": 0.16,
+  "toPerDrive": 0.106,
+  "downsPerDrive": 0.41,
+  "timePerDrive": 0.023,
+  "missPerDrive": 0.125,
+  "safPerDrive": 0,
+  "passShare": 0.682,
+  "cmpPct": 0.654,
+  "ypa": 9.89,
+  "ypc": 15.12,
+  "anyA": 6.79,
+  "intPct": 0.024,
+  "laneIntShare": 0,
+  "sackPct": 0.131,
+  "sackTime": 3.01,
+  "timeToThrow": 2.25,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 13.97,
+  "yacPerCmp": 1.15,
+  "pass20PerAtt": 0.167,
+  "pass40PerAtt": 0.025,
+  "depth": {
+   "s": {
+    "att": 779,
+    "cmp": 0.768,
+    "int": 0.017
+   },
+   "m": {
+    "att": 438,
+    "cmp": 0.514,
+    "int": 0.039
+   },
+   "d": {
+    "att": 442,
+    "cmp": 0.593,
+    "int": 0.023
+   }
+  },
+  "targetsCaught": {
+   "X": 0.108,
+   "Z": 0.065,
+   "SL": 0.285,
+   "TE": 0.316,
+   "RB": 0.226
+  },
+  "cmpManVsZone": {
+   "man": 0.538,
+   "zone": 0.612
+  },
+  "ypcRun": -0.35,
+  "runMedian": -0.6,
+  "runP10": -3.8,
+  "runP25": -1,
+  "runP75": 0.7,
+  "runP90": 1.7,
+  "runP99": 4.6,
+  "stuffPct": 0.612,
+  "run10Pct": 0.002,
+  "run20Pct": 0.001,
+  "runByPlay": {
+   "inside": {
+    "n": 275,
+    "ypc": -0.61
+   },
+   "outside": {
+    "n": 312,
+    "ypc": -0.07
+   },
+   "power": {
+    "n": 302,
+    "ypc": -0.41
+   }
+  },
+  "brokenPerRun": 0.231,
+  "brokenPerPlay": 0.153,
+  "whiffPerPlay": 0.051,
+  "missedTacklePct": 0.224,
+  "fumLostPerPlay": 0.0043,
+  "fumKeptPerPlay": 0.0054,
+  "flagsPerPlay": 0.045,
+  "bustPerPass": 0.041,
+  "bigHitPerPlay": 0.053,
+  "third": {
+   "att": 597,
+   "conv": 0.26
+  },
+  "fourth": {
+   "att": 289,
+   "conv": 0.263
+  },
+  "fg": {
+   "att": 137,
+   "pct": 0.562,
+   "u40": 0.86,
+   "40s": 0.568,
+   "50+": 0.3,
+   "n50": 50
+  },
+  "tdSharePass": 0.988,
+  "tdLenMedian": 21.1,
+  "tdLen20plus": 0.536,
+  "avgPlaySecs": 3.09,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.57,
+   "plays": 5.35,
+   "time": 0.092
+  },
+  "ends": {
+   "TD": 84,
+   "FG": 77,
+   "MISS": 60,
+   "INT": 39,
+   "DOWNS": 197,
+   "PUNT": 0,
+   "FUM": 12,
+   "SAF": 0,
+   "TIME": 11
+  },
+  "abilityPopsPerPlay": 0.754,
+  "scoreHist": {
+   "0": 20,
+   "3": 29,
+   "6": 5,
+   "7": 24,
+   "9": 3,
+   "10": 19,
+   "14": 11,
+   "16": 1,
+   "17": 6,
+   "21": 1,
+   "24": 1
+  }
+ },
+ {
+  "label": "human-pro-nostick",
+  "off": "gold",
+  "def": "gold",
+  "skill": 0.35,
+  "defIQ": 0,
+  "human": true,
+  "stickDelay": 0,
+  "neverStick": true,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 4.62,
+  "ptsPerDrive": 1.15,
+  "playsPerDrive": 5.66,
+  "tdPerDrive": 0.092,
+  "fgPerDrive": 0.171,
+  "toPerDrive": 0.085,
+  "downsPerDrive": 0.548,
+  "timePerDrive": 0.025,
+  "missPerDrive": 0.079,
+  "safPerDrive": 0,
+  "passShare": 0.688,
+  "cmpPct": 0.665,
+  "ypa": 8.96,
+  "ypc": 13.48,
+  "anyA": 6.17,
+  "intPct": 0.019,
+  "laneIntShare": 0,
+  "sackPct": 0.134,
+  "sackTime": 3.03,
+  "timeToThrow": 2.27,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 13.57,
+  "yacPerCmp": -0.09,
+  "pass20PerAtt": 0.149,
+  "pass40PerAtt": 0.01,
+  "depth": {
+   "s": {
+    "att": 788,
+    "cmp": 0.783,
+    "int": 0.013
+   },
+   "m": {
+    "att": 409,
+    "cmp": 0.509,
+    "int": 0.039
+   },
+   "d": {
+    "att": 421,
+    "cmp": 0.596,
+    "int": 0.01
+   }
+  },
+  "targetsCaught": {
+   "X": 0.088,
+   "Z": 0.072,
+   "SL": 0.288,
+   "TE": 0.305,
+   "RB": 0.247
+  },
+  "cmpManVsZone": {
+   "man": 0.547,
+   "zone": 0.622
+  },
+  "ypcRun": -3.69,
+  "runMedian": -4,
+  "runP10": -4.4,
+  "runP25": -4,
+  "runP75": -3.7,
+  "runP90": -2.4,
+  "runP99": -2.2,
+  "stuffPct": 1,
+  "run10Pct": 0,
+  "run20Pct": 0,
+  "runByPlay": {
+   "inside": {
+    "n": 275,
+    "ypc": -3.43
+   },
+   "outside": {
+    "n": 280,
+    "ypc": -3.95
+   },
+   "power": {
+    "n": 293,
+    "ypc": -3.69
+   }
+  },
+  "brokenPerRun": 0.327,
+  "brokenPerPlay": 0.174,
+  "whiffPerPlay": 0,
+  "missedTacklePct": 0.197,
+  "fumLostPerPlay": 0.0041,
+  "fumKeptPerPlay": 0.0059,
+  "flagsPerPlay": 0.045,
+  "bustPerPass": 0.047,
+  "bigHitPerPlay": 0.022,
+  "third": {
+   "att": 596,
+   "conv": 0.191
+  },
+  "fourth": {
+   "att": 351,
+   "conv": 0.197
+  },
+  "fg": {
+   "att": 120,
+   "pct": 0.683,
+   "u40": 0.949,
+   "40s": 0.727,
+   "50+": 0.438,
+   "n50": 48
+  },
+  "tdSharePass": 1,
+  "tdLenMedian": 12.5,
+  "tdLen20plus": 0.341,
+  "avgPlaySecs": 3.13,
+  "lastDrive": {
+   "n": 120,
+   "pts": 1.07,
+   "plays": 5.22,
+   "time": 0.1
+  },
+  "ends": {
+   "TD": 44,
+   "FG": 82,
+   "MISS": 38,
+   "INT": 30,
+   "DOWNS": 263,
+   "PUNT": 0,
+   "FUM": 11,
+   "SAF": 0,
+   "TIME": 12
+  },
+  "abilityPopsPerPlay": 0.744,
+  "scoreHist": {
+   "0": 31,
+   "3": 38,
+   "6": 9,
+   "7": 22,
+   "9": 2,
+   "10": 11,
+   "13": 3,
+   "14": 1,
+   "17": 3
+  }
+ },
+ {
+  "label": "ai-pro-elite-v-silver",
+  "off": "elite",
+  "def": "silver",
+  "skill": 0.68,
+  "defIQ": 0,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 16.74,
+  "ptsPerDrive": 4.19,
+  "playsPerDrive": 6.79,
+  "tdPerDrive": 0.51,
+  "fgPerDrive": 0.204,
+  "toPerDrive": 0.163,
+  "downsPerDrive": 0.077,
+  "timePerDrive": 0.01,
+  "missPerDrive": 0.035,
+  "safPerDrive": 0,
+  "passShare": 0.668,
+  "cmpPct": 0.768,
+  "ypa": 10.15,
+  "ypc": 13.21,
+  "anyA": 8.24,
+  "intPct": 0.031,
+  "laneIntShare": 0.077,
+  "sackPct": 0.034,
+  "sackTime": 3.27,
+  "timeToThrow": 1.42,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 9.67,
+  "yacPerCmp": 3.54,
+  "pass20PerAtt": 0.075,
+  "pass40PerAtt": 0.04,
+  "depth": {
+   "s": {
+    "att": 1309,
+    "cmp": 0.843,
+    "int": 0.034
+   },
+   "m": {
+    "att": 702,
+    "cmp": 0.641,
+    "int": 0.028
+   },
+   "d": {
+    "att": 92,
+    "cmp": 0.674,
+    "int": 0.011
+   }
+  },
+  "targetsCaught": {
+   "X": 0.194,
+   "Z": 0.045,
+   "SL": 0.311,
+   "TE": 0.243,
+   "RB": 0.208
+  },
+  "cmpManVsZone": {
+   "man": 0.767,
+   "zone": 0.706
+  },
+  "ypcRun": 4.7,
+  "runMedian": 3.7,
+  "runP10": 1.8,
+  "runP25": 2.3,
+  "runP75": 5.9,
+  "runP90": 7.7,
+  "runP99": 35.3,
+  "stuffPct": 0.024,
+  "run10Pct": 0.027,
+  "run20Pct": 0.018,
+  "runByPlay": {
+   "inside": {
+    "n": 370,
+    "ypc": 4.73
+   },
+   "outside": {
+    "n": 361,
+    "ypc": 4.44
+   },
+   "power": {
+    "n": 352,
+    "ypc": 4.93
+   }
+  },
+  "brokenPerRun": 0.381,
+  "brokenPerPlay": 0.232,
+  "whiffPerPlay": 0.115,
+  "missedTacklePct": 0.295,
+  "fumLostPerPlay": 0.0049,
+  "fumKeptPerPlay": 0.0037,
+  "flagsPerPlay": 0.04,
+  "bustPerPass": 0.046,
+  "bigHitPerPlay": 0.083,
+  "third": {
+   "att": 466,
+   "conv": 0.633
+  },
+  "fourth": {
+   "att": 87,
+   "conv": 0.517
+  },
+  "fg": {
+   "att": 115,
+   "pct": 0.852,
+   "u40": 1,
+   "40s": 0.917,
+   "50+": 0.651,
+   "n50": 43
+  },
+  "tdSharePass": 0.829,
+  "tdLenMedian": 11,
+  "tdLen20plus": 0.371,
+  "avgPlaySecs": 2.52,
+  "lastDrive": {
+   "n": 120,
+   "pts": 2.87,
+   "plays": 5.74,
+   "time": 0.042
+  },
+  "ends": {
+   "TD": 245,
+   "FG": 98,
+   "MISS": 17,
+   "INT": 62,
+   "DOWNS": 37,
+   "PUNT": 0,
+   "FUM": 16,
+   "SAF": 0,
+   "TIME": 5
+  },
+  "abilityPopsPerPlay": 1.474,
+  "scoreHist": {
+   "0": 1,
+   "3": 1,
+   "6": 4,
+   "7": 8,
+   "9": 1,
+   "10": 11,
+   "13": 9,
+   "14": 14,
+   "17": 22,
+   "20": 9,
+   "21": 16,
+   "24": 17,
+   "28": 7
+  }
+ },
+ {
+  "label": "ai-pro-silver-v-elite",
+  "off": "silver",
+  "def": "elite",
+  "skill": 0.68,
+  "defIQ": 0,
+  "games": 120,
+  "drives": 480,
+  "ptsPerGame": 3.02,
+  "ptsPerDrive": 0.76,
+  "playsPerDrive": 5.68,
+  "tdPerDrive": 0.063,
+  "fgPerDrive": 0.106,
+  "toPerDrive": 0.25,
+  "downsPerDrive": 0.512,
+  "timePerDrive": 0.023,
+  "missPerDrive": 0.046,
+  "safPerDrive": 0,
+  "passShare": 0.686,
+  "cmpPct": 0.498,
+  "ypa": 5.03,
+  "ypc": 10.1,
+  "anyA": 1.71,
+  "intPct": 0.063,
+  "laneIntShare": 0.036,
+  "sackPct": 0.056,
+  "sackTime": 2.63,
+  "timeToThrow": 1.61,
+  "scrambleRate": 0,
+  "airYdsPerCmp": 8.21,
+  "yacPerCmp": 1.89,
+  "pass20PerAtt": 0.029,
+  "pass40PerAtt": 0.01,
+  "depth": {
+   "s": {
+    "att": 1169,
+    "cmp": 0.537,
+    "int": 0.046
+   },
+   "m": {
+    "att": 477,
+    "cmp": 0.447,
+    "int": 0.09
+   },
+   "d": {
+    "att": 118,
+    "cmp": 0.314,
+    "int": 0.119
+   }
+  },
+  "targetsCaught": {
+   "X": 0.157,
+   "Z": 0.074,
+   "SL": 0.14,
+   "TE": 0.192,
+   "RB": 0.436
+  },
+  "cmpManVsZone": {
+   "man": 0.439,
+   "zone": 0.514
+  },
+  "ypcRun": 1.57,
+  "runMedian": 1.8,
+  "runP10": -1.7,
+  "runP25": 0.9,
+  "runP75": 2.8,
+  "runP90": 3.7,
+  "runP99": 6.3,
+  "stuffPct": 0.21,
+  "run10Pct": 0,
+  "run20Pct": 0,
+  "runByPlay": {
+   "inside": {
+    "n": 294,
+    "ypc": 1.69
+   },
+   "outside": {
+    "n": 292,
+    "ypc": 1.4
+   },
+   "power": {
+    "n": 270,
+    "ypc": 1.61
+   }
+  },
+  "brokenPerRun": 0.185,
+  "brokenPerPlay": 0.091,
+  "whiffPerPlay": 0.036,
+  "missedTacklePct": 0.167,
+  "fumLostPerPlay": 0.004,
+  "fumKeptPerPlay": 0.0037,
+  "flagsPerPlay": 0.049,
+  "bustPerPass": 0.028,
+  "bigHitPerPlay": 0.064,
+  "third": {
+   "att": 590,
+   "conv": 0.224
+  },
+  "fourth": {
+   "att": 349,
+   "conv": 0.218
+  },
+  "fg": {
+   "att": 73,
+   "pct": 0.699,
+   "u40": 0.935,
+   "40s": 0.818,
+   "50+": 0.2,
+   "n50": 20
+  },
+  "tdSharePass": 0.8,
+  "tdLenMedian": 17.9,
+  "tdLen20plus": 0.4,
+  "avgPlaySecs": 2.36,
+  "lastDrive": {
+   "n": 120,
+   "pts": 0.57,
+   "plays": 5.45,
+   "time": 0.092
+  },
+  "ends": {
+   "TD": 30,
+   "FG": 51,
+   "MISS": 22,
+   "INT": 109,
+   "DOWNS": 246,
+   "PUNT": 0,
+   "FUM": 11,
+   "SAF": 0,
+   "TIME": 11
+  },
+  "abilityPopsPerPlay": 0.978,
+  "scoreHist": {
+   "0": 56,
+   "3": 31,
+   "6": 7,
+   "7": 17,
+   "10": 5,
+   "14": 3,
+   "17": 1
+  }
+ }
+]

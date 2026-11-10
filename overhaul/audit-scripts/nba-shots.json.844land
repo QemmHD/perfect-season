@@ -1,0 +1,100 @@
+{
+ "844land": {
+  "tDom": 466,
+  "tCanvas": 1834,
+  "tPad": 1851,
+  "tPlay": 2516,
+  "layout": {
+   ".hg2-bug": {
+    "x": 289,
+    "y": 8,
+    "w": 266,
+    "h": 29
+   },
+   ".hg2-marks": {
+    "x": 261,
+    "y": 40,
+    "w": 323,
+    "h": 17
+   },
+   ".hg2-look": {
+    "x": 328,
+    "y": 64,
+    "w": 188,
+    "h": 22
+   },
+   ".hg2-hint": {
+    "x": 288,
+    "y": 279,
+    "w": 268,
+    "h": 42
+   },
+   ".hg2-coach": {
+    "x": 305,
+    "y": 324,
+    "w": 235,
+    "h": 54
+   },
+   ".hg2-skills": {
+    "x": 622,
+    "y": 203,
+    "w": 208,
+    "h": 44
+   },
+   ".hg2-stick": {
+    "x": 14,
+    "y": 270,
+    "w": 108,
+    "h": 108
+   },
+   ".hg2-pass": {
+    "x": 692,
+    "y": 260,
+    "w": 56,
+    "h": 56
+   },
+   ".hg2-shoot": {
+    "x": 750,
+    "y": 298,
+    "w": 80,
+    "h": 80
+   },
+   ".play-readout-toggle": {
+    "x": 12,
+    "y": 84,
+    "w": 135,
+    "h": 44
+   }
+  },
+  "skillButtons": [
+   {
+    "t": "CROSS",
+    "w": 60,
+    "h": 44,
+    "x": 622,
+    "y": 203,
+    "disabled": true
+   },
+   {
+    "t": "STEP BACK",
+    "w": 84,
+    "h": 44,
+    "x": 688,
+    "y": 203,
+    "disabled": true
+   },
+   {
+    "t": "SPIN",
+    "w": 52,
+    "h": 44,
+    "x": 778,
+    "y": 203,
+    "disabled": true
+   }
+  ],
+  "overlaps": [],
+  "errors": [
+   "console: Failed to load resource: net::ERR_FAILED"
+  ]
+ }
+}

@@ -1,0 +1,74 @@
+
+=== defIQ 0 (n=200 per row, random real club-season matchups) ===
+build | beeline sprint, shoot@12m assist     G  15.0%  S   1.5%  W   2.0%  B   1.0%  L  51.0%  O   0.0%  T  29.5%  clock 5.4s  | TACKLED 51%,  30%, GOAL 15%, WIDE 2%
+build | beeline sprint, shoot@16m assist     G  18.0%  S   2.0%  W   3.5%  B   1.5%  L  47.5%  O   0.0%  T  27.5%  clock 5.3s  | TACKLED 47%,  28%, GOAL 18%, WIDE 4%
+build | beeline sprint, shoot@20m assist     G  16.0%  S   5.5%  W   4.5%  B  11.0%  L  42.0%  O   0.0%  T  21.0%  clock 5.0s  | TACKLED 42%,  21%, GOAL 16%, BLOCKED 11%
+build | beeline sprint, shoot@25m assist     G  10.5%  S  13.5%  W  22.5%  B   6.0%  L  35.0%  O   0.0%  T  12.5%  clock 4.7s  | TACKLED 34%, WIDE 14%, SAVED 13%,  13%
+build | beeline sprint, shoot@30m assist     G  14.0%  S  20.0%  W  23.5%  B   4.0%  L  31.0%  O   0.0%  T   7.5%  clock 4.2s  | TACKLED 26%, SAVED 18%, WIDE 15%, GOAL 14%
+build | beeline sprint, shoot@20m drag       G  17.5%  S   4.5%  W   9.0%  B   5.0%  L  43.0%  O   0.0%  T  21.0%  clock 5.0s  | TACKLED 43%,  21%, GOAL 18%, WIDE 8%
+build | beeline jog, shoot@16m assist        G   9.5%  S   0.0%  W   1.0%  B   0.0%  L  59.5%  O   0.0%  T  30.0%  clock 4.4s  | TACKLED 60%,  30%, GOAL 10%, WIDE 1%
+build | weave sprint, shoot@16m assist       G  12.0%  S   1.5%  W   2.0%  B   1.0%  L  55.0%  O   0.0%  T  28.5%  clock 5.1s  | TACKLED 55%,  28%, GOAL 12%, WIDE 2%
+build | autopilot 0.68 (Pro AI)              G  26.0%  S  13.0%  W  19.5%  B   6.0%  L  34.0%  O   1.5%  T   0.0%  clock 7.3s  | GOAL 26%, INTERCEPTED 24%, WIDE 16%, SAVED 10%
+build | autopilot 0.88 (Legend AI)           G  18.0%  S  15.5%  W  14.5%  B   5.0%  L  46.5%  O   0.5%  T   0.0%  clock 6.1s  | INTERCEPTED 35%, GOAL 18%, SAVED 11%, WIDE 10%
+counter | beeline sprint, shoot@12m assist   G  15.0%  S  26.0%  W   1.0%  B   1.0%  L  40.5%  O   0.0%  T  16.5%  clock 6.9s  | TACKLED 41%,  17%, GOAL 15%, SMOTHERED 14%
+counter | beeline sprint, shoot@16m assist   G  53.0%  S   1.0%  W   5.5%  B   1.5%  L  31.5%  O   0.0%  T   7.5%  clock 6.4s  | GOAL 53%, TACKLED 30%,  8%, WIDE 6%
+counter | beeline sprint, shoot@20m assist   G  47.5%  S  17.0%  W  11.5%  B   0.5%  L  20.0%  O   0.0%  T   3.5%  clock 5.9s  | GOAL 48%, TACKLED 19%, SAVED 17%, WIDE 8%
+counter | beeline sprint, shoot@25m assist   G  21.5%  S  22.5%  W  37.5%  B   0.5%  L  18.0%  O   0.0%  T   0.0%  clock 5.2s  | WIDE 26%, SAVED 22%, GOAL 22%, OVER THE BAR 12%
+counter | beeline sprint, shoot@30m assist   G  22.0%  S  31.5%  W  34.0%  B   0.0%  L  12.0%  O   0.0%  T   0.5%  clock 4.5s  | SAVED 30%, WIDE 26%, GOAL 22%, OVER THE BAR 9%
+counter | beeline sprint, shoot@20m drag     G  40.0%  S  14.5%  W  23.5%  B   0.0%  L  20.0%  O   0.0%  T   2.0%  clock 5.9s  | GOAL 40%, WIDE 20%, TACKLED 17%, SAVED 14%
+counter | beeline jog, shoot@16m assist      G  21.5%  S   1.0%  W   1.5%  B   0.0%  L  65.5%  O   0.0%  T  10.5%  clock 4.1s  | TACKLED 66%, GOAL 22%,  11%, WIDE 1%
+counter | weave sprint, shoot@16m assist     G  32.0%  S   2.5%  W   4.0%  B   1.0%  L  46.5%  O   0.0%  T  14.0%  clock 6.4s  | TACKLED 46%, GOAL 32%,  14%, WIDE 4%
+counter | autopilot 0.68 (Pro AI)            G  20.0%  S  11.0%  W  19.0%  B   6.0%  L  36.5%  O   7.5%  T   0.0%  clock 7.1s  | GOAL 20%, INTERCEPTED 18%, TACKLED 14%, WIDE 13%
+counter | autopilot 0.88 (Legend AI)         G  17.5%  S  13.0%  W  17.0%  B   8.5%  L  39.5%  O   4.5%  T   0.0%  clock 7.0s  | INTERCEPTED 20%, GOAL 18%, TACKLED 17%, WIDE 12%
+wide | beeline sprint, shoot@12m assist      G  23.5%  S   2.5%  W   3.0%  B   0.5%  L  50.5%  O   0.0%  T  20.0%  clock 3.5s  | TACKLED 50%, GOAL 24%,  20%, WIDE 3%
+wide | beeline sprint, shoot@16m assist      G  24.0%  S   1.5%  W   3.0%  B   3.0%  L  48.0%  O   0.0%  T  20.5%  clock 3.3s  | TACKLED 47%, GOAL 24%,  21%, BLOCKED 3%
+wide | beeline sprint, shoot@20m assist      G  17.5%  S   9.5%  W   8.5%  B   6.0%  L  41.0%  O   0.0%  T  17.5%  clock 3.1s  | TACKLED 40%, GOAL 18%,  18%, SAVED 10%
+wide | beeline sprint, shoot@25m assist      G  13.5%  S  13.5%  W  19.5%  B  15.5%  L  28.5%  O   0.0%  T   9.5%  clock 2.8s  | TACKLED 25%, BLOCKED 16%, GOAL 14%, SAVED 12%
+wide | beeline sprint, shoot@30m assist      G   8.5%  S  23.0%  W  32.5%  B   2.0%  L  26.0%  O   0.0%  T   8.0%  clock 2.3s  | WIDE 24%, TACKLED 24%, SAVED 23%, GOAL 9%
+wide | beeline sprint, shoot@20m drag        G  18.5%  S   5.0%  W  10.5%  B   6.5%  L  42.5%  O   0.0%  T  17.0%  clock 3.1s  | TACKLED 39%, GOAL 19%,  17%, WIDE 10%
+wide | beeline jog, shoot@16m assist         G  16.5%  S   2.0%  W   5.5%  B   4.0%  L  41.5%  O   0.0%  T  30.5%  clock 3.4s  | TACKLED 40%,  31%, GOAL 17%, WIDE 5%
+wide | weave sprint, shoot@16m assist        G  26.5%  S   2.0%  W   8.5%  B   9.5%  L  35.0%  O   0.0%  T  18.5%  clock 4.1s  | TACKLED 35%, GOAL 27%,  19%, BLOCKED 10%
+wide | autopilot 0.68 (Pro AI)               G  18.5%  S  16.0%  W  16.0%  B   9.0%  L  33.0%  O   7.0%  T   0.5%  clock 4.5s  | GOAL 19%, INTERCEPTED 17%, SAVED 13%, WIDE 13%
+wide | autopilot 0.88 (Legend AI)            G  21.5%  S  15.0%  W  19.0%  B   7.5%  L  28.0%  O   9.0%  T   0.0%  clock 4.2s  | GOAL 22%, WIDE 13%, INTERCEPTED 13%, SAVED 12%
+
+=== defIQ 1 (n=200 per row, random real club-season matchups) ===
+build | beeline sprint, shoot@12m assist     G  12.0%  S   2.5%  W   0.0%  B   1.0%  L  58.0%  O   0.0%  T  26.5%  clock 5.0s  | TACKLED 58%,  27%, GOAL 12%, SMOTHERED 2%
+build | beeline sprint, shoot@16m assist     G  15.5%  S   1.5%  W   1.0%  B   3.0%  L  55.0%  O   0.0%  T  24.0%  clock 4.9s  | TACKLED 54%,  24%, GOAL 16%, BLOCKED 3%
+build | beeline sprint, shoot@20m assist     G  14.0%  S   8.5%  W   4.5%  B   6.0%  L  52.5%  O   0.0%  T  14.5%  clock 4.7s  | TACKLED 52%,  14%, GOAL 14%, SAVED 8%
+build | beeline sprint, shoot@25m assist     G   9.0%  S   7.5%  W  19.0%  B   5.0%  L  50.0%  O   0.0%  T   9.5%  clock 4.4s  | TACKLED 48%, WIDE 14%,  10%, GOAL 9%
+build | beeline sprint, shoot@30m assist     G   9.0%  S  13.5%  W  22.5%  B   3.0%  L  45.0%  O   0.0%  T   7.0%  clock 3.9s  | TACKLED 41%, WIDE 14%, SAVED 13%, GOAL 9%
+build | beeline sprint, shoot@20m drag       G  17.5%  S   5.0%  W   6.0%  B   5.0%  L  51.5%  O   0.0%  T  15.0%  clock 4.7s  | TACKLED 51%, GOAL 18%,  15%, WIDE 6%
+build | beeline jog, shoot@16m assist        G   9.5%  S   0.5%  W   0.0%  B   1.0%  L  68.5%  O   0.0%  T  20.5%  clock 4.0s  | TACKLED 69%,  21%, GOAL 10%, BLOCKED 1%
+build | weave sprint, shoot@16m assist       G  10.0%  S   2.5%  W   0.5%  B   1.0%  L  58.0%  O   0.0%  T  28.0%  clock 5.0s  | TACKLED 58%,  28%, GOAL 10%, SAVED 3%
+build | autopilot 0.68 (Pro AI)              G  15.0%  S  18.5%  W  17.0%  B   5.0%  L  44.0%  O   0.0%  T   0.5%  clock 7.1s  | INTERCEPTED 30%, GOAL 15%, SAVED 14%, WIDE 12%
+build | autopilot 0.88 (Legend AI)           G  14.0%  S  12.0%  W  13.5%  B   4.5%  L  56.0%  O   0.0%  T   0.0%  clock 5.5s  | INTERCEPTED 43%, GOAL 14%, WIDE 13%, TACKLED 9%
+counter | beeline sprint, shoot@12m assist   G   9.5%  S  22.0%  W   2.0%  B   0.0%  L  54.5%  O   0.0%  T  12.0%  clock 5.8s  | TACKLED 55%,  12%, SMOTHERED 12%, SAVED 11%
+counter | beeline sprint, shoot@16m assist   G  37.0%  S   4.5%  W   5.5%  B   0.0%  L  47.0%  O   0.0%  T   6.0%  clock 5.4s  | TACKLED 46%, GOAL 37%,  6%, WIDE 6%
+counter | beeline sprint, shoot@20m assist   G  31.0%  S  12.5%  W  12.5%  B   1.0%  L  39.5%  O   0.0%  T   3.5%  clock 5.0s  | TACKLED 36%, GOAL 31%, SAVED 12%, WIDE 10%
+counter | beeline sprint, shoot@25m assist   G  12.5%  S  19.5%  W  32.0%  B   0.0%  L  35.0%  O   0.0%  T   1.0%  clock 4.5s  | TACKLED 28%, WIDE 23%, SAVED 18%, GOAL 13%
+counter | beeline sprint, shoot@30m assist   G  13.0%  S  23.0%  W  31.5%  B   0.0%  L  32.5%  O   0.0%  T   0.0%  clock 3.9s  | TACKLED 26%, WIDE 22%, SAVED 19%, GOAL 13%
+counter | beeline sprint, shoot@20m drag     G  31.0%  S   7.5%  W  21.0%  B   0.0%  L  36.5%  O   0.0%  T   4.0%  clock 5.0s  | TACKLED 33%, GOAL 31%, WIDE 18%, SAVED 8%
+counter | beeline jog, shoot@16m assist      G  11.5%  S   2.0%  W   1.5%  B   0.5%  L  77.0%  O   0.0%  T   7.5%  clock 3.6s  | TACKLED 77%, GOAL 12%,  8%, WIDE 2%
+counter | weave sprint, shoot@16m assist     G  22.0%  S   5.0%  W   3.0%  B   0.0%  L  56.0%  O   0.0%  T  14.0%  clock 6.3s  | TACKLED 53%, GOAL 22%,  14%, SAVED 5%
+counter | autopilot 0.68 (Pro AI)            G  12.0%  S  13.0%  W  18.0%  B   7.0%  L  45.5%  O   4.0%  T   0.5%  clock 7.1s  | INTERCEPTED 21%, TACKLED 21%, WIDE 14%, SAVED 13%
+counter | autopilot 0.88 (Legend AI)         G  12.5%  S  12.0%  W  17.5%  B   5.5%  L  48.0%  O   4.5%  T   0.0%  clock 6.6s  | INTERCEPTED 27%, TACKLED 18%, GOAL 13%, WIDE 12%
+wide | beeline sprint, shoot@12m assist      G  27.5%  S   2.5%  W   2.0%  B   1.0%  L  54.0%  O   0.0%  T  13.0%  clock 3.3s  | TACKLED 52%, GOAL 28%,  13%, WIDE 2%
+wide | beeline sprint, shoot@16m assist      G  26.5%  S   1.0%  W   3.5%  B   4.5%  L  51.0%  O   0.0%  T  13.5%  clock 3.1s  | TACKLED 49%, GOAL 27%,  14%, BLOCKED 5%
+wide | beeline sprint, shoot@20m assist      G  14.0%  S  11.0%  W   9.5%  B   5.0%  L  48.5%  O   0.0%  T  12.0%  clock 2.9s  | TACKLED 46%, GOAL 14%,  12%, SAVED 10%
+wide | beeline sprint, shoot@25m assist      G   9.5%  S  12.0%  W  19.5%  B   8.0%  L  42.5%  O   0.0%  T   8.5%  clock 2.5s  | TACKLED 40%, WIDE 13%, SAVED 11%, GOAL 10%
+wide | beeline sprint, shoot@30m assist      G   7.0%  S  17.5%  W  26.5%  B   2.0%  L  40.0%  O   0.0%  T   7.0%  clock 2.1s  | TACKLED 37%, WIDE 22%, SAVED 16%,  7%
+wide | beeline sprint, shoot@20m drag        G  13.5%  S   6.0%  W  12.5%  B   6.5%  L  49.5%  O   0.0%  T  12.0%  clock 2.9s  | TACKLED 47%, GOAL 14%,  12%, WIDE 11%
+wide | beeline jog, shoot@16m assist         G  13.0%  S   0.0%  W   5.0%  B   2.5%  L  52.5%  O   0.0%  T  27.0%  clock 3.2s  | TACKLED 52%,  27%, GOAL 13%, WIDE 5%
+wide | weave sprint, shoot@16m assist        G  22.5%  S   2.0%  W  10.0%  B   5.0%  L  43.0%  O   0.0%  T  17.5%  clock 3.9s  | TACKLED 43%, GOAL 23%,  18%, WIDE 10%
+wide | autopilot 0.68 (Pro AI)               G  14.5%  S  16.5%  W  13.5%  B   9.5%  L  38.5%  O   7.5%  T   0.0%  clock 4.3s  | INTERCEPTED 17%, GOAL 14%, SAVED 13%, TACKLED 12%
+wide | autopilot 0.88 (Legend AI)            G  19.5%  S  16.0%  W  15.0%  B   8.5%  L  29.0%  O  11.0%  T   1.0%  clock 4.1s  | GOAL 20%, SAVED 15%, WIDE 12%, OFFSIDE 11%
+
+=== set pieces by a person (sd 0.06 s), defIQ 0 ===
+penalty | pen low corner                     G  84.5%  S   9.0%  W   1.5%  B   0.0%  L   5.0%  O   0.0%  T   0.0%  clock 0.0s  | GOAL 85%, SAVED 9%, CLEARED 4%, WIDE 2%
+penalty | pen high corner                    G  76.0%  S   7.5%  W   9.5%  B   0.0%  L   7.0%  O   0.0%  T   0.0%  clock 0.0s  | GOAL 76%, OVER THE BAR 7%, SAVED 6%, CLEARED 4%
+penalty | pen centre                         G  35.5%  S  63.5%  W   1.0%  B   0.0%  L   0.0%  O   0.0%  T   0.0%  clock 0.0s  | SAVED 63%, GOAL 36%, OVER THE BAR 1%, KEEPER COLLECTS 1%
+penalty | autopilot 0.75                     G  77.0%  S  21.0%  W   0.5%  B   0.5%  L   1.0%  O   0.0%  T   0.0%  clock 0.0s  | GOAL 77%, SAVED 21%, TACKLED 1%, WIDE 1%
+freekick | fk far top + bend                 G   3.5%  S  10.5%  W  73.5%  B   5.5%  L   5.5%  O   0.0%  T   1.5%  clock 0.1s  | WIDE 51%, OVER THE BAR 23%, SAVED 9%, BLOCKED 6%
+freekick | fk far top no bend                G   4.5%  S  18.5%  W  55.5%  B   6.5%  L  12.5%  O   0.0%  T   2.5%  clock 0.2s  | OVER THE BAR 32%, WIDE 24%, SAVED 16%, BLOCKED 7%
+freekick | fk near low                       G   4.5%  S  18.0%  W  38.5%  B  27.0%  L  11.0%  O   0.0%  T   1.0%  clock 0.1s  | WIDE 34%, BLOCKED 27%, SAVED 15%, INTERCEPTED 6%
+freekick | autopilot 0.75                    G  14.0%  S  22.5%  W  47.0%  B  12.5%  L   4.0%  O   0.0%  T   0.0%  clock 0.1s  | OVER THE BAR 28%, WIDE 20%, SAVED 17%, GOAL 14%

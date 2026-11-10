@@ -1,0 +1,35 @@
+== by situation and thumb (75 team, 75 keeper, timing sd 0.06 s) ==
+1v1 / run                            goal  62.0%  saved  22.7%  held   4.7%  wide   2.7%  blk   0.0%  lost   0.7%  green  64.0%
+1v1 / still                          goal  64.7%  saved  19.3%  held   4.7%  wide   6.0%  blk   0.0%  lost   0.7%  green  64.0%
+1v1 / drag                           goal  61.3%  saved  22.0%  held   6.0%  wide   2.0%  blk   0.0%  lost   0.0%  green  64.0%
+1v1 / bad                            goal  23.3%  saved  41.3%  held  13.3%  wide   4.0%  blk   0.0%  lost   0.0%  green  64.0%
+edge / run                           goal  39.3%  saved  25.3%  held  14.7%  wide  10.7%  blk   0.0%  lost  21.3%  green  60.0%
+edge / still                         goal  14.0%  saved  12.0%  held   7.3%  wide  12.7%  blk  32.0%  lost  24.7%  green  50.7%
+edge / drag                          goal  47.3%  saved  14.7%  held   8.0%  wide  22.0%  blk   0.0%  lost  13.3%  green  60.0%
+edge / bad                           goal  22.0%  saved  32.7%  held  20.7%  wide  19.3%  blk   0.0%  lost  24.7%  green  60.0%
+wide / run                           goal  14.0%  saved  26.7%  held  12.7%  wide  34.0%  blk   0.0%  lost   4.7%  green  64.0%
+wide / still                         goal  23.3%  saved  40.7%  held  18.0%  wide   8.7%  blk   0.0%  lost   0.7%  green  64.0%
+wide / drag                          goal  14.0%  saved  25.3%  held  12.0%  wide  38.0%  blk   0.0%  lost   4.7%  green  64.0%
+wide / bad                           goal  16.7%  saved  46.7%  held  26.7%  wide   5.3%  blk   0.0%  lost   2.0%  green  64.0%
+volley / still                       goal  32.0%  saved  50.7%  held  32.0%  wide  12.7%  blk   0.0%  lost   0.0%  green  71.3%
+volley / drag                        goal  37.3%  saved  28.7%  held  18.7%  wide  28.0%  blk   0.0%  lost   0.0%  green  71.3%
+== 1v1 and edge by SHO (thumb: drag), timing sd 0.06 ==
+1v1 SHO 55                           goal  40.0%  saved  28.7%  held   8.7%  wide   8.0%  blk   0.0%  lost   0.0%  green  43.3%
+edge SHO 55                          goal  26.0%  saved  22.0%  held  14.7%  wide  33.3%  blk   0.0%  lost  17.3%  green  52.0%
+1v1 SHO 75                           goal  58.0%  saved  24.7%  held   3.3%  wide   1.3%  blk   0.0%  lost   0.7%  green  64.0%
+edge SHO 75                          goal  49.3%  saved  15.3%  held  10.7%  wide  18.0%  blk   0.0%  lost  14.7%  green  68.0%
+1v1 SHO 95                           goal  64.7%  saved  18.7%  held   2.0%  wide   0.7%  blk   0.0%  lost   0.0%  green  82.7%
+edge SHO 95                          goal  76.0%  saved   5.3%  held   2.0%  wide   5.3%  blk   0.0%  lost  13.3%  green  82.7%
+== 1v1 and edge by keeper (SHO 75, drag) ==
+1v1 GK 52                            goal  80.7%  saved  10.0%  held   0.0%  wide   3.3%  blk   0.0%  lost   0.7%  green  54.7%
+edge GK 52                           goal  62.0%  saved   8.7%  held   4.0%  wide  20.0%  blk   0.0%  lost   9.3%  green  64.0%
+1v1 GK 75                            goal  58.0%  saved  24.0%  held   3.3%  wide   3.3%  blk   0.0%  lost   0.0%  green  54.7%
+edge GK 75                           goal  41.3%  saved  21.3%  held  14.7%  wide  20.0%  blk   0.0%  lost  16.7%  green  64.0%
+1v1 GK 93                            goal  24.0%  saved  46.7%  held  14.7%  wide   3.3%  blk   0.0%  lost   0.7%  green  54.7%
+edge GK 93                           goal  16.0%  saved  42.7%  held  30.0%  wide  20.7%  blk   0.0%  lost  18.7%  green  64.0%
+== 1v1 by timing spread (drag) ==
+1v1 timing sd 0                      goal  76.0%  saved  18.7%  held   4.0%  wide   0.0%  blk   0.0%  lost   0.0%  green 100.0%
+1v1 timing sd 0.03                   goal  72.7%  saved  20.7%  held   4.7%  wide   1.3%  blk   0.0%  lost   0.7%  green  94.0%
+1v1 timing sd 0.06                   goal  63.3%  saved  25.3%  held   4.7%  wide   2.0%  blk   0.0%  lost   0.7%  green  59.3%
+1v1 timing sd 0.1                    goal  56.0%  saved  27.3%  held   6.0%  wide   6.0%  blk   0.0%  lost   0.0%  green  34.7%
+1v1 timing sd 0.15                   goal  45.3%  saved  33.3%  held   7.3%  wide  10.7%  blk   0.0%  lost   0.7%  green  25.3%

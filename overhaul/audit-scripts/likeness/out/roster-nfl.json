@@ -1,0 +1,1162 @@
+{
+ "sport": "nfl",
+ "cards": 32242,
+ "players": 7343,
+ "tiers": {
+  "bronze": 10840,
+  "silver": 10780,
+  "gold": 9235,
+  "promo": 1106,
+  "legend": 130,
+  "spotlight": 131,
+  "goat": 20
+ },
+ "htCoverage": 0.9871986926324391,
+ "wtCoverage": 0.9871986926324391,
+ "numMissingCards": 8351,
+ "ht": {
+  "min": 65,
+  "p10": 70,
+  "p50": 74,
+  "p90": 77,
+  "max": 82
+ },
+ "wt": {
+  "min": 156,
+  "p10": 189,
+  "p50": 230,
+  "p90": 310,
+  "max": 390
+ },
+ "top": [
+  {
+   "name": "Randy Moss",
+   "ovr": 110,
+   "tier": "goat",
+   "pos": "WR",
+   "editions": 20,
+   "ht": [
+    76
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    null,
+    84,
+    18,
+    81
+   ]
+  },
+  {
+   "name": "Tom Brady",
+   "ovr": 110,
+   "tier": "goat",
+   "pos": "QB",
+   "editions": 29,
+   "ht": [
+    76
+   ],
+   "wt": [
+    225
+   ],
+   "num": [
+    12
+   ]
+  },
+  {
+   "name": "Aaron Donald",
+   "ovr": 110,
+   "tier": "goat",
+   "pos": "DT",
+   "editions": 21,
+   "ht": [
+    73
+   ],
+   "wt": [
+    285
+   ],
+   "num": [
+    99
+   ]
+  },
+  {
+   "name": "Joe Montana",
+   "ovr": 109,
+   "tier": "goat",
+   "pos": "QB",
+   "editions": 19,
+   "ht": [
+    74
+   ],
+   "wt": [
+    205
+   ],
+   "num": [
+    null,
+    16,
+    19
+   ]
+  },
+  {
+   "name": "Peyton Manning",
+   "ovr": 109,
+   "tier": "goat",
+   "pos": "QB",
+   "editions": 28,
+   "ht": [
+    77
+   ],
+   "wt": [
+    230
+   ],
+   "num": [
+    null,
+    18
+   ]
+  },
+  {
+   "name": "Drew Brees",
+   "ovr": 109,
+   "tier": "goat",
+   "pos": "QB",
+   "editions": 29,
+   "ht": [
+    72
+   ],
+   "wt": [
+    209
+   ],
+   "num": [
+    9
+   ]
+  },
+  {
+   "name": "Walter Payton",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "RB",
+   "editions": 21,
+   "ht": [
+    70
+   ],
+   "wt": [
+    200
+   ],
+   "num": [
+    null,
+    34
+   ]
+  },
+  {
+   "name": "Ronnie Lott",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "S",
+   "editions": 22,
+   "ht": [
+    72
+   ],
+   "wt": [
+    199
+   ],
+   "num": [
+    42,
+    null
+   ]
+  },
+  {
+   "name": "Bruce Smith",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "DE",
+   "editions": 30,
+   "ht": [
+    76
+   ],
+   "wt": [
+    275
+   ],
+   "num": [
+    null,
+    78
+   ]
+  },
+  {
+   "name": "Reggie White",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "DE",
+   "editions": 26,
+   "ht": [
+    77
+   ],
+   "wt": [
+    285
+   ],
+   "num": [
+    null,
+    92
+   ]
+  },
+  {
+   "name": "Jerry Rice",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "WR",
+   "editions": 31,
+   "ht": [
+    74
+   ],
+   "wt": [
+    200
+   ],
+   "num": [
+    null,
+    80
+   ]
+  },
+  {
+   "name": "Deion Sanders",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "CB",
+   "editions": 19,
+   "ht": [
+    73
+   ],
+   "wt": [
+    187
+   ],
+   "num": [
+    null,
+    21,
+    24
+   ]
+  },
+  {
+   "name": "Barry Sanders",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "RB",
+   "editions": 20,
+   "ht": [
+    68
+   ],
+   "wt": [
+    200
+   ],
+   "num": [
+    20
+   ]
+  },
+  {
+   "name": "Emmitt Smith",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "RB",
+   "editions": 23,
+   "ht": [
+    69
+   ],
+   "wt": [
+    216
+   ],
+   "num": [
+    25,
+    22,
+    null
+   ]
+  },
+  {
+   "name": "Ray Lewis",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "LB",
+   "editions": 26,
+   "ht": [
+    73
+   ],
+   "wt": [
+    235
+   ],
+   "num": [
+    52
+   ]
+  },
+  {
+   "name": "Patrick Mahomes",
+   "ovr": 108,
+   "tier": "goat",
+   "pos": "QB",
+   "editions": 13,
+   "ht": [
+    74
+   ],
+   "wt": [
+    225
+   ],
+   "num": [
+    15
+   ]
+  },
+  {
+   "name": "Lawrence Taylor",
+   "ovr": 107,
+   "tier": "goat",
+   "pos": "LB",
+   "editions": 23,
+   "ht": [
+    75
+   ],
+   "wt": [
+    237
+   ],
+   "num": [
+    56,
+    null
+   ]
+  },
+  {
+   "name": "Ed Reed",
+   "ovr": 107,
+   "tier": "goat",
+   "pos": "S",
+   "editions": 19,
+   "ht": [
+    71
+   ],
+   "wt": [
+    205
+   ],
+   "num": [
+    20
+   ]
+  },
+  {
+   "name": "Rob Gronkowski",
+   "ovr": 107,
+   "tier": "goat",
+   "pos": "TE",
+   "editions": 15,
+   "ht": [
+    78
+   ],
+   "wt": [
+    265
+   ],
+   "num": [
+    87
+   ]
+  },
+  {
+   "name": "Tony Gonzalez",
+   "ovr": 106,
+   "tier": "goat",
+   "pos": "TE",
+   "editions": 26,
+   "ht": [
+    77
+   ],
+   "wt": [
+    247
+   ],
+   "num": [
+    null,
+    88
+   ]
+  },
+  {
+   "name": "Marshall Faulk",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "RB",
+   "editions": 17,
+   "ht": [
+    70
+   ],
+   "wt": [
+    211
+   ],
+   "num": [
+    null,
+    28
+   ]
+  },
+  {
+   "name": "Larry Allen",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "OG",
+   "editions": 15,
+   "ht": [
+    75
+   ],
+   "wt": [
+    325
+   ],
+   "num": [
+    null,
+    73,
+    71
+   ]
+  },
+  {
+   "name": "Adam Vinatieri",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "K",
+   "editions": 25,
+   "ht": [
+    72
+   ],
+   "wt": [
+    200
+   ],
+   "num": [
+    null,
+    4
+   ]
+  },
+  {
+   "name": "Walter Jones",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "OT",
+   "editions": 14,
+   "ht": [
+    77
+   ],
+   "wt": [
+    300
+   ],
+   "num": [
+    71
+   ]
+  },
+  {
+   "name": "Champ Bailey",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "CB",
+   "editions": 20,
+   "ht": [
+    73
+   ],
+   "wt": [
+    184
+   ],
+   "num": [
+    24
+   ]
+  },
+  {
+   "name": "LaDainian Tomlinson",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "RB",
+   "editions": 16,
+   "ht": [
+    70
+   ],
+   "wt": [
+    215
+   ],
+   "num": [
+    21
+   ]
+  },
+  {
+   "name": "Calvin Johnson",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "WR",
+   "editions": 14,
+   "ht": [
+    77
+   ],
+   "wt": [
+    237
+   ],
+   "num": [
+    81
+   ]
+  },
+  {
+   "name": "Adrian Peterson",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "RB",
+   "editions": 18,
+   "ht": [
+    73
+   ],
+   "wt": [
+    220
+   ],
+   "num": [
+    28,
+    23,
+    26
+   ]
+  },
+  {
+   "name": "Patrick Willis",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "LB",
+   "editions": 14,
+   "ht": [
+    73
+   ],
+   "wt": [
+    242
+   ],
+   "num": [
+    52
+   ]
+  },
+  {
+   "name": "Aaron Rodgers",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "QB",
+   "editions": 23,
+   "ht": [
+    74
+   ],
+   "wt": [
+    223
+   ],
+   "num": [
+    12,
+    8
+   ]
+  },
+  {
+   "name": "J.J. Watt",
+   "ovr": 105,
+   "tier": "spotlight",
+   "pos": "DE",
+   "editions": 19,
+   "ht": [
+    77
+   ],
+   "wt": [
+    288
+   ],
+   "num": [
+    99
+   ]
+  },
+  {
+   "name": "Steve Young",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "QB",
+   "editions": 15,
+   "ht": [
+    74
+   ],
+   "wt": [
+    215
+   ],
+   "num": [
+    null,
+    8
+   ]
+  },
+  {
+   "name": "Will Shields",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "OG",
+   "editions": 16,
+   "ht": [
+    75
+   ],
+   "wt": [
+    299
+   ],
+   "num": [
+    68
+   ]
+  },
+  {
+   "name": "Jonathan Ogden",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "OT",
+   "editions": 14,
+   "ht": [
+    80
+   ],
+   "wt": [
+    318
+   ],
+   "num": [
+    75
+   ]
+  },
+  {
+   "name": "Brian Urlacher",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "LB",
+   "editions": 18,
+   "ht": [
+    75
+   ],
+   "wt": [
+    244
+   ],
+   "num": [
+    54
+   ]
+  },
+  {
+   "name": "Shaun Alexander",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "RB",
+   "editions": 11,
+   "ht": [
+    71
+   ],
+   "wt": [
+    228
+   ],
+   "num": [
+    37
+   ]
+  },
+  {
+   "name": "Steve Hutchinson",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "OG",
+   "editions": 13,
+   "ht": [
+    77
+   ],
+   "wt": [
+    311
+   ],
+   "num": [
+    76,
+    73
+   ]
+  },
+  {
+   "name": "Jahri Evans",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "OG",
+   "editions": 14,
+   "ht": [
+    76
+   ],
+   "wt": [
+    318
+   ],
+   "num": [
+    73
+   ]
+  },
+  {
+   "name": "Trent Williams",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "OT",
+   "editions": 17,
+   "ht": [
+    77
+   ],
+   "wt": [
+    315
+   ],
+   "num": [
+    71
+   ]
+  },
+  {
+   "name": "Antonio Brown",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "WR",
+   "editions": 15,
+   "ht": [
+    70
+   ],
+   "wt": [
+    185
+   ],
+   "num": [
+    84,
+    81
+   ]
+  },
+  {
+   "name": "Zack Martin",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "OG",
+   "editions": 13,
+   "ht": [
+    76
+   ],
+   "wt": [
+    310
+   ],
+   "num": [
+    70
+   ]
+  },
+  {
+   "name": "Myles Garrett",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "DE",
+   "editions": 16,
+   "ht": [
+    76
+   ],
+   "wt": [
+    272
+   ],
+   "num": [
+    95
+   ]
+  },
+  {
+   "name": "Lamar Jackson",
+   "ovr": 104,
+   "tier": "spotlight",
+   "pos": "QB",
+   "editions": 13,
+   "ht": [
+    74
+   ],
+   "wt": [
+    205
+   ],
+   "num": [
+    8
+   ]
+  },
+  {
+   "name": "O.J. Simpson",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "RB",
+   "editions": 16,
+   "ht": [
+    73
+   ],
+   "wt": [
+    212
+   ],
+   "num": [
+    null,
+    32,
+    36
+   ]
+  },
+  {
+   "name": "Dick Butkus",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "LB",
+   "editions": 8,
+   "ht": [
+    75
+   ],
+   "wt": [
+    245
+   ],
+   "num": [
+    null,
+    51
+   ]
+  },
+  {
+   "name": "Mel Blount",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "CB",
+   "editions": 18,
+   "ht": [
+    75
+   ],
+   "wt": [
+    205
+   ],
+   "num": [
+    null,
+    47
+   ]
+  },
+  {
+   "name": "Marcus Allen",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "RB",
+   "editions": 18,
+   "ht": [
+    74
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    32,
+    null
+   ]
+  },
+  {
+   "name": "Dan Marino",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "QB",
+   "editions": 24,
+   "ht": [
+    76
+   ],
+   "wt": [
+    228
+   ],
+   "num": [
+    13
+   ]
+  },
+  {
+   "name": "Thurman Thomas",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "RB",
+   "editions": 14,
+   "ht": [
+    70
+   ],
+   "wt": [
+    206
+   ],
+   "num": [
+    null,
+    34
+   ]
+  },
+  {
+   "name": "Rich Gannon",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "QB",
+   "editions": 15,
+   "ht": [
+    75
+   ],
+   "wt": [
+    210
+   ],
+   "num": [
+    null,
+    12
+   ]
+  },
+  {
+   "name": "Aeneas Williams",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "CB",
+   "editions": 17,
+   "ht": [
+    71
+   ],
+   "wt": [
+    187
+   ],
+   "num": [
+    null,
+    35
+   ]
+  },
+  {
+   "name": "Brett Favre",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "QB",
+   "editions": 25,
+   "ht": [
+    74
+   ],
+   "wt": [
+    222
+   ],
+   "num": [
+    4,
+    null
+   ]
+  },
+  {
+   "name": "Marvin Harrison",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "WR",
+   "editions": 17,
+   "ht": [
+    72
+   ],
+   "wt": [
+    185
+   ],
+   "num": [
+    88
+   ]
+  },
+  {
+   "name": "Priest Holmes",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "RB",
+   "editions": 13,
+   "ht": [
+    69
+   ],
+   "wt": [
+    213
+   ],
+   "num": [
+    null,
+    33,
+    31
+   ]
+  },
+  {
+   "name": "Charles Woodson",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "CB",
+   "editions": 22,
+   "ht": [
+    73
+   ],
+   "wt": [
+    200
+   ],
+   "num": [
+    null,
+    24,
+    21
+   ]
+  },
+  {
+   "name": "Alan Faneca",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "OG",
+   "editions": 15,
+   "ht": [
+    76
+   ],
+   "wt": [
+    322
+   ],
+   "num": [
+    null,
+    65,
+    66
+   ]
+  },
+  {
+   "name": "Kurt Warner",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "QB",
+   "editions": 14,
+   "ht": [
+    74
+   ],
+   "wt": [
+    214
+   ],
+   "num": [
+    13
+   ]
+  },
+  {
+   "name": "Marshal Yanda",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "OG",
+   "editions": 12,
+   "ht": [
+    75
+   ],
+   "wt": [
+    310
+   ],
+   "num": [
+    73
+   ]
+  },
+  {
+   "name": "Joe Thomas",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "OT",
+   "editions": 13,
+   "ht": [
+    78
+   ],
+   "wt": [
+    315
+   ],
+   "num": [
+    73
+   ]
+  },
+  {
+   "name": "Khalil Mack",
+   "ovr": 103,
+   "tier": "spotlight",
+   "pos": "DE",
+   "editions": 16,
+   "ht": [
+    75
+   ],
+   "wt": [
+    252
+   ],
+   "num": [
+    52
+   ]
+  }
+ ],
+ "mostEditions": [
+  {
+   "name": "Jerry Rice",
+   "editions": 31,
+   "best": 108
+  },
+  {
+   "name": "Bruce Smith",
+   "editions": 30,
+   "best": 108
+  },
+  {
+   "name": "Tom Brady",
+   "editions": 29,
+   "best": 110
+  },
+  {
+   "name": "Drew Brees",
+   "editions": 29,
+   "best": 109
+  },
+  {
+   "name": "Peyton Manning",
+   "editions": 28,
+   "best": 109
+  },
+  {
+   "name": "Reggie White",
+   "editions": 26,
+   "best": 108
+  },
+  {
+   "name": "Ray Lewis",
+   "editions": 26,
+   "best": 108
+  },
+  {
+   "name": "Tony Gonzalez",
+   "editions": 26,
+   "best": 106
+  },
+  {
+   "name": "Morten Andersen",
+   "editions": 25,
+   "best": 100
+  },
+  {
+   "name": "Brett Favre",
+   "editions": 25,
+   "best": 103
+  },
+  {
+   "name": "Adam Vinatieri",
+   "editions": 25,
+   "best": 105
+  },
+  {
+   "name": "Dan Marino",
+   "editions": 24,
+   "best": 103
+  },
+  {
+   "name": "Lawrence Taylor",
+   "editions": 23,
+   "best": 107
+  },
+  {
+   "name": "Rod Woodson",
+   "editions": 23,
+   "best": 100
+  },
+  {
+   "name": "Emmitt Smith",
+   "editions": 23,
+   "best": 108
+  },
+  {
+   "name": "Aaron Rodgers",
+   "editions": 23,
+   "best": 105
+  },
+  {
+   "name": "Randy White",
+   "editions": 22,
+   "best": 100
+  },
+  {
+   "name": "Ronnie Lott",
+   "editions": 22,
+   "best": 108
+  },
+  {
+   "name": "Junior Seau",
+   "editions": 22,
+   "best": 100
+  },
+  {
+   "name": "Brian Dawkins",
+   "editions": 22,
+   "best": 102
+  },
+  {
+   "name": "Terrell Owens",
+   "editions": 22,
+   "best": 100
+  },
+  {
+   "name": "Charles Woodson",
+   "editions": 22,
+   "best": 103
+  },
+  {
+   "name": "Bobby Wagner",
+   "editions": 22,
+   "best": 100
+  },
+  {
+   "name": "Walter Payton",
+   "editions": 21,
+   "best": 108
+  },
+  {
+   "name": "Mike Singletary",
+   "editions": 21,
+   "best": 100
+  }
+ ]
+}

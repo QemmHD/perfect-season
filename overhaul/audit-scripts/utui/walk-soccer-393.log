@@ -1,0 +1,49 @@
+01-main-home {"title":"","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+02-main-howto {"title":"","tab":"HOME","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":1.7}
+03-main-missions {"title":"","tab":"HOME","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+04-main-gauntlet {"title":"","tab":"HOME","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+05-main-mode-blind {"title":"","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+06-main-mode-daily {"title":"","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+07-main-mode-h2h {"title":"","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":1,"scroll":null}
+08-main-mode-classic-play {"title":"","tab":"","top":63,"small":5,"clipped":[],"trunc":0,"lowc":2,"scroll":null}
+09-main-draft-after-spin {"title":"","tab":"","top":63,"small":5,"clipped":[],"trunc":0,"lowc":2,"scroll":null}
+10-main-ranks {"title":"","tab":"RANKS","top":65,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":1}
+11-main-profile {"title":"","tab":"PROFILE","top":65,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":1.9}
+12-main-settings {"title":"","tab":"PROFILE","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":1}
+13-ut-home-first {"title":"Ultimate Team","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":1.4}
+14-ut-home {"title":"Ultimate Team","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":1.4}
+15-ut-rewards {"title":"Rewards","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":null}
+16-ut-daily {"title":"Daily","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":5,"scroll":1.1}
+17-ut-records {"title":"Club Records","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":null}
+18-ut-play {"title":"Play","tab":"PLAY","top":74,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":1.6}
+19-ut-play-club-cups {"title":"Club Cups","tab":"PLAY","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":1.8}
+20-ut-play-squad-battles {"title":"Squad Battles","tab":"PLAY","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":1.4}
+21-ut-play-champions-circuit {"title":"Champions Circuit","tab":"PLAY","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":1.1}
+22-ut-play-ut-draft {"title":"UT Draft","tab":"PLAY","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":null}
+23-ut-play-rivals {"title":"Rivals","tab":"PLAY","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":1.7}
+24-ut-squad {"title":"Squad","tab":"SQUAD","top":74,"small":0,"clipped":[],"trunc":1,"lowc":7,"scroll":null}
+25-ut-club-players {"title":"Club","tab":"CLUB","top":74,"small":0,"clipped":[],"trunc":0,"lowc":9,"scroll":2.4}
+26-ut-club-filter {"title":"Club","tab":"CLUB","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+27-ut-card-detail {"title":"Club","tab":"CLUB","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":1.3}
+28-ut-card-detail-top {"title":"Club","tab":"CLUB","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":1.3}
+29-ut-club-tracker {"title":"Pack Tracker","tab":"CLUB","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":null}
+30-ut-club-storage {"title":"Club","tab":"CLUB","top":74,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":null}
+31-ut-club-collection {"title":"Club","tab":"CLUB","top":74,"small":0,"clipped":[],"trunc":0,"lowc":8,"scroll":3.4}
+32-ut-club-sets {"title":"Sets","tab":"CLUB","top":65,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":null}
+33-ut-club-development {"title":"Club","tab":"CLUB","top":74,"small":0,"clipped":[],"trunc":0,"lowc":12,"scroll":5.1}
+34-ut-club-evolutions {"title":"Evolutions","tab":"CLUB","top":65,"small":0,"clipped":[],"trunc":0,"lowc":5,"scroll":1}
+35-ut-ch-sbc {"title":"Challenges","tab":"CHALLENGES","top":74,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":4.7}
+36-ut-ch-sbc-detail {"title":"Challenges","tab":"CHALLENGES","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+37-ut-ch-standouts {"title":"Weekly Standouts","tab":"CHALLENGES","top":65,"small":0,"clipped":[],"trunc":0,"lowc":6,"scroll":1.5}
+38-ut-ch-objectives {"title":"Challenges","tab":"CHALLENGES","top":74,"small":0,"clipped":[],"trunc":0,"lowc":5,"scroll":1.5}
+39-ut-ch-season-pass {"title":"Challenges","tab":"CHALLENGES","top":76,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":null}
+40-ut-store {"title":"Store","tab":"STORE","top":74,"small":0,"clipped":[],"trunc":0,"lowc":4,"scroll":3.6}
+41-ut-store-odds {"title":"Store","tab":"STORE","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+42-ut-store-market {"title":"Store","tab":"STORE","top":74,"small":0,"clipped":[],"trunc":0,"lowc":8,"scroll":1.2}
+43-ut-pack-open-0 {"title":"Store","tab":"STORE","top":78,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+44-ut-pack-open-1 {"title":"Store","tab":"STORE","top":78,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+45-ut-pack-open-2 {"title":"Store","tab":"STORE","top":71,"small":1,"clipped":[],"trunc":0,"lowc":0,"scroll":null}
+46-ut-pack-open-done {"title":"Store","tab":"STORE","top":1000000000,"small":0,"clipped":[],"trunc":0,"lowc":1,"scroll":null}
+47-ut-after-pack {"title":"Store","tab":"STORE","top":74,"small":0,"clipped":[],"trunc":0,"lowc":3,"scroll":3.6}
+48-ut-exit {"title":"","tab":"HOME","top":65,"small":0,"clipped":[],"trunc":0,"lowc":0,"scroll":1}
+errors [] blocked [ 'ryqaibujweiwwvdtswxj.supabase.co' ]

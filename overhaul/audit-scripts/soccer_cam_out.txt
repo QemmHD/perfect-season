@@ -1,0 +1,28 @@
+
+== 390x844 portrait ==
+build                  carrier at (130,568)    | his sprite 42px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 1/5 | goal mouth 46px wide at y 165
+build (mirrored)       carrier at (260,568)    | his sprite 42px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 1/5 | goal mouth 46px wide at y 165
+counter                carrier at (130,568)    | his sprite 42px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 0/3 | goal mouth 43px wide at y 158
+counter (mirrored)     carrier at (260,568)    | his sprite 42px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 0/3 | goal mouth 43px wide at y 158
+wide                   carrier at (-36,568)   OFF-SCREEN  | his sprite 42px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 1/5 | goal mouth 62px wide at y 220
+wide (mirrored)        carrier at (426,568)   OFF-SCREEN  | his sprite 42px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 1/5 | goal mouth 62px wide at y 220
+corner                 carrier at (17,346)     | his sprite 17px tall | pitch width visible at his row 41.6 m of 68 | teammates on screen 3/5 | goal mouth 67px wide at y 340
+corner (mirrored)      carrier at (373,346)    | his sprite 17px tall | pitch width visible at his row 41.6 m of 68 | teammates on screen 3/5 | goal mouth 67px wide at y 340
+freekick               carrier at (245,591)    | his sprite 43px tall | pitch width visible at his row 16.2 m of 68 | teammates on screen 4/4 | goal mouth 81px wide at y 282
+freekick (mirrored)    carrier at (145,591)    | his sprite 43px tall | pitch width visible at his row 16.2 m of 68 | teammates on screen 4/4 | goal mouth 81px wide at y 282
+penalty                carrier at (195,487)    | his sprite 36px tall | pitch width visible at his row 19.8 m of 68 | teammates on screen 1/3 | goal mouth 94px wide at y 322
+penalty (mirrored)     carrier at (195,487)    | his sprite 36px tall | pitch width visible at his row 19.8 m of 68 | teammates on screen 1/3 | goal mouth 94px wide at y 322
+
+== 320x568 portrait ==
+build                  carrier at (107,382)    | his sprite 34px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 1/5 | goal mouth 37px wide at y 111
+build (mirrored)       carrier at (213,382)    | his sprite 34px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 1/5 | goal mouth 37px wide at y 111
+counter                carrier at (107,382)    | his sprite 34px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 0/3 | goal mouth 35px wide at y 106
+counter (mirrored)     carrier at (213,382)    | his sprite 34px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 0/3 | goal mouth 35px wide at y 106
+wide                   carrier at (-30,382)   OFF-SCREEN  | his sprite 34px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 1/5 | goal mouth 51px wide at y 148
+wide (mirrored)        carrier at (350,382)   OFF-SCREEN  | his sprite 34px tall | pitch width visible at his row 16.9 m of 68 | teammates on screen 1/5 | goal mouth 51px wide at y 148
+corner                 carrier at (14,233)     | his sprite 14px tall | pitch width visible at his row 41.6 m of 68 | teammates on screen 3/5 | goal mouth 55px wide at y 229
+corner (mirrored)      carrier at (306,233)    | his sprite 14px tall | pitch width visible at his row 41.6 m of 68 | teammates on screen 3/5 | goal mouth 55px wide at y 229
+freekick               carrier at (201,398)    | his sprite 36px tall | pitch width visible at his row 16.2 m of 68 | teammates on screen 4/4 | goal mouth 67px wide at y 190
+freekick (mirrored)    carrier at (119,398)    | his sprite 36px tall | pitch width visible at his row 16.2 m of 68 | teammates on screen 4/4 | goal mouth 67px wide at y 190
+penalty                carrier at (160,328)    | his sprite 29px tall | pitch width visible at his row 19.8 m of 68 | teammates on screen 1/3 | goal mouth 77px wide at y 217
+penalty (mirrored)     carrier at (160,328)    | his sprite 29px tall | pitch width visible at his row 19.8 m of 68 | teammates on screen 1/3 | goal mouth 77px wide at y 217

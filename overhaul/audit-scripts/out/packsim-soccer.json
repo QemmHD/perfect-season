@@ -1,0 +1,1028 @@
+{
+ "sport": "soccer",
+ "week": "2026-W46",
+ "N": 10000,
+ "packs": [
+  {
+   "kind": "bronze",
+   "name": "Bronze Pack",
+   "price": 220,
+   "packs": 10000,
+   "cards": 70000,
+   "tiers": {
+    "bronze": 6.6005,
+    "silver": 0.3995
+   },
+   "bands": {
+    "<65": 0.9429,
+    "65-74": 0.0571
+   },
+   "qsMean": 129,
+   "qsP50": 125,
+   "qsP90": 145,
+   "qsMax": 200,
+   "evRatio": 0.584,
+   "pAnySpecial": 0,
+   "pAny86": 0,
+   "pAny88": 0,
+   "pAny90": 0,
+   "pWalkout2": 0,
+   "pWalkout3": 0,
+   "bestOvrMean": 64.86,
+   "distinctCards": 9410,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0.029,
+    "after10": 0.014,
+    "after25": 0.017,
+    "after50": 0.029,
+    "after100": 0.051,
+    "after200": 0.104
+   },
+   "topCardShare": 0.00043,
+   "meanOvr": 59.6,
+   "goldOvrMean": 0
+  },
+  {
+   "kind": "silver",
+   "name": "Silver Pack",
+   "price": 380,
+   "packs": 10000,
+   "cards": 70000,
+   "tiers": {
+    "silver": 4.7513,
+    "bronze": 2,
+    "gold": 0.2298,
+    "rare": 0.0189
+   },
+   "bands": {
+    "<65": 0.2857,
+    "65-74": 0.6788,
+    "75-79": 0.033,
+    "80-82": 0.0021,
+    "83-85": 0.0003,
+    "86-87": 0,
+    "88-89": 0
+   },
+   "qsMean": 221,
+   "qsP50": 215,
+   "qsP90": 255,
+   "qsMax": 365,
+   "evRatio": 0.582,
+   "pAnySpecial": 0,
+   "pAny86": 0.0004,
+   "pAny88": 0.0002,
+   "pAny90": 0,
+   "pWalkout2": 0.0004,
+   "pWalkout3": 0,
+   "bestOvrMean": 71.74,
+   "distinctCards": 19053,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0,
+    "after25": 0,
+    "after50": 0.006,
+    "after100": 0.031,
+    "after200": 0.057
+   },
+   "topCardShare": 0.00041,
+   "meanOvr": 65.36,
+   "goldOvrMean": 76.55
+  },
+  {
+   "kind": "gold",
+   "name": "Gold Pack",
+   "price": 900,
+   "packs": 10000,
+   "cards": 60000,
+   "tiers": {
+    "gold": 2.752,
+    "silver": 2,
+    "rare": 1.2234,
+    "standout": 0.0162,
+    "promo": 0.0055,
+    "legend": 0.0016,
+    "standout+holo": 0.0009,
+    "promo+holo": 0.0004
+   },
+   "bands": {
+    "65-74": 0.3333,
+    "75-79": 0.4822,
+    "80-82": 0.1482,
+    "83-85": 0.0292,
+    "86-87": 0.0044,
+    "88-89": 0.0015,
+    "90-93": 0.0009,
+    "94-99": 0.0002
+   },
+   "qsMean": 412,
+   "qsP50": 390,
+   "qsP90": 425,
+   "qsMax": 2895,
+   "evRatio": 0.458,
+   "pAnySpecial": 0.0246,
+   "pAny86": 0.042,
+   "pAny88": 0.0158,
+   "pAny90": 0.007,
+   "pWalkout2": 0.0525,
+   "pWalkout3": 0.0016,
+   "bestOvrMean": 81.43,
+   "distinctCards": 15799,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0,
+    "after25": 0.007,
+    "after50": 0.003,
+    "after100": 0.035,
+    "after200": 0.058
+   },
+   "topCardShare": 0.00043,
+   "meanOvr": 74.29,
+   "goldOvrMean": 77.69
+  },
+  {
+   "kind": "premium",
+   "name": "Premium Gold",
+   "price": 1600,
+   "packs": 10000,
+   "cards": 100000,
+   "tiers": {
+    "rare": 4.2972,
+    "gold": 3.637,
+    "silver": 2,
+    "standout": 0.0367,
+    "promo": 0.0204,
+    "legend": 0.0052,
+    "standout+holo": 0.0021,
+    "promo+holo": 0.0009,
+    "legend+holo": 0.0005
+   },
+   "bands": {
+    "65-74": 0.2,
+    "75-79": 0.4148,
+    "80-82": 0.31,
+    "83-85": 0.0615,
+    "86-87": 0.0082,
+    "88-89": 0.0031,
+    "90-93": 0.002,
+    "94-99": 0.0003
+   },
+   "qsMean": 813,
+   "qsP50": 760,
+   "qsP90": 825,
+   "qsMax": 3350,
+   "evRatio": 0.508,
+   "pAnySpecial": 0.0658,
+   "pAny86": 0.129,
+   "pAny88": 0.0528,
+   "pAny90": 0.0233,
+   "pWalkout2": 0.1537,
+   "pWalkout3": 0.0057,
+   "bestOvrMean": 83.29,
+   "distinctCards": 16259,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0,
+    "after25": 0.016,
+    "after50": 0.03,
+    "after100": 0.07,
+    "after200": 0.128
+   },
+   "topCardShare": 0.00066,
+   "meanOvr": 76.6,
+   "goldOvrMean": 78.85
+  },
+  {
+   "kind": "daily",
+   "name": "Daily Drop",
+   "price": 0,
+   "packs": 10000,
+   "cards": 40000,
+   "tiers": {
+    "silver": 2.0909,
+    "bronze": 1.5145,
+    "gold": 0.3452,
+    "rare": 0.0299,
+    "standout": 0.0186,
+    "standout+holo": 0.0009
+   },
+   "bands": {
+    "<65": 0.3786,
+    "65-74": 0.5227,
+    "75-79": 0.087,
+    "80-82": 0.0077,
+    "83-85": 0.0016,
+    "86-87": 0.0011,
+    "88-89": 0.0004,
+    "90-93": 0.0008
+   },
+   "qsMean": 144,
+   "qsP50": 130,
+   "qsP90": 170,
+   "qsMax": 1080,
+   "evRatio": null,
+   "pAnySpecial": 0.0195,
+   "pAny86": 0.0094,
+   "pAny88": 0.0049,
+   "pAny90": 0.0033,
+   "pWalkout2": 0.0204,
+   "pWalkout3": 0,
+   "bestOvrMean": 72,
+   "distinctCards": 16789,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0,
+    "after25": 0,
+    "after50": 0,
+    "after100": 0.007,
+    "after200": 0.018
+   },
+   "topCardShare": 0.00052,
+   "meanOvr": 65.19,
+   "goldOvrMean": 76.58
+  },
+  {
+   "kind": "elite",
+   "name": "Elite Gold",
+   "price": 1900,
+   "packs": 10000,
+   "cards": 80000,
+   "tiers": {
+    "rare": 7.8879,
+    "standout": 0.0988,
+    "legend": 0.0089,
+    "standout+holo": 0.0037,
+    "legend+holo": 0.0007
+   },
+   "bands": {
+    "75-79": 0.119,
+    "80-82": 0.7086,
+    "83-85": 0.1423,
+    "86-87": 0.0199,
+    "88-89": 0.0062,
+    "90-93": 0.0038,
+    "94-99": 0.0002
+   },
+   "qsMean": 873,
+   "qsP50": 785,
+   "qsP90": 1355,
+   "qsMax": 3290,
+   "evRatio": 0.459,
+   "pAnySpecial": 0.1121,
+   "pAny86": 0.2194,
+   "pAny88": 0.0797,
+   "pAny90": 0.0315,
+   "pWalkout2": 0.2672,
+   "pWalkout3": 0.0096,
+   "bestOvrMean": 84.19,
+   "distinctCards": 2823,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0,
+    "after25": 0.045,
+    "after50": 0.095,
+    "after100": 0.195,
+    "after200": 0.31
+   },
+   "topCardShare": 0.00147,
+   "meanOvr": 81.18,
+   "goldOvrMean": 81.13
+  },
+  {
+   "kind": "jumbo",
+   "name": "Jumbo Premium",
+   "price": 3200,
+   "packs": 10000,
+   "cards": 210000,
+   "tiers": {
+    "rare": 9.5103,
+    "gold": 6.4239,
+    "silver": 5,
+    "standout": 0.0404,
+    "promo": 0.0162,
+    "legend": 0.0068,
+    "standout+holo": 0.0013,
+    "promo+holo": 0.0009,
+    "legend+holo": 0.0002
+   },
+   "bands": {
+    "65-74": 0.2381,
+    "75-79": 0.3594,
+    "80-82": 0.3249,
+    "83-85": 0.0652,
+    "86-87": 0.0086,
+    "88-89": 0.0026,
+    "90-93": 0.0011,
+    "94-99": 0.0001
+   },
+   "qsMean": 1634,
+   "qsP50": 1580,
+   "qsP90": 1670,
+   "qsMax": 4130,
+   "evRatio": 0.511,
+   "pAnySpecial": 0.0658,
+   "pAny86": 0.2289,
+   "pAny88": 0.0778,
+   "pAny90": 0.0259,
+   "pWalkout2": 0.251,
+   "pWalkout3": 0.007,
+   "bestOvrMean": 84.34,
+   "distinctCards": 19405,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0.01,
+    "after10": 0.014,
+    "after25": 0.036,
+    "after50": 0.064,
+    "after100": 0.128,
+    "after200": 0.224
+   },
+   "topCardShare": 0.00063,
+   "meanOvr": 76.35,
+   "goldOvrMean": 79.12
+  },
+  {
+   "kind": "standout",
+   "name": "Standout Guarantee",
+   "price": 2600,
+   "packs": 10000,
+   "cards": 110000,
+   "tiers": {
+    "gold": 5.554,
+    "rare": 4.446,
+    "standout": 0.9593,
+    "standout+holo": 0.0407
+   },
+   "bands": {
+    "75-79": 0.5534,
+    "80-82": 0.3281,
+    "83-85": 0.0664,
+    "86-87": 0.0237,
+    "88-89": 0.0105,
+    "90-93": 0.0179
+   },
+   "qsMean": 1643,
+   "qsP50": 1635,
+   "qsP90": 1805,
+   "qsMax": 1950,
+   "evRatio": 0.632,
+   "pAnySpecial": 1,
+   "pAny86": 0.5223,
+   "pAny88": 0.3048,
+   "pAny90": 0.1956,
+   "pWalkout2": 1,
+   "pWalkout3": 0,
+   "bestOvrMean": 85.74,
+   "distinctCards": 7798,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0.018,
+    "after10": 0.018,
+    "after25": 0.069,
+    "after50": 0.104,
+    "after100": 0.162,
+    "after200": 0.235
+   },
+   "topCardShare": 0.00852,
+   "meanOvr": 78.94,
+   "goldOvrMean": 78.37
+  },
+  {
+   "kind": "lightning",
+   "name": "Lightning Standout",
+   "price": 1950,
+   "packs": 10000,
+   "cards": 110000,
+   "tiers": {
+    "gold": 5.5485,
+    "rare": 4.4515,
+    "standout": 0.9592,
+    "standout+holo": 0.0408
+   },
+   "bands": {
+    "75-79": 0.5525,
+    "80-82": 0.3317,
+    "83-85": 0.0652,
+    "86-87": 0.0227,
+    "88-89": 0.0102,
+    "90-93": 0.0178
+   },
+   "qsMean": 1640,
+   "qsP50": 1625,
+   "qsP90": 1805,
+   "qsMax": 1980,
+   "evRatio": 0.841,
+   "pAnySpecial": 1,
+   "pAny86": 0.507,
+   "pAny88": 0.3003,
+   "pAny90": 0.195,
+   "pWalkout2": 1,
+   "pWalkout3": 0,
+   "bestOvrMean": 85.67,
+   "distinctCards": 7811,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0.018,
+    "after10": 0.027,
+    "after25": 0.076,
+    "after50": 0.104,
+    "after100": 0.156,
+    "after200": 0.234
+   },
+   "topCardShare": 0.00878,
+   "meanOvr": 78.93,
+   "goldOvrMean": 78.37
+  },
+  {
+   "kind": "roster",
+   "name": "Roster Builder",
+   "price": 1000,
+   "packs": 10000,
+   "cards": 100000,
+   "tiers": {
+    "silver": 6,
+    "gold": 2.7681,
+    "rare": 1.2319
+   },
+   "bands": {
+    "65-74": 0.6,
+    "75-79": 0.2911,
+    "80-82": 0.0889,
+    "83-85": 0.0173,
+    "86-87": 0.002,
+    "88-89": 0.0005,
+    "90-93": 0.0002
+   },
+   "qsMean": 535,
+   "qsP50": 530,
+   "qsP90": 570,
+   "qsMax": 760,
+   "evRatio": 0.535,
+   "pAnySpecial": 0,
+   "pAny86": 0.0272,
+   "pAny88": 0.007,
+   "pAny90": 0.0016,
+   "pWalkout2": 0.0272,
+   "pWalkout3": 0,
+   "bestOvrMean": 81.31,
+   "distinctCards": 19138,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0.02,
+    "after10": 0.01,
+    "after25": 0.008,
+    "after50": 0.016,
+    "after100": 0.024,
+    "after200": 0.059
+   },
+   "topCardShare": 0.00038,
+   "meanOvr": 71.51,
+   "goldOvrMean": 77.69
+  },
+  {
+   "kind": "captains",
+   "name": "Captains Pack",
+   "price": 2300,
+   "packs": 10000,
+   "cards": 60000,
+   "tiers": {
+    "gold": 2.7729,
+    "rare": 2.2271,
+    "standout": 0.9592,
+    "standout+holo": 0.0408
+   },
+   "bands": {
+    "75-79": 0.5061,
+    "80-82": 0.3417,
+    "83-85": 0.0683,
+    "86-87": 0.035,
+    "88-89": 0.0165,
+    "90-93": 0.0323
+   },
+   "qsMean": 1220,
+   "qsP50": 1200,
+   "qsP90": 1385,
+   "qsMax": 1560,
+   "evRatio": 0.531,
+   "pAnySpecial": 1,
+   "pAny86": 0.481,
+   "pAny88": 0.29,
+   "pAny90": 0.1937,
+   "pWalkout2": 1,
+   "pWalkout3": 0,
+   "bestOvrMean": 85.28,
+   "distinctCards": 7553,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0.033,
+    "after25": 0.12,
+    "after50": 0.157,
+    "after100": 0.178,
+    "after200": 0.223
+   },
+   "topCardShare": 0.01618,
+   "meanOvr": 79.41,
+   "goldOvrMean": 78.37
+  },
+  {
+   "kind": "dynasty",
+   "name": "Dynasty Pack",
+   "price": 4300,
+   "packs": 10000,
+   "cards": 110000,
+   "tiers": {
+    "gold": 4.6187,
+    "rare": 4.3813,
+    "standout": 1.9251,
+    "standout+holo": 0.0749
+   },
+   "bands": {
+    "75-79": 0.4671,
+    "80-82": 0.3657,
+    "83-85": 0.073,
+    "86-87": 0.0405,
+    "88-89": 0.0184,
+    "90-93": 0.0353
+   },
+   "qsMean": 2370,
+   "qsP50": 2370,
+   "qsP90": 2585,
+   "qsMax": 2850,
+   "evRatio": 0.551,
+   "pAnySpecial": 1,
+   "pAny86": 0.7606,
+   "pAny88": 0.5201,
+   "pAny90": 0.3644,
+   "pWalkout2": 1,
+   "pWalkout3": 0,
+   "bestOvrMean": 87.43,
+   "distinctCards": 7796,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0.073,
+    "after10": 0.091,
+    "after25": 0.145,
+    "after50": 0.196,
+    "after100": 0.226,
+    "after200": 0.293
+   },
+   "topCardShare": 0.01783,
+   "meanOvr": 79.68,
+   "goldOvrMean": 78.58
+  },
+  {
+   "kind": "position:GK",
+   "name": "Position Pack Goalkeepers",
+   "price": 650,
+   "packs": 10000,
+   "cards": 40000,
+   "tiers": {
+    "gold": 2.7746,
+    "rare": 1.2254
+   },
+   "bands": {
+    "75-79": 0.7449,
+    "80-82": 0.211,
+    "83-85": 0.0378,
+    "86-87": 0.0052,
+    "88-89": 0.001,
+    "90-93": 0.0001
+   },
+   "qsMean": 322,
+   "qsP50": 320,
+   "qsP90": 345,
+   "qsMax": 450,
+   "evRatio": 0.495,
+   "pAnySpecial": 0,
+   "pAny86": 0.0252,
+   "pAny88": 0.0044,
+   "pAny90": 0.0004,
+   "pWalkout2": 0.0252,
+   "pWalkout3": 0,
+   "bestOvrMean": 81.22,
+   "distinctCards": 652,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0.05,
+    "after10": 0.025,
+    "after25": 0.1,
+    "after50": 0.185,
+    "after100": 0.307,
+    "after200": 0.471
+   },
+   "topCardShare": 0.00415,
+   "meanOvr": 77.69,
+   "goldOvrMean": 77.69
+  },
+  {
+   "kind": "position:DEF",
+   "name": "Position Pack Defenders",
+   "price": 650,
+   "packs": 10000,
+   "cards": 40000,
+   "tiers": {
+    "gold": 2.7558,
+    "rare": 1.2442
+   },
+   "bands": {
+    "75-79": 0.736,
+    "80-82": 0.2239,
+    "83-85": 0.0358,
+    "86-87": 0.0034,
+    "88-89": 0.0008,
+    "90-93": 0.0001
+   },
+   "qsMean": 320,
+   "qsP50": 315,
+   "qsP90": 345,
+   "qsMax": 445,
+   "evRatio": 0.493,
+   "pAnySpecial": 0,
+   "pAny86": 0.0172,
+   "pAny88": 0.0037,
+   "pAny90": 0.0004,
+   "pWalkout2": 0.0172,
+   "pWalkout3": 0,
+   "bestOvrMean": 81.09,
+   "distinctCards": 3064,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0.025,
+    "after25": 0.03,
+    "after50": 0.04,
+    "after100": 0.102,
+    "after200": 0.16
+   },
+   "topCardShare": 0.00122,
+   "meanOvr": 77.62,
+   "goldOvrMean": 77.62
+  },
+  {
+   "kind": "position:MID",
+   "name": "Position Pack Midfielders",
+   "price": 650,
+   "packs": 10000,
+   "cards": 40000,
+   "tiers": {
+    "gold": 2.7917,
+    "rare": 1.2083
+   },
+   "bands": {
+    "75-79": 0.7124,
+    "80-82": 0.2223,
+    "83-85": 0.056,
+    "86-87": 0.007,
+    "88-89": 0.0019,
+    "90-93": 0.0003
+   },
+   "qsMean": 326,
+   "qsP50": 320,
+   "qsP90": 350,
+   "qsMax": 495,
+   "evRatio": 0.501,
+   "pAnySpecial": 0,
+   "pAny86": 0.0367,
+   "pAny88": 0.009,
+   "pAny90": 0.0012,
+   "pWalkout2": 0.0367,
+   "pWalkout3": 0,
+   "bestOvrMean": 81.71,
+   "distinctCards": 2188,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0.05,
+    "after10": 0.025,
+    "after25": 0.02,
+    "after50": 0.035,
+    "after100": 0.1,
+    "after200": 0.205
+   },
+   "topCardShare": 0.00155,
+   "meanOvr": 77.83,
+   "goldOvrMean": 77.83
+  },
+  {
+   "kind": "position:ATT",
+   "name": "Position Pack Attackers",
+   "price": 650,
+   "packs": 10000,
+   "cards": 40000,
+   "tiers": {
+    "gold": 2.8036,
+    "rare": 1.1964
+   },
+   "bands": {
+    "75-79": 0.7241,
+    "80-82": 0.214,
+    "83-85": 0.0521,
+    "86-87": 0.0071,
+    "88-89": 0.0018,
+    "90-93": 0.0008
+   },
+   "qsMean": 323,
+   "qsP50": 320,
+   "qsP90": 350,
+   "qsMax": 475,
+   "evRatio": 0.497,
+   "pAnySpecial": 0,
+   "pAny86": 0.0388,
+   "pAny88": 0.0105,
+   "pAny90": 0.0034,
+   "pWalkout2": 0.0388,
+   "pWalkout3": 0,
+   "bestOvrMean": 81.49,
+   "distinctCards": 2326,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0.025,
+    "after25": 0.06,
+    "after50": 0.07,
+    "after100": 0.135,
+    "after200": 0.204
+   },
+   "topCardShare": 0.00155,
+   "meanOvr": 77.71,
+   "goldOvrMean": 77.71
+  },
+  {
+   "kind": "starter",
+   "name": "Starter",
+   "price": 0,
+   "packs": 10000,
+   "cards": 150000,
+   "tiers": {
+    "bronze": 9.1067,
+    "silver": 4.8933,
+    "gold": 0.9293,
+    "rare": 0.0707
+   },
+   "bands": {
+    "<65": 0.6071,
+    "65-74": 0.3262,
+    "75-79": 0.0624,
+    "80-82": 0.0035,
+    "83-85": 0.0007,
+    "86-87": 0.0001,
+    "88-89": 0
+   },
+   "qsMean": 407,
+   "qsP50": 405,
+   "qsP90": 455,
+   "qsMax": 570,
+   "evRatio": null,
+   "pAnySpecial": 0,
+   "pAny86": 0.0016,
+   "pAny88": 0.0006,
+   "pAny90": 0,
+   "pWalkout2": 0.0016,
+   "pWalkout3": 0,
+   "bestOvrMean": 76.51,
+   "distinctCards": 21355,
+   "dupRateSeq": {
+    "after1": 0,
+    "after5": 0,
+    "after10": 0.013,
+    "after25": 0.013,
+    "after50": 0.02,
+    "after100": 0.053,
+    "after200": 0.117
+   },
+   "topCardShare": 0.00029,
+   "meanOvr": 63.08,
+   "goldOvrMean": 76.51
+  },
+  {
+   "kind": "scout",
+   "name": "Scout's Choice",
+   "price": 500,
+   "bestOvrMean": 87.91,
+   "bestBands": {
+    "83-85": 0.1352,
+    "86-87": 0.3371,
+    "88-89": 0.3121,
+    "90-93": 0.2156
+   },
+   "pStandoutOption": 0.0864,
+   "qsBestMean": 210,
+   "evRatio": 0.42
+  }
+ ],
+ "live": [],
+ "standouts": [
+  {
+   "id": "soccer:standout:2026-W46F:2019:122153:MUN",
+   "name": "Paul Pogba",
+   "season": 2019,
+   "ovr": 91,
+   "base": 86,
+   "featured": true
+  },
+  {
+   "id": "soccer:standout:2026-W46:2020:190263:REI",
+   "name": "Predrag Rajković",
+   "season": 2020,
+   "ovr": 81,
+   "base": 78,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2021:29241:CHE",
+   "name": "Thiago Silva",
+   "season": 2021,
+   "ovr": 86,
+   "base": 83,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2014:45653:VIL",
+   "name": "Mateo Musacchio",
+   "season": 2014,
+   "ovr": 81,
+   "base": 78,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2014:4317:PSG",
+   "name": "Maxwell",
+   "season": 2014,
+   "ovr": 84,
+   "base": 81,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2017:126664:BAR",
+   "name": "Lucas Digne",
+   "season": 2017,
+   "ovr": 81,
+   "base": 78,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2021:161056:FCB",
+   "name": "Joshua Kimmich",
+   "season": 2021,
+   "ovr": 90,
+   "base": 87,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2015:85314:CHE",
+   "name": "Oscar",
+   "season": 2015,
+   "ovr": 88,
+   "base": 85,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2018:75615:JUV",
+   "name": "Douglas Costa",
+   "season": 2018,
+   "ovr": 87,
+   "base": 84,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2016:148928:ATM",
+   "name": "Saúl Ñíguez",
+   "season": 2016,
+   "ovr": 81,
+   "base": 78,
+   "featured": false
+  },
+  {
+   "id": "soccer:standout:2026-W46:2014:73782:BSC2",
+   "name": "Adrián Ramos",
+   "season": 2014,
+   "ovr": 80,
+   "base": 77,
+   "featured": false
+  }
+ ],
+ "uplift": {
+  "promo": {
+   "n": 277,
+   "meanBase": 84.6,
+   "meanEd": 87.9,
+   "meanDelta": 3.3,
+   "minEd": 73,
+   "maxEd": 97,
+   "deltaHist": {
+    "3-5": 273,
+    "6-10": 4
+   }
+  },
+  "legend": {
+   "n": 132,
+   "meanBase": 86.2,
+   "meanEd": 90.1,
+   "meanDelta": 3.9,
+   "minEd": 88,
+   "maxEd": 97,
+   "deltaHist": {
+    "3-5": 124,
+    "0-2": 8
+   }
+  }
+ },
+ "goldPool": {
+  "n": 8321,
+  "bands": {
+   "75-79": 5478,
+   "80-82": 1566,
+   "83-85": 830,
+   "90-93": 71,
+   "88-89": 133,
+   "86-87": 243
+  },
+  "rareCut": {
+   "GK": 79,
+   "FB": 79,
+   "CB": 79,
+   "DM": 79,
+   "CM": 80,
+   "ST": 80,
+   "W": 79,
+   "AM": 81
+  },
+  "rareN": 2913
+ },
+ "market": {
+  "silver": {
+   "n": 56,
+   "meanPrice": 127,
+   "meanQs": 43,
+   "meanOvr": 70
+  },
+  "gold": {
+   "n": 112,
+   "meanPrice": 300,
+   "meanQs": 76,
+   "meanOvr": 77
+  },
+  "rare": {
+   "n": 84,
+   "meanPrice": 334,
+   "meanQs": 107,
+   "meanOvr": 82.2
+  },
+  "promo": {
+   "n": 56,
+   "meanPrice": 2096,
+   "meanQs": 692,
+   "meanOvr": 88.2
+  },
+  "standout": {
+   "n": 28,
+   "meanPrice": 2364,
+   "meanQs": 789,
+   "meanOvr": 84.2
+  }
+ },
+ "qsByTier": {
+  "bronze": [
+   10,
+   20,
+   20
+  ],
+  "silver": [
+   30,
+   45,
+   55
+  ],
+  "gold": [
+   70,
+   80,
+   205
+  ],
+  "promo": [
+   350,
+   685,
+   940
+  ],
+  "legend": [
+   1750,
+   1750,
+   2590
+  ]
+ },
+ "bucketSizes": {
+  "bronze": 6642,
+  "silver": 14980,
+  "gold": 8321,
+  "promo": 277,
+  "spotlight": 0,
+  "legend": 132,
+  "goat": 0,
+  "standout": 0,
+  "landmark": 0,
+  "program": 0
+ }
+}

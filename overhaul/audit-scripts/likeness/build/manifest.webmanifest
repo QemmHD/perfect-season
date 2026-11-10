@@ -1,0 +1,16 @@
+{
+  "name": "Perfect Season",
+  "short_name": "Perfect Season",
+  "description": "Spin a random NBA or NFL team and decade, draft a lineup of legends, and go for a perfect season: 82–0 and 16–0, or 17–0 and the Super Bowl.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#04121a",
+  "theme_color": "#04121a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,134 @@
+vite v5.4.10 building for production...
+transforming...
+✓ 426 modules transformed.
+rendering chunks...
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) /home/user/ps-studio/supabase/functions/card-registry/contract.ts is dynamically imported by /home/user/ps-studio/src/ut/registry.ts but also statically imported by /home/user/ps-studio/src/ut/events.ts, /home/user/ps-studio/src/ut/packs.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/version.json                                  0.04 kB │ gzip:   0.06 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/swish-BkcM1oS_.mp3                     4.39 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/index.html                                    5.74 kB │ gzip:   1.56 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/backboard-CA5EV4VD.mp3                 5.96 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/hit-2-Bj6jd9zU.mp3                     5.96 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/hit-3-BpVUe9jf.mp3                     5.96 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/soccer-kick-1-_ySwvouq.mp3             5.96 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/dunk-ghFC0nok.mp3                      6.58 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/soccer-kick-2-DvqpcyZp.mp3             6.58 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/sw.js                                         6.64 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/hit-1-CzI6hhLG.mp3                     7.52 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/thud-B39yxcZH.mp3                      7.52 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/kick-DXkNl8dA.mp3                      7.84 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/whistle-DeTbXNJj.mp3                   7.84 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/soccer-whistle-BHs_tfzE.mp3           12.85 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/ooh-kKo8txVT.mp3                      20.64 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/groan-PD_ZbDO0.mp3                    24.56 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/.vite/manifest.json                          27.04 kB │ gzip:   3.95 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/buzzer-DsBbim5F.mp3                   28.84 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/horn-BMdZ_gWo.mp3                     33.85 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/cheer-stadium-DyLSn9wp.mp3            40.75 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/cheer-arena-BVahyW4a.mp3              41.54 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/roar-arena-CPZWdcmm.mp3               53.81 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/roar-stadium-CL7uX0Qb.mp3             60.60 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/soccer-roar-Cfr1I5iR.mp3              64.52 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/crowd-arena-GQNnD_m4.mp3              85.26 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/crowd-stadium-ByxrXYSs.mp3            85.26 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/soccer-chant-s8Fg-6hl.mp3             85.26 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/PackArt-LGZaQvGh.css                   0.57 kB │ gzip:   0.34 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/persp-hYMmNyQh.css                     3.62 kB │ gzip:   1.27 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/arcade-BipQX95B.css                    5.37 kB │ gzip:   1.72 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Vote-BJrDjKis.css                      5.71 kB │ gzip:   1.85 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Football2-CFbTp2Dy.css                 6.79 kB │ gzip:   1.93 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/content-progress-s91sf_kV.css          8.56 kB │ gzip:   2.11 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Match-BF3lg7FK.css                     8.56 kB │ gzip:   2.40 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/CardArt-DZ5uQo38.css                  10.34 kB │ gzip:   3.01 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Admin-DpeKhE0Q.css                    12.46 kB │ gzip:   2.98 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/UltimateTeam-CheHnW97.css            139.39 kB │ gzip:  27.48 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/index-BC0n-Ozt.css                   205.86 kB │ gzip:  41.27 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/soccer-lazy-BRk2L95Z.js                0.65 kB │ gzip:   0.41 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/rivals-net-CccZ_9Hk.js                 1.05 kB │ gzip:   0.65 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/sport-CKm__E-o.js                      1.13 kB │ gzip:   0.53 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/preload-helper-C1FmrZbK.js             1.14 kB │ gzip:   0.68 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/stiff_arm-DXsMbVuQ.js                  1.63 kB │ gzip:   1.20 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/run-Dck5V8Ph.js                        1.87 kB │ gzip:   1.43 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Marks-B2PkUnY4.js                      2.01 kB │ gzip:   0.71 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/sprint-D30qwyS_.js                     2.03 kB │ gzip:   1.55 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/rivals-Bvnp6fU9.js                     2.10 kB │ gzip:   0.98 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/jog-Dyu_EzwS.js                        2.17 kB │ gzip:   1.62 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/errlog-UOTLg4p3.js                     2.26 kB │ gzip:   1.14 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/catch-D5l5OnTe.js                      2.48 kB │ gzip:   1.81 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/shuffle-teI2so5o.js                    2.49 kB │ gzip:   1.89 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Lab-CMPDPUCw.js                        2.49 kB │ gzip:   1.16 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Scene-C4OCVXll.js                      2.56 kB │ gzip:   1.33 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/cut-DNWbD7de.js                        2.71 kB │ gzip:   2.03 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/crossover-4pV7BQoE.js                  2.72 kB │ gzip:   2.02 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/stumble-BHIgi8eG.js                    2.87 kB │ gzip:   2.18 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/dribble-Ov7vI57q.js                    3.03 kB │ gzip:   2.29 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/teams-DCcpuG8_.js                      3.12 kB │ gzip:   1.52 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/catch_run-Dqgq_2pu.js                  3.18 kB │ gzip:   2.37 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/jumpshot-CE0sGWAc.js                   3.64 kB │ gzip:   2.75 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/block-Bi5j-tfS.js                      3.73 kB │ gzip:   2.69 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/fall_forward-BBo6RfM2.js               3.88 kB │ gzip:   2.85 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/layup-DAFT4Yuz.js                      3.95 kB │ gzip:   3.01 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/kick-CC2O803y.js                       4.10 kB │ gzip:   3.04 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/backpedal-PVlsMGIb.js                  4.26 kB │ gzip:   3.04 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/jump-lKa3K-At.js                       4.57 kB │ gzip:   3.32 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/PackArt-B_5doUX4.js                    4.62 kB │ gzip:   1.48 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Hero-CnyOli2N.js                       4.64 kB │ gzip:   1.82 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/fall_back-BNo-os7n.js                  4.65 kB │ gzip:   3.18 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/slip-Crmjv0ka.js                       5.03 kB │ gzip:   3.74 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/dive-5W5Q4AMr.js                       5.34 kB │ gzip:   3.91 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/celebrate-w6DoVLrc.js                  5.96 kB │ gzip:   4.17 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/ready-BQ2bHO6l.js                      6.58 kB │ gzip:   4.36 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/throw-BnUJE21V.js                      6.66 kB │ gzip:   4.69 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Vote-a5QduWLO.js                       6.66 kB │ gzip:   2.65 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/gift-apply-dfvAKpqf.js                 6.82 kB │ gzip:   3.09 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/uniforms-CS3vZgGv.js                   7.28 kB │ gzip:   3.27 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/getup_front-D5U_scM8.js                7.36 kB │ gzip:   5.42 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/color-CzAXAyWi.js                      7.72 kB │ gzip:   3.19 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/CardArt-BTxQ8-wK.js                    7.91 kB │ gzip:   3.12 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Gallery-7MBlP8Tx.js                    8.69 kB │ gzip:   3.61 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Training-VCy6TLKH.js                   9.52 kB │ gzip:   3.81 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/getup-mcLF4BT9.js                      9.91 kB │ gzip:   7.25 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/court-DVUx9xts.js                     10.50 kB │ gzip:   4.16 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Arcade-C9jmqNLt.js                    11.62 kB │ gzip:   4.00 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/match-ik1Tdgnk.js                     14.57 kB │ gzip:   5.16 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/mocap-RC-YIXU0.js                     14.99 kB │ gzip:   5.59 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/favorites-CXYDQFNV.js                 15.31 kB │ gzip:   6.25 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/persp-BIZ8YPqQ.js                     15.63 kB │ gzip:   6.99 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/poses-DHz5H5pI.js                     17.64 kB │ gzip:   7.36 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/ratings-GjchP5Jx.js                   19.96 kB │ gzip:   8.57 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Match-OHG4VfNv.js                     29.08 kB │ gzip:  10.77 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Admin-BxnNmBvL.js                     32.34 kB │ gzip:  10.02 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/names-Bd6rJ-in.js                     34.95 kB │ gzip:  14.27 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/content-progress-B0N_6FRx.js          37.91 kB │ gzip:  15.18 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/live-editions-EoYkD0fd.js             43.48 kB │ gzip:   7.42 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Card-DF3Pc-eV.js                      59.75 kB │ gzip:  21.88 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/live-calendar-DBCIMbmX.js             64.71 kB │ gzip:  15.36 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/sound-Byy6VNix.js                     67.18 kB │ gzip:  36.31 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/arcade-CTwEIzpK.js                    90.74 kB │ gzip:  35.94 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/numbered-nba-fsWjzbzI.js             109.82 kB │ gzip:  16.00 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/index-ITRcDHAa.js                    133.93 kB │ gzip:  43.12 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/nfl-combine-DVgvoZvk.js              136.74 kB │ gzip:  32.22 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/Football2-CsAt2-ZZ.js                173.70 kB │ gzip:  66.95 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/index-Cvs1FVwy.js                    228.19 kB │ gzip:  59.40 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/state-1QPoFo30.js                    233.35 kB │ gzip:  67.70 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/index-Br4J7UAU.js                    234.66 kB │ gzip:  77.81 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/UltimateTeam-BQu_usxD.js             252.35 kB │ gzip:  79.50 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/numbered-nfl-DcL6EucY.js             274.69 kB │ gzip:  41.41 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/season-references-nba-Bzg-HacI.js    649.64 kB │ gzip: 109.62 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/soccer-B_-zwYVc.js                   995.70 kB │ gzip: 296.50 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/nfl-attrs-DE7t5FmR.js              1,042.50 kB │ gzip: 150.29 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/nba-attrs-DKRoNbFg.js              1,096.30 kB │ gzip: 338.08 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/nfl-B_EpJfsL.js                    1,185.98 kB │ gzip: 351.25 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/nba-DviJ8aqN.js                    1,480.84 kB │ gzip: 479.26 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/season-references-nfl-BO23FFZx.js  2,549.79 kB │ gzip: 412.50 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/cards-nfl-CCdM29PJ.js              2,924.91 kB │ gzip: 657.51 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/cards-nba-CJFC09LV.js              3,266.40 kB │ gzip: 939.22 kB
+../../../tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-scripts/likeness/build/assets/cards-soccer-C0rxpsrr.js           3,686.88 kB │ gzip: 998.71 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 22.16s
