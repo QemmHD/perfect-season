@@ -1,0 +1,13 @@
+# Things to tell the owner in the morning
+- Test page link: https://claude.ai/artifact/38vSryyQVZLARkNKvq1g6W
+- Sites preview (ChatGPT) can't be deployed by Claude — ask Codex to redeploy from the branch.
+- Spotlight on test page = local roll, no serial.
+- Data-rights note: 2K/Madden refs (publisher ratings) and Transfermarkt-derived soccer facts.
+- Any gameplay/rating change splits online pairing until both phones update.
+- Soccer is a full third sport (draft/season/cup with penalties, arcade match, UT with formations). Needs an iPhone playtest of the soccer controls. First soccer launch needs internet once per deploy.
+- Older app builds on a second phone reject a cloud save with soccer progress until they update (their own device save is safe).
+- Rollback point: branch backup/pre-new-era-2026-11-01 (= old main 7285ced).
+- LIVE BACKEND INCIDENT (final QA, 2026-11-01): a QA run of the old Codex build 3417c1a without ?ns=inspect registered 3 throwaway NBA cards in the LIVE card registry, each serial #1: 1961 Richie Guerin (NYK), 1996 Tim Hardaway (GSW), 1973 Wes Unseld (WAS); plus one encrypted cloud save for a throwaway identity. No real player data touched. Options: retire the 3 copies via the normal sold path with the throwaway key (active counts → 0; #1 stays consumed) and/or admin frees the #1 serials in the DB. Awaiting owner's OK — no further live writes made.
+- Final QA: all QA scripts pass (cloud/cloud-backend skipped: live backend). WebKitGTK smoke 48/48. Old saves (live 7285ced + Codex 3417c1a) migrate intact; New Era 65k once + Icon pick per sport. Fixed 6 UI bugs + Icon pick now pre-2010 greats. Left: soccer 3-5-2 tag overlap at 320, low-contrast coin in gold price buttons, Club Season tab case, soccer name tags at edge.
+- LIVE since 2026-11-01 ~22:58Z (main 262ba97). Sites (ChatGPT) preview still old → needs Codex/owner redeploy. Still pending owner answer: retire the 3 QA test cards in the live registry?
+- 2026-11-09 23:5xZ: RETIRED (owner-approved) the 3 throwaway NBA copies via normal sold path, signed by throwaway key 45133da8…: Guerin 1/0, Hardaway 1/0, Unseld 2/1 (issued/active); created:false, serials unchanged (#1 stays used). NFL: ~20 throwaway copies likely live; owner chose "give me the DB query": /tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/retire-qa/owner-query.sql (read-only). When owner sends rows back, retire only rows with retired_at empty via retire.mjs pattern; check created:false.

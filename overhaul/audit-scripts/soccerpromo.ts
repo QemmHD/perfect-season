@@ -1,0 +1,14 @@
+import { getPool } from '/home/user/ps-studio/src/ut/pool';
+import { quickSellValue } from '/home/user/ps-studio/src/ut/packs';
+const pool = await getPool();
+const promos = Object.values(pool.buckets.promo).flat().sort((a,b)=>a.ovr-b.ovr);
+const h: Record<number, number> = {};
+for (const p of promos) h[p.ovr] = (h[p.ovr] ?? 0) + 1;
+console.log('promo ovr hist', JSON.stringify(h));
+for (const p of promos.slice(0, 8)) console.log(p.line.name, p.line.season, p.line.label, p.ovr, 'base', pool.base.get(p.line.seasonId!)?.ovr, 'qs', quickSellValue(p));
+for (const p of promos.slice(-3)) console.log(p.line.name, p.line.season, p.line.label, p.ovr, 'base', pool.base.get(p.line.seasonId!)?.ovr);
+const legs = Object.values(pool.buckets.legend).flat().sort((a,b)=>a.ovr-b.ovr);
+console.log('legend low', legs.slice(0,3).map(l=>l.line.name+' '+l.line.season+' '+l.ovr+' base '+pool.base.get(l.line.seasonId!)?.ovr));
+const labels: Record<string, number> = {};
+for (const p of promos) labels[p.line.label ?? '?'] = (labels[p.line.label ?? '?'] ?? 0) + 1;
+console.log('labels', JSON.stringify(labels));

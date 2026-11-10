@@ -1,0 +1,13 @@
+# Owner instructions (verbatim intent, newest last)
+- Inspect Codex's feature/season-evolution work; fix bugs; preserve accounts/coins/cards/serials/levels/squads; no storage-key changes; keep Nostr+Supabase; no backup download workflow.
+- Overnight: deep research (many websites, GitHub, tools); UI organized like a real game app; 10+ new features, 5+ new packs, 2 promos; balance overalls & pack weights; rework UT ratings to feel like real UT; maybe rework UT gameplay; soccer after the rest, accurate data; wow factor; don't stop early.
+- OVR scale: model on how EA FC 27 truly progresses (his 80–87/88–92/icons 87–96 was a rough guess — use research).
+- Pull ratings from all the games (2K/Madden) — rating year must match the card's season.
+- Ratings must matter in gameplay & be balanced; use 2K/Madden/FC as reference for animation & play; may change art.
+- If accounts were reset → compensation (Icon pick 88+, +65k coins). We are NOT resetting; still grant one-time New Era bundle to existing players.
+- Learn pack pricing in full detail; exhaustive research.
+- Everything must work perfectly: no bugs/errors; scaling & UI perfect.
+- AUTHORIZED: push to main / live GitHub Pages when complete, perfected, verified (rollback point first).
+- Tell him things; keep files clean; make the GitHub repo look like an App Store ad; keep categorized notes (this folder).
+- Months of content, planned in detail (12-month live calendar).
+- 2026-11-01 evening: owner asked whether no-reset is OK given cards already pulled (answered: yes — owned cards re-rate by ID on the new scale automatically; old pulls aren't "inflated"), and asked for a TRACKER showing all cards pulled so players can weigh packs → agent building on claude/pull-tracker (ps-tracker). Must be merged + QA'd before ship.
