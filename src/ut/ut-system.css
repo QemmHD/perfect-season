@@ -1,0 +1,375 @@
+/* Claude, 2026-11-10 (studio overhaul, team ut): the Ultimate Team visual kit (kit.tsx).
+   Tokens (plates, glows, an 8 px grid, 20 px display titles), one motion spec, press feedback and
+   the shared pieces: section titles, reward chips, GO chips, CLAIM and primary buttons, countdowns,
+   progress rings and empty states. Existing identity only: Archivo condensed italic, teal for
+   actions, gold for rewards. Every target is >= 44 design px; every animation is off under reduced
+   motion. Kept under 4 KB gzip (scripts/qa/ut-studio.mjs kit checks it). */
+:root {
+  --ut-s1: 8px;
+  --ut-s2: 16px;
+  --ut-s3: 24px;
+  --ut-s4: 32px;
+  --ut-r1: 10px;
+  --ut-r2: 14px;
+  --ut-title: 20px;
+  --ut-plate: linear-gradient(180deg, #102e3a, #0a1f2a 58%, #081922);
+  --ut-plate-hi: inset 0 1px rgba(255, 255, 255, 0.07), inset 0 0 0 1px rgba(143, 166, 178, 0.16);
+  --ut-plate-drop: 0 6px 18px rgba(0, 0, 0, 0.38);
+  --ut-glow-gold: 0 0 18px rgba(245, 184, 61, 0.42);
+  --ut-glow-teal: 0 0 18px rgba(25, 227, 201, 0.4);
+  --ut-chip: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+  --ut-amber: #ffbe4d;
+  --ut-push: 200ms;
+  --ut-pop: 160ms;
+  --ut-tab: 120ms;
+  --ut-sheet: 240ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ut-push: 0ms;
+    --ut-pop: 0ms;
+    --ut-tab: 0ms;
+    --ut-sheet: 0ms;
+  }
+}
+
+/* ---------- motion: push (forward), pop (back), tab (crossfade), sheet ---------- */
+.ut-push-in {
+  animation: ut-k-push var(--ut-push) var(--ease-out) both;
+}
+.ut-pop-in {
+  animation: ut-k-pop var(--ut-pop) var(--ease-out) both;
+}
+.ut-tab-in {
+  animation: ut-k-fade var(--ut-tab) linear both;
+}
+.ut-sheet-in {
+  animation: ut-k-sheet var(--ut-sheet) var(--ease-out) both;
+}
+@keyframes ut-k-push {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes ut-k-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+@keyframes ut-k-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ut-k-sheet {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+/* ---------- press feedback: within a frame, on every UT control without its own :active ---------- */
+:where(.screen.ut button:not(:disabled):active, .screen.ut [data-pressable]:active, [data-pressed='true']) {
+  transform: scale(0.97);
+  filter: brightness(1.08);
+}
+
+/* ---------- section title ---------- */
+.ut-k-sec {
+  display: flex;
+  align-items: center;
+  gap: var(--ut-s1);
+  min-height: 32px;
+  margin: var(--ut-s3) 0 var(--ut-s1);
+}
+.ut-k-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: italic 900 var(--ut-title) / 1.05 var(--display);
+  font-stretch: 68%;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ut-k-sec small {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sub);
+}
+
+/* ---------- reward chip ---------- */
+.ut-k-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 999px;
+  background: var(--ut-chip), rgba(6, 24, 32, 0.9);
+  box-shadow: var(--ut-plate-hi);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--soft);
+  white-space: nowrap;
+}
+.ut-k-reward > i {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 50%;
+  background: rgba(245, 184, 61, 0.14);
+  color: var(--gold);
+}
+.ut-k-reward[data-kind='sp'] > i,
+.ut-k-reward[data-kind='xp'] > i {
+  background: rgba(25, 227, 201, 0.13);
+  color: var(--teal);
+}
+.ut-k-reward b {
+  color: var(--text);
+}
+
+/* ---------- GO chip: compact, with an invisible 44 px hit area ---------- */
+.ut-k-go {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  min-width: 52px;
+  padding: 0 8px 0 12px;
+  border: 1px solid rgba(25, 227, 201, 0.55);
+  border-radius: 999px;
+  background: rgba(25, 227, 201, 0.1);
+  color: var(--teal);
+  font: italic 900 13px var(--display);
+  font-stretch: 78%;
+  letter-spacing: 0.8px;
+}
+.ut-k-go::before {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
+}
+
+/* ---------- CLAIM (gold, sheen while waiting, sparks on claim) ---------- */
+.ut-k-claim,
+.ut-k-primary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  border: 0;
+  font-family: var(--display);
+  font-stretch: 68%;
+  font-style: italic;
+  font-weight: 900;
+  text-transform: uppercase;
+  isolation: isolate;
+}
+.ut-k-claim {
+  min-height: 44px;
+  min-width: 96px;
+  padding: 0 var(--ut-s2);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffd978, var(--gold) 55%, var(--gold-2));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.5), var(--ut-glow-gold);
+  color: var(--gold-ink);
+  font-size: 17px;
+  letter-spacing: 0.8px;
+  overflow: visible;
+}
+.ut-k-claim::before,
+.ut-k-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%) -150% 0 / 250% 100% no-repeat;
+  animation: ut-k-sheen 2.6s 0.6s ease-in-out infinite;
+  pointer-events: none;
+}
+.ut-k-claim::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #fff3c4 0 3px, transparent 4px) 50% 2px / 8px 8px no-repeat,
+    radial-gradient(circle, #ffd978 0 3px, transparent 4px) 90% 30% / 8px 8px no-repeat,
+    radial-gradient(circle, #fff3c4 0 2px, transparent 3px) 86% 82% / 6px 6px no-repeat,
+    radial-gradient(circle, #ffd978 0 3px, transparent 4px) 40% 96% / 8px 8px no-repeat,
+    radial-gradient(circle, #fff3c4 0 2px, transparent 3px) 6% 64% / 6px 6px no-repeat,
+    radial-gradient(circle, #ffd978 0 3px, transparent 4px) 12% 16% / 8px 8px no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+.ut-k-claim[data-burst]::after {
+  animation: ut-k-burst 0.6s var(--ease-out) both;
+}
+.ut-k-claim:disabled {
+  background: var(--panel-3);
+  box-shadow: none;
+  color: var(--sub);
+}
+.ut-k-claim:disabled::before,
+.ut-k-primary:disabled::before {
+  display: none;
+}
+@keyframes ut-k-sheen {
+  0%,
+  45% {
+    background-position: -150% 0;
+  }
+  100% {
+    background-position: 250% 0;
+  }
+}
+@keyframes ut-k-burst {
+  0% {
+    opacity: 1;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+/* ---------- the one primary action of a screen ---------- */
+.ut-k-primary {
+  flex-direction: column;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 var(--ut-s3);
+  clip-path: polygon(2.5% 0, 100% 0, 97.5% 100%, 0 100%);
+  background: linear-gradient(180deg, #45f5dd, var(--teal-2));
+  color: var(--teal-ink);
+  font-size: 22px;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.ut-k-primary.gold {
+  background: linear-gradient(180deg, #ffd978, var(--gold-2));
+  color: var(--gold-ink);
+}
+.ut-k-primary small {
+  font: 700 11px var(--body);
+  letter-spacing: 0.6px;
+  margin-top: 3px;
+  opacity: 0.85;
+}
+.ut-k-primary:disabled {
+  background: var(--panel-3);
+  color: var(--sub);
+}
+
+/* ---------- countdown (amber in the last 24 h) ---------- */
+.ut-k-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(143, 166, 178, 0.12);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--soft);
+  white-space: nowrap;
+}
+.ut-k-count[data-tone='amber'] {
+  background: rgba(255, 190, 77, 0.14);
+  color: var(--ut-amber);
+}
+
+/* ---------- progress ring ---------- */
+.ut-k-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+.ut-k-ring svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.ut-k-ring circle {
+  fill: none;
+  stroke-width: 4;
+  stroke: rgba(143, 166, 178, 0.2);
+}
+.ut-k-ring circle + circle {
+  stroke: var(--teal);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s var(--ease-out);
+}
+.ut-k-ring[data-done] circle + circle {
+  stroke: var(--gold);
+}
+.ut-k-ring b {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ---------- empty state: icon, one line, one way forward ---------- */
+.ut-k-empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: var(--ut-s4) var(--ut-s3);
+  border-radius: var(--ut-r2);
+  background: var(--ut-plate);
+  box-shadow: var(--ut-plate-hi);
+  text-align: center;
+}
+.ut-k-empty > i {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(25, 227, 201, 0.1);
+  color: var(--teal);
+}
+.ut-k-empty p {
+  margin: 0;
+  max-width: 280px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--soft);
+}
+.ut-k-empty .ut-k-go {
+  height: 44px;
+  padding: 0 14px 0 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ut-push-in,
+  .ut-pop-in,
+  .ut-tab-in,
+  .ut-sheet-in,
+  .ut-k-claim::before,
+  .ut-k-primary::before,
+  .ut-k-claim[data-burst]::after {
+    animation: none;
+  }
+  :where(.screen.ut button:not(:disabled):active, .screen.ut [data-pressable]:active, [data-pressed='true']) {
+    transform: none;
+  }
+}

@@ -4,17 +4,19 @@
 // tabs themselves and their segments (Club: Players / Storage / Collection / Development;
 // Challenges: SBCs / Objectives / Season Pass); they show no back button, except Home's EXIT.
 import type { UtView } from './UltimateTeam';
+// Claude 2026-11-10 (studio overhaul): every name below comes from labels.ts, unchanged.
+import { SEGMENT_LABEL, TAB_LABEL, VIEW_TITLE as T } from './labels';
 
 export type UtTab = 'hub' | 'play' | 'squad' | 'club' | 'sbc' | 'store';
 
 /** The tab bar, in order, with each tab's label. */
 export const UT_TABS: [UtTab, string][] = [
-  ['hub', 'HOME'],
-  ['play', 'PLAY'],
-  ['squad', 'SQUAD'],
-  ['club', 'CLUB'],
-  ['sbc', 'CHALLENGES'],
-  ['store', 'STORE'],
+  ['hub', TAB_LABEL.hub],
+  ['play', TAB_LABEL.play],
+  ['squad', TAB_LABEL.squad],
+  ['club', TAB_LABEL.club],
+  ['sbc', TAB_LABEL.sbc],
+  ['store', TAB_LABEL.store],
 ];
 
 interface ViewInfo {
@@ -27,38 +29,38 @@ interface ViewInfo {
 }
 
 const V: Record<UtView, ViewInfo> = {
-  hub: { title: 'Ultimate Team', tab: 'hub' },
-  daily: { title: 'Daily', tab: 'hub', parent: 'hub' },
-  inbox: { title: 'Rewards', tab: 'hub', parent: 'hub' },
-  records: { title: 'Club Records', tab: 'hub', parent: 'hub' },
+  hub: { title: T.hub, tab: 'hub' },
+  daily: { title: T.daily, tab: 'hub', parent: 'hub' },
+  inbox: { title: T.inbox, tab: 'hub', parent: 'hub' },
+  records: { title: T.records, tab: 'hub', parent: 'hub' },
 
-  play: { title: 'Play', tab: 'play' },
-  cup: { title: 'Club Cups', tab: 'play', parent: 'play' },
-  league: { title: 'Club Season', tab: 'play', parent: 'play' },
-  battles: { title: 'Squad Battles', tab: 'play', parent: 'play' },
-  circuit: { title: 'Champions Circuit', tab: 'play', parent: 'play' },
-  events: { title: 'Legends Events', tab: 'play', parent: 'play' },
-  moments: { title: 'Moments', tab: 'play', parent: 'play' },
-  draft: { title: 'UT Draft', tab: 'play', parent: 'play' },
-  rivals: { title: 'Rivals', tab: 'play', parent: 'play' },
+  play: { title: T.play, tab: 'play' },
+  cup: { title: T.cup, tab: 'play', parent: 'play' },
+  league: { title: T.league, tab: 'play', parent: 'play' },
+  battles: { title: T.battles, tab: 'play', parent: 'play' },
+  circuit: { title: T.circuit, tab: 'play', parent: 'play' },
+  events: { title: T.events, tab: 'play', parent: 'play' },
+  moments: { title: T.moments, tab: 'play', parent: 'play' },
+  draft: { title: T.draft, tab: 'play', parent: 'play' },
+  rivals: { title: T.rivals, tab: 'play', parent: 'play' },
 
-  squad: { title: 'Squad', tab: 'squad' },
+  squad: { title: T.squad, tab: 'squad' },
 
-  club: { title: 'Club', tab: 'club' },
-  storage: { title: 'Club', tab: 'club' },
-  gallery: { title: 'Club', tab: 'club' },
-  development: { title: 'Club', tab: 'club' },
-  sets: { title: 'Sets', tab: 'club', parent: 'gallery' },
-  evolutions: { title: 'Evolutions', tab: 'club', parent: 'development' },
+  club: { title: T.club, tab: 'club' },
+  storage: { title: T.storage, tab: 'club' },
+  gallery: { title: T.gallery, tab: 'club' },
+  development: { title: T.development, tab: 'club' },
+  sets: { title: T.sets, tab: 'club', parent: 'gallery' },
+  evolutions: { title: T.evolutions, tab: 'club', parent: 'development' },
   // Claude: the Pack Tracker (docs/PULL-TRACKER.md), also linked from the Store
-  tracker: { title: 'Pack Tracker', tab: 'club', parent: 'club' },
+  tracker: { title: T.tracker, tab: 'club', parent: 'club' },
 
-  sbc: { title: 'Challenges', tab: 'sbc' },
-  objectives: { title: 'Challenges', tab: 'sbc' },
-  season: { title: 'Challenges', tab: 'sbc' },
-  standouts: { title: 'Weekly Standouts', tab: 'sbc', parent: 'sbc' },
+  sbc: { title: T.sbc, tab: 'sbc' },
+  objectives: { title: T.objectives, tab: 'sbc' },
+  season: { title: T.season, tab: 'sbc' },
+  standouts: { title: T.standouts, tab: 'sbc', parent: 'sbc' },
 
-  store: { title: 'Store', tab: 'store' },
+  store: { title: T.store, tab: 'store' },
 };
 
 export const viewInfo = (v: UtView): ViewInfo => V[v] ?? V.hub;
@@ -68,15 +70,15 @@ export const tabLabel = (t: UtTab) => UT_TABS.find(([k]) => k === t)![1];
 /** The segments of a tab with more than one root screen. */
 export const SEGMENTS: Partial<Record<UtTab, [UtView, string][]>> = {
   club: [
-    ['club', 'PLAYERS'],
-    ['storage', 'STORAGE'],
-    ['gallery', 'COLLECTION'],
-    ['development', 'DEVELOPMENT'],
+    ['club', SEGMENT_LABEL.club],
+    ['storage', SEGMENT_LABEL.storage],
+    ['gallery', SEGMENT_LABEL.gallery],
+    ['development', SEGMENT_LABEL.development],
   ],
   sbc: [
-    ['sbc', 'SBCs'],
-    ['objectives', 'OBJECTIVES'],
-    ['season', 'SEASON PASS'],
+    ['sbc', SEGMENT_LABEL.sbc],
+    ['objectives', SEGMENT_LABEL.objectives],
+    ['season', SEGMENT_LABEL.season],
   ],
 };
 
