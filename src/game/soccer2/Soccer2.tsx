@@ -21,9 +21,9 @@ import { frameAt, Recorder, type Replay, REPLAY_SPEED, replayTime, REPLAYS_IN_AU
 import { useInputInterrupt } from '../useInputInterrupt';
 import { WaitLine } from '../Wait';
 import { decide, pilot } from './autopilot';
-import { cancelShoot, ctrlOf, kickOff, pass, passPlan, passTarget, PL, PW, pressShoot, releaseShoot, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step, timingWord } from './engine';
+import { bendCurl, cancelShoot, ctrlOf, GX, kickOff, pass, passPlan, passTarget, PL, PW, pressShoot, releaseShoot, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step, timingWord } from './engine';
 import type { SoccerKits } from './kits';
-import { attackFor, ATTACKS, END_TEXT, minuteOf, newMatch, recordAttack, SCENARIO_HINTS, SCENARIO_NAMES, totalOf, type Match } from './match';
+import { attackFor, ATTACKS, END_TEXT, minuteOf, newMatch, recordAttack, SCENARIO_HINTS, SCENARIO_NAMES, SET_PIECE_WAIT, setPieceCountdown, totalOf, type Match } from './match';
 import { SoccerRenderer } from './render';
 import { kickAttack, newShootout, nextKick, recordKick, score as soScore, type Shootout, type Side } from './shootout';
 import type { Attack, AttackEnd, Body, Pt, Scenario, Squad } from './types';
@@ -40,6 +40,10 @@ const AIM_DRAG = 46;
 const AIM_DEAD = 0.28;
 /** PASS held this long (s) is a lofted ball, a cross */
 const LOFT_HOLD = 0.22;
+/** The crowd builds as the ball nears goal (J-1, Claude 2026-11-10): its level, from QUIET at FAR m
+ * or more to LOUD at NEAR m or less, set through crowd.level at most every CROWD_MS (in steps of
+ * 0.02, so it rarely needs setting), and never while a swell is still settling. */
+const CROWD = { QUIET: 0.24, LOUD: 0.5, FAR: 35, NEAR: 12, MS: 250 };
 
 /** What a replay needs to redraw a moment. */
 interface Snap {
@@ -157,6 +161,12 @@ export function Soccer2({
   const rivalRef = useRef(rival);
   rivalRef.current = rival;
   const [soView, setSoView] = useState<ReturnType<typeof soScore> & { marks: { side: Side; scored: boolean }[]; first: Side } | null>(null);
+  /** the set piece waiting for a person: since when (match time), and whether the autopilot has it */
+  const spWait = useRef<{ sp: NonNullable<Attack['setPiece']>; at: number; auto: boolean } | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownRef = useRef<number | null>(null);
+  /** the crowd: the level last set, when, and until when a swell is still settling */
+  const crowdRef = useRef({ level: CROWD.QUIET, at: 0, swellTill: 0 });
   const [guess, setGuess] = useState<number | null>(null);
   const finished = useRef(false);
 
@@ -170,6 +180,24 @@ export function Soccer2({
     hinted.current.add(key);
     setHint(text);
     window.setTimeout(() => setHint((h) => (h === text ? null : h)), 4200);
+  };
+  /** a play lifts the crowd (crowd.swell); the level by distance waits until it has settled */
+  const swell = (x: number) => {
+    crowd.swell(x);
+    crowdRef.current.swellTill = performance.now() + 500 + x * 600 + 1200;
+  };
+  /** the crowd's level for where the ball is (J-1): quiet in midfield, louder near the goal */
+  const crowdFor = (a: Attack | null, now: number) => {
+    const c = crowdRef.current;
+    if (now - c.at < CROWD.MS || now < c.swellTill) return;
+    const playing = !!a && !a.end && (uiRef.current === 'live' || uiRef.current === 'so-kick');
+    const d = a ? Math.hypot(a.ball.x - GX, PL - a.ball.y) : CROWD.FAR;
+    const k = playing ? Math.max(0, Math.min(1, (CROWD.FAR - d) / (CROWD.FAR - CROWD.NEAR))) : 0;
+    const level = Math.round((CROWD.QUIET + (CROWD.LOUD - CROWD.QUIET) * k) * 50) / 50;
+    c.at = now;
+    if (Math.abs(level - c.level) < 0.019) return;
+    c.level = level;
+    crowd.level(level);
   };
   const shake = (px: number) => {
     if (!reducedMotion()) fxRef.current.shake = Math.max(fxRef.current.shake, px);
@@ -206,8 +234,9 @@ export function Soccer2({
     setUi('intro');
   };
   useEffect(() => {
-    void loadSamples('stadium');
-    crowd.start(0.24, 'stadium');
+    // soccer's own ground (sound.ts 'pitch': its chant, roar, kicks, bounce and whistle), loaded up front
+    void loadSamples('pitch');
+    crowd.start(CROWD.QUIET, 'pitch');
     if (forceShootout) startShootout();
     else lineUp(0);
     return () => crowd.stop(0.6);
@@ -245,21 +274,22 @@ export function Soccer2({
       if (e === 'pass' || e === 'cross') sfx.kick();
       else if (e === 'shot' || e === 'header') {
         sfx.kick();
-        crowd.swell(0.5);
+        swell(0.5);
       } else if (e === 'release-green') say('PERFECT!', 'green', 700);
       else if (e === 'release' && a.release) {
         const w = timingWord(a.release.off, a.release.green);
         say(w === 'GOOD' ? 'GOOD' : w === 'EARLY' ? 'EARLY' : 'LATE', w === 'GOOD' ? 'plain' : 'bad', 650);
       }
       else if (e === 'control' || e === 'chest') sfx.catch();
+      else if (e === 'bounce') sfx.bounce();
       else if (e === 'save-catch' || e === 'claim' || e === 'smother') {
         sfx.catch();
         sfx.ooh();
-        crowd.swell(0.7);
+        swell(0.7);
       } else if (e === 'save-parry') {
         sfx.hit(0.3);
         sfx.ooh();
-        crowd.swell(0.8);
+        swell(0.8);
         if (!a.end) say('PARRIED!', 'plain', 900);
       } else if (e === 'post' || e === 'bar') {
         sfx.hit(0.6);
@@ -268,7 +298,7 @@ export function Soccer2({
         say(e === 'post' ? 'OFF THE POST!' : 'OFF THE BAR!', 'big', 1000);
       } else if (e === 'tackle') sfx.tackle(0.35);
       else if (e === 'beat') {
-        crowd.swell(0.5);
+        swell(0.5);
         sfx.whoosh();
       } else if (e === 'block') sfx.hit(0.4);
       else if (e === 'intercept' || e === 'header-clear') sfx.kick();
@@ -276,7 +306,7 @@ export function Soccer2({
         sfx.whistle();
         sfx.tackle(0.6);
       } else if (e === 'penalty') {
-        crowd.swell(1);
+        swell(1);
         say('PENALTY!', 'big', 1600, 'FOULED IN THE BOX');
         clearInput();
       } else if (e === 'freekick') {
@@ -289,7 +319,7 @@ export function Soccer2({
         slowUntil.current = performance.now() + 500;
         sfx.kick();
         sfx.roar();
-        crowd.swell(1);
+        swell(1);
         vibrate([30, 40, 30]);
         shake(5);
         renderer.goalScored(a.t);
@@ -461,6 +491,24 @@ export function Soccer2({
     r.done();
   };
 
+  /** A set piece the person has left for SET_PIECE_WAIT s: the autopilot's taker has it from then
+   * until it's taken (R-1; the countdown shows over its last 5 s). */
+  const setPieceAuto = (a: Attack): boolean => {
+    const sp = a.setPiece;
+    if (!sp) {
+      spWait.current = null;
+      return false;
+    }
+    let w = spWait.current;
+    if (!w || w.sp !== sp) w = spWait.current = { sp, at: a.t, auto: false };
+    if (!w.auto && !autoplayHook && a.taker === a.ctrl && a.t - w.at >= SET_PIECE_WAIT && !a.meter && !a.strike && !a.kick) {
+      w.auto = true;
+      clearInput();
+      say('TAKEN FOR YOU', 'plain', 1100);
+    }
+    return w.auto;
+  };
+
   /* ---------- input ---------- */
   /** the stick on screen (x right, y down), from the pointer or the keys */
   const stickScreen = (): Pt => {
@@ -484,7 +532,7 @@ export function Soccer2({
     const v = steerNow();
     return Math.hypot(v.x, v.y) > 0.1 ? v : null;
   };
-  const live = () => (uiRef.current === 'live' || uiRef.current === 'so-kick') && !!atkRef.current && !atkRef.current.end && !(uiRef.current === 'so-kick' && !usKicking.current);
+  const live = () => (uiRef.current === 'live' || uiRef.current === 'so-kick') && !!atkRef.current && !atkRef.current.end && !(uiRef.current === 'so-kick' && !usKicking.current) && !spWait.current?.auto;
 
   const stickAt = (e: React.PointerEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -672,7 +720,8 @@ export function Soccer2({
         acc += elapsed * slow;
         while (acc >= DT) {
           acc -= DT;
-          const ai = autoplayHook || (u === 'so-kick' && !usKicking.current);
+          const auto = setPieceAuto(a);
+          const ai = autoplayHook || (u === 'so-kick' && !usKicking.current) || auto;
           // no drag on SHOOT: a set-piece taker aims with the stick, the keyboard with the arrows
           if (!ai && a.meter && shotPointer.current !== null && !shotDrag.current?.aim && (shotPointer.current === 'key' || (a.setPiece && a.taker === a.ctrl))) setAim(a, stickAim());
           step(a, DT, ai ? decide(a, pilotRef.current) : steerNow());
@@ -684,12 +733,24 @@ export function Soccer2({
           }
         }
         rec.current.push(a.t, snapOf(a));
+        // an untaken set piece: the countdown to the autopilot taking it (whole seconds, set on change)
+        const sw = spWait.current;
+        const cd = sw && !sw.auto && !autoplayHook ? setPieceCountdown(a.t - sw.at) : null;
+        if (cd !== countdownRef.current) {
+          countdownRef.current = cd;
+          setCountdown(cd);
+        }
       } else if (a && a.end && !replayRef.current) {
         acc = 0;
         settle(a, elapsed * slow);
         handleEvents(a);
         rec.current.push(a.t, snapOf(a));
       } else acc = 0;
+      if (countdownRef.current !== null && (!a || a.end || !a.setPiece || (u !== 'live' && u !== 'so-kick'))) {
+        countdownRef.current = null;
+        setCountdown(null);
+      }
+      crowdFor(a, now);
       debug?.(a, match, u);
       const ck = clockRef.current;
       if (ck && a) {
@@ -792,7 +853,12 @@ export function Soccer2({
           {pop.sub && <small>{pop.sub}</small>}
         </div>
       )}
-      {hint && <div className="hg2-hint sc2-hint">{hint}</div>}
+      {hint && countdown === null && <div className="hg2-hint sc2-hint">{hint}</div>}
+      {countdown !== null && playing && !autoplayHook && (
+        <div className="hg2-hint sc2-hint sc2-autokick" role="timer" aria-live="polite">
+          AUTO KICK IN <b className="num">{countdown}</b>
+        </div>
+      )}
       {replaying && (
         <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
           <i />
@@ -932,9 +998,10 @@ export function Soccer2({
               {([-1, 0, 1] as const).map((k) => (
                 <button
                   key={k}
-                  aria-pressed={Math.sign(a.curl) === k && (k !== 0 || Math.abs(a.curl) < 0.05)}
+                  aria-pressed={k === 0 ? Math.abs(a.curl) < 0.05 : Math.abs(a.curl) >= 0.05 && Math.sign(a.curl) === Math.sign(bendCurl(k))}
                   onClick={() => {
-                    setCurl(a, k * 0.75);
+                    // the way the arrow points (bendCurl: + curl bends the ball to its left)
+                    setCurl(a, bendCurl(k));
                     sfx.click();
                     setTick((n) => n + 1);
                   }}

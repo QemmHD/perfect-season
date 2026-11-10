@@ -116,8 +116,9 @@ export interface Ball {
   owner: number | null;
   /** who touched it last, and how */
   last: number | null;
-  /** what it is doing in flight */
-  flight: null | { kind: PassKind | 'shot' | 'cross' | 'parry' | 'clear'; from: number; to: number | null; at: number };
+  /** what it is doing in flight; `bounces`: how often it has bounced since (a shot or parry that has
+   * bounced twice is a loose ball again: engine.ts deadShot) */
+  flight: null | { kind: PassKind | 'shot' | 'cross' | 'parry' | 'clear'; from: number; to: number | null; at: number; bounces?: number };
 }
 
 /** SHOOT held: the power meter. top is where the green slice sits (seconds after the press). */

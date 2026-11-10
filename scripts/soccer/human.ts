@@ -4,7 +4,7 @@
 // attacks; then penalties and free kicks taken by a person. Finds dominant strategies and exploits.
 //   bash O/heavy.sh npx vite-node scripts/soccer/human.ts [n=200]
 import { autoplayAttack } from '../../src/game/soccer2/autopilot';
-import { GX, setupAttack } from '../../src/game/soccer2/engine';
+import { bendCurl, GX, setupAttack } from '../../src/game/soccer2/engine';
 import { hashString, rng } from '../../src/engine/rng';
 import type { Pt, Scenario } from '../../src/game/soccer2/types';
 import { arg, beeline, pairsOf, realSquads, setPieceHuman, tally, type Strat } from './lib';
@@ -40,8 +40,8 @@ for (const [lab, aim] of [
 tally('penalty | autopilot 0.75', N, (i) => autoplayAttack(setupAttack('penalty', pairs[i][0], pairs[i][1], 'hp' + i, {}), 0.75, 'pp' + i));
 // a free kick at the far top corner, bent back in with the BEND button that points toward the goal
 // (far post on the right: the left arrow, k = -1), as Soccer2.tsx's handler turns it into curl
-/** the BEND buttons' curl, as Soccer2.tsx's handler sets it (setCurl(a, k * 0.75)) */
-const bendButton = (k: number) => k * 0.75;
+/** the BEND buttons' curl, as Soccer2.tsx's handler sets it (bendCurl since soccer-1: k * 0.75 before) */
+const bendButton = bendCurl;
 // (the seed keys are the audit's row names, so the rows replay its kicks)
 for (const [lab, key, aim, bend] of [
   ['fk far top + BEND toward goal', 'fk far top + bend', { x: 0.9, y: 0.8 }, true],

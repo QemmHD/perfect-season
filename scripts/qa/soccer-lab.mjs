@@ -7,7 +7,10 @@
 // (live hosts aborted and counted, the safe-area insets injected, ?ns=inspect&relay=ws://localhost:7777).
 // The play parts run on the owner's phone (393x852, Dynamic Island 59/34) and the smallest (320x568);
 // `smoke` opens the lab on all six presets (page errors, the computed --sat, a live-host probe that
-// must be blocked). Parts: all | smoke | play | buttons | auto | sets | pens.
+// must be blocked). soccer-1 parts on the same two phones: `bend` (a free kick with Bend left: its
+// arrow, and where the kick goes), `autokick` (a free kick left alone: the countdown, then the
+// autopilot takes it), `confetti` (a shootout: the rival's goal throws confetti in the rival's kit).
+// Parts: all | smoke | play | buttons | auto | sets | pens | bend | autokick | confetti.
 import { launch, base, artifacts } from './browser.mjs';
 import { blocked, blockedLine, computedSat, phone, PRESETS, urlFor } from '../soccer/qa-isolate.mjs';
 import fs from 'node:fs';
@@ -245,9 +248,102 @@ for (const p of [preset('393x852-sat59'), preset('320x568')]) {
     errorsAll.push(...errors);
     await context.close();
   }
+  if (part('bend')) {
+    // C-4: the left arrow bends the free kick left (the arrow over the ball and the kick agree)
+    const { context, page, errors, cdp } = await open(p, { seed: 'qa-bend', scenario: 'freekick', home: 'LIV', hs: '2019', away: 'MCI', as: '2019' });
+    await page.waitForSelector('.sc2-go');
+    await page.locator('.sc2-go').tap();
+    await page.waitForSelector('.sc2-bend button');
+    const sizes = await page.locator('.sc2-bend button').evaluateAll((bs) => bs.map((b) => { const r = b.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), label: b.getAttribute('aria-label') }; }));
+    await page.getByRole('button', { name: 'Bend left' }).tap();
+    await page.waitForTimeout(300);
+    const pressed = await page.getByRole('button', { name: 'Bend left' }).getAttribute('aria-pressed');
+    await page.screenshot({ path: `${out}/${tag}-bend-left.png` });
+    const curl = await page.evaluate(() => window.__soccer.a.curl);
+    // aim at the middle of the goal on the green, and see which way it swings
+    const sh = await center(page, '.hg2-shoot');
+    await touch(cdp, 'touchStart', [{ ...sh, id: 4 }]);
+    await page.waitForTimeout(620);
+    await touch(cdp, 'touchEnd', []);
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${out}/${tag}-bend-left-flight.png` });
+    const kick = await page.evaluate(() => { const s = window.__soccer.a.lastShot; return s ? { aimX: s.aim.x, crossX: s.cross?.x ?? null } : null; });
+    const path = await page.evaluate(() => { const a = window.__soccer.a; return { ballX: a.ball.x, ballY: a.ball.y, end: a.end?.text ?? null }; });
+    report.push({ tag, step: 'bend', sizes, pressed, curl, kick, path, errors });
+    errorsAll.push(...errors);
+    if (sizes.some((b) => b.h < 44 || b.w < 44)) errorsAll.push(tag + ': a BEND button under 44 px ' + JSON.stringify(sizes));
+    if (!(curl > 0) || pressed !== 'true') errorsAll.push(tag + ': Bend left set curl ' + curl + ' pressed ' + pressed);
+    await context.close();
+  }
+  if (part('autokick')) {
+    // R-1: a free kick left alone counts down from 5 s and the autopilot takes it at 12 s
+    const { context, page, errors } = await open(p, { seed: 'qa-autokick', scenario: 'freekick', home: 'LIV', hs: '2019', away: 'MCI', as: '2019' });
+    await page.waitForSelector('.sc2-go');
+    await page.locator('.sc2-go').tap();
+    let shot = false;
+    let takenAt = null;
+    const seen = new Set();
+    const t0 = Date.now();
+    while (Date.now() - t0 < 30000) {
+      const s = await state(page);
+      const cd = await page.locator('.sc2-autokick').innerText().catch(() => null);
+      if (cd) seen.add(cd.replace(/\s+/g, ' ').trim());
+      if (!shot && cd && /IN 3/.test(cd)) {
+        await page.screenshot({ path: `${out}/${tag}-autokick-countdown.png` });
+        shot = true;
+      }
+      if (!s.setPiece || s.end) {
+        takenAt = s.t;
+        break;
+      }
+      await page.waitForTimeout(200);
+    }
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${out}/${tag}-autokick-taken.png` });
+    report.push({ tag, step: 'autokick', countdown: [...seen], takenAt, errors });
+    errorsAll.push(...errors);
+    if (takenAt === null || takenAt < 12 || takenAt > 15) errorsAll.push(tag + ': the free kick was not taken for the person at 12-15 s (' + takenAt + ')');
+    if (!seen.size) errorsAll.push(tag + ': no countdown shown');
+    await context.close();
+  }
+  if (part('confetti')) {
+    // J-3: their goal in a shootout throws confetti in their kit (their kicks are the AI's; ours are
+    // left to the autopilot after the wait, so the loop needs no touches)
+    const { context, page, errors } = await open(p, { seed: 'qa-pens', pens: '1', home: 'BAR', hs: '2015', away: 'LIV', as: '2019' });
+    let theirGoal = null;
+    const t0 = Date.now();
+    while (Date.now() - t0 < 150000 && !theirGoal) {
+      const s = await state(page);
+      if (s.ui === 'final') break;
+      if (s.ui === 'so-intro' && (await page.locator('.sc2-go').count())) {
+        const theirs = /THEIR KICK/.test(await page.locator('.sc2-intro').innerText().catch(() => ''));
+        await page.locator('.sc2-go').tap({ timeout: 1500 }).catch(() => {});
+        if (theirs) {
+          for (let k = 0; k < 60; k++) {
+            const q = await state(page);
+            if (q.end) {
+              if (q.end.kind === 'G') {
+                await page.waitForTimeout(260);
+                await page.screenshot({ path: `${out}/${tag}-their-goal-confetti.png` });
+                theirGoal = await page.evaluate(() => { const a = window.__soccer.a; const b = a.bodies[a.shotBy]; return { scorer: b.p.tag, side: b.side, act: b.act }; });
+              }
+              break;
+            }
+            await page.waitForTimeout(100);
+          }
+        }
+        continue;
+      }
+      await page.waitForTimeout(250);
+    }
+    report.push({ tag, step: 'confetti', theirGoal, errors });
+    errorsAll.push(...errors);
+    if (!theirGoal) errorsAll.push(tag + ': no rival goal in the shootout to check the confetti');
+    await context.close();
+  }
 }
 await browser.close();
-fs.writeFileSync(out + '/report.json', JSON.stringify(report, null, 1));
+fs.writeFileSync(out + '/report-' + only + '.json', JSON.stringify(report, null, 1));
 console.log(JSON.stringify(report, null, 1).slice(0, 6000));
 console.log(blockedLine());
 console.log('errors', errorsAll.length, errorsAll.slice(0, 5));

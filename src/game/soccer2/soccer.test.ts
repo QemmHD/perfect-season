@@ -3,7 +3,7 @@
 import cardsText from '../../data/cards-soccer.json?raw';
 import { describe, expect, it } from 'vitest';
 import { autoplayAttack, decide, pilot } from './autopilot';
-import { CLOCK, groundSpeedFor, GX, kickOff, loftVelocity, pass, PL, pressShoot, releaseShoot, setupAttack, shotVelocity, step, stepBall, TOP, tracePath } from './engine';
+import { groundSpeedFor, GX, kickOff, loftVelocity, pass, PL, pressShoot, releaseShoot, setupAttack, shotVelocity, step, stepBall, TOP, tracePath } from './engine';
 import { autoplayMatch, dealOf, newMatch, recordAttack, totalOf } from './match';
 import { clubSquad, gkDive, gkReaction, greenHalf, passError, rateSoccerLine, rt, shotCone, soccerLines, squadFrom, tackleWin, topSpeed, type SoccerCardsFile } from './ratings';
 import { newShootout, recordKick, simShootout, score, takers } from './shootout';
@@ -266,7 +266,9 @@ describe('determinism and safety', () => {
         autoplayAttack(a, (i % 4) / 3, 'q' + i);
         expect(a.end, sc + i).not.toBeNull();
         expect(finite(a), sc + i).toBe(true);
-        expect(a.t).toBeLessThan(CLOCK * 3 + 31);
+        // within its clock and a little more for set pieces and shots in the air (studio overhaul
+        // soccer-1: this allowed the 120 s hard stop, which a dead "shot" used to hang on: R-1)
+        expect(a.t, sc + i).toBeLessThan(a.clock + 15);
         seen.add(a.end!.kind);
       }
     expect([...seen].every((k) => 'GSWBLOT'.includes(k))).toBe(true);
