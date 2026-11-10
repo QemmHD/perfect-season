@@ -155,7 +155,8 @@ describe('the day’s challenges (' + SPORT + ')', () => {
   });
 
   it('auto-fills with the cheapest cards and leaves the squad alone when it can', () => {
-    const s: Sbc = { id: 'x', kind: 'daily', title: 'X', blurb: '', size: 3, reqs: [{ k: 'sameFr', n: 3 }], reward: { coins: 1 } };
+    // (a Gold pack: auto-fill never trades a card worth more than the reward, packs-1, so not a 1-coin dummy)
+    const s: Sbc = { id: 'x', kind: 'daily', title: 'X', blurb: '', size: 3, reqs: [{ k: 'sameFr', n: 3 }], reward: { pack: 'gold' } };
     const club = [...bulls96(3, 90).map((rc, i) => ({ uid: 'star' + i, rc, slot: 'S' + i })), ...bulls96(4, 60).map((rc, i) => ({ uid: 'bench' + i, rc, slot: null }))];
     const got = autoFill(s, club)!;
     expect(got).toHaveLength(3);
@@ -182,7 +183,7 @@ describe('the day’s challenges (' + SPORT + ')', () => {
   });
 
   it('prefers equally valued storage copies without sacrificing a valuable spare for a cheap challenge', () => {
-    const s: Sbc = { id: 'storage', kind: 'daily', title: 'Storage', blurb: '', size: 3, reqs: [], reward: { coins: 1 } };
+    const s: Sbc = { id: 'storage', kind: 'daily', title: 'Storage', blurb: '', size: 3, reqs: [], reward: { pack: 'gold' } };
     const cards = bulls96(3, 65);
     const club = cards.map((rc, i) => ({ uid: 'club' + i, rc, slot: null }));
     const spares = cards.map((rc, i) => ({ uid: 'spare' + i, rc, slot: null, storage: true }));

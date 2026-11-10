@@ -522,7 +522,14 @@ export default function UltimateTeam(props: {
     window.setTimeout(() => (busy.current = false), 600);
     // truly random cards (`seed` only names the pack and its cards' ids)
     // Claude: a Preview Pack opens exactly the cards it showed
-    const cards = preset ?? openPack(pool, kind);
+    let cards: RatedCard[];
+    try {
+      cards = preset ?? openPack(pool, kind);
+    } catch (e) {
+      // Claude (packs-1, D9): a pack this build can't open stays pending (nothing below runs)
+      onToast(e instanceof Error ? e.message : String(e));
+      return;
+    }
     const at = Date.now();
     const owned = ownedCardsForPack(cards, seed, at);
     const helper = packTags(pool, ut, lineup, cards);

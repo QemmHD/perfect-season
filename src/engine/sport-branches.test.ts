@@ -30,6 +30,9 @@ const PATTERNS: [RegExp, string][] = [
   [/\bif\s*\(\s*(?:IS_)?NFL\s*\)/, 'if (NFL)'],
   [/[=!]==\s*'(?:nba|nfl)'\s*\?/, "sport === 'nba' ? a : b"],
   [/[=!]==\s*"(?:nba|nfl)"\s*\?/, 'sport === "nba" ? a : b'],
+  // Claude (packs-1, audit H4): a helper that names one sport, as a ternary's test (`nba(c) ? a : b`).
+  // sbc.ts had five of these, so soccer got football's position SBCs. `??` and `?.` are not ternaries.
+  [/\b(?:nba|nfl|isNba|isNfl)\([^)]*\)\s*\?(?![?.])/, 'nba(x) ? a : b'],
 ];
 
 /** The hits in one file's source (comments left out, the patterns over the whole text, so a ternary
@@ -52,6 +55,13 @@ describe('sport branches', () => {
   it('catches the two-way branches it is for', () => {
     expect(branchHits('x.ts', "const a = NFL ? 1 : 2;\nif (!NFL) x();\nconst b = sport === 'nba' ? 3 : 4;\nconst c = NFL\n  ? 5\n  : 6;")).toHaveLength(4);
     expect(branchHits('y.ts', "const a = pick({ nba: 1, nfl: 2, soccer: 3 });\n// NFL ? in a comment\nconst NFL_KEYS = 1;")).toEqual([]);
+  });
+  it('catches a sport helper used as a ternary test, split over lines too (packs-1)', () => {
+    const helper = branchHits('h.ts', "const a = nba(c)\n  ? { title: 'Backcourt' }\n  : { title: 'Pass Catchers' };\nconst b = isNfl(pool) ? 1 : 2;\nconst d = nfl() ? 3 : 4;");
+    expect(helper).toHaveLength(3);
+    expect(helper[0]).toMatch(/^h\.ts:1 {2}nba\(x\) \? a : b {2}const a = nba\(c\)/);
+    // not a branch: nullish fallbacks, optional chaining, a three-way pick, a call inside a condition
+    expect(branchHits('ok.ts', "const a = nba(c) ?? 1;\nconst b = nfl(c)?.x;\nconst t = pickFor(c.pool.sport, { nba: 1, nfl: 2, soccer: 3 });\nif (nba(c) && ok) go();")).toEqual([]);
   });
   it('names all three sports (no two-way NFL/NBA branch on a soccer code path)', () => {
     // keys are relative to this file: '../ut/x.ts', or './x.ts' here in engine/

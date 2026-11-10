@@ -4,7 +4,10 @@ import { pickFor as bySport } from '../engine/sport';
 // sheets (Scout's Choice, Standout picks): three face-down options, exactly one kept.
 // All of it opens locally like Gold/Premium (UltimateTeam openNow); nothing uses the card registry.
 import { hashString, rng, shuffle } from '../engine/rng';
+import { easternDateKey } from '../engine/season';
+import { per, promosOn } from './calendar';
 import { claimed, contentOf, withClaim, withContent, type PickState } from './content-state';
+import { promoCards } from './live-cards';
 import { packRand, SCOUT_STANDOUT } from './packs';
 import type { Pool } from './pool';
 import { fcToDisplay } from './fc-scale';
@@ -191,6 +194,65 @@ export function pickFor(pool: Pool, kind: 'scout' | 'standout-pick' | 'swap', id
   if (kind === 'standout-pick') return { id, kind, title: 'Standout Pick', options: standoutOptions(pool, id, week).map((rc) => rc.line.id), at };
   const s = scoutOptions(pool, id, week);
   return { id, kind, title: kind === 'swap' ? 'Swap Desk · Scout’s Choice' : "Scout's Choice" + bySport(pool.sport, { nba: '', nfl: ' · ' + s.group, soccer: '' }), options: s.options.map((rc) => rc.line.id), at };
+}
+
+// ---------- reward picks for the ut team (packs-1 contract; research §8.2) ----------
+
+/** Claude (packs-1): the picks ut's rewards hand out (Rivals bounties, the weekly chest, the Season Pass). */
+export type AwardPickKind = 'front-office' | 'pick-82' | 'program-pick';
+
+/** Gold picks: how many options, from which overall (basketball's scale, shown on the sport's own). */
+const GOLD_PICKS: Record<'front-office' | 'pick-82', { n: number; floor: number; title: string }> = {
+  'front-office': { n: 5, floor: 80, title: 'Front Office Pick' },
+  'pick-82': { n: 3, floor: 82, title: 'Player Pick' },
+};
+/** Programs whose cards a Program Pick offers (the Finale and Landmark programs are SBC rewards only). */
+const PICK_PROGRAMS = new Set(['program', 'honors']);
+
+/** `n` different players among the season golds at `floor`+, the same ones for the same seed. */
+function goldOptions(pool: Pool, floor: number, n: number, seed: string): RatedCard[] {
+  const min = fcToDisplay(floor, pool.sport);
+  const golds = Object.values(pool.buckets.gold)
+    .flat()
+    .filter((rc) => rc.line.kind === 'season' && rc.ovr >= min)
+    .sort((a, b) => (a.line.id < b.line.id ? -1 : 1));
+  const rand = packRand('award-pick:' + seed);
+  const out: RatedCard[] = [];
+  const pids = new Set<string>();
+  for (let k = 0; out.length < n && k < n * 40 && golds.length; k++) {
+    const c = golds[Math.floor(rand() * golds.length)];
+    if (pids.has(c.line.pid)) continue;
+    pids.add(c.line.pid);
+    out.push(c);
+  }
+  return out;
+}
+
+/**
+ * Claude (packs-1): award a reward pick under the reward's own id. It joins the open pick sheets (face
+ * down until opened, exactly one card kept with keepPick, uid `pick:<id>`), once per id. front-office:
+ * 1 of 5 golds 80+; pick-82: 1 of 3 golds 82+; program-pick: 1 of 3 of the current program's released
+ * cards, or a pick-82 when no program is live (and always in soccer, which has no Live Calendar yet).
+ */
+export function awardPick(ut: UtState, pool: Pool, kind: AwardPickKind, id: string, at: number): UtState {
+  if (kind === 'program-pick') {
+    const day = easternDateKey(new Date(at));
+    const promo = promosOn(day)
+      .filter((p) => PICK_PROGRAMS.has(p.kind))
+      .sort((a, b) => (a.start < b.start ? 1 : a.start > b.start ? -1 : 0))
+      .find((p) => promoCards(pool, p.id, day).length);
+    if (promo) {
+      const released = promoCards(pool, promo.id, day);
+      const plain = released.filter((rc) => !rc.line.featured);
+      const options = shuffle(plain.length >= 3 ? plain : released, rng(hashString('program-pick:' + id))).slice(0, 3);
+      return addPick(ut, { id, kind, title: (per(promo.name, pool.sport) ?? 'Program') + ' Pick', options: options.map((rc) => rc.line.id), at });
+    }
+    return awardPick(ut, pool, 'pick-82', id, at);
+  }
+  const g = GOLD_PICKS[kind];
+  const options = goldOptions(pool, g.floor, g.n, kind + ':' + id);
+  if (!options.length) return ut;
+  return addPick(ut, { id, kind, title: g.title + ' · ' + fcToDisplay(g.floor, pool.sport) + '+', options: options.map((rc) => rc.line.id), at });
 }
 
 /**

@@ -1,0 +1,46 @@
+/* Claude (packs-1): the SBC screen's own styles (packs team; docs/studio-overhaul/packs.md). The trade-in
+   confirm's warning rows: each card worth a second look, named in the theme's red. */
+.sbc-warn {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 228px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sbc-warn-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--red);
+  border-radius: 12px;
+  background: rgba(107, 38, 51, 0.38);
+  color: var(--red);
+}
+.sbc-warn-ico {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.sbc-warn-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sbc-warn-txt b {
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--text);
+}
+.sbc-warn-txt .num {
+  color: var(--red);
+}
+.sbc-warn-txt small {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--red);
+}

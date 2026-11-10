@@ -2,7 +2,7 @@
 // starter, and quick-sell values. The pool is this sport's (the stand-in pool until the real card
 // data lands; the odds don't depend on it).
 import { SPORT } from '../engine/sport';
-import { LEGEND_GOLD, LEGEND_PREMIUM, openPack, PACK_SHAPE, packDefs, positionChoices, PROMO_GOLD, PROMO_PREMIUM, quickSellValue, revealOrder, walkoutLevel } from './packs';
+import { LEGEND_GOLD, LEGEND_PREMIUM, openPack, PACK_SHAPE, packDefs, positionChoices, PROMO_GOLD, PROMO_PREMIUM, quickSellValue, revealOrder, UNKNOWN_PACK, walkoutLevel } from './packs';
 import { getPool, type Pool, TIER_RANK } from './pool';
 import { onScale } from './rate';
 import { positionMix } from './squad';
@@ -100,7 +100,8 @@ describe('packs (' + SPORT + ')', () => {
           expect(c.tier).toBe('gold');
         }
       }
-    expect(openPack(pool, 'position:nowhere', 'x')).toEqual([]);
+    // Claude (packs-1, D9): an unknown choice throws instead of opening as no cards (that spent the pending pack)
+    expect(() => openPack(pool, 'position:nowhere', 'x')).toThrow(UNKNOWN_PACK);
   });
 
   it('gives a starter with a card for every spot, a gold among them, one player once', () => {
