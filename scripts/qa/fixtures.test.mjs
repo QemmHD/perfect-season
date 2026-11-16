@@ -3,7 +3,7 @@
 // machine holds them: PS_QA_FIXTURES) have the shapes the shell plan promises.
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { applyFixture, FIXTURE_KEYS, fixtureFile, loadFixture, PROFILES, SPORTS, summarize } from './fixtures.mjs';
+import { applyFixture, FIXTURE_KEYS, fixtureAge, fixtureFile, loadFixture, PROFILES, SPORTS, summarize, weekOfDay } from './fixtures.mjs';
 import { allowedUrl } from './browser.mjs';
 import { RECOVERY_KEYS } from '../../src/lib/recovery';
 
@@ -96,4 +96,22 @@ describe('serialized fixtures', () => {
         if (p === 'checkpoint') expect(s.checkpoint).toBe(true);
         if (p === 'standard') expect([s.starterClaimed, s.checkpoint, s.owned > 30]).toEqual([true, false, true]);
       });
+});
+
+// Claude (shell-1 fix, 2026-11-16): a serialized fixture carries week-bound state, so its age is reported.
+describe('fixture age', () => {
+  it('names app weeks the way src/ut/sbc.ts weekOf does (ISO, Monday start)', () => {
+    expect(['2026-11-10', '2026-11-15', '2026-11-16', '2026-01-01', '2027-01-01', '2025-12-29'].map(weekOfDay)).toEqual(['2026-W46', '2026-W46', '2026-W47', '2026-W01', '2026-W53', '2026-W01']);
+  });
+  it('is stale after 6 days or when the app week changes', () => {
+    const made = '2026-11-10T15:00:00.000Z';
+    expect(fixtureAge(made, new Date('2026-11-12T15:00:00Z'))).toEqual({ days: 2, madeWeek: '2026-W46', nowWeek: '2026-W46', weekChanged: false, stale: false });
+    // the reviewed case: made Tuesday Nov 10, read Monday Nov 16 (a new week, 6 days later)
+    expect(fixtureAge(made, new Date('2026-11-16T15:00:00Z'))).toMatchObject({ days: 6, weekChanged: true, stale: true });
+    // same week but Sunday night Eastern vs Monday UTC: the Eastern day decides
+    expect(fixtureAge('2026-11-16T02:00:00Z', new Date('2026-11-16T03:30:00Z')).weekChanged).toBe(false);
+    // Monday 00:30 to Sunday 23:30 Eastern: the same week, but almost 7 days old
+    expect(fixtureAge('2026-11-09T05:30:00Z', new Date('2026-11-16T04:30:00Z'))).toMatchObject({ days: 7, weekChanged: false, stale: true });
+    expect(fixtureAge('not a date').stale).toBe(true);
+  });
 });

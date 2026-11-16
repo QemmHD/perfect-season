@@ -3,7 +3,9 @@ import { launch, fixture, require } from './browser.mjs';
 import { createRequire } from 'node:module';
 const { WebSocketServer } = require('ws');
 const { verifyEvent } = createRequire(new URL('../../package.json', import.meta.url))('nostr-tools/pure');
-const relay = new WebSocketServer({ port: 7777 }),
+// Claude (studio overhaul, shell-1 fix, 2026-11-16): an ephemeral port, never 7777 (every team's isolated
+// QA points its app at ws://localhost:7777; a relay there would mix their runs with this one).
+const relay = new WebSocketServer({ port: 0, host: '127.0.0.1' }),
   clients = new Map(),
   stored = new Map();
 let signed = 0;
@@ -36,12 +38,14 @@ relay.on('connection', (socket) => {
     } else if (m[0] === 'CLOSE') subs.delete(m[1]);
   });
 });
+await new Promise((resolve) => (relay.address() ? resolve() : relay.once('listening', resolve)));
+const relayUrl = 'ws://localhost:' + relay.address().port;
 const browser = await launch();
 try {
   // Claude 2026-11-01: `node scripts/qa/online.mjs soccer` runs soccer's online UT queue the same way
   for (const sport of process.argv.slice(2).length ? process.argv.slice(2) : ['nba', 'nfl']) {
-    const a = await fixture(browser, sport, 'Codex QA A'),
-      b = await fixture(browser, sport, 'Codex QA B');
+    const a = await fixture(browser, sport, 'Codex QA A', 390, {}, { relay: relayUrl }),
+      b = await fixture(browser, sport, 'Codex QA B', 390, {}, { relay: relayUrl });
     for (const p of [a.page, b.page]) {
       await p.getByRole('button', { name: /Ultimate Team:/ }).click();
       await p.locator('.ut-tabs button').filter({hasText:/^PLAY$/}).click();

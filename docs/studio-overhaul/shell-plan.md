@@ -78,6 +78,7 @@ Hard rules for every task:
 | General: keep the update flow | shell-8 (install/activate carry-over, no-loop throttled test), shell-9, shell-10 |
 | Owner device checks | §7, copied to `shell.md` in shell-3 (early-ship items) and shell-10 |
 | Error recovery (not in STREAM; required by "make sure the games loads runs" and "all menus work") | shell-4 |
+| Isolated QA for the registry and cloud-save scripts (`content`, `circulation`, `cloud`), lost when shell-1 isolated every context | shell-1b (owner shell, with shell-5) |
 
 **Audit L items:** shell does L2 (header "LV" label, shell-3), L6 (description, shell-2) and L7 (QA standalone and arcade insets, shell-1/2). L1, the rest of L2, L3, L4, L5, L8 and L9 have other owners (§5).
 
@@ -271,6 +272,20 @@ This is not `npm run build`. The lead must answer D1 **before shell-7 starts**. 
 **Protocol impact:** none (QA only). **Save-compat risk:** none. Fixtures stay in inspect contexts on localhost.
 **Dependencies:** none. **Touched outside lane:** none.
 **Files:** `scripts/qa/browser.mjs`, `scripts/qa/edge-lib.mjs`, `scripts/qa/edge-headers.mjs`, `scripts/qa/home-matrix.mjs`, `scripts/qa/fixtures.mjs`, `scripts/qa/perf-ut.mjs`, `scripts/qa/edge-snippet.mjs` (all new except `browser.mjs`), `docs/BROWSER-QA.md`, `docs/studio-overhaul/shell.md` (new). Scratchpad: `O/fixtures/`, `O/qa-snippets/`, `O/shots/shell/before/`.
+
+---
+
+### shell-1b · P1 · Local registry and cloud-save stand-in for the isolated QA scripts (added 2026-11-16 after the shell-1 review)
+
+**Owner: shell.** Scheduled with shell-5 (same harness files); if shell-5 runs long it moves to the shell-10 Part C buffer as item 1b, never dropped. **Size:** about 2 h.
+
+**Why.** shell-1 made every Playwright context abort non-localhost hosts (BUILD-RULES). `content.mjs`, `circulation.mjs` and `cloud.mjs` called the live card registry (`…/functions/v1/card-registry`) and cloud saves (`…/functions/v1/player-save`) under `ns=inspect`, so they now fail, and the teams that rely on them (packs: pack recovery and numbered copies; ut: cloud restore of `ut.hq`) lose that coverage during the overhaul.
+
+**Changes**
+- New `scripts/qa/local-backend.mjs`: `stubBackend(context, { registry: true, cloud: true })`, a `context.route` handler registered **before** `isolate()` that fulfils only those two function paths on the app's registry host from in-memory state (registration and next serial per card id, active counts and retirements, signed-save revisions with 409 on a stale revision). It never forwards a request; every other non-local host is still aborted and listed. Contracts come from `supabase/functions/card-registry/contract.ts` and the existing request shapes in `src/ut/registry.ts` / `src/lib/cloud-save.ts`; signatures are verified with the same `nostr-tools` check the functions use.
+- `fixture(…, { backend: 'local' })` opts a script in; `content.mjs`, `circulation.mjs` and `cloud.mjs` opt in, with their live-only assertions (cross-device timing against the real Supabase realtime) marked as such.
+
+**Acceptance:** the three scripts pass on the dev server with 0 non-localhost requests other than the aborted, listed ones; a unit test proves the stub never calls `route.continue()` and refuses a request whose host is not the registry host.
 
 ---
 
@@ -894,6 +909,7 @@ Findings are reported by owner. shell-owned fixes go to `claude/studio-shell`.
 
 **Part C, buffer** (in this order, each only if its trigger fires):
 1. any failed acceptance from shell-1 to shell-9;
+1b. shell-1b, if it did not land with shell-5;
 2. **6b, fetch-as-JSON**, if a heap ceiling was missed. It covers `cards-*`, `season-references-*`, `nfl-combine` and `numbered-*`. It needs four resolution paths (browser fetch, vitest alias, vite-node, the artifact build) and a `dist` duplicate rule: if a file can't appear exactly once, keep `stringify` and record the heap;
 3. the gated prefetch, if it slipped from shell-7;
 4. **per-sport mocap chunks**, after players' ~40 new clips have landed, only if clip requests per match are still > 3: `manualChunks` per sport, ≤ 60 KB gzip each, 1 request per match, no other sport's clips;

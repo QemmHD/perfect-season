@@ -87,12 +87,48 @@ export function applyFixture({ keys, allowed, name, today }, env) {
   }
 }
 
+/** The app's week id for an Eastern calendar day (src/ut/sbc.ts weekOf: ISO week, Monday start). */
+export function weekOfDay(day) {
+  const [y, m, d] = day.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const week = Math.ceil(((t.getTime() - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
+  return t.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
+}
+const easternDay = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
+
+/**
+ * How old a serialized fixture is. `heavy` stores week-bound state as of the day it was made (the
+ * active Champions Circuit run, battles.week, today's objectives, the season period), so a fixture
+ * from an earlier week no longer describes a mid-week player even though its cards still load.
+ * Stale = more than 6 days old, or made in another app week. Remake with `fixtures.mjs make`.
+ */
+export function fixtureAge(made, now = new Date()) {
+  const t = new Date(made);
+  if (!Number.isFinite(t.getTime())) return { days: null, madeWeek: null, nowWeek: weekOfDay(easternDay(now)), weekChanged: true, stale: true };
+  const days = Math.round(((now.getTime() - t.getTime()) / 86400000) * 10) / 10;
+  const madeWeek = weekOfDay(easternDay(t)),
+    nowWeek = weekOfDay(easternDay(now));
+  return { days, madeWeek, nowWeek, weekChanged: madeWeek !== nowWeek, stale: days > 6 || madeWeek !== nowWeek };
+}
+const warnedStale = new Set();
+/** One warning per fixture file and process when it is stale (see fixtureAge). */
+export function warnIfStale(f, file) {
+  const age = fixtureAge(f.made);
+  if (age.stale && !warnedStale.has(file)) {
+    warnedStale.add(file);
+    console.warn(`fixtures: ${f.profile}/${f.sport} was made ${f.made} (${age.days} days ago, week ${age.madeWeek}; now ${age.nowWeek}). Its week-bound state (circuit run, battles week, objectives) is out of date. Remake it on the dev server: node scripts/qa/fixtures.mjs make --sports ${f.sport} --profiles ${f.profile}`);
+  }
+  return age;
+}
+
 /** A serialized fixture, or a clear error naming the command that makes it. */
 export function loadFixture(profile, sport) {
   const file = fixtureFile(profile, sport);
   if (!fs.existsSync(file)) throw Error(`Fixture ${profile}/${sport} is missing (${file}). Make it on the dev server: node scripts/qa/fixtures.mjs make --sports ${sport} --profiles ${profile}`);
   const f = JSON.parse(fs.readFileSync(file, 'utf8'));
   for (const k of Object.keys(f.keys)) if (!FIXTURE_KEYS.includes(k)) throw Error(`${file} holds ${k}, which is not a fixture key.`);
+  f.age = warnIfStale(f, file);
   return f;
 }
 
@@ -449,11 +485,12 @@ export async function check(browser, sport, profile) {
     const all = await page.evaluate(() => Object.keys(localStorage));
     // keys besides the fixture's may only be the app's own: its signing key and cloud-save bookkeeping
     const foreign = all.filter((k) => !FIXTURE_KEYS.includes(k) && k !== 'perfect-season:key:v1' && !k.startsWith('perfect-season:cloud:') && k !== 'perfect-season:updated' && k !== 'perfect-season:missing-files');
-    const made = profile === 'fresh' ? null : loadFixture(profile, sport).summary;
+    const f = profile === 'fresh' ? null : loadFixture(profile, sport);
+    const made = f?.summary ?? null;
     const same = !made || ['owned', 'levelled', 'evolved', 'pullLogPacks', 'starterClaimed', 'checkpoint'].every((k) => JSON.stringify(made[k]) === JSON.stringify(loaded[k]));
     const hosts = [...new Set(blocked)];
     const isolated = probe === 'aborted' && hosts.includes('example.com');
-    return { sport, profile, errors, homeMs: home, utMs: ut, sameAsMade: same, isolated, summary: loaded, foreignKeys: foreign, blocked: hosts };
+    return { sport, profile, errors, homeMs: home, utMs: ut, sameAsMade: same, isolated, made: f?.made ?? null, age: f?.age ?? null, summary: loaded, foreignKeys: foreign, blocked: hosts };
   } finally {
     await context.close();
   }
@@ -470,16 +507,19 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const sports = argOf(args, 'sports', SPORTS),
     profiles = argOf(args, 'profiles', cmd === 'make' ? PROFILES.filter((p) => p !== 'fresh') : PROFILES);
   const browser = await launch();
-  let failed = 0;
+  let failed = 0,
+    stale = 0;
   try {
     for (const sport of sports)
       for (const profile of profiles) {
         const r = cmd === 'make' ? await make(browser, sport, profile) : await check(browser, sport, profile);
         if (cmd === 'check' && (r.errors.length || r.foreignKeys.length || !r.sameAsMade || !r.isolated)) failed++;
+        if (cmd === 'check' && r.age?.stale) stale++;
         console.log(JSON.stringify({ cmd, sport, profile, ...r }));
       }
   } finally {
     await browser.close();
   }
+  if (stale) console.warn(`fixtures: ${stale} fixture(s) are stale (older than 6 days or from another app week); they load, but their week-bound state is out of date. Run \`node scripts/qa/fixtures.mjs make\` on the dev server.`);
   if (failed) process.exitCode = 1;
 }

@@ -12,7 +12,10 @@ Branch `claude/studio-shell`. Plan: [shell-plan.md](shell-plan.md). `O` below me
   It sets `window.__psInsets`, `--ps-inset-*`/`--ps-edge` on `<html>`, the stage's `--sat` (inset + 22 pt edge, in frame px) and `.arcade-full`'s `--sat`/`--sab`/`--sal`/`--sar` (screen px). Without it Chromium's `env()` is 0, so match HUDs and overlays sit **81 pt higher** than they will on the phone. Measured on untouched `acdf3e2` at 393: `.arcade-full --sat` 0 → **81 px**, stage `--sat` 58.55 → **80.382 frame px** (= 81/k), Home's LV ring 65 → **87 pt** (+22), the NBA score bug 8 → 89 pt. **Lead: please forward this path to every team.**
 - **Rules that read `env(safe-area-inset-*)` directly** can't be moved by the snippet and stay inside the blurred band on a phone. `rawEnvRules(page)` lists them; on Home today: `.save-warning` and `.camp-overlay` (`src/evolution/evolution.css`, shell-2 asks the lead for that grant). UT CSS loaded later adds `.hq-moment-overlay` (`ut/clubhouse.css`), `.ut-so-stamp` and `.ut-lm-ticker` (`ut/content-ui.css`): **ut team**, please write those as `var(--ps-inset-top, env(safe-area-inset-top, 0px))` (+ `var(--ps-edge, 0px)` for anything with text). That form works on your branch before shell merges.
 - **Fixtures.** `O/fixtures/<profile>-<sport>.json` for `standard`, `heavy`, `utNoStarter`, `checkpoint` (and `fresh`) in all three sports, made on `68123cc` (= `acdf3e2` source). Use them with `fixture(browser, sport, name, width, ctxOptions, { profile: 'heavy', insets, height, standalone: true })` and `PS_QA_FIXTURES=O/fixtures`. `heavy` is the long-time player the UT redesign must stay fast for (2,003 / 1,998 / 2,005 copies).
-- **Isolation is now built into `browser.mjs`.** Every non-localhost request is aborted. Scripts that talked to the live registry or cloud saves (`content.mjs`, `circulation.mjs`, `cloud.mjs`) now see those calls fail as if offline; do not work around this against live hosts.
+- **Isolation is now built into `browser.mjs`.** Every non-localhost request is aborted. Scripts that talked to the live registry or cloud saves (`content.mjs`, `circulation.mjs`, `cloud.mjs`) now see those calls fail as if offline; do not work around this against live hosts. Their local stand-in is task **shell-1b** (owner shell, with shell-5; `shell-plan.md`).
+- **Never bind a QA relay to port 7777** (2026-11-16). `ws://localhost:7777` is where every team's isolated app points, and nothing listens there normally; a relay on it would hand your fake peers and events to every other team's run. Start yours on an ephemeral port and pass `fixture(…, { relay: 'ws://localhost:' + port })`. `home-matrix.mjs` and `online.mjs` now do this.
+- **The fixtures are week-stamped** (2026-11-16). The `O/fixtures` files were made 2026-11-10 (app week 2026-W46); from 2026-11-16 (W47) `heavy`'s circuit run, battles week and objectives describe last week. Cards, levels, evolutions and the Pack Tracker are unaffected. `loadFixture` now warns once per stale file; remake weekly with `node scripts/qa/fixtures.mjs make` on a dev server.
+- **perf-ut: compare by ratio to the same-run control, not by ms** (2026-11-16). Default N is 5; each sport also runs the 0-card `utNoStarter` control interleaved; rows carry `ratioToControl`. Above a 1-minute load of 4 the result is saved as `.noisy.json` and is not a baseline.
 - **shell-2 landed Fix A (every team, read "Announcements" under shell-2):** `--sat` now includes the 22-pt status-bar edge on island phones; `<html>` carries `--ps-inset-*` / `--ps-edge`; `useLayout()` gains `edge` and `room` (`content` is now the room below the edge). **Lead:** D3 (evolution.css) was used for 3 `top` declarations; D5 (Home budget) has shell's proposal and the measured table under shell-2.
 - **ut / packs: the heavy first-render costs and the rating costs** are in "UT open: costs" below. The rating step (packs-owned `rate.ts`, `card-face.ts`, `ut-scale.ts`) is most of the open; the first render after the pool is 120–210 ms.
 
@@ -176,6 +179,27 @@ None. Layout only; the HUD moves are render-only. No engine reads `--sat`. The o
 
 ## shell-1 · QA harness core, production fixtures, team QA snippet and baselines (done)
 
+### Review fixes (2026-11-16)
+
+An independent review of `68123cc..05ea3f4` found two medium and three low issues. All five are fixed or tracked. QA only: no saves, keys, ids, match rules or protocol changed.
+
+- **The detail-bar audit counted hidden text (medium).** `detailBarAudit` counted a text run when the hit-tested element was the run's own element, a descendant of it, or an **ancestor** of it. In the empty strip under the floating bar the hit is the `.sheet` itself, so the rows of the closed "ALL n ATTRIBUTES" `<details>` were reported as showing.
+  - A run now counts only when its element passes `checkVisibility({ contentVisibilityAuto, opacityProperty, visibilityProperty })` and the point hits that element or a descendant.
+  - `auditScreen`'s `invisible()` runs the same `checkVisibility()` test first, so closed `<details>` text can no longer enter `tiny`, `lowContrast` or `textInBand`.
+  - New `scripts/qa/edge-lib.page.test.mjs` (3 tests) builds a static 393×852 sheet in real Chromium: a closed `<details>` whose rows lie in the strip and hit-test to the sheet, a tiny label inside it, and one visible row. With the old code all 3 tests fail (`['Run block 31', …]` reported, `Juke move 98 8px` in `tiny`). With the fix they pass. Opening the `<details>` brings the tiny label back, which proves the check still finds real text.
+  - `edge-headers --phase before --devices all` was re-run on the kept build: 27 runs, 0 page errors, 0 failed steps, 274 s. Every topmost, band, control and bottom-cut number is identical to the first run (0 differences across 27 runs × 15 screens). Only `textBelowBar` changed; see the corrected H1 row and table below.
+- **The stand-in relay could bind 7777 (medium).** `home-matrix.mjs` tried `127.0.0.1:7777` first, which is where every team's isolated app connects. It now always listens on an ephemeral port and passes that URL to `fixture()`. `online.mjs`, an older script, had the same problem (`new WebSocketServer({ port: 7777 })`) and is fixed the same way. `BROWSER-QA.md` now says QA relays never bind 7777.
+- **perf-ut timings were not reproducible at N = 3 (low).**
+  - The default is now N = 5.
+  - Each sport and rate also runs the audit's `utNoStarter` control with the audit readiness test, interleaved run by run, and every row gets `ratioToControl`.
+  - Each run records the 1-minute load average and the heavy.sh slots in use. Above a median load of 4 the result is saved as `perf-ut-<label>.noisy.json` and the script exits 3 instead of writing a baseline (`--allow-load` overrides).
+  - The existing 1× numbers below were taken at N = 3 without a control. They stay as recorded, but later comparisons should use the ratio.
+- **Serialized fixtures drift (low).** `loadFixture` now reports `age` (`days`, `madeWeek`, `nowWeek`, `stale`) and warns once per file when the file is more than 6 days old or from another app week. `fixtures.mjs check` prints the age and a summary warning; `browser.mjs` returns it as `f.fixture.age`. `BROWSER-QA.md` documents a weekly `fixtures.mjs make`.
+  - The `O/fixtures` files are from 2026-11-10 (W46) and are stale as of today (W47). They were **not** remade in this fix, because other teams may be mid-way through before/after comparisons on them. The lead or shell should remake them at a quiet point (followup).
+- **content/circulation/cloud lost their isolated coverage (low).** This is now tracked as task **shell-1b** in `shell-plan.md`: a local registry and cloud-save stand-in (`scripts/qa/local-backend.mjs`), owned by shell and scheduled with shell-5, with the shell-10 buffer as its fallback.
+- **Found while re-running.** The shell-2 session had left a dev server (`vite --port 5211`, started 12:43) running with no PID file pointing at it. My first `vite preview` therefore failed with "port in use", and that first re-run measured the shell-2 dev server instead of the kept build. I caught this from the topmost numbers (+22 pt everywhere), stopped that server by its PID, confirmed `index.html` matched the kept build byte for byte, and re-ran. The `before/` directory now holds kept-build results again. The figures quoted above all come from the second run.
+  - **Root cause (lead, every team):** the BUILD-RULES start line `nohup npx vite … & echo $! > pid` records the PID of the `npx` wrapper. `kill $(cat pid)` stops that wrapper, but the `vite` child can keep running and keep the port; this happened twice here. Start the server as `nohup ./node_modules/.bin/vite --port <port> --strictPort … & echo $! > pid`, so the PID is vite itself. Before you start a server, also check that `vite.log` does not say "Port … is already in use".
+
 QA only: no app code, CSS, saves or protocol changed.
 
 ### What changed
@@ -209,10 +233,10 @@ QA only: no app code, CSS, saves or protocol changed.
 | heavy: 2,000 ± 5% copies, ≥ 30% levelled, ≥ 50 evolved (NBA/NFL), 300 pull-log packs, full `ut.hq` | **Met.** NBA 2,003 / 33.2% / 60 evolved + 2 evolving / 300 packs (1,200 cards); NFL 1,998 / 34.9% / 60 + 2 / 300 (1,050); Soccer 2,005 / 32.7% / 60 + 2 / 300 (1,480). `ut.hq`: season track (25 tiers claimed), 133–277 claims, 388–560 journal entries, 151 days, 23 weeks, 3 saved squads, 8 development programs done + 1 running, 5 moments, 6 circuit weeks + an active run, 160 matches, 6 SBCs. 59,672 coins, Level 19. |
 | Every fixture loads on dev and on the kept build with 0 page errors, writes only existing keys, only on localhost | **Met.** 5 profiles × 3 sports on each: 0 page errors, summary unchanged after load, 0 foreign keys. Localhost-only and existing-keys-only are unit tested. |
 | Main/UT header topmost at 65–76 pt at 393 | **Met.** Home and UT Home topmost control 65.0 pt (cap top of "LEVEL" text 70.7), UT tab headers 74.1, in all three sports. |
-| Card-detail bar shows content below it at 393/390/402, not at 320 | **Met.** The bar floats 34 pt above the sheet bottom at 393/390/402 (and 375×812/420/430/440) with 2–7 text runs showing under it (NBA/NFL at top, middle and end; soccer at top and middle). At 320 and 375×667 the gap is 0–0.4 pt and nothing shows. |
+| Card-detail bar shows content below it at 393/390/402, not at 320 | **Met** (corrected 2026-11-16 with the fixed audit). The bar floats 34–34.7 pt above the sheet bottom on all 7 notch and island phones. Visible content shows under it in these cases (each checked against the screenshots):<br>- NBA: at the top (2 runs, "Lob City · Finishes alley-oops") and the middle (4 runs, the "ALL 19 ATTRIBUTES" row).<br>- NFL: at the top (3 runs, "THE 2007 SEASON"), plus the middle at 390 only (1 run, "LOCK AS FAVOURITE").<br>- Soccer: at the top (1–4 runs, the "ALL 6 ATTRIBUTES" row).<br>At the end of every sheet the 34-pt strip is empty (0 runs). The first run reported 4–7 runs there, all text of the closed `<details>`, which never paints. At 320 and 375×667 the gap is 0–0.4 pt and nothing shows. |
 | Home classes on 9 phones match the computed table | **Met.** 432/432 matrix states and 27/27 edge-headers runs: `''`/`normal` on the 7 notch/island phones, `snug`/`tight` on 375×667 and 320×568. |
 | Snippet on untouched `acdf3e2` at 393: arcade `--sat` 81 px, stage 81/k frame px, LV ring 22 pt down | **Met.** 81 px; 80.382 frame px (k = 1.00769, 80.99 screen px); 65 → 87 pt. |
-| perf-ut standard 1× within ±15% of 2,123 / 2,092 / 679 ms | **Partly met.** See below: NBA 2,214 ms (+4%); NFL 2,484–2,708 (+19–29%); soccer 838–881 (+23–30%). With the audit's own 0-card player (`utNoStarter`) and its readiness test the port gives 2,195 / 2,355 / 737 ms (+3% / +13% / +9%), all within ±15%, and the heap numbers match the audit to 0.1–0.6 MB. The gap is the standard player's 40–69 owned cards, not the harness. |
+| perf-ut standard 1× within ±15% of 2,123 / 2,092 / 679 ms | **Partly met** (N = 3, before the 2026-11-16 load guard and control; compare later runs by `ratioToControl`). See below: NBA 2,214 ms (+4%); NFL 2,484–2,708 (+19–29%); soccer 838–881 (+23–30%). With the audit's own 0-card player (`utNoStarter`) and its readiness test the port gives 2,195 / 2,355 / 737 ms (+3% / +13% / +9%), all within ±15%, and the heap numbers match the audit to 0.1–0.6 MB. The gap is the standard player's 40–69 owned cards, not the harness. |
 | Heavy numbers recorded; heavy first-render table names the top 5 per sport | **Met** (below). |
 | edge-headers for one sport over 9 phones ≤ 4 min; `screen-fit.mjs` still passes | **Met.** Kept build: 90 s NBA, 95 s NFL, 70 s soccer (3 contexts at a time; 120 s/sport on the dev server). `screen-fit.mjs` passes (Safari and standalone, 5 sizes, keyboard, rotation, 0 errors). |
 
@@ -220,17 +244,19 @@ QA only: no app code, CSS, saves or protocol changed.
 
 Topmost text/control in pt (insets t/b). "Band" = text runs / controls inside the band over the whole walk.
 
-| Phone | Home / UT Home | UT tabs | SKIP | Toast cap top | Draft | Match frame | Detail bar gap | Band (text/ctl) |
+Detail bar: the gap in pt, then the text runs showing below the bar at the top / middle / end of the sheet as NBA · NFL · soccer (re-measured 2026-11-16 with the fixed audit).
+
+| Phone | Home / UT Home | UT tabs | SKIP | Toast cap top | Draft | Match frame | Detail bar gap; runs below (top/mid/end) | Band (text/ctl) |
 |---|---|---|---|---|---|---|---|---|
-| 393×852 (59/34) | 65.0 | 74.1 | 71.1 | 80.6 | 63.0 | 73 | 34 | 26–27 / 6 |
-| 402×874 (62/34) | 68.2 | 77.5 | 74.4 | 84.1 | 66.1 | 76 | 34 | 22–27 / 6 |
-| 420×912 (68/34) | 74.5 | 84.2 | 80.9 | 91.1 | 72.3 | 82 | 34 | 21–26 / 6 |
-| 440×956 (62/34) | 68.8 | 78.9 | 75.5 | 86.2 | 66.5 | 76 | 34–34.7 | 12–19 / 6 |
-| 430×932 (59/34) | 65.6 | 75.5 | 72.2 | 82.6 | 63.4 | 73 | 34 | 19–26 / 6 |
-| 390×844 (47/34) | 53.0 | 62.0 | 59.0 | 68.4 | 51.0 | 61 | 34–34.5 | 20–26 / 6 |
-| 375×812 (50/34) | 55.8 | 64.4 | 61.5 | 70.6 | 53.8 | 64 | 34–34.2 | 22–27 / 6 |
-| 375×667 (20/0) | 24.8 | 33.5 | 31.5 | 39.7 | 21.0 | 34 | 0–0.4 | 0 / 5 |
-| 320×568 (20/0) | 24.1 | 31.5 | 29.8 | 36.8 | 20.8 | 33 | 0–0.3 | 1 / 5 |
+| 393×852 (59/34) | 65.0 | 74.1 | 71.1 | 80.6 | 63.0 | 73 | 34; 2/4/0 · 3/0/0 · 4/0/0 | 26–27 / 6 |
+| 402×874 (62/34) | 68.2 | 77.5 | 74.4 | 84.1 | 66.1 | 76 | 34; 2/4/0 · 3/0/0 · 4/0/0 | 22–27 / 6 |
+| 420×912 (68/34) | 74.5 | 84.2 | 80.9 | 91.1 | 72.3 | 82 | 34–34.1; 2/4/0 · 3/0/0 · 4/0/0 | 21–26 / 6 |
+| 440×956 (62/34) | 68.8 | 78.9 | 75.5 | 86.2 | 66.5 | 76 | 34–34.7; 2/4/0 · 3/0/0 · 1/0/0 | 12–19 / 6 |
+| 430×932 (59/34) | 65.6 | 75.5 | 72.2 | 82.6 | 63.4 | 73 | 34; 2/4/0 · 3/0/0 · 1/0/0 | 19–26 / 6 |
+| 390×844 (47/34) | 53.0 | 62.0 | 59.0 | 68.4 | 51.0 | 61 | 34–34.5; 2/4/0 · 3/1/0 · 1/0/0 | 20–26 / 6 |
+| 375×812 (50/34) | 55.8 | 64.4 | 61.5 | 70.6 | 53.8 | 64 | 34–34.2; 2/4/0 · 3/0/0 · 4/0/0 | 22–27 / 6 |
+| 375×667 (20/0) | 24.8 | 33.5 | 31.5 | 39.7 | 21.0 | 34 | 0–0.4; none | 0 / 5 |
+| 320×568 (20/0) | 24.1 | 31.5 | 29.8 | 36.8 | 20.8 | 33 | 0–0.3; none | 1 / 5 |
 
 Every header starts 6–17 pt below the inset, inside the 22-pt edge, on every notch and island phone. Match frames: NBA/NFL from the kept build's bench with the raw insets emulated; soccer's from the dev server (`O/shots/shell/shell-1/before-dev/`), because a build has no soccer bench. Contact sheets: `O/shots/shell/before/sheet-<sport>.png` and `sheet-<sport>-band.png`.
 
@@ -285,6 +311,7 @@ The heavy club adds little to the first render today (heavy 120–210 ms against
 - `bash O/heavy.sh npm run typecheck`: pass.
 - `PS_QA_FIXTURES=O/fixtures PS_QA_SNIPPET=O/qa-snippets/shell-edge.mjs bash O/heavy.sh npx vitest run scripts/qa`: 4 files, 30 tests pass.
 - Dev server on 5211 (untouched `acdf3e2` source): `fixtures.mjs check` (15/15), `screen-fit.mjs` (pass), the snippet check, `perf-ut --cpu-profile all` (attribution), `edge-headers --devices all` (kept as `O/shots/shell/shell-1/before-dev/`; its pack-SKIP step failed under reduced motion before the fix below, then passed at 393/320 for NBA and soccer).
+- Review fixes (2026-11-16): `PS_QA_FIXTURES=O/fixtures PS_QA_SNIPPET=O/qa-snippets/shell-edge.mjs bash O/heavy.sh npx vitest run scripts/qa`: 5 files, 37 tests pass (the 3 new page tests fail on the old `edge-lib.mjs`). `edge-headers --phase before --devices all` was re-run on the kept build (`index.html` md5 equal to the kept build's): 27 runs, 0 errors, 0 failed steps, 274 s; screenshots of the detail strips looked at for NBA/NFL/soccer at 393 and NFL at 390.
 - Kept build (`vite preview` of `O/audit-scripts/likeness/build` on 5211): `fixtures.mjs check` (15/15), `edge-headers --phase before --devices all` (27 runs, 0 errors, 0 failed steps, 255 s), `home-matrix --phase before --devices all` (432 states, 0 errors, 0 class mismatches, 255 s), `perf-ut` 1× standard + heavy N=3, audit-readiness N=5, standard N=7.
 - Screens looked at: the band shots of Home/UT Home/SKIP at 393, the card detail at its end (H1), Home with a saved run at 393 (tiles under PLAY), and the snippet's Home and match frame.
 
@@ -308,5 +335,6 @@ None for this task (QA only). The device checks for the early ship (LEVEL bright
 ### Left for later tasks
 
 - 4× `perf-ut` runs: shell-7 (the plan's cut line).
-- A local registry/cloud stand-in so `content.mjs`, `circulation.mjs` and `cloud.mjs` can run isolated again (not in the plan; listed as a follow-up).
+- A local registry/cloud stand-in so `content.mjs`, `circulation.mjs` and `cloud.mjs` can run isolated again: now task shell-1b (owner shell, with shell-5).
+- Remake `O/fixtures` (stale since 2026-11-16, week W47) at a point when no team is mid-comparison.
 - The 420×912 top inset (68) is an estimate until read on a device.

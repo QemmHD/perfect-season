@@ -82,7 +82,7 @@ const matches = (e, f) =>
 
 /**
  * Start the relay. Stand-ins publish signed presence (and one of them queue) events on the tags the
- * app itself subscribes to, every two seconds, in `sport`. Port 7777 when free, else any free port.
+ * app itself subscribes to, every two seconds, in `sport`. Always on a free ephemeral port, never 7777.
  */
 async function startRelay(sport) {
   const clients = new Set(),
@@ -140,9 +140,11 @@ async function startRelay(sport) {
       }
     });
   });
+  // Always an ephemeral port: 7777 is where every team's isolated QA points its app (?relay=ws://localhost:7777),
+  // and nothing listens there normally. A stand-in relay on 7777 would hand other teams' runs our fake peers.
   const port = await new Promise((resolve, reject) => {
-    server.once('error', (e) => (e.code === 'EADDRINUSE' ? server.listen(0, '127.0.0.1', () => resolve(server.address().port)) : reject(e)));
-    server.listen(7777, '127.0.0.1', () => resolve(7777));
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve(server.address().port));
   });
   const stand = [
     { key: generateSecretKey(), name: 'Matrix Peer A', st: 'menu' },

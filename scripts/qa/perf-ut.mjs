@@ -5,7 +5,16 @@
 // the UT tab is tapped with the CPU at the chosen slowdown.
 //
 //   node scripts/qa/perf-ut.mjs [--sports nba,nfl,soccer] [--profiles standard,heavy] [--rates 1,4]
-//     [--runs 3] [--dsf 3] [--cpu-profile first|all|none] [--ready tabs|audit] [--label before]
+//     [--runs 5] [--dsf 3] [--cpu-profile first|all|none] [--ready tabs|audit] [--label before]
+//     [--control utNoStarter|none] [--max-load 4] [--allow-load]
+//
+// The shared machine (4 CPUs, 7 teams) moves absolute times by ±40% from minute to minute, so every
+// case is also measured against a control in the same run: the audit's own 0-card player
+// (`utNoStarter`, audit readiness), interleaved run by run with the measured profiles. Compare
+// branches by `ratioToControl` (ready ms / control ready ms), not by absolute ms. The 1-minute load
+// average and the heavy.sh slots in use are recorded before every run; when the median load is above
+// --max-load (4) the result is written as `perf-ut-<label>.noisy.json` and the script exits 3 instead
+// of writing a baseline, unless --allow-load is given.
 //
 // Recorded per run: tap → UT ready (`.ut-tabs` on screen and no `.ut-loading`; `--ready audit` uses the
 // audit's looser condition instead), tap → first paint
@@ -22,7 +31,9 @@
 // Isolation: ?ns=inspect, local relay, every non-localhost host aborted (browser.mjs isolate).
 //
 // Output: <PS_QA_SHOTS>/perf-ut/perf-ut-<label>.json (runs, medians, profiles) and one line per run.
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { artifacts, base, buildRoot, isolate, launch } from './browser.mjs';
@@ -36,11 +47,14 @@ const opt = (name, fallback) => {
 const sports = opt('sports', 'nba,nfl,soccer').split(',');
 const profiles = opt('profiles', 'standard,heavy').split(',');
 const rates = opt('rates', '1').split(',').map(Number);
-const runs = Math.max(1, +opt('runs', 3));
+const runs = Math.max(1, +opt('runs', 5));
 const dsf = +opt('dsf', 3);
 const cpuProfile = opt('cpu-profile', 'first');
 const label = opt('label', buildRoot ? 'build' : 'dev');
 const readyAs = opt('ready', 'tabs');
+const control = opt('control', 'utNoStarter');
+const maxLoad = +opt('max-load', 4);
+const allowLoad = argv.includes('--allow-load');
 const OUT = path.join(process.env.PS_QA_SHOTS || path.join(artifacts, 'shots'), 'perf-ut');
 
 const appUrl = (sport) => {
@@ -55,6 +69,37 @@ const median = (xs) => {
   return v.length % 2 ? v[m] : Math.round((v[m - 1] + v[m]) / 2);
 };
 const mb = (n) => +(n / 1048576).toFixed(1);
+
+/** heavy.sh's machine-wide slots (/tmp/ps-heavy-N.lock) held right now; this run's own slot counts. */
+export function heavySlotsInUse(slots = 3) {
+  let busy = 0;
+  for (let i = 0; i < slots; i++) {
+    const f = `/tmp/ps-heavy-${i}.lock`;
+    if (!fs.existsSync(f)) continue;
+    // flock -n exits 1 when another process holds the lock; it takes and drops it otherwise
+    const r = spawnSync('flock', ['-n', f, 'true']);
+    if (r.status === 1) busy++;
+  }
+  return busy;
+}
+/** The machine's state before a run: 1-minute load average and heavy.sh slots in use. */
+export const machineLoad = () => ({ load1: +os.loadavg()[0].toFixed(2), slots: heavySlotsInUse() });
+
+/** Is this set of runs quiet enough to be a baseline? Median 1-minute load at or below `max`. */
+export function loadVerdict(samples, max = 4) {
+  const loads = samples.map((s) => s.load1).filter(Number.isFinite).sort((a, b) => a - b);
+  const m = loads.length ? (loads.length % 2 ? loads[loads.length >> 1] : (loads[loads.length / 2 - 1] + loads[loads.length / 2]) / 2) : null;
+  return { medianLoad: m === null ? null : +m.toFixed(2), maxLoad: loads.length ? loads[loads.length - 1] : null, maxSlots: Math.max(0, ...samples.map((s) => s.slots ?? 0)), ok: m !== null && m <= max, limit: max };
+}
+
+/** Each summary row's ready time as a ratio of the control's (same sport and CPU rate, same run). */
+export function ratioToControl(summary, controlProfile) {
+  return summary.map((row) => {
+    const c = summary.find((x) => x.sport === row.sport && x.rate === row.rate && x.profile === controlProfile && x.control);
+    const r = (a, b) => (a && b ? +(a / b).toFixed(3) : null);
+    return { ...row, ratioToControl: row.control ? 1 : r(row.readyMs, c?.readyMs), paintRatioToControl: row.control ? 1 : r(row.paintMs, c?.paintMs) };
+  });
+}
 
 /** Long tasks from the start of every document (the same observer the audit used). */
 const LONG_TASKS = () => {
@@ -148,7 +193,8 @@ function rateCosts(byId, selfMap, lines) {
 
 const POOL_FNS = ['buildPool', 'poolBuilder', 'buildPoolInSlices'];
 
-async function run(browser, sport, profile, rate, withProfile) {
+async function run(browser, sport, profile, rate, withProfile, ready = readyAs) {
+  const machine = machineLoad();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: dsf, isMobile: true, hasTouch: true, serviceWorkers: 'allow' });
   const blocked = await isolate(context);
   await inject(context, profile, sport, 'Perf QA');
@@ -188,7 +234,7 @@ async function run(browser, sport, profile, rate, withProfile) {
         requestAnimationFrame(() => setTimeout(() => (window.__utPaint = performance.now()), 0));
       });
       mo.observe(document.body, { childList: true, subtree: true });
-    }, readyAs === 'audit');
+    }, ready === 'audit');
     if (rate > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate });
     if (withProfile) {
       await cdp.send('Profiler.enable');
@@ -237,7 +283,7 @@ async function run(browser, sport, profile, rate, withProfile) {
       fs.mkdirSync(OUT, { recursive: true });
       fs.writeFileSync(path.join(OUT, `cpu-${label}-${sport}-${profile}-x${rate}.cpuprofile`), JSON.stringify(cpu));
     }
-    return { sport, profile, rate, worker, ...m, heapHomeMB: mb(heapHome), heapUtMB: mb(heapUt), errors, blocked: [...new Set(blocked)], cpu: prof };
+    return { sport, profile, rate, ready, machine, worker, ...m, heapHomeMB: mb(heapHome), heapUtMB: mb(heapUt), errors, blocked: [...new Set(blocked)], cpu: prof };
   } finally {
     await context.close();
   }
@@ -246,42 +292,55 @@ async function run(browser, sport, profile, rate, withProfile) {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const browser = await launch();
   const all = [];
-  const summary = [];
+  let summary = [];
+  const medians = (sport, profile, rate, rs, isControl) => ({
+    sport,
+    profile,
+    rate,
+    control: isControl,
+    ready: rs[0]?.ready,
+    runs: rs.length,
+    readyMs: median(rs.map((r) => r.readyMs)),
+    paintMs: median(rs.map((r) => r.paintMs)),
+    longest: median(rs.map((r) => r.longest)),
+    longTaskMs: median(rs.map((r) => r.longTaskMs)),
+    heapHomeMB: median(rs.map((r) => r.heapHomeMB * 10)) / 10,
+    heapUtMB: median(rs.map((r) => r.heapUtMB * 10)) / 10,
+    decodedKB: median(rs.map((r) => r.decodedKB)),
+    readyEach: rs.map((r) => r.readyMs),
+    loadEach: rs.map((r) => r.machine.load1),
+    errors: rs.flatMap((r) => r.errors),
+    blocked: [...new Set(rs.flatMap((r) => r.blocked))],
+  });
   try {
     for (const sport of sports)
-      for (const profile of profiles)
-        for (const rate of rates) {
-          const rs = [];
-          for (let i = 0; i < runs; i++) {
-            const r = await run(browser, sport, profile, rate, cpuProfile === 'all' || (cpuProfile === 'first' && i === 0));
-            rs.push(r);
+      for (const rate of rates) {
+        // the control and the measured profiles take turns run by run, so a busy minute hits them alike
+        const cases = [...(control !== 'none' ? [{ profile: control, ready: 'audit', control: true }] : []), ...profiles.filter((p) => p !== control || readyAs !== 'audit').map((profile) => ({ profile, ready: readyAs, control: false }))];
+        const got = cases.map(() => []);
+        for (let i = 0; i < runs; i++)
+          for (let c = 0; c < cases.length; c++) {
+            const { profile, ready, control: isControl } = cases[c];
+            const r = await run(browser, sport, profile, rate, !isControl && (cpuProfile === 'all' || (cpuProfile === 'first' && i === 0)), ready);
+            got[c].push(r);
             all.push(r);
             const { cpu: p, ...line } = r;
-            console.log(JSON.stringify({ ...line, run: i + 1, cpu: p ? { totalMs: p.totalMs, poolEndsAtMs: p.poolEndsAtMs, renderMs: p.renderMs } : null }));
+            console.log(JSON.stringify({ ...line, control: isControl, run: i + 1, cpu: p ? { totalMs: p.totalMs, poolEndsAtMs: p.poolEndsAtMs, renderMs: p.renderMs } : null }));
           }
-          summary.push({
-            sport,
-            profile,
-            rate,
-            runs: rs.length,
-            readyMs: median(rs.map((r) => r.readyMs)),
-            paintMs: median(rs.map((r) => r.paintMs)),
-            longest: median(rs.map((r) => r.longest)),
-            longTaskMs: median(rs.map((r) => r.longTaskMs)),
-            heapHomeMB: median(rs.map((r) => r.heapHomeMB * 10)) / 10,
-            heapUtMB: median(rs.map((r) => r.heapUtMB * 10)) / 10,
-            decodedKB: median(rs.map((r) => r.decodedKB)),
-            readyEach: rs.map((r) => r.readyMs),
-            errors: rs.flatMap((r) => r.errors),
-            blocked: [...new Set(rs.flatMap((r) => r.blocked))],
-          });
-        }
+        cases.forEach((c, i) => summary.push(medians(sport, c.profile, rate, got[i], c.control)));
+      }
   } finally {
     await browser.close();
   }
+  if (control !== 'none') summary = ratioToControl(summary, control);
+  const load = loadVerdict(all.map((r) => r.machine), maxLoad);
+  const baseline = load.ok || allowLoad;
   fs.mkdirSync(OUT, { recursive: true });
-  const file = path.join(OUT, `perf-ut-${label}.json`);
-  fs.writeFileSync(file, JSON.stringify({ label, base, build: buildRoot, dsf, ready: readyAs, viewport: '390x844', summary, runs: all }, null, 1));
-  console.log(JSON.stringify({ file, summary: summary.map(({ readyEach, errors, blocked, ...s }) => ({ ...s, errors: errors.length, blocked })) }));
+  const file = path.join(OUT, `perf-ut-${label}${baseline ? '' : '.noisy'}.json`);
+  fs.writeFileSync(file, JSON.stringify({ label, base, build: buildRoot, dsf, ready: readyAs, control, viewport: '390x844', load, baseline, summary, runs: all }, null, 1));
+  console.log(JSON.stringify({ file, load, summary: summary.map(({ readyEach, loadEach, errors, blocked, ...s }) => ({ ...s, errors: errors.length, blocked })) }));
+  if (!baseline)
+    console.error(`perf-ut: median 1-minute load ${load.medianLoad} is above ${maxLoad} (max ${load.maxLoad}, up to ${load.maxSlots} heavy.sh slots busy); not a baseline. Saved as ${path.basename(file)}. Compare by ratioToControl, rerun when the machine is quieter, or pass --allow-load.`);
   if (all.some((r) => r.errors.length)) process.exitCode = 1;
+  else if (!baseline) process.exitCode = 3;
 }

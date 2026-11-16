@@ -169,7 +169,10 @@ const measureScreen = (page, d) =>
         if (!s) styles.set(e, (s = getComputedStyle(e)));
         return s;
       };
+      // checkVisibility also catches what the style walk misses: text inside a closed <details>, under
+      // content-visibility:hidden/auto skipped content, or in a display:contents subtree's hidden slot
       const invisible = (e) => {
+        if (typeof e.checkVisibility === 'function' && !e.checkVisibility({ contentVisibilityAuto: true, opacityProperty: true, visibilityProperty: true })) return true;
         for (let n = e; n && n.nodeType === 1; n = n.parentElement) {
           const s = cs(n);
           if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return true;
@@ -405,14 +408,20 @@ export const detailBarAudit = (page) =>
     const below = [];
     const walker = document.createTreeWalker(sheet, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.textContent.trim() && !bar.contains(n) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT) });
     const range = document.createRange();
+    const shown = (e) => typeof e.checkVisibility !== 'function' || e.checkVisibility({ contentVisibilityAuto: true, opacityProperty: true, visibilityProperty: true });
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const p = n.parentElement;
+      // text in a closed <details>, display:none, visibility:hidden or opacity 0 never shows below the bar
+      if (!p || !shown(p)) continue;
       range.selectNodeContents(n);
       for (const r of range.getClientRects()) {
         const top = Math.max(r.top, b.bottom),
           bottom = Math.min(r.bottom, s.bottom);
         if (bottom - top < 1) continue;
+        // the run counts only when the point hits its own element or a descendant of it; a hit on an
+        // ancestor (the sheet itself, in the empty strip under the bar) means the text is not painted there
         const hit = document.elementFromPoint((r.left + r.right) / 2, (top + bottom) / 2);
-        if (hit && (hit === n.parentElement || n.parentElement.contains(hit) || hit.contains(n.parentElement))) below.push(n.textContent.trim().slice(0, 30));
+        if (hit && (hit === p || p.contains(hit))) below.push(n.textContent.trim().slice(0, 30));
       }
     }
     return { sheetBottom: r1(s.bottom), barTop: r1(b.top), barBottom: r1(b.bottom), gap: r1(s.bottom - b.bottom), scrollTop: Math.round(sheet.scrollTop), scrollMax: Math.round(sheet.scrollHeight - sheet.clientHeight), textBelowBar: [...new Set(below)].slice(0, 8) };

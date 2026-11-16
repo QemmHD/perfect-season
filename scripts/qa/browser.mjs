@@ -122,7 +122,7 @@ export async function fixture(browser, sport = 'nba', name = 'Codex QA', width =
       p.inventory = shared.inventory;
       return p;
     }, sport);
-  return { page, context, current, errors, blocked, displayMode, fixture: made && { profile, made: made.made, source: made.source }, original: profile === 'fresh' ? null : await current() };
+  return { page, context, current, errors, blocked, displayMode, fixture: made && { profile, made: made.made, source: made.source, age: made.age }, original: profile === 'fresh' ? null : await current() };
 }
 export async function shot(page, name) {
   await page.screenshot({ path: path.join(artifacts, name + '.png'), animations: 'disabled', timeout: 12000 });
