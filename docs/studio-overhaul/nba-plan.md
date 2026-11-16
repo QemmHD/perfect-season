@@ -1,1648 +1,1580 @@
-# Team nba: build plan (studio overhaul, revision 2, 2026-11-10)
+# Team nba: build plan (studio overhaul, revision 3: Game Design V2, 2026-11-16)
 
 Worktree `/home/user/ps-s-nba`, branch `claude/studio-nba`, dev-server port **5215**.
 `O` = `/tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul`.
 
-Sources read in full: `O/BRIEF.md`, `O/BUILD-RULES.md`, `O/OWNERSHIP.md`, `O/STREAM-nba.md`, `O/audit-nba.md` (NBA-01 … NBA-30,
-§4, §5, §11, §12, §13), `O/research-basketball.md` (all sections), `CLAUDE.md`, `docs/ARCADE-V2.md`, `docs/CORE-GAMEPLAY.md`,
-`docs/GAMEPLAY-RATINGS.md`, `docs/GAMEPLAY-RESEARCH.md`, every file in `src/game/hoops2/`, `src/game/Arcade.tsx`,
-`src/game/difficulty.ts`, `src/game/play-feedback.ts`, `src/game/progress.ts`, the hosts (`src/ut/Match.tsx`, `src/App.tsx`,
-`src/ut/Moments.tsx`, `src/ut/moments.ts`, `src/evolution/Training.tsx`, `src/game/Lab.tsx`), the mark consumers
-(`src/ut/match-debrief.ts`, `ut/Match.tsx` label tables, `src/ui/Results.tsx`), `src/ut/play.ts decide()`, `src/ut/battles.ts`
-levels, `src/ut/league.ts`, `src/ut/rate.ts toHooper`, `src/engine/broadcast.ts`, `src/net/match.ts arcadeOf`,
-`src/lib/sound.ts`, `scripts/qa/browser.mjs`, `scripts/qa/online.mjs`, the audit harnesses in `O/audit-scripts/`, the other
-teams' STREAM briefs, and (read-only) the nfl team's plan, whose shared-file contracts this plan adopts.
-The team doc for results is `docs/studio-overhaul/nba.md` (created in nba-1).
+**Binding sources, in this order:**
+1. BRIEF.md: the hard constraints and the owner decisions of 2026-11-09.
+2. `O/design-v2/GAME-DESIGN-V2.md`: the V2 bible. This plan implements its §F.2 "nba" list, builds the §F.1 pieces nba
+   owns, and follows the §F.4 first-impression slice as the build order.
+3. `O/DESIGN-V2-DECISIONS.md`: the lead's F.6 decisions. Planning cards are cut. nba also owns
+   `src/game/controls-geometry.css` and the held arena that makes a rematch take ≤ 10 s. ut owns haptics.
+4. `O/design-v2/mockups.html`: the visual target. Section 1's NBA phones show the score bug with the Heat bar, the toast
+   line, the gold arc and ground ring, the teal pass ring, the red on-ball arc, and the CALL / SHOOT / PASS cluster at
+   393 and 320 wide.
+5. `O/STREAM-nba.md`, `O/audit-nba.md` and `O/research-basketball.md`: the audit P0 fixes, kept wherever V2 does not
+   replace them.
+6. `O/design-v2/research-engagement.md`: only items #4 (Daily Play) and #19 (juice) land on this team.
 
-## 0. What changed in revision 2
+Revision 2 (`git show 58bcc10:docs/studio-overhaul/nba-plan.md`) holds the critique response index (M1–M27, R1–R12,
+K1–K21, T1–T22). Every answer there still stands, except the ones §0 below changes. When a task says "as revision 2",
+the engineer reads that section from `58bcc10`.
 
-An independent critique found gaps, ordering problems and oversized tasks. Every point is answered in §11 (index), either
-by a change below or by a stated reason for rejecting it. The main changes:
+Team doc: `docs/studio-overhaul/nba.md` (created in nba-1).
 
-1. **Owner decisions 2 and 3 come early.** A minimal "defense played by default" format lands in **nba-6**, right after
-   fouls. SWITCH/STEAL/CONTEST and the rest of defense come in nba-7, on top of it. If time runs out, polish is cut, not
-   the owner's decision.
-2. **One global fit, at the end.** nba-8 builds the stats mechanisms (usage, eras, difficulty, zones, AI playbook) and
-   checks only local properties. The §3 bands are asserted once, in **nba-10**, after every mechanic that moves PPP, TOV,
-   ORB or the shot mix has landed. The lead gets a post-merge re-check recipe, because packs is re-rating cards.
-3. **Every task has a Must list and a Cut line.** The cap is 10 tasks, so tasks were rebalanced rather than split into
-   20. Cut-line items move to §9 if a session overruns. P0 items and owner decisions are never on a cut line.
-4. **Online overtime and forfeit** get a design note, committed before any code, and a two-client matrix (nba-9). They
-   follow the nfl team's contract (`'FF'` end mark, `onFinish(..., forfeit)`), so `Arcade.tsx` gets one shared shape.
-5. **Shooting targets state the human model.** The model uses two release spreads: σ 50 ms for a median human and σ 35 ms
-   for a skilled one. nba-1 measures which THR is a "league-average shooter". The plan adopts the research's per-contest
-   bands. Where its three statements cannot all hold, the math is shown (§3.3).
-6. **One controls context table** (§5) settles every gesture before nba-3 starts. "Circle = spin" is cut. The research's
-   "swipe up = dunk" and "swipe down = floater" are replaced by automatic finish choice.
-7. **Day-one contracts and lead escalations** (§4, §6) are written into `nba.md` in nba-1, not task by task.
+---
+
+## 0. What V2 changes in this plan
+
+**Order (F.4).** The first-impression slice items come straight after nba-1, in V2's order:
+- the shared stick, the A/B/C/D cluster and pause (nba-2)
+- the camera, the action-safe box, the HUD kit, the live shot clock and the held arena (nba-3)
+- the gold ring with the PERFECT chime and haptic, plus Heat and the match grade (nba-4)
+
+The rest follows: fouls and free throws, then defense by default, then the duel, stats, online and the fit.
+
+**Changes to existing tasks (F.2 nba #1–#8):**
+
+| F.2 | What changes | Task |
+|---|---|---|
+| #1 | The controls become **shared** pieces: `Stick.tsx`/`stick.ts`, the A/B/C/D cluster built from the geometry tokens, swipes that start on A, and the CALL radial with **ISO** in place of SPACE. nba also writes `controls-geometry.css` (lead decision). | nba-2 |
+| #2 | The meter becomes the **gold ring** in `perfect.ts`: a ±30 ms floor, three states (gold, amber, red), "gold never lies", touch timestamps, a 4-tap calibration, and a rating-scaled gold segment ≥ 8 px on screen. | nba-4 |
+| #3 | The camera is the B.1.3 three-quarter view: 12° yaw, fixed zoom near the rim, anchored to the safe box. The HUD kit is shared: score bug, Heat bar, toast line and pause. | nba-3 |
+| #4 | Kept: fouls, free throws, real misses; defense by default with Auto-defend and SIM; overtime. | nba-5, nba-6 |
+| #5 | New: timing cues on CONTEST and STEAL; the ankle-breaker gold flash; ramped move velocities. | nba-7 |
+| #6 | New: shared `heat.ts` and On Fire; the match grade on `Progress`. | nba-4 |
+| #7 | Promoted: transition possessions after steals and long rebounds (they were on revision 2's cut line). | nba-7 |
+| #8 | Kept: usage, eras, the difficulty ladder, pause/quit/forfeit, the box score. | nba-8, nba-9 |
+| #10 | New (P1): NBA Daily Play scenarios. | nba-10 |
+
+**Cut (F.2 nba #9 and the knock-on effects):**
+- **Play and look cards** (revision 2's nba-10), with their `'cards:'` stream and the card-pick context. The CALL radial
+  covers the planning beat.
+- **The defensive look chip.** It cost a tap every possession for the same reason. DROP stays as an AI scheme that the
+  AI picks for your five automatically.
+- **Per-player two-stage Heat** ("HOT HAND / LOCKED IN", 2 or 3 straight makes) and today's per-player `g.fire`. V2's
+  team Heat bar replaces both. "Hot Hand" is now ut's win-streak coin bonus (D.14), so the old name would clash.
+- **RUN's ×1.08 window factor.** RUN survives only as text in the toast line ("RUN 8-0"). Heat is the one published
+  modifier.
+- **nba's own `hoops2/haptics.ts` and the `vibrateLive` append to `sound.ts`.** We call ut's `src/lib/haptics.ts`
+  patterns instead (§4.6).
+- **The in-game final overlay.** ut's D.1 result sequence and One-More bar end every match. nba provides the data, the
+  held arena and a `BoxSheet` that ut opens from BOX SCORE.
+- **The 10-tap calibrator** becomes V2's 4-tap "tap on the beat".
+- **The three-line post-shot chip** becomes one toast line: the timing step plus the failed dial.
+
+**Renamed for V2's vocabulary (none of these have shipped, so no save is touched):**
+- PURE → **PERFECT**: `BoxLine.pure` → `perfect`, plus a new `perfect3`.
+- Heat stages → **HEATING UP / ON FIRE**.
+- The prefs key `perfect-season:hoops-prefs:v1` → the sport-neutral `perfect-season:touch-prefs:v1` (§4.7). The old key
+  only ever existed in this branch's plan.
+
+**Kept unchanged from revision 2:** every audit P0 fix (NBA-01…06, 08…10, 12…22), plus the §3.1 per-16 box targets,
+the eras, the four-rung ladder, variance, defense-rewards-playing, the online OT/forfeit design, QA isolation, the test
+budget and the determinism rules.
+
+**Protocol.** One running line in `nba.md`: **"Protocol bump needed: NBA draft 10 → 11, UT NBA 10 → 11 because …"**
+(gold windows, fouls, format, Heat, moves, transition, usage, eras, OT). The lead bumps once at integration (F.3).
+
+---
 
 ## 1. Goals
 
-1. **It plays like basketball.** Solo matches alternate offense and defense, and defense is played by default. The
-   rival's score comes from possessions you defend, and ties go to overtime. The game has fouls, free throws, fast breaks,
-   runs, and a box score with a player of the game. A solo game takes 4–6 minutes.
-2. **Stats feel legit.** An even Pro game lands on the research's 2024-25 per-16-possession targets (§3), with:
-   - the right shot-zone mix
-   - a star's share for stars
-   - eras that play in the right order
-   - a real four-rung difficulty ladder
-   - no hidden-rating tiebreaks
-3. **Touch controls are built for thumbs.**
-   - Nothing sits on top of the ball handler or your defender.
-   - The stick never ignores a thumb.
-   - Every gesture has one meaning per context.
-   - The release is measured from the touch, and the green is drawn at its true size.
-   - A PURE release is clearly good.
-4. **Readable, fair, taught.**
-   - The clock never freezes.
-   - Banners stay off the rim and labels never stack.
-   - Names print with their accents, and no two players share a tag.
-   - Every miss, and every rival score, explains itself.
-   - Each new mechanic gets a one-time, one-line hint.
-5. **Keep what works (audit §12):**
-   - the deterministic fixed-step engine
+1. **Rhythm hoops (V2 A.4).** Find the beat, hit the gold. Every skill moment uses the same gold ring:
+   - the jumper, the finish, the board, the contest, the steal and the ankle-breaker
+   - gold always delivers the best outcome the situation allows
+   - an NBA player who learns it can already play the other two sports
+2. **It plays like basketball (owner decisions 2 and 3).** Solo games:
+   - four quarters of 4 + 4 possessions, alternating offense and defense
+   - defense played by default
+   - a staged Clutch finish
+   - overtime instead of rating tiebreaks
+   - fouls and free throws, fast breaks, Heat
+   - 4–6 minutes
+3. **Stats feel legit.** AI against AI lands on the 2024-25 per-16-possession targets (§3.1), with the right shot mix, a
+   star's share for stars, eras in order and a real four-rung ladder.
+4. **Thumbs first.** The control grammar and geometry come from V2 A.5:
+   - a floating stick, with sprint past the ring
+   - at most four right-thumb targets, none in the top two thirds of the screen
+   - everything fires on touch-down
+   - the handler and the rim always inside the action-safe box
+   - a pause button in every match
+5. **Readable and honest.** The clock never freezes. Banners live in the toast line, never over the rim. Names print with
+   their accents. Every miss names its dial (TIMING, PRESSURE or RANGE).
+6. **The next game in ≤ 10 s.** The arena stays mounted through ut's result sheet and re-seeds in place.
+7. **Keep what works** (audit §12, V2 B.1.9):
+   - the deterministic engine and its tests
    - physical rebounds and catches
-   - the recorded jump shot timed to the meter
-   - the rating tests
-   - landscape and safe areas
-   - the render-only juice layer
-   - input hygiene and `rescue()`
+   - the recorded jumper and its shot tempos
+   - the scheme read and LAST PLAY coaching
+   - contest grades
+   - replays, hit-stop and the posterizer
+   - landscape layout and reduced motion
    - the ~2 ms frame cost
+
+---
 
 ## 2. Hard rules and working conventions
 
+These are revision 2's rules, with V2's additions.
+
 - **Saves.** No profile, storage key, card/edition/copy id or saved-field meaning changes.
-  - Everything new is in memory: `Hooper`, `HoopsGame`, `Possession` and `Progress` gain *optional* fields.
-  - The one exception is a new per-device key, `perfect-season:hoops-prefs:v1`
-    (`{ v: 1, controls, meter, offsetMs, autoDefend, hints }`). It is read with try/catch, falls back to defaults when
-    missing or corrupt, and is not in `recovery.ts` lists.
-  - Writing it triggers a harmless cloud-save queue (`cloud-save.ts:186-191`); this is documented in `nba.md`.
-- **Protocol.** We never edit `DRAFT_RULES` or `UT_RULES`. One running line in `nba.md` collects every reason:
-  **"Protocol bump needed: NBA draft 10→11, UT NBA 10→11 because …"**. NFL and soccer are not changed by this team.
+  - `Hooper`, `HoopsGame`, `Possession` and `Progress` gain *optional* in-memory fields only.
+  - The one new key is `perfect-season:touch-prefs:v1` (§4.7). It is read with try/catch, falls back to defaults, and is
+    not in the `recovery.ts` lists.
+- **Protocol.** We never edit `DRAFT_RULES` or `UT_RULES`. Every outcome change appends its reason to the running line.
 - **Determinism.**
-  - Seeded RNG only (`p.rand`, `pl.rand`). No `Math.random()` or `Date.now()` in `engine.ts`, `game.ts` or `autopilot.ts`.
-  - Touch timestamps only feed your own offense's release offset (each phone plays its own offense).
-  - New random draws use their own named seed streams: `'ai:'` for alternate-format AI possessions and `'cards:'` for
-    dealt cards. They never shift the RNG order that `aiPossessionsOf` uses for online takeovers.
-  - New sim-side math uses only `+ − × ÷`, `sqrt`, `min`, `max` and lookup tables, never new `Math.exp/pow/log`. Those
-    are not guaranteed bit-identical between JSC (iPhone) and V8, and takeovers must match on both phones.
-    `determinism.test.ts` enforces this rule for the new functions.
-- **Branching.** `pick({ nba, nfl, soccer })` only. Run `src/engine/sport-branches.test.ts` whenever `Arcade.tsx` or
-  `difficulty.ts` is touched.
+  - Seeded RNG only (`p.rand`, `pl.rand`). No `Math.random()` or `Date.now()` in `engine.ts`, `game.ts`, `autopilot.ts`,
+    `heat.ts` or the outcome functions of `perfect.ts`.
+  - Touch timestamps only feed your own offense's release offset; each phone plays its own offense.
+  - New random draws use named seed streams (`'ai:'`, `'break:'`, `'daily:'`). The race's `aiPossessionsOf` RNG order
+    stays byte-identical (tested).
+  - New sim-side math uses only `+ − × ÷`, `sqrt`, `min`, `max` and lookup tables, never new `Math.exp/pow/log`, because
+    JSC and V8 differ. `heat.ts` is integer-only. `determinism.test.ts` scans the new files.
+- **Branching.** `pick({ nba, nfl, soccer })` only. The shared files (`stick.ts`, `perfect.ts`, `heat.ts`, `hud/*`) take
+  per-sport values through `pick`. Run `sport-branches.test.ts` whenever they, `Arcade.tsx` or `difficulty.ts` change.
 - **Layout.**
-  - 390 design-px frame. No width media queries in new CSS. Taps ≥ 44 design px. Text ≥ 10 design px. SVG for symbols.
-  - New CSS goes in new nba-owned files imported from hoops2 components: `hud.css`, `controls.css`, `match.css`.
-  - Every rule is scoped `.hg2:not(.fb2)`, because football reuses `.hg2-*`.
-  - `.arcade-full` is portaled outside the 390 stage, so its sizes are real CSS px. Controls read `--sat/--sab/--sal/--sar`.
-- **Reduced motion.** Every new animated element has a defined `prefers-reduced-motion` behaviour (the table in nba-2,
-  extended by each task).
-  - Screenshots of animation use `reducedMotion: 'no-preference'`.
-  - Each task also runs one `'reduce'` pass, because `browser.mjs` fixtures default to `'reduce'`.
-- **Shared files.** These get small local hunks only, never reformatted, each listed under "Touched outside my lane":
-  - `Arcade.tsx`, `difficulty.ts`, `ut/Match.tsx`, `App.tsx`
-  - `PlayReadout.tsx`, `play-feedback.ts`, `play-readout.css`
-  - `lib/sound.ts` (append-only, away from soccer's crowd wiring)
-  - `render.ts` player sections
-  - `Lab.tsx` and `evolution/Training.tsx` (unowned)
-- **QA isolation** (nba-1 builds it; every browser run uses it):
-  - `scripts/audit/nba-lib.mjs` is copied from `O/audit-scripts/utui/lib.mjs`. Every context gets
-    `route('**/*')`, aborting any host that is not localhost/127.0.0.1 (fonts.googleapis.com and fonts.gstatic.com are
-    allowed).
-  - Base URL `http://localhost:5215/` with `?ns=inspect&relay=ws://localhost:7795`. **7795 is the team's own relay
-    port**, so we never share a relay with another team; nba's copy of the relay runs there. BUILD-RULES names 7777; the
-    isolation it asks for still holds, because 7795 is localhost. The deviation is recorded in `nba.md`.
-  - Inset injection: `page.addStyleTag` sets `.arcade-full { --sat --sab --sal --sar }` to the iPhone values in §3.8.
-    Chromium reads `env()` as 0, and shell's QA override (Fix D) isn't merged yet.
-  - The shared `scripts/qa/*.mjs` (core-gameplay, gameplay, play-feedback, online) don't route-abort and default to port
-    5173. They run only through `scripts/audit/nba-qa-run.mjs`, which:
-    - sets `PS_QA_URL=http://localhost:5215/`
-    - preloads an isolation patch that wraps Playwright's `newContext` with the same route-abort
-    - refuses to start if the patch can't attach
-  - `scripts/qa/online.mjs` binds 7777, so it runs only under `flock /tmp/ps-qa-relay-7777.lock`.
-  - The heavy.sh semaphore wraps every heavy command. Dev server start: `nohup npx vite --port 5215 --strictPort > /tmp/ps-nba-vite.log 2>&1 & echo $! > /tmp/ps-nba-vite.pid`;
-    stop: `kill $(cat /tmp/ps-nba-vite.pid)`. Never `pkill -f` or `pgrep -f`.
+  - Use the 390 design-px frame. `.arcade-full` is portaled outside the stage, so its sizes are real CSS px taken from
+    the V2 table (§3.8).
+  - No width media queries. Geometry tokens interpolate with `clamp()`/`calc()` on `100vw`, and landscape is a JS class.
+  - Taps ≥ 44 px. Text ≥ 10 px. Canvas name chips are 7 art px tall, which is 10.5 design px at 1.5 px per art pixel.
+  - Symbols are SVG.
+- **CSS files.**
+  - Shared pieces: `src/game/controls-geometry.css` and `src/game/hud/hud.css`, prefixed `.ps-ctl-*` / `.ps-hud-*`,
+    with no `.hg2` scope.
+  - nba-only CSS: `src/game/hoops2/{hud,match}.css`, scoped `.hg2:not(.fb2)`, because football reuses `.hg2-*`.
+- **Reduced motion.** Every new animated element gets a row in the `nba.md` table (§3.15). Screenshots use
+  `reducedMotion: 'no-preference'`, and every task also runs one `'reduce'` pass.
+- **Shared files** get small local hunks, are never reformatted, and are each listed under "Touched outside my lane":
+  `Arcade.tsx`, `difficulty.ts`, `progress.ts`, `ut/Match.tsx`, `App.tsx`, `PlayReadout.tsx`, `play-feedback.ts`, the
+  `render.ts` player sections, `Lab.tsx` and `evolution/Training.tsx`.
+- **QA isolation.** As revision 2 §2:
+  - `scripts/audit/nba-lib.mjs` route-aborts every host but localhost/127.0.0.1 (fonts.googleapis.com and
+    fonts.gstatic.com allowed)
+  - base URL `http://localhost:5215/?ns=inspect&relay=ws://localhost:7795`; 7795 is the team's own relay, recorded in
+    `nba.md`
+  - insets injected on `.arcade-full`
+  - the shared `scripts/qa/*.mjs` run only through `nba-qa-run.mjs`
+  - `online.mjs` runs only under `flock /tmp/ps-qa-relay-7777.lock`
+  - nothing ever writes to live Supabase, relays or boards
+- **Machine.**
+  - Every heavy command goes through `bash O/heavy.sh …`.
+  - Dev server: `nohup npx vite --port 5215 --strictPort > /tmp/ps-nba-vite.log 2>&1 & echo $! > /tmp/ps-nba-vite.pid`.
+    Stop it with `kill $(cat /tmp/ps-nba-vite.pid)`. Never `pkill -f` or `pgrep -f`.
 - **The standard test set** runs after every task, through heavy.sh:
-  `npx vitest run src/game/hoops2 src/game/juice.test.ts src/game/play-feedback.test.ts src/game/difficulty.test.ts src/ut/match-debrief.test.ts src/ut/content.test.ts src/engine/sport-branches.test.ts`.
-  `src/game/balance.test.ts` runs (opt-in) in nba-8 and nba-10. The full `npm test` and the single `npm run build` run
-  only in nba-10.
-- **Test budget.** New always-on tests add **≤ 60 s** to the NBA run of `npm test`, which already spends ~170 s in
-  `ratings-matter`. Always-on tests:
-  - determinism, < 15 s
-  - box, 20 games, < 10 s
-  - calibration smoke, 20 games with wide bands, < 20 s
-  - OT, 200 forced ties, < 5 s
-  - unit tests
-- **Opt-in tests** (each behind an environment variable):
-  - calibration (`NBA_CAL`)
-  - human harness (`HUMAN`)
-  - curve dump (`NBA_CURVE`)
-  - 10k-game OT (`NBA_OT`)
-  - 200-game box (`NBA_BOX`)
-  - era runs (`NBA_ERA`)
-  - Moments harness (`NBA_MOMENTS`)
-- **Compute on the shared machine.** Iteration runs use `NBA_CAL_GAMES=15` (report only, never asserted). Acceptance runs
-  use 150 games/config, once per task where a task asks for them. No task holds a heavy.sh slot for more than 20 minutes
-  in one go; long runs are split by config.
-- **Docs.** Each task updates the NBA parts of `docs/ARCADE-V2.md`, `docs/CORE-GAMEPLAY.md` or `docs/GAMEPLAY-RATINGS.md`
-  where it changes what they describe. nba-10 does a final pass. Known stale lines: ARCADE-V2 "Offense only" and
-  "5–6 min"; GAMEPLAY-RATINGS "75 open three 67%" and the curve numbers; CORE-GAMEPLAY "SHOOT becomes BOARD" and the
-  controls.
-- **Commits.** One or more per task, staged by explicit path. Message `Claude: …` plus the two trailer lines from
-  BUILD-RULES, then `git push -u origin claude/studio-nba` (retry 2/4/8/16 s on network errors).
+  `npx vitest run src/game/hoops2 src/game/hud src/game/stick.test.ts src/game/perfect.test.ts src/game/heat.test.ts src/game/juice.test.ts src/game/play-feedback.test.ts src/game/difficulty.test.ts src/ut/match-debrief.test.ts src/ut/content.test.ts src/engine/sport-branches.test.ts`.
+  - `balance.test.ts` is opt-in (nba-8, nba-10).
+  - The full `npm test` and the single `npm run build` run only in nba-10.
+- **Test budget.**
+  - New always-on tests add ≤ 60 s to the NBA run: determinism < 15 s, box 20 games < 10 s, calibration smoke < 20 s,
+    OT 200 ties < 5 s, plus unit tests.
+  - Opt-in tests: `NBA_CAL`, `HUMAN`, `NBA_CURVE`, `NBA_OT`, `NBA_BOX`, `NBA_ERA`, `NBA_MOMENTS`.
+- **Compute.** Iterate at `NBA_CAL_GAMES=15` (report only). Accept at 150 games/config. Hold a heavy.sh slot ≤ 20 minutes
+  at a time.
+- **Docs.** Each task updates the NBA parts of `docs/ARCADE-V2.md`, `docs/CORE-GAMEPLAY.md` and
+  `docs/GAMEPLAY-RATINGS.md` where they change; nba-10 does the final pass. The shared pieces get
+  `docs/studio-overhaul/shared-controls.md` (§4, written in nba-2 and extended in nba-3/4).
+- **Commits.** One or more per task, staged by explicit path, never `git add -A`.
+  - Message: `Claude: …`, then the body, then the two trailer lines from BUILD-RULES.
+  - Then `git push -u origin claude/studio-nba`, retrying after 2/4/8/16 s on network errors.
+  - No model names in commits, code or docs.
+
+---
 
 ## 3. Targets (the numbers the tasks prove)
 
-**Scale and sample.** "Even 78" means each starting five's mean **rating-scale overall** (`RatedCard.rawOvr`, the
-2K-comparable number, as `aiOpponent()` builds squads). nba-1 prints the displayed (`ut-scale.ts`) mean beside it.
-Acceptance runs use **150 games/config** (2,400 possessions per side; PPP SE ≈ 0.022), and every asserted band is at least
-±2 SE wide. 15-game iteration runs are never asserted.
+Scale and sample are as revision 2. "Even 78" means the starting fives' mean `rawOvr`. Acceptance runs use 150
+games/config (2,400 possessions per side; PPP SE ≈ 0.022). Every asserted band is ≥ ±2 SE wide. 15-game runs are never
+asserted. `hoops2/targets.ts` holds every row as data. **nba-1 updates the rows this revision changes:** §3.3 windows,
+§3.7 Heat, §3.8 geometry, §3.10 rematch, §3.13 feel, §3.14 grade.
 
-### 3.1 Per 16 possessions, one side, even 78 Pro (AI vs AI, Pro skill, Pro defense, modern era)
+### 3.1 Per 16 possessions, one side, even 78 Pro, AI vs AI, modern era: unchanged
 
-From the research's B-R per-100 table for 2024-25 (§4.7), and its §5.14 table. Tolerances are ours.
+| Stat | Accept |
+|---|---|
+| PPP | 1.08–1.18 |
+| FGA | 13.4–15.4 |
+| 3PA/FGA | .35–.45 |
+| FTA/FGA | .18–.28 |
+| TOV% | 11–15% |
+| STL | 1.0–1.5 |
+| BLK | 0.6–1.0 |
+| PF | 2.5–3.5 |
+| ORB% | 22–29% |
+| AST/FGM | 55–68% |
+| FG% / 3P% / eFG | .44–.50 / .33–.39 / .52–.57 |
+| Rim FG% | 62–72% |
+| Mid FG% | 38–47% |
+| FT% | 74–80% |
+| Shot mix rim / close / mid / three | 20–38 / 12–25 / 4–12 / 35–45% |
+| Heavy + smothered share of jumpers | ≤ 45% |
+| Passes per possession | ≥ 1.2 |
+| Seconds per possession | 6.5–9.5 |
+| Top-usage card's FGA share | 25–36% |
+| Top scorer's points share | ≤ 45% |
+| Scorers per game | ≥ 3.5 |
+| PG time | ≤ 45% |
+| C slot's 3PA | ≤ 10% |
+| Transition share / PPP | 12–17% / 1.15–1.35 |
+| Ties decided off the floor | 0 |
 
-| Stat | Real (per 16) | Accept | Audit baseline |
-|---|---|---|---|
-| Points (PPP) | 18.3 (1.145) | 1.08–1.18 | 1.28 |
-| FGA | 14.4 | 13.4–15.4 | not reported |
-| 3PA (3PA/FGA) | 6.0 (.42) | .35–.45 | .327 |
-| FTA (FTA/FGA) | 3.5 (.24) | .18–.28 | .019 |
-| Turnovers (TOV%) | 2.3 (12.6%) | 11–15% | 6.6% |
-| Steals | 1.31 | 1.0–1.5 | not reported |
-| Blocks | 0.78 | 0.6–1.0 | not reported |
-| Personal fouls | 2.98 | 2.5–3.5 | ~0 |
-| Offensive rebounds (ORB%) | 1.8 (25%) | 22–29% | 22.3% |
-| Assists (AST/FGM) | 4.3 (63.5%) | 55–68% | 84% (generous count) |
-| FG% / 3P% / eFG | .467 / .360 / .543 | .44–.50 / .33–.39 / .52–.57 | .539 / .431 / .610 |
-| Rim FG% (0–3 ft) | 69.6% | 62–72% | 58% |
-| Mid-range FG% | 40–44% | 38–47% | **65%** |
-| FT% | 78% | 74–80% | n/a |
-| Shot mix rim / close / mid / three | 23 / 30 / 5 / 42% | 20–38 / 12–25 / 4–12 / 35–45% | 27 / 14 / 26 / 33% |
-| Heavy + smothered share of jumpers | — | ≤ 45% (all configs) | 46% (89% for 90 v 75) |
-| Passes per possession | ~3 | ≥ 1.2 (incl. 90 v 75) | 1.31 (0.37 for 90 v 75) |
-| Seconds per possession (14 s clock) | — | 6.5–9.5 | 6.2 (2.6 for 90 v 75) |
-| Highest-usage card's share of FGA | 28–35% | 25–36% | 15% |
-| Top scorer's share of team points | — | ≤ 45% | 62% |
-| Players who score per game | — | ≥ 3.5 | 2.9 |
-| PG slot's share of possession time | — | ≤ 45% | 74% |
-| C slot's share of team 3PA | — | ≤ 10% unless his real 3PA ≥ 3/g | not reported |
-| Transition share / its PPP | 15.7% / 1.22 | 12–17% / 1.15–1.35 | none |
-| Ties decided off the floor | 0 | 0 (OT cap never hit in 10k sims) | 5–10% |
+The per-player sanity rows are as revision 2.
 
-**Per-player sanity rows** (research §5.11), from the fit's box lines:
-- bigs with real 3PA < 1/g take < 1 three per 4 games
-- shooters with real 3P% ≥ .40 on ≥ 4 3PA/g shoot 40–45%
-- every player's FT% stays within 50–93%
+### 3.1b Eras: unchanged (revision 2 §3.1b)
 
-### 3.1b Eras (research §4.6–4.7), fives grouped by the median season of the starting five
+3PA/FGA is non-decreasing by decade (0.02 slack). Pre-1980 3PA/FGA ≤ .05. The 2020s have the highest PPP by ≥ 0.02.
 
-| Decade | 3PA/FGA | PPP | TOV per 16 | ORB per 16 | FT/FGA |
-|---|---|---|---|---|---|
-| 1960s–70s | ≤ .05 | 1.00–1.10 (B-R estimates) | 2.6–3.2 | ≥ 2.2 | ≥ 2020s + .04 |
-| 1980s | ≤ .12 | 1.02–1.12 | 2.6–3.0 | ≥ 2020s + 0.2 | > 2020s |
-| 1990s | .10–.25 | 1.02–1.12 | 2.5–2.9 | — | — |
-| 2000s | .15–.28 | 1.02–1.12 | 2.3–2.7 | — | — |
-| 2010s | .25–.38 | 1.02–1.12 | 2.2–2.6 | — | — |
-| 2020s | .36–.46 | 1.10–1.18, highest decade by ≥ 0.02 | 2.1–2.5 | 1.6–2.0 | — |
+### 3.2 Difficulty ladder (NBA-19): four rungs, measured with the median human, defense played
 
-3PA/FGA is non-decreasing by decade (0.02 slack), and seconds per possession are lower in the 1980s than the 2000s.
-
-### 3.2 Difficulty ladder (NBA-19): four rungs, one continuous curve
-
-UT has four rungs (`ut/battles.ts` LEVEL: skill −0.15 / 0 / +0.08 / +0.15 and def −0.5 / 0 / 0.5 / 1 on top of the base,
-plus Club Season's adaptive skill). Draft uses `AI_SKILL` 0.45 / 0.68 / 0.88. So difficulty is defined as two
-**continuous** functions; the rungs are just points on them:
-
-- `releaseSd(skill)`: the AI release spread. It is monotone decreasing on skill ∈ [0.42, 0.94] and passes through 95 ms at
-  0.45, 58 ms at 0.68, ~50 ms at 0.76 and 44 ms at 0.88 (±5 ms). It is a table lookup with linear interpolation, so no
-  `pow`.
-- `windowFactor(def)`: the AI defense's effect on your windows: `def < 0 ? 1 − 0.5·def : 1 − 0.2·def`. That gives
-  ×1.25 / ×1 / ×0.9 / ×0.8.
-
-Rows are measured with the median-human harness (nba-1), with defense played (alternate format):
-
-| | Rookie | Pro | All-Star | Legend | Baseline |
-|---|---|---|---|---|---|
-| AI offense PPP vs a median-human defender | ≤ 1.00 | 1.08–1.18 | 1.12–1.22 | ≥ 1.18 | 1.27 / 1.28 / 1.16 (inverted) |
-| Median-human offense PPP vs that AI defense | ≥ 1.15 | 1.05–1.20 | 0.98–1.12 | 0.90–1.05 | 0.4–0.9 |
-| Median human wins | 60–80% | 40–60% | 30–50% | 20–40% | Rookie loses most |
-| AI turnover rate | 11–15% | 11–15% | 11–15% | 11–15% | 5.6% / 6.6% / 18% |
-
-Three more rows:
-- On Pro, every simple honest human tactic (drive, cross-drive, three, elbow, kick) scores ≥ 0.80 PPP, and the step-back
-  exploit ≤ 1.30.
-- Human straight-drive possessions ending in a strip: Pro ≤ 7%, Legend ≤ 10% (baseline 10–25%).
-- Autopilot vs the median human, same fives, Pro: autopilot PPP ≤ human − 0.05 (research §5.3).
-
-### 3.3 Shooting (NBA-14/15, research §5.1)
-
-**Human model.** The **median human** releases with σ = **50 ms** Gaussian error around the window centre. That covers up
-to ~32 ms of iPhone touch-latency jitter plus casual timing. It is the reference for every asserted band. The **skilled
-human** is σ = **35 ms** (the research's figure); those numbers are reported and only held to ceilings. nba-4's timing
-calibrator measures the owner's own σ on the phone (Owner device checks). If it is < 40 ms, the lead revisits these bands.
-
-**League-average shooter.** THR_avg is the THR that `hoops2/ratings.ts` (and `ut/rate.ts` for UT) gives a 2024-25 player
-who shot 36.0% on ≥ 3 3PA/g. nba-1 measures it (expected ≈ 72) and writes it into `targets.ts`. "Elite" is THR ≥ 92.
-
-**Window sizes** (full width, Pro, fresh, catch-and-shoot):
-
-| | Open | Light | Heavy | Smothered |
+| | Rookie | Pro | All-Star | Legend |
 |---|---|---|---|---|
-| THR 55 | 20–25 ms | ×0.75 (≥ 20 ms floor) | amber, ×0.42 | amber, ×0.17 |
-| THR_avg | 44–50 ms | ×0.75 | amber | amber |
-| THR 75 | 45–55 ms | ×0.75 | amber | amber |
-| THR 85 | — | — | **25–30 ms** | **10–12 ms** |
-| THR 95+ | 70–85 ms (rhythm catch ≤ 95) | — | — | — |
+| AI offense PPP vs a median-human defender | ≤ 1.00 | 1.08–1.18 | 1.12–1.22 | ≥ 1.18 |
+| Median-human offense PPP vs that AI defense | ≥ 1.15 | 1.05–1.20 | 0.98–1.12 | 0.90–1.05 |
+| Median human wins | 60–80% | 40–60% | 30–50% | 20–40% |
+| AI TOV% | 11–15% | 11–15% | 11–15% | 11–15% |
 
-Heavy and smothered contests draw an amber sweet spot instead of a green slice; their makes follow a rating-scaled cap.
+- **Difficulty only ever changes the AI's side**, plus how often you are offered gold (§3.3). It never shrinks gold below
+  the floor.
+- `releaseSd(skill)` is a table-interpolated, monotone curve. Revision 2's anchors (95 / 58 / 50 / 44 ms) are now only
+  **starting values**: V2's wider gold windows mean the anchors are re-fitted in nba-10.
+- `windowFactor(def)` = ×1.25 / 1 / 0.9 / 0.8, floored at ±30 ms.
+- Three more rows, as revision 2:
+  - every simple honest tactic scores ≥ 0.80 PPP on Pro, and the step-back exploit ≤ 1.30
+  - straight-drive strips: Pro ≤ 7%, Legend ≤ 10%
+  - autopilot PPP ≤ the median human's − 0.05
 
-- **Floors.** Open and light windows are ≥ **20 ms** at every difficulty, including Legend and online. Heavy and smothered
-  are ≥ 8 ms. This settles the research's own conflict:
-  - §5.1.2 gives a poor shooter 15–25 ms.
-  - §5.15 says "open ≥ ~40 ms on Pro"; we read that as the average shooter, who gets 44–55 ms.
-  - So a THR-55 open three is a real risk (≈ 25% at σ 50), never pure luck.
-- **Pull-up / moving / fade.** The window is ×0.88 and moved +10 ms later, so a pull-up makes ≤ 0.90× a catch-and-shoot for
-  the same shooter and contest (NBA.com 32.9 vs 37.4%).
-- **Fatigue** (research §5.7) moves the window +15 ms at 60% energy and +25 ms at 40%. It also shrinks it by up to 15%
-  (×(1 − 0.15·clamp((0.70 − e)/0.40, 0, 1))). Below 50% energy, speed and burst are capped −5%.
-- **One combined cap.** `windowScale(parts)` in engine.ts is the only place window multipliers meet:
-  - heat (nba-4), RUN (nba-6), meter mode (nba-4), difficulty (nba-4 and nba-8)
-  - rhythm (existing), fatigue and pull-up (nba-4), zones (nba-8, if they ever touch the window)
-  - The product is capped at **×1.45** of the base window, and the absolute full green at **≤ 110 ms**.
-  - A unit test runs the worst stack: On Fire ×1.25 · RUN ×1.08 · meter Off ×1.10 · Rookie ×1.25 · rhythm, THR 99.
-- **Green = make where drawn.** An open or light release inside the green always scores, with no block roll. Heavy and
-  smothered draw an **amber** sweet spot labelled "PURE · HEAVY", where the best result is the rating-scaled cap. The
-  colour follows the live contest every frame.
+### 3.3 The gold ring for the jumper (V2 B.0.1, B.1.5; replaces revision 2 §3.3)
 
-**Make rates, threes, catch-and-shoot, Pro, fresh** (research §5.1.6 anchors 39.1 / 35.0 / 29.7 / 27.1%):
+**Timing.** Press and release are timed from `PointerEvent.timeStamp` and converted to game time (`perfect.ts`). A
+release that falls between two 60 Hz steps lands with |off| < 1 ms (baseline: up to 16.7 ms).
 
-| Contest | THR_avg at σ 50 (asserted) | Elite (THR 95) at σ 50 | THR_avg at σ 35 (ceiling) |
-|---|---|---|---|
-| Open | **38–41%** | **50–56%** | ≤ 55% |
-| Light | **33–36%** | — | ≤ 46% |
-| Heavy | **25–29%** | — | 25–31% |
-| Smothered | **15–22%** | — | 15–24% |
-| Pull-up | ≤ 0.90 × the catch-and-shoot rate | — | — |
+**Gold half-width** (open, catch-and-shoot, Pro, fresh):
+`base(thr) = 30 + 30 · clamp((thr − 55) / 44, 0, 1)` ms, plus 0.4 ms per point above 99 (at most +5).
+These are starting values, fitted in nba-4 and nba-10.
 
-Open mid-range for THR_avg: 40–46%. Free throws: the FT meter at σ 50 lands within ±6 points of `freeThrow(rating)`.
+| THR | 55 | THR_avg (73, measured in nba-1) | 85 | 95 | 99 |
+|---|---|---|---|---|---|
+| Gold ± (ms) | 30 | 42 | 50 | 57 | 60 |
 
-**Documented divergence** (recorded in `nba.md`). The research's three statements cannot all hold at σ 35:
-- the windows (§5.1.2)
-- "an open green always goes in" (§5.1.5)
-- "THR_avg open 38–41% at σ 35" (§5.1.6)
+- **Multipliers go through the single `windowScale(parts)`:**
+  - light contest ×0.75
+  - rhythm catch (shot within 0.4 s of the catch) ×1.20
+  - On Fire ×1.25
+  - meter Off ×1.10
+  - difficulty ×1.25 / 1 / 0.9 / 0.8
+  - pull-up ×0.88, with the window centre moved +10 ms later
+  - fatigue: +15 ms later at 60% energy and +25 ms at 40%, and up to 15% narrower
+- **The product is capped at ×1.45 and ±90 ms.** The **±30 ms floor** is applied last and always wins ("anyone,
+  anywhere"). The worst stack (THR 99, rhythm, On Fire, Off, Rookie) lands on ±87–90 ms, the top of V2's "±30 to ±85"
+  range.
 
-The arithmetic: a 47 ms window gives P(|e| < 23.5 ms) = 2Φ(23.5/35) − 1 ≈ 0.50 from greens alone. All three hold at
-σ ≈ 50 except the elite row: 70–85 ms windows give ≥ 50% greens even at σ 50. We keep the STREAM's windows and the green
-rule. We assert the bands at σ 50, and accept elite open at 50–56% (research 48–52%). Skilled thumbs beat the real rates,
-by design (it is a skill game). Box-level realism comes from the AI's release spread, the contest mix and the off-green
-fall-off.
+**States** (`perfect.ts`, recomputed every frame from the live contest):
 
-- **Release precision.** A release at exactly `t0 + top`, landing between two 60 Hz steps, gives |off| < 1 ms (baseline:
-  up to 16.7 ms).
-- **Meter.** The radius is 0.13 × min(W, H) (was 0.09). The slice is drawn at true size and position, with a centre notch.
-  A THR-75 open green is ≥ 8 px wide at 390 px (baseline ~4 px).
+| State | When (jumpers) | Outcome |
+|---|---|---|
+| **gold** | the contest is open or light (Legend: open only), **and** the shot is in range | a release in gold is a **make**: no block roll, no rim-out. **Gold never lies.** |
+| **amber** | a heavy contest; a light contest on Legend; or out of range (RANGE) | no guarantee. Timing raises the chance up to a rating-scaled cap. Toast: PRESSURE or RANGE. |
+| **red** | smothered, or more than 4 ft beyond range, or no angle | ≤ 15% even when perfectly timed. Toast: PRESSURE / TOO FAR. |
 
-### 3.4 Game format and length (owner decision 3)
+- **Range** (a jumper's distance from the rim):
+  - THR ≥ 85: in range to 27.75 ft
+  - THR 70–84: to 25.75 ft
+  - THR 60–69: to the arc (23.75 ft; 22 in the corner)
+  - THR < 60: to 16 ft
+  - a big with real 3PA < 1 a game: threes are always amber RANGE
+- **On Fire** turns amber into gold only for *uncontested* (open) attempts, which means range-amber and Legend-light.
+  Heavy stays amber and red stays red.
 
-Solo games (alternate format) are 16 + 16 possessions, in quarters of 4 + 4, with OT periods of 2 + 2. Online head to head
-stays the 16-possession offense race, plus OT periods when tied.
+**Drawing.** The ring around the shooter's feet closes on the inner target ring, and a short arc meter sits above his
+head (mockup NBA phone).
+- The gold segment is drawn at its true time-size and position and is **≥ 8 design px** at 320 and 393 wide (baseline:
+  about 4 px for THR 75 open).
+- Amber and red have their own colours. There is no gold slice unless the state is gold.
+- The arc radius is 0.13 × min(W, H).
 
-**Time budget**, measured with the median-human script at 1× with defense played, replays on:
+**Make rates.** The median human is σ 50 ms, the skilled human σ 35 ms. Catch-and-shoot threes, Pro, fresh:
+
+| | Gold offered | Gold rate at σ 50 (asserted) | Make rate at σ 50 (asserted) | At σ 35 |
+|---|---|---|---|---|
+| THR 55, open | yes (in range) | 40–50% | ≤ gold + 8 pts | report |
+| THR_avg, open | yes | 55–65% | ≤ gold + 8 pts | ceiling 80% |
+| THR 95, open | yes | 70–80% | ≤ gold + 6 pts | ceiling 92% |
+| THR_avg, light | yes (not Legend) | 42–52% | ≤ gold + 8 pts | report |
+| THR_avg, heavy | amber | 0 | 22–30% | ≤ 34% |
+| any, smothered | red | 0 | ≤ 15% | ≤ 15% |
+| Pull-up | — | — | ≤ 0.90 × catch-and-shoot | — |
+
+**Documented divergence** (written into `nba.md`). V2's ±30 ms floor and "gold never lies" mean a median human makes
+45–80% of *open* looks, well above real open-three rates (35–45%).
+- Realism is held at the **box level** instead, through three things:
+  - how often gold is offered: the AI defense's contest mix and closeouts, and the range gate
+  - the steeper off-gold fall-off
+  - the AI's release spread
+- The asserted numbers are the §3.2 human PPP bands and §3.1's AI-vs-AI box. This is the skill game V2 asks for.
+- The lead revisits it if the owner's own calibrated σ (nba-4's calibrator) is under 35 ms.
+
+**Free throws.** A 2-second band meter (B.1.5 #7) at σ 50 lands within ±6 points of `freeThrow(rating)`.
+
+### 3.4 Format and length (owner decision 3, V2 B.1.1)
+
+- **Solo:** four quarters of 4 + 4 possessions, alternating, 16 + 16 in all.
+  - **Clutch** = the last 2 + 2 possessions of Q4.
+  - **OT** = 2 + 2 possessions, repeated until decided (cap 10; never hit in 10k sims).
+- **Online race:** 16 possessions of offense, in four quarters of 4, plus 2-possession OT periods when tied. Clutch staging
+  covers your possessions 15–16.
 
 | Part | Budget |
 |---|---|
 | Live possession, median, both ends | 7–9 s |
 | Dead time between possessions | ≤ 1.2 s |
-| Free-throw attempt | ≤ 4 s each (online auto-shoot after 4 s idle) |
-| Card or look pick (nba-10) | median ≤ 1 s; first touch on the court picks; auto-pick at 2.5 s |
-| Replays | ≤ 1 per quarter, ≤ 4 s, tap skips |
-| Tip-off intro + halftime | ≤ 5 s total |
+| Free throw | ≤ 4 s each (online auto-shoots after 4 s idle) |
+| Replays | ≤ 1 per quarter plus the Clutch "FOR THE WIN" replay, ≤ 4 s, tap skips |
+| Tip-off curtain + halftime | ≤ 5 s total |
 | A SIM'd defensive possession | ≤ 0.3 s |
-| **Whole solo game** | **4:00–6:00** (sum of medians ≈ 5:30) |
+| **Whole solo game, median human at 1×, defense played** | **4:00–6:00 (expected ≈ 5:30)** |
 
-Auto-defend games and all-SIM-defense games are reported separately (expected ≈ 4:15 and ≈ 3:30). Length is measured in
-nba-6 and again in nba-10, after cards.
+Auto-defend games (≈ 4:15) and all-SIM games (≈ 3:30) are reported.
 
-### 3.5 Variance and squad strength (research §4.5; ut-ui M3's 24-2 blowout)
+### 3.5 Variance and squad strength: unchanged
 
-- **Even game** (AI vs AI, alternate): final-margin SD 4–6 points; ties before OT 4–8%; lead changes ≥ 1.5 per game.
-- **Win probability by OVR edge** (displayed ut-scale overall, mean of the starting fives): +5 → 60–70%; +10 → 75–85%;
-  +20 → ≥ 90%.
-- **Displayed 96 v 64:** median margin ≤ 20 (baseline blowouts of 24-2).
+- Even game: margin SD 4–6; ties before OT 4–8%; ≥ 1.5 lead changes.
+- Win probability: OVR edge +5 → 60–70%, +10 → 75–85%, +20 → ≥ 90%.
+- Displayed 96 v 64: median margin ≤ 20.
 
-### 3.6 Defense must reward playing (owner decision 2)
+### 3.6 Defense must reward playing (owner decision 2): unchanged, plus V2's rings
 
-- A median-human defender policy concedes ≤ the Auto-defend PPP − 0.03. The policy stays in front of his man, contests
-  within ±100 ms of the release (σ 50 ms), and switches when beaten.
-- A poor policy (random stick, no contests) concedes ≤ Auto-defend PPP + 0.12. The downside is bounded, so beginners
-  aren't blown out.
-- Auto-defend and per-possession SIM run the same engine path: PPP within ±0.03 (identical by construction; tested).
-- Full-game SIM win % is within ±5 points of an Auto-defend game's win % (same fives, 300 games).
-- **Defensive camera:** your controlled defender's sprite overlaps the AI handler by ≤ 35% at ≥ 90% of AI releases. He is
-  never under a control rect in 30 sampled frames at all eight sizes.
+- A median-human defender concedes ≤ the Auto-defend PPP − 0.03.
+- A poor defender concedes ≤ Auto + 0.12.
+- SIM ≡ Auto-defend (same marks, same seed).
+- Full-game SIM win % is within ±5 of an Auto-defend game's.
+- **CONTEST ring:** a PERFECT contest forces the lowest shot grade the geometry allows. Over 600 AI jumpers from ≤ 4 ft,
+  a median-human contester at σ 50 hits gold on 35–55% of them and lowers AI PPP by ≥ 0.06 against idle-assist.
+- **STEAL flash** (the ball is exposed during a crossover or a lazy pass): a tap inside it at σ 50 strips 30–45% of the
+  time with no foul roll. Outside it the steal rate is ≤ 8%, with a 25–35% foul rate when repeated inside 1 s.
+- **Camera on defense:** your defender overlaps the AI handler by ≤ 35% at ≥ 90% of AI releases, and is never under a
+  control.
 
-### 3.7 Heat, runs and late-game fouls
+### 3.7 Heat (V2 B.0.2; replaces revision 2's two-stage Heat and the RUN factor)
 
-- Per alternate game: "Hot Hand" (stage 1) in 50–80% of games, "Locked In" (stage 2) in 15–35%. The final stage names
-  are a lead decision (§4).
-- RUN banner: 0.8–2.0 per alternate game.
-- Intentional fouls happen only when the AI trails by 3–6, the user is in the bonus, and it is the last 2 possessions:
-  0 outside that state, and fired in ≥ 70% of qualifying states.
+**Rules (`heat.ts`, integer, published in the Help sheet):**
+- **Gains:** PERFECT skill moment +12; a basket +10; a stop or forced turnover +15; a clean possession with ≥ 2 passes +5.
+- **Losses:** a turnover −20; conceding −10.
+- **Stages:** HEATING UP at 66; ON FIRE at 100.
+- **On Fire** lasts your next **2** possessions, and the bar returns to 0 when it ends.
+- The bar resets to 0 at halftime.
+- The AI earns Heat by the same rules, and its bar is visible in solo play. Online, only your own bar is shown, because the
+  rival's Heat is not on the wire.
 
-### 3.8 Controls, HUD and text
+**Targets, per solo game, median human, Pro, even 78:**
 
-**Eight QA sizes, with injected insets:**
-
-| Orientation | Size (insets) |
+| Row | Band |
 |---|---|
-| Portrait | 393×852 (sat 59 / sab 34), 430×932 (59/34), 375×667 (20/0), 320×568 (20/0) |
-| Landscape | 852×393 (sal/sar 59, sab 21), 932×430 (59/21), 667×375 (0), 568×320 (0) |
+| You reach HEATING UP | 70–95% of games |
+| You reach ON FIRE | 25–55% of games |
+| AI reaches HEATING UP | 60–90% of games |
+| AI reaches ON FIRE | 15–45% of games |
+| On Fire spells per side per game | mean ≤ 2.0 |
+| PPP on On Fire possessions, vs that side's baseline | ≤ +0.25 |
+| Intentional fouls (as revision 2) | 0 outside the qualifying state; fired in ≥ 70% of qualifying states |
 
-The Dynamic Island sizes also run once with sat **81** (59 + shell Fix A's 22 px edge), because Fix A raises the in-game
-`--sat`. Everything is re-measured after shell's merge.
+If a band fails, nba-10 tunes the published numbers and updates the Help text; V2 marks them as starting values.
 
-**Gestures:**
-- ≤ 2% misclassification over 200 jittered synthetic gestures per class (tap, hold, 4 swipe directions).
-- 0 accidental passes from stick touches in the scripted run.
-- Stick + SHOOT held together are both tracked (two-pointer test).
-- The stick responds within 1 frame of pointerdown, and never spawns from the bottom `sab + 12 px` band (home indicator).
+### 3.8 Controls geometry (V2 A.5; replaces revision 2's HUD-share rows)
 
-**HUD share.** These replace the critique's portrait numbers, which can't all hold: 852 − 59 − 96 − 34 − 210 = 453 px,
-which is 53%, not 55%.
+**Exact rects.** Measured on `.arcade-full` with injected insets. ±2 px at the two V2 sizes:
 
-| Size | Top HUD | Bottom controls | Court share | Baseline |
-|---|---|---|---|---|
-| 393×852 | ≤ sat + 96 px | ≤ sab + 190 px | ≥ 55% of the height at sat 59; ≥ 52% at sat 81 | ≈ 45% |
-| 320×568 | ≤ sat + 84 | ≤ sab + 170 | ≥ 50% | — |
+| Element | 393×852 (sat 59 / sab 34) | 320×568 (20 / 0) |
+|---|---|---|
+| A (SHOOT / CONTEST / BOARD / FT) | Ø92, centre (323, 738) | Ø84, centre (266, 510) |
+| B (PASS / STEAL) | Ø64, centre (238, 778) | Ø56, centre (190, 536) |
+| C (CALL / SWITCH) | Ø48, centre (250, 694) | Ø44, centre (200, 468) |
+| D (hidden in NBA) | Ø48, centre (340, 652) | Ø44, centre (282, 436) |
+| Stick ghost ring | Ø120, centre (84, 730) | Ø104, centre (70, 496) |
+| Stick zone | x 0–189, y 383–818 | x 0–154, y 256–568 |
+| Score bug | 232×40 at (80, 65) | 200×34 at (60, 24) |
+| Pause | 44×44 at (12, 63) | 44×44 at (6, 20) |
+| Heat bar | 232×6 at (80, 108) | 200×5 at (60, 60) |
+| Toast line | one line, 28 px tall, bottom edge at y = 618 | bottom edge at y = 404 |
+| Action-safe box | y 115–568 | y 76–368 |
 
-At 320 wide, SHOOT is 84, PASS 56 and the stick base r = 48.
-
-The rim-box check (the projected rim ± 40 px) covers the post-shot chip, the heat/RUN banners, the FT meter, the play
-cards, the CALL radial and hints.
-
-**Readable text.** Every new DOM text is ≥ 10 px at 320 wide: chip, box score, cards, pause menu, CALL radial and hints.
-The box score fits 320 px with no horizontal page scroll; an internal scroller with a sticky name column is allowed. Canvas
-labels keep ≥ 10 px glyph height.
-
-**Name tags.** 0 duplicate on-court tags across 1,000 random UT squads (a first-initial prefix on collision), and 0 glyph
-misses for F35.
+- **Gaps.** Button-to-button gaps are 10–18 px at both sizes (A–B 16/10, A–C 15/14, A–D 18/12). Every target is ≥ 44 px.
+  There are at most four right-thumb targets, and none sits above 2/3 of the height.
+- **Other sizes.** 430×932 and 375×667 use the interpolated tokens (§4.1): no overlaps, everything ≥ 44 px, everything
+  inside the insets.
+- **Landscape** (852×393, 932×430, 667×375, 568×320) keeps the 393 sizes anchored to the corners inside `--sal/--sar`,
+  with the safe box below the bug.
+- **Safe box.** The handler and the rim are inside it in ≥ 98% of 300 sampled offense frames at every size. On defense
+  the same holds for your defender and the AI handler.
+- **Camera (V2 B.1.3):**
+  - rim centre at 20–24% of the viewport height
+  - handler's feet at 50–55% (median)
+  - on-ball defender overlap ≤ 35% at ≥ 90% of releases
+  - zoom varies ≤ 2% while the ball is within 15 ft of the rim (no zoom-in pile-ups)
+- **Gestures** (as revision 2):
+  - ≤ 2% misclassification over 200 jittered gestures per class (tap, hold, four swipes)
+  - 0 accidental passes from stick touches
+  - two pointers (the stick plus A) both tracked
+  - the stick responds within 1 frame
+  - a thumb resting in the zone 300 ms before the whistle moves the handler > 1.5 ft within 300 ms of it (baseline 0 for
+    2.25 s)
+- **Sprint ring.** Pushing ≥ 1.15 × the ring radius sets `sprint`, and the edge fires one `tick` haptic. The ring follows
+  the thumb beyond 1.6 R.
+- **Text.** Every DOM text ≥ 10 px at 320 wide. Name chips carry 0 glyph misses for every name in `cards-nba.json`. 0
+  duplicate on-court tags across 1,000 random UT squads.
 
 ### 3.9 Performance, bundle and test time
 
-- **Absolute frame budget** in offense, defense, FT trips and replays alike:
-  - at 4× CPU: median ≥ 55 fps and ≤ 5% of frames over 20 ms (baseline 51.8–56.7 fps, up to 62 frames > 20 ms in 10 s)
-  - at 1×: p99 ≤ 10 ms
+- **Frames:** at 4× CPU, median ≥ 55 fps and ≤ 5% of frames > 20 ms; at 1×, p99 ≤ 10 ms. Measured in offense, defense,
+  FT trips, replays and the On Fire flames.
 - **Bundle:**
-  - game chunk ≤ +15 KB gzip
+  - game chunk ≤ +18 KB gzip; this includes the shared stick/ring/heat/HUD that nfl and soccer also load
   - main / first-paint chunk +0 KB
-  - UT chunk ≤ +2 KB (only `hoops2/usage.ts`, which is dependency-free)
-  - no new hoops2 imports from `main.tsx`, `App.tsx` or the UT entry
-  - `targets.ts` is imported by tests only
-- **Test time:** ≤ 60 s added to the NBA `npm test` run (§2).
+  - UT chunk ≤ +2 KB: only the type-light `hud/grade.ts` and `hoops2/usage.ts`, both dependency-free (source-scan test)
+  - `targets.ts` and `daily-play` data stay out of the main chunk
+- **Test time:** ≤ +60 s on the NBA `npm test`.
 
-### 3.10 Flow and pause
+### 3.10 Flow, pause and the held arena
 
-- **Pre-game:** from the PLAY tap to the first controllable possession takes ≤ 2 taps and ≤ 3.5 s. That counts ut's solo
-  pre-match screen (M13), shell's loading state (M9) and our tip-off intro. Skipping the intro takes ≤ 0.3 s.
-- **Pause:** 0 engine steps and 0 timer callbacks during a 10 s pause. A scripted game paused mid-possession and resumed
-  ends with marks identical to the same run without the pause.
+- **Pre-game:** the PLAY tap to the first controllable possession takes ≤ 2 taps and ≤ 3.5 s. Skipping the curtain takes
+  ≤ 0.3 s.
+- **Pause:** 0 engine steps and 0 timer callbacks during a 10 s pause. A paused-and-resumed scripted game ends with marks
+  identical to the unpaused run. It auto-pauses on `visibilitychange`/`pagehide`.
+- **Held arena (V2 D.1):**
+  - whistle → `onFinish` ≤ 0.3 s when the host holds the arena
+  - `rematch()` → first controllable frame ≤ 1.5 s at 4× CPU, with the 1.5 s opponent curtain included and skippable
+  - no new canvas or renderer instance (identity kept)
+  - JS heap after the 5th rematch within +10% of after the 1st
+  - **whole loop:** whistle → next tip-off ≤ 10 s with ut's 5 s slam/tally, measured end to end once ut's sheet is in the
+    branch; until then against a stub sheet that waits 5 s
 
-### 3.11 Practice drills and Moments
+### 3.11 Practice drills and Moments: unchanged
 
-- Practice mode has 0 FT trips, 0 OT periods, 0 alternation, 0 card picks and no pip limit.
-- Shoot, finish and pass drills still count every attempt; a pump fake is not an attempt.
-- Each NBA Moment's completion rate under the median-human harness is measured before (nba-1) and after (nba-10). Each
-  band goes to ut, for example The Green Room (2 PURE releases in 5): 35–65%.
+0 FT trips, OT periods, alternation and pip limits in practice. Drills count every attempt; a pump fake is not one.
+Moment completion bands before and after go to ut (The Green Room counts PERFECT releases).
 
-### 3.12 Online overtime and forfeit (two-client matrix on relay port 7795)
+### 3.12 Online overtime and forfeit: unchanged (revision 2 §3.12)
 
-Four cases:
-- a tie goes to OT on both phones
-- OT plus a rival stall: both phones show the same takeover score
-- OT plus a forfeit
-- OT plus 30 s in the background
+The four-case two-client matrix on relay 7795, 0 mismatches in 20 seeded runs, ≤ 37 ends on the wire.
 
-0 mismatched results across 20 seeded two-client runs. The wire never carries more than 37 ends (16 + 2×10 OT + `FF`;
-`arcadeOf` caps at 40).
+### 3.13 Feel: haptics and audio (V2 B.0.5)
 
-### 3.13 Haptics (owner's phone)
+**Haptic patterns.** We call ut's `src/lib/haptics.ts`, and test with a spy that the right pattern fires for the right
+event:
 
-- **Android:** distinct patterns for green, make, dunk, block, turnover and clock.
-- **iOS:**
-  - A green is 2 ticks about 60 ms apart inside the release gesture; a make is 1 tick.
-  - Loop-side events (block, turnover, shot clock) are **dropped**, not delayed.
-  - Both are stated in `nba.md` and checked on the owner's phone. If WebKit refuses the second tick outside the
-    activation, the green falls back to 1 tick plus the visual pop, and that is documented.
-
-## 4. Owner-decision conflicts and lead decisions (escalated in `nba.md` on day one)
-
-1. **Owner decision 2 vs modes with no arcade match.** The decision lists Moments, Gauntlet and draft season/playoff games
-   among the solo games where defense is played by default.
-   - Gauntlet (`ui/Gauntlet.tsx`), `engine/season.ts playSeason()` and the playoffs are rating sims with no arcade match.
-   - Moments are Hoops2 `practice` drills.
-   - **nba ships what the engine can:**
-     - the alternate format available to any host with two fives (nba-6)
-     - a new drill, `practice.drill: 'defend'` ("get N stops in M AI possessions", nba-7), so ut can add a defensive Moment
-   - **Options for the lead:**
-     - (a) keep Gauntlet/season/playoffs as sims this round (recommended; no arcade exists there)
-     - (b) add an optional "play this game" arcade entry for playoff games or the Gauntlet boss (ut and shell screens;
-       nba's format is ready)
-     - (c) play only the Finals
-2. **In-game names that echo other games.** The BRIEF bans copied names; owner decision 1 covers mode names only. nba
-   ships one exported `BADGE_LABEL` map in `hoops2/badges.ts` with the research §5.8 originals: Deadeye → Ice Water,
-   Limitless → Deep Range, Dimer → Table Setter, Posterizer → Poster Maker, Clamps → Lockdown, Ankle Breaker → Ankle Taker,
-   Rim Protector → Paint Wall.
-   - Heat stages "HEATING UP" / "ON FIRE" and "<TAG> IS ON FIRE!" (`Hoops2.tsx:394`) become **"HOT HAND" / "LOCKED IN"**.
-   - The badge tier "Hall of Fame" becomes **"Elite"** in display.
-   - Internal ids (`fire`, badge ids) stay. nba's in-game surfaces use the map by default.
-   - **Lead decision:** have packs' `ut/rate.ts BADGE_NAMES` read the same map (a one-line import), so cards and the
-     in-game pop agree. If the lead declines, nba flips its pop to the card names (one constant) and records it.
-3. **UT mode ideas without an owner** (research §5.13: Top Plays/Flashbacks, Clutch mode, card-once Gauntlet, one-use
-   boosts). STREAM-ut doesn't include them.
-   - nba exposes cheap engine options on `newHoopsMatch`: `possessions`, `clock` seconds and `startersOnly` (nba-6).
-   - The 4-point "logo" zone needs a new mark and a protocol change, so it is built only if ut/lead commit to Clutch mode.
-4. **Score-scale handoffs.** Typical scores change: PPP 1.28 → ~1.145, plus FTs and OT.
-   - `src/engine/broadcast.ts` (the draft GameCast's uniform 206 ± 17) has no owner in OWNERSHIP.md: lead.
-   - `ut/league.ts` AI-only "arcade-length scoring" (`league.ts:303`) is ut's.
-   - nba-10 writes both handoffs with the measured mean and SD per side per 16 (alternate format), plus the era-aware
-     totals from research §5.11.
-5. **Tie copy** (ut-owned files): `ut/Match.tsx ~1449` "A tie goes to the better squad" and `ui/Results.tsx:250` "Tied on
-   points: the better team (by rating) takes it" become, for NBA, "Tied after regulation: overtime decided it". Proposed
-   copy goes to ut; soccer's penalties line is untouched.
-6. **Online quit = instant loss** (not an AI-finished game). This is agreed with ut and nfl in §6.3. The app being killed
-   mid-match still falls back to ut's "match in progress" marker and the existing takeover.
-
-## 5. The controls context table (one meaning per gesture per context; tested in nba-3)
-
-Slots on the right: **A** = SHOOT (92 px; 84 at 320 wide), **B** = PASS (64; 56), **C** = small (48): CALL on offense,
-SWITCH on defense. The left thumb is the floating stick everywhere.
-
-| Context | Left thumb | A (SHOOT slot) | B (PASS slot) | C | Hint (first time) |
-|---|---|---|---|---|---|
-| Offense, ball in hand | Stick: move; edge = sprint | **Down:** the gather starts and the meter t0 = the touch timestamp. **Up < 120 ms, < 12 px:** the gather is cancelled into a pump fake. **Held ≥ 120 ms, then up:** the shot. Stopped = pull-up jumper (also inside 11.5 ft). Moving to the rim = an automatic finish: layup, dunk by ratings, or a **floater** 6–12 ft with a defender between him and the rim. **Swipe ≥ 36 px within 250 ms:** the gather is cancelled at no cost into a move: left/right = crossover that way, down = step-back, up = spin. | Tap: pass to the stick-aimed or most open man. Hold, release over the rim: lob (alley-oop to a cutting dunker). Tapping a teammate's body passes to him. | CALL radial: SCREEN / CUT / SPACE | "Hold SHOOT, release on the green · tap = pump fake · swipe off it = moves" |
-| Offense or defense, rebound race | Stick: your nearest man (assist toward the *estimated* landing) | **BOARD:** jump on pointerdown (no tap/hold split) | hidden | hidden | "BOARD: jump as the ring fills" |
-| Free throw | — | Hold: raise the marker; release in the band | hidden | hidden | "Hold, release in the band" |
-| Defense, AI has the ball (nba-6 stick; nba-7 buttons) | Stick: your defender; idle = AI positioning (assist) | **CONTEST:** jump on pointerdown; hands up are automatic within 4 ft | STEAL: tap | SWITCH: tap (nearest to the ball) | "Defense: steer your man · CONTEST on the release" |
-| Dead ball, inbound, celebration | Stick direction stored and applied at tip-off (NBA-12) | Held: ignored, with a "LET GO TO SHOOT" state. Tap: skip the celebration or replay. | hidden | hidden | — |
-| Card pick (nba-10) | First touch on the court picks the highlighted card | same | same | same | "Pick a play, or just start" |
-| Buttons mode (pref) | Same stick | Tap = pump, hold = shot, **no swipes** | as offense | CALL | CROSS / STEP / SPIN buttons (≥ 44 px) in an arc above SHOOT, firing on pointerdown |
-
-Design notes:
-- **Gesture timing conflict resolved.** The gather starts on pointerdown, so the meter's t0 is exact. The tap and swipe
-  classes resolve inside the first 120–250 ms, which is far before the window top (0.52 s jumper, 0.42 s layup). Both
-  cancel the gather at no cost; the existing cancellable capture is reused. BOARD and CONTEST jump on pointerdown, so they
-  never wait for pointerup.
-- **What is cut.** "Circle = spin" is gone (it duplicated "up"). The research's swipe-up dunk and swipe-down floater are
-  replaced by the automatic finish choice above, so "up" and "down" have one meaning each.
-- **Practice drills** use the offense row; the pass drill also allows B.
-
-## 6. Cross-team contracts (written into `nba.md` in nba-1, announced in the team doc)
-
-1. **`render.ts` `draw()`, with players.**
-   - nba moves its HUD drawing out of `draw()` into a new nba-owned `src/game/hoops2/hud-draw.ts`: rings, arrows, labels,
-     the meter, the FT meter, energy rings, the BOARD ring and heat trails.
-   - `draw()` keeps **one call line** after the sprite items loop (`render.ts` ~659-756), which players will rewrite for
-     A-1. nba never edits the items loop; players keep that one line.
-   - Kits per possession: in the alternate format the offense isn't always "ours". nba passes a per-possession
-     `kitOf(bodyIdx)` into the existing look selection at its call site. That is a 2–3 line hunk in players' section,
-     agreed here. `lookFor` itself (`render.ts:61-77`) stays players'.
-2. **`Arcade.tsx` and `difficulty.ts`, with nfl.** nba adopts nfl's contract names exactly:
-   - `onQuit?: () => void` on the game component.
-   - `onFinish(us, them, how, took, pens?, forfeit?: 'us' | 'them')`.
-   - The `'FF'` end mark (worth 0, ≤ 8 chars, in `POINTS`/`owns`). A quitter pads its ends with `'FF'` to at least the
-     regulation count, plus one `'FF'` if already past regulation.
-   - The solo rival's progress comes from `onRival`.
-   - `userDefenseIQ(online, level)` in `difficulty.ts`, which our §3.2 `windowFactor` mirrors.
-   - `onBoxScore`, never sent over the wire.
-   - OT ends are appended after regulation.
-   - Whoever lands a sport-agnostic block first writes it, and the other reuses it. nba hunks sit inside
-     `pick({ nba: … })` branches.
-   - Each sport keeps its own pause scheduler; no new shared file. The pause-menu look is aligned with nfl.
-3. **Forfeit, with ut and nfl.**
-   - The quitter's phone settles a loss.
-   - The rival's Arcade sees `'FF'` and finishes at once with a win (`forfeit: 'them'`). `'FF'` is in-band, so it
-     survives `net/match.ts arcadeOf`, which strips unknown fields.
-   - The existing `left`/`gone` signals (`App.tsx:553, 632`, `ut/Match.tsx:940`) stay as the backup when `'FF'` never
-     arrives: today's takeover.
-   - ut's "match in progress" marker settles an app-kill as a loss.
-   - No new wire field, and no change to the lead's validator.
-4. **Pre-game sequence, with ut and shell.**
-   - UT solo: ut's M13 pre-match screen is the **only** screen with buttons (PLAY / SIM / Auto-defend toggle). Arcade
-     gets `kickoff={false}` from that host and skips its kickoff.
-   - Shell's M9 loading state shows only while the chunk loads (0 s when cached) and hands over to nba's tip-off intro,
-     which shows the matchup.
-   - Draft head to head vs AI: Arcade's kickoff is the pre-game screen.
-   - Target §3.10.
-5. **Clips, with players.** nba calls players' clip preload (if exported) during the 1.5 s tip-off intro, so first frames
-   don't pop from hand-keyed poses to mocap (NBA-30).
-6. **Ratings plumbing, with packs.**
-   - `ut/rate.ts toHooper` keeps building on `hooper(nbaLineOf(line))`, so the optional `usg`, `yr`, `fd` and `zones` fields
-     survive when packs makes matches use the card's own ratings.
-   - nba adds `src/game/hoops2/toHooper-fields.test.ts`, which asserts that a rated UT card's Hooper carries them.
-   - nba changes no displayed rating (see §11 M4).
-7. **Marks, with ut.**
-   - New marks are exported from `hoops2/game.ts` as `NBA_MARK_LABEL` and `markPoints()`.
-   - `ut/Match.tsx` uses `nba: { ...HOOPS_FOOTBALL_LABEL, ...NBA_MARK_LABEL }`, a one-line hunk; the shared table that nfl
-     also extends is not grown.
-   - `ut/match-debrief.ts` allows the new marks.
-   - Box data reaches hosts through `onBoxScore` from nba-5 on, so ut's result screen (M3) can be built before nba's
-     in-game overlay.
-8. **Settings, with ut** (whose hunks `App.tsx` holds).
-   - The pause menu's Sound/Haptics toggles call `setFeedback()` and dispatch `ps:settings`.
-   - The `App.tsx` listener (~8 lines) does **read-modify-write on the stored profile at that moment**, via a pure helper
-     `withSettings(stored, patch)` that only touches `settings.sound/haptics`. A UT match that just settled its profile
-     can't be overwritten by a stale snapshot. Tested.
-9. **AI fallback after a queue.**
-   - UT's fallback (`UT_AI_AFTER = 50 s`, `ut/Match.tsx ~1177`) mounts with `online: null`, so it becomes the alternate
-     format (defense played).
-   - Draft's queue fallback is checked in nba-6. Rule: the format is "alternate whenever the rival is the AI".
-10. **Shell.**
-    - `.arcade-full --sat` moves with Fix A; all our offsets use `var(--sat/--sab/--sal/--sar)`.
-    - Fix D's QA override replaces our injection after merge.
-    - The NBA/NFL chunk split (NBA-30) is flagged to shell (`vite.config.ts`).
-
-## 7. Scope map: every STREAM item → task
-
-| STREAM item | Task |
+| Pattern | Events |
 |---|---|
-| NBA-08 shot clock every tick, 5 s warning | nba-2 |
-| NBA-12 thumb on the stick at tip-off | nba-3 |
-| NBA-13/17 layout, floating stick, gestures, reachable calls, nothing over the handler, all sizes | nba-3 (8 sizes) |
-| NBA-14/15 touch timestamps, true-size green, research sizes, moving window, 7-step feedback, PURE, contest design, meter-off | nba-4 |
-| NBA-14 fix 4 timing calibration | nba-4 (10-tap calibrator) |
-| NBA-09 pause and quit everywhere; online quit = forfeit with confirm | nba-9 |
-| NBA-10 box score + player of the game | nba-1 (tracker), nba-5 (`onBoxScore` to hosts), nba-9 (overlay) |
-| NBA-20/21 camera, banners, rim pile | nba-2 (both ends), nba-6 (live defense measurement) |
-| NBA-22 pixel font | nba-2 |
-| Haptics | nba-3 |
-| Per-16 calibration and era scaling | nba-8 (mechanisms), nba-10 (single fit, asserted) |
-| NBA-01 fouls, FT meter, and-ones | nba-5 |
-| NBA-01 late intentional fouls | nba-7 |
-| NBA-02 mid ~42%, eFG, zone mix | nba-8 (shot value), nba-10 (fit) |
-| NBA-03 usage; AI not 83% threes / 89% heavy | nba-8 |
-| NBA-04 turnovers ~12% | nba-5, re-measured nba-8, asserted nba-10 |
-| NBA-05 eras | nba-5 (stub), nba-8 |
-| NBA-19 difficulty ladder | nba-8 (four rungs), nba-10 (fit) |
-| NBA-06 ties → OT | nba-6 (every solo path), nba-9 (online) |
-| Prove it: seeded tests, `ratings-matter` meaningful | nba-1, every task, nba-10 |
-| NBA-07 play defense in solo matches | nba-6 (format, stick), nba-7 (SWITCH/STEAL/CONTEST) |
-| Rival score from those possessions; Auto-defend; SIM per possession | nba-6 |
-| Online keeps the race | nba-6 (untouched), nba-9 (OT/forfeit, matrix), nba-10 |
-| Game length 4–6 min | nba-6 (v1), nba-10 (final) |
-| Fast breaks | nba-7 (steal → break; long rebound → early is cut line) |
-| Heating Up / On Fire | nba-4 (names per §4.2) |
-| Team RUN | nba-6 |
-| Hot and cold zones | nba-8 (cut line) |
-| Three play cards; defensive looks | nba-7 (drop look and a look chip), nba-10 (cards, cut first) |
-| BOARD timing | nba-5 |
-| Moves: tiers, pips, cancel | nba-7 |
-| Owner device checks | §12, filled task by task |
+| `tick` | input accepted: stick sprint edge, CALL pick, STEAL tap |
+| `double` | PERFECT: release, finish, board, contest, steal, ankle-breaker |
+| `long` | a score, a block, a turnover against you |
+| `heartbeat` | Clutch with a one-score margin, once per possession; requested from ut (§4.6) |
 
-Audit items outside the STREAM list are covered too:
-- NBA-11 → nba-5
-- NBA-16 → nba-2
-- NBA-18 → nba-3
-- NBA-24 velocity ramps → nba-7; real miss endpoints → nba-5
-- NBA-27 → nba-3
-- NBA-29 floor cache → nba-2
-- NBA-30 attrs skip, intro, clip preload → nba-9
-- audit §5 AI: rebounding → nba-5; playbook → nba-8
-- §11 #13 pass lead → nba-5; §11 #14 pull-up/floater → nba-3 table, nba-4
-- research §5.7 → nba-4; §5.8 refill and glow → nba-4/nba-7; §5.10 → nba-4/nba-7; §5.12 box ×6.2 → nba-9; §5.11 sanity rows → nba-10
+**Audio** (consumed from soccer's `sound.ts` addition, §4.6):
+- the PERFECT chime is two notes, +1 semitone per consecutive PERFECT up to 5
+- a ring-fill tick in the last 200 ms
+- the shot-clock tick each second under 4 s
+- rim, glass and net sounds on their real events
+
+**Juice:**
+- hit-stop 33–120 ms, capped at 150 ms per second (dunk rim contact 70 ms, block 60 ms, PERFECT release 1 frame)
+- at most one slow-motion beat per score
+- reduced motion removes scale and shake and keeps colour and sound
+
+### 3.14 Match grade (V2 B.0.3)
+
+- **Letter** from offense points per possession against the par for the rung:
+  - par: Rookie 1.20, Pro 1.10, All-Star 1.05, Legend 0.97, online 1.10
+  - S ≥ 1.25 × par; A ≥ 1.10 × par; B ≥ 0.90 × par; otherwise C
+- **FLAWLESS** = a win with 0 turnovers.
+- **Median human at Pro over 300 games:** S 5–15%, A 20–35%, B 30–45%, C 15–35%. The grade never changes coin pay; ut
+  reads it.
+
+### 3.15 Reduced-motion table (in `nba.md`; one row per element)
+
+| Element | With reduced motion |
+|---|---|
+| clock warning | colour only |
+| camera easing | ×2 faster settle, no shake |
+| toast-line words | no scale; colour kept |
+| gold ring | static fill colour change, no shrink animation (the timing is the same) |
+| Heat trail and flames | static tint |
+| CALL radial | instant |
+| tip-off curtain | static lineup card |
+| release pop and hit-stop | none; gold flash kept |
+| Clutch staging | gold bug and crowd sound only, no camera tighten |
+| rematch dim | instant |
+| FT meter | unchanged (it is input) |
+
+---
+
+## 4. The shared V2 pieces nba writes: interface contracts
+
+nfl and soccer write against this section until the files land in their branch (OWNERSHIP V2 grants). Signatures are
+binding. Bodies may change. Any change to a signature is announced in `nba.md` under "Contract changes" with the date.
+The files are listed in landing order.
+
+| File | Lands in | Consumers |
+|---|---|---|
+| `src/game/controls-geometry.css` | nba-2 | nba, nfl, soccer, ut (the One-More bar sits at A's position) |
+| `src/game/stick.ts` (pure) + `src/game/Stick.tsx` | nba-2 | all three sports |
+| `src/game/hud/gestures.ts`, `Cluster.tsx`, `ToastLine.tsx`, `PauseButton.tsx`, `PauseSheet.tsx`, `prefs.ts`, `feel.ts`, `hud.css`, `index.ts` | nba-2 | all three |
+| `src/game/hud/ScoreBug.tsx`, `HeatBar.tsx`, `geometry.ts` | nba-3 | all three |
+| `Arcade.tsx` held-arena props and `ArcadeHandle` | nba-3 | ut hosts; nfl and soccer adopt them for their branches |
+| `src/game/perfect.ts` (pure) + `src/game/hud/ring-draw.ts` | nba-4 | all three |
+| `src/game/heat.ts` (pure, integer) | nba-4 | all three; ut reads the counts |
+| `src/game/hud/grade.ts` + optional `Progress.grade` / `Progress.box` | nba-4 | each sport fills them; ut reads them |
+| `src/game/hud/BoxSheet.tsx` | nba-9 | ut's BOX SCORE button, every sport |
+| `src/game/hoops2/daily-play.ts` | nba-10 | ut hosts the Daily Play |
+
+### 4.1 `controls-geometry.css` (tokens only, on the class `.ps-geo`)
+
+Hosts add `ps-geo` to `.arcade-full`; ut's result sheet adds it too, so the One-More bar can sit on A. Each token
+interpolates linearly by viewport width between the 320 and 393 values and clamps outside that range. For example:
+`--ctl-a-d: clamp(84px, calc(84px + (100vw - 320px) * 8 / 73), 92px)`.
+
+Insets come from `--sat/--sab/--sal/--sar` on the same element. The values below are the 320 → 393 endpoints. Offsets are
+measured from the safe-inset edge to the element's outer edge.
+
+| Token | 320 → 393 | Meaning |
+|---|---|---|
+| `--ctl-a-d`, `--ctl-a-r`, `--ctl-a-b` | 84 → 92, 12 → 24, 16 → 34 | A: diameter, right gap, bottom gap (+ `--sab`) |
+| `--ctl-b-d`, `--ctl-b-r`, `--ctl-b-b` | 56 → 64, 102 → 123, 4 → 8 | B |
+| `--ctl-c-d`, `--ctl-c-r`, `--ctl-c-b` | 44 → 48, 98 → 119, 78 → 100 | C |
+| `--ctl-d-d`, `--ctl-d-r`, `--ctl-d-b` | 44 → 48, 16 → 29, 110 → 142 | D |
+| `--stick-d`, `--stick-l`, `--stick-b` | 104 → 120, 18 → 24, 20 → 28 | stick ghost: diameter, left gap (+ `--sal`), bottom gap |
+| `--stick-zone-w`, `--stick-zone-top` | 48vw, 45vh | the zone where the stick may spawn |
+| `--bug-w`, `--bug-h`, `--bug-t` | 200 → 232, 34 → 40, 4 → 6 | score bug (centred; top = `--sat` + `--bug-t`) |
+| `--pause-l`, `--pause-t` | 6 → 12, 0 → 4 | pause button, 44×44 |
+| `--heat-h`, `--heat-t` | 5 → 6, 40 → 49 | Heat bar (width = `--bug-w`) |
+| `--toast-b`, `--toast-h` | 164 → 234, 24 → 28 | toast line: bottom edge above the viewport bottom, and height |
+| `--safe-t`, `--safe-b` | 56 → 56, 200 → 284 | action-safe box: top below `--sat`; bottom edge above the viewport bottom |
+| `--scrim-h` | 240 | bottom gradient scrim, transparent → `rgba(7,21,33,0.55)` |
+
+Colour tokens (V2 C.3) are also declared here: `--ps-gold #f6b93b`, `--ps-teal #4fe3c1`, `--ps-red #ff5d5d`,
+`--ps-violet #8b7cf6`, `--ps-glass rgba(7,21,33,0.72)`, `--ps-stroke #1d3a50`.
+
+The class `.ps-geo.land` switches to the landscape rule (the 393 sizes, corner-anchored). The host sets the class from
+JS; there are no media queries.
+
+### 4.2 `stick.ts` (pure) and `Stick.tsx`
+
+```ts
+// src/game/stick.ts — no DOM, no timers; unit-tested
+export interface StickGeom { zone: { x: number; y: number; w: number; h: number }; ringR: number; ghost: { x: number; y: number };
+  deadZone: number /* 0.12 */; sprintAt: number /* 1.15 × ringR, 0 = no sprint ring (nfl "Burst button" pref) */;
+  followAt: number /* 1.6 × ringR */; floating: boolean /* false = fixed ring at the ghost (a permanent stick) */; homeBand: number /* px above sab never spawns */ }
+export interface StickPointer { id: number; x: number; y: number; t: number /* PointerEvent.timeStamp */ }
+export interface StickState { id: number | null; origin: { x: number; y: number }; pos: { x: number; y: number }; since: number | null }
+export interface StickOut { x: number; y: number; mag: number /* 0..1 after the dead-zone rescale */; sprint: boolean; active: boolean }
+export const stickIdle: (g: StickGeom) => StickState;
+export function stickDown(s: StickState, p: StickPointer, g: StickGeom): StickState;   // ignored outside the zone or in the home band
+export function stickMove(s: StickState, p: StickPointer, g: StickGeom): StickState;   // origin clamped so the ring stays on screen; follows past followAt
+export function stickUp(s: StickState, p: StickPointer, g: StickGeom): StickState;
+export function stickOut(s: StickState, g: StickGeom): StickOut;  // never null: centred = {0,0,0,false,active} (nfl's "never turn centred input into null")
+export function sprintEdge(prev: StickOut, next: StickOut): boolean;  // true once when sprint turns on (the haptic tick)
+export function geomFrom(el: Element): StickGeom;  // reads the §4.1 tokens; DOM helper, not called by the pure functions
+```
+
+`Stick.tsx` is `<Stick geom? disabled? onChange={(o: StickOut) => void} onSprintEdge?={() => void} />`. It provides:
+- non-passive listeners, `touch-action: none` and `setPointerCapture`
+- the ghost ring at rest
+- a pre-held thumb: a pointer already down when the component enables (at the whistle) is adopted at once, and its
+  direction is applied on the first frame
+- `onChange` fired at most once per animation frame, and on down and up
+
+### 4.3 The HUD kit: `src/game/hud/*` (React, `hud.css`)
+
+```ts
+// gestures.ts (pure)
+export type Gesture = { kind: 'tap' | 'hold' | 'swipe'; dir?: 'L' | 'R' | 'U' | 'D'; heldMs: number };
+export function classify(points: { x: number; y: number; t: number }[], tDown: number, tUp: number | null): Gesture | null; // tap < 120 ms & < 12 px; swipe ≥ 36 px within 250 ms
+
+// Cluster.tsx: the right-thumb A/B/C/D buttons at the §4.1 positions
+export type Slot = 'A' | 'B' | 'C' | 'D';
+export interface SlotSpec { label: string; icon?: ReactNode; hidden?: boolean; disabled?: boolean; tone: 'gold' | 'teal' | 'glass';
+  swipes?: boolean /* A only */; hints?: { up?: string; side?: string; down?: string } /* the small SPIN / CROSS / STEP labels */; pips?: number }
+export interface ClusterInput { slot: Slot; phase: 'down' | 'move' | 'up' | 'cancel'; t: number /* PointerEvent.timeStamp */; gesture?: Gesture }
+export function Cluster(props: { slots: Record<Slot, SlotSpec>; onInput: (e: ClusterInput) => void; buttonsOnly?: boolean;
+  arc?: { id: string; label: string }[] /* Buttons-only mode: the swipes as small buttons in an arc above A, firing on down */; onArc?: (id: string, t: number) => void }): JSX.Element;
+// Every 'down' is delivered on pointerdown (actions start on touch-down); the gesture arrives with 'up' or 'move'.
+
+export function Radial(props: { items: { id: string; label: string }[]; at: Slot; open: boolean; onPick: (id: string, t: number) => void; onClose: () => void }): JSX.Element; // ≥ 44 px items above the slot
+
+// ToastLine.tsx: the one line above the controls (V2 A.5)
+export type ToastTone = 'gold' | 'teal' | 'red' | 'violet' | 'plain';
+export interface Toast { text: string; tone?: ToastTone; ms?: number /* default 1200 */; priority?: number /* higher replaces lower */; pop?: boolean /* the PERFECT 1.0→1.25→1.0 scale in 220 ms */ }
+export function useToast(): { show(t: Toast): void; clear(): void };
+export function ToastLine(): JSX.Element; // reads the queue from context
+
+// PauseButton.tsx / PauseSheet.tsx
+export function PauseButton(props: { onPause: () => void }): JSX.Element;
+export function PauseSheet(props: { open: boolean; online: boolean; onResume: () => void; onQuit?: () => void /* offline: confirm, then a loss */;
+  onForfeit?: () => void /* online: confirm, then a forfeit */; children?: ReactNode /* sport items: controls help, calibrate, Auto-defend, sound */ }): JSX.Element;
+
+// ScoreBug.tsx / HeatBar.tsx (nba-3)
+export interface BugProps { you: number; rival: number; youName?: string; rivalName?: string; period: string /* 'Q2' · '2ND & 4' · "67'" */;
+  clock?: string; clockLow?: boolean; progress?: number /* 0..1, the 3 px possession line */; phase?: 'normal' | 'clutch' | 'ot';
+  heat?: { you: HeatView; rival?: HeatView } }
+export interface HeatView { v: number /* 0..100 */; stage: 'cold' | 'heating' | 'fire' }
+export function ScoreBug(p: BugProps): JSX.Element; // the 232×40 capsule; gold with "CLUTCH" in that phase
+export function HeatBar(p: { you: HeatView; rival?: HeatView }): JSX.Element;
+
+// geometry.ts (nba-3)
+export function readGeometry(el: Element): { safeTop: number; safeBottom: number; toastBottom: number; controlTop: number; land: boolean };
+// prefs.ts and feel.ts: §4.7 and §4.6
+```
+
+### 4.4 `perfect.ts`: the gold ring
+
+This file holds the window maths and the judging. It is pure and has no clock.
+
+```ts
+export type RingState = 'gold' | 'amber' | 'red';
+export type Dial = 'TIMING' | 'PRESSURE' | 'RANGE';
+export const GOLD_FLOOR_MS = 30;            // half-width; nothing ever shrinks gold below it
+export const WINDOW_CAP = { mult: 1.45, ms: 90 };
+export interface WindowPart { id: string; mult: number }   // e.g. { id: 'fire', mult: 1.25 }
+export function windowScale(baseMs: number, parts: WindowPart[]): number;  // product, then cap, then floor (the only place parts meet)
+export interface RingSpec { idealMs: number /* from the touch-down to the perfect moment */; goldMs: number /* half-width */; state: RingState; dial?: Dial }
+export interface Judged { step: -3 | -2 | -1 | 0 | 1 | 2 | 3 /* 0 = PERFECT */; inGold: boolean; offMs: number; dial?: Dial; word: string /* 'PERFECT', 'SLIGHTLY LATE', … */ }
+export function judge(spec: RingSpec, offMs: number): Judged;  // inGold only when spec.state === 'gold' and |offMs| ≤ goldMs
+export interface TouchClock { real: number; game: number; acc: number; rate: number }   // updated each rAF
+export function gameTimeAt(c: TouchClock, timeStamp: number, now: number): number;   // falls back to `now` when |timeStamp − now| > 1000 ms
+export function calibrate(taps: number[], beats: number[]): { offsetMs: number; sdMs: number };  // 4 taps (V2), outliers > 150 ms dropped
+export const STEP_WORDS: readonly string[]; // VERY EARLY … PERFECT … VERY LATE
+```
+
+**The honesty rule every consumer must keep and test:** a sport passes `state: 'gold'` only when its outcome function
+returns the best possible result for an in-gold release. Each sport adds a test that, over 10,000 seeded gold releases,
+none is worse than that result.
+
+`hud/ring-draw.ts` draws the ring on canvas, and the mockup's arc meter is the same call:
+`drawRing(ctx, { x, y, rx, ry, t: 0..1, spec, px /* design px per ms */, reduced })`. It guarantees the gold band is
+≥ 8 design px by stretching the ring's time-to-pixel scale, never the window.
+
+### 4.5 `heat.ts`: Heat, deterministic and integer-only
+
+```ts
+export type HeatEvent = 'perfect' | 'score' | 'stop' | 'clean' | 'turnover' | 'conceded';
+export interface HeatState { v: number /* 0..100 */; fire: number /* units of On Fire left */; peak: number; fires: number /* On Fire spells this match */ }
+export const HEAT: { gain: Record<HeatEvent, number>; up: 66; fire: 100; spell: number; windowMult: 1.25 };  // built with pickFor(sport)
+//   gain.score: nba 10 · nfl 25 · soccer 40 ; spell: nba 2 · nfl 3 · soccer 1 ; the others are shared (+12 +15 +5 −20 −10)
+export const heatStart: HeatState;
+export function heatAfter(s: HeatState, ev: HeatEvent, sport: SportId): HeatState;   // clamps 0..100; reaching 100 starts a spell
+export function heatUnitEnd(s: HeatState): HeatState;                                // one possession/snap/attack used; at 0 the bar returns to 0
+export function heatHalf(s: HeatState): HeatState;                                   // the half-time reset (peak and fires kept)
+export function heatStage(s: HeatState): 'cold' | 'heating' | 'fire';
+export const heatWindow: (s: HeatState) => 1 | 1.25;  // the WindowPart multiplier
+```
+
+The engine stores `HeatState` per side in `HoopsGame`. It is the same on both phones for the same marks, and is never
+saved. ut reads `fires` and `peak` through the grade.
+
+### 4.6 What nba consumes from other teams (with local shims until they land)
+
+| From | What | Shim until it lands |
+|---|---|---|
+| ut: `src/lib/haptics.ts` | `haptic(p: 'tick' \| 'double' \| 'long' \| 'heartbeat')`. nba asks for `heartbeat` (Clutch, B.0.4) on day one. | `src/game/hud/feel.ts` exports the same signature over today's `vibrate()`; the lead swaps one import at integration |
+| soccer: `src/lib/sound.ts` addition | `sfx.perfect(streak: number)`, `sfx.ringTick()` | `feel.ts` falls back to the existing `sfx.swish`/`sfx.tick` |
+| shell: insets / Fix A | `--sat` raised by 22 px on Dynamic Island phones | §3.8 rows are re-measured with sat 81 once shell merges |
+| players | the near-first sprite budget (players-2), kits per possession at the call site (revision 2 §6.1), the poses `pump`, `euro`, `stepback`, `contest`, `reach`, `stumble`, FT routine | every act falls back to an existing pose |
+| ut | the One-More bar, the result slam/tally, the Daily Play host and board | nba tests against a stub sheet |
+| lead | the `Progress` field review and the protocol bump | — |
+
+### 4.7 `hud/prefs.ts`: one sport-neutral, per-device key
+
+```ts
+// key 'perfect-season:touch-prefs:v1' (new; never in recovery lists or the profile)
+export interface TouchPrefs { v: 1; offsetMs?: number /* calibration, shared by all sports */; controls?: 'gestures' | 'buttons';
+  meter?: 'on' | 'off'; hints?: Partial<Record<SportId, number>> /* bitmask of seen one-line hints */;
+  autoDefend?: Partial<Record<SportId, boolean>> /* ready for the lead's unification (F.2 lead #3) */ }
+export function loadPrefs(): TouchPrefs;          // missing / corrupt / old shape → defaults; never throws
+export function savePrefs(patch: Partial<TouchPrefs>): void;  // read-modify-write; touches no other key
+```
+
+### 4.8 Grade and box on `Progress` (F.1) and the held arena
+
+```ts
+// src/game/hud/grade.ts — dependency-free (it lands in the UT chunk)
+export interface MatchGrade { v: 1; letter: 'S' | 'A' | 'B' | 'C'; flawless: boolean; perfects: number; moments: number /* gold chances taken, for ut's Touch rating */;
+  bestHeat: number; fires: number; ppu: number /* points per possession / drive / attack */; par: number }
+export function gradeLetter(ppu: number, par: number): MatchGrade['letter'];   // S ≥ 1.25·par, A ≥ 1.10·par, B ≥ 0.90·par
+// src/game/progress.ts (two optional lines, type-only imports): box?: BoxData; grade?: MatchGrade — both stripped before the wire
+```
+
+`BoxData` is `{ us: BoxLine[]; them: BoxLine[]; pog?: string }`. NBA's `BoxLine` has `perfect` and `perfect3`, which ut's
+card-mastery feats read ("10 PERFECT threes with Curry").
+
+**`Arcade.tsx`, the held arena** (nba writes the sport-agnostic block once; nfl and soccer adopt it):
+- New optional prop `hold?: boolean`, default false, so legacy hosts are unchanged. When it is set:
+  - the final whistle dims the arena (its own CSS)
+  - `onFinish` fires within 0.3 s instead of after the 1.6/2.6 s timeout
+  - the component stays mounted under the host's sheet
+- A `ref` exposes `ArcadeHandle { rematch(next?: { seed?: string; rival?: Rival; them?: Squad }): void }`. It re-seeds the
+  same engine and renderer, shows the 1.5 s opponent curtain (skippable), and tips off.
+- `onFinish(us, them, how, took, pens?, forfeit?)` keeps nfl's revision-2 shape.
+
+---
+
+## 5. The NBA controls context table (V2 B.1.2; one meaning per gesture per context; tested in nba-2)
+
+The left thumb is the floating stick everywhere: push past the ring to sprint. Every action starts on touch-down.
+
+| Context | A (Ø92, gold) | B (Ø64, teal) | C (Ø48, glass) | D | Court |
+|---|---|---|---|---|---|
+| **Offense, ball in hand** | **SHOOT.** Down: the gather starts, ring t0 = the touch timestamp. Up < 120 ms and < 12 px: a pump fake. Held ≥ 120 ms, then up: the shot (stopped = jumper; driving to the rim = automatic finish: layup, dunk or floater). Swipe ≥ 36 px within 250 ms (cancels the gather for free): ← / → crossover, ↓ step-back, ↑ spin, or **euro-step** when driving. | **PASS.** Down starts a 120 ms wind-up to the stick-aimed man (else the most open). Still held at 120 ms = lob (alley-oop to a cutter). | **CALL:** opens a radial above C with SCREEN / CUT / **ISO**. Slide to an item and lift, or tap it. | hidden | tap a teammate (a ≥ 44 px target) = pass to him. Outside the stick zone, or anywhere while the stick is held by another pointer. |
+| **Rebound race** | **BOARD:** jump on down; the gold ring closes on the ball's last drop | hidden | hidden | hidden | — |
+| **Free throw** | hold: the marker rises over ≤ 2 s; release in the band | — | — | — | — |
+| **Defense** (nba-6 stick; nba-7 buttons) | **CONTEST:** jump on down; the ring closes on the shooter as he rises; gold = PERFECT contest; early = foul risk | **STEAL:** tap; a gold flash on the ball marks it as exposed | **SWITCH** to the man nearest the ball | hidden | — |
+| **Dead ball / celebration** | held: ignored ("LET GO TO SHOOT"); tap: skip | hidden | hidden | hidden | the stick direction is stored and applied at the whistle |
+| **Buttons-only pref** | tap = pump, hold = shot, no swipes | as offense | as offense | — | CROSS / STEP / SPIN arc above A (≥ 44 px each), firing on down |
+
+- **Removed:** the card-pick row (cut), the look chip (cut) and "circle = spin" (already cut).
+- **ISO** clears the strong side for your highest-usage card and feeds him the ball (NBA-03: star usage).
+- Practice drills use the offense row; the pass drill also allows B.
+
+---
+
+## 6. Cross-team contracts carried over from revision 2
+
+Revision 2 §6 stands as written, except for the items below.
+- **§6.1 `render.ts`, with players:**
+  - nba's `hoops2/hud-draw.ts` draws the gold ring (through `hud/ring-draw.ts`), the gold ground ring under the
+    controlled player, the teal pass ring, the red on-ball arc, the FT meter, the BOARD ring, the Heat trail and the On
+    Fire flames
+  - `draw()` keeps one call line after the items loop
+  - the per-possession kits go through `kitOf` at the call site
+  - V2 C.2's venue palette is players' (OWNERSHIP V2 grant); nba keeps the court geometry, the floor cache and the camera
+- **§6.2 `Arcade.tsx` / `difficulty.ts` with nfl:**
+  - unchanged (`onQuit`, the forfeit `onFinish`, `'FF'`, `onRival`, `userDefenseIQ`, `onBoxScore` stripped from the wire)
+  - plus the held arena in §4.8
+- **§6.4 pre-game:** ut's pre-match screen is the only screen with buttons. Arcade's 1.5 s curtain is also the rematch
+  curtain.
+- **§6.7 marks with ut:** unchanged (`NBA_MARK_LABEL`, `markPoints()`, `'4'`, `'F0'…'F3'`).
+- **§6.8 settings:** the pause sheet's Sound/Haptics toggles use the read-modify-write `withSettings` helper (tested).
+- **New, with ut (V2 D.1, D.5, D.6):**
+  - ut's One-More bar sits at `--ctl-a-*`
+  - ut reads `Progress.grade` (letter, PERFECTs, best Heat, fires, moments) and the box for objectives, the Touch rating
+    and card mastery
+  - ut's REMATCH and NEXT call `ArcadeHandle.rematch()`
+
+---
+
+## 7. Scope map: every source item → task
+
+| Item | Source | Task |
+|---|---|---|
+| Shared stick, A/B/C/D, geometry tokens, pre-held thumb, sprint ring, swipes on A, CALL with ISO, tap teammate, Buttons-only | V2 F.2 #1, A.5, F.4 #2; NBA-12, 13, 17, 18 | nba-2 |
+| Pause button and offline pause/quit | V2 A.5, F.4 #2; NBA-09 | nba-2 (online in nba-9) |
+| Three-quarter camera, fixed zoom, safe box, defensive overlap | V2 F.2 #3, B.1.3, F.4 #3; NBA-20 | nba-3 (defense measured in nba-6) |
+| HUD kit: bug, Heat bar, toast line; banners off the rim | V2 F.1, C.3; NBA-21 | nba-2 (toast), nba-3 |
+| Live shot clock, 5 s warning, tick under 4 s | NBA-08; V2 B.1.1, F.4 #4 | nba-3 |
+| Pixel font (& / : + ' and the diacritic fold), unique tags, labels | NBA-22; V2 C.3 | nba-3 |
+| Pass-target % with the closeout; floor cache | NBA-16, NBA-29 | nba-3 |
+| Held arena, rematch ≤ 10 s | lead decision; V2 D.1 | nba-3 |
+| Gold ring: windows, states, touch timestamps, calibration, honesty; layup ring | V2 F.2 #2, B.0.1, B.1.5; NBA-14, 15 | nba-4 |
+| PERFECT chime and haptic, toast words, release pop, net snap | V2 B.0.5, B.1.7, F.4 #5 | nba-4 |
+| Heat and On Fire, team bars; ball trail and flames | V2 F.2 #6, B.0.2 | nba-4 (AI Heat in nba-6) |
+| Match grade on `Progress` | V2 F.2 #6, B.0.3 | nba-4 (par per rung in nba-6) |
+| Fouls, FT band meter, and-ones, turnovers, real misses, rim rattle, rebounding AI, BOARD ring | NBA-01, 04, 11, 24; V2 B.1.5 | nba-5 |
+| Defense by default, Auto-defend, SIM, the rival's real score, OT, Clutch staging | owner decisions 2 and 3; NBA-06, 07; V2 B.0.4, B.1.1 | nba-6 |
+| CONTEST / STEAL rings, SWITCH, ankle-breaker, movement feel, moves, pips, ramps, contact, transition, intentional fouls | V2 F.2 #5, #7, B.1.4–5; NBA-24 | nba-7 |
+| Shot value, usage and ISO, eras, four rungs, AI playbook, hot/cold zones (P1) | NBA-02, 03, 05, 19; V2 B.1.8 | nba-8 |
+| Online OT and forfeit, online pause, tip-off curtain, box sheet and POG, attrs skip, clip preload | NBA-06 online, 09, 10, 30 | nba-9 |
+| NBA Daily Play (P1) | V2 F.2 #10, D.3 | nba-10 |
+| The single global fit, final QA, handoffs | revision 2 R2 | nba-10 |
+
+---
 
 ## 8. Tasks (ordered)
 
-Each task lists **Must** (the task isn't done without it), a **Cut line** (moves to §9 if the session overruns), tests,
-screenshots (under `O/shots/nba/<task>/`), protocol, saves, files touched outside the lane, and dependencies. Every task
-ends with:
+Each task has a **Must** list, a **Cut line**, measurable **Acceptance**, tests, screenshots (under
+`O/shots/nba/<task>/`), protocol, saves, files outside the lane, and dependencies. Every task ends with:
 - the standard test set (§2)
-- the hints for the controls it adds (§5)
-- its doc updates
-- its rows in the reduced-motion table
-- a commit and push
+- its one-line hints, through the toast line
+- its doc updates and its reduced-motion rows
+- a commit and a push
+
+P0 items and owner decisions are never on a cut line.
 
 ---
 
-### nba-1 · Enabling · Harness, baseline, box tracker, QA infrastructure and day-one contracts
+### nba-1 · Enabling · Finish the harness, baseline, QA isolation and day-one V2 contracts (partly done: keep first)
 
-**Why.** Every later task needs before/after numbers against §3. NBA-10 needs per-player lines from the engine's own
-events. Cross-team shapes have to be settled before anyone writes them twice.
+**Already in the worktree from before the pause (uncommitted):**
+- `hoops2/box.ts` (`BoxTracker`)
+- the observation-only engine events (`fga`, `drb`, `stl`, `int`, `foul`)
+- `harness.ts`, with squads, the human model and the six defender policies
+- `targets.ts`, with THR_avg measured at 73 (engine) and 80 (UT), and the UT gap escalated to packs
+- `determinism.test.ts`, `calibration.test.ts` and `box.test.ts`
+- `practiceStart()` moved into `game.ts`
 
-**Must**
-- **`hoops2/box.ts` (new).**
-  - `BoxLine { id, name, tag, pts, fgm, fga, tpm, tpa, ftm, fta, orb, drb, ast, stl, blk, tov, pf, pure }`.
-  - `BoxTracker` with `onStep(p, handlerBefore)`, `onEnd(p)`, `lines(side)` and `team(side)`, keyed by player id.
-  - An assist is a catch followed by a make within 2.5 s and ≤ 1 dribble move. No RNG.
-- **`engine.ts` observation-only events:** `drb:<idx>`, `stl:<idx>`, `int:<idx>`, `fga:<idx>:<kind>:<2|3>`. They never
-  change state or RNG order.
-- **`hoops2/targets.ts` (new, test-only):** every §3 row as data `{ key, real, lo, hi, source }`, including THR_avg
-  (measured here).
-- **`determinism.test.ts`** (always on, < 15 s):
-  - 3 seeded games (autopilot, with and without juice, uneven `dt` batches) give identical marks, scores and final `p.t`.
-  - A recorded human input script replays to the same marks.
-  - A source scan finds no new `Math.exp/pow/log` in the new sim functions (§2).
-- **`calibration.test.ts`** (opt-in `NBA_CAL=1`; `NBA_CAL_GAMES`, default 15 for iteration, 150 for acceptance):
-  - Ported from the audit's `nba-box` and `nba-conc` using `BoxTracker`.
-  - Configs: even 70/78/86 Pro, 78 Rookie/All-Star/Legend, 90 v 75, displayed 96 v 64, OVR edges +5/+10/+20, and the
-    by-decade era run (`NBA_ERA=1`).
-  - Writes JSON to `$NBA_CAL_OUT` (OS temp; not committed) and prints a table against `targets.ts`.
-  - `NBA_CAL_ASSERT=1` turns the bands into assertions; that switch is used only in nba-10.
-- **`calibration-smoke.test.ts`** (always on, 20 games, wide bands, < 20 s): PPP 0.95–1.30, FTA/FGA ≥ .12 once nba-5 lands,
-  TOV 8–18%.
-- **`human.test.ts`:**
-  - Gaussian release error with `HUMAN_SD` (default **0.050**; also reports 0.035).
-  - A `mixed` median-human strategy for offense, and the §3.6 defender policies (median, poor, idle, good contester,
-    early jumper, steal spammer) as no-ops until nba-6/7 wire them.
-  - A four-rung difficulty sweep (`HUMAN_LEVELS=rookie,pro,allstar,legend`) that plays the AI's possessions against the
-    same fives and reports win %.
-- **`curve.test.ts`** (opt-in `NBA_CURVE=1`): make % against offset × THR × contest × difficulty, to `$NBA_CURVE_OUT`.
-- **`moments.test.ts`** (opt-in `NBA_MOMENTS=1`): every NBA Moment and Training drill run 200 times under the median human,
-  reporting the completion rate. Baseline for §3.11.
-- **QA infrastructure** (§2):
-  - `scripts/audit/nba-lib.mjs`: route-abort, inset injection for the 8 sizes, reduced-motion modes, port 5215, relay 7795.
-  - `scripts/audit/nba-relay.mjs`: a localhost relay on 7795, copied from `online.mjs`'s server part.
-  - `scripts/audit/nba-qa-run.mjs`: the isolation preload, `PS_QA_URL` and a refusal check.
-  - The audit's `nba-shots.cjs`, `nba-clock.cjs`, `nba-deadstick.cjs`, `nba-perf.cjs`, `nba-final.cjs` and `nba-se.cjs`,
-    ported to it.
-- **Baseline run** (heavy.sh): calibration at 150 games for even 78 Pro and 90 v 75, 15 games for the rest; the human
-  harness at 20 games/strategy × 4 rungs; the curve dump; perf at 1× and 4× CPU (absolute fps, frames > 20 ms) at
-  430×932 and 320×568; Playwright captures at the 8 sizes. The numbers must reproduce the audit within noise:
-  - PPP 1.28 ± 0.05
-  - FT rate < .05
-  - mid FG% > .55
+**Must (the rest):**
+1. **V2 vocabulary and rows:**
+   - `BoxLine.pure` → `perfect`, plus `perfect3` (unshipped, so this is safe)
+   - `targets.ts` rows replaced for §3.3 (V2 windows and gold rates), §3.7 (Heat), §3.8 (the geometry table), §3.10
+     (rematch), §3.13 (patterns) and §3.14 (grade)
+   - the HOT HAND / LOCKED IN, RUN-factor and card rows removed
+2. **The remaining harnesses:**
+   - `calibration-smoke.test.ts`: always on, 20 games, wide bands, < 20 s
+   - `human.test.ts` (opt-in `HUMAN`): σ 50 / σ 35 and the four-rung sweep
+   - `curve.test.ts` (opt-in `NBA_CURVE`)
+   - `moments.test.ts` (opt-in `NBA_MOMENTS`)
+3. **QA isolation:**
+   - `scripts/audit/nba-lib.mjs`: route-abort, the 8 sizes with insets, both reduced-motion modes, port 5215, relay 7795
+   - `nba-relay.mjs`
+   - `nba-qa-run.mjs`, which refuses to run unpatched
+   - the audit's `nba-shots/clock/deadstick/perf/final/se` scripts, ported
+4. **Two V2 baseline probes:**
+   - `nba-geo.mjs` measures today's control rects against the §3.8 table at 393×852 and 320×568
+   - `nba-rematch.mjs` measures today's whistle → next tip-off through the UT Squad Battles fixture
+5. **The baseline run** (heavy.sh):
+   - calibration at 150 games for even 78 Pro and 90 v 75; 15 games for the other configs
+   - the human harness, 20 games per strategy × 4 rungs
+   - the curve dump
+   - perf at 1× and 4× (430×932, 320×568)
+   - captures at the 8 sizes
+6. **`docs/studio-overhaul/nba.md` (new):**
+   - the baseline, THR_avg and the running protocol line
+   - **§4's contracts copied verbatim**, under "Contracts for nfl / soccer / ut", with a "Contract changes" log
+   - revision 2's §4 escalations, updated: the Heat-name escalation is withdrawn because V2 names it
+   - the §4.6 requests: `heartbeat` to ut, `sfx.perfect`/`ringTick` to soccer
+   - "Touched outside my lane", "Owner device checks" and "Left undone"
 
-  Differences are explained in `nba.md` before nba-2.
-- **`docs/studio-overhaul/nba.md` (new):** baseline, THR_avg, the running protocol line, §4 escalations, §6 contracts,
-  "Touched outside my lane", "Owner device checks", "Left undone".
+**Acceptance:**
+- The baseline reproduces the audit within noise: PPP 1.28 ± 0.05, FT rate < .05, mid FG% > .55. Any difference is
+  explained in `nba.md`.
+- The determinism test passes: 3 seeded games are identical across loops, uneven `dt`, juice and the tracker. The
+  recorded person replays exactly.
+- `box.test.ts`: Σ PTS = the score, attempts match the marks, and one assist is credited for pass → catch → make.
+- The standard set is green. Always-on additions are < 45 s in total.
+- The probes print a baseline for every §3.8 and §3.10 row.
 
 **Cut line:** none (enabling).
-
-**Tests:** `box.test.ts` (always-on 20 games; `NBA_BOX=1` for 200):
-- Σ player PTS = team score; FGA/3PA/FTA match the marks; 0 mismatches.
-- A hand-built pass → catch → make credits one assist.
-
-**Screenshots:** baseline tip-off, meter and final at the 8 sizes.
-
-**Protocol:** none (observation events only). **Saves:** none.
-**Outside lane:** none (`scripts/audit/*` are new team files).
-**Dependencies:** reads `ut/pool.ts`, `ut/battles.ts aiOpponent` and `ut/teams.ts` read-only.
+**Protocol:** none (observation events only). **Saves:** none. **Outside lane:** none.
 
 ---
 
-### nba-2 · P0 · Readable court at both ends: live HUD, camera framing, floor cache, banners, labels, font, unique tags
+### nba-2 · P0 · F.4 slice #2 · The shared controls: geometry tokens, floating stick, A/B/C/D cluster, gestures on A, CALL with ISO, tap-to-pass, toast line, pause
 
-Covers NBA-08, NBA-20, NBA-21, NBA-22, NBA-16, NBA-29 (floor cache), the defensive camera rule, unique tags, the in-game
-badge names (§4.2) and the reduced-motion table. Render and DOM only.
+Covers V2 F.2 #1, A.5, C.3 (buttons); NBA-12, 13, 17, 18, 27; NBA-09 (offline); the §5 table.
 
-**Must**
-- **Shot clock (NBA-08), `Hoops2.tsx`.**
-  - A `clockRef` written from the rAF loop when `Math.ceil(p.clock)` changes.
-  - At ≤ 5 s: `.low` (a pulse; with reduced motion, colour only) and `sfx.tick()` once a second.
-  - The clock haptic goes through nba-3's module once it exists. Until then it is Android-only, and on iOS it is dropped
-    (it is loop-side).
-  - A shot-clock violation shows "0" before the banner.
-- **Camera, new pure `hoops2/camera.ts`** plus the camera section of `render.ts`:
-  - `follow(cam, target, dt)` with time-based easing `1 − exp(−k·dt)` (render-side, so `exp` is fine there).
-  - Offense:
-    - Track 70% handler + 30% ball, with a 1.5 ft dead zone.
-    - **Hold the shooter:** from `pressShoot` until the ball is 60% of the way to the rim, the focus moves ≤ 2 ft toward
-      the rim.
-    - A lateral offset of 4–6 ft away from the ball side, plus a +0.08 pitch, so the on-ball defender separates from the
-      handler.
-  - **Defense** (used from nba-6): the behind-the-shooter camera depth-sorts by `cx` (`render.ts:719-756`). Your defender
-    stands between the AI handler and the rim, so he would hide the handler (NBA-20 in reverse). The rule:
-    - a lateral offset of 5–7 ft toward the side your defender is **not** on
-    - pitch +0.12
-    - focus at 60% handler / 40% your defender
-    - The target is §3.6's defensive camera row. It is unit-tested here with synthetic positions and measured live in nba-6.
-  - A fixed zoom near the rim; zoom only in replays.
-  - A responsive anchor: `renderer.setControlTop(px)` from the controls' bounding rect. The handler (or your defender)
-    sits at 52–55% of the height, always ≥ 8 px above the highest control.
-  - A ground ring and short arrow under the on-ball defender (the contest colour), drawn in `hud-draw.ts` so it survives
-    occlusion.
-- **HUD hook (§6.1).** Create `hoops2/hud-draw.ts` and move the existing meter, ring and label drawing there. `draw()` keeps
-  one call line after the items loop.
-- **Floor cache (NBA-29).** Reuse the rasterised floor `ImageData` when the camera has moved ≤ 0.5 px. The dead zone makes
-  that common. Typed-array replay snapshots are on the cut line, only if §3.9 still fails.
-- **Banners (NBA-21), `hud.css`.**
-  - `.hg2-pop` moves to the top band under the score bug (portrait `top: calc(var(--sat) + 96px)`; landscape beside the
-    bug, inside `--sal/--sar`).
-  - The look chip and the hint merge into one line.
-  - Nothing DOM-drawn sits over the rim/paint rect.
-  - Score bug at 320 wide: the pause slot (44 px) at its left edge, LAST PLAY as a 44 px icon, and "Q2 3/4 · D" as one
-    chip (filled in nba-6/9).
-- **Labels, new `hoops2/labels.ts`.** `layoutLabels(reqs)` does greedy priority placement:
-  meter result > contest grade > handler name > pass-target % > badge pop > call label > defender name.
-  It tries two alternate offsets and drops the lowest priority on a conflict. Badge pops use `BADGE_LABEL` (§4.2).
-- **Font (NBA-22).** `foldName(s)`: NFD, strip combining marks, plus `ø→O, ł→L, đ→D, ß→SS, æ→AE, œ→OE`. F35 gains
-  `& / : + ( ) ,`. `tagOf` keeps the full surname up to 14 letters. DOM text keeps the accents.
-- **Unique tags.** `uniqueTags(ours, theirs, benches)` in `game.ts` runs at match start: on a collision (Johnson, Davis,
-  Jones…) both become "J.JOHNSON" / "M.JOHNSON", still ≤ 14 glyphs. Display only.
-- **Pass-target % (NBA-16)** comes from `catchValue()` (closeout-adjusted), with a contest icon, and the receiver's and his
-  defender's names on the target marker.
-- **Reduced-motion table** in `nba.md`, one row per new animated element:
+**Must:**
+- **Shared files built to the §4.1–4.3 and §4.7 contracts:**
+  - `controls-geometry.css`
+  - `stick.ts` + `Stick.tsx`
+  - `hud/gestures.ts`, `Cluster.tsx` (with `Radial`), `ToastLine.tsx`, `PauseButton.tsx`, `PauseSheet.tsx`, `prefs.ts`,
+    `feel.ts`, `hud.css`, `index.ts`
+  - `docs/studio-overhaul/shared-controls.md`: how a sport mounts them, with a 20-line example
+- **Visual style (V2 C.3, mockup):**
+  - A gold with a dark label; B teal; C/D dark glass with a 1.5 px stroke ring, a white SVG icon and a 10 px label
+  - small direction labels around A (▲ SPIN, ◀ CROSS ▶ · ▼ STEP) drawn in SVG
+  - the bottom gradient scrim
+- **NBA wiring in `Hoops2.tsx`** (the new `HoopsControls.tsx` maps §5 contexts to slot specs; the loop stays in
+  `Hoops2.tsx`):
+  - the provisional gather on A-down (`pressShoot(p, at)` with the touch timestamp)
+  - a tap cancels into `pumpFake(p)`
+  - a swipe cancels into the move: crossover, step-back, spin, or euro-step when driving (new `Act` `'euro'`)
+  - B's 120 ms wind-up, turning into a lob when held
+  - CALL's radial with SCREEN / CUT / ISO (`callPlay(p, 'iso')`: teammates clear the strong side and the ball goes to the
+    highest-usage card)
+  - tap a teammate = pass, under the §5 hit rule
+  - the `disabled` state recomputed from the loop as a class toggle (NBA-18)
+- **Pump fake and "make him land" in `engine.ts`** (as revision 2 nba-3):
+  - the bite chance from `p.rand`
+  - one fake per 0.8 s
+  - a descending closest defender grades the contest one tier lighter
+- **The toast line** replaces the hint strip and the `.hg2-pop` banners from this task on. One-line hints, once per device
+  (prefs `hints.nba`): the stick, SHOOT / pump / swipes, PASS / lob, CALL.
+- **Pause (offline, F.4 slice):**
+  - the pause button at the V2 position
+  - `PausableTimers` replaces the `setTimeout` chain in `finish()`/`next()`
+  - stepping stops (`p.t` frozen)
+  - auto-pause on `visibilitychange`/`pagehide`
+  - `PauseSheet` with Resume and Quit; Quit confirms, then calls `onQuit` → a defined loss
+  - online: the button opens the sheet with "Online: the game keeps going" and Resume only; forfeit lands in nba-9
+- **Haptics** through `feel.ts`: `tick` on the sprint edge and the CALL pick; `long` on a turnover.
+- **Copy:** `Arcade.tsx`'s NBA `arc-how` text matches §5.
 
-  | Element | With reduced motion |
-  |---|---|
-  | clock pulse | colour only |
-  | camera easing | ×2 faster settle, no shake |
-  | banners | fade, no slide |
-  | ember trail and flame | static tint |
-  | RUN banner | fade |
-  | CALL radial | instant |
-  | card deal | instant |
-  | tip-off intro | static lineup card |
-  | release pop | no hit-stop, green flash kept |
-  | FT meter | unchanged (it's input) |
+**Acceptance** (`scripts/audit/nba-controls.mjs`, CDP multi-touch, the 8 sizes):
+- every §3.8 rect within ±2 px at 393×852 and 320×568
+- gaps 10–18 px; every target ≥ 44 px; 0 overlaps; ≤ 4 right-thumb targets; none above 2/3 of the height
+- the handler is never under a control at tip-off or in 30 sampled frames
+- a pre-held thumb moves the handler > 1.5 ft within 300 ms of the whistle
+- the stick responds in ≤ 1 frame; the sprint edge fires exactly one `tick`
+- tap → `pump`; hold → the shot; L / R / D / U → cross / cross / step-back / spin; euro-step while driving
+- tap a teammate → pass; B held → lob; CALL → ISO puts the ball in the star's hands within 2 s
+- 0 accidental passes from stick touches
+- pause: 0 engine steps and 0 timers in 10 s; marks identical after resume; quit → a loss shown
+- 0 page errors; only localhost requests
 
-  Later tasks add their rows.
+**Tests:**
+- `stick.test.ts`: dead zone, rescale, sprint at 1.15 R, follow at 1.6 R, home band, pre-held adoption, never-null output,
+  fixed mode
+- `gestures.test.ts`: 200 jittered gestures per class, ≤ 2% wrong
+- `cluster.test.ts` (jsdom): `down` fires on pointerdown; two pointers are tracked
+- `prefs.test.ts`: corrupt / old / missing → defaults; no other key touched
+- `pause.test.ts`
+- `gameplay.test.ts`: the pump fake baits by rating and never shoots; a swipe cancels the gather at no cost; ISO targets
+  the top-usage card
 
-**Cut line:** typed-array replay snapshots (only needed if the 4× budget fails after the floor cache).
+**Screenshots:** tip-off and a mid-drive at the 8 sizes; the CALL radial; Buttons-only; a hint in the toast line; the
+pause sheet. Each with its nba-1 twin, and compared with the mockup's NBA phone.
 
-**Tests and measurements**
-- `camera.test.ts`:
-  - 1 s of input at 30 vs 60 fps ends within 0.5 px.
-  - The jumper hold keeps the focus ≤ 2 ft from where it started.
-  - The anchor keeps feet ≥ 8 px above the control top at 320×568 and 393×852.
-  - Defense rule: synthetic AI handler and defender positions → projected overlap ≤ 35% at ≥ 90% of 1,000 sampled
-    release frames.
-- `labels.test.ts`:
-  - `foldName` covers every character of every name in `cards-nba.json` (122 non-ASCII), 0 misses.
-  - `layoutLabels` gives no overlaps on 1,000 random frames.
-  - `uniqueTags`: 0 duplicates across 1,000 random UT squads.
-- `nba-clock.cjs`: the bug text equals `ceil(p.clock)` at 20 Hz; 0 mismatches longer than a frame (baseline "8" for 7.2 s).
-- `nba-hud.cjs` (new) at the 8 sizes:
-  - `.hg2-pop` never intersects the rim box.
-  - On-ball defender overlap ≤ 35% at ≥ 90% of releases (`__hoopsDebug` hook).
-  - Top HUD within §3.8.
-  - 0 page errors; only localhost requests.
-- `nba-perf.cjs`: §3.9 absolute budget at 1× and 4× (430×932 and 320×568).
+**Cut line:** the radial's open animation; the euro-step (it falls back to spin).
+**Protocol:** bump needed (the pump fake, "make him land", ISO's movement, the euro-step).
+**Saves:** the new touch-prefs key only.
+**Outside lane:**
+- `Arcade.tsx` (NBA copy)
+- `PlayReadout.tsx` (an additive controlled `open` prop, so LAST PLAY moves into the bug in nba-3)
+- `render.ts` (the `'pump'`/`'euro'` pose fallback lines)
 
-**Screenshots:** release with a visible defender, make banner, 320 rim pile, Jokić/Dončić names, a renamed pair of
-same-surname tags, 852 landscape release, 932 landscape; each with its nba-1 twin.
-
-**Protocol:** none (render, DOM and text). **Saves:** none.
-**Outside lane:** none, except `render.ts`'s single HUD call line (agreed in §6.1).
-**Dependencies:** shell (bug plate, Fix A/C), players (sprite drawing; the HUD hook line).
+**Dependencies:** shell (insets); nfl and soccer review §4 within the task (posted in `nba.md`).
 
 ---
 
-### nba-3 · P0 · Thumb-first controls: input layer, the context table, gestures, pump fake, CALL radial, haptics, hints
+### nba-3 · P0 · F.4 slice #3, #4, #8 · The frame: three-quarter camera, action-safe box, score bug and Heat bar, live clock, readable text, held arena
 
-Covers NBA-12, NBA-13, NBA-17, NBA-18, NBA-27, STREAM "Haptics", research §5.3 and the §5 table.
+Covers V2 F.2 #3, B.1.3, C.3; NBA-08, 16, 20, 21, 22, 29; the lead's held-arena decision (V2 D.1).
 
-**Must**
-- **Input layer, new `HoopsControls.tsx` + `controls.css`** (the loop stays in `Hoops2.tsx`):
-  - `touch-action: none`, non-passive listeners, one tracker per pointer, and `setPointerCapture` always.
-  - **Floating stick.**
-    - It spawns where the thumb lands in the left 45% of the screen, below the HUD band, and **not** in the bottom
-      `sab + 12 px`.
-    - In landscape it stays inside `--sal`.
-    - A ghost ring at rest. Base radius 52 (48 at 320 wide), round and `flex: none` (fixes the 114×128 oval).
-    - A **12% dead zone** with rescaled output; sprint at 92%.
-    - The direction is kept in `stickRef` through dead balls and applied at tip-off (**NBA-12**).
-    - A touch that starts on a teammate and lifts in < 200 ms without moving is a pass.
-  - **Right cluster** per §5: A/B/C slots whose meaning comes from `context(p)` (offense / rebound / FT / defense / dead /
-    cards). The `disabled` state is recomputed from the loop through a class toggle (NBA-18).
-  - **CALL** (C, 48 px) opens a left-thumb radial of SCREEN / CUT / SPACE (each ≥ 44 px), within 250 px of the stick
-    centre. It replaces the strip at `sat + 104px`.
-  - **Buttons mode** (pref `controls: 'buttons'`): today's CROSS / STEP / SPIN buttons move into an arc above SHOOT and fire
-    on pointerdown; swipes are off.
-  - **LAST PLAY** moves into the score bug. `PlayReadout` gets an optional controlled `open`/`onToggle` prop (an additive
-    hunk in a shared file; football keeps its toggle).
-- **Gestures, new pure `gestures.ts`:** `classify(points, tDown, tUp) → { kind: 'tap' | 'hold' | 'swipe', dir }`. No circle
-  class. `contextTable.ts` holds §5 as data, and both the UI and the tests read it.
-- **Provisional gather (§5 design note).**
-  - pointerdown calls `pressShoot(p, at)` at once.
-  - A tap cancels it into `pumpFake(p)`.
-  - A swipe cancels it into the move.
-  - Cancels inside 250 ms cost nothing (the existing cancellable capture).
-- **Pump fake and "make him land", `engine.ts`.**
-  - New `Act` `'pump'`.
-  - The nearest defender within 6 ft bites with chance
-    `clamp(0.15 + (70−prd)/120 + (70−ind)/200 − 0.15·defIQ + (shooterRating−70)/150, 0.05, 0.6)` from `p.rand`.
-  - One fake per 0.8 s.
-  - A closest defender who is descending at release grades one contest tier lighter.
-  - `render.ts poseOf` gets a 2-line `'pump'` fallback (players' section; listed).
-- **Haptics, new `hoops2/haptics.ts`:** `haptic(kind)`.
-  - Android patterns: green `[12,30,12]`, make `18`, dunk `[25,40,25]`, block `[30,20,30]`, turnover `60`, clock `8`.
-  - iOS (§3.13): pointer handlers call it directly. A green tries 2 ticks about 60 ms apart; a make is 1 tick; loop-side
-    calls are dropped.
-  - `lib/sound.ts` gets an appended `vibrateLive(pattern)` (~6 lines, away from soccer's crowd code); `vibrate()` is
-    unchanged for NFL and soccer.
-- **First-time hints, new `hoops2/hints.ts` + one DOM line in the HUD band.**
-  - One line each, never over the court centre or the rim box.
-  - Shown once per device (a bitmask in hoops-prefs `hints`), dismissed on first use or after 3 s.
-  - This task adds the lines for the stick, SHOOT/pump/swipes, PASS/lob and CALL.
-  - Later tasks register theirs: meter (nba-4), FT and BOARD (nba-5), defense (nba-6/7), cards (nba-10).
-- **`prefs.ts`:** `loadPrefs()` / `savePrefs()` for the key in §2.
-- **Copy.** `Arcade.tsx`'s NBA `arc-how` text and `Hoops2`'s hints match §5. The old "flick the stick" did nothing.
+**Must:**
+- **Camera** (new pure `hoops2/camera.ts` plus the camera section of `render.ts`):
+  - the high three-quarter half-court view: pitch ≈ 55°, yaw 12° off the rim line
+  - rim at 20–24% of the height; the handler held at 50–55%
+  - follow = a dead-zone blend of handler and ball with `1 − exp(−k·dt)` damping (render-side)
+  - fixed zoom near the rim
+  - on a shot it holds the shooter and tilts 2% toward the rim
+  - anchored to `readGeometry()`'s safe box
+  - zoom only in replays and in the Clutch tighten (6%)
+- **The defensive camera rule** (the same orientation, so the layout never flips): the yaw sign follows the side your
+  defender is not on, so the AI handler stays visible (revision 2's overlap rule).
+  - Unit-tested here; measured live in nba-6.
+  - V2 B.1.3's "defend from your basket at the bottom" variant ships behind `?arcade&cam=v2b` for the owner device check.
+- **HUD kit, part 2:**
+  - `ScoreBug` with YOU / period-clock / RIV, the 3 px possession line and the CLUTCH and OT phases
+  - `HeatBar` (fed zeros until nba-4)
+  - `geometry.ts`
+  - LAST PLAY becomes a 44 px icon in the bug
+  - the old top strip and chips are removed
+- **Shot clock (NBA-08):**
+  - written from the rAF loop whenever `Math.ceil(p.clock)` changes
+  - ≤ 5 s: the `clockLow` warning
+  - < 4 s: `sfx.tick()` once a second
+  - a violation shows "0" before the toast
+- **Text:**
+  - `foldName` (NFD, strip combining marks, ø ł đ ß æ œ)
+  - F35 gains `& / : + ' ( ) ,`
+  - `uniqueTags` on collision (J.JOHNSON / M.JOHNSON)
+  - `layoutLabels` priority placement
+  - name chips 7 art px tall on a dark plate
+  - one badge pop per possession, in the toast line, through `BADGE_LABEL`
+  - the scorer plate ("CURRY · 3PT · 11 PTS") in the toast line, from `BoxTracker`
+- **Pass-target % (NBA-16)** from `catchValue()` with the closeout, shown on the teal target ring with the receiver's
+  name.
+- **Floor cache (NBA-29):** reuse the floor `ImageData` while the camera has moved ≤ 0.5 px.
+- **Held arena (§4.8):**
+  - `hold` and `ArcadeHandle.rematch()` in `Arcade.tsx` (a sport-agnostic block written once, plus the NBA branch)
+  - `Hoops2` re-seeds in place: new `HoopsGame`, the same renderer and sprite caches
+  - the 1.5 s curtain shows the opponent
+  - a stub host in `Lab.tsx` (`?arcade&hold`) runs whistle → stub 5 s sheet → rematch, for the probe
 
-**Cut line:** the CALL radial's open animation (instant only); a resize option for the stick.
+**Acceptance:**
+- `nba-hud.cjs` at the 8 sizes:
+  - bug, pause and Heat bar rects per §3.8 (±2 px)
+  - nothing DOM-drawn intersects the projected rim ± 40 px
+  - rim at 20–24%; handler at 50–55% (median of 300 frames)
+  - handler and rim inside the safe box in ≥ 98% of frames
+  - on-ball defender overlap ≤ 35% at ≥ 90% of releases
+  - zoom variation ≤ 2% near the rim
+- `nba-clock.cjs`: the bug text equals `ceil(p.clock)` at 20 Hz, with 0 mismatches longer than a frame (baseline: "8" shown
+  for 7.2 s).
+- `labels.test.ts`: `foldName` covers every character in `cards-nba.json` (0 misses); 0 duplicate tags across 1,000
+  squads; 0 label overlaps in 1,000 frames.
+- `camera.test.ts`: 30 vs 60 fps end within 0.5 px; the shooter hold moves the focus ≤ 2 ft; the defense rule's overlap
+  ≤ 35% at ≥ 90% of 1,000 synthetic releases.
+- `nba-rematch.mjs`: whistle → `onFinish` ≤ 0.3 s; `rematch()` → controllable ≤ 1.5 s at 4× CPU; renderer identity kept;
+  heap after 5 rematches ≤ +10%; the full stub loop ≤ 10 s.
+- `nba-perf.cjs`: the §3.9 frame budget at 1× and 4×.
 
-**Tests and measurements**
-- `gestures.test.ts`:
-  - 200 jittered synthetic gestures per class (tap, hold, 4 swipe directions), with timing jitter ±40 ms and path noise
-    ±6 px: ≤ 2% misclassified.
-  - Every §5 context × slot maps to exactly one action.
-- `controls-input.test.ts` (jsdom):
-  - Two pointers (stick + SHOOT) are both tracked.
-  - A stick touch never produces a pass.
-  - The bottom band never spawns the stick.
-- `prefs.test.ts`: missing, corrupt or old-shape JSON → defaults; never touches other keys.
-- `haptics.test.ts`: patterns on a `navigator.vibrate` spy; the iOS path drops loop-side calls and emits 2 ticks for a green
-  inside a gesture.
-- `hints.test.ts`: once per device; a corrupt prefs value shows them again.
-- `gameplay.test.ts`:
-  - A pump fake baits by rating and never fires a shot.
-  - A landing defender lightens the contest.
-  - A swipe inside the gather cancels the shot at no cost.
-- `scripts/audit/nba-controls.mjs` (CDP multi-touch) at the **8 sizes**:
-  - every control ≥ 44×44 with no overlaps (4 px gaps)
-  - the handler is never under a control at tip-off or in 30 sampled frames
-  - CALL within 250 px of the stick (baseline ~600)
-  - a thumb down 300 ms before tip-off moves the handler > 1.5 ft within 300 ms of tip-off (baseline 0 for 2.25 s)
-  - the stick responds within 1 frame
-  - tap → `pump`; hold → meter; swipe L/R/D/U → cross/cross/stepback/spin
-  - tap a teammate → pass; PASS hold to the rim → lob
-  - §3.8 HUD share
-  - 0 page errors
-- Practice: the green-room and finish drills still count attempts; a pump fake is not an attempt.
+**Screenshots:**
+- a release with a visible defender
+- the Clutch bug, the OT bug
+- the 320 rim area
+- Jokić / Dončić chips, a renamed same-surname pair
+- the scorer plate
+- 852 landscape
+- the rematch curtain
+- each next to its nba-1 twin and the mockup
 
-**Screenshots:** tip-off and mid-drive at the 8 sizes, CALL radial open, buttons mode, a first-time hint; each with its
-nba-1 twin.
+**Cut line:** a floor reflection under the handler; typed-array replay snapshots (only if §3.9 fails).
+**Protocol:** none (render, DOM, text, and a held-mount flow that changes no outcome).
+**Saves:** none.
+**Outside lane:**
+- `Arcade.tsx` (the `hold`/`ref` block plus the NBA branch)
+- `render.ts` (the single HUD call line, §6.1)
+- `Lab.tsx` (one line)
 
-**Protocol:** bump needed (the pump fake and "make him land" change outcomes). **Saves:** the new prefs key only (tested).
-**Outside lane:** `PlayReadout.tsx` (an additive prop), `lib/sound.ts` (appended), `Arcade.tsx` (NBA copy), `render.ts`
-(`'pump'` pose fallback).
-**Dependencies:** shell (insets, Fix D), players (pump pose), nfl (`PlayReadout` prop).
+**Dependencies:** players (the sprite budget; the venue palette is theirs); ut (the real result sheet; tested against the
+stub until it lands).
 
 ---
 
-### nba-4 · P0 · The shot: touch timestamps, windows and one cap, green rule, meter, feedback, fatigue, Heat, release pop, timing calibrator
+### nba-4 · P0 · F.4 slice #5 · The gold ring, PERFECT, Heat and the grade
 
-Covers NBA-14 (fixes 1–4), NBA-15, research §5.1, §5.2, §5.7, §5.8 (Heat, court-edge glow), §5.10 (release pop) and the
-§3.3 targets.
+Covers V2 F.2 #2 and #6, B.0.1–B.0.3, B.0.5, B.1.5 #1/#3, B.1.7; NBA-14 (fixes 1–4), NBA-15; research §5.1, §5.7.
 
-**Must**
-- **Touch timestamps.** `clockMap = { real, game, acc, rate }` is updated every rAF.
-  - `gameTimeAt(ts) = game + acc + max(0, ts − real)/1000 × rate`, using `e.timeStamp`.
-  - It falls back to `performance.now()` when |`e.timeStamp` − `performance.now()`| > 1 s.
-  - `pressShoot(p, at)` / `releaseShoot(p, lag, at)`. `lag` = prefs `offsetMs` (default 25 ms; set by the calibrator).
-- **Windows per §3.3:**
-  - the curve `full(thr) = 20 + 58·clamp((thr−55)/40, 0, 1)` ms, extended to 99 (+0.6 ms/pt) and above (+0.3 ms/pt,
-    ≤ 11 pts); refined within the bands by the test
-  - contest factors open 1, light 0.75, heavy 0.42, smothered 0.17
-  - floors 20 / 8 ms
-  - `windowFactor(def)` (§3.2)
-  - meter mode ×1.00 / 1.05 / 1.10 through `p.meterBonus` (sims and AI use 1)
+**Must:**
+- **`perfect.ts` + `hud/ring-draw.ts`** to the §4.4 contract. `windowScale` is the only place multipliers meet. The
+  engine's `releaseProbability`/`shoot()` read `RingSpec` from it.
+- **Touch timestamps:**
+  - the `TouchClock` is updated every rAF
+  - `pressShoot(p, at)` / `releaseShoot(p, lag, at)`, with `lag` = prefs `offsetMs` (default 25)
+- **Windows, states and range per §3.3:**
+  - the ±30 ms floor
+  - gold only for open/light (Legend: open), in range
+  - amber for heavy, Legend-light and out of range
+  - red for smothered, too far or no angle
+  - **gold = make** (no block roll, no rim-out)
+  - a steeper off-gold fall-off
+  - fatigue shift and shrink, plus the −5% speed/burst cap below 50% energy
   - pull-up ×0.88 and +10 ms
-  - fatigue: shift and shrink (§3.3) plus the −5% speed/burst cap below 50%
-  - **`windowScale(parts)`, the single combined cap** (×1.45, ≤ 110 ms)
-- **Green = make where drawn.** In `shoot()`/`releaseProbability`, open and light greens return 1 and skip the block roll.
-  Heavy and smothered never set `greened`; they set `pure: true` for an in-window release and use the lowered caps. The
-  off-window fall-off gets steeper. All of it is fitted to §3.3 by `shot-curve.test.ts`.
-- **Meter drawing** (in `hud-draw.ts`):
-  - R = 0.13 × min(W, H), a true-size slice at `top + shift`, a centre notch
-  - amber for heavy/smothered
-  - Cue-only flashes at the release point; Off draws nothing
-  - the colour follows `contestOf` live
-- **Feedback.**
-  - `lastShot` gains `green`, `shift`, `cr`, `energy` and `pure`.
-  - A pure `missReason(p, shot)` returns `timing | contest | rating | fatigue`, from counterfactual make chances.
-  - Post-shot chip (~900 ms, `hud.css`, top band):
-    - line 1 is one of seven steps (Very Early … **PURE** … Very Late)
-    - line 2 is the coverage ("Wide open · 7.2 ft")
-    - line 3, on a miss, is the reason
-  - `play-feedback.ts basketballFeedback` gets Timing and "Why it missed" facts (the nba function only).
-- **Two-stage Heat** (STREAM P1; display names per §4.2: "HOT HAND" / "LOCKED IN").
-  - `HoopsGame.heat: { idx, stage, makesSince }`, optional and in memory.
-  - Stage 1 after 2 straight makes: ×1.10 and an ember trail.
-  - Stage 2 after 3: ×1.25 and a **court-edge glow**. Heat Check cards reach it at 2.
-  - It ends on a miss, a turnover, or after 4 further makes. Stage 2 also refills burst pips; that hook is wired in nba-7
-    when pips exist.
-  - Both multipliers go through `windowScale`.
-- **Release pop** (render only, through `juice.ts`): a one-frame hit-stop on a PURE release, the arc flashing green, and a
-  swish particle (reduced motion: the flash only).
-  - The engine emits an observation-only `stumble:<idx>` when a big takes a heavy rim contest; players may draw it, and
-    until then there is a 2-frame lean in our juice.
-- **Timing calibrator, new `TimingCalibrator.tsx`** (10 taps on a beat). It writes `offsetMs` = −mean and shows the
-  player's own SD (the owner's σ for §3.3). It opens from the kickoff controls help now, and from the pause menu in nba-9.
-  No Settings screen is touched.
-- **Practice:** a drill's `green` measure counts `ls.greened || ls.pure` (`Hoops2.tsx:369`), so The Green Room stays
-  completable when a drill draws a heavy contest.
+  - rhythm ×1.2
+  - difficulty `windowFactor`
+- **The finish ring** (B.1.5 #3): hold A while driving and release as the ring closes at the rim, for layups and
+  floaters. Dunkers with a lane dunk automatically. A PERFECT finish through contact is an and-one; the FT trip arrives
+  in nba-5, and until then the and-one plays as today.
+- **Drawing:**
+  - the ground ring plus the arc meter, with gold ≥ 8 px
+  - the gold ground ring under the controlled player, the teal ring on the pass target, the red arc on the on-ball defender
+  - amber and red have their own colours
+  - meter Off (pref) draws only the ground ring's colour and gets ×1.10
+- **Feedback** (one toast line, no three-line chip):
+  - `word · dial`, e.g. "PERFECT", "SLIGHTLY LATE · TIMING", "SMOTHERED · PRESSURE", "TOO FAR · RANGE"
+  - a pre-shot coverage word ("OPEN · release on gold")
+  - `missReason` (counterfactual: timing / contest / range / fatigue)
+  - `play-feedback.ts basketballFeedback` gets the same facts (the nba function only)
+- **The 4-tap calibration:**
+  - `TimingCalibrator.tsx`, built on `perfect.calibrate()`
+  - it writes `offsetMs` and shows the player's own σ
+  - offered once before the first match on the device (skippable), and from the pause sheet
+- **`heat.ts`** to the §4.5 contract:
+  - `HoopsGame.heat: { us, them }`
+  - gains from the engine's events (PERFECT, basket, clean ≥ 2 passes, turnover) in the race now; stops and conceding in
+    nba-6
+  - On Fire: `heatWindow` through `windowScale`; amber → gold for uncontested attempts; 2 possessions
+  - the half-time reset
+  - removes `g.fire`/`fireAt`; the Heat Check badge now gains +16 per PERFECT, instead of +12, by that player, published
+  - HEATING UP gives a ball trail and a crowd lift; ON FIRE gives flames on the ball and a court-edge glow, and the first
+    On Fire score triggers the slow-motion replay
+- **The grade** (§4.8): `hud/grade.ts`, plus `Progress.grade` and `Progress.box` (optional, stripped from the wire),
+  filled at the final.
+  - `perfects` = PERFECT releases, finishes and boards
+  - `moments` = gold rings offered and attempted
+  - `bestHeat`, `fires`, and `ppu` against the par for the rung
+- **Juice:**
+  - PERFECT: a 1-frame hit-stop, the gold arc flash, `double` haptic, `sfx.perfect(streak)`
+  - a ring-fill tick in the last 200 ms
+  - a net snap on every make (3 frames of net stretch)
+  - all through `juice.ts`; reduced motion keeps the flash and the sound
+- **Practice:** a drill's `green` counts `perfect`, so The Green Room stays completable.
 
-**Cut line:** a visible layup-meter arc; the Cue-only mode (Full and Off stay); energy rings under players.
-
-**Tests and measurements**
-- `shot-curve.test.ts` (always on, closed-form expectation over the Gaussian, no sampling):
-  - windows inside the §3.3 bands for THR 55 / THR_avg / 75 / 85 / 95 × contests × the 4 rungs
-  - floors hold
-  - **the worst `windowScale` stack ≤ ×1.45 and ≤ 110 ms**
-  - an open or light green always makes and is never blocked; heavy/smothered never `greened`
-  - the §3.3 make-rate table at σ 50 (asserted) and σ 35 (ceilings)
+**Acceptance:**
+- `perfect.test.ts` (closed-form over the Gaussian, no sampling):
+  - every §3.3 window and gold-rate band at σ 50, and the σ 35 ceilings
+  - the floor holds after the worst shrink stack (Legend × heavy fatigue × pull-up)
+  - the worst grow stack ≤ ×1.45 and ≤ ±90 ms
   - pull-up ≤ 0.90 × catch-and-shoot
-  - above 99 finite and ≤ +5 points over 99
-- `ratings-matter.test.ts`: the "shot curve" block is replaced by the new targets (documented as intentional); every
-  monotonicity test stays green.
-- `gameplay.test.ts`:
-  - a release between steps gives |off| < 1 ms
-  - fatigue shifts +15 ± 2 ms at 60% and shrinks ≤ 15%
-  - `missReason` names "contest" for a smothered pure release and "timing" for a 120 ms-late open one
-  - Heat stages and endings
-- `play-feedback.test.ts`: the seven labels and the reason line.
-- `calibrator.test.ts`: the offset and SD from synthetic taps.
-- Human harness (σ 50): open-jumper green rate 30–50%; green kick-out makes = 100% of greens drawn.
-- `nba-meter.cjs`:
-  - slice ≥ 8 px for THR-75 open at 390
-  - amber in heavy range
-  - the chip sequence after a scripted release
-  - the release pop seen with `no-preference`, absent with `reduce`
+  - range gates by THR
+  - above-99 values finite and ≤ +5 ms
+- **Honesty test:** 10,000 seeded gold releases (jumpers and finishes) → 10,000 makes, 0 blocks. 0 gold states drawn on
+  heavy or smothered.
+- A release between two steps gives |off| < 1 ms.
+- `nba-meter.cjs`: the gold band ≥ 8 px at 320 and 393 for THR 55 open; amber in heavy range; red when smothered; the
+  toast sequence after a scripted release; the pop seen with `no-preference` and absent with `reduce`.
+- `heat.test.ts` (shared): every gain and loss; the stage thresholds; the spell length per sport; the half reset; integer
+  only (source scan); `pick` for the per-sport values.
+- `game.test.ts`: On Fire widens by exactly ×1.25 through `windowScale`; amber → gold only for open attempts.
+- `grade.test.ts`: the letter thresholds; FLAWLESS; `Progress.grade` survives the host path and is absent from the
+  `arcadeOf` wire.
+- Feel spy test: `double` on every PERFECT, `long` on a score; 0 haptics while paused.
+- `calibrator.test.ts`: offset and σ from synthetic taps; outlier drop.
+- Human harness report (15 games): green rate per contest and Heat stage rates (asserted in nba-10).
+- `ratings-matter.test.ts`: the shot-curve block replaced (documented); every monotonicity test green.
 
-**Screenshots:** meter open / light / heavy (amber) / tired (shifted and shrunk), the PURE chip, a "Contest" miss chip,
-Hot Hand trail, Locked In glow, the calibrator.
+**Screenshots:** open / light / heavy (amber) / smothered (red) / out of range (RANGE) rings at 393 and 320; a tired
+shooter; the PERFECT toast; the HEATING UP trail; the ON FIRE flames; the calibrator; the finish ring.
 
-**Protocol:** bump needed (window sizes and positions, green rule, caps, fall-off, fatigue, heat stages, pull-up).
-**Saves:** prefs `meter` / `offsetMs` only.
-**Outside lane:** `play-feedback.ts` (the nba function), `juice.ts` (nba usage only).
-**Dependencies:** players (stumble pose, optional; per-player release speed is deferred, §9).
+**Cut line:** meter Off mode; the court-edge glow (the flames stay).
+**Protocol:** bump needed (windows, states, gold = make, range gate, fatigue, pull-up, finish ring, Heat replacing `fire`).
+**Saves:** prefs `offsetMs` and `meter` only.
+**Outside lane:**
+- `progress.ts` (two optional type lines)
+- `play-feedback.ts` (the nba function)
+- `juice.ts` (nba usage only)
+- `ut/Match.tsx` (one line: keep `grade`/`box` on the progress it settles)
+
+**Dependencies:** ut (haptics, `heartbeat`); soccer (`sfx.perfect`); shims in `feel.ts` until those land.
 
 ---
 
-### nba-5 · P0 · Every point and every miss: fouls, free throws, turnovers, real misses, rebounding AI, BOARD, practice rules
+### nba-5 · P0 · Every point and every miss: fouls, free throws, turnovers, real misses, rebounding AI, the BOARD ring
 
-Covers:
-- NBA-01 (fouls, FT, and-ones), NBA-04, NBA-11
-- NBA-24 (miss endpoints), §11 #13 (pass lead)
-- audit §5 AI rebounding (perfect information, no box-outs)
-- STREAM "BOARD timing", research §5.5 steals and §5.6
-- box data to hosts, and practice-mode regressions
+As revision 2 nba-5 (NBA-01, 04, 11, 24; audit §5 rebounding; research §5.5–5.6), with V2's ring and juice.
 
-**Must**
-- **Era stub, new `hoops2/era.ts`.** `eraStyle(five)` returns neutral factors (`foul`, `tov`, `orb`, `threeAppetite`,
-  `pace`, all 1) until nba-8 fills it. This removes the forward dependency.
-- **Fouls.**
-  - `foulChance(kind, contest, shooter, defender, defIQ, era.foul)`, arithmetic only: contested drives/finishes 12–18%,
-    heavy jumpers 2–3%, threes ~1%.
-  - It rises with STR and a new optional `Hooper.fd` (from FTA per 36 in `hooper()`), and falls with defensive discipline
-    `(prd+ind)/2` and `defIQ`.
-  - A foul on a make is an and-one (2+1 or 3+1); on a miss, 2 or 3 free throws.
-- **Free-throw trips.**
-  - `Possession.ft?: { shooter, total, made, taken, and1 }`, with dead-ball placement and the clock stopped.
-  - `shootFreeThrow(p, off)` for the user; `autoFreeThrow(p)` = `p.rand() < freeThrow(rating)` for the AI, sims and skip.
-  - A missed last FT goes to the defense (~15% ORB on FT misses is simplified away; documented).
-  - **Online, the trip auto-shoots after 4 s idle**, so a phone sitting on the FT prompt never trips `STALL_MS`/`GONE_MS`.
-    Offline it waits.
-- **FT meter** (`hud-draw.ts` + the §5 FT context):
-  - A vertical bar with a fixed band; hold to raise the marker (0.6 s to the top) and release in the band.
-  - The band's half-width is set by FT rating, so σ 50 lands within ±6 points of `freeThrow(rating)`.
-  - A calm bonus (no contest), −10% when tired. Skippable.
-- **Team fouls and the bonus.** `HoopsGame.fouls` per half per side; from the 3rd team foul, non-shooting fouls give 2 FTs.
-  The defenders' reach roll resolves to steal / **reach-in foul** / nothing.
-- **Marks** (§6.7):
-  - `'4'` (3+1) and `'F0'…'F3'` (made FTs of a trip)
-  - `MARK_POINTS` and the strip text; `markPoints()` and `NBA_MARK_LABEL` exported
-  - Consumers: `Arcade.tsx POINTS` (nba branch), `ut/Match.tsx` (one line) and `ut/match-debrief.ts`
-- **Turnovers.**
-  - Reach-in steals ×0.4 when the handler separates > 4 ft/s, and ×0.2 from behind.
-  - **Directional** steals (the ball side).
-  - A failed poke stuns the handler 0.25 s.
-  - **Pass lead** uses the receiver's intended path and a 3.6 ft reach, so "PASS OUT OF REACH" no longer happens to a
-    teammate changing direction.
-- **Real misses (NBA-24).**
-  - The same uniform that decided the miss chooses front rim / back rim / glass / airball. Airball only for heavy+
-    contests or |off| > 150 ms.
-  - Carom length: threes 6–14 ft, rim attempts 3–8 ft.
-  - The `rim`, `glass` and `airball` events play `sfx.rim`, the backboard sample and an "ooh".
-- **Rebounding AI (audit §5).**
-  - Today every defender runs to the exact landing spot the moment a miss is decided (`engine.ts:1284`), and the user's
-    assist gets it too (988-989).
-  - Now each player reads a **landing estimate**: the true endpoint + seeded noise ∝ remaining flight time × (1 − rebIQ),
-    which converges as the ball drops. The user's assist uses the same estimate.
-  - **Box-outs:** the two players nearest the rim on each side seal their man (body between man and rim) for the first
-    0.4 s before releasing to the ball.
-- **BOARD timing.**
-  - On a miss, the controlled player shows a ring that fills toward the ideal jump moment: the ball dropping through his
-    max reach minus his time to peak.
-  - A jump in the 120 ms before it is a **green board**: +25% reach-race radius, plus a green flash.
-  - Ratings, height and position still decide. AI rebounders time with skill noise.
-  - Offense end now; the defense end comes free in nba-6 (same code, "your nearest man").
-- **Box data to hosts.** `HoopsGame.box` via `BoxTracker`; `onBoxScore(box)` from Hoops2 and Arcade (§6.2). Stripped from
-  the wire.
-- **Practice rules** (`practice` prop): no fouls or FT trips (a fouled drill attempt counts as a make if it went in, else a
-  miss), no box-outs requirement, no pip limit later.
-- `game.ts`: delete `void shooter` (NBA-11).
+**Must:**
+- **`era.ts` stub**, returning neutral factors until nba-8.
+- **Fouls:**
+  - `foulChance(kind, contest, shooter, defender, defIQ, era.foul)`, arithmetic only: drives and finishes 12–18%, heavy
+    jumpers 2–3%, threes ~1%; up with STR and the new optional `Hooper.fd`
+  - and-ones (2+1, 3+1); 2 or 3 FTs on a miss
+  - team fouls per half, with the bonus from the 3rd team foul
+  - reach-in fouls
+- **The FT band meter** (V2 B.1.5 #7, §5 FT row):
+  - hold A; the marker rises over ≤ 2 s; release in the band
+  - the band's half-width is set by FT rating, so σ 50 lands within ±6 points of `freeThrow(rating)`
+  - online auto-shoots after 4 s idle; the AI, sims and skip use `autoFreeThrow`
+  - for Heat, a FT trip that scores at least 1 point counts as one score event (+10); a trip never adds more than that
+- **Marks:** `'4'` and `'F0'…'F3'`; `markPoints()`, `NBA_MARK_LABEL`; consumers `Arcade.tsx` POINTS (nba branch),
+  `ut/Match.tsx` (one line), `ut/match-debrief.ts`.
+- **Turnovers:**
+  - directional steals; reach-in ×0.4 when the handler separates, ×0.2 from behind
+  - a failed poke stuns 0.25 s
+  - the pass lead uses the receiver's path (no "PASS OUT OF REACH" to a teammate who changes direction)
+- **Real misses (NBA-24):**
+  - front rim / back rim / glass / airball, chosen by the deciding uniform; airballs only for heavy+ or |off| > 150 ms
+  - caroms: threes 6–14 ft, rim attempts 3–8 ft
+  - the rim rattle and an "ooh" on rim-outs; the rim, glass and net sounds
+- **Rebounding AI:** a noisy, converging landing estimate (the user's assist uses the same one); box-outs by the two
+  nearest each side for 0.4 s.
+- **The BOARD ring** (V2 B.1.5 #6) uses `perfect.ts`: the ring closes on the ball's last drop toward your nearest man's
+  ideal jump. A gold tap = a PERFECT board: +25% reach radius, `double`, +12 Heat. Ratings and height still decide.
+- **Box data to hosts:** `onBoxScore`; `Progress.box` filled.
+- **Practice rules:** no fouls or FT trips; no box-out requirement.
+- Delete `void shooter` (NBA-11).
 
-**Cut line:** offensive fouls (charges); out-of-bounds turnovers; the "ooh" sample.
+**Acceptance:**
+- `fouls.test.ts`: bands by situation; monotone in STR/`fd` (up) and discipline/`defIQ` (down); the bonus; marks ↔
+  points; the online FT auto-shoot after 4 s; airballs only under the stated conditions.
+- `rebound.test.ts`: the estimate error shrinks as the ball drops; box-outs seal ≥ 0.3 s in ≥ 70% of misses; a gold board
+  is +25% reach and nothing else; the assist never reads the exact endpoint.
+- Calibration report (15 games/config, report only): FTA/FGA, FT%, and-ones, TOV% by rung, steals 50–65% of turnovers,
+  "PASS OUT OF REACH" < 1%, ORB%, three misses landing ≥ 10 ft.
+- Human harness: straight-drive strips ≤ 7% on Pro and ≤ 10% on Legend; the FT meter within ±6 points at σ 50; BOARD at
+  σ 50 adds +3 to +6 ORB% points over not jumping.
+- `ratings-matter`: FT 90 > 75; `fd` 90 draws more fouls; REB still matters.
+- `moments.test.ts`: drills within ±5 points of baseline; 0 FT trips in practice.
 
-**Tests and measurements**
-- `fouls.test.ts`:
-  - `foulChance` bands by situation; monotone in STR/`fd` (up) and discipline/`defIQ` (down)
-  - the bonus at the 3rd team foul; marks map to points
-  - a FT trip never changes ratings
-  - online auto-shoot after 4 s; airballs only under the stated conditions
-- `rebound.test.ts`:
-  - the AI estimate error shrinks as the ball falls
-  - box-outs put the sealer between his man and the rim for ≥ 0.3 s in ≥ 70% of misses
-  - a green board raises the reach radius by 25% and nothing else
-  - the assist no longer reads the exact endpoint
-- `gameplay.test.ts`: a direction-changing receiver catches a led pass; the steal direction rule.
-- Calibration report (15 games/config, report only):
-  - FTA/FGA, FT% and and-ones per 16
-  - TOV% at Rookie/Pro/All-Star/Legend
-  - steals as a share of turnovers (50–65%), PF and STL per 16
-  - "PASS OUT OF REACH" < 1% of passes
-  - ORB% and three misses landing ≥ 10 ft
-- Human harness: straight-drive strips Pro ≤ 7%, Legend ≤ 10%; FT meter at σ 50 within ±6 points; BOARD with σ 50 board
-  timing adds +3 to +6 ORB% points over not jumping.
-- `ratings-matter.test.ts` adds: FT 90 vs 75 scores more; `fd` 90 draws more fouls; REB still matters with box-outs.
-- `moments.test.ts` (opt-in): the green-room and finish drills unchanged within ±5 points of baseline; 0 FT trips.
+**Screenshots:** the FT meter (portrait, landscape, 320); the 3+1 toast; a front-rim miss and a glass miss; a box-out;
+the BOARD ring and a PERFECT board.
 
-**Screenshots:** FT line-up and meter (portrait and landscape), the 3+1 banner, a front-rim miss and a glass miss, a box-out,
-the BOARD ring and a green board.
-
-**Protocol:** bump needed (fouls, FT, new marks on the wire, turnovers, miss endpoints, rebounding AI, board timing).
-**Saves:** marks aren't saved (`ends` feed only the result screen and debrief).
+**Cut line:** charges (they move to nba-7's contact rules if time allows); out-of-bounds turnovers.
+**Protocol:** bump needed. **Saves:** none.
 **Outside lane:** `Arcade.tsx` (POINTS, nba branch), `ut/Match.tsx` (one line), `ut/match-debrief.ts`.
-**Dependencies:** ut (labels, box consumer), players (FT routine pose; falls back to idle).
+**Dependencies:** ut (labels, box consumer); players (FT routine pose, falling back to idle).
 
 ---
 
-### nba-6 · P0 (owner decisions 2 and 3) · Defense played by default: alternate format, Auto-defend, per-possession SIM, the rival's real score, solo overtime, RUN
+### nba-6 · P0 (owner decisions 2 and 3) · Defense played by default: four quarters, Auto-defend, SIM, the rival's real score, OT, Clutch
 
-Covers:
-- NBA-07 (format), STREAM "rival score from those possessions", "Auto-defend and SIM", "Online keeps the race"
-- game length v1, the team RUN, NBA-06 on every solo path
-- the defensive camera (live), a minimal defensive feedback line, the AI fallback format, and engine options for UT modes
+As revision 2 nba-6 (NBA-06, 07), with V2's format and staging.
 
-**Must**
-- **`game.ts` `newHoopsMatch(us, them, usBench, themBench, seed, { possessions = 16, clock = 14, startersOnly = false, defIQ, aiSkill })`.**
-  - It returns `{ us, them }` with linked arrays: one five's energy and subs serve both ends (`them.theirs === us.ours`,
-    `them.theirEnergy === us.energy`).
-  - Quarters of 4 + 4 and OT of 2 + 2.
-  - Seeds `'h2:'` and `'ai:'`; the race's `aiPossessionsOf` RNG order is untouched.
-- **`Hoops2.tsx`: prop `format: 'race' | 'alternate'`, `aiSkill`, `onRival(progress)`.**
-  - In alternate it runs your possession, then theirs: the autopilot with the rival's cards at `aiSkill`, your five
-    defending.
-  - The controlled defender `Possession.userD` (body 5–9): `step(p, dt, stick, guard)`. With the stick he slides at
-    `topSpeed × lerp(0.82, 0.95, prd)`. With no input, the existing `defend()` logic plays him (**idle-assist**), so idling
-    is never worse than today's AI.
-  - Hands up are automatic within 4 ft.
-  - The score bug shows one chip, "Q2 3/4 · D".
-- **Auto-defend** (prefs `autoDefend`, default off; the toggle is on the pre-game screen and, from nba-9, the pause menu):
-  defensive possessions play themselves at 3× with a ticker; tap to watch at 1×.
-- **SIM** (a 44 px chip at the start of each defensive possession): resolves it instantly through **the same engine path as
-  Auto-defend** (idle-assist, headless), so the result is identical by construction.
-- **Reward integrity.** In `manualOnly` modes (Circuit, Club Season, Cup), Auto-defend and per-possession SIM keep
-  `how: 'played'` when you played your offense. A whole-game SIM stays `'sim'`. Tested and confirmed with ut.
-- **`Arcade.tsx` (nba branch, §6.2):**
-  - Solo (`!online`, and every AI-rival path including the queue fallback, §6.9) uses `format: 'alternate'`.
-  - `shown`/`them` come from `onRival`.
-  - Online stays `race`, untouched.
-- **Solo ties never go to a rating.**
-  - Alternate: tied after 16 + 16 → OT periods (you start odd periods). The cap is 10, and only beyond it does `decide()`
-    run (never hit; opt-in `NBA_OT=1` 10k test).
-  - Full-game sims use a new `simHoopsMatch(us, them, seed, opts) → { us: Progress; them: Progress }`, exported from
-    `Hoops2.tsx` (the module `ut/Match.tsx` already imports). It runs the alternate engine headless with idle-assist
-    defense, so a whole-game SIM matches an Auto-defend game. It is used by:
-    - **Arcade's kickoff "SIM IT"** (nba branch)
-    - **`ut/Match.tsx simBoth`**: the nba line at 895/913 switches to `simHoopsMatch`; nfl's pairs are untouched
-  - Both include OT, so `decide()` never sees an NBA tie.
-- **RUN** (§3.7):
-  - Alternate: three straight scoring possessions by one team without the other scoring in between → "RUN 7-0" (the real
-    run points) and ×1.08 for that team's next possession, through `windowScale`. Symmetric for the AI.
-  - Online race version: **your own three straight scoring possessions** only, so it never depends on wire timing.
-  - In alternate, stage 2 Heat also ends when the rival scores 2 straight possessions (research §5.8).
-- **Defensive feedback (minimal):** after each AI possession, the chip shows their shot's coverage ("Open 3 · your man
-  7.2 ft away" / "Heavy contest · missed"). nba-7 adds the reasons.
-- **Defensive camera live:** `?arcade&def` lab hook (`Lab.tsx`, one line) starts a defensive possession; nba-2's rule is
-  measured.
-- **Kits per possession** (§6.1) so your team keeps its colours at both ends.
+**Must:**
+- **`newHoopsMatch(us, them, usBench, themBench, seed, { possessions = 16, clock = 14, startersOnly = false, defIQ, aiSkill })`:**
+  - linked energy and subs across both ends
+  - **quarters of 4 + 4, Clutch = the last 2 + 2 of Q4, OT 2 + 2** repeated (cap 10)
+  - seeds `'h2:'`/`'ai:'`; the race's `aiPossessionsOf` stays byte-identical
+- **`Hoops2` `format: 'race' | 'alternate'`, `aiSkill`, `onRival`:**
+  - your possession, then theirs: the autopilot with the rival's cards; your five defends
+  - your controlled defender `Possession.userD` is steered with the shared `Stick`
+  - idle = the existing `defend()` (idle-assist, never worse than today's AI)
+  - hands go up automatically within 4 ft
+  - the bug shows "Q2 · 3/4" on the possession line
+- **Heat at both ends:** stops (+15), conceding (−10) and the AI's own Heat by the same rules. The rival's bar is visible
+  in solo.
+- **Auto-defend** (prefs `autoDefend.nba`; on ut's pre-game screen and in the pause sheet): defensive possessions play
+  themselves at 3× with a ticker.
+- **SIM chip** (44 px): the same headless engine path as Auto-defend.
+- **Reward integrity:** `how: 'played'` with Auto-defend and SIMs in `manualOnly` modes (tested, confirmed with ut).
+- **`Arcade.tsx` (nba branch):**
+  - every AI-rival path (including the queue fallback) uses `alternate`
+  - `shown`/`them` come from `onRival`
+  - online stays `race`, untouched
+- **Ties:** OT in both formats. `simHoopsMatch()` (headless, idle-assist defense, with OT) feeds Arcade's SIM IT and
+  `ut/Match.tsx simBoth` (the nba line only), so `decide()` never sees an NBA tie.
+- **Clutch staging (V2 B.0.4)**, presentation only, with no rule change:
+  - the bug turns gold and reads CLUTCH
+  - the crowd bed rises
+  - the camera tightens 6%
+  - `heartbeat` when the margin is one score
+  - "FOR THE WIN" when the final possession can tie or win, and it always gets the replay
+- **Grade par per rung** (§3.14) from the host's level; online uses Pro.
+- **Defensive feedback (minimal):** the toast after each AI possession ("OPEN 3 · your man 7.2 ft away").
+- **RUN** is text only: "RUN 8-0" in the toast after 3 straight scoring possessions.
+- **Kits per possession** (§6.1); a `?arcade&def` lab hook.
 - **Hints:** "Defense: steer your man · or tap AUTO / SIM".
 
-**Cut line:** quarter-break banners; the "watch at 1×" tap during Auto-defend (the ticker stays).
-
-**Tests and measurements**
-- `game.test.ts` (always on):
-  - linked energy and subs across both ends
-  - quarter and OT indices; halftime and Icon "clutch" indices kept
-  - in alternate, the rival's score equals the points of the played AI possessions (no precomputed path)
-  - 200 forced ties → OT, 0 rating decisions (< 5 s)
-  - RUN and Heat-end transitions
-  - the race-format `aiPossessionsOf` output is byte-identical to before for 50 seeds (takeover safety)
-- `defense-format.test.ts`:
-  - idle-assist matches the AI path (≤ 0.5 ft drift over 5 s)
-  - SIM ≡ Auto-defend (same marks, same seed)
-  - `how: 'played'` with Auto-defend and SIMs in a `manualOnly` match
-  - full-game SIM vs Auto-defend game win % within ±5 points (opt-in, 300 games)
-- `toHooper-fields.test.ts` (§6.6).
-- Human harness (alternate): §3.6 policies (median ≤ Auto − 0.03; poor ≤ Auto + 0.12, as far as the stick-only defense
-  allows; re-asserted in nba-10).
-- `scripts/audit/nba-alt.cjs` (UT Squad Battles fixture through `nba-lib.mjs`):
-  - a full solo game with the median-human script at 1× lasts 4:00–6:00, broken down by §3.4 part
+**Acceptance:**
+- `game.test.ts`: linked arrays; quarter, Clutch and OT indices; in `alternate` the rival's score = the points of the
+  played AI possessions; 200 forced ties → OT with 0 rating decisions; the race `aiPossessionsOf` byte-identical over 50
+  seeds; Heat stop and conceded events.
+- `defense-format.test.ts`: idle-assist drifts ≤ 0.5 ft over 5 s from the AI path; SIM ≡ Auto-defend; `how: 'played'`;
+  opt-in 300-game SIM vs Auto-defend win % within ±5.
+- `nba-alt.cjs` (UT Squad Battles fixture):
+  - a full solo game with the median-human script at 1× lasts **4:00–6:00**, broken down by §3.4 part
   - Auto-defend and all-SIM lengths reported
-  - defensive camera overlap ≤ 35% at ≥ 90% of AI releases, at the 8 sizes
+  - defensive camera overlap ≤ 35% at ≥ 90% of AI releases at the 8 sizes
   - your defender never under a control
-  - frame budget §3.9 during defense
-  - the draft head-to-head vs AI also alternates
+  - frame budget during defense
+  - the draft head to head vs AI alternates
+  - Clutch staging seen in Q4's last 2 + 2
   - 0 page errors
-- Online regression: `nba-qa-run.mjs scripts/qa/online.mjs` (locked port) — two NBA clients still race and settle one
-  win / one loss.
+- Human harness (alternate): median defender ≤ Auto − 0.03; poor ≤ Auto + 0.12 (re-asserted in nba-10); Heat stage rates
+  reported against §3.7.
+- Online regression (`online.mjs` under the lock): two clients still race and settle one win and one loss.
 
-**Screenshots:** a defensive possession in a UT match (portrait, landscape and 320), the Auto-defend ticker, the SIM chip,
-the RUN banner, an OT banner, the "their shot" chip.
+**Screenshots:** a defensive possession (portrait, landscape, 320); the Auto-defend ticker; the SIM chip; the Clutch bug
+with "FOR THE WIN"; the OT bug; the rival's Heat bar.
 
-**Protocol:** bump needed (transition rules arrive in nba-7; here the RUN window factor touches the online race).
+**Cut line:** quarter-break toasts; "watch at 1×" during Auto-defend (the ticker stays).
+**Protocol:** bump needed (OT, Heat at both ends; the format itself is solo-only).
 **Saves:** prefs `autoDefend` only.
-**Outside lane:** `Arcade.tsx` (nba branch), `ut/Match.tsx` (`simBoth` nba line), `Lab.tsx` (one line), `render.ts`
-(kit mapping at the call site, §6.1).
-**Dependencies:** ut (M13 pre-game screen, result screen reads both sides' box, `how` semantics), nfl (same `onRival`
-shape), players (kits).
+**Outside lane:** `Arcade.tsx` (nba branch), `ut/Match.tsx` (`simBoth` nba line), `Lab.tsx` (one line), `render.ts` (kit
+mapping at the call site).
+**Dependencies:** ut (the pre-game screen, `how` semantics, the result sheet reading both sides' box); nfl (the same
+`onRival` shape); players (kits).
 
 ---
 
-### nba-7 · P1 · The on-ball duel at both ends: SWITCH/STEAL/CONTEST, move tiers and burst pips, drop look, fast breaks, intentional fouls, defensive feedback
+### nba-7 · P0/P1 · The duel at both ends: CONTEST and STEAL rings, SWITCH, the ankle-breaker, movement feel, moves and pips, transition
 
-Covers:
-- NBA-07 controls, STREAM "Moves: three tiers, three pips, cancellable after ~150 ms", "Fast breaks", "defensive looks (drop)"
-- NBA-24 velocity ramps, NBA-01 intentional fouls
-- research §5.4, §5.5 steals, §5.8 (On Fire refills pips), §5.10 contact reads
-- the defensive drill for owner decision 2 (§4.1)
+Covers V2 F.2 #5 and #7, B.1.4, B.1.5 #2/#4/#5, B.1.6's control frames; STREAM moves, fast breaks; NBA-24 ramps; NBA-01
+intentional fouls; research §5.4–5.5.
 
-**Must**
-- **Defense buttons** (the §5 defense row):
-  - `switchDefender(p, to?)`: the defender nearest the ball, or a tapped one.
-  - `reachIn(p)` (STEAL): in front of or beside the ball hand within 3 ft, with a chance from STL vs HND and the dribble
-    beat (ball low = better). Otherwise a whiff (0.35 s off balance) or a **reach-in foul** (likelier when repeated within
-    1 s; feeds the bonus). Cooldown 0.6 s.
-  - `jumpContest(p)` (CONTEST, jump on pointerdown): timed to the release from ≤ 4 ft, it grades one tier heavier and adds
-    a block chance by BLK, VRT, height and timing. Early, he is landing at the release (make-him-land). Contact on a late
-    jump can be a shooting foul.
+**Must (P0 first):**
+- **Defense buttons (§5):**
+  - **CONTEST** (A, jump on down): a ring closes on the shooter as he rises. Gold = a PERFECT contest (the lowest grade the
+    geometry allows, a block chance by BLK/VRT/height, +12 Heat). Early = landing at the release, or a shooting foul on a
+    late, close jump.
+  - **STEAL** (B): a 150 ms gold flash on the ball when it is exposed (during a crossover, or on a lazy pass). A tap inside
+    it = a PERFECT steal (a clean strip, no foul roll, +12 Heat). Outside it, a low chance and a reach-in foul that grows
+    when repeated inside 1 s. Cooldown 0.6 s.
+  - **SWITCH** (C): to the man nearest the ball.
   - The AI pump-fakes a defender who leaves his feet early.
-- **Moves (research §5.4), `engine.ts`:**
-  - tiers by HND: 85+ elite (100% travel, defender loses 0.45 s), 60–84 standard (80%, 0.30 s), < 60 basic (60%, 0.15 s,
-    higher strip risk)
-  - **3 burst pips** per possession, refilled by a pass, a new possession or **stage 2 Heat** (the nba-4 hook)
-  - a defender's bump costs a pip (`move:nopip` when empty)
-  - **cancel window**: a shoot or pass input ≥ 150 ms after a move starts ends it
-  - **velocity ramps** over 3 steps (no one-step change > 0.5 × top speed)
-  - Pips show as 1–3 dots on SHOOT (gesture mode) or on each move button (buttons mode).
-  - The engine emits `stumble:<idx>` when an elite-tier move beats a defender (contact read; players draw it, with our
-    lean as the fallback).
-- **Drop look.**
-  - `Scheme` adds `'drop'`: the screener's defender stays back near the rim on a pick (pull-up open, roll covered).
-  - `schemeFor` weights it by the offense's shooting and handling. `LOOK_TEXT/TIP` gain it.
-  - On defense a 44 px **look chip** cycles MAN / SWITCH / DROP before the AI possession. It is tapped during the dead
-    ball and costs no time; the default is the AI's choice for your five.
-- **Fast breaks.**
-  - `newPossession(..., start: 'half' | 'break')`: a break is a 2-on-1 or 3-on-2, with trailing defenders behind the ball
-    and the handler at speed near midcourt.
-  - Alternate: after your steal → break; after the AI's steal → its break.
-  - Race (online and sims): a seeded 8–10% break from the possession seed, identical on both phones.
-  - "FAST BREAK" banner.
-- **Intentional fouls.** In the last 2 possessions, an AI trailing by 3–6 with the user in the bonus fouls your worst FT
-  shooter (§3.7). You can do the same with STEAL. The FT meter plays it out.
-- **Defensive feedback.** A pure `defenseReason(p, shot)` names the main cause of a rival score: late jump / early jump /
-  your man N ft away / beaten off the dribble / switch mismatch / the look. It shows in the chip and in Last Play's
-  `basketballFeedback` (the defensive branch).
-- **`practice.drill: 'defend'`** ("get N stops in M AI possessions") for ut's defensive Moment (§4.1).
-- **BOARD at the defensive end** (nba-5's code, "your nearest man").
-- **Hints** for CONTEST, STEAL, SWITCH, the look chip and pips.
+- **Movement feel (V2 B.1.4)**, as engine constants in lookup tables:
+  - 0 → top speed in 0.30 s (ACC 95) to 0.55 s (ACC 60)
+  - top speed with the ball 13 ft/s (SPD 60) to 17 ft/s (SPD 99)
+  - a direction change > 90° costs 35% of speed at AGI 60 and 12% at AGI 95
+  - big men carry further before stopping
+  - chest-to-chest contact slows the handler to 40% and starts a 0.4 s bump; STR + momentum beats it (bully-through
+    stays)
+- **Moves:**
+  - velocity ramps over 3 steps (50 ms); no single-step Δv > 0.5 × top speed
+  - control returns at the V2 B.1.6 frames: crossover 9 f, step-back 13 f (SHOOT buffered from 6 f), spin 12 f, pump 6 f,
+    euro-step 12 f
+  - cancellable by shoot or pass ≥ 150 ms after the start
+  - tiers by handle: < 60 / 60–84 / 85+ (travel 60 / 80 / 100%; the defender loses 0.15 / 0.30 / 0.45 s)
+  - **3 pips** per possession, refilled by a pass, a new possession, or On Fire starting; a 4th move is slow and loose
+  - pips show as dots on A
+- **The ankle-breaker (V2 B.1.5 #2):**
+  - when the on-ball defender lunges or reaches, a 150 ms gold flash rings his feet
+  - a crossover or step-back started inside it = a PERFECT move: he plays `slip`/`stumble` for 0.8 s, with `double` and
+    +12 Heat
+  - emitted as `ankles-perfect:<idx>`
+- **Transition (promoted, V2 B.1.1):**
+  - `newPossession(..., start: 'half' | 'break')`: after your steal or a long defensive rebound (≥ 12 ft carom), your
+    next possession is a 3-on-2 (or 2-on-1) with 7 s on the clock
+  - the AI's steals feed its breaks too
+  - the race (online and sims) gets a seeded 8–10% break share from the `'break:'` stream, identical on both phones
+- **Intentional fouls** (revision 2 rule): the last 2 possessions, the AI trailing by 3–6, the user in the bonus; they go
+  to your worst FT shooter.
+- **Defensive feedback:** `defenseReason()` (late jump / early jump / your man N ft away / beaten off the dribble / switch
+  mismatch) in the toast and in LAST PLAY's defensive branch.
+- **`practice.drill: 'defend'`** ("N stops in M possessions") for ut's defensive Moment.
+- **DROP** as an AI scheme the AI picks for your five (no chip). BOARD at the defensive end.
 
-**Cut line:**
-- **zone 2-3** look (defenders hold zone spots by ball position)
-- early-offense starts after long rebounds (4-on-4, 6–8%)
-- the repeat-move ×0.6 decay
-- contact-read stumbles
-
-**Tests and measurements**
-- `defense.test.ts`:
-  - SWITCH picks the defender nearest the ball
-  - STEAL: ≈ 15–20% well timed and ≈ 5% untimed for 75 vs 75; foul rate 25–35% when repeated inside 1 s
-  - a timed jump from ≤ 4 ft upgrades the contest; ≥ 200 ms early downgrades it
-  - drop: the screener's man ≥ 8 ft nearer the rim than the screen
-  - intentional fouls fire only in the qualifying state
+**Acceptance:**
+- `defense.test.ts` (75 vs 75):
+  - SWITCH picks the man nearest the ball
+  - STEAL: a gold-flash tap at σ 50 strips 30–45% with no foul; untimed ≤ 8%; repeated inside 1 s fouls 25–35%
+  - CONTEST: gold rate 35–55% at σ 50 over 600 jumpers from ≤ 4 ft; a PERFECT contest never grades lighter than heavy
+  - an early jump ≥ 200 ms downgrades the contest
 - `moves.test.ts`:
   - travel 100 / 80 / 60% ± 5% by tier; lost step 0.45 / 0.30 / 0.15 s
-  - the 4th move without pips is refused; stage 2 Heat refills them
-  - a cancel at ≥ 150 ms stops the move and starts the shot
-  - max one-step Δv ≤ 0.5 × top speed
-- `transition.test.ts`: race-format break share 8–10% (seeded, identical across two runs); a break starts with defenders
-  behind the ball.
-- Scripted defender policies over 600 AI possessions (Pro):
-  - median ≤ Auto − 0.03
-  - poor ≤ Auto + 0.12
-  - good contester ≤ idle − 0.05
-  - early jumper ≥ idle + 0.05
-  - steal spammer: more fouls, PPP ≥ idle
-  - versus drop, the AI's pull-up mid share rises
-- Human harness: cross-drive with pips ≥ 0.85 PPP; transition PPP 1.15–1.35 (report).
-- `nba-def.cjs` (`?arcade&def`) at the 8 sizes:
-  - defense buttons ≥ 44 px with no overlap; your defender never under a control
-  - the CONTEST tap jumps within 1 frame
-  - frame budget during defense
-  - 0 page errors
+  - control returns at the B.1.6 frames ± 1
+  - a 4th move without pips is slow
+  - a cancel at ≥ 150 ms starts the shot
+  - max Δv ≤ 0.5 × top speed per step
+  - 0 → top speed in 0.30 ± 0.03 s (ACC 95) and 0.55 ± 0.05 s (ACC 60)
+  - the turn penalty at AGI 60 / 95
+- `transition.test.ts`: race break share 8–10%, identical across two runs; alternate transition share 12–17% with PPP
+  1.15–1.35 (report; asserted in nba-10).
+- Defender policies over 600 AI possessions (Pro): median ≤ Auto − 0.03; poor ≤ Auto + 0.12; good contester ≤ idle −
+  0.06; early jumper ≥ idle + 0.05; steal spammer fouls more with PPP ≥ idle.
+- Human harness: cross-drive with pips ≥ 0.85 PPP; PERFECT ankle-breakers 10–30% of moves at σ 50 (report).
+- `nba-def.cjs`: the defense cluster per §3.8; CONTEST jumps within 1 frame; your defender never under a control; the
+  frame budget; 0 page errors.
 
-**Screenshots:** the defense HUD (portrait and landscape), a timed block, a reach-in foul, the drop look, a 3-on-2 break,
-elite vs basic crossover, pips on SHOOT, the defensive reason chip.
+**Screenshots:** the defense HUD (portrait, landscape, 320); a PERFECT contest / block; the STEAL flash; a reach-in foul;
+the ankle-breaker flash and stumble; elite vs basic crossover; pips; a 3-on-2 break.
 
-**Protocol:** bump needed (moves, pips, cancel, ramps, fast breaks and drop also play in online races; board timing).
+**Cut line (P1):**
+- the lob ring (B held with a cutter: one ring for the pass and the dunk); the lob stays as today
+- zone 2-3
+- early offense after long offensive rebounds
+- the repeat-move decay
+
+**Protocol:** bump needed (moves, pips, ramps, movement constants, contact, transition, defense outcomes).
 **Saves:** none.
 **Outside lane:** `play-feedback.ts` (the nba defensive branch).
-**Dependencies:** players (steal reach, contest jump, block vs rebound poses, tiered moves, stumble; all fall back to
-existing poses).
+**Dependencies:** players (crossover, step-back, spin, euro, contest, reach, stumble/slip poses per B.1.6; existing poses
+as the fallback).
 
 ---
 
-### nba-8 · P0 · Who shoots and how eras play: shot value, usage, eras, four-rung difficulty, AI playbook, hot/cold zones
+### nba-8 · P0 · Who shoots and how eras play: shot value, usage with ISO, eras, the four-rung ladder, the AI playbook
 
-Covers NBA-02, NBA-03, NBA-05 (including the 1960s/70s three-point leak), NBA-19 (four rungs, continuous), audit §5 AI
-offense (no SPIN, CUT, SPACE or set post-up), and STREAM P1 hot/cold zones. **Mechanisms with local acceptance only. The
-§3 bands are asserted once, in nba-10.**
+As revision 2 nba-8 (NBA-02, 03, 05, 19; audit §5 AI offense). **Mechanisms with local acceptance only; the §3 bands
+are asserted once, in nba-10.**
 
-**Must**
-- **Shot value (NBA-02).**
-  - Mid and close fall toward their targets (`offGreenBase` / `perfectCap`).
-  - Rim finishes rise for an average finisher: `0.9^(crowd+spacingHelp)` becomes a lookup table equal to `0.95^n`
-    (arithmetic rule), capped.
-  - The value order holds: rim > corner three > above-break three > mid (unit test on `shotValue`).
-- **Usage (NBA-03).**
-  - Optional `Hooper.usg` from real data (FGA estimated from `ppg`, `fg2`, `fg3`, `a3`, `ft`, `fta`; + `0.44·FTA + TOV`,
-    per 36), falling back to the points rank.
-  - **`usageShares()` lives in a new dependency-free `hoops2/usage.ts`**, so the UT chunk stays ≤ +2 KB.
-  - `autopilot.ts` weights touches toward each five's real shares (star 28–35% of FGA, soft cap 36%). The PG enters the
-    ball to the star.
-  - **Build-up rule:** no heavily contested three before 5 s of clock is used, unless the clock is under 4 s.
-- **Eras (NBA-05), `era.ts` filled.**
-  - `eraStyle(five)` reads the median `Hooper.yr` and sets:
-    - three-point appetite: pre-1980 ×0.05, plus "no three unless the clock is < 3 s or trailing late"; 1980s ×0.35,
-      1990s ×0.65, 2000s ×0.75, 2010s ×0.9, 2020s ×1.0
-    - pace
-    - post-up weight
-    - mid-range tolerance
-    - a turnover factor and a crash-the-glass factor (for the §3.1b TOV/ORB rows)
-    - a defensive foul factor
-  - **No displayed rating changes:** pre-1980 `thr` keeps its touch-based estimate (see §11 M4). The 1960s/70s leak is
-    closed by behaviour, to 3PA/FGA ≤ .05.
-- **Difficulty (NBA-19).**
-  - Difficulty changes only the AI's side. `difficulty.ts` gets nfl's `userDefenseIQ(online, level)` (§6.2): offline the
-    user defends at the standard level; online `COMPETITIVE_DEFENSE`.
-  - `autopilot.ts releaseSd(skill)` becomes the §3.2 table-interpolated curve; decision sharpness also scales with skill.
-  - `windowFactor(def)` is continuous.
-  - All four UT rungs plus Club Season's adaptive skill and def are covered.
-- **AI playbook, new `hoops2/plays.ts`.**
-  - Six plays from the existing `screen` / `cut` / `space` primitives: High Pick, Iso Star, Drive and Kick, Post Feed,
-    Floppy, Horns. Each is a list of timed teammate actions and starting spots; they never touch ratings or odds.
-  - The autopilot calls a play per possession, weighted by the five's archetypes and era.
-  - The AI handler uses SPIN, CROSS and STEP by tier and situation.
-  - Bigs with post skill get set post-ups. Now that the user picks the defensive look, the AI's plays matter.
-  - Card dealing (nba-10) reuses this file, with its own `'cards:'` stream.
-- **Hot and cold zones (P1).**
-  - Optional `Hooper.zones` from real splits against that season's league average (`LEAGUE_3P` anchors from §4.6,
-    interpolated; no 3P zones before 1979-80; the corner gets +2.7).
-  - Hot ≥ +3 on ≥ 2 3PA/g, lethal ≥ +6 on ≥ 4, cold ≤ −4. Effect: lethal +5, hot +3, cold −2 points.
-  - A small flame or frost mark under the handler, only while he stands in that zone.
-- `ratings-matter.test.ts` keeps every monotonicity test and adds:
-  - usage follows creation ratings
-  - a five's star takes the most shots
-  - a hot zone never lowers makes
-  - each of the four rungs is harder than the one below
+**Must:**
+- **Shot value:** mid and close fall toward their targets; rim finishes rise (a lookup table, no `pow`); the value order is
+  rim > corner three > above-break three > mid.
+- **Usage:**
+  - optional `Hooper.usg` from real data
+  - `usageShares()` in the dependency-free `hoops2/usage.ts`
+  - the autopilot weights touches to real shares (star 28–35% of FGA, soft cap 36%)
+  - **ISO** (the user's CALL and the AI's Iso Star play) feeds the top-usage card
+  - build-up rule: no heavily contested three before 5 s of the clock unless < 4 s remain
+- **Eras (`era.ts`):** three-point appetite by decade (pre-1980 ×0.05 plus the late-clock rule, 1980s ×0.35 … 2020s
+  ×1.0), pace, post-ups, mid tolerance, turnover, crash and foul factors. No displayed rating changes.
+- **The four-rung ladder:**
+  - difficulty changes only the AI's side (`userDefenseIQ` shared with nfl in `difficulty.ts`)
+  - the table-interpolated, monotone `releaseSd(skill)`
+  - the continuous `windowFactor`
+  - **the gold-offer gate by rung** (§3.3: Legend offers gold on open looks only)
+  - all four UT rungs plus Club Season's adaptive skill covered
+- **AI playbook (`hoops2/plays.ts`):** High Pick, Iso Star, Drive and Kick, Post Feed, Floppy, Horns, from the existing
+  primitives. Picked by archetype and era. The AI uses SPIN / CROSS / STEP by tier; bigs get set post-ups.
+- **Hot and cold zones (P1, V2 keeps them):**
+  - `Hooper.zones` from real splits vs that season's league average
+  - the effect (lethal +5, hot +3, cold −2 points) goes into the off-gold make chance and the amber cap, never into gold
+  - shown as a faint floor glow for the handler only (V2 B.1.8)
 
-**Cut line:** hot/cold zones as a whole (data, effect and mark ship together or not at all: no hidden modifiers); the
-Horns and Floppy plays (four plays stay).
-
-**Tests and measurements**
-- `era.test.ts`: `eraStyle` factors by decade, monotone in appetite.
-- `usage.test.ts`: shares sum to 1, the soft cap holds, and there are no imports beyond types (a source scan).
-- `plays.test.ts`: each play's actors reach their spots within 3 s; plays never change a Hooper or `releaseProbability`
-  inputs.
-- `difficulty.test.ts` (shared, nba cases): `releaseSd` monotone over [0.42, 0.94] through the anchors ±5 ms;
-  `windowFactor` continuous.
-- `toHooper-fields.test.ts`: `usg`, `yr`, `fd` and `zones` present on rated UT cards (§6.6).
-- **Provisional report** (`NBA_CAL=1`, 60 games/config; report only):
-  - era order (3PA by decade, 1960s/70s ≤ .05)
+**Acceptance:**
+- `era.test.ts`, `usage.test.ts` (shares sum to 1; the soft cap; source scan: no imports beyond types), `plays.test.ts`
+  (actors reach their spots within 3 s; plays never change a Hooper or ring inputs).
+- `difficulty.test.ts`: `releaseSd` monotone over [0.42, 0.94]; `windowFactor` continuous; the gate by rung.
+- `toHooper-fields.test.ts`: `usg`, `yr`, `fd` and `zones` survive packs' `toHooper`.
+- `ratings-matter`: usage follows creation ratings; the star takes the most shots; a hot zone never lowers makes; each
+  rung is harder than the one below.
+- Provisional report (`NBA_CAL=1`, 60 games/config):
+  - era order (pre-1980 3PA/FGA ≤ .05)
   - concentration rows (usage 25–36%, top scorer ≤ 45%, ≥ 3.5 scorers, PG time ≤ 45%, C slot 3PA ≤ 10%)
-  - 0 "heavy three before 5 s with clock > 4"
-  - the TOV bands re-measured after the split (the critique's forward dependency)
-  - for 90 v 75: 3PA rate ≤ .55, heavy+smothered ≤ 50%, passes ≥ 1.0, seconds per possession ≥ 6
-- `balance.test.ts` (opt-in) re-run and reported.
+  - 0 heavy threes before 5 s with > 4 s left
+  - for 90 v 75: 3PA rate ≤ .55, heavy+smothered ≤ 50%, passes ≥ 1.0, seconds ≥ 6
+- Human harness: ISO puts the top-usage card on 28–35% of the human's FGA when used on every possession.
 
-**Screenshots:** a hot-zone flame, a cold frost mark, an AI post-up, an AI spin move.
+**Screenshots:** a hot-zone glow, a cold mark, an AI post-up, an AI spin.
 
-**Protocol:** bump needed (shot value, AI usage and tempo, era behaviour, difficulty split, zones, AI plays).
-**Saves:** new optional `Hooper` fields are derived, never saved.
-**Outside lane:** `difficulty.ts` (nfl's helper name, shared), `Arcade.tsx` and `ut/Match.tsx` (pass `userDefenseIQ` in
-nba lines).
-**Dependencies:** nfl (`difficulty.ts`), packs (`toHooper`, §6.6), ut (`usageShares()` for `league.ts`).
+**Cut line:** hot/cold zones as a whole (data, effect and glow ship together or not at all); the Horns and Floppy plays.
+**Protocol:** bump needed. **Saves:** none (derived fields).
+**Outside lane:** `difficulty.ts` (nfl's helper name), `Arcade.tsx` and `ut/Match.tsx` (pass `userDefenseIQ` in the nba
+lines).
+**Dependencies:** nfl (`difficulty.ts`), packs (`toHooper`), ut (`usageShares()` for `league.ts`).
 
 ---
 
-### nba-9 · P0 · Match flow and online: pause, quit and forfeit, online overtime (design first), tip-off intro, box score and player of the game
+### nba-9 · P0 · Match flow and online: online OT and forfeit (design first), online pause, the tip-off curtain, the box sheet
 
-Covers NBA-09, NBA-06 online, NBA-10 (overlay), NBA-30 (attrs skip, intro, clip preload), research §5.12 (×6.2), and
-online stall safety. **Order inside the task: (1) the online design note, committed alone; (2) online OT and forfeit with
-the two-client matrix; (3) pause and the menu; (4) intro and box overlay.** The online part touches the three-sport
-`Arcade.tsx` paths, so it is done first and nothing else in the task touches them.
+As revision 2 nba-9 (NBA-06 online, 09, 10, 30), with the offline pause already in nba-2 and the result screen now ut's.
+**Order inside the task:** (1) the design note, committed alone; (2) online OT and forfeit with the matrix; (3) the online
+pause sheet and full pause items; (4) the curtain and the box sheet.
 
-**Must**
-- **(1) Design note** `docs/studio-overhaul/nba-online-ot.md`. It is a pure-function design for the race with OT.
-  - `matchState(mine.ends, theirs.ends) → { need, over, winner }`:
-    - `need = 16 + 2m`, where m is the smallest number of OT periods after which the scores differ, counting each side's
-      points through `need` only.
-    - It is computed identically on both phones from the two `ends` arrays.
-  - A phone plays while `mine.ends.length < need`, and shows the WaitLine when it is ahead of the rival.
-  - The wire's `done` is `ends.length ≥ need && over`, so it is monotonic: `need` only grows while a side is waiting.
-  - `rivalLive` (`Arcade.tsx:179`) replaces `wire.done && ends.length >= TOTAL` with `matchState`.
-  - **Takeover:**
-    - `finishedFrom` (`Arcade.tsx:60`) slices to `need`, not `TOTAL`, and the AI sim continues the same seeded game
-      (`aiPossessionsOf(..., 16 + 2·10)` precomputed).
-    - The stall and gone timers (`STALL_MS`, `GONE_MS`) key on "mine reached `need`, theirs hasn't", not on `mine.done`.
-  - **Forfeit:** the `'FF'` contract (§6.2–6.3).
-  - **Limits:** ≤ 37 ends; 10 OT periods, then the old `decide()`; old clients can't meet new ones after the lead's bump.
-  - The note lists every changed line in `Arcade.tsx` and is announced in `nba.md` for nfl, whose OT drives follow the
-    same shape.
-- **(2) Online OT and forfeit**, built from the note.
-  - QA-only hooks behind `ns=inspect` on localhost, so the matrix can force cases: an all-miss script to force a tie, and
-    stall or forfeit at a chosen possession.
-  - `scripts/audit/nba-online.mjs`: two clients on relay 7795 run the §3.12 matrix (20 seeded runs).
-- **(3) Pause and quit**, new `PauseMenu.tsx` + `match.css`:
-  - A pause button in the score bug (44 px).
-  - Offline: stepping stops (`p.t` frozen), and every between-possession timer goes through a `PausableTimers` helper
-    (replacing the `setTimeout` chain in `finish()` / `next()`).
-  - It auto-pauses on `visibilitychange` / `pagehide`.
-  - Menu:
-    - Resume
-    - Controls help (a §5 diagram)
-    - meter mode
-    - timing calibrator (nba-4)
-    - Auto-defend
-    - Sound and Haptics (§6.8: read-modify-write)
-    - Quit
-  - Online: "Online: the game keeps going" (no freeze) and Forfeit with a confirm.
-  - Offline Quit confirms, then calls `onQuit` → a defined loss. Moments and Training pass their existing exit as `onQuit`
-    (one line in `Training.tsx`); hosts without it show Resume only.
-- **(4) Tip-off and the end.**
-  - Hoops2 skips `loadAttrs()` when `five`/`rivalFive` are given; Arcade's nba branch skips it for `teams`.
-  - The 700 ms blank timer becomes a 1.5 s skippable intro: both fives with numbers and names, the defensive look, one
-    controls reminder.
-  - Players' clips are preloaded during it (§6.5). Arcade takes `kickoff={false}` from hosts that already showed a
-    pre-game screen (§6.4).
-  - Between possessions a tap advances (skips the celebration and replay). Control is never lost after a score.
-  - **Final overlay:** a two-tab card, Box score / Player of the game.
-    - Columns PTS FG 3P FT REB AST STL BLK TO PF PURE, in an internal scroller with a sticky name column at 320 wide.
-    - A "real-game pace ×6.2" toggle.
-    - The POG by game score `PTS + 0.4·FGM − 0.7·FGA − 0.4·(FTA−FTM) + 0.7·ORB + 0.3·DRB + STL + 0.7·AST + 0.7·BLK − TOV − 0.4·PF`,
-      with his line.
-  - `Progress.box` reaches hosts and is stripped before the wire.
+**Must:**
+1. **`docs/studio-overhaul/nba-online-ot.md`:**
+   - `matchState(mine.ends, theirs.ends) → { need, over, winner }`, with `need = 16 + 2m`
+   - a monotonic `done`
+   - `rivalLive` and `finishedFrom` slice to `need`
+   - the stall and gone timers key on "mine reached `need`, theirs hasn't"
+   - the `'FF'` forfeit
+   - ≤ 37 ends
+   - every changed `Arcade.tsx` line listed and announced to nfl
+2. **Online OT and forfeit** built from the note. QA-only hooks behind `ns=inspect` on localhost can force a tie, a stall
+   or a forfeit. `scripts/audit/nba-online.mjs` runs the §3.12 matrix.
+3. **The pause sheet, complete:**
+   - Resume, Controls help (a §5 diagram), Calibrate, meter mode, Auto-defend, Sound and Haptics (`withSettings`), Quit
+   - online: "the game keeps going" and Forfeit with a confirm → `'FF'`
+   - "Today 27 min · next reward at 30" when ut's minutes API is present (V2 E.9 #2; optional prop, absent otherwise)
+4. **Start and end:**
+   - skip `loadAttrs()` when fives are given
+   - the 1.5 s skippable curtain: both fives with numbers and names and one controls reminder; the same curtain as
+     `rematch()`
+   - players' clip preload during it
+   - `kickoff={false}` from hosts with a pre-game screen
+   - between possessions a tap advances
+5. **`hud/BoxSheet.tsx`** (shared, generic columns):
+   - NBA columns PTS FG 3P FT REB AST STL BLK TO PF PERFECT
+   - a sticky name column scroller at 320
+   - a "real-game pace ×6.2" toggle
+   - player of the game by game score, with his line
+   - opened by ut's BOX SCORE button from `Progress.box`
 
-**Cut line:** the POG card's "best moment" mini replay; the landscape-specific box layout (it uses the scroller); the
-controls diagram (text instead).
-
-**Tests and measurements**
-- `arcade-ot.test.ts` (always on, pure):
-  - `matchState` on synthetic `ends` pairs: tie → need 18 → 20…
-  - `done` monotonic
-  - takeover with OT gives the same score on both "phones"
-  - `'FF'` ends the match at once and is never inferred from a missing field
-  - ≤ 37 ends
-- `nba-online.mjs` matrix (§3.12): tie → OT on both; OT + stall; OT + forfeit; OT + 30 s background; 0 mismatches in 20
-  seeded runs. Plus the old race regression: one win / one loss.
-- `pause.test.ts`:
-  - 0 engine steps and 0 timer callbacks in a 10 s pause
-  - a paused-and-resumed scripted game ends with identical marks
-  - `withSettings` touches only `settings.sound/haptics` and keeps a just-settled UT state
+**Acceptance:**
+- `arcade-ot.test.ts` (pure): `matchState` tie → 18 → 20…; `done` monotonic; a takeover with OT gives the same score on
+  both phones; `'FF'` ends at once and is never inferred from a missing field; ≤ 37 ends.
+- `nba-online.mjs`: tie → OT on both; OT + stall; OT + forfeit; OT + 30 s in the background. 0 mismatches in 20 seeded
+  runs, plus the old race regression (one win, one loss).
 - `nba-match.cjs`:
-  - pause freezes the clock text
-  - auto-pause on hide
-  - quit → loss shown
-  - **pre-game §3.10** (≤ 2 taps, ≤ 3.5 s; intro skipped ≤ 0.3 s) on the UT fixture, with the M13/M9 parts reported
-    separately until ut and shell merge
-  - UT mount without the 1.1 MB attrs load
-  - the final card at 320 with no page scroll and text ≥ 10 px
+  - the pre-game flow per §3.10 (≤ 2 taps, ≤ 3.5 s; the curtain skipped in ≤ 0.3 s)
+  - a UT mount without the 1.1 MB attrs load
+  - the online pause doesn't freeze; forfeit → a loss here, a win there
+  - the box sheet at 320 with no page scroll and text ≥ 10 px
+  - 0 page errors
+- `pause.test.ts` extended: `withSettings` touches only `settings.sound/haptics` and keeps a just-settled UT state.
 
-**Screenshots:** the pause menu (393×852, 320×568, landscape), the online forfeit confirm, the OT banner (online, both
-phones), the tip-off intro (and its reduced-motion version), the box score at 320 and 393, the POG card.
+**Screenshots:** the pause sheet (393, 320, landscape); the online forfeit confirm; the OT bug on both phones; the
+curtain (and its reduced-motion version); the box sheet at 320 and 393; the POG.
 
-**Protocol:** bump needed (OT possessions and `'FF'` on the wire; the tie rule; the takeover with OT).
-**Saves:** none saved; `Progress` fields optional; the `App.tsx` settings listener is read-modify-write (tested).
-**Outside lane:** `Arcade.tsx` (the shared online paths: design-noted, adopting nfl's names), `App.tsx` (settings listener
-and forfeit mapping, per §6.3/6.8, coordinated with ut), `ut/Match.tsx` (forfeit → won), `evolution/Training.tsx` (`onQuit`).
-**Dependencies:** nfl (the same forfeit/OT shape), ut (forfeit settlement, in-progress marker, tie copy §4.5), shell (M9),
-players (clip preload), lead (`arcadeOf` unchanged; the bump).
+**Cut line:** the POG's mini replay; a landscape-specific box layout; the controls diagram (text instead).
+**Protocol:** bump needed (OT possessions and `'FF'` on the wire; the takeover with OT).
+**Saves:** none.
+**Outside lane:**
+- `Arcade.tsx` (the shared online paths, design-noted)
+- `App.tsx` (settings listener, forfeit mapping)
+- `ut/Match.tsx` (forfeit → won)
+- `evolution/Training.tsx` (`onQuit`)
+
+**Dependencies:** nfl (the same OT/forfeit shape); ut (forfeit settlement, the in-progress marker, BOX SCORE); shell;
+players (clip preload); lead (`arcadeOf` unchanged).
 
 ---
 
-### nba-10 · P0 + P1 · Planning cards (cut first), the single global fit, final QA and handoffs
+### nba-10 · P0 + P1 · Daily Play (P1, cut first), the single global fit, final QA and handoffs
 
-Covers STREAM "Three play cards before a possession, plus defensive looks", the one asserted calibration (restructure
-point 2), the re-measured game length, the final QA, and the handoffs.
-
-**Must (in this order)**
-1. **The global fit.** All mechanics are in. The fit turns only named knobs:
-   - `offGreenBase`, `perfectCap`
-   - the foul base, the steal base
-   - the `releaseSd` anchors, `windowFactor`
+**Must (in this order):**
+1. **The NBA Daily Play** (P1, V2 D.3; cut first if the session overruns). `hoops2/daily-play.ts`:
+   ```ts
+   export interface DailyPlay { id: string /* 'nba:<ET day key>' */; title: string /* "Down 2 · 14 s · ball in Curry's hands" */;
+     us: { ids: string[]; star: string }; them: { ids: string[] }; start: { you: number; rival: number; clock: number; possessions: 1 | 2; startAt: 'half' | 'break' };
+     goal: 'win' | 'tie-or-win'; par: { seconds: number; perfects: number } }
+   export function dailyPlayFor(day: string): DailyPlay;     // seeded from 'daily:nba:' + day; real era squads from the draft data; same for everyone
+   export function scoreDailyPlay(r: { won: boolean; perfects: number; seconds: number }): { score: number; stars: 0 | 1 | 2 | 3 };
+   ```
+   - `Hoops2` gets a `scenario` prop: the start state and 1–2 possessions; no curtain, alternation or OT
+   - a pool of ≥ 30 hand-written scenario templates (down 1–3, 8–24 s, end-of-quarter heave, defend-the-last-shot)
+     filled from real era squads
+   - ut hosts the three attempts, the board and the share card
+2. **The global fit.** Named knobs only:
+   - `releaseSd` anchors, `windowFactor`
+   - the off-gold fall-off and amber caps
+   - the foul and steal bases
    - break share, box-out timing
    - era factors
+   - Heat gains (only if §3.7 fails; the Help text is updated with them)
 
-   Iterate at `NBA_CAL_GAMES=15`, then accept with `NBA_CAL=1 NBA_CAL_ASSERT=1` at **150 games/config** for every row in
-   §3.1, §3.1b, §3.2, §3.3, §3.5, §3.6 and §3.7, plus the per-player sanity rows. The human harness covers all four rungs.
-   `ratings-matter` stays green. `moments.test.ts` gives the §3.11 after-numbers per Moment, with bands for ut. Budget:
-   ≤ 6 heavy.sh acceptance runs.
-2. **Handoffs written in `nba.md`:**
-   - the score scale per 16 (mean and SD, alternate and race) for `ut/league.ts` and `engine/broadcast.ts` (§4.4)
+   Iterate at 15 games, then accept with `NBA_CAL=1 NBA_CAL_ASSERT=1` at **150 games/config** for every row in §3.1,
+   §3.1b, §3.2, §3.3 (gold and make bands), §3.5, §3.6, §3.7 and §3.14, plus the per-player sanity rows. The human harness
+   covers all four rungs. `ratings-matter` stays green. Moments bands go to ut. At most 6 acceptance runs through heavy.sh.
+3. **Handoffs in `nba.md`:**
+   - the score scale per 16 (alternate and race) for `ut/league.ts` and `engine/broadcast.ts`
    - the Moments bands
    - the tie copy
-   - the `BADGE_LABEL` decision
-   - **the post-merge re-check for the lead:** packs re-rates every card (owner decision 5) and makes matches use card
-     ratings, so the squads the fit used will shift. The lead runs `NBA_CAL=1 NBA_CAL_GAMES=60` on the integration
-     branch, then a 1-hour knob re-fit if any §3.1 row leaves its band.
-3. **Final QA:**
-   - `npm run typecheck`, the full `npm test` once, and one `npm run build` (4 GB heap); all through heavy.sh
-   - every `scripts/audit/nba-*.cjs/mjs` at the 8 sizes, with both reduced-motion modes
+   - `BADGE_LABEL`
+   - the published Heat numbers
+   - the lead's post-merge re-check (`NBA_CAL=1 NBA_CAL_GAMES=60` on the integration branch after packs' re-rate, plus a
+     1-hour knob re-fit if a §3.1 row leaves its band)
+4. **Final QA:**
+   - `npm run typecheck`, the full `npm test` once and one `npm run build`, all through heavy.sh
+   - every `scripts/audit/nba-*` at the 8 sizes in both reduced-motion modes
    - the shared `scripts/qa/core-gameplay.mjs`, `gameplay.mjs`, `play-feedback.mjs` and `online.mjs` through
      `nba-qa-run.mjs`
    - the online matrix again
-   - game length §3.4 re-measured with cards
-   - frame budget §3.9 in offense, defense, FT trips and replays
-   - bundle §3.9 (game chunk ≤ +15 KB gzip, main +0, UT ≤ +2 KB)
-   - test time ≤ +60 s
-4. **Docs:** `ARCADE-V2.md` (format, length, defense), `CORE-GAMEPLAY.md` (the §5 controls table, BOARD, FT, defense) and
-   `GAMEPLAY-RATINGS.md` (curve numbers, §3.3 model, eras, usage, difficulty), plus the complete `nba.md`: protocol line,
-   "Touched outside my lane", owner device checks, "Left undone".
+   - the §3.4 game length re-measured
+   - the §3.9 frames in offense, defense, FT trips, replays and On Fire
+   - bundle and test-time budgets
+   - the §3.10 rematch loop end to end with ut's real sheet, if it is in the branch
+5. **Docs:**
+   - `ARCADE-V2.md` (format, length, defense, Clutch, Heat)
+   - `CORE-GAMEPLAY.md` (the §5 table, the gold ring, BOARD, FT, defense)
+   - `GAMEPLAY-RATINGS.md` (the §3.3 model, eras, usage, the ladder)
+   - `shared-controls.md` final
+   - the complete `nba.md`, with the final line "Protocol bump needed: NBA draft 10 → 11, UT NBA 10 → 11 because …"
 
-**Cut line (cut first in the whole plan): play and look cards.**
-- New `PlayCards.tsx`: chalk diagrams in SVG over the plays from `plays.ts`, three dealt by the five's archetypes
-  (`'cards:'` stream).
-- Before your possessions: offense cards. Before AI possessions: defensive look cards (Man, Switch, Drop, Zone if it
-  shipped, Trap).
-- **The first touch on the court picks the highlighted card**, and it auto-picks at 2.5 s (online too: no stall), so cards
-  cost ~0 s for players who ignore them.
-- Not in practice mode.
-- Tests: `cards.test.ts`:
-  - picking never changes a Hooper or a shot probability
-  - a shooter five sees Floppy ≥ 2× as often over 1,000 deals
-  - the deal stream doesn't shift any other RNG order
-- Human harness per play: every play 0.90–1.25 PPP, none > 1.30. Length re-measured with cards on.
+**Acceptance:**
+- Every asserted band above passes at 150 games/config, each number next to its nba-1 baseline in `nba.md`.
+- `daily-play.test.ts`:
+  - the same day gives the same scenario on two runs
+  - 365 consecutive days give ≥ 30 distinct templates
+  - every scenario is winnable by the autopilot in ≥ 25% of 200 runs and ≤ 85%
+  - its chunk stays out of main
+- Full `npm test` green. Build OK. Main chunk +0 KB. Game chunk ≤ +18 KB gzip. UT ≤ +2 KB.
 
-**Tests and measurements:** as listed in Must; every number goes into `nba.md` next to its nba-1 baseline.
-
-**Screenshots:** offense and defense card picks (393, 320, landscape), and the final contact sheet of every nba screen at
-393×852 and 320×568, with the before twins.
-
-**Protocol:** bump needed (fit values; plays move teammates). Final line: "Protocol bump needed: NBA draft 10→11, UT NBA
-10→11 because …".
+**Cut line:** Daily Play (P1).
+**Protocol:** bump needed (fit values).
 **Saves:** none.
-**Outside lane:** none new.
-**Dependencies:** lead (integration, the bump, the post-merge re-check).
+**Dependencies:** lead (integration, the bump, the re-check); ut (Daily Play host and board).
 
 ---
 
-## 9. Deferred (deliberately), with reasons, plus the cut lines
+## 9. Deferred and cut, with reasons
 
-1. **NBA-23 foot sliding, NBA-24 pose cross-fades, NBA-25 30 fps clips, NBA-26 looks.** Owned by players. We expose every
-   action as an `Act` or event: `pump`, steal reach, contest jump, FT, floater, stumble, tiered moves.
-2. **A button layout editor and stick resize** (research §5.3). Not in the brief; the floating stick plus the
-   gestures/buttons option cover reach. Revisit after the owner's device check.
-3. **A ticking 12:00 game clock.** The format counts possessions; we show "Q2 3/4".
-4. **Shared real-time defense online.** Not possible over relays (brief). Online keeps the race.
-5. **"Clutch Stop" card** (research §5.5). Superseded by real solo defense.
-6. **Era-aware GameCast totals** (`engine/broadcast.ts`). No owner; the handoff carries the numbers (§4.4).
-7. **Club Season AI box scores by usage** (`ut/league.ts`). ut's; we ship `hoops2/usage.ts` and the numbers.
-8. **Card-screen surfaces** (category bars, a hot-zone court map, shot-DNA grades; research §5.12). Card UI belongs to
-   players and packs; `Hooper.zones` and `usg` are exposed.
-9. **Per-player shot DNA timing** (release-speed offsets −40…+30 ms; research §5.1.1). It would move the freshly fitted
-   windows; it is a next-round item with players' signature motion (A-4).
-10. **NBA-28 soundscape** (announcer, chants, music). No new audio assets. Countdown ticks and rim/glass sounds ship.
-11. **NBA-30 chunk split.** `vite.config.ts` is shell's; flagged (§6.10).
-12. **Gauntlet and draft season/playoff games played as arcade matches.** Escalated as an owner-decision conflict (§4.1),
-    with the engine ready.
-13. **A 4-point logo zone and Clutch mode.** Only if ut/lead commit (§4.3).
-14. **Rejected research items:** swipe-up dunk and swipe-down floater (replaced by automatic finish choice, §5); 2K-size
-    Takeover; a pre-1980 `thr` rating change (§11 M4).
-15. **Cut-line items** (shipped only if the task's Must list is green within its session; otherwise listed here in
-    `nba.md`):
-    - nba-2: typed-array replay snapshots
-    - nba-3: the CALL animation and stick resize
-    - nba-4: the layup arc, Cue-only mode and energy rings
-    - nba-5: charges, out-of-bounds turnovers and the "ooh"
-    - nba-6: quarter banners and watch-at-1×
-    - nba-7: zone 2-3, early offense, repeat-move decay and stumbles
-    - nba-8: hot/cold zones, Horns and Floppy
-    - nba-9: the POG replay, the landscape box layout and the controls diagram
-    - nba-10: play and look cards
+1. **Cut by V2:** play and look cards; the defensive look chip; per-player two-stage Heat; RUN's window factor; nba's
+   own haptics module; the in-game final overlay; the 10-tap calibrator; HOT HAND / LOCKED IN names (§0).
+2. **Players' work:** NBA-23 foot sliding, NBA-24 pose cross-fades, NBA-25 30/15 fps clips, NBA-26 looks, 5-head sprites,
+   crowd rows, venue palette, celebrations. nba exposes every act and event they need (§4.6).
+3. **Gauntlet and draft season/playoff games as arcade matches:** the owner-decision-2 conflict stays escalated (revision
+   2 §4.1). The engine format is ready for any host.
+4. A button-layout editor and a left-handed mirror (V2: "a later setting").
+5. A ticking 12:00 game clock. The format counts possessions.
+6. Shared real-time defense online: not possible over relays. Online keeps the race.
+7. Per-player shot-DNA timing offsets. They would move the fitted windows; next round, with players' motion DNA.
+8. The NBA-28 soundscape (announcer, chants, music). Sounds come only through soccer's `sound.ts` additions.
+9. The NBA-30 chunk split. `vite.config.ts` is shell's; flagged.
+10. A 4-point zone and modifier weekends. They need a protocol and a queue (V2 D.9: solo only, unless the lead commits).
+11. **Cut-line items** (shipped only if the task's Must list is green within its session; otherwise listed in `nba.md`):
+    - nba-2: the radial animation, the euro-step
+    - nba-3: floor reflection, replay snapshots
+    - nba-4: meter Off, the court-edge glow
+    - nba-5: charges, out-of-bounds turnovers
+    - nba-6: quarter toasts, watch-at-1×
+    - nba-7: the lob ring, zone 2-3, early offense, repeat-move decay
+    - nba-8: hot/cold zones, Horns, Floppy
+    - nba-9: the POG replay, the landscape box, the controls diagram
+    - nba-10: Daily Play
 
-## 10. Risk register (each risk → mitigation → where it is checked)
+## 10. Risk register
+
+Revision 2's rows stand. V2 adds these:
 
 | Risk | Mitigation | Checked in |
 |---|---|---|
-| `arcadeOf` strips unknown wire fields, so a forfeit flag never arrives. The rival waits, and the AI may finish the quitter's game as a win. | In-band `'FF'` end mark (≤ 8 chars, in POINTS/owns) per nfl's contract; ≤ 37 ends < the 40 cap. `left`/`gone` stay as the backup. | nba-9 `arcade-ot.test.ts`, matrix |
-| `Arcade.tsx` collisions with nfl (solo defense, pause, forfeit, difficulty, box) | Adopt nfl's names (§6.2); nba hunks only inside `pick({ nba })`; sport-agnostic blocks written once; the OT design note shared | nba-6, nba-9 |
-| `ut/Match.tsx` collisions (`simBoth` pairs, M3/M13, the `UT_RULES` line, the shared label table) | One-line nba hunks: `simHoopsMatch` in the nba line, `{ ...HOOPS_FOOTBALL_LABEL, ...NBA_MARK_LABEL }`; never the shared table or `UT_RULES` | nba-5, nba-6 |
-| `App.tsx`, `lib/sound.ts`, `render.ts draw()`, kits, unowned `Lab.tsx` / `Training.tsx` | §6.1 HUD hook and kit mapping; `vibrateLive` appended away from crowd code; one-line hunks; all listed in `nba.md` | every task |
-| Packs' `toHooper` change drops `usg/yr/fd/zones` | Contract §6.6 plus `toHooper-fields.test.ts` | nba-6, nba-8, re-check at integration |
-| A stale profile snapshot from the pause-menu settings overwrites a UT match's save | Read-modify-write `withSettings` helper plus a test; the prefs key is outside recovery lists; the cloud-save queue is documented | nba-9 |
-| Reward integrity: SIM/Auto-defend in `manualOnly` modes; the Moments green-reward drift | `how: 'played'` test, confirmed with ut; drill `green` counts `pure`; before/after Moment bands to ut | nba-6, nba-4, nba-10 |
-| Determinism: new streams shift takeover RNG; JSC vs V8 float differences | Named seed streams (`'ai:'`, `'cards:'`); race `aiPossessionsOf` byte-identical test; arithmetic-only rule for new sim math (source scan) | nba-1, nba-6 |
-| Gesture timing: the meter t0 vs tap/swipe recognition; BOARD latency | Provisional gather on pointerdown with free cancel; BOARD and CONTEST on pointerdown (§5) | nba-3 |
-| iPhone layout: tight 320 cluster; landscape insets; home indicator; Chromium `env()` = 0; Fix A moves the HUD | Per-width sizes; `--sal/--sar`; bottom `sab + 12` exclusion; injected insets; re-measure after shell's merge | nba-3, nba-10 |
-| Small-phone overflow (box score, score bug at 320) | Internal scroller with a sticky name column; one merged bug chip; text ≥ 10 px tests | nba-2, nba-9 |
-| Reduced motion was specified only for the clock | The table (nba-2) with a row per element; a `reduce` pass per task | every task |
-| QA isolation: `browser.mjs` doesn't route-abort; port 5173; UT fixtures open packs | `nba-qa-run.mjs` preload isolation + `PS_QA_URL`; refuses to run unpatched | nba-1 onward |
-| Relay port collisions on 7777 | The team relay on 7795; `flock` around shared `online.mjs` | nba-1, nba-6, nba-9 |
-| Performance below 50 fps at 4× | Floor cache (NBA-29) in nba-2; the absolute budget measured in defense, FT and replays too | nba-2, nba-6, nba-10 |
-| Bundle: NBA growth loads with football; the UT chunk pulls the engine | `usage.ts` dependency-free; `targets.ts` test-only; chunk split flagged to shell | nba-8, nba-10 |
-| Compute: fitting and long Playwright runs compete for 3 slots | 15-game iteration mode; 150-game acceptance only where asked; ≤ 20 min per slot hold | every task |
-| Branding: Heat banners and badge names echo 2K/Jam | `BADGE_LABEL` and Heat stage names (§4.2) by default; lead decision for card-side names | nba-2, nba-4 |
-| Windows stack until greens are trivial | `windowScale` ×1.45 / 110 ms cap; worst-stack test | nba-4 |
-| Defense by default backfires ("auto beats manual") | Idle-assist; median ≤ Auto − 0.03; poor ≤ Auto + 0.12; SIM ≡ Auto | nba-6, nba-7, nba-10 |
-| Tiny windows online (THR-55 at Legend) | 20 ms open floor at every difficulty; the live shot % warns before the shot | nba-4 |
-| WebKit can't be tested headless | Owner device checks (§12) cover release feel, `timeStamp` clock sanity (calibrator readout), pointer capture, NFD, haptics, pause on a call | nba-10 |
+| nfl and soccer build their own stick or ring before ours lands | §4 contracts published in nba-1 (`nba.md`), shims allowed, signatures frozen, a "Contract changes" log | nba-1, nba-2, nba-4 |
+| ±30 ms gold floor pushes human makes far above real rates | the gold-offer gate (contest, range, rung), off-gold fall-off and AI release spread; box realism asserted on AI-vs-AI and the human PPP ladder; the divergence documented | nba-4, nba-8, nba-10 |
+| "Gold never lies" broken by a stray block or rim-out path | the honesty test: 10,000 gold releases, 0 misses, in every sport that consumes `perfect.ts` | nba-4, nba-5 (board), nba-7 (contest, steal) |
+| Heat snowballs (On Fire → easy scores → more Heat) | spell of 2 possessions, bar back to 0, half reset, §3.7 bands including On Fire PPP ≤ +0.25 | nba-4, nba-6, nba-10 |
+| Interpolated geometry wrong on 375/430 or in landscape | the 8-size probe; `.ps-geo.land` class; no media queries | nba-2 |
+| The held arena leaks memory or stale state between matches | renderer identity and heap test across 5 rematches; a `HoopsGame` rebuilt from scratch each time | nba-3 |
+| `progress.ts` is unowned and also read by nfl, soccer and ut | two optional type-only lines, stripped before the wire, listed outside lane, lead review | nba-4 |
+| ut's haptics or soccer's chime don't land in our branch | `feel.ts` shims with the same signatures; one-line swap at integration | nba-2, nba-4 |
+| Defensive camera variant (V2 B.1.3 "your basket at the bottom") is ambiguous | ship the same-orientation rule by default and the V2 variant behind `?arcade&cam=v2b`; owner device check decides | nba-3, nba-6 |
+| Daily Play eats the fit's time | Daily Play is first in nba-10 but is the cut line; the fit is never cut | nba-10 |
 
-## 11. Critique response index
-
-M = missing, R = restructure, K = risk, T = target. "→" gives where it is handled.
-
-| ID | Point | Response |
-|---|---|---|
-| M1 | Owner decision 2 conflict (Moments, Gauntlet, season/playoffs) | → §4.1 escalation with options; `practice.drill: 'defend'` in nba-7; format available to any host (nba-6) |
-| M2 | NBA-06 tie paths (`simBoth`, SIM IT, `finishedFrom`) and the tie copy | → nba-6 `simHoopsMatch` for `simBoth` and SIM IT; nba-9 `finishedFrom`/`rivalLive`; copy handoff §4.5 |
-| M3 | Practice-mode regressions (Training, Moments, green-room) | → nba-4 (`green` counts `pure`), nba-5 (practice rules), §3.11 bands, nba-1/nba-10 Moments harness |
-| M4 | Pre-1980 `thr`; era PPP/TOV/ORB | **Rating change rejected:** `thr` is the estimate of "could he shoot it". UT's `thr` comes from packs' `rate.ts` anyway, and packs is re-rating everything with documentation (owner decision 5); a second, nba-side displayed change would conflict. The 3PA leak is closed by behaviour (≤ .05, nba-8). Era PPP/TOV/ORB rows → §3.1b. |
-| M5 | Audit §5 AI: box-outs, perfect-information rebounding, no SPIN/CUT/SPACE/post-up | → nba-5 (landing estimate, box-outs, assist parity); nba-8 (AI playbook, moves, post-ups) |
-| M6 | Camera design on defense | → nba-2 rule (offset away from your defender, pitch, focus mix); measured live in nba-6 (§3.6) |
-| M7 | SHOOT context table | → §5, tested in nba-3 |
-| M8 | Research §5.1.6 per-contest targets; THR_avg undefined | → §3.3 (bands asserted at σ 50; σ 35 ceilings; THR_avg measured in nba-1; pull-up ≤ 0.90; documented divergence with the math) |
-| M9 | Fatigue shrink; On Fire pip refill and glow | → nba-4 (shrink ≤ 15%, glow); nba-7 (refill hook) |
-| M10 | Release pop; contact-read events | → nba-4 (hit-stop, green arc, swish, big's stumble event); nba-7 (elite-move stumble) |
-| M11 | NBA-27 iOS haptics | → §3.13, nba-3 |
-| M12 | NBA-14 fix 4 calibrator | → nba-4 `TimingCalibrator` (offset and SD); in the pause menu in nba-9 |
-| M13 | First-time teaching | → nba-3 `hints.ts`; every task registers its lines |
-| M14 | Defensive feedback | → nba-6 (coverage line), nba-7 (`defenseReason`, Last Play) |
-| M15 | Online stalls on prompts | → FT auto-shoot 4 s online (nba-5); cards auto-pick 2.5 s (nba-10); no defensive picks online |
-| M16 | RUN online | → race version counts your own possessions only (nba-6) |
-| M17 | Score-scale handoffs | → §4.4; numbers in nba-10 |
-| M18 | UT mode ideas unowned | → §4.3 escalation; engine options in nba-6; 4-point zone conditional |
-| M19 | Badge names in the in-game pop | → §4.2 `BADGE_LABEL` default plus a lead decision |
-| M20 | Box ×6.2; per-player sanity rows | → nba-9 (×6.2 toggle); §3.1 sanity rows asserted in nba-10 |
-| M21 | Four UT rungs; continuous `releaseSd` | → §3.2; nba-8 |
-| M22 | Area docs updates | → §2 Docs; each task; nba-10 final pass |
-| M23 | Tests outside hoops2 | → §2 standard set (match-debrief, content, difficulty, sport-branches; balance opt-in) |
-| M24 | AI fallback after the queue | → §6.9; nba-6 |
-| M25 | Duplicate surnames | → nba-2 `uniqueTags`; §3.8 |
-| M26 | NBA-30 clip preload during the intro | → §6.5; nba-9 |
-| M27 | 430×932 and 932×430 | → §3.8 eight sizes |
-| R1 | Minimal alternate right after nba-5 | → nba-6 |
-| R2 | Calibrate after mechanics; post-merge re-check | → nba-8 local only; nba-10 single asserted fit; lead re-check recipe |
-| R3 | Split oversized tasks | **Partly accepted.** The cap is 10 tasks, so we rebalanced instead: misses and the glass → nba-5; Heat stays with the window code; moves → nba-7; eras/usage separated from the fit; pause → nba-9; final QA with the fit. Every task has Must and Cut lines (§9.15). |
-| R4 | Online OT/forfeit as a separate task with a written design | **Partly accepted:** it is nba-9's first two deliverables, with the design note committed alone before code and its own matrix. Pause/quit/intro/box share the task because they trigger forfeit and live in the same files, and the 10-task cap holds. |
-| R5 | Forward dependency (`eraFoul`, TOV before the split) | → era stub in nba-5; TOV re-measured in nba-8; asserted in nba-10 |
-| R6 | Game length after cards | → §3.4 budget; first touch picks; re-measured in nba-10 |
-| R7 | Combined window cap | → `windowScale` (nba-4) with a worst-stack test |
-| R8 | Day-one contracts (`render.ts` hook, `Arcade.tsx` with nfl, pre-game sequence) | → §6.1, §6.2, §6.4, written in nba-1 |
-| R9 | Inject insets until shell's Fix D | → `nba-lib.mjs` (§2, §3.8) |
-| R10 | Test budget: heavy tests opt-in | → §2 (≤ 60 s; the 10k OT and 200-game box are opt-in) |
-| R11 | Forfeit via `left`/`gone`, not a new wire flag; agree loss vs AI-finish | **Partly accepted:** no new wire field. We use nfl's in-band `'FF'` because `left` alone starts an AI takeover (the quitter could win). `left`/`gone` stay as the backup. An online quit is an instant loss (§4.6, §6.3). |
-| R12 | Cut circle = spin; settle the swipe overloads | → §5 |
-| K1–K21 | Risks | → §10 (one row each) |
-| T1 | Game length budget | → §3.4 |
-| T2 | Variance and squad strength | → §3.5 |
-| T3 | Defense rewards playing | → §3.6 |
-| T4 | Defensive camera | → §3.6 |
-| T5 | STL/BLK/PF; C slot; 1960s/70s | → §3.1, §3.1b |
-| T6 | Era PPP/TOV/ORB | → §3.1b |
-| T7 | Combined cap | → §3.3 |
-| T8 | Contest-tier 3P% | **Modified:** asserted at σ 50; σ 35 as ceilings (§3.3, math shown) |
-| T9 | Heat/RUN pacing and intentional fouls | → §3.7 |
-| T10 | Gestures | → §3.8 |
-| T11 | HUD share | **Modified:** the critique's portrait numbers can't all hold (453/852 = 53%), so bottom controls ≤ sab + 190; court ≥ 55% at sat 59, ≥ 52% once Fix A makes it 81 (§3.8) |
-| T12 | Absolute frame budget | → §3.9 |
-| T13 | Bundle | → §3.9 |
-| T14 | Test time | → §2, §3.9 |
-| T15 | Pre-game flow | → §3.10, §6.4 |
-| T16 | Pause | → §3.10 |
-| T17 | Readable text | → §3.8 |
-| T18 | Name tags | → §3.8 |
-| T19 | Moments and drills | → §3.11 |
-| T20 | Calibration hygiene (scale, SE) | → §3 preamble (rawOvr; 150 games; bands ≥ ±2 SE) |
-| T21 | iOS haptics | → §3.13 |
-| T22 | Online OT/forfeit matrix | → §3.12, nba-9 |
-
-## 12. Owner device checks (filled in `nba.md` as tasks land)
+## 11. Owner device checks (filled in `nba.md` as tasks land)
 
 - **Controls:**
-  - thumb reach of the stick, SHOOT gestures and CALL on the owner's iPhone, portrait and landscape
-  - pointer capture with two thumbs
-- **Timing:**
-  - the timing calibrator's offset and **the owner's own release SD** (if it is under 40 ms, the §3.3 bands are revisited)
-  - whether the green window feels fair for an average shooter
-  - `e.timeStamp` vs `performance.now()` sanity (the calibrator's debug line)
+  - thumb reach of the V2 cluster and stick on the owner's iPhone, portrait and landscape
+  - the sprint ring push
+  - swipes on A vs Buttons-only
+  - CALL radial reach
+- **Ring:**
+  - the 4-tap calibration offset and the owner's own σ (< 35 ms → the lead revisits §3.3)
+  - whether gold feels fair for an average shooter and clearly fatter for a star
+  - `timeStamp` sanity
 - **Feel:**
-  - haptic distinctness: green 2 ticks vs make 1 tick
-  - the FT meter
-  - defense controls (stick, CONTEST, STEAL, SWITCH), Auto-defend and SIM
-- **Flow:**
-  - solo game length
-  - the tip-off intro
-  - pause on a real phone call or app switch
-- **Display:** accented names (NFD fold on WebKit).
+  - the `double` vs `long` haptics, the PERFECT chime ladder
+  - the On Fire spell length
+  - Clutch staging and the heartbeat
+- **Defense:**
+  - the stick, CONTEST and STEAL rings, SWITCH, Auto-defend and SIM
+  - **the defensive camera variant** (default vs `cam=v2b`)
+- **Flow:** solo game length; the tip-off curtain; the rematch loop ≤ 10 s; pause on a real phone call.
+- **Display:** accented names (the NFD fold on WebKit); the safe box under the Dynamic Island once shell's Fix A merges.
