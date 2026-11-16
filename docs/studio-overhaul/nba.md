@@ -662,7 +662,7 @@ drawing (players-2's near-first budget, a dependency). 320 meets §3.9. 430 and 
 - **Typecheck:** `bash O/heavy.sh npm run typecheck`: clean.
 - **The standard set:** `bash O/heavy.sh npx vitest run src/game/hoops2 src/game/hud src/game/stick.test.ts
   src/game/juice.test.ts src/game/play-feedback.test.ts src/game/difficulty.test.ts src/ut/match-debrief.test.ts
-  src/engine/sport-branches.test.ts`. Result: 20 files passed, 5 skipped (opt-in), 113 tests passed. The run
+  src/engine/sport-branches.test.ts`. Result: 20 files passed, 5 skipped (opt-in), 111 tests passed (7 skipped), 235 s. The run
   before the determinism-list update had 1 failure, that scan.
 - **Browser** (against 5215, every host other than localhost aborted, none tried):
   - `nba-hud.mjs` (8 sizes)
