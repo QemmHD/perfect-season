@@ -37,7 +37,7 @@ try {
       for (const seed of SEEDS) {
         if (carriers.length >= NEED) break;
         await page.goto(url({ arcade: '', sport: 'nfl', seed }), { waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('.fb2-call', { timeout: 60000 });
+        await page.waitForSelector('.fb2-tray', { timeout: 60000 });
         await page.evaluate(async () => {
           const { FootballRenderer } = await import(performance.getEntriesByType('resource').map((e) => e.name).filter((n) => new URL(n).pathname === '/src/game/football2/render.ts').pop() ?? '/src/game/football2/render.ts');
           if (!window.__catchDraw) {
@@ -49,7 +49,7 @@ try {
           }
           window.__log = [];
         });
-        const cards = page.locator('.fb2-cards .fb2-card');
+        const cards = page.locator('.fb2-tray .fb2-card[data-call]');
         for (let i = 0; i < (await cards.count()); i++)
           if ((await cards.nth(i).innerText()).includes('PASS')) {
             await cards.nth(i).click();

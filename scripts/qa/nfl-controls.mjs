@@ -20,7 +20,7 @@ import { launch, phone, report, serverUp, shotPath } from './nfl-lib.mjs';
 
 const VIEWS = (process.argv[2] ?? 'A,C').split(',');
 const MOTION = process.argv[3] ?? 'both';
-const TASK = 'nfl-2';
+const TASK = process.env.NFL_TASK || 'nfl-2';
 /** V2 §A.5 centres (css px) at viewport A (393×852) and C (320×568) */
 const SPEC = {
   A: { A: [323, 738], B: [238, 778], C: [250, 694], D: [340, 652] },
@@ -66,13 +66,13 @@ async function load(page, url, seed, { burstPref = false } = {}) {
     } catch {}
   }, burstPref);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.fb2-call', { timeout: 60000 });
+  await page.waitForSelector('.fb2-tray', { timeout: 60000 });
   await hook(page);
 }
 
 async function pickCall(page, kind) {
   const want = kind === 'PASS' ? 'pass' : 'run';
-  const cards = page.locator('.fb2-cards .fb2-card:not(.more)');
+  const cards = page.locator('.fb2-tray .fb2-card[data-call]');
   for (let i = 0; i < (await cards.count()); i++)
     if ((await cards.nth(i).innerText()).includes(kind)) {
       await cards.nth(i).click();
@@ -199,7 +199,12 @@ try {
       await load(page, url, 'ctl-' + view + '-2');
       await pickCall(page, 'PASS');
       // thumb resting in the stick zone before the snap, then dragged right: live at the snap
-      const zone = { x: Math.round(viewport.w * 0.2), y: Math.round(H * 0.72) };
+      // (nfl-3: on the stick's ghost spot, below the play tray, where a resting thumb sits)
+      const ghost = await page.evaluate(() => {
+        const r = document.querySelector('.v2-stick-ring').getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+      const zone = { x: Math.round(ghost.x), y: Math.round(ghost.y) };
       let preHeld = 0;
       for (let i = 0; i < 10; i++) {
         if (i) {
@@ -246,12 +251,19 @@ try {
       for (let s = 0; s < 8; s++) {
         const m = await page.evaluate(() => {
           const out = [];
+          // nfl-3: a chip whose receiver is up under the score bug is held below the Heat bar (no overlap): not a tip miss
+          const css = getComputedStyle(document.querySelector('.fb2'));
+          const v = (k) => parseFloat(css.getPropertyValue(k)) || 0;
+          const band = v('--bug-top') + v('--bug-h') + v('--heat-h') + 8 + 44;
+          // ...one whose receiver is down by the toast line is held above it, and one by the screen's
+          // edge is kept whole on the screen (a wideout split to the sideline at 320)
+          const floor = innerHeight - v('--toast-bottom') - 28 - 6;
           for (const el of document.querySelectorAll('.fb2-icon')) {
             if (el.style.visibility === 'hidden') continue;
             const id = Number(el.getAttribute('data-icon'));
             const r = el.getBoundingClientRect();
             const h = window.__heads[id];
-            out.push({ id, cx: r.left + r.width / 2, bottom: r.bottom, w: r.width, h: r.height, head: h ?? null, fanned: el.classList.contains('fanned') });
+            out.push({ id, cx: r.left + r.width / 2, bottom: r.bottom, w: r.width, h: r.height, head: h && h.y - 4 >= band && h.y - 4 <= floor && h.x >= 30 && h.x <= innerWidth - 30 ? h : null, fanned: el.classList.contains('fanned') });
           }
           return out;
         });

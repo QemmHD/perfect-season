@@ -276,14 +276,14 @@ dailyPlay(dayKey: string): NflScenario   // deterministic from the day key; the 
 | C11 shell event and offsets | shell | adopted |
 | C12 league sim | ut | requested |
 | C13 Bulldozer label, fixtures | packs | requested |
-| C14 camera notice, floor LOD | players | requested, awaiting answer |
+| C14 camera notice, floor LOD | players | notice delivered with nfl-3 (near players 34-35 css px at 393 through `camera.ts` `ART` = 1.38 × the projected size); floor LOD still requested |
 | C15 geometry | nba | proposed names, local fallbacks (nfl-3) |
 | C16 Stick | nba | proposed; local `stickFrom` in `shared-v2.ts` |
 | C17 gold ring | nba | proposed; local maths in `shared-v2.ts` |
 | C18 Heat | nba | proposed; local types |
-| C19 HUD kit | nba | proposed; local props type |
+| C19 HUD kit | nba | proposed; local `ScoreBug` (+ Heat bar) and `ToastLine` in `shared-v2.ts` (nfl-3), with football's additions in `ScoreBugExtra` |
 | C20 haptics and chime | ut, soccer | adapter in `shared-v2.ts` |
-| C21 playtime | ut | proposed; no-op adapter in `shared-v2.ts` |
+| C21 playtime | ut | proposed; no-op adapter in `shared-v2.ts`; `input()` wired on every touch, key, control, tray card and kick tap (nfl-3) |
 | C22 grade | ut | offered |
 | C23 Daily Play | ut | offered (P1) |
 
@@ -494,6 +494,10 @@ An independent review of `b0277ad..7ac837c` found one medium and four low issues
 
 ## Touched outside my lane
 
+- **nfl-3** `src/game/Arcade.tsx` (shared with nba; NFL lines only): the NFL kickoff copy (P-4) and one line that skips `loadAttrs()` for an NFL UT match (`FOOTBALL && teams…`).
+- **nfl-3** `src/evolution/Training.tsx`: the NFL drill tips (strings only).
+- **nfl-3** `src/game/play-feedback.ts` and its test (shared nba/nfl; NFL strings only): the next-step copy (P-4).
+
 - **nfl-2** `src/game/Arcade.tsx` (shared with nba; NFL branch only): four optional props, `onQuit`/`quitText` (C4) and `feedback`/`onFeedback` (the pause menu's sound and haptics switches), passed to `Football2`; `onQuit` is offered only offline (about 12 lines).
 - **nfl-2** `src/App.tsx` (ut/shell's): the draft game's `<Arcade>` passes `feedback={profile.settings}` and an `onFeedback` that updates the same settings the Settings sheet does (2 lines). It does **not** pass `onQuit`: what quitting a draft game means is App's call (C4), so the pause menu there shows Resume, Controls and Sound/Haptics only until App and ut wire it.
 - **nfl-2** `src/game/Lab.tsx` (the `?arcade` test bench): local sound/haptics state and an `onQuit` that writes the progress into a hidden `data-quit` span, so QA can prove quit reaches the host (6 lines).
@@ -544,11 +548,68 @@ The proxy's pocket thumb (`autopilot.ts` `pocketThumb`): a beaten rusher is seen
 
 **Protocol bump needed:** NFL draft 10→11, UT 11→12 (see the table at the top).
 
+### nfl-3: the screen: camera, action-safe box, 124 px tray, HUD kit, overlays, load and pacing (P-1, P-3, P-4, V-1, V-3, V-4) — done 2026-11-16
+
+**What changed and why.**
+- **The broadcast camera, `camera.ts`** (V2 §B.2.3; called from `render.ts`, render-only). Upright: the line of scrimmage sits at 45% of the height before the snap and the formation is centred on the ball; live, the play's spot eases to 58% (the pocket holds halfway). The horizon is at 6%; pitch 0.6, field of view 0.75, 0.034 px a yard per css px of width at the focus, so the wideouts split 13 yd stay on screen at every width. Players are drawn `ART` = 1.38 times their projected size (V2 §C.6 "sprite scale = projected scale × a per-sport constant"): the quarterback and the back measure 35 css px at 393 while the field keeps its real proportions. **Dynamic zoom:** the slingshot's reticle (or the ball's landing spot in the air) pulls the zoom back, down to 0.75, until it fits the C15 action-safe box, then the focus slides so the passer and his target are both inside; a carrier with 2+ defenders within 3 yd or in contact pushes in to 1.15; Clutch (`frame.clutch`, nfl-9 sets it) multiplies by 1.06; under reduced motion the zoom stays 1 and the camera only follows. Each new play lines up at once; the camera settles exactly when close, so a still camera reuses its floor. Landscape keeps the side-on camera (the audit's readability reference) with the line a little left of centre, clear of the tray.
+- **Turf overlays, `overlay.ts`** (render-only): the V2 ground rings (gold `#f6b93b` under the man you control, teal `#4fe3c1` under the receiver your throw is going to, a red `#ff5d5d` arc on the side the nearest rusher comes from), the run lane (a faint arrow from the back through the hole, before the snap and through the mesh), the ball never under 4×3 px with a shadow ring that tightens as it comes down and a three-dot trail, the incompletion's bounce (two hops and a roll over 0.6 s; it fades in place under reduced motion), and the line to gain flashing on a conversion (steady under reduced motion). The "who's open" helper rings for new players no longer use red or gold (green / amber / grey), so the four ring colours mean one thing each (V2 §C.5 rule 5).
+- **The play tray, `PlayTray.tsx` + `play-tray.css`** (P-1, replacing nfl-2's strip): docked 8 px above A, full width between the safe areas, **124 px** at 393 and 112 at 320 (the bug's own blend). Three suggested cards, then FLIP, BOOK (the full dialog) and the rest of the book in the same swipe. Fourth down: **[the best play] [FIELD GOAL n YARDS] [PUNT]**, preselected (the kick in range, a punt from deep with 4+ to go, else the play), and **A says what the pick does: GO / KICK / PUNT** (the C and D fourth-down buttons are gone). The header is one line: the down, distance and spot, then whatever the toast line has to say before the snap, else **LAST PLAY** with the result (tap for the breakdown: the facts and the coaching line, which used to be the `PlayReadout` chip that overlapped the hint, V-3). A drag on the field before the snap folds the tray to a 44 px bar and pans the camera (gestures.ts `look`); a tap on the bar brings it back.
+- **The HUD kit (C19, local in `shared-v2.ts`, styled by `hud.css`):** one 232×40 score bug (YOU and the rival in skewed team blocks, the drive label with the two-minute clock, the down and distance, and a 3 px line of one pip a drive: gold TD, teal FG, red turnover, grey otherwise, the live one filling with field position); the Heat bar directly under it (until nfl-4 it shows the quarterback's On Fire streak, burning when he's on fire; the old ON FIRE chip and the drive-mark row are gone); and **one toast line** (28 px, bottom edge at `--toast-bottom`, docked into the tray's header before the snap; under the Heat bar in landscape). Everything the screen says goes through `hud.ts`'s `ToastQueue`: hints (cleared the moment the play moves on, not 4.2 s later: P-4), results ("+7 YDS · TACKLED BY SMITH", "FIRST DOWN", "SACKED BY …"), the ability pop and the banners, by priority. The big centre-screen pop is gone (audit §9: banners belong in the toast line).
+- **V-4, one ability pop a play:** the first ability a play reports goes to the toast line ("BULLDOZER · HENRY"), the rest are not shown; the engine's seeded roll is untouched. "Truck Stick" now reads **BULLDOZER** (C13; the id `truck-stick` is unchanged).
+- **P-3:** the playbook dialog is one shrinkable grid track (`minmax(0, 1fr)`), `box-sizing: border-box` with `min-width: 0` on its cards; the width media query is gone (auto-fill columns instead) and its 9 px labels are 10 px.
+- **P-4 copy:** every `Football2` tip shortened to fit one toast line at 320; `Arcade.tsx`'s NFL kickoff: "from your own 25" → "starting wherever the kickoff leaves you", and the how-to rows describe the stick, its ring, the name chips and JUKE/SPIN/POWER; Training's NFL tips (no swipes or double-taps any more); `play-feedback.ts`'s NFL next steps (no SCRAMBLE or BURST button, the lane arrow, stepping away and throwing it away). The kickoff's "a tie goes to the better team" stays true until nfl-9's overtime lands (follow-up below). Shell's `arena-tips.ts` is not on this branch; its NFL lines are reviewed when it merges.
+- **Load:** `Football2` and `Arcade` skip `loadAttrs()` when the teams come rated (a UT match): **0 bytes of `nfl-attrs`**. `ps:arena-ready` is dispatched after the first drawn frame (C11).
+- **Pacing (`pacing.ts`):** whistle to tray **0.7 s** (from 1.35), 0.78 s on a first down (its line flashes); a score's 2.3 s celebration and a long touchdown's replay lead-in end 0.3 s after a tap; **replays only for touchdowns** (25+ yards, as before; the big-hit, truck and stiff-arm replays are gone, their slow motion stays). Takeaway replays come with nfl-8's played returns. `sim-kit.ts`'s wall-clock model reads the same constants (`after: 'first'` added, the `moment` replay removed).
+- **Playtime (C21):** `input()` on every pointerdown on the screen, the stick, A–D, the tray, the kick meter and the run keys; never from the autopilot.
+- **Name chips** stay between the Heat bar and the toast line (and above D in landscape), so they never overlap the HUD.
+- **Performance:** the floor is re-projected only when the camera moved (V2 §C.6), the canvas's 2D context is read once, and sprites 28 px or taller change size in 4 px steps so the larger players don't rebuild every few frames as they move in depth.
+
+**Before → after** (`scripts/qa/nfl-presnap.mjs`, isolated, touch, dsf 1; before = `c7f90e5`):
+
+| Measure | Before | After | Acceptance |
+|---|---|---|---|
+| Line of scrimmage, % of height before the snap (A / C) | 62.1 / 62.1 | **45.0 / 45.0** | 43–47 |
+| Lowest offensive body vs tray top (A / C / E) | RB at 597 vs 712 (A) | **507 vs 560 / 338 vs 348 / 397 vs 434**; B 555 vs 634; D: no body inside the tray | ≤ tray top − 6 |
+| Tray height (A / C / E) | 98 / 113 / 98 (nfl-2's strip; plan baseline 236) | **124 / 112 / 116** | ≤ 124 |
+| Near players (QB, RB) at A, css px | 20–22 (audit 12–25) | **35** (B 38, E 32, C 27–30); linemen in their crouch 27 | 32–36 at A |
+| Stands, sky and bug, % of height (A, own 25) | 27.1 | **12.7** | ≤ 15 |
+| Ball in flight | 2–4 px (audit) | **≥ 4 px** (4×3 minimum) | ≥ 4 |
+| Deep ball, motion on (A) | no zoom | **zoom 0.84**, reticle inside the safe box on 19/19 samples | < 0.85; inside |
+| Deep ball, reduced motion | — | **zoom 1** | 1 |
+| HUD overlaps (bug, Heat, pause, toast, tray, icons, A–D), A–E × pre-snap pass/run, pocket, after, fourth, both motions | 0 overlaps but 9 px text and two-line toasts | **0**, smallest HUD text **10 px** | 0; ≥ 10 px |
+| Toasts at C and E | 35–55 px, two lines | **28 px, one line** | one line |
+| Playbook at A / C / E | x = −5, 10 px wider than the screen | **inside [12, vw − 12]**, scrollWidth = clientWidth | — |
+| Ability roll, 2,000+ plays each (gold / elite / promo) | 0.50 / 0.50 / 0.50 of chances | **unchanged** (0.500 / 0.501 / 0.499) | 45–55% |
+| Ability pops shown per play (gold / elite / promo) | 0.72 / 2.41 / 2.59 | **0.58 / 0.78 / 0.84**, never more than 1 | ≤ 1 |
+| PLAY → first playable tray, draft / UT, 1× | 409 / 338 ms (nfl-1) | **370 / 255 ms** | ≤ 1.6 s |
+| … 4× CPU | 1434 / 1268 ms | **1059 / 1448 ms** | ≤ 4 s |
+| `nfl-attrs` bytes in a UT match | 1,637,454 | **0** (the draft game still loads it) | 0 |
+| `ps:arena-ready` | not sent | **sent** after the first frame (205–891 ms after PLAY) | sent |
+| Whistle → tray, 20 plays (A) | 1.35 s nominal | **0.66–0.81 s** (0.70–0.72 ordinary, 0.79–0.81 first downs) | 0.6–0.8 |
+| React commits a second in live play with no input (19 plays) | — | **0.26–1.62** | ≤ 2 |
+| Frame pacing, autoplay lab at 390×844 dsf 3, 15 s, 4× CPU (load average 5–7 on the shared machine; same session) | 51.8 / 55.1 fps, 17–28 frames > 33 ms, 10–13 long tasks | **52.6 / 51.5 fps, 21–29 frames > 33 ms, 13–14 long tasks** | no regression (within noise) |
+
+The far players (the two deepest defenders) draw 11–12 px at A: the plan's "about 22" is not met by this camera (perspective puts them at a third of the quarterback's height). It is not in nfl-3's acceptance; listed below.
+
+**Tests added or changed.**
+- `hud.test.ts` (new): the toast line's priorities, waiting and stale toasts, keys, clearing on phase change and at a new play, "never stacks" over 500 random pushes; the one-pop rule; BULLDOZER and no banned words; **the ability roll over 2,100 real plays (elite and promo squads): 45–55% of chances, at most one pop a play, and more than one ability reported on 20+ plays (not vacuous)**; the bug's model (labels, pips, FINAL).
+- `camera.test.ts` (new): the framing at A and C through the renderer's own projection (line of scrimmage 43–47%, every receiver on screen, stands ≤ 15%, far/near < 0.65); the live row; **20 seeded deep throws: zoom under 0.85 on 20/20 and the reticle, the passer and the landing spot inside the safe box on 20/20; reduced motion keeps the zoom at exactly 1 on all 20**; traffic and Clutch zoom; the ball's 4×3 floor; the run lane's life; the bounce and the line flash; and **render-only: 72 seeded plays hash identically with the camera and every overlay drawing each step (a recording context saw 1,000+ calls) and without them**.
+- `gestures.test.ts`: the pre-snap field is now `look` (was `none`: the old behaviour was the gap the tray collapse fills); look-drag, tap, stick-zone and cancel cases.
+- `calibration.test.ts`: the wall-clock model's `first` wait and the touchdown-only replay (its `moment` replays were removed on purpose).
+- `play-feedback.test.ts`: "Save BURST" → "Save the burst" (the copy was the P-4 bug).
+- QA: `scripts/qa/nfl-presnap.mjs` (new: `layout`, `zoom`, `pace`, `load`); `nfl-controls.mjs`, `nfl-catch-run.mjs` and `nfl-baselines.mjs` follow the tray (`.fb2-tray`, `[data-call]`) and the stick's label; `nfl-controls.mjs` rests the pre-snap thumb on the stick's ghost spot (below the tray) and leaves out chips held inside the HUD band or at the screen's edge from its 12 px tip check. All pass at A and C, both motion settings; `nfl-catch-run.mjs` 6/6 at A and C.
+
+**Protocol:** none (render and UI only; the determinism pins and the render-only test hold). **Saves:** none.
+
 ## For the lead (found in nfl-1)
 
 - **QA isolation:** under `?ns=inspect` the app and the shared `scripts/qa/browser.mjs` fixture still call the live `player-save` and `card-registry` functions (aborted here by `nfl-guard.cjs`). Every team's legacy QA should run behind a route-abort, and `ns=inspect` should probably disable cloud saves and registry writes in the app itself (`src/lib/cloud-save.ts`, `src/ut/registry.ts`: lead-only paths).
 
 ## Owner device checks
+
+- **nfl-3** The new camera on the owner's phone: the formation above the tray before the snap, the players' size (35 px quarterback), the pull-back on a deep throw and the push-in on contact.
+- **nfl-3** The 124 px tray: three cards and a swipe into the book, the fourth-down [play] [FIELD GOAL] [PUNT] with A saying GO / KICK / PUNT, LAST PLAY in the header, and dragging the field to look around.
+- **nfl-3** The score bug and Heat bar under the Dynamic Island, and the toast line's one-line results ("+7 YDS · TACKLED BY …").
 
 - **nfl-2** The floating stick under the left thumb, and burst by pushing past the ring (V2 lead decision 2: the "Burst button" switch under pause → Controls restores hold-BURST on D if the owner prefers it).
 - **nfl-2** The A/B/C/D cluster's reach for the right thumb on the owner's phone, JUKE toward the stick or by a swipe off A, and DIVE/SLIDE showing on D only near the sticks.
@@ -565,6 +626,10 @@ The proxy's pocket thumb (`autopilot.ts` `pocketThumb`): a beaten rusher is seen
 Copied from the plan (§9), each with its reason; cut-line items land here with the task that dropped them.
 
 **Deferred**
+- **nfl-3: the far players' size.** The deepest defenders draw 11–12 px at 393 (the plan hoped for about 22). A flatter camera would shrink the near players below 34 or push the wideouts off the screen; players' LOD sprites (C14) and nfl-10's final camera fit can revisit it.
+- **nfl-3: the kickoff copy's tie line.** "A tie goes to the better team" is still true; nfl-9 replaces it with the C2 overtime line when overtime lands.
+- **nfl-3: the crowd-swell audio cues** (the plan's cut line) move to nfl-10's polish list.
+- **nfl-3: frame pacing at 4× CPU** is at parity with the pre-task tree (about 52 fps, 20–30 frames over 33 ms in 15 s) and still short of the plan's ≤ 5; the floor's per-frame projection while the camera moves (`persp.ts drawFloor`, players' C14 request) and the sprite budget for sprites ≥ 28 px (players) are the remaining costs.
 - **nfl-2: the AI quarterback's 0.8 yd step-up** against a free edge rusher. It changes every AI drive (the determinism pins, the fast/full baselines), so it moves to nfl-5 with the rest of the AI's football brain; the AI's old sideline bail throw stays with it until then.
 - **nfl-2: the legacy Codex QA scripts** `joystick.mjs`, `rushing.mjs` and `core-gameplay.mjs` still look for the fixed stick, BURST and the pass panel (`Run joystick:`, `.fb2-burst`, `.fb2-passing`). Their checks (two-axis displacement, release-to-stop, two-thumb burst, interruption) are covered for the new controls by `nfl-controls.mjs` and the engine tests; porting their selectors to `.v2-stick` and `[data-ctl]` is listed for nfl-3's QA step.
 - **nfl-2: quit wiring in the hosts.** `Arcade` offers `onQuit`/`quitText` (C4); App's draft game and ut's `Match.tsx` decide what quitting means and pass them (ut contract B). Until then the pause menu in those hosts has no QUIT row.

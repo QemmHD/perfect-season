@@ -157,7 +157,7 @@ try {
       };
     });
     await page.goto(url({ arcade: '', sport: 'nfl', seed: 'profiler' }), { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.fb2-call', { timeout: 60000 });
+    await page.waitForSelector('.fb2-tray', { timeout: 60000 });
     // keep the run alive for the whole drag: the defenders are held off the field (QA-side only)
     await page.evaluate(async () => {
       const { FootballRenderer } = await import(performance.getEntriesByType('resource').map((e) => e.name).filter((n) => new URL(n).pathname === '/src/game/football2/render.ts').pop() ?? '/src/game/football2/render.ts');
@@ -167,14 +167,14 @@ try {
         return draw.call(this, ctx, p, los, o);
       };
     });
-    const cards = page.locator('.fb2-cards .fb2-card');
+    const cards = page.locator('.fb2-tray .fb2-card[data-call]');
     for (let i = 0; i < (await cards.count()); i++)
       if ((await cards.nth(i).innerText()).includes('RUN')) {
         await cards.nth(i).click();
         break;
       }
     await page.getByRole('button', { name: 'SNAP', exact: true }).click();
-    const stick = page.getByRole('group', { name: /Run joystick:/ });
+    const stick = page.getByRole('group', { name: /Movement stick/ });
     await stick.waitFor();
     await page.waitForTimeout(800);
     const b = await stick.boundingBox();
