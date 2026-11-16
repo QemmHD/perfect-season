@@ -4,7 +4,7 @@
 // on the wire.
 /// <reference types="vite/client" />
 import { describe, expect, it } from 'vitest';
-import { awarded, canForfeit, wireOf, type Progress } from '../progress';
+import { awarded, canForfeit, forfeitedBy, settleInputs, wireOf, type Progress } from '../progress';
 import { END_TEXT, FORFEIT, forfeitBy, forfeitEnds, newMatch, totalOf } from './match';
 import { squadFor } from './squads.test-util';
 
@@ -82,7 +82,7 @@ describe('a forfeit decides the match (soccer-2 review fix)', () => {
     expect(canForfeit(pr(0, ['S', 'W'], false), 7)).toBe(true);
     expect(canForfeit(null, 7)).toBe(true);
     // Arcade refuses through it; Soccer2 offers QUIT/FORFEIT only while attacks are left, and no penalties after a forfeit
-    expect(read('src/game/Arcade.tsx')).toMatch(/!canForfeit\(p, TOTAL\)\) return;/);
+    expect(read('src/game/Arcade.tsx')).toMatch(/!canForfeit\(p, TOTAL\)\) return false;/);
     const sc = read('src/game/soccer2/Soccer2.tsx');
     expect(sc).toMatch(/const canLeave = !match\.over && !soRef\.current && !left\.current;/);
     expect(sc).toMatch(/allowShootout && !left\.current && r && r\.done && !r\.forfeit/);
@@ -91,12 +91,74 @@ describe('a forfeit decides the match (soccer-2 review fix)', () => {
   it('both hosts read it: ut decides on the forfeit and settles a solo quit as a loss; the draft does the same', () => {
     const ut = read('src/ut/Match.tsx');
     expect(ut).toMatch(/onFinish=\{\(us, them, how, _took, pens, ff\) => finish\(us, them, how, pens, ff\)\}/);
-    expect(ut).toMatch(/onQuit=\{\(us, them\) => finish\(us, them, 'played', undefined, 'us'\)\}/);
+    expect(ut).toMatch(/onQuit=\{\(us, them\) => finish\(us, them, 'played', undefined, 'us', true\)\}/);
     expect(ut).toMatch(/const d = ff\s*\? \{ won: ff === 'them', tiebreak: false \}/);
     const app = read('src/App.tsx');
     expect(app).toMatch(/onFinish=\{\(us, them, how, took, pens, ff\) =>/);
     expect(app).toMatch(/pens, forfeit: ff \}\)/);
     expect(app).toMatch(/onQuit=\{\(us, them\) => finish\(r, playSeason/);
     expect(app).toMatch(/arcade\.forfeit \? arcade\.forfeit === 'them'/);
+  });
+});
+
+// soccer-2 re-review: Arcade settles on what this render knows, never on the forfeit state an effect
+// sets a commit later (the phone that finished first and waits used to settle a forfeit on raw scores)
+describe('settleInputs: what Arcade settles on, in the same render', () => {
+  const online = { online: true, watchFF: true, soccer: true, forfeit: null } as const;
+  it('receiver already done, the rival forfeits while leading 2-0: a 3-0 win, in the very render the forfeit arrives', () => {
+    const mine = pr(1, ['G', 'S', 'W', 'B', 'L', 'O', 'T']);
+    // before: the rival is still playing, nothing settles
+    const waiting = settleInputs({ ...online, mine, rivalLive: pr(2, ['G', 'G', 'S'], false) });
+    expect(waiting.final).toBeNull();
+    expect(waiting.ff).toBeNull();
+    // the forfeiter's last Progress lands; the forfeit state is still null in this render
+    const rivalLive = pr(2, forfeitEnds(['G', 'G', 'S'], 7));
+    expect(forfeitedBy(rivalLive)).toBe(true);
+    const s = settleInputs({ ...online, mine, rivalLive });
+    expect(s.ff).toBe('them');
+    expect(s.level).toBe(false);
+    expect(s.final!.map((p) => p.score)).toEqual([3, 0]);
+    // and with the state caught up a commit later, the same answer
+    expect(settleInputs({ ...online, mine, rivalLive, forfeit: 'them' }).final!.map((p) => p.score)).toEqual([3, 0]);
+  });
+  it("the forfeiter's mirror: its own padded record says it, and it loses 0-3 whatever it led by", () => {
+    const mine: Progress = { ...pr(2, forfeitEnds(['G', 'G', 'S'], 7)), forfeit: true };
+    // the rival is still mid-match: this phone settles at once on what it has heard of them
+    const s = settleInputs({ ...online, mine, rivalLive: pr(0, ['S', 'W', 'B'], false) });
+    expect(s.ff).toBe('us');
+    expect(s.final!.map((p) => p.score)).toEqual([0, 3]);
+    // nothing heard from them yet
+    expect(settleInputs({ ...online, mine, rivalLive: null }).final!.map((p) => p.score)).toEqual([0, 3]);
+  });
+  it('the receiver still mid-match settles on what it played, as a 3-0 win', () => {
+    const s = settleInputs({ ...online, mine: pr(0, ['S', 'W'], false), rivalLive: pr(1, forfeitEnds(['G'], 7)) });
+    expect(s.ff).toBe('them');
+    expect(s.final!.map((p) => p.score)).toEqual([3, 0]);
+  });
+  it('a level forfeit never waits for penalties; a level match without one does', () => {
+    const lvl = settleInputs({ ...online, mine: pr(1, ['G', 'S', 'W', 'B', 'L', 'O', 'T']), rivalLive: pr(1, forfeitEnds(['G'], 7)) });
+    expect(lvl.level).toBe(false);
+    expect(lvl.final!.map((p) => p.score)).toEqual([3, 0]);
+    const ends = ['G', 'S', 'W', 'B', 'L', 'O', 'T'];
+    const plain = settleInputs({ ...online, mine: pr(1, ends), rivalLive: pr(1, ends) });
+    expect(plain.level).toBe(true);
+    expect(plain.final).toBeNull();
+    expect(settleInputs({ ...online, mine: pr(1, ends), rivalLive: pr(1, ends), pens: { won: true } }).final!.map((p) => p.score)).toEqual([1, 1]);
+  });
+  it("an 'FF' is read only where it is watched (soccer online), and a normal finish settles on the score", () => {
+    const rivalLive = pr(2, forfeitEnds(['G', 'G'], 7));
+    expect(settleInputs({ ...online, watchFF: false, mine: pr(1, ['G']), rivalLive }).ff).toBeNull();
+    const done = settleInputs({ ...online, mine: pr(2, ['G', 'G', 'S', 'W', 'B', 'L', 'O']), rivalLive: pr(1, ['G', 'S', 'W', 'B', 'L', 'O', 'T']) });
+    expect(done.ff).toBeNull();
+    expect(done.final!.map((p) => p.score)).toEqual([2, 1]);
+    // solo: the AI's match is the other side
+    const solo = settleInputs({ online: false, watchFF: false, soccer: true, forfeit: null, mine: pr(1, ['G', 'S', 'W', 'B', 'L', 'O', 'T']), rivalLive: null, ai: pr(0, ['S', 'S', 'W', 'B', 'L', 'O', 'T']) });
+    expect(solo.final!.map((p) => p.score)).toEqual([1, 0]);
+  });
+  it('Arcade reads it in the render and passes the derived side, not the state', () => {
+    const arcade = read('src/game/Arcade.tsx');
+    expect(arcade).toMatch(/const \{ ff, us, them, level, final \} = settleInputs\(/);
+    expect(arcade).toMatch(/ff \?\? undefined\), level \? 2600 : 1600\);\n  \}, \[us, them, pens, ff\]\);/);
+    expect(arcade).not.toMatch(/forfeit \? awarded\(us, them, forfeit\)/);
   });
 });

@@ -173,6 +173,17 @@
   white-space: nowrap;
   opacity: 0.82;
 }
+/* "what a hold does" (PASS: LOB, THRU: LOFT) after a press-and-hold glyph, alike on both domes */
+.sc2-ctl-sub.hold {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.sc2-ctl-sub.hold svg {
+  width: 9px;
+  height: 9px;
+  flex: none;
+}
 /* a lit dome: a three-stop radial body, a specular cap, an inner rim, a hard coloured edge below (the
  * button's side), a contact shadow and a glow */
 .sc2-ctl::before {

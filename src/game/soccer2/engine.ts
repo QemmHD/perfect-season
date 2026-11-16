@@ -1655,8 +1655,10 @@ function human(a: Attack, b: Body, stick: Pt, sprint: boolean, dt: number) {
   const kicking = b.act === 'kick' && a.t - b.actAt < 0.3;
   let top = topSpeed(b.p) * (sprint ? 1 : JOG) * lerp(0.88, 1, a.stamina);
   if (owner) top *= dribblePace(b.p);
-  // winding up a shot slows him a little (0.75 until 2026-11-02, when the stick still aimed)
-  if (a.meter) top *= 0.85;
+  // winding up a shot slows him a little (0.75 until 2026-11-02, when the stick still aimed; 0.85 until
+  // the soccer-2 re-review, which left C4 no margin once stamina drains: 0.87 keeps the raw ratio over
+  // 0.85). The autopilot's stick is still while a meter is up, so its matches (golden) don't move.
+  if (a.meter) top *= 0.87;
   if (kicking) top *= 0.4;
   const dir = mag > 0.01 ? { x: stick.x / Math.max(1, mag), y: stick.y / Math.max(1, mag) } : { x: 0, y: 0 };
   accelTo(b, dir.x * top, dir.y * top, dt, owner ? 1 : 1.1);

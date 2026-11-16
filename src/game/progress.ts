@@ -54,3 +54,40 @@ export function awarded(us: Progress, them: Progress, by: 'us' | 'them'): [Progr
  * other phone, so it is refused (soccer-2 fix).
  */
 export const canForfeit = (p: Progress | null | undefined, total: number) => !p?.done && (p?.ends.length ?? 0) < total;
+
+/** a rival's final record that says it forfeited: done, with an explicit 'FF' end (never inferred) */
+export const forfeitedBy = (p: Progress | null | undefined) => !!p?.done && p.ends.includes('FF');
+
+/**
+ * What `Arcade` settles on (soccer-2 re-review fix), worked out in the same render as the progress
+ * it reads, so a forfeit can never miss the commit that finishes the match. `forfeit` is the side
+ * that has already forfeited on this phone (state); otherwise this phone's own padded record
+ * (`mine.forfeit`) or, when `watchFF` (soccer online), the rival's explicit 'FF' ends say it.
+ * `us`/`them` are null until that side is settled; `final` is the pair to report (a forfeit's 3-0
+ * award applied), or null while the match is still on or a level match waits for penalties.
+ */
+export function settleInputs(a: {
+  mine: Progress | null | undefined;
+  rivalLive: Progress | null | undefined;
+  forfeit: 'us' | 'them' | null;
+  watchFF: boolean;
+  online: boolean;
+  /** the other phone gave up on this one: the AI finished your attacks */
+  taken?: Progress | null;
+  /** this phone gave up on the rival: the AI finished theirs */
+  takeover?: Progress | null;
+  /** solo: the AI's whole match */
+  ai?: Progress | null;
+  /** soccer: a level score goes to penalties */
+  soccer: boolean;
+  /** the agreed or played shootout, once there is one */
+  pens?: unknown;
+}): { ff: 'us' | 'them' | null; us: Progress | null; them: Progress | null; level: boolean; final: [Progress, Progress] | null } {
+  const ff = a.forfeit ?? (a.mine?.forfeit ? 'us' : a.watchFF && forfeitedBy(a.rivalLive) ? 'them' : null);
+  const soFar = (p: Progress | null | undefined): Progress => p ?? { score: 0, drive: 0, done: false, ends: [] };
+  const us = a.taken ?? (a.mine?.done ? a.mine : ff === 'them' ? soFar(a.mine) : null);
+  const them = a.online ? (a.takeover ?? (a.rivalLive?.done ? a.rivalLive : ff === 'us' ? soFar(a.rivalLive) : null)) : (a.ai ?? null);
+  const level = a.soccer && !ff && !!us && !!them && us.score === them.score;
+  const final = !us || !them || (level && !a.pens) ? null : ff ? awarded(us, them, ff) : ([us, them] as [Progress, Progress]);
+  return { ff, us, them, level, final };
+}

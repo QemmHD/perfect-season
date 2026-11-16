@@ -1101,7 +1101,7 @@ export function App() {
             const botRating = rateTeam(SLOTS.map((s) => d.botLineup[s]));
             finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us, pens, forfeit: ff });
           }}
-          onQuit={(us, them) => finish(r, playSeason(d.lineup), null, { lineup: d.botLineup, rating: rateTeam(SLOTS.map((s) => d.botLineup[s])) }, { us: us.score, them: them.score, how: 'played', takenOver: false, tookMe: false, forfeit: 'us' })}
+          onQuit={(us, them) => finish(r, playSeason(d.lineup), null, { lineup: d.botLineup, rating: rateTeam(SLOTS.map((s) => d.botLineup[s])) }, { us: us.score, them: them.score, how: 'sim', takenOver: false, tookMe: false, forfeit: 'us' })}
         /></React.Suspense>
       </div>
     );

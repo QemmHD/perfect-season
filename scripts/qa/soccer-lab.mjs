@@ -47,6 +47,9 @@ async function center(page, sel) {
 async function frameTime(page, ms = 2000) {
   return page.evaluate((ms) => new Promise((res) => { const ts = []; const t0 = performance.now(); const f = (t) => { ts.push(t); if (t - t0 < ms) requestAnimationFrame(f); else { const d = ts.slice(1).map((t, i) => t - ts[i]).sort((a, b) => a - b); res({ frames: d.length, median: d[Math.floor(d.length / 2)], p95: d[Math.floor(d.length * 0.95)] }); } }; requestAnimationFrame(f); }), ms);
 }
+// C5 from the frame recorder: the first frame on 'live' (the whistle), the first frame the carrier has
+// any speed (the held push taken: 'respondMs'), and the first he has moved 0.05 m ('movedMs', the gate)
+const C5_OF = () => { const r = window.__rec; const i = r.findIndex((f) => f.ui === 'live'); if (i < 0) return null; const w = r[i]; const go = r.slice(i).find((f) => f.v > 0.05); const m = r.slice(i).find((f) => Math.hypot(f.x - w.x, f.y - w.y) > 0.05); return { whistleAt: w.t, respondMs: go ? Math.round(go.t - w.t) : null, movedMs: m ? Math.round(m.t - w.t) : null }; };
 if (part('smoke')) {
   // every preset: the lab loads with no page error, the injected insets reach .arcade-full, and a
   // request and a WebSocket to a live host from the page are both stopped (and counted)
@@ -418,7 +421,7 @@ if (part('layout')) {
     await page.waitForTimeout(700);
     await page.screenshot({ path: `${shots}/${tag}-intro.png` });
     // a frame recorder: the ui, the carrier's position and the match clock, every animation frame
-    await page.evaluate(() => { window.__rec = []; const f = () => { const s = window.__soccer; if (s && s.a) { const c = s.a.bodies[s.a.ctrl]; window.__rec.push({ t: performance.now(), ui: s.ui, x: c.x, y: c.y, at: s.a.t }); } requestAnimationFrame(f); }; requestAnimationFrame(f); });
+    await page.evaluate(() => { window.__rec = []; const f = () => { const s = window.__soccer; if (s && s.a) { const c = s.a.bodies[s.a.ctrl]; window.__rec.push({ t: performance.now(), ui: s.ui, x: c.x, y: c.y, v: Math.hypot(c.vx, c.vy), at: s.a.t }); } requestAnimationFrame(f); }; requestAnimationFrame(f); });
     // C5: the left thumb goes down (and pushes up) 500 ms before the whistle, then the right thumb kicks off
     const ghost = await rectOf(page, '.ps-stick-ghost');
     await touch(cdp, 'touchStart', [{ x: ghost.cx, y: ghost.cy, id: 1 }]);
@@ -428,7 +431,7 @@ if (part('layout')) {
     // (both thumbs stay down until it's measured: a touchEnd lifts the whole set over CDP)
     await touch(cdp, 'touchStart', [{ x: ghost.cx, y: ghost.cy - 45, id: 1 }, { x: go.cx, y: go.cy, id: 2 }]);
     await page.waitForTimeout(400);
-    const c5 = await page.evaluate(() => { const r = window.__rec; const i = r.findIndex((f) => f.ui === 'live'); if (i < 0) return null; const w = r[i]; const m = r.slice(i).find((f) => Math.hypot(f.x - w.x, f.y - w.y) > 0.05); return { whistleAt: w.t, movedMs: m ? Math.round(m.t - w.t) : null }; });
+    const c5 = await page.evaluate(C5_OF);
     if (!c5 || c5.movedMs === null || c5.movedMs > 100) fail('C5 pre-held thumb: ' + JSON.stringify(c5));
     // C1: the cluster, zone, bug, pause and toast line from the DOM, live
     await touch(cdp, 'touchEnd', []);
@@ -638,6 +641,17 @@ if (part('layout')) {
         await page.waitForTimeout(250);
         await page.screenshot({ path: `${(process.env.PS_QA_SOCCER_SHOTS || out)}/${p.tag}-rival-taker.png` });
         shot = true;
+        // soccer-2 re-review: the pause button stays in a shootout; its sheet has no QUIT or FORFEIT, and a.t holds
+        await page.locator('.sc2-pause').tap();
+        await page.waitForSelector('.sc2-sheet');
+        const sheet = await page.locator('.sc2-sheet').innerText();
+        const t0 = (await state(page)).t;
+        await page.waitForTimeout(800);
+        const t1 = (await state(page)).t;
+        await page.screenshot({ path: `${(process.env.PS_QA_SOCCER_SHOTS || out)}/${p.tag}-pens-paused.png` });
+        if (!/RESUME/.test(sheet) || /QUIT|FORFEIT/.test(sheet) || t1 !== t0) errorsAll.push(p.tag + ': shootout pause ' + JSON.stringify({ sheet, t0, t1 }));
+        report.push({ tag: p.tag, step: 'pens-pause', sheet: sheet.split('\n').filter(Boolean), held: t1 === t0 });
+        await page.getByRole('button', { name: 'RESUME' }).tap();
       } else if (s.ui === 'so-intro') await page.locator('.sc2-ctl.go').tap({ force: true, timeout: 1500 }).catch(() => {});
       else if (s.ui === 'so-kick' && !s.end && (await page.locator('.sc2-ctl[data-act="shoot"]').count())) {
         const sh = await center(page, '.sc2-ctl[data-act="shoot"]');
@@ -649,6 +663,49 @@ if (part('layout')) {
     report.push({ tag: p.tag, step: 'rival-taker', shot, errors });
     errorsAll.push(...errors);
     await context.close();
+  }
+}
+// C5 repeated (soccer-2 re-review): one run sits near the 100 ms gate on a loaded machine, so the gate is
+// the median of RUNS fresh kick-offs per preset (each run also reported)
+if (part('c5')) {
+  const RUNS = Number(process.env.PS_QA_C5_RUNS || 5);
+  for (const p of PRESETS) {
+    const runs = [];
+    for (let k = 0; k < RUNS; k++) {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-c5-' + k, scenario: 'build', home: 'BAR', hs: '2015', away: 'RMA', as: '2017' });
+      await page.waitForSelector('.sc2-ctl.go');
+      await page.waitForTimeout(500);
+      await page.evaluate(() => { window.__rec = []; const f = () => { const s = window.__soccer; if (s && s.a) { const c = s.a.bodies[s.a.ctrl]; window.__rec.push({ t: performance.now(), ui: s.ui, x: c.x, y: c.y, v: Math.hypot(c.vx, c.vy), at: s.a.t }); } requestAnimationFrame(f); }; requestAnimationFrame(f); });
+      const ghost = await rectOf(page, '.ps-stick-ghost');
+      await touch(cdp, 'touchStart', [{ x: ghost.cx, y: ghost.cy, id: 1 }]);
+      await touch(cdp, 'touchMove', [{ x: ghost.cx, y: ghost.cy - 45, id: 1 }]);
+      await page.waitForTimeout(500);
+      const go = await rectOf(page, '.sc2-ctl.go');
+      await touch(cdp, 'touchStart', [{ x: ghost.cx, y: ghost.cy - 45, id: 1 }, { x: go.cx, y: go.cy, id: 2 }]);
+      await page.waitForTimeout(400);
+      runs.push(await page.evaluate(C5_OF));
+      if (k === 0) {
+        // the stick's keep-out follows the live ring (soccer-2 re-review): the thumb lifts and lands
+        // again away from the ghost, and a keep-out rect sits on the ring there, not on the ghost
+        await touch(cdp, 'touchEnd', []);
+        await page.waitForTimeout(150);
+        const at = { x: ghost.cx + 40, y: ghost.cy - 110 };
+        await touch(cdp, 'touchStart', [{ x: at.x, y: at.y, id: 5 }]);
+        await page.waitForTimeout(120);
+        const ringKeep = await page.evaluate((at) => { const c = document.querySelector('.hg2-canvas').getBoundingClientRect(); const k = window.__soccer.view.keep; const W = document.querySelector('.hg2-canvas').width / c.width; const near = k.map((r) => ({ cx: c.left + (r.x + r.w / 2) / W, cy: c.top + (r.y + r.h / 2) / W })).map((q) => Math.hypot(q.cx - at.x, q.cy - at.y)); return Math.round(Math.min(...near)); }, at);
+        await touch(cdp, 'touchEnd', []);
+        await page.waitForTimeout(150);
+        const lifted = await page.evaluate((at) => { const c = document.querySelector('.hg2-canvas').getBoundingClientRect(); const k = window.__soccer.view.keep; const W = document.querySelector('.hg2-canvas').width / c.width; return Math.round(Math.min(...k.map((r) => Math.hypot(c.left + (r.x + r.w / 2) / W - at.x, c.top + (r.y + r.h / 2) / W - at.y)))); }, at);
+        if (ringKeep > 3 || lifted < 40) errorsAll.push(p.tag + ': stick keep-out ' + JSON.stringify({ ringKeep, lifted }));
+        report.push({ tag: p.tag, step: 'stick-keep', ringKeepOffPx: ringKeep, afterLiftNearestPx: lifted });
+      }
+      errorsAll.push(...errors);
+      await context.close();
+    }
+    const med = (k) => { const v = runs.map((r) => r?.[k]).filter((x) => typeof x === 'number').sort((a, b) => a - b); return v.length === runs.length ? v[Math.floor(v.length / 2)] : null; };
+    const c5 = { runs: runs.map((r) => r && [r.respondMs, r.movedMs]), respondMedian: med('respondMs'), movedMedian: med('movedMs') };
+    if (c5.movedMedian === null || c5.movedMedian > 100) errorsAll.push(p.tag + ': C5 median ' + JSON.stringify(c5));
+    report.push({ tag: p.tag, step: 'c5', c5 });
   }
 }
 await browser.close();

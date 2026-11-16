@@ -71,8 +71,8 @@ export default function SoccerLab() {
         onDone={setMine}
         onShootout={(r) => ((window as unknown as { __pens: unknown }).__pens = r)}
         online={q.has('online')}
-        onQuit={(p) => ((window as unknown as { __quit: unknown }).__quit = { us: p, them: ai })}
-        onForfeit={(p) => ((window as unknown as { __forfeit: unknown }).__forfeit = p)}
+        onQuit={(p) => void ((window as unknown as { __quit: unknown }).__quit = { us: p, them: ai })}
+        onForfeit={(p) => void ((window as unknown as { __forfeit: unknown }).__forfeit = p)}
       />
       <span hidden data-progress={JSON.stringify(mine)} />
     </div>

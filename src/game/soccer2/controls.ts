@@ -32,8 +32,10 @@ export type SlotAct = 'shoot' | 'pass' | 'thru' | 'cross' | 'short' | 'bend';
 export interface Slot {
   act: SlotAct;
   label: string;
-  /** the second line: what a hold does */
+  /** the second line */
   sub?: string;
+  /** the second line says what a HOLD does: drawn after a hold glyph (soccer-2 re-review: PASS and THRU read alike) */
+  hold?: boolean;
 }
 export type Slots = Record<SlotId, Slot | null>;
 /** What the player is doing: open play on the ball, or one of the three set pieces. */
@@ -54,7 +56,7 @@ export function slotsFor(phase: ControlPhase): Slots {
     case 'freekick':
       return { A: { act: 'shoot', label: 'SHOOT' }, B: { act: 'cross', label: 'CROSS', sub: 'TO HIM' }, C: { act: 'short', label: 'SHORT' }, D: { act: 'bend', label: 'BEND' } };
     default:
-      return { A: { act: 'shoot', label: 'SHOOT' }, B: { act: 'pass', label: 'PASS', sub: 'HOLD: LOB' }, C: { act: 'thru', label: 'THRU', sub: 'LOFT' }, D: null };
+      return { A: { act: 'shoot', label: 'SHOOT' }, B: { act: 'pass', label: 'PASS', sub: 'LOB', hold: true }, C: { act: 'thru', label: 'THRU', sub: 'LOFT', hold: true }, D: null };
   }
 }
 

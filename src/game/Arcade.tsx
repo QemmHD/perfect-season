@@ -12,7 +12,7 @@ import type { BotLevel, Lineup, Player } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { type Attrs, loadAttrs } from './attrs';
 import { aiDrives2, aiDrivesOf, Football2 } from './football2/Football2';
-import { awarded, canForfeit, type RivalLive, wireOf } from './progress';
+import { awarded, canForfeit, forfeitedBy, type RivalLive, settleInputs, wireOf } from './progress';
 import { WaitLine } from './Wait';
 import { DRIVES } from './football2/drive';
 import { offenseOf } from './football2/squad';
@@ -258,20 +258,19 @@ export function Arcade({
   // soccer's online forfeit (soccer-2; merge: nba-7's forfeit block does the same for every sport):
   // a side that forfeits sends its attacks padded with 'FF' and done, and the match ends on both phones
   const [forfeit, setForfeit] = useState<'us' | 'them' | null>(null);
-  const rivalFF = SOCCER && online && !!rivalLive?.done && rivalLive.ends.includes('FF');
+  const rivalFF = SOCCER && online && forfeitedBy(rivalLive);
   useEffect(() => {
     if (rivalFF && !forfeit) setForfeit('them');
   }, [rivalFF]);
-  const soFar = (p: Progress | null | undefined): Progress => p ?? { score: 0, drive: 0, done: false, ends: [] };
-  const us: Progress | null = taken ?? (mine?.done ? mine : forfeit === 'them' ? soFar(mine) : null);
-  const them: Progress | null = online ? (takeover ?? (rivalLive?.done ? rivalLive : forfeit === 'us' ? soFar(rivalLive) : null)) : ai;
   const sent = useRef(false);
   const how = useRef<'played' | 'sim'>('played');
   // soccer: a level match goes to penalties. Online, sims and taken-over games use the shootout both
   // phones work out the same way (the host's eleven kicks first); a match played against the AI has
   // its shootout played out on the pitch (Soccer2's onShootout).
   const [pens, setPens] = useState<Pens | null>(null);
-  const level = SOCCER && !forfeit && !!us && !!them && us.score === them.score;
+  // the forfeit is read in this render (not from the state the effect above sets a commit later), so
+  // the phone that finished first and is waiting settles a rival forfeit as one (soccer-2 re-review)
+  const { ff, us, them, level, final } = settleInputs({ mine, rivalLive, forfeit, watchFF: SOCCER && online, online, taken, takeover, ai, soccer: SOCCER, pens });
   const agreed = useMemo(() => (SOCCER && sg && squads ? sg.agreedShootout(squads.us, squads.them, seed, online ? host : true) : null), [sg, squads]);
   const onPitch = !taken && how.current === 'played';
   useEffect(() => {
@@ -280,13 +279,12 @@ export function Arcade({
     setPens({ us: agreed.us, them: agreed.them, won: agreed.winner === 'us' });
   }, [level, pens, agreed, onPitch]);
   useEffect(() => {
-    if (sent.current || !us || !them) return;
-    if (level && !pens) return;
+    if (sent.current || !final) return;
     sent.current = true;
     // a forfeit decides the match, whatever the score (soccer-2 fix): football's rule, 3-0 to the side left standing
-    const [u, t] = forfeit ? awarded(us, them, forfeit) : [us, them];
-    window.setTimeout(() => onFinish(u, t, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined, forfeit ?? undefined), level ? 2600 : 1600);
-  }, [us, them, pens]);
+    const [u, t] = final;
+    window.setTimeout(() => onFinish(u, t, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined, ff ?? undefined), level ? 2600 : 1600);
+  }, [us, them, pens, ff]);
 
   const progress = (p: Progress) => {
     if (taken) return;
@@ -295,17 +293,19 @@ export function Arcade({
   };
   // soccer, online: FORFEIT from the pause sheet (confirmed there): what was played, padded with 'FF' to TOTAL
   // (refused once every attack is in: nothing is left to pad, so the other phone could never see it)
-  const forfeitNow = (p: Progress) => {
-    if (sent.current || forfeit || mine?.done || !canForfeit(p, TOTAL)) return;
+  // (true when accepted: Soccer2 ends the match on its side only then)
+  const forfeitNow = (p: Progress): boolean => {
+    if (sent.current || ff || taken || mine?.done || !canForfeit(p, TOTAL)) return false;
     const ends = p.ends.slice(0, TOTAL);
     while (ends.length < TOTAL) ends.push('FF');
     setForfeit('us');
     progress({ ...p, ends, drive: TOTAL, done: true, forfeit: true });
+    return true;
   };
   // soccer, solo: QUIT from the pause sheet (confirmed there): the host decides what a quit means (ut contract B)
   // A quit is a forfeit: the AI's attacks through the ones you played, and football's 3-0 award (soccer-2 fix)
-  const quitNow = (p: Progress) => {
-    if (sent.current || !ai || !onQuit) return;
+  const quitNow = (p: Progress): boolean => {
+    if (sent.current || !ai || !onQuit) return false;
     sent.current = true;
     const n = Math.min(TOTAL, p.ends.length);
     const ends = p.ends.slice(0, TOTAL);
@@ -313,6 +313,7 @@ export function Arcade({
     const so: Progress = { ...ai, score: pointsThrough(ai, n), drive: n, done: true, ends: ai.ends.slice(0, n) };
     const [u, t] = awarded({ ...p, ends, drive: TOTAL, done: true, forfeit: true }, so, 'us');
     onQuit(u, t);
+    return true;
   };
 
   // sim: the autopilot plays your drives at a middling level

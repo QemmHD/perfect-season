@@ -285,6 +285,9 @@ if (run('quit')) {
   await page.locator('.ut-tabs').waitFor({ timeout: 60000 });
   await wait(page, 1200);
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')).ut.record ?? { w: 0, l: 0 });
+  // soccer-2 re-review: a quit pays nothing (coins, card XP, paid slot, Season XP, objective games)
+  const purse = () => page.evaluate(() => { const p = JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')); const u = p.ut; const days = u.hq?.days ?? {}; return { coins: p.coins, paid: u.paid?.n ?? 0, xp: (u.owned ?? []).reduce((s, o) => s + (o.xp ?? 0) + 1000 * (o.level ?? 0), 0), games: Object.values(days).reduce((s, d) => s + (d.games ?? 0), 0), sp: Object.values(u.hq?.seasons ?? {}).reduce((s, x) => s + (x.xp ?? 0), 0) }; });
+  const paid0 = await purse();
   await page.locator('.ut-tabs button', { hasText: 'PLAY' }).first().click();
   await wait(page, 800);
   await page.locator('.play-mode').filter({ hasText: 'SQUAD BATTLES' }).first().click();
@@ -306,7 +309,9 @@ if (run('quit')) {
   assert.equal(head, 'LOSS');
   assert.equal(after.l, (before.l ?? 0) + 1);
   assert.equal(after.w, before.w ?? 0);
-  report.quitUt = { head, before, after };
+  const paid1 = await purse();
+  assert.deepEqual(paid1, paid0);
+  report.quitUt = { head, before, after, purse: [paid0, paid1] };
   // the draft: a 1 vs 1 against the AI, played
   await page.goto(page.url().split('#')[0], { waitUntil: 'domcontentloaded' });
   await wait(page, 2000);

@@ -124,6 +124,9 @@ export function settle(
     clubOvr?: number;
     opponent?: string;
     how?: 'played' | 'sim';
+    /** soccer-2 re-review: a solo QUIT. The loss stands (record, ladder, Cup/Circuit/Season round) but it
+     *  pays nothing: no coins or card XP, no paid-game slot, no Season XP, objective game or development */
+    quit?: boolean;
   },
 ): Settled {
   const activeCircuit = r.circuit ? hqOf(ut).circuit.active : undefined;
@@ -179,9 +182,9 @@ export function settle(
   ut = ut.hq ? ut : { ...ut, hq: hqOf(ut) };
   const today = ut.paid.day === r.day ? ut.paid.n : 0;
   const capped = today >= PAID_GAMES_A_DAY;
-  const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
+  const { coins, xp } = capped || r.quit ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
   const x = awardXp(
-    { ...ut, paid: { day: r.day, n: today + (capped ? 0 : 1) } },
+    { ...ut, paid: { day: r.day, n: today + (capped || r.quit ? 0 : 1) } },
     r.played,
     xp,
   );
@@ -247,7 +250,7 @@ export function settle(
         matchId: r.matchId!,
       })
     : seasonUt;
-  const progression = recordMatchProgress(cupUt, {
+  const progression = r.quit ? { ut: cupUt, sp: 0 } : recordMatchProgress(cupUt, {
     id: r.matchId ?? 'legacy:' + r.packId,
     at: r.at,
     mode: r.cup

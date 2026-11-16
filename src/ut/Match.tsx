@@ -686,6 +686,7 @@ export default function UtMatch(props: {
     how: 'played' | 'sim',
     pens?: Pens,
     ff?: 'us' | 'them',
+    quit?: boolean,
   ) => {
     if (done.current || !setup || !pool) return;
     done.current = true;
@@ -723,6 +724,7 @@ export default function UtMatch(props: {
         day: easternDateKey(),
         how,
         opponent: s.rival.name,
+        quit,
       };
       const shownD = settleDraft(ut, dIn);
       props.update((p) => ({ ...p, ut: settleDraft(p.ut, dIn).ut }));
@@ -770,6 +772,7 @@ export default function UtMatch(props: {
       packId: newId(),
       at: Date.now(),
       pay: s.rung && s.rung.i >= 0 ? s.level?.pay : undefined,
+      quit,
     };
     const shown = settle(ut, input);
     const beforeDivision = divisionOf(rivalsOf(ut.rivals, week).points),
@@ -780,7 +783,8 @@ export default function UtMatch(props: {
     const cardIds = s.me.wire.map((w) => w[1]);
     props.update((p) => {
       const r = settle(p.ut, input);
-      const evo = recordEvoMatch(r.ut, {
+      // a quit earns no Evolution progress either (soccer-2 re-review)
+      const evo = quit ? r.ut : recordEvoMatch(r.ut, {
         matchId: input.matchId,
         won: d.won,
         played: input.played,
@@ -952,7 +956,7 @@ export default function UtMatch(props: {
           onProgress={(p) => conn?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => conn?.update((s) => ({ ...s, arcadeTook: k }))}
           onFinish={(us, them, how, _took, pens, ff) => finish(us, them, how, pens, ff)}
-          onQuit={(us, them) => finish(us, them, 'played', undefined, 'us')}
+          onQuit={(us, them) => finish(us, them, 'played', undefined, 'us', true)}
         />
       </div>
     );

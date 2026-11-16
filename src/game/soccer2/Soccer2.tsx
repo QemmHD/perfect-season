@@ -135,7 +135,7 @@ export function Soccer2({
    */
   fixedShootout?: { first: Side; scored: boolean[] };
   /** the lab's QA hook: the live attack and match each frame, the goal mouth on screen, and the pause */
-  debug?: (a: Attack | null, m: Match, ui: string, view: { goal: { x: number; y: number; w: number; h: number } | null; paused: boolean; stats: SoccerRenderer['stats']; arrows: SoccerRenderer['arrows']; safe: { x: number; y: number; w: number; h: number } | null; clutch: boolean; fx: { granted: number } }) => void;
+  debug?: (a: Attack | null, m: Match, ui: string, view: { goal: { x: number; y: number; w: number; h: number } | null; paused: boolean; stats: SoccerRenderer['stats']; arrows: SoccerRenderer['arrows']; safe: { x: number; y: number; w: number; h: number } | null; clutch: boolean; fx: { granted: number }; /** the label pass's keep-outs, canvas px */ keep: { x: number; y: number; w: number; h: number }[] }) => void;
   /** the lab's drills and screenshots: the man on the ball starts here (pitch metres; open play only) */
   start?: Pt;
   /** a head to head against another phone: the pause sheet offers FORFEIT instead of QUIT */
@@ -145,10 +145,10 @@ export function Soccer2({
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
   onShootout?: (r: ShootoutResult) => void;
-  /** solo QUIT, confirmed: the attacks played so far (the host decides what a quit means) */
-  onQuit?: (p: Progress) => void;
-  /** online FORFEIT, confirmed: the attacks played so far (the host pads them with 'FF' and ends the match) */
-  onForfeit?: (p: Progress) => void;
+  /** solo QUIT, confirmed: the attacks played so far (the host decides what a quit means); `false` = refused, play on */
+  onQuit?: (p: Progress) => boolean | void;
+  /** online FORFEIT, confirmed: the attacks played so far (the host pads them with 'FF' and ends the match); `false` = refused */
+  onForfeit?: (p: Progress) => boolean | void;
 }) {
   const [lastReadout,setLastReadout] = useState<PlayFeedback|null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -330,6 +330,14 @@ export function Soccer2({
     if (!a || (uiRef.current !== 'intro' && uiRef.current !== 'so-intro')) return;
     kickOff(a);
     sfx.whistle();
+    // a thumb already resting on the stick drives the carrier from the whistle's own frame (C5, soccer-2
+    // re-review): the first step after it reads the held push, not the stick's enable a commit later
+    const h = heldStick.current;
+    if (h?.active && !pausedRef.current) {
+      stickRef.current = { x: h.x, y: h.y };
+      stickSprint.current = h.sprint;
+      if (sprintPointer.current === null) setSprint(a, h.sprint);
+    }
     if (uiRef.current === 'so-intro') {
       setUi('so-kick');
       setGuess(null);
@@ -660,7 +668,10 @@ export function Soccer2({
   const live = () => (uiRef.current === 'live' || uiRef.current === 'so-kick') && !!atkRef.current && !atkRef.current.end && !(uiRef.current === 'so-kick' && !usKicking.current) && !spWait.current?.auto;
 
   /** The left thumb's stick reports (V2 A.5): its push, and sprint past the ring (the tick is the stick's). */
+  /** the stick's latest output, enabled or not (onHeld before the whistle, onStick after) */
+  const heldStick = useRef<StickOut | null>(null);
   const onStick = (o: StickOut) => {
+    heldStick.current = o;
     if (o.active) beat();
     stickRef.current = o.active ? { x: o.x, y: o.y } : null;
     stickSprint.current = o.sprint;
@@ -819,6 +830,10 @@ export function Soccer2({
   const leave = (how: 'quit' | 'forfeit') => {
     // never once every attack is in (a shootout is agreed or under way): QUIT and FORFEIT are not offered then
     if (finished.current || left.current || match.over || soRef.current) return;
+    // the host goes first: only a quit or forfeit it accepted ends the match here (soccer-2 re-review:
+    // one it refuses, say while the AI's attacks still load, leaves the sheet open and the match on)
+    const host = how === 'quit' ? onQuit : onForfeit;
+    if (!host || host(progress()) === false) return;
     finished.current = true;
     left.current = how;
     pausedRef.current = false;
@@ -826,7 +841,6 @@ export function Soccer2({
     setPaused(false);
     setUi('final');
     sfx.click();
-    (how === 'quit' ? onQuit : onForfeit)?.(progress());
   };
 
   // keyboard: arrows/WASD run, Space shoot (hold), J pass (hold: lob), K through ball (hold: lofted), Shift sprint, Esc pause
@@ -894,15 +908,26 @@ export function Soccer2({
     const cr = canvas.getBoundingClientRect();
     if (cr.width < 1) return;
     const k = renderer.W / cr.width;
-    const box = (r: DOMRect) => ({ x: (r.left - cr.left) * k, y: (r.top - cr.top) * k, w: r.width * k, h: r.height * k });
+    const box = (r: { left: number; top: number; width: number; height: number }) => ({ x: (r.left - cr.left) * k, y: (r.top - cr.top) * k, w: r.width * k, h: r.height * k });
     const safe = wrap.querySelector('.sc2-safe');
     renderer.frameInfo.safe = safe ? box(safe.getBoundingClientRect()) : null;
-    renderer.frameInfo.controls = Array.from(wrap.querySelectorAll('.sc2-ctl, .ps-stick-ghost, .sc2-bug, .sc2-pause')).map((el) => box(el.getBoundingClientRect()));
+    // the stick: its live ring while a thumb is down (it lands and follows under the thumb), else the ghost
+    const sb = stickBase.current;
+    const stick = sb ? [box({ left: sb.x - sb.r, top: sb.y - sb.r, width: sb.r * 2, height: sb.r * 2 })] : Array.from(wrap.querySelectorAll('.ps-stick-ghost')).map((el) => box(el.getBoundingClientRect()));
+    renderer.frameInfo.controls = [...Array.from(wrap.querySelectorAll('.sc2-ctl, .sc2-bug, .sc2-pause')).map((el) => box(el.getBoundingClientRect())), ...stick];
     // the label pass's keep-outs (V-3; soccer-2 fix): the toast line (or the plates in its place) and every
     // control, so no tag prints under a DOM button. Read here, never per frame.
     keepRef.current = [...Array.from(wrap.querySelectorAll('.sc2-toast, .sc2-plates')).map((el) => box(el.getBoundingClientRect())), ...renderer.frameInfo.controls];
   };
   const keepRef = useRef<{ x: number; y: number; w: number; h: number }[]>([]);
+  const stickBase = useRef<{ x: number; y: number; r: number } | null>(null);
+  // the stick's ring landed, moved 8+ px under the thumb or went: the keep-outs follow at once (soccer-2 re-review)
+  const onStickBase = (b: { x: number; y: number; r: number } | null) => {
+    stickBase.current = b;
+    const wrap = wrapRef.current;
+    const canvas = canvasRef.current;
+    if (wrap && canvas) readFrame(wrap, canvas);
+  };
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
@@ -975,7 +1000,7 @@ export function Soccer2({
       renderer.frameInfo.clutch = clutchNow;
       clutchRef.current.on = clutchNow;
       crowdFor(a, now);
-      debug?.(a, match, u, { goal: renderer.goalMouth(), paused: pausedRef.current, stats: renderer.stats, arrows: renderer.arrows, safe: renderer.frameInfo.safe, clutch: clutchNow, fx: { granted: juice.granted } });
+      debug?.(a, match, u, { goal: renderer.goalMouth(), paused: pausedRef.current, stats: renderer.stats, arrows: renderer.arrows, safe: renderer.frameInfo.safe, clutch: clutchNow, fx: { granted: juice.granted }, keep: keepRef.current });
       // the score bug's clock line: the attack's time left, red in its last 5 s
       const line = lineRef.current;
       if (line && a) {
@@ -1184,7 +1209,7 @@ export function Soccer2({
         lineRef={lineRef}
         label={'You ' + match.goals + ', ' + rivalShown + ' ' + (rival ? rival.score : 'to come') + (match.over ? ', full time' : ', ' + minuteOf(match, shownI) + ', attack ' + (shownI + 1) + ' of ' + total + ', ' + SCENARIO_NAMES[match.deal[shownI]])}
       />
-      {!autoplayHook && ui !== 'final' && ui !== 'loading' && !inSo && <PauseButton onPress={pause} />}
+      {!autoplayHook && ui !== 'final' && ui !== 'loading' && <PauseButton onPress={pause} />}
       {inSo && soView && <PenTally view={soView} rivalName={rivalShown} />}
       {pop && (
         <div key={pop.id} className={'hg2-pop ' + pop.tone} role="status">
@@ -1231,7 +1256,7 @@ export function Soccer2({
           ))}
         </div>
       )}
-      {!autoplayHook && a && !theirKick && ui !== 'loading' && ui !== 'final' && <Stick disabled={!playing || paused} onChange={onStick} onTap={tapPass} />}
+      {!autoplayHook && a && !theirKick && ui !== 'loading' && ui !== 'final' && <Stick disabled={!playing || paused} onChange={onStick} onTap={tapPass} onBase={onStickBase} onHeld={(o) => (heldStick.current = o)} />}
       {slots && (
         <div className="sc2-cluster" role="group" aria-label="Actions">
           {targetsOf(slots).map((id) => {
@@ -1245,7 +1270,7 @@ export function Soccer2({
                 className={'sc2-ctl sc2-ctl-' + id.toLowerCase() + ' tone-' + tone + (held[id] || (sl.act === 'shoot' && shooting) ? ' down' : '') + (intro ? ' go' : '')}
                 data-slot={id}
                 data-act={sl.act}
-                aria-label={bend ? 'Bend: ' + (bendK === 0 ? 'straight' : bendK < 0 ? 'left' : 'right') + '. Tap to change' : sl.label + (sl.sub ? ' (' + sl.sub.toLowerCase() + ')' : '')}
+                aria-label={bend ? 'Bend: ' + (bendK === 0 ? 'straight' : bendK < 0 ? 'left' : 'right') + '. Tap to change' : sl.label + (sl.sub ? ' (' + (sl.hold ? 'hold: ' : '') + sl.sub.toLowerCase() + ')' : '')}
                 onPointerDown={(e) => slotDown(id, sl, e)}
                 onPointerMove={sl.act === 'shoot' ? (e) => shootDrag(e.pointerId, e.clientX, e.clientY) : undefined}
                 onPointerUp={(e) => slotUp(id, sl, e)}
@@ -1255,7 +1280,17 @@ export function Soccer2({
               >
                 <span className="sc2-ctl-label">{bend ? <Arrow dir={bendK} /> : sl.label}</span>
                 {bend && <span className="sc2-ctl-sub">BEND</span>}
-                {sl.sub && <span className="sc2-ctl-sub">{sl.sub}</span>}
+                {sl.sub && (
+                  <span className={'sc2-ctl-sub' + (sl.hold ? ' hold' : '')}>
+                    {sl.hold && (
+                      <svg viewBox="0 0 10 10" aria-hidden="true">
+                        <circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                        <circle cx="5" cy="5" r="1.9" fill="currentColor" />
+                      </svg>
+                    )}
+                    {sl.sub}
+                  </span>
+                )}
                 {sl.act === 'shoot' && shooting && (
                   <span className="sc2-aimpad" aria-hidden="true">
                     <i className="u" />

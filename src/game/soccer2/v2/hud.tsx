@@ -30,13 +30,13 @@ function geomFrom(zone: HTMLElement): StickGeom {
  * Output is computed inside the pointer handler (no frame of latency); the ring is drawn on the next
  * animation frame, straight to the DOM (no React render per move).
  */
-export function Stick({ disabled = false, onChange, onTap }: { disabled?: boolean; onChange: (o: StickOut) => void; onTap?: (x: number, y: number) => void }) {
+export function Stick({ disabled = false, onChange, onTap, onBase, onHeld }: { disabled?: boolean; onChange: (o: StickOut) => void; onTap?: (x: number, y: number) => void; /** the live ring's centre and radius (page px) when it lands or follows the thumb 8+ px; null once the thumb lifts */ onBase?: (b: { x: number; y: number; r: number } | null) => void; /** while disabled (before the whistle): what a resting thumb holds, so the host can apply it on the whistle's own frame */ onHeld?: (o: StickOut) => void }) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const knobRef = useRef<HTMLElement>(null);
-  const live = useRef({ geom: null as StickGeom | null, state: null as StickState | null, out: STICK_IDLE, raf: 0, down: null as { x: number; y: number; t: number } | null });
-  const props = useRef({ disabled, onChange, onTap });
-  props.current = { disabled, onChange, onTap };
+  const live = useRef({ geom: null as StickGeom | null, state: null as StickState | null, out: STICK_IDLE, raf: 0, down: null as { x: number; y: number; t: number } | null, baseKey: '' });
+  const props = useRef({ disabled, onChange, onTap, onBase, onHeld });
+  props.current = { disabled, onChange, onTap, onBase, onHeld };
 
   // the whistle: a thumb that was already down drives the player on this very frame
   useEffect(() => {
@@ -80,14 +80,29 @@ export function Stick({ disabled = false, onChange, onTap }: { disabled?: boolea
     const paint = () => {
       if (!l.raf) l.raf = requestAnimationFrame(draw);
     };
+    // where the live ring is, for the host's label keep-outs (soccer-2 re-review): told when it lands,
+    // when it has followed the thumb 8+ px, and when it goes, never per move
+    const base = () => {
+      const s = l.state;
+      const g = l.geom;
+      const b = s && s.id !== null && g ? { x: s.origin.x, y: s.origin.y, r: g.ringR } : null;
+      const key = b ? Math.round(b.x / 8) + ',' + Math.round(b.y / 8) : '';
+      if (key === l.baseKey) return;
+      l.baseKey = key;
+      props.current.onBase?.(b);
+    };
     const report = () => {
       if (!l.state || !l.geom) return;
       const next = stickOut(l.state, l.geom, l.out);
       const prev = l.out;
       l.out = next;
       paint();
+      base();
       const p = props.current;
-      if (p.disabled) return;
+      if (p.disabled) {
+        p.onHeld?.(next);
+        return;
+      }
       if (sprintEdge(prev, next)) haptic('tick');
       if (next.x !== prev.x || next.y !== prev.y || next.sprint !== prev.sprint || next.active !== prev.active) p.onChange(next);
     };
@@ -134,7 +149,9 @@ export function Stick({ disabled = false, onChange, onTap }: { disabled?: boolea
       const was = l.out;
       l.out = STICK_IDLE;
       paint();
+      base();
       if (!props.current.disabled && was.active) props.current.onChange(STICK_IDLE);
+      if (props.current.disabled) props.current.onHeld?.(STICK_IDLE);
       if (e.type === 'pointerup' && d0 && classify(e.clientX - d0.x, e.clientY - d0.y, e.timeStamp - d0.t) === 'tap') props.current.onTap?.(e.clientX, e.clientY);
     };
     zone.addEventListener('pointerdown', down, { passive: false });
@@ -149,6 +166,11 @@ export function Stick({ disabled = false, onChange, onTap }: { disabled?: boolea
       zone.removeEventListener('pointercancel', up);
       zone.removeEventListener('lostpointercapture', up);
       if (l.raf) cancelAnimationFrame(l.raf);
+      // the stick goes with a thumb still on it (the whistle, a goal): its ring is no keep-out any more
+      if (l.baseKey) {
+        l.baseKey = '';
+        props.current.onBase?.(null);
+      }
     };
   }, []);
 
