@@ -6,7 +6,8 @@ import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, hairFor, type Look } from './body
 import { clipMeta, getClip, legScale, warp } from './mocap';
 import * as P from './poses';
 import type { Pose } from './rig';
-import type { Body } from '../soccer2/types';
+import { SOCCER_STANDINS, standIn } from './select-family';
+import type { Act, Body } from '../soccer2/types';
 import type { SoccerKit } from '../soccer2/render';
 
 export const CLIPS = ['ready', 'jog', 'run', 'sprint', 'kick', 'dive', 'fall_forward', 'fall_forward_m', 'fall_back', 'catch', 'jump', 'celebrate', 'shuffle', 'shuffle_l', 'backpedal'];
@@ -78,7 +79,16 @@ export function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { 
   return { clip, ct: m.gait.frac * clipMeta(clip).duration };
 }
 
+/** Every act the soccer selection animates (soccer2/types.ts `Act`); anything else gets a stand-in. */
+export const KNOWN_ACTS: ReadonlySet<string> = new Set<Act>(['idle', 'run', 'dribble', 'kick', 'tackle', 'down', 'dive', 'catch', 'header', 'celebrate', 'set', 'wall']);
+
+/** What a body shows; an act this file doesn't animate yet is drawn as its family's stand-in (select-family.ts). */
 export function animOf(b: Body, t: number, look: Look, m: Memo): Anim {
+  if (!KNOWN_ACTS.has(b.act)) b = { ...b, act: standIn(b.act, KNOWN_ACTS, SOCCER_STANDINS, Math.hypot(b.vx, b.vy) > 1) as Act };
+  return animKnown(b, t, look, m);
+}
+
+function animKnown(b: Body, t: number, look: Look, m: Memo): Anim {
   const since = t - b.actAt;
   const speed = Math.hypot(b.vx, b.vy);
   const fallback: Anim = { key: 'id' + Math.floor(((t * 0.5) % 1) * 4), pose: P.idle(Math.floor(((t * 0.5) % 1) * 4) / 4) };

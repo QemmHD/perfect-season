@@ -7,9 +7,10 @@ import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, hairFor, type Look } from './body
 import { clipMeta, getClip, type Ground, legScale, warp } from './mocap';
 import * as P from './poses';
 import type { Joints, Pose } from './rig';
+import { NBA_STANDINS, standIn } from './select-family';
 import { heaviness } from './style';
 import { JUMPER_TOP, RIM_H } from '../hoops2/engine';
-import type { Body, Possession } from '../hoops2/types';
+import type { Act, Body, Possession } from '../hoops2/types';
 import type { Kit } from '../hoops2/render';
 
 /**
@@ -122,7 +123,19 @@ export function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { 
  * What a body is doing right now, as a clip or a pose. `shotAt`: when a jump shot of his left his
  * hands (the ball's in the air), so a shot tapped too quickly to be seen rising still follows through.
  */
+/** Every act the NBA selection animates (hoops2/types.ts `Act`); anything else gets a stand-in. */
+export const KNOWN_ACTS: ReadonlySet<string> = new Set<Act>(['idle', 'screen', 'run', 'dribble', 'shoot', 'layup', 'dunk', 'contact', 'standdunk', 'pass', 'catch', 'defend', 'contest', 'block', 'cross', 'stepback', 'spin', 'stumble', 'fall', 'land', 'celebrate', 'rebound']);
+
+/**
+ * What a body is doing right now, as a clip or a pose. An act this file doesn't animate yet (a V2
+ * act the engine emits first) is drawn as its family's stand-in (select-family.ts).
+ */
 export function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shotAt: number | null): Anim {
+  if (!KNOWN_ACTS.has(b.act)) b = { ...b, act: standIn(b.act, KNOWN_ACTS, NBA_STANDINS, Math.hypot(b.vx, b.vz) > 1) as Act };
+  return animKnown(b, t, carrying, look, m, shotAt);
+}
+
+function animKnown(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shotAt: number | null): Anim {
   const pose: Anim = poseOf(b, t, carrying);
   const speed = Math.hypot(b.vx, b.vz);
   // off the floor (still up after a dunk, knocked back in the air), a clip keeps its feet under him

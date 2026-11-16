@@ -6,9 +6,10 @@ import { DEFAULT_HAIR, DEFAULT_SKIN, type Look } from './body';
 import { clipMeta, getClip, type Ground, legScale, warp } from './mocap';
 import * as P from './poses';
 import type { Joints, Pose } from './rig';
+import { NFL_STANDINS, standIn } from './select-family';
 import { heaviness } from './style';
 import { isLine, speedOf } from '../football2/engine';
-import type { Body, Play } from '../football2/types';
+import type { Act, Body, Play } from '../football2/types';
 import type { FbKit } from '../football2/render';
 
 export function lookFor(b: Body, kit: FbKit): Look {
@@ -175,7 +176,24 @@ export function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { 
   return { clip, ct: m.gait.frac * clipMeta(clip).duration };
 }
 
+/** Every act the NFL selection animates (football2/types.ts `Act`); anything else gets a stand-in. */
+export const KNOWN_ACTS: ReadonlySet<string> = new Set<Act>(['stance', 'run', 'block', 'throw', 'catch', 'carry', 'juke', 'spin', 'stiff', 'truck', 'windup', 'tackle', 'down', 'rush', 'backpedal', 'celebrate', 'kick']);
+
+/**
+ * What a body is doing right now, as a clip or a pose. An act this file doesn't animate yet is drawn
+ * as its family's stand-in (select-family.ts); the play's quarterback and carrier are matched by
+ * identity below, so the stand-in body takes their place in a copy of the play too.
+ */
 export function animOf(b: Body, t: number, p: Play, look: Look, m: Memo, aiming: boolean): Anim {
+  if (!KNOWN_ACTS.has(b.act)) {
+    const nb: Body = { ...b, act: standIn(b.act, KNOWN_ACTS, NFL_STANDINS, Math.hypot(b.vx, b.vy) > 0.6) as Act };
+    p = { ...p, qb: p.qb === b ? nb : p.qb, carrier: p.carrier === b ? nb : p.carrier };
+    b = nb;
+  }
+  return animKnown(b, t, p, look, m, aiming);
+}
+
+function animKnown(b: Body, t: number, p: Play, look: Look, m: Memo, aiming: boolean): Anim {
   const pose: Anim = poseOf(b, t, p);
   if (p.phase === 'pre' || (b.act === 'stance' && Math.hypot(b.vx, b.vy) < 0.6)) return pose;
   const speed = Math.hypot(b.vx, b.vy);
