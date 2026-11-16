@@ -320,7 +320,7 @@ try {
         .click();
       const points = () =>
         page
-          .locator('.fb2-cards .fb2-card.on polyline')
+          .locator('.fb2-tray-strip .fb2-card.on polyline')
           .first()
           .getAttribute('points');
       const right = await points();
@@ -361,7 +361,7 @@ try {
         assert.ok(
           await page
             .getByRole('button', {
-              name: 'Scramble: the quarterback runs',
+              name: 'Run it: the quarterback tucks it and runs',
               exact: true
             })
             .isVisible(),

@@ -1,6 +1,8 @@
 // Codex: the thumb's two screen axes must reach the field in either camera orientation.
 import { describe, expect, it } from 'vitest';
-import { CarryGate, screenRunInput } from './controls';
+import { audibleTo, CarryGate, callAllowed, screenRunInput } from './controls';
+import { choices, newGame } from './drive';
+import type { Defense, FbPlayer, Offense } from './types';
 describe('football joystick mapping', () => {
   it.each([
     ['end', 0, -1, 0, 1],
@@ -106,5 +108,47 @@ describe('the momentum carry gate', () => {
     expect(g.input(8, false, { x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
     // the next carrier (a lateral, a new play) starts over
     expect(g.input(9, false, null)).toBeNull();
+  });
+});
+
+// Claude (nfl-2 review fix): AUDIBLE and the book keep to a drill's kind.
+describe('practice drills keep to their call', () => {
+  it('allows only runs in a run drill, only passes in a throw drill, everything in a game', () => {
+    expect([callAllowed('run', 'run'), callAllowed('run', 'pass')]).toEqual([true, false]);
+    expect([callAllowed('throw', 'run'), callAllowed('throw', 'pass')]).toEqual([false, true]);
+    expect([callAllowed('kick', 'run'), callAllowed('kick', 'pass')]).toEqual([false, false]);
+    expect([callAllowed(undefined, 'run'), callAllowed(null, 'pass')]).toEqual([true, true]);
+  });
+  it('never lets AUDIBLE turn a run drill into a pass (or a throw drill into a run), whatever the cards', () => {
+    const run = { call: 'run' as const },
+      pass = { call: 'pass' as const };
+    for (const cards of [[run, run, run], [pass, pass, run], [run], [pass, run, pass]]) {
+      for (const cur of cards) {
+        const r = audibleTo(cur, cards, 'run');
+        if (r?.kind === 'card') expect(cards[r.index].call).toBe('run');
+        if (r?.kind === 'book') expect(r.call).toBe('run');
+        const t = audibleTo(cur, cards, 'throw');
+        if (t?.kind === 'card') expect(cards[t.index].call).toBe('pass');
+        if (t?.kind === 'book') expect(t.call).toBe('pass');
+      }
+    }
+    // a run drill's cards are all runs: AUDIBLE does nothing at all
+    expect(audibleTo(run, [run, run, run], 'run')).toBeNull();
+    expect(audibleTo(pass, [pass, pass, pass], 'throw')).toBeNull();
+    // in a game it flips, to a card when one has the other call, else from the book
+    expect(audibleTo(pass, [pass, pass, run], undefined)).toEqual({ kind: 'card', index: 2 });
+    expect(audibleTo(run, [run, run, run], undefined)).toEqual({ kind: 'book', call: 'pass' });
+  });
+  it('a run drill lined up from the real choices offers only runs (the tray never shows a pass)', () => {
+    const man = (pos: string): FbPlayer => ({ id: pos, name: pos, tag: pos, num: null, ht: 74, wt: 220, pos, ovr: 75, a: {}, abil: [] });
+    const off: Offense = { qb: man('QB'), rb: man('RB'), wr: [man('WR'), man('WR'), man('WR')], te: man('TE'), ol: [man('OT'), man('OG'), man('C'), man('OG'), man('OT')], k: man('K') };
+    const def: Defense = { dl: [man('DE'), man('DT'), man('DT'), man('DE')], lb: [man('LB'), man('LB'), man('LB')], cb: [man('CB'), man('CB')], s: [man('S'), man('S')] };
+    const g = newGame(off, def, 'drill', 4);
+    for (let down = 1; down <= 4; down++) {
+      g.down = down;
+      const cs = choices(g).filter((c) => callAllowed('run', c.call));
+      expect(cs.length).toBeGreaterThan(0);
+      expect(cs.every((c) => c.call === 'run')).toBe(true);
+    }
   });
 });
