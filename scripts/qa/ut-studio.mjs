@@ -559,6 +559,9 @@ const tapTargets = (page) =>
         const n = (seen[label] = (seen[label] ?? -1) + 1);
         let skip = '';
         if (D.test(label)) skip = 'denylist';
+        // the tab or segment already open: tapping it again rightly changes nothing (switches and
+        // toggle buttons are still tapped: they flip)
+        else if (e.matches('[aria-current=page], [aria-current=true], [role=tab][aria-selected=true]')) skip = 'already selected';
         else if (/\bOPEN\b/i.test(label) && R.test(e.closest('article, li, section, .ut-mine-pack, div')?.innerText ?? '')) skip = 'registered pack';
         else if (e.matches('a[target=_blank]')) skip = 'leaves the app';
         out.push({ label, n, skip });
