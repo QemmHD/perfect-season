@@ -93,11 +93,13 @@ export const PITCH = {
   lineA: 0.85,
   /** the run-off outside the lines, this much darker */
   runoff: 0.12,
-  /** the boards: panel, light strip, word mark */
+  /** the boards: panel and light strip */
   board: '#141a2a',
   boardText: '#e9f1ff',
-  /** the word mark on the boards behind the goal (original, no sponsor) */
-  boardWords: 'PERFECT SEASON   ',
+  /** the LED panels on the boards behind the goal: each panel this many metres wide, lit this much in the
+   *  clubs' colours (Wave 1: a painted word mark foreshortened to ~5 px and read as garbled letters) */
+  boardPanelM: 4,
+  boardLit: 0.55,
   /** the crowd's three value bands, nearest the pitch last, in 2-texel blocks */
   crowd: ['#221d36', '#342d52', '#4a426e'] as const,
   fleck: 0.06,
@@ -142,8 +144,7 @@ export function pitchTex(theme: PitchTheme): FieldTex {
   const boardText = rgb(PITCH.boardText);
   const bands = PITCH.crowd.map(rgb);
   const dark: RGB = [14, 22, 16];
-  const word = PITCH.boardWords.toUpperCase();
-  // the boards behind the goal line, 1.25 m deep: the word mark in 2-texel letter pixels
+  // the boards behind the goal line, 1.25 m deep: LED panels in the two clubs' colours
   const BOARD_Y0 = PL + 4.6;
   const BOARD_Y1 = BOARD_Y0 + 1.25;
   const fan = (side: number, row: number, seat: number): RGB => {
@@ -170,15 +171,13 @@ export function pitchTex(theme: PitchTheme): FieldTex {
         if (x < 0 || x > PW || y < 0 || y > PL) col = mix(col, dark, PITCH.runoff);
         if (onLine(x, y)) col = mix(col, line, PITCH.lineA);
       } else if (y > BOARD_Y0 && y < BOARD_Y1 && x > -6 && x < PW + 6) {
-        // the boards behind the goal: a lit top edge and the word mark (letters read upright from the camera)
+        // the boards behind the goal: a lit top edge over LED panels in the clubs' colours, with a dark seam
+        // between panels (no lettering: at the broadcast camera's angle the boards are only a few pixels deep)
         const gy = Math.floor((BOARD_Y1 - y) * k) - 2;
-        const gx = Math.floor((x + 6) * k);
-        col = gy < 0 ? mix(board, boardText, 0.35) : board;
-        const ch = Math.floor(gx / 8);
-        const g = F35[word[ch % word.length]];
-        const cx = Math.floor((gx % 8) / 2);
-        const cy = Math.floor(gy / 2);
-        if (g && cx < 3 && cy >= 0 && cy < 5 && g[cy * 3 + cx] === '1') col = boardText;
+        const along = x + 6;
+        const panel = Math.floor(along / PITCH.boardPanelM);
+        const seam = along - panel * PITCH.boardPanelM < 0.3;
+        col = gy < 0 ? mix(board, boardText, 0.35) : seam ? board : mix(board, panel % 2 ? away : home, PITCH.boardLit);
       } else if (x > -6 && x < PW + 6 && y > -6 && y < PL + 6) {
         // the boards along the touchlines: home colours in panels with a light strip
         const along = ((Math.floor(y / 3.2) % 2) + 2) % 2;

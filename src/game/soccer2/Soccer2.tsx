@@ -22,7 +22,7 @@ import { soccerFeedback, type PlayFeedback } from '../play-feedback';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { crowd, loadSamples, sfx, vibrate } from '../../lib/sound';
-import { LOFT_HOLD, nextBend, type ControlPhase, type Slot, type SlotId, slotsFor, type Slots, targetsOf } from './controls';
+import { bugTag, LOFT_HOLD, nextBend, type ControlPhase, type Slot, type SlotId, slotsFor, type Slots, targetsOf } from './controls';
 import { PauseSheet } from './PauseSheet';
 import { PausableTimers } from './timers';
 import { haptic, heartbeat, PauseButton, ScoreBug, Stick, type StickOut, ToastLine, usePlaytime } from './v2';
@@ -1082,7 +1082,7 @@ export function Soccer2({
   // between attacks the scoreboard still shows the one just played
   const shownI = ui === 'after' ? Math.max(0, match.i - 1) : Math.min(match.i, total - 1);
   const rivalShown = rival?.name ?? rivalName;
-  const rivalTag = rivalShown.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3) || 'RIV';
+  const rivalTag = bugTag(rivalShown);
   usePlaytime('match', { paused, auto: !!autoplayHook, stoppage: !playing && !theirKick });
   // Clutch (V2 B.0.4): the stoppage attack is staged. Rules unchanged; the camera, the bug, the crowd,
   // the heartbeat and the line in the toast line change.
@@ -1370,3 +1370,4 @@ function PenTally({ view, rivalName }: { view: { marks: { side: Side; scored: bo
 }
 
 export type { AttackEnd };
+

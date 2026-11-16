@@ -338,6 +338,7 @@
   font: 900 11px/1 var(--display);
   font-style: normal;
   letter-spacing: 1px;
+  white-space: nowrap;
 }
 .sc2-bug-side.us i {
   color: #b9fff1;

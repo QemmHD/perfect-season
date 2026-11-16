@@ -102,3 +102,13 @@ export function nearestWithin<T extends { x: number; y: number }>(pts: readonly 
   }
   return best;
 }
+
+/**
+ * The rival's three letters on the score bug (Wave 1): the first real word of the name, skipping a decade
+ * ("'10s Barcelona" -> BAR, not 10S), a short first word kept whole ("AI Pro" -> AI, not AIP), else RIV.
+ */
+export function bugTag(name: string): string {
+  const words = name.split(/\s+/).map((w) => w.replace(/[^A-Za-z0-9]/g, '')).filter((w) => /[A-Za-z]/.test(w) && !/^\d+s?$/i.test(w));
+  const w = words[0] ?? '';
+  return (w.length <= 3 ? w : w.slice(0, 3)).toUpperCase() || 'RIV';
+}
