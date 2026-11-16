@@ -151,7 +151,6 @@ describe('no cut when the ball changes hands', () => {
       }
     }
     jumps.sort((a, b) => a - b);
-    if (process.env.CAM_PROBE) console.log('CAMPROBE', changes, [0.5, 0.75, 0.9, 0.99, 1].map((k) => jumps[Math.min(jumps.length - 1, Math.floor(jumps.length * k))].toFixed(1)).join(' '));
     expect(changes).toBeGreaterThan(20);
     // before the fix (anchor handed to the receiver's spot): median 135 px, p90 270, max 298 at 393 wide;
     // with it: median 11.6, p90 41.6, max 64.5 (the rest is the row clamp that keeps the stands and the goal in)
