@@ -26,6 +26,194 @@ Branch `claude/studio-shell`. Plan: [shell-plan.md](shell-plan.md). `O` below me
   - `src/shell/arena.ts`: `arenaActive()`, `onArenaChange(cb)`, `arenaElement()` and `shellWork(kind)`. It watches `<body>`'s own children for `.arcade-full`. **nba / nfl / soccer / players: keep each engine's root as `createPortal(<div className="arcade-full …">, document.body)`.** `src/shell/arena.test.ts` fails if an engine stops doing that; tell shell if you need to change it.
   - **nba / nfl: `src/game/Arcade.tsx` has 4 shell lines in the loader effect** (`loadErr` state, a `.catch` on each loader, `if (loadErr) throw loadErr.e`). Keep them when you rework Arcade. `src/game/attrs.ts` `loadAttrs(strict = false)` now has a strict mode that rejects when the attribute file exists but can't download; Arcade uses it. Without `strict` it behaves as before (the null lookup), except that a failed download is tried again on the next call instead of being cached.
   - **ut:** `App.tsx` has two one-line wraps around `{page}` and `{body}` in the `<Transition>`s. Keep them where they are when you edit those lines.
+- **shell-5: sub-page header plates, the match HUD scrim and 44-pt acceptance items (every team).**
+  - `src/shell/plates.css` now plates `.screen > .draft-head` (Draft, Search) and `.screen > .po-head` (Playoffs, gold set) from y = 0, and Training Camp's `.evo-screen > .evo-top` (moved below the status-bar edge). Keep those class names and their position as direct children of `.screen`. `.vote-head` gets no plate (the vote screen is centred, not at `--sat`).
+  - **nba / nfl / soccer:** each arena gets `.arcade-full::after`, a scrim from y = 0 to the raw inset (`--ps-inset-top`), fading to transparent at the inset line, `pointer-events: none`, painted last. Keep your HUD below `--sat` (inset + edge) as today, keep the classes `hg2` (NBA), `fb2` (NFL) and `sc2` (soccer), and don't use `.arcade-full::after` yourselves. If a new camera draws players, the ball or the rim above the inset, tell shell: `edge-walk.mjs` samples that strip in every match (20 frames per sport and phone).
+  - **packs, 44-pt acceptance items** (measured in design px by `edge-walk.mjs` on `claude/studio-shell`, all 9 phones): pack **SKIP 65 × 36** (27/27 runs); **QUICK SELL DUPES 133 × 34** (seen when the grid has a duplicate); **TAP TO CONTINUE** (the walkout's second control; the audit measured 224 × 42 at 320); the pack grid's per-card actions you add. Give each 44 or a `::before` hit area (`styles.css` "44pt hit areas").
+  - **ut, 44-pt acceptance item:** the UT Home season chips (`First Tip …`, `Thirty a Night …`, `Air Raid …`, `Rookie Breakouts …`) are **141 × 41** on every phone.
+  - **nfl:** the in-play receiver buttons (`Pass to X · …`) measure **43 × 44** at 375 × 812 and 375 × 667 (rounding of a 44-px box at k = 0.96); one design px more of width clears them.
+  - **lead (unowned `src/evolution/`):** Training Camp's chips are under 44: `Leave Training Camp` 66 × 36, `CAMP SQUAD` / `MY ULTIMATE TEAM` 172 × 34, `RELAXED` / `GAME DAY` / `INTENSE` 113 × 34.
+  - **Dev servers share one Vite cache.** Every worktree's `node_modules` is a symlink to the same folder, so `node_modules/.vite` is re-optimized by whichever team's dev server starts last, and lazy chunks then fail with "504 Outdated Optimize Dep" (the app reloads to recover, losing the QA step). shell runs its dev server with a wrapper config that only sets `cacheDir` to a scratch folder (`vite --config <scratch>/vite.qa.config.mjs`); other teams seeing unexplained reloads on lazy screens may want the same.
+
+## shell-5 · Fit completion: full-matrix walker with tap timing, premium plates, M6, preserve and edge-state checks (done)
+
+Measured on 2026-11-16. "Before" is the kept build `acdf3e2` (`vite preview` of `O/audit-scripts/likeness/build`). "After" is this branch on the dev server on 5211. Both use the standard player, 9 phones × 3 sports, isolated: `?ns=inspect`, the local relay, and every other host aborted (the only host refused was the app's own Supabase launch call). Shots and reports are in `O/shots/shell/{before,after}/walk/<sport>-<device>/`, with contact sheets in `O/shots/shell/{before,after}/sheets/<sport>-<device>.png` (27 each).
+
+### What changed
+
+- **Fix C part 2: sub-page plates** (`src/shell/plates.css`):
+  - The Draft and Search bar (`.screen > .draft-head`) and the Playoffs title (`.screen > .po-head`) get the `::before` plate from y = 0. The Draft uses the teal set. Playoffs uses the gold set, to match its gold glow.
+  - The status plate takes the matching top colour on those screens: `html:has(… .draft-head, .evo-top)` and `html:has(.ut-top, .po-head)`. All `:has()` arguments are still plain classes.
+  - Each header was checked to start at `--sat`.
+  - `.vote-head` does not start at `--sat` (the vote screen centres its contents), so it gets no plate.
+  - **Training Camp's `.evo-top`** drew from y = 0 with an 18 px pad, because its screen drops the `--sat` padding. Its HOME button sat in the band. Training Camp was not on the audit's list; the walker found it. The bar now carries the plate itself and pads to `--sat + 12`, so its contents start below inset + edge.
+- **Opaque toasts:** `.toast` is now a solid gradient (`#123544` → `#0d2632`) with a 1 px inner highlight. It was 97% alpha. White text contrast is ≥ 7:1 on both stops.
+- **Premium pass** (the plan let it move to shell-10 if time ran short; it is done here):
+  - A 96 px inline-SVG `feTurbulence` grain tile: 357 bytes, grey, alpha 1, drawn at 4%.
+  - A centred 1 px accent on the hairline, teal on main screens and gold on UT and Playoffs.
+  - `--plate-shadow` depth.
+  - All of it sits on one non-scrolling pseudo-element per header with `contain: paint`: `.shell-top::before`, `.evo-top::before`, or `.screen > :is(.topbar, .draft-head, .po-head)::after`.
+  - A mask fades the grain in over the 14 px below the inset line. The flat status plate above therefore meets the plate with no seam: a first version without the mask measured ΔE 2.2 on Playoffs, and the page test now guards this.
+  - The header plates no longer set `pointer-events: none`, so shell-3's probes at y = 2 land on the header, as they did before.
+  - `plates.css` is 2,856 B gzipped (budget 3 KB). Its only `url()` is the inline SVG tile; there are no raster images and no `backdrop-filter`.
+- **HUD scrim:** `.arcade-full.hg2:not(.fb2, .sc2)::after`, `.arcade-full.fb2::after` and `.arcade-full.sc2::after`.
+  - It covers y 0 to `var(--ps-inset-top)`, the raw inset and never `--sat`, from `rgba(2,8,12,.86)` down to transparent at the inset line, with `pointer-events: none`.
+  - Sideways it is 0 tall, because the published inset is 0.
+  - It ships for all three sports. The sprite check passed; see the table below.
+- **Fix B colours.** The owner has not reported the device result for Fix B yet, so the plate colours are unchanged from shell-3. That check is still open under "Owner device checks".
+- **M6** (`src/shell/targets.css`, new, imported after `plates.css`):
+  - `.respin::before` grows each respin to 44: `min(0, (--respin-h − 44)/2)` above and below, from 38/36/34 px at the normal, tight and compact fits, and nothing sideways. The growth is at most 5 px, inside the 6–8 px `--respin-gap`.
+  - `.boost::before` grows the boosters 2 px up and down (4 at compact), inside the tray's 8/10 px padding.
+  - CSS only: `Draft.tsx` is not shell's file.
+- **The keyboard** (`src/shell/keyboard.ts` and `keyboard.css`, new; `watchKeyboard()` is started in `main.tsx`):
+  - The stage follows the visual viewport, so when the keyboard opens the frame shrinks above it. The walker measured Welcome's name field and Search's friend code below the new bottom edge on all 27 phone and sport runs before.
+  - Fix: after the stage re-lays out (two frames, then 140 and 420 ms), the focused field is centred in its own scrolling column. The reveal also treats a bar pinned over the field (Welcome's NEXT) as covering it, and centres the field above that bar.
+  - It moves only that column's `scrollTop`. It never moves the document, the stage or `#root` (`scrollIntoView` would scroll the `overflow: hidden` stage), and it does nothing while the field is already visible.
+  - `keyboard.css`: under `.fit-compact`, which no upright phone reaches without a keyboard (the 320 × 568 SE has 658 px of room), Search gets a scrolling column and Welcome's NEXT bar sticks to the bottom of the visible part.
+- **The walker** (`scripts/qa/edge-walk.mjs`, new) runs through the real UI with role and name selectors and real taps. Its parts are `walk`, `match`, `edge`, `packrm` and `paint` (see `docs/BROWSER-QA.md`).
+  - **walk:** Home (top, scrolled, 4 mode tiles), How to play, Missions, Gauntlet, Training Camp, Ranks, Profile, Settings and its Advanced danger zone (with the keyboard), and the Draft (toast, board, booster tray). Then UT: Home, Rewards, Daily, Records, Play and 7 modes (soccer's hidden ones are recorded as n/a), Rivals, Squad, Club, Filter, card detail top and end, Tracker, Storage, Collection, Sets, Development, Evolutions, SBCs, an SBC, Standouts, Objectives, Season Pass, Store, Odds and Market. Then the daily pack with motion (seal, walkout with SKIP, grid) and EXIT.
+  - **match:** Head to Head vs the AI: Search, the friend-code keyboard, the whole draft played pick by pick, the Vote, the intro, PLAY. Then a UT Squad Battle: Rung 1, the Vote, the intro, kick-off, live play, NFL play call and playbook, the PlayReadout, and soccer's KICK OFF. Soccer's shootout comes from the dev-only lab.
+  - **edge:** Home sideways, and Welcome (a fresh player) with the keyboard up.
+  - Every tap records input → next paint (Event Timing, the slowest entry per interaction) and the rAF frame intervals of the 600 ms after it.
+  - Every screen records `auditScreen`, the plates, the preserve checks (UT back label and EXIT, the PLAY rect, squeezed `.page` children, sticky CTAs), and plain shots, plus band shots at 393. A failed step saves `-FAILED.png` and the walk goes on.
+- **Harness changes** (`scripts/qa/edge-lib.mjs`, `browser.mjs`):
+  - New helpers: `tapTimingInit`/`readTap`/`percentile`, `stripPixels`/`stripSprites`/`splitStatic`/`scrimOff`/`hudScrim`, `keyboardViewport`/`keyboardAudit`, `rotate`/`rotatedAudit`, `preserveAudit` and `stickyAudit`.
+  - `platesAudit` now includes the sub-page headers, and `PLATES_OFF_CSS` also turns off the new pseudo-elements.
+  - `fixture()` takes an `init` option, an init script run before the first load.
+  - **Two corrections to `auditScreen`, applied to both phases alike:**
+    1. `controlInBand` now judges a control by its visible (clipped) part. Before, the Settings sheet's ADMIN button, scrolled up under the sheet's own top edge at 320/375, counted as "in the band" by its box.
+    2. `overlap` no longer counts a control scrolled under a bar (the UT tab bar, the Draft's sticky sort chips, the booster tray), where the bar's own box covers it. Only hit areas reaching into a visible neighbour count.
+
+### Before / after (9 phones × 3 sports, standard player)
+
+| Check | Before (kept build) | After (this branch) | Acceptance |
+|---|---|---|---|
+| Screens walked per phone (NBA / NFL / soccer) | 66 / 70 / 61–62 | **68 / 72 / 63–66** | ≥ 45 / 45 / 38 |
+| Failed steps, page errors | 0, 0 | **0, 0** (after the walker fixes below) | 0 |
+| Time per sport per phone | 153–195 s | **156–221 s** (3 runs in parallel) | ≤ 6 min |
+| Text in the band (runs, all screens) on island and notch phones | 92–147 per run | **0** | 0 |
+| Text in the band at 375 × 667 / 320 × 568 | 0 / 9–12 | **0 / 0** | 0 |
+| Controls in the band | 43–48 per run, including the real-match HUD | **0** (toasts, SKIP and the match HUD included) | 0 |
+| Bottom cut, document scroll, horizontal overflow, offscreen | 0 | **0** | 0 |
+| Respin or booster under 44 (any phone) | 5 controls on 27/27 runs (respins 172 × 38/36/34, boosters 40/36 tall) | **0** | 0 |
+| Overlapping hit areas (pairs over 2 px; the app's own −1 px chip insets meeting are 2 px) | 376 pairs, 25 kinds | **349 pairs, the same kinds and no new kind** (respin row at 320 included) | 0 new |
+| Back labels and EXIT against before | | **378 compared, 0 differ** | unchanged |
+| PLAY bar rect | | **identical in every Home state, phone and sport (spread 0.0), and equal to before (0.0)** | ± 1 pt |
+| Squeezed `.page` children | 0 | **0** | 0 |
+| Sticky CTA (Club Cups, card detail top and end) | 27/27 sticky and on screen | **27/27** | kept |
+| Pack cinema under reduced motion (daily drop at 393) | steps: seal → [walkout when the pack has a walkout] → reveal; 0–1 running animations | **the same steps; 0 running animations** (whether a walkout step appears depends on the pack's cards) | unchanged |
+| Sideways | | **27/27:** stage counter-rotated (−90), `--ps-edge` 0 px, stage, PLAY and tab bar inside the screen, 0 document scroll and overflow | edge 0, nothing clipped |
+| Keyboard up (310 px): focused field and primary buttons visible | Danger zone yes; **Search and Welcome no on 27/27** (field 287–457 px, below 310) | **81/81 states:** Danger (KEEP, ERASE), Search (code field, JOIN), Welcome (name field, NEXT) | visible |
+
+**Plates** (`platesAudit` on every walker screen with a header on top, 27 runs): 1,071 header checks are opaque from y = 0 with 9/9 probes on the header. They cover the main TopBar on 243 screens, UT and the other `.topbar` screens on 702, the Draft and Search bar on 108, and Training Camp on 18. The only misses are the 27 sideways Home frames, where the probe grid (made for portrait) lands beside the rotated frame by design. Header paint while scrolling (`--parts paint`, heavy player, 4× CPU, DSF 3, CDP trace, 2.2 s of scrolling; every Paint event that starts above the header bottom is counted as the header's, which is an upper bound):
+
+| List | NBA | NFL | Soccer | Before (kept build) | Acceptance |
+|---|---|---|---|---|---|
+| Club Players | **0.42 ms/frame** | **0.42** | **0.37** | 0.43 / 0.31 / 0.44 | ≤ 1 ms |
+| SBCs | **0** (no paint at all) | **0** | **0** | 0 | ≤ 1 ms |
+
+**HUD scrim sprite check** (`--parts match`: 10 frames per match, 2 matches, so 20 frames per sport and phone, 180 per sport; the strip y 0..inset with the scrim hidden; pixels far from their row's colour; `O/shots/shell/after/walk/*/report.json` `hud`):
+- NBA: **0** sprite pixels in 180 frames.
+- NFL: **0** in 180.
+- Soccer: **0** on 8 phones. At 420 × 912 (inset 68) the strip's last rows (y 60–67) hold 124–288 outlying pixels a frame (4,500 over 20 frames).
+  - These are the stands' floodlight row and the top of the crowd, which move with the camera. Checked on the frame crop `/tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/shell5/strip-soccer-420.png`. There is no player, ball or goal.
+  - The scrim is at 0–15% there, because it fades out at the inset line.
+- The scrim ships for all three sports. Before: soccer 388 pixels at 402, the same stand.
+- Scrim geometry: top 0, height = inset (59 at 393), `pointer-events: none`, on every kick-off and live frame.
+
+**Tap timing at 1×** (serial pass, `--parts walk --jobs 1` at 393; before on the production kept build, after on the dev server, whose development React is slower than production; `O/shots/shell/timing/`):
+
+| | NBA | NFL | Soccer | Acceptance |
+|---|---|---|---|---|
+| Taps (measured by Event Timing) | 73 (72) → 74 (74) | 73 (72) → 74 (72) | 65 (62) → 66 (66) | |
+| p95 input → next paint | 80 → **88 ms** | 88 → **112 ms** | 88 → **80 ms** | ≤ 100 ms |
+| Navigations with > 1 frame over 33 ms in 600 ms | 0 → **1** | 3 → **1** | 3 → **1** | ≤ 1 |
+| Average fps over those windows | 59.1 → **58.6** | 58.5 → **58.5** | 58.8 → **59.2** | ≥ 55 |
+
+NFL after misses p95 by 12 ms, measured on the dev server (development React). The offenders below are screens mounting, owned by their teams; shell adds no work to any tap. The 27-run matrix at 3 runs in parallel gives p95 88–376 ms in both phases (load 5–8 on 4 CPUs), so only the serial pass is a baseline.
+
+| Tap (after, serial) | Input → paint | Long frames | Owner |
+|---|---|---|---|
+| UT tab CHALLENGES (SBC list mount), all sports | 136–152 ms | 1 (83–100 ms) | ut / packs (Challenges.tsx) |
+| SQUAD BATTLES (NFL) | 144 ms | 1 (117 ms) | ut |
+| LEGENDS EVENTS (NFL) | 112 ms | 1 | ut |
+| UT tab SQUAD (NFL) | 112 ms | 2 | ut |
+| EXIT to Home (NBA) | 88 ms | 4 (fps 41) | ut / shell (UT unmount; shell-6/7 look at it) |
+| Scout Market (soccer) | 72 ms | 2 | packs |
+| match PLAY (arena mount, matrix runs) | 200–430 ms | 1–2 | nba / nfl / soccer (shell-6's arena curtain is the cover) |
+
+Before had the same kinds: CHALLENGES 120–152 ms, SQUAD BATTLES / LEGENDS EVENTS 120–128 ms, Ultimate Team open (fps 34), and the pack tear.
+
+### Walker fixes found while running it
+
+- **Lazy chunks failed with "504 Outdated Optimize Dep".** Every worktree's `node_modules` (and so `node_modules/.vite`) is shared, so another team's dev server re-optimizes the cache. The app then reloads to recover, and the tap is lost. Fixed for shell's runs with a scratch wrapper config that only sets `cacheDir` (see "Messages to other teams").
+- **Mode tiles:** the text is title case in the DOM, so the walker matches it case-insensitively.
+- **Matches:** the intro screen (your five against theirs) waits for PLAY; soccer's attacks wait for KICK OFF.
+- **The draft loop:** when nobody in the drawer fits, it closes the drawer to reach the board's action. Soccer's 1v1 draft stalled on 4 phones before this.
+- **The pack SKIP** can be gone before the tap lands, so the grid is what is checked.
+- **The reduced-motion pass** uses the daily drop in a fresh context (`--parts packrm`). The player's own Spotlight pack registers with the card registry, which isolated QA cannot reach ("Your pack is reserved").
+
+### Tests
+
+- `src/shell/plates.test.mjs` (18 tests; +7):
+  - sub-page plates: inset from `-sat`, no `pointer-events`, the gold set on Playoffs, Training Camp's padding, no vote plate;
+  - the grain tile is ≤ 1 KB, `feTurbulence`, opacity 0.03–0.05, a grey matrix with alpha 1, on a `contain: paint` pseudo-element, with the inset mask and the accents;
+  - the toast is opaque with ≥ 7:1 text;
+  - the scrim covers 0..raw inset only, never `--sat`/`--ps-edge`, and fades out;
+  - `targets.css` is imported once after `plates.css`; the respin growth makes 44 at 38/36/34 px and stays inside the smallest gap; the boosters make 44 at 40/36 inside the tray padding.
+  - **Changed old tests:** the 2 KB / no-`url()` budget is now 3 KB with one inline SVG (the plan's shell-5 budget), and the rule names follow the merged `:is()` selectors.
+- `scripts/qa/plates.page.test.mjs` (+6, real Chromium on the real CSS):
+  - the Draft bar is opaque from y = 0 with 9 hits on the bar, ΔE ≤ 2 across the inset line and the hairline at 133;
+  - Playoffs is on the gold set with no seam;
+  - the grain varies along a row by > 0.5 and ≤ 11 luma;
+  - the toast is opaque;
+  - each sport's scrim is 0..59 px with `pointer-events: none`, and 0 sideways;
+  - the compact respin row gives two 44-px areas that never meet and stay below the reels.
+- `scripts/qa/edge-lib.test.mjs` (+3): the percentile; the sprite detector finds a 4 × 6 ball on a sky strip, nothing on a clean sky, and counts a crowd row apart.
+- `src/shell/keyboard.test.ts` (3): the visible-band test, including a panned visual viewport.
+
+### Verification
+
+- `bash O/heavy.sh npm run typecheck`: pass, twice (after the code commit, and after the keyboard cover fix).
+- `PS_QA_FIXTURES=O/fixtures PS_QA_SNIPPET=O/qa-snippets/shell-edge.mjs bash O/heavy.sh npx vitest run src/shell scripts/qa src/stage-layout.test.ts`: 12 files, 133 tests pass.
+- `PS_SPORT=soccer bash O/heavy.sh npx vitest run soccer sport-branches src/shell`: 14 files, 119 passed, 2 skipped. `PS_SPORT=nfl bash O/heavy.sh npx vitest run sport-branches src/shell`: 6 files, 49 passed.
+- `edge-walk.mjs`:
+  - `--phase after --devices all` and `--phase before --devices all` (kept build, `PS_QA_BUILD_ROOT`): 27 + 27 runs, 0 page errors;
+  - `--parts packrm` (both phases);
+  - `--parts paint` (both phases);
+  - `--parts walk --jobs 1` at 393 (both phases);
+  - `--parts edge --devices all` after the keyboard cover fix: 27/27.
+- Screenshots looked at: Home, Draft, toast, boosters, Training Camp, UT Home, pack walkout (band), NBA live, NFL play call at 320, soccer shootout, Welcome and Search with the keyboard, the soccer 420 strip crop, and the NFL 320 contact sheet.
+
+### Protocol bump needed
+
+None. CSS, a focus helper and QA only; nothing reaches an engine or a match result.
+
+### Touched outside my lane
+
+- None of other teams' files.
+- `src/shell/plates.css`, `targets.css` and `keyboard.css` target other teams' classes from shell's own files:
+  - `.draft-head`, `.po-head`, `.evo-screen > .evo-top`, `.toast` and `.arcade-full.{hg2,fb2,sc2}::after` (plates);
+  - `.respin`, `.boost` (targets);
+  - `.fit-compact .screen.search`, `.fit-compact .welcome > .actionbar` (keyboard).
+
+### Owner device checks
+
+1. **Training Camp** (NBA/NFL): the HOME button and the NBA/NFL chip sit below the clock, on the same dark plate as Home's header.
+2. **The Draft:** a dark header plate behind the round counter runs up under the clock with no line at the inset; the respin buttons and booster chips are easy to hit.
+3. **A live match:** the strip under the clock is dark and steady, with no player, ball or rim hidden in it.
+4. **The keyboard:**
+   - On first launch, tapping the name field keeps it and NEXT above the keyboard.
+   - In Head to Head → PLAY A FRIEND, the code field and JOIN stay visible.
+   - iOS also pans the page by itself; if the field jumps twice, tell shell.
+5. **Fix B colours** (shell-3 check 3): still open; the plate colours wait for it.
+
+### Left for later tasks
+
+- **Tap timing on a production build of this branch:** shell-10 (D1 covers measurement builds for shell-7/8/9 only). The after numbers here are dev-server numbers.
+- **The packs, ut, nfl and lead 44-pt items:** listed in "Messages to other teams"; shell-10 verifies them on the integrated branch.
+- **shell-1b** (the local registry and cloud-save stand-in): not done here; it moves to the shell-10 buffer as item 1b, as the plan says.
+- **Playoffs and Search plates** are covered by the page tests and the Search walk. The Playoffs screen itself is not on the walker's route (it needs a full season); shell-10 should add it.
 
 ## shell-4 · Recovery and save safety: error boundaries, match load failures, `arena.ts`, M8 danger zone (done)
 

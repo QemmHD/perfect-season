@@ -44,7 +44,11 @@ export function watchKeyboard(): () => void {
     const el = document.activeElement;
     if (!(el instanceof HTMLElement) || !el.matches(FIELD) || !el.closest('.stage')) return;
     const band = visibleBand();
-    if (inBand(el.getBoundingClientRect(), band)) return;
+    const f = el.getBoundingClientRect();
+    // a bar pinned over the field (Welcome's NEXT, keyboard.css) hides it as surely as the keyboard does
+    const at = document.elementFromPoint((f.left + f.right) / 2, (f.top + f.bottom) / 2);
+    const cover = at && at !== el && !el.contains(at) && !at.contains(el) ? at.getBoundingClientRect() : null;
+    if (inBand(f, band) && !cover) return;
     const target = revealTarget(el, band.bottom - band.top);
     const scroller = scrollerOf(target);
     if (!scroller) return;
@@ -53,7 +57,7 @@ export function watchKeyboard(): () => void {
     const r = target.getBoundingClientRect(),
       c = scroller.getBoundingClientRect();
     const top = Math.max(c.top, band.top),
-      bottom = Math.min(c.bottom, band.bottom);
+      bottom = Math.min(c.bottom, band.bottom, cover && cover.top > f.top - f.height ? cover.top : Infinity);
     // client px → the column's own px (the stage is scaled to the phone)
     const k = c.height / (scroller.offsetHeight || c.height || 1);
     scroller.scrollTop += ((r.top + r.bottom) / 2 - (top + bottom) / 2) / k;
