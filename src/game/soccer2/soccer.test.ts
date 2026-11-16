@@ -201,7 +201,11 @@ describe('ratings decide attacks', () => {
       });
     const elite = goals(95);
     const poor = goals(55);
-    expect(elite).toBeGreaterThan(poor + 0.12);
+    // (studio overhaul soccer-1, R-2: the margin was +0.12; part of it was the elite finisher's
+    // on-target shots parried into the keeper's own net, the bug R-2 fixes. soccer-4 refits the SHO
+    // curve: plan S1/S6)
+    expect(elite).toBeGreaterThan(poor + 0.1);
+    expect(elite).toBeGreaterThan(poor * 2.5);
   });
   it('an elite keeper saves more of the same shots', () => {
     const saved = (v: number) =>

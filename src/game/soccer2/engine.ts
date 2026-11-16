@@ -242,6 +242,40 @@ export interface AttackOpts {
 }
 
 /**
+ * A corner's layout from the left flag (x 0; mirror x for the right one): the taker, the ball, five
+ * attackers' spots in the box (the strongest in the air first), seven defenders' zones (near post,
+ * the six-yard line, then the penalty spot's ring) and the keeper. One source for a dealt corner
+ * (setupAttack) and one earned in play (setPieceAfterOut, R-2).
+ */
+export const CORNER = {
+  taker: { x: 0.9, y: PL - 0.9 },
+  spot: { x: 0.5, y: PL - 0.5 },
+  box: [
+    { x: 33, y: PL - 9 },
+    { x: 37, y: PL - 11.5 },
+    { x: 29, y: PL - 12.5 },
+    { x: 40, y: PL - 7.5 },
+    { x: 25, y: PL - 18 },
+  ] as readonly Pt[],
+  zone: [
+    { x: 30.6, y: PL - 0.8 },
+    { x: 32, y: PL - 4 },
+    { x: 36, y: PL - 4.4 },
+    { x: 40, y: PL - 4 },
+    { x: 33.5, y: PL - 9.8 },
+    { x: 38, y: PL - 11 },
+    { x: 29.5, y: PL - 13.5 },
+  ] as readonly Pt[],
+  gk: { x: 34.6, y: PL - 0.7 },
+} as const;
+
+/** CORNER for the flag on `side` (1: the left, x 0; -1: the right, x 68), in pitch metres. */
+export function cornerLayout(side: number) {
+  const m = (p: Pt): Pt => ({ x: side === 1 ? p.x : PW - p.x, y: p.y });
+  return { taker: m(CORNER.taker), spot: m(CORNER.spot), box: CORNER.box.map(m), zone: CORNER.zone.map(m), gk: m(CORNER.gk) };
+}
+
+/**
  * Line up an attack: `att` attacks up the pitch at `def`'s goal. Each scenario uses the players
  * that would be there (a counter: the front three against two centre-backs and recovering
  * midfielders; a corner: the big men in the box), mirrored left or right by the seed.
@@ -307,30 +341,16 @@ export function setupAttack(scenario: Scenario, att: Squad, def: Squad, seed: st
       break;
     }
     case 'corner': {
+      // the shared layout (an earned corner lines up the same way: setPieceAfterOut); A and D mirror it
+      const L = CORNER;
       const taker = [lcm, rcm, hold, lw, rw].sort((p, q) => rt(q.a.PAS) - rt(p.a.PAS))[0];
-      carrier = A(taker, 'TKR', 0.9, PL - 0.9);
+      carrier = A(taker, 'TKR', L.taker.x, L.taker.y);
       const pool = [st, lcb, rcb, lw, rw, lcm, rcm, hold].filter((p) => p !== taker);
-      const spots: Pt[] = [
-        { x: 33, y: PL - 9 },
-        { x: 37, y: PL - 11.5 },
-        { x: 29, y: PL - 12.5 },
-        { x: 40, y: PL - 7.5 },
-        { x: 25, y: PL - 18 },
-      ];
-      spots.forEach((s, i) => A(pool[i], 'BX' + i, s.x, s.y));
-      const zone: Pt[] = [
-        { x: 30.6, y: PL - 0.8 },
-        { x: 32, y: PL - 4 },
-        { x: 36, y: PL - 4.4 },
-        { x: 40, y: PL - 4 },
-        { x: 33.5, y: PL - 9.8 },
-        { x: 38, y: PL - 11 },
-        { x: 29.5, y: PL - 13.5 },
-      ];
-      [dLB, dLCB, dRCB, dRB, dDM, dLCM, dRCM].forEach((p, i) => D(p, 'Z' + i, zone[i].x, zone[i].y));
-      setPiece = { kind: 'corner', spot: { x: mx(0.5), y: PL - 0.5 }, side };
-      gk.x = mx(34.6);
-      gk.y = PL - 0.7;
+      L.box.forEach((s, i) => A(pool[i], 'BX' + i, s.x, s.y));
+      [dLB, dLCB, dRCB, dRB, dDM, dLCM, dRCM].forEach((p, i) => D(p, 'Z' + i, L.zone[i].x, L.zone[i].y));
+      setPiece = { kind: 'corner', spot: { x: mx(L.spot.x), y: L.spot.y }, side };
+      gk.x = mx(L.gk.x);
+      gk.y = L.gk.y;
       break;
     }
     case 'freekick': {
@@ -857,7 +877,7 @@ function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: nu
   if (kind === 'pen') cone *= SP_TUNE.penCone;
   if (kind === 'fk') cone *= SP_TUNE.fkCone;
   // a header from a corner: under a crowd of bodies, a worse contact than an open-play cross
-  if (kind === 'header' && a.scenario === 'corner') cone *= SP_TUNE.cornerHeaderCone;
+  if (kind === 'header' && cornerPlay(a)) cone *= SP_TUNE.cornerHeaderCone;
   const from = { x: a.ball.x, y: a.ball.y, h: Math.max(0.11, a.ball.h) };
   // across his body: a shot well away from the way he's running is harder to keep true; and from
   // range it's harder to place (Claude 2026-11-02)
@@ -1007,6 +1027,14 @@ function keeperInFlight(a: Attack, gk: Body) {
   } else act(gk, 'set', plan.react);
 }
 
+/**
+ * A parry's direction (R-2, Claude 2026-11-16, studio overhaul soccer-1). `outLo`..`outHi`: the
+ * share pushed out wide (away from the goal line) rather than back into the middle, by HAN; only a
+ * ball parried from outside ±(GHALF − `postIn`) m goes on round the post; a keeper with HAN under
+ * `fumbleHan` may knock it back across his six-yard box. The HAN fit itself is soccer-4's.
+ */
+export const PARRY = { outLo: 0.5, outHi: 0.85, postIn: 0.3, fumbleHan: 55 };
+
 /** The ball reaches the keeper's line during a shot: does he get to it? */
 function keeperSave(a: Attack, gk: Body, prev: Pt & { h: number }) {
   const b = a.ball;
@@ -1064,11 +1092,19 @@ function keeperSave(a: Attack, gk: Body, prev: Pt & { h: number }) {
     endAttack(a, 'S', 'SAVED BY ' + gk.p.tag);
     return true;
   }
-  // parried: back out into play, or round the post
-  const side = Math.sign(dx) || (a.rand() < 0.5 ? -1 : 1);
-  const out = a.rand() < 0.45;
+  // parried (R-2, Claude 2026-11-16): pushed away from the goal line, toward the side he went (the
+  // side away from the middle of the goal, unless his hands are poor: HAN under PARRY.fumbleHan can
+  // knock it back across the six-yard box). Only one parried from outside ±(GHALF − PARRY.postIn)
+  // goes on round the post (a corner). Before, 45% went "out" toward the line from anywhere across
+  // the goal, and 14.3% of all goals were parries straight into his own net.
+  const body = Math.sign(dx) || (a.rand() < 0.5 ? -1 : 1);
+  const wide = Math.sign(bx - GX) || body;
+  const han = gk.p.a.HAN;
+  const away = Number.isFinite(han) && han < PARRY.fumbleHan ? body : wide;
+  const out = a.rand() < clamp(lerp(PARRY.outLo, PARRY.outHi, rt(han)), PARRY.outLo, PARRY.outHi);
   const sp = speed * lerp(0.25, 0.45, a.rand());
-  const dir = out ? norm(side * 0.9, 0.45) : norm(side * (0.3 + a.rand() * 0.8), -1);
+  const roundPost = out && Math.abs(bx - GX) > GHALF - PARRY.postIn;
+  const dir = !out ? norm(away * (0.3 + a.rand() * 0.8), -1) : roundPost ? norm(wide * 0.9, 0.45) : norm(away * 0.9, -0.35);
   b.x = bx;
   b.y = gk.y - 0.2;
   b.h = bh;
@@ -1212,6 +1248,13 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
     ball.vy = owner.vy;
     ball.vh = 0;
     if (owner.side === 'A') tackles(a, owner);
+  } else if (ball.owner === null && a.kick?.kind === 'throw') {
+    // a quick throw-in: the thrower holds it over his head until it goes
+    const th = a.bodies[a.kick.by];
+    ball.x = clamp(th.x, 0, PW);
+    ball.y = th.y;
+    ball.h = THROW.hold;
+    ball.vx = ball.vy = ball.vh = 0;
   } else if (ball.owner === null) {
     stepBall(ball, dt);
     // it came down hard enough to bounce (stepBall turned it back up): a sound for the renderer, and
@@ -1229,7 +1272,7 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
   if (ball.owner === null && !a.strike && !a.kick) contact(a);
   if (a.end) return;
   if (ball.x < -0.2 || ball.x > PW + 0.2) {
-    endAttack(a, 'L', 'OUT OF PLAY');
+    overTheTouchline(a);
     return;
   }
   // the clock (a shot in the air finishes first)
@@ -1267,9 +1310,11 @@ function launchPass(a: Attack) {
   b.vh = k.vh;
   b.curl = k.curl;
   b.flight = { kind: k.kind, from: by.id, to: k.to, at: a.t };
-  // offside is judged now: who's past the second-last defender and the ball, in their half
+  by.passKind = k.kind;
+  // offside is judged now: who's past the second-last defender and the ball, in their half (never
+  // from a throw-in)
   const line = offsideLine(a);
-  a.offIds = a.bodies.filter((q) => q.side === 'A' && q.id !== by.id && q.y > line + 0.15 && q.y > b.y && q.y > PL / 2).map((q) => q.id);
+  a.offIds = k.kind === 'throw' ? [] : a.bodies.filter((q) => q.side === 'A' && q.id !== by.id && q.y > line + 0.15 && q.y > b.y && q.y > PL / 2).map((q) => q.id);
   setPath(a, tracePath(b, 4));
   if (a.setPiece) {
     a.setPiece = null;
@@ -1307,7 +1352,8 @@ function launchPass(a: Attack) {
       a.chaser = q.id;
     }
   }
-  a.events.push(k.kind === 'cross' || k.kind === 'lofted' ? 'cross' : 'pass');
+  if (k.kind === 'throw') act(by, 'idle', a.t);
+  a.events.push(k.kind === 'cross' || k.kind === 'lofted' ? 'cross' : k.kind === 'throw' ? 'throw' : 'pass');
 }
 
 function launchShot(a: Attack) {
@@ -1421,10 +1467,16 @@ function duringFlight(a: Attack, prev: Pt & { h: number }) {
       return;
     }
     const last = b.last !== null ? a.bodies[b.last] : null;
-    // the keeper's touch last (a parry, or one that died and rolled on: deadShot) is his save
+    // over the byline off a defender or the keeper: a corner, played in this attack (R-2)
+    if (last && last.side === 'D' && (a.restarts ?? 0) < RESTARTS.max) {
+      setPieceAfterOut(a, 'corner', x < GX ? 1 : -1);
+      return;
+    }
+    // (out of restarts) the keeper's touch last (a parry, or one that died and rolled on) is his save
     if ((f?.kind === 'parry' || f?.kind === 'clear') && last?.role === 'gk') endAttack(a, 'S', 'SAVED · TURNED ROUND');
     else if (last && last.side === 'D') endAttack(a, 'B', 'DEFLECTED OUT');
-    else endAttack(a, 'W', h > GH ? 'OVER THE BAR' : 'WIDE');
+    // off an attacker: their goal kick
+    else endAttack(a, 'W', f?.kind === 'shot' ? (h > GH ? 'OVER THE BAR · GOAL KICK' : 'WIDE · GOAL KICK') : 'GOAL KICK');
     return;
   }
 }
@@ -1509,11 +1561,11 @@ function contact(a: Attack) {
     // in the air, a defender close by goes up with him
     if (air) {
       const rival = nearestDefender(a, q);
-      if (rival.b && rival.d < (f?.kind === 'cross' ? (a.scenario === 'corner' ? SP_TUNE.cornerMark : 1.5) : 0.9)) {
+      if (rival.b && rival.d < (f?.kind === 'cross' ? (cornerPlay(a) ? SP_TUNE.cornerMark : 1.5) : 0.9)) {
         const att = rt(q.p.a.PHY) + 0.15 * rt(q.p.a.SHO);
         const def = rt(rival.b.p.a.PHY) * 0.7 + rt(rival.b.p.a.DEF) * 0.45 + 0.06 * a.defIQ;
         // a corner: the box is marked man for man, so the defenders win more of them
-        const base = a.scenario === 'corner' ? SP_TUNE.cornerDuel : 0.42;
+        const base = cornerPlay(a) ? SP_TUNE.cornerDuel : 0.42;
         if (a.rand() < clamp(base + (def - att) * 0.8, 0.15, 0.85)) {
           b.owner = null;
           b.last = rival.b.id;
@@ -1853,6 +1905,133 @@ function setPieceAfterFoul(a: Attack, kind: 'freekick' | 'penalty', at: Pt) {
   a.events.push('whistle');
 }
 
+/**
+ * Restarts earned in play (R-2, Claude 2026-11-16, studio overhaul soccer-1; V2 earns set pieces
+ * from play): at most `max` per attack (corners and quick throw-ins together); each one leaves at
+ * least `play` s on the attack's clock, so a corner won as time runs out is still taken; a quick
+ * throw-in only from beyond y `throwY` (the final third).
+ */
+export const RESTARTS = { max: 2, play: 5, throwY: 75 };
+/** A quick throw-in: the beat before it goes (s), the height it's held at and thrown from (m), the
+ * longest throw (m). */
+export const THROW = { beat: 0.6, hold: 2.05, reach: 24 };
+
+/** A corner's rules (the marking, the duels in the air, the keeper's box, the header's cone) apply to
+ * a dealt corner and to the rest of an attack after an earned one. */
+const cornerPlay = (a: Attack) => a.scenario === 'corner' || a.restart === 'corner';
+
+/** Over the touchline: off a defender in the final third, a quick throw-in for us; off us, theirs. */
+function overTheTouchline(a: Attack) {
+  const b = a.ball;
+  const last = b.last !== null ? a.bodies[b.last] : null;
+  if (last?.side === 'D') {
+    if (b.y > RESTARTS.throwY && (a.restarts ?? 0) < RESTARTS.max) setPieceAfterOut(a, 'throw', b.x < GX ? -1 : 1);
+    else endAttack(a, last.role === 'gk' ? 'S' : 'L', last.role === 'gk' ? 'SAVED · OUT OF PLAY' : 'OUT OF PLAY');
+    return;
+  }
+  endAttack(a, 'L', 'THROW-IN · THEIRS');
+}
+
+/**
+ * A restart earned in play (R-2). A corner: everyone lines up as for a dealt one (cornerLayout: the
+ * best passer takes it, the strongest in the air go to the first spots in the box, the defenders to
+ * their zones), from the flag on `side` (1 the left, -1 the right), and the person or the autopilot
+ * takes it like any corner. A quick throw-in: the attacker nearest where it went out takes it from
+ * the touchline on `side` (-1 the left, 1 the right) to the nearest teammate, a beat later.
+ */
+function setPieceAfterOut(a: Attack, kind: 'corner' | 'throw', side: number) {
+  a.restarts = (a.restarts ?? 0) + 1;
+  a.restart = kind;
+  a.clock = Math.max(a.clock, a.used + RESTARTS.play);
+  const ball = a.ball;
+  const out = { x: ball.x, y: ball.y };
+  a.meter = null;
+  a.first = null;
+  a.strike = null;
+  a.kick = null;
+  a.path = null;
+  a.gkPlan = null;
+  a.offIds = [];
+  a.chaser = null;
+  ball.owner = null;
+  ball.flight = null;
+  ball.vx = ball.vy = ball.vh = 0;
+  ball.h = 0;
+  ball.curl = 0;
+  ball.dip = 0;
+  const atts = a.bodies.filter((b) => b.side === 'A');
+  for (const b of a.bodies) b.tried = -1;
+  if (kind === 'corner') {
+    const L = cornerLayout(side);
+    const gk = keeperOf(a);
+    const taker = [...atts].sort((p, q) => rt(q.p.a.PAS) - rt(p.p.a.PAS))[0];
+    const aerial = (b: Body) => rt(b.p.a.PHY) + (b.p.ht - 180) / 40;
+    const box = atts.filter((b) => b !== taker).sort((p, q) => aerial(q) - aerial(p));
+    const zone = a.bodies.filter((b) => b.side === 'D' && b.role !== 'gk').sort((p, q) => rt(q.p.a.DEF) + rt(q.p.a.PHY) - rt(p.p.a.DEF) - rt(p.p.a.PHY));
+    const place = (b: Body, at: Pt) => {
+      b.x = at.x;
+      b.y = at.y;
+      b.home = { x: at.x, y: at.y };
+    };
+    place(taker, L.taker);
+    // more than five in the box: the rest wait on the edge of it
+    box.forEach((b, i) => place(b, L.box[i] ?? { x: GX + (i % 2 ? 9 : -9), y: PL - 20 - i }));
+    zone.forEach((b, i) => place(b, L.zone[i] ?? { x: GX + (i % 2 ? 6 : -6), y: PL - 16 }));
+    gk.x = L.gk.x;
+    gk.y = L.gk.y;
+    a.setPiece = { kind: 'corner', spot: L.spot, side };
+    a.taker = taker.id;
+    a.ctrl = taker.id;
+    ball.x = L.spot.x;
+    ball.y = L.spot.y;
+    for (const b of a.bodies) {
+      b.vx = b.vy = b.vh = 0;
+      b.h = 0;
+      b.stunUntil = 0;
+      b.run = null;
+      b.commit = Infinity;
+      act(b, 'idle', a.t);
+    }
+    gk.home = keeperSpot(a, gk, 0);
+    a.events.push('corner-won', 'whistle');
+    return;
+  }
+  // the quick throw-in
+  a.setPiece = null;
+  a.taker = null;
+  const spot = { x: side < 0 ? 0 : PW, y: clamp(out.y, 32, PL - 2) };
+  const byDist = [...atts].sort((p, q) => dist(p, spot) - dist(q, spot));
+  const thrower = byDist[0];
+  const to = byDist[1] ?? null;
+  // he stands just off the pitch; the ball is on the line, over his head
+  thrower.x = spot.x + side * 0.3;
+  thrower.y = spot.y;
+  thrower.vx = thrower.vy = 0;
+  thrower.run = null;
+  const inward = norm(GX - thrower.x, 0);
+  thrower.fx = inward.x;
+  thrower.fy = inward.y;
+  // he holds it until it goes (the brains leave a stunned man where he is)
+  thrower.stunUntil = a.t + THROW.beat;
+  act(thrower, 'catch', a.t);
+  ball.x = spot.x;
+  ball.y = spot.y;
+  ball.h = THROW.hold;
+  ball.last = thrower.id;
+  const from = { x: spot.x, y: spot.y, h: THROW.hold };
+  let tgt: Pt = to ? { x: to.x, y: to.y } : { x: spot.x - side * 12, y: spot.y };
+  const d = dist(from, tgt);
+  if (d > THROW.reach) {
+    const u = norm(tgt.x - from.x, tgt.y - from.y);
+    tgt = { x: from.x + u.x * THROW.reach, y: from.y + u.y * THROW.reach };
+  }
+  const v = loftVelocity(from, tgt, lerp(0.7, 1.25, Math.min(d, THROW.reach) / THROW.reach));
+  a.kick = { at: a.t + THROW.beat, by: thrower.id, to: to ? to.id : null, kind: 'throw', vx: v.vx, vy: v.vy, vh: v.vh, curl: 0 };
+  if (to) a.ctrl = to.id;
+  a.passStick = undefined;
+  a.events.push('throw-in');
+}
+
 /* ---------- defenders ---------- */
 
 function defend(a: Attack, d: Body, dt: number) {
@@ -1995,7 +2174,7 @@ function keeper(a: Attack, gk: Body, dt: number) {
   if (f && (f.kind === 'cross' || f.kind === 'lofted' || f.kind === 'through') && a.path) {
     const m = meetPoint(a, gk, 2.5);
     // from a corner he commands a little more of his box
-    const corner = a.scenario === 'corner';
+    const corner = cornerPlay(a);
     if (m && m.y > PL - (corner ? SP_TUNE.cornerClaimDepth : 7.5) && Math.abs(m.x - GX) < (corner ? 11 : 10)) {
       const rivals = a.bodies.filter((q) => q.side === 'A').map((q) => meetPoint(a, q, 2.4)?.t ?? 9);
       const mine = Math.max(0, dist(gk, m) - 1) / topSpeed(gk.p);

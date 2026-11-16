@@ -292,8 +292,8 @@ export function Soccer2({
         swell(0.8);
         if (!a.end) say('PARRIED!', 'plain', 900);
       } else if (e === 'post' || e === 'bar') {
-        sfx.hit(0.6);
-        sfx.ooh();
+        // the woodwork's clang and the crowd's ooh (sound.ts, V2 F.1: the three sports share it)
+        sfx.post();
         shake(3);
         say(e === 'post' ? 'OFF THE POST!' : 'OFF THE BAR!', 'big', 1000);
       } else if (e === 'tackle') sfx.tackle(0.35);
@@ -314,6 +314,14 @@ export function Soccer2({
         clearInput();
         tip('fk', 'BEND to curl it · hold SHOOT, drag to aim, let go in the green');
       } else if (e === 'advantage') say('ADVANTAGE', 'plain', 800);
+      // restarts earned in play (R-2): a corner off a defender or the keeper, a quick throw-in
+      else if (e === 'corner-won') {
+        sfx.whistle();
+        swell(0.6);
+        say('CORNER!', 'good', 1300, a.restarts && a.restarts > 1 ? 'ANOTHER ONE' : 'WON IT');
+        clearInput();
+        tip('corner', SCENARIO_HINTS.corner);
+      } else if (e === 'throw-in') say('THROW-IN', 'plain', 900, 'QUICK ONE');
       else if (e === 'goal') {
         fxRef.current.flash = 0.45;
         slowUntil.current = performance.now() + 500;
@@ -344,7 +352,11 @@ export function Soccer2({
     const why = shotVerdict(a);
     if (e === 'G') say('GOAL!', 'big', 2200, by + (a.lastShot?.greened ? ' · PERFECT STRIKE' : ''));
     else if (e === 'S') say('SAVED', 'bad', 1700, why ?? text);
-    else if (e === 'W') say(text === 'OVER THE BAR' ? 'OVER THE BAR' : 'WIDE', 'bad', 1700, why ?? undefined);
+    else if (e === 'W') {
+      // a shot off target ("WIDE · GOAL KICK"), or a ball we put over their line ("GOAL KICK")
+      const head = text.startsWith('OVER THE BAR') ? 'OVER THE BAR' : text.startsWith('WIDE') ? 'WIDE' : 'GOAL KICK';
+      say(head, 'bad', 1700, why ?? (head === 'GOAL KICK' ? undefined : 'GOAL KICK'));
+    }
     else if (e === 'B') say('BLOCKED', 'bad', 1500, why ?? text);
     else if (e === 'O') say('OFFSIDE', 'bad', 1500, text.replace('OFFSIDE · ', ''));
     else if (e === 'T') say('TIME UP', 'plain', 1400, 'ATTACK OVER');

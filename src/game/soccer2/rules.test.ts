@@ -3,13 +3,18 @@
 //    an attack can't hang on a dead "shot" until its 120 s hard stop;
 //  - set pieces a person leaves untaken are taken for him after SET_PIECE_WAIT, with a countdown;
 //  - C-4: the BEND buttons bend the free kick the way their arrows point;
-//  - J-1: the bounce event is for the sound only and changes nothing.
+//  - J-1: the bounce event is for the sound only and changes nothing;
+//  - R-2 (2026-11-16): a parry goes away from the goal line (round the post only from outside
+//    ±(GHALF − 0.3)) and, from a keeper with HAN 55+, never back across his goal; a ball over the
+//    byline off a defender or the keeper is a corner played in the same attack, off an attacker a
+//    goal kick; over the touchline off a defender in the final third a quick throw-in for us, off us
+//    a throw-in for them; at most two restarts an attack.
 import { describe, expect, it } from 'vitest';
 import { autoplayAttack, decide, pilot } from './autopilot';
-import { bendCurl, DEAD, kickOff, PL, pressShoot, releaseShoot, setAim, setCurl, setupAttack, step, TOP } from './engine';
+import { bendCurl, CORNER, cornerLayout, DEAD, GHALF, GX, kickOff, PARRY, PL, pressShoot, PW, releaseShoot, RESTARTS, setAim, setCurl, setupAttack, step, THROW, TOP } from './engine';
 import { SET_PIECE_WAIT, setPieceCountdown } from './match';
 import { squadFor } from './squads.test-util';
-import type { Attack, Scenario } from './types';
+import type { Attack, Body, Scenario, Squad } from './types';
 
 const DT = 1 / 60;
 const LETTERS = 'GSWBLOT';
@@ -208,5 +213,200 @@ describe('J-1: the bounce is a sound, not a rule', () => {
         expect(stripped.events, sc + i).toEqual(kept.events.filter((e) => e !== 'bounce'));
       }
     expect(seen).toBeGreaterThan(0);
+  });
+});
+
+/** The same eleven with its keeper's HAN set (a parry's direction reads it). */
+const withHan = (sq: Squad, han: number): Squad => ({ ...sq, gk: { ...sq.gk, a: { ...sq.gk.a, HAN: han } } });
+
+/** Every parry in `n` clean strikes at the keeper from 10–20 m: where it left his hands, and how. */
+function parries(def: Squad, n: number, tag: string) {
+  const out: { x: number; vx: number; vy: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = setupAttack('build', A, def, tag + i, { side: 1 });
+    kickOff(a);
+    const c = a.bodies[a.ctrl];
+    c.x = GX - 12 + (i % 9) * 3;
+    c.y = PL - 10 - (i % 5) * 2.5;
+    c.fx = 0;
+    c.fy = 1;
+    a.ball.x = c.x;
+    a.ball.y = c.y + 0.4;
+    for (const b of a.bodies) if (b.side === 'D' && b.role !== 'gk') b.y = Math.min(b.y, c.y - 6);
+    pressShoot(a);
+    // across the goal, low to high: the keeper gets to most of them, and parries some
+    setAim(a, { x: -0.8 + ((i * 7) % 17) / 10, y: -0.9 + ((i * 3) % 13) / 8 });
+    for (let k = 0; k < Math.round(TOP * 60); k++) step(a, DT, { x: 0, y: 0 });
+    releaseShoot(a, null);
+    for (let k = 0; k < 180 && !a.end; k++) {
+      const before = a.events.length;
+      step(a, DT, { x: 0, y: 0 });
+      if (a.events.indexOf('save-parry', before) >= 0 && a.ball.flight?.kind === 'parry') {
+        out.push({ x: a.ball.x, vx: a.ball.vx, vy: a.ball.vy });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+describe('R-2: a parry goes away from goal', () => {
+  it('leaves his hands going away from the goal line, unless pushed round the post from outside ±(GHALF − 0.3)', () => {
+    let roundPost = 0;
+    const all = [...parries(withHan(B, 60), 160, 'parry-a'), ...parries(withHan(B, 42), 160, 'parry-b')];
+    expect(all.length).toBeGreaterThan(40);
+    for (const p of all) {
+      if (p.vy > 0) {
+        expect(Math.abs(p.x - GX)).toBeGreaterThan(GHALF - PARRY.postIn);
+        roundPost++;
+      }
+    }
+    // pushing it round the post does happen, from out there
+    expect(roundPost).toBeGreaterThan(0);
+  });
+
+  it('from a keeper with sound hands (HAN 55+) it goes to the side it came, never back across his goal', () => {
+    const sure = parries(withHan(B, 70), 200, 'parry-sure').filter((p) => Math.abs(p.x - GX) > 0.05);
+    expect(sure.length).toBeGreaterThan(20);
+    for (const p of sure) expect(Math.sign(p.vx)).toBe(Math.sign(p.x - GX));
+    expect(PARRY.fumbleHan).toBe(55);
+  });
+});
+
+/** An attack in play with the ball running over a line, last touched by `who`. */
+function overTheLine(seed: string, who: 'gk' | 'def' | 'att', ball: { x: number; y: number; vx: number; vy: number }): Attack {
+  const a = setupAttack('build', A, B, seed, { side: 1 });
+  kickOff(a);
+  step(a, DT, { x: 0, y: 0 });
+  sendOver(a, who, ball);
+  return a;
+}
+function sendOver(a: Attack, who: 'gk' | 'def' | 'att', ball: { x: number; y: number; vx: number; vy: number }) {
+  const by: Body = who === 'gk' ? a.bodies.find((b) => b.role === 'gk')! : who === 'def' ? a.bodies.find((b) => b.side === 'D' && b.role !== 'gk')! : a.bodies[a.ctrl];
+  a.setPiece = null;
+  a.taker = null;
+  a.kick = null;
+  Object.assign(a.ball, { owner: null, h: 0.3, vh: 0, curl: 0, dip: 0, last: by.id, ...ball });
+  a.ball.flight = { kind: who === 'gk' ? 'parry' : who === 'def' ? 'clear' : 'ground', from: by.id, to: null, at: a.t };
+  const from = a.events.length;
+  for (let i = 0; i < 90 && !a.end && !a.events.slice(from).some((e) => e === 'corner-won' || e === 'throw-in'); i++) step(a, DT, { x: 0, y: 0 });
+}
+const finish = (a: Attack, seed: string) => {
+  const pl = pilot(0.7, seed);
+  for (let i = 0; i < 60 * 60 && !a.end; i++) step(a, DT, decide(a, pl));
+  return a;
+};
+
+describe('R-2: the restarts', () => {
+  it('a corner layout has one source: a dealt corner lines up on cornerLayout', () => {
+    for (const side of [1, -1]) {
+      const a = setupAttack('corner', A, B, 'layout' + side, { side });
+      const L = cornerLayout(side);
+      expect(a.setPiece!.spot).toEqual(L.spot);
+      const taker = a.bodies[a.taker!];
+      expect({ x: taker.x, y: taker.y }).toEqual(L.taker);
+      expect(a.bodies.filter((b) => b.slot.startsWith('BX')).map((b) => ({ x: b.x, y: b.y }))).toEqual(L.box);
+      expect(a.bodies.filter((b) => b.slot.startsWith('Z')).map((b) => ({ x: b.x, y: b.y }))).toEqual(L.zone);
+      expect(CORNER.box).toHaveLength(5);
+    }
+  });
+
+  it('a parry over the byline is a corner in the same attack, from the flag on its side', () => {
+    for (const [i, x] of [GX + 7, GX - 8].entries()) {
+      const a = overTheLine('parry-corner' + i, 'gk', { x, y: PL - 0.6, vx: Math.sign(x - GX) * 1.5, vy: 6 });
+      expect(a.end, 'case ' + i).toBeNull();
+      expect(a.events).toContain('corner-won');
+      expect(a.setPiece?.kind).toBe('corner');
+      const L = cornerLayout(x < GX ? 1 : -1);
+      expect(a.setPiece!.spot).toEqual(L.spot);
+      expect(a.ball.x).toBeCloseTo(L.spot.x, 6);
+      expect(a.restarts).toBe(1);
+      expect(a.ctrl).toBe(a.taker);
+      expect(a.bodies[a.taker!].side).toBe('A');
+      // the clock leaves time to take it, and the attack plays on to a proper end
+      expect(a.clock - a.used).toBeGreaterThanOrEqual(RESTARTS.play - 1e-9);
+      finish(a, 'parry-corner-pilot' + i);
+      expect(LETTERS).toContain(a.end!.kind);
+      expect(a.t).toBeLessThan(a.clock + 15);
+    }
+  });
+
+  it('off a defender too; and no more than two restarts in an attack', () => {
+    const a = overTheLine('two-restarts', 'def', { x: GX + 9, y: PL - 0.6, vx: 1, vy: 6 });
+    expect(a.events).toContain('corner-won');
+    sendOver(a, 'gk', { x: GX - 9, y: PL - 0.6, vx: -1, vy: 6 });
+    expect(a.restarts).toBe(2);
+    expect(a.setPiece?.kind).toBe('corner');
+    // a third: the keeper's save stands, no third restart
+    sendOver(a, 'gk', { x: GX + 9, y: PL - 0.6, vx: 1, vy: 6 });
+    expect(a.restarts).toBe(2);
+    expect(a.end).toMatchObject({ kind: 'S', text: 'SAVED · TURNED ROUND' });
+    // and a quick throw-in counts toward the two
+    const b = overTheLine('two-restarts-throw', 'def', { x: PW - 0.4, y: 90, vx: 3, vy: 0 });
+    expect(b.events).toContain('throw-in');
+    sendOver(b, 'gk', { x: GX - 9, y: PL - 0.6, vx: -1, vy: 6 });
+    expect(b.restarts).toBe(2);
+    sendOver(b, 'def', { x: 0.4, y: 92, vx: -3, vy: 0 });
+    expect(b.end).toMatchObject({ kind: 'L', text: 'OUT OF PLAY' });
+  });
+
+  it('over the byline off an attacker: a goal kick, the attack over', () => {
+    const a = overTheLine('goal-kick', 'att', { x: GX + 12, y: PL - 0.6, vx: 0, vy: 6 });
+    expect(a.end).toMatchObject({ kind: 'W', text: 'GOAL KICK' });
+    expect(a.restarts ?? 0).toBe(0);
+  });
+
+  it('over the touchline: off a defender in the final third a quick throw-in to the nearest man; off us theirs', () => {
+    const a = overTheLine('throw-ours', 'def', { x: PW - 0.4, y: 88, vx: 4, vy: 0.5 });
+    expect(a.end).toBeNull();
+    expect(a.events).toContain('throw-in');
+    expect(a.kick?.kind).toBe('throw');
+    const thrower = a.bodies[a.kick!.by];
+    expect(thrower.side).toBe('A');
+    expect(thrower.x).toBeGreaterThan(PW);
+    // the nearest other attacker is the man it's for, and the stick is on him
+    const others = a.bodies.filter((b) => b.side === 'A' && b !== thrower);
+    const near = others.reduce((m, b) => (Math.hypot(b.x - thrower.x, b.y - thrower.y) < Math.hypot(m.x - thrower.x, m.y - thrower.y) ? b : m));
+    expect(a.kick!.to).toBe(near.id);
+    expect(a.ctrl).toBe(near.id);
+    // held overhead for the beat, then thrown: no offside from a throw-in
+    const at = a.kick!.at;
+    while (a.t < at - DT) {
+      step(a, DT, { x: 0, y: 0 });
+      expect(a.ball.h).toBeCloseTo(THROW.hold, 6);
+    }
+    for (let i = 0; i < 3; i++) step(a, DT, { x: 0, y: 0 });
+    expect(a.events).toContain('throw');
+    expect(a.ball.flight?.kind === 'throw' || a.ball.owner !== null).toBe(true);
+    expect(a.offIds).toEqual([]);
+    expect(thrower.passKind).toBe('throw');
+    finish(a, 'throw-ours-pilot');
+    expect(LETTERS).toContain(a.end!.kind);
+
+    // short of the final third (y ≤ 75) it isn't a quick restart
+    const deep = overTheLine('throw-deep', 'def', { x: 0.4, y: 70, vx: -4, vy: 0 });
+    expect(deep.end).toMatchObject({ kind: 'L', text: 'OUT OF PLAY' });
+    expect(deep.events).not.toContain('throw-in');
+    // off us: their throw, the attack lost
+    const theirs = overTheLine('throw-theirs', 'att', { x: 0.4, y: 90, vx: -4, vy: 0 });
+    expect(theirs.end).toMatchObject({ kind: 'L', text: 'THROW-IN · THEIRS' });
+  });
+
+  it('across seeded autopilot attacks: never more than two restarts, every wide end a goal kick, all inside the clock + 15 s', () => {
+    const SC: Scenario[] = ['build', 'counter', 'wide', 'corner', 'freekick'];
+    const weak = withHan(B, 45);
+    let restarted = 0;
+    let corners = 0;
+    for (const sc of SC)
+      for (let i = 0; i < 60; i++) {
+        const a = autoplayAttack(setupAttack(sc, A, weak, 'restarts:' + sc + i, { side: i % 2 ? 1 : -1 }), 0.55 + (i % 4) * 0.12, 'restarts-pilot' + i);
+        expect(a.restarts ?? 0, sc + i).toBeLessThanOrEqual(RESTARTS.max);
+        if (a.restarts) restarted++;
+        corners += a.events.filter((e) => e === 'corner-won').length;
+        if (a.end!.kind === 'W') expect(a.end!.text, sc + i).toMatch(/GOAL KICK$/);
+        expect(a.t, sc + i).toBeLessThan(a.clock + 15);
+      }
+    expect(restarted).toBeGreaterThan(0);
+    expect(corners).toBeGreaterThan(0);
   });
 });

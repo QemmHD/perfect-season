@@ -370,6 +370,23 @@ function cheer(x: number): boolean {
 
 const DUNKS = ['dunk', 'contact', 'standdunk', 'oop'];
 
+/** V2's PERFECT chime (sfx.perfect): its root (G5), and how far a streak lifts it */
+export const PERFECT_ROOT = 784;
+export const PERFECT_MAX_STEP = 4;
+/** the semitones a PERFECT streak lifts the chime: 0 for the first, +1 a PERFECT, at most +4 */
+export const perfectStep = (streak: number): number => Math.max(0, Math.min(PERFECT_MAX_STEP, Math.floor(Number.isFinite(streak) ? streak : 1) - 1));
+/** the ring's closing tick (sfx.ringTick): its first note (E6) */
+export const RING_TICK = 1319;
+/** the woodwork clang (sfx.post): a struck tube's partials over its root (ratio, seconds, gain) */
+const POST_ROOT = 620;
+const POST_PARTIALS: [number, number, number][] = [
+  [1, 0.42, 0.06],
+  [2.76, 0.3, 0.04],
+  [5.4, 0.16, 0.022],
+];
+/** a frequency ratio of n equal-tempered semitones */
+const semis = (n: number) => Math.pow(2, n / 12);
+
 export const sfx = {
   click: () => tone(660, 0.05, { type: 'triangle', gain: 0.06 }),
   spinStart: () => {
@@ -438,6 +455,29 @@ export const sfx = {
   whoosh: () => noise(0.22, { gain: 0.05, freq: 1800 }),
   /** a value adding onto the team rating: each one a step higher */
   count: (i: number) => tone(523 * Math.pow(2, i / 6), 0.09, { type: 'triangle', gain: 0.07 }),
+
+  /* ---- Game Design V2 (F.1), shared by the three sports' rings (Claude 2026-11-16, studio overhaul
+     soccer-1; contract in docs/studio-overhaul/soccer.md §5.0.1 a). Synthesized: no files. ---- */
+
+  /** a gold release, PERFECT: a root and then the fifth above it 70 ms later (about 180 ms in all),
+   * both a semitone higher for each PERFECT in a row (streak 1 is the root), up to +4 */
+  perfect: (streak = 1) => {
+    const f = PERFECT_ROOT * semis(perfectStep(streak));
+    tone(f, 0.11, { type: 'triangle', gain: 0.085 });
+    tone(f * semis(7), 0.11, { type: 'triangle', gain: 0.075, at: 0.07 });
+    // a little air on top of the fifth, so it rings rather than beeps
+    tone(f * 2, 0.09, { type: 'sine', gain: 0.025, at: 0.07 });
+  },
+  /** one tick of a closing ring's last 200 ms: the caller schedules up to four (i 0..3), each two
+   * semitones above the last */
+  ringTick: (i = 0) => tone(RING_TICK * semis(2 * Math.max(0, Math.min(3, Math.round(i)))), 0.03, { type: 'square', gain: 0.028 }),
+  /** the ball off the woodwork: a short metallic clang (inharmonic partials, a hard edge) and the
+   * crowd's "oooh" */
+  post: () => {
+    for (const [ratio, dur, gain] of POST_PARTIALS) tone(POST_ROOT * ratio, dur, { type: ratio === 1 ? 'triangle' : 'sine', gain });
+    noise(0.035, { gain: 0.07, freq: 3400 });
+    sfx.ooh();
+  },
   /** soccer's full time: the long whistle (the short one where it isn't loaded) */
   fulltime: () => {
     if (sample('fulltime')) return;

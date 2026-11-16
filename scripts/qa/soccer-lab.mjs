@@ -9,8 +9,10 @@
 // `smoke` opens the lab on all six presets (page errors, the computed --sat, a live-host probe that
 // must be blocked). soccer-1 parts on the same two phones: `bend` (a free kick with Bend left: its
 // arrow, and where the kick goes), `autokick` (a free kick left alone: the countdown, then the
-// autopilot takes it), `confetti` (a shootout: the rival's goal throws confetti in the rival's kit).
-// Parts: all | smoke | play | buttons | auto | sets | pens | bend | autokick | confetti.
+// autopilot takes it), `confetti` (a shootout: the rival's goal throws confetti in the rival's kit),
+// `restarts` (R-2, 2026-11-16: a keeper's parry staged running wide of the post, the corner it earns
+// lined up in the same attack, then a ball off a defender over the touchline and the quick throw-in).
+// Parts: all | smoke | play | buttons | auto | sets | pens | bend | autokick | confetti | restarts.
 import { launch, base, artifacts } from './browser.mjs';
 import { blocked, blockedLine, computedSat, phone, PRESETS, urlFor } from '../soccer/qa-isolate.mjs';
 import fs from 'node:fs';
@@ -282,10 +284,18 @@ for (const p of [preset('393x852-sat59'), preset('320x568')]) {
     await page.locator('.sc2-go').tap();
     let shot = false;
     let takenAt = null;
+    let lastT = 0;
     const seen = new Set();
     const t0 = Date.now();
-    while (Date.now() - t0 < 30000) {
+    const first = (await state(page)).i;
+    while (Date.now() - t0 < 45000) {
       const s = await state(page);
+      // the kick taken and the attack over: the lab deals the next free kick (a new attack)
+      if (s.i !== first) {
+        takenAt = lastT;
+        break;
+      }
+      lastT = s.t;
       const cd = await page.locator('.sc2-autokick').innerText().catch(() => null);
       if (cd) seen.add(cd.replace(/\s+/g, ' ').trim());
       if (!shot && cd && /IN 3/.test(cd)) {
@@ -296,7 +306,7 @@ for (const p of [preset('393x852-sat59'), preset('320x568')]) {
         takenAt = s.t;
         break;
       }
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(150);
     }
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${out}/${tag}-autokick-taken.png` });
@@ -339,6 +349,49 @@ for (const p of [preset('393x852-sat59'), preset('320x568')]) {
     report.push({ tag, step: 'confetti', theirGoal, errors });
     errorsAll.push(...errors);
     if (!theirGoal) errorsAll.push(tag + ': no rival goal in the shootout to check the confetti');
+    await context.close();
+  }
+  if (part('restarts')) {
+    // R-2: the live attack object (window.__soccer.a) is staged the way rules.test.ts does it: the ball
+    // leaves the keeper's hands wide of the right post, running over the byline
+    const { context, page, errors } = await open(p, { seed: 'qa-restart', scenario: 'build', home: 'LIV', hs: '2019', away: 'MCI', as: '2019' });
+    await page.waitForSelector('.sc2-go');
+    await page.locator('.sc2-go').tap();
+    await page.waitForFunction(() => window.__soccer.ui === 'live' && window.__soccer.a.t > 0.3, null, { timeout: 10000 });
+    const stage = (who, ball) => page.evaluate(({ who, ball }) => {
+      const a = window.__soccer.a;
+      const by = who === 'gk' ? a.bodies.find((b) => b.role === 'gk') : a.bodies.find((b) => b.side === 'D' && b.role !== 'gk');
+      a.setPiece = null;
+      a.taker = null;
+      a.kick = null;
+      Object.assign(a.ball, { owner: null, h: 0.5, vh: 1.5, curl: 0, dip: 0, last: by.id, ...ball });
+      a.ball.flight = { kind: who === 'gk' ? 'parry' : 'clear', from: by.id, to: null, at: a.t };
+      if (who === 'gk') { by.x = ball.x - 1.2; by.y = 104.2; by.act = 'dive'; by.actAt = a.t; by.h = 0.5; }
+    }, { who, ball });
+    await stage('gk', { x: 39.2, y: 103.6, vx: 2.4, vy: 2.2 });
+    await page.waitForTimeout(160);
+    await page.screenshot({ path: `${out}/${tag}-parry-wide.png` });
+    await page.waitForFunction(() => window.__soccer.a.setPiece?.kind === 'corner' || window.__soccer.a.end, null, { timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(450);
+    await page.screenshot({ path: `${out}/${tag}-earned-corner.png` });
+    const corner = await page.evaluate(() => { const a = window.__soccer.a; return { setPiece: a.setPiece, restarts: a.restarts ?? 0, end: a.end, clockLeft: a.clock - a.used, taker: a.taker !== null ? a.bodies[a.taker].p.tag : null, ctrlIsTaker: a.ctrl === a.taker }; });
+    // take the corner (the autopilot after the wait would too): tap PASS
+    const passBtn = page.locator('.hg2-pass').first();
+    if (await passBtn.count()) await passBtn.tap({ timeout: 2000 }).catch(() => {});
+    await page.waitForTimeout(1600);
+    const after = await state(page);
+    // a ball off a defender over the touchline in the final third: a quick throw-in
+    let thrown = null;
+    if (!after.end) {
+      await stage('def', { x: 67.6, y: 90, vx: 4, vy: 0.4, h: 0.2, vh: 0 });
+      await page.waitForFunction(() => window.__soccer.a.kick?.kind === 'throw' || window.__soccer.a.end, null, { timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: `${out}/${tag}-quick-throw.png` });
+      thrown = await page.evaluate(() => { const a = window.__soccer.a; return { kick: a.kick ? { kind: a.kick.kind, to: a.kick.to } : null, restarts: a.restarts ?? 0, end: a.end, ballH: a.ball.h }; });
+    }
+    report.push({ tag, step: 'restarts', corner, afterCorner: { end: after.end, setPiece: after.setPiece }, thrown, errors });
+    errorsAll.push(...errors);
+    if (corner.setPiece?.kind !== 'corner' || corner.restarts !== 1 || corner.end || !corner.ctrlIsTaker) errorsAll.push(tag + ': no earned corner ' + JSON.stringify(corner));
     await context.close();
   }
 }

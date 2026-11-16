@@ -30,6 +30,11 @@ interface AtkRec {
   text: string;
   pen: boolean;
   passes: number;
+  /** restarts earned in play (R-2, soccer-1): corners won, quick throw-ins; and whether a goal came
+   * after an earned corner */
+  corners: number;
+  throws: number;
+  cornerGoal: boolean;
 }
 interface LevelOut {
   shots: ShotRec[];
@@ -47,12 +52,16 @@ function playAttack(a: Attack, skill: number, seed: string, shots: ShotRec[]): A
   let nShots = 0;
   let passes = 0;
   let pen = false;
+  let corners = 0;
+  let throws = 0;
   while (!a.end && n++ < 60 * 120) {
     step(a, 1 / 60, decide(a, pl));
     for (; ei < a.events.length; ei++) {
       const e = a.events[ei];
       if (e === 'pass' || e === 'cross') passes++;
       if (e === 'penalty') pen = true;
+      if (e === 'corner-won') corners++;
+      if (e === 'throw-in') throws++;
       if (e === 'shot' || e === 'header') {
         if (open) shots.push({ ...open, res: open.res || 'other' });
         const s = a.lastShot!;
@@ -72,7 +81,7 @@ function playAttack(a: Attack, skill: number, seed: string, shots: ShotRec[]): A
     }
   }
   if (open) shots.push({ ...open, res: open.res || (a.end?.kind ?? 'T') });
-  return { sc: a.scenario, end: a.end?.kind ?? 'T', used: a.used, shots: nShots, text: a.end?.text ?? '', pen, passes };
+  return { sc: a.scenario, end: a.end?.kind ?? 'T', used: a.used, shots: nShots, text: a.end?.text ?? '', pen, passes, corners, throws, cornerGoal: corners > 0 && a.end?.kind === 'G' };
 }
 
 /** A side's match of attacks (the deal, stoppage time), as aiAttacksOf plays it. */
@@ -145,6 +154,11 @@ function table(lvl: string, v: LevelOut) {
   }
   const n = shots.length;
   console.log('shots per side per match', (n / (results.length * 2)).toFixed(2));
+  // restarts earned in play (R-2): the A9 baseline
+  const won = atks.reduce((s, a) => s + a.corners, 0);
+  const thrown = atks.reduce((s, a) => s + a.throws, 0);
+  const sides = results.length * 2;
+  console.log('earned corners per side per match', (won / sides).toFixed(2), ' (dealt corners', (atks.filter((a) => a.sc === 'corner').length / sides).toFixed(2) + ')', ' quick throw-ins per side per match', (thrown / sides).toFixed(2), ' goals after an earned corner', atks.filter((a) => a.cornerGoal).length, '(' + pct(atks.filter((a) => a.cornerGoal).length, atks.filter((a) => a.end === 'G').length) + ' of goals)', ' attacks with 2 restarts', atks.filter((a) => a.corners + a.throws >= 2).length);
   const res: Record<string, number> = {};
   for (const s of shots) res[s.res] = (res[s.res] || 0) + 1;
   console.log('shot results', Object.entries(res).map(([k, m]) => k + ' ' + pct(m, n, 0)).join('  '), ' on target (G+S)', pct((res.G || 0) + (res.S || 0), n, 0), ' save% of on-target', pct(res.S || 0, (res.G || 0) + (res.S || 0), 0));

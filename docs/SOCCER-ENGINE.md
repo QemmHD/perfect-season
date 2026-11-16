@@ -312,6 +312,24 @@ before/after numbers are there):
   swell that is still settling).
 - **Confetti (J-3)** comes out in the scorer's kit (the rival's goals threw yours), and not at all
   with reduced motion.
+- **Parries and restarts (R-2, 2026-11-16).** A parry leaves the keeper's hands away from the goal
+  line: pushed wide (`PARRY.outLo`..`outHi` = 50–85% by HAN) at `(±0.9, −0.35)` or back out in front
+  at `(±0.3..1.1, −1)`, always toward the side away from the middle of the goal unless HAN is under
+  55 (then the side his body went, so a poor handler can knock it back across his six-yard box). Only
+  a ball parried from outside ±(GHALF − 0.3) goes on round the post. Before, 45% went "out" toward the
+  line from anywhere across the goal: 14.3% of all goals were parries into his own net. A ball over
+  the byline off a defender or the keeper is now a **corner played in the same attack**
+  (`setPieceAfterOut`, event `'corner-won'`), lined up from the shared `cornerLayout(side)`/`CORNER`
+  that a dealt corner uses; the corner's marking, duels and header cone apply after it
+  (`a.restart`). Off an attacker it ends `'W'` "GOAL KICK" (a shot: "WIDE · GOAL KICK", "OVER THE
+  BAR · GOAL KICK"). Over the touchline off a defender beyond y 75: a **quick throw-in** (event
+  `'throw-in'`): the attacker nearest the spot holds it overhead on the line for 0.6 s
+  (`THROW.beat`) and throws it to the nearest teammate (flight `'throw'`, no offside, `Body.passKind`
+  `'throw'`); off an attacker it ends `'L'` "THROW-IN · THEIRS". At most `RESTARTS.max` (2) restarts
+  an attack, each leaving at least 5 s on its clock; past that the keeper's save stands ("SAVED ·
+  TURNED ROUND"). No random numbers are drawn for any of it.
+- **Shared ring sounds (V2 F.1).** `sfx.perfect(streak)`, `sfx.ringTick(i)` and `sfx.post()` in
+  `src/lib/sound.ts`, synthesized, for all three sports; soccer plays `sfx.post` on the woodwork.
 - **Guards:** `golden.test.ts` (a hash of 60 seeded attacks with their whistle and post-whistle
   state, 20 `aiProgress` matches and 50 agreed shootouts: presentation work must leave it alone),
   `agreement.test.ts`/`agreement-ut.test.ts` (both phones' views of takeover, taken and `simBoth`

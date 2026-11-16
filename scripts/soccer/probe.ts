@@ -25,6 +25,11 @@ let parryGoals = 0;
 let reboundGoals = 0;
 let parries = 0;
 let deadShots = 0;
+/** R-2: restarts earned in play (corners off a defender or a parry, quick throw-ins), the most in one attack */
+let cornersWon = 0;
+let throwIns = 0;
+let maxRestarts = 0;
+let parryCorners = 0;
 let deadGoals = 0;
 /** each dead shot: what it was (shot or parry), why (slow, or bounced twice while still quick) */
 const deadWhy: Record<string, number> = {};
@@ -74,6 +79,15 @@ for (let i = 0; i < N; i++) {
     if (shotish.slice(0, -1).some((e) => e === 'save-parry' || e === 'post' || e === 'bar' || e === 'block')) reboundGoals++;
   }
   parries += a.events.filter((e) => e === 'save-parry').length;
+  cornersWon += a.events.filter((e) => e === 'corner-won').length;
+  throwIns += a.events.filter((e) => e === 'throw-in').length;
+  maxRestarts = Math.max(maxRestarts, a.restarts ?? 0);
+  // a corner straight from a parry: the last shot-ish event before it was the keeper's parry
+  a.events.forEach((e, k) => {
+    if (e !== 'corner-won') return;
+    const before = a.events.slice(0, k).filter((x) => ['shot', 'header', 'save-parry', 'post', 'bar', 'block', 'corner-won'].includes(x));
+    if (before[before.length - 1] === 'save-parry') parryCorners++;
+  });
   // R-1: shots and parries that died short and were played on as a loose ball
   const dead = a.events.filter((e) => e === 'shot-dead').length;
   deadShots += dead;
@@ -88,4 +102,5 @@ console.log('frozen balls: on the 120 s hard stop', hardStops, pc(hardStops, N),
 console.log('attacks over clock + 15 s of game time:', overClock, pc(overClock, N), JSON.stringify(why));
 for (const e of examples) console.log('  ', e);
 console.log('dead shots played on as loose balls (R-1):', deadShots, JSON.stringify(deadWhy), ' attacks that still ended in a goal after one:', deadGoals);
+console.log('restarts earned (R-2): corners', cornersWon, '(' + parryCorners + ' from a parry)', ' quick throw-ins', throwIns, ' most in one attack', maxRestarts);
 console.log('goals', goals, ' straight from a keeper parry (into his own net):', parryGoals, pc(parryGoals, goals), ' after a rebound (parry, woodwork, block):', reboundGoals, pc(reboundGoals, goals), ' parries', parries);

@@ -17,10 +17,16 @@ import type { Attack, Scenario, Squad } from './types';
 /**
  * Re-bases, newest last (each one's reason; the commit that did it is in the team doc):
  *  1. soccer-1 step A (2026-11-10): created on the untouched engine (main acdf3e2).
+ *     soccer-1 step B (R-1: dead shots play on; set pieces auto-taken after 12 s) left all three
+ *     hashes as they were: none of these attacks has a shot that dies short, and the AI takes its
+ *     own set pieces at once.
+ *  2. soccer-1 R-2 (2026-11-16): parries go away from the goal line (round the post only from
+ *     outside ±(GHALF − 0.3), wide by HAN); corners off a defender or a parry, goal kicks, quick
+ *     throw-ins, at most two restarts an attack.
  */
 const GOLDEN = {
-  attacks: '0f8f55a4585cb3',
-  matches: '0b2cfdb283c412',
+  attacks: '0dde30cbc63300',
+  matches: '07f3dde0f40f62',
   shootouts: '13ebc2208d1307',
 };
 
