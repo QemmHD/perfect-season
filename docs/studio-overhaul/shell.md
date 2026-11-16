@@ -18,7 +18,7 @@ Branch `claude/studio-shell`. Plan: [shell-plan.md](shell-plan.md). `O` below me
 - **perf-ut: compare by ratio to the same-run control, not by ms** (2026-11-16). Default N is 5; each sport also runs the 0-card `utNoStarter` control interleaved; rows carry `ratioToControl`. Above a 1-minute load of 4 the result is saved as `.noisy.json` and is not a baseline.
 - **shell-2 landed Fix A (every team, read "Announcements" under shell-2):** `--sat` now includes the 22-pt status-bar edge on island phones; `<html>` carries `--ps-inset-*` / `--ps-edge`; `useLayout()` gains `edge` and `room` (`content` is now the room below the edge). **Lead:** D3 (evolution.css) was used for 3 `top` declarations; D5 (Home budget) has shell's proposal and the measured table under shell-2.
 - **ut / packs: the heavy first-render costs and the rating costs** are in "UT open: costs" below. The rating step (packs-owned `rate.ts`, `card-face.ts`, `ut-scale.ts`) is most of the open; the first render after the pool is 120–210 ms.
-- **shell-3: the header plate API (D4), every team that draws a top bar.** `src/shell/plates.css` publishes `--plate-top`, `--plate-bot`, `--plate-line` and the UT set `--plate-top-ut`, `--plate-bot-ut`, `--plate-line-ut` on `:root`. shell owns the surfaces: `.shell-top` carries the plate itself, and every `.screen > .topbar` (UT `.ut-top`, Results, Gauntlet, UT Match) gets a `::before` plate from y = 0 to its bottom, ending on a 1 px hairline. ut owns what sits on them. Please don't give a top bar its own background, and keep the class names `.shell-top`, `.topbar` (as a direct child of `.screen`), `.ut-top`, `.scrim`, `.ut-open-screen`, `.splash`, `.vs-splash` and `.screen.reveal`: the status plate keys its colour and visibility on them.
+- **shell-3: the header plate API (D4), every team that draws a top bar.** `src/shell/plates.css` publishes `--plate-top`, `--plate-bot`, `--plate-line` and the UT set `--plate-top-ut`, `--plate-bot-ut`, `--plate-line-ut` on `:root`. shell owns the surfaces: `.shell-top` carries the plate itself, and every `.screen > .topbar` (UT `.ut-top`, Results, Gauntlet, UT Match) gets a `::before` plate from y = 0 to its bottom, ending on a 1 px hairline. ut owns what sits on them. Please don't give a top bar its own background, and keep the class names `.shell-top`, `.topbar` (as a direct child of `.screen`), `.ut-top`, `.scrim`, `.ut-open-screen`, `.splash`, `.vs-splash` and `.screen.reveal`: the status plate keys its colour and visibility on them. **Review fix (2026-11-16):** the status plate is transparent unless a header is on screen, and stays transparent over these full-screen overlays drawn over a header screen: `.champ` (Champions / Perfect Season), `.cast` (GameCast), `.ut-pick-screen` (UT player pick), `.promotion` (Rivals) and `.sportfade` (sport switch). **ut, packs, players:** keep those class names on the overlays' root elements. A new full-screen overlay that sits over a header screen and is not a `.scrim` needs its class added to that rule in `src/shell/plates.css` (plain class, no combinators); tell shell, or the band shows a strip of the screen underneath.
 - **players: keep `.ut-detail-btns`** in the CardDetail redesign (the H1 rule is `.sheet.bottom .ut-detail-btns`), or move the card actions into a non-scrolling sheet footer, which makes the rule unnecessary. Tell shell either way.
 - **ut: a tap-blocking bug in Squad (found by shell-3's H1 probe, not fixed here, outside shell's lane).** In `src/ut/SquadView.tsx` the picker's DETAILS chip calls `close(() => props.onInspect(cur.uid))`. `Sheet.close(after)` runs `after` *instead of* `onClose`, so the picker is never unmounted: its scrim stays in the DOM as `scrim bottom closing`, invisible (its fade-out ends at opacity 0) and still covering the whole frame. After a player opens a card's DETAILS from the squad and closes the card, every tap on the Squad screen and the UT tab bar is swallowed until UT is reopened. Reproduced in all three sports at 393 and 320 (QA runs with reduced motion); with motion on, the code path is the same, because the 200 ms timer only delays `after`. One-line fix (ut's file): `onInspect={(uid) => { setPick(null); props.onInspect(uid); }}` at `SquadView.tsx:235`. A defensive second line for the shared sheet (whoever owns `styles.css` sheets): `.scrim.closing { pointer-events: none; }`.
 - **shell-4: recovery screens and the arena signal (every team).**
@@ -123,23 +123,49 @@ None. The boundary and the loader catch change nothing in a running match. `stri
 
 Owner decision 6: the iPhone top-edge fix ships on its own as soon as it passes review. This section is the lead's review packet.
 
-- **Commit range:** `acdf3e2..claude/studio-shell-edge`. The plan commits (`e951c09`, `68123cc`) are docs only. The code is in `05ea3f4` and `7f7655d` (shell-1, QA harness only), `25c6f6a` (shell-2: Fix A, Fix D, M1, L6) and `05a6beb` (shell-3: Fix B, Fix C part 1, H1, L2). The branch tip is a docs-only commit that adds this handoff text; the gate ran on `05a6beb`'s tree. **Review fix (2026-11-16):** the commit after the handoff fixes the four shell-2 review findings (Classic hint slot, saved-run Home tiles under PLAY, `.save-warning` sideways, legacy `Hoops.tsx` `--sat`), see shell-2 "Review fixes"; it belongs in the early ship, and `claude/studio-shell-edge` is fast-forwarded to it.
-- **Pointer branch:** `claude/studio-shell-edge`, at the handoff commit. Plain push; no force, no rebase.
-- **Rollback:** revert the range, newest first: `git revert --no-edit 05a6beb 25c6f6a` reverts the app changes; the QA-harness commits can stay. Fix B alone can be switched off with one line in `src/shell/plates.css` (`html .status-plate { display: none; }`), and every plate with the `PLATES_OFF_CSS` rule in `scripts/qa/edge-lib.mjs`.
+- **Commit range:** `acdf3e2..claude/studio-shell-edge`. The plan commits (`e951c09`, `68123cc`) are docs only. The code is in:
+  - `05ea3f4` and `7f7655d` (shell-1, QA harness only);
+  - `25c6f6a` (shell-2: Fix A, Fix D, M1, L6);
+  - `05a6beb` (shell-3: Fix B, Fix C part 1, H1, L2);
+  - `52f347e` (the shell-2 review fixes: Classic hint slot, saved-run Home tiles under PLAY, `.save-warning` sideways, legacy `Hoops.tsx` `--sat`; see shell-2 "Review fixes");
+  - `55127fd` (the shell-3 review fix: the status plate is transparent on screens without a header and over full-screen overlays; see shell-3 "Review fixes").
+  - `9729de6` and the branch tip are docs only (this handoff text). **The ship gate below ran on `55127fd`'s tree**, the code tip of the edge branch.
+- **Pointer branch:** `claude/studio-shell-edge`, at `55127fd` plus the docs-only tip. Every move was a plain fast-forward push; no force, no rebase. It is **not** `claude/studio-shell`: that branch also carries shell-4 (recovery screens, the danger zone) and later shell work, which are not in the early ship. The shell-3 review fix is on both branches, as the same diff (`603cb7b` on `claude/studio-shell`), so the later merge applies it once.
+- **Rollback:** revert the range, newest first: `git revert --no-edit 55127fd 52f347e 05a6beb 25c6f6a` reverts the app changes; the QA-harness commits can stay. Fix B alone can be switched off with one line in `src/shell/plates.css` (`html .status-plate { display: none; }`), and every plate with the `PLATES_OFF_CSS` rule in `scripts/qa/edge-lib.mjs`.
 - **Protocol bump needed:** none. Layout and paint only; no engine reads any of it. **Save-compat risk:** none. No storage key, id, saved field or reward changes.
 
 ### Files in the unit (`git diff --stat acdf3e2..claude/studio-shell-edge`)
 
 | What | Files |
 |---|---|
-| Ships in the app | `index.html` (status plate, its inline base, the description), `public/manifest.webmanifest` (description), `src/main.tsx` (1 import), `src/shell/plates.css` (new), `src/stage.tsx`, `src/stage-layout.ts`, `src/styles.css` (`.arcade-full` insets, Home budget, LV label), `src/ui/Pages.tsx` (Home class token and hint), `src/ut/nav.css` (H1), `src/evolution/evolution.css` (3 `top` declarations, D3) |
+| Ships in the app | `index.html` (status plate, its inline base, the description), `public/manifest.webmanifest` (description), `src/main.tsx` (1 import), `src/shell/plates.css` (new), `src/stage.tsx`, `src/stage-layout.ts`, `src/styles.css` (`.arcade-full` insets, Home budget, LV label, saved-run tiles), `src/ui/Pages.tsx` (Home class token and hint), `src/ut/nav.css` (H1), `src/evolution/evolution.css` (3 `top` declarations, D3, and `.save-warning` sideways), `src/game/hoops/Hoops.tsx` (legacy `--sat`) |
 | Tests | `src/stage-layout.test.ts`, `src/shell/plates.test.mjs`, `scripts/qa/*.test.mjs` |
 | QA harness (never shipped) | `scripts/qa/browser.mjs`, `fixtures.mjs`, `edge-lib.mjs`, `edge-snippet.mjs`, `edge-headers.mjs`, `home-matrix.mjs`, `perf-ut.mjs`, `plates.mjs`, `screen-fit.mjs`, `online.mjs` |
 | Docs | `docs/BROWSER-QA.md`, `docs/studio-overhaul/shell-plan.md`, `docs/studio-overhaul/shell.md` |
 
-31 files. The files that ship in the app account for about 250 changed lines; the rest is tests, the QA harness and docs.
+32 files at the edge tip. The 11 files that ship in the app account for 269 added and 28 removed lines; the rest is tests, the QA harness and docs.
 
 ### shell-3 · Fix B (status plate), Fix C part 1 (solid header plates), H1, L2 (done)
+
+#### Review fixes (2026-11-16)
+
+An independent review of `7f7655d..9729de6` found four issues. Code fix: `603cb7b` on `claude/studio-shell`, the same diff as `55127fd` on `claude/studio-shell-edge`.
+- **High: a flat strip over every screen without a header.** The `@supports selector(:has(a))` base painted the plate `--bg` on screens with no `.shell-top`/`.topbar`. Those screens draw a glow at the top (Draft, Playoffs, Welcome, Vote, Search), so the plate cut it with a hard line at the inset (review, CIEDE2000 across the line: Draft 5.99, Playoffs 13.98, Welcome 10.86, Vote 10.21, Search 3.28; Fix A alone 1.03 on the Draft). **Fixed:** the base is now `transparent`, and the header rules after it make the plate opaque only where a header plate sits under it. Header-less screens now look exactly as with Fix A alone.
+- **Medium: a strip of the screen underneath over full-screen overlays.** Champions (`.champ`), GameCast (`.cast`), the UT player pick (`.ut-pick-screen`), the Rivals promotion (`.promotion`) and the sport switch (`.sportfade`) sit inside the stage, under the plate, over a header screen (review: dE 6.0 to 8.6). **Fixed:** they join the open sheet's transparent rule, `html:has(.scrim:not(.closing), .champ, .cast, .ut-pick-screen, .promotion, .sportfade) .status-plate`. Plain classes only, for the `:has()` cost. The class list is in the D4 message above so ut, packs and players keep it.
+- **Low: the `:has()` cost was at the noise floor.** Re-measured after the fix, but the machine was not quiet (load 7.4 to 10 on 4 CPUs, against the perf-ut guard of 4). Result: **unconfirmed**, see the table and the `:has()` paragraph.
+- **Low: the edge branch had moved past the gated tree.** The gate is re-run on the edge branch's code tip `55127fd` (which contains `52f347e`), and the commit range, pointer branch, rollback list and file list above are updated.
+
+Measured after the fix (393 × 852, 59/34, standard player, isolated dev server, 3 sports, the same in each; `plates.mjs --parts seams`, CIEDE2000 1.5 pt above against 1.5 pt below the inset line, max of x = 20/195/370; `O/shots/shell/shell-3/edge-gate/plates/seams.json`):
+
+| Screen | With every plate | Fix A alone | Acceptance |
+|---|---|---|---|
+| Draft (real, reached with PLAY) | **0.86** | 0.86 | ≤ 2 |
+| Playoffs / Welcome / Vote / Search (the real class over the Draft) | **1.08 / 1.00 / 0.35 / 1.28** | the same | ≤ 2 |
+| Champions / Perfect Season / GameCast / Rivals promotion / sport switch (the real class over Home) | **0.85 / 0.34 / 1.21 / 0 / 0** | the same | ≤ 2 |
+| UT player pick (over UT Home) | **0.63** | 0.48 | ≤ 2 |
+| Home / UT Home (unchanged) | 0.68 / 0.00 | | ≤ 2 |
+
+The review's numbers compare the band's mean with the strip just below it, so they are not the same measure; the page test below also checks that the old `--bg` rule gives dE > 2 on Draft, Playoffs and Welcome, so the guard can fail. Screenshots: `O/shots/shell/shell-3/fix-seams/seams-nba/draft-top.png` (no strip under the clock) and `edge-gate/plates/seams-<sport>/`.
 
 #### What changed
 
@@ -148,8 +174,9 @@ Owner decision 6: the iPhone top-edge fix ships on its own as soon as it passes 
   - `src/shell/plates.css` (imported in `main.tsx` right after `styles.css`) sets the height to `var(--ps-inset-top, env(...))`, so QA sees the real inset through `__psInsets`, and sets the colour from what is on screen:
     - main screens (`.shell-top`, or a screen's own `.topbar`): `--plate-top`;
     - UT (`.ut-top`): `--plate-top-ut`, the UT header plate's top colour, so the inset line has no seam;
-    - screens without a top bar (Draft, Search, Season…): the app background `--bg`. The plan had `--plate-top` everywhere, which would have drawn a lighter strip over every header-less screen;
+    - screens without a top bar (Draft, Playoffs, Welcome, Vote, Search…): **transparent** (review fix), so the band shows the screen's own top exactly as with Fix A alone. The first version painted `--bg` there, which cut those screens' top glow with a hard line; the plan's `--plate-top` everywhere would have been worse;
     - an open sheet (`.scrim:not(.closing)`): **transparent**, so the band shows the scrimmed header exactly like the rest of the screen. This replaces the plan's fixed `#030c10`, which matches only one background; transparent matches every one by construction. It fades with the scrim (0.22 s), and returns while the sheet closes;
+    - full-screen overlays drawn over a header screen (`.champ`, `.cast`, `.ut-pick-screen`, `.promotion`, `.sportfade`): transparent, in the same rule as the open sheet (review fix), so the band shows the overlay;
     - pack opening, the launch splash, the versus splash and the season reveal: `display: none`. The band shows the screen's own tier colour or background;
     - matches portal `.arcade-full` to `<body>` at z-index 50, so they already cover it;
     - sideways (`--ps-inset-top: 0`) and on framed desktop layouts its height is 0.
@@ -191,38 +218,45 @@ Owner decision 6: the iPhone top-edge fix ships on its own as soon as it passes 
 | A tap 4 pt above the sheet's edge lands on the bar | 0 of 360 | **540 of 540** (5 entry points × 3 positions × 3 x × 4 phones × 3 sports) | all |
 | 320 × 568 (sab 0): bar-region pixels vs before | | **0.00%** changed (3 sports) | ≤ 1% |
 | LV label | 8 px | 10 px; ring 42, tap target 44 | ≥ 10 px, 44 |
-| `plates.css` | | 3,362 B, **1,450 B gzipped**, no images | ≤ 2 KB gz |
+| Seam at the inset line on screens without a header (Draft / Playoffs / Welcome / Vote / Search) | first version (flat `--bg`): visible line (review: 5.99 / 13.98 / 10.86 / 10.21 / 3.28) | **0.86 / 1.08 / 1.00 / 0.35 / 1.28**, the same as Fix A alone (review fix) | ≤ 2 |
+| Seam on overlays over a header screen (Champions, GameCast, Rivals promotion, sport switch, UT pick) | first version: a strip of the screen underneath (review: 8.24 / 7.74 / 6.86 / 6.01 / 8.6) | **0.85 / 1.21 / 0 / 0 / 0.63** (review fix) | ≤ 2 |
+| `:has()` style recalc, UT Home → Club (heavy) | | **unconfirmed**: +1.5 ms pooled before the review fix, +0.34 ms after it (paired +0.29), both on a loaded machine (load 3.6–10, runs swing 7–32 ms) | ≤ 2 ms, on a quiet machine |
+| `plates.css` | | 3,670 B, **1,583 B gzipped** (after the review fix), no images | ≤ 2 KB gz |
 | Reduced motion | | no transition (computed 1e-05 s from the global rule) | no new animation |
 
 **`:has()` cost** (CDP `RecalcStyleDuration` for UT Home → Club, heavy NBA player, 2,003 copies; `plates.css` toggled on and off in the same page, interleaved, one unmeasured cycle after each toggle):
-- Two runs of 9 pairs each: median rise −1.5 ms and +2.15 ms (paired medians −0.17 and +1.93 ms). Pooled over 18 pairs: on 9.91 ms, off 8.40 ms, **rise 1.5 ms** (≤ 2 ms: met). The load average was 3.6–7.0 on 4 CPUs, and single runs swing by ±2 ms, so the result sits at this machine's noise floor. The lead may want to re-measure on a quiet machine; the plan's fallback (a `data-top` attribute written by an observer) stays available.
+- **Status: unconfirmed.** Neither measurement ran on a quiet machine (the perf-ut load guard is a 1-minute load below 4), so the ≤ 2 ms criterion is neither met nor failed. Re-measure before the early ship when the machine is quiet: `node scripts/qa/plates.mjs --phase has-quiet --parts has --runs 9` on a dev server, with `uptime` before and after. The plan's fallback (a `data-top` attribute written by an observer) stays available.
+- Before the review fix: two runs of 9 pairs each, median rise −1.5 ms and +2.15 ms (paired medians −0.17 and +1.93 ms); one of the two is over 2 ms. Pooled over 18 pairs: on 9.91 ms, off 8.40 ms, rise 1.5 ms. Load 3.6–7.0 on 4 CPUs.
+- After the review fix (6 more `:has()` arguments in the transparent rule), on `55127fd`: one run of 9 pairs, on 12.90 ms, off 12.56 ms, **median rise +0.34 ms** (paired +0.29 ms). Load 7.4 at the start and 10.1 at the end, and single runs swing from 7 to 32 ms, so this run says only that the rule adds nothing that stands out of that noise. `O/shots/shell/shell-3/edge-gate/has/has.json`.
 - Two design choices keep it low: the colour rules restyle only the plate (an inherited custom property set on `<html>` would restyle the whole tree on every state flip), and the `:has()` arguments use no combinators (`.screen > .topbar` became `.topbar`, which only appears on screens).
 - Measurement note: three earlier runs without the warm-up cycle read +1.4, +1.9 and +3.1 ms. In those, every "on" run paid the engine's selector rebuild after the sheet was re-enabled, which is a harness artifact (now fixed), not a cost players see.
 
 #### Ship gate (lead decision D2)
 
-All on `05a6beb`, dev server on 5211 unless noted, isolated (`?ns=inspect`, local relays on ephemeral ports, every other host aborted). Across every run: **0 page errors**; the only host refused is the app's own Supabase launch call, aborted before it leaves the machine.
+**Re-run after the review fix (2026-11-16) on `55127fd`**, the edge branch's code tip (`05a6beb` + `52f347e` + the shell-3 review fix), with the branch checked out in the shell worktree; dev server on 5211, isolated (`?ns=inspect`, local relays on ephemeral ports, every other host aborted). Logs: `O/shots/shell/shell-3/edge-gate/`. Across every run: **0 page errors**; the only host refused is the app's own Supabase launch call, aborted before it leaves the machine. (The first gate ran on `05a6beb`; its results were the same apart from the test counts.)
 
 | Step | Result |
 |---|---|
 | `heavy.sh npm run typecheck` | pass |
-| `heavy.sh npm test` (full, once) | pass, exit 0: NBA 75 files / 643 tests (58 skipped), NFL 73 / 599 (101 skipped), soccer 9 / 74 |
-| `heavy.sh npm run build` (once) | pass, built in 41.7 s. In `dist/index.html` the CSS links come after the inline `<style>`, and the built CSS has all seven plate rules. `dist/` removed afterwards |
+| `heavy.sh npm test` (full, once) | pass, exit 0: NBA 75 files / 648 tests (58 skipped), NFL 73 / 601 (104 skipped), soccer 9 / 74 |
+| `heavy.sh npm run build` (once) | pass, built in 38.7 s. In `dist/index.html` the app's CSS links come after the inline `<style>`, and the built CSS has all seven plate rules, including `@supports selector(:has(a)){html .status-plate{background-color:transparent}}` and the overlay rule. `dist/` removed afterwards |
 | `screen-fit.mjs`: 9 phones, Safari and forced standalone | pass, including the new plate assertions (y 0, height = inset on every phone; 0 sideways), `safe 59/34 · edge 22`, and the score bug at inset + edge + 8 in 3 sports |
-| `edge-headers.mjs --phase shell-3/ship-edge --devices all` (27 runs, band shots at 393) | 0 failed steps; text in the band 0, controls in the band 0, bottom cuts 0; 189 header checks all opaque from y = 0 with 9/9 probes and the hairline on the first row (min text 4.95, min hairline 1.46); detail bar gap 0–0.5 pt, 0 text below; plate hidden on every pack SKIP screen; Home classes match on all 27 |
-| `home-matrix.mjs --phase shell-3/ship-home --devices all` (432 states) | 0 class mismatches; text/controls in the band 0; bottom cuts 0; document scroll 0; last row clears the fade at scroll end 200/200. Against shell-2's run: PLAY rect and every row height identical in all 432 states (6 overflowing 375×667 states differ only in the column's resting scroll offset) |
-| `plates.mjs --phase ship` (plates, h1, has) | every number in the table above |
+| `edge-headers.mjs --phase shell-3/edge-gate-headers --devices all` (27 runs, band shots at 393) | 0 failed steps; text in the band 0, controls in the band 0, bottom cuts 0; 189 header checks all opaque from y = 0 with 9/9 probes and the hairline on the first row (min text 4.95, min hairline 1.46); detail bar gap 0–0.5 pt, 0 text below; plate hidden on every pack SKIP screen; Home classes match on all 27 |
+| `home-matrix.mjs --phase shell-3/edge-gate-home --devices all` (432 states) | 0 class mismatches; text/controls in the band 0; bottom cuts 0; last row hidden at scroll end 0; tiles under the fade at rest 16 of 432, all NBA/NFL saved run at 320 by 0.6 pt (the allowed scroll fallback, as in shell-2's review-fix run). Against shell-2's review-fix run: the PLAY rect and every row height identical in all 432 states |
+| `plates.mjs --phase edge-gate/plates --parts plates,seams` | Home band 1.28%, UT band 1.49%, UT seam 0.00, sheet −0.26% / UT sheet 0.00%, plate back after the sheet, hidden on pack opening, splash, vs-splash and season reveal (3 sports); every seam in "Review fixes" above |
+| `plates.mjs --phase edge-gate/has --parts has --runs 9` | +0.34 ms; unconfirmed (loaded machine), see above |
+| `plates.mjs --phase ship` (h1), first gate on `05a6beb` | the H1 numbers in the table above; `55127fd` changes no H1 code, and edge-headers re-measured the bar (gap 0–0.5 pt, 0 text below) |
 | Self-containment | `git diff --name-only acdf3e2..HEAD`: no change to `vite.config.ts` or `sw.js`; no unit file imports `src/shell/arena`, `cards-load` or `pool-cache` (grep of import lines) |
 
 Screenshots: `O/shots/shell/shell-3/` (`before/`, `ship/`, `ship-edge/` with contact sheets `sheet-<sport>.png` and `sheet-<sport>-band.png`), and DSF 3 crops of the top 140 pt of Home and UT Home, plain and under the simulated band, in `O/shots/shell/ship/` for comparison with the owner's photo.
 
 #### Tests
 
-- `src/shell/plates.test.mjs` (9 tests): the plate sits before `#root` with its base in index.html's inline `<style>` (not a style attribute); `plates.css` is imported once, right after `styles.css`; ≤ 2 KB gzipped, no `url()`, no `backdrop-filter`; the six tokens exist; header text ≥ 4.5:1 and hairlines ≥ 1.25:1 from the tokens; the UT plate starts with the colour the status plate takes on UT; the colour rules' order; hidden on the four immersive screens, transparent under an open sheet, no transition under reduced motion; the H1 rule is scoped to `.sheet.bottom` and the unscoped one is unchanged; LV 10 px with the ring and tap target unchanged. Plain JS, because it reads files with `node:fs` (vitest hands CSS imports back empty, even `?raw`).
-- `scripts/qa/plates.page.test.mjs` (8 tests, real Chromium, a static page built from the real CSS): main plate 59 pt in `--plate-top` with 9 probes on the header and the hairline on the first row; UT colour and no seam (CIEDE2000 ≤ 2 on real pixels); transparent under a scrim and back while it closes; `--bg` on a header-less screen; hidden on all four immersive screens; no transition under reduced motion; the H1 bar flush at top/mid/end with a tap 4 pt above the edge on the bar; unchanged at sab 0; and a control that shows the old rule floating > 30 pt (so the test can fail).
+- `src/shell/plates.test.mjs` (11 tests; the review fix adds 2: transparent by default inside `@supports`, ahead of the header rules, with `--plate-top` kept for old Safari; the overlay rule lists `.champ`, `.cast`, `.ut-pick-screen`, `.promotion`, `.sportfade`, and every `:has()` argument is a plain class): the plate sits before `#root` with its base in index.html's inline `<style>` (not a style attribute); `plates.css` is imported once, right after `styles.css`; ≤ 2 KB gzipped, no `url()`, no `backdrop-filter`; the six tokens exist; header text ≥ 4.5:1 and hairlines ≥ 1.25:1 from the tokens; the UT plate starts with the colour the status plate takes on UT; the colour rules' order; hidden on the four immersive screens, transparent under an open sheet, no transition under reduced motion; the H1 rule is scoped to `.sheet.bottom` and the unscoped one is unchanged; LV 10 px with the ring and tap target unchanged. Plain JS, because it reads files with `node:fs` (vitest hands CSS imports back empty, even `?raw`).
+- `scripts/qa/plates.page.test.mjs` (11 tests, real Chromium, a static page built from the real CSS; the review fix adds 3: on `.screen.draft`, `.playoffs`, `.welcome`, `.vote` and `.search` with their real backgrounds the plate is transparent and dE ≤ 2 across the inset line; a control where the old `--bg` rule gives dE > 2 on Draft, Playoffs and Welcome; the overlays make the plate transparent, GameCast and Champions keep dE ≤ 2, and a header screen without an overlay keeps its opaque plate): main plate 59 pt in `--plate-top` with 9 probes on the header and the hairline on the first row; UT colour and no seam (CIEDE2000 ≤ 2 on real pixels); transparent under a scrim and back while it closes; `--bg` on a header-less screen; hidden on all four immersive screens; no transition under reduced motion; the H1 bar flush at top/mid/end with a tap 4 pt above the edge on the bar; unchanged at sab 0; and a control that shows the old rule floating > 30 pt (so the test can fail).
 - `scripts/qa/edge-lib.test.mjs` (+3): CIEDE2000 against Sharma's reference pairs, colour parsing, WCAG contrast and luma, and the band-difference metric.
 - `scripts/qa/screen-fit.mjs` now asserts the plate is the inset tall at y = 0 on Home on all 9 phones (Safari and standalone) and 0 tall sideways.
-- New runner `scripts/qa/plates.mjs` (see `docs/BROWSER-QA.md`). `edge-headers.mjs` records the plate audit on every screen.
+- New runner `scripts/qa/plates.mjs` (see `docs/BROWSER-QA.md`); the review fix adds its `seams` part. `edge-headers.mjs` records the plate audit on every screen.
 
 #### Protocol bump needed
 
@@ -237,7 +271,7 @@ None.
 
 1. Installed-app screenshots of Home and UT Home on the 393 × 852 phone, measured with the audit's method: "LEVEL N" peak luminance ≥ 160 against "x/y XP" at about 168 (ratio ≥ 0.95); edge sharpness ≥ 90 (today 21–26); nothing looks cut off at the top.
 2. Settings → the bottom note reads `safe 59/34 · edge 22`. On an iPhone Air it also tells us the real top inset (the plan assumes about 68).
-3. Fix B: does the band under the clock become one flat colour on Home and on UT Home, with no seam where the header starts? With a sheet open (Settings), is the strip dimmed like the rest? On pack opening, does the band show the pack screen's own colour? On the Draft, is the band the same dark as the screen?
+3. Fix B: does the band under the clock become one flat colour on Home and on UT Home, with no seam where the header starts? With a sheet open (Settings), is the strip dimmed like the rest? On pack opening, does the band show the pack screen's own colour? On the Draft, the Playoffs and the first-run Welcome screen, does the screen's own top glow run up under the clock with no dark strip or line at the inset? On the Champions screen and a live playoff game (GameCast), does the band show the overlay rather than the screen under it?
 4. The card detail from Club, Squad and the Pack Tracker: the bar sits flush with the bottom edge, with no stats showing under it, at the top and the end of the sheet.
 5. Home in every mode: nothing sits under the PLAY fade (shell-2).
 
@@ -248,7 +282,7 @@ If check 3 shows the plate looking worse than the system's own blur, switch Fix 
 - The premium plate pass (noise, accent, depth), the sub-page headers, toasts, the HUD scrim and the pack SKIP: shell-5.
 - The Squad picker tap-blocking bug: ut (see "Messages to other teams").
 - Gauntlet's gold background gets the main (teal) plate; give it the UT set in shell-5 if the owner wants it.
-- Old iOS (Safari before 15.4, no `:has()`): an `@supports selector(:has(a))` guard keeps the plate in `--plate-top` there, which matches Home and is close on UT. It also stays visible over pack opening and under sheets on those phones. Acceptable for a few old devices.
+- Old iOS (Safari before 15.4, no `:has()`): an `@supports selector(:has(a))` guard keeps the plate in `--plate-top` there, which matches Home and is close on UT. It also stays opaque over pack opening, under sheets, over the overlays and on screens without a header on those phones (where it draws the first version's strip). Acceptable for a few old devices.
 
 ## shell-2 · Fix A (top-edge clearance), Fix D (hygiene), M1 (Home in every state), L6 (done)
 
