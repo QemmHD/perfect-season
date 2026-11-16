@@ -193,7 +193,8 @@ try {
     }
     const commits = (await page.evaluate(() => window.__commits)) - before;
     await page.mouse.up();
-    log({ mode: 'profiler', dragMs: Date.now() - start, pointerMoves: moves, commits, errors });
+    // commitsBeforeDrag proves the hook is live (the play call and the snap commit); commits is the drag's own
+    log({ mode: 'profiler', dragMs: Date.now() - start, pointerMoves: moves, commitsBeforeDrag: before, commits, errors });
     await context.close();
   } else if (MODE === 'wall') {
     const games = Number(process.argv[3] ?? 5);

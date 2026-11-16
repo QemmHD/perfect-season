@@ -26,7 +26,7 @@ async function isolate(context) {
   await context.route('**/*', (route) => {
     const u = new URL(route.request().url());
     if (u.protocol === 'data:' || u.protocol === 'blob:' || ALLOWED.includes(u.hostname)) return route.continue();
-    blocked.push(u.hostname);
+    blocked.push(u.hostname + u.pathname.slice(0, 60));
     return route.abort();
   });
   await context.addInitScript((allowed) => {
@@ -60,6 +60,7 @@ for (const type of [pw.chromium, pw.firefox, pw.webkit]) {
 process.on('exit', () => {
   if (blocked.length) {
     console.error('nfl-guard: BLOCKED ' + blocked.length + ' non-local request(s): ' + [...new Set(blocked)].join(', '));
+    console.error('nfl-guard: every one was aborted before it left the machine; the run fails because the page tried.');
     process.exitCode = 1;
   } else console.error('nfl-guard: no non-local requests (reduced motion: ' + motion + ')');
 });
