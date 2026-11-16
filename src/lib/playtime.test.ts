@@ -344,12 +344,19 @@ describe('E.1.4 banking', () => {
     expect(again.writes).toBe(0);
     expect(page.store.has('perfect-season:playtime-pending:v1')).toBe(false);
   });
-  it('raw time alone (app open, no input) writes at most once every 10 minutes', async () => {
+  it('raw time alone (app open, no input) never writes; it banks with the next counted write', async () => {
     const t = await tab();
     screen(t, 'menu', 1800);
-    expect(t.writes).toBe(3);
-    expect(pt(t).daySec).toBe(0);
+    expect(t.writes).toBe(0);
+    match(t, 'ut:1', 120);
+    expect(t.writes).toBe(1);
     expect(pt(t).rawDaySec).toBeGreaterThanOrEqual(1790);
+  });
+  it('menus on a day with no counted play write nothing (Wave 1, ut-2 review fix)', async () => {
+    const t = await tab();
+    screen(t, 'menu', 600, 5);
+    expect(t.writes).toBe(0);
+    expect(pt(t)?.daySec ?? 0).toBe(0);
   });
 });
 

@@ -231,6 +231,10 @@ let play = 0,
   /** navigator.locks, read once (the getter is not free) */
   L: LockManager | undefined,
   free: (() => void) | null = null;
+/** Wave 1 (ut-2 review fix): the Eastern day the ledger last showed counted play on. Menu seconds can
+ * only count on such a day (menus are at most a third of play), so a periodic flush waits for it, and
+ * raw time alone never writes: both bank with the next counted write, a match's bank, or park on hide. */
+let playedDay = '';
 const me = Math.random();
 const clock = () => performance.now();
 
@@ -328,7 +332,7 @@ function tick() {
       else play += dt;
     }
   }
-  if (!live(h) && t - flushed >= 60000 && (menu + play >= 1 || raw >= 600)) flush();
+  if (!live(h) && t - flushed >= 60000 && (play >= 1 || (menu >= 1 && playedDay === etDay(Date.now())))) flush();
 }
 
 /** Bank the buffers (and a finished activity) into the profile: one write. */
@@ -358,7 +362,11 @@ function flush(done?: Prov, complete = false) {
     }
   }
   const now = Date.now();
-  sink((p) => ({ ...p, playtime: credit(p.playtime, c, now, !p.playtime && !p.stats.games && !p.history.length && !(p.ut.record.w + p.ut.record.l + p.ut.record.h2hW + p.ut.record.h2hL)) }));
+  sink((p) => {
+    const playtime = credit(p.playtime, c, now, !p.playtime && !p.stats.games && !p.history.length && !(p.ut.record.w + p.ut.record.l + p.ut.record.h2hW + p.ut.record.h2hL));
+    if (playtime.daySec > 0) playedDay = playtime.day;
+    return { ...p, playtime };
+  });
 }
 
 /** The page is hiding: what is not banked yet goes to the device-only pending key (no profile write). */
