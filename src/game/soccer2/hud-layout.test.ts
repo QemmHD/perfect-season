@@ -68,6 +68,31 @@ describe('tags on the pitch (V-3)', () => {
       expect(tagBox('KANE', W / 2, low[0].y, W).y + 16).toBeLessThanOrEqual(H - 30);
     }
   });
+  it('a tag that meets the toast line goes above it, never down into the cluster: no tag under a button, the stick ghost or the toast, at a free kick or in open play', () => {
+    for (const W of WIDTHS) {
+      for (const sat of SAT[W]) {
+        const H = HEIGHT[W];
+        const sab = W === 320 || W === 375 ? 0 : 34;
+        const g = geometryFor(W, H, { t: sat, r: 0, b: sab, l: 0 });
+        // what Soccer2 passes (readFrame): the toast, then every control
+        const keep = [g.toast, rectOf(g.a), rectOf(g.b), rectOf(g.c), rectOf(g.d), rectOf(g.stickGhost), g.bug, g.pause];
+        const r = rng(W * 7 + sat);
+        for (let k = 0; k < 300; k++) {
+          // tags around the toast line and over the cluster (the reviewed case: x near D at a free kick)
+          const n = 1 + Math.floor(r() * 4);
+          const cy = g.toast.y - 20 + r() * 60;
+          const tags: Tag[] = Array.from({ length: n }, (_, i) => ({ s: ['KANE', 'MESSI', 'BEND', 'VAN DIJK'][i % 4], x: (i === 0 ? g.d.cx : r() * W), y: cy + (r() - 0.5) * 20, color: TAG.white, prio: 5 - i }));
+          const out = layoutLabels(tags, W, H, keep);
+          const tag = W + 'x' + H + ' sat ' + sat + ' #' + k;
+          expect(overlaps(out, W), tag).toBe(0);
+          for (const t of out) for (const b of keep) expect(meets(tagBox(t.s, t.x, t.y, W), b), tag + ' ' + t.s + ' under a control').toBe(false);
+          // the man over D whose tag meets the toast line goes above it, not down into the cluster
+          const kane = out.find((t) => t.s === 'KANE')!;
+          if (meets(tagBox('KANE', tags[0].x, tags[0].y, W), g.toast)) expect(tagBox('KANE', kane.x, kane.y, W).y + 16, tag).toBeLessThanOrEqual(g.toast.y);
+        }
+      }
+    }
+  });
   it('tags are readable: 10 px letters on a 16 px chip', () => {
     expect(tagBox('KANE', 100, 100, 390).h).toBe(16);
   });

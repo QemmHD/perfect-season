@@ -54,7 +54,7 @@ export function slotsFor(phase: ControlPhase): Slots {
     case 'freekick':
       return { A: { act: 'shoot', label: 'SHOOT' }, B: { act: 'cross', label: 'CROSS', sub: 'TO HIM' }, C: { act: 'short', label: 'SHORT' }, D: { act: 'bend', label: 'BEND' } };
     default:
-      return { A: { act: 'shoot', label: 'SHOOT' }, B: { act: 'pass', label: 'PASS', sub: 'HOLD: LOB' }, C: { act: 'thru', label: 'THRU', sub: 'HOLD: LOFT' }, D: null };
+      return { A: { act: 'shoot', label: 'SHOOT' }, B: { act: 'pass', label: 'PASS', sub: 'HOLD: LOB' }, C: { act: 'thru', label: 'THRU', sub: 'LOFT' }, D: null };
   }
 }
 

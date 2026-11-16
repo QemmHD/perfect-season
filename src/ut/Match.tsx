@@ -685,6 +685,7 @@ export default function UtMatch(props: {
     them: Progress,
     how: 'played' | 'sim',
     pens?: Pens,
+    ff?: 'us' | 'them',
   ) => {
     if (done.current || !setup || !pool) return;
     done.current = true;
@@ -696,8 +697,10 @@ export default function UtMatch(props: {
       return a !== b ? a > b : !!s.online?.host;
     };
     // soccer: a level match was settled on penalties (Arcade.tsx)
-    const d =
-      pens && us.score === them.score
+    // soccer-2: a forfeit (online, or a solo quit) decides the match whatever the score
+    const d = ff
+      ? { won: ff === 'them', tiebreak: false }
+      : pens && us.score === them.score
         ? { won: pens.won, tiebreak: true }
         : decide(
             us.score,
@@ -948,7 +951,8 @@ export default function UtMatch(props: {
           host={setup.online ? !!setup.online.host : true}
           onProgress={(p) => conn?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => conn?.update((s) => ({ ...s, arcadeTook: k }))}
-          onFinish={(us, them, how, _took, pens) => finish(us, them, how, pens)}
+          onFinish={(us, them, how, _took, pens, ff) => finish(us, them, how, pens, ff)}
+          onQuit={(us, them) => finish(us, them, 'played', undefined, 'us')}
         />
       </div>
     );

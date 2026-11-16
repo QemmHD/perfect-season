@@ -232,6 +232,8 @@ export function Soccer2({
   const crowdRef = useRef({ level: CROWD.QUIET, at: 0, swellTill: 0 });
   const [guess, setGuess] = useState<number | null>(null);
   const finished = useRef(false);
+  /** the match was left from the pause sheet (a quit or a forfeit), or the rival forfeited: no penalties after it (soccer-2 fix) */
+  const left = useRef<'quit' | 'forfeit' | 'them' | null>(null);
 
   const say = (text: string, tone: Tone, ms = 1200, sub?: string) => {
     const id = ++popId.current;
@@ -476,7 +478,7 @@ export function Soccer2({
   const endMatch = () => {
     const r = rivalRef.current;
     sfx.fulltime();
-    if (allowShootout && r && r.done && r.score === match.goals) {
+    if (allowShootout && !left.current && r && r.done && !r.forfeit && r.score === match.goals) {
       say('ALL SQUARE', 'big', 1700, 'PENALTIES');
       timers.later(startShootout, 1500);
       return;
@@ -489,17 +491,32 @@ export function Soccer2({
   };
   // finished level and the rival's score arrives later (online): penalties then
   useEffect(() => {
-    if (ui !== 'final' || soRef.current || !allowShootout) return;
-    if (rival && rival.done && rival.score === match.goals) {
+    if (ui !== 'final' || soRef.current || !allowShootout || left.current) return;
+    if (rival && rival.done && !rival.forfeit && rival.score === match.goals) {
       say('ALL SQUARE', 'big', 1700, 'PENALTIES');
       const t = window.setTimeout(startShootout, 1500);
       return () => clearTimeout(t);
     }
-  }, [ui, rival?.done, rival?.score]);
+  }, [ui, rival?.done, rival?.score, rival?.forfeit]);
+  // the rival forfeited (online): the match is yours, at once (no penalties, no more attacks)
+  useEffect(() => {
+    if (!rival?.forfeit || left.current) return;
+    left.current = 'them';
+    pausedRef.current = false;
+    setPaused(false);
+    if (!finished.current) {
+      finished.current = true;
+      timers.dispose();
+      clearInput();
+      setUi('final');
+    }
+    sfx.roar();
+    say('THEY FORFEIT', 'big', 2600, 'YOU WIN');
+  }, [rival?.forfeit]);
 
   /* ---------- penalties ---------- */
   const startShootout = () => {
-    if (soRef.current) return;
+    if (soRef.current || left.current) return;
     const first: Side = fixedShootout ? fixedShootout.first : (seed.length + match.goals) % 2 ? 'them' : 'us';
     soRef.current = newShootout(us, them, seed + ':so', first);
     if (!finished.current && match.over) {
@@ -800,8 +817,10 @@ export function Soccer2({
     };
   }, []);
   const leave = (how: 'quit' | 'forfeit') => {
-    if (finished.current) return;
+    // never once every attack is in (a shootout is agreed or under way): QUIT and FORFEIT are not offered then
+    if (finished.current || left.current || match.over || soRef.current) return;
     finished.current = true;
+    left.current = how;
     pausedRef.current = false;
     timers.dispose();
     setPaused(false);
@@ -879,7 +898,11 @@ export function Soccer2({
     const safe = wrap.querySelector('.sc2-safe');
     renderer.frameInfo.safe = safe ? box(safe.getBoundingClientRect()) : null;
     renderer.frameInfo.controls = Array.from(wrap.querySelectorAll('.sc2-ctl, .ps-stick-ghost, .sc2-bug, .sc2-pause')).map((el) => box(el.getBoundingClientRect()));
+    // the label pass's keep-outs (V-3; soccer-2 fix): the toast line (or the plates in its place) and every
+    // control, so no tag prints under a DOM button. Read here, never per frame.
+    keepRef.current = [...Array.from(wrap.querySelectorAll('.sc2-toast, .sc2-plates')).map((el) => box(el.getBoundingClientRect())), ...renderer.frameInfo.controls];
   };
+  const keepRef = useRef<{ x: number; y: number; w: number; h: number }[]>([]);
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
@@ -986,16 +1009,8 @@ export function Soccer2({
           const target = show && corner ? (passTarget(a, dir, 'lofted')?.id ?? null) : (plan?.to?.id ?? null);
           // the man in control is the rival's in a shootout's their-kick: a violet ring and tag, never our gold (V-3)
           const ours = !(u.startsWith('so') && !usKicking.current);
-          // the toast line, while it shows: no tag prints under it (V-3)
-          const tl = wrap.querySelector('.sc2-toast');
-          let keepOut: { x: number; y: number; w: number; h: number }[] | undefined;
-          if (tl) {
-            const r = tl.getBoundingClientRect();
-            const cr = canvas.getBoundingClientRect();
-            const k = renderer.W / Math.max(1, cr.width);
-            keepOut = [{ x: (r.left - cr.left) * k, y: (r.top - cr.top) * k, w: r.width * k, h: r.height * k }];
-          }
-          renderer.draw(ctx, a, { target, pass: plan, jolt: juice.view(), flash: fx.flash, names: u === 'intro', ours, keepOut }, kitOf);
+          // the toast line and the controls, as last measured: no tag prints under them (V-3)
+          renderer.draw(ctx, a, { target, pass: plan, jolt: juice.view(), flash: fx.flash, names: u === 'intro', ours, keepOut: keepRef.current }, kitOf);
         }
         // shell's arena-ready: once, after the first frame with the pitch and the players
         if (!arenaReady.current && renderer.firstFrame) {
@@ -1029,6 +1044,8 @@ export function Soccer2({
   const a = atkRef.current;
   const total = totalOf(match);
   const inSo = ui.startsWith('so') || (ui === 'final' && !!soRef.current);
+  // QUIT / FORFEIT only while attacks are still to play: once all are in, the result (or the agreed shootout) stands
+  const canLeave = !match.over && !soRef.current && !left.current;
   const playing = ui === 'live' || (ui === 'so-kick' && usKicking.current);
   const intro = ui === 'intro' || ui === 'so-intro';
   const sp = a?.setPiece?.kind ?? null;
@@ -1068,9 +1085,12 @@ export function Soccer2({
                 ? { text: clutchLine + " · 90+'", kind: 'good' }
                 : null;
 
+  /** when a cluster button last had a pointer down or up: the click after it is the same press, not a second one */
+  const slotPointerAt = useRef(0);
   const slotDown = (id: SlotId, sl: Slot, e: React.PointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    slotPointerAt.current = performance.now();
     beat();
     if (intro) {
       haptic('tick');
@@ -1096,10 +1116,31 @@ export function Soccer2({
     if (sl.act === 'shoot' || sl.act === 'pass' || sl.act === 'thru') e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const slotUp = (id: SlotId, sl: Slot, e: React.PointerEvent<HTMLButtonElement>) => {
+    slotPointerAt.current = performance.now();
     press(id, false);
     if (sl.act === 'shoot') shootUp(e.pointerId);
     else if (sl.act === 'pass') doPassUp(e.pointerId);
     else if (sl.act === 'thru') doThruUp(e.pointerId);
+  };
+  /**
+   * A click with no pointer down before it (VoiceOver, Switch Control, a keyboard's Enter on a focused
+   * button): the button's tap, so assistive tech can kick off, pass, play it through, cross and bend.
+   * SHOOT needs the meter (a hold), so its keyboard way is Space.
+   */
+  const slotClick = (sl: Slot) => {
+    if (performance.now() - slotPointerAt.current < 1000) return;
+    if (intro) {
+      kickOffNow();
+      return;
+    }
+    if (sl.act === 'pass') {
+      doPassDown('key');
+      doPassUp('key');
+    } else if (sl.act === 'thru') {
+      doThruDown('key');
+      doThruUp('key');
+    } else if (sl.act === 'cross' || sl.act === 'short') setPiecePass(sl.act === 'cross');
+    else if (sl.act === 'bend') cycleBend();
   };
   const slotCancel = (id: SlotId, sl: Slot) => {
     press(id, false);
@@ -1107,6 +1148,19 @@ export function Soccer2({
     else if (sl.act === 'pass') passDown.current = null;
     else if (sl.act === 'thru') thruDown.current = null;
   };
+
+  // the keep-outs move only when the toast, the plates, the cluster or the frame change: measure then,
+  // and again once the toast's slide-in has settled (soccer-2 fix: no layout reads every frame)
+  const keepKey = (toast?.text ?? '') + '|' + plates.length + '|' + (slots ? targetsOf(slots).join('') : '') + '|' + compact + wide + ui;
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    const canvas = canvasRef.current;
+    if (!wrap || !canvas) return;
+    readFrame(wrap, canvas);
+    const settle = () => readFrame(wrap, canvas);
+    wrap.addEventListener('animationend', settle);
+    return () => wrap.removeEventListener('animationend', settle);
+  }, [keepKey]);
 
   return createPortal(
     <div className={'arcade-full hg2 sc2 ps-geo' + (wide ? ' wide land' : '') + (compact ? ' compact' : '')} ref={wrapRef} onPointerDown={fieldDown} onPointerUp={fieldUp} onPointerCancel={() => (swipe.current = null)}>
@@ -1130,7 +1184,7 @@ export function Soccer2({
         lineRef={lineRef}
         label={'You ' + match.goals + ', ' + rivalShown + ' ' + (rival ? rival.score : 'to come') + (match.over ? ', full time' : ', ' + minuteOf(match, shownI) + ', attack ' + (shownI + 1) + ' of ' + total + ', ' + SCENARIO_NAMES[match.deal[shownI]])}
       />
-      {!autoplayHook && ui !== 'final' && ui !== 'loading' && <PauseButton onPress={pause} />}
+      {!autoplayHook && ui !== 'final' && ui !== 'loading' && !inSo && <PauseButton onPress={pause} />}
       {inSo && soView && <PenTally view={soView} rivalName={rivalShown} />}
       {pop && (
         <div key={pop.id} className={'hg2-pop ' + pop.tone} role="status">
@@ -1196,6 +1250,7 @@ export function Soccer2({
                 onPointerMove={sl.act === 'shoot' ? (e) => shootDrag(e.pointerId, e.clientX, e.clientY) : undefined}
                 onPointerUp={(e) => slotUp(id, sl, e)}
                 onPointerCancel={() => slotCancel(id, sl)}
+                onClick={() => slotClick(sl)}
                 onLostPointerCapture={(e) => slotUp(id, sl, e)}
               >
                 <span className="sc2-ctl-label">{bend ? <Arrow dir={bendK} /> : sl.label}</span>
@@ -1217,14 +1272,14 @@ export function Soccer2({
       )}
       {ui === 'final' && (
         <div className="fg-final hg2-final sc2-final" role="status">
-          <span className="eyebrow">{soRef.current ? 'Penalties' : 'Your attacks'}</span>
+          <span className="eyebrow">{left.current === 'forfeit' || left.current === 'quit' ? 'Forfeit · ' + rivalShown + ' wins' : left.current === 'them' ? rivalShown + ' forfeits · you win' : soRef.current ? 'Penalties' : 'Your attacks'}</span>
           <b className="num">{soRef.current && soView ? soView.us + '–' + soView.them : match.goals}</b>
           {match.ends.length > 0 && <small>{match.ends.join(' · ')}</small>}
           {soRef.current && <small className="sc2-pens">{soRef.current.winner === 'us' ? 'YOU WIN THE SHOOTOUT' : 'YOU LOSE THE SHOOTOUT'}</small>}
           {rival && !rival.done && !soRef.current && <WaitLine rival={rival} unit="attack" total={total} />}
         </div>
       )}
-      {paused && <PauseSheet online={online} rivalName={rivalShown} quitNote={quitNote} onResume={resume} onQuit={onQuit ? () => leave('quit') : undefined} onForfeit={onForfeit ? () => leave('forfeit') : undefined} />}
+      {paused && <PauseSheet online={online} rivalName={rivalShown} quitNote={quitNote} onResume={resume} onQuit={onQuit && canLeave ? () => leave('quit') : undefined} onForfeit={onForfeit && canLeave ? () => leave('forfeit') : undefined} />}
       {ui === 'loading' && <div className="fg-loading">Walking out…</div>}
     </div>,
     document.body

@@ -1,6 +1,6 @@
 // Soccer in the app, end to end in Chromium (Claude, 2026-11-01). Needs the dev server (the local
 // relay runs in this process):
-//   PS_QA_URL=http://localhost:5193/ node scripts/qa/soccer-app.mjs [all|switch|draft|arcade|ut|widths]
+//   PS_QA_URL=http://localhost:5193/ node scripts/qa/soccer-app.mjs [all|switch|draft|arcade|ut|quit|widths]
 // - switch: an NBA player switches to SOCCER on Home (the reload model), the other sports' saves untouched
 // - draft:  a Classic soccer draft (eight spots on the pitch) → the 38-game W-D-L season → the cup (simulated
 //           rounds with GameCast) → results (W-D-L, points)
@@ -252,6 +252,83 @@ if (run('ut')) {
   assert.doesNotMatch(store, /Spotlight Pack/);
   await shot(page, 'soccer-ut-store');
   noErrors(errors, 'ut');
+  await context.close();
+}
+
+// soccer-2 review fix: solo QUIT through the real hosts (ut contract B), never the lab's stub.
+// A UT Squad Battle and a draft 1 vs 1, both played (no ?autoplay, so the pause button shows), paused,
+// QUIT MATCH → QUIT: the match settles as a loss in the host (ut record l+1; the draft's vs.won false).
+async function quitMatch(page, tag) {
+  await page.locator('.sc2').waitFor({ timeout: 60000 });
+  await page.locator('.sc2-ctl.go').waitFor({ timeout: 30000 });
+  await page.locator('.sc2-ctl.go').click();
+  await wait(page, 2500);
+  await page.getByRole('button', { name: /pause/i }).first().click();
+  await wait(page, 600);
+  await shot(page, tag + '-paused');
+  const sheet = await page.locator('.sc2-sheet').innerText();
+  assert.match(sheet, /QUIT MATCH/);
+  assert.doesNotMatch(sheet, /FORFEIT/);
+  await page.getByRole('button', { name: 'QUIT MATCH' }).click();
+  await wait(page, 400);
+  await shot(page, tag + '-quit-confirm');
+  await page.getByRole('button', { name: 'QUIT', exact: true }).click();
+  return sheet;
+}
+if (run('quit')) {
+  const { page, errors, context } = await fixture(browser, 'soccer', 'Claude QA', 393, { viewport: { width: 393, height: 852 }, hasTouch: true, isMobile: true });
+  await insets(context, [59, 0, 34, 0]);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await wait(page, 2000);
+  // UT Squad Battles, rung 1
+  await page.getByRole('button', { name: /Ultimate Team:/ }).click();
+  await page.locator('.ut-tabs').waitFor({ timeout: 60000 });
+  await wait(page, 1200);
+  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')).ut.record ?? { w: 0, l: 0 });
+  await page.locator('.ut-tabs button', { hasText: 'PLAY' }).first().click();
+  await wait(page, 800);
+  await page.locator('.play-mode').filter({ hasText: 'SQUAD BATTLES' }).first().click();
+  await wait(page, 1200);
+  await page.getByRole('button', { name: /^Rung 1:/ }).click();
+  await wait(page, 1500);
+  const go = page.getByRole('button', { name: /^PLAY/ }).last();
+  if (await go.isVisible().catch(() => false)) await go.click();
+  await page.locator('.vote-opt.play').waitFor({ timeout: 60000 });
+  await page.locator('.vote-opt.play').click();
+  await page.locator('.arc-kick button.shine').waitFor({ timeout: 60000 });
+  await page.locator('.arc-kick button.shine').click();
+  await quitMatch(page, 'soccer-quit-ut');
+  await page.getByRole('heading', { name: /WIN|LOSS/, exact: true }).waitFor({ timeout: 30000 });
+  const head = await page.getByRole('heading', { name: /WIN|LOSS/, exact: true }).innerText();
+  await wait(page, 1500);
+  await shot(page, 'soccer-quit-ut-result');
+  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')).ut.record);
+  assert.equal(head, 'LOSS');
+  assert.equal(after.l, (before.l ?? 0) + 1);
+  assert.equal(after.w, before.w ?? 0);
+  report.quitUt = { head, before, after };
+  // the draft: a 1 vs 1 against the AI, played
+  await page.goto(page.url().split('#')[0], { waitUntil: 'domcontentloaded' });
+  await wait(page, 2000);
+  const back = page.getByRole('button', { name: /Back|HOME/ }).first();
+  if (!(await page.locator('.playbar').count()) && (await back.isVisible().catch(() => false))) await back.click();
+  await page.getByRole('button', { name: /Head to Head|1 vs 1/i }).first().click();
+  await page.locator('.playbar button').first().click();
+  await page.getByRole('button', { name: /PLAY THE AI NOW/ }).click({ timeout: 20000 });
+  await wait(page, 3000);
+  await draft(page, 'soccer-quit-1v1');
+  await page.locator('.arc-kick button.shine').waitFor({ timeout: 60000 });
+  await page.locator('.arc-kick button.shine').click();
+  await quitMatch(page, 'soccer-quit-1v1');
+  await page.locator('.vs-head').waitFor({ timeout: 30000 });
+  await wait(page, 1500);
+  await shot(page, 'soccer-quit-1v1-result');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')));
+  const last = saved.history[saved.history.length - 1];
+  assert.equal(last.mode, '1v1');
+  assert.equal(last.vs.won, false);
+  report.quitDraft = { won: last.vs.won, playoff: last.playoff };
+  noErrors(errors, 'quit');
   await context.close();
 }
 

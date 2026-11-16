@@ -30,7 +30,7 @@ export function PauseSheet({ online, rivalName, quitNote = 'It counts as a loss.
       <div className="sc2-sheet" role="dialog" aria-modal="true" aria-labelledby="sc2-sheet-title">
         {view === 'main' && (
           <>
-            <span className="sc2-sheet-eyebrow">{online ? 'Online · ' + rivalName : 'Paused'}</span>
+            <span className="sc2-sheet-eyebrow">{(online ? 'Online · ' : 'Solo · ') + rivalName}</span>
             <h2 id="sc2-sheet-title">PAUSED</h2>
             {online && <p className="sc2-sheet-note">Your attacks wait for you. {rivalName} plays on.</p>}
             <button type="button" ref={first} className="sc2-sheet-btn primary" onClick={onResume}>

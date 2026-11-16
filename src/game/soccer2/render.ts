@@ -1276,33 +1276,38 @@ export function tagBox(s: string, x: number, y: number, W: number): { x: number;
  * The label pass (V-3, Claude 2026-11-16, soccer-2): tags that would print over each other are
  * stacked. The most important keeps its place; each other one moves up just clear of whatever it
  * meets (down instead if that would leave the top of the screen), so "FREE KICK" over the meter and
- * "BEND" over the ball read as two words, never "FBENDICK". Pure, for hud-layout.test.
+ * "BEND" over the ball read as two words, never "FBENDICK". The keep-outs (the toast line and the
+ * cluster's buttons, soccer-2 fix) are walked the same way: a tag goes above them first, and below
+ * only when there is no room above, so it never lands under a DOM button. Pure, for hud-layout.test.
  */
 export function layoutLabels(tags: readonly Tag[], W: number, H: number, keepOut: readonly { x: number; y: number; w: number; h: number }[] = []): Tag[] {
   type Box = ReturnType<typeof tagBox>;
   const placed: { t: Tag | null; b: Box }[] = keepOut.map((b) => ({ t: null, b }));
   const meets = (p: Box, q: Box) => p.x < q.x + q.w + 1 && q.x < p.x + p.w + 1 && p.y < q.y + q.h + 1 && q.y < p.y + p.h + 1;
+  const hitAt = (t: Tag, y: number) => {
+    const b = tagBox(t.s, t.x, y, W);
+    return placed.find((p) => meets(b, p.b));
+  };
   const order = tags.map((t, i) => ({ t, i })).sort((p, q) => q.t.prio - p.t.prio || p.i - q.i);
   for (const { t } of order) {
-    let y = t.y;
-    let up = true;
-    for (let n = 0; n < 24; n++) {
-      const b = tagBox(t.s, t.x, y, W);
-      const hit = placed.find((p) => meets(b, p.b));
-      if (!hit) break;
-      // a keep-out band (the toast line): the tag drops just below it (under a man's feet it hides nothing),
-      // or goes above it when there's no room below
-      if (!hit.t) up = hit.b.y + hit.b.h + 2 + 16 > H;
-      const yUp = hit.b.y - 17 + 3;
-      if (up && yUp >= 3) y = yUp;
-      else {
-        up = false;
-        y = hit.b.y + hit.b.h + 2 + 3;
+    let y: number | null = null;
+    // up: just above whatever it meets, until clear (or off the top)
+    for (let yu = t.y, n = 0; n < 24 && yu >= 3; n++) {
+      const hit = hitAt(t, yu);
+      if (!hit) {
+        y = yu;
+        break;
       }
+      yu = hit.b.y - 17 + 3;
     }
-    y = Math.max(3, Math.min(H - 13, y));
-    const t2 = { ...t, y };
-    placed.push({ t: t2, b: tagBox(t.s, t.x, y, W) });
+    // no room above: down, just below whatever it meets
+    for (let yd = t.y, n = 0; y === null && n < 24 && yd <= H - 13; n++) {
+      const hit = hitAt(t, yd);
+      if (!hit) y = yd;
+      else yd = hit.b.y + hit.b.h + 2 + 3;
+    }
+    const t2 = { ...t, y: Math.max(3, Math.min(H - 13, y ?? t.y)) };
+    placed.push({ t: t2, b: tagBox(t.s, t.x, t2.y, W) });
   }
   return placed.flatMap((p) => (p.t ? [p.t] : []));
 }

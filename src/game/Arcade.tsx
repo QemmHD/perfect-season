@@ -12,7 +12,7 @@ import type { BotLevel, Lineup, Player } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { type Attrs, loadAttrs } from './attrs';
 import { aiDrives2, aiDrivesOf, Football2 } from './football2/Football2';
-import { type RivalLive, wireOf } from './progress';
+import { awarded, canForfeit, type RivalLive, wireOf } from './progress';
 import { WaitLine } from './Wait';
 import { DRIVES } from './football2/drive';
 import { offenseOf } from './football2/squad';
@@ -283,7 +283,9 @@ export function Arcade({
     if (sent.current || !us || !them) return;
     if (level && !pens) return;
     sent.current = true;
-    window.setTimeout(() => onFinish(us, them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined, forfeit ?? undefined), level ? 2600 : 1600);
+    // a forfeit decides the match, whatever the score (soccer-2 fix): football's rule, 3-0 to the side left standing
+    const [u, t] = forfeit ? awarded(us, them, forfeit) : [us, them];
+    window.setTimeout(() => onFinish(u, t, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined, forfeit ?? undefined), level ? 2600 : 1600);
   }, [us, them, pens]);
 
   const progress = (p: Progress) => {
@@ -292,18 +294,25 @@ export function Arcade({
     onProgress(wireOf(p));
   };
   // soccer, online: FORFEIT from the pause sheet (confirmed there): what was played, padded with 'FF' to TOTAL
+  // (refused once every attack is in: nothing is left to pad, so the other phone could never see it)
   const forfeitNow = (p: Progress) => {
-    if (sent.current || forfeit) return;
+    if (sent.current || forfeit || mine?.done || !canForfeit(p, TOTAL)) return;
     const ends = p.ends.slice(0, TOTAL);
     while (ends.length < TOTAL) ends.push('FF');
     setForfeit('us');
     progress({ ...p, ends, drive: TOTAL, done: true, forfeit: true });
   };
   // soccer, solo: QUIT from the pause sheet (confirmed there): the host decides what a quit means (ut contract B)
+  // A quit is a forfeit: the AI's attacks through the ones you played, and football's 3-0 award (soccer-2 fix)
   const quitNow = (p: Progress) => {
     if (sent.current || !ai || !onQuit) return;
     sent.current = true;
-    onQuit(p, ai);
+    const n = Math.min(TOTAL, p.ends.length);
+    const ends = p.ends.slice(0, TOTAL);
+    while (ends.length < TOTAL) ends.push('FF');
+    const so: Progress = { ...ai, score: pointsThrough(ai, n), drive: n, done: true, ends: ai.ends.slice(0, n) };
+    const [u, t] = awarded({ ...p, ends, drive: TOTAL, done: true, forfeit: true }, so, 'us');
+    onQuit(u, t);
   };
 
   // sim: the autopilot plays your drives at a middling level
@@ -481,7 +490,7 @@ export function Arcade({
         rivalName={rivalName}
         seed={seed}
         defIQ={defenseIQ}
-        rival={shown}
+        rival={shown && rivalFF ? { ...shown, forfeit: true } : shown}
         kits={k}
         autoplayHook={autoplay}
         fixedShootout={online && agreed ? { first: agreed.first, scored: agreed.scored } : undefined}

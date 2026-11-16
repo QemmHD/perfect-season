@@ -281,7 +281,54 @@ Also run and green after the change (393 sat 59 and 320): the older lab parts `p
 **Not done here, and why:**
 - The **two-phone forfeit in a browser** (two contexts on the in-process relay through a whole online soccer draft) is not scripted yet: soccer-app.mjs has no online flow. The forfeit path is covered by `forfeit.test.ts` and the lab's sheet; the two-phone run is a follow-up for soccer-10's gate.
 - **CONTROLS toggles** (`autoSwitch`, `buttonsOnly`) wait for the features they switch (above).
-- **The hosts** (`ut/Match.tsx`, `App.tsx`) don't pass `onQuit` yet, and they settle on score, not the 6th `forfeit` argument: hand-offs below. Until then QUIT shows only in hosts that pass `onQuit` (the lab), and a forfeit win depends on the hosts reading `forfeit`.
+- ~~**The hosts** (`ut/Match.tsx`, `App.tsx`) don't pass `onQuit` yet, and they settle on score, not the 6th `forfeit` argument.~~ Done in the review fixes below.
+
+### soccer-2 review fixes (2026-11-16)
+
+An independent review of `c239663..d861656` found seven issues. All are fixed on the current HEAD (after soccer-3).
+
+- **(high) A forfeit did not decide the match.** Both hosts settled on the score, so a forfeiter who led (2–0 after three attacks) was recorded as the winner on both phones, and a level forfeit fell to the rating coin flip.
+  - **Now:** a forfeit decides it on both sides of the wire.
+  - `progress.ts` `awarded(us, them, by)` applies football's rule: the side that forfeits loses **3–0**, or by the score as played when that was already worse for it. Arcade applies it before `onFinish` on both phones, so even a host that ignores the 6th argument records the right winner.
+  - Both hosts also read the 6th argument:
+    - `ut/Match.tsx`: `finish(…, ff)` gives `d = { won: ff === 'them', tiebreak: false }`.
+    - `App.tsx` (the draft play-out): `arcade.forfeit` decides `vsWon`. A rival forfeit records `online.forfeit: 'them'` ("… left"); your own records `'you'` (the field's existing type).
+- **(medium) FORFEIT during an online shootout** (all 7 ends in, so nothing could be padded and the phones could disagree).
+  - `canForfeit(p, TOTAL)` refuses once every attack is in. Arcade's `forfeitNow` goes through it, and also refuses once `mine.done`.
+  - Soccer2 offers QUIT/FORFEIT only while `canLeave` (`!match.over && !shootout && !left`), and `leave()` refuses the same states.
+  - The pause button is hidden in a shootout, where it was visible but did nothing.
+- **(medium) A false "ALL SQUARE · PENALTIES" after a forfeit** (on the phone that left, and on the phone that received a level forfeit).
+  - `leave()` sets a `left` ref. `endMatch`'s shootout branch, the level-score effect and `startShootout` all return when it is set.
+  - Arcade passes `rival.forfeit` (an explicit `'FF'` on the rival's record) through `RivalLive`. On the receiving phone the match stops at once with "THEY FORFEIT · YOU WIN" and never starts penalties.
+  - The final card says "Forfeit · <rival> wins" or "<rival> forfeits · you win".
+- **(medium) Solo QUIT reached only the lab.**
+  - Both real hosts now pass `onQuit`: ut `finish(us, them, 'played', undefined, 'us')`, and the draft `finish(…, { forfeit: 'us' })`.
+  - Arcade's `quitNow` sends the AI's attacks through the ones you played (not all 7), and the same 3–0 award. So a quit always settles as a loss that ut's cup/league validators accept (they reject `won: false` with `us > them`).
+  - Squad Battles therefore records a quit as a loss rather than "no result" (§5.2 said leave with no result). The loss reward (30 coins, 40 XP) is less than the existing instant SIM gives, so a quit cannot be farmed. ut-4 may refine this per mode.
+- **(low) Tags pushed down into the cluster.**
+  - `layoutLabels` walks every keep-out like a tag: above first, below only when there is no room above.
+  - Soccer2 passes the toast/plates and every control (A–D, the stick ghost, the bug, the pause button) as keep-outs.
+  - Those rects come from `readFrame` (every 30 frames, after each layout change of the toast/plates/cluster/frame, and on `animationend`), never per frame. The per-frame `querySelector`/`getBoundingClientRect` pair is gone.
+- **(low) C4 margin.**
+  - **Not changed in physics:** the wind-up multiplier is exactly 0.85 (`engine.ts human()`). Raising it would change the autopilot's runs (`human()` also drives the pilot) and re-base golden for a feel tweak.
+  - The criterion is now stated as measured: **≥ 0.85 × sprint top speed at equal stamina** (raw 0.843 because 0.3 s more sprinting drains stamina 0.78 → 0.71; normalised 0.850 on every preset, which is the multiplier itself, not noise).
+  - The plan's acceptance line (C4, §4 and §8) should read the same. `docs/studio-overhaul/soccer-plan.md` has a large uncommitted revision in this worktree that is not mine, so I left that file alone: a follow-up for the planner.
+- **(low) Polish:**
+  - The sheet's eyebrow is "Solo · <rival>" (no more "PAUSED / PAUSED").
+  - THRU's sub-label is "LOFT" (it filled the 44–48 px dome).
+  - Every cluster button has an `onClick` fallback for assistive tech and keyboard Enter: kick off, pass, through ball, cross, short and bend. It is ignored within 1 s of a pointer down or up, so a touch never fires twice. SHOOT needs the meter, so its keyboard route stays Space.
+
+**Re-checked:**
+- **The real hosts, isolated** (`scripts/qa/soccer-app.mjs quit`, new; 393×852 with insets 59/34, `?ns=inspect&relay=ws://localhost:7777`, live hosts aborted, 11 blocked Supabase requests and 0 reached):
+  - UT Squad Battles rung 1, played, paused: the sheet shows QUIT MATCH and no FORFEIT. QUIT → result **LOSS 0–3**, `ut.record` l 0 → 1, w unchanged.
+  - Draft 1 vs 1 against the AI, played, QUIT → **YOU LOST 0–3**, `history[-1].vs.won === false`.
+  - Screenshots are in `O/shots/soccer/soccer-2-fix/`, and I looked at them.
+- **`soccer-lab.mjs layout`** on all presets: cluster positions exact, text spill none, toast over the goal 0/121, pause holds `a.t`, the stub QUIT, C4 ratio 0.850 (raw 0.843).
+- **Tests:**
+  - `forfeit.test.ts` +3: a leading forfeiter loses 0–3 on both phones, a level forfeit is never a coin flip, worse than 3–0 keeps the score, a forfeit after 7 ends is refused, Soccer2's `canLeave`/no-penalties guards, and both hosts' wiring.
+  - `hud-layout.test.ts` +1: 300 crowds per preset around the toast line and over D, with no tag under a control and a tag that meets the toast going above it.
+- **Suite:** `PS_SPORT=soccer npx vitest run soccer sport-branches` (heavy.sh): 19 files, **168/168** (137 s), golden unchanged, agreement green. `npm run typecheck` clean.
+- **Not done:** the two-phone online forfeit in a browser (two contexts on the local relay) is still unscripted (soccer-app.mjs has no online flow); it stays a soccer-10 gate item. The forfeit decision is covered by `forfeit.test.ts` on both phones' sides.
 
 ## soccer-3 · Camera at 34 m, the action-safe box, edge arrows, the pitch, render juice, goal moments and Clutch staging
 
@@ -527,6 +574,10 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 | `src/game/Arcade.tsx` | nba/nfl shared | soccer-2 (marked "merge: nba-7/nfl C1"): `'FF': 0` in the soccer `POINTS`; the `onQuit?(us, them)` prop (ut contract B) passed to Soccer2 offline as `quitNow`; the online forfeit block (`forfeit` state, `rivalFF` from an explicit `'FF'` end, `forfeitNow` padding to TOTAL, `us`/`them` when a side forfeits, no penalties after a forfeit); `onFinish`'s optional 6th `forfeit: 'us' \| 'them'`; `progress()` sends `wireOf(p)` (all sports: the same five fields as before) (~40 lines). | soccer-2 |
 | `src/game/progress.ts` | shared | soccer-2 (marked merge): `Progress.forfeit?` and `wireOf(p)` (+14 lines). | soccer-2 |
 | `src/ut/Match.tsx` (`END_LABEL`, soccer) | ut shared | `FF: 'FF'` (1 line). | soccer-2 |
+| `src/ut/Match.tsx` (`finish`, the `<Arcade>` props) | ut shared | soccer-2 review fix: `finish(…, ff?)` decides a forfeit (`won: ff === 'them'`); `onFinish` passes the 6th argument; `onQuit={(us, them) => finish(us, them, 'played', undefined, 'us')}` (ut contract B) (~6 lines). | soccer-2 fix |
+| `src/App.tsx` (draft `finish`, the `<Arcade>` props) | ut/lead shared | soccer-2 review fix: `arcade.forfeit?` decides `vsWon`; a rival forfeit is recorded like a rival who left, your own as `online.forfeit: 'you'`; `onFinish` passes `forfeit: ff`; `onQuit` settles a solo quit as a loss (~6 lines). | soccer-2 fix |
+| `src/game/progress.ts` | shared | soccer-2 review fix: `awarded()` (football's 3–0 forfeit rule), `canForfeit()`, `RivalLive.forfeit?` (+22 lines, additive). | soccer-2 fix |
+| `src/game/Arcade.tsx` | nba/nfl shared | soccer-2 review fix: `awarded()` before `onFinish` when a side forfeited; `forfeitNow` refused through `canForfeit`; `quitNow` sends the AI's attacks through the ones played and the award; Soccer2's `rival` carries `forfeit` (~12 lines). | soccer-2 fix |
 | `src/lib/sound.ts` | soccer owns the soccer crowd wiring; V2 F.1 gives soccer the PERFECT chime | `sfx.perfect`, `sfx.ringTick`, `sfx.post` and their constants (`PERFECT_ROOT`, `PERFECT_MAX_STEP`, `perfectStep`, `RING_TICK`): additive, about 40 lines, nothing existing changed. Tested in the new `src/lib/sound-perfect.test.ts` (default suite). | soccer-1 |
 | `src/game/pixel/pitch.ts` | players | `onLine` is now exported (one word) so soccer's `pitchTex` draws the same markings; `pitchTexture` there is no longer used by soccer (players may adopt `PITCH`/`pitchTex` or delete it). | soccer-3 |
 | `src/game/soccer2/render.ts` players section (`sprite()`) | players (shared file) | Two hooks: the sprite's look-down angle comes from `tiltAt(y)` (≤ `SPRITE_TILT` 0.6, the camera's) instead of `min(0.9, pitchAt)`, and two counters (`stats.sprites`, `stats.stale`) for the stale-draw budget. The size passed in is the camera's (`spriteScale`). | soccer-3 |
@@ -534,6 +585,8 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 ## Protocol
 
 **Protocol bump needed: soccer draft 2 → 3, UT 2 → 3, because** soccer-1 changes how attacks end and therefore the AI simulations both phones compute: R-1 (a shot or parry that dies short is a loose ball and the clock runs) and R-2 (parries go away from the goal line; corners off a defender or a parry, goal kicks and quick throw-ins played inside the attack). The golden hash was re-based for R-2 (reason in `golden.test.ts`); both phones still agree (agreement tests green). One bump covers every later soccer task too (V2 F.3); the lead does it at integration. NBA and NFL are unaffected: the only shared change is three new synthesized sounds in `sound.ts`.
+
+**soccer-2 review fix: rides the same bump.** A forfeit now decides the result (3–0 to the side left standing) instead of the score at the moment of the forfeit: that changes how a soccer online result is decided, so old and new soccer clients must not meet (soccer draft 2 → 3, UT 2 → 3, already needed). NBA/NFL never set `forfeit`, so their results are unchanged.
 
 **soccer-2: no bump of its own.** The controls, HUD, pause and the human-only lofted through ball change no AI simulation (golden unchanged, agreement green). `'FF'` on the wire is new to soccer's online match and rides the same soccer bump (draft 2 → 3, UT 2 → 3): an old client would not recognise a forfeit and would wait for the AI to take over instead.
 
@@ -545,7 +598,7 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 - **shell (soccer-3):** soccer dispatches `ps:arena-ready` (`window`, `detail: { sport: 'soccer' }`) once per match after the first frame with the pitch and players.
 - **nba (soccer-3):** the hidden `.sc2-safe` probe reads the action-safe box from the tokens (`--safe-t`, `--safe-b`); at merge it reads yours.
 
-- **ut (soccer-2):** pass `onQuit(us, them)` (and `quitNote` if the mode's note differs from "It counts as a loss.") to `<Arcade>` in `ut/Match.tsx`, and read `onFinish`'s 6th argument `forfeit` (`'them'` = a win however the score stood); add `'FF'` to the soccer letters in `match-debrief.ts`. **lead / ut (App.tsx draft host):** the same two for the draft play-out.
+- **ut (soccer-2):** ~~pass `onQuit` and read the 6th `forfeit` argument~~ (done by soccer's review fix, a few lines in `ut/Match.tsx` and `App.tsx`, listed above; ut-4 may refine what a quit means per mode, e.g. Squad Battles "no result", and pass a `quitNote`). Still yours: add `'FF'` to the soccer letters in `match-debrief.ts`.
 - **nba / nfl:** soccer's `Arcade.tsx` hunks are marked "merge"; keep one forfeit block and one `wireOf` strip for all three sports. Soccer's stand-ins use nba's names (`stickGeom`, `stickOut`, `STICK_IDLE`…); soccer adds sprint-off hysteresis (1.0×) via `stickOut(s, g, prev)`, which the V2 contract asks for.
 - **players:** `Body.passKind: 'loftedThrough'` now occurs (THRU held): the lofted kick clip.
 
