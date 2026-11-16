@@ -15,7 +15,7 @@ import { FINALE_KIND, promoCards } from './live-cards';
 import { fill, type Odds, type PackDef } from './packs';
 import type { Pool } from './pool';
 import { fcToDisplay } from './fc-scale';
-import { boosted, boostOf } from './flash';
+import { boosted, boostOf } from './boost';
 import { weekOf } from './sbc';
 import type { UtState } from './state';
 import type { RatedCard, UtSport } from './types';

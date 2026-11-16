@@ -375,7 +375,7 @@
      "d": "2026-11-27",
      "windows": ["09:00","12:00","15:00","18:00","21:00"],
      "hours": 2,
-     "offers": ["jumbo-premium@-30%","elite-gold@-30%","live:s2-feast-week@-20%","scout-choice@-30%","standout-guarantee@-25%"],
+     "offers": ["jumbo-premium@-30%","elite-gold@-30%","live:s2-feast-week@-20%","scout-choice@-20%","standout-guarantee@-25%"],
      "gift": {"pack":"gold"}
     }
    ],
@@ -968,7 +968,7 @@
     {"id":"live:s5-frenzy","tpl":"program","name":"Free Agent Frenzy Pack","start":"2027-03-12","end":"2027-03-25"},
     {"id":"live-plus:s5-frenzy","tpl":"guarantee","name":"Free Agent Frenzy Guarantee","start":"2027-03-12","end":"2027-03-25"}
    ],
-   "flash": [{"id":"s5-market","name":"Market Frenzy","d":"2027-03-11","windows":["16:00"],"hours":24,"offers":["scout-market 24 cards (instead of 12)","scout-choice@-30%"]}],
+   "flash": [{"id":"s5-market","name":"Market Frenzy","d":"2027-03-11","windows":["16:00"],"hours":24,"offers":["scout-market 24 cards (instead of 12)","scout-choice@-20%"]}],
    "checkIn": {"final":"live-pick:s5-desert-stars:3"},
    "programPick": "live-pick:s5-desert-stars:3",
    "pass": {"levels":30,"top":"Desert All-Stars / Franchise Tag pick (1 of 3)"},
@@ -1355,7 +1355,7 @@
     {"id":"live:s7-dream-teams","tpl":"program","name":"Dream Teams Pack","start":"2027-05-14","end":"2027-06-17","price":6000,"programOdds":0.2},
     {"id":"live-plus:s7-dream-teams","tpl":"guarantee","name":"Dream Teams Guarantee","start":"2027-05-14","end":"2027-06-17","price":15000}
    ],
-   "flash": [{"id":"s7-draft-clock","name":"On the Clock","d":"2027-04-29","windows":["20:00","21:00","22:00"],"hours":1,"offers":["live:s7-draft-night@-20%","scout-choice@-30%","elite-gold@-30%"]}],
+   "flash": [{"id":"s7-draft-clock","name":"On the Clock","d":"2027-04-29","windows":["20:00","21:00","22:00"],"hours":1,"offers":["live:s7-draft-night@-20%","scout-choice@-20%","elite-gold@-30%"]}],
    "checkIn": {"final":"live-pick:s7-dream-teams:3"},
    "programPick": "live-pick:s7-dream-teams:3",
    "pass": {"levels":30,"top":"Decade Dream Teams pick (1 of 3, 90-93)"},
@@ -1497,7 +1497,7 @@
     {"id":"live-plus:s8-lottery","tpl":"guarantee","name":{"nba":"Lottery Night Guarantee","nfl":"Minicamp Standouts Guarantee"},"start":"2027-06-22","end":"2027-07-04"}
    ],
    "flash": [
-    {"id":"s8-midnight-market","name":"Midnight Market","d":"2027-06-30","windows":["18:00"],"hours":24,"offers":["scout-market 24 cards","scout-choice@-30%"]},
+    {"id":"s8-midnight-market","name":"Midnight Market","d":"2027-06-30","windows":["18:00"],"hours":24,"offers":["scout-market 24 cards","scout-choice@-20%"]},
     {"id":"s8-fireworks","name":"Fireworks Flash","d":"2027-07-04","windows":["21:00"],"hours":2,"offers":["jumbo-premium@-30%","live:s8-lottery@-25%"]}
    ],
    "checkIn": {"final":"live-pick:s8-ring-night:3"},

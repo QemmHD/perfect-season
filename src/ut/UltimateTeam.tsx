@@ -619,7 +619,9 @@ export default function UltimateTeam(props: {
       );
   };
 
-  const buyLimited = (kind: LimitedKind, price: number) => {
+  // Claude (packs-3 fix): `openKind` is what opens (a Club Collection buy's frozen `studio:` recipe), while
+  // the limit is recorded under `kind`
+  const buyLimited = (kind: LimitedKind, price: number, openKind: string = kind) => {
     const at = Date.now();
     if (buysLeft(ut, kind, day, at) <= 0) {
       sfx.nope();
@@ -642,9 +644,9 @@ export default function UltimateTeam(props: {
     }
     sfx.coin();
     openNow(
-      kind,
+      openKind,
       newId(),
-      packName(SPORT, kind),
+      packName(SPORT, openKind),
       (p) => ({
         ...p,
         coins: p.coins - price,
@@ -993,7 +995,8 @@ export default function UltimateTeam(props: {
     const pay = (p: typeof profile) => ({ ...p, coins: p.coins - d.price, ut: recordFlash(p.ut, key) });
     sfx.coin();
     if (d.kind === 'scout') {
-      const id = 'scout:' + newId();
+      // Claude (packs-3 fix): the sale price rides in the id, so the Pack Tracker logs what was paid
+      const id = 'scout:flash:' + d.price + ':' + newId();
       const pick = pickFor(pool, 'scout', id, week, at);
       update((p) => (ok(p) && !picksFull(p.ut) ? { ...pay(p), ut: addPick(pay(p).ut, pick) } : p));
       return setPickOpen(id);
@@ -1021,7 +1024,7 @@ export default function UltimateTeam(props: {
     if (kind === 'daily') return claimDailyDrop();
     if (kind === 'scout') return buyScout(packDefs(SPORT).scout.price);
     const limited = pa.limitOf(kind);
-    if (limited) return buyLimited(limited, packDefs(SPORT)[limited].price);
+    if (limited) return buyLimited(limited, packDefs(SPORT)[limited].price, kind);
     if (profile.coins < price) {
       sfx.nope();
       onToast(
@@ -2165,8 +2168,14 @@ function objectiveDeckReady(ut: UtState, day: string): number {
   ).length;
 }
 
+/** Claude (packs-3 fix): a flash-sale Scout's Choice's id is `scout:flash:<price>:<id>`: the coins paid. */
+const flashPickPrice = (id: string): number | null => {
+  const m = /^scout:flash:(\d+):/.exec(id);
+  return m ? Number(m[1]) : null;
+};
 /** Claude: how the Pack Tracker records a kept pick: its kind, the coins a Store-bought Scout's
- * Choice cost (its id is `scout:<id>`; reward scout picks keep their pack's id), and its source. */
+ * Choice cost (its id is `scout:<id>`, a flash sale's `scout:flash:<price>:<id>`; reward scout picks
+ * keep their pack's id), and its source. */
 function pickMeta(pick: PickState): {
   kind: string;
   price: number;
@@ -2183,7 +2192,7 @@ function pickMeta(pick: PickState): {
           : sourceOfPending(pick.id);
   return {
     kind: pick.kind,
-    price: bought ? packDefs(SPORT).scout.price : 0,
+    price: bought ? flashPickPrice(pick.id) ?? packDefs(SPORT).scout.price : 0,
     source,
   };
 }

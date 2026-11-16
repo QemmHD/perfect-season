@@ -503,8 +503,9 @@ describe('pack prices after the ratings rework (' + SPORT + ')', () => {
     const { positionChoices } = await import('./packs');
     const defs = packDefs(SPORT);
     for (const d of Object.values(defs)) {
-      // spotlight is registry-rolled, scout a pick, daily free, lightning a 25% discount by design
-      if (['spotlight', 'scout', 'daily', 'lightning'].includes(d.kind)) continue;
+      // spotlight is registry-rolled, scout a pick, daily free, lightning a 25% discount by design;
+      // Captains and Dynasty are chase items (each Standout at the Standout Guarantee's price: the exploits suite)
+      if (['spotlight', 'scout', 'daily', 'lightning', 'captains', 'dynasty'].includes(d.kind)) continue;
       let v = 0;
       const N = 300;
       for (let i = 0; i < N; i++) v += openPack(pool, d.kind === 'position' ? 'position:' + positionChoices(SPORT)[i % positionChoices(SPORT).length].key : d.kind, 'ev' + i, W).reduce((a, c) => a + quickSellValue(c), 0);

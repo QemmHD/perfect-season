@@ -2,7 +2,8 @@
 import { SPORT } from '../engine/sport';
 import { fakeCard } from './fake.test-util';
 import { getPool, type Pool } from './pool';
-import { autoFill, checkReq, checkSbc, type Req, rewardCard, rewardText, type Sbc, sbcsFor, sbcValue, teamNeed, UPGRADE_TUNE, weekOf } from './sbc';
+import { autoFill, checkReq, checkSbc, type Req, rewardCard, rewardText, type Sbc, sbcsFor, teamNeed, UPGRADE_TUNE, weekOf } from './sbc';
+import { sbcValue } from './value';
 
 const bulls96 = (n: number, ovr = 80) => Array.from({ length: n }, (_, i) => fakeCard({ pos: ['PG', 'SG', 'SF', 'PF', 'C'][i % 5], ovr, fr: 'CHI', season: 1996 }));
 

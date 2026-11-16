@@ -456,7 +456,7 @@ export function Store(props: {
               }
             />
           )}
-          {STUDIO_PACKS.some(k=>catalogOf(props.sport)[k].enabled)&&<><SectionHead title="Club Collection"/><div className="ut-shop">{STUDIO_PACKS.map(k=>item(k))}</div></>}
+          {STUDIO_PACKS.some(k=>catalogOf(props.sport)[k].enabled)&&<><SectionHead title="Club Collection"/><div className="ut-shop">{STUDIO_PACKS.map(k=>item(k,limitNote(k),left(k)?undefined:'limit'))}</div></>}
           {(() => {
             // Claude wave 3: this season's program packs (Live Calendar)
             const live = livePacksOn(props.day);
@@ -568,7 +568,7 @@ function Market(props: { pool: Pool; ut: UtState; day: string; coins: number; st
   const size = swapSize(now, props.pool.sport);
   return (
     <>
-      <p className="ut-lede">Twelve scouted base cards a day at fixed prices, the same for everyone, one of them an {fcToDisplay(83, props.pool.sport)}–{fcToDisplay(86, props.pool.sport)}. Each can be bought once; new cards at midnight Eastern.</p>
+      <p className="ut-lede">Twelve scouted base cards a day at fixed prices, the same for everyone, usually one of them an {fcToDisplay(83, props.pool.sport)}–{fcToDisplay(86, props.pool.sport)}. Each can be bought once; new cards at midnight Eastern.</p>
       <div className="ut-market">
         {items.map((it) => {
           const rc = props.pool.base.get(it.cardId);

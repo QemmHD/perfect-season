@@ -117,11 +117,16 @@ export const CONTENT_PRICES: Record<UtSport, { scout: number; elite: number; jum
   // and a pack a named flash sale discounts stays at or under 75% even at the sale price: Jumbo is sold
   // 30% off in sales, so it sits near 0.51 (NBA 3,600 → 4,200, NFL 2,700 → 3,000, soccer 3,200 → 3,300);
   // the Standout Guarantee near 0.52–0.55 so its Lightning copy (25% off) stays at 0.69–0.74.
-  nba: { scout: 650, elite: 2600, jumbo: 4200, standout: 3000, lightning: 2250 },
-  nfl: { scout: 250, elite: 1800, jumbo: 3000, standout: 1800, lightning: 1350 },
+  // Claude (packs-3 review fixes, owner decision 4): Scout's Choice is a chase item, not a quick-sell pack.
+  // It hands out a gold 84+ (the best of three), which the cheapest coin route (Premiums) pays
+  // routeCost(84) for: NBA 13,022, NFL 4,570, soccer 8,413. At 650 / 250 / 500 it was the cheapest 84+ in
+  // the game (a Market 84 costs at least a quarter of its route cost). It now costs a quarter of
+  // routeCost(84) or more, also at a flash sale's 20% off (to 50 coins): 3,300 / 1,200 / 2,150 (exploits).
+  nba: { scout: 3300, elite: 2600, jumbo: 4200, standout: 3000, lightning: 2250 },
+  nfl: { scout: 1200, elite: 1800, jumbo: 3000, standout: 1800, lightning: 1350 },
   // soccer (Claude 2026-11-01): eleven starters, about 1.4 times basketball's cards a pack, each worth 0.7 as much sold
   // (packs-3: soccer's Standout Guarantee 2,600 → 2,400 returned 48%; Lightning keeps 25% off, 1,800)
-  soccer: { scout: 500, elite: 1900, jumbo: 3300, standout: 2400, lightning: 1800 },
+  soccer: { scout: 2150, elite: 1900, jumbo: 3300, standout: 2400, lightning: 1800 },
 };
 
 /**

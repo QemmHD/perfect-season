@@ -19,10 +19,10 @@ import { curveOdds, FEATURED_STANDOUT, FLOORS, GOLD_CURVE, isFloorKind, type Odd
 import type { Pool } from './pool';
 import { positionMix } from './squad';
 import { standoutProgram } from './standouts';
-import { tierOf } from './rate';
+import { TIER_CUTS, tierOf } from './rate';
 import { promoCards } from './live-cards';
 import { livePackDef, packOfKind, promoOfPack } from './live-packs';
-import { weekOf } from './sbc';
+import { type Sbc, weekOf } from './sbc';
 import type { RatedCard, Tier, UtSport } from './types';
 
 /** From this displayed overall up, a gold is valued at its route cost (basketball's 83, each sport's scale). */
@@ -179,4 +179,33 @@ export function livePackEv(pool: Pool, kind: string, day: string, at?: number): 
   const def = livePackDef(pool.sport, p, at);
   const program: [RatedCard[], number][] = [[promoCards(pool, promoOfPack(kind), day), def.odds], ...def.extra.map(([id, o]): [RatedCard[], number] => [promoCards(pool, id, day), o])];
   return { ev: packEv(pool, def.slots, { week: weekOf(day), program }), price: def.price };
+}
+
+// ---------- the SBC value rules (Claude, packs-3; research §8.8, packs-plan D10; moved from sbc.ts) ----------
+
+/**
+ * A challenge's value out ÷ value in, at acquisition cost (D10): the reward (a pack at its Store
+ * price, a gold card at the cost of the pack route that pays the same draw, plus coins) over the
+ * cheapest cards that meet its tier, minimum and team-overall requirements. The Daily Upgrades pay
+ * 1.1–1.3 times what goes in, the repeatables 0.9–1.1 (a fair swap, never a cheap route).
+ * Null for a challenge this model doesn't price (franchise, decade or position requirements).
+ */
+export function sbcValue(s: Pick<Sbc, 'size' | 'reqs' | 'reward'>, sport: UtSport): { input: number; output: number; ratio: number; fodder: number[] } | null {
+  let tier: Tier | undefined;
+  let minOvr: number | undefined;
+  let teamOvr: number | undefined;
+  for (const r of s.reqs) {
+    if (r.k === 'tier' && r.n >= s.size) tier = r.tier;
+    else if (r.k === 'minOvr') minOvr = r.ovr;
+    else if (r.k === 'teamOvr') teamOvr = r.ovr;
+    else if (r.k !== 'tier') return null;
+  }
+  const w = s.reward;
+  if (w.standout || w.program || w.cardId || (w.card && w.card.tier !== 'gold')) return null;
+  const defs = packDefs(sport);
+  let output = w.coins ?? 0;
+  if (w.pack) output += (w.pack.startsWith('position:') ? defs.position : defs[w.pack as keyof typeof defs])?.price ?? defs.premium.price;
+  if (w.card) output += goldRewardValue(sport, Math.max(w.card.minOvr ?? 0, TIER_CUTS[sport].gold));
+  const f = cheapestFodder(sport, { size: s.size, tier, minOvr, teamOvr });
+  return { input: f.value, output, ratio: output / f.value, fodder: f.ovrs };
 }

@@ -1,5 +1,7 @@
 // Claude (packs-3, 2026-11-16): the Store's time-limited moments (research §8.2; packs-plan packs-3 items 5–6).
 //
+// (packs-3 review fixes: the Lightning windows are in lightning.ts and the boost in boost.ts, both
+// re-exported here, so the profile's first-paint modules don't load the sales.)
 //   Lightning windows   2 of the 4 weekend slots each ISO week (Sat 12–2 pm, Sat 8–10 pm, Sun 1–3 pm,
 //                       Sun 7–9 pm Eastern; live-calendar.json defaults.flashWindows), chosen by the seed
 //                       'flash:' + week, so everyone has the same two. The Lightning Standout is 25% off
@@ -12,104 +14,15 @@
 //   Program boost       from each program wave's Friday 18:00 Eastern for 48 hours, the program slot of
 //                       that promo's program packs is 1.5 times as likely, at most 60%.
 // Everything is a function of the Eastern clock and the schedule, the same on every device.
-import { hashString, rng } from '../engine/rng';
-import { addDays, cycleOf, cycleSuffix, packsOn, per, promoById, seasonsOfCycle, wavesOf } from './calendar';
-import type { CalPromoOn } from './calendar';
-import { weekOf } from './sbc';
+import { addDays, cycleOf, cycleSuffix, packsOn, seasonsOfCycle } from './calendar';
+import { easternAt, easternParts } from './lightning';
 import type { UtSport } from './types';
 
 const HOUR = 3600000;
 
-/** Eastern wall-clock parts of an instant. */
-export function easternParts(at: number): { day: string; weekday: number; hour: number; minute: number } {
-  const d = new Date(at);
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(d);
-    const g = (t: string) => parts.find((p) => p.type === t)?.value ?? '0';
-    return { day: g('year') + '-' + g('month') + '-' + g('day'), weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(g('weekday')), hour: Number(g('hour')) % 24, minute: Number(g('minute')) };
-  } catch {
-    return { day: d.toISOString().slice(0, 10), weekday: d.getUTCDay(), hour: d.getUTCHours(), minute: d.getUTCMinutes() };
-  }
-}
-
-/** The instant of an Eastern wall-clock time (EST or EDT as that moment has it). */
-export function easternAt(day: string, hour = 0, minute = 0): number {
-  const utc = Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10), hour, minute);
-  for (const off of [5, 4]) {
-    const at = utc + off * HOUR;
-    const e = easternParts(at);
-    if (e.day === day && e.hour === hour && e.minute === minute) return at;
-  }
-  return utc + 5 * HOUR;
-}
-
-/** The ISO weekday (Mon 0 … Sun 6) offset of a date from its week's Monday. */
-const mondayOf = (day: string) => {
-  const wd = new Date(day + 'T12:00:00Z').getUTCDay();
-  return addDays(day, -((wd + 6) % 7));
-};
-/** The Monday of an ISO week ("2026-W48"). */
-export function weekMonday(week: string): string {
-  const [y, w] = week.split('-W').map(Number);
-  const jan4 = new Date(Date.UTC(y, 0, 4)).toISOString().slice(0, 10);
-  return addDays(mondayOf(jan4), (w - 1) * 7);
-}
-
-// ---------- Lightning windows ----------
-
-/** The four weekend slots (days after the week's Monday, Eastern start hour), 2 hours each. */
-export const LIGHTNING_SLOTS: readonly { d: 5 | 6; h: number; label: string }[] = [
-  { d: 5, h: 12, label: 'Sat 12:00-14:00' },
-  { d: 5, h: 20, label: 'Sat 20:00-22:00' },
-  { d: 6, h: 13, label: 'Sun 13:00-15:00' },
-  { d: 6, h: 19, label: 'Sun 19:00-21:00' },
-];
-export const LIGHTNING_PER_WEEKEND = 2;
-export const LIGHTNING_LENGTH_H = 2;
-/** The Lightning Standout's discount on the Standout Guarantee. */
-export const LIGHTNING_DISCOUNT = 0.25;
-
-export interface Window {
-  /** `<Eastern day>:<start hour>`, the limit key's suffix */
-  id: string;
-  day: string;
-  hour: number;
-  start: number;
-  end: number;
-}
-
-/** A week's two Lightning windows, earliest first (seeded by 'flash:' + week). */
-export function flashWindowsOf(week: string): Window[] {
-  const rand = rng(hashString('flash:' + week));
-  const idx = [0, 1, 2, 3];
-  for (let i = idx.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [idx[i], idx[j]] = [idx[j], idx[i]];
-  }
-  const mon = weekMonday(week);
-  return idx
-    .slice(0, LIGHTNING_PER_WEEKEND)
-    .sort((a, b) => a - b)
-    .map((i) => {
-      const s = LIGHTNING_SLOTS[i];
-      const day = addDays(mon, s.d);
-      const start = easternAt(day, s.h);
-      return { id: day + ':' + s.h, day, hour: s.h, start, end: start + LIGHTNING_LENGTH_H * HOUR };
-    });
-}
-
-/** The Lightning window open at `at`, with minutes left, or null. */
-export function lightningWindow(at: number): { id: string; minutesLeft: number } | null {
-  const w = flashWindowsOf(weekOf(easternParts(at).day)).find((x) => x.start <= at && at < x.end);
-  return w ? { id: w.id, minutesLeft: Math.ceil((w.end - at) / 60000) } : null;
-}
-
-/** The next Lightning window that hasn't ended (this week's or next week's). */
-export function nextLightning(at: number): Window | null {
-  const week = weekOf(easternParts(at).day);
-  const next = weekOf(addDays(weekMonday(week), 7));
-  return [...flashWindowsOf(week), ...flashWindowsOf(next)].find((w) => w.end > at) ?? null;
-}
+// Claude (packs-3 review fixes): the Eastern clock and the Lightning windows live in lightning.ts, a
+// small module the profile's first-paint code (content-packs.ts) can load without the sales and boosts.
+export { easternAt, easternParts, flashWindowsOf, LIGHTNING_DISCOUNT, LIGHTNING_LENGTH_H, LIGHTNING_PER_WEEKEND, LIGHTNING_SLOTS, lightningWindow, nextLightning, weekMonday, type Window } from './lightning';
 
 // ---------- named season flash sales ----------
 
@@ -233,43 +146,6 @@ export function swapSize(at: number, sport: UtSport): number {
   return flashSalesAt(at, sport).find((s) => s.swapSize)?.swapSize ?? SWAP_SIZE;
 }
 
-// ---------- the Friday program boost ----------
-
-/** Program-slot odds × this during a boost, at most BOOST_CAP. */
-export const BOOST = 1.5;
-export const BOOST_CAP = 0.6;
-export const BOOST_HOURS = 48;
-
-/** The days a promo releases cards: its start, or each of its waves. */
-function releaseDays(p: CalPromoOn, sport: UtSport): string[] {
-  const w = wavesOf(p, sport);
-  return w.length ? w.map((x) => x.d) : [p.start];
-}
-
-/**
- * A promo's boost windows: from the Friday on or after each release day (within the promo's run),
- * 18:00 Eastern, for 48 hours.
- */
-export function boostWindows(promoId: string, sport: UtSport): { start: number; end: number }[] {
-  const p = promoById(promoId);
-  if (!p || !per(p.count, sport)) return [];
-  const fridays = new Set<string>();
-  for (const d of releaseDays(p, sport)) {
-    let f = d;
-    while (new Date(f + 'T12:00:00Z').getUTCDay() !== 5) f = addDays(f, 1);
-    if (f <= p.end) fridays.add(f);
-  }
-  return [...fridays].sort().map((f) => {
-    const start = easternAt(f, 18);
-    return { start, end: start + BOOST_HOURS * HOUR };
-  });
-}
-
-/** The boost on a promo's program packs at `at`: until when, or null. */
-export function boostOf(promoId: string, sport: UtSport, at: number): { until: number } | null {
-  const w = boostWindows(promoId, sport).find((x) => x.start <= at && at < x.end);
-  return w ? { until: w.end } : null;
-}
-
-/** The boosted program-slot chance. */
-export const boosted = (p: number) => Math.min(BOOST_CAP, p * BOOST);
+// Claude (packs-3 review fixes): the Friday program boost lives in boost.ts (live-packs.ts loads with the
+// profile, at first paint, and needs only the boost); re-exported here for the tests and tools.
+export { BOOST, BOOST_CAP, BOOST_HOURS, boosted, boostOf, boostWindows } from './boost';

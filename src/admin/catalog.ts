@@ -42,11 +42,15 @@ export function defaultCatalog(sport: UtSport): Catalog {
   // the price they were awarded at (snapshots).
   // Claude (packs-3, audit H2): no Club Collection pack sells a Weekly Standout for less than the Standout
   // Guarantee does (floorPrice), so Captains and Dynasty rose: NBA 2,400 → 2,500 and 4,400 → 4,800, NFL
-  // 1,000 → 1,200 and 1,900 → 2,200, soccer 1,450 → 1,700 and 2,700 → 3,200 (all inside the 45-60% band).
+  // 1,000 → 1,200 and 1,900 → 2,200, soccer 1,450 → 1,700 and 2,700 → 3,200.
+  // Claude (packs-3 review fixes, audit H2): that floor still charged a Standout only part of the Standout
+  // Guarantee's price, so Dynasty sold two for less than two Guarantees. Each Standout now costs the full
+  // Guarantee price, and Captains and Dynasty are chase items at their floor (packs.md "packs-3 review
+  // fixes"): NBA 4,300 and 8,400, NFL 2,600 and 4,900, soccer 3,200 and 6,200.
   const prices = {
-    nba: [1700, 2500, 4800],
-    nfl: [1100, 1200, 2200],
-    soccer: [1100, 1700, 3200],
+    nba: [1700, 4300, 8400],
+    nfl: [1100, 2600, 4900],
+    soccer: [1100, 3200, 6200],
   }[sport];
   STUDIO_PACKS.forEach((k, i) => {
     c[k].price = prices[i];
@@ -61,23 +65,28 @@ export function defaultCatalog(sport: UtSport): Catalog {
 /**
  * Claude (packs-3, audit H2): what one card of each recipe tier is worth in a Club Collection pack's
  * minimum price. `silver`, `gold` and `rare` are a slot's mean quick-sell value (value.ts slotQs: a silver,
- * a gold, a gold 78+); `standout` is the coins the Standout Guarantee asks for its Standout: its price less
- * its golds' quick-sell value ÷ 0.6. The pack-economy tests pin these to the live definitions.
+ * a gold, a gold 78+); `standout` is the Standout Guarantee's whole price (CONTENT_PRICES.standout), so a
+ * Club Collection pack never sells a Standout for less than the Guarantee asks for one (review fix: it was
+ * the Guarantee's price less its golds' value ÷ 0.6, NBA 1,196, NFL 428, soccer 883). The exploits suite
+ * pins these to the live definitions (the numbers live here, not imported, because packs.ts imports this
+ * module).
  */
 export const STUDIO_VALUE: Record<
   UtSport,
   Record<(typeof STUDIO_TIERS)[number], number>
 > = {
-  nba: { silver: 61, gold: 151, rare: 159, standout: 1196 },
-  nfl: { silver: 21.4, gold: 53.6, rare: 56.8, standout: 428 },
-  soccer: { silver: 42.8, gold: 89.6, rare: 93.1, standout: 883 },
+  nba: { silver: 61, gold: 151, rare: 159, standout: 3000 },
+  nfl: { silver: 21.4, gold: 53.6, rare: 56.8, standout: 1800 },
+  soccer: { silver: 42.8, gold: 89.6, rare: 93.1, standout: 2400 },
 };
 /** The share of its quick-sell value a pack's price may not go under (a pack returns at most 60%). */
 export const STUDIO_EV_MAX = 0.6;
 /**
- * The least a Club Collection pack may cost: each Standout at the Standout Guarantee's price for one,
- * the rest at their quick-sell value ÷ 0.6, rounded up to 100 coins. A live catalog priced below it still
- * loads, at this price; the Store Packs editor shows it and refuses to publish under it.
+ * The least a Club Collection pack may cost (packs-plan packs-3 item 4): each Standout at the Standout
+ * Guarantee's whole price, plus the rest at their quick-sell value ÷ 0.6, rounded up to 100 coins. A live
+ * catalog priced below it still loads, at this price; the Store Packs editor shows it and refuses to
+ * publish under it. A pack with a Standout is therefore a chase item (it returns about a quarter of its
+ * price; the 0.45–0.60 band and this floor can't both hold, packs.md); one without stays in the band.
  */
 export function floorPrice(
   sport: UtSport,

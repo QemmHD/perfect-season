@@ -9,7 +9,6 @@ import { curvePick, GOLD_CURVE, goldsOf, openPack, packDefs, packRand, quickSell
 import { decadeOf, type Pool, TIER_RANK } from './pool';
 import { onScale, TIER_CUTS } from './rate';
 import { UT_SCALE } from './ut-scale';
-import { cheapestFodder, goldRewardValue } from './value';
 import type { CardMint, RatedCard, Tier, UtSport } from './types';
 
 export type Req =
@@ -354,7 +353,7 @@ export const UPGRADE_TIMES = 2;
 /**
  * Claude (packs-3, research §8.8, packs-plan D10): each upgrade's size and requirement, per sport, on the
  * displayed scale. Tuned so the reward is worth 1.1-1.3 times the cheapest cards that meet them for a Daily
- * Upgrade, and 0.9-1.1 times for a repeatable (sbcValue; the exploits suite holds every sport to it).
+ * Upgrade, and 0.9-1.1 times for a repeatable (value.ts sbcValue; the exploits suite holds every sport to it).
  * Before, NBA's Bronze Upgrade paid 3.3 times its five cards, NFL's Silver Upgrade 6.7 times, and Golden
  * Hour turned eight 80s into an 83+ (2.2 times): a cheap route to 83+ golds. `team` is a team-overall
  * requirement, `min` an every-card minimum; `reward` the gold reward's floor. Ids and list order are unchanged.
@@ -367,8 +366,11 @@ interface Tune {
 }
 export const UPGRADE_TUNE: Record<UtSport, { bronze: Tune; silver: Tune; gold: Tune; toGold: Tune; golden: Tune; elite: Tune }> = {
   nba: { bronze: { size: 7, min: 62 }, silver: { size: 6, team: 73 }, gold: { size: 6, team: 79 }, toGold: { size: 5, team: 71 }, golden: { size: 4, team: 83, reward: 84 }, elite: { size: 5, min: 83, reward: 85 } },
-  // football's silvers sell for a third as much, so its Silver Upgrade takes golds too ("silver or better")
-  nfl: { bronze: { size: 6, team: 73 }, silver: { size: 8, team: 80 }, gold: { size: 9, min: 82 }, toGold: { size: 6, team: 70 }, golden: { size: 3, team: 83, reward: 84 }, elite: { size: 4, min: 83, reward: 85 } },
+  // football's silvers sell for a third as much. Its Silver Upgrade asked eight cards at team 80, which only
+  // golds can reach (a silver is at most 74): the packs-3 review fix keeps it a silver challenge, eleven
+  // silvers each 74+, the most silvers a challenge takes. It pays 1.52 times what goes in, above the 1.1-1.3
+  // band, because eleven silvers are worth only 660 coins against the Gold pack's 1,000 (packs.md).
+  nfl: { bronze: { size: 6, team: 73 }, silver: { size: 11, min: 74 }, gold: { size: 9, min: 82 }, toGold: { size: 6, team: 70 }, golden: { size: 3, team: 83, reward: 84 }, elite: { size: 4, min: 83, reward: 85 } },
   soccer: { bronze: { size: 5, team: 69 }, silver: { size: 7, team: 74 }, gold: { size: 8, team: 79 }, toGold: { size: 5, min: 69 }, golden: { size: 4, team: 83, reward: 84 }, elite: { size: 5, min: 83, reward: 85 } },
 };
 const WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
@@ -414,34 +416,8 @@ export function sbcsFor(pool: Pool, day: string, done: Record<string, unknown> =
   return [...dailies, ...weekly, ...upgrades];
 }
 
-// ---------- the SBC value rules (Claude, packs-3; research §8.8, packs-plan D10) ----------
-
-/**
- * A challenge's value out ÷ value in, at acquisition cost (value.ts): the reward (a pack at its Store
- * price, a gold card at the cost of the pack route that pays the same draw, plus coins) over the
- * cheapest cards that meet its tier, minimum and team-overall requirements. The Daily Upgrades pay
- * 1.1–1.3 times what goes in, the repeatables 0.9–1.1 (a fair swap, never a cheap route).
- * Null for a challenge this model doesn't price (franchise, decade or position requirements).
- */
-export function sbcValue(s: Pick<Sbc, 'size' | 'reqs' | 'reward'>, sport: UtSport): { input: number; output: number; ratio: number; fodder: number[] } | null {
-  let tier: Tier | undefined;
-  let minOvr: number | undefined;
-  let teamOvr: number | undefined;
-  for (const r of s.reqs) {
-    if (r.k === 'tier' && r.n >= s.size) tier = r.tier;
-    else if (r.k === 'minOvr') minOvr = r.ovr;
-    else if (r.k === 'teamOvr') teamOvr = r.ovr;
-    else if (r.k !== 'tier') return null;
-  }
-  const w = s.reward;
-  if (w.standout || w.program || w.cardId || (w.card && w.card.tier !== 'gold')) return null;
-  const defs = packDefs(sport);
-  let output = w.coins ?? 0;
-  if (w.pack) output += (w.pack.startsWith('position:') ? defs.position : defs[w.pack as keyof typeof defs])?.price ?? defs.premium.price;
-  if (w.card) output += goldRewardValue(sport, Math.max(w.card.minOvr ?? 0, TIER_CUTS[sport].gold));
-  const f = cheapestFodder(sport, { size: s.size, tier, minOvr, teamOvr });
-  return { input: f.value, output, ratio: output / f.value, fodder: f.ovrs };
-}
+// The SBC value rules (Claude, packs-3; research §8.8, packs-plan D10): sbcValue lives in value.ts, so the
+// coin model stays out of the first-paint bundle (this module loads with the profile; review fix).
 
 // ---------- filling a challenge from the club ----------
 

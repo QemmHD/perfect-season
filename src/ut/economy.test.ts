@@ -77,7 +77,8 @@ describe('the economy (' + SPORT + ')', () => {
       for (let i = 0; i < N; i++) back += openPack(pool, def.kind === 'position' ? 'position:' + choices[i % choices.length].key : def.kind, 'qs:' + def.kind + i).reduce((a, c) => a + quickSellValue(c), 0);
       const ratio = back / N / def.price;
       expect(ratio).toBeLessThan(0.95);
-      expect(ratio).toBeGreaterThan(0.3);
+      // Captains and Dynasty are chase items (each Standout at the Standout Guarantee's price): a fifth or more
+      expect(ratio, def.kind).toBeGreaterThan(def.kind === 'captains' || def.kind === 'dynasty' ? 0.2 : 0.3);
     }
   });
 

@@ -6,7 +6,7 @@ import { pickFor as bySport } from '../engine/sport';
 import { hashString, rng, shuffle } from '../engine/rng';
 import { easternDateKey } from '../engine/season';
 import { per, promosOn } from './calendar';
-import { lightningWindow, nextLightning } from './flash';
+import { lightningWindow, nextLightning } from './lightning';
 import { claimed, contentOf, picksFull, withClaim, withContent, type PickState } from './content-state';
 import { promoCards } from './live-cards';
 import { drawGold, ownedCardIds, packRand, SCOUT_STANDOUT } from './packs';
@@ -45,7 +45,7 @@ export const LIMITS: Record<LimitedKind, { per: 'day' | 'week' | 'window'; n: nu
  * week (Sat 12–2 pm and 8–10 pm, Sun 1–3 pm and 7–9 pm), seeded by the week, the same for everyone
  * (flash.ts). Before, every weekend had all four of Sat/Sun 12–2 pm and 8–10 pm.
  */
-export { lightningWindow } from './flash';
+export { lightningWindow } from './lightning';
 
 /** Minutes until the next Lightning window opens (0 while one is open). */
 export function minutesToLightning(at: number): number {
