@@ -1,8 +1,9 @@
 // Rule probe (studio overhaul soccer-1, ported from the 2026-11-09 audit's soccer_probe.ts, same
 // seeds): over n real-squad autopilot attacks (build, counter, wide, corner, free kick in turn) it
 // counts frozen balls (an attack on the 120 s hard stop, or a dead loose ball nobody plays for 5 s
-// of game time), attacks still going past the clock + 15 s, goals straight from a keeper's parry,
-// goals from a rebound (a parry, the woodwork or a block earlier in the attack), and the step cost.
+// of game time), attacks still going past the clock + 15 s, dead shots played on (R-1), goals
+// straight from a keeper's parry, goals from a rebound (a parry, the woodwork or a block earlier in
+// the attack), and the step cost.
 //   bash O/heavy.sh npx vite-node scripts/soccer/probe.ts [n=3000]
 import { decide, pilot } from '../../src/game/soccer2/autopilot';
 import { CLOCK, kickOff, setupAttack, step } from '../../src/game/soccer2/engine';
@@ -23,6 +24,10 @@ let goals = 0;
 let parryGoals = 0;
 let reboundGoals = 0;
 let parries = 0;
+let deadShots = 0;
+let deadGoals = 0;
+/** each dead shot: what it was (shot or parry), why (slow, or bounced twice while still quick) */
+const deadWhy: Record<string, number> = {};
 const tHist: number[] = [];
 let steps = 0;
 const examples: string[] = [];
@@ -36,8 +41,15 @@ for (let i = 0; i < N; i++) {
   let stillSince = -1;
   let longestStill = 0;
   while (!a.end && n++ < 60 * 200) {
+    const was = a.ball.flight?.kind;
+    const deadBefore = a.events.length;
     step(a, 1 / 60, decide(a, pl));
     steps++;
+    if (a.events.indexOf('shot-dead', deadBefore) >= 0) {
+      const sp = Math.hypot(a.ball.vx, a.ball.vy);
+      const k = was + (sp < 3 ? ' slow' : sp < 8 ? ' bounced, 3-8 m/s' : ' bounced, 8+ m/s');
+      deadWhy[k] = (deadWhy[k] ?? 0) + 1;
+    }
     const b = a.ball;
     if (b.owner === null && !a.setPiece && Math.hypot(b.vx, b.vy) < 0.3 && b.h < 0.05) {
       if (stillSince < 0) stillSince = a.t;
@@ -62,6 +74,10 @@ for (let i = 0; i < N; i++) {
     if (shotish.slice(0, -1).some((e) => e === 'save-parry' || e === 'post' || e === 'bar' || e === 'block')) reboundGoals++;
   }
   parries += a.events.filter((e) => e === 'save-parry').length;
+  // R-1: shots and parries that died short and were played on as a loose ball
+  const dead = a.events.filter((e) => e === 'shot-dead').length;
+  deadShots += dead;
+  if (dead && a.end?.kind === 'G') deadGoals++;
 }
 const ns = Number(process.hrtime.bigint() - t0);
 tHist.sort((p, q) => p - q);
@@ -71,4 +87,5 @@ console.log('attack length (game s) p50/p90/p99/max', [0.5, 0.9, 0.99].map((q) =
 console.log('frozen balls: on the 120 s hard stop', hardStops, pc(hardStops, N), ' | a dead loose ball for 5 s+', deadBalls, pc(deadBalls, N));
 console.log('attacks over clock + 15 s of game time:', overClock, pc(overClock, N), JSON.stringify(why));
 for (const e of examples) console.log('  ', e);
+console.log('dead shots played on as loose balls (R-1):', deadShots, JSON.stringify(deadWhy), ' attacks that still ended in a goal after one:', deadGoals);
 console.log('goals', goals, ' straight from a keeper parry (into his own net):', parryGoals, pc(parryGoals, goals), ' after a rebound (parry, woodwork, block):', reboundGoals, pc(reboundGoals, goals), ' parries', parries);

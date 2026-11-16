@@ -14,6 +14,7 @@ import { drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../
 import { pitchTexture, type PitchTheme } from '../pixel/pitch';
 import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
+import { reducedMotion } from '../../ui/motion';
 import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
 import { shotCone, topSpeed } from './ratings';
 import type { Attack, Body, Pt } from './types';
@@ -453,9 +454,12 @@ export class SoccerRenderer {
     ctx.fillRect(X - Math.round(R * 0.5), Y - Math.round(R * 0.6), 1, 1);
   }
 
-  private burst(x: number, y: number, n: number, kind: 'turf' | 'confetti') {
+  /** Turf kicked up by a tackle or a dive, or confetti for a goal in the scorer's kit (J-3, Claude
+   * 2026-11-10: it was always your colours, the rival's goals included). No confetti with reduced motion. */
+  private burst(x: number, y: number, n: number, kind: 'turf' | 'confetti', kit: SoccerKit = this.kits.us) {
+    if (kind === 'confetti' && reducedMotion()) return;
     const turf = ['#3c7a2c', '#58993c', '#6b4a2a', '#8a6a3c'];
-    const conf = [this.kits.us.jersey, this.kits.us.trim, '#ffffff', '#ffd23a'];
+    const conf = [kit.jersey, kit.trim, '#ffffff', '#ffd23a'];
     for (let i = 0; i < n; i++) {
       const ang = Math.random() * Math.PI * 2;
       const sp = kind === 'turf' ? 1.5 + Math.random() * 2.5 : 2 + Math.random() * 5;
@@ -464,7 +468,7 @@ export class SoccerRenderer {
     if (this.bits.length > 400) this.bits.splice(0, this.bits.length - 400);
   }
 
-  private particles(ctx: CanvasRenderingContext2D, a: Attack) {
+  private particles(ctx: CanvasRenderingContext2D, a: Attack, kitOf: (b: Body) => 'us' | 'them') {
     const now = performance.now() / 1000;
     const dt = this.lastNow ? Math.min(0.05, now - this.lastNow) : 0;
     this.lastNow = now;
@@ -473,7 +477,7 @@ export class SoccerRenderer {
       const was = this.acts.get(k);
       if (was !== b.act) {
         if (was !== undefined && (b.act === 'tackle' || b.act === 'down' || b.act === 'dive')) this.burst(b.x, b.y, 9, 'turf');
-        if (b.act === 'celebrate') this.burst(b.x, b.y, 70, 'confetti');
+        if (b.act === 'celebrate') this.burst(b.x, b.y, 70, 'confetti', this.kits[kitOf(b)]);
         this.acts.set(k, b.act);
       }
     }
@@ -750,7 +754,7 @@ export class SoccerRenderer {
     if (!ballBehind) items.push({ y: a.ball.y - 0.25, draw: () => this.ball(ctx, a) });
     items.sort((p, q) => q.y - p.y);
     for (const it of items) it.draw();
-    this.particles(ctx, a);
+    this.particles(ctx, a, kitOf);
     // the man you're on: his name; his stamina once sprinting has cost some
     const h = heads[c.id];
     if (h && !a.end) {

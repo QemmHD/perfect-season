@@ -215,8 +215,9 @@ van Dijk) on 7–9 % of open-play attacks. A good human gets more than the autop
   and panels, the controlled player's ring, name (under his feet, not over the ball) and stamina,
   the pass target ring, the shot meter arch (hoops2 style) and the aim ring sized by the error cone,
   free-kick bend arrow, turf and confetti, and an instant replay of goals.
-- Sounds reuse the existing samples: kick, whistle, the stadium crowd bed and swells, roar on a
-  goal, ooh on saves and the woodwork, groans, tackles.
+- Sounds: soccer's own ground (`sound.ts` venue `'pitch'`, loaded when the match mounts: its chant
+  bed, roar, kicks, bounce and full-time whistle), swells on plays, the crowd building as the ball
+  nears goal, ooh on saves and the woodwork, groans, tackles (the NFL stadium bed until 2026-11-10).
 
 ## Files
 
@@ -287,3 +288,36 @@ finisher scored 85% from the edge of the box. Changed: `shotCone` floor 1.3° �
 x2.25). `scripts/audit_soccer_shots.ts 200 shots` (75 sides unless noted): 1v1 running 62%, edge
 running/aimed 38/44%, 1v1 vs keeper 52/75/93 = 81/60/27%, 1v1 by SHO 55/75/95 = 44/62/68%.
 Soccer tests 74/74.
+
+### Studio overhaul soccer-1 (Claude, 2026-11-10)
+
+Rule bugs, with the guards that hold them (team doc: `docs/studio-overhaul/soccer.md`; the
+before/after numbers are there):
+- **Dead shots (R-1).** A `'shot'` or `'parry'` flight that rolls slower than `DEAD.speed` (3 m/s)
+  below `DEAD.h` (0.3 m), or has bounced `DEAD.bounces` (2) times, becomes a `'clear'` from whoever
+  touched it last (`deadShot`, event `'shot-dead'`): anyone can play it and the keeper drops his read
+  of it. The attack's clock runs whenever the ball is slower than 3 m/s, shot or not. Before, a weak
+  shot or header that stopped short stayed a "shot" nobody could touch and froze the clock until the
+  120 s hard stop (25 of 3,000 real-squad attacks; now 0, and no attack runs past its clock + 15 s).
+  A ball the keeper last touched that rolls over the byline is still his save ("SAVED · TURNED ROUND").
+- **Untaken set pieces.** A set piece a person leaves goes to the autopilot's taker after
+  `SET_PIECE_WAIT` (12 s of match time, `match.ts`), with an "AUTO KICK IN 5…1" countdown over the
+  last five seconds (`setPieceCountdown`); shootout kicks too. The AI takes its own in about a second.
+- **BEND (C-4).** `bendCurl(k)` turns the button's arrow (k −1 left, 0, 1 right) into curl
+  (`-0.75k`: + bends the ball to its left); the buttons used `k * 0.75` and bent against their arrows.
+  The swipe (`-dx/140`) always agreed with `bendCurl`. BEND buttons are 44 px tall.
+- **Sounds (J-1).** `'bounce'` (render-only; nothing in the engine reads events) when the ball comes
+  down hard enough to bounce (`sfx.bounce`); the crowd level follows the ball's distance to goal
+  through `crowd.level` (0.24 at 35 m+ to 0.5 at 12 m, at most four times a second, never over a
+  swell that is still settling).
+- **Confetti (J-3)** comes out in the scorer's kit (the rival's goals threw yours), and not at all
+  with reduced motion.
+- **Guards:** `golden.test.ts` (a hash of 60 seeded attacks with their whistle and post-whistle
+  state, 20 `aiProgress` matches and 50 agreed shootouts: presentation work must leave it alone),
+  `agreement.test.ts`/`agreement-ut.test.ts` (both phones' views of takeover, taken and `simBoth`
+  over 500 seeds, the agreed shootout mirrored over 1,000), `rules.test.ts` (the rules above).
+  `aiProgressFor(…, { rival, online })` in `arcade.ts` is the one door to the AI's simulations.
+- **Harnesses:** `scripts/soccer/` (`sim`, `human`, `ratings-human`, `probe`, `bend`, `cam`; run with
+  `npx vite-node scripts/soccer/<name>.ts [n] [part]`); browser QA isolation, insets and the six
+  device presets in `scripts/soccer/qa-isolate.mjs`; an in-process QA relay in `scripts/soccer/relay.mjs`;
+  the lab's `start=x,y` puts the man on the ball at a spot.

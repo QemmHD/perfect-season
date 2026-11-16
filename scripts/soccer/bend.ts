@@ -5,11 +5,11 @@
 // them: n 11 / 3 / 24); the mean of (where it crosses the line − where it was aimed). + is to the right
 // on screen (x across the pitch, as the portrait camera looks up it).
 //   bash O/heavy.sh npx vite-node scripts/soccer/bend.ts
-import { kickOff, PL, pressShoot, releaseShoot, setAim, setCurl, setupAttack, step, TOP } from '../../src/game/soccer2/engine';
+import { bendCurl, kickOff, PL, pressShoot, releaseShoot, setAim, setCurl, setupAttack, step, TOP } from '../../src/game/soccer2/engine';
 import { player, squad } from './lib';
 
-/** the BEND buttons' curl, as Soccer2.tsx's handler sets it (setCurl(a, k * 0.75)) */
-const button = (k: number) => k * 0.75;
+/** the BEND buttons' curl, as Soccer2.tsx's handler sets it (bendCurl since soccer-1: k * 0.75 before) */
+const button = bendCurl;
 for (const k of [-1, 0, 1]) {
   let sum = 0;
   let n = 0;

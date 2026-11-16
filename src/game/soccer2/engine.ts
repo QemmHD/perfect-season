@@ -719,6 +719,15 @@ export function setCurl(a: Attack, k: number) {
   a.curl = clamp(k, -1, 1);
 }
 
+/**
+ * The BEND buttons' curl: k is the way the button's arrow points on screen (-1 left, 0 straight,
+ * 1 right; the camera looks up the pitch, so screen right is +x). A positive curl bends the ball to
+ * its left, so Bend left is +0.75. Claude 2026-11-10 (studio overhaul soccer-1, C-4): the buttons
+ * set k * 0.75, which bent the ball against their arrows (Bend left ended 2.5 m right of the aim).
+ * The swipe across the pitch (Soccer2: -dx / 140) always had this sign.
+ */
+export const bendCurl = (k: number): number => (k === 0 ? 0 : -k * 0.75);
+
 /* ---------- aiming (Claude 2026-11-02, docs/SOCCER-ENGINE.md "Aim and shoot") ---------- */
 
 /** Half the goal's width the aim spans: full aim is 0.56 m inside the post. */
@@ -1144,7 +1153,10 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
   a.t += dt;
   const t = a.t;
   const ball = a.ball;
-  if (!a.setPiece && !a.strike && !(ball.flight && ['shot', 'parry'].includes(ball.flight.kind))) a.used += dt;
+  // the attack's clock: it holds for a set piece, a shot being struck and a shot or parry on its way,
+  // and runs again once the ball is slower than DEAD.speed (a dying shot doesn't stop time: R-1)
+  const onItsWay = !!ball.flight && (ball.flight.kind === 'shot' || ball.flight.kind === 'parry') && Math.hypot(ball.vx, ball.vy, ball.vh) >= DEAD.speed;
+  if (!a.setPiece && !a.strike && !onItsWay) a.used += dt;
 
   // the kick or strike lands on the ball
   if (a.kick && t >= a.kick.at) launchPass(a);
@@ -1202,7 +1214,14 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
     if (owner.side === 'A') tackles(a, owner);
   } else if (ball.owner === null) {
     stepBall(ball, dt);
+    // it came down hard enough to bounce (stepBall turned it back up): a sound for the renderer, and
+    // the count the dead-shot rule reads
+    if (ball.h === 0 && ball.vh > 0) {
+      a.events.push('bounce');
+      if (ball.flight) ball.flight.bounces = (ball.flight.bounces ?? 0) + 1;
+    }
     duringFlight(a, prev);
+    if (!a.end) deadShot(a);
     // keep the predicted path fresh (a ball still running past its end, a bounce off a body)
     if (!a.end && ball.owner === null && a.t - a.pathAt > 0.5 && ball.flight?.kind !== 'shot') setPath(a, tracePath(ball));
   }
@@ -1402,11 +1421,38 @@ function duringFlight(a: Attack, prev: Pt & { h: number }) {
       return;
     }
     const last = b.last !== null ? a.bodies[b.last] : null;
-    if (f?.kind === 'parry' && last?.role === 'gk') endAttack(a, 'S', 'SAVED · TURNED ROUND');
+    // the keeper's touch last (a parry, or one that died and rolled on: deadShot) is his save
+    if ((f?.kind === 'parry' || f?.kind === 'clear') && last?.role === 'gk') endAttack(a, 'S', 'SAVED · TURNED ROUND');
     else if (last && last.side === 'D') endAttack(a, 'B', 'DEFLECTED OUT');
     else endAttack(a, 'W', h > GH ? 'OVER THE BAR' : 'WIDE');
     return;
   }
+}
+
+/**
+ * When a shot or a parry has died (R-1, Claude 2026-11-10, studio overhaul soccer-1): rolling slower
+ * than `speed` (m/s, along the grass) below `h` (m), or bounced `bounces` times. Until then a shot is
+ * the keeper's and the blockers' business (nobody else may touch it), and a shot or a parry still
+ * moving at `speed` or more holds the attack's clock.
+ */
+export const DEAD = { speed: 3, h: 0.3, bounces: 2 };
+
+/**
+ * A shot or parry that has died short is a loose ball again (a clearance from whoever touched it
+ * last): anyone can play it, the keeper stops waiting on his read of it, and the clock runs. Before
+ * this, a weak shot or header that stopped short of the line stayed a "shot" nobody could touch and
+ * the attack hung until its 120 s hard stop (25 in 3,000 real-squad attacks, the 2026-11-09 audit).
+ */
+function deadShot(a: Attack) {
+  const b = a.ball;
+  const f = b.flight;
+  if (b.owner !== null || !f || (f.kind !== 'shot' && f.kind !== 'parry')) return;
+  const slow = Math.hypot(b.vx, b.vy) < DEAD.speed && b.h < DEAD.h;
+  if (!slow && (f.bounces ?? 0) < DEAD.bounces) return;
+  b.flight = { kind: 'clear', from: b.last ?? f.from, to: null, at: a.t };
+  a.gkPlan = null;
+  setPath(a, tracePath(b));
+  a.events.push('shot-dead');
 }
 
 /** Who gets to a free ball: a pass arriving, a loose ball, a rebound. */

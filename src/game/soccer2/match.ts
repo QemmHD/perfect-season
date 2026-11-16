@@ -13,6 +13,20 @@ import type { Attack, AttackEnd, Scenario, Squad } from './types';
 export const ATTACKS = 6;
 export const STOPPAGE = 1;
 
+/**
+ * A set piece a person leaves untaken (a corner, a free kick, a penalty, a shootout kick) goes to
+ * the autopilot's taker after this long (s of match time), with a countdown over its last 5 s
+ * (Claude 2026-11-10, studio overhaul soccer-1, R-1: an untaken set piece used to hold the attack's
+ * clock until its 120 s hard stop). The AI takes its own in about a second, so this never touches an
+ * AI simulation.
+ */
+export const SET_PIECE_WAIT = 12;
+/** The countdown to show after a set piece has waited `waited` s: whole seconds left (5 to 1), else null. */
+export function setPieceCountdown(waited: number): number | null {
+  const left = SET_PIECE_WAIT - waited;
+  return left > 0 && left <= 5 ? Math.ceil(left - 1e-9) : null;
+}
+
 export const END_TEXT: Record<AttackEnd, string> = { G: 'GOAL', S: 'SAVED', W: 'WIDE', B: 'BLOCKED', L: 'LOST IT', O: 'OFFSIDE', T: 'TIME' };
 
 export const SCENARIO_NAMES: Record<Scenario, string> = {

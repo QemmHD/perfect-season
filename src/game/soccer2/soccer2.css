@@ -56,6 +56,17 @@
   box-sizing: border-box;
   top: calc(var(--sat) + 76px);
 }
+/* a set piece left untaken: the countdown to the autopilot taking it (Claude 2026-11-10, soccer-1) */
+.sc2 .sc2-autokick {
+  color: var(--gold);
+  letter-spacing: 0.6px;
+}
+.sc2 .sc2-autokick b {
+  display: inline-block;
+  min-width: 1ch;
+  margin-left: 4px;
+  font-size: 15px;
+}
 /* the attack's card, before the whistle */
 .sc2-intro {
   position: absolute;
@@ -224,7 +235,8 @@
 .sc2-bend button,
 .sc2-dive button {
   min-width: 46px;
-  min-height: 40px;
+  /* 44 px: a thumb's tap target (40 until soccer-1, 2026-11-10) */
+  min-height: 44px;
   padding: 0 9px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.2);

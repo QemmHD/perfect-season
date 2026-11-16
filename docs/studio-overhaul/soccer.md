@@ -132,6 +132,38 @@ Mid-attack (60 real-squad autopilot attacks per scenario, the man on the ball or
 - `scripts/qa/soccer-lab.mjs`: every context isolated, the play parts at 393×852 (sat 59) and 320×568, and a new `smoke` part on all six presets. `scripts/qa/soccer-app.mjs`: isolated contexts, the in-process relay, `widths` on the six presets.
 - Lab parameter **`start=x,y`**: the man on the ball starts at that spot (pitch metres) in open-play attacks, for drills and screenshots.
 
+### Step B: the rule bugs R-1 and C-4, the soccer crowd (J-1), confetti (J-3)
+
+**What changed** (details in `docs/SOCCER-ENGINE.md`, "Studio overhaul soccer-1"):
+- **R-1, dead shots.** A `'shot'` or `'parry'` that rolls slower than 3 m/s below 0.3 m, or has bounced twice, becomes a loose ball (`deadShot`, event `'shot-dead'`): anyone can play it, the keeper drops his read, and the attack's clock runs whenever the ball is slower than 3 m/s.
+- **Untaken set pieces** go to the autopilot's taker after `SET_PIECE_WAIT` = 12 s, with an "AUTO KICK IN 5…1" countdown (`setPieceCountdown`, `.sc2-autokick`). It is person-only: the AI takes its own in about a second, so no simulation reads it.
+- **C-4, BEND.** `bendCurl(k)` = `-0.75k`, so each button bends the way its arrow points; the buttons are 44 px tall (40 before).
+- **J-1.** The match plays soccer's own ground (`sound.ts` venue `'pitch'`: the chant bed, roar, kicks, the bounce and the full-time whistle), not the NFL stadium. A render-only `'bounce'` event plays `sfx.bounce`; the crowd level follows the ball's distance to goal (0.24 at 35 m+ to 0.5 at 12 m).
+- **J-3.** Goal confetti comes out in the scorer's kit (the rival's goals threw yours), and none under reduced motion.
+- `soccer.test.ts`: the "every scenario ends" bound tightened from the 120 s hard stop to `a.clock + 15`. The old bound allowed exactly the R-1 bug.
+
+**Before → after** (same seeds):
+
+| Measure | Before (Step A) | After Step B | Target |
+|---|---|---|---|
+| `probe.ts 3000`: frozen balls on the 120 s hard stop | 25 (0.83%) | **0** | 0 |
+| A dead loose ball nobody plays for 5 s+ | 25 | **0** | 0 |
+| Attacks over the clock + 15 s | 25 | **0** | 0 |
+| Attack length p50 / p90 / p99 / max (game s) | 5.1 / 10.3 / 15.7 / 120.0 | 5.1 / 10.2 / 14.1 / 19.9 | — |
+| Dead shots played on as loose balls | — | 192 (shot slow 51, shot bounced 68, parry 73); 30 of those attacks still ended in a goal | — |
+| Goals straight from a parry | 65 of 456 (14.25%) | 65 of 461 (14.1%) | R-2 (below) |
+| `bend.ts` Bend left / straight / Bend right | +2.50 / −0.07 / −2.54 m | **−2.54 / −0.07 / +2.50 m** | ≤ −1.5 / ±0.5 / ≥ +1.5 |
+| `sim.ts 400 pro`: goals/match, draws, 0–0 | 2.33, 26.8%, 7.8% | 2.32, 25.5%, 7.8% | interim 2.1–2.8, 20–32% |
+| Shots/side, on target, goals/shot, save% | 5.21, 53.7%, 20.4%, 61.9% | 5.22, 53.5%, 20.2%, 62.2% | (soccer-4/7) |
+| Attack ends G / S / W / B / L / O / T | 16.7 / 15.2 / 22.5 / 8.4 / 33.7 / 3.0 / 0.6% | 16.6 / 15.4 / 22.4 / 8.5 / 34.2 / 3.0 / **0.0%** | — |
+| Step cost (engine + autopilot) | 22.5 µs | 34.0 µs (shared machine at load ≈ 5; not comparable) | — |
+
+**Tests.** New `rules.test.ts` (9 tests): a slow shot is no longer a `'shot'` within 1 s and the attack ends within 15 s with a valid letter; an idle person can't hang a dead ball; a ball that bounced twice is loose while a hard true shot stays the keeper's; 180 autopilot attacks all end inside `a.clock + 15`; the countdown's numbers and the autopilot taking a free kick, a corner and a penalty that were left alone; `bendCurl`'s signs and 40 kicks per button (left ≤ −1.5 m, right ≥ +1.5 m, straight within 0.5 m); stripping `'bounce'` events changes no attack.
+
+**Golden.** The three hashes stayed green through Step B, so no re-base: none of the 60 hashed attacks, 20 matches or 50 shootouts has a shot that died short or a set piece left untaken (the AI takes its own at once), and the clock change only matters while such a ball rolls. Agreement green (both files). The R-2 commit re-bases it (below).
+
+**Suite.** `PS_SPORT=soccer npx vitest run soccer sport-branches`: 13 files, 103 tests, all pass; Duration **124.6 s** with the shared machine saturated (four other teams' Playwright, calibration and vitest runs queued on `heavy.sh`). 64.0 s at Step A under lighter load. See soccer-1's final timing below.
+
 ## Touched outside my lane
 
 | File | Owner | Hunk | Task |
