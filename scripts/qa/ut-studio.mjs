@@ -916,9 +916,12 @@ async function kitCase(a) {
           const ring = getComputedStyle(q('.ut-k-ring circle + circle')).animationName;
           claim.click();
           const burst = getComputedStyle(claim, '::after').animationName;
+          // in design px: the stage draws the 390 frame scaled to the phone (0.82 at 320 wide)
+          const stage = document.querySelector('.stage');
+          const k = stage.getBoundingClientRect().width / stage.offsetWidth || 1;
           const box = (e) => {
             const b = e.getBoundingClientRect();
-            return [Math.round(b.width), Math.round(b.height)];
+            return [Math.round(b.width / k), Math.round(b.height / k)];
           };
           const go = q('.ut-k-go');
           const before = getComputedStyle(go, '::before');
@@ -933,7 +936,7 @@ async function kitCase(a) {
             primary: box(q('.ut-k-primary')),
             primaries: document.querySelectorAll('[data-primary]').length,
             claim: box(claim),
-            goHit: [Math.round(go.getBoundingClientRect().width - 2 * parseFloat(before.left)), Math.round(go.getBoundingClientRect().height - 2 * parseFloat(before.top))],
+            goHit: [Math.round(go.getBoundingClientRect().width / k - 2 * parseFloat(before.left)), Math.round(go.getBoundingClientRect().height / k - 2 * parseFloat(before.top))],
             titlePx: getComputedStyle(q('.ut-k-title')).fontSize,
             titleFont: getComputedStyle(q('.ut-k-title')).fontStyle + ' ' + getComputedStyle(q('.ut-k-title')).fontStretch,
             countTone: [...host.querySelectorAll('.ut-k-count')].map((e) => e.dataset.tone + ' ' + e.textContent),
