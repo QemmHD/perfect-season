@@ -4,6 +4,7 @@
 // scaled up with smoothing off, so every pixel stays crisp. Uniform colors, number, hair and size
 // all come from the look, so any player can wear any team's home or away set.
 import { type RGB, mix, onColor, outlineOf, ramp, rgb } from './color';
+import { ball, type Buf, buffer, capsule } from './raster';
 import { type Joints, joints, type P2, type Pose, project, type Shape, shapeOf, type View } from './rig';
 
 export interface Look {
@@ -56,96 +57,6 @@ const SKINDARK = 17;
 const BUZZ = 18;
 const GLOVE = 19;
 const SLOTS = 20;
-
-interface Buf {
-  w: number;
-  h: number;
-  slot: Uint8Array;
-  tone: Uint8Array;
-  part: Uint8Array;
-  depth: Float32Array;
-}
-
-function buffer(w: number, h: number): Buf {
-  const n = w * h;
-  const depth = new Float32Array(n);
-  depth.fill(-1e9);
-  return { w, h, slot: new Uint8Array(n), tone: new Uint8Array(n), part: new Uint8Array(n), depth };
-}
-
-// the light: from the upper left, a little in front
-const LX = -0.5;
-const LY = 0.62;
-const LZ = 0.6;
-const LN = Math.hypot(LX, LY, LZ);
-
-function toneOf(nx: number, ny: number, nz: number, bias: number): number {
-  const i = (nx * LX + ny * LY + nz * LZ) / LN + bias;
-  return i > 0.66 ? 2 : i > 0.1 ? 1 : 0;
-}
-
-function put(b: Buf, x: number, y: number, d: number, slot: number, tone: number, part: number) {
-  if (x < 0 || y < 0 || x >= b.w || y >= b.h) return;
-  const i = y * b.w + x;
-  if (d <= b.depth[i]) return;
-  b.depth[i] = d;
-  b.slot[i] = slot;
-  b.tone[i] = tone;
-  b.part[i] = part;
-}
-
-/**
- * A limb: a rounded segment from a to b whose radius goes from ra to rb. `slotAt(t)` picks the
- * material along it (t 0 at a, 1 at b), so one thigh can be shorts at the top and skin at the knee.
- */
-function capsule(b: Buf, ox: number, oy: number, a: P2, c: P2, ra: number, rb: number, slotAt: (t: number) => number, part: number, bias = 0) {
-  const ax = a.x + ox;
-  const ay = a.y + oy;
-  const bx = c.x + ox;
-  const by = c.y + oy;
-  const r = Math.max(ra, rb);
-  const x0 = Math.floor(Math.min(ax, bx) - r - 1);
-  const x1 = Math.ceil(Math.max(ax, bx) + r + 1);
-  const y0 = Math.floor(Math.min(ay, by) - r - 1);
-  const y1 = Math.ceil(Math.max(ay, by) + r + 1);
-  const dx = bx - ax;
-  const dy = by - ay;
-  const len2 = dx * dx + dy * dy || 1e-6;
-  for (let y = y0; y <= y1; y++)
-    for (let x = x0; x <= x1; x++) {
-      const px = x + 0.5;
-      const py = y + 0.5;
-      let t = ((px - ax) * dx + (py - ay) * dy) / len2;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const cx = ax + dx * t;
-      const cy = ay + dy * t;
-      const rr = ra + (rb - ra) * t;
-      const ex = px - cx;
-      const ey = py - cy;
-      const d2 = ex * ex + ey * ey;
-      if (d2 > rr * rr) continue;
-      const nx = ex / rr;
-      const ny = -ey / rr;
-      const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
-      const depth = a.d + (c.d - a.d) * t + nz * rr;
-      put(b, x, y, depth, slotAt(t), toneOf(nx, ny, nz, bias), part);
-    }
-}
-
-function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: (nx: number, ny: number, nz: number) => number, part: number) {
-  const cx = c.x + ox;
-  const cy = c.y + oy;
-  for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
-    for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
-      const ex = x + 0.5 - cx;
-      const ey = y + 0.5 - cy;
-      if (ex * ex + ey * ey > r * r) continue;
-      const nx = ex / r;
-      const ny = -ey / r;
-      const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
-      put(b, x, y, c.d + nz * r, slotFor(nx, ny, nz), toneOf(nx, ny, nz, 0.05), part);
-    }
-}
 
 // 3x5 and 4x7 digits for jersey numbers
 const D35: Record<string, string> = {
@@ -311,6 +222,24 @@ function isJoints(p: Pose | Joints): p is Joints {
  * this player (mocap.ts: built with shapeFor(look), feet at y = 0).
  */
 export function drawBody(look: Look, pose: Pose | Joints, view: View, px: number): Sprite {
+  return toSprite(rasterBody(look, pose, view, px));
+}
+
+/** A player's drawing as pixels (RGBA packed little-endian, 0 transparent), with its anchors. */
+export interface Raster {
+  w: number;
+  h: number;
+  px: Uint32Array;
+  /** the feet, the hands and the top of the head, as in Sprite */
+  ax: number;
+  ay: number;
+  handL: { x: number; y: number };
+  handR: { x: number; y: number };
+  top: number;
+}
+
+/** The pixels of drawBody, without a canvas (the same arguments; see drawBody). */
+export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: number): Raster {
   const nfl = look.sport === 'nfl';
   // soccer (Claude, 2026-11-01): short sleeves, shorter shorts, socks to the knee, keeper's gloves
   const soccer = look.sport === 'soccer';
@@ -528,7 +457,7 @@ function palette(look: Look): RGB[][] {
   return ramps;
 }
 
-function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, top: number): Sprite {
+function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, top: number): Raster {
   const { w, h, slot, tone, depth, part } = b;
   // the colors packed once per slot: its three tones, and the dark line drawn along its edges
   const pack = (c: RGB) => (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
@@ -577,15 +506,20 @@ function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, to
       if (y > 0 && slot[k] && depth[k] > bd) best = k;
       if (best >= 0) out[i] = line[slot[best]];
     }
+  return { w, h, px: out, ax: ox, ay: oy, handL: { x: ox + hl.x, y: oy + hl.y }, handR: { x: ox + hr.x, y: oy + hr.y }, top };
+}
+
+/** A raster on a canvas of its own size. */
+export function toSprite(r: Raster): Sprite {
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = r.w;
+  canvas.height = r.h;
   // (a phone out of canvas memory hands back no context: the sprite stays blank, and the caller
   // is told so it can let go of old drawings)
   const g = canvas.getContext('2d');
   if (!g) throw new CanvasOut();
-  g.putImageData(new ImageData(new Uint8ClampedArray(out.buffer), w, h), 0, 0);
-  return { canvas, ax: ox, ay: oy, handL: { x: ox + hl.x, y: oy + hl.y }, handR: { x: ox + hr.x, y: oy + hr.y }, top };
+  g.putImageData(new ImageData(new Uint8ClampedArray(r.px.buffer), r.w, r.h), 0, 0);
+  return { canvas, ax: r.ax, ay: r.ay, handL: r.handL, handR: r.handR, top: r.top };
 }
 
 /** No reliable source says what a player looks like, so everyone shares one skin tone; hair varies by player. */
