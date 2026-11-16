@@ -27,7 +27,7 @@ export { PauseButton, ScoreBug, Stick, ToastLine } from './hud';
 /** nba's controls-geometry tokens, as numbers (the CSS is ./geometry.css). */
 export { type Circle, gapOf, type Geometry, geometryFor, type Insets, meets, type Rect, rectOf, safeBox } from './geometry';
 /** ut's `src/lib/haptics.ts`. */
-export { haptic, HAPTIC_PATTERN, hapticCount } from './haptics';
+export { haptic, HAPTIC_PATTERN, hapticCount, heartbeat } from './haptics';
 /** ut's `src/lib/playtime.ts`. */
 export { playtimeState, usePlaytime } from './playtime';
 

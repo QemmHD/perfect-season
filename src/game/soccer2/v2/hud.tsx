@@ -172,9 +172,10 @@ export function Stick({ disabled = false, onChange, onTap }: { disabled?: boolea
  * through `lineRef` so it costs no render per frame), and the Heat bar's slot under it (hidden until
  * Heat arrives in soccer-7).
  */
-export function ScoreBug({ you, rival, rivalTag, minute, count, mid, heat, clutch, lineRef, label }: { you: number; rival: number | null; rivalTag: string; minute: string; count: string | null; mid?: React.ReactNode; heat: HeatState | null; clutch: boolean; lineRef?: React.Ref<HTMLElement>; label: string }) {
+export function ScoreBug({ you, rival, rivalTag, minute, count, mid, heat, clutch, pulse = 0, lineRef, label }: { you: number; rival: number | null; rivalTag: string; minute: string; count: string | null; mid?: React.ReactNode; heat: HeatState | null; clutch: boolean; /** bumped on the rival's goal: the bug's violet pulse plays once */ pulse?: number; lineRef?: React.Ref<HTMLElement>; label: string }) {
   return (
     <div className={'sc2-bug' + (clutch ? ' clutch' : '')} role="status" aria-label={label}>
+      {pulse > 0 && <span key={pulse} className="sc2-bug-pulse" aria-hidden="true" />}
       <span className="sc2-bug-side us">
         <i>YOU</i>
         <b className="num">{you}</b>

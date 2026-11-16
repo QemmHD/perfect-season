@@ -28,3 +28,15 @@ export function haptic(kind: HapticKind): void {
   const p = HAPTIC_PATTERN[kind];
   vibrate(typeof p === 'number' ? p : [...p]);
 }
+
+/**
+ * Clutch's heartbeat (V2 B.0.4): two ticks 120 ms apart, built from 'tick' (plan §5.0.2: ut may publish
+ * a 'heartbeat' kind; then this calls it). Gesture-gated like every haptic, so the host calls it from
+ * the player's own touches.
+ */
+export function heartbeat(): void {
+  if (!inGesture()) return;
+  hapticCount.tick += 2;
+  const t = HAPTIC_PATTERN.tick as number;
+  vibrate([t, 120 - t, t]);
+}

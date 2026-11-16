@@ -14,14 +14,19 @@ import { soccerFeedback, type PlayFeedback } from '../play-feedback';
 // right thumb), the A/B/C/D cluster on the V2 geometry (A SHOOT, B PASS, C THRU with a lofted hold, D
 // for set pieces now and TRICK later), tap a teammate to pass, the score bug "YOU 1 · 67' · 5/7 · 1
 // RIV" with its clock line, the toast line in place of the hint over the goal, and the pause sheet
-// with QUIT (solo) and FORFEIT (online).
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+// with QUIT (solo) and FORFEIT (online). Claude 2026-11-16 (soccer-3, V2 B.3.3, B.3.7, B.0.4): the camera
+// frames the V2 action-safe box (read from the page), the juice goes through fx.ts (hit-stop, trauma,
+// slow motion; render only), goal moments for both sides (a scorer plate in the toast line; the
+// rival's goals pop the moment the score changes), the stoppage attack is staged as CLUTCH, and
+// `ps:arena-ready` fires after the first frame with the pitch and the players.
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { crowd, loadSamples, sfx, vibrate } from '../../lib/sound';
 import { LOFT_HOLD, nextBend, type ControlPhase, type Slot, type SlotId, slotsFor, type Slots, targetsOf } from './controls';
 import { PauseSheet } from './PauseSheet';
 import { PausableTimers } from './timers';
-import { haptic, PauseButton, ScoreBug, Stick, type StickOut, ToastLine, usePlaytime } from './v2';
+import { haptic, heartbeat, PauseButton, ScoreBug, Stick, type StickOut, ToastLine, usePlaytime } from './v2';
+import { momentOf, SoccerFx } from './fx';
 import { reducedMotion } from '../../ui/motion';
 import { screenRunInput } from '../football2/controls';
 import { freeCanvas } from '../pixel/body';
@@ -32,13 +37,14 @@ import { WaitLine } from '../Wait';
 import { decide, pilot } from './autopilot';
 import { bendCurl, cancelShoot, ctrlOf, GX, kickOff, pass, passPlan, passTarget, PL, PW, pressShoot, releaseShoot, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step, timingWord } from './engine';
 import type { SoccerKits } from './kits';
-import { attackFor, ATTACKS, END_TEXT, minuteOf, newMatch, recordAttack, SCENARIO_NAMES, scenarioToast, SET_PIECE_WAIT, setPieceCountdown, totalOf, type Match } from './match';
+import { attackFor, ATTACKS, END_TEXT, isStoppage, minuteOf, newMatch, recordAttack, SCENARIO_HINTS, SCENARIO_NAMES, scenarioToast, SET_PIECE_WAIT, setPieceCountdown, totalOf, type Match } from './match';
 import { SoccerRenderer } from './render';
 import { kickAttack, newShootout, nextKick, recordKick, score as soScore, type Shootout, type Side } from './shootout';
 import type { Attack, AttackEnd, Body, Pt, Scenario, Squad } from './types';
 import './soccer2.css';
 import './v2/geometry.css';
 import './soccer2-controls.css';
+import './soccer2-moments.css';
 
 type Ui = 'loading' | 'intro' | 'live' | 'after' | 'so-intro' | 'so-kick' | 'so-after' | 'final';
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
@@ -53,6 +59,11 @@ const AIM_DEAD = 0.28;
  * or more to LOUD at NEAR m or less, set through crowd.level at most every CROWD_MS (in steps of
  * 0.02, so it rarely needs setting), and never while a swell is still settling. */
 const CROWD = { QUIET: 0.24, LOUD: 0.5, FAR: 35, NEAR: 12, MS: 250 };
+/** Clutch (V2 B.0.4): the crowd bed sits this much higher; the heartbeat haptic every BEAT_MS while the
+ * margin is one goal or none (played inside the player's own touches: iOS allows nothing else). */
+const CLUTCH = { CROWD: 0.1, BEAT_MS: 1200 };
+/** "2ND OF THE MATCH" */
+const ORDINAL = ['', '1ST', '2ND', '3RD', '4TH', '5TH', '6TH', '7TH'];
 /** The toast line's tips (one line at 320 px; the keyword first, one name per control). */
 const TIPS = {
   move: 'PASS · it goes where the stick points',
@@ -124,7 +135,7 @@ export function Soccer2({
    */
   fixedShootout?: { first: Side; scored: boolean[] };
   /** the lab's QA hook: the live attack and match each frame, the goal mouth on screen, and the pause */
-  debug?: (a: Attack | null, m: Match, ui: string, view: { goal: { x: number; y: number; w: number; h: number } | null; paused: boolean }) => void;
+  debug?: (a: Attack | null, m: Match, ui: string, view: { goal: { x: number; y: number; w: number; h: number } | null; paused: boolean; stats: SoccerRenderer['stats']; arrows: SoccerRenderer['arrows']; safe: { x: number; y: number; w: number; h: number } | null; clutch: boolean; fx: { granted: number } }) => void;
   /** the lab's drills and screenshots: the man on the ball starts here (pitch metres; open play only) */
   start?: Pt;
   /** a head to head against another phone: the pause sheet offers FORFEIT instead of QUIT */
@@ -160,8 +171,19 @@ export function Soccer2({
   /** in a shootout kick: whether we're the side kicking */
   const usKicking = useRef(true);
   const pilotRef = useRef(pilot(0.75, seed));
-  const fxRef = useRef({ shake: 0, flash: 0 });
-  const slowUntil = useRef(0);
+  /** the screen flash (a goal) */
+  const fxRef = useRef({ flash: 0 });
+  /** hit-stop, trauma shake and slow motion (fx.ts; render only) */
+  const juice = useMemo(() => new SoccerFx({ reduced: reducedMotion() }), []);
+  /** the goal plates in the toast line: ours (teal) and theirs (violet); when both land together
+   * (the rival's attack is revealed as yours ends) the newer sits on the line and the other above it */
+  const [plates, setPlates] = useState<{ id: number; side: 'us' | 'them'; text: string }[]>([]);
+  const scorers = useRef(new Map<string, number>());
+  /** the bug's pulse on the rival's goal */
+  const [bugPulse, setBugPulse] = useState(0);
+  const lastBeat = useRef(0);
+  const clutchRef = useRef({ on: false, close: false });
+  const arenaReady = useRef(false);
   /** the left thumb's stick, as it last reported (null: no thumb on it) */
   const stickRef = useRef<{ x: number; y: number } | null>(null);
   const stickSprint = useRef(false);
@@ -199,6 +221,8 @@ export function Soccer2({
   const [replaying, setReplaying] = useState(false);
   const rivalRef = useRef(rival);
   rivalRef.current = rival;
+  /** the rival's score last shown: a rise is their goal, popped in the same paint as the bug's number (F5) */
+  const rivalSeen = useRef(rival?.score ?? 0);
   const [soView, setSoView] = useState<ReturnType<typeof soScore> & { marks: { side: Side; scored: boolean }[]; first: Side } | null>(null);
   /** the set piece waiting for a person: since when (match time), and whether the autopilot has it */
   const spWait = useRef<{ sp: NonNullable<Attack['setPiece']>; at: number; auto: boolean } | null>(null);
@@ -233,14 +257,26 @@ export function Soccer2({
     const playing = !!a && !a.end && (uiRef.current === 'live' || uiRef.current === 'so-kick');
     const d = a ? Math.hypot(a.ball.x - GX, PL - a.ball.y) : CROWD.FAR;
     const k = playing ? Math.max(0, Math.min(1, (CROWD.FAR - d) / (CROWD.FAR - CROWD.NEAR))) : 0;
-    const level = Math.round((CROWD.QUIET + (CROWD.LOUD - CROWD.QUIET) * k) * 50) / 50;
+    const level = Math.round((CROWD.QUIET + (CROWD.LOUD - CROWD.QUIET) * k + (clutchRef.current.on ? CLUTCH.CROWD : 0)) * 50) / 50;
     c.at = now;
     if (Math.abs(level - c.level) < 0.019) return;
     c.level = level;
     crowd.level(level);
   };
-  const shake = (px: number) => {
-    if (!reducedMotion()) fxRef.current.shake = Math.max(fxRef.current.shake, px);
+  /** a goal plate in the toast line for a while */
+  const showPlate = (side: 'us' | 'them', text: string, ms = 2600) => {
+    const id = ++popId.current;
+    setPlates((ps) => [...ps.slice(-1), { id, side, text }]);
+    timers.later(() => setPlates((ps) => ps.filter((q) => q.id !== id)), ms);
+  };
+  /** Clutch's heartbeat: called from the player's own touches (the stick, the buttons) */
+  const beat = () => {
+    const c = clutchRef.current;
+    if (!c.on || !c.close) return;
+    const now = performance.now();
+    if (now - lastBeat.current < CLUTCH.BEAT_MS) return;
+    lastBeat.current = now;
+    heartbeat();
   };
   const progress = (): Progress => ({ score: match.goals, drive: match.i, done: match.over, ends: match.ends.slice(), plays: match.i });
   const clearInput = () => {
@@ -272,6 +308,7 @@ export function Soccer2({
     rec.current.clear();
     clearInput();
     pilotRef.current = pilot(0.75, seed + ':' + i);
+    juice.newAttack();
     setUi('intro');
   };
   useEffect(() => {
@@ -315,6 +352,12 @@ export function Soccer2({
 
   const handleEvents = (a: Attack) => {
     for (const e of a.events) {
+      // the juice first (hit-stop, shake, slow motion): render only, it reads the attack
+      const m = momentOf(e, a);
+      if (m) {
+        juice.apply(m, performance.now());
+        if (m.post) renderer.postHit();
+      }
       if (e === 'pass' || e === 'cross') sfx.kick();
       else if (e === 'shot' || e === 'header') {
         sfx.kick();
@@ -338,7 +381,6 @@ export function Soccer2({
       } else if (e === 'post' || e === 'bar') {
         // the woodwork's clang and the crowd's ooh (sound.ts, V2 F.1: the three sports share it)
         sfx.post();
-        shake(3);
         say(e === 'post' ? 'OFF THE POST!' : 'OFF THE BAR!', 'big', 1000);
       } else if (e === 'tackle') sfx.tackle(0.35);
       else if (e === 'beat') {
@@ -368,12 +410,10 @@ export function Soccer2({
       } else if (e === 'throw-in') say('THROW-IN', 'plain', 900, 'QUICK ONE');
       else if (e === 'goal') {
         fxRef.current.flash = 0.45;
-        slowUntil.current = performance.now() + 500;
         sfx.kick();
         sfx.roar();
         swell(1);
         vibrate([30, 40, 30]);
-        shake(5);
         renderer.goalScored(a.t);
       } else if (e === 'offside') sfx.whistle();
       else if (e === 'run') {
@@ -394,7 +434,17 @@ export function Soccer2({
     const by = a.shotBy !== null ? a.bodies[a.shotBy].p.tag : '';
     // why it didn't go in (late, early, straight at him...), else what happened
     const why = shotVerdict(a);
-    if (e === 'G') say('GOAL!', 'big', 2200, by + (a.lastShot?.greened ? ' · PERFECT STRIKE' : ''));
+    const clutch = isStoppage(match, match.i - 1);
+    if (e === 'G') {
+      say('GOAL!', 'big', 2200, by + (a.lastShot?.greened ? ' · PERFECT STRIKE' : ''));
+      // the scorer's plate in the toast line: "HAALAND 67' · 2ND OF THE MATCH" (V2 B.3.7)
+      const sc = a.shotBy !== null ? a.bodies[a.shotBy].p : null;
+      if (sc) {
+        const n = (scorers.current.get(sc.id) ?? 0) + 1;
+        scorers.current.set(sc.id, n);
+        showPlate('us', sc.tag + ' ' + minuteOf(match, match.i - 1) + ' · ' + (ORDINAL[n] ?? n + 'TH') + ' OF THE MATCH');
+      }
+    }
     else if (e === 'S') say('SAVED', 'bad', 1700, why ?? text);
     else if (e === 'W') {
       // a shot off target ("WIDE · GOAL KICK"), or a ball we put over their line ("GOAL KICK")
@@ -409,7 +459,8 @@ export function Soccer2({
       timers.later(() => sfx.whistle(), 200);
       if (e !== 'O') sfx.groan(e === 'S' || e === 'W' ? 0.8 : 0.5);
     }
-    const replay = e === 'G' && !reducedMotion() && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !match.over;
+    // a goal replays; in Clutch always, the last attack's included (V2 B.0.4; skipped under reduced motion)
+    const replay = e === 'G' && !reducedMotion() && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && (!match.over || clutch);
     const next = () => {
       if (match.over) endMatch();
       else {
@@ -418,7 +469,7 @@ export function Soccer2({
         lineUp(match.i);
       }
     };
-    if (replay) timers.later(() => startReplay(a, next), 1700);
+    if (replay) timers.later(() => startReplay(a, next, clutch && match.over), clutch && match.over ? 700 : 1700);
     else timers.later(next, e === 'G' ? 2500 : 1800);
   };
 
@@ -526,8 +577,9 @@ export function Soccer2({
   };
 
   /* ---------- replay ---------- */
-  const startReplay = (a: Attack, done: () => void) => {
-    const frames = rec.current.clip(a.t - 2.6, a.t + 0.9);
+  const startReplay = (a: Attack, done: () => void, short = false) => {
+    // the final whistle's replay is shorter: the result is already on its way to the host
+    const frames = short ? rec.current.clip(a.t - 1.8, a.t + 0.5) : rec.current.clip(a.t - 2.6, a.t + 0.9);
     if (frames.length < 10) {
       done();
       return;
@@ -592,6 +644,7 @@ export function Soccer2({
 
   /** The left thumb's stick reports (V2 A.5): its push, and sprint past the ring (the tick is the stick's). */
   const onStick = (o: StickOut) => {
+    if (o.active) beat();
     stickRef.current = o.active ? { x: o.x, y: o.y } : null;
     stickSprint.current = o.sprint;
     const a = atkRef.current;
@@ -729,7 +782,7 @@ export function Soccer2({
     // a replay picks up where it stopped
     const rp = replayRef.current;
     if (rp) rp.start += performance.now() - pauseAt.current;
-    slowUntil.current += performance.now() - pauseAt.current;
+    juice.shift(performance.now() - pauseAt.current);
     timers.resume();
     setPaused(false);
   };
@@ -817,10 +870,21 @@ export function Soccer2({
   };
 
   /* ---------- the loop ---------- */
+  /** The action-safe box and the controls' rects, from the page, in canvas px. */
+  const readFrame = (wrap: HTMLElement, canvas: HTMLCanvasElement) => {
+    const cr = canvas.getBoundingClientRect();
+    if (cr.width < 1) return;
+    const k = renderer.W / cr.width;
+    const box = (r: DOMRect) => ({ x: (r.left - cr.left) * k, y: (r.top - cr.top) * k, w: r.width * k, h: r.height * k });
+    const safe = wrap.querySelector('.sc2-safe');
+    renderer.frameInfo.safe = safe ? box(safe.getBoundingClientRect()) : null;
+    renderer.frameInfo.controls = Array.from(wrap.querySelectorAll('.sc2-ctl, .ps-stick-ghost, .sc2-bug, .sc2-pause')).map((el) => box(el.getBoundingClientRect()));
+  };
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
     let acc = 0;
+    let frameN = 0;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       const canvas = canvasRef.current;
@@ -841,12 +905,14 @@ export function Soccer2({
       const a = atkRef.current;
       const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
-      const slow = now < slowUntil.current ? 0.35 : 1;
+      if (!pausedRef.current) juice.update(elapsed);
+      // the juice's real time: none while a hit-stop holds, slower in slow motion (render only)
+      const gameDt = juice.gameTime(now, elapsed);
       const u = uiRef.current;
       // paused: nothing moves (the accumulator is dropped, so resuming never catches up); the frame stays drawn
       if (pausedRef.current) acc = 0;
       else if (a && (u === 'live' || u === 'so-kick') && !a.end && !replayRef.current) {
-        acc += elapsed * slow;
+        acc += gameDt;
         while (acc >= DT) {
           acc -= DT;
           const auto = setPieceAuto(a);
@@ -871,7 +937,7 @@ export function Soccer2({
         }
       } else if (a && a.end && !replayRef.current) {
         acc = 0;
-        settle(a, elapsed * slow);
+        settle(a, gameDt);
         handleEvents(a);
         rec.current.push(a.t, snapOf(a));
       } else acc = 0;
@@ -879,8 +945,14 @@ export function Soccer2({
         countdownRef.current = null;
         setCountdown(null);
       }
+      // the camera's frame: the action-safe box and the rects a name tag must keep off (from the page,
+      // re-read every half second and on a resize), and Clutch
+      if (frameN++ % 30 === 0 || renderer.frameInfo.safe === null) readFrame(wrap, canvas);
+      const clutchNow = !!a && !soRef.current && isStoppage(match, uiRef.current === 'after' ? match.i - 1 : match.i) && (u === 'intro' || u === 'live' || u === 'after');
+      renderer.frameInfo.clutch = clutchNow;
+      clutchRef.current.on = clutchNow;
       crowdFor(a, now);
-      debug?.(a, match, u, { goal: renderer.goalMouth(), paused: pausedRef.current });
+      debug?.(a, match, u, { goal: renderer.goalMouth(), paused: pausedRef.current, stats: renderer.stats, arrows: renderer.arrows, safe: renderer.frameInfo.safe, clutch: clutchNow, fx: { granted: juice.granted } });
       // the score bug's clock line: the attack's time left, red in its last 5 s
       const line = lineRef.current;
       if (line && a) {
@@ -890,7 +962,6 @@ export function Soccer2({
         line.classList.toggle('low', left <= 5 && !a.end && u === 'live');
       }
       const fx = fxRef.current;
-      fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.flash = Math.max(0, fx.flash - elapsed * 1.8);
       const ctx = canvas.getContext('2d');
       if (!ctx || !a) return;
@@ -901,7 +972,7 @@ export function Soccer2({
           const rt = replayTime(rp, pausedRef.current ? pauseAt.current : now);
           const sn = rt === null ? null : frameAt(rp.frames, rt);
           if (rt === null || !sn) endReplay();
-          else renderer.draw(ctx, { ...a, t: sn.t, bodies: sn.bodies, ball: sn.ball, meter: null, release: undefined, end: a.end }, { target: null, shake: 0, flash: 0, names: false }, kitOf);
+          else renderer.draw(ctx, { ...a, t: sn.t, bodies: sn.bodies, ball: sn.ball, meter: null, release: undefined, end: a.end }, { target: null, flash: 0, names: false }, kitOf);
         } else {
           const c = ctrlOf(a);
           const onBall = a.ball.owner === c.id || (a.setPiece && a.taker === c.id);
@@ -924,7 +995,12 @@ export function Soccer2({
             const k = renderer.W / Math.max(1, cr.width);
             keepOut = [{ x: (r.left - cr.left) * k, y: (r.top - cr.top) * k, w: r.width * k, h: r.height * k }];
           }
-          renderer.draw(ctx, a, { target, pass: plan, shake: fx.shake, flash: fx.flash, names: u === 'intro', ours, keepOut }, kitOf);
+          renderer.draw(ctx, a, { target, pass: plan, jolt: juice.view(), flash: fx.flash, names: u === 'intro', ours, keepOut }, kitOf);
+        }
+        // shell's arena-ready: once, after the first frame with the pitch and the players
+        if (!arenaReady.current && renderer.firstFrame) {
+          arenaReady.current = true;
+          window.dispatchEvent(new CustomEvent('ps:arena-ready', { detail: { sport: 'soccer' } }));
         }
       } catch (err) {
         console.error('[soccer draw]', err);
@@ -936,6 +1012,19 @@ export function Soccer2({
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
+
+  // the rival's goal (V2 B.3.7, plan F5): the plate, their sound and the bug's pulse, in the same paint
+  // as the new score (a layout effect, before the browser draws)
+  useLayoutEffect(() => {
+    const now = rival?.score ?? 0;
+    const was = rivalSeen.current;
+    rivalSeen.current = now;
+    if (now <= was || soRef.current || finished.current) return;
+    sfx.scoreThem();
+    setBugPulse((n) => n + 1);
+    const at = Math.max(0, Math.min(totalOf(match) - 1, (rival?.drive ?? 1) - 1));
+    showPlate('them', (rival?.name ?? rivalName).toUpperCase().slice(0, 12) + ' SCORE ' + minuteOf(match, at) + ' · ' + match.goals + '–' + now, 2200);
+  }, [rival?.score]);
 
   const a = atkRef.current;
   const total = totalOf(match);
@@ -949,6 +1038,12 @@ export function Soccer2({
   const rivalShown = rival?.name ?? rivalName;
   const rivalTag = rivalShown.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3) || 'RIV';
   usePlaytime('match', { paused, auto: !!autoplayHook, stoppage: !playing && !theirKick });
+  // Clutch (V2 B.0.4): the stoppage attack is staged. Rules unchanged; the camera, the bug, the crowd,
+  // the heartbeat and the line in the toast line change.
+  const clutch = !inSo && !match.over && isStoppage(match, shownI) && (ui === 'intro' || ui === 'live' || ui === 'after');
+  const margin = (rival?.score ?? 0) - match.goals;
+  clutchRef.current.close = clutch && Math.abs(margin) <= 1;
+  const clutchLine = clutch && ui !== 'after' ? (margin === 0 ? 'FOR THE WIN' : margin === 1 ? 'TO TIE IT' : null) : null;
 
   // the cluster: before the whistle A is the whistle itself; then the phase's four slots (controls.ts)
   const phase: ControlPhase = sp === 'penalty' || ui === 'so-kick' ? 'penalty' : sp === 'corner' ? 'corner' : sp === 'freekick' ? 'freekick' : 'attack';
@@ -964,16 +1059,19 @@ export function Soccer2({
       : countdown !== null && playing
         ? { text: 'AUTO KICK · in ' + countdown, kind: 'bad', timer: true }
         : ui === 'intro'
-          ? { text: scenarioToast(a.scenario), kind: 'good' }
+          ? { text: clutchLine ? clutchLine + ' · ' + SCENARIO_HINTS[a.scenario] : scenarioToast(a.scenario), kind: 'good' }
           : ui === 'so-intro'
             ? { text: usKicking.current ? 'YOUR KICK · ' + a.bodies[a.ctrl].p.name : TIPS.keep, kind: usKicking.current ? 'good' : 'plain' }
             : hint && (playing || theirKick)
               ? { text: hint, kind: 'plain' }
-              : null;
+              : clutchLine && playing
+                ? { text: clutchLine + " · 90+'", kind: 'good' }
+                : null;
 
   const slotDown = (id: SlotId, sl: Slot, e: React.PointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    beat();
     if (intro) {
       haptic('tick');
       kickOffNow();
@@ -1013,6 +1111,8 @@ export function Soccer2({
   return createPortal(
     <div className={'arcade-full hg2 sc2 ps-geo' + (wide ? ' wide land' : '') + (compact ? ' compact' : '')} ref={wrapRef} onPointerDown={fieldDown} onPointerUp={fieldUp} onPointerCancel={() => (swipe.current = null)}>
       <canvas ref={canvasRef} className="hg2-canvas" />
+      {/* the V2 action-safe box, read by the camera (never drawn) */}
+      <i className="sc2-safe" aria-hidden="true" />
       {/* the last play's read-out, between attacks only: in play the field's only text is the toast line, the tags and the bug (V2 C.5) */}
       {!autoplayHook && !playing && <PlayReadout readout={lastReadout} live={playing} resetKey={match.i} />}
       {slots && <div className="ps-scrim" aria-hidden="true" />}
@@ -1023,9 +1123,10 @@ export function Soccer2({
         rivalTag={rivalTag}
         minute={minuteOf(match, shownI)}
         count={match.over ? null : shownI + 1 + '/' + total}
-        mid={inSo && soView ? <><b>PENS</b><small className="num">{soView.us}–{soView.them}</small></> : match.over ? <b>FULL TIME</b> : undefined}
+        mid={inSo && soView ? <><b>PENS</b><small className="num">{soView.us}–{soView.them}</small></> : match.over ? <b>FULL TIME</b> : clutch ? <b>CLUTCH</b> : undefined}
         heat={null}
-        clutch={false}
+        clutch={clutch}
+        pulse={bugPulse}
         lineRef={lineRef}
         label={'You ' + match.goals + ', ' + rivalShown + ' ' + (rival ? rival.score : 'to come') + (match.over ? ', full time' : ', ' + minuteOf(match, shownI) + ', attack ' + (shownI + 1) + ' of ' + total + ', ' + SCENARIO_NAMES[match.deal[shownI]])}
       />
@@ -1037,7 +1138,18 @@ export function Soccer2({
           {pop.sub && <small>{pop.sub}</small>}
         </div>
       )}
-      {toast && <ToastLine text={toast.text} kind={toast.kind} timer={toast.timer} />}
+      {plates.length > 0 ? (
+        <div className="sc2-plates" role="status" aria-live="polite">
+          {plates.map((q) => (
+            <div key={q.id} className={'sc2-plate ' + q.side}>
+              <i aria-hidden="true" />
+              {q.text}
+            </div>
+          ))}
+        </div>
+      ) : (
+        toast && <ToastLine text={toast.text} kind={toast.kind} timer={toast.timer} />
+      )}
       {replaying && (
         <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
           <i />

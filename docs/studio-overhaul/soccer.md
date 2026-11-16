@@ -283,6 +283,132 @@ Also run and green after the change (393 sat 59 and 320): the older lab parts `p
 - **CONTROLS toggles** (`autoSwitch`, `buttonsOnly`) wait for the features they switch (above).
 - **The hosts** (`ut/Match.tsx`, `App.tsx`) don't pass `onQuit` yet, and they settle on score, not the 6th `forfeit` argument: hand-offs below. Until then QUIT shows only in hosts that pass `onQuit` (the lab), and a forfeit win depends on the hosts reading `forfeit`.
 
+## soccer-3 · Camera at 34 m, the action-safe box, edge arrows, the pitch, render juice, goal moments and Clutch staging
+
+**What changed** (V2 B.3.3, B.3.7, B.0.4, B.0.5, C.1.3, C.2; audit V-1, V-2, V-4, J-2; plan soccer-3). Render only: no engine, AI, rule or rating change.
+- **`camera.ts`** (new, pure): the portrait camera. The man on the ball is the lens's anchor (`anchoredCam`): he sits on the axis, so the framing moves the whole picture rigidly up or down (a shift lens) and every framing rule is a plain interval.
+  - **Scale and angle:** 34 m across at his row on the 393 phone (32 m at 320, still inside V1's 32–36), looking down at 0.9 rad. The lens is long (half-angle 0.2 rad). The reason is measured: at 32–36 m across, only a long lens keeps the goal mouth ≥ 60 px wide from 30 m out on a 320 px phone.
+  - **Follow and look-ahead:** 85% of the ball's x, with a look-ahead of velocity × 0.6 s (at most 6 m) plus 3 m toward the goal.
+  - **The framing pass (`frameFor`).** Hard limits:
+    - the carrier's feet inside V2's action-safe box (read from the page: a hidden `.sc2-safe` probe on the geometry tokens);
+    - the stands at most 12% of the height;
+    - inside 30 m (and at every set piece), the whole goal mouth.
+
+    Then it fits, if they still fit: a through ball's man, his two nearest options, and any other teammate ahead of him that a pan of at most 16% of the width brings in. The eased frame is clamped back into the hard limits every frame.
+  - **Zoom:** it eases out only for a through ball's man or a corner, at most 15%. It moves in 0.05 steps, at most one step every 0.25 s (≤ 4 changes a second), and cuts straight there under reduced motion. The stoppage attack (Clutch) sits 6% tighter.
+  - **Set pieces:** a corner is framed from the flag's side (the taker 22–30 px from his edge, at 40 m across) with the goal line in the upper third. A penalty puts the goal in the upper third.
+  - **Landscape** keeps the earlier camera.
+- **Sizes (V3):** `ART` makes the sprites larger than the ground scale, so a 1.80 m man under control is 34 px tall at 393 (35 at 320). The sprites are seen at their own 0.6 rad tilt (`SPRITE_TILT`), not the steep 0.9, so they read as before. Every world height (the goal frame and net, the ball's height, the particles) is lifted by the same factor (`heightK`), so a keeper still fits under his crossbar. The sprites' scale is snapped to 2.5 px/m steps, so men at about the same depth share sprite sizes. The ball is ≥ 6 px across with its shadow.
+- **The pitch (`render.ts` `PITCH` + `pitchTex`).** One palette the players team can retune under its venue grant:
+  - mow stripes `#2e9a4a` / `#288a41` every 5.5 m with a faint checker;
+  - lines `#f2fff2` at 85%;
+  - a darker run-off;
+  - boards behind the goal with an original "PERFECT SEASON" word mark;
+  - four floodlight pools baked into the texture;
+  - the crowd (touchlines and far stand) in three value bands `#221d36` / `#342d52` / `#4a426e` of 2-texel blocks, with 6% team flecks and 2% white;
+  - a cached screen overlay: the night vignette (corners −18%) and the depth haze (top 6% darker and greyer).
+
+  **Floor cache:** the floor is redrawn only when the camera moves by about a pixel. A still camera (set pieces, before the whistle) costs one blit: 1 redraw in 64 frames at a free kick or a penalty.
+- **Ground rings (C.1.3):** gold `#f6b93b` 2 px under the man you control (violet for the rival's taker), teal `#4fe3c1` under the pass's man, and a red `#ff5d5d` arc on the defender within 3.5 m of the carrier, facing him. The controlled man's name tag moves over his head when under his feet it would meet a button, the stick, the bug or pause (`ctrlTagSpot`).
+- **Edge arrows:** a teal chevron with the man's initial and number ("P7", "N11") on the safe box's edge, pointing at him. Every teammate off the screen, under the bug, or more than 40 px below the box (under the thumbs) gets one. Two never overlap (`placeArrows`). Tapping one passes to him (22 px radius, a 44 px target, checked before the bodies). They have no pulse.
+- **Juice (`fx.ts`, new; render only):** through the shared `Juice`.
+  - **Hit-stop:** power shot (≥ 24 m/s) 33 ms, goal 66, save 60, woodwork 80. Every stop is clamped to 33–120 ms, a rolling ledger caps them at 150 ms in any second, and under reduced motion each is ≤ 30 ms.
+  - **Trauma shake:** goal 0.45, woodwork 0.3, save 0.25, tackle or block 0.15, power shot 0.12.
+  - **Slow motion:** one beat an attack, a near miss (the woodwork, or wide or over within 1 m) at 0.4× for 0.6 s, or a goal at 0.35× for 0.5 s (the earlier goal slow-down now respects reduced motion).
+  - **The rest:** a 3-frame net bulge, then back over a quarter second; the ball's trail on shots or parries faster than 22 m/s; the post's 1 px shiver for 0.34 s with `sfx.post`.
+  - **Reduced motion:** no shake, slow motion, bulge or shiver, the flash ≤ 30% and plates without their pop.
+
+  Hit-stop and slow motion only hold back the real time fed to the fixed-step accumulator. A pause shifts them (`fx.shift`).
+- **Goal moments (both sides):**
+  - **Ours:** a teal plate in the toast line, "MESSI 45' · 1ST OF THE MATCH".
+  - **Theirs:** a violet plate "RMA SCORE 45' · 1–1", `sfx.scoreThem()` and a violet pulse round the bug. A layout effect fires them in the same paint as the new score.
+  - When both land together (the rival's attack is revealed as yours ends), the newer plate sits on the line and the other just above it.
+- **Clutch staging on the stoppage attack** (rules unchanged):
+  - the bug turns gold and reads CLUTCH;
+  - the camera sits 6% tighter;
+  - the crowd bed sits 0.1 higher;
+  - at a margin of one goal or none, the heartbeat haptic (two ticks 120 ms apart, at most every 1.2 s, played inside the player's own touches: `v2/haptics.ts heartbeat()`);
+  - the toast line says "FOR THE WIN" (level) or "TO TIE IT" (one down) before the whistle and during the attack;
+  - a goal in Clutch always replays, the final whistle's included. That replay is shorter (2.3 s of play, starting 0.7 s after the goal), and none plays under reduced motion.
+- **`ps:arena-ready`** is dispatched on `window` once per match (`detail: { sport: 'soccer' }`), after the first frame drawn with the pitch and the players.
+
+**Before → after.** `scripts/soccer/cam.ts`, the real `camera.ts` on the V2 safe box. Before is the old replica at 390×844 and 320×568 with the audit's HUD rects.
+
+| V1, kick-off | Before (390×844) | After, 393×852 sat 59 (sat 81, 390×844, 430×932 the same) | After, 375×667 / 320×568 | Target |
+|---|---|---|---|---|
+| Metres across at the carrier's row | 16.9 (corner 41.6) | 34.0 (corner 40.0) | 33.5 / 32.0 (corner 39.4 / 37.6) | 32–36 |
+| Carrier in the safe box | wide off-screen (x −36 / 426) | 100% of 12 kick-offs (6 scenarios × 2 mirrors) | 100% | 100% |
+| Teammates on screen: build / counter / wide / corner / FK | 1/5, 0/3, 1/5, 3/5, 4/4 | 3/5, 2/3, 4/5, 4/5, 4/4 | 3/5, 2/3, 4/5 (320: 3/5), 4/5 (320: **3/5**), 4/4 | ≥ 3, 2, 3, 4, 4 |
+| Stands (share of the height) | 37% near goal (audit V-2) | ≤ 12.0% | ≤ 12.0% | ≤ 12% |
+| Goal mouth inside 30 m: FK / penalty | 81 / 94 px (16 m across) | 73 / 77 px | 70 / 75; 62 / 67 px | ≥ 60 px |
+| Corner taker | 17 px at x = 17 | 27 px at x = 22, goal line y 150 (H/3 = 284) | 27 px at x 16 / 30 | ≥ 22 px, x in [20, W − 20], goal in the upper third |
+
+| V2, mid-attack, 200 real-squad autopilot attacks per scenario | Before (390×844): on screen / clear of the controls | After, all six presets: carrier in the safe box | Goal fully in frame inside 25 m | Zoom changes/s | Name tag over a control |
+|---|---|---|---|---|---|
+| Build | 76.7% / 75.4% | 100.0% | 99.9% | 0.01–0.05 | 0% |
+| Counter | 84.6% / 83.5% | 100.0% | 99.9–100% | 0.01 | 0% |
+| Wide | 74.5% / 73.8% | 100.0% | 100.0% | 0.01–0.02 | 0% |
+| Corner | 70.4% / 70.4% | 100.0% | 99.4–99.5% | 0.81 | 0% |
+| Free kick | 79.7% / 72.3% | 100.0% | 99.9% | 0.02 | 0% |
+| Target | | ≥ 98% | ≥ 95% | ≤ 4 | 0% |
+
+(The stands stay ≤ 12.0% in every mid-attack frame on every preset.)
+
+**V3, measured in the browser** (the drawn sprite's head-to-feet height, lab `qa`, `stats.ctrlPx`):
+- Controlled man at 393: 33–36 px in open play and at set pieces; 30 px for the free-kick taker once play moves on.
+- At 320: 30–35 px.
+- The corner taker at 40 m across: 26–27 px.
+- Smallest man on screen (harness): 25 px at 393.
+- Ball: 8 px (6 px at a corner), with its shadow.
+
+**Frame pacing** (dev lab, autopilot, 393×852 at DPR 3, isolated; `O/scratchpad/s3/perf.cjs`). The shared machine was at a load average of 7–11 on 4 CPUs for every run, so only runs side by side compare. The baseline is this task's starting files (HEAD `d861656`) with a stale counter added, run in the same minute:
+
+| 4× CPU | fps | p99 ms | Longest long task | Stale sprite draws |
+|---|---|---|---|---|
+| Baseline (HEAD), load 11 | 50.5 | 66.6 | 118 ms | 7.25% |
+| After, first cut, load 7.5 | 41.5 | 99.9 | 105 ms | 9.7% |
+| After (scale snapped to steps, three new sprites a frame after a long frame), load 9.5 | **46.5** | 66.7 | 99 ms | 11.8% |
+| The 2026-11-09 audit, idle machine | 59 | 33.3 | — | — |
+
+At 6×: baseline 35.6 fps, after 32.5. Floor redraws fell from every frame to about half the frames in open play, and to 1 in 64 at a still set piece.
+- **The cost is the sprites, not the camera or the pitch.** V3's sizes put every man on screen at 30–45 px, where the players' LOD gives 16 facings and every second clip frame (before, far men were under 22 px: 8 facings, every third frame). So more new sprites are needed each frame than the build budget allows.
+- **Not met here:** fps ≥ 58, p99 ≤ 33.4 ms and stale ≤ 1%. They need the players team's LOD at V2 sizes (followup below), and an idle machine to measure on.
+- **Met:** no long task > 200 ms.
+
+**Tests** (new):
+- `camera.test.ts` (12 tests, about 2 s):
+  - V1 on the six presets: width, carrier in the box, stands, goal ≥ 60 px inside 30 m, teammates (the 320 corner held at 3/5), the corner taker's place and size, and the goal line in the upper third at corners and penalties;
+  - V3 sizes (34 ± 2 at 393, ≥ 30 at 320, far men ≥ 22, ball ≥ 5);
+  - every hidden teammate has an arrow, inside the box, none overlapping;
+  - the corner zoom;
+  - V2 over 6 attack pairs × 5 scenarios at 393 and 320 (≥ 98% in the box, ≥ 95% goal in frame, ≤ 4 zoom changes/s, no tag over a control, stands ≤ 12%).
+- `juice-soccer.test.ts` (6 tests):
+  - 24 seeded attacks (6 scenarios × 4 seeds, a quarter in stoppage time with Clutch's camera) through an app-like loop with uneven 8–34 ms frames, `SoccerFx` hit-stop, shake and slow motion and `camStep` every frame end identically, to the 4th decimal, to plain stepping, with and without reduced motion;
+  - each hit-stop's length and the 33–120 ms range;
+  - the 150 ms-a-second cap over 400 requests;
+  - the reduced-motion clamps;
+  - slow motion once per attack, and a pause shifting it;
+  - the event-to-moment map.
+- `camera.test-util.ts` holds the measuring maths for the tests and `scripts/soccer/cam.ts` (rewritten: it calls the real camera, with no replica).
+
+**Golden unchanged** (attacks `0dde30cbc63300`, matches `07f3dde0f40f62`, shootouts `13ebc2208d1307`); agreement green.
+
+**Suite.** `PS_SPORT=soccer npx vitest run soccer sport-branches` (through `heavy.sh`): 19 files, **164/164**, Duration **138.6 s** at a load of about 10. That is over the 120 s cap. The two agreement files took 77 s and 53 s of it, and the new files add about 10 s. After that run the camera test's V2 sample was cut from 10 to 6 pairs. `npm run typecheck` clean.
+
+**Browser QA** (dev server 5217, touch, every context isolated: 0 requests to live hosts; screenshots in `O/shots/soccer/soccer-3/`, all looked at):
+- `final-*`: every scenario before the whistle and mid-attack at 393×852 sat 59, sat 81 and 320×568.
+- `moment-*`: our plate and the rival's, stacked; the Clutch bug with "FOR THE WIN"; the replay; the same at 320 with reduced motion.
+- `t1`/`t2`/`v3`: calibration.
+
+The rival's plate appeared in the same mutation as the bug's new score (**0 ms**; F5 ≤ 200 ms). `ps:arena-ready` fired about 0.5 s after the lab mounted. A whole lab match with Clutch, two goals each, the replay and a shootout ran with no page errors.
+
+**Seen and judged:**
+- **The steep 34 m view shows about 65 m of pitch top to bottom,** so a corner leaves the lower half of the screen as empty grass under the box. That follows from V2's numbers (34 m across, stands ≤ 12%, the goal line in the upper third).
+- **The 12% stands cap overrides C.5's "stands about 30–40% of the height"** (the acceptance governs).
+- **The pitch is less dramatic in depth than `mockups-v2`'s soccer cell:** a long lens is the price of the 60 px goal mouth at 320.
+
+**Protocol:** none (render only; golden unchanged).
+
 ## Contracts (plan §5): what soccer publishes and what it adopts
 
 Published in soccer-1 so ut, nba, nfl, players and shell can rely on them from now on. Branches merge only at integration: where another team's piece isn't in our base, soccer writes against the interface below, and the lead keeps one copy at merge. Where another team publishes different names first, theirs win and only `src/game/soccer2/v2/` changes.
@@ -402,6 +528,8 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 | `src/game/progress.ts` | shared | soccer-2 (marked merge): `Progress.forfeit?` and `wireOf(p)` (+14 lines). | soccer-2 |
 | `src/ut/Match.tsx` (`END_LABEL`, soccer) | ut shared | `FF: 'FF'` (1 line). | soccer-2 |
 | `src/lib/sound.ts` | soccer owns the soccer crowd wiring; V2 F.1 gives soccer the PERFECT chime | `sfx.perfect`, `sfx.ringTick`, `sfx.post` and their constants (`PERFECT_ROOT`, `PERFECT_MAX_STEP`, `perfectStep`, `RING_TICK`): additive, about 40 lines, nothing existing changed. Tested in the new `src/lib/sound-perfect.test.ts` (default suite). | soccer-1 |
+| `src/game/pixel/pitch.ts` | players | `onLine` is now exported (one word) so soccer's `pitchTex` draws the same markings; `pitchTexture` there is no longer used by soccer (players may adopt `PITCH`/`pitchTex` or delete it). | soccer-3 |
+| `src/game/soccer2/render.ts` players section (`sprite()`) | players (shared file) | Two hooks: the sprite's look-down angle comes from `tiltAt(y)` (≤ `SPRITE_TILT` 0.6, the camera's) instead of `min(0.9, pitchAt)`, and two counters (`stats.sprites`, `stats.stale`) for the stale-draw budget. The size passed in is the camera's (`spriteScale`). | soccer-3 |
 
 ## Protocol
 
@@ -409,7 +537,13 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 
 **soccer-2: no bump of its own.** The controls, HUD, pause and the human-only lofted through ball change no AI simulation (golden unchanged, agreement green). `'FF'` on the wire is new to soccer's online match and rides the same soccer bump (draft 2 → 3, UT 2 → 3): an old client would not recognise a forfeit and would wait for the AI to take over instead.
 
+**soccer-3: no bump.** Camera, pitch, rings, arrows, juice, goal moments and Clutch staging are render only: golden unchanged, agreement green, `juice-soccer.test.ts` proves identical outcomes.
+
 ## Hand-offs
+
+- **players (soccer-3):** the stale-draw budget at V2 sizes. Every man on the soccer screen is now 30–45 px, where `sprite()`'s LOD gives 16 facings and a clip frame every 2 steps. Stale draws are 11.8% at 4× CPU (7.3% before, when far men were small). A cheaper LOD for men away from the ball (8 facings, every 3rd frame) and pre-warming each attack's sprites before the whistle are yours; V3 fixes only the sizes. `PITCH` in `soccer2/render.ts` is the palette to retune under your venue grant, and the camera passes sprites `spriteScale(s, ART)` (2.5 px/m steps) at `SPRITE_TILT` 0.6.
+- **shell (soccer-3):** soccer dispatches `ps:arena-ready` (`window`, `detail: { sport: 'soccer' }`) once per match after the first frame with the pitch and players.
+- **nba (soccer-3):** the hidden `.sc2-safe` probe reads the action-safe box from the tokens (`--safe-t`, `--safe-b`); at merge it reads yours.
 
 - **ut (soccer-2):** pass `onQuit(us, them)` (and `quitNote` if the mode's note differs from "It counts as a loss.") to `<Arcade>` in `ut/Match.tsx`, and read `onFinish`'s 6th argument `forfeit` (`'them'` = a win however the score stood); add `'FF'` to the soccer letters in `match-debrief.ts`. **lead / ut (App.tsx draft host):** the same two for the draft play-out.
 - **nba / nfl:** soccer's `Arcade.tsx` hunks are marked "merge"; keep one forfeit block and one `wireOf` strip for all three sports. Soccer's stand-ins use nba's names (`stickGeom`, `stickOut`, `STICK_IDLE`…); soccer adds sprint-off hysteresis (1.0×) via `stickOut(s, g, prev)`, which the V2 contract asks for.
@@ -420,6 +554,8 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 - **players:** a quick throw-in's thrower carries `passKind: 'throw'` and act `'catch'` (arms up) while he holds the ball; route it to a throw clip if you add one (§5.5).
 
 ## Owner device checks
+
+- soccer-3: the 34 m frame and readability with the bigger sprites beside the real Dynamic Island (sat 59); the edge arrows as tap targets; the heartbeat haptic in Clutch (iPhone plays it only during your touches); the post shiver and the hit-stop feel (do 66 ms on a goal read as weight or as a hitch?); frame pacing on the phone itself (the dev box was overloaded).
 
 - soccer-2: the floating stick and the sprint ring under a real thumb (does 1.15× feel like a deliberate push?); a thumb resting on the stick at the whistle; A/B/C/D reach and size with one hand on the 393 phone; the pressed feel and the tick haptic (iPhone plays it only inside the touch); the pause button by the Dynamic Island; the toast line's legibility in sunlight.
 
