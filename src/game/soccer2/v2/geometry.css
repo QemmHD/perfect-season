@@ -62,8 +62,9 @@
 }
 
 /* Sideways: the 393 sizes, anchored to the corners inside the side insets. Set from JS, never from a
- * media query. */
-.ps-geo.land {
+ * media query. Wave 1: scoped to the soccer root, because basketball's controls-geometry.css (loaded with
+ * Ultimate Team) has its own .ps-geo.land with a taller safe top (100 px); whichever loaded last won. */
+.sc2.ps-geo.land {
   --ctl-a-d: 92px;
   --ctl-a-r: 24px;
   --ctl-a-b: 20px;
