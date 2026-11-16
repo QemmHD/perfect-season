@@ -52,7 +52,7 @@ export interface ResultInfo {
   /** a head-to-head played out as a game, before the results */
   showdown?: { cast: GameCastData; opp: PlayoffTeam };
   /** a head-to-head played on the field: each side's points, and whether a tie went to the better team */
-  arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; tiebreak: boolean; pens?: { us: number; them: number; won: boolean } };
+  arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; tiebreak: boolean; pens?: { us: number; them: number; won: boolean }; forfeit?: 'us' | 'them' };
 }
 
 const MODE_TAG: Record<string, string> = { classic: 'CLASSIC', blind: 'BLIND', daily: 'DAILY', '1v1': '1 VS 1' };
@@ -210,7 +210,7 @@ export function Results({
             <div className="vs-head" ref={headRef}>
               <span className="eyebrow wide">
                 {r.online ? (r.online.forfeit === 'them' ? 'Head to head · ' + r.online.opp + ' left' : 'Head to head · live') : '1 vs 1 · snake draft'}
-                {info.arcade ? (info.arcade.how === 'sim' ? ' · simmed' : ' · played') : ''}
+                {info.arcade ? (info.arcade.forfeit === 'us' ? ' · you quit' : info.arcade.how === 'sim' ? ' · simmed' : ' · played') : ''}
               </span>
               <span className={'disp vs-title stamp-in ' + (r.vs.won ? 'win' : r.vs.won === false ? 'loss' : '')}>{vsTitle}</span>
               {lb && <LbLine lb={lb} />}
