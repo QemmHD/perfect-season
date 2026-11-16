@@ -11,8 +11,9 @@
 // than the ledger's (the clock went back) freezes accrual for that day.
 //
 // Writes: none during a match (provisional seconds stay in memory, and in the device-only pending
-// key when the page hides); one when an activity banks; menu seconds at most once a minute. This is
-// not simulation code and never runs on a frame path: one interval and one capture input listener.
+// key when the page hides); one when an activity banks; menu seconds at most once a minute, and only
+// when they count (an idle or menu-only device writes nothing, so it never starts a cloud upload).
+// This is not simulation code and never runs on a frame path: one interval and one capture input listener.
 import { useEffect } from 'react';
 import { SPORT, type SportId } from '../engine/sport';
 import type { Profile } from './profile';
@@ -217,6 +218,17 @@ interface Host {
 interface Prov extends Activity {
   sec: number;
   age: number;
+  /** the Eastern day it started on */
+  day?: string;
+}
+/** What one tab parked in the device-only pending key (one entry per tab id). */
+interface Pend {
+  day: string;
+  provs: Prov[];
+  play: number;
+  menu: number;
+  raw: number;
+  acts: number;
 }
 type Sink = (fn: (p: Profile) => Profile) => void;
 
@@ -226,8 +238,17 @@ const used = new Map<string, number>();
 const banked: string[] = [];
 /** recent inputs: time (ms), x, y */
 const inputs: number[] = [];
-let sink: Sink | null = null;
-let prov: Prov | null = null;
+/** provisional activities by id, oldest first: a run left for a match and resumed later keeps its seconds */
+const provs = new Map<string, Prov>();
+let sink: Sink | null = null,
+  /** the profile's ledger as it is now (App's ref), so a flush happens only when it changes what counts */
+  read: (() => Playtime | undefined) | undefined,
+  /** the provisional activity on screen */
+  cur: Prov | undefined,
+  /** this tab's entry in the pending key, as last written */
+  pk: Pend | null = null,
+  /** the Eastern day the menu and raw buffers belong to */
+  bufDay = '';
 let play = 0,
   menu = 0,
   raw = 0,
@@ -238,14 +259,14 @@ let play = 0,
   last = 0,
   flushed = 0,
   paused = false,
-  parked = false,
   started = false,
   held = false,
   asked = -1e9,
   /** navigator.locks, read once (the getter is not free) */
   L: LockManager | undefined,
   free: (() => void) | null = null;
-const me = Math.random();
+const me = Math.random(),
+  ME = String(me);
 /** the break reminder's watcher: each counting tick, the seconds counted and the screen's context */
 let watcher: ((sec: number, ctx: PlayCtx | undefined, t: number) => void) | null = null;
 const clock = () => performance.now();
@@ -318,6 +339,17 @@ const top = (): Host | undefined => {
 };
 const live = (h?: Host) => !!(h && h.act && RULES[h.ctx]?.[3]);
 
+/** The activity's provisional record. A new one drops those of an earlier day, and the oldest past 4. */
+function provOf(a: Activity): Prov {
+  let p = provs.get(a.id);
+  if (!p) {
+    const day = etDay(Date.now());
+    for (const [k, q] of provs) if (q.day !== day || provs.size >= 4) provs.delete(k);
+    provs.set(a.id, (p = { id: a.id, sport: a.sport, kind: a.kind, sec: 0, age: 0, day }));
+  }
+  return p;
+}
+
 function tick() {
   const t = clock(),
     dt = Math.min(2, (t - last) / 1000);
@@ -330,24 +362,45 @@ function tick() {
     a = r?.[3] && !done ? h?.act : undefined,
     on = !!(h && r && !done && (!r[0] || t - lastIn <= r[0] * 1000));
   // the activity's age (for the 120 s forfeit rule) runs whether or not the player is touching
-  if (a && prov?.id !== a.id) prov = { ...a, sec: 0, age: 0 };
-  if (a && prov) prov.age += dt;
+  cur = a && (cur?.id === a.id ? cur : provOf(a));
+  if (cur) cur.age += dt;
   if (!lead(t, on)) return;
   raw += dt;
   let counted = 0;
   if (on && h && r) {
     const key = r[1] ? h.ctx + ':' + (h.act?.id ?? h.n) : '',
       u = (key && used.get(key)) || 0;
-    if ((h.ctx !== 'match' || varied(t, prov?.age ?? 0)) && (!key || u < r[1])) {
+    if ((h.ctx !== 'match' || varied(t, cur?.age ?? 0)) && (!key || u < r[1])) {
       counted = dt;
       if (key) used.set(key, u + dt);
-      if (a && prov) prov.sec += dt;
+      if (cur) cur.sec += dt;
       else if (r[2] || !h.act) menu += dt;
       else play += dt;
     }
   }
   watcher?.(counted, h?.ctx, t);
-  if (!live(h) && t - flushed >= 60000 && (menu + play >= 1 || raw >= 600)) flush();
+  // menus bank at most once a minute, and only when that changes what counts: raw time and menu
+  // seconds with no room under the 25% rule wait in memory (and the pending key) for the next real bank
+  if (!live(h) && t - flushed >= 60000) {
+    flushed = t;
+    if (gains()) flush();
+  }
+}
+
+/** Would banking the buffers now count a second or a completed activity? (Raw time alone never writes.) */
+function gains(): boolean {
+  const now = Date.now(),
+    day = etDay(now);
+  // menu and raw seconds of a day that has ended never count on the next one
+  if (bufDay !== day) {
+    if (bufDay) menu = raw = 0;
+    bufDay = day;
+  }
+  if (acts) return true;
+  if (play + menu < 1) return false;
+  const p = read?.(),
+    q = credit(p, { sec: Math.floor(play), menu: Math.floor(menu), raw: 0, sport: SPORT, act: 0 }, now);
+  return q.daySec > (p?.day === q.day ? p.daySec : 0);
 }
 
 /** Bank the buffers (and a finished activity) into the profile: one write. */
@@ -356,6 +409,7 @@ function flush(done?: Prov, complete = false) {
     if (done) (play += done.sec), (acts += complete ? 1 : 0);
     return;
   }
+  reclaim();
   const c: Credit = {
     sec: Math.floor(play) + Math.round(done?.sec ?? 0),
     menu: Math.floor(menu),
@@ -368,27 +422,60 @@ function flush(done?: Prov, complete = false) {
   raw -= Math.floor(raw);
   acts = 0;
   flushed = clock();
-  if (parked) {
-    parked = false;
-    try {
-      localStorage.removeItem(PENDING);
-    } catch {
-      // storage blocked
-    }
-  }
   const now = Date.now();
   sink((p) => ({ ...p, playtime: credit(p.playtime, c, now, !p.playtime && !p.stats.games && !p.history.length && !(p.ut.record.w + p.ut.record.l + p.ut.record.h2hW + p.ut.record.h2hL)) }));
 }
 
-/** The page is hiding: what is not banked yet goes to the device-only pending key (no profile write). */
-function park() {
-  if (!prov && menu + play + raw < 1) return;
+/** The pending key: one entry per tab id. (ut-2's first shape was one record, read as one entry.) */
+function pend(): Record<string, Pend> {
   try {
-    localStorage.setItem(PENDING, JSON.stringify({ day: etDay(Date.now()), prov, play, menu, raw, acts }));
-    parked = true;
+    const s = JSON.parse(localStorage.getItem(PENDING) ?? 'null');
+    return !s ? {} : s.tabs ?? { old: { ...s, provs: s.prov ? [s.prov] : [] } };
   } catch {
-    // storage blocked
+    return {};
   }
+}
+function keep(tabs: Record<string, Pend>): boolean {
+  try {
+    if (Object.keys(tabs).length) localStorage.setItem(PENDING, JSON.stringify({ tabs }));
+    else localStorage.removeItem(PENDING);
+    return true;
+  } catch {
+    return false; // storage blocked
+  }
+}
+
+/**
+ * This tab's parked seconds come back to memory only. If another tab started meanwhile and took
+ * them (its entry is gone), they are that tab's now, so they leave this one: counted once.
+ */
+function reclaim() {
+  if (!pk) return;
+  const tabs = pend();
+  if (tabs[ME]) {
+    delete tabs[ME];
+    keep(tabs);
+  } else {
+    play = Math.max(0, play - pk.play);
+    menu = Math.max(0, menu - pk.menu);
+    raw = Math.max(0, raw - pk.raw);
+    acts = Math.max(0, acts - pk.acts);
+    for (const q of pk.provs) {
+      const p = provs.get(q.id);
+      if (p) p.sec = Math.max(0, p.sec - q.sec);
+    }
+  }
+  pk = null;
+}
+
+/** The page is hiding: what is not banked yet goes to this tab's entry in the device-only pending key (no profile write). */
+function park() {
+  reclaim();
+  if (!provs.size && menu + play + raw < 1) return;
+  const tabs = pend(),
+    e: Pend = { day: etDay(Date.now()), provs: [...provs.values()].map((p) => ({ ...p })), play, menu, raw, acts };
+  tabs[ME] = e;
+  if (keep(tabs)) pk = e;
 }
 
 function start() {
@@ -396,18 +483,24 @@ function start() {
   started = true;
   last = flushed = clock();
   L = navigator.locks;
-  try {
-    const s = JSON.parse(localStorage.getItem(PENDING) ?? 'null');
-    if (s && s.day === etDay(Date.now())) {
-      ({ play = 0, menu = 0, raw = 0, acts = 0 } = s);
-      prov = s.prov ?? null;
-      parked = true;
-    } else if (s) localStorage.removeItem(PENDING);
-  } catch {
-    // a bad pending entry is dropped
+  // a relaunch the same day takes what earlier pages parked (ut-6 settles a killed match); older days are dropped
+  const day = (bufDay = etDay(Date.now())),
+    tabs = pend();
+  let took = false;
+  for (const [k, s] of Object.entries(tabs)) {
+    delete tabs[k];
+    if (s?.day !== day) continue;
+    took = true;
+    play += s.play || 0;
+    menu += s.menu || 0;
+    raw += s.raw || 0;
+    acts += s.acts || 0;
+    for (const q of s.provs ?? []) if (q?.id) provs.set(q.id, { ...q, day: q.day ?? day });
   }
+  if (took) tabs[ME] = { day, provs: [...provs.values()].map((p) => ({ ...p })), play, menu, raw, acts };
+  if (keep(tabs) && took) pk = tabs[ME];
   for (const type of ['pointerdown', 'pointermove', 'keydown']) document.addEventListener(type, onInput, { capture: true, passive: true });
-  document.addEventListener('visibilitychange', () => (document.visibilityState === 'hidden' ? (park(), letGo()) : (last = clock())));
+  document.addEventListener('visibilitychange', () => (document.visibilityState === 'hidden' ? (park(), letGo()) : ((last = clock()), reclaim())));
   addEventListener('pagehide', park);
   setInterval(tick, 1000);
 }
@@ -437,19 +530,22 @@ export function usePlaytime(ctx: PlayCtx, activity?: Activity): void {
  */
 export function bankActivity(id: string, how: 'complete' | 'forfeit'): void {
   if (banked.includes(id)) return;
-  const p = prov?.id === id ? prov : undefined;
-  if (p) prov = null;
+  const had = !!pk;
+  reclaim();
+  const p = provs.get(id);
+  provs.delete(id);
+  if (cur?.id === id) cur = undefined;
   if (how === 'complete') {
     banked.push(id);
     if (banked.length > 16) banked.shift();
     flush(p, true);
   } else if (p && p.age >= 120) flush(p);
-  else if (parked) park();
+  else if (had) park();
 }
 
-/** Counted seconds not in the profile yet: the activity in progress and the menu/play buffers. */
+/** Counted seconds not in the profile yet: the activity on screen and the menu/play buffers. */
 export function pendingSec(): number {
-  return Math.floor((prov?.sec ?? 0) + play + menu);
+  return Math.floor((cur?.sec ?? 0) + play + menu);
 }
 
 /** The break reminder (src/ui/BreakReminder.tsx): told every second this tab ticks. One watcher. */
@@ -466,11 +562,15 @@ export function setPlaytimePaused(v: boolean): void {
   paused = v;
 }
 
-/** App, once: where banked seconds go (the profile update). */
-export function registerPlaytimeSink(update: Sink): () => void {
+/**
+ * App, once: where banked seconds go (the profile update), and how to read the ledger as it is now
+ * (so menus write only when the 25% rule lets their seconds count).
+ */
+export function registerPlaytimeSink(update: Sink, ledger?: () => Playtime | undefined): () => void {
   sink = update;
+  read = ledger;
   start();
   return () => {
-    if (sink === update) sink = null;
+    if (sink === update) (sink = null), (read = undefined);
   };
 }

@@ -22,6 +22,7 @@ import { hqOf, rewardLabel } from './progression';
 import type { Pool } from './pool';
 import type { UtState } from './state';
 import { HQArrow } from './Clubhouse';
+import { bankActivity, usePlaytime } from '../lib/playtime';
 function MomentArena({
   m,
   pool,
@@ -52,12 +53,18 @@ function MomentArena({
     document.body.classList.add('ut-moment-playing');
     return () => document.body.classList.remove('ut-moment-playing');
   }, []);
+  // MINUTES (V2 E.1): a Moment is a live match; its seconds bank when the last attempt ends
+  const playId = 'moment:' + seed;
+  usePlaytime('match', { id: playId, sport: pool.sport, kind: 'match' });
   const attempt = (a: Attempt) => {
     if (held.current.length >= m.attempts) return;
     const next = [...held.current, a];
     held.current = next;
     setAttempts(next);
-    if (next.length === m.attempts) onFinish(next);
+    if (next.length === m.attempts) {
+      bankActivity(playId, 'complete');
+      onFinish(next);
+    }
   };
   const common = {
     seed,
@@ -93,7 +100,7 @@ function MomentArena({
       )}{' '}
       {createPortal(
         <div className="hq-moment-overlay">
-          <button onClick={onExit} aria-label="Leave Moment">
+          <button onClick={() => (bankActivity(playId, 'forfeit'), onExit())} aria-label="Leave Moment">
             <Back size={16} />
           </button>
           <span>

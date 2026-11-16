@@ -70,10 +70,13 @@ async function tab(profile = blankProfile(), relaunch = false) {
   vi.resetModules();
   const m: PT = await import('./playtime');
   const t = { m, profile, writes: 0 };
-  m.registerPlaytimeSink((fn) => {
-    t.writes++;
-    t.profile = fn(t.profile);
-  });
+  m.registerPlaytimeSink(
+    (fn) => {
+      t.writes++;
+      t.profile = fn(t.profile);
+    },
+    () => t.profile.playtime,
+  );
   return t;
 }
 
@@ -98,7 +101,7 @@ function match(t: Tab, id: string, sec: number, every = 2, how: 'complete' | 'fo
   off();
 }
 /** A screen for `sec` seconds, then left. */
-function screen(t: Tab, ctx: Parameters<PT['enterPlaytime']>[0], sec: number, every = 0, act?: ReturnType<typeof ACT>) {
+function screen(t: Tab, ctx: Parameters<PT['enterPlaytime']>[0], sec: number, every = 0, act?: Parameters<PT['enterPlaytime']>[1]) {
   const off = t.m.enterPlaytime(ctx, act);
   play(sec, every);
   off();
@@ -298,12 +301,38 @@ describe('E.1.4 banking', () => {
     expect(pt(t).daySec).toBeGreaterThanOrEqual(119);
     expect(pt(t).acts).toBe(0);
   });
-  it('an unfinished match never banks: the next one replaces it', async () => {
+  it('an unfinished match banks nothing, and the next one does not take its seconds', async () => {
     const t = await tab();
     match(t, 'ut:a', 200, 2, null);
     match(t, 'ut:b', 10);
-    t.m.bankActivity('ut:a', 'complete');
     expect(pt(t).daySec).toBeLessThanOrEqual(11);
+    expect(pt(t).acts).toBe(1);
+  });
+  it('a draft left for a match and finished later banks all of its time (review fix: one provisional per activity)', async () => {
+    const t = await tab();
+    const run = { id: 'draft:r1', sport: 'nba' as const, kind: 'draft' as const };
+    screen(t, 'draft', 120, 2, run); // drafting for 2 minutes
+    match(t, 'ut:1', 60); // leaves to play a match
+    const afterMatch = pt(t).daySec;
+    screen(t, 'draft', 60, 2, run); // resumes the same run (checkpoint, same id) and finishes it
+    t.m.bankActivity('draft:r1', 'complete');
+    expect(pt(t).daySec - afterMatch).toBeGreaterThanOrEqual(178);
+    expect(pt(t).daySec - afterMatch).toBeLessThanOrEqual(182);
+  });
+  it('at most 4 activities wait unbanked, and none from an earlier day', async () => {
+    const t = await tab();
+    for (const id of ['a', 'b', 'c', 'd', 'e']) match(t, 'ut:' + id, 30, 2, null);
+    t.m.bankActivity('ut:a', 'complete'); // the oldest of five was dropped
+    expect(pt(t).daySec).toBe(0);
+    t.m.bankActivity('ut:b', 'complete');
+    expect(pt(t).daySec).toBeGreaterThanOrEqual(29);
+    vi.setSystemTime(Date.now() + 86400_000);
+    match(t, 'ut:f', 5, 1, null); // a new day's activity drops yesterday's
+    const before = pt(t).daySec;
+    t.m.bankActivity('ut:c', 'complete');
+    expect(pt(t).day).toBe('2026-11-17');
+    expect(pt(t).daySec).toBe(0);
+    expect(before).toBeGreaterThan(0);
   });
   it('menu seconds bank once a minute, never while a match is live', async () => {
     const t = await tab();
@@ -344,12 +373,61 @@ describe('E.1.4 banking', () => {
     expect(again.writes).toBe(0);
     expect(page.store.has('perfect-season:playtime-pending:v1')).toBe(false);
   });
-  it('raw time alone (app open, no input) writes at most once every 10 minutes', async () => {
+  it('an idle visible hour (app open, no input) makes 0 profile writes; its raw time rides along with the next bank', async () => {
     const t = await tab();
-    screen(t, 'menu', 1800);
-    expect(t.writes).toBe(3);
-    expect(pt(t).daySec).toBe(0);
-    expect(pt(t).rawDaySec).toBeGreaterThanOrEqual(1790);
+    screen(t, 'menu', 3600);
+    expect(t.writes).toBe(0);
+    match(t, 'ut:1', 60);
+    expect(t.writes).toBe(1);
+    expect(pt(t).rawDaySec).toBeGreaterThanOrEqual(3655);
+    expect(pt(t).daySec).toBeLessThanOrEqual(61);
+  });
+  it('30 minutes of menus on a day with no match make 0 profile writes (the 25% rule credits none of them)', async () => {
+    const t = await tab();
+    screen(t, 'menu', 1800, 5);
+    expect(t.writes).toBe(0);
+    // a frozen day (the clock went back) writes nothing either
+    const f = await tab(blankProfile({ playtime: { ...t.m.freshPlaytime('2026-11-17'), life: 600 } }), true);
+    screen(f, 'menu', 600, 5);
+    match(f, 'ut:x', 0, 0, null);
+    expect(f.writes).toBe(0);
+  });
+  it('menu seconds wait for room: after a later match they count, up to the 25% rule, in that bank', async () => {
+    const t = await tab();
+    screen(t, 'menu', 600, 5);
+    expect(t.writes).toBe(0);
+    match(t, 'ut:1', 1200);
+    expect(t.writes).toBe(1);
+    expect(pt(t).dayMenuSec).toBeGreaterThanOrEqual(395);
+    expect(pt(t).dayMenuSec).toBeLessThanOrEqual(400);
+  });
+  it('menu and raw seconds of a day that ended do not count on the next', async () => {
+    const t = await tab();
+    screen(t, 'menu', 600, 5);
+    vi.setSystemTime(Date.now() + 86400_000);
+    screen(t, 'menu', 61);
+    match(t, 'ut:1', 30);
+    expect(pt(t).day).toBe('2026-11-17');
+    expect(pt(t).dayMenuSec).toBe(0);
+    expect(pt(t).rawDaySec).toBeLessThan(200);
+  });
+  it('a second tab started the same day takes what a hidden tab parked; the first one gives it up (counted once)', async () => {
+    const a = await tab();
+    a.m.enterPlaytime('match', ACT('ut:a'));
+    play(150);
+    page.visibilityState = 'hidden';
+    page.fire('visibilitychange');
+    page.lock = null;
+    // the first tab is alive in the background; a second one opens and settles the parked match
+    page.visibilityState = 'visible';
+    const b = await tab(a.profile);
+    b.m.bankActivity('ut:a', 'forfeit');
+    expect(pt(b).daySec).toBeGreaterThanOrEqual(148);
+    // the first tab comes back and finishes its match: only the seconds after its return count there
+    page.fire('visibilitychange');
+    play(30);
+    a.m.bankActivity('ut:a', 'complete');
+    expect((a.profile.playtime?.daySec ?? 0) + pt(b).daySec).toBeLessThanOrEqual(150 + 32);
   });
 });
 
@@ -357,7 +435,7 @@ describe('E.1 menus are at most 25% of the day', () => {
   it('menus alone count nothing; after a 30-minute match, at most 10 menu minutes count', async () => {
     const t = await tab();
     screen(t, 'menu', 600, 5);
-    expect(pt(t).daySec).toBe(0);
+    expect(t.profile.playtime?.daySec ?? 0).toBe(0);
     match(t, 'ut:1', 1800);
     screen(t, 'menu', 1800, 5);
     expect(pt(t).dayMenuSec).toBe(600);

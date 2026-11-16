@@ -80,8 +80,11 @@ export function mergePlaytime(a: Playtime | undefined, b: Playtime | undefined):
     sameWeek = a.week === b.week,
     ca = a.claimed,
     cb = b.claimed,
-    lk = (x: Playtime) => x.league.lastWeek?.week ?? x.league.season,
-    lg = lk(a) >= lk(b) ? a.league : b.league;
+    // the newer league: by last week when both have one ("2026-W47"), else by season number ("S2")
+    wa = a.league.lastWeek?.week,
+    wb = b.league.lastWeek?.week,
+    sn = (x: Playtime) => parseInt(x.league.season.slice(1), 10) || 0,
+    lg = (wa && wb ? wa >= wb : sn(a) !== sn(b) ? sn(a) > sn(b) : !!wa || !wb) ? a.league : b.league;
   const pair = (k: "day" | "week", key: "dayKey" | "weekKey") =>
     ca[key] === cb[key] ? union(ca[k], cb[k]).sort((x, y) => x - y) : ((ca[key] ?? "") > (cb[key] ?? "") ? ca : cb)[k];
   const m: Playtime = {

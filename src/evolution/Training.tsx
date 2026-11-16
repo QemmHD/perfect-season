@@ -13,6 +13,7 @@ import { Hoops2, kitsFor } from '../game/hoops2/Hoops2';
 import { Football2, fbKitsFor } from '../game/football2/Football2';
 import type { Profile } from '../lib/profile';
 import { sfx } from '../lib/sound';
+import { bankActivity, usePlaytime } from '../lib/playtime';
 import { ArenaHero } from '../ui/Hero';
 import { Confetti } from '../ui/common';
 import { getPool } from '../ut/pool';
@@ -76,8 +77,12 @@ export function Training({
   const lineup = useMemo(sample, []),
     successes = results.filter((r) => r.success).length,
     done = results.length >= 10;
+  // MINUTES (V2 E.1): each drill run is a live match, banked when its 10 reps are done; the camp's menus stay menus
+  const campId = 'camp:' + (drill?.id ?? '') + ':' + round;
+  usePlaytime(playing && drill && !done ? 'match' : 'menu', playing && drill ? { id: campId, sport: SPORT, kind: 'match' } : undefined);
   useEffect(() => {
     if (!done || !drill) return;
+    bankActivity(campId, 'complete');
     const next = {
       ...records,
       [drill.id]: Math.max(records[drill.id] ?? 0, successes),
@@ -243,7 +248,7 @@ export function Training({
           <div className="camp-overlay">
             <button
               aria-label="Leave training"
-              onClick={() => setPlaying(false)}
+              onClick={() => (bankActivity(campId, 'forfeit'), setPlaying(false))}
             >
               ← CAMP
             </button>

@@ -10,6 +10,11 @@
 //     with the CPU throttled 4x (thread time, so other load on this shared machine stays out of it;
 //     the throttler's own slices still land in some calls, hence the median): must be <= 0.2 ms.
 //   node scripts/qa/ut-minutes.mjs [--sport nba|nfl|soccer|all] [--speed 4] [--cpu 4]
+// ut-2 review fixes, two more cases (--case match|moment|menus, default match):
+//   moment: a Moment (NBA/NFL) played for 150 s with the thumb tapping, then left: 0 profile writes
+//     while it plays (it is a live match, not a menu) and exactly 1 when leaving banks it as a forfeit;
+//   menus: 3 minutes of tapping around UT menus on a day with no match: 0 profile writes (the 25%
+//     rule credits none of it, so nothing is saved and no cloud upload starts).
 // Writes O/shots/ut/ut-2/minutes-<sport>.json and a result screenshot. Needs the dev server on 5212.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -25,9 +30,68 @@ const BASE = arg('base', 'http://localhost:5212/');
 const OUT = arg('out', '/tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/shots/ut/ut-2');
 const SPEED = +arg('speed', '4');
 const CPU = +arg('cpu', '4');
-const SPORTS = arg('sport', 'nba') === 'all' ? ['nba', 'nfl', 'soccer'] : [arg('sport', 'nba')];
+const CASE = arg('case', 'match');
+const SPORTS = arg('sport', 'nba') === 'all' ? (CASE === 'moment' ? ['nba', 'nfl'] : ['nba', 'nfl', 'soccer']) : [arg('sport', 'nba')];
 const RELAY_OK = ['localhost:7777', '127.0.0.1:7777'];
 fs.mkdirSync(OUT, { recursive: true });
+
+/** The thumb: a tap every 1.5 s at a different spot, until stopped. */
+const thumb = (page) =>
+  page.evaluate(() => {
+    window.__tap = 0;
+    const tap = () => {
+      const n = window.__tap++;
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 40 + ((n * 67) % 300), clientY: 200 + ((n * 41) % 420), pointerType: 'touch' }));
+    };
+    tap();
+    window.__tapper = setInterval(tap, 1500);
+    return performance.now();
+  });
+const ledger = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:v1')).playtime ?? null);
+
+/** --case moment / menus (review fixes): profile writes while a Moment plays, and while menus are browsed with no match. */
+async function other(page, sport) {
+  await page.getByRole('button', { name: /Ultimate Team:/ }).click();
+  await page.locator('.ut-tabs').waitFor({ timeout: 90000 });
+  await page.waitForFunction(() => !document.querySelector('.ut-loading'), null, { timeout: 90000 });
+  if (CASE === 'menus') {
+    const w0 = await page.evaluate(() => window.__writes.length);
+    const pw0 = await page.evaluate(() => window.__ptWrites ?? 0);
+    const t0 = await thumb(page);
+    const tabs = ['PLAY', 'SQUAD', 'CLUB', 'CHALLENGES', 'HOME'];
+    for (let i = 0; i < 18; i++) {
+      await page.locator('.ut-tabs button').filter({ hasText: tabs[i % tabs.length] }).first().click().catch(() => {});
+      await page.waitForTimeout(10000);
+    }
+    const r = await page.evaluate((t0) => (clearInterval(window.__tapper), { secs: (performance.now() - t0) / 1000 }), t0);
+    const writes = (await page.evaluate(() => window.__writes.length)) - w0;
+    const ledgerWrites = (await page.evaluate(() => window.__ptWrites ?? 0)) - pw0;
+    return { menuSec: +r.secs.toFixed(0), profileWrites: writes, ledgerWrites, playtime: await ledger(page), ok: ledgerWrites === 0 };
+  }
+  await page.locator('.ut-tabs button').filter({ hasText: 'PLAY' }).first().click();
+  await page.waitForTimeout(800);
+  await page.locator('.play-mode').filter({ hasText: 'MOMENTS' }).first().click();
+  await page.locator('.hq-moment-tile').first().click();
+  await page.getByRole('button', { name: /PLAY MOMENT|PLAY AGAIN/ }).click();
+  await page.locator('.hq-moment-overlay').waitFor({ timeout: 90000 });
+  const before = await ledger(page);
+  const w0 = await page.evaluate(() => window.__writes.length);
+  const t0 = await thumb(page);
+  await page.waitForFunction(() => window.__momentEnd, null, { timeout: 150000 }).catch(() => {});
+  const left = await page.locator('.hq-moment-overlay').isVisible();
+  if (left) await page.getByRole('button', { name: 'Leave Moment' }).click();
+  await page.waitForTimeout(1500);
+  // writes before the arena went are during play; the bank is the first write after it
+  const w = await page.evaluate(({ t0, w0 }) => (clearInterval(window.__tapper), { end: window.__momentEnd, writes: window.__writes.slice(w0), t0 }), { t0, w0 });
+  const secs = (w.end - t0) / 1000;
+  const during = w.writes.filter((t) => t < w.end - 50).length;
+  // the bank and the Moment's own result save land in the same React update (one write) or two
+  const atBank = w.writes.filter((t) => t >= w.end - 50 && t < w.end + 1000).length;
+  const after = await ledger(page);
+  const counted = (after?.daySec ?? 0) - (before?.daySec ?? 0);
+  await page.screenshot({ path: path.join(OUT, 'minutes-' + sport + '-moment.png') });
+  return { activeSec: +secs.toFixed(1), countedSec: counted, writesDuringPlay: during, writesAtEnd: atBank, finishedByItself: !left, ok: during === 0 && atBank >= 1 && counted >= Math.min(120, secs * 0.9) && counted <= secs + 3 };
+}
 
 async function phone(browser, sport) {
   const context = await browser.newContext({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1, reducedMotion: 'reduce' });
@@ -57,12 +121,21 @@ async function phone(browser, sport) {
     const set = Storage.prototype.setItem;
     window.__writes = [];
     Storage.prototype.setItem = function (k, v) {
-      if (k === 'perfect-season:profile:v1') window.__writes.push(performance.now());
+      if (k === 'perfect-season:profile:v1') {
+        window.__writes.push(performance.now());
+        // writes that change the MINUTES ledger (the ticker's own), apart from other UT saves
+        const pt = JSON.stringify(JSON.parse(v).playtime ?? null);
+        if (pt !== window.__pt) (window.__ptWrites = (window.__ptWrites ?? 0) + 1), (window.__pt = pt);
+      }
       return set.call(this, k, v);
     };
     // when the arena first shows (the match's play stage starts)
     new MutationObserver(() => {
       if (!window.__arcadeAt && document.querySelector('.screen.arcade')) window.__arcadeAt = performance.now();
+      // a Moment's arena: when it shows and when it goes (finished or left)
+      const m = !!document.querySelector('.hq-moment-overlay');
+      if (m && !window.__momentAt) window.__momentAt = performance.now();
+      if (!m && window.__momentAt && !window.__momentEnd) window.__momentEnd = performance.now();
     }).observe(document, { childList: true, subtree: true });
     window.__long = [];
     try {
@@ -112,6 +185,16 @@ try {
   for (const sport of SPORTS) {
     const { context, page, errors, blocked, sockets } = await phone(browser, sport);
     await page.locator('.home .playbar').waitFor({ timeout: 90000 });
+    if (CASE !== 'match') {
+      const r = { sport, case: CASE, ...(await other(page, sport)), errors, blockedHosts: [...new Set(blocked)], sockets };
+      r.ok = r.ok && !errors.length && !sockets.refused.length;
+      fs.writeFileSync(path.join(OUT, 'minutes-' + sport + '-' + CASE + '.json'), JSON.stringify(r, null, 1));
+      console.log(JSON.stringify(r));
+      console.log(sport + ' ' + CASE + ': ' + (r.ok ? 'PASS' : 'FAIL'));
+      if (!r.ok) failed = true;
+      await context.close();
+      continue;
+    }
     if (SPEED !== 1)
       await page.evaluate(async (speed) => {
         const code = await (await fetch('/src/game/Arcade.tsx')).text();

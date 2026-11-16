@@ -256,8 +256,9 @@ export function App() {
 
   const update = (fn: (p: Profile) => Profile) => setProfile((p) => fn(p));
   // Claude 2026-11-16 (V2 E.1): MINUTES. Banked seconds land in the profile; each screen says what it is
-  useEffect(() => registerPlaytimeSink(update), []);
-  usePlaytime(PLAY_CTX[screen] ?? 'menu', run ? { id: playId(run), sport: SPORT, kind: 'draft' } : undefined);
+  useEffect(() => registerPlaytimeSink(update, () => profileRef.current.playtime), []);
+  // the run is the activity only while it is unfinished (and on its own results); a queue is never part of an old run
+  usePlaytime(PLAY_CTX[screen] ?? 'menu', run && screen !== 'search' && (!run.result || screen === 'results') ? { id: playId(run), sport: SPORT, kind: 'draft' } : undefined);
   // ut-3: the break reminder waits out the timed draft vote, a Gauntlet climb and Training Camp
   useEffect(() => holdBreak('app', screen === 'vote' || screen === 'gauntlet' || screen === 'training'), [screen]);
 

@@ -87,6 +87,17 @@ describe('cloud apply path: mergePlaytime', () => {
     const r = mergePlaytime(b, a)!;
     expect([r.daySec, r.life, r.claimed.day, r.league.tier]).toEqual([m.daySec, m.life, m.claimed.day, m.league.tier]);
   });
+  it('the newer league compares like with like: weeks when both have one, else season numbers', () => {
+    const lg = (season: string, week?: string, tier = 1): Playtime => ({ ...ledger(10), league: { tier, season, best: tier, ...(week ? { lastWeek: { week, rank: 1, am: 0, moved: 0 as const } } : {}) } });
+    // a season string alone must not beat a real week of a later season ('2' sorts before 'S')
+    for (const [x, y] of [[lg('S1'), lg('S2', '2026-W53', 4)], [lg('S2', '2026-W53', 4), lg('S1')]] as const) expect(mergePlaytime(x, y)!.league.tier).toBe(4);
+    // a later season with no finished week yet beats an earlier season's week
+    expect(mergePlaytime(lg('S3', undefined, 5), lg('S2', '2027-W02', 2))!.league.tier).toBe(5);
+    expect(mergePlaytime(lg('S2', '2027-W02', 2), lg('S3', undefined, 5))!.league.tier).toBe(5);
+    // same season: the ledger that has finished a week is newer; two weeks compare as weeks
+    expect(mergePlaytime(lg('S2', undefined, 1), lg('S2', '2026-W50', 3))!.league.tier).toBe(3);
+    expect(mergePlaytime(lg('S2', '2026-W51', 2), lg('S2', '2026-W50', 3))!.league.tier).toBe(2);
+  });
   it('different days: the later day’s counts and claims, the week per weekday, the lifetime max', () => {
     const mon = ledger(50);
     const tue = { ...credit(ledger(10), { sec: 1200, menu: 0, raw: 1200, sport: 'nba', act: 1 }, MON + DAY), claimed: { day: [0, 1], week: [], life: [], dayKey: '2026-11-17', weekKey: '2026-W47' } };
