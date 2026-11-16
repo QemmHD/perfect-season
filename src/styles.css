@@ -723,6 +723,13 @@ button:focus-visible {
   flex-direction: row;
   justify-content: center;
   gap: 10px;
+  /* Wave 1: a word never breaks inside itself ("PERFEC/T SEASO/N" at 320 when the web font is missing and
+     the fallback runs wider): the two words sit side by side, or one under the other */
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.logo .disp {
+  white-space: nowrap;
 }
 .fit-normal .logo .disp {
   font-size: 49px;
