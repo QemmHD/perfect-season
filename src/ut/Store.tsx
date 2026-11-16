@@ -124,7 +124,7 @@ function OddsSheet({ def, sport, onClose }: { def: PackDef; sport: UtSport; onCl
               {pct(goldBand(86, 100))}; a “Gold 78+” slot uses the same curve from 78 up. Rare golds are a shimmer on the top 35% at each position, not a slot.
             </p>
           )}
-          {def.prefer && <p className="note">Golds in this pack prefer players you don’t own yet, at the overall drawn, so these odds are the least you get.</p>}
+          {def.prefer && <p className="note">Golds in this pack prefer players you don’t own yet, at the overall drawn or higher, never lower, so these odds are the least you get.</p>}
           <button className="btn" onClick={() => close()}>
             CLOSE
           </button>

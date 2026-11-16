@@ -319,7 +319,7 @@ These are modelled on the EA FC 27 research notes. Every rating threshold goes t
 
 **Holographic variants**
 - Same stats as the edition, plus a pointer-following holo shine written from scratch (colour-dodge sheen, diffraction grating, sparkle field).
-- 4% of the special editions (Standout, Hot Season, Landmark, Legend) drawn in packs come out holo.
+- 5% of the special editions (Standout, Hot Season, Landmark, Legend) drawn in packs come out holo, and only from a slot that rolls for its special. A guaranteed Standout, program or Legend slot is never holo (`holoChanceOf`, packs-2; it was 4% of every special before).
 - They are never in picks, SBC rewards or the market.
 
 **Walkout sequence**

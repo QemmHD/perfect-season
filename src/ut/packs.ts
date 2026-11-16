@@ -404,17 +404,17 @@ export interface CurveOpts {
 
 /**
  * With `owned`, the cards at overall `at` the player doesn't own; when he owns them all, those at the
- * nearest overall above, then below (+1, −1, +2, …, within [lo, hi]); empty when he owns everything.
- * Moving up first means the protection never lowers a published chance.
+ * nearest overall above (+1, +2, … up to `hi`); empty when he owns every card from `at` up, and the
+ * caller then gives a card at `at` (a duplicate). It never steps below `at`, so for every overall x the
+ * chance of x or better with the protection is at least the published (fresh-club) chance.
+ * (Claude, packs-2 review fix: it used to try −1 after +1 at each distance, which lowered 84+ / 88+ rates.)
  */
-function unownedNear(idx: Map<number, RatedCard[]>, at: number, lo: number, hi: number, owned: ReadonlySet<string>): RatedCard[] {
-  const free = (o: number) => (idx.get(o) ?? []).filter((rc) => !owned.has(rc.line.id));
-  let fresh = free(at);
-  for (let d = 1; !fresh.length && (at + d <= hi || at - d >= lo); d++) {
-    if (at + d <= hi) fresh = free(at + d);
-    if (!fresh.length && at - d >= lo) fresh = free(at - d);
+function unownedNear(idx: Map<number, RatedCard[]>, at: number, hi: number, owned: ReadonlySet<string>): RatedCard[] {
+  for (let o = at; o <= hi; o++) {
+    const fresh = (idx.get(o) ?? []).filter((rc) => !owned.has(rc.line.id));
+    if (fresh.length) return fresh;
   }
-  return fresh;
+  return [];
 }
 
 /** The top overall a curve reaches on a sport's scale. */
@@ -438,7 +438,7 @@ export function curvePick(list: readonly RatedCard[], curve: Curve, floor: numbe
   const idx = byOvr(list);
   const at = nearestPresent(idx, want, floor, top);
   if (at === null) return null;
-  const fresh = opts?.owned?.size ? unownedNear(idx, at, floor, top, opts.owned) : [];
+  const fresh = opts?.owned?.size ? unownedNear(idx, at, top, opts.owned) : [];
   return uniform(fresh.length ? fresh : idx.get(at)!, rand);
 }
 
@@ -484,7 +484,7 @@ export function goldsOf(pool: Pool, positions?: readonly string[]): RatedCard[] 
  * weights), then a card there uniformly. Only when no position of the mix has that overall does it move
  * to the nearest one that does (−1, +1, …). `owned` turns on the preference for cards the player
  * doesn't own: at the drawn overall at that position, then at any of the mix's positions, then the
- * nearest overall above or below (unownedNear).
+ * nearest overall above (unownedNear, never below: a duplicate at the drawn overall instead).
  */
 export function drawGold(pool: Pool, floor: number, rand: Rand, mix?: [string, number][], owned?: ReadonlySet<string>): RatedCard | null {
   const sport = pool.sport;
@@ -504,7 +504,7 @@ export function drawGold(pool: Pool, floor: number, rand: Rand, mix?: [string, n
   const here = byOvr(golds[pos]).get(at)!;
   if (owned?.size) {
     const free = here.filter((rc) => !owned.has(rc.line.id));
-    const fresh = free.length ? free : unownedNear(all, at, lo, top, owned);
+    const fresh = free.length ? free : unownedNear(all, at, top, owned);
     if (fresh.length) return uniform(fresh, rand);
   }
   return uniform(here, rand);

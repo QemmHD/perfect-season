@@ -499,7 +499,7 @@ At most 3 full walkouts a pack, best last. The rest become level-1 flashes insid
 | QS Spotlight / GOAT (NBA) | 30 / 30 (NFL 10 / 10) | D2 ranges; strictly monotone by D1 at min/median/max |
 | Auto-fill with a Spotlight 104 MJ in the club | in 7 SBCs | 0 |
 | Per G75 slot: 85+ / 86+ / 88+ | n/a | 1.0% ± 0.08 / 0.58% ± 0.06 / 0.20% ± 0.04 (200k draws) |
-| Gold-pack golds 75–79 / 80–82 / 83–85 / 86+ | 64.7 / 28.7 / 5.7 / ≈1.0% | 45 / 49 / 5 / 0.7 (± 2) |
+| Any-gold (G75) slot band split 75–79 / 80–82 / 83–85 / 86+ | Gold-pack golds 64.7 / 28.7 / 5.7 / ≈1.0% | 45 / 49 / 5 / 0.7 (± 2) per any-gold slot. The whole Gold pack reads about 42 / 52 / 5.5 / 0.6 because research's slot list makes one of its golds a G78 (packs-2 review: target confirmed as per-slot; lead to confirm) |
 | `rewardCard` 84+ (Golden Hour) | uniform over every 84+ gold | G84 curve: 85+ 42% ± 3, 86+ 24% ± 3 |
 | Market 83+ items a day / max OVR | Hot Season 94–97 ×2 + Standout + rare 83–91 | ≤ 1 / ≤ 86, priced ≥ 25% of `routeCost` |
 | Swap Desk Scout picks a day | 3 | 1 |
@@ -509,7 +509,7 @@ At most 3 full walkouts a pack, best last. The rest become level-1 flashes insid
 | Boosted program row | n/a | min(0.6, 1.5 × base) ± 0.1 pt, for program packs (**[V2]** Headliners and Vault cut) |
 | Daily Upgrade / repeatable SBC value out ÷ in (D10) | unmeasured | 1.1–1.3 / 0.9–1.1 |
 | Odds sheet | tiers per slot only | bands, tiers, holo, featured, effective program rate with pity; ±1.5 pt of 10k sim |
-| Duplicates at 200 packs | Elite 27%; NFL LB/DL/OL Unit 39–47% | Elite ≤ 20%; Units ≤ 35%; guarantees 0% while any of the set is unowned |
+| Duplicates at 200 packs | Elite 27%; NFL LB/DL/OL Unit 39–47% | Elite ≤ 20% (NFL: the pool's floor + 1 pt, about 24%, because 2,400 cards from about 1,850 golds 82+ must repeat at least 23%); Units ≤ 35%; guarantees 0% while any of the set is unowned |
 | Ladder (NBA coins) | HS ≈2,100, Spotlight ≈17,500, Legend ≈177,000 | D5 table |
 | Hot Season shown vs played (NFL Ferguson '77) | shown 94, face THP 99, played 79 | shown = season + d ≤ 95; max \|face − played\| ≤ 1 |
 | GOAT faces at the cap (Brady) | 5 of 6 at 110 | ≤ 2 (D4) |
@@ -770,7 +770,7 @@ Three tasks are 3.5 h because of the 10-task cap. Each has an explicit internal 
 - **Registered seeds:** the 20 frozen seeds per sport rebuild the same ids. The test is gated on `FOREIGN_FINGERPRINT`.
 - **Holo:** 0 holos in guaranteed slots over 10k Standout Guarantees; 5% ± 0.6 of special cards from random slots.
 - **Duplicates at 200 packs** (one player, same pack in a row):
-  - Elite ≤ 20%;
+  - Elite ≤ 20% (NFL: the pool's own floor + 1 pt; see section 3);
   - NFL LB/DL/OL Unit ≤ 35%;
   - Standout Guarantee and Program Guarantee repeat an owned card 0% while any of the set is unowned.
 - **Reward card:** `rewardCard` 84+ over 10k draws gives 85+ 42% ± 3 and 86+ 24% ± 3.

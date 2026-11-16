@@ -11,6 +11,7 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 | packs-2: real-pack odds for every source, Player Pick 84+, Scout Drop tables | done | see `git log` (subject "packs-2") |
 | packs-1 review fixes (SBC stamps, pick cap, confirm, auto-fill, unknown pack tile) | done | see `git log` (subject "packs-1 review fixes") |
 | packs-3: prices, limits and exploits | done | see `git log` (subject "packs-3") |
+| packs-2 review fixes (protection never lowers a published chance; acceptance wording; holo doc) | done | see `git log` (subject "packs-2 review fixes") |
 | packs-4 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
@@ -338,7 +339,7 @@ None. Stamps are economy only; no match reads them.
 
   Headliners and Franchise Vault are cut (D16): no new buyable kind.
 - **Holo 5%, only from a rolled slot.** `HOLO_CHANCE` 4% → 5% (`variants.ts`), and `holoChanceOf(slot, tier)` is 0 when the slot's chance of that tier is 1: a guaranteed Standout, program card or Club Collection Standout is never holo now.
-- **Chase duplicate protection.** With the club's card ids (`openPack(…, { owned })`), a Standout slot never gives an owned Weekly Standout and a program slot never an owned program card while any of that set is unowned (it redraws among the unowned). Position/Unit packs, Elite Gold and the 84+ / 85+ picks also prefer golds the club doesn't own: at the drawn overall at that position, then at the mix's other positions, then the nearest overall **above**, then below. A fresh club draws exactly the published curve, and the protection can only raise a published chance, so the odds sheet shows them as minimums ("these odds are the least you get").
+- **Chase duplicate protection.** With the club's card ids (`openPack(…, { owned })`), a Standout slot never gives an owned Weekly Standout and a program slot never an owned program card while any of that set is unowned (it redraws among the unowned). Position/Unit packs, Elite Gold and the 84+ / 85+ picks also prefer golds the club doesn't own: at the drawn overall at that position, then at the mix's other positions, then the nearest overall **above** (up to the curve's top). It never steps below the drawn overall: when the club owns every card from there up, it gives a duplicate at the drawn overall. A fresh club draws exactly the published curve, and the protection can only raise a published chance, so the odds sheet shows them as minimums ("these odds are the least you get"). (The first packs-2 commit also tried the overall below after each one above, which lowered 84+ / 88+ rates; fixed after review, see "packs-2 review fixes".)
 - **Initial re-prices (packs-3 tunes them all again).** Golds on the curve sell for more (gold mean 77.9 → 79.9), so the packs that went above 63% EV were re-priced to about 57–59%: NBA Silver 400 → 500, Gold 900 → 1,050, Position 700 → 800, Roster Builder 1,500 → 1,700; NFL Silver 320 → 350, Gold 900 → 1,000, Unit 500 → 575, Roster Builder 900 → 1,100; soccer Silver 380 → 450. Elite Gold's re-spec is priced on its value: research's 3,000 would return 42%, so NBA 2,200 → 2,600, NFL 1,500 → 1,800, soccer stays 1,900 (about 49%). Soccer's Captains and Dynasty had fallen to 35% when packs-1 moved Standout quick-sell under Hot Season: 2,300 → 1,450 and 4,300 → 2,700. `NOMINAL_PRICE` (stamps for earned packs) follows: a MINUTES Silver is now 5 / 3 / 4 stamps.
 - **`src/ut/drop-tables.ts` (V2.4 E, D14), pure: imports only the seeded rng and types.** `dropTable`, `dropOdds` (exact, every tap path enumerated), `rollDrop(seed, sport, index)` (deterministic per seed, `path` = the tier after each of the 3 taps, so the reveal plays only what was rolled), `dropValue` / `dropEv` (coins, stamps at 11, packs at their measured quick-sell value). Drop 1 is ut's Scout Reveal unchanged: Silver Pack + 100 coins, each tap upgrading the pack (→ Gold 35%, → Premium 25%, → Jumbo 15%) and **the first miss settling it** (`stopOnMiss: true`, the only reading that gives ut's published 65.0 / 26.25 / 7.44 / 1.31%). Drops 2–3 start Common, each tap upgrading Common 20% / Rare 25% / Epic 30%, a miss only spending that tap: 51.2 / 36.05 / 11.25 / 1.5%; Common 25 coins, Rare 45, Epic 60 + 3 stamps, Legendary a Silver Pack.
 - **`src/ut/pack-actions.ts`: the packs team's one hook in `UltimateTeam.tsx`.** `usePackActions(ut)` → `openOpts()` (the owned card ids, memoised on `ut.owned`) and `limitOf(kind)` (the limit kind of an Elite, Jumbo, Standout or Lightning pack, from `LIMITED_PACKS` in `content-packs.ts`). Named `limitOf` rather than the plan's `canBuy`, because the buy flow needs which limit routes the purchase, not a yes/no (it checks the count itself).
@@ -435,7 +436,7 @@ Live Calendar program packs (NBA): First Tip Pack EV 0.53 → 0.57, P(≥1 84+) 
 | G75 slot, 200,000 draws: 85+ 1.0% ± 0.08, 86+ 0.58% ± 0.06, 88+ 0.20% ± 0.04 | pass in NBA, NFL and soccer (`pack-curve` suite) |
 | Gold-pack band split 45 / 49 / 5 / 0.7 ± 2 | the any-gold slots: 45.0 / 49.2 / 5.2 / 0.6 (tested, all sports). The whole Gold pack's golds read 41.3 / 52.8 / 5.4 / 0.6 (NBA) because research's slot list makes one of its three golds a G78; that is the research's own odds sheet (Gold NBA 80+ 93%, 82+ 53%), so the 45 / 49 / 5 / 0.7 target is the per-slot curve, which holds |
 | Registered-receipt seeds rebuild identical ids (fingerprint-gated); 0 holos in guaranteed slots | the 20 frozen receipts per sport equal the packs-1 fixture (`packs-economy` suite, gated on `FOREIGN_FINGERPRINT`); 0 holos in 10,000 Standout Guarantees; 5.0% ± 0.6 holo among specials from a rolled slot |
-| Duplicates at 200 packs: Elite ≤ 20%, NFL Units ≤ 35%, guarantees 0% while any of the set is unowned | Elite NBA 27% → 2%, soccer 31% → 2%; **NFL 40% → 23%**: NFL Elite opens 2,400 cards in 200 packs from about 1,850 golds 82+, so at least 23% must repeat; the test holds NFL to that floor + 1 pt. NFL Units 33–47% → 0–18% (LB 18%). Standout and Program Guarantees 0% |
+| Duplicates at 200 packs: Elite ≤ 20%, NFL Units ≤ 35%, guarantees 0% while any of the set is unowned | Elite NBA 27% → 2%, soccer 31% → 2%; **NFL 40% → 23%**: NFL Elite opens 2,400 cards in 200 packs from about 1,850 golds 82+, so at least 23% must repeat; the test holds NFL to that floor + 1 pt. NFL Units 33–47% → 0–18% (LB 18%) in the first packs-2 commit; **after the packs-2 review fix** (protection never steps below the drawn overall) QB-RB-K 6.3%, WR-TE 3.9%, OL 15.9%, DL 20.3%, DB 34.7%, **LB 53.5%**: each is its upward-only floor (see "packs-2 review fixes"). Standout and Program Guarantees 0% |
 | pick-84 over 10k awards: every option ≥ 84, three distinct, none special; repeat id a no-op | pass in all sports; it also prefers unowned golds (tested) |
 | `dropOdds` = 200k `rollDrop` ± 0.5 pt; drops 2–3 51.2 / 36.05 / 11.25 / 1.5%, drop 1 65.0 / 26.25 / 7.44 / 1.31%; drops 2–3 EV 35–45 | exact and within 0.5 pt in all sports; EV NBA 43.9, NFL 42.6, soccer 43.4 coin-equivalents |
 | pick-84 and a Scout Drop roll in the browser at 393 with 0 page errors | pass (below) |
@@ -671,6 +672,47 @@ None. Prices, limits, odds, boosts and SBC requirements don't touch matches, and
 - The "scout-market 24 cards" offers (s5 Market Frenzy, s8 Midnight Market) are ignored. A 24-card market is new behaviour for a later task, and `flashOfferIssues` lists them.
 - The sale's `gift` packs (Black Friday's Gold, Christmas's Premium) are not paid. That is a free reward with its own claim, which belongs with packs-7's launch moment.
 - packs-4 replaces the odds sheet with the computed one (it already shows the boosted row).
+
+## packs-2 review fixes (after the independent review of c78475d..35a8181)
+
+Fixed on top of packs-3. No storage key, card or copy id, claim id or receipt changes; no new saved field. Protocol: none (pack contents only).
+
+### What changed and why
+
+- **Duplicate protection can no longer lower a published chance (medium).** `unownedNear` (packs.ts) searched +1 then −1 at each distance, so a club owning every card at the drawn overall and the one above got a card *below* the drawn overall even when unowned cards existed higher up. The odds sheet's "these odds are the least you get" was false for exactly the `prefer` packs. Now the search is upward only: unowned cards at the drawn overall at that position, then at the mix's other positions, then the nearest overall above (up to the curve's top); when the club owns everything from there up, it gives a duplicate **at the drawn overall**, never lower. With the same random numbers, the protected card is never below the fresh one, so P(x or better) ≥ the published value for every x. The Store note now reads "… at the overall drawn or higher, never lower, so these odds are the least you get."
+- Measured with paired seeds, 1,500 packs, counting packs 300–1,500 (share of golds, `scripts/packs/protect.ts`): fresh → protected.
+
+  | Pack | 84+ old code | 84+ fixed | 88+ old code | 88+ fixed |
+  |---|---|---|---|---|
+  | NBA PG | 2.667 → 2.556 | 2.667 → 2.667 | 0.222 → 0.222 | 0.222 → 0.222 |
+  | NBA SG | 2.444 → 2.139 | 2.444 → 2.444 | 0.306 → 0.306 | 0.306 → 0.306 |
+  | NBA SF | 2.806 → 2.611 | 2.806 → 2.806 | 0.139 → 0.111 | 0.139 → 0.139 |
+  | NBA PF | 2.861 → 2.667 | 2.861 → 2.861 | 0.194 → 0.167 | 0.194 → 0.194 |
+  | NBA C | 2.694 → 2.472 | 2.694 → 2.694 | 0.250 → 0.250 | 0.250 → 0.250 |
+  | NFL QB-RB-K | 2.556 → 2.444 | 2.556 → 2.556 | 0.292 → 0.278 | 0.292 → 0.292 |
+  | NFL WR-TE | 2.125 → 2.111 | 2.125 → 2.125 | 0.222 → 0.222 | 0.222 → 0.222 |
+  | Elite NBA / NFL | unchanged | unchanged | unchanged | unchanged |
+
+  (NFL OL reads 2.514 → 2.500 in both builds: that is the in-pack no-repeat redraw changing the random sequence, one card in about 7,200, not the protection.)
+- **The cost: thin NFL units repeat more.** The old downward step was what held NFL LB to 18% duplicates at 200 packs. Honest odds and few duplicates conflict on a thin unit: LB has 1,016 golds but only 433 of them 78+, against 1,200 draws (4 G75 + 2 G78 a pack). The fewest repeats any protection can reach without giving a card under the drawn overall (expected draws per overall, matched top-down to cards at that overall or above) is QB-RB-K 6.0%, WR-TE 6.0%, OL 16.2%, DL 21.4%, DB 35.0%, **LB 53.1%**; the protection measures 6.3 / 3.9 / 15.9 / 20.3 / 34.7 / 53.5%, i.e. at the floor. NBA positions have a floor of 0. The `pack-curve` test now holds NFL Units to max(35%, upward-only floor + 2 pt), like the Elite floor rule. **For the lead:** the alternatives are a smaller LB Unit pack, folding LB into a wider front-seven unit, or accepting it (200 LB packs is about 115,000 coins). Published odds win over the duplicate target here.
+- **Acceptance wording (low, issues 2 and 3).** `packs-plan.md` §3 and the test list now say the 45 / 49 / 5 / 0.7 band split is per any-gold (G75) slot (the whole Gold pack reads about 42 / 52 / 5.5 / 0.6 because research's slot list puts a G78 in it; lead to confirm), and that NFL Elite's duplicate target is the pool's own floor + 1 pt (2,400 cards from about 1,850 golds 82+ must repeat at least 23%). No code change: the measured numbers in "packs-2" above already said so.
+- **UT-CONTENT-2.md holo line (low).** It said 4% of pack specials come out holo; it now says 5%, only from slots that roll for their special, and never from a guaranteed Standout, program or Legend slot (`holoChanceOf`).
+- **Preview Pack and Daily Drop reroll once at release (low, documented, no code).** A preview's cards are recomputed from its seed (`openPack('premium', 'preview-<seed>-<n>')`), not saved, and packs-2 changed the draw. So when this build ships, each player's current unbought preview shows different cards, once; today's Daily Drop contents change the same way. Nothing owned, saved or bought changes, and the next previews are stable again. Not worth a new saved field (`preview.curve`): advancing the preview would also show different cards. Listed under owner checks and for the release notes.
+
+### Tests (`pack-curve` suite, all three sports, now 16)
+
+- **"duplicate protection never lowers a published chance"**: Elite and every Position/Unit choice, 500 packs with paired seeds, with and without an accumulating owned set (counting from pack 150); for x = 82 … 88 the protected share of golds x+ is ≥ the fresh share − 0.05 pt.
+- **"a club owning every 88 and 89"**: 40,000 paired G82 draws: the protected card is never below the fresh one, never an owned 88/89 while unowned 90+ exist, and 88+ comes at least as often; and a club owning every gold 84+ gets a duplicate at the drawn overall, never a lower card.
+- Both new tests fail on the previous `unownedNear` (checked: "position:PG 82+: 23.52 < 23.95" and "protection stepped down: 88 -> 87") and pass now.
+- The 200-pack duplicate test adds DB and uses the upward-only floor for NFL Units (above); in NBA it asserts SF and C have a floor under 0.5%.
+
+### Browser QA
+
+`scripts/packs/qa-odds.mjs` (the packs-3 harness: dev server on 5213, `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted, touch, `deviceScaleFactor: 1`, reduced motion), NBA at 393×852 (insets 59/34) and 320×568. The Position Pack and Elite Gold odds sheets both end "Golds in this pack prefer players you don’t own yet, at the overall drawn or higher, never lower, so these odds are the least you get." It wraps to two lines at 320 and stays inside the sheet above CLOSE. Shots: `O/shots/packs/packs-2-fixes/nba-{393,320}-{position-pack,elite-gold}-odds.png`. No page errors; the only host blocked was the Supabase registry.
+
+### Owner device checks (packs-2 review fixes)
+
+- After the update installs, the current Preview Pack shows different cards once (and today's Daily Drop, if unopened). Expected; nothing owned changes. Worth one line in the release notes.
 
 ## Requests (answers are recorded here as they arrive)
 

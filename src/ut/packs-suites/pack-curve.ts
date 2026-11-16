@@ -139,12 +139,100 @@ export function packCurveSuite(): void {
       return dup / all;
     };
 
-    it('keeps duplicates at 200 packs to Elite ≤ 20% (or the pool’s own floor) and (NFL) Unit packs ≤ 35%', () => {
+    /**
+     * The fewest repeats any protection can reach in `n` packs without ever giving a card under the overall
+     * drawn (the published odds stay minimums): the expected draws per overall matched top-down to unused
+     * cards at that overall or above.
+     */
+    const upwardFloor = (key: string, n = 200) => {
+      const positions = positionChoices(SPORT).find((c) => c.key === key)!.positions;
+      const have = new Map<number, number>();
+      for (const c of positions.flatMap((q) => pool.buckets.gold[q] ?? [])) have.set(c.ovr, (have.get(c.ovr) ?? 0) + 1);
+      const want = new Map<number, number>();
+      let draws = 0;
+      for (const slot of packDefs(SPORT).position.slots)
+        for (const [k, p] of Object.entries(slot))
+          if (isFloorKind(k))
+            for (const [o, q] of curveOdds(GOLD_CURVE, at(FLOORS[k]), SPORT)) {
+              want.set(o, (want.get(o) ?? 0) + n * (p ?? 0) * q);
+              draws += n * (p ?? 0) * q;
+            }
+      let free = 0;
+      let unique = 0;
+      for (const o of [...new Set([...have.keys(), ...want.keys()])].sort((a, b) => b - a)) {
+        free += have.get(o) ?? 0;
+        const m = Math.min(free, want.get(o) ?? 0);
+        unique += m;
+        free -= m;
+      }
+      return 1 - unique / draws;
+    };
+
+    it('keeps duplicates at 200 packs to Elite ≤ 20% (or the pool’s own floor) and (NFL) Unit packs ≤ 35% (or the upward-only floor)', () => {
       // football's Elite opens 2,400 cards in 200 packs from about 1,850 golds 82+: at least 23% must repeat
       const cards = 200 * packDefs(SPORT).elite.slots.length;
       const floor = Math.max(0, 1 - goldsOf(pool).filter((c) => c.ovr >= at(82)).length / cards);
       expect(dupRate((i, owned) => openPack(pool, 'elite', 'dup:e' + i, W, { owned }))).toBeLessThanOrEqual(Math.max(0.2, floor + 0.01));
-      if (SPORT === 'nfl') for (const key of ['LB', 'DL', 'OL']) expect(dupRate((i, owned) => openPack(pool, 'position:' + key, 'dup:' + key + i, W, { owned })), key).toBeLessThanOrEqual(0.35);
+      // packs-2 review fix: the protection never steps below the drawn overall, so a thin unit (football's
+      // linebackers: 1,016 golds, 433 of them 78+, for 1,200 draws) repeats at least its upward-only floor
+      if (SPORT === 'nfl')
+        for (const key of ['LB', 'DL', 'OL', 'DB']) {
+          const rate = dupRate((i, owned) => openPack(pool, 'position:' + key, 'dup:' + key + i, W, { owned }));
+          expect(rate, key).toBeLessThanOrEqual(Math.max(0.35, upwardFloor(key) + 0.02));
+        }
+      // basketball's positions have room: the floor is about 0 (a few hundredths of a card at the very top)
+      if (SPORT === 'nba') for (const key of ['SF', 'C']) expect(upwardFloor(key), key).toBeLessThan(0.005);
+    });
+
+    // Claude (packs-2 review fix): the protection only ever moves a gold up, never below the drawn overall,
+    // so "x or better" with an owned club is never under the published (fresh-club) chance.
+    it('duplicate protection never lowers a published chance: paired seeds, Position/Unit and Elite, 82+ … 88+', () => {
+      const kinds = ['elite', ...positionChoices(SPORT).map((c) => 'position:' + c.key)];
+      for (const kind of kinds) {
+        const owned = new Set<string>();
+        const fresh: RatedCard[] = [];
+        const kept: RatedCard[] = [];
+        for (let i = 0; i < 500; i++) {
+          const a = openPack(pool, kind, 'paired:' + kind + i, W);
+          const b = openPack(pool, kind, 'paired:' + kind + i, W, { owned });
+          for (const c of b) owned.add(c.line.variantOf?.id ?? c.line.id);
+          // count once the club has a real collection (the reviewer's window started at pack 300 of 1,500)
+          if (i < 150) continue;
+          fresh.push(...a.filter((c) => c.tier === 'gold'));
+          kept.push(...b.filter((c) => c.tier === 'gold'));
+        }
+        for (let x = 82; x <= 88; x++) expect(share(kept, x), kind + ' ' + x + '+').toBeGreaterThanOrEqual(share(fresh, x) - 0.05);
+      }
+    });
+
+    it('a club owning every 88 and 89 still gets 88+ from a G82 slot at least as often as a fresh club', () => {
+      const golds = goldsOf(pool);
+      const owned = new Set(golds.filter((c) => c.ovr === at(88) || c.ovr === at(89)).map((c) => c.line.id));
+      expect(golds.some((c) => c.ovr >= at(90) && !owned.has(c.line.id))).toBe(true);
+      const ra = rng(hashString('own-88-89'));
+      const rb = rng(hashString('own-88-89'));
+      let hiFresh = 0;
+      let hiOwned = 0;
+      for (let i = 0; i < 40000; i++) {
+        const a = drawGold(pool, 82, ra)!;
+        const b = drawGold(pool, 82, rb, undefined, owned)!;
+        // the same draws: the protected card is never below the fresh one, and never one he owns here
+        if (b.ovr < a.ovr) throw new Error('protection stepped down: ' + a.ovr + ' -> ' + b.ovr);
+        if (owned.has(b.line.id)) throw new Error('gave an owned 88/89 while 90+ were unowned: ' + b.line.id);
+        if (a.ovr >= at(88)) hiFresh++;
+        if (b.ovr >= at(88)) hiOwned++;
+      }
+      expect(hiFresh).toBeGreaterThan(0);
+      expect(hiOwned).toBeGreaterThanOrEqual(hiFresh);
+      // owning everything from the drawn overall up gives a duplicate at that overall, not a lower card
+      const top = new Set(golds.filter((c) => c.ovr >= at(84)).map((c) => c.line.id));
+      const rc = rng(hashString('own-84-up'));
+      const rd = rng(hashString('own-84-up'));
+      for (let i = 0; i < 5000; i++) {
+        const a = drawGold(pool, 82, rc)!;
+        const b = drawGold(pool, 82, rd, undefined, top)!;
+        if (b.ovr < a.ovr) throw new Error('protection stepped down: ' + a.ovr + ' -> ' + b.ovr);
+      }
     });
 
     it('never repeats an owned guarantee card while any of its set is unowned', () => {
