@@ -1095,6 +1095,8 @@ export function App() {
           host={r.online ? r.online.found.host : true}
           onProgress={(p) => matchRef.current?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => matchRef.current?.update((s) => ({ ...s, arcadeTook: k }))}
+          feedback={profile.settings}
+          onFeedback={(k, v) => update((p) => ({ ...p, settings: { ...p.settings, [k]: v } }))}
           onFinish={(us, them, how, took, pens) => {
             const season = playSeason(d.lineup);
             const botRating = rateTeam(SLOTS.map((s) => d.botLineup[s]));

@@ -2,15 +2,18 @@ import { PlayReadout } from '../PlayReadout';
 import { footballFeedback, type PlayFeedback } from '../play-feedback';
 import type { Practice } from '../../evolution/training';
 // Arcade football, Retro Bowl style: your offense against the rival's defense, eleven on eleven.
-// Before the snap pick one of three play cards (its routes are drawn on the field) and SNAP. On a
-// pass, drag back anywhere and let go to throw: the arc shows where it lands and who it's going to.
-// With the ball in your hands, the joystick controls both axes; skill moves have their own buttons.
-// Fourth down: go for it, kick on the meter, or punt.
+// The V2 control grammar (Claude, studio overhaul nfl-2): the left thumb is a floating stick, the
+// right thumb has A/B/C/D (their jobs change with the moment; gestures.ts and the map in
+// PauseMenu.tsx). Before the snap pick a play card (its routes are drawn on the field) and SNAP on
+// A. In the pocket the stick moves the quarterback; drag back anywhere on the right and let go to
+// throw, or tap a receiver's name chip. With the ball, the stick steers and bursts past its ring;
+// JUKE, SPIN, POWER and DIVE/SLIDE are A to D. Fourth down: go for it, kick on the meter, or punt.
+// Pause any time; real time between plays runs on the pause-aware clock.ts.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
 import { logError } from '../../lib/errlog';
-import { crowd, sfx, tapHaptic, vibrate } from '../../lib/sound';
+import { crowd, setFeedback, sfx, tapHaptic, vibrate } from '../../lib/sound';
 import { Juice } from '../juice';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
@@ -40,14 +43,22 @@ import {
   startChoice,
   startPlay
 } from './drive';
-import { CONCEPTS, CONCEPT_NAMES, dist, FIELD_W, flipPlay, maxThrow, moveEdge, moveWithBall, RUN_NAMES, scramble, setBurst, snap, step, throwTo, throwToReceiver } from './engine';
+import { CONCEPTS, CONCEPT_NAMES, coverBall, dist, FIELD_W, flipPlay, giveUp, isLine, maxThrow, moveEdge, moveWithBall, outsideBox, receiverLead, RUN_NAMES, scramble, setBurst, snap, step, throwAway, throwTo, throwToReceiver } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, PassType, Play, Pt, RunInput } from './types';
 import './rushing-controls.css';
 import { CarryGate, screenRunInput } from './controls';
+import { GameClock } from './clock';
+import { burstHeld, type Gesture, type GestureState, Gestures, nextPassType, stickZone } from './gestures';
+import { PauseMenu } from './PauseMenu';
+import { BURST_BUTTON, readPref, writePref } from './prefs';
+import { type IconsHandle, ReceiverIcons } from './ReceiverIcons';
+import { controlGeometry, haptic, type Insets, PauseButton, Stick, type StickHandle, usePlaytime, type Vec } from './shared-v2';
 import { AUTO_KICK_AIM, AUTO_PICK, KICK_RESULT, KICK_TO_TRAY, LONG_TD_REPLAY, PUNT_TO_TRAY, REPLAY_LEAD, REPLAY_TAIL, SLOWMO, SLOWMO_RATE, WHISTLE_TO_TRAY } from './pacing';
 import './playbook.css';
+import './pass-controls.css';
+import './pause.css';
 import { PlaybookDialog } from './PlaybookDialog';
 import { useInputInterrupt } from '../useInputInterrupt';
 
@@ -93,6 +104,32 @@ function countGame() {
   }
 }
 
+/** The stick's vector (y up, after its dead zone) as a field direction: up the screen is up the field. */
+function fieldOf(v: Vec, view: 'end' | 'side'): Pt {
+  return view === 'side' ? { x: v.y, y: v.x } : { x: v.x, y: v.y };
+}
+
+/** What the touches mean right now (gestures.ts). */
+function gestureState(ui: Ui, p: Play | null): GestureState {
+  if (!p) return 'idle';
+  if (ui === 'pre' || ui === 'fourth') return 'pre';
+  if (ui !== 'live') return 'idle';
+  if (p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) return 'pocket';
+  if (p.phase === 'air') return 'air';
+  if (p.phase === 'run' || (p.phase === 'drop' && p.call === 'run')) return 'carrier';
+  return 'idle';
+}
+
+/** The safe-area insets: the test hook if there is one (as the stage reads it), else the probe's env() padding. */
+function readInsets(probe: HTMLElement | null): Insets {
+  const hook = (window as { __psInsets?: [number, number, number, number] }).__psInsets;
+  if (hook) return { top: hook[0], right: hook[1], bottom: hook[2], left: hook[3] };
+  if (!probe) return { top: 0, right: 0, bottom: 0, left: 0 };
+  const cs = getComputedStyle(probe);
+  const n = (v: string) => parseFloat(v) || 0;
+  return { top: n(cs.paddingTop), right: n(cs.paddingRight), bottom: n(cs.paddingBottom), left: n(cs.paddingLeft) };
+}
+
 /** A home kit from a team's colors, and an away kit (white jerseys, the team's helmet). */
 export function fbKitsFor(c1: string, c2: string): { home: FbKit; away: FbKit } {
   const light = luma(rgb(c2)) > 115;
@@ -119,6 +156,11 @@ export function Football2({
   field,
   autoplayHook,
   timeScale = 1,
+  online = false,
+  quitText,
+  onQuit,
+  feedback,
+  onFeedback,
   onProgress,
   onDone
 }: {
@@ -143,6 +185,14 @@ export function Football2({
   autoplayHook?: boolean;
   /** the lab's slow motion, for filming the moves frame by frame (1 in the app) */
   timeScale?: number;
+  /** an online match: pausing stops only this phone's game (the menu says so), and there's no Quit here */
+  online?: boolean;
+  /** offline quit (contract C4): what the confirm says, and what leaving means (the host decides) */
+  quitText?: string;
+  onQuit?: (p: Progress) => void;
+  /** sound and haptics as the profile has them, and how to change them (the pause menu's switches) */
+  feedback?: { sound: boolean; haptics: boolean };
+  onFeedback?: (key: 'sound' | 'haptics', on: boolean) => void;
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
 }) {
@@ -177,30 +227,47 @@ export function Football2({
   const slowUntil = useRef(0);
   // the slingshot: where the drag began and how far back it's pulled (css px)
   const dragRef = useRef<{ id: number; x0: number; y0: number; dx: number; dy: number } | null>(null);
-  // steering: a stick that floats wherever the finger lands
-  const stickRef = useRef<{ id: number; x0: number; y0: number; x: number; y: number; radius: number } | null>(null);
+  // the floating stick (C16, through shared-v2): read once a step, never through React state
+  const stickRef = useRef<StickHandle>(null);
+  // who owns each touch, and what it turned into (gestures.ts)
+  const gestures = useRef(new Gestures());
+  // real time that stops when the game is paused: the loop, replays, the kick needle, every wait
+  const clock = useMemo(() => new GameClock(), []);
+  useEffect(() => () => clock.dispose(), []);
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+  const playtime = usePlaytime('match');
+  const startedAt = useRef(clock.now());
+  // the receivers' name chips and the reticle (placed by ref each frame)
+  const iconsRef = useRef<IconsHandle>(null);
+  // the Burst-button preference: hold D to burst instead of pushing past the stick's ring
+  const [burstPref, setBurstPref] = useState(() => readPref(BURST_BUTTON));
+  const burstPrefRef = useRef(burstPref);
+  burstPrefRef.current = burstPref;
+  const burstButton = useRef(false);
+  // what A and D say right now (RUN IT or THROW AWAY; DIVE, SLIDE or nothing), from the loop
+  const [aAway, setAAway] = useState(false);
+  const [dMode, setDMode] = useState<'dive' | 'slide' | null>(null);
+  const live = useRef({ aAway: false, dMode: null as 'dive' | 'slide' | null });
+  // the C15 geometry for this screen and its insets, as CSS variables on the game
+  const [geom, setGeom] = useState<Record<string, string>>({});
+  const probeRef = useRef<HTMLDivElement>(null);
   const runKeys = useRef(new Set<string>());
   const kickRef = useRef<{ t0: number; stopped: number | null; dist: number; win: number } | null>(null);
   const [ui, setUi] = useState<Ui>('loading');
+  const uiRef = useRef(ui);
+  uiRef.current = ui;
   const [, setTick] = useState(0);
   const [pop, setPop] = useState<{ id: number; text: string; tone: Tone; sub?: string } | null>(null);
   const popId = useRef(0);
   const [hint, setHint] = useState<string | null>(null);
   const hinted = useRef(new Set<string>());
   const [wide, setWide] = useState(false);
-  // the stick's knob and its held state are drawn straight onto the element (a React render per
-  // pointer move re-rendered the whole game at the touch rate)
-  const stickElRef = useRef<HTMLDivElement>(null);
-  const knobRef = useRef<HTMLElement>(null);
-  const drawKnob = (x: number, y: number) => {
-    const k = knobRef.current;
-    if (k) k.style.transform = x || y ? 'translate(' + x * 28 + 'px,' + y * 28 + 'px)' : '';
-  };
-  const markHeld = (held: boolean) => stickElRef.current?.classList.toggle('held', held);
   // the momentum carry: a new carrier runs on until the player takes him (controls.ts)
   const gate = useRef(new CarryGate());
   const [phase, setPhase] = useState<Play['phase']>('pre');
   const [passType, setPassType] = useState<PassType>('touch');
+  const passTypeRef = useRef<PassType>('touch');
   const [bursting, setBursting] = useState(false);
   const burstPointer = useRef<number | 'keyboard' | null>(null);
   // the three play cards for this down, and the one lined up
@@ -225,13 +292,13 @@ export function Football2({
   const say = (text: string, tone: Tone, ms = 1200, sub?: string) => {
     const id = ++popId.current;
     setPop({ id, text, tone, sub });
-    window.setTimeout(() => setPop((p) => (p && p.id === id ? null : p)), ms);
+    clock.after(ms, () => setPop((p) => (p && p.id === id ? null : p)));
   };
   const tip = (key: string, text: string) => {
     if (practice || autoplayHook || hinted.current.has(key)) return;
     hinted.current.add(key);
     setHint(text);
-    window.setTimeout(() => setHint((h) => (h === text ? null : h)), 4200);
+    clock.after(4200, () => setHint((h) => (h === text ? null : h)));
   };
   const progress = (g: Game): Progress => ({ score: g.score, drive: g.drive, done: g.over, ends: wireEnds(g), plays: g.plays });
   const shake = (px: number) => {
@@ -254,9 +321,7 @@ export function Football2({
     setBook(null);
     playRef.current = startChoice(g, cs[0]);
     dragRef.current = null;
-    stickRef.current = null;
-    drawKnob(0, 0);
-    markHeld(false);
+    // (a thumb resting on the stick stays down: it's live at the next snap)
     gate.current.reset();
     runKeys.current.clear();
     setPhase('pre');
@@ -330,19 +395,31 @@ export function Football2({
     if (!p || p.phase !== 'pre') return;
     sfx.click();
     pilotRef.current.readAt = 0;
-    p.passType = passType;
+    // the throw type starts every snap at TOUCH (C cycles it)
+    passTypeRef.current = 'touch';
+    setPassType('touch');
+    p.passType = 'touch';
     snap(p);
     setBook(null);
     setUi('live');
     setPhase(p.phase);
-    if (p.call === 'pass') tip('pass', 'Tap a receiver to lead him · or drag back to aim');
-    else tip('run', 'Joystick to run in any direction · hold BURST for speed');
+    if (p.call === 'pass') tip('pass', 'Tap a name to throw · or drag back on the right to aim');
+    else tip('run', burstPrefRef.current ? 'Stick to run · hold D to burst' : 'Stick to run · push past the ring to burst');
+  };
+
+  /** AUDIBLE (B before the snap): flip the call between its run and its pass. */
+  const audible = () => {
+    if (!game || (ui !== 'pre' && ui !== 'fourth') || playRef.current?.phase !== 'pre' || !opts[picked]) return;
+    const cur = opts[picked].choice;
+    const i = opts.findIndex((o) => o.choice.call !== cur.call);
+    if (i >= 0) pick(i);
+    else chooseBook(cur.call === 'pass' ? { call: 'run', concept: cur.concept, run: game.run } : { call: 'pass', concept: game.concept, run: cur.run });
   };
 
   /** Report the play, then line up the next one `wait` seconds later. */
   const nextUp = (g: Game, driveOver: boolean, wait: number) => {
     onProgress(progress(g));
-    window.setTimeout(() => {
+    clock.after(wait * 1000, () => {
       if (g.over) {
         setUi('final');
         if (!counted.current) {
@@ -357,7 +434,7 @@ export function Football2({
         tip('clock', 'The clock runs between plays · an incompletion or going out of bounds stops it');
       } else if (driveOver) say('DRIVE ' + (g.drive + 1) + ' OF ' + g.drives, 'plain', 1100);
       lineUpNext(g);
-    }, wait * 1000);
+    });
   };
 
   /** the ability names on the pop (Madden-style) */
@@ -368,7 +445,7 @@ export function Football2({
   const handleEvents = (p: Play) => {
     // juice (render only): hit-stop, the camera's kick, sweat and sparks
     const J = fxRef.current.juice;
-    const nowMs = performance.now();
+    const nowMs = clock.now();
     const at = (b: { x: number; y: number } | null | undefined, h = 1) => (b ? renderer.screenOf(b.x, b.y, h) : null);
     for (const e of p.events) {
       if (e === 'beat:truck') {
@@ -428,7 +505,7 @@ export function Football2({
         vibrate([20, 30, 20]);
         crowd.swell(0.8);
         shake(kind === 'truck' ? 4 : 2);
-        if (kind === 'truck') slowUntil.current = performance.now() + SLOWMO.truck * 1000;
+        if (kind === 'truck') slowUntil.current = clock.now() + SLOWMO.truck * 1000;
         say(kind === 'juke' ? 'JUKED!' : kind === 'spin' ? 'SPIN MOVE!' : kind === 'truck' ? 'TRUCKED!' : 'STIFF ARM!', 'big', 900);
       } else if (e === 'whiff') {
         sfx.whoosh();
@@ -440,7 +517,7 @@ export function Football2({
       } else if (e === 'bighit') {
         if (p.carrier) highlight.current = { t: p.t, x: p.carrier.x, y: p.carrier.y, before: REPLAY_BEFORE };
         // the hit lands in slow motion
-        slowUntil.current = performance.now() + SLOWMO.bighit * 1000;
+        slowUntil.current = clock.now() + SLOWMO.bighit * 1000;
         sfx.hit(1);
         sfx.thud(0.12);
         shake(6);
@@ -461,9 +538,6 @@ export function Football2({
     if (!game) return;
     const e = p.end!;
     dragRef.current = null;
-    stickRef.current = null;
-    drawKnob(0, 0);
-    markHeld(false);
     runKeys.current.clear();
     setPhase('dead');
     const a = afterPlay(game, e);
@@ -528,13 +602,13 @@ export function Football2({
       if (c) highlight.current = { t: p.t, x: c.x, y: c.y - 6, before: LONG_TD_REPLAY.before };
     }
     // the whistle: the play's dead (a touchdown has its horn)
-    if (!a.points) window.setTimeout(() => sfx.whistle(), 220);
+    if (!a.points) clock.after(220, () => sfx.whistle());
     const hl = highlight.current;
     highlight.current = null;
     // (not the game's last play: it's reported done, and the results come next)
     if (hl && !game.over && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) {
       onProgress(progress(game));
-      window.setTimeout(() => startReplay(hl, () => nextUp(game, !!a.driveOver, REPLAY_TAIL)), (a.points ? REPLAY_LEAD.score : REPLAY_LEAD.play) * 1000);
+      clock.after((a.points ? REPLAY_LEAD.score : REPLAY_LEAD.play) * 1000, () => startReplay(hl, () => nextUp(game, !!a.driveOver, REPLAY_TAIL)));
     } else nextUp(game, !!a.driveOver, a.points ? WHISTLE_TO_TRAY.score : a.driveOver ? WHISTLE_TO_TRAY.drive : WHISTLE_TO_TRAY.play);
   };
 
@@ -545,7 +619,7 @@ export function Football2({
       done();
       return;
     }
-    replayRef.current = { frames, t0: frames[0].t, t1: frames[frames.length - 1].t, start: performance.now(), speed: REPLAY_SPEED, focus: { a: hl.x, b: hl.y }, done };
+    replayRef.current = { frames, t0: frames[0].t, t1: frames[frames.length - 1].t, start: clock.now(), speed: REPLAY_SPEED, focus: { a: hl.x, b: hl.y }, done };
     renderer.replay = { x: hl.x, y: hl.y };
     setReplaying(true);
   };
@@ -564,14 +638,14 @@ export function Football2({
     if (!game || ui !== 'fourth') return;
     sfx.click();
     playRef.current = fieldGoalUnit(game);
-    kickRef.current = { t0: performance.now(), stopped: null, dist: fgDistance(game), win: kickWindow(game) };
+    kickRef.current = { t0: clock.now(), stopped: null, dist: fgDistance(game), win: kickWindow(game) };
     setUi('kick');
   };
   const kickNow = () => {
     const k = kickRef.current;
     const p = playRef.current;
     if (!game || !p || !k || k.stopped !== null) return;
-    const ph = ((performance.now() - k.t0) / 1100) % 2;
+    const ph = ((clock.now() - k.t0) / 1100) % 2;
     const pos = ph < 1 ? ph : 2 - ph;
     k.stopped = pos;
     setTick((n) => n + 1);
@@ -594,8 +668,8 @@ export function Football2({
     p.phase = 'air';
     kickAnim.current = { good, at: t0 + ((110 - from.y) / (150 - from.y)) * (t1 - t0) };
     sfx.kick(0.22);
-    window.setTimeout(() => setUi('after'), 450);
-    window.setTimeout(() => {
+    clock.after(450, () => setUi('after'));
+    clock.after(KICK_RESULT * 1000, () => {
       kick(game, aim);
       practice?.onAttempt({ points: good ? 3 : 0, success: good, detail: (good ? 'GOOD FROM ' : 'WIDE FROM ') + k.dist + ' YARDS' });
       if (good) {
@@ -607,13 +681,13 @@ export function Football2({
         say('NO GOOD', 'bad', 1500, side < 0 ? 'WIDE LEFT' : 'WIDE RIGHT');
       }
       nextUp(game, true, KICK_TO_TRAY);
-    }, KICK_RESULT * 1000);
-    window.setTimeout(() => {
+    });
+    clock.after(2650, () => {
       kickRef.current = null;
       kickAnim.current = null;
       // the kick play is over: nothing steps it again (the game may be over and keep showing it)
       p.phase = 'dead';
-    }, 2650);
+    });
   };
   const puntNow = () => {
     if (!game || ui !== 'fourth' || game.clock === 0) return;
@@ -627,7 +701,8 @@ export function Football2({
   // the autopilot calls the plays in tests
   useEffect(() => {
     if (!autoplayHook || !game) return;
-    const t = window.setTimeout(
+    const t = clock.after(
+      (ui === 'kick' ? AUTO_KICK_AIM : AUTO_PICK) * 1000,
       () => {
         if (ui === 'pre') {
           const i = pilotRef.current.rand() < 0.3 ? 2 : pilotRef.current.rand() < 0.5 ? 1 : 0;
@@ -639,10 +714,9 @@ export function Football2({
           else if (d === 'punt') puntNow();
           else snapNow();
         } else if (ui === 'kick') kickNow();
-      },
-      (ui === 'kick' ? AUTO_KICK_AIM : AUTO_PICK) * 1000
+      }
     );
-    return () => clearTimeout(t);
+    return () => clock.cancel(t);
   }, [ui, autoplayHook, game]);
 
   /** The slingshot's landing spot right now: pulled back, it flies the other way. */
@@ -665,22 +739,31 @@ export function Football2({
    * stops the runner); a new carrier the player hasn't touched the stick for runs on his momentum.
    */
   const steerNow = (p: Play): RunInput => {
-    const s = stickRef.current;
+    const vec = stickRef.current?.read().vec ?? null;
     const keys = runKeys.current;
-    const held = !!s || keys.size > 0;
-    const x = s?.x ?? Number(keys.has('arrowright') || keys.has('d')) - Number(keys.has('arrowleft') || keys.has('a'));
-    const y = s?.y ?? Number(keys.has('arrowdown') || keys.has('s')) - Number(keys.has('arrowup') || keys.has('w'));
+    let field: Pt | null = null;
+    if (vec) field = fieldOf(vec, renderer.mode);
+    else if (keys.size) {
+      const x = Number(keys.has('arrowright') || keys.has('d')) - Number(keys.has('arrowleft') || keys.has('a'));
+      const y = Number(keys.has('arrowdown') || keys.has('s')) - Number(keys.has('arrowup') || keys.has('w'));
+      field = screenRunInput(x, y, renderer.mode);
+    }
     const carrier = p.phase === 'run' ? p.carrier : null;
-    return gate.current.input(carrier ? carrier.id : null, p.call === 'run' && carrier === p.rb, held ? screenRunInput(x, y, renderer.mode) : null);
+    return gate.current.input(carrier ? carrier.id : null, p.call === 'run' && carrier === p.rb, field);
   };
 
   // the loop: fixed steps for the play, a draw every frame
   useEffect(() => {
     if (!game) return;
     let raf = 0;
-    let last = performance.now();
+    let last = clock.now();
     let acc = 0;
-    const loop = (now: number) => {
+    let geomKey = '';
+    let insetTick = 0;
+    let lastW = -1;
+    let lastH = -1;
+    let burstShown = false;
+    const loop = () => {
       raf = requestAnimationFrame(loop);
       const canvas = canvasRef.current;
       const wrap = wrapRef.current;
@@ -695,10 +778,27 @@ export function Football2({
         canvas.style.height = renderer.H * renderer.zoom + 'px';
         setWide(w > h);
       }
+      // the control geometry (C15) for this screen and its insets (read when the size changes, and
+      // about once a second in case the insets alone did: a style read every frame costs a layout)
+      if (++insetTick >= 60 || w !== lastW || h !== lastH) {
+        insetTick = 0;
+        lastW = w;
+        lastH = h;
+        const ins = readInsets(probeRef.current);
+        const key = [w, h, ins.top, ins.right, ins.bottom, ins.left].join(',');
+        if (key !== geomKey) {
+          geomKey = key;
+          setGeom({ ...controlGeometry(w, h, ins), '--sat': ins.top + 'px', '--sar': ins.right + 'px', '--sab': ins.bottom + 'px', '--sal': ins.left + 'px' });
+        }
+      }
+      // paused: the clock stands still and so does everything on it (the frame stays as it was)
+      if (pausedRef.current) return;
+      const now = clock.now();
       const p = playRef.current;
       const fx = fxRef.current;
       const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
+      if (!autoplayHook) applyGestures(gestures.current.tick(performance.now()));
       // slow motion and hit-stop only hold back real time: the same fixed steps run, a beat later
       fx.juice.update(elapsed);
       acc += fx.juice.gameTime(now, now < slowUntil.current ? elapsed * SLOWMO_RATE : elapsed);
@@ -727,6 +827,12 @@ export function Football2({
           acc -= DT;
           const was: Play['phase'] = p.phase;
           const steer = autoplayHook ? decide(p, game, pilotRef.current) : steerNow(p);
+          // burst: past the stick's ring, or D held with the Burst-button preference (one source counts)
+          if (!autoplayHook) {
+            const held = burstHeld({ ring: !!stickRef.current?.read().sprint, button: burstButton.current, buttonPref: burstPrefRef.current });
+            const on = setBurst(p, held);
+            if (on !== burstShown) setBursting((burstShown = on));
+          }
           step(p, DT, steer);
           handleEvents(p);
           if (p.phase !== was) setPhase(p.phase);
@@ -780,8 +886,10 @@ export function Football2({
             open: openRings && !autoplayHook,
             shake: fx.shake,
             flash: fx.flash,
-            juice: fx.juice
+            juice: fx.juice,
+            chips: !autoplayHook
           });
+        if (p && !autoplayHook) frameControls(p);
       } catch (e) {
         console.error('[draw]', e);
         logError('football draw', e);
@@ -807,54 +915,102 @@ export function Football2({
     } else moveWithBall(p, kind, dir);
     tapHaptic(10);
   };
-  const down = (e: React.PointerEvent) => {
+  /** A juke toward a field side (-1 left, 1 right), or 0 to cut away from the nearest man. */
+  const juke = (dir: -1 | 0 | 1) => {
     const p = playRef.current;
-    if (!p || ui !== 'live' || autoplayHook) return;
-    // one finger drives at a time
-    if (dragRef.current || stickRef.current) return;
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    if (p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) {
-      dragRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 };
-    } else if (p.phase === 'run' || p.phase === 'air' || (p.phase === 'drop' && p.call === 'run')) {
-      stickRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: 0, y: 0, radius: 46 };
-      gate.current.touch();
-      drawKnob(0, 0);
-      markHeld(true);
+    if (p) move3(p, 'juke', dir);
+  };
+  /** The stick's side across the field, if it's pushed clearly one way (a juke goes that way). */
+  const stickSide = (): -1 | 0 | 1 => {
+    const v = stickRef.current?.read().vec;
+    if (!v) return 0;
+    const f = fieldOf(v, renderer.mode);
+    return Math.abs(f.x) >= 0.25 ? (f.x < 0 ? -1 : 1) : 0;
+  };
+  /** A sideways swipe as a side across the field (upright, the screen's across is the field's; held
+   * sideways the field runs across the screen, so a swipe there just cuts away from the nearest man). */
+  const screenSide = (dir: -1 | 1): -1 | 0 | 1 => (renderer.mode === 'end' ? dir : 0);
+  const cycleType = () => {
+    const next = nextPassType(passTypeRef.current);
+    passTypeRef.current = next;
+    setPassType(next);
+    if (playRef.current) playRef.current.passType = next;
+    tapHaptic(8);
+  };
+  const throwIcon = (id: number) => {
+    const p = playRef.current;
+    if (!p || gestureState(uiRef.current, p) !== 'pocket') return;
+    p.passType = passTypeRef.current;
+    if (throwToReceiver(p, id)) {
+      tapHaptic(10);
+      dragRef.current = null;
+      setPhase(p.phase);
     }
+  };
+  /** Act on what the touches turned into (gestures.ts). Reads refs only: the frame loop calls it too. */
+  const applyGestures = (out: Gesture[]) => {
+    for (const g of out) {
+      const p = playRef.current;
+      if (g.kind === 'stick-down') {
+        runKeys.current.clear();
+        gate.current.touch();
+      } else if (g.kind === 'sling-start') dragRef.current = { id: g.id, x0: g.x0, y0: g.y0, dx: 0, dy: 0 };
+      else if (g.kind === 'sling-release') {
+        const aim = p ? aimNow(p) : null;
+        dragRef.current = null;
+        if (p && aim) {
+          p.passType = passTypeRef.current;
+          if (throwTo(p, aim)) {
+            tapHaptic(10);
+            setPhase(p.phase);
+          }
+        }
+      } else if (g.kind === 'sling-cancel') dragRef.current = null;
+      else if (g.kind === 'icon-throw') throwIcon(g.icon);
+      else if (g.kind === 'cycle') cycleType();
+      else if (g.kind === 'cover') {
+        if (p) coverBall(p, g.on);
+      } else if (g.kind === 'swipe') juke(screenSide(g.dir));
+      else if (g.kind === 'a-tap') juke(0);
+    }
+  };
+  const ctxNow = () => ({ w: wrapRef.current?.clientWidth ?? innerWidth, state: gestureState(uiRef.current, playRef.current), zone: stickZone(wrapRef.current?.clientWidth ?? innerWidth, wrapRef.current?.clientHeight ?? innerHeight) });
+  const down = (e: React.PointerEvent) => {
+    if (autoplayHook || pausedRef.current) return;
+    const p = playRef.current;
+    const ctx = ctxNow();
+    let icon: number | null = null;
+    if (ctx.state === 'pocket' && p) {
+      const hits = iconsRef.current?.hits(e.clientX, e.clientY) ?? [];
+      // two chips' touch areas overlap here: fan them out and throw to nobody
+      if (hits.length > 1) {
+        iconsRef.current?.fan(clock.now());
+        haptic('tick');
+        return;
+      }
+      icon = hits[0] ?? null;
+    }
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, icon }, ctx));
   };
   const move = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (d && d.id === e.pointerId) {
       d.dx = e.clientX - d.x0;
       d.dy = e.clientY - d.y0;
-      return;
     }
-    const s = stickRef.current;
-    if (!s || s.id !== e.pointerId) return;
-    const R = s.radius;
-    let x = (e.clientX - s.x0) / R;
-    let y = (e.clientY - s.y0) / R;
-    const l = Math.hypot(x, y);
-    if (l > 1) {
-      x /= l;
-      y /= l;
+    applyGestures(gestures.current.move(e.pointerId, e.clientX, e.clientY, e.timeStamp));
+  };
+  const up = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (d && d.id === e.pointerId) {
+      d.dx = e.clientX - d.x0;
+      d.dy = e.clientY - d.y0;
     }
-    s.x = x;
-    s.y = y;
-    drawKnob(x, y);
+    applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp));
   };
-  const stickDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (ui !== 'live' || stickRef.current || dragRef.current) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    runKeys.current.clear();
-    stickRef.current = { id: e.pointerId, x0: r.left + r.width / 2, y0: r.top + r.height / 2, x: 0, y: 0, radius: r.width / 2 - 27 };
-    gate.current.touch();
-    markHeld(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
-    move(e);
-  };
+  /** The touch taken away (a system swipe from an edge, a call): let go of it, throw nothing. */
+  const cancel = (e: React.PointerEvent) => applyGestures(gestures.current.cancel(e.pointerId));
   const keyRun = (e: React.KeyboardEvent, held: boolean) => {
     const key = e.key.toLowerCase();
     if (!['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) return;
@@ -862,54 +1018,20 @@ export function Football2({
     if (held && !e.repeat) gate.current.touch();
     if (held) runKeys.current.add(key);
     else runKeys.current.delete(key);
-    const keys = runKeys.current;
-    const x = Number(keys.has('arrowright') || keys.has('d')) - Number(keys.has('arrowleft') || keys.has('a'));
-    const y = Number(keys.has('arrowdown') || keys.has('s')) - Number(keys.has('arrowup') || keys.has('w'));
-    const length = Math.max(1, Math.hypot(x, y));
-    drawKnob(x / length, y / length);
-    markHeld(keys.size > 0 || !!stickRef.current);
   };
-  const up = (e: React.PointerEvent) => {
-    const d = dragRef.current;
-    const p = playRef.current;
-    if (d && d.id === e.pointerId) {
-      const aim = p ? aimNow(p) : null;
-      dragRef.current = null;
-      if (p && aim && throwTo(p, aim)) {
-        tapHaptic(10);
-        setPhase(p.phase);
-      }
-      return;
-    }
-    const s = stickRef.current;
-    if (s && s.id === e.pointerId) {
-      stickRef.current = null;
-      drawKnob(0, 0);
-      markHeld(false);
-      runKeys.current.clear();
-    }
-  };
-  /** The touch taken away (a system swipe from an edge, a call): let go of everything, throw nothing. */
-  const cancel = (e: React.PointerEvent) => {
-    if (dragRef.current?.id === e.pointerId) dragRef.current = null;
-    const s = stickRef.current;
-    if (s && s.id === e.pointerId) {
-      stickRef.current = null;
-      drawKnob(0, 0);
-      markHeld(false);
-      runKeys.current.clear();
-    }
-  };
-  useInputInterrupt(() => {
+  /** Let go of every touch, key and hold (an interruption, a pause). */
+  const letGo = () => {
     dragRef.current = null;
-    stickRef.current = null;
-    drawKnob(0, 0);
-    markHeld(false);
+    stickRef.current?.release();
+    applyGestures(gestures.current.clear());
     runKeys.current.clear();
+    burstButton.current = false;
     stopBurst();
-  });
+  };
+  useInputInterrupt(letGo);
   const stopBurst = () => {
     burstPointer.current = null;
+    burstButton.current = false;
     if (playRef.current) setBurst(playRef.current, false);
     setBursting(false);
   };
@@ -922,6 +1044,104 @@ export function Football2({
       setPhase(p.phase);
     }
   };
+  const doThrowAway = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const p = playRef.current;
+    if (p && throwAway(p)) {
+      tapHaptic(10);
+      dragRef.current = null;
+      setPhase(p.phase);
+    }
+  };
+
+  /**
+   * Once a frame (live, not autoplay): the chips over the receivers and the reticle, what A and D
+   * say (THROW AWAY outside the tackle box; DIVE near the sticks or the goal line, SLIDE for a
+   * quarterback past the line). React state changes only when a label does.
+   */
+  const frameControls = (p: Play) => {
+    const g0 = game;
+    const st = gestureState(uiRef.current, p);
+    const pocket = st === 'pocket';
+    let pick: number | null = null;
+    let reticle: { x: number; y: number; rx: number; ry: number } | null = null;
+    if (pocket) {
+      // the most open receiver: the reticle shows where a tap on him lands
+      let best = -1;
+      for (const b of p.bodies) {
+        if (b.side !== 'O' || b === p.qb || isLine(b)) continue;
+        let open = 99;
+        for (const d of p.bodies) if (d.side === 'D' && d.job !== 'rush') open = Math.min(open, dist(d, b));
+        if (open > best) {
+          best = open;
+          pick = b.id;
+        }
+      }
+      if (pick !== null && !dragRef.current) {
+        const at = receiverLead(p, p.bodies[pick], passTypeRef.current);
+        const q = renderer.screenOf(at.x, at.y);
+        if (q) reticle = { x: q.x, y: q.y, rx: Math.max(12, q.s * 1.1), ry: Math.max(6, q.s * 0.5) };
+      }
+    }
+    iconsRef.current?.place({ heads: pocket ? renderer.heads : {}, pick, reticle, now: clock.now() });
+    const away = pocket && outsideBox(p);
+    let dm: 'dive' | 'slide' | null = null;
+    const c = p.carrier;
+    if (st === 'carrier' && p.phase === 'run' && c && !p.down && g0) {
+      if (c === p.qb && c.y > p.los) dm = 'slide';
+      else {
+        const line = g0.ballOn + g0.toGo;
+        if ((line - c.y > 0 && line - c.y <= 3) || (100 - c.y > 0 && 100 - c.y <= 3)) dm = 'dive';
+      }
+    }
+    if (away !== live.current.aAway) setAAway((live.current.aAway = away));
+    if (dm !== live.current.dMode) setDMode((live.current.dMode = dm));
+  };
+
+  // ---- pause: the button, the menu, and an automatic pause when the page is hidden ----
+  const canPause = !autoplayHook && !practice && (ui === 'pre' || ui === 'fourth' || ui === 'live' || ui === 'after' || ui === 'kick');
+  const canPauseRef = useRef(canPause);
+  canPauseRef.current = canPause;
+  const pause = () => {
+    if (pausedRef.current || !canPauseRef.current) return;
+    if (!clock.pause()) return;
+    pausedRef.current = true;
+    letGo();
+    playtime.pause(true);
+    crowd.stop(0.3);
+    setPaused(true);
+  };
+  const resume = () => {
+    if (!pausedRef.current) return;
+    clock.resume();
+    pausedRef.current = false;
+    playtime.pause(false);
+    crowd.start(0.22);
+    setPaused(false);
+  };
+  useEffect(() => {
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') pause();
+    };
+    const gone = () => pause();
+    document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('pagehide', gone);
+    return () => {
+      document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('pagehide', gone);
+    };
+  }, []);
+  const quit = () => {
+    if (!game || !onQuit) return;
+    playtime.abandon(clock.now() - startedAt.current);
+    clock.dispose();
+    onQuit(progress(game));
+  };
+  const setBurstLayout = (on: boolean) => {
+    writePref(BURST_BUTTON, on);
+    setBurstPref(on);
+  };
 
   const g = game;
   const p = playRef.current;
@@ -930,13 +1150,44 @@ export function Football2({
   const running = ui === 'live' && phase === 'run';
   const rushing = running || (ui === 'live' && phase === 'drop' && p?.call === 'run');
   const steering = rushing || (ui === 'live' && phase === 'air');
+  const calling = (ui === 'pre' || ui === 'fourth') && !!g && !!p;
+  const canCall = calling && g!.clock !== 0 && practice?.drill !== 'kick';
+  const receivers = useMemo(() => (p ? p.bodies.filter((b) => b.side === 'O' && b !== p.qb && !isLine(b)) : []), [p]);
   useEffect(() => {
     if (!rushing) stopBurst();
   }, [rushing]);
+  /** A, B, C or D: fires on touch-down; Enter or Space for a keyboard. */
+  const ctl = (slot: 'a' | 'b' | 'c' | 'd', label: React.ReactNode, act: (e: React.PointerEvent | React.KeyboardEvent) => void, opts: { cls?: string; aria: string; icon?: React.ReactNode; small?: string; pressed?: boolean; extra?: Partial<React.ButtonHTMLAttributes<HTMLButtonElement>> } = { aria: '' }) => (
+    <button
+      type="button"
+      className={'fb2-ctl ' + slot + (opts.cls ? ' ' + opts.cls : '')}
+      data-ctl={slot.toUpperCase()}
+      aria-label={opts.aria}
+      aria-pressed={opts.pressed}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (pausedRef.current) return;
+        act(e);
+      }}
+      onKeyDown={(e) => {
+        if (!e.repeat && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          act(e);
+        }
+      }}
+      {...opts.extra}
+    >
+      {opts.icon}
+      {slot === 'a' || slot === 'b' ? label : <em>{label}</em>}
+      {opts.small && <small>{opts.small}</small>}
+    </button>
+  );
   return createPortal(
     <div
       className={'arcade-full hg2 fb2' + (wide ? ' wide' : '')}
       ref={wrapRef}
+      style={geom as React.CSSProperties}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}
@@ -1000,60 +1251,36 @@ export function Football2({
         </button>
       )}
       {ui === 'loading' && <div className="fg-loading">Taking the field…</div>}
-      {steering && !autoplayHook && (
-        <div
-          ref={stickElRef}
-          className={'hg2-stick fb2-stick' + (stickRef.current || runKeys.current.size ? ' held' : '')}
-          role="group"
-          aria-label="Run joystick: drag in any direction. Arrow keys or WASD."
-          tabIndex={0}
-          onPointerDown={stickDown}
-          onPointerMove={move}
-          onPointerUp={up}
-          onPointerCancel={cancel}
-          onLostPointerCapture={cancel}
+      {g && !autoplayHook && (
+        <Stick
+          ref={stickRef}
+          active={!paused && (calling || ui === 'live')}
+          quiet={!steering && !passing}
+          ghost={phase === 'air' && ui === 'live'}
+          label={phase === 'air' && ui === 'live' ? 'HOLD TO RUN' : undefined}
+          onDown={(e) => applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp }, ctxNow()))}
+          onMove={(_, sprint) => {
+            // the ring takes effect at the touch, not at the next fixed step
+            const live = playRef.current;
+            if (live && !burstPrefRef.current && !autoplayHook) setBurst(live, sprint);
+          }}
+          onUp={(e) => e && applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp))}
           onKeyDown={(e) => keyRun(e, true)}
           onKeyUp={(e) => keyRun(e, false)}
-          onBlur={() => {
-            runKeys.current.clear();
-            if (!stickRef.current) {
-              drawKnob(0, 0);
-              markHeld(false);
-            }
-          }}
-        >
-          <i ref={knobRef} />
-          {phase === 'air' && (
-            <span className="fb2-ghost" aria-hidden="true">
-              <b>HOLD TO RUN</b>
-            </span>
-          )}
-        </div>
+        />
       )}
-      {(ui === 'pre' || ui === 'fourth') && g && p && !autoplayHook && (
-        <div className="fb2-call" onPointerDown={(e) => e.stopPropagation()}>
+      {passing && !autoplayHook && <ReceiverIcons ref={iconsRef} receivers={receivers} show={passing} onThrow={throwIcon} />}
+      {calling && !autoplayHook && (
+        <div className="fb2-call v2" onPointerDown={(e) => e.stopPropagation()}>
           {ui === 'fourth' && (
             <span className="fb2-4th">
-              {g.clock === 0
-                ? 'TIME’S UP · ' + fgDistance(g) + ' YD FIELD GOAL TO FINISH IT'
-                : downText(g) + ' · ' + (fgOk ? fgDistance(g) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE')}
+              {g!.clock === 0
+                ? 'TIME’S UP · ' + fgDistance(g!) + ' YD FIELD GOAL TO FINISH IT'
+                : downText(g!) + ' · ' + (fgOk ? fgDistance(g!) + ' YD FIELD GOAL IN RANGE' : 'OUT OF FIELD GOAL RANGE')}
             </span>
           )}
-          {g.clock !== 0 && practice?.drill !== 'kick' && (
-            <div className="fb2-coach-row">
-              <button onClick={openBook}>
-                FULL PLAYBOOK{' '}
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-                  <path d="M3 13 13 3M4 3h9v9" />
-                </svg>
-              </button>
-              <button onClick={flipFormation} aria-pressed={flipped}>
-                FLIP PLAY <span>{flipped ? 'LEFT' : 'RIGHT'}</span>
-              </button>
-            </div>
-          )}
-          {g.clock !== 0 && practice?.drill !== 'kick' && (
-            <div className="fb2-cards" role="radiogroup" aria-label="Pick a play">
+          {canCall && (
+            <div className="fb2-cards" role="radiogroup" aria-label="Pick a play (swipe for more)">
               {opts.map((o, i) => (
                 <button key={i} className={'fb2-card ' + o.choice.call + (i === picked ? ' on' : '')} role="radio" aria-checked={i === picked} onClick={() => pick(i)}>
                   <PlayArt play={o.play} />
@@ -1061,25 +1288,20 @@ export function Football2({
                   <b>{o.choice.call === 'pass' ? CONCEPT_NAMES[o.choice.concept] : RUN_NAMES[o.choice.run]}</b>
                 </button>
               ))}
+              <button className="fb2-card more" onClick={flipFormation} aria-pressed={flipped} aria-label={'Flip the formation: now ' + (flipped ? 'left' : 'right')}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 8h13l-3-3M20 16H7l3 3" />
+                </svg>
+                FLIP {flipped ? 'LEFT' : 'RIGHT'}
+              </button>
+              <button className="fb2-card more" onClick={openBook}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 5h6a3 3 0 0 1 3 3v11a2 2 0 0 0-2-2H4zM20 5h-6a3 3 0 0 0-3 3v11a2 2 0 0 1 2-2h7z" />
+                </svg>
+                PLAYBOOK
+              </button>
             </div>
           )}
-          <div className="fb2-btns">
-            {g.clock !== 0 && practice?.drill !== 'kick' && (
-              <button className="fb2-go snap" onClick={snapNow}>
-                {ui === 'fourth' ? 'GO FOR IT' : 'SNAP'}
-              </button>
-            )}
-            {ui === 'fourth' && fgOk && (
-              <button className="fb2-go kick" onClick={startKick}>
-                KICK
-              </button>
-            )}
-            {ui === 'fourth' && g.clock !== 0 && practice?.drill !== 'kick' && (
-              <button className="fb2-go punt" onClick={puntNow}>
-                PUNT
-              </button>
-            )}
-          </div>
         </div>
       )}
       {book && (ui === 'pre' || ui === 'fourth') && (
@@ -1109,129 +1331,95 @@ export function Football2({
           </div>
         </PlaybookDialog>
       )}
-      {passing && !autoplayHook && (
-        <div className="fb2-passing" onPointerDown={(e) => e.stopPropagation()} aria-label="Passing controls">
-          <small>PASS TO</small>
-          <div className="fb2-receivers">
-            {(['X', 'SL', 'Z', 'TE', 'RB'] as const).map((slot) => {
-              const receiver = p?.bodies.find((b) => b.side === 'O' && b.slot === slot);
-              return (
-                <button
-                  key={slot}
-                  onClick={() => {
-                    const live = playRef.current;
-                    if (live && receiver && throwToReceiver(live, receiver.id)) {
-                      tapHaptic(10);
-                      dragRef.current = null;
-                      setPhase(live.phase);
-                    }
-                  }}
-                  aria-label={'Pass to ' + slot + (receiver ? ' · ' + receiver.p.name : '')}
-                  title={receiver?.p.name}
-                >
-                  {slot}
-                </button>
-              );
-            })}
-          </div>
-          <div className="fb2-pass-types" aria-label="Pass trajectory">
-            {(['bullet', 'touch', 'lob'] as const).map((type) => (
-              <button
-                key={type}
-                aria-pressed={passType === type}
-                onClick={() => {
-                  setPassType(type);
-                  if (playRef.current) playRef.current.passType = type;
-                }}
-              >
-                {type.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {passing && !autoplayHook && (
-        <div className="fb2-moves fb2-scramble-controls" onPointerDown={(e) => e.stopPropagation()}>
-          <button
-            className="fb2-mv scramble"
-            onPointerDown={doScramble}
-            onKeyDown={(e) => {
-              if (!e.repeat && (e.key === 'Enter' || e.key === ' ')) doScramble(e);
-            }}
-            aria-label="Scramble: the quarterback runs"
-          >
-            RUN IT
-          </button>
-        </div>
-      )}
-      {rushing && !autoplayHook && (
-        <button
-          className={'fb2-burst' + (bursting ? ' held' : '')}
-          aria-label="Burst: hold to sprint"
-          aria-pressed={bursting}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (burstPointer.current !== null) return;
-            const live = playRef.current;
-            if (live && setBurst(live, true)) {
-              burstPointer.current = e.pointerId;
-              setBursting(true);
-              e.currentTarget.setPointerCapture(e.pointerId);
-            }
-          }}
-          onPointerUp={(e) => {
-            if (burstPointer.current === e.pointerId) stopBurst();
-          }}
-          onPointerCancel={(e) => {
-            if (burstPointer.current === e.pointerId) stopBurst();
-          }}
-          onLostPointerCapture={(e) => {
-            if (burstPointer.current === e.pointerId) stopBurst();
-          }}
-          onKeyDown={(e) => {
-            if (!e.repeat && (e.key === ' ' || e.key === 'Enter')) {
-              e.preventDefault();
-              const live = playRef.current;
-              if (live && setBurst(live, true)) {
-                burstPointer.current = 'keyboard';
-                setBursting(true);
-              }
-            }
-          }}
-          onKeyUp={(e) => {
-            if ((e.key === ' ' || e.key === 'Enter') && burstPointer.current === 'keyboard') stopBurst();
-          }}
-          onBlur={stopBurst}
-        >
-          BURST<small>HOLD</small>
-        </button>
-      )}
-      {running && !autoplayHook && (
-        <div className="fb2-moves" onPointerDown={(e) => e.stopPropagation()}>
-          {(['juke', 'spin', 'power'] as const).map((kind) => (
-            <button
-              key={kind}
-              className={'fb2-mv ' + kind}
-              aria-label={kind === 'power' ? 'Power: truck or stiff arm' : kind === 'juke' ? 'Juke: evade the nearest defender' : 'Spin: evade a tackle'}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                if (p) move3(p, kind);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  if (p) move3(p, kind);
+      {!autoplayHook && !paused && (
+        <>
+          {/* A: the timed thing, always in the same place */}
+          {calling && canCall && ctl('a', ui === 'fourth' ? 'GO' : 'SNAP', () => snapNow(), { aria: ui === 'fourth' ? 'GO FOR IT' : 'SNAP', icon: ICONS.snap, small: ui === 'fourth' ? 'FOR IT' : undefined })}
+          {passing && (aAway ? ctl('a', 'AWAY', doThrowAway, { cls: 'away', aria: 'Throw it away out of bounds', icon: ICONS.away, small: 'THROW' }) : ctl('a', 'RUN IT', doScramble, { aria: 'Run it: the quarterback tucks it and runs', icon: ICONS.run }))}
+          {running &&
+            ctl(
+              'a',
+              'JUKE',
+              (e) => {
+                // toward the stick's side; with the stick centred, a swipe off A picks the side (or he cuts away on lift)
+                const side = stickSide();
+                if (side || !('pointerId' in e)) juke(side);
+                else {
+                  (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+                  applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, ctl: 'A' }, ctxNow(), { pendingA: true }));
                 }
-              }}
-            >
-              {kind.toUpperCase()}
-            </button>
-          ))}
-        </div>
+              },
+              {
+                aria: 'Juke toward the stick, or swipe left or right off this button',
+                icon: ICONS.juke,
+                extra: {
+                  onPointerMove: (e) => applyGestures(gestures.current.move(e.pointerId, e.clientX, e.clientY, e.timeStamp)),
+                  onPointerUp: (e) => applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp)),
+                  onPointerCancel: (e) => applyGestures(gestures.current.cancel(e.pointerId))
+                }
+              }
+            )}
+          {/* B */}
+          {calling && canCall && ctl('b', 'AUDIBLE', audible, { aria: 'Audible: switch the call between run and pass', icon: ICONS.audible })}
+          {running && ctl('b', 'SPIN', () => p && move3(p, 'spin'), { aria: 'Spin: evade a tackle', icon: ICONS.spin })}
+          {/* C */}
+          {ui === 'fourth' && fgOk && ctl('c', 'FIELD GOAL', () => startKick(), { cls: 'kick', aria: 'Kick the ' + (g ? fgDistance(g) : '') + ' yard field goal', icon: ICONS.kick })}
+          {passing && ctl('c', passType.toUpperCase(), cycleType, { cls: 'chip', aria: 'Throw type: ' + passType + '. Tap for the next (touch, bullet, lob)', icon: ICONS[passType], extra: { 'data-type': passType } as Partial<React.ButtonHTMLAttributes<HTMLButtonElement>> })}
+          {running && ctl('c', 'POWER', () => p && move3(p, 'power'), { aria: 'Power: a truck or a stiff arm', icon: ICONS.power })}
+          {/* D */}
+          {ui === 'fourth' && canCall && ctl('d', 'PUNT', () => puntNow(), { aria: 'Punt', icon: ICONS.punt })}
+          {running && dMode && ctl('d', dMode === 'slide' ? 'SLIDE' : 'DIVE', () => {
+              const live = playRef.current;
+              if (live && giveUp(live, dMode)) tapHaptic(12);
+            }, { aria: dMode === 'slide' ? 'Slide: the quarterback gives himself up' : 'Dive forward for the line', icon: ICONS.dive })}
+          {rushing && burstPref && !(running && dMode) &&
+            ctl(
+              'd',
+              'BURST',
+              (e) => {
+                burstButton.current = true;
+                burstPointer.current = 'pointerId' in e ? e.pointerId : 'keyboard';
+                if ('pointerId' in e) (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+              },
+              {
+                cls: 'burst' + (bursting ? ' held' : ''),
+                aria: 'Burst: hold to sprint',
+                icon: ICONS.burst,
+                pressed: bursting,
+                extra: {
+                  onPointerUp: (e) => burstPointer.current === e.pointerId && stopBurst(),
+                  onPointerCancel: (e) => burstPointer.current === e.pointerId && stopBurst(),
+                  onLostPointerCapture: (e) => burstPointer.current === e.pointerId && stopBurst(),
+                  onKeyUp: (e) => (e.key === ' ' || e.key === 'Enter') && burstPointer.current === 'keyboard' && stopBurst(),
+                  onBlur: stopBurst
+                }
+              }
+            )}
+        </>
       )}
+      {canPause && !replaying && !paused && <PauseButton onPause={pause} />}
+      {paused && (
+        <PauseMenu
+          online={online}
+          burstButton={burstPref}
+          onBurstButton={setBurstLayout}
+          feedback={feedback}
+          onFeedback={
+            onFeedback &&
+            ((key, on) => {
+              const next = { sound: feedback?.sound ?? true, haptics: feedback?.haptics ?? true, [key]: on };
+              setFeedback(next.sound, next.haptics);
+              onFeedback(key, on);
+            })
+          }
+          quitText={quitText}
+          onQuit={onQuit && !online ? quit : undefined}
+          onResume={resume}
+        />
+      )}
+      <div ref={probeRef} className="fb2-inset-probe" aria-hidden="true" />
       {ui === 'kick' && kickRef.current && (
-        <KickMeter window={kickRef.current.win} start={kickRef.current.t0} stopped={kickRef.current.stopped} distance={kickRef.current.dist} onKick={kickNow} />
+        <KickMeter window={kickRef.current.win} start={kickRef.current.t0} stopped={kickRef.current.stopped} distance={kickRef.current.dist} now={() => clock.now()} paused={paused} onKick={kickNow} />
       )}
       {ui === 'final' && g && (
         <div className="fg-final hg2-final" role="status">
@@ -1246,10 +1434,10 @@ export function Football2({
   );
 }
 
-function KickMeter({ window: win, start, stopped, distance, onKick }: { window: number; start: number; stopped: number | null; distance: number; onKick: () => void }) {
+function KickMeter({ window: win, start, stopped, distance, now, paused, onKick }: { window: number; start: number; stopped: number | null; distance: number; now: () => number; paused: boolean; onKick: () => void }) {
   const [, force] = useState(0);
   useEffect(() => {
-    if (stopped !== null) return;
+    if (stopped !== null || paused) return;
     let raf = 0;
     const loop = () => {
       force((n) => n + 1);
@@ -1257,15 +1445,15 @@ function KickMeter({ window: win, start, stopped, distance, onKick }: { window: 
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [stopped]);
-  const ph = ((performance.now() - start) / 1100) % 2;
+  }, [stopped, paused]);
+  const ph = ((now() - start) / 1100) % 2;
   const pos = stopped ?? (ph < 1 ? ph : 2 - ph);
   return (
     <button
       className="fb2-kick"
       onPointerDown={(e) => {
         e.stopPropagation();
-        onKick();
+        if (!paused) onKick();
       }}
       aria-label={'Kick the ' + distance + ' yard field goal: tap when the needle is in the window'}
     >
@@ -1277,6 +1465,29 @@ function KickMeter({ window: win, start, stopped, distance, onKick }: { window: 
     </button>
   );
 }
+
+/** The control buttons' symbols (SVG, drawn in the button's ink). */
+const svg = (d: string, fill = false) => (
+  <svg viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke={fill ? 'none' : 'currentColor'} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
+const ICONS: Record<string, React.ReactNode> = {
+  snap: svg('M12 4c4.5 0 8 3.6 8 8s-3.5 8-8 8-8-3.6-8-8 3.5-8 8-8zM9 10l6 4M9 14l6-4'),
+  audible: svg('M4 8h13l-3-3M20 16H7l3 3'),
+  run: svg('M6 18 18 6M9 6h9v9'),
+  away: svg('M5 19 19 5M19 5h-7M19 5v7M4 9v10h10'),
+  juke: svg('M6 20l5-6-4-4 6-6M15 4h4v4'),
+  spin: svg('M20 12a8 8 0 1 1-3-6.2M20 4v5h-5'),
+  power: svg('M5 12h9M10 6l6 6-6 6M19 5v14'),
+  dive: svg('M4 6l8 8M12 14h7M4 19h16'),
+  burst: svg('M13 2 4 14h7l-2 8 9-12h-7z', true),
+  kick: svg('M6 3v9h12V3M12 12v9'),
+  punt: svg('M4 18c4-10 12-10 16 0M16 18h4v-4'),
+  touch: svg('M3 17c5-9 13-9 18 0'),
+  bullet: svg('M3 13h15M14 9l4 4-4 4'),
+  lob: svg('M3 19c3-14 15-14 18 0')
+};
 
 const ART_COLOR: Record<string, string> = { X: '#ffd23a', SL: '#ff7aa8', Z: '#5cb8ff', TE: '#7cf08c', RB: '#c7a2ff' };
 

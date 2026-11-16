@@ -112,6 +112,10 @@ export function Arcade({
   onProgress,
   onTakeover,
   onFinish,
+  onQuit,
+  quitText,
+  feedback,
+  onFeedback,
 }: {
   /** the two drafted lineups; or `teams`, built already */
   lineup?: Lineup;
@@ -145,6 +149,12 @@ export function Arcade({
   onTakeover: (k: number) => void;
   /** `pens`: soccer, a level match settled on penalties */
   onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens) => void;
+  /** offline quit from the pause menu (contract C4; football so far): the host decides what leaving means */
+  onQuit?: (us: Progress, them: Progress) => void;
+  quitText?: string;
+  /** the pause menu's sound and haptics switches (football so far) */
+  feedback?: { sound: boolean; haptics: boolean };
+  onFeedback?: (key: 'sound' | 'haptics', on: boolean) => void;
 }) {
   const defenseIQ = defenseDifficulty(online, botLevel, aiDefense);
   const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay || manualOnly ? 'play' : 'kickoff');
@@ -471,5 +481,6 @@ export function Arcade({
     return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
   }
   const k = kits ?? kitsFor(null, null, 'nfl');
-  return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress}
+    online={online} quitText={quitText} onQuit={onQuit && !online ? (p) => onQuit(p, them ?? { score: 0, drive: 0, done: false, ends: [] }) : undefined} feedback={feedback} onFeedback={onFeedback} />;
 }

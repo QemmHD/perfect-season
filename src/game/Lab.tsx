@@ -37,6 +37,9 @@ export default function Lab() {
   const level = Number(q.get('level') ?? 0.85);
   const s = useMemo(() => sample(level), [level]);
   const [prog, setProg] = useState<Progress | null>(null);
+  // football's pause menu: its sound/haptics switches and quit, readable by QA (nfl-2)
+  const [fb, setFb] = useState({ sound: true, haptics: true });
+  const [quit, setQuit] = useState<Progress | null>(null);
   // soccer's bench is ?soccer-lab (dev server only)
   if (pick({ nba: false, nfl: false, soccer: true })) return <div style={{ padding: 20, color: '#fff' }}>Soccer: open ?soccer-lab on the dev server.</div>;
   if (pick({ nba: true, nfl: false, soccer: false }))
@@ -73,10 +76,15 @@ export default function Lab() {
         drives={q.has('drives') ? Number(q.get('drives')) : undefined}
         autoplayHook={q.has('auto')}
         timeScale={Number(q.get('slowmo') ?? 1)}
+        feedback={fb}
+        onFeedback={(k, on) => setFb((f) => ({ ...f, [k]: on }))}
+        quitText="Leave the lab game?"
+        onQuit={(p) => setQuit(p)}
         onProgress={setProg}
         onDone={setProg}
       />
       <span hidden data-progress={JSON.stringify(prog)} />
+      <span hidden data-quit={quit ? JSON.stringify(quit) : ''} />
     </div>
   );
 }

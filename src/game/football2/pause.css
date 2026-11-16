@@ -1,0 +1,256 @@
+/* Claude (studio overhaul nfl-2): the pause button (C19 PauseButton's local version, at the C15
+   pause slot) and the pause menu: a glass sheet over the frozen field, bevelled rows, gold RESUME. */
+.fb2 .v2-pause {
+  position: absolute;
+  top: var(--pause-top, calc(var(--sat) + 4px));
+  left: var(--pause-left, calc(var(--sal) + 12px));
+  z-index: 6;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f2f6f7;
+  background: linear-gradient(180deg, rgba(58, 70, 96, 0.92), rgba(16, 22, 36, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+  touch-action: none;
+}
+/* the score bug makes room for the pause button beside it (nfl-3 replaces the bug with the HUD kit's) */
+.fb2 .hg2-bug {
+  left: calc(var(--pause-left, 12px) + 52px);
+  width: min(400px, calc(100% - var(--pause-left, 12px) - 60px - var(--sar)));
+  box-sizing: border-box;
+  transform: none;
+  max-width: none;
+}
+.fb2 .hg2-bug > span.mid {
+  flex: 1;
+}
+.fb2 .v2-pause:active {
+  transform: translateY(1px);
+}
+.fb2 .v2-pause:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.fb2 .fb2-inset-probe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+.fb2-pause-shade {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: #fff;
+  overflow: auto;
+}
+.fb2-pause-shade::backdrop {
+  background: radial-gradient(ellipse at 50% 40%, rgba(6, 16, 28, 0.6), rgba(2, 6, 12, 0.86));
+  backdrop-filter: blur(6px) saturate(0.8);
+  -webkit-backdrop-filter: blur(6px) saturate(0.8);
+}
+.fb2-pause-menu {
+  box-sizing: border-box;
+  width: min(340px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 16px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 38%),
+    linear-gradient(180deg, rgba(14, 30, 44, 0.96), rgba(6, 14, 22, 0.97));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  font-family: var(--display);
+}
+.fb2-pause-menu header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.fb2-pause-menu header small {
+  font: 900 10px var(--display);
+  letter-spacing: 2px;
+  color: var(--teal);
+}
+.fb2-pause-menu header b {
+  font: 900 italic 28px/1 var(--display);
+  letter-spacing: 0.5px;
+}
+.fb2-pause-menu button {
+  font-family: var(--display);
+  color: #fff;
+  touch-action: manipulation;
+}
+.fb2-pm-resume {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 240, 190, 0.6);
+  font: 900 italic 20px var(--display) !important;
+  color: #2a1a00 !important;
+  background: radial-gradient(ellipse at 40% 20%, #fff1b8, #ffd23a 45%, #e99a1a);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.55),
+    inset 0 -4px 8px rgba(120, 60, 0, 0.35),
+    0 4px 0 #8a5608,
+    0 0 18px rgba(255, 200, 60, 0.25);
+}
+.fb2-pm-row,
+.fb2-pm-switch {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  text-align: left;
+  font: 900 italic 16px var(--display);
+}
+.fb2-pm-row span,
+.fb2-pm-switch span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.fb2-pm-row small,
+.fb2-pm-switch small {
+  font: 700 normal 11px var(--body);
+  color: var(--sub);
+  letter-spacing: 0;
+}
+.fb2-pm-row.quit {
+  border-color: rgba(255, 122, 122, 0.45);
+  color: #ffb0b0 !important;
+}
+.fb2-pm-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.fb2-pm-switch i {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s;
+}
+.fb2-pm-switch i::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff, #c9d6dc);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s;
+}
+.fb2-pm-switch.on i {
+  background: var(--teal);
+}
+.fb2-pm-switch.on i::after {
+  transform: translateX(16px);
+}
+.fb2-pm-controls,
+.fb2-pm-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(64vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.fb2-pm-map {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.fb2-pm-map b {
+  font: 900 11px var(--display);
+  letter-spacing: 1.6px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.fb2-pm-map p {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font: 600 12px/1.35 var(--body);
+  color: var(--soft);
+}
+.fb2-pm-map kbd {
+  font: 900 italic 11px var(--display);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  text-align: center;
+}
+.fb2-pm-confirm p {
+  margin: 0 0 4px;
+  font: 600 14px/1.4 var(--body);
+  color: var(--soft);
+}
+.fb2-pm-back {
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(25, 227, 201, 0.5);
+  background: rgba(25, 227, 201, 0.1);
+  font: 900 italic 15px var(--display);
+  color: var(--teal) !important;
+}
+.fb2-pause-menu button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb2-pm-switch i,
+  .fb2-pm-switch i::after {
+    transition: none;
+  }
+}

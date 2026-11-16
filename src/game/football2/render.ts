@@ -37,6 +37,8 @@ export interface FbOverlay {
   flash: number;
   /** trauma shake, kick, zoom and particles (render only) */
   juice?: Juice;
+  /** nfl-2: the screen shows the receivers' name chips itself (no slot tags on the canvas) */
+  chips?: boolean;
 }
 
 /** ability pop colours: offense gold, defense teal */
@@ -343,6 +345,8 @@ export class FootballRenderer {
     this.pops.push({ id, text, side, at: real });
     if (this.pops.length > 6) this.pops.shift();
   }
+  /** nfl-2: each player's head on screen as last drawn (css px), for the name chips */
+  heads: Record<number, { x: number; y: number }> = {};
   /** a field point on screen (for effects drawn by the game) */
   screenOf(x: number, y: number, h = 0): { x: number; y: number; s: number } | null {
     return this.lens ? this.lens.at(x, y, h) : null;
@@ -828,6 +832,7 @@ export class FootballRenderer {
         }
       }
     }
+    this.heads = heads;
     // the ball, in the air (with its shadow) or in his hands
     const bn = ballNow(p);
     if (bn) {
@@ -910,7 +915,7 @@ export class FootballRenderer {
       if (h) label(ctx, text, h.x, h.y - up, color, this.W);
     };
     if (o.routes) for (const b of p.bodies) if (b.side === 'O' && !isLine(b) && b !== p.qb) tag(b, '#ffffff');
-    if(p.phase==='drop'&&p.call==='pass')for(const b of p.bodies)if(b.side==='O'&&b!==p.qb&&!isLine(b))tag(b,ROUTE_COLOR[b.slot]??'#ffffff',b.slot,18);
+    if(p.phase==='drop'&&p.call==='pass'&&!o.chips)for(const b of p.bodies)if(b.side==='O'&&b!==p.qb&&!isLine(b))tag(b,ROUTE_COLOR[b.slot]??'#ffffff',b.slot,18);
     if (p.carrier && p.phase === 'run') tag(p.carrier, '#ffe08a');
     if (p.phase === 'run') for (const b of p.bodies) if (b.side === 'D' && b.windAt !== Infinity) tag(b, '#ff8a3a', '!', 32);
     ctx.restore();
