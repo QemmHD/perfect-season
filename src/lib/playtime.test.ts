@@ -364,7 +364,7 @@ describe('E.1 menus are at most 25% of the day', () => {
   it('menus alone count nothing; after a 30-minute match, at most 10 menu minutes count', async () => {
     const t = await tab();
     screen(t, 'menu', 600, 5);
-    expect(pt(t).daySec).toBe(0);
+    expect(t.profile.playtime?.daySec ?? 0).toBe(0);
     match(t, 'ut:1', 1800);
     screen(t, 'menu', 1800, 5);
     expect(pt(t).dayMenuSec).toBe(600);

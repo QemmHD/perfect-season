@@ -4,6 +4,7 @@
 // audit's PPP 1.28) and for plan §3.1's targets (PPP 1.145), so the smoke catches a collapse or a
 // runaway, not the fit: calibration.test.ts (opt-in, 150 games) measures that. A task that moves a
 // number for good narrows its band here and says so in docs/studio-overhaul/nba.md.
+import { SPORT } from '../../engine/sport';
 import { getPool } from '../../ut/pool';
 import { BoxTracker, type BoxTeam } from './box';
 import { newTally, playMatch, squadShown, summary } from './harness';
@@ -33,7 +34,8 @@ const sum = (parts: BoxTeam[]): BoxTeam => {
   return out;
 };
 
-describe('NBA calibration smoke', () => {
+// Wave 1: basketball's own pool only (under PS_SPORT=nfl/soccer getPool() is that sport's)
+describe.skipIf(SPORT !== 'nba')('NBA calibration smoke', () => {
   it(`${GAMES} AI v AI games at even 78 Pro land inside the wide bands`, async () => {
     const pool = await getPool();
     const ta = newTally();

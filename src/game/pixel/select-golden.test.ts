@@ -18,7 +18,10 @@ describe.skipIf(SPORT !== 'nba')('select-nba: identical to the renderer before t
 describe.skipIf(SPORT !== 'nfl')('select-nfl: identical to the renderer before the move', () => {
   it('hashes every body, every other frame of 2 seeded games to the base digest', async () => {
     const r = await goldenNfl(nfl);
+    // Wave 1 re-base: the move was proved on claude/studio-players (ed52d518). nfl-1/nfl-2's engine (the
+    // carrier's momentum, the quarterback's backpedal and pocket) changes the bodies themselves, so the
+    // stream is re-pinned on the merged engine; select-nfl.ts is byte-identical to players' tip.
     expect(r.samples).toBe(104852);
-    expect(r.digest).toBe('ed52d518');
+    expect(r.digest).toBe('4bf2407c');
   }, 120000);
 });

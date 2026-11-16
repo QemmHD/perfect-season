@@ -71,8 +71,12 @@ describe('the E.5 tables', () => {
     expect(sum(LADDERS.daily)).toBe(450);
     expect(sum(LADDERS.weekly)).toBe(2100);
   });
-  it('pack values are quick-sell (half the NBA price)', () => {
-    for (const k of ['silver', 'gold', 'premium'] as const) expect(PACK_VALUE[k]).toBe(PACK_SHAPE.nba.price[k] / 2);
+  // Wave 1: packs-2 re-priced the NBA Silver/Gold packs (500 / 1,050; Premium stays 1,800). MINUTES has no
+  // claim screen in Wave 1, so its economy table keeps the prices it was designed on until team ut re-runs
+  // the coin flow against packs' prices (ut.md integration checklist item 10) and moves PACK_VALUE.
+  it('pack values are quick-sell of the prices the table was designed on (Premium still half the NBA price)', () => {
+    expect(PACK_VALUE).toEqual({ silver: 200, gold: 450, premium: 900 });
+    expect(PACK_VALUE.premium).toBe(PACK_SHAPE.nba.price.premium / 2);
   });
   it('lean: ladder coins × 0.6, a Gold for the 600 rung, the 60-minute Silver on weekdays only', () => {
     const L = ladders('lean');
