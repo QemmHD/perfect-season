@@ -120,7 +120,7 @@ try {
           document.querySelector('.arc-kick button.big.shine').click();
           return window.__clickT;
         });
-        await page.waitForSelector('.fb2-call .fb2-go.snap', { timeout: 60000 });
+        await page.waitForSelector('.fb2 [data-ctl="A"]', { timeout: 60000 });
         const trayAt = await page.evaluate(() => performance.now());
         log({ mode: 'load', match: ut ? 'ut' : 'draft', cpu, mountToPlayEnabledMs: Math.round(enabledAt), playToTrayMs: Math.round(trayAt - clickAt), mountToTrayMs: Math.round(enabledAt + trayAt - clickAt), nflAttrsBytes: attrsBytes, errors });
         await context.close();

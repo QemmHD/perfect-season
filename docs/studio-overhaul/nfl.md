@@ -10,6 +10,7 @@ Worktree `/home/user/ps-s-nfl`, branch `claude/studio-nfl`, cut from `claude/stu
 
 | Task | Reason |
 |---|---|
+| nfl-2 | The pocket: the stick moves the quarterback (sight and throw error follow), the automatic scramble when he crosses the line, `throwAway` (outside the tackle box only, never intercepted), `giveUp` slide and dive (a tackle, no fumble roll), `coverBall` (a covered ball comes loose 0.3 as often; no moves), the TOUCH/BULLET/LOB chip resetting to TOUCH each snap, and burst read from the stick's ring. Human-played drives come out differently. The AI's drives, sims and takeovers are unchanged (the determinism pins hold): its quarterback never moves on the stick and keeps its old sideline bail throw. |
 | nfl-1 | Input semantics after a carrier change: a stick the player has not touched since the catch, handoff or scramble now reaches the engine as `null` (the carrier keeps his momentum) instead of `{0,0}` (a hard brake); the engine's `null` carry for receivers and scrambling QBs keeps the heading for 0.35 s. Human-played drives come out differently, so an old and a new client must not share a queue. AI drives, sims and takeovers are unchanged (the autopilot never sends `null` to a carrier; the determinism test proves it). |
 
 NBA and soccer are not changed by this team. The lead bumps each sport once at integration (`DRAFT_RULES` in `src/net/match.ts`, `UT_RULES` in `src/ut/Match.tsx`; we never edit either).
@@ -464,14 +465,66 @@ The late thumb now beats the held one on designed runs because `null` follows th
 
 ## Touched outside my lane
 
+- **nfl-2** `src/game/Arcade.tsx` (shared with nba; NFL branch only): four optional props, `onQuit`/`quitText` (C4) and `feedback`/`onFeedback` (the pause menu's sound and haptics switches), passed to `Football2`; `onQuit` is offered only offline (about 12 lines).
+- **nfl-2** `src/App.tsx` (ut/shell's): the draft game's `<Arcade>` passes `feedback={profile.settings}` and an `onFeedback` that updates the same settings the Settings sheet does (2 lines). It does **not** pass `onQuit`: what quitting a draft game means is App's call (C4), so the pause menu there shows Resume, Controls and Sound/Haptics only until App and ut wire it.
+- **nfl-2** `src/game/Lab.tsx` (the `?arcade` test bench): local sound/haptics state and an `onQuit` that writes the progress into a hidden `data-quit` span, so QA can prove quit reaches the host (6 lines).
+- **nfl-2** `src/game/football2/render.ts` (ours, outside the players' sections): `heads` is kept public for the name chips, and the canvas slot tags in the pocket are skipped when the screen draws chips (`chips` overlay flag). No player-drawing code changed.
+
 - `scripts/qa/joystick.mjs` (Codex's shared QA script; nfl-1, `10aa263`): the post-handoff assertion now checks the momentum carry and that a touched, centred stick stops the runner (about 12 lines).
 - `docs/NFL-DIRECT-CONTROL.md` is in our lane (OWNERSHIP); nfl-1 appended a "momentum carry" section and left the Codex text as it was.
+
+### nfl-2: the V2 control grammar (floating stick, A/B/C/D, pocket, passing surface, pause) — done 2026-11-16
+
+**What changed and why** (audit C-2, C-3, C-6, D-5 pause; V2 §A.5 and §B.2.2; the record is also in `docs/NFL-DIRECT-CONTROL.md`).
+- **The floating stick** (`shared-v2.ts` `Stick`, the local C16): it lives in the C15 zone (left 48%, lower 55%), the ring jumps to the thumb, a thumb resting there before the snap is live at the snap, `onDown` feeds `CarryGate.touch()`, and the knob, ring and sprint state move by ref. **Burst is the ring**: past 1.15 × the radius `setBurst(p, true)` at the touch and on every step after (stamina maths untouched); `prefs.ts` `BURST_BUTTON` (`perfect-season:fb2-burst-button`, default off) puts hold-BURST on D instead. HOLD TO RUN now rides the floating stick's ghost ring.
+- **A/B/C/D** (`pass-controls.css`) from the C15 variables, which `shared-v2.ts` `controlGeometry(w, h, insets)` computes (the V2 §A.5 table at 393×852 and 320×568, blended between by the tighter of width and height, landscape compact and pushed in by the side insets) and Football2 sets on `.arcade-full`, with the insets from the stage's test hook or an `env()` probe. Context map as in "The context map" above; fourth down adds FIELD GOAL (C) and PUNT (D). Glossy bevelled buttons with SVG symbols, the gold A, the teal B.
+- **`gestures.ts`** (pure): ownership on touch-down (control → stick zone → receiver chip → right two thirds), tap vs drag at 10 px / 250 ms, the slingshot from 10 px, a pending A press that resolves as a swipe (≥ 36 px in 250 ms) or a plain JUKE, the cover-ball hold (0.3 s still), the second-finger TOUCH → BULLET → LOB cycle that never counts the stick's finger, and `burstHeld` (one source at a time).
+- **The pocket** (`engine.ts`, `types.ts`): the stick moves the quarterback from the first step at `lerp(3.6, 5.0, AGI)` yd/s (until he's at his 6.5 yd drop he keeps backpedalling: the stick can drift him, not bring him forward); `p.roll` costs up to 20% of his sight; letting go holds the spot the stick left (`p.spot`); the act is `backpedal` through the drop. `outsideBox` is |x − ball| > 4.5. Crossing the line makes him a runner (`scramble`), and then he can't throw. `throwAway` (outside the box only) lands 3 yd past the near sideline, nobody plays it, it is never intercepted, and it reads THROWN AWAY. `giveUp('slide')` (a quarterback past the line: 0.25 s of slowing) and `giveUp('dive')` (anyone: 1.2–2.0 yd by SPD in 0.32 s) end as a tackle at the end or at first contact, with no fumble roll. `coverBall` (the right thumb held still on the field): 4% slower, no moves, a hit jars the ball loose 0.3 as often. A sack sets `down` on the quarterback and `tackle` on the sacker. After a throw from a moving pocket the quarterback stops instead of gliding.
+- **The passing surface** (`ReceiverIcons.tsx`): a chip in the route colour 4 px over each eligible receiver's head (surname at 11 px, else the number, else the slot; fill-ins' "WR 86" style names fall back to the number), each a 44×44 touch area; where two areas overlap a touch fans the chips out instead of throwing. A chip throws an auto-led pass of the current type **on touch-down** (V2 "everything fires on touch-down"; so the plan's "drag from a chip becomes a slingshot" was dropped: aim starts on the open field around the chips). The landing reticle is always drawn: the slingshot's own while dragging, otherwise a teal ring at the lead spot of the most open receiver, whose chip is outlined.
+- **Pause** (`shared-v2.ts` `PauseButton` at the C15 slot, `PauseMenu.tsx`, `pause.css`, `clock.ts`): in every pre-snap and live state (not the final, replays, practice or autoplay). The menu: RESUME, CONTROLS (the map for each moment and the Burst-button switch), SOUND/HAPTICS (when the host passes `feedback`), and offline QUIT with a confirm through `onQuit` (C4). `clock.ts` `GameClock` is the screen's real time: the fixed-step loop, replays, slow motion, the kick needle and every wait between plays (`after`) stop while paused. The game pauses itself on `visibilitychange` to hidden and on `pagehide`. Playtime `pause(true/false)` and `abandon()` are called (C21; a no-op until ut's module lands). Online, pausing stops only your own game and the menu says so; forfeit comes with nfl-9.
+- **The play-call strip** before the snap is the existing cards in a swipeable strip left of the cluster (FLIP and PLAYBOOK as its last cards) so SNAP and AUDIBLE can sit on A and B; nfl-3 replaces it with the 124 px tray. The score bug makes room for the pause button.
+- Old move buttons, BURST, the pass panel and the fixed stick are gone (their CSS removed from `rushing-controls.css`).
+
+**Before → after.**
+
+| Measure | Before | After | Acceptance |
+|---|---|---|---|
+| Human proxy, Pro gold, sack % of dropbacks (`scripts/nfl_pocket_proxy.ts`, 400 games each, 95% intervals) | 13.2 [12.4–14.1] (pocket off) | **8.3 [7.6–9.0]** (pocket on) | ≥ 3 points lower |
+| … throwaways | 0 | **3.6% [3.2–4.1]** | 1–4% |
+| … INT % of attempts | 2.12 [1.77–2.54] | **1.81 [1.49–2.19]** | up ≤ 0.3 points |
+| … points per drive | 3.49 | 3.69 | — |
+| A/B/C/D centres vs V2 §A.5 (`nfl-controls.mjs`) | fixed buttons elsewhere | **0 px off** at A and C | ≤ 4 px |
+| Gaps A–B / A–C / A–D | — | **15.9 / 15.2 / 17.7** (A), **10.3 / 14.2 / 11.7** (C) | 10–18 |
+| Right-thumb targets (pre-snap / pocket / carrier) | up to 10 in the pass panel | **2 / 2 / 3–4**, none in the top two thirds | ≤ 4 |
+| Thumb held before the snap moves the QB on the first step | the old stick appeared only after the snap | **10/10** at A and C, both motion settings | 10/10 |
+| Crossing the sprint ring → `p.bursting` | (no ring) | **the next frame** | ≤ 1 frame |
+| Name chips to the heads | slot letters drawn on the canvas | **4 px** | ≤ 12 px |
+| Touch-down on a chip → ball in the air | a panel button, on click | **0.6–1.1 ms** after the page receives the touch (the emulated event's own timestamp is 23–56 ms earlier on this loaded machine: it waits in the browser's input queue) | ≤ 16 ms |
+| Paused: drift of `p.t` over 3 s; hidden page | no pause | **0**; paused within the frame, drift 0 | 0; ≤ 1 frame |
+
+The proxy's pocket thumb (`autopilot.ts` `pocketThumb`): a beaten rusher is seen and, 0.25–0.5 s later, escaped sideways (stepping up from an edge, backing off an inside man, never to the line); on one dropback in ten he rolls out on purpose; outside the box, rushed, half the time he throws it away; and a hurried bail inside the box is no longer a throwaway for a person (`Pilot.legalOnly`). The AI's pilot is untouched.
+
+**Tests added or changed.**
+- `gameplay.test.ts`, "the pocket (nfl-2)": displacement 1.5–5 yd in 1 s with a stick at AGI 40/70/99 in four directions and none beyond the drop with `null` or a centred stick; a stick held at the snap moves him on step one and can't bring him forward while dropping; throwaway refused inside the box and never intercepted outside it (500 seeds, > 400 thrown); the automatic scramble fires the step he crosses the line and never before, and he can't throw after; slide and dive always end in a tackle with no fumble (500 seeds) and a slide is refused behind the line; covering the ball; a sack's acts; identical inputs give an identical end; **C9**: 500 seeded plays identical with every act swapped for a dummy; **burst**: stamina traces identical from the ring and from D over 200 seeds.
+- `gestures.test.ts` (new): every ownership rule, tap/drag at the thresholds, the chip's touch-down throw, swipe off A (left, right, too short, too slow, vertical, lapsed), the cover hold with the stick held, the second finger never the stick's.
+- `clock.test.ts` (new): paused time stands still, timers keep their remaining time, cancel, dispose, nested timers.
+- `shared-v2.test.ts`: `controlGeometry` matches the V2 table at both sizes (and landscape), buttons ≥ 44 px on any phone.
+- `prefs.test.ts`: the Burst-button key (missing, garbage, throwing storage, missing storage).
+- `determinism.test.ts`: unchanged and green (the AI's plays, `aiDrivesOf` and takeovers still hash to the pins).
+- `scripts/qa/nfl-controls.mjs` (new): all of the browser checks above at A and C with motion on and reduced, 0 page errors, no non-local requests. `nfl-catch-run.mjs` and `nfl-baselines.mjs` selectors follow the new stick and SNAP; `nfl-catch-run.mjs` still passes at A and C (6 of 6 carriers keep ≥ 70% of catch speed at +0.25 s, YAC > 1 yd on 6 of 6).
+
+**Protocol bump needed:** NFL draft 10→11, UT 11→12 (see the table at the top).
 
 ## For the lead (found in nfl-1)
 
 - **QA isolation:** under `?ns=inspect` the app and the shared `scripts/qa/browser.mjs` fixture still call the live `player-save` and `card-registry` functions (aborted here by `nfl-guard.cjs`). Every team's legacy QA should run behind a route-abort, and `ns=inspect` should probably disable cloud saves and registry writes in the app itself (`src/lib/cloud-save.ts`, `src/ut/registry.ts`: lead-only paths).
 
 ## Owner device checks
+
+- **nfl-2** The floating stick under the left thumb, and burst by pushing past the ring (V2 lead decision 2: the "Burst button" switch under pause → Controls restores hold-BURST on D if the owner prefers it).
+- **nfl-2** The A/B/C/D cluster's reach for the right thumb on the owner's phone, JUKE toward the stick or by a swipe off A, and DIVE/SLIDE showing on D only near the sticks.
+- **nfl-2** Moving in the pocket and THROW AWAY outside the tackles; the name chips (tap = throw on touch-down) and the reticle.
+- **nfl-2** Pause, and the automatic pause when the phone locks or the app goes to the background.
 
 - The catch-and-run feel without touching the stick, and the HOLD TO RUN ghost while the ball is in the air (nfl-1).
 - That a thumb resting on the stick through the throw never stops the catch, and that the first deliberate push takes the carrier at once (nfl-1).
@@ -482,6 +535,11 @@ The late thumb now beats the held one on designed runs because `null` follows th
 Copied from the plan (§9), each with its reason; cut-line items land here with the task that dropped them.
 
 **Deferred**
+- **nfl-2: the AI quarterback's 0.8 yd step-up** against a free edge rusher. It changes every AI drive (the determinism pins, the fast/full baselines), so it moves to nfl-5 with the rest of the AI's football brain; the AI's old sideline bail throw stays with it until then.
+- **nfl-2: the legacy Codex QA scripts** `joystick.mjs`, `rushing.mjs` and `core-gameplay.mjs` still look for the fixed stick, BURST and the pass panel (`Run joystick:`, `.fb2-burst`, `.fb2-passing`). Their checks (two-axis displacement, release-to-stop, two-thumb burst, interruption) are covered for the new controls by `nfl-controls.mjs` and the engine tests; porting their selectors to `.v2-stick` and `[data-ctl]` is listed for nfl-3's QA step.
+- **nfl-2: quit wiring in the hosts.** `Arcade` offers `onQuit`/`quitText` (C4); App's draft game and ut's `Match.tsx` decide what quitting means and pass them (ut contract B). Until then the pause menu in those hosts has no QUIT row.
+- **nfl-2: the CONTROLS page's drawing** (a diagram of the thumbs) is the plan's second cut-line item; the page lists the map as text and moves to nfl-3 for the drawing.
+- **nfl-2: the online takeover deadline on the pause menu** comes with nfl-9's forfeit.
 - **Precision Passing and the SNAG catch tap.** The passing window already asks too much in 2-3 s (audit C-3); revisit after the owner's device check of the icon and slingshot controls. The Big Hit ring is built (nfl-8).
 - **Earned zones, pre-snap zone chips, trigger and knockout on the card face.** They change ability activation on every play (a full recalibration) and need a card-face hand-off; the P0 noise fix (one pop per play) ships in nfl-3. When built, the trigger and knockout text belongs on the card face (players) and in the card detail (packs/ut).
 - **Crowd pressure on solo road games.** Solo-only flair that needs a ut `crowd` prop; the later rule is C7, with a static border under reduced motion.

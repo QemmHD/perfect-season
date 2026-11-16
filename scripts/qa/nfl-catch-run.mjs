@@ -49,11 +49,12 @@ try {
           }
         await page.getByRole('button', { name: 'SNAP', exact: true }).click();
         await page.waitForTimeout(900);
-        await page.getByRole('button', { name: /^Pass to RB/ }).click();
+        // (the chip may sit in the stick zone, which owns touches there: throw through its keyboard path)
+        await page.getByRole('button', { name: /^Pass to RB/ }).dispatchEvent('click');
         // the ball in the air: the stick shows, untouched (the ghost, once the momentum carry is in)
         if (!ghostShot) {
           await page.waitForTimeout(120);
-          if (await page.locator('.fb2-ghost').count()) {
+          if (await page.locator('.v2-stick.ghost').count()) {
             ghostShot = true;
             await page.screenshot({ path: shotPath('nfl-1', `ghost-${view}-${reducedMotion}`) });
           }
