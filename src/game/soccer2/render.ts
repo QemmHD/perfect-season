@@ -13,6 +13,8 @@ import { drawBody, freeCanvas, type Look, type Sprite, SpriteCache, CanvasOut } 
 import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
 import { drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { pitchTexture, type PitchTheme } from '../pixel/pitch';
+import { drawGroundMark } from '../pixel/ground';
+import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import { animOf, CLIPS, heightM, lookFor, type Memo } from '../pixel/select-soccer';
 import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
 import { shotCone, topSpeed } from './ratings';
@@ -41,6 +43,9 @@ export interface SoccerOverlay {
   /** names over everyone (before kick-off) */
   names: boolean;
 }
+
+/** his drawn height in metres (V2's spread around the game's mean height) */
+const drawnM = (b: Body) => (drawnHeight('soccer', b.p.ht / 2.54) * 2.54) / 100;
 
 export class SoccerRenderer {
   W = 0;
@@ -141,7 +146,8 @@ export class SoccerRenderer {
     }
     memo.faceAt = t;
     dir = memo.face;
-    const raw = Math.max(8, Math.round(heightM(b) * s));
+    // drawn with V2's height spread around the game's mean (render only: the engine keeps b.p.ht)
+    const raw = Math.max(8, Math.round(drawnM(b) * s));
     const px = raw > 14 ? raw - (raw % 2) : raw;
     const dirs = px < 22 ? 8 : 16;
     const facing = Math.atan2(-dir.y, dir.x);
@@ -591,14 +597,11 @@ export class SoccerRenderer {
     const ballBehind = a.ball.y > PL + 0.05;
     if (ballBehind) this.ball(ctx, a);
     this.frame(ctx);
-    // shadows
+    // shadows (pixel/ground.ts: V2's soft contact shadow, shrinking as he rises)
     for (const b of a.bodies) {
       const f = this.lens(b.x, b.y);
-      const rx = Math.max(2, Math.round(f.s * 0.36));
-      ctx.fillStyle = 'rgba(8,26,8,0.4)';
-      ctx.beginPath();
-      ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(1, Math.round(rx * Math.sin(pitchAt(this.cam!, b.y)) * 0.8)), 0, 0, Math.PI * 2);
-      ctx.fill();
+      const look = this.looks.get(b.p.id + '|' + b.side + '|' + kitOf(b));
+      drawGroundMark(ctx, { x: f.x, y: f.y, shoulderPx: shoulderWidthPx(b.p.ht / 2.54, look?.wt ?? Math.round(23 * heightM(b) ** 2 * 2.2046), drawnM(b) * f.s), pitch: pitchAt(this.cam!, b.y), lift: b.h / heightM(b) });
     }
     const c = ctrlOf(a);
     const ring = (b: Body, color: string, k = 0.58, w = 0.08) => {

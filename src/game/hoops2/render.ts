@@ -6,7 +6,9 @@
 import { drawBody, type Look, type Sprite, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
 import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
+import { drawGroundMark } from '../pixel/ground';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
+import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
 import { AT_RIM, type Anim, animOf, CLIPS, dribbleArm, hangOf, lookFor, type Memo, spins360 } from '../pixel/select-nba';
@@ -137,7 +139,8 @@ export class HoopsRenderer {
     const turn = spins360(b) ? Math.PI * 2 * Math.min(1, Math.max(0, (t - b.actAt - 0.12) / 0.42)) : 0;
     const dcx = Math.cos(b.face + turn);
     const dcz = Math.sin(b.face + turn);
-    const raw = Math.max(10, Math.round((b.p.ht / 12) * s));
+    // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
+    const raw = Math.max(10, Math.round((drawnHeight('nba', b.p.ht) / 12) * s));
     const px = raw > 14 ? raw - (raw % 2) : raw;
     const dirs = px < 26 ? 8 : 16;
     const fb = (Math.round((Math.atan2(-dcx, dcz) / (Math.PI * 2)) * dirs) + dirs) % dirs;
@@ -393,17 +396,12 @@ export class HoopsRenderer {
       ctx.strokeStyle='#19e3c9';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(f.x,f.y,Math.max(6,f.s*1.7),Math.max(2,f.s*.6),0,0,Math.PI*2);ctx.stroke();
       ctx.strokeStyle='#ffd579bb';ctx.setLineDash([3,3]);ctx.beginPath();ctx.ellipse(to.x,to.y,Math.max(6,to.s*2),Math.max(2,to.s*.7),0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
     }
-    // shadows on the floor
+    // shadows on the floor (pixel/ground.ts: V2's soft contact shadow, shrinking as he rises)
     const t = p.t;
     for (const b of p.bodies) {
       const f = this.at(b.cx, b.cz);
-      const shrink = 1 / (1 + b.h * 0.12);
-      const rx = Math.max(3, Math.round(f.s * 1.05 * shrink));
-      const ry = Math.max(1, Math.round(rx * Math.sin(pitchAt(this.pc, b.cx)) * 0.9));
-      ctx.fillStyle = 'rgba(30,14,6,' + (0.4 * shrink).toFixed(2) + ')';
-      ctx.beginPath();
-      ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, ry, 0, 0, Math.PI * 2);
-      ctx.fill();
+      const tall = (drawnHeight('nba', b.p.ht) / 12) * f.s;
+      drawGroundMark(ctx, { x: f.x, y: f.y, shoulderPx: shoulderWidthPx(b.p.ht, b.p.wt, tall), pitch: pitchAt(this.pc, b.cx), lift: b.h / (b.p.ht / 12) });
     }
     // the ball's shadow
     const bsh = this.at(bp.cx, bp.cz);

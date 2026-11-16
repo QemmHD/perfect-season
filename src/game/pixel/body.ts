@@ -3,9 +3,10 @@
 // it), shaded in three tones from a light above and in front, then outlined. The grid is drawn
 // scaled up with smoothing off, so every pixel stays crisp. Uniform colors, number, hair and size
 // all come from the look, so any player can wear any team's home or away set.
-import { type RGB, mix, onColor, outlineOf, ramp, rgb } from './color';
+import { luma, OUTLINE, type RGB, mix, onColor, ramp3, rgb } from './color';
+import { headRadiusPx, LIMB_SCALE, padsWidthPx, torsoWidthPx } from './proportions';
 import { ball, type Buf, buffer, capsule } from './raster';
-import { type Joints, joints, type P2, type Pose, project, type Shape, shapeOf, type View } from './rig';
+import { type Joints, joints, type P2, type Pose, project, type Shape, shapeOf, type V3, type View } from './rig';
 
 export interface Look {
   sport: 'nba' | 'nfl' | 'soccer';
@@ -57,6 +58,9 @@ const SKINDARK = 17;
 const BUZZ = 18;
 const GLOVE = 19;
 const SLOTS = 20;
+
+/** The main materials' palette slots, for tests and tools that read a Raster's `slot`. */
+export const MATERIAL_SLOT = { skin: SKIN, jersey: JERSEY, trim: TRIM, shorts: SHORTS, socks: SOCK, shoes: SHOE, hair: HAIR, helmet: HELMET, pants: PANTS } as const;
 
 // 3x5 and 4x7 digits for jersey numbers
 const D35: Record<string, string> = {
@@ -150,6 +154,9 @@ export interface Sprite {
   top: number;
 }
 
+/** A bare head is drawn this much narrower than it is tall (V2's head boxes: 7x8 at 34 art px, 12x13 at 64). */
+const HEAD_WIDTH = 0.88;
+
 /** The browser wouldn't give a new canvas (iOS caps the canvas memory a page holds). */
 export class CanvasOut extends Error {
   constructor() {
@@ -236,6 +243,10 @@ export interface Raster {
   handL: { x: number; y: number };
   handR: { x: number; y: number };
   top: number;
+  /** per pixel: the material slot (0 empty) and the body part (1-2 legs, 3 torso, 4-5 arms, 6 head,
+   * 7 hair volume), for tests and tools; the outline ring is slot 0 */
+  slot: Uint8Array;
+  part: Uint8Array;
 }
 
 /** The pixels of drawBody, without a canvas (the same arguments; see drawBody). */
@@ -244,7 +255,11 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   // soccer (Claude, 2026-11-01): short sleeves, shorter shorts, socks to the knee, keeper's gloves
   const soccer = look.sport === 'soccer';
   const s = shapeFor(look);
-  const j = isJoints(pose) ? pose : joints(pose, s);
+  const j0 = isJoints(pose) ? pose : joints(pose, s);
+  // Broadcast Pixel build (proportions.ts): the torso's face-on width comes from his weight for his
+  // height (football pads add shoulders), and his arms hang outside it, however wide it is
+  const torsoHalf = (torsoWidthPx(look.ht, look.wt, px) + (nfl ? padsWidthPx(look.pads ?? 1, px) : 0)) / 2;
+  const j = armsOut(j0, torsoHalf / px - s.rUpper * LIMB_SCALE * 0.35);
   const P = (k: keyof typeof j) => project(j[k], view, px);
   const W = Math.ceil(px * 1.25) + 6;
   const H = Math.ceil(px * 1.7) + 6;
@@ -259,13 +274,14 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   const biasR = rightNear ? 0 : farBias;
   const chest = P('chest');
   const neck = P('neck');
-  const head = P('head');
+  const head0 = P('head');
   const shL = P('shL');
   const shR = P('shR');
   const hipL = P('hipL');
   const hipR = P('hipR');
   const R = (r: number) => Math.max(0.9, r * px);
-  const bulkR = (r: number) => R(r);
+  // limbs drawn x1.15 thicker than the rig (V2 C.1.1)
+  const bulkR = (r: number) => R(r * LIMB_SCALE);
 
   // ---- legs ----
   const legs = (side: 'L' | 'R', bias: number, part: number) => {
@@ -287,20 +303,30 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
       capsule(b, ox, oy, { ...hip, d: hip.d + 0.6 }, hem, bulkR(s.rThigh * 1.32), bulkR(s.rThigh * 1.12), (t) => (t > 0.86 ? TRIM : SHORTS), part, bias);
     }
     // the shoe: a chunky toe
-    capsule(b, ox, oy, ankle, toe, bulkR(0.024), bulkR(0.02), (t) => (t > 0.15 ? SHOE : SOCK), part, bias + 0.05);
+    capsule(b, ox, oy, ankle, toe, R(0.024), R(0.02), (t) => (t > 0.15 ? SHOE : SOCK), part, bias + 0.05);
   };
   legs('L', biasL, 1);
   legs('R', biasR, 2);
 
   // ---- torso: a rounded block from the hips to the shoulders, as wide as they look from here ----
   const half = (a: P2, c: P2) => Math.hypot(a.x - c.x, a.y - c.y) / 2;
-  const hipHalf = Math.max(R(s.rTorso * 0.85), half(hipL, hipR) + R(s.rThigh * 0.75));
-  const shHalf = Math.max(R(s.rTorso), half(shL, shR) + R(s.rUpper * (nfl ? 0.9 : 0.55)));
+  // how square-on the shoulders and hips are to us (1 face-on, 0 side-on), from the rig's joints
+  const squareSh = Math.min(1, half(project(j0.shL, view, px), project(j0.shR, view, px)) / Math.max(1e-6, s.shoulderW * px));
+  const squareHip = Math.min(1, half(hipL, hipR) / Math.max(1e-6, s.hipW * px));
+  // face-on the build's width, side-on the chest's depth, an ellipse between
+  const depthHalf = Math.max(R(s.rTorso), torsoHalf * 0.6);
+  const across = (w: number, dpt: number, sq: number) => Math.hypot(w * sq, dpt * Math.sqrt(1 - sq * sq));
+  const hipHalf = Math.max(across(torsoHalf * 0.8, depthHalf * 0.9, squareHip), half(hipL, hipR) + bulkR(s.rThigh * 0.75));
+  const shHalf = across(torsoHalf, depthHalf, squareSh);
   const shMid: P2 = { x: (shL.x + shR.x) / 2, y: (shL.y + shR.y) / 2, d: (shL.d + shR.d) / 2 };
   const hipMid: P2 = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2, d: (hipL.d + hipR.d) / 2 };
   // the waist: shorts (or pants) below, jersey above
   const waist = nfl ? 0.12 : 0.2;
-  capsule(b, ox, oy, hipMid, shMid, hipHalf, shHalf, (t) => (t < waist ? (nfl ? PANTS : SHORTS) : t < waist + 0.06 && !nfl ? TRIM : JERSEY), 3, 0);
+  // a V: tapering from the chest down to the hips, the build's full width from the chest up
+  const chestAt: P2 = { x: hipMid.x + (shMid.x - hipMid.x) * 0.55, y: hipMid.y + (shMid.y - hipMid.y) * 0.55, d: hipMid.d + (shMid.d - hipMid.d) * 0.55 };
+  const lowT = (t: number) => t * 0.55;
+  capsule(b, ox, oy, hipMid, chestAt, hipHalf, shHalf, (t) => (lowT(t) < waist ? (nfl ? PANTS : SHORTS) : lowT(t) < waist + 0.06 && !nfl ? TRIM : JERSEY), 3, 0);
+  capsule(b, ox, oy, chestAt, shMid, shHalf, shHalf, () => JERSEY, 3, 0);
   // the neck
   capsule(b, ox, oy, chest, neck, R(s.rTorso * 0.42), R(s.rTorso * 0.38), () => SKIN, 3, -0.05);
 
@@ -326,8 +352,10 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
     number(b, look.num, cx, cy, shHalf * 2 * squeeze - 2, squeeze);
   }
 
-  // ---- head ----
-  const hr = R(s.headR);
+  // ---- head: the 5-head hero's (proportions.ts), set on the neck at its drawn size ----
+  const hr = Math.max(0.9, headRadiusPx(s.headR, px));
+  const grow = hr / Math.max(1e-6, s.headR * px);
+  const head: P2 = { x: neck.x + (head0.x - neck.x) * grow, y: neck.y + (head0.y - neck.y) * grow, d: neck.d + (head0.d - neck.d) * grow };
   const cp = Math.cos(view.pitch);
   const sp = Math.sin(view.pitch);
   // his up, forward and right, as screen directions (x right, y up, z toward us)
@@ -373,6 +401,26 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   } else {
     const style = look.hair;
     const hc: P2 = head;
+    // the hair's volume over the skull (short, headband, locs): a slightly bigger ball behind it, kept
+    // to the crown, the sides above the ears and the nape, so the hair sits on the head, not painted on
+    const volume = style === 0 ? 1.12 : style === 4 ? 1.08 : style === 5 ? 1.12 : 0;
+    if (volume) {
+      const vc: P2 = { x: hc.x - fwdS.x * hr * 0.1, y: hc.y - upS.y * hr * 0.12, d: hc.d + upS.z * hr * 0.12 - fwdS.z * hr * 0.1 - hr * 0.9 };
+      ball(
+        b,
+        ox,
+        oy,
+        vc,
+        hr * volume,
+        (nx, ny, nz) => {
+          const u = nx * upS.x + ny * upS.y + nz * upS.z;
+          const f = nx * fwdS.x + ny * fwdS.y + nz * fwdS.z;
+          return u > 0.3 || (f < -0.35 && u > -0.5) ? HAIR : 0;
+        },
+        7,
+        HEAD_WIDTH
+      );
+    }
     ball(
       b,
       ox,
@@ -402,7 +450,8 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
         if (hair) return style === 1 ? BUZZ : HAIR;
         return SKIN;
       },
-      6
+      6,
+      HEAD_WIDTH
     );
     if (style === 2) {
       // a high top: a block of hair on the crown
@@ -416,7 +465,9 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   }
   // ---- colors ----
   const pal = palette(look);
-  return finish(b, pal, ox, oy, P('handL'), P('handR'), Math.round(oy + head.y - hr * 1.3));
+  // dark skin on a dark kit: a 1 px lit-side rim on the skin, so his arms don't sink into the jersey
+  const rim = luma(rgb(look.skin)) < 95 && luma(rgb(look.jersey)) < 95;
+  return finish(b, pal, ox, oy, P('handL'), P('handR'), Math.round(oy + head.y - hr * 1.3), rim);
 }
 
 function palette(look: Look): RGB[][] {
@@ -429,7 +480,7 @@ function palette(look: Look): RGB[][] {
     [0, 0, 0],
     [0, 0, 0],
   ]);
-  const set = (i: number, c: RGB) => (ramps[i] = ramp(c));
+  const set = (i: number, c: RGB) => (ramps[i] = ramp3(c));
   set(SKIN, skin);
   set(JERSEY, jersey);
   set(TRIM, trim);
@@ -444,12 +495,13 @@ function palette(look: Look): RGB[][] {
   set(PANTS, rgb(look.pants ?? '#e8e8e8'));
   set(BAND, trim);
   set(GLOVE, rgb(look.gloves ?? look.skin));
-  const sk = ramp(skin);
-  ramps[SKINDARK] = [mix(sk[0], [0, 0, 0], 0.15), sk[0], sk[0]];
+  // the nose and the ears: the skin's own shadow tone, so skin stays three tones
+  const sk = ramp3(skin);
+  ramps[SKINDARK] = [sk[0], sk[0], sk[0]];
   set(BUZZ, mix(rgb(look.hairColor), skin, 0.35));
   // the number: the trim color if it reads on the jersey, else black or white
   const num = onColor(jersey, [trim, [255, 255, 255], [20, 20, 24]]);
-  ramps[NUM] = [mix(num, [0, 0, 0], 0.15), num, mix(num, [255, 255, 255], 0.12)];
+  ramps[NUM] = ramp3(num);
   const line = onColor(num, [shorts, trim, [20, 20, 24]]);
   ramps[NUMLINE] = [line, line, line];
   const eye: RGB = [28, 18, 22];
@@ -457,12 +509,23 @@ function palette(look: Look): RGB[][] {
   return ramps;
 }
 
-function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, top: number): Raster {
+function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, top: number, rim: boolean): Raster {
   const { w, h, slot, tone, depth, part } = b;
-  // the colors packed once per slot: its three tones, and the dark line drawn along its edges
+  // the lit-side rim (dark skin on a dark kit): skin with nothing above or to the left of it takes
+  // the skin's highlight, the side the light comes from
+  const rimmed: number[] = [];
+  if (rim)
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (slot[i] === SKIN && (x === 0 || !slot[i - 1] || y === 0 || !slot[i - w])) rimmed.push(i);
+      }
+  // the colours packed once per slot: its three tones
   const pack = (c: RGB) => (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
   const col = pal.map((tones) => (tones ? tones.map(pack) : [0, 0, 0]));
-  const line = pal.map((tones) => (tones ? pack(outlineOf(tones[1])) : 0));
+  const line = pack(OUTLINE) >>> 0;
+  // hair volume and the head are one shape: no line between them
+  const grp = (p: number) => (p === 7 ? 6 : p);
   const out = new Uint32Array(w * h);
   const T = 1.6;
   for (let y = 0; y < h; y++)
@@ -470,43 +533,90 @@ function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, to
       const i = y * w + x;
       const s = slot[i];
       if (s) {
-        // an inner line where a nearer part overlaps this farther one
+        // the grid's own edge: a figure cut off there still gets its outline (in place of the pixel)
+        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
+          out[i] = line;
+          continue;
+        }
+        // an inner separation where a nearer part overlaps this farther one: this part's shadow tone
         const d = depth[i] + T;
-        const pi = part[i];
+        const pi = grp(part[i]);
         let k = i + 1;
-        let edge = x + 1 < w && slot[k] !== 0 && part[k] !== pi && depth[k] > d;
+        let edge = slot[k] !== 0 && grp(part[k]) !== pi && depth[k] > d;
         k = i - 1;
-        if (!edge) edge = x > 0 && slot[k] !== 0 && part[k] !== pi && depth[k] > d;
+        if (!edge) edge = slot[k] !== 0 && grp(part[k]) !== pi && depth[k] > d;
         k = i + w;
-        if (!edge) edge = y + 1 < h && slot[k] !== 0 && part[k] !== pi && depth[k] > d;
+        if (!edge) edge = slot[k] !== 0 && grp(part[k]) !== pi && depth[k] > d;
         k = i - w;
-        if (!edge) edge = y > 0 && slot[k] !== 0 && part[k] !== pi && depth[k] > d;
-        out[i] = edge ? line[s] : col[s][tone[i]];
+        if (!edge) edge = slot[k] !== 0 && grp(part[k]) !== pi && depth[k] > d;
+        out[i] = col[s][edge ? 0 : tone[i]];
         continue;
       }
-      // the outline around the whole figure, in a dark version of the nearest part it borders
-      let best = -1;
-      let bd = -1e9;
-      let k = i + 1;
-      if (x + 1 < w && slot[k] && depth[k] > bd) {
-        bd = depth[k];
-        best = k;
-      }
-      k = i - 1;
-      if (x > 0 && slot[k] && depth[k] > bd) {
-        bd = depth[k];
-        best = k;
-      }
-      k = i + w;
-      if (y + 1 < h && slot[k] && depth[k] > bd) {
-        bd = depth[k];
-        best = k;
-      }
-      k = i - w;
-      if (y > 0 && slot[k] && depth[k] > bd) best = k;
-      if (best >= 0) out[i] = line[slot[best]];
+      // the outline: one art pixel of #14121c around the whole figure (V2 C.1.3)
+      const r = x + 1 < w && slot[i + 1],
+        l = x > 0 && slot[i - 1],
+        dn = y + 1 < h && slot[i + w],
+        upk = y > 0 && slot[i - w];
+      if (!(r || l || dn || upk)) continue;
+      if (r && l && dn && upk) {
+        // a pinhole inside the figure (between an arm and the body) is an inner separation, not
+        // outline: the farthest neighbour's shadow tone
+        let k = i + 1;
+        for (const q of [i - 1, i + w, i - w]) if (depth[q] < depth[k]) k = q;
+        out[i] = col[slot[k]][0];
+      } else out[i] = line;
     }
-  return { w, h, px: out, ax: ox, ay: oy, handL: { x: ox + hl.x, y: oy + hl.y }, handR: { x: ox + hr.x, y: oy + hr.y }, top };
+  // the rim wins over the inner separations
+  for (const i of rimmed) out[i] = col[SKIN][2];
+  // no dithering (V2: none below 56 art px, and the shading never needs it above): a 2x2 checkerboard
+  // of two tones of one material, which a curved surface can fall into by chance, takes one tone
+  // (a fix can make a new checkerboard in a window already passed, so until none is left)
+  const keep = new Set(rimmed);
+  for (let pass = 0, changed = true; changed && pass < 8; pass++) {
+    changed = false;
+    for (let y = 0; y + 1 < h; y++)
+      for (let x = 0; x + 1 < w; x++) {
+        const i = y * w + x;
+        const s = slot[i];
+        if (!s || slot[i + 1] !== s || slot[i + w] !== s || slot[i + w + 1] !== s) continue;
+        if (out[i] !== out[i + w + 1] || out[i + 1] !== out[i + w] || out[i] === out[i + 1]) continue;
+        for (const [k, from] of [[i + 1, i], [i + w, i], [i, i + 1], [i + w + 1, i + 1]])
+          if (!keep.has(k)) {
+            out[k] = out[from];
+            changed = true;
+            break;
+          }
+      }
+  }
+  // an outline pixel boxed in on all four sides (a concave corner, a gap two pixels wide between a limb
+  // and the body) reads as a black line inside the figure, and doubles the outline at corners: it
+  // takes the farthest body neighbour's shadow tone, so corners turn on the diagonal
+  for (let y = 1; y < h - 1; y++)
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (out[i] !== line || slot[i] || !out[i - 1] || !out[i + 1] || !out[i - w] || !out[i + w]) continue;
+      let k = -1;
+      for (const q of [i - 1, i + 1, i - w, i + w, i - w - 1, i - w + 1, i + w - 1, i + w + 1]) if (slot[q] && (k < 0 || depth[q] < depth[k])) k = q;
+      if (k >= 0) out[i] = col[slot[k]][0];
+    }
+  return { w, h, px: out, ax: ox, ay: oy, handL: { x: ox + hl.x, y: oy + hl.y }, handR: { x: ox + hr.x, y: oy + hr.y }, top, slot, part };
+}
+
+/**
+ * The arms set out from the spine so they hang outside the drawn torso (a heavy man's torso is wider
+ * than his rig's shoulders): each arm moves sideways along the shoulder line, whole, so no bone
+ * changes length. `reach` is the wanted distance from the spine to each shoulder, a share of height.
+ */
+function armsOut(j: Joints, reach: number): Joints {
+  const dx = j.shR.x - j.shL.x,
+    dy = j.shR.y - j.shL.y,
+    dz = j.shR.z - j.shL.z;
+  const span = Math.hypot(dx, dy, dz);
+  const push = reach - span / 2;
+  if (push <= 1e-4 || span < 1e-6) return j;
+  const u = { x: (dx / span) * push, y: (dy / span) * push, z: (dz / span) * push };
+  const move = (q: V3, k: number): V3 => ({ x: q.x + u.x * k, y: q.y + u.y * k, z: q.z + u.z * k });
+  return { ...j, shL: move(j.shL, -1), elL: move(j.elL, -1), wrL: move(j.wrL, -1), handL: move(j.handL, -1), shR: move(j.shR, 1), elR: move(j.elR, 1), wrR: move(j.wrR, 1), handR: move(j.handR, 1) };
 }
 
 /** A raster on a canvas of its own size. */
@@ -522,7 +632,7 @@ export function toSprite(r: Raster): Sprite {
   return { canvas, ax: r.ax, ay: r.ay, handL: r.handL, handR: r.handR, top: r.top };
 }
 
-/** No reliable source says what a player looks like, so everyone shares one skin tone; hair varies by player. */
+/** The neutral default skin and hair, for any player without a curated look (never a guess from a name, team or nationality). */
 export const DEFAULT_SKIN = '#a8714f';
 export const DEFAULT_HAIR = '#1d1612';
 

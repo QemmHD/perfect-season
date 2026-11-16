@@ -6,7 +6,9 @@
 import { drawBody, type Sprite, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { drawField, type FieldCam, fieldAt, fieldCam, fieldFacing, type FieldTheme } from '../pixel/field';
 import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
+import { drawGroundMark } from '../pixel/ground';
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
+import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import type { Look } from '../pixel/body';
 import { animOf, ballArm, CLIPS, lookFor, type Memo } from '../pixel/select-nfl';
 import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, throwErrorRadius, windupOf } from './engine';
@@ -233,7 +235,8 @@ export class FootballRenderer {
     memo.faceAt = t;
     // sizes, angles and (for small, far players) facings in steps, so a player moving up the field
     // reuses his drawings
-    const raw = Math.max(8, Math.round((b.p.ht / 36) * s));
+    // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
+    const raw = Math.max(8, Math.round((drawnHeight('nfl', b.p.ht) / 36) * s));
     const px = raw > 14 ? raw - (raw % 2) : raw;
     const dirs = px < 22 ? 8 : 16;
     const fb = (Math.round((L.facing(dir.x, dir.y) / (Math.PI * 2)) * dirs) + dirs) % dirs;
@@ -480,15 +483,11 @@ export class FootballRenderer {
         ctx.fill();
       }
     }
-    // shadows
+    // shadows (pixel/ground.ts: V2's soft contact shadow, sized to his shoulders and pads)
     for (const b of p.bodies) {
       const f = L.at(b.x, b.y);
-      const rx = Math.max(2, Math.round(f.s * 0.42));
-      const ry = Math.max(1, Math.round(rx * Math.sin(L.pitch(b.y)) * 0.8));
-      ctx.fillStyle = 'rgba(8,26,8,0.42)';
-      ctx.beginPath();
-      ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, ry, 0, 0, Math.PI * 2);
-      ctx.fill();
+      const tall = (drawnHeight('nfl', b.p.ht) / 36) * f.s;
+      drawGroundMark(ctx, { x: f.x, y: f.y, shoulderPx: shoulderWidthPx(b.p.ht, b.p.wt, tall, isLine(b) || b.p.pos === 'DT' || b.p.pos === 'DE' ? 1.25 : 1), pitch: L.pitch(b.y) });
     }
     // who's open: green, tight (yellow) or covered (red), live while the quarterback has it
     if (o.open && p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) {

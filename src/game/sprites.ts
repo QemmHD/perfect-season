@@ -2,8 +2,9 @@
 // built once per look (uniform, number, build, pose) and cached as a small canvas the games scale
 // up with smoothing off, so the pixels stay crisp.
 //
-// Everyone shares one skin tone: the data has no reliable source for what a player looks like,
-// and the games don't guess.
+// SKIN is the neutral default tone. A player's own look (skin from a cited public photo, hair, gear)
+// comes from the appearance record (docs/studio-overhaul/players.md); without one he keeps the
+// neutral default, never a tone guessed from a name, team or nationality.
 export const SKIN = '#b98260';
 const SKIN_SHADE = '#9a6847';
 

@@ -79,17 +79,21 @@ export function capsule(b: Buf, ox: number, oy: number, a: P2, c: P2, ra: number
     }
 }
 
-export function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: (nx: number, ny: number, nz: number) => number, part: number) {
+export function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: (nx: number, ny: number, nz: number) => number, part: number, sx = 1) {
+  // `sx` narrows it across (a head is taller than it is wide)
   const cx = c.x + ox;
   const cy = c.y + oy;
+  const rx = r * sx;
   for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
-    for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
-      const ex = x + 0.5 - cx;
+    for (let x = Math.floor(cx - rx - 1); x <= Math.ceil(cx + rx + 1); x++) {
+      const ex = (x + 0.5 - cx) / sx;
       const ey = y + 0.5 - cy;
       if (ex * ex + ey * ey > r * r) continue;
       const nx = ex / r;
       const ny = -ey / r;
       const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
-      put(b, x, y, c.d + nz * r, slotFor(nx, ny, nz), toneOf(nx, ny, nz, 0.05), part);
+      // slot 0 from slotFor: no pixel here (a partial shell, such as hair volume)
+      const slot = slotFor(nx, ny, nz);
+      if (slot) put(b, x, y, c.d + nz * r, slot, toneOf(nx, ny, nz, 0.05), part);
     }
 }
