@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+// Wave 1 (render cost): the query list is made once; its `matches` stays live when the setting changes.
+// The match renderers ask every frame, and matchMedia() itself is not free.
+let reduceQuery: MediaQueryList | null = null;
 export function reducedMotion(): boolean {
   try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    reduceQuery ??= window.matchMedia('(prefers-reduced-motion: reduce)');
+    return reduceQuery.matches;
   } catch {
     return false;
   }

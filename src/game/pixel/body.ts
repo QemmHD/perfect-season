@@ -480,7 +480,20 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   return finish(b, pal, ox, oy, P('handL'), P('handR'), Math.round(oy + head.y - hr * 1.3), rim);
 }
 
+/** Wave 1 (render cost): palettes by the colours they're made of. A palette is ~18 ramp3 calls with
+ * their outline-clearance loops, and every sprite build asked for one; a match has a few dozen looks. */
+const PALETTES = new Map<string, RGB[][]>();
 function palette(look: Look): RGB[][] {
+  const key = [look.skin, look.jersey, look.trim, look.shorts, look.socks, look.shoes, look.hairColor, look.helmet, look.stripe, look.mask, look.pants, look.gloves].join('|');
+  let pal = PALETTES.get(key);
+  if (!pal) {
+    if (PALETTES.size >= 512) PALETTES.clear();
+    pal = makePalette(look);
+    PALETTES.set(key, pal);
+  }
+  return pal;
+}
+function makePalette(look: Look): RGB[][] {
   const skin = rgb(look.skin);
   const jersey = rgb(look.jersey);
   const trim = rgb(look.trim);
