@@ -487,7 +487,8 @@ export function sight(p: Play, len: number) {
   if (p.fire) return 1;
   const a = p.qb.p.a;
   const calm = 1 - p.pressure * (1 - 0.6 * rt(a.TUP, 50, 99));
-  const yards = lerp(8, 56, Math.pow(accAt(p.qb.p, len), 1.1)) * lerp(0.45, 1, calm);
+  // on the move in the pocket (nfl-2) he sees less of it: up to a fifth less at full tilt
+  const yards = lerp(8, 56, Math.pow(accAt(p.qb.p, len), 1.1)) * lerp(0.45, 1, calm) * (p.roll ? lerp(1, 0.8, p.roll) : 1);
   return clamp(yards / Math.max(1, len), 0.18, 1);
 }
 
@@ -558,6 +559,101 @@ export function isLine(b: Body) {
   return b.slot === 'LT' || b.slot === 'LG' || b.slot === 'C' || b.slot === 'RG' || b.slot === 'RT';
 }
 
+// ---------- the pocket (Claude, studio overhaul nfl-2) ----------
+
+/** The quarterback's drop: this many yards behind the line, over this long (s). */
+export const DROP_DEPTH = 6.5;
+export const DROP_TIME = 0.75;
+/** While he's still dropping, the stick can't bring him forward faster than this backpedal (yd/s, negative = back). */
+const DROP_BACK = -2.6;
+/** The tackle box: this far either side of where the ball was snapped (yards). */
+export const BOX_HALF = 4.5;
+/** A stick shorter than this in the pocket is a resting thumb: he holds his spot. */
+const POCKET_DEAD = 0.05;
+
+/** Outside the tackle box: where a quarterback may throw it away. */
+export function outsideBox(p: Play): boolean {
+  return Math.abs(p.qb.x - p.bx) > BOX_HALF;
+}
+
+/** How fast the stick moves a quarterback in the pocket (yd/s): 3.6 for a statue, 5.0 for an agile one. */
+export function pocketSpeed(qb: FbPlayer): number {
+  return lerp(3.6, 5.0, rt(qb.a.AGI, 40, 99));
+}
+
+/** The stick's pull on a quarterback in the pocket this step, or null when the drop or his spot has him. */
+function pocketPull(p: Play, steer: RunInput): Pt | null {
+  if (p.phase !== 'drop' || p.call !== 'pass' || p.carrier !== p.qb) return null;
+  if (typeof steer !== 'object' || steer === null) return null;
+  const len = Math.hypot(steer.x, steer.y);
+  if (!Number.isFinite(len) || len < POCKET_DEAD) return null;
+  return len > 1 ? { x: steer.x / len, y: steer.y / len } : steer;
+}
+
+/**
+ * Throw it away (nfl-2): only from outside the tackle box (inside it, there's no throwaway: he has
+ * to make a play). The ball sails three yards past the near sideline beyond the line, nobody plays
+ * it, it can't be intercepted, and the down is an incompletion.
+ */
+export function throwAway(p: Play): boolean {
+  if (p.phase !== 'drop' || p.call !== 'pass' || p.carrier !== p.qb || p.t < 0.3 || !outsideBox(p)) return false;
+  const qb = p.qb;
+  const to = { x: qb.x < p.bx ? -3 : FIELD_W + 3, y: Math.max(p.los + 2, qb.y + 5) };
+  const len = dist(qb, to);
+  p.aim = null;
+  p.ball = { from: { x: qb.x, y: qb.y + 0.3 }, to, t0: p.t, t1: p.t + flightTime(p, len, 'touch'), peak: peakOf(len, 'touch') + 1, type: 'touch', away: true };
+  p.carrier = null;
+  p.phase = 'air';
+  act(qb, 'throw', p.t);
+  p.events.push('throwaway');
+  return true;
+}
+
+/** How long a quarterback's slide takes to bring him down, and a dive's flight (s). */
+export const SLIDE_TIME = 0.25;
+export const DIVE_TIME = 0.32;
+
+/**
+ * Give himself up (nfl-2): a quarterback past the line slides (feet first, 0.25 s of slowing, then
+ * down where he stops); any carrier dives forward for the line (a yard and a bit, more for a fast
+ * man). Either way the play ends as a tackle with no fumble, at the end of it or at the first
+ * contact.
+ */
+export function giveUp(p: Play, kind: 'slide' | 'dive'): boolean {
+  const c = p.carrier;
+  if (!c || p.phase !== 'run' || p.end || p.down) return false;
+  if (kind === 'slide' && (c !== p.qb || c.y <= p.los)) return false;
+  if (p.move && p.t < p.move.until) return false;
+  p.covered = false;
+  if (kind === 'dive') {
+    const v = Math.hypot(c.vx, c.vy);
+    // the way he's going, if that's forward at all; otherwise straight up the field
+    const ux = v > 0.5 && c.vy > 0 ? c.vx / v : 0;
+    const uy = v > 0.5 && c.vy > 0 ? c.vy / v : 1;
+    const reach = lerp(1.2, 2.0, rt(c.p.a.SPD, 40, 99));
+    c.vx = (ux * reach) / DIVE_TIME;
+    c.vy = (uy * reach) / DIVE_TIME;
+    act(c, 'tackle', p.t);
+  } else act(c, 'down', p.t);
+  p.down = { kind, at: p.t, until: p.t + (kind === 'slide' ? SLIDE_TIME : DIVE_TIME) };
+  p.bursting = false;
+  p.events.push(kind);
+  return true;
+}
+
+/** Cover the ball up (nfl-2): both arms round it, a step slower and no moves, and a hit seldom jars it loose. */
+export function coverBall(p: Play, on: boolean): boolean {
+  p.covered = on && p.phase === 'run' && !!p.carrier && !p.down && !p.end;
+  return p.covered;
+}
+/** A covered ball comes loose this much as often. */
+const COVERED_FUMBLE = 0.3;
+
+/** the momentum carry: how long a new carrier nobody is steering turns gently (s), and how gently
+ * (a share of his turn rate) */
+const CARRY_HOLD = 0.35;
+const CARRY_TURN = 0.6;
+
 /** what each move takes out of the runner, and how fast it comes back (a second's running) */
 const DRAIN: Record<Move, number> = { juke: 0.28, spin: 0.34, stiff: 0.3, truck: 0.36 };
 const STAMINA_BACK = 0.1;
@@ -607,7 +703,7 @@ export function windupOf(b: Body) {
  */
 export function moveWithBall(p: Play, kind: Move, dir = 0) {
   const c = p.carrier;
-  if (!c || p.phase !== 'run' || p.t < p.moveReady) return;
+  if (!c || p.phase !== 'run' || p.t < p.moveReady || p.covered || p.down) return;
   const near = p.bodies.filter((b) => b.side === 'D').sort((a, b) => dist(a, c) - dist(b, c))[0];
   const away = near ? Math.sign(c.x - near.x) || 1 : 1;
   const eff = (0.35 + 0.65 * p.stamina) * Math.pow(REPEAT, p.used[kind] ?? 0);
@@ -625,6 +721,7 @@ export function scramble(p: Play) {
   const qb = p.qb;
   qb.job = 'carry';
   p.phase = 'run';
+  p.carrierAt = p.t;
   act(qb, 'carry', p.t);
   for (const b of p.bodies) if (b.side === 'D') b.job = 'pursue';
   p.events.push('scramble');
@@ -698,7 +795,8 @@ function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string, flag?: Fl
 
 /**
  * Advance the play by dt. A vector directly controls both field axes, including stopping/backward.
- * A numeric across-field target or null retains the existing simulation/pilot lane behavior.
+ * A numeric across-field target is the pilot's lane. Null follows a designed run's lane, and carries
+ * any other ball carrier on his momentum (see RunInput).
  */
 export function step(p: Play, dt: number, steer: RunInput) {
   if (p.phase === 'pre' || p.phase === 'dead') return;
@@ -737,6 +835,7 @@ export function step(p: Play, dt: number, steer: RunInput) {
     steerTo(qb, p.bx - 0.4 * direction, p.los - 3.7, 4, dt);
     if (t > 0.42 && dist(rb, qb) < 1.8) {
       p.carrier = rb;
+      p.carrierAt = t;
       rb.job = 'carry';
       qb.job = 'idle';
       p.phase = 'run';
@@ -753,10 +852,22 @@ export function step(p: Play, dt: number, steer: RunInput) {
   } else p.pressure = 0;
 
   const carrier = p.carrier;
+  const pull = pocketPull(p, steer);
+  p.roll = pull ? Math.min(1, Math.hypot(pull.x, pull.y)) : 0;
   for (const b of p.bodies) {
     if (t < b.stunUntil) {
       b.vx *= 0.85;
       b.vy *= 0.85;
+      move(b, dt);
+      continue;
+    }
+    if (b === carrier && p.phase === 'run' && p.down) {
+      // giving himself up: a slide bleeds off his speed, a dive flies on, and then he's down
+      if (p.down.kind === 'slide') {
+        const k = Math.max(0, 1 - dt / Math.max(dt, p.down.until - t + dt));
+        b.vx *= k;
+        b.vy *= k;
+      }
       move(b, dt);
       continue;
     }
@@ -769,7 +880,7 @@ export function step(p: Play, dt: number, steer: RunInput) {
       if (!m) p.stamina = clamp(p.stamina + (burst ? -0.27 : STAMINA_BACK) * dt, 0, 1);
       const scrambler = b === qb && on(b, 'scrambler');
       if (scrambler) used(p, b, 'scrambler');
-      const sp = speedOf(b.p) * (t < p.slowUntil ? 0.65 : burst ? 1.09 : 0.94) * lerp(0.9, 1, p.stamina) * (scrambler ? 1.04 : 1);
+      const sp = speedOf(b.p) * (t < p.slowUntil ? 0.65 : burst ? 1.09 : 0.94) * lerp(0.9, 1, p.stamina) * (scrambler ? 1.04 : 1) * (p.covered ? 0.96 : 1);
       const followingRun = steer === null && p.call === 'run' && b === p.rb && b.y < p.los + 1;
       // An outside handoff stretches behind the line before turning upfield. A constant forward
       // velocity used to drag every run into the tackle box, even when its arrow pointed outside.
@@ -795,6 +906,27 @@ export function step(p: Play, dt: number, steer: RunInput) {
         const amount = Math.min(1, (acceleration * dt) / Math.max(0.001, delta));
         b.vx += dx * amount;
         b.vy += dy * amount;
+      } else if (steer === null && !(p.call === 'run' && b === p.rb)) {
+        // The momentum carry (nfl-1): a receiver or a scrambling quarterback nobody is steering yet
+        // keeps his speed and bends his run upfield. For the first moment of the carry he turns at
+        // CARRY_TURN of his rate (nobody snaps square the instant he has the ball); drifting back
+        // toward his own goal, he plants and comes back.
+        const early = t - (p.carrierAt ?? 0) < CARRY_HOLD;
+        const want = sp * (m && m.kind !== 'truck' ? 0.8 : 1);
+        const acceleration = lerp(8, 15, rt(b.p.a.ACC, 40, 99)) * dt;
+        if (b.vy < 0) {
+          const plant = lerp(26, 38, rt(b.p.a.AGI, 40, 99)) * dt;
+          b.vx += clamp(-b.vx, -plant * 0.5, plant * 0.5);
+          b.vy += plant;
+        } else {
+          const heading = Math.atan2(b.vx, b.vy);
+          const rate = lerp(2.4, 3.8, rt(b.p.a.AGI, 40, 99)) * (early ? CARRY_TURN : 1) * dt;
+          const turned = heading - clamp(heading, -rate, rate);
+          const speed = Math.hypot(b.vx, b.vy);
+          const v = speed + clamp(want - speed, -acceleration * 2, acceleration);
+          b.vx = Math.sin(turned) * v;
+          b.vy = Math.cos(turned) * v;
+        }
       } else {
         const len = landmark ? Math.max(0.1, dist(b, landmark)) : 1;
         const wantX = landmark ? ((landmark.x - b.x) / len) * sp : aim === null ? 0 : clamp((aim - b.x) * 2.2, -sp * 0.65, sp * 0.65);
@@ -812,7 +944,7 @@ export function step(p: Play, dt: number, steer: RunInput) {
       continue;
     }
     if (b.side === 'O') {
-      offense(p, b, dt);
+      offense(p, b, dt, pull);
       continue;
     }
     defense(p, b, dt, seen, seenVel);
@@ -838,6 +970,9 @@ export function step(p: Play, dt: number, steer: RunInput) {
         o.y -= (dy / dd) * shift * (1 - leverage);
       }
     }
+  // the quarterback the stick took past the line of scrimmage is a runner now (no button needed)
+  if (p.phase === 'drop' && p.call === 'pass' && p.carrier === qb && p.spot && qb.y > p.los) scramble(p);
+  if (p.phase === 'run' && carrier && p.down && t >= p.down.until && carrier.y < 100) endPlay(p, 'tackle', carrier, p.down.kind === 'slide' ? 'QB SLIDES' : 'DIVES FORWARD');
   if (p.phase === 'run' && carrier) {
     if (carrier.y >= 100) endPlay(p, 'td', carrier, 'TOUCHDOWN');
     else if (carrier.y <= -10) endPlay(p, 'out', carrier, 'OUT OF END ZONE');
@@ -851,15 +986,30 @@ export function step(p: Play, dt: number, steer: RunInput) {
   void r;
 }
 
-function offense(p: Play, b: Body, dt: number) {
+function offense(p: Play, b: Body, dt: number, pull: Pt | null) {
   const t = p.t;
   const qb = p.qb;
   if (b === qb) {
-    if (p.call === 'pass' && p.carrier === qb) {
-      // the drop, then a step up or away from pressure
-      steerTo(qb, p.bx, p.los - 6.5, 3, dt);
-      act(qb, 'stance', t);
-    } else if (p.phase === 'run') steerTo(qb, qb.x, qb.y, 0, dt);
+    if (p.call === 'pass' && p.carrier === qb && pull) {
+      // the stick moves him in the pocket (nfl-2): slide, step up, roll out, by his agility
+      // live from the first step (a thumb already on the stick at the snap counts), but until he's
+      // at his drop depth he keeps backpedalling: the stick can drift him, not bring him forward
+      const sp = pocketSpeed(qb.p);
+      const dropping = t < DROP_TIME && qb.y > p.los - DROP_DEPTH + 0.2;
+      const dvx = pull.x * sp - qb.vx,
+        dvy = (dropping ? Math.min(pull.y * sp, DROP_BACK) : pull.y * sp) - qb.vy;
+      const delta = Math.hypot(dvx, dvy);
+      const amount = Math.min(1, (lerp(14, 22, rt(qb.p.a.ACC, 40, 99)) * dt) / Math.max(0.001, delta));
+      qb.vx += dvx * amount;
+      qb.vy += dvy * amount;
+      p.spot = { x: qb.x + qb.vx * dt, y: qb.y + qb.vy * dt };
+      act(qb, dropping ? 'backpedal' : Math.hypot(qb.vx, qb.vy) > 1 ? 'run' : 'stance', t);
+    } else if (p.call === 'pass' && p.carrier === qb) {
+      // the drop (backpedalling), then he sets; once the stick has moved him he holds where it left him
+      if (p.spot) steerTo(qb, p.spot.x, p.spot.y, 3, dt);
+      else steerTo(qb, p.bx, p.los - DROP_DEPTH, 3, dt);
+      act(qb, !p.spot && t < DROP_TIME && qb.y > p.los - DROP_DEPTH + 0.2 ? 'backpedal' : 'stance', t);
+    } else if (p.phase === 'run' || p.spot) steerTo(qb, qb.x, qb.y, 0, dt);
     move(b, dt);
     return;
   }
@@ -1066,6 +1216,8 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
     act(b, free ? 'rush' : 'block', t);
     move(b, dt);
     if (p.carrier === qb && dist(b, qb) < 0.8 && p.phase === 'drop' && p.call === 'pass') {
+      act(qb, 'down', t);
+      act(b, 'tackle', t);
       endPlay(p, 'sack', qb, 'SACKED BY ' + b.p.tag);
       return;
     }
@@ -1129,6 +1281,14 @@ const WIND_R = 2.6;
 const FAKE = 0.3;
 
 function tackle(p: Play, d: Body, c: Body) {
+  if (p.down) {
+    // he gave himself up: down by contact, nothing to roll
+    d.windAt = Infinity;
+    d.dive = null;
+    act(d, 'tackle', p.t);
+    endPlay(p, 'tackle', c, p.down.kind === 'slide' ? 'QB SLIDES' : 'DOWN BY CONTACT');
+    return;
+  }
   const r = p.rand;
   const m = p.move && p.t < p.move.until + 0.15 ? p.move : null;
   d.windAt = Infinity;
@@ -1159,7 +1319,7 @@ function tackle(p: Play, d: Body, c: Body) {
     // a big hit can jar it loose (an Enforcer a point more often)
     const hit = rt(d.p.a.HIT, 50, 99);
     const enforcer = on(d, 'enforcer');
-    if (r() < 0.012 + 0.02 * hit - 0.02 * rt(c.p.a.CAR, 50, 99) + (enforcer ? 0.01 : 0)) {
+    if (r() < (0.012 + 0.02 * hit - 0.02 * rt(c.p.a.CAR, 50, 99) + (enforcer ? 0.01 : 0)) * (p.covered ? COVERED_FUMBLE : 1)) {
       if (enforcer) used(p, d, 'enforcer');
       // the ball's loose: who falls on it is close to a coin flip (the offense keeps about 45% of
       // its fumbles), so a jarring hit isn't always a turnover (Claude 2026-11-01; it always was)
@@ -1249,6 +1409,7 @@ export function moveEdge(kind: Move, c: Body, d: Body): number {
  * arm/jump reach. High lobs clear underneath defenders; each player attempts once per pass. */
 function playPassingLane(p: Play, dt: number) {
   const ball = p.ball!;
+  if (ball.away) return;
   const k = clamp((p.t - ball.t0) / (ball.t1 - ball.t0), 0, 1);
   if (k < 0.12 || k > 0.92) return; // catch-point battles are resolved by arrive()
   const at = ballNow(p)!;
@@ -1284,6 +1445,10 @@ function arrive(p: Play) {
   const r = p.rand;
   const at = ball.to;
   p.ball = null;
+  if (ball.away) {
+    endPlay(p, 'incomplete', at, 'THROWN AWAY');
+    return;
+  }
   if (at.x < 0 || at.x > FIELD_W || at.y > 110) {
     endPlay(p, 'incomplete', at, 'INCOMPLETE');
     return;
@@ -1327,6 +1492,7 @@ function arrive(p: Play) {
     }
     if (roll < pi + clamp(pc, 0.08, 0.97 - pi)) {
       p.carrier = off;
+      p.carrierAt = p.t;
       off.job = 'carry';
       p.catcher = off;
       p.catchInfo = { ro, high, contested };

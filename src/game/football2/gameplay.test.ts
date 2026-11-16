@@ -286,3 +286,251 @@ describe('core football play mechanics', () => {
     expect(pursuitTarget(d, { x: 52, y: 45 }, { x: 20, y: 8 }, 8).x).toBeLessThan(53.33);
   });
 });
+
+// ---------- the pocket (Claude, studio overhaul nfl-2) ----------
+import { BOX_HALF, coverBall, DROP_TIME, giveUp, moveWithBall, outsideBox, scramble, throwAway } from './engine';
+import { burstHeld } from './gestures';
+import type { Play, PlayEnd, RunInput } from './types';
+
+/** A pass play just snapped, with every defender frozen unless `live` (so nothing ends it early). */
+function pocket(seed: number, live = false, call: 'pass' | 'run' = 'pass') {
+  const p = lineUp(offense(), defense(), call, 'curls', 'inside', 35, 26, rng(seed), 0);
+  if (!live) for (const d of p.bodies.filter((b) => b.side === 'D')) d.stunUntil = Infinity;
+  snap(p);
+  return p;
+}
+const run = (p: Play, secs: number, steer: RunInput) => {
+  for (let i = 0; i < Math.round(secs * 60) && !p.end; i++) step(p, 1 / 60, steer);
+};
+
+describe('the pocket (nfl-2)', () => {
+  it('moves the quarterback 1.5-5 yd in a second with the stick, and not at all beyond the drop without it', () => {
+    for (const agi of [40, 70, 99])
+      for (const dir of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0.7, y: 0.7 }, { x: 0, y: -1 }]) {
+        const p = pocket(agi + dir.x * 10 + dir.y);
+        p.qb.p.a.AGI = agi;
+        run(p, DROP_TIME + 0.15, null);
+        const set = { x: p.qb.x, y: p.qb.y };
+        run(p, 1, dir);
+        const moved = dist(p.qb, set);
+        expect(moved).toBeGreaterThanOrEqual(1.5);
+        expect(moved).toBeLessThanOrEqual(5);
+        // no stick: he holds wherever the stick left him
+        const left = { x: p.qb.x, y: p.qb.y };
+        run(p, 1, null);
+        expect(dist(p.qb, left)).toBeLessThan(0.6);
+      }
+    for (let seed = 1; seed <= 20; seed++) {
+      const p = pocket(seed);
+      run(p, DROP_TIME + 0.15, null);
+      const set = { x: p.qb.x, y: p.qb.y };
+      run(p, 1, null);
+      expect(dist(p.qb, set)).toBeLessThan(0.15);
+      // a resting thumb (a centred stick) is the same as none
+      run(p, 1, { x: 0, y: 0 });
+      expect(dist(p.qb, set)).toBeLessThan(0.15);
+    }
+  });
+
+  it('takes a stick already held at the snap on the first step, and keeps the drop going backwards', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const held = pocket(seed),
+        free = pocket(seed);
+      step(held, 1 / 60, { x: 1, y: 0.4 });
+      step(free, 1 / 60, null);
+      expect(held.qb.x).toBeGreaterThan(free.qb.x);
+      // still dropping: pushing up doesn't bring him forward before he's set
+      const up = pocket(seed);
+      const y0 = up.qb.y;
+      run(up, 0.3, { x: 0, y: 1 });
+      expect(up.qb.y).toBeLessThan(y0);
+    }
+  });
+
+  it('refuses a throwaway inside the box, and outside it the ball is never intercepted (500 seeds)', () => {
+    let thrown = 0;
+    for (let seed = 1; seed <= 500; seed++) {
+      const p = pocket(seed, true);
+      run(p, 0.5, null);
+      if (p.end) continue;
+      expect(outsideBox(p)).toBe(false);
+      expect(throwAway(p)).toBe(false);
+      // roll out past the tackle box, then throw it away
+      const side = seed % 2 ? 1 : -1;
+      for (let i = 0; i < 120 && !p.end && !outsideBox(p); i++) step(p, 1 / 60, { x: side, y: 0 });
+      if (p.end) continue;
+      expect(Math.abs(p.qb.x - p.bx)).toBeGreaterThan(BOX_HALF);
+      expect(throwAway(p)).toBe(true);
+      thrown++;
+      const events: string[] = [];
+      for (let i = 0; i < 300 && !p.end; i++) {
+        step(p, 1 / 60, null);
+        events.push(...p.events);
+        p.events.length = 0;
+      }
+      const end = p.end as PlayEnd | null;
+      expect(end?.kind).toBe('incomplete');
+      expect(end?.text).toBe('THROWN AWAY');
+      expect(events.some((e) => e === 'lane-int' || e === 'int' || e === 'pass-deflected')).toBe(false);
+    }
+    // most seeds reach it (a few are sacked rolling out, which is the point of throwing it away sooner)
+    expect(thrown).toBeGreaterThan(400);
+  });
+
+  it('makes the quarterback a runner the moment the stick takes him over the line, and never before', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const p = pocket(seed);
+      run(p, DROP_TIME, null);
+      let before = true;
+      for (let i = 0; i < 400 && !p.end; i++) {
+        const wasY = p.qb.y;
+        step(p, 1 / 60, { x: (seed % 3) - 1, y: 1 });
+        if (p.events.includes('scramble')) {
+          expect(before).toBe(true);
+          expect(p.qb.y).toBeGreaterThan(p.los);
+          expect(wasY).toBeLessThanOrEqual(p.los + 0.2);
+          before = false;
+        } else if (before) expect(p.phase).toBe('drop');
+        p.events.length = 0;
+        if (!before) break;
+      }
+      expect(before).toBe(false);
+      expect(p.carrier).toBe(p.qb);
+      // past the line he can't throw it
+      expect(throwTo(p, { x: p.qb.x, y: p.qb.y + 15 })).toBe(false);
+      expect(throwAway(p)).toBe(false);
+    }
+    // sliding along the line of scrimmage behind it never makes him a runner
+    const p = pocket(3);
+    run(p, 3, { x: 0.6, y: -0.1 });
+    expect(p.phase).toBe('drop');
+  });
+
+  it('always ends a slide (and a dive) in a tackle with no fumble (500 seeds)', () => {
+    for (let seed = 1; seed <= 500; seed++) {
+      const kind = seed % 4 === 0 ? 'dive' : 'slide';
+      const p = pocket(seed, true);
+      // a scramble up the middle, a few yards past the line, with the defense on him
+      p.t = 1;
+      scramble(p);
+      Object.assign(p.qb, { x: p.bx, y: p.los + 3, vx: 0, vy: 7 });
+      if (seed % 3 === 0) {
+        const d = p.bodies.find((b) => b.side === 'D' && b.slot === 'MLB')!;
+        Object.assign(d, { x: p.bx + 0.3, y: p.los + 4.2, vx: 0, vy: -5, stunUntil: 0, readUntil: 0, heldUntil: 0 });
+      }
+      expect(giveUp(p, kind)).toBe(true);
+      expect(giveUp(p, kind)).toBe(false);
+      const events: string[] = [];
+      for (let i = 0; i < 120 && !p.end; i++) {
+        step(p, 1 / 60, { x: 0, y: 1 });
+        events.push(...p.events);
+        p.events.length = 0;
+      }
+      expect(p.end?.kind).toBe('tackle');
+      expect(events.some((e) => e.startsWith('fumble'))).toBe(false);
+      expect(p.end!.secs - 1).toBeLessThanOrEqual(kind === 'slide' ? 0.27 : 0.34);
+    }
+    // a slide is a quarterback's, past the line
+    const p = pocket(9);
+    p.t = 1;
+    scramble(p);
+    Object.assign(p.qb, { y: p.los - 2 });
+    expect(giveUp(p, 'slide')).toBe(false);
+  });
+
+  it('covers the ball: a step slower, no moves while covered, the same stamina', () => {
+    const a = pocket(4),
+      b = pocket(4);
+    for (const p of [a, b]) {
+      p.t = 1;
+      scramble(p);
+      Object.assign(p.qb, { x: 26, y: 50, vx: 0, vy: 7 });
+    }
+    expect(coverBall(b, true)).toBe(true);
+    run(a, 1, { x: 0, y: 1 });
+    run(b, 1, { x: 0, y: 1 });
+    expect(b.qb.y).toBeLessThan(a.qb.y);
+    moveWithBall(b, 'juke');
+    expect(b.move).toBeNull();
+    expect(coverBall(b, false)).toBe(false);
+  });
+
+  it('puts the sacked quarterback down and the sacker in his tackle', () => {
+    let sacks = 0;
+    for (let seed = 1; seed <= 40 && sacks < 5; seed++) {
+      const p = pocket(seed, true);
+      for (const d of p.bodies.filter((b) => b.job === 'rush')) d.winAt = 0.2;
+      run(p, 6, null);
+      if (p.end?.kind !== 'sack') continue;
+      sacks++;
+      expect(p.qb.act).toBe('down');
+      const sacker = p.bodies.find((b) => b.side === 'D' && b.act === 'tackle');
+      expect(sacker).toBeTruthy();
+      expect(p.end.text).toContain(sacker!.p.tag);
+    }
+    expect(sacks).toBe(5);
+  });
+
+  it('plays the same inputs to the same end, stick, throwaway and all', () => {
+    const go = (seed: number) => {
+      const p = pocket(seed, true);
+      const r = rng(seed * 7);
+      for (let i = 0; i < 1500 && !p.end; i++) {
+        const t = i / 60;
+        const steer: RunInput = t < 1.4 ? { x: Math.sin(seed + t) * 0.9, y: 0.2 * Math.cos(t * 3) } : p.phase === 'run' ? { x: r() - 0.5, y: 0.9 } : null;
+        if (t > 1.5 && p.phase === 'drop') {
+          if (!throwAway(p)) throwTo(p, { x: p.qb.x + 4, y: p.qb.y + 12 });
+        }
+        step(p, 1 / 60, steer);
+      }
+      return JSON.stringify({ end: p.end, at: p.bodies.map((b) => [b.x, b.y, b.vx, b.vy]) });
+    };
+    for (let seed = 1; seed <= 25; seed++) expect(go(seed)).toBe(go(seed));
+  });
+
+  it('never reads a body\'s act: 500 seeded plays come out the same with every act swapped for a dummy (C9)', () => {
+    const go = (seed: number, dummy: boolean) => {
+      const p = pocket(seed, true, seed % 3 === 0 ? 'run' : 'pass');
+      const r = rng(seed * 13);
+      const events: string[] = [];
+      for (let i = 0; i < 1500 && !p.end; i++) {
+        const t = i / 60;
+        if (p.phase === 'drop' && p.call === 'pass' && t > 1 + (seed % 5) * 0.3) {
+          if (seed % 7 === 0) throwAway(p);
+          else throwTo(p, { x: p.qb.x + (seed % 11) - 5, y: p.qb.y + 8 + (seed % 17) });
+        }
+        if (p.phase === 'run' && r() < 0.03) moveWithBall(p, (['juke', 'spin', 'stiff', 'truck'] as const)[seed % 4], seed % 2 ? 1 : -1);
+        step(p, 1 / 60, p.phase === 'drop' && p.call === 'pass' ? { x: Math.sin(seed + t), y: -0.2 } : p.phase === 'run' ? { x: Math.cos(t + seed) * 0.5, y: 0.85 } : null);
+        events.push(...p.events);
+        p.events.length = 0;
+        if (dummy)
+          for (const b of p.bodies) {
+            b.act = 'celebrate';
+            b.actAt = -99;
+          }
+      }
+      return JSON.stringify({ end: p.end, events, at: p.bodies.map((b) => [b.x, b.y, b.vx, b.vy, b.stunUntil]) });
+    };
+    for (let seed = 1; seed <= 500; seed++) expect(go(seed, true)).toBe(go(seed, false));
+  });
+
+  it('spends identical stamina whether burst comes from the ring or from the D button (200 seeds)', () => {
+    const trace = (seed: number, viaButton: boolean) => {
+      const p = pocket(seed, true, 'run');
+      const want = rng(seed * 31);
+      let held = false;
+      const out: number[] = [];
+      for (let i = 0; i < 600 && !p.end; i++) {
+        if (i % 20 === 0) held = want() < 0.5;
+        // the same thumb, read either from the sprint ring (button preference off) or D (on); the other source is ignored
+        const ring = viaButton ? want() < 0.5 : held;
+        const button = viaButton ? held : want() < 0.5;
+        setBurst(p, burstHeld({ ring, button, buttonPref: viaButton }));
+        step(p, 1 / 60, p.phase === 'run' ? { x: 0.2, y: 0.9 } : null);
+        out.push(p.stamina);
+      }
+      return out;
+    };
+    for (let seed = 1; seed <= 200; seed++) expect(trace(seed, true)).toEqual(trace(seed, false));
+  });
+});

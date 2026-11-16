@@ -43,7 +43,12 @@ export interface Pt {
   y: number;
 }
 
-/** Human input is a normalized field vector; numeric/null input retains the AI's lane following. */
+/**
+ * Human input is a normalized field vector (a touched, centred stick is {0,0} and brakes). A number
+ * is the AI's lane. `null` is "nobody is steering": a designed run follows its lane, and any other
+ * carrier (a receiver, a scrambling quarterback) carries his momentum and turns upfield. The screen
+ * sends it for a carrier the player hasn't touched the stick for since he got the ball (nfl-1).
+ */
 export type RunInput = Pt | number | null;
 
 export type Job = 'block' | 'route' | 'rush' | 'man' | 'zone' | 'spy' | 'carry' | 'pursue' | 'qb' | 'idle' | 'track' | 'handoff';
@@ -107,6 +112,8 @@ export interface Ball {
   type?: PassType;
   /** Each defender gets one physical play on this pass, rather than a fresh lottery every frame. */
   tried?: number[];
+  /** thrown away out of bounds (nfl-2): nobody plays it, and it's never intercepted */
+  away?: boolean;
 }
 
 export type EndKind = 'tackle' | 'incomplete' | 'td' | 'int' | 'sack' | 'out' | 'fumble';
@@ -183,6 +190,8 @@ export interface Play {
   events: string[];
   catcher: Body | null;
   caughtAt: Pt | null;
+  /** when the ball last changed hands (a handoff, a catch, a scramble), for the momentum carry */
+  carrierAt?: number;
   /** where the throw lands (the slingshot's aim), for the HUD */
   aim: Pt | null;
   /** the quarterback is On Fire: he sees the whole arc and throws it quicker */
@@ -193,4 +202,16 @@ export interface Play {
   bust?: number;
   /** how the ball was caught (for the drawing only): how far he reached, a high ball, in traffic */
   catchInfo?: { ro: number; high: boolean; contested: boolean };
+  /**
+   * The pocket (nfl-2). `spot` is where the quarterback settles: his drop until the stick has moved
+   * him, then wherever the stick left him. `roll` is how hard the stick is moving him this step (0-1;
+   * 0 or absent on a scripted drop), which costs his sight of the arc and adds throw error.
+   */
+  spot?: Pt;
+  roll?: number;
+  /** the carrier is giving himself up (nfl-2): a quarterback's slide or a dive for the line; the
+   * play ends in a tackle at `until`, or at the first contact, with no fumble */
+  down?: { kind: 'slide' | 'dive'; at: number; until: number };
+  /** the carrier covers the ball up with both arms (nfl-2): he holds on through a hit, a step slower, no moves */
+  covered?: boolean;
 }

@@ -9,11 +9,13 @@ import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
 import { drawGate } from '../pixel/ready';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
-import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
+import { drawFloor, type FieldTex, fieldTexture, type PCam, pitchAt, project } from '../pixel/persp';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import type { Look } from '../pixel/body';
 import { animOf, ballArm, lookFor, type Memo } from '../pixel/select-nfl';
 import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, throwErrorRadius, windupOf } from './engine';
+import { ART, FootballCamera, FRAME, lensFor, type SafeBox } from './camera';
+import { airBall, Bounce, football, groundRing, laneArrow, LineFlash, pressureArc, RING } from './overlay';
 import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import type { Juice } from '../juice';
 import type { Body, Play, Pt } from './types';
@@ -42,10 +44,12 @@ export interface FbOverlay {
   flash: number;
   /** trauma shake, kick, zoom and particles (render only) */
   juice?: Juice;
+  /** nfl-2: the screen shows the receivers' name chips itself (no slot tags on the canvas) */
+  chips?: boolean;
+  /** nfl-3: the camera's frame: the C15 action-safe box, reduced motion, Clutch staging, and the
+   * pre-snap look-around (yards to shift the view by while the player drags the field) */
+  frame?: { safe: SafeBox | null; reduced: boolean; clutch?: boolean; look?: Pt | null };
 }
-
-/** ability pop colours: offense gold, defense teal */
-const POP_COLOR = { O: '#ffd23a', D: '#3ef0c0' };
 
 /** What the drawing needs from a camera, either kind. */
 interface Lens {
@@ -67,7 +71,7 @@ export class FootballRenderer {
   private persp: PCam | null = null;
   private field: { canvas: HTMLCanvasElement; cam: FieldCam } | null = null;
   private tex: FieldTex | null = null;
-  private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
+  private floor: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; img: ImageData; px: Uint32Array; key: string } | null = null;
   private sprites = new SpriteCache<ArtSprite>(600);
   /** the art pixel (pixel/art-scale.ts), set by the screen from its canvas each frame */
   art: ArtScale = ART_C;
@@ -96,20 +100,25 @@ export class FootballRenderer {
   private acts = new Map<number, string>();
   private playSeen: Play | null = null;
   private lastNow = 0;
-  /** ability pops over players' heads: which body, the ability's name, its side, when (real s) */
-  private pops: { id: number; text: string; side: 'O' | 'D'; at: number }[] = [];
-  pop(id: number, text: string, side: 'O' | 'D', real: number) {
-    if (this.pops.some((q) => q.id === id && q.text === text && real - q.at < 1.2)) return;
-    this.pops.push({ id, text, side, at: real });
-    if (this.pops.length > 6) this.pops.shift();
+  /** nfl-3: the broadcast camera (camera.ts), the incompletion's bounce and the line to gain's flash (overlay.ts) */
+  readonly cam = new FootballCamera();
+  private bounce = new Bounce();
+  private lineFlash = new LineFlash();
+  /** the last pass in the air (for the bounce's direction) and the camera's last frame (real s) */
+  private lastBall: { from: Pt; to: Pt } | null = null;
+  private camAt = 0;
+  /** The line to gain was reached: flash it (render-only; Football2 calls this at the whistle). */
+  flashLine(y: number) {
+    this.lineFlash.flash(y, performance.now() / 1000);
   }
+  /** nfl-2: each player's head on screen as last drawn (css px), for the name chips */
+  heads: Record<number, { x: number; y: number }> = {};
   /** a field point on screen (for effects drawn by the game) */
   screenOf(x: number, y: number, h = 0): { x: number; y: number; s: number } | null {
     return this.lens ? this.lens.at(x, y, h) : null;
   }
   /** an instant replay: the spot to look at, the camera pushed in a little */
   replay: Pt | null = null;
-  private zoomK = 1;
   private lens!: Lens;
 
   constructor(
@@ -138,14 +147,10 @@ export class FootballRenderer {
       this.persp = null;
     } else {
       this.side = null;
-      this.persp = this.perspAt(FIELD_W / 2, 25);
+      this.persp = lensFor(W, H, FIELD_W / 2, 25, FRAME.preRow, 1);
+      this.cam.reset();
     }
     this.lens = this.makeLens();
-  }
-
-  private perspAt(fx: number, fy: number): PCam {
-    // the play's spot two thirds down the screen, the far stands under the scoreboard
-    return pcam(this.W, this.H, fx, fy, { row: 0.68, s: Math.max(11, this.W / 26) * this.zoomK, horizon: 0.13, pitch: 0.5, fov: 0.42 });
   }
 
   private makeLens(): Lens {
@@ -169,26 +174,17 @@ export class FootballRenderer {
     };
   }
 
-  /** where the camera wants to be: the ball (in the air, the man with it) and a bit downfield */
+  /** Sideways: where the camera wants to be: the ball (in the air, the man with it) and a bit
+   * downfield, following across too (upright, camera.ts frames the play). */
   private target(p: Play, aim: Pt | null): Pt {
     if (this.replay) return { x: Math.max(12, Math.min(FIELD_W - 12, this.replay.x)), y: Math.min(this.replay.y + 2, 104) };
-    const b = ballNow(p);
-    const c = p.carrier ?? p.qb;
-    const at = b ?? c;
+    const at = ballNow(p) ?? p.carrier ?? p.qb;
     const pre = p.phase === 'pre' || p.phase === 'drop';
-    let y = at.y + (pre ? (this.mode === 'side' ? 9 : 1) : this.mode === 'side' ? 3 : -1);
-    if (aim && p.phase === 'drop') y = Math.max(y, (p.qb.y + aim.y) / 2 + (this.mode === 'side' ? 2 : -6));
+    // (before the snap the line sits left of centre, so the deep safeties stay clear of the tray docked on the right)
+    let y = at.y + (pre ? 11 : 3);
+    if (aim && p.phase === 'drop') y = Math.max(y, (p.qb.y + aim.y) / 2 + 2);
     // an overthrow out the back: the camera stops at the end zone
-    y = Math.min(y, this.mode === 'side' ? 100 : 104);
-    // sideways the camera follows across too; upright it stays near the middle before the throw so
-    // both sides show, then rides with the ball
-    const x =
-      this.mode === 'side'
-        ? Math.max(20, Math.min(FIELD_W - 20, at.x))
-        : pre
-          ? FIELD_W / 2 + (Math.max(8, Math.min(FIELD_W - 8, at.x)) - FIELD_W / 2) * 0.55
-          : Math.max(12, Math.min(FIELD_W - 12, at.x));
-    return { x, y };
+    return { x: Math.max(20, Math.min(FIELD_W - 20, at.x)), y: Math.min(y, 100) };
   }
 
   /** Who a throw to `aim` is going to: the receiver whose route takes him closest, and where. */
@@ -312,12 +308,20 @@ export class FootballRenderer {
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(this.W / q);
       canvas.height = Math.ceil(this.H / q);
-      const img = canvas.getContext('2d')!.createImageData(canvas.width, canvas.height);
-      this.floor = { canvas, img, px: new Uint32Array(img.data.buffer) };
+      const fctx = canvas.getContext('2d')!;
+      const img = fctx.createImageData(canvas.width, canvas.height);
+      this.floor = { canvas, ctx: fctx, img, px: new Uint32Array(img.data.buffer), key: '' };
     }
     const fl = this.floor;
-    drawFloor(this.persp!, this.tex, fl.px, q);
-    fl.canvas.getContext('2d')!.putImageData(fl.img, 0, 0);
+    // nfl-3 (V2 §C.6): the floor is re-projected only when the camera has moved; a still camera
+    // (the play call, a held drag) blits the last one
+    const pc = this.persp!;
+    const key = [pc.cx, pc.cy, pc.ch, pc.f, pc.hy].map((v) => Math.round(v * 1000)).join(',');
+    if (key !== fl.key) {
+      fl.key = key;
+      drawFloor(pc, this.tex, fl.px, q);
+      fl.ctx.putImageData(fl.img, 0, 0);
+    }
     ctx.drawImage(fl.canvas, 0, 0, fl.canvas.width * q, fl.canvas.height * q);
   }
 
@@ -419,16 +423,27 @@ export class FootballRenderer {
     ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     ctx.imageSmoothingEnabled = false;
     this.aiming = !!o.aim;
-    // follow the play
-    this.zoomK += ((this.replay ? 1.3 : 1) - this.zoomK) * 0.08;
-    const want = this.target(p, o.aim);
-    if (!this.follow) this.follow = want;
-    this.follow = { x: this.follow.x + (want.x - this.follow.x) * 0.08, y: this.follow.y + (want.y - this.follow.y) * 0.1 };
+    const real = performance.now() / 1000;
+    const reduced = !!o.frame?.reduced;
+    // follow the play: sideways the classic follow, upright the broadcast camera (camera.ts)
     if (this.side) {
+      const want = this.target(p, o.aim);
+      if (!this.follow) this.follow = want;
+      this.follow = { x: this.follow.x + (want.x - this.follow.x) * 0.08, y: this.follow.y + (want.y - this.follow.y) * 0.1 };
       this.side.fx = this.follow.x;
       this.side.fy = this.follow.y;
-    } else this.persp = this.perspAt(this.follow.x, this.follow.y);
+    } else {
+      const dt = this.camAt ? real - this.camAt : 0;
+      this.persp = this.cam.update({ W: this.W, H: this.H, p, aim: o.aim, safe: o.frame?.safe ?? null, reduced, clutch: o.frame?.clutch, replay: this.replay, look: o.frame?.look ?? null }, dt);
+    }
+    this.camAt = real;
     this.lens = this.makeLens();
+    // the pass in the air, remembered for the incompletion's bounce
+    if (p.ball) this.lastBall = { from: p.ball.from, to: p.ball.to };
+    this.bounce.watch(p, real, this.lastBall);
+    if (!p.ball && !p.end) this.lastBall = null;
+    // sprites, shadows and rings are ART times the projected size (camera.ts); sideways stays 1:1
+    const art = this.side ? 1 : ART;
     const L = this.lens;
     this.budget = 4;
     const jv = o.juice?.view() ?? { x: 0, y: 0, scale: 1 };
@@ -455,7 +470,10 @@ export class FootballRenderer {
     };
     across(ballOn, '#4aa8ff');
     if (o.toGain !== null && o.toGain < 100) across(o.toGain, '#ffd23a');
+    this.lineFlash.draw(ctx, L, FIELD_W, real, reduced);
     this.posts(ctx, 110);
+    // the run's lane, before the snap and through the mesh
+    laneArrow(ctx, L, p);
     // the routes before the snap, a color for each man, an arrowhead at the end
     if (o.routes) {
       ctx.lineJoin = 'round';
@@ -490,7 +508,7 @@ export class FootballRenderer {
     // shadows (pixel/ground.ts: V2's soft contact shadow, sized to his shoulders and pads)
     for (const b of p.bodies) {
       const f = L.at(b.x, b.y);
-      const tall = (drawnHeight('nfl', b.p.ht) / 36) * f.s;
+      const tall = (drawnHeight('nfl', b.p.ht) / 36) * f.s * art;
       drawGroundMark(ctx, { x: f.x, y: f.y, shoulderPx: shoulderWidthPx(b.p.ht, b.p.wt, tall, isLine(b) || b.p.pos === 'DT' || b.p.pos === 'DE' ? 1.25 : 1), pitch: L.pitch(b.y) });
     }
     // who's open: green, tight (yellow) or covered (red), live while the quarterback has it
@@ -500,33 +518,30 @@ export class FootballRenderer {
         let near = 99;
         for (const d of p.bodies) if (d.side === 'D' && d.job !== 'rush') near = Math.min(near, dist(d, b));
         const f = L.at(b.x, b.y);
-        const rx = Math.max(5, Math.round(f.s * 0.7));
-        ctx.strokeStyle = near >= 3.2 ? 'rgba(62,240,122,0.95)' : near >= 1.8 ? 'rgba(255,210,58,0.95)' : 'rgba(255,90,90,0.9)';
+        const rx = Math.max(5, Math.round(f.s * art * 0.7));
+        // open green, tight amber, covered grey (gold, teal and red are the V2 rings' alone)
+        ctx.strokeStyle = near >= 3.2 ? 'rgba(62,240,122,0.95)' : near >= 1.8 ? 'rgba(255,150,50,0.95)' : 'rgba(200,206,220,0.85)';
         ctx.lineWidth = Math.max(2, Math.round(f.s * 0.12));
         ctx.beginPath();
         ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(2, Math.round(rx * Math.sin(L.pitch(b.y)))), 0, 0, Math.PI * 2);
         ctx.stroke();
       }
     }
-    // the man with the ball, ringed so the eye finds him (red, pulsing, as the rush closes on the passer)
-    const lead = p.carrier && p.phase !== 'pre' ? p.carrier : null;
-    if (lead) {
-      const f = L.at(lead.x, lead.y);
-      const heat = lead === p.qb && p.phase === 'drop' ? p.pressure : 0;
-      const rx = Math.max(4, Math.round(f.s * (0.62 + heat * (0.18 + 0.08 * Math.sin(p.t * 22)))));
-      ctx.strokeStyle = heat > 0.05 ? 'rgba(255,' + Math.round(224 - 170 * heat) + ',' + Math.round(138 - 100 * heat) + ',0.95)' : 'rgba(255,224,138,0.85)';
-      ctx.lineWidth = Math.max(1, Math.round(f.s * 0.08));
-      ctx.beginPath();
-      ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(2, Math.round(rx * Math.sin(L.pitch(lead.y)) * 0.85)), 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
+    // the V2 ground rings (overlay.ts): gold under the man you control (the quarterback before the
+    // snap, then whoever has it), teal under the receiver your throw is going to, and a red arc on
+    // the side the rush comes from
+    const lead = p.phase === 'pre' ? p.qb : p.carrier;
+    if (lead && !this.replay && !p.end) groundRing(ctx, L, lead, 0.6 * art, RING.you);
+    const goingTo = !this.replay && p.phase === 'drop' && o.aim ? this.receiverFor(p, o.aim) : p.phase === 'air' && p.ball && !p.ball.away ? this.receiverFor(p, p.ball.to) : null;
+    if (goingTo) groundRing(ctx, L, goingTo.b, 0.55 * art, RING.target);
+    if (!this.replay) pressureArc(ctx, L, p);
     // a tackler gathering to dive: a ring that tightens and reddens as he's about to go
     if (p.phase === 'run') {
       for (const b of p.bodies) {
         if (b.side !== 'D' || b.windAt === Infinity) continue;
         const k = Math.min(1, (p.t - b.windAt) / windupOf(b));
         const f = L.at(b.x, b.y);
-        const rx = Math.max(5, Math.round(f.s * (0.95 - 0.3 * k)));
+        const rx = Math.max(5, Math.round(f.s * art * (0.95 - 0.3 * k)));
         ctx.strokeStyle = 'rgba(255,' + Math.round(170 - 120 * k) + ',40,0.95)';
         ctx.lineWidth = Math.max(2, Math.round(f.s * 0.14));
         ctx.beginPath();
@@ -538,10 +553,10 @@ export class FootballRenderer {
     if (p.phase === 'run' && p.carrier && p.stamina < 0.99) {
       const c = p.carrier;
       const f = L.at(c.x, c.y);
-      const w = Math.max(16, Math.round(f.s * 1.5));
+      const w = Math.max(16, Math.round(f.s * art * 1.2));
       const h = Math.max(3, Math.round(f.s * 0.14));
       const x = Math.round(f.x - w / 2);
-      const y = Math.round(f.y + Math.max(4, f.s * 0.45));
+      const y = Math.round(f.y + Math.max(4, f.s * art * 0.45));
       ctx.fillStyle = 'rgba(6,10,8,0.8)';
       ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
       ctx.fillStyle = p.stamina < 0.25 ? '#ff5a5a' : p.stamina < 0.5 ? '#ffd23a' : '#3ef0c0';
@@ -554,7 +569,7 @@ export class FootballRenderer {
     for (const b of order) {
       const f = L.at(b.x, b.y);
       if (f.y < -40 || f.y > this.H + 80 || f.x < -60 || f.x > this.W + 60) continue;
-      const spr = this.sprite(b, p.t, p, f.s);
+      const spr = this.sprite(b, p.t, p, spriteScale(b.p.ht, f.s * art));
       // a spectacular catch: a receiver with the hands for it (SPC 85+) goes up and gets a high ball
       const since = p.t - b.actAt;
       const leap = b.act === 'catch' && b === p.catcher && p.catchInfo?.high && (b.p.a.SPC ?? 0) >= 85 && since < 0.42 ? Math.sin((since / 0.42) * Math.PI) * 0.55 : 0;
@@ -585,16 +600,12 @@ export class FootballRenderer {
         }
       }
     }
-    // the ball, in the air (with its shadow) or in his hands
-    const bn = ballNow(p);
-    if (bn) {
-      const g = L.at(bn.x, bn.y);
-      ctx.fillStyle = 'rgba(8,26,8,0.45)';
-      const sw = Math.max(2, Math.round(g.s * 0.3));
-      ctx.fillRect(Math.round(g.x - sw / 2), Math.round(g.y), sw, Math.max(1, Math.round(sw / 2)));
-      const a = L.at(bn.x, bn.y, bn.h);
-      football(ctx, a.x, a.y, a.s, p.t);
-    } else if (hand) football(ctx, hand.x, hand.y, hand.s, 0);
+    this.heads = heads;
+    // the ball: in the air (its shadow ring on the turf and a trail), bouncing loose after an
+    // incompletion, or in his hands (overlay.ts; never under 4×3 px)
+    if (p.ball) airBall(ctx, L, p, art, reduced);
+    else if (hand) football(ctx, hand.x, hand.y, hand.s * art, 0);
+    else this.bounce.draw(ctx, L, real, art, reduced);
     // the slingshot: the arc (as much of it as he can see: an accurate passer all of it, a weaker one
     // or one with a rusher in his face only its start), where it lands and who it's going to
     if (o.aim && p.qb) {
@@ -620,8 +631,8 @@ export class FootballRenderer {
       const to = seen >= 1 ? this.receiverFor(p, o.aim) : null;
       if (seen >= 1 && to) {
         const g = L.at(to.at.x, to.at.y);
-        const rr = Math.max(4, Math.round(g.s * 0.55));
-        ctx.strokeStyle = 'rgba(255,224,138,0.95)';
+        const rr = Math.max(4, Math.round(g.s * art * 0.45));
+        ctx.strokeStyle = 'rgba(79,227,193,0.75)';
         ctx.lineWidth = Math.max(1, Math.round(g.s * 0.1));
         ctx.beginPath();
         ctx.ellipse(Math.round(g.x), Math.round(g.y), rr, Math.max(2, Math.round(rr * Math.sin(L.pitch(to.at.y)))), 0, 0, Math.PI * 2);
@@ -641,33 +652,14 @@ export class FootballRenderer {
     }
     this.particles(ctx, p);
     o.juice?.draw(ctx);
-    // ability pops: the ability that just did it, over his head
-    const real = performance.now() / 1000;
-    this.pops = this.pops.filter((q) => real - q.at < 1.2);
-    for (const q of this.pops) {
-      const h = heads[q.id];
-      if (!h) continue;
-      const k = (real - q.at) / 1.2;
-      const y = Math.round(h.y - 34 - k * 12);
-      const a0 = ctx.globalAlpha;
-      ctx.globalAlpha = a0 * Math.min(1, (1 - k) * 3);
-      ctx.fillStyle = '#0b0e18';
-      ctx.fillRect(h.x - 5, y - 4, 10, 10);
-      ctx.fillStyle = POP_COLOR[q.side];
-      ctx.fillRect(h.x - 3, y - 4, 6, 10);
-      ctx.fillRect(h.x - 5, y - 2, 10, 6);
-      ctx.fillStyle = '#0b0e18';
-      ctx.fillRect(h.x - 1, y - 1, 2, 4);
-      label(ctx, q.text, h.x, y + 9, POP_COLOR[q.side], this.W);
-      ctx.globalAlpha = a0;
-    }
+    // (ability pops live in the screen's toast line now: one a play, nfl-3 / V-4)
     // names: the receivers before the snap, the man with the ball after
     const tag = (b: Body, color: string, text = b.p.tag, up = 14) => {
       const h = heads[b.id];
       if (h) label(ctx, text, h.x, h.y - up, color, this.W);
     };
     if (o.routes) for (const b of p.bodies) if (b.side === 'O' && !isLine(b) && b !== p.qb) tag(b, '#ffffff');
-    if(p.phase==='drop'&&p.call==='pass')for(const b of p.bodies)if(b.side==='O'&&b!==p.qb&&!isLine(b))tag(b,ROUTE_COLOR[b.slot]??'#ffffff',b.slot,18);
+    if(p.phase==='drop'&&p.call==='pass'&&!o.chips)for(const b of p.bodies)if(b.side==='O'&&b!==p.qb&&!isLine(b))tag(b,ROUTE_COLOR[b.slot]??'#ffffff',b.slot,18);
     if (p.carrier && p.phase === 'run') tag(p.carrier, '#ffe08a');
     if (p.phase === 'run') for (const b of p.bodies) if (b.side === 'D' && b.windAt !== Infinity) tag(b, '#ff8a3a', '!', 32);
     ctx.restore();
@@ -678,23 +670,20 @@ export class FootballRenderer {
   }
 }
 
+/**
+ * nfl-3: the scale a player is drawn at, snapped so a sprite 28 px or taller changes size in 4 px
+ * steps (2 px below): at the larger NFL sprites the camera's easing would otherwise rebuild each
+ * man's drawing every couple of frames as he moves in depth (V2 §C.6 snaps sprite scale to steps).
+ */
+function spriteScale(ht: number, s: number): number {
+  const yd = ht / 36;
+  const px = yd * s;
+  if (px < 28) return s;
+  return (Math.round(px / 4) * 4) / yd;
+}
+
 /** each receiver's route in its own color, the way the play art shows them */
 const ROUTE_COLOR: Record<string, string> = { X: '#ffd23a', SL: '#ff7aa8', Z: '#5cb8ff', TE: '#7cf08c', RB: '#c7a2ff' };
-
-/** The ball: brown with white laces, its size by the distance, turning over in flight. */
-function football(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, t: number) {
-  const X = Math.round(x);
-  const Y = Math.round(y);
-  const w = Math.max(4, Math.round(s * 0.34));
-  const h = Math.max(2, Math.round(w * 0.62));
-  const turn = Math.floor(t * 12) % 2;
-  ctx.fillStyle = '#2e1606';
-  ctx.fillRect(X - Math.ceil(w / 2), Y - Math.ceil(h / 2), w, h);
-  ctx.fillStyle = '#8b4a1f';
-  ctx.fillRect(X - Math.ceil(w / 2) + 1, Y - Math.ceil(h / 2), Math.max(1, w - 2), Math.max(1, h - 1));
-  ctx.fillStyle = turn ? '#f4f4f4' : '#d6d6d6';
-  ctx.fillRect(X - Math.floor(w / 4), Y - Math.ceil(h / 2), Math.max(1, Math.floor(w / 2)), 1);
-}
 
 const F35: Record<string, string> = {
   A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100', G: '011100101101011', H: '101101111101101', I: '111010010010111', J: '001001001101010', K: '101101110101101', L: '100100100100111', M: '101111111101101', N: '110101101101101', O: '010101101101010', P: '110101110100100', Q: '010101101110011', R: '110101110101101', S: '011100010001110', T: '111010010010010', U: '101101101101111', V: '101101101101010', W: '101101111111101', X: '101101010101101', Y: '101101010010010', Z: '111001010100111',

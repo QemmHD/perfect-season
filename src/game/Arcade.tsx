@@ -129,6 +129,10 @@ export const Arcade = forwardRef(function Arcade({
   onProgress,
   onTakeover,
   onFinish,
+  onQuit,
+  quitText,
+  feedback,
+  onFeedback,
 }: {
   /** the two drafted lineups; or `teams`, built already */
   lineup?: Lineup;
@@ -164,6 +168,12 @@ export const Arcade = forwardRef(function Arcade({
   onTakeover: (k: number) => void;
   /** `pens`: soccer, a level match settled on penalties; `forfeit`: 'us' when this phone quit (a loss) */
   onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens, forfeit?: 'us') => void;
+  /** offline quit from the pause menu (contract C4; football so far): the host decides what leaving means */
+  onQuit?: (us: Progress, them: Progress) => void;
+  quitText?: string;
+  /** the pause menu's sound and haptics switches (football so far) */
+  feedback?: { sound: boolean; haptics: boolean };
+  onFeedback?: (key: 'sound' | 'haptics', on: boolean) => void;
 }, ref: ForwardedRef<ArcadeHandle>) {
   const defenseIQ = defenseDifficulty(online, botLevel, aiDefense);
   // the match being played: the first, or a rematch in the held arena (its seed and rival)
@@ -188,6 +198,8 @@ export const Arcade = forwardRef(function Arcade({
         // soccer plays from the lines themselves: no attribute file to wait for
         setAttrs(() => () => null);
       }).catch((e) => live && setLoadErr({ e }));
+    // NFL in Ultimate Team: the teams arrive rated, so the attribute file isn't fetched (nfl-3)
+    else if (FOOTBALL && teams?.offense && teams.rivalDefense && teams.rivalOffense && teams.defense) setAttrs(() => () => null);
     else loadAttrs(true).then((f) => live && setAttrs(() => f)).catch((e) => live && setLoadErr({ e }));
     return () => {
       live = false;
@@ -465,7 +477,7 @@ export const Arcade = forwardRef(function Arcade({
         <span className="eyebrow">{online ? 'Online · Legend defense' : 'Head to head · kickoff'}</span>
         <h1 className="disp">YOUR OFFENSE VS {rivalName.toUpperCase()}</h1>
         <p>
-          {TOTAL} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
+          {TOTAL} drives each, starting wherever the kickoff leaves you. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
         </p>
         {off && (
           <div className="arc-roster">
@@ -481,8 +493,8 @@ export const Arcade = forwardRef(function Arcade({
           </div>
         )}
         <div className="arc-how">
-          <span>Pass: drag back anywhere, let go to throw · the arc shows who it’s going to</span>
-          <span>Run: drag to steer · JUKE, SPIN or POWER at a tackler</span>
+          <span>Pass: tap a receiver’s name, or drag back on the right and let go</span>
+          <span>Run: the left stick steers, past its ring to burst · JUKE, SPIN, POWER on the right</span>
         </div>
         {online && rivalLive?.done && (
           <p className="arc-wait">
@@ -550,5 +562,6 @@ export const Arcade = forwardRef(function Arcade({
     return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} online={online} hold={hold && !online} round={round.n} roundAt={round.at} onQuit={online ? undefined : quit} onProgress={progress} onDone={progress} />;
   }
   const k = kits ?? kitsFor(null, null, 'nfl');
-  return <Football2 key={round.n} lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+  return <Football2 key={round.n} lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress}
+    online={online} quitText={quitText} onQuit={onQuit && !online ? (p) => onQuit(p, them ?? { score: 0, drive: 0, done: false, ends: [] }) : undefined} feedback={feedback} onFeedback={onFeedback} />;
 });

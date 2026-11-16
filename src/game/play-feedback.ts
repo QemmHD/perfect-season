@@ -102,15 +102,15 @@ export function footballFeedback(
   const next = settlement?.flag
     ? 'The flag changed this play. Check the new down and distance before choosing your next call.'
     : e?.kind === 'sack'
-      ? 'Get the ball out sooner or use SCRAMBLE before the rush reaches the quarterback.'
+      ? 'Get the ball out sooner, slide away from the rush with the stick, or RUN IT before it reaches the quarterback.'
       : e?.kind === 'int'
         ? 'Check the defender in the throwing lane, not just the receiver. Touch and lob can clear underneath coverage.'
         : run && p.stamina < 0.25
-          ? 'Stamina was low at the whistle. Save BURST for a clear lane; it shares energy with your skill moves.'
+          ? 'Stamina was low at the whistle. Save the burst for a clear lane; it shares energy with your skill moves.'
           : run && gain < 3
-            ? 'Follow the highlighted run lane before cutting upfield. Flip the play to attack the other side.'
+            ? 'Follow the lane arrow through the hole before cutting upfield. Flip the play to attack the other side.'
             : !run && !e?.caught
-              ? 'Lead the receiver into space. Under pressure, choose a shorter throw or move out of the pocket.'
+              ? 'Lead the receiver into space. Under pressure, take the shorter throw, step away with the stick, or throw it away outside the tackles.'
               : gain >= 10
                 ? 'Keep exploiting that space. Use a different concept if the next coverage takes it away.'
                 : 'Keep the next down manageable; mix runs with quick throws instead of forcing every play deep.';
