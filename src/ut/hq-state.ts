@@ -76,6 +76,15 @@ export interface ClubHQ {
   };
   /** Optional summaries retain entries/results when the calendar moves between weeks. */
   circuitHistory?: Record<string, CircuitWeek>;
+  /**
+   * Claude 2026-11-16 (ut-1), optional cache: how many pool-dependent rewards (Sets, Collection
+   * milestones, Moments) were ready when UT last computed its inbox, and the signature of the state it
+   * was computed from (claimables.ts). Lets the main app's badge stay exact without loading the card
+   * pool. Losing it is harmless: it is rebuilt on the next UT open.
+   */
+  poolClaimables?: { sig: string; n: number };
+  /** Claude 2026-11-16 (ut-1), optional UI memory: what the player has already seen (seen.ts). */
+  seen?: Record<string, string>;
 }
 export const emptyTotals = (): Totals =>
   Object.fromEntries(COUNTERS.map((k) => [k, 0])) as Totals;
@@ -122,6 +131,21 @@ const numbers = (v: unknown, max: number) =>
         ),
       ]
     : [];
+/** The optional cache, kept only when well formed (sig ≤ 80 chars, n ≤ 999). */
+function poolClaimablesOf(v: unknown): { poolClaimables?: { sig: string; n: number } } {
+  const c = obj(v);
+  return typeof c.sig === 'string' && c.sig.length > 0 && c.sig.length <= 80
+    ? { poolClaimables: { sig: c.sig, n: nat(c.n, 999) } }
+    : {};
+}
+/** At most 64 seen tokens, keys and values ≤ 80 chars. */
+export const SEEN_MAX = 64;
+function seenOf(v: unknown): { seen?: Record<string, string> } {
+  const e = Object.entries(obj(v)).filter(
+    ([k, x]) => k.length > 0 && k.length <= 80 && typeof x === 'string' && x.length <= 80,
+  ) as [string, string][];
+  return e.length ? { seen: Object.fromEntries(e.slice(-SEEN_MAX)) } : {};
+}
 export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
   const r = obj(raw),
     base = freshHQ(),
@@ -288,6 +312,8 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
           ),
         }
       : {}),
+    ...poolClaimablesOf(r.poolClaimables),
+    ...seenOf(r.seen),
     circuit: {
       week: typeof circuit.week === 'string' ? circuit.week : '',
       entries: nat(circuit.entries, 3),

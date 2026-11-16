@@ -4,35 +4,9 @@ import { hqOf, recordActivity } from './progression';
 import { canPlay, slotsFor } from './squad';
 import { ratedOf, type Pool } from './pool';
 import { organizeStorage } from './storage';
-export const DEVELOPMENT_PATHS = [
-  {
-    id: 'breakout' as const,
-    title: 'Breakout',
-    text: 'Make an emerging card a regular.',
-    games: 3,
-    wins: 1,
-    xp: 200,
-    sp: 150
-  },
-  {
-    id: 'captain' as const,
-    title: 'Captain',
-    text: 'Lead your squad to three wins.',
-    games: 5,
-    wins: 3,
-    xp: 350,
-    sp: 250
-  },
-  {
-    id: 'ironman' as const,
-    title: 'Ironman',
-    text: 'Stay ready. Build your match experience.',
-    games: 6,
-    wins: 0,
-    xp: 300,
-    sp: 200
-  }
-];
+import { DEVELOPMENT_PATHS, developmentReady } from './objectives';
+// Claude, 2026-11-16 (ut-1): the paths and their readiness moved to objectives.ts (light), re-exported.
+export { DEVELOPMENT_PATHS, developmentReady } from './objectives';
 export function savePreset(
   ut: UtState,
   id: number,
@@ -109,17 +83,6 @@ export function cancelDevelopment(ut: UtState): UtState {
     ...ut,
     hq: { ...h, development: { ...h.development, active: undefined } }
   };
-}
-export function developmentReady(ut: UtState): boolean {
-  const a = hqOf(ut).development.active,
-    p = DEVELOPMENT_PATHS.find((p) => p.id === a?.path);
-  return (
-    !!a &&
-    !!p &&
-    ut.owned.some((c) => c.uid === a.uid) &&
-    a.games >= p.games &&
-    a.wins >= p.wins
-  );
 }
 export function claimDevelopment(
   ut: UtState,
