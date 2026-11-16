@@ -239,6 +239,9 @@ try {
                   overflows: home.overflows,
                   scrollRange: home.scrollRange,
                   lastRowClearsFadeAtEnd: home.lastRowClearsFadeAtEnd,
+                  modesBottomAtRest: home.modesBottomAtRest,
+                  modesClearFadeAtRest: home.modesClearFadeAtRest,
+                  cutAtRest: home.cutAtRest,
                   topMost: a.topMost.y,
                   textInBand: a.textInBand.length,
                   controlInBand: a.controlInBand.length,
@@ -278,6 +281,8 @@ const summary = {
   rowUnderFade: states.filter((r) => r.gapToFade < 0).length,
   overflowing: states.filter((r) => r.overflows).length,
   lastRowHiddenAtEnd: states.filter((r) => r.overflows && !r.lastRowClearsFadeAtEnd).length,
+  // shell-2 fix: the mode tiles must clear PLAY's fade at rest; only the 20-pt-bar phones (375×667, 320) may not
+  tilesUnderFadeAtRest: states.filter((r) => r.modesClearFadeAtRest === false).map((r) => `${r.sport} ${r.device} ${r.mode} cp${+r.checkpoint} on${+r.online}: ${r.modesBottomAtRest} > ${r.fadeTop}`),
   onlineNotReady: [...new Set(states.filter((r) => r.online && !r.onlineReady).map((r) => r.sport))],
   pageErrors: errors,
 };

@@ -171,7 +171,7 @@ export function HomePage(props: {
   // Claude (UI reorganisation): everything above the PLAY button scrolls when it can't fit (320x568
   // with a saved run used to push PLAY off the screen); PLAY itself never moves.
   return (
-    <div className={'page-view home' + (room < 620 ? ' short' : room < 730 ? ' snug' : '') + (room >= 816 ? ' tall' : '')}>
+    <div className={'page-view home' + (room < 620 ? ' short' : room < 730 ? ' snug' : '') + (room >= 816 ? ' tall' : '') + (props.checkpoint ? ' has-run' : '')}>
       <div className="home-scroll">
         <h1 className={'logo' + (intro ? ' intro' : '')} aria-label="Perfect Season">
           <span className="disp l1" aria-hidden="true">
@@ -251,7 +251,10 @@ export function HomePage(props: {
             <span>{props.dailyDone ? 'Your ranked try is in. Replays are practice. New spins in ' + left + '.' : 'Everyone gets today’s same spins. Your first try is ranked.'}</span>
           ) : p.mode === 'blind' ? (
             <span>Draft from memory. Stats stay hidden until the results.</span>
-          ) : null /* Claude (studio overhaul, shell-2): Classic's respin hint lives in How to play; its slot stays so the tiles never move */}
+          ) : (
+            /* Claude (studio overhaul, shell-2 fix): back in its slot, which every mode keeps so the tiles never move */
+            <span>1 free {pick({ nba: 'team', nfl: 'team', soccer: 'club' })} respin and 1 free decade respin every draft.</span>
+          )}
         </div>
         <div className="spacer" />
       </div>

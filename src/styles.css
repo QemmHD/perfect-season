@@ -11700,6 +11700,47 @@ button.friendcard:active {
   padding-top: 9px;
   padding-bottom: 9px;
 }
+/* shell-2 fix: at the hero's 88-px floor the scoreboard box touched its frame; a slimmer box keeps ~5 px clear */
+.page-view.home .jumbo {
+  padding-top: 7px;
+  padding-bottom: 8px;
+}
+/* Claude (studio overhaul, shell-2 fix): with a saved run the continue card adds ~78 px, and NBA/NFL's second
+   row of mode tiles sat under PLAY at rest on the 393 phone. The run state wins that room back so every tile
+   clears the fade: a shorter scoreboard (its numbers shrink to fit), Training Camp as one 44-px row and a
+   tighter continue card. The column still scrolls; the hint line under the tiles is the part left below. */
+.page-view.home.has-run .home-scroll > .hero {
+  flex: 4 0 64px;
+  min-height: 64px;
+}
+.page-view.home.has-run .jumbo {
+  gap: 10px;
+  padding: 4px 14px 5px;
+}
+.page-view.home.has-run .jumbo .rec {
+  gap: 2px;
+}
+.page-view.home.has-run .jumbo .rec b {
+  font-size: 34px;
+}
+.page-view.home.has-run .jumbo .plus {
+  font-size: 22px;
+}
+.page-view.home.has-run .home-scroll > .evo-home-actions {
+  gap: 6px;
+}
+.page-view.home.has-run .home-scroll .continue-card {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.page-view.home.has-run .home-scroll .training-entry {
+  min-height: 44px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.page-view.home.has-run .home-scroll .training-entry small {
+  display: none;
+}
 .mode .livebadge.daily-new {
   background: var(--gold);
   color: var(--gold-ink);

@@ -26,7 +26,7 @@ Branch `claude/studio-shell`. Plan: [shell-plan.md](shell-plan.md). `O` below me
 
 Owner decision 6: the iPhone top-edge fix ships on its own as soon as it passes review. This section is the lead's review packet.
 
-- **Commit range:** `acdf3e2..claude/studio-shell-edge`. The plan commits (`e951c09`, `68123cc`) are docs only. The code is in `05ea3f4` and `7f7655d` (shell-1, QA harness only), `25c6f6a` (shell-2: Fix A, Fix D, M1, L6) and `05a6beb` (shell-3: Fix B, Fix C part 1, H1, L2). The branch tip is a docs-only commit that adds this handoff text; the gate ran on `05a6beb`'s tree.
+- **Commit range:** `acdf3e2..claude/studio-shell-edge`. The plan commits (`e951c09`, `68123cc`) are docs only. The code is in `05ea3f4` and `7f7655d` (shell-1, QA harness only), `25c6f6a` (shell-2: Fix A, Fix D, M1, L6) and `05a6beb` (shell-3: Fix B, Fix C part 1, H1, L2). The branch tip is a docs-only commit that adds this handoff text; the gate ran on `05a6beb`'s tree. **Review fix (2026-11-16):** the commit after the handoff fixes the four shell-2 review findings (Classic hint slot, saved-run Home tiles under PLAY, `.save-warning` sideways, legacy `Hoops.tsx` `--sat`), see shell-2 "Review fixes"; it belongs in the early ship, and `claude/studio-shell-edge` is fast-forwarded to it.
 - **Pointer branch:** `claude/studio-shell-edge`, at the handoff commit. Plain push; no force, no rebase.
 - **Rollback:** revert the range, newest first: `git revert --no-edit 05a6beb 25c6f6a` reverts the app changes; the QA-harness commits can stay. Fix B alone can be switched off with one line in `src/shell/plates.css` (`html .status-plate { display: none; }`), and every plate with the `PLATES_OFF_CSS` rule in `scripts/qa/edge-lib.mjs`.
 - **Protocol bump needed:** none. Layout and paint only; no engine reads any of it. **Save-compat risk:** none. No storage key, id, saved field or reward changes.
@@ -157,6 +157,21 @@ If check 3 shows the plate looking worse than the system's own blur, switch Fix 
 
 Layout only. No saves, storage keys, ids, match rules or protocol changed. Part of the early-ship unit with shell-1 and shell-3.
 
+### Review fixes (2026-11-16)
+
+An independent review of `05ea3f4..25c6f6a` found two medium and two low issues. All four are fixed; the sections below this one describe the state after the fix where they were wrong.
+
+- **Medium: Classic Home had a blank 40-px band between the tiles and PLAY** (62 pt at 393 in NBA/NFL, 68 in soccer). The hint slot kept its height while its line was removed, and `homeAudit` counted the empty slot as the last row, so the 8–24 pt gap check passed on empty space.
+  - Fix (review option A): the Classic line is back in its slot, "1 free team respin and 1 free decade respin every draft." (soccer: "club"). The reason for removing it, the 26-px PLAY shadow, is gone: the fade is 8 px and the spacer floor is 10 px, so the line sits fully clear of the fade (gap 8.2–11.2 pt to PLAY on all 9 phones). Every mode fills the slot again, so the tiles still never move when a mode is picked.
+  - `homeAudit.rowsNow()` now skips rows that paint nothing (no text, canvas, svg, img, button or input), so an empty slot can never pass the gap check again.
+  - Also: at the hero's 88-px floor the scoreboard box touched the hero frame (1.9 pt each side). Home's `.jumbo` is 5 px slimmer (padding 7/8), leaving 5.4 pt each side.
+- **Medium: with a saved run, NBA/NFL Home overflowed by 74 pt and the DAILY / HEAD TO HEAD tiles sat 8–26 pt under PLAY's fade at rest at 393** (every phone with an island or notch was similar).
+  - Fix: Home gets a `has-run` class when a run is saved (`Pages.tsx`, the class line), and that state wins back 34 frame px: the hero's floor is 64 (its scoreboard shrinks to 34-px numbers and stays 5.7 pt clear of the frame), Training Camp becomes one 44-px row (its subtitle hides), the continue card's padding is 9 and the actions gap 6.
+  - `homeAudit` now also reports `modesBottomAtRest`, `modesClearFadeAtRest` and the rows the fade cuts at rest; `home-matrix` lists every state whose tiles don't clear the fade as `tilesUnderFadeAtRest`.
+  - Result (432 states): the tiles clear the fade at rest everywhere except NBA/NFL with a saved run at 320×568, by 0.6 pt (the allowed scroll fallback). At 393 they clear by 8.8 pt; 402 11.1, 420 9.8, 430 20.2, 440 22.7, 390 21.3, 375×812 13.1, 375×667 5.5. The only row the fade cuts at rest is the hint line under the tiles. NBA/NFL saved-run Homes scroll 27–43 pt (was 61–79); soccer saved-run Homes now fit on all 9 phones (was 2–17 pt of scroll).
+- **Low: `.save-warning` read the screen's top inset although it renders inside the transformed stage.** Sideways, the stage counter-rotates and the warning sat under the island. It now reads `var(--sat, …)` (frame px, follows rotation) with the screen-px form as the fallback. Measured at 393×852: upright `top` 80.38 frame px (= 81 pt, unchanged); sideways (insets 0/59/21/59) 58.5 frame px, so the bar starts 59 px in from the island side instead of at 0. `.camp-overlay` keeps `--ps-inset-top`; it is portaled to `<body>`.
+- **Low: the legacy `game/hoops/Hoops.tsx` parsed `--sat` with `parseFloat`**, which is NaN inside `.arcade-full`, where `--sat` is now a `calc()`. It now falls back to `--ps-inset-top` + `--ps-edge` when `--sat` is not a plain length. The component has no importer, so no player was affected. **Every team:** inside `.arcade-full`, `--sat` is a `calc()`; read it through CSS, or measure a probe, never `parseFloat`.
+
 ### What changed
 
 - **Fix A: content starts below the blurred band.** `src/stage-layout.ts`:
@@ -174,7 +189,7 @@ Layout only. No saves, storage keys, ids, match rules or protocol changed. Part 
   - `.camp-overlay`, portrait and landscape → `var(--ps-inset-top, env())` (raw inset, no edge). Measured in Training Camp at 393: score bug 89–123 pt, camp overlay 146–184. With the edge it would have collided with the play-call row at `--sat + 104` (185).
 - **M1, Home in every state** (`src/ui/Pages.tsx` granted hunk, `src/styles.css` Home block):
   - Home's class reads `room` (one token), so it is identical to `acdf3e2` on all 9 phones.
-  - The Classic hint "1 free team respin and 1 free decade respin every draft." is gone; How to play already says it. The hint slot under the modes keeps its height in every mode, so picking a mode never moves a tile.
+  - The hint slot under the modes keeps its height in every mode, so picking a mode never moves a tile. (The first version removed the Classic hint line and left its slot empty; the review fix puts it back, see "Review fixes".)
   - The 26-px upward shadow on PLAY becomes an 8-px `::before` fade (`pointer-events: none`). The spacer has a 10-px floor, so the last row never sits under the fade, at rest or scrolled to the end.
   - Home's vertical budget is tightened by 50 frame px, scoped to `.page-view.home`:
     - logo margins 9/10 → 3/4;
@@ -227,27 +242,29 @@ Layout only. No saves, storage keys, ids, match rules or protocol changed. Part 
 |---|---|---|
 | NBA/NFL, no saved run | overflows on every phone (6–19 pt); the hint line sits under PLAY | **fits on all 9 phones**; gap to PLAY 8.2–11.2 pt |
 | Soccer, no saved run | fits with a 27–39 pt dead gap | fits; gap 12.0–19.8 pt; the hero takes the rest |
-| NBA/NFL, saved run | scrolls 83–96 | scrolls 61–79 |
-| Soccer, saved run | scrolls 17–30 | scrolls 2–17 (fits at 390 and 440) |
-| Last row clears the fade at scroll end | 0 of 360 overflowing states | **200 of 200** |
-| A fitting state's last row under PLAY or its fade | n/a | 0 of 232 |
+| NBA/NFL, saved run | scrolls 83–96 | scrolls 27–43 (first version 61–79); the tiles clear the fade at rest on every phone but 320 (−0.6 pt) |
+| Soccer, saved run | scrolls 17–30 | **fits on all 9 phones**, gap 8.2–11.2 (first version scrolled 2–17) |
+| Last row clears the fade at scroll end | 0 of 360 overflowing states | **144 of 144** |
+| A fitting state's last row under PLAY or its fade | n/a | 0 of 288 |
+| Mode tiles under the fade at rest | | 16 of 432, all NBA/NFL saved run at 320 (by 0.6 pt) |
 | PLAY bar and tab bar rects vs baseline | | identical (0 moved by > 1 pt) |
 | Text/control in the band; bottom cut; document scroll > 1 | 432 / 0 / 0 | 0 / 0 / 0 |
 
-- In the overflowing (saved-run) states the column scrolls under the 8-px fade at rest. That is the scroll cue: PLAY never moves, and every row is reachable and clears the fade at the end.
+- Numbers in this table are after the review fix (`O/shots/shell/shell-2/review-fix/home-matrix/`).
+- In the overflowing (saved-run) states the hint line under the tiles scrolls under the 8-px fade at rest. That is the scroll cue: PLAY never moves, and every row is reachable and clears the fade at the end.
 - The remaining hit-area overlaps the audit lists in those states (AI chips × PLAY) come from `::before` hit areas that the scroller clips. A tap there lands on PLAY.
 - Sport-switch neighbours overlapping by 2 px is pre-existing (unchanged).
 
 ### Home budget (D5: shell owns Home's vertical layout, ut owns its strip's contents)
 
-Row heights in pt, from the top: logo / sport switch / hero / stat strip / actions / modes / hint slot. Online on; Classic and 1v1 are identical, because the slot height never changes. "Slack" is what the column can give up before it scrolls: the hero above its 84-px box minimum, plus the spacer above its 10-px floor.
+Row heights in pt, from the top: logo / sport switch / hero / stat strip / actions / modes / hint slot. Online on; Classic and 1v1 are identical, because the slot height never changes. After the review fix; with a saved run the hero's floor is 64 (`has-run`). "Slack" is what the column can give up before it scrolls: the hero above its 84-px box minimum, plus the spacer above its 10-px floor.
 
 | Phone | Sport | Saved run | Rows | Gap to PLAY | Slack |
 |---|---|---|---|---|---|
 | 393 | NBA/NFL | none | 76.2 / 38.3 / 88.4 / 30.2 / 54.4 / 139.1 / 40.3 | 10.1 | ≈ 4 |
-| 393 | NBA/NFL | yes | 76.2 / 38.3 / 84.6 / 30.2 / 132.0 / 139.1 / 40.3 | scrolls 74 | − 74 |
+| 393 | NBA/NFL | yes | 76.2 / 38.3 / 66.5 / 30.2 / 115.9 / 139.1 / 40.3 | scrolls 40 (tiles clear the fade by 8.8) | − 40 |
 | 393 | soccer | none | 76.2 / 38.3 / 146.5 / 30.2 / – / 139.1 / 40.3 | 15.5 | ≈ 67 |
-| 393 | soccer | yes | 76.2 / 38.3 / 84.6 / 30.2 / 69.5 / 139.1 / 40.3 | scrolls 12 | − 12 |
+| 393 | soccer | yes | 76.2 / 38.3 / 77.3 / 30.2 / 65.5 / 139.1 / 40.3 | 10.1 | ≈ 13 |
 | 402 | NBA/NFL | none | 78.0 / 39.2 / 92.5 / 30.9 / 55.7 / 142.2 / 41.2 | 10.3 | ≈ 6 |
 | 402 | soccer | none | 78.0 / 39.2 / 151.6 / 30.9 / – / 142.2 / 41.2 | 16.3 | ≈ 71 |
 | 420 | NBA/NFL | none | 81.5 / 40.9 / 94.8 / 32.3 / 58.2 / 148.6 / 43.1 | 10.8 | ≈ 4 |
@@ -279,6 +296,7 @@ Row heights in pt, from the top: logo / sport switch / hero / stat strip / actio
   - `edge-headers.mjs --phase fixA --devices all`: 27 runs, 0 errors or failed steps, 0 band findings.
   - `home-matrix.mjs --phase fixA --devices all`: 432 states, 0 errors or class mismatches.
 - No width media query and no `screen.height` were added (grep of the diff).
+- **Review fix re-run** (dev server on 5211): typecheck pass; `vitest run src/stage-layout.test.ts src/engine/sport-branches.test.ts scripts/qa` 8 files, 76 pass; `PS_SPORT=nfl` and `PS_SPORT=soccer` stage-layout + sport-branches 28 + 28 pass; `home-matrix --devices all --phase review-fix`: 432 states, 0 errors, 0 class mismatches, PLAY and tab bars unmoved vs `fixA`, 0 band text/controls, 0 bottom cuts; `screen-fit.mjs` passes (its first run timed out opening UT on the loaded dev server; the re-run passed unchanged). The save-warning check upright and sideways is a scratch probe (`scratchpad/shell2fix/savewarn.mjs`). Screens looked at: NBA Home with a saved run at 393, NFL Classic without one at 393, soccer with a saved run at 320.
 - Screens looked at:
   - Home at 393: NBA Blind, NBA 1v1 with a saved run, soccer Classic; Home at 375×667 (1v1).
   - UT Home with the band at 393; NFL pack SKIP with the band; soccer match frame with the band; NBA match at 320.
@@ -300,15 +318,16 @@ None. Layout only; the HUD moves are render-only. No engine reads `--sat`. The o
 
 ### Touched outside my lane
 
-- `src/evolution/evolution.css`: `.save-warning` and `.camp-overlay` (portrait and landscape), 3 `top` declarations. These are the D3 grant the plan requests.
-- `src/ui/Pages.tsx` (shared): the Home class token and the Classic hint line, within shell's granted Home hunk.
+- `src/evolution/evolution.css`: `.save-warning` and `.camp-overlay` (portrait and landscape), 3 `top` declarations. These are the D3 grant the plan requests. The review fix changed `.save-warning` to the stage's `--sat`.
+- `src/game/hoops/Hoops.tsx` (nba's legacy v1 file, no importer): 3 lines in the review fix so it no longer reads `--sat` with `parseFloat`.
+- `src/ui/Pages.tsx` (shared): the Home class token, the `has-run` class and the Classic hint line, within shell's granted Home hunk.
 
 ### Owner device checks
 
 - In the installed app on the 393×852 phone, screenshot Home and UT Home. The LV ring, "LEVEL N" and the coins should sit fully below the blurred band, with "LEVEL N" as bright as "x/y XP".
 - Settings → bottom note reads `safe 59/34 · edge 22`.
 - In a match, the score bug sits clear of the band.
-- On Home, nothing is hidden under PLAY. With a saved run, the column scrolls and its last row stops above PLAY's fade.
+- On Home, nothing is hidden under PLAY. With a saved run, all four mode tiles sit above PLAY's fade without scrolling; the column scrolls only for the hint line, which stops above the fade.
 - The 420×912 phone's top inset (68) is still an estimate; its diagnostics line confirms it.
 
 ## shell-1 · QA harness core, production fixtures, team QA snippet and baselines (done)

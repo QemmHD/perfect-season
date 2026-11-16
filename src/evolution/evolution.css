@@ -664,8 +664,10 @@
 .save-warning {
   position: fixed;
   z-index: 11000;
-  /* below the status-bar edge iOS blurs (shell-2; the stage publishes --ps-inset-top and --ps-edge) */
-  top: calc(var(--ps-inset-top, env(safe-area-inset-top, 0px)) + var(--ps-edge, 0px));
+  /* below the status-bar edge iOS blurs. It renders inside the transformed stage, so it reads the stage's --sat
+     (frame px, inset + edge, follows the counter-rotation); the screen-px fallback is for outside a stage
+     (shell-2 fix) */
+  top: var(--sat, calc(var(--ps-inset-top, env(safe-area-inset-top, 0px)) + var(--ps-edge, 0px)));
   left: 0;
   right: 0;
   background: #4c2814;

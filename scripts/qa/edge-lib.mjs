@@ -444,7 +444,9 @@ export const homeAudit = (page) =>
       return { top: r1(r.top), bottom: r1(r.bottom), h: r1(r.height) };
     };
     const name = (e) => [...e.classList].filter((c) => !/^(rise|in|intro)/.test(c)).join('.') || e.tagName.toLowerCase();
-    const rowsNow = () => [...scroll.children].filter((e) => !e.classList.contains('spacer') && e.getBoundingClientRect().height > 0);
+    // a row counts only when it paints something: an empty slot (the hint row with nothing in it) is space, not a row
+    const paints = (e) => e.textContent.trim() !== '' || !!e.querySelector('canvas, svg, img, button, input');
+    const rowsNow = () => [...scroll.children].filter((e) => !e.classList.contains('spacer') && e.getBoundingClientRect().height > 0 && paints(e));
     // the fade over the content above PLAY: a ::before band, or the bar's own upward shadow
     const pr = play.getBoundingClientRect(),
       before = getComputedStyle(play, '::before'),
@@ -473,8 +475,22 @@ export const homeAudit = (page) =>
       endBottom = l ? r1(l.getBoundingClientRect().bottom) : null;
       scroll.scrollTop = was;
     }
+    // at rest (scrolled to the top): the mode tiles clear the fade, and which rows the fade cuts through
+    const wasTop = scroll.scrollTop;
+    scroll.scrollTop = 0;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const modesEl = scroll.querySelector('.modes');
+    const modesBottomAtRest = modesEl ? r1(modesEl.getBoundingClientRect().bottom) : null;
+    const cutAtRest = rowsNow()
+      .map((e) => ({ row: name(e), ...rect(e) }))
+      .filter((r) => r.top < fadeTop - 0.5 && r.bottom > fadeTop + 0.5)
+      .map((r) => r.row);
+    scroll.scrollTop = wasTop;
     const stage = document.querySelector('.stage');
     return {
+      modesBottomAtRest,
+      modesClearFadeAtRest: modesBottomAtRest === null ? null : modesBottomAtRest <= fadeTop + 0.5,
+      cutAtRest,
       homeClass: ['short', 'snug', 'tall'].filter((c) => home.classList.contains(c)).join(' '),
       fit: [...stage.classList].find((c) => c.startsWith('fit-'))?.slice(4) ?? '',
       rows,

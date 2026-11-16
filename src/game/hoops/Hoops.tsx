@@ -182,7 +182,10 @@ export function Hoops({
       const ctx = canvas.getContext('2d')!;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // the baseline sits low enough for the backboard to clear the scoreboard
-      const top = parseFloat(getComputedStyle(wrap).getPropertyValue('--sat') || '0') + 168;
+      // Claude (studio overhaul, shell-2 fix): inside .arcade-full --sat is a calc() that parseFloat can't read
+      const cs = getComputedStyle(wrap);
+      const sat = parseFloat(cs.getPropertyValue('--sat'));
+      const top = (Number.isFinite(sat) ? sat : (parseFloat(cs.getPropertyValue('--ps-inset-top')) || 0) + (parseFloat(cs.getPropertyValue('--ps-edge')) || 0)) + 168;
       const view = viewFor(w, h, top);
       const rival0 = rivalLineup.C as Player | null;
       drawHoops(ctx, view, p, { paint: rival0?.c1 ?? '#333', trim: rival0?.c2 ?? '#fff', abbr: rival0?.abbr ?? 'OPP' }, {
