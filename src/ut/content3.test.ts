@@ -129,8 +129,10 @@ describe('Preview Pack (' + SPORT + ')', () => {
     const a = previewCards(pool, ut, W).map((c) => c.line.id);
     expect(a.length).toBeGreaterThan(0);
     expect(previewCards(pool, migrateUt(JSON.parse(JSON.stringify(ut))), W).map((c) => c.line.id)).toEqual(a);
+    // Claude (packs-3, audit H1): a buy waits 24 hours too now (it unlocked the next preview at once)
     const bought = nextPreview(ut, true, 100);
-    expect(previewStatus(bought, 100).ready).toBe(true);
+    expect(previewStatus(bought, 100).ready).toBe(false);
+    expect(previewStatus(bought, 100 + PREVIEW_COOLDOWN_MS).ready).toBe(true);
     expect(previewCards(pool, bought, W).map((c) => c.line.id)).not.toEqual(a);
     const skipped = nextPreview(ut, false, 100);
     expect(previewStatus(skipped, 100 + PREVIEW_COOLDOWN_MS - 1).ready).toBe(false);

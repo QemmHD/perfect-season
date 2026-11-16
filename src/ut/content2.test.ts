@@ -12,6 +12,8 @@ import { deriveEditionLine, landmarkId, LANDMARK_CAP, LANDMARK_FLOOR, parseEditi
 import { landmarkCatalog, LANDMARK_ATTRS, type LandmarkType } from './landmarks';
 import { buyMarket, marketBought, marketFor, MARKET_FLOOR, swapForPick } from './market';
 import { packTags } from './pack-helper';
+import { flashWindowsOf } from './flash';
+import { weekOf } from './sbc';
 import { openPack, packDefs, quickSellValue } from './packs';
 import { getPool, type Pool } from './pool';
 import { rareInfo } from './rare';
@@ -222,14 +224,16 @@ describe('Daily Drop, limits and picks', () => {
     expect(buysLeft(ut, 'elite', '2026-11-02', at)).toBe(2);
     ut = recordBuy(ut, 'standout', DAY, at);
     expect(buysLeft(ut, 'standout', '2026-10-31', at)).toBe(0); // same ISO week
-    expect(lightningWindow(at)).toBeNull();
-    expect(buysLeft(ut, 'lightning', DAY, at)).toBe(0);
-    const open = Date.parse('2026-11-01T17:30:00Z'); // Sunday 12:30 Eastern
-    expect(lightningWindow(open)?.id).toBe('2026-11-01:12');
-    expect(minutesToLightning(at)).toBe(30);
-    expect(buysLeft(ut, 'lightning', DAY, open)).toBe(1);
-    ut = recordBuy(ut, 'lightning', DAY, open);
-    expect(buysLeft(ut, 'lightning', DAY, open)).toBe(0);
+    // Claude (packs-3): two seeded windows a weekend now (flash.ts), not all four of 12-2 and 8-10 pm
+    const win = flashWindowsOf(weekOf(DAY))[0];
+    expect(lightningWindow(win.start - 30 * 60000)).toBeNull();
+    expect(buysLeft(ut, 'lightning', DAY, win.start - 30 * 60000)).toBe(0);
+    const open = win.start + 30 * 60000;
+    expect(lightningWindow(open)?.id).toBe(win.id);
+    expect(minutesToLightning(win.start - 30 * 60000)).toBe(30);
+    expect(buysLeft(ut, 'lightning', win.day, open)).toBe(1);
+    ut = recordBuy(ut, 'lightning', win.day, open);
+    expect(buysLeft(ut, 'lightning', win.day, open)).toBe(0);
     expect(lightningWindow(Date.parse('2026-11-03T17:30:00Z'))).toBeNull(); // a Tuesday
   });
 

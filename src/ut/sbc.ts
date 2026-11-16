@@ -9,6 +9,7 @@ import { curvePick, GOLD_CURVE, goldsOf, openPack, packDefs, packRand, quickSell
 import { decadeOf, type Pool, TIER_RANK } from './pool';
 import { onScale, TIER_CUTS } from './rate';
 import { UT_SCALE } from './ut-scale';
+import { cheapestFodder, goldRewardValue } from './value';
 import type { CardMint, RatedCard, Tier, UtSport } from './types';
 
 export type Req =
@@ -346,16 +347,41 @@ const WEEKLY: Template[] = [
   () => ({ title: 'Hot Season Hunt', blurb: 'Six cards: five golds, three teammates.', size: 6, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'sameFr', n: 3 }], reward: { card: { tier: 'promo' } } }),
 ];
 
-/** Upgrades (cards in for a better pack: twice a day each) and repeatables (five cards in for a
- * better card: as often as you like). */
+/** Upgrades (cards in for a better pack: twice a day each) and repeatables (cards in for a better card:
+ * as often as you like). */
 export const UPGRADE_TIMES = 2;
+
+/**
+ * Claude (packs-3, research §8.8, packs-plan D10): each upgrade's size and requirement, per sport, on the
+ * displayed scale. Tuned so the reward is worth 1.1-1.3 times the cheapest cards that meet them for a Daily
+ * Upgrade, and 0.9-1.1 times for a repeatable (sbcValue; the exploits suite holds every sport to it).
+ * Before, NBA's Bronze Upgrade paid 3.3 times its five cards, NFL's Silver Upgrade 6.7 times, and Golden
+ * Hour turned eight 80s into an 83+ (2.2 times): a cheap route to 83+ golds. `team` is a team-overall
+ * requirement, `min` an every-card minimum; `reward` the gold reward's floor. Ids and list order are unchanged.
+ */
+interface Tune {
+  size: number;
+  team?: number;
+  min?: number;
+  reward?: number;
+}
+export const UPGRADE_TUNE: Record<UtSport, { bronze: Tune; silver: Tune; gold: Tune; toGold: Tune; golden: Tune; elite: Tune }> = {
+  nba: { bronze: { size: 7, min: 62 }, silver: { size: 6, team: 73 }, gold: { size: 6, team: 79 }, toGold: { size: 5, team: 71 }, golden: { size: 4, team: 83, reward: 84 }, elite: { size: 5, min: 83, reward: 85 } },
+  // football's silvers sell for a third as much, so its Silver Upgrade takes golds too ("silver or better")
+  nfl: { bronze: { size: 6, team: 73 }, silver: { size: 8, team: 80 }, gold: { size: 9, min: 82 }, toGold: { size: 6, team: 70 }, golden: { size: 3, team: 83, reward: 84 }, elite: { size: 4, min: 83, reward: 85 } },
+  soccer: { bronze: { size: 5, team: 69 }, silver: { size: 7, team: 74 }, gold: { size: 8, team: 79 }, toGold: { size: 5, min: 69 }, golden: { size: 4, team: 83, reward: 84 }, elite: { size: 5, min: 83, reward: 85 } },
+};
+const WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
+const tuneReqs = (t: Tune, tier: Tier): Req[] => [{ k: 'tier', tier, n: t.size }, ...(t.team ? [{ k: 'teamOvr' as const, ovr: t.team }] : []), ...(t.min ? [{ k: 'minOvr' as const, ovr: t.min }] : [])];
+const tuneText = (t: Tune) => (t.team ? ', team ' + t.team + '+' : t.min ? ', each ' + t.min + '+' : '');
+const upper = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 const UPGRADES: [Template, number][] = [
-  [() => ({ title: 'Bronze Upgrade', blurb: 'Any five cards for a Silver pack.', size: 5, reqs: [{ k: 'tier', tier: 'bronze', n: 5 }], reward: { pack: 'silver' } }), UPGRADE_TIMES],
-  [() => ({ title: 'Silver Upgrade', blurb: 'Five silvers (or better) for a Gold pack.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { pack: 'gold' } }), UPGRADE_TIMES],
-  [(c) => ({ title: 'Gold Upgrade', blurb: 'Five good golds for a Premium pack.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium' } }), UPGRADE_TIMES],
-  [() => ({ title: 'Silver to Gold', blurb: 'Five silvers for a gold.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { card: { tier: 'gold' } } }), Infinity],
-  [(c) => ({ title: 'Golden Hour', blurb: 'Eight golds for a better one.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 77) }], reward: { card: { tier: 'gold', minOvr: sc(c, 84) } } }), Infinity],
-  [(c) => ({ title: 'Elite Pull', blurb: 'Eight strong golds for a star.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 83) }], reward: { card: { tier: 'gold', minOvr: sc(c, 88) } } }), Infinity],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].bronze; return { title: 'Bronze Upgrade', blurb: upper(WORDS[t.size]) + ' cards' + tuneText(t) + ' for a Silver pack.', size: t.size, reqs: tuneReqs(t, 'bronze'), reward: { pack: 'silver' } }; }, UPGRADE_TIMES],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].silver; return { title: 'Silver Upgrade', blurb: upper(WORDS[t.size]) + ' silvers or better' + tuneText(t) + ' for a Gold pack.', size: t.size, reqs: tuneReqs(t, 'silver'), reward: { pack: 'gold' } }; }, UPGRADE_TIMES],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].gold; return { title: 'Gold Upgrade', blurb: upper(WORDS[t.size]) + ' golds' + tuneText(t) + ' for a Premium pack.', size: t.size, reqs: tuneReqs(t, 'gold'), reward: { pack: 'premium' } }; }, UPGRADE_TIMES],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].toGold; return { title: 'Silver to Gold', blurb: upper(WORDS[t.size]) + ' silvers' + tuneText(t) + ' for a gold.', size: t.size, reqs: tuneReqs(t, 'silver'), reward: { card: { tier: 'gold' } } }; }, Infinity],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].golden; return { title: 'Golden Hour', blurb: upper(WORDS[t.size]) + ' golds' + tuneText(t) + ' for a better one.', size: t.size, reqs: tuneReqs(t, 'gold'), reward: { card: { tier: 'gold', minOvr: t.reward } } }; }, Infinity],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].elite; return { title: 'Elite Pull', blurb: upper(WORDS[t.size]) + ' strong golds' + tuneText(t) + ' for a star.', size: t.size, reqs: tuneReqs(t, 'gold'), reward: { card: { tier: 'gold', minOvr: t.reward } } }; }, Infinity],
 ];
 
 /**
@@ -386,6 +412,35 @@ export function sbcsFor(pool: Pool, day: string, done: Record<string, unknown> =
     return { ...t(u), id: 'u:' + day + ':' + i + ':' + n, kind: 'upgrade' as const, ...(Number.isFinite(times) ? { left: times - n } : {}) };
   });
   return [...dailies, ...weekly, ...upgrades];
+}
+
+// ---------- the SBC value rules (Claude, packs-3; research §8.8, packs-plan D10) ----------
+
+/**
+ * A challenge's value out ÷ value in, at acquisition cost (value.ts): the reward (a pack at its Store
+ * price, a gold card at the cost of the pack route that pays the same draw, plus coins) over the
+ * cheapest cards that meet its tier, minimum and team-overall requirements. The Daily Upgrades pay
+ * 1.1–1.3 times what goes in, the repeatables 0.9–1.1 (a fair swap, never a cheap route).
+ * Null for a challenge this model doesn't price (franchise, decade or position requirements).
+ */
+export function sbcValue(s: Pick<Sbc, 'size' | 'reqs' | 'reward'>, sport: UtSport): { input: number; output: number; ratio: number; fodder: number[] } | null {
+  let tier: Tier | undefined;
+  let minOvr: number | undefined;
+  let teamOvr: number | undefined;
+  for (const r of s.reqs) {
+    if (r.k === 'tier' && r.n >= s.size) tier = r.tier;
+    else if (r.k === 'minOvr') minOvr = r.ovr;
+    else if (r.k === 'teamOvr') teamOvr = r.ovr;
+    else if (r.k !== 'tier') return null;
+  }
+  const w = s.reward;
+  if (w.standout || w.program || w.cardId || (w.card && w.card.tier !== 'gold')) return null;
+  const defs = packDefs(sport);
+  let output = w.coins ?? 0;
+  if (w.pack) output += (w.pack.startsWith('position:') ? defs.position : defs[w.pack as keyof typeof defs])?.price ?? defs.premium.price;
+  if (w.card) output += goldRewardValue(sport, Math.max(w.card.minOvr ?? 0, TIER_CUTS[sport].gold));
+  const f = cheapestFodder(sport, { size: s.size, tier, minOvr, teamOvr });
+  return { input: f.value, output, ratio: output / f.value, fodder: f.ovrs };
 }
 
 // ---------- filling a challenge from the club ----------

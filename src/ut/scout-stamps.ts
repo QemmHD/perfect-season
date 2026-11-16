@@ -78,9 +78,9 @@ export function addClaim(claims: string[] | undefined, id: string, max = 5000): 
  * packs, signed Club Collection packs) earn stamps only for coins actually paid.
  */
 export const NOMINAL_PRICE: Record<'nba' | 'nfl' | 'soccer', Record<string, number>> = {
-  nba: { bronze: 250, silver: 500, gold: 1050, premium: 1800, position: 800, elite: 2600, jumbo: 3600, standout: 3000, lightning: 2250, roster: 1700, captains: 2400, dynasty: 4400 },
-  nfl: { bronze: 175, silver: 350, gold: 1000, premium: 1400, position: 575, elite: 1800, jumbo: 2700, standout: 1800, lightning: 1350, roster: 1100, captains: 1000, dynasty: 1900 },
-  soccer: { bronze: 220, silver: 450, gold: 900, premium: 1600, position: 650, elite: 1900, jumbo: 3200, standout: 2600, lightning: 1950, roster: 1000, captains: 1450, dynasty: 2700 },
+  nba: { bronze: 250, silver: 500, gold: 1050, premium: 1900, position: 800, elite: 2600, jumbo: 4200, standout: 3000, lightning: 2250, roster: 1700, captains: 2500, dynasty: 4800 },
+  nfl: { bronze: 175, silver: 350, gold: 1000, premium: 1400, position: 575, elite: 1800, jumbo: 3000, standout: 1800, lightning: 1350, roster: 1100, captains: 1200, dynasty: 2200 },
+  soccer: { bronze: 220, silver: 450, gold: 900, premium: 1600, position: 650, elite: 1900, jumbo: 3300, standout: 2400, lightning: 1800, roster: 1100, captains: 1700, dynasty: 3200 },
 };
 
 const BASE_TIERS = new Set(['bronze', 'silver', 'gold']);

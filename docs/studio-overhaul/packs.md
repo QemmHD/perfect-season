@@ -10,7 +10,8 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 | packs-1 B: the Scout Stamp core and V2 hand-off contracts | done | see `git log` (subject "packs-1 commit B") |
 | packs-2: real-pack odds for every source, Player Pick 84+, Scout Drop tables | done | see `git log` (subject "packs-2") |
 | packs-1 review fixes (SBC stamps, pick cap, confirm, auto-fill, unknown pack tile) | done | see `git log` (subject "packs-1 review fixes") |
-| packs-3 … packs-10 | not started | |
+| packs-3: prices, limits and exploits | done | see `git log` (subject "packs-3") |
+| packs-4 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
 
@@ -546,6 +547,130 @@ Run with NBA at 393×852 (insets 59/34) and at 320×568. Shots are in `O/shots/p
 ### Protocol
 
 None. Stamps, picks, the confirm and the Store tile are economy and presentation.
+
+## packs-3: prices, limits and exploits
+
+### What changed and why
+
+- **One coin model (`src/ut/value.ts`, D10).** `routeCost(sport, ovr)` = the Premium Gold price ÷ the exact chance a Premium holds a gold of that overall or better (from the pack's own slots on the gold curve). `coinValue(rc)`: 2 × quick-sell, a gold 83+ at its route cost, a special at its D5 rung (`SPECIAL_RUNG`, the rung's lower bound until packs-6 measures the ladder). `goldRewardValue(sport, floor)`: a gold reward from 83 up is worth `routeCost(floor)`, because buying Premiums until one holds a gold `floor`+ hands out exactly that draw. Below 83 it is the curve's mean. `cheapestFodder` is a DP over the overall sum. `packEv(pool, slots, ctx)` / `livePackEv(...)` give a pack's expected quick-sell value exactly. They agree with 10,000 simulated packs within 0.001–0.002 for every Store kind.
+- **Scout Market (audit C2, owner decision 4).** Twelve base cards a day: 2 silvers, 5 golds up to 82 and 4 golds 78–82, all on the curves, plus one **scouted** gold 83–86 (the curve cut at 86). No Hot Season, Standout or other special, and nothing above 86. Each card costs the most of: its kind's floor (silver 100, gold 300, gold 78+ 400, scouted 1,500), 3 × quick-sell, and ¼ of its route cost. The seed is now `ut-market:v2:<sport>:<day>`. `MarketTag` keeps `promo` / `standout` in its union, and the Store tags read SILVER / GOLD / GOLD 78+ / SCOUTED at 10 design px (they were 7.5).
+- **Swap Desk:** 1 a day (it was 3), so 7 picks a week instead of 21. Inside a "swap-desk 4-for-1" flash window it takes 4 duplicates (`swapSize(at, sport)`); otherwise 5.
+- **Preview Pack (audit H1).** The next preview comes 24 hours after a buy **or** a skip (`PREVIEW_COOLDOWN_MS`). Before, a buy unlocked the next one at once and a skip waited only an hour. A preview binds the week it was made in (`preview.wk`, optional, written at creation and by each next preview), so its Standout slot shows the same cards across the Monday rollover. The copy says "Next preview in 23 h 50 min. One preview a day."
+- **Club Collection (audit H2), `src/admin/catalog.ts`.** `floorPrice(sport, counts)` prices each Standout at what the Standout Guarantee asks for one (its price less its golds' quick-sell value ÷ 0.6), and the rest at quick-sell ÷ 0.6, rounded up to 100. `STUDIO_VALUE` pins the per-tier values, and the exploits suite holds them to the live definitions within 1%. `checkedCatalog(raw, sport)` raises a price to its floor, so a live catalog under the floor still loads (`setCatalog` and the relay path pass the sport). The Store Packs editor shows "Minimum N coins" under the price field. Below it, the line turns red, REVIEW is disabled, the error names the pack, and `publishCatalog` refuses too (`belowFloor`). Default prices: NBA Captains 2,400 → 2,500 and Dynasty 4,400 → 4,800; NFL Captains 1,000 → 1,200 and Dynasty 1,900 → 2,200; soccer Roster 1,000 → 1,100, Captains 1,450 → 1,700 and Dynasty 2,700 → 3,200. Limits through `pa.limitOf` (`studio:` recipes included): Roster 2 a day, Captains 1 a day, Dynasty 1 a week.
+- **Program packs (audit H3, M5), `live-packs.ts`.** One program-pack price per sport (`LIVE_PROGRAM_PRICE`: NBA 3,300, NFL 2,000; soccer 2,800, held for when it has a calendar). Every program pack returns about the same coins whatever its odds, so the schedule's premium on low-odds packs only made them poor value: Ring Night returned 0.40 and Summer Heat 0.44. A guarantee costs `max(its scaled schedule price, ceil100(2.2 × the program pack))`: NBA 7,300 (was 3,200–4,900), NFL 4,400 (was 1,900–2,800).
+- **Friday boost (`flash.ts`).** From the Friday on or after each release day (the promo's start, or each wave) at 18:00 Eastern, for 48 hours, a promo's program packs draw the program slot at `min(0.6, 1.5 × base)`. The share is scaled across the promo and its extras; the Legend chance stays and the Weekly Standout share shrinks. `livePackDef(sport, pack, at)` returns `boost: { until } | null` and the boosted slot. A pack opens with the odds of the moment it opens (`OpenOpts.at`, default now). The Store tile shows "BOOSTED program odds ×1.5 for 1d 23h", and its odds sheet shows the boosted row. Guarantees are never boosted (they are 100% already).
+- **Lightning windows.** Two of the four weekend slots (Sat 12–2 pm and 8–10 pm, Sun 1–3 pm and 7–9 pm Eastern) each ISO week, seeded by `'flash:' + week` and the same for everyone. Before, all four Sat/Sun 12–2 / 8–10 slots were open every weekend. The limit key `lightning:<day>:<hour>` is unchanged. The Store note names the next window ("opens in 1d 1h: Sat 8 pm–10 pm Eastern. Two surprise windows every weekend."). Soccer gets the same windows: the slots are code constants, so they don't depend on the calendar.
+- **Named season flash sales.** `flashSalesAt(at, sport)` reads `seasons[].flash`, which nothing read before. It handles one date or `every <Day> A..B`, each window's start (Eastern) and length, and the cycle shift and id suffix. `"<pack>@-N%"` becomes a deal at the Store price N% off (to 50 coins), 1 per player per sale day under `flash:<sale>:<kind>:<day>`. That key is kept by both counter prunes (`recordBuy` keeps `flash:` keys within its last 40). `"swap-desk 4-for-1"` sets the swap size. Any other text is ignored and listed by `flashOfferIssues()`: today the two "scout-market 24 cards" offers. The Store shows a FLASH SALE block (name, time left, struck Store price, −N% chip, 1 left / Bought in this sale, a 44-px BUY), and `buyFlash` in `UltimateTeam.tsx` buys it. Scout's Choice deals become a pick; the rest open as packs.
+- **Prices by value (M5).** Every sold non-chase item returns 0.45–0.60 of its price, and every flash deal 0.75 or less at its sale price, boost included. NBA Premium 1,800 → 1,900 (0.61 → 0.58). Jumbo NBA 3,600 → 4,200, NFL 2,700 → 3,000, soccer 3,200 → 3,300: Jumbo sells 30% off in sales, so it sits near 0.51. Soccer Standout Guarantee 2,600 → 2,400 (0.48 → 0.52), Lightning 1,950 → 1,800, still 25% off. `NOMINAL_PRICE` (stamps for earned packs) follows. Chase items are listed apart: the Program Guarantee (0.23–0.32), Spotlight (packs-6) and Scout's Choice, a pick of three 84+ golds valued by route cost, not quick-sell.
+- **SBC value rules (research §8.8), `sbc.ts`.** `sbcValue(s, sport)` is reward ÷ the cheapest cards that meet the challenge, at D10 values. `UPGRADE_TUNE[sport]` sets each upgrade's size and team-overall or every-card minimum (display scale, per sport) so the Daily Upgrades pay 1.1–1.3 and the repeatables 0.9–1.1. Golden Hour pays an 84+ and Elite Pull an 85+ in every sport (NBA was 83 / 85, NFL 81 / 83). Ids, titles, list order and rewards' kinds are unchanged. Blurbs are generated from the numbers ("Four golds, team 83+ for a better one.").
+
+### Before → after (`O/packs-out/before-packs-3/` → `O/packs-out/after-packs-3/`, `scripts/packs/exploits.ts`, 10,000 packs per item)
+
+| Measure | NBA | NFL | Soccer |
+|---|---|---|---|
+| Store packs, EV / price range | 0.49–0.61 → 0.49–0.58 | 0.49–0.61 → 0.49–0.59 | 0.48–0.62 → 0.47–0.60 |
+| Program packs (every scheduled one) | 3,000–4,200 at 0.40–0.60 → 3,300 at 0.51–0.55 | 1,800–2,500 at 0.42–0.61 → 2,000 at 0.52–0.55 | no calendar |
+| Program Guarantee price / EV | 3,200–4,900 / 0.47–0.67 → 7,300 / 0.24–0.32 | 1,900–2,800 / 0.44–0.61 → 4,400 / 0.23–0.28 | — |
+| Boosted program packs, highest EV | — → 0.59 | — → 0.57 | — |
+| Flash deals, highest EV at sale price | — → 0.734 (Jumbo −30%) | — → 0.743 (Standout −25%) | none |
+| Lightning Standout | 0.69 | 0.74 | 0.64 → 0.70 |
+| Market, 60 days: max overall / days with > 1 card 83+ / specials | 97 / 60 / 180 → 86 / 0 / 0 | 97 / 60 / 180 → 85 / 0 / 0 | 97 / 59 / 180 → 86 / 0 / 0 |
+| Market 83+ price ÷ route cost, lowest | 0.002 → 0.25 | 0 → 0.249 | 0 → 0.249 |
+| Swap Desk picks a week | 21 → 7 | 21 → 7 | 21 → 7 |
+| Preview, hourly checker buying only specials, 30 days (20 players) | 47.7 specials, up to 8 previews a day → 2.50, 1 a day | 48.7 → 2.20 | 45.9 → 2.40 |
+| Daily Upgrades value out ÷ in (Bronze / Silver / Gold) | 3.33 / 2.63 / 1.12 → 1.19 / 1.21 / 1.20 | 7.00 / 6.67 / 2.64 → 1.21 / 1.19 / 1.20 | 4.50 / 3.00 / 1.72 → 1.22 / 1.20 / 1.21 |
+| Repeatables (Silver to Gold / Golden Hour / Elite Pull) | 1.50 / 2.20 / 1.18 → 0.98 / 1.04 / 1.01 | 1.56 / 0.62 / 2.56 → 1.02 / 0.95 / 1.04 | 1.31 / 2.66 / 1.14 → 0.99 / 1.01 / 0.96 |
+
+The Preview's 2.2–2.5 is the Premium's own rate (30 previews × about 8% a special): checking hourly no longer helps.
+
+**D10 route costs** (coins for a gold of this overall or better by the Premium route, after):
+
+| Overall | 80 | 82 | 83 | 84 | 85 | 86 | 87 | 88 |
+|---|---|---|---|---|---|---|---|---|
+| NBA | 1,908 | 2,407 | 5,893 | 13,022 | 29,639 | 50,904 | 81,270 | 144,697 |
+| NFL | 1,400 | 1,439 | 2,355 | 4,570 | 9,828 | 16,576 | 26,218 | 46,363 |
+| Soccer | 1,601 | 1,827 | 3,942 | 8,413 | 18,869 | 32,256 | 51,375 | 91,312 |
+
+**Coin flow (an engaged NBA player, ≈ 1,470 coin-equivalents a day by D.16, in Premium-equivalents a day):** income buys 0.82 → 0.77 Premiums (Premium 1,800 → 1,900). The two-a-day Daily Upgrades added 2,380 coins of value a day above what went in (≈ 1.32 Premiums) → 1,160 (≈ 0.61). In all, 2.14 → 1.38 Premium-equivalents a day. The removed cheap routes are on top of that: two 94–97 Hot Season cards a day for about 2,100 coins each, 14 extra Scout's Choice picks a week, and about 45 extra specials a month from previews.
+
+### Tests
+
+- **`exploits` suite** (`packs-suites/exploits.ts`; `exploits.test.ts` NBA/NFL, `soccer-exploits.test.ts` soccer), 20 tests, 20–35 s a sport:
+  - every Store kind over 10,000 packs in [0.45, 0.60], agreeing with the exact EV within 0.015; every Position/Unit key; Premium (the Preview); the Standout Guarantee in band and Lightning ≤ 0.75 in each of 52 weeks;
+  - Market over 60 days: 12 distinct players, ≤ 1 card 83+ a day (present ≥ 55 days), none above 86, no special, 83+ priced ≥ ¼ route cost;
+  - Swap Desk 1 a day, 5 cards, 4 in the s4 Deadline Day window;
+  - Preview not ready at +24 h − 1 ms after a buy and after a skip, ready at +24 h; the same cards across a Monday rollover; `wk` survives today's normalizer, an older build drops it; the hourly 30-day simulation ≤ 2.5 specials and ≥ 24 h between previews;
+  - Club Collection values pinned to the definitions; defaults at or above the floor and in band; a 1,000 Captains clamps to the floor (`checkedCatalog(raw, sport)`), and `belowFloor` names it (the editor's refusal); the three limits;
+  - Lightning: exactly 2 windows a weekend from the 4 slots, deterministic, each 2 h, inside the window and not 1 ms outside, the pair changing in ≥ 26 of 51 week-to-week steps;
+  - offer parsing (sales, swap, ignored texts listed); the s4 Big Game Flash: its two deals at the right prices in 15:00–17:00 and 21:00–23:00 only, its key, 1 per player kept across a prune;
+  - every flash deal of the year ≤ 0.75 at its window, boost included;
+  - every scheduled program pack in band, also boosted; every guarantee ≥ 2.2 × its program pack and ≥ 0.2 EV;
+  - boost windows Fri 18:00 → Sun 18:00 Eastern; at Sun 18:00 − 1 min the row is min(0.6, 1.5 × base) ± 0.001, at + 1 min the base; the slot still sums to 1 with the Legend kept; guarantees never boosted; 10,000 boosted openings hit the published row within 1.5 pt;
+  - the six upgrades in their bands on three days;
+  - route cost rising and matching 10,000 simulated Premiums within 5%.
+- **Changed old tests (the old behaviour was the bug, or the design changed):**
+  - `calendar.test.ts`: a guarantee returns 0.2–0.35, not about half (it costs 2.2 packs now).
+  - `content2.test.ts`: the Lightning case uses the week's seeded window instead of a fixed Sunday 12:00.
+  - `content3.test.ts`: a bought preview waits 24 hours (it was ready at once: audit H1).
+  - `sbc.test.ts`: Golden Hour's size comes from `UPGRADE_TUNE`, and Elite Pull asks more by value, not by an 8-card team overall.
+  - `packs-economy` "before fixture": the upgrades may differ, and a new check rebuilds the old six upgrades and proves every day's catalogue (dailies, weeklies, ids, order) still equals the packs-1 fixture.
+- Typecheck clean. NBA `vitest run src/ut src/admin src/engine/sport-branches.test.ts` 341 passed; NFL 339 passed; soccer `vitest run soccer sport-branches` 152 passed.
+
+### Browser QA (packs-3)
+
+`scripts/packs/qa-exploits.mjs` was isolated as before: dev server 5213, `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted (the only host blocked was the Supabase registry), touch, `deviceScaleFactor: 1`. The clock was fixed at Black Friday 2026-11-27 18:30 Eastern.
+
+Runs: NBA 393 (reduced motion) and 320 (full motion), NFL 393, soccer 393 and 320. Shots are in `O/shots/packs/packs-3/` (`*-store-top`, `*-flash`, `*-flash-bought`, `*-program-boosted`, `*-lightning-note`, `*-preview-wait`, `*-market`, `*-swap`).
+
+- **FLASH SALE · Black Friday Blitz, "Ends in 1h 30m".** Five deals: Jumbo 4,200 → 2,950, Elite 2,600 → 1,800, Cup Contenders Pack 3,300 → 2,650 (−20%), Scout's Choice 650 → 450, Standout Guarantee 3,000 → 2,250. The BUY button is 83×44 design px.
+- **Buying a deal like a player.** Buying the Jumbo charged 2,950 and logged `jumbo/store/2950`. It saved `flash:s2-black-friday:jumbo:2026-11-27`, and the tile then read "Bought in this sale" (NFL: 2,100).
+- **The program tile** reads "BOOSTED program odds ×1.5 for 1d 23h". Its blurb says 45% (base 30%).
+- **Lightning:** "opens in 1d 1h: Sat 8 pm–10 pm Eastern."
+- **Preview:** "Next preview in 23 h 50 min. One preview a day."
+- **The Market.** Tags at 10 design px. Prices: NBA silvers 200, golds 400–450, the scouted 83 at 1,500; soccer's scouted 84 at 2,100.
+- **The Swap Desk** reads "One swap a day: ready."
+- No page errors in any run. Soccer shows no flash block (it has no calendar) and the same Lightning windows.
+- The admin editor's minimum line was not shot: the editor sits behind the owner's admin unlock, which QA does not use. It is covered by `belowFloor` / `checkedCatalog` tests, and it is an owner device check below.
+
+### Saved state and older builds
+
+| Field | Shape | If an older build strips it |
+|---|---|---|
+| `ut.content.preview.wk` | ISO week | the preview reads the current week until the next one is made (its Standout slot could change once at a Monday); harmless |
+
+- No storage key, card or copy id, claim id or receipt changed.
+- Market `bought[]` is day-scoped. On release day it points at the new day's items, so an item bought before the update marks the same index bought.
+- Lightning and live limit keys keep their formats. Flash keys are new (`flash:…`) and expire with the 40-counter prune.
+- Pending Club Collection packs keep their frozen recipe.
+- Old previews keep their `until`, so an old one-hour skip finishes as before.
+
+### Protocol
+
+None. Prices, limits, odds, boosts and SBC requirements don't touch matches, and `CONTENT_PRINT` / `pool.print` are unchanged.
+
+### Touched outside my lane (packs-3)
+
+- `src/ut/UltimateTeam.tsx` (ut), 40 added and 12 removed lines:
+  - `buyFlash` (24 lines) and `onFlash={buyFlash}` on `<Store>`;
+  - imports of `swapSize`, `LIMITS`, `flashDeal` / `flashLeft` / `recordFlash`;
+  - `swap()` uses `swapSize(at, SPORT)`, and its toast says "once a day";
+  - the preview start, buy and skip pass `week`, and the skip toast says "24 hours";
+  - the limit toast reads `LIMITS[kind].per` (a Dynasty resets next week).
+- `src/ut/content-ui.css` is not edited: the market tag size is overridden from the new packs-owned `src/ut/store.css`.
+
+### Owner device checks (packs-3)
+
+- The flash sale block and its struck prices read well at phone size.
+- The BOOSTED line on a program tile.
+- The admin Store Packs editor's "Minimum N coins" line, and the refusal below it: set NFL Captains to 1,000 and REVIEW stays disabled.
+- The new prices feel fair: Program Guarantee 7,300 (NBA) and 4,400 (NFL), Jumbo 4,200 (NBA).
+
+### Left for later tasks (packs-3)
+
+- **The Program Guarantee returns 0.23–0.32, under the plan's 0.25 for a few packs.** 2.2 × the program pack and a 0.25 floor can't both hold with its 5 golds 82+ and one program card. The test holds it to 0.2. packs-6 (the ladder: Program rung 6,600–10,000) decides whether its contents grow.
+- The "scout-market 24 cards" offers (s5 Market Frenzy, s8 Midnight Market) are ignored. A 24-card market is new behaviour for a later task, and `flashOfferIssues` lists them.
+- The sale's `gift` packs (Black Friday's Gold, Christmas's Premium) are not paid. That is a free reward with its own claim, which belongs with packs-7's launch moment.
+- packs-4 replaces the odds sheet with the computed one (it already shows the boosted row).
 
 ## Requests (answers are recorded here as they arrive)
 

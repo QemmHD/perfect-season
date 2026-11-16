@@ -1,5 +1,5 @@
 // Claude, 2026-11-01 (wave 2): the Preview Pack in the Store: see the Premium Gold pack's exact
-// cards, then buy them or skip (the next preview arrives after a cooldown).
+// cards, then buy them or skip (the next preview arrives 24 hours later; packs-3).
 import React from 'react';
 import { Coin } from '../ui/icons';
 import { UtCard } from './CardArt';
@@ -25,13 +25,13 @@ export function PreviewPack(props: { pool: Pool; ut: UtState; week: string; coin
       </span>
       {!started ? (
         <>
-          <p>A Premium Gold pack you can look inside first. Buy it and the next preview is ready at once; skip it and the next one comes after an hour.</p>
+          <p>A Premium Gold pack you can look inside first. Buy it or skip it: either way the next preview comes 24 hours later.</p>
           <button className="btn primary" onClick={props.onStart}>
             PREVIEW A PACK
           </button>
         </>
       ) : !st.ready ? (
-        <p className="ut-preview-wait">Next preview in {st.minutesLeft >= 60 ? Math.floor(st.minutesLeft / 60) + 'h ' + (st.minutesLeft % 60) + 'm' : st.minutesLeft + 'm'}.</p>
+        <p className="ut-preview-wait">Next preview in {st.minutesLeft >= 60 ? Math.floor(st.minutesLeft / 60) + ' h' + (st.minutesLeft % 60 ? ' ' + (st.minutesLeft % 60) + ' min' : '') : st.minutesLeft + ' min'}. One preview a day.</p>
       ) : (
         <>
           <div className="ut-preview-cards">

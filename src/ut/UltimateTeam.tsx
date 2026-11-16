@@ -138,6 +138,7 @@ import {
   dailyStatus,
   keepPick,
   pickFor,
+  LIMITS,
   recordBuy,
   type LimitedKind,
 } from './content-packs';
@@ -157,7 +158,7 @@ import {
   startDraft,
   tokenReady,
 } from './draft-mode';
-import { buyMarket, SWAP_SIZE, swapCandidates, swapForPick } from './market';
+import { buyMarket, swapCandidates, swapForPick, swapSize } from './market';
 import { packTags, type HelperTag } from './pack-helper';
 import { FEATURED_STANDOUT } from './packs';
 import { claimSet } from './sets';
@@ -196,7 +197,7 @@ import {
 } from './live-packs';
 import { programReward } from './live-cards';
 import { recordPull, sourceOfPending } from './pull-log';
-import { usePackActions } from './pack-actions';
+import { flashDeal, flashLeft, recordFlash, usePackActions } from './pack-actions';
 import { PullTracker } from './PullTracker';
 import type { PickState } from './content-state';
 // Claude (UI reorganisation): last, so the shell and shared pieces win over older rules
@@ -625,9 +626,7 @@ export default function UltimateTeam(props: {
         kind === 'lightning'
           ? 'The Lightning window is closed. It opens on weekend afternoons and evenings.'
           : 'You’ve reached this pack’s limit. It resets ' +
-              (kind === 'standout' || kind === 'scout'
-                ? 'next week.'
-                : 'tomorrow.'),
+              (LIMITS[kind].per === 'week' ? 'next week.' : 'tomorrow.'),
       );
       return;
     }
@@ -751,14 +750,16 @@ export default function UltimateTeam(props: {
   const swap = () => {
     if (!pool) return;
     const locked = lockedSet(ut);
-    const uids = swapCandidates(stored.filter((c) => !locked.has(c.uid)))
-      .slice(0, SWAP_SIZE)
-      .map((c) => c.uid);
     const at = Date.now();
+    const uids = swapCandidates(stored.filter((c) => !locked.has(c.uid)))
+      .slice(0, swapSize(at, SPORT))
+      .map((c) => c.uid);
     const id = newId();
     if (!swapForPick(ut, pool, uids, id, day, at))
       return onToast(
-        'The Swap Desk takes five duplicate golds from storage, three times a day.',
+        'The Swap Desk takes ' +
+          swapSize(at, SPORT) +
+          ' duplicate golds from storage, once a day.',
       );
     update((p) => {
       const r = swapForPick(p.ut, pool, uids, id, day, at);
@@ -846,7 +847,9 @@ export default function UltimateTeam(props: {
   };
 
   const startPreview = () =>
-    setUt((u) => withPreviewSeed(u, newId().replace(/-/g, '').slice(0, 12)));
+    setUt((u) =>
+      withPreviewSeed(u, newId().replace(/-/g, '').slice(0, 12), week),
+    );
   const buyPreview = () => {
     if (!pool) return;
     const id = previewId(ut);
@@ -870,7 +873,7 @@ export default function UltimateTeam(props: {
       (p) => ({
         ...p,
         coins: p.coins - price,
-        ut: nextPreview(p.ut, true, at),
+        ut: nextPreview(p.ut, true, at, week),
       }),
       false,
       (p) => p.coins >= price && previewId(p.ut) === id,
@@ -880,8 +883,8 @@ export default function UltimateTeam(props: {
   };
   const skipPreview = () => {
     const at = Date.now();
-    setUt((u) => nextPreview(u, false, at));
-    onToast('Skipped. Your next preview is ready in an hour.');
+    setUt((u) => nextPreview(u, false, at, week));
+    onToast('Skipped. Your next preview is ready in 24 hours.');
   };
 
   const submitStreamCards = (id: string, uids: string[]) => {
@@ -971,6 +974,30 @@ export default function UltimateTeam(props: {
       undefined,
       { price: def.price, source: 'store' },
     );
+  };
+
+  // Claude (packs-3): a named flash sale's deal (pack-actions.ts), 1 per player per sale day
+  const buyFlash = (key: string) => {
+    if (!pool) return;
+    const at = Date.now();
+    const d = flashDeal(SPORT, key, at);
+    if (!d) return onToast('This flash sale has ended.');
+    if (!flashLeft(ut, key)) return onToast('One of each per player in this sale.');
+    if (d.kind === 'scout' && picksFull(ut)) return onToast(PICKS_FULL);
+    if (profile.coins < d.price) {
+      sfx.nope();
+      return onToast('Not enough coins yet: ' + (d.price - profile.coins).toLocaleString('en-US') + ' more.');
+    }
+    const ok = (p: typeof profile) => p.coins >= d.price && flashLeft(p.ut, key);
+    const pay = (p: typeof profile) => ({ ...p, coins: p.coins - d.price, ut: recordFlash(p.ut, key) });
+    sfx.coin();
+    if (d.kind === 'scout') {
+      const id = 'scout:' + newId();
+      const pick = pickFor(pool, 'scout', id, week, at);
+      update((p) => (ok(p) && !picksFull(p.ut) ? { ...pay(p), ut: addPick(pay(p).ut, pick) } : p));
+      return setPickOpen(id);
+    }
+    openNow(d.kind, newId(), d.name, pay, false, ok, undefined, { price: d.price, source: 'store' });
   };
 
   const claimObjectivePick = () => {
@@ -1816,6 +1843,7 @@ export default function UltimateTeam(props: {
           onStandouts={() => go('standouts')}
           onTracker={() => go('tracker')}
           onLive={buyLive}
+          onFlash={buyFlash}
           preview={
             <PreviewPack
               pool={pool}

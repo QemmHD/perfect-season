@@ -1,0 +1,78 @@
+/* Claude (packs-3): the Store's flash sale block, the program BOOSTED line and the Scout Market tags.
+   Tokens follow Game Design V2 C.3 with the existing palette as fallbacks. */
+.ut-flash {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--gold, #f6b93b) 60%, transparent);
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--gold, #f6b93b) 22%, transparent), transparent 60%),
+    linear-gradient(160deg, #1f1606 0%, var(--panel, #10161f) 72%);
+  box-shadow:
+    inset 0 1px 0 #ffffff14,
+    0 10px 26px #00000055,
+    0 0 22px color-mix(in srgb, var(--gold, #f6b93b) 18%, transparent);
+  flex-shrink: 0;
+}
+.ut-flash-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ut-flash-head .eyebrow {
+  color: var(--gold, #f6b93b);
+}
+.ut-flash-head b {
+  font-size: 22px;
+  line-height: 1.1;
+}
+.ut-flash-head small {
+  font-size: 11.5px;
+  color: var(--sub);
+}
+.ut-flash-item {
+  background: linear-gradient(180deg, #ffffff0a, #00000022), var(--panel, #10161f);
+  border-color: color-mix(in srgb, var(--gold, #f6b93b) 40%, transparent);
+}
+.ut-flash-item s {
+  color: var(--sub);
+  text-decoration-thickness: 1.5px;
+}
+.ut-flash-off {
+  color: #1a1100;
+  background: var(--gold, #f6b93b);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font: 900 11px/1.3 var(--body);
+}
+.ut-flash-item .btn.ut-buy {
+  min-height: 44px;
+}
+.ut-boost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px !important;
+  font-weight: 700;
+  color: #ffe58c !important;
+}
+.ut-boost b {
+  font: 900 10px/1 var(--body);
+  letter-spacing: 0.8px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: #1a1100;
+  background: linear-gradient(180deg, #ffe58c, var(--gold, #f6b93b));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--gold, #f6b93b) 45%, transparent);
+}
+/* the Scout Market's kind tags read at 10 design px (they were 7.5) */
+.ut-market .ut-market-tag {
+  font-size: 10px;
+  padding: 3px 6px;
+}
+.ut-market .ut-market-tag.t-high {
+  color: #1a1100;
+  background: linear-gradient(180deg, #ffe58c, var(--gold, #f6b93b));
+}

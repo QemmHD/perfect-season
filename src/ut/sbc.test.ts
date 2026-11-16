@@ -2,7 +2,7 @@
 import { SPORT } from '../engine/sport';
 import { fakeCard } from './fake.test-util';
 import { getPool, type Pool } from './pool';
-import { autoFill, checkReq, checkSbc, type Req, rewardCard, rewardText, type Sbc, sbcsFor, teamNeed, weekOf } from './sbc';
+import { autoFill, checkReq, checkSbc, type Req, rewardCard, rewardText, type Sbc, sbcsFor, sbcValue, teamNeed, UPGRADE_TUNE, weekOf } from './sbc';
 
 const bulls96 = (n: number, ovr = 80) => Array.from({ length: n }, (_, i) => fakeCard({ pos: ['PG', 'SG', 'SF', 'PF', 'C'][i % 5], ovr, fr: 'CHI', season: 1996 }));
 
@@ -95,17 +95,19 @@ describe('the day’s challenges (' + SPORT + ')', () => {
     expect(sbcsFor(pool, '2026-10-28', { [first.id]: 1, [second.id]: 1 }).filter((s) => s.kind === 'upgrade')[0].left).toBe(2);
   });
 
-  it('a repeatable takes eight golds for a better gold, as often as you like', () => {
+  it('a repeatable takes golds for a better gold, as often as you like', () => {
     const day = '2026-10-27';
     const gh = (done: Record<string, number>) => sbcsFor(pool, day, done).find((s) => s.title === 'Golden Hour')!;
     let s = gh({});
-    expect(s.size).toBe(8);
-    expect(s.reqs).toContainEqual({ k: 'tier', tier: 'gold', n: 8 });
+    // Claude (packs-3, research §8.8): sized so the reward is worth what goes in (exploits suite), not eight 80s
+    expect(s.size).toBe(UPGRADE_TUNE[SPORT].golden.size);
+    expect(s.reqs).toContainEqual({ k: 'tier', tier: 'gold', n: s.size });
     // the better the card it pays, the more it asks
     const ep = sbcsFor(pool, day).find((x) => x.title === 'Elite Pull')!;
-    const team = (x: typeof s) => (x.reqs.find((r) => r.k === 'teamOvr') as { ovr: number }).ovr;
+    const floor = (x: typeof s) => Math.max(...x.reqs.map((r) => (r.k === 'teamOvr' || r.k === 'minOvr' ? r.ovr : 0)));
     expect(ep.reward.card!.minOvr!).toBeGreaterThan(s.reward.card!.minOvr!);
-    expect(team(ep)).toBeGreaterThan(team(s));
+    expect(floor(ep)).toBeGreaterThanOrEqual(floor(s));
+    expect(sbcValue(ep, SPORT)!.input).toBeGreaterThan(sbcValue(s, SPORT)!.input);
     expect(s.left).toBeUndefined();
     const done: Record<string, number> = {};
     const ids = new Set<string>();

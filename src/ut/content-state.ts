@@ -63,8 +63,10 @@ export interface ContentState {
   streams?: Record<string, number>;
   /** wave 2: the login calendar (daily-hub.ts): days claimed so far in the cycle and the last day */
   calendar?: { day: string; n: number };
-  /** wave 2: the Preview Pack (preview-pack.ts): a per-player seed, the preview number, a cooldown */
-  preview?: { seed: string; n: number; until?: number };
+  /** wave 2: the Preview Pack (preview-pack.ts): a per-player seed, the preview number, a cooldown;
+   * Claude (packs-3): `wk`, the week the preview was made in (optional: an older build drops it, and the
+   * preview then reads the current week until the next one is made; harmless) */
+  preview?: { seed: string; n: number; until?: number; wk?: string };
   /** Claude: the Pack Tracker (pull-log-state.ts, docs/PULL-TRACKER.md): recent packs and per-type totals */
   pulls?: PullLog;
   /** Claude (packs-1): Scout Stamps earned (packs, grants) and spent (scout-stamps.ts). Never read alone:
@@ -143,7 +145,7 @@ export function normalizeContent(raw: unknown): ContentState | undefined {
   if (rec(raw.streams)) out.streams = Object.fromEntries(Object.entries(raw.streams).filter(([, v]) => typeof v === 'number').map(([k, v]) => [k, int(v, 0, 1e9)]));
   if (rec(raw.calendar) && str(raw.calendar.day)) out.calendar = { day: raw.calendar.day, n: int(raw.calendar.n, 0, 1e6) };
   if (rec(raw.preview) && str(raw.preview.seed))
-    out.preview = { seed: raw.preview.seed, n: int(raw.preview.n, 0, 1e9), ...(typeof raw.preview.until === 'number' ? { until: int(raw.preview.until, 0, Number.MAX_SAFE_INTEGER) } : {}) };
+    out.preview = { seed: raw.preview.seed, n: int(raw.preview.n, 0, 1e9), ...(typeof raw.preview.until === 'number' ? { until: int(raw.preview.until, 0, Number.MAX_SAFE_INTEGER) } : {}), ...(typeof raw.preview.wk === 'string' && /^\d{4}-W\d{2}$/.test(raw.preview.wk) ? { wk: raw.preview.wk } : {}) };
   if (rec(raw.pulls)) {
     const pulls = normalizePulls(raw.pulls);
     if (pulls) out.pulls = pulls;
