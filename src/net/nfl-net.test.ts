@@ -30,7 +30,7 @@ describe.skipIf(!NFL)('football boards', () => {
     expect(boardTag('classic', 'all', day)).toContain('perfect-season/nfl/v1');
     expect(boardTag('h2h', 'week', day)).toContain('/nfl/');
     expect(NET_V).toContain(DATA_V);
-    expect(NET_V).toMatch(/-10$/); // Claude gameplay ratings pass (2026-11-01): abilities, moves, run game
+    expect(NET_V).toMatch(/-11$/); // Wave 1 (2026-11-16): carrier momentum, pocket movement (DRAFT_RULES 11)
     // basketball's fingerprint, which football must never match
     expect(DATA_V).not.toBe('1gypzor');
   });

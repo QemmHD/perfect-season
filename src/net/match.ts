@@ -18,7 +18,11 @@ import { type Event, KIND_APP, KIND_HANDSHAKE, KIND_MATCH, KIND_PRESENCE, KIND_Q
 // Soccer (Claude 2026-11-01): its own queue from 1, apart from the other two by name and data.
 // Soccer 2 (Claude 2026-11-02): drag-to-aim with aim assist, continuous shot timing, keeper and free
 // passing changes (the agreed shootout and both sides' attacks come out differently).
-const DRAFT_RULES = pick({ nba: 10, nfl: 10, soccer: 2 });
+// Wave 1 (Claude 2026-11-16, studio overhaul): NBA 11 (the V2 controls: pump fake, euro-step, lob, ISO,
+// gather from the touch, sprint ring), NFL 11 (carrier keeps his momentum, pocket movement, throwaway,
+// slide/dive, scramble), soccer 3 (dead shots play on, parries wide, earned corners, goal kicks, quick
+// throw-ins, and a forfeit decides the match): old and new clients never meet.
+const DRAFT_RULES = pick({ nba: 11, nfl: 11, soccer: 3 });
 /** Same player data, scoring and draft rules: required for both phones to score a match the same way. */
 export const NET_V = pick({ nba: 'ps1-', nfl: 'ps1-', soccer: 'ps1-soccer-' }) + DATA_V + '-' + DRAFT_RULES + NS_SUFFIX;
 /** Everyone with the app open, whichever sport: the online count is the whole app's. */
