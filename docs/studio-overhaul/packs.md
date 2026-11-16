@@ -537,7 +537,7 @@ Run with NBA at 393×852 (insets 59/34) and at 320×568. Shots are in `O/shots/p
 
 ### Touched outside my lane (review fixes)
 
-- `src/ut/UltimateTeam.tsx` (ut), 13 lines:
+- `src/ut/UltimateTeam.tsx` (ut), 15 added and 2 changed lines:
   - the SBC reward pack's id (`'sbc:' + s.id + ':' + newId()`);
   - the `picksFull` / `PICKS_FULL` import;
   - the Scout's Choice purchase guard (handler and update);
