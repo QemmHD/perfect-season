@@ -9,7 +9,8 @@ Worktree `/home/user/ps-s-ut`, branch `claude/studio-ut` (cut from live main `ac
 | Task | State | Commits |
 |---|---|---|
 | ut-0 foundation: QA harness, compat, kit with V2 tokens, labels, haptics | done | `6aad8dd` compat, `4c78ad1` harness and fixtures, `e71b88e` haptics, `b1ee784` kit and labels, `92e85c9` kit case in design px, then the dead-tap rule and this doc |
-| ut-1 … ut-9 | not started | |
+| ut-1 progress core and the light next-best-action engine | done | see the ut-1 section |
+| ut-2 … ut-9 | not started | |
 
 ## Protocol
 
@@ -18,10 +19,12 @@ Worktree `/home/user/ps-s-ut`, branch `claude/studio-ut` (cut from live main `ac
 ## Touched outside my lane
 
 - `src/ut/Match.tsx` (shared): the screen title and the VS / result eyebrows read their mode names from `labels.ts` (same words). String constants only; no logic, no `UT_RULES` line.
+- ut-1: nothing outside the lane. (`src/ut/packs-claimables.ts` is a new ut file whose body packs fills at merge; see "Merge stand-ins".)
 
 ## Merge stand-ins (for the lead)
 
-None yet. (ut-0 consumes nothing from another team.)
+- `src/ut/packs-claimables.ts` (ut-1): returns zero. Packs owns the body: their new claims (calendar check-in and path claims, stamp redemption ready, Program Bag keys), with the same rows added to `inbox.ts` `inboxItems`, and no imports from pool/packs/cards/sbc/rate/squad (`claimables-graph.test.ts`).
+- `claimables.ts` copies of packs-owned checks (Daily Drop `dailyStatus`, `previousDay`, `STREAK_DAYS`; login calendar `calendarStatus`; New Era; Standouts objective): if packs changes the originals, `claimables-reimpl.test.ts` names the copy to update (integration checklist item 5).
 
 ---
 
@@ -93,6 +96,61 @@ All browser numbers: `scripts/qa/ut-studio.mjs` against the dev server on port 5
 ### Owner device checks (ut-0)
 
 - Haptics: a tick on CLAIM, the long pattern on a pack claim, and nothing late on an unrelated tap (iOS plays one tick for any pattern).
+
+---
+
+## ut-1 · Progress core and the light next-best-action engine
+
+### What changed
+
+**Objectives move** `src/ut/objectives.ts` (new, light: imports only `engine/sport`, `hq-state` and types). `Reward`, `Prize`, `Objective`, `DAILY`, `WEEKLY`, `LIFETIME` (the lifetime table, now named), `objectiveDeck`, `hqOf`, `seasonFor`, `seasonReward`, `seasonReady`, `SEASON_TIERS`, `SEASON_STEP`, `readyRewards`, `rewardLabel`, `DEVELOPMENT_PATHS`, `developmentReady` moved unchanged; `progression.ts` and `club-management.ts` re-export them, so every import compiles as before. `weekKey` is a local copy of the ISO-week algorithm (equal to `sbc.ts weekOf` and the boards' `weekKey` for 800 days across two year boundaries), so `progression.ts` no longer reaches `sbc.ts` and the card pool. One internal change: `objectiveDeck` looks receipts up in a `Set` instead of `claims.includes` per objective (same answers; a club with thousands of receipts was the slowest part of the count). Also `clubStatsOf(ut, uid)` → `{ games, wins, since? }` for players' card back.
+
+**Pool-free claimables** `src/ut/claimables.ts`: `utClaimables(ut, day, week, sport, now)` → `{ count, ids, lines, packs, picks, dropReady, dropDay, calendarReady, streak, streakAtRisk, hoursLeft, approx }`. It counts the Rewards inbox's claimable rows by the inbox's own rules. Checks whose originals live next to the pool are local copies (Daily Drop status, login calendar, New Era, Standouts objective, the Cup title, Season Pass tiers), each pinned to its original. The three pool-dependent rows (Sets, Collection milestones, Moments) come from the new optional cache `hq.poolClaimables = { sig, n }`, which `UltimateTeam.tsx` rewrites whenever it computes the inbox (only when it changes, and never over a newer state). `sig` is an order-independent hash of owned and discovered editions plus set/collection receipts and Moments progress (≤ 80 chars). When it does not match (cards gained outside UT, an old client stripped it) the count is the light one with `approx: true`, and the next UT open makes it exact. `streakAtRisk` = Daily Drop waiting, a streak of 2+ days running and ≤ 4 h to Eastern midnight. `inbox.ts` gains `poolRowCount(items)`.
+
+**Packs seam** `src/ut/packs-claimables.ts`: `packsClaimables(ut, day, sport) → { n, ids, lines }`, zero on this branch (merge stand-in above).
+
+**Seen state** `src/ut/seen.ts`: `isUnseen`, `markSeen`, `showDot` (a dot only for something unseen *and* actionable) over the new optional `hq.seen` (≤ 64 keys, key and token ≤ 80 chars, oldest key dropped). Keys reserved: `store:wave`, `live:<id>`, `objectives:week`, `pass:season` (consumers arrive with the hub in ut-4).
+
+**Stamps** `src/ut/stamps.ts`: `ensureStudio(ut, day)` writes `studio:since:<ET day>` and `pid:<12 base36>` (from `crypto.getRandomValues`) into `hq.claims` once; `studioSince` (the earliest, if two phones race) and `playerKey`. `UltimateTeam.tsx` calls it on the first UT open of this build.
+
+**GO targets** `src/ut/go.ts`: `GoTarget = { view, label, odds? }`; `goForCounter` (games/wins/points → Squad Battles PLAY; online wins → Rivals; packs → OPEN your packs, else the Store with odds; SBCs → SBC; Moments → Moments, in soccer a match instead; development → TRAIN; collect → the cards route); `goForObjective` (null once complete or claimed); `goForCards` with **the ethics rule** (SBC, then Scout Market, then a pick, the Store last and flagged `odds`); `openUtAt(view, open)` for the main app.
+
+**GO chips on Objectives and Daily** (`Clubhouse.tsx` ObjectivesView, `DailyHubView.tsx`, new `GoLink.tsx` + `progress-go.css`): every unfinished objective's dead "IN PROGRESS" chip is now the kit's `GoChip` leading where it moves; a Store route says "ODDS SHOWN" under the chip. Daily's unfinished rows get the same chip next to their count, and the all-three bonus leads to the first objective still open. Objectives opens on the first group that holds a ready reward, and "1 REWARD READY" is singular.
+
+**Next best action** `src/ut/next-action.ts` (contract W6): `nextCtxOf(ut, sport, now, extras)` builds a plain `NextCtx` from one sport's save; `nextUp(ctx)` returns `{ id, line, cta, target, stake?, amber?, done? }`. Priority (V2 D.5): 1 unclaimed rewards (this sport, then another sport's stored count via `extras.elsewhere`, the starter pack, Minutes rungs via `extras.minutes`), with the Daily Drop claim drawn **amber** when its streak is at risk; 2 the most recently played unfinished run (Cup, Circuit with "1 win to Finalist", Club Season, UT Draft); 3 a play streak at risk (`extras.streak`, ut-7); 4 something ending within 24 h (Sunday: a weekly objective ≤ 2 games/wins short, a Rivals division ≤ 2 wins short); 5 a milestone 1–2 steps away (Rivals' next division reward; Minutes, league and Career Road arrive through `extras.milestones`); 6 Daily Play (`extras.dailyPlay`, B1); 7 the last of today's three objectives; 8 Season Pass within 30% of the next pack level; 9 a program wave (`extras.wave`, packs); 10 unopened packs or picks; 11 the best next match in the recent mode (Squad Battles rung with its pack stake, Rivals, Legends Events); 12 **Done for today** (dailies done, the 8 paid games played, or Minutes capped) with KEEP PLAYING. With `extras.after` it is the One-More bar (V2 D.10): a third straight loss → a lower rung, an easier difficulty or a 60 s Moments drill (never in soccer); a loss by one score (NBA 3 points, NFL 8, soccer 1 goal) → REMATCH; a FLAWLESS Squad Battles win → the harder rung; a run that continues → its next game; otherwise the next rung. After the day's goals the bar keeps the match one tap away but turns calm (`done`, KEEP PLAYING). Constants mirrored from heavy modules (paid-game cap, rungs and rung packs, Circuit steps) are pinned to their originals.
+
+**Near-miss chips** `src/ut/near-miss.ts`: `nearMisses(ut, sport, now, { sets? })` → at most three chips at 1–2 true steps, closest first, each with a `GoTarget`: "1 win to Finalist", "2 wins to Pro", "1 game to today's bonus", "120 SP to level 7", "1 win to Gold Pack", and sets one card away when the pool-holding caller passes them. Nothing is shown unless the reward is genuinely reachable (a Circuit prize the games left cannot reach gets no chip).
+
+`rivals.ts` names its win reward `RIVALS_WIN_RP = 30` (same value).
+
+**Not done here (plan rev. 2 extras):** the reserved `program` / `stamps` views in `nav.ts` were not added: packs owns those screens, and adding views nobody renders would be dead routes. Packs adds them with their screens.
+
+### Numbers
+
+- **Dead "IN PROGRESS" chips** (`scripts/qa/ut-go-chips.mjs`, isolated phone, touch, fixtures `audit` and `near-miss`): **before 32** at 393×852 on Objectives (near-miss: DAILY 1, WEEKLY 3, LIFETIME 6–7 per sport; Daily's unfinished rows had no control at all) → **after 0** in 3 sports × 393×852 and 320×568 × 2 fixtures, with **176 GO chips** drawn; **88 / 88** GO taps (one fresh phone each, 393×852) opened their screen (Squad Battles, Challenges, Store, Moments, Development, Rivals; soccer's Moments objective opens Squad Battles); 0 page errors; sockets 438 local, **0 non-local**. Screenshots: `O/shots/ut/ut-1/` (before in `before/`).
+- **Claimables = inbox count:** 35–36 QA fixtures per sport (all of them), NBA, NFL and soccer: **100%** with a valid cache, and each also equals the inbox the app recorded when it built the fixture. Cold start: `approx` and the light count, then exact after one UT open; a gift outside UT invalidates the cache.
+- **Speed** (3,000 owned, 5,000 hq receipts, 5,000 content receipts, 120 banked days): vite-node, mean of 100 — `utClaimables` **0.89 ms**, `nextCtxOf + nextUp` **0.85 ms** (`poolSig` 0.26 ms). Inside vitest (median of 41, parallel workers): 0.99–1.66 ms and 1.27–1.79 ms across the three sport runs. Before the `Set` lookup in `objectiveDeck` the count took 18 ms.
+- **Import graph:** from `claimables`, `go`, `stamps`, `next-action`, `near-miss`, `packs-claimables`, `objectives`, `seen` (and now `progression`) no path reaches pool, packs, cards, sbc, rate, squad, content-packs, daily-hub, moments or inbox.
+- **Round trip** (`scripts/compat/old-client.ts`): the three `acdf3e2` saves lose nothing; a stamped save (studio stamps, cache, seen) loses nothing, keeps both stamps, and the old client drops only `ut.hq.poolClaimables` and `ut.hq.seen` (caches, rebuilt on the next UT open).
+
+### Tests
+
+- `objectives.test.ts` (10): deck, claim ids, targets, progress, reward amounts and ready counts for six clubs, plus the Season Pass track and calendar, against a snapshot written by the **pre-move** code; re-exports are the same functions; `weekKey` over 800 days; `clubStatsOf`.
+- `claimables.test.ts` (≈ 40 per sport): every QA fixture equals the inbox; cold start; stale cache; idempotent cache write; the streak window at 19:59 vs 20:01 ET.
+- `claimables-reimpl.test.ts` (≈ 37 per sport): every copy equals its original over every fixture and a 60-day calendar; next-action's mirrored constants equal play.ts, battles.ts and circuit.ts.
+- `claimables-graph.test.ts` (9): the static import walk (type-only imports skipped), with a sanity check that it sees the heavy path.
+- `progress-core.test.ts` (13): seen state, stamps (once, earliest, survives reload, ignored by objectives), GO targets exist and are shown in this sport, packs/odds, the ethics order, additive hq fields (old saves gain no keys; malformed cache dropped).
+- `next-action.test.ts` (27): one case per priority level 1–12 (several for 1), recency tie-break, each `after` rule (rematch by each sport's score, lower rung, easier difficulty, drill / none in soccer, FLAWLESS, run continues, next rung, calm Done), never Done while anything is claimable (400 fuzzed clubs), near-miss chips (three, sorted, deterministic, none out of reach), speed.
+- `soccer-claimables.test.ts` runs claimables, reimpl, next-action and progress-core under soccer's run.
+- **Results:** NBA 15 files / 212 tests (with inbox-completeness, overhaul, polish, play-status, labels, kit, studio-compat, rivals, sport-branches) green; NFL the same 212 green; soccer `vitest run soccer sport-branches` 11 files / 201 green. `npm run typecheck` clean. Existing tests unedited.
+
+### Protocol
+
+None. Nothing here touches match physics, ratings, pairing or settlement; the objectives move changes no id, target or reward.
+
+### Owner device checks (ut-1)
+
+- GO chips on Objectives and Daily under the thumb at 375 and 320 widths; the "ODDS SHOWN" line reads at arm's length.
 
 ---
 

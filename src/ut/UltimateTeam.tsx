@@ -170,7 +170,9 @@ import { cancelEvo, claimEvo, playId, startEvo } from './evolutions';
 import { EvolutionsView } from './EvolutionsView';
 import { calendarStatus, claimCalendar, claimDailyBonus } from './daily-hub';
 import { DailyHubView } from './DailyHubView';
-import { claimAll, inboxItems } from './inbox';
+import { claimAll, inboxItems, poolRowCount } from './inbox';
+import { poolSig, writePoolCache } from './claimables';
+import { ensureStudio, playerKey, studioSince } from './stamps';
 import { InboxView } from './InboxView';
 import {
   nextPreview,
@@ -907,6 +909,26 @@ export default function UltimateTeam(props: {
     [pool, profile, day, week],
   );
   const inboxReady = inbox.filter((i) => i.claimable).length;
+  // Claude 2026-11-16 (studio overhaul, ut-1): keep the light claimables count exact outside UT. The
+  // pool-dependent rows (Sets, Collection, Moments) are cached with the signature of what they read
+  // (claimables.ts); written only when it changes, and never over a newer state.
+  useEffect(() => {
+    if (!pool) return;
+    const sig = poolSig(ut, SPORT),
+      n = poolRowCount(inbox),
+      c = ut.hq?.poolClaimables;
+    if (c && c.sig === sig && c.n === n) return;
+    update((p) =>
+      poolSig(p.ut, SPORT) === sig
+        ? { ...p, ut: writePoolCache(p.ut, sig, n) }
+        : p,
+    );
+  }, [pool, inbox]);
+  // ...and stamp the save once with the day it first ran this build (stamps.ts)
+  useEffect(() => {
+    if (studioSince(ut) && playerKey(ut)) return;
+    update((p) => ({ ...p, ut: ensureStudio(p.ut, easternDateKey()) }));
+  }, []);
   const claimEverything = () => {
     if (!pool) return;
     const at = Date.now();
@@ -1375,6 +1397,8 @@ export default function UltimateTeam(props: {
       <ObjectivesView
         ut={ut}
         day={day}
+        sport={SPORT}
+        onGo={go}
         onClaim={(id) => {
           const at = Date.now();
           claimPrize((u) => claimObjective(u, id, day, at));
@@ -1560,6 +1584,7 @@ export default function UltimateTeam(props: {
         ut={ut}
         day={day}
         sport={SPORT}
+        onGo={go}
         onDrop={claimDailyDrop}
         onCalendar={claimCalendarDay}
         onObjective={(id) => {

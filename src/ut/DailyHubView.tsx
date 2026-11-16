@@ -8,13 +8,18 @@ import { CALENDAR, calendarStatus, DAILY_BONUS, dailyBonusReady, dailyObjectives
 import { rewardLabel } from './progression';
 import type { UtState } from './state';
 import type { UtSport } from './types';
+import { goForObjective } from './go';
+import { GoLink } from './GoLink';
+import type { UtView } from './UltimateTeam';
 
-export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; onDrop: () => void; onCalendar: () => void; onObjective: (id: string) => void; onBonus: () => void }) {
+export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; onDrop: () => void; onCalendar: () => void; onObjective: (id: string) => void; onBonus: () => void; onGo: (view: UtView) => void }) {
   const { ut, day } = props;
   const drop = dailyStatus(ut, day);
   const cal = calendarStatus(ut, day);
   const objectives = dailyObjectives(ut, day);
   const bonusReady = dailyBonusReady(ut, day);
+  // the bonus leads to the first of today's three still to finish (none: claim them above first)
+  const bonusGo = objectives.map((o) => goForObjective(o, props.sport, ut)).find(Boolean) ?? null;
   const bonusDone = !bonusReady && objectives.length > 0 && objectives.every((o) => o.claimed) && !!ut.content?.claims?.includes('daily-bonus:' + day);
   return (
     <div className="page ut-dailyhub">
@@ -60,6 +65,8 @@ export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; 
       <span className="eyebrow">TODAY’S OBJECTIVES</span>
       {objectives.map((o) => {
         const ready = !o.claimed && o.progress >= o.target;
+        // Claude 2026-11-16 (ut-1): an unfinished objective leads where it moves (audit H5)
+        const go = goForObjective(o, props.sport, ut);
         return (
           <div key={o.id} className={'ut-dobj' + (o.claimed ? ' done' : ready ? ' ready' : '')}>
             <span>
@@ -78,9 +85,12 @@ export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; 
                 CLAIM
               </button>
             ) : (
-              <i className="ut-dobj-state num">
-                {o.progress}/{o.target}
-              </i>
+              <span className="ut-dobj-go">
+                <i className="ut-dobj-state num">
+                  {o.progress}/{o.target}
+                </i>
+                {go && <GoLink go={go} what={o.text} onGo={props.onGo} />}
+              </span>
             )}
           </div>
         );
@@ -94,6 +104,8 @@ export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; 
         </span>
         {bonusDone ? (
           <i className="ut-dobj-state">DONE</i>
+        ) : !bonusReady && bonusGo ? (
+          <GoLink go={bonusGo} what="finish today's three objectives" onGo={props.onGo} />
         ) : (
           <button className="btn gold" disabled={!bonusReady} onClick={props.onBonus}>
             CLAIM

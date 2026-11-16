@@ -47,6 +47,8 @@ import {
 } from './circuit';
 import { DEVELOPMENT_PATHS, developmentReady } from './club-management';
 import type { UtSport } from './types';
+import { GoLink } from './GoLink';
+import { goForObjective } from './go';
 export function HQArrow() {
   return (
     <svg
@@ -790,18 +792,20 @@ function periodLabel(group: string, period: string, day: string): string {
 export function ObjectivesView({
   ut,
   day,
+  sport,
   onClaim,
   onClaimAll,
+  onGo,
 }: {
   ut: UtState;
   day: string;
+  sport: UtSport;
   onClaim: (id: string) => void;
   onClaimAll: () => void;
+  /** Claude 2026-11-16 (ut-1): an unfinished objective's GO leads where it is done (go.ts) */
+  onGo: (view: UtView) => void;
 }) {
-  const [group, setGroup] = useState<
-      'daily' | 'weekly' | 'lifetime' | 'banked'
-    >('daily'),
-    all = objectiveDeck(ut, day),
+  const all = objectiveDeck(ut, day),
     ready = all.filter((o) => !o.claimed && o.progress >= o.target),
     banked = all.filter(
       (o) =>
@@ -811,6 +815,15 @@ export function ObjectivesView({
             ? day
             : all.find((x) => x.group === 'weekly')?.period),
     );
+  // open on the first group that holds a ready reward (Daily when none does)
+  const [group, setGroup] = useState<
+    'daily' | 'weekly' | 'lifetime' | 'banked'
+  >(
+    () =>
+      (['daily', 'weekly', 'lifetime'] as const).find((g) =>
+        ready.some((o) => o.group === g && !banked.includes(o)),
+      ) ?? (ready.some((o) => banked.includes(o)) ? 'banked' : 'daily'),
+  );
   const rows =
     group === 'banked'
       ? banked
@@ -822,7 +835,8 @@ export function ObjectivesView({
       </Lede>
       <div className="hq-objective-summary">
         <span>
-          <b className="disp num">{ready.length}</b> REWARDS READY
+          <b className="disp num">{ready.length}</b>{' '}
+          {ready.length === 1 ? 'REWARD READY' : 'REWARDS READY'}
         </span>
         <button
           className="btn primary"
@@ -845,46 +859,57 @@ export function ObjectivesView({
         ))}
       </div>
       <div className="hq-objectives">
-        {rows.map((o) => (
-          <div
-            key={o.id}
-            className={
-              'hq-objective' +
-              (o.claimed ? ' claimed' : o.progress >= o.target ? ' ready' : '')
-            }
-          >
-            <span className="eyebrow">
-              {o.group === 'lifetime'
-                ? 'CLUB MILESTONE'
-                : periodLabel(o.group, o.period, day)}
-            </span>
-            <div className="hq-objective-title">
-              <h3 className="disp">{o.title}</h3>
-              {o.claimed && <IconCheck />}
-            </div>
-            <p>{o.text}</p>
-            <div className="hq-objective-meter">
-              <ProgressBar value={o.progress} max={o.target} label={o.text} />
-              <b className="num">
-                {o.progress} / {o.target}
-              </b>
-            </div>
-            <div className="hq-objective-prize">
-              <small>{rewardLabel(o.reward)}</small>
-              <button
-                className="chip"
-                disabled={o.claimed || o.progress < o.target}
-                onClick={() => onClaim(o.id)}
-              >
-                {o.claimed
-                  ? 'CLAIMED'
+        {rows.map((o) => {
+          const go = goForObjective(o, sport, ut);
+          return (
+            <div
+              key={o.id}
+              className={
+                'hq-objective' +
+                (o.claimed
+                  ? ' claimed'
                   : o.progress >= o.target
-                    ? 'CLAIM REWARD'
-                    : 'IN PROGRESS'}
-              </button>
+                    ? ' ready'
+                    : '')
+              }
+            >
+              <span className="eyebrow">
+                {o.group === 'lifetime'
+                  ? 'CLUB MILESTONE'
+                  : periodLabel(o.group, o.period, day)}
+              </span>
+              <div className="hq-objective-title">
+                <h3 className="disp">{o.title}</h3>
+                {o.claimed && <IconCheck />}
+              </div>
+              <p>{o.text}</p>
+              <div className="hq-objective-meter">
+                <ProgressBar
+                  value={o.progress}
+                  max={o.target}
+                  label={o.text}
+                />
+                <b className="num">
+                  {o.progress} / {o.target}
+                </b>
+              </div>
+              <div className="hq-objective-prize">
+                <small>{rewardLabel(o.reward)}</small>
+                {go ? (
+                  <GoLink go={go} what={o.text} onGo={onGo} />
+                ) : (
+                  <button
+                    className="chip"
+                    disabled={o.claimed}
+                    onClick={() => onClaim(o.id)}
+                  >
+                    {o.claimed ? 'CLAIMED' : 'CLAIM REWARD'}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {!rows.length && (
         <div className="empty">
