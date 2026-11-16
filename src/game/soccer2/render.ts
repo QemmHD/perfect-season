@@ -149,7 +149,7 @@ export class SoccerRenderer {
     // drawn with V2's height spread around the game's mean (render only: the engine keeps b.p.ht)
     // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
     const raw = Math.max(8, this.art.artPxFor(drawnM(b) * s));
-    const px = quantPx(raw);
+    const px = quantPx(raw, this.art.viewPerArt);
     const dirs = px < 22 ? 8 : 16;
     const facing = Math.atan2(-dir.y, dir.x);
     const fb = (Math.round((facing / (Math.PI * 2)) * dirs) + dirs) % dirs;

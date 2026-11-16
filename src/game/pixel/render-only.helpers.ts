@@ -64,7 +64,7 @@ export const SIM_ENTRIES = {
 function drawPass(look: Look, sel: () => { clip?: string; ct?: number; step?: number; pose: unknown }, heightViewPx: number, raster: boolean) {
   const an = sel();
   const a = artScaleFor('A', 3, 1, 3);
-  const px = quantPx(a.artPxFor(heightViewPx));
+  const px = quantPx(a.artPxFor(heightViewPx), a.viewPerArt);
   shoulderWidthPx(look.ht, look.wt, px, look.pads ?? 0);
   if (raster) {
     const pose = an.clip ? mocapJoints(an.clip, frameAt(an.clip, an.ct ?? 0, an.step ?? 2), look, { ground: 'clip' }) : (an.pose as never);
