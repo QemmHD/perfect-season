@@ -11,11 +11,12 @@ Worktree `/home/user/ps-s-ut`, branch `claude/studio-ut` (cut from live main `ac
 | ut-0 foundation: QA harness, compat, kit with V2 tokens, labels, haptics | done | `6aad8dd` compat, `4c78ad1` harness and fixtures, `e71b88e` haptics, `b1ee784` kit and labels, `92e85c9` kit case in design px, then the dead-tap rule and this doc |
 | ut-1 progress core and the light next-best-action engine | done | see the ut-1 section |
 | ut-2 MINUTES engine: ticker, profile ledger and cloud merge, ladders and league maths | done | see the ut-2 section |
-| ut-3 … ut-9 | not started | |
+| ut-3 MINUTES on screen and healthy play: Home and UT Home ring chips, the Minutes screen, Profile panel, settings, break reminder, Done for today | done | see the ut-3 section |
+| ut-4 … ut-9 | not started | |
 
 ## Protocol
 
-**Protocol bump needed: none from team ut** (plan §9). ut-0 changes no match physics, rules, ratings, pairing or settlement: labels are display text, the kit and haptics are presentation, the harness and fixtures are QA-only. ut-2 (MINUTES) reads input and time and writes its own ledger only: no match outcome, rating or queue changes.
+**Protocol bump needed: none from team ut** (plan §9). ut-3 is presentation and settings only (chips, the Minutes screen, the panel, a reminder sheet at stoppages, a board-publish switch). ut-0 changes no match physics, rules, ratings, pairing or settlement: labels are display text, the kit and haptics are presentation, the harness and fixtures are QA-only. ut-2 (MINUTES) reads input and time and writes its own ledger only: no match outcome, rating or queue changes.
 
 ## Touched outside my lane
 
@@ -24,6 +25,11 @@ Worktree `/home/user/ps-s-ut`, branch `claude/studio-ut` (cut from live main `ac
 - ut-2, `src/App.tsx` (shared; the MINUTES host lines are outside ut's App grant, plan W1): one import; `registerPlaytimeSink(update)` and the root `usePlaytime(...)` next to `update`; the `PLAY_CTX` screen map and `playId` (2 lines); one `bankActivity` in the draft `finish`; Reset progress keeps `playtime` (the onReset `setProfile` line). No other App logic changes.
 - ut-2, `src/ut/Match.tsx` (shared, ut's result path): one import, one `usePlaytime` line, one `bankActivity` line at the top of `finish()`. No `UT_RULES` change, nothing that decides a result.
 - ut-2, `src/lib/cloud-save.ts` (V2 grant `src/lib/cloud*`): the other-tab storage listener ignores the ticker's device-only `perfect-season:playtime-*` keys (one condition), so they never queue a cloud save.
+- ut-3, `src/ui/Pages.tsx` (shared): `RanksPage` gains the MINUTES segment (a third `.seg` button, the lazy `MinutesView`, an `update` prop and `showMinutesRanks()`); the Settings sheet gains two rows (Session reminder, Hide me from leaderboards) with a one-line note each, and its `onChange` key type widens to them. The Home chip row and Profile panel are inside ut's Pages grant. `LiveCount` drops its visible "· N in queue" part (Home's Head to Head tile already shows the queue whenever anyone is searching; the chip's label still says both).
+- ut-3, `src/App.tsx` (shared): `<BreakReminder>` mounted next to the toast, and one `useEffect` holding it on the draft `vote`, `gauntlet` and `training` screens; `openMinutes` (RANKS → MINUTES) passed to Home, Profile and Ultimate Team; `update` passed to `RanksPage`; the board flush returns early when `settings.hideBoards` is on (one condition, plus the setting in that effect's deps), and the Results board line says so instead of "Posting…".
+- ut-3, `src/ut/Match.tsx` (shared, ut's vote/result path): one import and one `useEffect` that holds the break reminder during the match handshake (`found`, `vs`, the timed `vote`).
+- ut-3, `.ranks-head` gets `flex-wrap: wrap` (in ut's new `src/ui/playtime-ui.css`, not styles.css): with three segments, "SOCCER RANKS" and "NFL RANKS" push the segments under the title instead of off the frame.
+- ut-3, shell's top bar: the `LV` label over the level ring is 8 px (pre-existing; shell's). The ut-3 harness excludes it from its tiny-text count and names it here.
 
 ## Merge stand-ins (for the lead)
 
@@ -272,6 +278,77 @@ None. MINUTES reads input and time and writes the ledger; nothing in a match's p
 
 ---
 
+## ut-3 · MINUTES on screen and healthy play
+
+### What changed
+
+- **Home ring chip** (`src/ui/playtime-ui.tsx` `HomeMinutesChip`, in Home's stat strip): a 22 px ring toward the next rung with a clock inside, `27/30` while counting, `READY` with a gold dot when a rung waits (any track), `DONE` with a check at 90 once nothing waits. Its label carries the whole line ("Minutes: 27 of 30 minutes today. 75 coins + stamp next. Open Minutes"). It sits on the stat strip's one row, so Home gains no height: the online chip drops its visible "· N in queue" (Head to Head's tile already shows the queue whenever anyone is searching) and the strip's padding and gap shrink a little (5 chips inside the 16 px gutters, even at 100+ online). Tap: RANKS → MINUTES.
+- **UT Home ring** (`Hub.tsx`, `src/ut/hub.css`): the kit's `MinutesRing`, full width under the hero: "27 / 30 min · 75 coins + stamp next", "Silver Pack ready", "Done for today · Great session.". Tap: leaves UT to RANKS → MINUTES (`onMinutes`, passed from App through `UltimateTeam`).
+- **One chip model** (`src/ut/minutes.ts` `minutesChip`, `shortReward`): state, minutes, target and line for both chips. Ready beats everything (a day rung first, then week and career); done only at 90 with nothing waiting; rested days say "Rested ×2: 50 coins next"; a frozen day says "Paused today: the date changed"; a new player starts at 3 of 5.
+- **The Minutes screen** (`src/ui/MinutesView.tsx` + `minutes.css`, lazy: `React.lazy` in Pages, loaded only with the segment): RANKS has a third segment, MINUTES (`showMinutesRanks()` opens it). Under "Active play only · up to 90 a day · resets midnight ET" and an (i) for the explainer:
+  - a glass hero with a 96 px gold ring toward the next rung and one message: "3 minutes to your next reward" + the reward + a teaser ("An hour today earns a Silver Pack", "Your first 3 minutes are on us", "Welcome back: today's first three rewards are doubled"); "N rewards ready" with the kit's CLAIM / CLAIM ALL (haptic `long` when a pack is in it, tick otherwise; burst; coin sound) and a "Claimed: …" line; the calm "Done for today. Great session." with "Matches still pay coins as usual and count for your Career XP. The ladder resets at midnight Eastern."; a frozen day explained;
+  - Today, This week and Career rails: SVG chests (wood for coins, silver, gold, violet premium, teal status), opened with a check when claimed, glowing gold and bobbing when ready, the next rung enlarged with a light pool, the rest locked and desaturated; a gradient fill that meets each chest on time; the headline at the right ("DONE AT 90", "SILVER PACK AT 150", "STARTER · PRO NEXT"). The career rail shows 5 of its 9 rungs from one before the first unclaimed, badge names under status-only rungs;
+  - the league tile: the six tier shields (yours lit), "Leagues start next week", the LEAGUE / THIS WEEK / HALL OF FAME board tabs (each says what it will show; ut-8 fills them), and a note when you are hidden from boards;
+  - the explainer sheet in V2 E.9.6's words, plus the three ladders, the rested bonus and where packs, stamps and picks go.
+  Claims are `claimMinutes` (pure, idempotent): the second tap finds no button, and a stale second call grants nothing.
+- **Profile playtime panel** (`PlaytimePanel`): Today, This week (active and "open" time) and Lifetime cells, "You've had the app open 1 h 12 min today. Only active play counts toward Minutes.", lifetime hours by sport (soccer only where it is on), the badge tier chip (`lifeBadge`: Rookie at 1 h … GOAT at 1,000; "NO BADGE YET" before), and a 44 px "MINUTES: rewards and leagues" row into the screen.
+- **Raw week** (`playtime.ts`, cloud merge): the ledger gains optional `rawWeek` (raw visible seconds per weekday), so the panel can say this week's open time. `credit` fills it, `rollTo` resets it with the week, `mergePlaytime` takes the most of each weekday on the same week (the later week's otherwise). A ledger from before ut-3 has none: the week's open time reads at least the counted week and today's open time, never less.
+- **Settings** (Settings sheet, two rows with a one-line note each): **Session reminder** (`settings.breakReminder`, on unless turned off) and, where boards exist, **Hide me from leaderboards** (`settings.hideBoards`). Hiding is honoured now, not at ut-8: App's board flush returns early while it is on (draft, Daily and head-to-head boards), `publishRivals` sends no Rivals standing, and a finished draft's Results line says "You're hidden from the public boards (Settings)." instead of "Posting…". Entries stay queued on this phone and go out if the player un-hides. Results already posted stay up (the note says so). Reading boards still works. ut-8's new minutes/play boards must go through the same guard.
+- **Break reminder** (`src/ui/BreakReminder.tsx`, mounted once in App): `watchPlaytime` (new, `playtime.ts`) tells it each ticking second how much counted and on which screen. After 3,600 counted seconds it waits for a stoppage (`menu` or `replay`: menus, a UT result, draft Results; never `match`, `sim`, `draft`, `draftSim`, `queue`) and shows one bottom sheet: "Good time for a stretch. Your progress is saved." OK, a tap on the scrim or a swipe dismisses it. The hour starts again after it fires, and after 10 minutes with nothing counted (a real break). Hosts hold it on menu-class screens that are play or have a clock: UT's handshake (`found`, `vs`, the timed `vote`), and App's draft `vote`, Gauntlet and Training Camp (`holdBreak(who, on)`, one name per host). With the setting off nothing shows and the count still resets at each stoppage, so turning it on never fires a backlog.
+- **`playtimeLine()` for the sports' pause sheets**: now adds the seconds counted but not banked yet (`pendingSec()`, the match in progress), so "Today 31 min · next reward at 60" is right mid-match. Signature unchanged (a third optional argument).
+- **Done for today in `nextUp`**: when the day's 90 are in, the calm line is `MINUTES_DONE_LINE` ("Matches still pay coins as usual and count for your Career XP"); other caps keep the old line.
+
+### Numbers
+
+- **Home, no added scroll** (`scripts/qa/ut-studio.mjs minutes`, fixture `minutes-27`, `--edge`, touch; scroll = `.home-scroll` overflow in design px, PLAY = the PLAY button's top y):
+
+| Sport | 393x852 scroll before → after | 375x667 | 320x568 | PLAY top y before → after (393 / 375 / 320) |
+|---|---|---|---|---|
+| NBA | 38 → 38 | 16 → 16 | 21 → 21 | 674 / 564 / 562 → identical |
+| NFL | 38 → 38 | 16 → 16 | 21 → 21 | identical |
+| Soccer | 0 → 0 | 0 → 0 | 0 → 0 | identical |
+
+  (The 38 px at 393 in NBA/NFL is the Training Camp row's, before and after.) The chip row: 5 chips, every one inside x 16–374 in all 27 runs.
+- **Minutes screen** (27 runs: 3 sports × 3 sizes × `minutes-27`, `minutes-week-600`, `minutes-90`; re-run in NFL and soccer after the header wrap, 18/18): 0 targets < 44, 0 text < 10 (shell's 8 px `LV` in the top bar excluded and listed above), 0 contrast failures (solid and over gradients, sampled from the screenshot; text that sits under the tab bar at the scroll edge is not counted, because the sampler reads the bar's pixels), 0 page errors; the next rung (or the ready one, or the done hero) fully visible without scrolling at 320x568 in all three sports; RANKS' segments inside the gutters.
+- **Claims** (`minutes-week-600`: the daily 60 and the weekly 600 waiting): CLAIM ALL → first DOM/style feedback in **3–15 ms** (≤ 17 ms under `--rm`), +50 coins and +2 packs in the claiming sport's club (NBA, NFL and soccer keys checked), the button gone; a second tap on the same spot: +0 coins, +0 packs.
+- **Reduced motion** (`--rm`, 6 runs): `animation-name: none` on the hero ring, the rail fills, the ready chest and Home's ring; they draw at their final values.
+- **Break reminder in the app** (Playwright on its fake clock, NBA 393x852 and soccer 320x568, a thumb on Profile every 5 s): no sheet in the first 59 minutes, the sheet between 59 and 62 minutes with the one line, OK 72x48 design px, one tap closes it; Settings shows Session reminder on and Hide me from leaderboards off by default; 0 page errors, 0 non-local sockets.
+- **Break reminder** (`src/ui/break-reminder.test.ts`, the real ticker on a fake page and clock): one 70-minute match → **0** reminders during it, **exactly 1** on its result screen, none in the next 5 minutes; seven 10-minute matches → 1, between matches 6 and 7; 2.5 hours → 2.
+- **Size:** `playtime.ts` 3,205 B gzip (was 3,055; +150 for the watcher, `pendingSec` and `rawWeek`; over ut-2's 3,072 B line by 133 B). First-paint additions: `playtime-ui.tsx` with the parts of `minutes.ts` it uses ≈ 2.7 KB gzip, `BreakReminder.tsx` 0.8 KB, `playtime-ui.css` 1.8 KB. The Minutes screen (`MinutesView.tsx` + `minutes.css` 2.3 KB) is its own lazy chunk.
+
+### Tests
+
+- `src/ui/minutes-view.test.tsx` (36): the chip's words at 0, 27, 58, 60 ready, 89, 90 done, 90 waiting, rested, frozen, new player, several waiting; the Home chip markup (27/30, READY + dot, DONE); the Minutes screen per state (hero, rails, asides, CLAIM only when ready, done and rested and frozen copy, hidden-from-boards note); claims at 30, 60 and 300 weekly pay once (second claim returns the same object, nothing waits); `nextUp`'s Minutes done line; the Profile panel (counted and raw, by sport, badge, an old save without a ledger); raw week; `lifeBadge`; `playtimeLine` with unbanked seconds; reduced-motion rules and the ring drawn at its final offset; **the guilt-copy red line**: "Don't lose", "miss you", "hurry", "last chance", "you'll lose", "before it's gone", "don't miss" in no player-facing string of 60+ ut-owned files (comments stripped), and the matcher catches a planted one.
+- `src/ut/rivals-net.test.ts` (+1): hidden from boards, `publishRivals` signs and sends nothing; shown again, the same entry as before.
+- `scripts/compat/old-client.ts`: the round-trip ledger now carries `rawWeek`; it comes back byte-equal through the live build and the cloud snapshot in 3 sports.
+- `src/ui/break-reminder.test.ts` (9): the runs above, a 10-minute break resets the hour, idle menus never count, held screens wait (two holders), the setting off shows nothing and leaves no backlog, `breakStep` per context.
+- `src/ui/soccer-minutes.test.ts`, `src/ui/soccer-break-reminder.test.ts`: both suites under soccer's run.
+- Harness: `node scripts/qa/ut-studio.mjs minutes [--rm] [--sport s] [--size n] [--fixture f]` (and `minutes` joins the selfcheck's screens).
+
+### Protocol
+
+None. Presentation, settings and a reminder at stoppages; nothing in a match, a rating, a queue or a settlement changes.
+
+### Found and fixed during the task
+
+- With a third segment, "SOCCER RANKS" and "NFL RANKS" pushed MINUTES off the frame (clipped, so the generic offscreen check missed it): the header now wraps, and the minutes case checks every segment sits inside the gutters.
+- Hiding from boards first only stopped the draft boards: the Rivals standings and the draft Results line ("Posting…") now honour it too.
+- The break reminder would have counted the draft vote, a Gauntlet climb and Training Camp as stoppages (all menu-class to the ticker): they hold it now.
+
+### Left for later tasks
+
+- Board tabs and the league tile are placeholders until ut-8 (as planned): "Leagues start next week". If ut-8 slips past next week, that line must change.
+- `playtime.ts` is 133 B over ut-2's 3,072 B gzip line (3,205 B).
+
+### Owner device checks (ut-3)
+
+- The Home chip row at the owner's size: five chips in one row, the Minutes ring readable at arm's length; tapping it opens Minutes.
+- CLAIM on a pack rung: one long buzz, never a buzz on a scroll that starts on the button.
+- After an hour of real play, the stretch sheet appears on the next menu or result screen and never mid-possession, mid-vote or in Training Camp; OK closes it at once.
+- Hide me from leaderboards: a finished draft with it on never appears on the boards from another phone.
+
+---
+
 ## V2 shared pieces: interface contracts (plan §3)
 
 Other teams can code against these now. Each contract is copied into `ut.md`. Where another team's piece is not on ut's branch yet, ut keeps a ≤ 8-line local stand-in marked `// merge: replace with <team>'s <name>`, listed in `ut.md` for the lead.
@@ -290,6 +367,7 @@ export function playtimeLine(p: Profile, now?: number): string;        // "Today
 export function playtimeView(p: Profile, now?: number): PlaytimeView;  // today/week/life, counted and raw, done
 ```
 - **As built (ut-2):** the single-tab lock is a **Web Lock** (`navigator.locks`, same browsers as `BroadcastChannel`: Safari 15.4+, Chrome 69+) with the `localStorage` lock as the fallback. `BroadcastChannel` was built first and measured: its per-second `postMessage` was the ticker's biggest cost inside a match (≈ 0.1 ms of the 4x budget); a held lock costs nothing per second. `mergePlaytime` lives in `src/lib/cloud-data.ts` (the apply path; it keeps `playtime.ts` under 3 KB gzip). Also exported: `enterPlaytime(ctx, activity) → leave()` (the hook's body, for non-React hosts and tests), `credit`, `rollTo`, `freshPlaytime`, `etDay`, `isoWeek`, `weekday`, `DAY_RUNGS`, `DAY_CAP`, `WEEK_CAP`, `ENDOWED_SEC`.
+- **Added in ut-3:** `watchPlaytime(fn)` (one watcher, told each ticking second the counted seconds and the screen's context: the break reminder), `pendingSec()` (counted seconds not banked yet), `playtimeLine(p, now?, unbanked = pendingSec())` (the pause line includes the match in progress), `PlaytimeView.week.rawMin`, and the optional ledger field `rawWeek` (merged per weekday). Sports' pause sheets: `playtimeLine(profile)`; optionally `setPlaytimePaused(true/false)`.
 - Rules (each with a unit test): visible + focused only; one ticking tab (`BroadcastChannel` with a `localStorage` lock fallback; as built, a Web Lock, see above); per-context input windows (match 45 s, draft 30 s, menus 20 s); `sim` counts real elapsed time only; draft season sim max 3 min per run; queue max 2 min; replay/reward sequences max 2 min per match; menus ≤ 25% of the day's counted total; input variety (≥ 6 events in the last 60 s of a match, not all within 8 px of one point); match and draft seconds are provisional and bank on `bankActivity('complete')` or on a forfeit after ≥ 120 s; menu seconds bank every 60 s; caps 5,400 s a day and 37,800 a week; ET day key and `weekKey()`; date going backwards or a repeated day key freezes accrual for that day.
 - **Performance rule:** during a match the ticker makes **0 profile writes** (provisional seconds sit in memory and in the device-local pending key, written on `visibilitychange: hidden`); one write when the activity banks; menu writes at most every 60 s. Never on the per-frame path.
 - **Input source:** one capture-phase `pointerdown`/`keydown` listener on `document`. Sports do not have to wire anything; `setPlaytimePaused` is the only optional hook (without it, a paused match stops counting after the 45 s window).
