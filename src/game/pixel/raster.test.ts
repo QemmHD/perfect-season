@@ -15,7 +15,7 @@ const VIEWS = [
 const POSES = [P.idle(0.25), P.run(0.375, 1), P.jumpShot(0.5), P.stance(true), P.kickLeg(0.5), P.dive(0.6)];
 const SIZES = [34, 60, 24, 34, 22, 40];
 
-const RASTER_HASH = '38046b9e';
+const RASTER_HASH = 'd53fc0a0';
 
 function setHash(): string {
   let h = 0x811c9dc5;

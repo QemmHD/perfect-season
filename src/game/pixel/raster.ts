@@ -79,8 +79,9 @@ export function capsule(b: Buf, ox: number, oy: number, a: P2, c: P2, ra: number
     }
 }
 
-export function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: (nx: number, ny: number, nz: number) => number, part: number, sx = 1) {
-  // `sx` narrows it across (a head is taller than it is wide)
+export function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: (nx: number, ny: number, nz: number) => number, part: number, sx = 1, over = -1) {
+  // `sx` narrows it across (a head is taller than it is wide); `over`: a body part this ball always
+  // covers, whatever its depth (the head sits on the torso and neck: a chin never sinks into the chest)
   const cx = c.x + ox;
   const cy = c.y + oy;
   const rx = r * sx;
@@ -94,6 +95,9 @@ export function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: 
       const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
       // slot 0 from slotFor: no pixel here (a partial shell, such as hair volume)
       const slot = slotFor(nx, ny, nz);
-      if (slot) put(b, x, y, c.d + nz * r, slot, toneOf(nx, ny, nz, 0.05), part);
+      if (!slot) continue;
+      const i = y * b.w + x;
+      if (over >= 0 && x >= 0 && y >= 0 && x < b.w && y < b.h && b.slot[i] && b.part[i] === over) b.depth[i] = -1e9;
+      put(b, x, y, c.d + nz * r, slot, toneOf(nx, ny, nz, 0.05), part);
     }
 }

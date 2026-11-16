@@ -88,24 +88,71 @@ export function saturate(c: RGB, k: number): RGB {
 
 const same = (a: RGB, b: RGB) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 
+/** CIE L*a*b* (D65) of an sRGB colour. */
+export function toLab(c: RGB): [number, number, number] {
+  const lin = (v: number) => {
+    const u = clamp255(v) / 255;
+    return u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4;
+  };
+  const [r, g, b] = c.map(lin);
+  const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  const x = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047);
+  const y = f(0.2126 * r + 0.7152 * g + 0.0722 * b);
+  const z = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+
+/** How far apart two colours look (CIE76 delta E: about 2 is a just-visible step). */
+export function deltaE(a: RGB, b: RGB): number {
+  const p = toLab(a);
+  const q = toLab(b);
+  return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+}
+
+/** No kit tone comes closer to the outline than this (delta E), so the silhouette never sinks into a dark kit. */
+export const OUTLINE_CLEARANCE = 10;
+/**
+ * Skin and hair keep their own base (who he is: the darkest Monk tones and black hair must stay
+ * themselves and distinct from their neighbours), so only their shadow is held off the outline, by
+ * this much, and never up to the base.
+ */
+export const IDENTITY_CLEARANCE = 6;
+/** A base this light or lighter stays the base: a white kit reads white, with the highlight pure white. */
+const LIGHT_BASE = 0.95;
+
+const clearOf = (c: RGB, by: number) => luma(c) > luma(OUTLINE) && deltaE(c, OUTLINE) >= by;
+
 /**
  * V2's three tones for one material (C.1.3): the shadow 22 points of lightness darker with its hue
- * turned 10 degrees toward blue, the highlight 14 points lighter. A colour at either end of the scale
- * is moved in a little so all three tones stay distinct (white kits keep a white highlight, black
- * ones a visible shadow), and no tone ever lands on the outline colour.
+ * turned 10 degrees toward blue, the highlight 14 points lighter.
+ * - Dark kit materials (black and navy kits, helmets, shoes): every tone keeps OUTLINE_CLEARANCE from
+ *   the `#14121c` outline, so the outline still draws the silhouette and inner separations never turn
+ *   into black lines. The shadow lifts along its own hue until it clears the outline, and the base
+ *   stays at least 6 points over the shadow (a black kit draws as charcoal; the outline around it is
+ *   what reads as black).
+ * - Light materials: the base stays as it is up to 0.95 lightness and the highlight goes to white,
+ *   so white kits read white rather than light grey; only the shadow darkens.
+ * - `identity` (skin, hair): see IDENTITY_CLEARANCE.
  */
-export function ramp3(base: RGB): [RGB, RGB, RGB] {
-  let [h, s, l] = toHsl(base.map(clamp255) as RGB);
-  // room for the highlight above and the shadow below
-  l = Math.max(0.07, Math.min(0.9, l));
+export function ramp3(base: RGB, identity = false): [RGB, RGB, RGB] {
+  const [h, s, l0] = toHsl(base.map(clamp255) as RGB);
+  const l = Math.min(LIGHT_BASE, l0);
   const toBlue = ((240 - h + 540) % 360) - 180;
   const sh = s < 0.05 ? 235 : h + Math.sign(toBlue) * Math.min(10, Math.abs(toBlue));
-  const shadow = fromHsl(sh, s < 0.05 ? 0.08 : Math.min(1, s * 1.05), Math.max(0.025, l - 0.22));
-  const mid = fromHsl(h, s, l);
-  const light = fromHsl(h, s, Math.min(0.985, l + 0.14));
+  const shS = s < 0.05 ? 0.08 : Math.min(1, s * 1.05);
+  const by = identity ? IDENTITY_CLEARANCE : OUTLINE_CLEARANCE;
+  // identity colours: the shadow lifts at most to 3 points under the base
+  const shMax = identity ? Math.max(0, l - 0.03) : 1;
+  let shL = Math.max(0, Math.min(shMax, l - 0.22));
+  let shadow = fromHsl(sh, shS, shL);
+  while (!clearOf(shadow, by) && shL < shMax) shadow = fromHsl(sh, shS, (shL = Math.min(shMax, shL + 0.01)));
+  let midL = identity ? l : Math.max(l, shL + 0.06);
+  let mid = fromHsl(h, s, midL);
+  if (!identity) while (!clearOf(mid, by) && midL < 1) mid = fromHsl(h, s, (midL = Math.min(1, midL + 0.01)));
+  const light = fromHsl(h, s, Math.min(1, midL + 0.14));
   const out: [RGB, RGB, RGB] = [shadow, mid, light];
   for (const c of out) if (same(c, OUTLINE)) c[2] += 1;
   if (same(out[0], out[1])) out[0] = out[0].map((v) => Math.max(0, v - 6)) as RGB;
-  if (same(out[1], out[2])) out[2] = out[2].map((v) => Math.min(255, v + 6)) as RGB;
+  if (same(out[1], out[2])) out[1] = out[1].map((v) => Math.max(0, v - 6)) as RGB;
   return out;
 }

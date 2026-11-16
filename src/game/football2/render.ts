@@ -234,7 +234,7 @@ export class FootballRenderer {
     // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
     // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
     const raw = Math.max(8, this.art.artPxFor((drawnHeight('nfl', b.p.ht) / 36) * s));
-    const px = quantPx(raw);
+    const px = quantPx(raw, this.art.viewPerArt);
     const dirs = px < 22 ? 8 : 16;
     const fb = (Math.round((L.facing(dir.x, dir.y) / (Math.PI * 2)) * dirs) + dirs) % dirs;
     // seen from high up close: the rig reads best no steeper than this

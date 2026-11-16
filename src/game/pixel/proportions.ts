@@ -8,22 +8,66 @@ import type { Look } from './body';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** V2's head scale on the head capsule's radius, by the sprite's height in art px. */
-export function headScale(artPx: number): number {
-  return clamp(1.55 - artPx / 120, 1.2, 1.45);
+/** V2 C.1.1's head table: heads tall by figure height in art px (a band's value across the band). */
+export const HEAD_TABLE: readonly (readonly [lo: number, hi: number, heads: number])[] = [
+  [16, 20, 4.5],
+  [22, 26, 5],
+  [32, 36, 5.5],
+  [56, 72, 6],
+];
+
+/** Heads tall for a figure `fig` art px tall: the table's band, linear between bands, held past the ends. */
+export function targetHeads(fig: number): number {
+  const t = HEAD_TABLE;
+  if (fig <= t[0][1]) return t[0][2];
+  for (let i = 0; i < t.length; i++) {
+    const [lo, hi, h] = t[i];
+    if (fig <= hi) {
+      if (fig >= lo) return h;
+      const [, phi, ph] = t[i - 1];
+      return ph + ((h - ph) * (fig - phi)) / (lo - phi);
+    }
+  }
+  return t[t.length - 1][2];
 }
 
 /**
- * The rig's head radius (rig.ts, 0.084 of height) is a real person's head plus a cartoon margin;
- * scaled by headScale it lands about 0.6 heads chunkier than V2's table at every size. This brings the
- * product onto the C.1.1 table (4.5 heads at 16-20 art px, 5 at 22-26, 5.5 at 32-36, 6 at 56-72;
- * proportions.test.ts measures it on the raster).
+ * A standing player's figure height in art px (feet to crown, hair and outline excluded) for a grid
+ * `artPx` tall: the idle pose and the broadcast camera's pitch (0.45) shorten him. A line fitted on the
+ * raster over 14-100 px (within about 1 px; proportions.test.ts sweeps it).
  */
-export const HEAD_FIT = 0.92;
+export function figurePx(artPx: number): number {
+  return 0.8 * artPx + 1.8;
+}
 
-/** The head's drawn radius in art px for a rig head radius (share of height) at a sprite height. */
-export function headRadiusPx(rigHeadR: number, artPx: number): number {
-  return rigHeadR * headScale(artPx) * HEAD_FIT * artPx;
+/** The rig's head radius (rig.ts) for a 6'6" player without pads: the head the table is set for. */
+export const RIG_HEAD_R = 0.084;
+
+/**
+ * The head's height in whole art px for a sprite `artPx` tall (V2 C.1.1, the 5-head hero). The head is
+ * sized in rows, not by a scale on the rig's radius, so every height in a band lands on the band's
+ * heads-tall (a radius scaled by one constant was only right at the band centres, and drifted to 5.1
+ * heads at near and replay sizes). A taller player's smaller rig head (rig.ts) still shows.
+ */
+export function headRows(rigHeadR: number, artPx: number): number {
+  const fig = figurePx(artPx);
+  return Math.max(3, Math.round((fig / targetHeads(fig)) * (rigHeadR / RIG_HEAD_R)));
+}
+
+/**
+ * The head's width in whole art px for a head `rows` tall: as wide as tall up to 6 rows (a small head
+ * reads as a round block, V2's 5x5 and 6x6 boxes), 0.9 as wide above.
+ */
+export function headCols(rows: number): number {
+  return rows;
+}
+
+/**
+ * Where a head of `count` whole pixels across (or down) centres so the grid gives it exactly that
+ * many: on a pixel edge for an even count, a pixel centre for an odd one. `c` is in grid px.
+ */
+export function snapCentre(c: number, count: number): number {
+  return count % 2 ? Math.floor(c) + 0.5 : Math.round(c);
 }
 
 /** Limb radii are drawn this much thicker than the rig's (V2: x1.15). */

@@ -145,7 +145,7 @@ export function skinTone(i: number): string {
 
 /** A skin tone's ramp: [shadow, base, light, outline, rim]; the rim is the lit edge V2 C.1.3 asks for. */
 export function skinRamp(i: number): [string, string, string, string, string] {
-  const [s, b, l] = ramp3(rgb(skinTone(i)));
+  const [s, b, l] = ramp3(rgb(skinTone(i)), true);
   return [hex(s), hex(b), hex(l), hex(OUTLINE), hex(mix(l, [255, 246, 214], 0.35))];
 }
 

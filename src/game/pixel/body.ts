@@ -5,7 +5,7 @@
 // all come from the look, so any player can wear any team's home or away set.
 import type { Appearance } from './appearance';
 import { luma, OUTLINE, type RGB, mix, onColor, ramp3, rgb } from './color';
-import { headRadiusPx, LIMB_SCALE, padsWidthPx, torsoWidthPx } from './proportions';
+import { headCols, headRows, LIMB_SCALE, padsWidthPx, snapCentre, torsoWidthPx } from './proportions';
 import { ball, type Buf, buffer, capsule } from './raster';
 import { type Joints, joints, type P2, type Pose, project, type Shape, shapeOf, type V3, type View } from './rig';
 
@@ -158,9 +158,6 @@ export interface Sprite {
   /** the top of the head */
   top: number;
 }
-
-/** A bare head is drawn this much narrower than it is tall (V2's head boxes: 7x8 at 34 art px, 12x13 at 64). */
-const HEAD_WIDTH = 0.88;
 
 /** The browser wouldn't give a new canvas (iOS caps the canvas memory a page holds). */
 export class CanvasOut extends Error {
@@ -358,9 +355,16 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   }
 
   // ---- head: the 5-head hero's (proportions.ts), set on the neck at its drawn size ----
-  const hr = Math.max(0.9, headRadiusPx(s.headR, px));
+  // sized in whole rows and columns and centred on the grid so it gets exactly that many, so the head
+  // keeps one size across a band instead of gaining or losing a row with the sprite's sub-pixel offset
+  const rows = headRows(s.headR, px);
+  const cols = headCols(rows);
+  const hr = rows / 2;
+  const hw = cols / rows;
   const grow = hr / Math.max(1e-6, s.headR * px);
   const head: P2 = { x: neck.x + (head0.x - neck.x) * grow, y: neck.y + (head0.y - neck.y) * grow, d: neck.d + (head0.d - neck.d) * grow };
+  head.x = snapCentre(head.x + ox, cols) - ox;
+  head.y = snapCentre(head.y + oy, rows) - oy;
   const cp = Math.cos(view.pitch);
   const sp = Math.sin(view.pitch);
   // his up, forward and right, as screen directions (x right, y up, z toward us)
@@ -408,9 +412,9 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
     const hc: P2 = head;
     // the hair's volume over the skull (short, headband, locs): a slightly bigger ball behind it, kept
     // to the crown, the sides above the ears and the nape, so the hair sits on the head, not painted on
-    const volume = style === 0 ? 1.12 : style === 4 ? 1.08 : style === 5 ? 1.12 : 0;
+    const volume = style === 0 || style === 4 || style === 5 ? 1.12 : 0;
     if (volume) {
-      const vc: P2 = { x: hc.x - fwdS.x * hr * 0.1, y: hc.y - upS.y * hr * 0.12, d: hc.d + upS.z * hr * 0.12 - fwdS.z * hr * 0.1 - hr * 0.9 };
+      const vc: P2 = { x: hc.x - fwdS.x * hr * 0.1, y: hc.y - upS.y * hr * 0.26, d: hc.d + upS.z * hr * 0.26 - fwdS.z * hr * 0.1 - hr * 0.9 };
       ball(
         b,
         ox,
@@ -423,7 +427,7 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
           return u > 0.3 || (f < -0.35 && u > -0.5) ? HAIR : 0;
         },
         7,
-        HEAD_WIDTH
+        hw * 1.04
       );
     }
     ball(
@@ -456,16 +460,17 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
         return SKIN;
       },
       6,
-      HEAD_WIDTH
+      hw,
+      3
     );
     if (style === 2) {
-      // a high top: a block of hair on the crown
-      const top: P2 = { x: hc.x - fwdS.x * hr * 0.1, y: hc.y - upS.y * hr * 0.7, d: hc.d + upS.z * hr * 0.7 };
-      capsule(b, ox, oy, top, { ...top, y: top.y - hr * 0.45 }, hr * 0.82, hr * 0.8, () => HAIR, 6, 0.1);
+      // a high top: a block of hair on the crown, set behind the skull so the face and hairline stay whole
+      const top: P2 = { x: hc.x - fwdS.x * hr * 0.1, y: hc.y - upS.y * hr * 0.7, d: hc.d - hr };
+      capsule(b, ox, oy, top, { ...top, y: top.y - hr * 0.45 }, hr * 0.82, hr * 0.8, () => HAIR, 7, 0.1);
     } else if (style === 5) {
       // locs down the back of the head
       const back: P2 = { x: hc.x - fwdS.x * hr * 0.55, y: hc.y + hr * 0.1, d: hc.d - fwdS.z * hr * 0.55 - 0.5 };
-      capsule(b, ox, oy, back, { ...back, x: back.x - fwdS.x * hr * 0.2, y: back.y + hr * 0.95 }, hr * 0.62, hr * 0.42, () => HAIR, 6, -0.05);
+      capsule(b, ox, oy, back, { ...back, x: back.x - fwdS.x * hr * 0.2, y: back.y + hr * 0.95 }, hr * 0.62, hr * 0.42, () => HAIR, 7, -0.05);
     }
   }
   // ---- colors ----
@@ -486,14 +491,16 @@ function palette(look: Look): RGB[][] {
     [0, 0, 0],
   ]);
   const set = (i: number, c: RGB) => (ramps[i] = ramp3(c));
-  set(SKIN, skin);
+  // skin and hair keep their true base (ramp3's identity rule); kit materials keep clear of the outline
+  const own = (i: number, c: RGB) => (ramps[i] = ramp3(c, true));
+  own(SKIN, skin);
   set(JERSEY, jersey);
   set(TRIM, trim);
   set(SHORTS, shorts);
   set(SOCK, rgb(look.socks));
   set(SHOE, rgb(look.shoes));
   set(SOLE, [240, 240, 240]);
-  set(HAIR, rgb(look.hairColor));
+  own(HAIR, rgb(look.hairColor));
   set(HELMET, rgb(look.helmet ?? look.jersey));
   set(STRIPE, rgb(look.stripe ?? look.trim));
   set(MASK, rgb(look.mask ?? '#9aa0a6'));
@@ -501,12 +508,13 @@ function palette(look: Look): RGB[][] {
   set(BAND, trim);
   set(GLOVE, rgb(look.gloves ?? look.skin));
   // the nose and the ears: the skin's own shadow tone, so skin stays three tones
-  const sk = ramp3(skin);
+  const sk = ramp3(skin, true);
   ramps[SKINDARK] = [sk[0], sk[0], sk[0]];
-  set(BUZZ, mix(rgb(look.hairColor), skin, 0.35));
+  own(BUZZ, mix(rgb(look.hairColor), skin, 0.35));
   // the number: the trim color if it reads on the jersey, else black or white
   const num = onColor(jersey, [trim, [255, 255, 255], [20, 20, 24]]);
-  ramps[NUM] = ramp3(num);
+  // the number is a marking inside the jersey, not an edge: a black number stays black
+  ramps[NUM] = ramp3(num, true);
   const line = onColor(num, [shorts, trim, [20, 20, 24]]);
   ramps[NUMLINE] = [line, line, line];
   const eye: RGB = [28, 18, 22];

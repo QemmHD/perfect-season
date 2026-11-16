@@ -191,7 +191,7 @@ export class HoopsRenderer {
     // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
     // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
     const raw = Math.max(10, this.art.artPxFor((drawnHeight('nba', b.p.ht) / 12) * s));
-    const px = quantPx(raw);
+    const px = quantPx(raw, this.art.viewPerArt);
     const dirs = px < 26 ? 8 : 16;
     const fb = facingIndex(this.c3, b.face + turn, dirs);
     const pitch = Math.round(Math.min(0.9, pitchAt(this.c3, b.cx, b.cz)) / 0.15) * 0.15;

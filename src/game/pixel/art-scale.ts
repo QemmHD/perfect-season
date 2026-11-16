@@ -100,14 +100,21 @@ export function artScale(canvas: HTMLCanvasElement, viewW: number, viewH: number
   return artScaleFor(option, cssPerView * dpr, designScale(vv?.width ?? innerWidth, vv?.height ?? innerHeight), dpr);
 }
 
-/** Sprite sizes in art px step coarser as they grow, 1/2/4/6 px (fewer distinct drawings as players move in depth). */
-export function quantPx(artPx: number): number {
+/**
+ * Sprite sizes in art px step coarser as they grow (fewer distinct drawings as players move in depth):
+ * 1/2/4/6 art px at V2's 1.5 design px art pixel (`viewPerArt` 1.5, option A), scaled down with a finer
+ * art pixel so a step stays about the same share of the figure: 1/2/3/4 at today's grain (option C,
+ * 1 view px per art px), where a 6 px step at a 64 px near player was a 9% size pop.
+ */
+export function quantPx(artPx: number, viewPerArt = DESIGN_PER_ART): number {
   const p = Math.max(1, Math.round(artPx));
+  const f = Math.min(1, viewPerArt / DESIGN_PER_ART);
+  const step = (n: number) => Math.max(1, Math.ceil(n * f - 1e-9));
   // each band's steps start at the band's first size, so a bigger sprite is never drawn smaller
   if (p <= 14) return p;
-  if (p < 30) return p - (p % 2);
-  if (p < 62) return 30 + Math.floor((p - 30) / 4) * 4;
-  return 62 + Math.floor((p - 62) / 6) * 6;
+  if (p < 30) return p - (p % step(2));
+  if (p < 62) return 30 + Math.floor((p - 30) / step(4)) * step(4);
+  return 62 + Math.floor((p - 62) / step(6)) * step(6);
 }
 
 /** A sprite placed in view px: anchors and size scaled from art px, and the canvas px per art px to blit at. */

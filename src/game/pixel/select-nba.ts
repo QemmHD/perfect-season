@@ -19,7 +19,7 @@ import type { Kit } from '../hoops2/render';
 preloadPixels('nba');
 
 /**
- * The dunk he throws down, by his ratings (2K-style animation tiers): through contact, a posterizer;
+ * The dunk he throws down, by his ratings (tiered animations): through contact, a posterizer;
  * a windmill (or a 360) for an elite leaper-dunker (DNK 92+, VRT 85+); a tomahawk (DNK 85+, VRT
  * 75+); a two-handed power slam for a strong big (STR 80+, 6'9"+); otherwise one or two hands.
  */
@@ -125,16 +125,14 @@ export function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { 
   return { clip, ct: m.gait.frac * clipMeta(clip).duration };
 }
 
-/**
- * What a body is doing right now, as a clip or a pose. `shotAt`: when a jump shot of his left his
- * hands (the ball's in the air), so a shot tapped too quickly to be seen rising still follows through.
- */
 /** Every act the NBA selection animates (hoops2/types.ts `Act`); anything else gets a stand-in. */
 export const KNOWN_ACTS: ReadonlySet<string> = new Set<Act>(['idle', 'screen', 'run', 'dribble', 'shoot', 'layup', 'dunk', 'contact', 'standdunk', 'pass', 'catch', 'defend', 'contest', 'block', 'cross', 'stepback', 'spin', 'pump', 'euro', 'stumble', 'fall', 'land', 'celebrate', 'rebound']);
 
 /**
  * What a body is doing right now, as a clip or a pose. An act this file doesn't animate yet (a V2
- * act the engine emits first) is drawn as its family's stand-in (select-family.ts).
+ * act the engine emits first) is drawn as its family's stand-in (select-family.ts). `shotAt`: when a
+ * jump shot of his left his hands (the ball's in the air), so a shot tapped too quickly to be seen
+ * rising still follows through.
  */
 export function animOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shotAt: number | null): Anim {
   if (!KNOWN_ACTS.has(b.act)) b = { ...b, act: standIn(b.act, KNOWN_ACTS, NBA_STANDINS, Math.hypot(b.vx, b.vz) > 1) as Act };

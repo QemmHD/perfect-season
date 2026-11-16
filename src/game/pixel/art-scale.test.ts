@@ -93,4 +93,25 @@ describe('the art pixel (V2 C.1.2)', () => {
     }
     expect([quantPx(13), quantPx(29), quantPx(33), quantPx(59), quantPx(67)]).toEqual([13, 28, 30, 58, 62]);
   });
+
+  it("steps 1/2/3/4 at today's grain (1 view px per art px), so a near player's size pop stays near 6%", () => {
+    let prev = 0;
+    const steps = new Set<number>();
+    for (let p = 1; p <= 140; p++) {
+      const q = quantPx(p, 1);
+      expect(q).toBeLessThanOrEqual(p);
+      expect(q).toBeGreaterThanOrEqual(prev);
+      expect(quantPx(q, 1)).toBe(q);
+      if (q !== prev && prev >= 62) steps.add(q - prev);
+      prev = q;
+    }
+    expect([...steps]).toEqual([4]);
+    expect([quantPx(29, 1), quantPx(33, 1), quantPx(59, 1), quantPx(67, 1)]).toEqual([28, 33, 57, 66]);
+    // the largest jump at or above 30 art px, as a share of the size jumped from
+    let worst = 0;
+    for (let p = 31; p <= 140; p++) if (quantPx(p, 1) !== quantPx(p - 1, 1)) worst = Math.max(worst, (quantPx(p, 1) - quantPx(p - 1, 1)) / quantPx(p - 1, 1));
+    expect(worst).toBeLessThanOrEqual(0.1);
+    // option A's art pixel (1.5 view px or more) keeps the plan's steps
+    expect(quantPx(67, 1.5)).toBe(quantPx(67));
+  });
 });
