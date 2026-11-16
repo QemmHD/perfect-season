@@ -238,6 +238,49 @@ describe('the momentum carry after a catch', () => {
     expect(headings).toHaveLength(20);
     expect(headings.filter((vy) => vy > 0)).toHaveLength(20);
   });
+  it('steers a receiver at once with a thumb that landed while the ball was in the air (held right through the catch)', () => {
+    const right = { x: 1, y: 0 };
+    /** One seeded pass play; the thumb lands in the air and holds right (or never lands). vx after the catch, by 1/60 s. */
+    const run = (seed: number, thumb: boolean) => {
+      const { off, def } = teams();
+      const concept = (['verts', 'slants', 'smash', 'flood', 'dagger', 'mesh', 'curls', 'posts'] as const)[seed % 8];
+      const p = lineUp(off, def, 'pass', concept, 'inside', 30, 26.67, rng(hashString('air-touch:' + seed)));
+      for (const d of p.bodies.filter((x) => x.side === 'D')) d.stunUntil = Infinity;
+      snap(p);
+      const g = newGame(off, def, 'air-touch:' + seed);
+      const pl = pilot(0.7, 'air-touch:' + seed);
+      const gate = new CarryGate();
+      let touched = false;
+      const vx: number[] = [];
+      for (let i = 0; i < 600 && !p.end && vx.length < 16; i++) {
+        decide(p, g, pl);
+        if (thumb && p.phase === 'air' && !touched) {
+          touched = true;
+          gate.touch(true);
+        }
+        const c = p.phase === 'run' ? p.carrier : null;
+        step(p, 1 / 60, gate.input(c ? c.id : null, false, touched ? right : null));
+        if (p.phase === 'run' && p.carrier) vx.push(p.carrier.vx);
+      }
+      return vx.length >= 16 ? vx : null;
+    };
+    let catches = 0;
+    for (let seed = 1; seed < 80 && catches < 20; seed++) {
+      const held = run(seed, true);
+      const free = run(seed, false);
+      if (!held || !free) continue;
+      catches++;
+      // the stick bites on the first step: pushing right from the catch on (+1.5 yd/s by +0.1 s,
+      // whatever way the catch had him moving), right of where his momentum alone takes him, and
+      // moving right by +0.25 s even from a hard leftward catch (a 0.15 s turn when he caught it square)
+      expect(held[1]).toBeGreaterThan(held[0]);
+      expect(held[6] - held[0]).toBeGreaterThan(1.5);
+      expect(held[6]).toBeGreaterThan(free[6] + 1);
+      expect(held[15]).toBeGreaterThan(0);
+      if (held[0] > -1) expect(held.slice(0, 10).some((v) => v > 0)).toBe(true);
+    }
+    expect(catches).toBe(20);
+  });
   it('leaves the AI unchanged: the autopilot never gives the engine null for a ball carrier', () => {
     const { off, def } = teams();
     let carrierSteps = 0;

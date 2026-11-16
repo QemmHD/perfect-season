@@ -47,7 +47,8 @@ for (const type of [pw.chromium, pw.firefox, pw.webkit]) {
   type.launch = async (...args) => {
     const browser = await launch(...args);
     const newContext = browser.newContext.bind(browser);
-    browser.newContext = async (options = {}) => isolate(await newContext({ ...options, reducedMotion: motion }));
+    // service workers blocked: their fetches would bypass context.route
+    browser.newContext = async (options = {}) => isolate(await newContext({ ...options, reducedMotion: motion, serviceWorkers: 'block' }));
     // a bare newPage() makes its own context: route it the same way
     browser.newPage = async (options = {}) => (await browser.newContext(options)).newPage();
     return browser;

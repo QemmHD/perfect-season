@@ -4,17 +4,20 @@
 // explicitly (a motion check against a default would be vacuous), the dev server is the team's
 // port 5216, and the iPhone safe areas go in through the stage's own test hook.
 //
-//   node scripts/qa/nfl-lib.mjs --probe     self-test: a page fetch to a non-local host is blocked and reported
+//   node scripts/qa/nfl-lib.mjs --probe     self-test: a page fetch to a non-local host is blocked and reported,
+//                                           and a service worker cannot register (control: it can without the block)
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const require = createRequire(new URL('../../package.json', import.meta.url));
 export const PORT = 5216;
 export const BASE = 'http://localhost:' + PORT + '/';
-export const SHOTS = process.env.NFL_SHOTS || '/tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/shots/nfl';
+/** Screenshots go to NFL_SHOTS, or to a folder under the machine's temp directory (never into the repo). */
+export const SHOTS = process.env.NFL_SHOTS || path.join(os.tmpdir(), 'ps-nfl-shots');
 export const RELAY_LOCK = '/tmp/ps-qa-relay-7777.lock';
 export const ALLOWED = ['localhost', '127.0.0.1', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
@@ -65,7 +68,8 @@ export async function phone(browser, { viewport = 'A', reducedMotion, dsf = 1 } 
   if (reducedMotion !== 'reduce' && reducedMotion !== 'no-preference') throw Error('nfl-lib: pass reducedMotion explicitly ("reduce" or "no-preference")');
   const v = VIEWPORTS[viewport];
   if (!v) throw Error('nfl-lib: unknown viewport ' + viewport);
-  const context = await browser.newContext({ viewport: { width: v.w, height: v.h }, isMobile: true, hasTouch: true, deviceScaleFactor: dsf, reducedMotion });
+  // a service worker's fetches bypass context.route: block workers so nothing gets past the guard
+  const context = await browser.newContext({ viewport: { width: v.w, height: v.h }, isMobile: true, hasTouch: true, deviceScaleFactor: dsf, reducedMotion, serviceWorkers: 'block' });
   await isolate(context);
   await context.addInitScript((insets) => {
     window.__psInsets = insets;
@@ -123,10 +127,43 @@ export function report() {
 
 // self-test: a fetch and a WebSocket to a non-local host are both stopped, and reported
 if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.includes('--probe')) {
+  // a throwaway local origin (service workers need one): a page and a worker script
+  const http = await import('node:http');
+  const server = http.createServer((req, res) => {
+    if (req.url === '/qa-probe-sw.js') {
+      res.writeHead(200, { 'content-type': 'text/javascript' });
+      res.end("self.addEventListener('fetch', () => {});");
+    } else {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end('<p>probe</p>');
+    }
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const origin = 'http://127.0.0.1:' + server.address().port + '/';
+  const tryWorker = (page) =>
+    page.evaluate(async () => {
+      if (!('serviceWorker' in navigator) || !navigator.serviceWorker) return 'unavailable';
+      try {
+        // (Playwright's block turns register() into a no-op that resolves to nothing)
+        const reg = await navigator.serviceWorker.register('/qa-probe-sw.js');
+        const all = await navigator.serviceWorker.getRegistrations();
+        return reg && all.length ? 'registered' : 'blocked';
+      } catch (e) {
+        return 'refused: ' + String(e && e.message).slice(0, 60);
+      }
+    });
   const browser = await launch();
   try {
+    // control: a context without the block does register, so the check below is not vacuous
+    const bare = await browser.newContext();
+    const barePage = await bare.newPage();
+    await barePage.goto(origin);
+    const control = await tryWorker(barePage);
+    await bare.close();
     const { page, context } = await phone(browser, { viewport: 'A', reducedMotion: 'reduce' });
-    await page.setContent('<p>probe</p>');
+    await page.goto(origin, { waitUntil: 'domcontentloaded' });
+    // service workers are blocked in every QA context (their fetches would bypass the route guard)
+    const worker = await tryWorker(page);
     const fetched = await page.evaluate(() =>
       fetch('https://example.com/qa-probe').then(
         () => 'reached',
@@ -142,13 +179,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.includes(
       }
     });
     await context.close();
-    console.log(JSON.stringify({ fetched, socket, blocked }));
-    const ok = fetched === 'failed' && socket.startsWith('refused') && blocked.some((b) => b.host === 'example.com');
+    console.log(JSON.stringify({ control, worker, fetched, socket, blocked }));
+    const ok = control === 'registered' && worker === 'blocked' && fetched === 'failed' && socket.startsWith('refused') && blocked.some((b) => b.host === 'example.com');
     report();
     // the probe's blocked request is the expected outcome: the self-test passes when it was caught
     process.exitCode = ok ? 0 : 1;
-    console.log(ok ? 'probe: blocked and reported' : 'probe: NOT blocked');
+    console.log(ok ? 'probe: worker, fetch and socket blocked and reported' : 'probe: NOT blocked');
   } finally {
     await browser.close();
+    server.close();
   }
 }

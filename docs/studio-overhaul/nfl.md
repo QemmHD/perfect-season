@@ -299,14 +299,14 @@ dailyPlay(dayKey: string): NflScenario   // deterministic from the day key; the 
 
 ## QA isolation and the local relay lock
 
-- Browser QA for this team goes through `scripts/qa/nfl-lib.mjs` (new scripts) or `scripts/qa/nfl-guard.cjs` (legacy scripts): every request to a host other than localhost, 127.0.0.1, fonts.googleapis.com and fonts.gstatic.com is aborted and reported, and a run that attempted one fails. URLs always carry `?ns=inspect&relay=ws://localhost:7777`. The dev server is on port 5216.
+- Browser QA for this team goes through `scripts/qa/nfl-lib.mjs` (new scripts) or `scripts/qa/nfl-guard.cjs` (legacy scripts): every request to a host other than localhost, 127.0.0.1, fonts.googleapis.com and fonts.gstatic.com is aborted and reported, and a run that attempted one fails. Service workers are blocked in every context (their fetches would bypass the route guard); the `--probe` self-test checks it. URLs always carry `?ns=inspect&relay=ws://localhost:7777`. The dev server is on port 5216.
 - **Relay lock: `/tmp/ps-qa-relay-7777.lock`.** The local relay binds the fixed port 7777, so every relay-using run, from any team, should hold this lock: `flock -w 1800 /tmp/ps-qa-relay-7777.lock env PS_QA_RELAY_LOCKED=1 node scripts/qa/<script>.mjs`. `nfl-lib.mjs` `relayGuard()` refuses to start a relay-using NFL script without the lock and checks that the port is free.
 
 ## Controls: the V2 grammar for NFL (pointer ownership, gestures and the control map)
 
 This replaces revision 2's control map (its ten-button pass panel and the BURST exception are gone; V2 allows at most four right-thumb targets). Built in nfl-2 as the pure, unit-tested `football2/gestures.ts`; the carry rule below is built (nfl-1).
 
-**The stick at a carrier change (nfl-1, built).** When the ball changes hands (a catch, a handoff, a scramble), a stick that is already held counts only when the change is a designed handoff, or when the stick has an upfield component of at least 0.3 of its length. Otherwise the new carrier runs on momentum (`null` to the engine) until a new stick touch or key press, or until the stick moves at least 0.25 from where it was at the change. A stick touched and then released still brakes (`{0,0}`). So a thumb drifting the QB back-left in the pocket never sends the receiver back-left after the catch. With the floating Stick (C16), `onDown` is the new touch. While the ball is in the air a HOLD TO RUN ghost pulses round today's stick; nfl-2 moves it onto the floating Stick, and nfl-3 moves its text into the toast line as "Momentum carries · steer when ready".
+**The stick at a carrier change (nfl-1, built).** When the ball changes hands (a catch, a handoff, a scramble), a stick that is already held counts only when the change is a designed handoff, or when the stick has an upfield component of at least 0.3 of its length. Otherwise the new carrier runs on momentum (`null` to the engine) until a new stick touch or key press, or until the stick moves at least 0.25 from where it was at the change. A stick touched and then released still brakes (`{0,0}`). So a thumb drifting the QB back-left in the pocket never sends the receiver back-left after the catch. **A touch made while the ball is in the air counts at the catch whatever its direction** (review fix): the thumb can only have landed after the throw, so it is deliberate, and the HOLD TO RUN ghost asks for exactly that. `touch(true)` marks it; a touch in the pocket (`touch()`) stays gated. With the floating Stick (C16), `onDown` is the new touch. While the ball is in the air a HOLD TO RUN ghost pulses round today's stick; nfl-2 moves it onto the floating Stick, and nfl-3 moves its text into the toast line as "Momentum carries · steer when ready".
 
 ### Pointer ownership and gestures
 
@@ -443,7 +443,7 @@ This replaces revision 2's control map (its ten-button pass panel and the BURST 
 | Live catch with the stick never touched (`nfl-catch-run.mjs`, A and C, normal and reduced motion) | audit: 5 of 5 braked to 0 within 0.25 s | **6 of 6 in all four runs:** speed at +0.25 s and +0.5 s 1.46–1.81× catch speed, YAC 3.9–8.1 yd | 6/6 ≥ 70% at +0.25 s and ≥ 50% at +0.5 s; YAC > 1 yd on ≥ 5/6 |
 | `Football2` React commits during a 2 s stick drag (56–63 pointer moves) | one per move (`setKnob`) | **0** (11 before the drag, so the hook is live) | ≤ 10 |
 
-The late thumb now beats the held one on designed runs because `null` follows the play's lane, and the proxy's held stick (straight at the pilot's lane) is a weaker runner than the lane path. That is the proxy, not a reward for waiting; nfl-7 recalibrates runs and re-checks it.
+The late thumb beats the held one on designed runs. The review fix below measured why against the old perfect thumb (corrected there: the held proxy is not weaker than the lane path; the momentum path is stronger than both on outside and power runs, and that goes to nfl-7).
 
 **Baselines taken** (all after C-1; the AI and the stickless human proxy are unchanged by it, so they are the baseline to beat for nfl-2 onward):
 - **Full CAL:** `nfl-calibration/baseline-full.{json,md}`, 400 games per case, **3214 s (53.6 min) wall, 47.8 min CPU** under the shared semaphore (budget ≤ 60 min). Fast CAL: 539 s (≤ 15 min). Highlights: AI Pro gold 3.64 pts/drive, 68.4% cmp, 2.8% INT, 2.9% sacks, YPC 3.93, 3rd down 48.9%; Legend elite 1.17 pts/drive, 7.1% INT, 31.1% of drives end in a turnover; Legend promo 9.3% INT, 40.0% turnover drives; the 11-drive shape 3.93 pts/drive; human proxy (stick 0.35 s late, 2.5 s to call) median drive **45.4 s**, P90 72.5 s, game 184 s.
@@ -462,6 +462,35 @@ The late thumb now beats the held one on designed runs because `null` follows th
 **Isolation findings.** The guard blocked a probe `fetch('https://example.com/qa-probe')` and a WebSocket to a non-local host, and failed those runs as designed. Running the legacy `joystick.mjs` through the guard showed that the shared `scripts/qa/browser.mjs` fixture, under `?ns=inspect`, still tries the **live** cloud save (`functions/v1/player-save`) and card registry (`functions/v1/card-registry`): 15 requests, every one aborted on the machine, so the run is marked failed by the isolation rule although all of its assertions pass. The app's home screen does the same (8 registry requests, aborted, in `nfl-baselines.mjs load`). Reported to the lead below; no team should run that fixture unguarded.
 
 **Protocol bump needed:** NFL draft 10→11, UT 11→12 (see the table at the top).
+
+#### nfl-1 review fixes (2026-11-16, on top of nfl-2)
+
+An independent review of `b0277ad..7ac837c` found one medium and four low issues. All five are fixed or answered.
+
+- **(medium) A touch made while the ball was in the air was ignored at the catch.** On a carrier change the gate re-decided from the held stick, and a stick held sideways (toward the sideline, or cutting back) was gated until it moved 0.25 or was touched again. In the pocket the thumb now moves the quarterback (nfl-2), but in the air it can only have landed after the throw, so it is deliberate. `CarryGate.touch(inAir)` remembers a touch made while nobody carries the ball (`fresh`); at the next carrier change a held, deflected stick then counts whatever its direction, and `fresh` is spent (a lateral decides afresh) and cleared by `reset()`. Football2 passes `p.phase === 'air'` from the stick-down gesture and from a key press. A pocket touch (`touch()`) is never fresh, so the pocket-drift guard is unchanged (the 20/20 back-left test still passes).
+
+  | Measure | Before | After |
+  |---|---|---|
+  | Unit: `touch(true)`, stick `{1,0}` held through the catch | `null` on every step | **`{1,0}`** from the first step |
+  | Live, `nfl-catch-run.mjs … held` (stick pushed hard right in the air, held through the catch; 6 carriers at A) | **0/6** turn right; catch3 vx −4.77 at the catch → −5.89 at +0.25 s (keeps drifting left) | **6/6 at A and 6/6 at C**: vx up 2.7–3.6 yd/s by +0.1 s; catch3 −4.77 → +2.21 at +0.25 s |
+  | Live, stick never touched (`nfl-catch-run.mjs`, A and C, motion on and reduced) | 6/6 in all four | **6/6 in all four** (unchanged) |
+
+- **(low) Is the held stick a weak baseline for the C-1 ratios?** The stick case now includes `stick-lane`, the human proxy steering by the pilot's numeric lane (the old perfect thumb, the same config as `human-pro-gold`). Full CAL, 400 games per case, `nfl-calibration/stick-compare.{json,md}`:
+
+  | Thumb | YPC [95%] | inside | outside | power | YAC | pts/drive |
+  |---|---|---|---|---|---|---|
+  | lane (perfect thumb) | 3.94 [3.76–4.12] | 3.53 | 4.16 | 4.11 | 4.33 | 3.70 |
+  | held from the change | 3.90 [3.74–4.05] | 3.70 | 3.98 | 4.03 | 4.99 | 3.71 |
+  | late 0.35 s | 5.23 [5.00–5.46] | 3.83 | **6.76** | 5.04 | 4.66 | 3.88 |
+  | late 0.7 s | 5.33 [5.07–5.59] | 3.87 | **6.68** | 5.44 | 4.61 | 3.88 |
+  | never touched | 4.63 [4.46–4.79] | 4.09 | 5.11 | 4.65 | 4.27 | 3.80 |
+
+  So the held proxy runs exactly like the old perfect thumb (3.90 vs 3.94), and the C-1 ratios hold against it too: late 0.35 s / lane = **1.33×**, never touched / lane = **1.18×** (≥ 0.95×). The earlier note ("the proxy's held stick is a weaker runner") was wrong and is corrected above. The real finding is the reviewer's second point: the engine's `null` path for a designed run (follow the play's lane and landmark) out-gains any steered thumb on **outside** (+2.6 YPC) and **power** runs, so a person who pushes the stick at the handoff gains about 1.3 yards a carry less than one who waits, and outside runs reach 6.7 YPC with the representative late thumb (target 4.3 overall). Handed to **nfl-7** (run feel and G-1 calibration): either the held stick should get the lane's shaping (the stretch landmark) for its first beats, or `null`'s outside path is too generous; recalibrate with `stick-late0.35` as the human reference.
+- **(low) Service workers could bypass the QA route guard.** `nfl-lib.mjs` `phone()` and `nfl-guard.cjs` now open every context with `serviceWorkers: 'block'`. The `--probe` self-test proves it against a throwaway local origin: a bare context registers a worker (`control: registered`), the QA context does not (`worker: blocked`), and the fetch and WebSocket probes are still blocked and reported.
+- **(low) Screenshots defaulted to this session's scratchpad path.** `SHOTS` is now `NFL_SHOTS` or `os.tmpdir()/ps-nfl-shots`.
+- **(low, P-4) The pocket's tip ("Tap a name to throw…") stayed up while the ball was in the air, arguing with HOLD TO RUN.** It is cleared on the throw (and on a throwaway), and the first real throw shows "Momentum carries · steer when ready" in its place (checked in screenshots at A and C, with the ghost and with the stick held). nfl-3 may move that line into the toast.
+
+**Tests added:** `controls.test.ts` "steers at once with a touch made while the ball is in the air" (the reviewer's repro, back-left too, a pocket touch still gated, spent after one carrier, let go before the catch = momentum); `rushing.test.ts` "steers a receiver at once with a thumb that landed while the ball was in the air": 20 seeded catches, held right vs never touched on the same seed: vx rises on the first step and by > 1.5 yd/s at +0.1 s, > 1 yd/s right of the momentum path, positive by +0.25 s, and positive within 0.15 s whenever the catch was not already moving left faster than 1 yd/s. `nfl-catch-run.mjs` gains the `held` mode above.
 
 ## Touched outside my lane
 
@@ -528,6 +557,7 @@ The proxy's pocket thumb (`autopilot.ts` `pocketThumb`): a beaten rusher is seen
 
 - The catch-and-run feel without touching the stick, and the HOLD TO RUN ghost while the ball is in the air (nfl-1).
 - That a thumb resting on the stick through the throw never stops the catch, and that the first deliberate push takes the carrier at once (nfl-1).
+- That a thumb put on the stick while the ball is in the air steers the catch at once in any direction, including toward the sideline (nfl-1 review fix).
 - The HOLD TO RUN label's place above the stick on the owner's phone (it sits over the field's lower left; nfl-3 moves it into the toast line).
 
 ## Deferred and rejected

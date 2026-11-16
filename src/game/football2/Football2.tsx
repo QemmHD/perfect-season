@@ -104,6 +104,10 @@ function countGame() {
   }
 }
 
+/** The pocket's first-time tip, and the one that replaces it once the ball is in the air. */
+const PASS_TIP = 'Tap a name to throw · or drag back on the right to aim';
+const AIR_TIP = 'Momentum carries · steer when ready';
+
 /** The stick's vector (y up, after its dead zone) as a field direction: up the screen is up the field. */
 function fieldOf(v: Vec, view: 'end' | 'side'): Pt {
   return view === 'side' ? { x: v.y, y: v.x } : { x: v.x, y: v.y };
@@ -403,7 +407,7 @@ export function Football2({
     setBook(null);
     setUi('live');
     setPhase(p.phase);
-    if (p.call === 'pass') tip('pass', 'Tap a name to throw · or drag back on the right to aim');
+    if (p.call === 'pass') tip('pass', PASS_TIP);
     else tip('run', burstPrefRef.current ? 'Stick to run · hold D to burst' : 'Stick to run · push past the ring to burst');
   };
 
@@ -486,7 +490,14 @@ export function Football2({
       if (e === 'snap') sfx.hit(0.15);
       else if (e === 'handoff') sfx.catch();
       else if (e === 'pancake') sfx.hit(0.6);
-      else if (e === 'throw' || e === 'throw-pressure' || e === 'scramble') sfx.whoosh();
+      else if (e === 'throw' || e === 'throw-pressure' || e === 'scramble') {
+        sfx.whoosh();
+        // the ball's away: the pocket's tip no longer applies (it would argue with HOLD TO RUN)
+        if (e !== 'scramble') {
+          setHint((h) => (h === PASS_TIP ? null : h));
+          tip('air', AIR_TIP);
+        }
+      } else if (e === 'throwaway') setHint((h) => (h === PASS_TIP ? null : h));
       else if (e === 'catch') {
         sfx.catch();
         crowd.swell(0.3);
@@ -953,7 +964,8 @@ export function Football2({
       const p = playRef.current;
       if (g.kind === 'stick-down') {
         runKeys.current.clear();
-        gate.current.touch();
+        // a thumb that lands while the ball is in the air is for the catch: it steers him at once
+        gate.current.touch(p?.phase === 'air');
       } else if (g.kind === 'sling-start') dragRef.current = { id: g.id, x0: g.x0, y0: g.y0, dx: 0, dy: 0 };
       else if (g.kind === 'sling-release') {
         const aim = p ? aimNow(p) : null;
@@ -1015,7 +1027,7 @@ export function Football2({
     const key = e.key.toLowerCase();
     if (!['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) return;
     e.preventDefault();
-    if (held && !e.repeat) gate.current.touch();
+    if (held && !e.repeat) gate.current.touch(playRef.current?.phase === 'air');
     if (held) runKeys.current.add(key);
     else runKeys.current.delete(key);
   };

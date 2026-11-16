@@ -68,6 +68,35 @@ describe('the momentum carry gate', () => {
     expect(g.input(6, true, { x: 0, y: 0 })).toBeNull();
     expect(g.input(6, true, { x: 0, y: 0.3 })).toEqual({ x: 0, y: 0.3 });
   });
+  it('steers at once with a touch made while the ball is in the air, whatever its direction', () => {
+    const right = { x: 1, y: 0 };
+    const g = new CarryGate();
+    // the reviewer's repro: touched in the air, held right through the catch
+    g.touch(true);
+    expect(g.input(null, false, right)).toEqual(right);
+    expect(g.input(11, false, right)).toEqual(right);
+    expect(g.input(11, false, right)).toEqual(right);
+    // back-left too: a thumb that landed after the throw is deliberate
+    g.reset();
+    g.touch(true);
+    expect(g.input(null, false, backLeft)).toEqual(backLeft);
+    expect(g.input(12, false, backLeft)).toEqual(backLeft);
+    // a touch in the pocket (not in the air) still waits for the upfield rule
+    g.reset();
+    g.touch();
+    expect(g.input(null, false, right)).toEqual(right);
+    expect(g.input(13, false, right)).toBeNull();
+    // the air touch is used once: the next carrier (a lateral) is decided afresh
+    g.reset();
+    g.touch(true);
+    expect(g.input(14, false, right)).toEqual(right);
+    expect(g.input(15, false, right)).toBeNull();
+    // let go before the catch: he runs on his momentum, never a brake
+    g.reset();
+    g.touch(true);
+    expect(g.input(null, false, right)).toEqual(right);
+    expect(g.input(16, false, null)).toBeNull();
+  });
   it('decides afresh for every new carrier: a touch before the ball changes hands does not carry over', () => {
     const g = new CarryGate();
     g.touch();

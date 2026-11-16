@@ -106,6 +106,9 @@ if (MODE === 'pin') {
     for (const level of ['rookie', 'pro', 'legend'] as const) run('human-' + level + '-gold', () => kit.runCase(teams('gold'), human(level), 'human-' + level + '-gold', GAMES));
   if (CASES.includes('stick'))
     for (const [name, extra] of [
+      // the human proxy steering by the pilot's numeric lane: the old perfect thumb, the yardstick
+      // the held, late and untouched thumbs are measured against (same config as human-pro-gold)
+      ['lane', {}],
       ['held', { stickDelay: 0 }],
       ['late' + HUMAN_STICK_REACTION, { stickDelay: HUMAN_STICK_REACTION }],
       ['late0.7', { stickDelay: 0.7 }],

@@ -24,15 +24,24 @@ export const CARRY_MOVE = 0.25;
  * until the held stick moves CARRY_MOVE from where it was. From then on the stick is direct control:
  * its vector, and {0,0} (a brake) when it is centred or let go. So a thumb drifting the quarterback
  * back-left never sends the receiver back-left after the catch, and a late thumb never stops him.
+ * A touch made while the ball is in the air (`touch(true)`: nobody carries it, and the stick can only
+ * be there for whoever catches it) is deliberate, so a stick it holds at the catch counts whatever
+ * its direction; a touch in the pocket (`touch()`) stays gated, so a drifting thumb never carries over.
  */
 export class CarryGate {
   private carrier: number | null = null;
   private steering = false;
   private at: Pt | null = null;
+  /** a touch made while the ball was in the air, waiting for the catch (Claude, nfl-1 review fix) */
+  private fresh = false;
 
-  /** A new touch of the stick, or a key press: the player has the carrier from now on. */
-  touch() {
+  /**
+   * A new touch of the stick, or a key press: the player has the carrier from now on. `inAir`:
+   * made while the ball is in the air, so it is meant for the receiver who catches it.
+   */
+  touch(inAir = false) {
     this.steering = true;
+    if (inAir && this.carrier === null) this.fresh = true;
   }
 
   /** A new play: nobody has the ball yet. */
@@ -40,6 +49,7 @@ export class CarryGate {
     this.carrier = null;
     this.steering = false;
     this.at = null;
+    this.fresh = false;
   }
 
   /**
@@ -52,7 +62,8 @@ export class CarryGate {
       this.carrier = carrier;
       this.at = stick;
       const len = stick ? Math.hypot(stick.x, stick.y) : 0;
-      this.steering = !!stick && len > 0 && (handoff || stick.y >= CARRY_UPFIELD * len);
+      this.steering = !!stick && len > 0 && (handoff || this.fresh || stick.y >= CARRY_UPFIELD * len);
+      this.fresh = false;
     } else if (!this.steering && stick && this.at && Math.hypot(stick.x - this.at.x, stick.y - this.at.y) >= CARRY_MOVE) this.steering = true;
     if (carrier === null) return stick ?? { x: 0, y: 0 };
     return this.steering ? (stick ?? { x: 0, y: 0 }) : null;
