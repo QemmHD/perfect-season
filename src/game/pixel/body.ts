@@ -177,10 +177,10 @@ export function freeCanvas(c: HTMLCanvasElement | null | undefined) {
  * long game mustn't pile them up. `inUse` are drawings still on screen (kept whole). A hit moves a
  * drawing to the back of the line.
  */
-export class SpriteCache {
-  private map = new Map<string, Sprite>();
+export class SpriteCache<S extends Sprite = Sprite> {
+  private map = new Map<string, S>();
   constructor(private cap: number) {}
-  get(key: string): Sprite | undefined {
+  get(key: string): S | undefined {
     const s = this.map.get(key);
     if (s) {
       this.map.delete(key);
@@ -188,7 +188,7 @@ export class SpriteCache {
     }
     return s;
   }
-  set(key: string, spr: Sprite, inUse: Iterable<Sprite>) {
+  set(key: string, spr: S, inUse: Iterable<Sprite>) {
     if (this.map.size >= this.cap) {
       const keep = new Set(inUse);
       let drop = Math.ceil(this.cap / 3);

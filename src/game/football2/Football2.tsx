@@ -49,6 +49,7 @@ import { screenRunInput } from './controls';
 import './playbook.css';
 import { PlaybookDialog } from './PlaybookDialog';
 import { useInputInterrupt } from '../useInputInterrupt';
+import { artScale } from '../pixel/art-scale';
 
 type Ui = 'loading' | 'pre' | 'fourth' | 'live' | 'after' | 'kick' | 'final';
 
@@ -668,9 +669,12 @@ export function Football2({
       const w = wrap.clientWidth;
       const h = wrap.clientHeight;
       renderer.resize(w, h);
-      if (canvas.width !== renderer.W || canvas.height !== renderer.H) {
-        canvas.width = renderer.W;
-        canvas.height = renderer.H;
+      // players-2: the backing store for the art pixel (pixel/art-scale.ts; 1 canvas px per view px unless ?artpx=A)
+      renderer.art = artScale(canvas, renderer.W, renderer.H);
+      const bw = Math.round(renderer.W * renderer.art.backing), bh = Math.round(renderer.H * renderer.art.backing);
+      if (canvas.width !== bw || canvas.height !== bh) {
+        canvas.width = bw;
+        canvas.height = bh;
         canvas.style.width = renderer.W * renderer.zoom + 'px';
         canvas.style.height = renderer.H * renderer.zoom + 'px';
         setWide(w > h);

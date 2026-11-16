@@ -9,10 +9,11 @@
 // line, the aim reticle and a small goal over the meter (where it's going, past the keeper), a ring
 // that tightens as the meter nears the green, and the release read-out (PERFECT / GOOD / EARLY / LATE).
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-soccer.ts.
-import { drawBody, freeCanvas, type Look, type Sprite, SpriteCache, CanvasOut } from '../pixel/body';
+import { drawBody, freeCanvas, type Look, SpriteCache, CanvasOut } from '../pixel/body';
 import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
 import { drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { pitchTexture, type PitchTheme } from '../pixel/pitch';
+import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import { animOf, CLIPS, heightM, lookFor, type Memo } from '../pixel/select-soccer';
@@ -54,10 +55,12 @@ export class SoccerRenderer {
   private cam: PCam | null = null;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache(700);
+  private sprites = new SpriteCache<ArtSprite>(700);
+  /** the art pixel (pixel/art-scale.ts), set by the screen from its canvas each frame */
+  art: ArtScale = ART_C;
   private looks = new Map<string, Look>();
   private memos = new Map<string, Memo>();
-  private last = new Map<string, Sprite>();
+  private last = new Map<string, ArtSprite>();
   private budget = 0;
   private follow: Pt | null = null;
   private bits: { x: number; y: number; h: number; vx: number; vy: number; vh: number; life: number; color: string; size: number }[] = [];
@@ -126,7 +129,7 @@ export class SoccerRenderer {
     return project(this.cam!, x, y, h);
   }
 
-  private sprite(b: Body, t: number, s: number, kitSide: 'us' | 'them'): Sprite {
+  private sprite(b: Body, t: number, s: number, kitSide: 'us' | 'them'): ArtSprite {
     const who = b.p.id + '|' + b.side + '|' + kitSide;
     let memo = this.memos.get(who);
     if (!memo) {
@@ -147,8 +150,9 @@ export class SoccerRenderer {
     memo.faceAt = t;
     dir = memo.face;
     // drawn with V2's height spread around the game's mean (render only: the engine keeps b.p.ht)
-    const raw = Math.max(8, Math.round(drawnM(b) * s));
-    const px = raw > 14 ? raw - (raw % 2) : raw;
+    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
+    const raw = Math.max(8, this.art.artPxFor(drawnM(b) * s));
+    const px = quantPx(raw);
     const dirs = px < 22 ? 8 : 16;
     const facing = Math.atan2(-dir.y, dir.x);
     const fb = (Math.round((facing / (Math.PI * 2)) * dirs) + dirs) % dirs;
@@ -164,7 +168,7 @@ export class SoccerRenderer {
     const step = an.clip ? (px < 22 ? Math.max(3, an.step ?? 2) : (an.step ?? 2)) : 1;
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
     const key = an.clip ? mocapKey(an.clip, frame, 'clip') : an.key;
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + '|' + this.art.canvasPerArt + '/' + this.art.backing;
     let spr = this.sprites.get(k);
     if (!spr) {
       const last = this.last.get(who);
@@ -173,12 +177,12 @@ export class SoccerRenderer {
       const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
       const make = () => (an.clip ? drawBody(look!, mocapJoints(an.clip, frame, look!, { ground: 'clip' }), view, px) : drawBody(look!, { ...an.pose, lift: 0 }, view, px));
       try {
-        spr = make();
+        spr = toView(make(), this.art);
       } catch (e) {
         if (!(e instanceof CanvasOut)) throw e;
         this.sprites.dispose(this.last.values());
         try {
-          spr = make();
+          spr = toView(make(), this.art);
         } catch {
           if (last) return last;
           throw e;
@@ -577,6 +581,7 @@ export class SoccerRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, a: Attack, o: SoccerOverlay, kitOf: (b: Body) => 'us' | 'them') {
+    ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     ctx.imageSmoothingEnabled = false;
     // a corner pulls out wide enough for the taker and the whole box; a replay pushes in
     const zt = this.replay ? 1.3 : a.setPiece?.kind === 'corner' ? 0.68 : 1;
@@ -629,7 +634,7 @@ export class SoccerRenderer {
           const spr = this.sprite(b, a.t, this.lens(b.x, b.y).s, kitOf(b));
           const x = Math.round(f.x - spr.ax);
           const y = Math.round(f.y - spr.ay);
-          ctx.drawImage(spr.canvas, x, y);
+          blitSprite(ctx, spr, x, y);
           heads[b.id] = { x: Math.round(f.x), y: y + spr.top };
         },
       });

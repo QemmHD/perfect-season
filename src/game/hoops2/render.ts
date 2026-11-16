@@ -3,9 +3,10 @@
 // row at a time, the arena's stands behind the basket, ten rigged players in their moves, the ball,
 // the backboard, rim and net, the 2K-style shot meter arched over the shooter and the contest grade.
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-nba.ts.
-import { drawBody, type Look, type Sprite, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
+import { drawBody, type Look, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
 import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
+import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
@@ -57,8 +58,10 @@ export class HoopsRenderer {
   private pc!: PCam;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache(360);
-  private last = new Map<string, Sprite>();
+  private sprites = new SpriteCache<ArtSprite>(360);
+  private last = new Map<string, ArtSprite>();
+  /** the art pixel (pixel/art-scale.ts), set by the screen from its canvas each frame */
+  art: ArtScale = ART_C;
 
   /** The game's over: hand back every canvas this drew with, now (iOS caps a page's canvas memory). */
   dispose() {
@@ -133,15 +136,16 @@ export class HoopsRenderer {
   private prevBall: { x: number; y: number; real: number } | null = null;
 
   /** A body's drawing this frame and whether the jump is drawn into it (then he's placed on the floor). */
-  private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number, ball: Possession['ball'], over?: { key: string; pose: Pose }): { spr: Sprite; ownLift: boolean } {
+  private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number, ball: Possession['ball'], over?: { key: string; pose: Pose }): { spr: ArtSprite; ownLift: boolean } {
     // facing on screen: the camera looks up the floor (+cx), across is +cz to the right; a 360
     // dunk turns him all the way round on the way up
     const turn = spins360(b) ? Math.PI * 2 * Math.min(1, Math.max(0, (t - b.actAt - 0.12) / 0.42)) : 0;
     const dcx = Math.cos(b.face + turn);
     const dcz = Math.sin(b.face + turn);
     // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
-    const raw = Math.max(10, Math.round((drawnHeight('nba', b.p.ht) / 12) * s));
-    const px = raw > 14 ? raw - (raw % 2) : raw;
+    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
+    const raw = Math.max(10, this.art.artPxFor((drawnHeight('nba', b.p.ht) / 12) * s));
+    const px = quantPx(raw);
     const dirs = px < 26 ? 8 : 16;
     const fb = (Math.round((Math.atan2(-dcx, dcz) / (Math.PI * 2)) * dirs) + dirs) % dirs;
     const pitch = Math.round(Math.min(0.9, pitchAt(this.pc, b.cx)) / 0.15) * 0.15;
@@ -165,7 +169,7 @@ export class HoopsRenderer {
     const lean = striding ? sprintLean(b.p.spd, Math.hypot(b.vx, b.vz) / Math.max(1, topSpeed(b, false))) : 0;
     const key = (an.clip ? mocapKey(an.clip, frame, an.ground) + (an.dribble !== undefined ? 'd' + an.dribble : '') : an.key) + (heavy ? 'w' + heavy : '') + (lean ? 'l' + lean : '');
     const ownLift = !!an.clip && an.ground === 'clip';
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + '|' + this.art.canvasPerArt + '/' + this.art.backing;
     let spr = this.sprites.get(k);
     if (!spr) {
       // a few new drawings a frame (the man with the ball always gets his): the rest keep last frame's
@@ -182,14 +186,14 @@ export class HoopsRenderer {
         return drawBody(look, j, view, px);
       };
       try {
-        spr = make();
+        spr = toView(make(), this.art);
       } catch (e) {
         if (!(e instanceof CanvasOut)) throw e;
         // the phone is out of canvas memory: let go of every old drawing and try once more; failing
         // that, he keeps last frame's
         this.sprites.dispose(this.last.values());
         try {
-          spr = make();
+          spr = toView(make(), this.art);
         } catch {
           if (last) return { spr: last, ownLift: this.lastLift.get(who) ?? false };
           throw e;
@@ -355,6 +359,7 @@ export class HoopsRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, p: Possession, real: number, fx: Fx) {
+    ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     this.budget = 4;
     ctx.imageSmoothingEnabled = false;
     // the camera drifts across with the ball and a little up and down the floor with it
@@ -435,12 +440,12 @@ export class HoopsRenderer {
               if (!q) continue;
               const g = this.at(q.cx, q.cz);
               ctx.globalAlpha = a0 * alpha;
-              ctx.drawImage(s.canvas, Math.round(g.x - s.ax), Math.round(g.y - s.ay));
+              blitSprite(ctx, s, Math.round(g.x - s.ax), Math.round(g.y - s.ay));
             }
             ctx.globalAlpha = a0;
           }
-          ctx.drawImage(s.canvas, x, y);
-          headOf[b.idx] = { x: Math.round(f.x), y: y + s.top, right: x + s.canvas.width };
+          blitSprite(ctx, s, x, y);
+          headOf[b.idx] = { x: Math.round(f.x), y: y + s.top, right: x + s.w };
           if (carrying) handSpot = { x: x + s.handR.x, y: y + s.handR.y, s: f.s };
         },
       });

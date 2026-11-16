@@ -3,9 +3,10 @@
 // the offense with perspective, the grass drawn a row at a time. On top: twenty-two rigged players
 // in their kits, the ball, the posts, the lines, the routes before the snap and the slingshot's arc.
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-nfl.ts.
-import { drawBody, type Sprite, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
+import { drawBody, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { drawField, type FieldCam, fieldAt, fieldCam, fieldFacing, type FieldTheme } from '../pixel/field';
 import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
+import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
@@ -66,7 +67,9 @@ export class FootballRenderer {
   private field: { canvas: HTMLCanvasElement; cam: FieldCam } | null = null;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache(600);
+  private sprites = new SpriteCache<ArtSprite>(600);
+  /** the art pixel (pixel/art-scale.ts), set by the screen from its canvas each frame */
+  art: ArtScale = ART_C;
 
   /** The game's over: hand back every canvas this drew with, now (iOS caps a page's canvas memory). */
   dispose() {
@@ -84,7 +87,7 @@ export class FootballRenderer {
   private aiming = false;
   private follow: Pt | null = null;
   /** each player's drawing last frame, and how many new drawings this frame may still make */
-  private last = new Map<string, Sprite>();
+  private last = new Map<string, ArtSprite>();
   private budget = 0;
   /** turf kicked up, confetti and the On Fire flames: field position and height, speed, life left, color, size */
   private bits: { x: number; y: number; h: number; vx: number; vy: number; vh: number; life: number; color: string; size: number; rise?: boolean }[] = [];
@@ -209,7 +212,7 @@ export class FootballRenderer {
     return best && bestD < 6 ? best : null;
   }
 
-  private sprite(b: Body, t: number, p: Play, s: number): Sprite {
+  private sprite(b: Body, t: number, p: Play, s: number): ArtSprite {
     const L = this.lens;
     const who = b.p.id + '|' + b.side;
     let memo = this.memos.get(who);
@@ -236,8 +239,9 @@ export class FootballRenderer {
     // sizes, angles and (for small, far players) facings in steps, so a player moving up the field
     // reuses his drawings
     // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
-    const raw = Math.max(8, Math.round((drawnHeight('nfl', b.p.ht) / 36) * s));
-    const px = raw > 14 ? raw - (raw % 2) : raw;
+    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
+    const raw = Math.max(8, this.art.artPxFor((drawnHeight('nfl', b.p.ht) / 36) * s));
+    const px = quantPx(raw);
     const dirs = px < 22 ? 8 : 16;
     const fb = (Math.round((L.facing(dir.x, dir.y) / (Math.PI * 2)) * dirs) + dirs) % dirs;
     // seen from high up close: the rig reads best no steeper than this
@@ -256,7 +260,7 @@ export class FootballRenderer {
     const heavy = striding ? Math.round(heaviness(b.p.wt, b.p.ht) * 4) / 4 : 0;
     const lean = striding ? sprintLean(b.p.a.SPD ?? 70, Math.hypot(b.vx, b.vy) / Math.max(1, speedOf(b.p))) : 0;
     const key = (an.clip ? mocapKey(an.clip, frame, an.ground) + (an.ball ?? '') : an.key) + (heavy ? 'w' + heavy : '') + (lean ? 'l' + lean : '');
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + '|' + this.art.canvasPerArt + '/' + this.art.backing;
     let spr = this.sprites.get(k);
     if (!spr) {
       // a few new drawings a frame at most (the man with the ball always gets his): past that, he
@@ -274,14 +278,14 @@ export class FootballRenderer {
         return drawBody(look, j, view, px);
       };
       try {
-        spr = make();
+        spr = toView(make(), this.art);
       } catch (e) {
         if (!(e instanceof CanvasOut)) throw e;
         // the phone is out of canvas memory: let go of every old drawing and try once more; failing
         // that, he keeps last frame's
         this.sprites.dispose(this.last.values());
         try {
-          spr = make();
+          spr = toView(make(), this.art);
         } catch {
           if (last) return last;
           throw e;
@@ -413,6 +417,7 @@ export class FootballRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, p: Play, ballOn: number, o: FbOverlay) {
+    ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     ctx.imageSmoothingEnabled = false;
     this.aiming = !!o.aim;
     // follow the play
@@ -565,11 +570,11 @@ export class FootballRenderer {
           if (!q) continue;
           const at = L.at(q.x, q.y);
           ctx.globalAlpha = a0 * alpha;
-          ctx.drawImage(spr.canvas, Math.round(at.x - spr.ax), Math.round(at.y - spr.ay));
+          blitSprite(ctx, spr, Math.round(at.x - spr.ax), Math.round(at.y - spr.ay));
         }
         ctx.globalAlpha = a0;
       }
-      ctx.drawImage(spr.canvas, x, y);
+      blitSprite(ctx, spr, x, y);
       heads[b.id] = { x: Math.round(g.x), y: y + spr.top };
       if (b === p.carrier) {
         const hd = b.act === 'throw' || p.phase === 'pre' || p.phase === 'drop' ? spr.handR : spr.handL;

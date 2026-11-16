@@ -28,6 +28,7 @@ import { SoccerRenderer } from './render';
 import { kickAttack, newShootout, nextKick, recordKick, score as soScore, type Shootout, type Side } from './shootout';
 import type { Attack, AttackEnd, Body, Pt, Scenario, Squad } from './types';
 import './soccer2.css';
+import { artScale } from '../pixel/art-scale';
 
 type Ui = 'loading' | 'intro' | 'live' | 'after' | 'so-intro' | 'so-kick' | 'so-after' | 'final';
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
@@ -652,9 +653,12 @@ export function Soccer2({
       const w = wrap.clientWidth;
       const h = wrap.clientHeight;
       renderer.resize(w, h);
-      if (canvas.width !== renderer.W || canvas.height !== renderer.H) {
-        canvas.width = renderer.W;
-        canvas.height = renderer.H;
+      // players-2: the backing store for the art pixel (pixel/art-scale.ts; 1 canvas px per view px unless ?artpx=A)
+      renderer.art = artScale(canvas, renderer.W, renderer.H);
+      const bw = Math.round(renderer.W * renderer.art.backing), bh = Math.round(renderer.H * renderer.art.backing);
+      if (canvas.width !== bw || canvas.height !== bh) {
+        canvas.width = bw;
+        canvas.height = bh;
         canvas.style.width = renderer.W + 'px';
         canvas.style.height = renderer.H + 'px';
         setWide(w > h);
