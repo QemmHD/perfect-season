@@ -7,6 +7,7 @@ import { registerServiceWorker } from './lib/update';
 import { Stage } from './stage';
 import './styles.css';
 import './shell/plates.css';
+import { RecoveryBoundary } from './shell/Recovery';
 
 // the arcade games' test bench (?arcade), loaded only when asked for
 const Lab = React.lazy(() => import('./game/Lab'));
@@ -81,7 +82,7 @@ function Root() {
   }, [ready]);
   return (
     <Stage>
-      {ready && (SOCCER_LAB && SoccerLab ? <React.Suspense fallback={null}><SoccerLab /></React.Suspense> : LAB ? <React.Suspense fallback={null}><Lab /></React.Suspense> : <App />)}
+      {ready && <RecoveryBoundary where="root">{SOCCER_LAB && SoccerLab ? <React.Suspense fallback={null}><SoccerLab /></React.Suspense> : LAB ? <React.Suspense fallback={null}><Lab /></React.Suspense> : <App />}</RecoveryBoundary>}
       {splash && <Splash leaving={ready} />}
     </Stage>
   );

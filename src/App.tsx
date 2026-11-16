@@ -28,6 +28,7 @@ import { type ArcadeState, cleanRoomCode, type Found, MatchConn, type OnlineCoun
 import { NET_ON } from './net/nostr';
 import { Sheet, Toast, TopBar } from './ui/common';
 import { Transition } from './ui/motion';
+import { RecoveryBoundary } from './shell/Recovery';
 import { Draft, type OnlineProps } from './ui/Draft';
 import { type LbStatus, NameSheet, openBoardNext, openOnlineNext } from './ui/Leaderboard';
 import { type Gift, watchGifts } from './net/gifts';
@@ -1184,7 +1185,7 @@ export function App() {
         </div>
         <div className="shell-views">
           <Transition id={tab} enter="tab" exitMs={160}>
-            {page}
+            <RecoveryBoundary where="tab" resetKey={tab} onHome={tab === 'home' ? undefined : () => goTab('home')}>{page}</RecoveryBoundary>
           </Transition>
         </div>
         <Tabs tab={tab} onTab={goTab} onUltimate={openUltimate} utNew={!profile.ut.starterClaimed} />
@@ -1195,7 +1196,7 @@ export function App() {
   return (
     <>
       <Transition id={viewId} enter={enter} exitMs={260}>
-        {body}
+        <RecoveryBoundary where="view" resetKey={viewId} onHome={() => goTab('home')}>{body}</RecoveryBoundary>
       </Transition>
       {saveFailed && <div className="save-warning" role="alert"><span>Progress isn’t saving on this phone.</span><button onClick={() => setLocker(true)}>CLOUD SAVE</button><button aria-label="Retry saving" onClick={() => { if(saveProfile(profile)){setSaveFailed(false); if(run?.draft && ['draft','reveal','playoffs'].includes(screen)) writeCheckpoint(run,screen as any);} }}>RETRY</button></div>}
       {modal === 'replace' && <Sheet label="Start a new draft?" kind="center" onClose={()=>setModal(null)}>{close=><div className="save-locker"><h2 className="disp">START FRESH?</h2><p>A new solo draft replaces your unfinished run. Your cards, coins and completed records stay with you.</p><button className="btn gold" onClick={()=>{clearCheckpoint();setSaved(null);setModal(null);startDraft(nextMode);}}>START NEW DRAFT</button><button className="btn ghost" onClick={()=>close()}>KEEP MY RUN</button></div>}</Sheet>}
