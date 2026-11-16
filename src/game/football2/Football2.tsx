@@ -46,6 +46,7 @@ import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, PassType, Play, Pt } from './types';
 import './rushing-controls.css';
 import { screenRunInput } from './controls';
+import { AUTO_KICK_AIM, AUTO_PICK, KICK_RESULT, KICK_TO_TRAY, LONG_TD_REPLAY, PUNT_TO_TRAY, REPLAY_LEAD, REPLAY_TAIL, SLOWMO, SLOWMO_RATE, WHISTLE_TO_TRAY } from './pacing';
 import './playbook.css';
 import { PlaybookDialog } from './PlaybookDialog';
 import { useInputInterrupt } from '../useInputInterrupt';
@@ -326,6 +327,7 @@ export function Football2({
     else tip('run', 'Joystick to run in any direction · hold BURST for speed');
   };
 
+  /** Report the play, then line up the next one `wait` seconds later. */
   const nextUp = (g: Game, driveOver: boolean, wait: number) => {
     onProgress(progress(g));
     window.setTimeout(() => {
@@ -343,7 +345,7 @@ export function Football2({
         tip('clock', 'The clock runs between plays · an incompletion or going out of bounds stops it');
       } else if (driveOver) say('DRIVE ' + (g.drive + 1) + ' OF ' + g.drives, 'plain', 1100);
       lineUpNext(g);
-    }, wait);
+    }, wait * 1000);
   };
 
   /** the ability names on the pop (Madden-style) */
@@ -414,7 +416,7 @@ export function Football2({
         vibrate([20, 30, 20]);
         crowd.swell(0.8);
         shake(kind === 'truck' ? 4 : 2);
-        if (kind === 'truck') slowUntil.current = performance.now() + 450;
+        if (kind === 'truck') slowUntil.current = performance.now() + SLOWMO.truck * 1000;
         say(kind === 'juke' ? 'JUKED!' : kind === 'spin' ? 'SPIN MOVE!' : kind === 'truck' ? 'TRUCKED!' : 'STIFF ARM!', 'big', 900);
       } else if (e === 'whiff') {
         sfx.whoosh();
@@ -426,7 +428,7 @@ export function Football2({
       } else if (e === 'bighit') {
         if (p.carrier) highlight.current = { t: p.t, x: p.carrier.x, y: p.carrier.y, before: REPLAY_BEFORE };
         // the hit lands in slow motion
-        slowUntil.current = performance.now() + 750;
+        slowUntil.current = performance.now() + SLOWMO.bighit * 1000;
         sfx.hit(1);
         sfx.thud(0.12);
         shake(6);
@@ -508,9 +510,9 @@ export function Football2({
       say(e.text, 'plain', 1100);
     } else if (e.kind === 'sack') say(e.text, 'bad', 1300, gain);
     else say(gain, yds > 0 ? 'good' : 'plain', 1000, e.kind === 'out' ? 'OUT OF BOUNDS' : undefined);
-    if (a.points && yds >= 25 && !highlight.current) {
+    if (a.points && yds >= LONG_TD_REPLAY.yards && !highlight.current) {
       const c = p.carrier ?? p.catcher;
-      if (c) highlight.current = { t: p.t, x: c.x, y: c.y - 6, before: 2.4 };
+      if (c) highlight.current = { t: p.t, x: c.x, y: c.y - 6, before: LONG_TD_REPLAY.before };
     }
     // the whistle: the play's dead (a touchdown has its horn)
     if (!a.points) window.setTimeout(() => sfx.whistle(), 220);
@@ -519,8 +521,8 @@ export function Football2({
     // (not the game's last play: it's reported done, and the results come next)
     if (hl && !game.over && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) {
       onProgress(progress(game));
-      window.setTimeout(() => startReplay(hl, () => nextUp(game, !!a.driveOver, 250)), a.points ? 1500 : 1100);
-    } else nextUp(game, !!a.driveOver, a.points ? 2300 : a.driveOver ? 1900 : 1350);
+      window.setTimeout(() => startReplay(hl, () => nextUp(game, !!a.driveOver, REPLAY_TAIL)), (a.points ? REPLAY_LEAD.score : REPLAY_LEAD.play) * 1000);
+    } else nextUp(game, !!a.driveOver, a.points ? WHISTLE_TO_TRAY.score : a.driveOver ? WHISTLE_TO_TRAY.drive : WHISTLE_TO_TRAY.play);
   };
 
   /** Play the highlight again, slower, from closer; then on with the drive. */
@@ -591,8 +593,8 @@ export function Football2({
         sfx.groan(1);
         say('NO GOOD', 'bad', 1500, side < 0 ? 'WIDE LEFT' : 'WIDE RIGHT');
       }
-      nextUp(game, true, 1700);
-    }, 1000);
+      nextUp(game, true, KICK_TO_TRAY);
+    }, KICK_RESULT * 1000);
     window.setTimeout(() => {
       kickRef.current = null;
       kickAnim.current = null;
@@ -606,7 +608,7 @@ export function Football2({
     punt(game);
     say('PUNT', 'plain', 1100, 'DRIVE OVER');
     setUi('after');
-    nextUp(game, true, 1300);
+    nextUp(game, true, PUNT_TO_TRAY);
   };
 
   // the autopilot calls the plays in tests
@@ -625,7 +627,7 @@ export function Football2({
           else snapNow();
         } else if (ui === 'kick') kickNow();
       },
-      ui === 'kick' ? 700 : 450
+      (ui === 'kick' ? AUTO_KICK_AIM : AUTO_PICK) * 1000
     );
     return () => clearTimeout(t);
   }, [ui, autoplayHook, game]);
@@ -681,10 +683,10 @@ export function Football2({
       last = now;
       // slow motion and hit-stop only hold back real time: the same fixed steps run, a beat later
       fx.juice.update(elapsed);
-      acc += fx.juice.gameTime(now, now < slowUntil.current ? elapsed * 0.4 : elapsed);
+      acc += fx.juice.gameTime(now, now < slowUntil.current ? elapsed * SLOWMO_RATE : elapsed);
       if (p && p.end) {
         // after the whistle: the hit lands, the tackled man slides, the pile settles
-        const vis = fx.juice.gameTime(now, now < slowUntil.current ? elapsed * 0.4 : elapsed);
+        const vis = fx.juice.gameTime(now, now < slowUntil.current ? elapsed * SLOWMO_RATE : elapsed);
         p.t += vis;
         for (const b of p.bodies) {
           if (Math.abs(b.vx) + Math.abs(b.vy) < 0.05) continue;
