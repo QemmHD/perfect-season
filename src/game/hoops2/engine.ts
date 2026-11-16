@@ -10,6 +10,15 @@
 // Getting open is the game: the stick at its edge is a sprint (on a stamina bar) that beats a slower
 // man, crossovers and step-backs shake a defender by the handle, and each possession the defense
 // shows a look to read (man, sagging off a poor shooter, switching, trapping the ball).
+//
+// Box-score events (Claude 2026-11-10, observation only: pushed beside the existing ones, they never
+// change state or the order of `p.rand` draws, so seeded games come out identical):
+//   fga:<shooter>:<kind>:<2|3>  a field-goal attempt as it leaves his hands (blocked ones too)
+//   drb:<defender>              a defensive rebound (the possession ends 'miss')
+//   stl:<defender>              a strip on the dribble (ends 'steal')
+//   int:<defender>              a pass picked off (ends 'int')
+//   foul:<defender>             the contact on an and-one (its 'ft:make' / 'ft:miss' follows)
+// `box.ts` builds per-player lines from them.
 import { badgeMult, badgeTier } from './badges';
 import type { Act, Body, Contest, EndKind, Hooper, Possession, Pt, Scheme, ShotKind } from './types';
 
@@ -549,7 +558,7 @@ function shoot(p: Possession, b: Body, kind: ShotKind, greened: boolean, off: nu
     b.bumped = true;
     loose(p, b, false);
     p.lastShot = { kind, contest, greened, off: clamp(off / 0.25, -1, 1), make: false, p: pm, and1: false };
-    p.events.push('blocked:' + cd.idx);
+    p.events.push(fgaEvent(b, kind, isThree(b) ? 3 : 2), 'blocked:' + cd.idx);
     return;
   }
   const make = r() < pm;
@@ -562,6 +571,7 @@ function shoot(p: Possession, b: Body, kind: ShotKind, greened: boolean, off: nu
   }
   if (cr < 5 && contest !== 'open') badgeEvent(p, cd, 'clamps');
   const flight = Math.max(0.55, 0.62 + d * 0.022);
+  const points = isThree(b) ? 3 : 2;
   p.ball = {
     kind: 'shot',
     from: { cx: b.cx, cz: b.cz, h: b.h + 8.2 },
@@ -571,12 +581,18 @@ function shoot(p: Possession, b: Body, kind: ShotKind, greened: boolean, off: nu
     arc: 5 + d * 0.28,
     who: b.idx,
     make,
-    points: isThree(b) ? 3 : 2,
+    points,
     shot: kind
   };
   p.handler = null;
   p.meter = null;
-  p.events.push(greened ? 'release-green' : 'release');
+  p.events.push(fgaEvent(b, kind, points), greened ? 'release-green' : 'release');
+}
+
+/** The box score's attempt (observation only): who, what shot, and what it's worth (a jumper from
+ * where he let it go; a finish is a two, its and-one booked as a free throw). */
+function fgaEvent(b: Body, kind: ShotKind, points: number): string {
+  return 'fga:' + b.idx + ':' + kind + ':' + points;
 }
 
 /** the finish at the rim, at the top of his jump */
@@ -608,9 +624,10 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
     b.bumped = true;
     loose(p, b, false);
     p.lastShot = { kind, contest, greened: releaseGreened, off: releaseOff, make: false, p: 0, and1: false };
-    p.events.push('blocked:' + cd.idx);
+    p.events.push(fgaEvent(b, kind, 2), 'blocked:' + cd.idx);
     return;
   }
+  p.events.push(fgaEvent(b, kind, 2));
   let pm: number;
   let greened = false;
   if (kind === 'layup') {
@@ -639,7 +656,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   const contact = cr < 3 && p.t >= cd.stunUntil;
   const fouled = make && contact && r() < (kind === 'contact' ? 0.42 : lerp(0.1, 0.28, rate(b.p.str)));
   const and1 = fouled && r() < freeThrow(b.p);
-  if (fouled) p.events.push(and1 ? 'ft:make' : 'ft:miss');
+  if (fouled) p.events.push('foul:' + cd.idx, and1 ? 'ft:make' : 'ft:miss');
   p.lastShot = { kind, contest, greened, off: releaseOff, make, p: pm, and1 };
   const dunk = kind !== 'layup';
   p.ball = {
@@ -781,6 +798,7 @@ export function crossover(p: Possession, dir: number) {
     p.events.push(dropped ? 'ankles:' + def.idx : 'shook:' + def.idx);
     if (dropped) badgeEvent(p, h, 'ankle-breaker');
   } else if (r() < clamp(0.03 + (def.p.stl - h.p.hnd) / 400, 0.01, 0.1)) {
+    p.events.push('stl:' + def.idx);
     end(p, 'steal', 0, 'STRIPPED BY ' + def.p.tag, h.idx);
   }
 }
@@ -806,6 +824,7 @@ function shakeMan(p: Possession, h: Body, bonus: number) {
     p.events.push(dropped ? 'ankles:' + def.idx : 'shook:' + def.idx);
     if (dropped) badgeEvent(p, h, 'ankle-breaker');
   } else if (r() < clamp(0.03 + (def.p.stl - h.p.hnd) / 400, 0.01, 0.1)) {
+    p.events.push('stl:' + def.idx);
     end(p, 'steal', 0, 'STRIPPED BY ' + def.p.tag, h.idx);
   }
 }
@@ -1121,6 +1140,7 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
             const passer = p.bodies.find((b) => b.side === 'O' && b.act === 'pass');
             const dimer = passer ? (1 - 0.4 * badgeMult(passer.p, 'dimer')) * lerp(1.4, 0.6, rate(passer.p.pas)) : 1;
             if (r() < (0.03 + 0.16 * rate(d.p.stl, 40, 99)) * dimer * (ball.kind === 'lob' ? 0.5 : 1) * (1 + 0.6 * p.defIQ)) {
+              p.events.push('int:' + d.idx);
               end(p, 'int', 0, 'PICKED OFF BY ' + d.p.tag, ball.who);
               return;
             }
@@ -1192,6 +1212,7 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
       if (grab) {
         act(grab, 'rebound', t);
         if (grab.side === 'D') {
+          p.events.push('drb:' + grab.idx);
           end(p, 'miss', 0, 'REBOUND ' + grab.p.tag, -1);
           return;
         }
@@ -1353,7 +1374,10 @@ function defend(p: Possession, b: Body, handler: Body | null, ballAt: Pt, inside
     // (by steal rating, but not as steeply: a 90 thief against even handles took 1.7x a 75's
     // steals; NBA teams range about 6.5-9.5 steals per 100 possessions)
     const chance = dt * (trapping ? 0.17 : helper ? 0.034 : 0.068) * (0.35 + 0.65 * rate(b.p.stl, 30, 99)) * (1.15 - rate(handler.p.hnd, 30, 99)) * (1 + 0.6 * iq);
-    if (r() < chance) end(p, 'steal', 0, 'STRIPPED BY ' + b.p.tag, handler.idx);
+    if (r() < chance) {
+      p.events.push('stl:' + b.idx);
+      end(p, 'steal', 0, 'STRIPPED BY ' + b.p.tag, handler.idx);
+    }
   }
 }
 

@@ -21,7 +21,7 @@ import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPE
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
 import { aimPass, callPlay, cancelShoot, jumpRebound, crossover, pass, pressShoot, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
-import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
+import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, practiceStart, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
 import type { Body, Hooper, Possession, Pt, Scheme } from './types';
@@ -31,6 +31,17 @@ import { useInputInterrupt } from '../useInputInterrupt';
 const DT = 1 / 60;
 /** what a phone's screen and touch add between what you saw and the release it hears (seconds) */
 const RELEASE_LAG = 0.03;
+
+/** What the dev server lets the QA probes read (window.__hg2): never part of a build. */
+interface QaProbe {
+  possession(): Possession | null;
+  game(): HoopsGame | null;
+  /** a court point on the canvas (canvas pixels) and the pixels a foot there */
+  screenOf(cx: number, cz: number, h?: number): { x: number; y: number; s: number } | null;
+  canvas(): HTMLCanvasElement | null;
+  /** canvas pixels to CSS pixels */
+  zoom(): number;
+}
 
 /** What a replay needs to redraw a moment of a possession. */
 interface Snap {
@@ -139,6 +150,17 @@ export function Hoops2({
     };
   }, []);
   const possRef = useRef<Possession | null>(null);
+  // The studio QA probes (scripts/audit/nba-geo.mjs, nba-rematch.mjs) read the camera and the live
+  // possession through this. Dev server only: Vite drops the block from the production build.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as { __hg2?: QaProbe };
+    const probe: QaProbe = { possession: () => possRef.current, game: () => game, screenOf: (cx, cz, h) => renderer.screenOf(cx, cz, h), canvas: () => canvasRef.current, zoom: () => renderer.zoom };
+    w.__hg2 = probe;
+    return () => {
+      if (w.__hg2 === probe) delete w.__hg2;
+    };
+  }, [game]);
   const stickRef = useRef<{ x: number; y: number } | null>(null);
   const pilotRef = useRef(pilot(0.75, seed));
   const fxRef = useRef<Fx>({ swish: 0, shake: 0, crowd: 0, flash: 0, juice: new Juice({ reducedMotion: reducedMotion() }) });
@@ -173,19 +195,7 @@ export function Hoops2({
 
   const next = (g: HoopsGame) => {
     possRef.current = startPossession(g);
-    if (practice) {
-      const p = possRef.current,
-        h = p.bodies[0];
-      const at = practice.drill === 'finish' ? { cx: RIM.cx - 13, cz: 0 } : { cx: RIM.cx - 24.5, cz: 0 };
-      Object.assign(h, at);
-      h.home = { ...at };
-      const d = p.bodies[5];
-      Object.assign(d, { cx: at.cx + 7, cz: at.cz + 2 });
-      if (practice.drill === 'pass') {
-        p.scheme = 'trap';
-        p.events = ['scheme:trap'];
-      }
-    }
+    if (practice) practiceStart(possRef.current, practice.drill);
     const pl = pilotRef.current;
     pl.letGo = null;
     pl.driving = false;
