@@ -11,12 +11,12 @@ import * as P from '../pixel/poses';
 import type { Joints, Pose } from '../pixel/rig';
 import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import { type Juice, squashStretch } from '../juice';
-import { ballPos, contestOf, JUMPER_TOP, RIM, RIM_H, shotChance, topSpeed } from './engine';
-import { catchChance } from './autopilot';
+import { ballPos, JUMPER_TOP, RIM, RIM_H, topSpeed } from './engine';
+import { HoopsHud, type HudView } from './hud-draw';
 import { type Cam3, CAM, camOf, camStart, camStep, type CamState, depthOf, facingIndex, guardOf, pitchAt, project, type SafeBox, screenToCourt, subjectOf, yawFor } from './camera';
 import { drawCourtFloor } from './floor';
 import { drawChip, foldName, type LabelReq, layoutLabels } from './labels';
-import type { Body, Contest, Possession } from './types';
+import type { Body, Possession } from './types';
 
 export interface Kit {
   jersey: string;
@@ -56,8 +56,6 @@ export function dunkStyle(b: Body): P.DunkStyle {
 /** an elite dunker spins a 360 on some of his windmill-tier dunks (by his id: the same man, the same dunk) */
 export const spins360 = (b: Body) => b.act === 'dunk' && dunkStyle(b) === 'windmill' && b.p.id.charCodeAt(0) % 2 === 1;
 
-const CONTEST_COLOR: Record<Contest, string> = { open: '#3ee08f', light: '#f4d03f', heavy: '#ff8c3a', smothered: '#ff4d5e' };
-const CONTEST_TEXT: Record<Contest, string> = { open: 'OPEN', light: 'LIGHT', heavy: 'HEAVY', smothered: 'SMOTHERED' };
 
 function lookFor(b: Body, kit: Kit): Look {
   return {
@@ -412,7 +410,8 @@ export class HoopsRenderer {
     this.replay = null;
     this.showOdds = true;
     this.clutch = false;
-    this.meterShown = null;
+    this.hud.reset();
+    this.netSnapUntil = 0;
     this.prevBall = null;
     this.memos.clear();
   }
@@ -424,8 +423,23 @@ export class HoopsRenderer {
   replay: { cx: number; cz: number } | null = null;
   /** the live shot % under the ball handler and over a pass target (off in replays and the autopilot) */
   showOdds = true;
-  /** the last shot meter, kept a moment after the release to show how it went */
-  private meterShown: { idx: number; t0: number; top: number; green: number; until: number; frac: number; greened: boolean | null } | null = null;
+  /** the court's HUD layer: the rings, the arc meter, Heat on the ball (hud-draw.ts) */
+  readonly hud = new HoopsHud();
+  /** a make's net snap: the net stretched down for three frames (until this real time, s) */
+  netSnapUntil = 0;
+  /** what the HUD layer may read of the renderer this frame */
+  private view(): HudView {
+    return {
+      W: this.W,
+      H: this.H,
+      reduced: this.reduced,
+      showOdds: this.showOdds,
+      replaying: !!this.replay,
+      at: (cx, cz, h = 0) => this.at(cx, cz, h),
+      pitch: (cx, cz) => Math.sin(pitchAt(this.c3, cx, cz)),
+      chip: (text, x, y, color, pri, slack) => this.chip(text, x, y, color, pri, slack)
+    };
+  }
 
   constructor(
     private theme: CourtTheme,
@@ -644,7 +658,7 @@ export class HoopsRenderer {
   }
 
   /** The rim (back or front half) and, with the front, the net, swaying after a make. */
-  private drawRim(ctx: CanvasRenderingContext2D, half: 'back' | 'front', swish: number) {
+  private drawRim(ctx: CanvasRenderingContext2D, half: 'back' | 'front', swish: number, snap = 0) {
     const r = 0.75;
     const ring = (a: number, h = RIM_H) => this.at(RIM.cx + Math.cos(a) * r, RIM.cz + Math.sin(a) * r, h);
     const c = this.at(RIM.cx, RIM.cz, RIM_H);
@@ -652,8 +666,9 @@ export class HoopsRenderer {
     // back half: away from the camera (along its forward, which is yawed); front: toward it
     const a0 = (half === 'back' ? -Math.PI / 2 : Math.PI / 2) + this.cs.yaw;
     if (half === 'front') {
-      // the net: strands from the rim down to a narrower ring, swaying after a swish
-      const len = 1.5 * (1 - swish * 0.25);
+      // the net: strands from the rim down to a narrower ring, swaying after a swish; a make snaps
+      // it down for three frames (V2 B.0.5)
+      const len = 1.5 * (1 - swish * 0.25) + snap * 0.9;
       ctx.lineWidth = Math.max(1, Math.round(c.s * 0.07));
       for (let i = 0; i < 12; i++) {
         const a = (i / 12) * Math.PI * 2;
@@ -761,6 +776,9 @@ export class HoopsRenderer {
       ctx.strokeStyle='#19e3c9';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(f.x,f.y,Math.max(6,f.s*1.7),Math.max(2,f.s*.6),0,0,Math.PI*2);ctx.stroke();
       ctx.strokeStyle='#ffd579bb';ctx.setLineDash([3,3]);ctx.beginPath();ctx.ellipse(to.x,to.y,Math.max(6,to.s*2),Math.max(2,to.s*.7),0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
     }
+    // the HUD's rings on the floor (hud-draw.ts), under the players
+    const view = this.view();
+    this.hud.under(ctx, view, p, real);
     // shadows on the floor
     const t = p.t;
     for (const b of p.bodies) {
@@ -819,7 +837,7 @@ export class HoopsRenderer {
     items.sort((a, b) => b.depth - a.depth);
     for (const it of items) it.draw();
     // the ball: in a flight, on the dribble, or in his hands
-    const fire = p.fire >= 0 && (p.handler === p.fire || p.ball?.who === p.fire);
+    const fire = p.heat === 'fire';
     let ball: { x: number; y: number; s: number };
     const hs = handSpot as { x: number; y: number; s: number } | null;
     if (p.ball) ball = this.at(bp.cx, bp.cz, bp.h);
@@ -843,61 +861,13 @@ export class HoopsRenderer {
     const ss = squashStretch(pb && dtb < 0.1 ? (ball.x - pb.x) / dtb : 0, pb && dtb < 0.1 ? (ball.y - pb.y) / dtb : 0, squash);
     this.prevBall = { x: ball.x, y: ball.y, real };
     this.drawBall(ctx, ball.x, ball.y, ball.s, real, fire, ss);
-    if (fire) {
-      // flames trailing the ball
-      for (let i = 0; i < 8; i++) {
-        const a = real * 9 + i * 1.7;
-        ctx.fillStyle = i % 2 ? '#ffd23a' : '#ff6a1a';
-        const d = Math.max(1, Math.round(ball.s * 0.18));
-        ctx.fillRect(Math.round(ball.x + Math.sin(a) * ball.s * 0.4), Math.round(ball.y - ball.s * 0.4 - ((real * 30 + i * 3) % (ball.s * 1.2))), d, d * 2);
-      }
-    }
+    this.hud.ball(ctx, view, ball.x, ball.y, ball.s, p.heat, real);
     // the front of the rim and the net, over the ball
-    this.drawRim(ctx, 'front', fx.swish);
+    this.drawRim(ctx, 'front', fx.swish, real < this.netSnapUntil && !this.reduced ? 1 : 0);
     // sweat, sparks and confetti
     fx.juice?.draw(ctx);
-    // the shot meter and the contest on the shooter
-    this.drawMeter(ctx, p, real, headOf);
-    // the pass target (NBA-16): a teal ring at his feet, his name and his shot as it will be when the
-    // ball gets there (his man closing out while it's in the air: catchChance), not as he stands now
-    if (p.target !== null && p.handler !== null && !p.meter && !p.finish) {
-      const m = p.bodies[p.target];
-      const h = headOf[p.target];
-      if (h && m) {
-        const f = this.at(m.cx, m.cz);
-        ctx.strokeStyle = '#19e3c9';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.ellipse(Math.round(f.x), Math.round(f.y), Math.max(7, f.s * 1.5), Math.max(3, f.s * 1.5 * Math.sin(pitchAt(this.c3, m.cx, m.cz))), 0, 0, Math.PI * 2);
-        ctx.stroke();
-        const c = this.showOdds ? catchChance(p, p.bodies[p.handler], m) : null;
-        this.chip(m.p.tag + (c !== null ? ' ' + Math.round(c * 100) + '%' : ''), h.x, h.y - 18, c !== null ? oddsColor(c) : '#88f6da', 3);
-      }
-    }
-    // the handler's name over his head (the contest grade takes its place while he shoots); at his
-    // feet his sprint's stamina while it isn't full, and his shot % from here
-    if (p.handler !== null && !p.ball && !p.meter) {
-      const b = p.bodies[p.handler];
-      const h = headOf[b.idx];
-      if (h) this.chip(b.p.tag, h.x, h.y - 18, p.fire === b.idx ? '#ffb02e' : '#ffffff', 4);
-      if (!p.finish) {
-        const f = this.at(b.cx, b.cz);
-        let y = Math.round(f.y + Math.max(4, f.s * 0.5));
-        if (b.burst < 0.99 || p.sprinting) {
-          const w = Math.max(22, Math.round(f.s * 2.6));
-          const x0 = Math.round(f.x - w / 2);
-          ctx.fillStyle = 'rgba(8,10,18,0.8)';
-          ctx.fillRect(x0 - 1, y - 1, w + 2, 5);
-          ctx.fillStyle = b.burst < 0.25 ? '#ff6a4a' : p.sprinting ? '#ffd35a' : '#19e3c9';
-          ctx.fillRect(x0, y, Math.round(w * b.burst), 3);
-          y += 7;
-        }
-        if (this.showOdds) {
-          const c = shotChance(p, b);
-          this.chip(Math.round(c * 100) + '%', f.x, y, oddsColor(c), 2, 0);
-        }
-      }
-    }
+    // the arc meter, the pass target's and the handler's chips (hud-draw.ts)
+    this.hud.over(ctx, view, p, real, headOf);
     // every chip this frame, placed by priority so none covers another (labels.ts)
     for (const q of layoutLabels(this.chips, this.W, this.H)) drawChip(ctx, q);
     ctx.restore();
@@ -911,104 +881,6 @@ export class HoopsRenderer {
       ctx.fillRect(0, 0, this.W, this.H);
     }
   }
-
-  private drawMeter(ctx: CanvasRenderingContext2D, p: Possession, real: number, heads: Record<number, { x: number; y: number; right: number }>) {
-    const m = p.meter;
-    if (m && p.handler !== null) {
-      const span = m.top * 1.3;
-      const frac = Math.min(1, (p.t - m.t0) / span);
-      this.meterShown = { idx: p.handler, t0: m.t0, top: m.top, green: m.green, until: Infinity, frac, greened: m.off !== undefined ? !!m.greened : null };
-    } else if (this.meterShown && this.meterShown.until === Infinity) {
-      // A canceled hold has no release result to display.
-      if (!p.lastShot && !p.ball && !p.finish) { this.meterShown = null; return; }
-      // just released (the engine let go of the meter): hold the result a moment
-      const ls = p.lastShot;
-      this.meterShown.greened = ls ? ls.greened : false;
-      this.meterShown.until = real + 0.7;
-    }
-    const ms = this.meterShown;
-    if (!ms) return;
-    if (ms.until !== Infinity && real > ms.until) {
-      this.meterShown = null;
-      return;
-    }
-    const head = heads[ms.idx];
-    if (!head) return;
-    // a 2K-style arch over his head: it fills from the left end as he rises, the green slice sits
-    // where the top of his jump lands, near the right end
-    const R = Math.max(26, Math.round(Math.min(this.W, this.H) * 0.09));
-    const th = Math.max(7, Math.round(R * 0.27));
-    const cx = head.x;
-    // centered low enough that the arch frames his head and arms (it reads as his, not the
-    // defender's in front of him), high enough that his hands and the ball stay inside it
-    const cy = Math.max(R + th + 24, head.y + Math.round(R * 0.3));
-    const A0 = Math.PI + 0.36;
-    const SW = Math.PI - 0.72;
-    const span = ms.top * 1.3;
-    const band = (a0: number, a1: number, r: number, w: number, color: string) => {
-      if (a1 <= a0) return;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, a0, a1);
-      ctx.stroke();
-    };
-    ctx.save();
-    ctx.lineCap = 'butt';
-    // the case: a dark edge, a light rim, a deep track
-    band(A0 - 0.05, A0 + SW + 0.05, R, th + 5, '#05070d');
-    band(A0 - 0.03, A0 + SW + 0.03, R, th + 2, '#e8ecf5');
-    band(A0, A0 + SW, R, th, '#1a2235');
-    // the green slice at its true size (a let-go inside it is a green), with bright marks just
-    // outside the track; a sliver under a heavy contest is drawn as the sliver it is
-    const gc = A0 + (ms.top / span) * SW;
-    const gw = Math.max(0.006, (ms.green / span) * SW);
-    const g0 = Math.max(A0, gc - gw);
-    const g1 = Math.min(A0 + SW, gc + gw);
-    const result = ms.greened !== null;
-    const glow = result ? 0 : Math.max(0, 1 - Math.abs(ms.frac * span - ms.top) / 0.12);
-    band(g0, g1, R, th, glow > 0 ? mixHex('#1f9e4c', '#7dffab', glow) : '#1f9e4c');
-    band(g0, g1, R + th / 2 + 2, 2, '#3ef07a');
-    band(g0, g1, R - th / 2 - 2, 2, '#3ef07a');
-    // the fill: warm while he rises, then green, white (close) or red (off)
-    const off = p.lastShot && result ? Math.abs(p.lastShot.off) : 1;
-    const fillTo = A0 + ms.frac * SW;
-    const color = !result ? '#ffd35a' : ms.greened ? '#3ef07a' : off < 0.32 ? '#f4f4f4' : '#ff5a5a';
-    band(A0, fillTo, R, th - 2, color);
-    band(A0, fillTo, R - th / 2 + 2, 1, 'rgba(255,255,255,0.55)');
-    // the leading edge: a bright notch that runs ahead of the fill
-    if (ms.frac > 0.01) band(fillTo - 0.035, fillTo, R, th + 4, '#ffffff');
-    // a green release: the whole arch lights up and a ring bursts off it
-    if (ms.greened && ms.until !== Infinity) {
-      const k = Math.min(1, (real - (ms.until - 0.7)) / 0.35);
-      band(A0, A0 + SW, R, th, 'rgba(62,240,122,' + (0.9 * (1 - k * 0.5)).toFixed(2) + ')');
-      if (k < 1) band(A0 - 0.1, A0 + SW + 0.1, R + 4 + k * R * 0.6, 3 * (1 - k) + 1, 'rgba(160,255,190,' + (1 - k).toFixed(2) + ')');
-    }
-    ctx.restore();
-    // the contest grade over his head while he rises
-    if (p.meter && p.handler === ms.idx) {
-      const grade = contestOf(p, p.bodies[ms.idx]);
-      this.chip(CONTEST_TEXT[grade], head.x, cy - R - th - 18, CONTEST_COLOR[grade], 6);
-      if (p.meter.style) this.chip(p.meter.style === 'catch' ? 'CATCH & SHOOT' : p.meter.style === 'pullup' ? 'MOVING SHOT' : 'SET SHOT', head.x, cy - R - th - 34, '#d6e5ed', 5);
-    } else if (result && p.lastShot) {
-      const shot = p.lastShot;
-      const text = shot.greened ? (shot.contest === 'heavy' || shot.contest === 'smothered' ? 'PERFECT / ' + CONTEST_TEXT[shot.contest] : 'PERFECT') : Math.abs(shot.off) < 0.22 ? 'GOOD RELEASE' : shot.off < 0 ? 'EARLY' : 'LATE';
-      this.chip(text, head.x, cy - R - th - 18, shot.greened ? '#3ef07a' : '#ffd35a', 6);
-    }
-  }
-}
-
-/** The live shot %'s color: green a good look, yellow a fair one, orange a poor one. */
-function oddsColor(c: number): string {
-  return c >= 0.5 ? '#3ef07a' : c >= 0.35 ? '#ffd35a' : '#ff8c5a';
-}
-
-/** a blend of two #rrggbb colors */
-function mixHex(a: string, b: string, k: number): string {
-  const ch = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
-  let out = '#';
-  for (let i = 0; i < 3; i++) out += Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * k).toString(16).padStart(2, '0');
-  return out;
 }
 
 export { text };

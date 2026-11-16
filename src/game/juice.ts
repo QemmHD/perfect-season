@@ -10,7 +10,7 @@
 // without it (juice.test.ts checks this for both sports).
 
 /** hit-stop lengths (ms) by moment */
-export const HITSTOP = { dunk: 70, block: 60, truck: 90, int: 50, green: 40, bighit: 80, posterize: 90 } as const;
+export const HITSTOP = { dunk: 70, block: 60, truck: 90, int: 50, green: 40, bighit: 80, posterize: 90, perfect: 17 } as const;
 export type HitStopKind = keyof typeof HITSTOP;
 
 export type ParticleKind = 'turf' | 'sweat' | 'confetti' | 'spark';

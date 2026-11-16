@@ -115,7 +115,6 @@ export function attackValue(p: Possession, h: Body): number {
   return reach * (2 * finish + and1) + (1 - reach) * 0.55 - strip;
 }
 
-const CONTEST_F: Record<string, number> = { open: 1, light: 0.95, heavy: 0.86, smothered: 0.6 };
 const CONTESTS = ['open', 'light', 'heavy', 'smothered'];
 const THREE_REAL = 0.95;
 
@@ -130,8 +129,11 @@ export function catchValue(p: Possession, from: Body, m: Body, sd: number): numb
   const v = shotValue(p, m, sd);
   const then = closeoutAt(p, from, m, CONTESTS.indexOf(v.contest));
   if (then === null) return v.value;
+  // the shot as it will be at the release, his man closed out: the gold ring reads that contest
+  // (an open look that's heavy by the release is amber, not a gold chance; nba-4)
+  const at = then === CONTESTS.indexOf(v.contest) ? v : shotValue(p, m, sd, CONTESTS[then] as Contest);
   // (caught in rhythm, a set shooter's window is a little wider)
-  return v.value * (CONTEST_F[CONTESTS[then]] / CONTEST_F[v.contest]) * (v.kind === 'three' ? 1.08 * THREE_REAL : 1);
+  return at.value * (v.kind === 'three' ? 1.08 * THREE_REAL : 1);
 }
 
 /**
@@ -174,7 +176,8 @@ function ownValue(p: Possession, h: Body, sd: number): { kind: string; contest: 
     for (const o of p.bodies) if (o.side === 'D' && p.t >= o.stunUntil) r3 = Math.min(r3, dist(o, h));
     const i3 = CONTESTS.indexOf(s.contest);
     const j3 = r3 < 4 ? Math.min(3, i3 + 1) : i3;
-    return { ...s, value: s.value * THREE_REAL * (CONTEST_F[CONTESTS[j3]] / CONTEST_F[s.contest]) };
+    const at = j3 === i3 ? s : shotValue(p, h, sd, CONTESTS[j3] as Contest);
+    return { ...s, contest: at.contest, value: at.value * THREE_REAL };
   }
   // (a floater in traffic is the last resort, not the plan, and a contested long two is the worst
   // shot in the game: about 0.8 points a shot in the NBA)
@@ -185,7 +188,9 @@ function ownValue(p: Possession, h: Body, sd: number): { kind: string; contest: 
   if (r >= (v.kind === 'mid' ? 9 : 4)) return v;
   const now = CONTESTS.indexOf(v.contest);
   const then = Math.min(3, now + (v.kind === 'mid' && r < 5.5 ? 2 : 1));
-  return { ...v, value: v.value * (CONTEST_F[CONTESTS[then]] / CONTEST_F[v.contest]) * (then === 3 ? 0.9 : 1) };
+  // the shot at the contest it will have (the ring's state with it), the same discount as above
+  const at = shotValue(p, h, sd, CONTESTS[then] as Contest);
+  return { ...v, contest: at.contest, value: at.value * (v.value / Math.max(1e-9, s.value)) * (then === 3 ? 0.9 : 1) };
 }
 
 /** One step of decisions: returns the stick (a court direction) for the handler. */

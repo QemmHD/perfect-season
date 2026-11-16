@@ -1,5 +1,6 @@
 // What each side of a played-out head to head knows about itself and the other: points so far,
 // drives (football) or possessions (basketball) done, and how each ended.
+import type { BoxData, MatchGrade } from './hud/grade';
 export interface Progress {
   score: number;
   drive: number;
@@ -7,6 +8,9 @@ export interface Progress {
   ends: string[];
   /** plays run (or possessions, in basketball): moves on while the drive's still going */
   plays?: number;
+  /** this phone's box score and match grade at the final (plan §4.8): kept off the wire (wireProgress) */
+  box?: BoxData;
+  grade?: MatchGrade;
 }
 
 /** the rival as the scoreboard shows them */

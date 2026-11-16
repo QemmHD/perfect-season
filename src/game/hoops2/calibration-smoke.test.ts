@@ -15,7 +15,9 @@ const PRO = 0.68;
 const SMOKE: [string, number, number][] = [
   ['ppp', 0.95, 1.4],
   ['fga16', 11, 18],
-  ['tpaRate', 0.15, 0.55],
+  // nba-4 lowered this floor from .15: the AI reads a three by its ring at the release (a contested one
+  // is amber), so it takes fewer (.10 / .09 here, from .33 / .24); nba-8's AI playbook raises it back
+  ['tpaRate', 0.06, 0.55],
   // free throws arrive with nba-5 (shooting fouls); it raises this floor to .12
   ['ftaRate', 0, 0.4],
   ['tovPct', 0.03, 0.2],

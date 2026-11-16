@@ -724,6 +724,228 @@ golden in `controls.test.ts` are byte-identical, and the rematch's AI side is pr
 
 ---
 
+## nba-4 · The gold ring, PERFECT feedback, Heat and the match grade (2026-11-16)
+
+### What changed
+
+**What a player sees in a basketball game now:**
+- **The gold ring.** Hold SHOOT and two things fill. A ring at the shooter's feet closes on a target ring, and a short
+  arc meter over his head (radius 0.13 × the short side) fills left to right. The window is drawn at its true size and
+  place in time, in its state's colour:
+  - **gold:** open or a light hand (Legend: open only), in range. A release in gold is a **make**: no block roll, no
+    rim-out. Gold never lies.
+  - **amber:** a heavy contest, a light one on Legend, or a jumper past his range. There is no guarantee: timing raises
+    the chance up to a cap set by his rating.
+  - **red:** smothered, more than 4 ft past his range, or behind the backboard. It never goes in more than 15% of the
+    time, even timed perfectly.
+- **The ring follows the live contest every frame until the release.** A man closing out during the rise turns gold
+  to amber, and the release is judged on the ring as it is then.
+- **Range by the three-point rating:** 27.75 ft at 85+, 25.75 ft at 70-84, the arc plus the 1.25 ft step behind it at
+  60-69, 16 ft under 60.
+- **Windows** (`perfect.ts`). The gold half-width is `30 + 30·clamp((thr − 55)/44)` ms (42 ms at THR_avg 73), plus
+  0.4 ms a point above 99 (at most +5). Every multiplier goes through `windowScale` and nowhere else:
+  - light ×0.75 (Deadeye takes back part of it)
+  - a rhythm catch (shot within 0.4 s of the catch) ×1.2, with a Table Setter's pass on top
+  - On Fire ×1.25
+  - meter Off ×1.10
+  - difficulty ×1.25 / 1 / 0.9 / 0.8 (a person's shots only)
+  - a pull-up ×0.88, 10 ms later
+  - tired legs: up to 15% narrower, and later (+15 ms at 60% energy, +25 ms at 40%; 17.5 ms at the game's 55% floor)
+  - the product is capped at ×1.45 and ±90 ms, then the ±30 ms floor is applied last.
+- **The finish ring.** Hold SHOOT on a drive and let go as the ring closes; it closes 0.12 s after he leaves the floor.
+  A layup held into the top of the jump is a late release. A PERFECT finish is never blocked and always goes in.
+  Dunkers with a lane still dunk.
+- **Timing comes from the touch.** Press and release come from `PointerEvent.timeStamp` through a `TouchClock`
+  updated every animation frame, so a release between two 60 Hz steps lands exactly where it was (|off| < 1 ms;
+  before, up to 16.7 ms). The phone's lag is the calibrated `offsetMs` (25 ms until calibrated).
+- **The toast line, one line, word and dial:**
+  - as he rises: the coverage, e.g. `OPEN · RELEASE ON GOLD`, `HEAVY · PRESSURE`, `DEEP · RANGE`,
+    `SMOTHERED · PRESSURE`, `TOO FAR · RANGE`
+  - after the release: `PERFECT` (`PERFECT ×3` on a streak), or the timing word and the dial it failed on, e.g.
+    `SLIGHTLY LATE · TIMING`, `ON TIME · PRESSURE`, `EARLY · RANGE`
+  - the LAST PLAY readout (`basketballFeedback`) adds `Ring: Gold · ±42 ms` and `Missed on: Timing / Tired legs
+    (later window) / Pressure / Range` (`missReason`, counterfactual: tired legs is named only when the release would
+    have been gold fresh)
+- **The rings on the floor** (`hoops2/hud-draw.ts`): a gold ring under the man you control, a teal ring on the pass
+  target (with his shot % on the catch), a red arc in front of the man guarding the ball (brighter as he closes).
+- **The 4-tap calibrator** (`TimingCalibrator.tsx`). Tap as the ring lands on the target, four beats after a
+  two-beat count-in. It shows the offset and your own spread (±σ), and SAVE writes `offsetMs` (held in −60..150).
+  Strays over 150 ms are dropped and fewer than 3 kept asks again. It is offered once before the first offline match
+  on the phone (skippable) and from the pause sheet (CALIBRATE TIMING); it pauses the game while open. The pause sheet
+  also has **Meter ON / OFF +10%**: Off draws only the ring's colour at his feet.
+- **Heat** (`heat.ts`, integer only) replaces the per-player fire (`g.fire`, `fireAt`, the streaks):
+  - +12 a PERFECT (+16 for a Heat Check card's), +10 a basket, +5 a clean possession (2+ passes, no turnover), −20 a
+    turnover; +15 a stop and −10 conceding arrive with defense (nba-6)
+  - HEATING UP at 66 (a gold trail behind the ball, the crowd lifts, the name chip turns gold); ON FIRE at 100 for the
+    next 2 possessions (flames on the ball, gold ×1.25 through `windowScale`, an uncontested amber ring turns gold)
+  - the bar returns to 0 when the spell ends and at half-time; the score bug's Heat bar shows it, and the Help sheet
+    prints the rules
+  - the first On Fire basket of the game gets the slow-motion replay
+- **Juice:** PERFECT is a 1-frame hit-stop, a camera nudge, the arc's gold flash and burst, a `double` haptic (inside
+  the touch for a jumper, so iOS plays it), and the chime climbing a semitone per PERFECT in a row (up to 5; soccer's
+  `sfx.perfect` shim). There is a ring-fill tick in the last 200 ms, and the net snaps down for 3 frames on every make.
+  A `long` haptic plays on a score, a block or a turnover, none while paused and none in a watched sim. With reduced
+  motion: no hit-stop, shake, pop or burst; the gold flash, colours and sounds stay.
+- **The match grade** (`hud/grade.ts`, dependency-free). At the final whistle the progress carries
+  `grade: { letter, flawless, perfects, moments, bestHeat, fires, ppu, par }` and `box: { us, them, pog }`. The letter
+  is S at 1.25 × par, A at 1.10 ×, B at 0.90 ×, else C (par Rookie 1.20 / Pro 1.10 / All-Star 1.05 / Legend 0.97 /
+  online 1.10). FLAWLESS is a win with 0 turnovers, settled by Arcade once the result is known. Both stay on the phone:
+  Arcade sends `wireProgress(p)` and `arcadeOf` builds only its five fields. The grade never changes coin pay.
+- **Practice:** a drill's `green` is a PERFECT (The Green Room counts them); its `offset` is the exact ms.
+- **The AI.** It reads its shots by the ring it will have at the release: a light look that a closeout makes heavy is
+  amber, not a gold chance. It lets go on a 60 Hz step (no `at`), so AI games stay deterministic.
+- **Camera (one line):** the zoom comes home 4× faster once the ball is inside 26 ft (`CAM.kZoomHome`). A long pass
+  into the paint had left it 4% out near the rim (zoom variation 6.2% → 1.5%, row ≤ 2%).
+
+### Before → after
+
+**The gold ring (closed form over the Gaussian release, `ring.test.ts`; catch-and-shoot, Pro, fresh):**
+
+| | Gold half-width | Gold rate σ 50 (band) | Make σ 50 (band) | Make σ 35 |
+|---|---|---|---|---|
+| THR 55 open (a 15 ft jumper, in range) | ±30 ms | 45.1% (40-50) ✓ | ≤ gold + 8 ✓ | |
+| THR_avg 73 open three | ±42.3 ms | 60.1% (55-65) ✓ | ≤ gold + 8 ✓ | ≤ 80% ✓ |
+| THR 95 open three | ±57.3 ms | 74.8% (70-80) ✓ | ≤ gold + 6 ✓ | ≤ 92% ✓ |
+| THR_avg light three | ±31.7 ms | 47.4% (42-52) ✓ | ≤ gold + 8 ✓ | |
+| THR_avg heavy three | amber | 0 | 22-30% ✓ | ≤ 34% ✓ |
+| smothered (THR 73 and 99) | red | 0 | ≤ 15% ✓ | ≤ 15% ✓ |
+| pull-up | ×0.88, +10 ms | | ≤ 0.90 × catch-and-shoot ✓ (centred and released on the set rhythm) | |
+
+- Before (nba-1 baseline, the old green): about 4 px of green on the arc for THR 75 open; the release was timed on
+  the 60 Hz step (up to 16.7 ms off); a green under a heavy contest still missed 40-70% of the time.
+- Worst grow stack (THR 99, rhythm, On Fire, Off, Rookie): ±87-90 ms, ≤ ×1.45. Worst shrink stack (Legend, light,
+  pull-up, tired twice): ±30 ms at every rating.
+- Honesty: 10,000 seeded gold releases (3,000+ jumpers, 1,000+ finishes, random spots, defenders, rungs, On Fire) →
+  10,000 makes, 0 blocks. 4,000 random spots × heavy/smothered × every shot kind → 0 gold states.
+- A press and a release between two steps: worst |off| over 400 placements < 1 ms (before: up to 16.7 ms).
+
+**In the browser** (`scripts/audit/nba-meter.mjs`, lab game, CDP touch, isolated, slow motion ×0.25; JSON and
+captures in `O/shots/nba/nba-4/`):
+
+| Spot | 393 | 320 |
+|---|---|---|
+| THR 55 open mid (±30 ms) | gold, band **10.96 px**, PERFECT, make | gold, band **9.03 px**, PERFECT, make |
+| light three | gold ±32.7 ms (12.0 px), released late: `SLIGHTLY LATE · TIMING` | gold (9.9 px), the same |
+| heavy three | amber `HEAVY · PRESSURE` → `SLIGHTLY LATE · PRESSURE` | amber, the same |
+| smothered three | red `SMOTHERED · PRESSURE` | red, the same |
+| 26.6 ft, THR 72 | amber `DEEP · RANGE` → `SLIGHTLY LATE · RANGE` | amber, the same |
+| 33 ft | red `TOO FAR · RANGE` | |
+| tired (55% energy) | gold ±38.7 ms (from 42.3), 17.5 ms later; PERFECT | |
+| a drive (finish ring) | layup ring, gold ±50.5 ms, the ideal at 380 ms; PERFECT, make | |
+
+- The PERFECT toast pops (`ps-toast-pop`) with no-preference and has no animation with reduce.
+- One PERFECT fired 1 `double`, 1 chime and 1 ring-fill tick (`__hg2.feel()`).
+- The calibrator, synthetic taps: "42 ms late on average · spread ±2 ms", saved 42 (393); 34 ms saved at 320. That is
+  CDP's own delay.
+- HEATING UP trail and ON FIRE flames captured.
+- 0 page errors; requests to other hosts aborted: none.
+
+**The AI's box (calibration smoke, 20 AI v AI games at displayed 78, Pro), nba-1 baseline (us / them) → now:**
+
+| | Before | After |
+|---|---|---|
+| PPP | 1.287 / 1.276 | 1.241 / 1.166 |
+| 3PA / FGA | .333 / .242 | **.102 / .093** |
+| 3P% | .461 / .439 | .424 / .303 |
+| Mid FG% | .618 / .628 | .643 / .515 |
+| eFG | .614 / .605 | .601 / .510 |
+| Heavy share | | .309 / .297 |
+| Shot mix rim / close / mid / three | | .62 / .19 / .09 / .10 |
+| TOV / poss | .069 / .082 | .106 / .066 |
+| PERFECTs per 16 | | 3.35 / 2.80 |
+
+**The median person at Pro** (`HUMAN=1 HUMAN_LEVELS=pro HUMAN_GAMES=15`, the ladder harness), nba-1 → now:
+
+| σ 50 | PPP | Win | Gold (PERFECT) rate |
+|---|---|---|---|
+| mixed | 0.87 → **0.56** | 8% → 7% | 2.3% |
+| step-back | 0.98 → 0.67 | → 20% | 4.3% |
+| cross-drive | → 1.05 (now the best tactic) | 53% | 0 |
+| spot-up three | → 0.58 | 7% | 1.9% |
+
+The AI's offense at Pro: 1.29 → 1.11 PPP.
+
+**Read this before shipping nba-4 in a wave: it makes the median person's offense much worse until the contest mix is
+fitted.** A diagnostic over 8 games per strategy (σ 50) shows why. The harness person's jumpers almost never have a
+gold ring at the release:
+- **spot-up threes:** at the press, 78 amber and 48 red; at the release, 1 of 126 gold (heavy 39 amber, smothered 55
+  red)
+- **step-backs:** 95 of 124 gold at the press, but the man recovers during the 0.52 s rise, so only 22 are gold at the
+  release (42 heavy, 25 out of range)
+
+This is by design: gold only for open or light looks, judged at the release, and V2's "gold never lies". But
+`contestOf` calls a man within about 4 ft heavy, and the AI defense stays that close on every spot-up. Plan §3.3 holds
+realism through "how often gold is offered" (the AI defense's contest mix and closeouts), and that lever is nba-6/7/8's
+and nba-10's fit. Two cliffs worth fitting there:
+- an amber RANGE ring half a foot past range makes about 21% where the gold just inside makes about 47%
+- off the window, amber and red fall to almost nothing (the plan's steeper fall-off)
+
+The AI takes far fewer threes for the same reason: it values a three that will be heavy at the release as amber, about
+0.6 points. See "Left undone".
+
+### Tests (new and changed)
+
+- `src/game/perfect.test.ts` (10): goldBase, windowScale's product, cap and floor, the worst grow and shrink stacks,
+  difficulty and fatigue parts, judge's seven steps and dials, `gameTimeAt` (slow motion, hit-stop, a foreign clock),
+  `calibrate` with outliers.
+- `src/game/hoops2/ring.test.ts` (20): the closed-form bands above at σ 50 and the σ 35 ceilings, goldBase half-widths,
+  pull-up ≤ 0.90, monotone in the rating at every contest (above 99 finite), the range gate by THR, Legend-light amber,
+  0 gold on heavy/smothered over 4,000 spots, red ≤ 15%, On Fire exactly ×1.25 through windowScale, On Fire turning
+  only uncontested amber gold, the game's spell and half reset, the 10,000-release honesty test, |off| < 1 ms between
+  steps.
+- `src/game/heat.test.ts` (8): every gain and loss (and Heat Check +16), per-sport score and spell (`pick`), 66/100,
+  nothing moving while On Fire, the half reset, integer-only by source scan and over 20,000 random events.
+- `src/game/hud/grade.test.ts` (6): the letter thresholds, the par per rung, FLAWLESS settled by the result,
+  `Progress.grade` and `box` kept on the host path and absent from `wireProgress`, Arcade sends `wireProgress`,
+  `arcadeOf` builds only its five fields, grade.ts dependency-free.
+- `src/game/hud/ring-draw.test.ts` (5): the gold band ≥ 8 px at 320 and 393 for THR 55 open on the arc and the ground
+  ring, the window untouched (only px per ms grows), amber and red drawn in their colours with no gold, reduced motion.
+- `src/game/hoops2/feel-events.test.ts` (5): `double` on every PERFECT (release, finish), `long` on a score, a block
+  and a turnover, none while paused, the touch's double not played twice (a spy on the haptics shim).
+- `src/game/hoops2/calibrator.test.ts` (3): taps against their beats, offset and spread, a stray dropped.
+- **Changed (each one's old behaviour was the old model, not a bug in the test):**
+  - `gameplay.test.ts`: gold is 1.0 inside and falls off steeply outside; the blocked-layup case is a red ring now
+    (not a PERFECT); the difficulty part is a person's.
+  - `ratings-matter.test.ts`: the old shot-curve block (36/51/68/82/87% at σ 45) is replaced by the monotone check
+    (the curve's targets are now ring.test's). Heat Check is +16 Heat. The even-mix three floor goes .25 → .08 and the
+    shooters' margin +.15 → +.10 (see the AI box above).
+  - `calibration-smoke.test.ts`: the 3PA floor goes .15 → .06.
+  - `golden.test.ts` and `controls.test.ts` (the AI race): re-recorded at nba-4 (an outcome change: protocol bump).
+  - `camera.test.ts`: the handler-row floor goes 0.50 → 0.47 (0.492 / 0.479 now, the AI driving more), and it samples
+    12 games, not 6, for the jumpers.
+  - `tune.test.ts`: reads `g.heat`.
+
+### Verification (nba-4)
+
+- `heavy.sh npm run typecheck`: clean.
+- `heavy.sh npx vitest run src/game/hoops2 src/game/perfect.test.ts src/game/heat.test.ts src/game/hud src/game/juice.test.ts src/engine/sport-branches.test.ts`:
+  23 files, 148 passed, 7 skipped (the opt-in probes). The camera test, re-run after its change: 6 passed.
+- `PS_SPORT=nfl … juice heat perfect hud football2/gameplay`: 60 passed. `PS_SPORT=soccer … sport-branches heat hud`:
+  35 passed.
+- `node scripts/audit/nba-meter.mjs` on the dev server (5215), isolated: every spot's state as wanted at 393 and 320.
+
+### Reduced motion (plan §3.15 rows added)
+
+| Element | With reduced motion |
+|---|---|
+| gold ring | no closing ring or sliding fill: the target fills and lights (gold) while the release is in the window; the timing is the same |
+| release pop, hit-stop, PERFECT burst | none; the gold flash, the chime and the haptic stay |
+| toast-line words | no pop; colour kept |
+| Heat trail and flames | a static tint ring on the ball |
+| net snap | none |
+| FT meter / calibrator | the calibrator's ring stays still and the target lights on the beat |
+
+**Protocol bump needed: NBA draft 10 → 11, UT NBA 10 → 11, because** of the gold windows and states (gold = a make,
+no block, no rim-out), the steeper off-gold fall-off, the range gate, tired legs moving and narrowing the window, the
+pull-up window, the rhythm catch at 0.4 s, the finish ring, Heat replacing the per-player fire (On Fire ×1.25 and
+amber → gold), the difficulty part on a person's shots, the AI reading its shot at the release contest, and releases
+timed from the touch. `golden.test.ts` and the AI-race golden were re-recorded.
+
+**Saves:** only the touch prefs' `offsetMs` and `meter` (`perfect-season:touch-prefs:v1`, the per-device key from
+nba-2), both optional. Heat and the grade are never saved, and the grade and box never go on the wire.
+
+---
+
 ## Contracts for nfl / soccer / ut
 
 The section below is plan §4, copied verbatim on 2026-11-16 (revision 3, commit `78a1c86`). nfl and soccer build against
@@ -863,8 +1085,9 @@ export interface Judged { step: -3 | -2 | -1 | 0 | 1 | 2 | 3 /* 0 = PERFECT */; 
 export function judge(spec: RingSpec, offMs: number): Judged;  // inGold only when spec.state === 'gold' and |offMs| ≤ goldMs
 export interface TouchClock { real: number; game: number; acc: number; rate: number }   // updated each rAF
 export function gameTimeAt(c: TouchClock, timeStamp: number, now: number): number;   // falls back to `now` when |timeStamp − now| > 1000 ms
-export function calibrate(taps: number[], beats: number[]): { offsetMs: number; sdMs: number };  // 4 taps (V2), outliers > 150 ms dropped
+export function calibrate(taps: number[], beats: number[]): { offsetMs: number; sdMs: number; kept: number };  // 4 taps (V2), outliers > 150 ms dropped
 export const STEP_WORDS: readonly string[]; // VERY EARLY … PERFECT … VERY LATE
+// landed in nba-4, also: goldBase, PART, PULLUP_LATE_MS, difficultyPart, fatigueOf, STEP_EDGES_MS, touchClock, CALIBRATE_OUTLIER_MS
 ```
 
 **The honesty rule every consumer must keep and test:** a sport passes `state: 'gold'` only when its outcome function
@@ -872,7 +1095,7 @@ returns the best possible result for an in-gold release. Each sport adds a test 
 none is worse than that result.
 
 `hud/ring-draw.ts` draws the ring on canvas, and the mockup's arc meter is the same call:
-`drawRing(ctx, { x, y, rx, ry, t: 0..1, spec, px /* design px per ms */, reduced })`. It guarantees the gold band is
+`drawRing(ctx, { x, y, rx, ry, t /* time over the ideal; 1 = perfect */, spec, px /* design px per ms */, reduced, mode?: 'ground' | 'arc', result? })`. It guarantees the gold band is
 ≥ 8 design px by stretching the ring's time-to-pixel scale, never the window.
 
 ### 4.5 `heat.ts`: Heat, deterministic and integer-only
@@ -883,7 +1106,7 @@ export interface HeatState { v: number /* 0..100 */; fire: number /* units of On
 export const HEAT: { gain: Record<HeatEvent, number>; up: 66; fire: 100; spell: number; windowMult: 1.25 };  // built with pickFor(sport)
 //   gain.score: nba 10 · nfl 25 · soccer 40 ; spell: nba 2 · nfl 3 · soccer 1 ; the others are shared (+12 +15 +5 −20 −10)
 export const heatStart: HeatState;
-export function heatAfter(s: HeatState, ev: HeatEvent, sport: SportId): HeatState;   // clamps 0..100; reaching 100 starts a spell
+export function heatAfter(s: HeatState, ev: HeatEvent, sport: SportId, extra?: number): HeatState;   // clamps 0..100; reaching 100 starts a spell (extra: an integer bonus, nba-4)
 export function heatUnitEnd(s: HeatState): HeatState;                                // one possession/snap/attack used; at 0 the bar returns to 0
 export function heatHalf(s: HeatState): HeatState;                                   // the half-time reset (peak and fires kept)
 export function heatStage(s: HeatState): 'cold' | 'heating' | 'fire';
@@ -960,6 +1183,10 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
 | 2026-11-16 | §4.3 `Cluster` / `PauseSheet` (nba-2 review) | `Cluster` takes optional `arcOff` (hide the Buttons-only arc); `PauseSheet` takes optional `quitNote` (the confirm's line in the sport's words; neutral default) | the radial over the arc; sport-neutral copy |
 | 2026-11-16 | §4.8 forfeit (nba-2 review) | a quit's `them` score is at least `us + 1`; UT `settle()` / `settleDraft()` take `forfeit` and pay nothing for it | Cup / Club Season reject a loss with more points; a quit is not a reward loop |
 | 2026-11-16 | `controls-geometry.css` (nba-3) | sideways `--safe-t` 64 → 100 px | the toast line sits under the bug sideways (to --sat + 94) |
+| 2026-11-16 | §4.4 `perfect.ts` (nba-4) | `calibrate` also returns `kept` (taps left after the outlier drop). New exports: `goldBase(rating)`, `PART` (the published multipliers), `PULLUP_LATE_MS`, `difficultyPart(def)`, `fatigueOf(energy) → { part, lateMs }`, `STEP_EDGES_MS`, `touchClock()`, `CALIBRATE_OUTLIER_MS`. `judge` words a timed release on an amber or red ring `ON TIME` | a sport builds its parts from one table; the calibrator asks again with < 3 taps |
+| 2026-11-16 | §4.4 `hud/ring-draw.ts` (nba-4) | `drawRing(ctx, { x, y, rx, ry, t, spec, px, reduced, mode?: 'ground' \| 'arc', result?: { offMs, inGold, age } })`; `t` is time over the ideal (1 = the perfect moment, runs past 1). Also `ringScale`, `bandPx`, `arcPx`, `ARC`, `MIN_GOLD_PX`, `RING_COLOR` | the arc meter and the ground ring are one call; the result is held after the release |
+| 2026-11-16 | §4.5 `heat.ts` (nba-4) | `heatAfter(s, ev, sport, extra = 0)`: an integer bonus on top of the gain (Heat Check's +4). `HEAT` is this page's sport's rules; `heatRules(sport)` any sport's. While On Fire `heatAfter` changes nothing | Heat Check +16; the spell can't be cut short |
+| 2026-11-16 | §4.8 `hud/grade.ts` (nba-4) | also `GRADE_PAR`, `GRADE_AT`, `parFor(def, online)`, `makeGrade({...})`, `settleGrade(p, won)` (FLAWLESS needs the win), `wireProgress(p)` (what the host sends), `BoxData<L>` generic in the line type | every sport fills and strips them the same way |
 
 ---
 
@@ -1040,6 +1267,10 @@ recorded on the base `78a1c86` come out byte-identical on today's engine, nba-2 
 them is an outcome change (re-record from that commit and add it here). **nba-3 adds nothing to it:** the camera, HUD,
 text and held arena are render/DOM/flow; `shotChanceWith`, `catchChance` and `autoplaySteps` are refactors with the
 golden and the AI-race golden byte-identical, and the rematch's AI side is proven equal to `aiPossessionsOf`.
+**nba-4 adds:** the gold windows and states (gold = a make, no block or rim-out), the off-gold fall-off, the range
+gate, tired legs, the pull-up and rhythm windows, the finish ring, team Heat replacing the per-player fire, the
+difficulty part on a person's shots, the AI reading its shots at the release contest, and releases timed from the
+touch. Both goldens were re-recorded at nba-4.
 
 ---
 
@@ -1075,12 +1306,31 @@ golden and the AI-race golden byte-identical, and the rematch's AI side is prove
     cache change.
   - `src/game/PlayReadout.tsx` and `play-readout.css` (shared with nfl): an optional `icon` mode (a 44 px
     button). nfl's pill is unchanged.
+- **nba-4:**
+  - `src/game/progress.ts` (shared): two optional type lines, `box?: BoxData` and `grade?: MatchGrade` (type-only
+    import).
+  - `src/game/Arcade.tsx` (shared with nfl): `onProgress(wireProgress(p))`, and `settleGrade(us, won)` on the two
+    `onFinish` calls (a no-op for a progress without a grade, so nfl and soccer are unchanged).
+  - `src/game/play-feedback.ts` (shared with nfl): the nba function only (`missReason`, the Ring and Missed-on rows).
+  - `src/game/juice.ts` (shared): one `HITSTOP.perfect: 17` entry.
+  - `src/ut/Match.tsx`: nothing needed. It passes the progress through, so ut reads `us.grade` / `us.box` there.
 - One hunk in the team's own `Hoops2.tsx` worth knowing about: a dev-server-only probe (`window.__hg2`, guarded by
   `import.meta.env.DEV`, so the production build drops it) that the geometry, camera and flow probes read.
 
 ---
 
 ## Owner device checks
+
+**nba-4:**
+- The gold ring's feel: is the window where your thumb expects it after calibrating, and is ±30 ms (THR 55) fair?
+  Run the calibrator (pause → CALIBRATE TIMING) and note your own spread: if it is under 35 ms, plan §3.3 asks the lead
+  to revisit the windows.
+- The `double` haptic on a PERFECT jumper (played inside the lift, so iOS should feel it) and on a finish (outside a
+  touch: iOS may queue it).
+- The chime per PERFECT streak (today the swish until soccer's `sfx.perfect` lands) and the ring-fill tick.
+- How often the ring is gold in your own games: the harness's person almost never gets an open look (see nba-4's
+  before → after). If it feels the same by hand, that confirms the contest-mix followup.
+- Meter OFF: the ring's colour at his feet only. Is it enough to play by?
 
 **nba-3:**
 - The camera's look on a real phone: 55° and 12° yaw, with the court receding. Do the stands, the slanted key
@@ -1108,6 +1358,23 @@ ring's feel, haptics, defense, the rematch loop and accented names.
 ---
 
 ## Left undone
+
+**nba-4:**
+- **The contest mix (must, before nba-4 ships to players).** The median person's Pro PPP fell 0.87 → 0.56, and the
+  AI's 3PA/FGA .33 → .10. That is because gold is offered on almost no contested jumper at the release (see the
+  before → after). The fit belongs to nba-6/7/8 (the defense's closeouts and contest mix, the AI playbook's open looks)
+  and nba-10 (the global fit, the range-edge and amber fall-off cliffs). `calibration-smoke`'s 3PA floor (.06),
+  `ratings-matter`'s three floor (.08) and the camera's handler row (0.47) were lowered for it, with notes to restore
+  them.
+- **Heat stage rates per game** (plan §3.7's bands) aren't measured yet: the human harness doesn't run Heat on its
+  possessions. nba-10 asserts them.
+- **Stops and conceding** in Heat, and the rival's bar: nba-6 (defense). `g.heat.them` exists and resets at the half.
+- **A PERFECT finish through contact as an and-one** waits for nba-5's free throws; the and-one plays as before.
+- **The −5% speed/burst cap below 50% energy** never applies: the game's energy floor is 55%, and the existing −8% at
+  the floor already covers it.
+- **The court-edge glow** for On Fire (cut line): not built; the flames and the trail ship.
+- The contest chip over his head still names the contest (OPEN) on a RANGE-amber ring; the toast line says
+  `DEEP · RANGE`.
 
 **nba-3:**
 - **`?arcade&cam=v2b`** (V2's "your basket at the bottom" on defense): the framing and the yaw rule are in

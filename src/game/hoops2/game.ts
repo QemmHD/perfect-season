@@ -1,9 +1,11 @@
 // A game of arcade basketball: two halves of possessions on offense against the rival's five.
-// Players tire as they go (less by stamina, back up at the half); three straight buckets put a man
-// on fire (a wider green window until he misses).
+// Players tire as they go (less by stamina, back up at the half). The team's Heat bar (heat.ts)
+// fills with PERFECT releases, baskets and clean possessions and drains with turnovers; at 100 the
+// side is ON FIRE for its next two possessions (gold ×1.25), and the bar resets at half-time.
 import { hashString, rng } from '../../engine/rng';
 import type { Drill } from '../../evolution/training';
-import { newPossession, RIM } from './engine';
+import { heatAfter, heatHalf, heatStage, heatStart, heatUnitEnd, type HeatState } from '../heat';
+import { has, newPossession, RIM } from './engine';
 import type { Hooper, Possession } from './types';
 
 export const PER_HALF = 8;
@@ -22,8 +24,12 @@ export interface HoopsGame {
   score: number;
   marks: Mark[];
   energy: number[];
-  streak: number[];
-  fire: number;
+  /** the team Heat bars (heat.ts): yours, and the side you face (its stops and your conceding: nba-6) */
+  heat: { us: HeatState; them: HeatState };
+  /** for the match grade: PERFECT moments, gold rings taken, turnovers */
+  perfects: number;
+  moments: number;
+  turnovers: number;
   /** points by player */
   box: number[];
   over: boolean;
@@ -46,15 +52,15 @@ export function clutchOf(h: Hooper): Hooper {
   for (const k of RATING_KEYS) out[k] = h[k] + 3;
   return out;
 }
-/** three straight makes put a man on fire; a Heat Check card two */
-export const fireAt = (h: Hooper | undefined) => (h?.abil.includes('heat-check') ? 2 : 3);
+/** A Heat Check card's PERFECT adds this much more Heat (+16 in all, against +12). */
+export const HEAT_CHECK_EXTRA = 4;
 
 /** a starter this tired comes off, when someone on the bench is fresh */
 export const SUB_AT = 0.65;
 const FRESH = 0.85;
 
 export function newHoopsGame(ours: Hooper[], theirs: Hooper[], seed: string, total = POSSESSIONS, bench: Hooper[] = [], defIQ = 0): HoopsGame {
-  return { ours: ours.slice(), theirs, seed, total, done: 0, score: 0, marks: [], energy: ours.map(() => 1), streak: ours.map(() => 0), fire: -1, box: ours.map(() => 0), over: false, bench: bench.slice(), benchEnergy: bench.map(() => 1), defIQ, theirEnergy: theirs.map(() => 1) };
+  return { ours: ours.slice(), theirs, seed, total, done: 0, score: 0, marks: [], energy: ours.map(() => 1), heat: { us: heatStart, them: heatStart }, perfects: 0, moments: 0, turnovers: 0, box: ours.map(() => 0), over: false, bench: bench.slice(), benchEnergy: bench.map(() => 1), defIQ, theirEnergy: theirs.map(() => 1) };
 }
 
 /**
@@ -64,7 +70,7 @@ export function newHoopsGame(ours: Hooper[], theirs: Hooper[], seed: string, tot
 function substitute(g: HoopsGame): void {
   for (let j = 0; j < g.bench.length; j++) g.benchEnergy[j] = Math.min(1, g.benchEnergy[j] + 0.05);
   for (let i = 0; i < g.ours.length; i++) {
-    if (g.energy[i] >= SUB_AT || i === g.fire) continue;
+    if (g.energy[i] >= SUB_AT) continue;
     let best = -1;
     for (let j = 0; j < g.bench.length; j++) {
       if (g.benchEnergy[j] < FRESH) continue;
@@ -76,7 +82,6 @@ function substitute(g: HoopsGame): void {
     g.ours[i] = { ...g.bench[best], pos: off.pos };
     g.bench[best] = off;
     [g.energy[i], g.benchEnergy[best]] = [g.benchEnergy[best], g.energy[i]];
-    g.streak[i] = 0;
   }
 }
 
@@ -86,7 +91,7 @@ export function startPossession(g: HoopsGame): Possession {
   const theirs = clutch ? g.theirs.map(clutchOf) : g.theirs;
   const p = newPossession(ours, theirs, g.energy, rng(hashString('h2:' + g.seed + ':' + g.done)), g.defIQ, g.theirEnergy);
   if (clutch && [...ours, ...theirs].some((h) => h.abil.includes('icon'))) p.events.push('clutch:icon');
-  p.fire = g.fire;
+  p.heat = heatStage(g.heat.us);
   return p;
 }
 
@@ -119,18 +124,21 @@ export function afterPossession(g: HoopsGame, p: Possession): Mark {
   else mark = 'TO';
   g.score += MARK_POINTS[mark];
   g.marks.push(mark);
-  if (e.kind === 'make' && e.who >= 0 && e.who < 5) {
-    g.box[e.who] += MARK_POINTS[mark];
-    g.streak[e.who]++;
-    if (g.streak[e.who] >= fireAt(g.ours[e.who])) g.fire = e.who;
-  }
-  const shooter = p.lastShot && !p.lastShot.make ? p.bodies.find((b) => b.side === 'O' && p.events.includes('release')) : null;
-  void shooter;
-  if (e.kind !== 'make') {
-    // a miss or a turnover cools whoever was on fire
-    for (let i = 0; i < 5; i++) if (i === e.who || e.kind === 'miss') g.streak[i] = Math.min(g.streak[i], 0);
-    if (g.fire >= 0 && (e.kind === 'miss' || e.who === g.fire)) g.fire = -1;
-  }
+  if (e.kind === 'make' && e.who >= 0 && e.who < 5) g.box[e.who] += MARK_POINTS[mark];
+  // Heat (heat.ts): every PERFECT (+16 for a Heat Check card's), a basket, a clean possession (a shot
+  // after two passes or more), a turnover; a possession played On Fire uses up one of its spell
+  const wasFire = g.heat.us.fire > 0;
+  let h = g.heat.us;
+  for (const who of p.perfects) h = heatAfter(h, 'perfect', 'nba', p.bodies[who] && has(p.bodies[who].p, 'heat-check') ? HEAT_CHECK_EXTRA : 0);
+  if (e.kind === 'make') h = heatAfter(h, 'score', 'nba');
+  const turnover = e.kind !== 'make' && e.kind !== 'miss';
+  if (turnover) h = heatAfter(h, 'turnover', 'nba');
+  else if (p.passes >= 2) h = heatAfter(h, 'clean', 'nba');
+  if (wasFire) h = heatUnitEnd(h);
+  g.heat = { ...g.heat, us: h };
+  g.perfects += p.perfects.length;
+  g.moments += p.moments;
+  if (turnover) g.turnovers++;
   // tiring: everyone a little, the ball handler and the scorer more, much less for great stamina
   // (a 50 drains about 2.7 times a 99); the defense tires by its own stamina too
   for (let i = 0; i < 5; i++) {
@@ -141,6 +149,7 @@ export function afterPossession(g: HoopsGame, p: Possession): Mark {
   for (let i = 0; i < g.theirs.length; i++) g.theirEnergy[i] = Math.max(0.55, g.theirEnergy[i] - Math.max(0.004, 0.03 * (1.6 - g.theirs[i].sta / 80) * 0.9));
   g.done++;
   if (g.done === g.total / 2) {
+    g.heat = { us: heatHalf(g.heat.us), them: heatHalf(g.heat.them) };
     for (let i = 0; i < 5; i++) g.energy[i] = Math.min(1, g.energy[i] + 0.3);
     for (let i = 0; i < g.theirEnergy.length; i++) g.theirEnergy[i] = Math.min(1, g.theirEnergy[i] + 0.3);
     for (let j = 0; j < g.bench.length; j++) g.benchEnergy[j] = Math.min(1, g.benchEnergy[j] + 0.3);

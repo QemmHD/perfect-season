@@ -1,3 +1,5 @@
+import type { Dial, RingState } from '../perfect';
+
 // The players and the game state for arcade basketball. Ratings are 0-99, 2K style; what a player can
 // do comes from them (a 40 three-point shooter has a sliver of a green window; only a real dunker
 // throws it down; only a posterizer dunks through contact).
@@ -145,9 +147,19 @@ export interface Meter {
   style?: 'set' | 'catch' | 'pullup';
   /** the nearest defender's room at the press: a man that far off can only close out so well */
   room?: number;
-  /** the result once released: -1 very early .. 1 very late, and whether it was green */
+  /**
+   * The gold ring (perfect.ts, plan §3.3), recomputed every step from the live contest until the
+   * release: gold (a release inside `green` is a make), amber (no guarantee) or red; and why not gold.
+   * `top` already carries the window's late shift (fatigue, a pull-up) and `late` says how much (s).
+   */
+  state: RingState;
+  dial?: Dial;
+  late?: number;
+  /** the result once released: -1 very early .. 1 very late, and whether it was PERFECT (in gold, on a gold ring) */
   off?: number;
   greened?: boolean;
+  /** the release's offset from the ideal, ms (exact: from the touch timestamps) */
+  offMs?: number;
   /**
    * The provisional gather (a person's SHOOT, nba-2): the meter runs from the touch, but he doesn't
    * leave the floor until GATHER_S, so a tap (pump fake) or a swipe (a move) can still take it back
@@ -206,10 +218,32 @@ export interface Possession {
   events: string[];
   rand: () => number;
   /** the last shot: for the HUD (contest grade, release, result) */
-  lastShot: { kind: ShotKind; contest: Contest; greened: boolean; off: number; make: boolean; p: number; and1: boolean } | null;
+  lastShot: {
+    kind: ShotKind;
+    contest: Contest;
+    greened: boolean;
+    off: number;
+    make: boolean;
+    p: number;
+    and1: boolean;
+    /** the ring as it was at the release (nba-4): its state and why it wasn't gold, the half-width
+     * and the exact offset (ms), and the window's late shift from tired legs (ms) */
+    state?: RingState;
+    dial?: Dial;
+    goldMs?: number;
+    offMs?: number;
+    fatigueMs?: number;
+  } | null;
   passes: number;
-  /** the player on fire (three straight makes) or -1 */
-  fire: number;
+  /** the offense's team Heat this possession (heat.ts): On Fire widens its gold ×1.25 */
+  heat: 'cold' | 'heating' | 'fire';
+  /** a person's possession (nba-4): the difficulty's window part and the meter-Off part are theirs */
+  person?: boolean;
+  meterOff?: boolean;
+  /** PERFECT skill moments this possession, by who (the box and Heat read them; Heat Check gains more) */
+  perfects: number[];
+  /** gold rings offered and attempted this possession (the grade's `moments`) */
+  moments: number;
   /** the next pass target the stick is pointing at */
   target: number | null;
   /** the defense's look this possession, and the defender doubling the ball in a trap */

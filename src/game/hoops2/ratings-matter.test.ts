@@ -4,7 +4,7 @@ import { rng } from '../../engine/rng';
 import { decide, pilot } from './autopilot';
 import { badgeMult, badgeTier } from './badges';
 import { canOop, contestOf, freeThrow, greenWindow, newPossession, releaseProbability, RIM, shotQ, step, stonewallChance } from './engine';
-import { afterPossession, clutchOf, fireAt, newHoopsGame, startPossession } from './game';
+import { afterPossession, clutchOf, HEAT_CHECK_EXTRA, newHoopsGame, startPossession } from './game';
 import type { Hooper } from './types';
 
 const HT: Record<string, number> = { PG: 74, SG: 77, SF: 79, PF: 81, C: 83 };
@@ -141,7 +141,12 @@ describe('NBA shot selection (the AI attacks the rim with finishers, shoots with
   it('even teams take a real mix (not ~85% contested threes) and score 1.0-1.15 a trip', () => {
     const m = mix({});
     expect(m.rim).toBeGreaterThan(0.25);
-    expect(m.three).toBeGreaterThan(0.25);
+    // nba-4: the AI now reads a three by the ring it will have at the release (a light look a man
+    // closes to heavy is amber: about 0.6 points, not the 1.29 the old contest ratio gave it), so an
+    // even 75 five takes far fewer contested threes (12% of shots here; it was ~85% contested before
+    // the 2026-11-01 pass). nba-8's shot value, usage and AI playbook bring it back to plan §3.1's
+    // .35-.45 by creating open looks; this floor only guards against threes disappearing.
+    expect(m.three).toBeGreaterThan(0.08);
     expect(m.three).toBeLessThan(0.6);
     expect(m.ppp).toBeGreaterThan(0.95);
     expect(m.ppp).toBeLessThan(1.18);
@@ -152,41 +157,49 @@ describe('NBA shot selection (the AI attacks the rim with finishers, shoots with
     const shoot = mix({ thr: 92, mid: 90 });
     expect(slash.rim, 'slashers at the rim').toBeGreaterThan(base.rim + 0.1);
     expect(slash.ppp, 'slashers score').toBeGreaterThan(base.ppp + 0.1);
-    expect(shoot.three, 'shooters shoot').toBeGreaterThan(base.three + 0.15);
+    // (nba-4: +0.13 measured, from a lower base: see the mix test above)
+    expect(shoot.three, 'shooters shoot').toBeGreaterThan(base.three + 0.1);
     expect(shoot.ppp, 'shooters score').toBeGreaterThan(base.ppp);
   }, 300000);
 });
 
-describe('NBA shot curve (plan curve, measured: GAMEPLAY-RATINGS.md)', () => {
+// nba-4 (V2's gold ring, plan §3.3) replaced the old shot-curve block ("open threes 45/60/75/90/99
+// land near 36/51/68/82/87%" at σ 45): a release in gold is now a make and off-gold falls away
+// steeply, so the curve's targets are the §3.3 gold and make rates (hoops2/ring.test.ts). What stays
+// here is the monotone part: a better shooter makes more, open or contested, at every rating.
+describe('NBA shot curve: monotone in the rating (nba-4 gold ring)', () => {
   const p = newPossession(SP.map((s) => mk(s)), SP.map((s) => mk(s)), [1, 1, 1, 1, 1], rng(1));
   const b = p.bodies[0];
-  // expected make with a 45 ms (σ) human release, an open/heavy three
+  // expected make with a 50 ms (σ) human release, an open/heavy three at the top of the arc
   const exp = (r: number, contest: 'open' | 'heavy') => {
     b.p = mk('PG', 75, { thr: r });
-    b.cx = RIM.cx - 24.5;
+    b.cx = RIM.cx - 24;
     b.cz = 0;
     const w = greenWindow(p, b, 'three', contest);
     let s = 0,
       n = 0;
     for (let i = -300; i <= 300; i++) {
       const off = i / 1000,
-        k = Math.exp(-(off * off) / (2 * 0.045 * 0.045));
+        k = Math.exp(-(off * off) / (2 * 0.05 * 0.05));
       s += k * releaseProbability(p, b, 'three', contest, off, w);
       n += k;
     }
     return s / n;
   };
-  it('open threes 45/60/75/90/99 land near 36/51/68/82/87%', () => {
-    const want = [36, 51, 68, 82, 87];
-    [45, 60, 75, 90, 99].forEach((r, i) => expect(Math.abs(exp(r, 'open') * 100 - want[i])).toBeLessThan(3.5));
-  });
-  it('heavy contests 45/60/75/90/99 land near 12/20/29/39/44%', () => {
-    const want = [12, 20, 29, 39, 44];
-    [45, 60, 75, 90, 99].forEach((r, i) => expect(Math.abs(exp(r, 'heavy') * 100 - want[i])).toBeLessThan(3.5));
+  it('open and heavy threes rise with the three-point rating', () => {
+    for (const c of ['open', 'heavy'] as const) {
+      let last = 0;
+      for (const r of [45, 60, 75, 90, 99]) {
+        const v = exp(r, c);
+        expect(v, c + ' ' + r).toBeGreaterThanOrEqual(last);
+        last = v;
+      }
+    }
+    expect(exp(95, 'open') - exp(75, 'open')).toBeGreaterThan(0.1);
   });
   it('above 99 is finite and only slightly better', () => {
     expect(shotQ(110)).toBeLessThan(1.25);
-    expect(exp(110, 'open')).toBeGreaterThan(exp(99, 'open'));
+    expect(exp(110, 'open')).toBeGreaterThanOrEqual(exp(99, 'open'));
     expect(exp(110, 'open') - exp(99, 'open')).toBeLessThan(0.05);
     expect(Number.isFinite(exp(150, 'open'))).toBe(true);
   });
@@ -251,9 +264,16 @@ describe('NBA badges: tiers, Lob City, Heat Check, Icon', () => {
     expect(canOop(mk('SF', 75, { ddk: 76, abil: ['lob-city'] }))).toBe(true);
     expect(canOop(mk('SF', 75, { ddk: 82 }))).toBe(true);
   });
-  it('Heat Check gets hot after two; Icon plays +3 in the clutch', () => {
-    expect(fireAt(mk('SG', 75, { abil: ['heat-check'] }))).toBe(2);
-    expect(fireAt(mk('SG'))).toBe(3);
+  it('Heat Check: +16 Heat for his PERFECT (+12 for anyone else); Icon plays +3 in the clutch', () => {
+    const hc = newHoopsGame(SP.map((s, i) => mk(s, 75, i === 1 ? { abil: ['heat-check'] } : {})), SP.map((s) => mk(s)), 'hc');
+    for (const who of [0, 1]) {
+      const before = hc.heat.us.v;
+      const q = startPossession(hc);
+      q.perfects.push(who);
+      q.end = { kind: 'miss', points: 0, text: '', who: -1 };
+      afterPossession(hc, q);
+      expect(hc.heat.us.v - before).toBe(who === 1 ? 12 + HEAT_CHECK_EXTRA : 12);
+    }
     const icon = clutchOf(mk('SG', 75, { abil: ['icon'] }));
     expect(icon.thr).toBe(78);
     expect(clutchOf(mk('SG')).thr).toBe(75);

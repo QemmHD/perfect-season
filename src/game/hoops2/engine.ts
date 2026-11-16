@@ -19,8 +19,9 @@
 //   int:<defender>              a pass picked off (ends 'int')
 //   foul:<defender>             the contact on an and-one (its 'ft:make' / 'ft:miss' follows)
 // `box.ts` builds per-player lines from them.
+import { difficultyPart, fatigueOf, goldBase, PART, PULLUP_LATE_MS, windowScale, type Dial, type RingSpec, type RingState, type WindowPart } from '../perfect';
 import { badgeMult, badgeTier } from './badges';
-import type { Act, Body, Contest, EndKind, Hooper, Possession, Pt, Scheme, ShotKind } from './types';
+import type { Act, Body, Contest, EndKind, Hooper, Meter, Possession, Pt, Scheme, ShotKind } from './types';
 
 export const RIM: Pt = { cx: 41.75, cz: 0 };
 export const RIM_H = 10;
@@ -126,7 +127,9 @@ export function newPossession(ours: Hooper[], theirs: Hooper[], energy: number[]
     rand,
     lastShot: null,
     passes: 0,
-    fire: -1,
+    heat: 'cold',
+    perfects: [],
+    moments: 0,
     target: null,
     scheme,
     trapper: null,
@@ -277,12 +280,9 @@ function closeoutCap(c: Contest, room: number | undefined): Contest {
   return CONTESTS[Math.min(CONTESTS.indexOf(c), cap)];
 }
 
-/** How much of the green window a contest leaves, and what it does to a release outside it. */
-const CONTEST_WINDOW: Record<Contest, number> = { open: 1, light: 0.7, heavy: 0.4, smothered: 0.15 };
+/** What a contest does to a release outside the gold (jumpers), and to a finish at the rim. */
 const CONTEST_MAKE: Record<Contest, number> = { open: 1, light: 0.84, heavy: 0.52, smothered: 0.3 };
-/** at the rim a hand in the face matters less than on a jumper: the window shrinks less, and so
- * does a finish's chance */
-const RIM_WINDOW: Record<Contest, number> = { open: 1, light: 0.85, heavy: 0.65, smothered: 0.45 };
+/** at the rim a hand in the face matters less than on a jumper */
 const RIM_MAKE: Record<Contest, number> = { open: 1, light: 0.93, heavy: 0.7, smothered: 0.5 };
 
 /**
@@ -303,33 +303,26 @@ function deepFactor(b: Body, d: number, floor: number): number {
   return tier ? Math.max(fall, lerp(0.8, 0.92, (tier - 1) / 4)) : fall;
 }
 
-/** A jumper's chance released just outside the green, open (timing and the contest come off it). */
+/** A jumper's chance released just outside the gold, open (timing and the contest come off it). */
 function offGreenBase(b: Body, kind: ShotKind, d: number): number {
   const rt = shotRating(b, kind);
   if (kind === 'layup') return lerp(0.42, 0.82, rate(rt, 40, 97));
   const q = shotQ(rt);
-  // the plan's curve (GAMEPLAY-RATINGS.md): an open three released just off green is 6% for a 40
+  // the plan's curve (GAMEPLAY-RATINGS.md): an open three released just off the gold is 6% for a 40
   // shooter, 40% for a 99; mid-range and close a little easier
   const base = kind === 'three' ? 0.06 : kind === 'mid' ? 0.1 : 0.14;
   const v = ext(base, base + 0.34, q);
   return kind === 'three' ? v * deepFactor(b, d, 0.5) : v;
 }
 
-/** How a shooter's make chance falls away outside the green (seconds): a great shooter's touch
- * forgives a near miss, a poor one's doesn't. */
+/** How a layup's make chance falls away outside the gold (seconds). */
 function touchWidth(b: Body, kind: ShotKind): number {
   return kind === 'layup' ? 0.065 : ext(0.014, 0.03, shotQ(shotRating(b, kind)));
 }
 
-/** The best a perfect release can do through a contest (jumpers): rating-scaled, 2K-style. */
-function perfectCap(b: Body, kind: ShotKind, contest: Contest): number {
-  if (kind === 'layup') return { open: 1, light: 0.97, heavy: 0.79, smothered: 0.48 }[contest];
-  if (contest === 'open') return 1;
-  const q = shotQ(shotRating(b, kind));
-  const [lo, hi] = contest === 'light' ? [0.8, 0.97] : contest === 'heavy' ? [0.32, 0.62] : [0.1, 0.3];
-  // Deadeye (by tier) takes part of the contest off a matching jump shot
-  const dead = badgeMult(b.p, 'deadeye', shotRating(b, kind));
-  return Math.min(0.99, ext(lo, hi, q) + dead * (1 - ext(lo, hi, q)) * 0.25);
+/** The best a perfectly timed finish does through a contest (the layup off its gold). */
+function perfectCap(contest: Contest): number {
+  return { open: 1, light: 0.97, heavy: 0.79, smothered: 0.48 }[contest];
 }
 
 /** The rating that matters for a shot from here. */
@@ -345,59 +338,161 @@ function shotKindAt(b: Body): ShotKind {
   return 'close';
 }
 
-/** The widest jump-shot half-window (seconds), an elite shooter's when open. */
-export const GREEN_W = 0.036;
+// ---------- the gold ring (plan §3.3, perfect.ts) ----------
 
+/** A catch this recent (s), standing, is a rhythm catch: ×1.2 on the gold. */
+export const RHYTHM_S = 0.4;
+/** Legend defense (and online): a light contest is amber, not gold. */
+export const LEGEND_DEF = 0.75;
+/** A jumper this far (ft) past his range is red, not amber. */
+export const RANGE_RED_FT = 4;
+
+/** The step behind the arc every three is taken from (ft): the arc tier's range includes it. */
+export const ARC_STEP = 1.25;
 /**
- * Half the green window (seconds) for this shooter on this shot under this contest. Arcade: a good
- * open shooter's window is wide; a poor shooter's is a sliver; deep threes past his range shrink it.
+ * How far from the rim (ft) a jumper is in range, by his three-point rating (plan §3.3): 27.75 at 85+,
+ * 25.75 at 70-84, the arc at 60-69 (23.75, with the step behind it that threes are taken from), 16 ft
+ * under 60 (a big's threes are always out of range).
  */
-export function greenWindow(p: Possession, b: Body, kind: ShotKind, contest: Contest): number {
-  const r = shotRating(b, kind);
-  // Difficulty scales timing tolerance, never the underlying card. An open perfect release is
-  // rewarded; perfect timing through a set defender still has to beat the contest.
-  let w = GREEN_W * (0.12 + 0.88 * Math.pow(rate(r, 45, 97), 1.6));
-  if (kind === 'layup') w = 0.07 * Math.pow(rate(r, 40, 97), 1.2);
-  const d = dist(b, RIM);
-  if (kind === 'three') w *= deepFactor(b, d, 0.4);
-  const cw = (kind === 'layup' ? RIM_WINDOW : CONTEST_WINDOW)[contest];
-  // Deadeye works on the jump shot it was earned with, by tier (Bronze 35% .. Legend all of it)
-  const dead = kind === 'layup' ? 0 : badgeMult(b.p, 'deadeye', r);
-  w *= cw + (1 - cw) * 0.5 * dead;
-  if (p.fire === b.idx) w *= 1.2;
-  const motion = Math.hypot(b.vx, b.vz);
-  const balance = kind === 'layup' ? 1 : lerp(1, 0.75, (motion - 3) / 13);
-  const rhythm = b.lastCatchAt !== undefined && p.t - b.lastCatchAt < 0.85 && motion < 4 ? 1.16 * (1 + 0.12 * (b.dimed ?? 0)) : 1;
-  return Math.max(0.003, w * lerp(0.85, 1, b.energy) * (1 - 0.16 * p.defIQ) * balance * rhythm);
+export function rangeFt(thr: number): number {
+  return thr >= 85 ? 27.75 : thr >= 70 ? 25.75 : thr >= 60 ? 23.75 + ARC_STEP : 16;
 }
 
-/** Continuous timing response: being one frame outside green is not a sudden 60% penalty.
- * This is our arcade model, inspired by published 2K timing/contest principles, not its proprietary formula. */
-export function releaseProbability(p: Possession, b: Body, kind: ShotKind, contest: Contest, off: number, green: number): number {
-  const rim = kind === 'layup';
-  const perfect = perfectCap(b, kind, contest);
-  const cm = (rim ? RIM_MAKE : CONTEST_MAKE)[contest];
-  const base = Math.min(perfect, offGreenBase(b, kind, dist(b, RIM)) * cm);
+/**
+ * The ring's state for a shot from here under this contest (plan §3.3). Jumpers: gold when open or
+ * light (Legend: open only) and in range; amber under a heavy contest, a Legend light one, or out of
+ * range; red when smothered, more than 4 ft past range or behind the backboard. On Fire turns an
+ * uncontested amber (range, Legend-light) gold; heavy stays amber, red stays red. A finish: gold open
+ * or light (Legend: open), amber heavy, red smothered.
+ */
+export function ringState(p: Possession, b: Body, kind: ShotKind, contest: Contest): { state: RingState; dial?: Dial; beyond: number } {
+  const fire = p.heat === 'fire';
+  const legend = p.defIQ >= LEGEND_DEF;
+  if (kind === 'layup') {
+    if (contest === 'smothered') return { state: 'red', dial: 'PRESSURE', beyond: 0 };
+    if (contest === 'heavy' || (contest === 'light' && legend && !fire)) return { state: 'amber', dial: 'PRESSURE', beyond: 0 };
+    return { state: 'gold', beyond: 0 };
+  }
+  const beyond = dist(b, RIM) - rangeFt(b.p.thr);
+  if (contest === 'smothered') return { state: 'red', dial: 'PRESSURE', beyond };
+  if (b.cx > RIM.cx + 1.25 || beyond > RANGE_RED_FT) return { state: 'red', dial: 'RANGE', beyond };
+  if (contest === 'heavy') return { state: 'amber', dial: 'PRESSURE', beyond };
+  if (fire) return { state: 'gold', beyond };
+  if (contest === 'light' && legend) return { state: 'amber', dial: 'PRESSURE', beyond };
+  if (beyond > 0) return { state: 'amber', dial: 'RANGE', beyond };
+  return { state: 'gold', beyond };
+}
+
+/**
+ * Everything that widens or narrows this shooter's gold right now, as windowScale's parts: a light
+ * contest (Deadeye takes part of it back), a rhythm catch (and a Dimer's pass), On Fire, meter Off and
+ * the difficulty (a person's own shots), a pull-up, tired legs. Also how much later the window sits (ms).
+ */
+export function windowParts(p: Possession, b: Body, kind: ShotKind, contest: Contest, style?: Meter['style']): { parts: WindowPart[]; lateMs: number } {
+  const parts: WindowPart[] = [];
+  let lateMs = 0;
+  if (contest === 'light') {
+    const dead = kind === 'layup' ? 0 : badgeMult(b.p, 'deadeye', shotRating(b, kind));
+    parts.push({ id: 'light', mult: PART.light + (1 - PART.light) * 0.5 * dead });
+  }
+  // sqrt (correctly rounded everywhere), not hypot: the sim math stays bit-identical on every engine
+  const motion = Math.sqrt(b.vx * b.vx + b.vz * b.vz);
+  if (kind !== 'layup' && b.lastCatchAt !== undefined && p.t - b.lastCatchAt <= RHYTHM_S + 1e-9 && motion < 4) {
+    parts.push({ id: 'rhythm', mult: PART.rhythm });
+    if (b.dimed) parts.push({ id: 'dimer', mult: 1 + 0.12 * b.dimed });
+  }
+  if (p.heat === 'fire') parts.push({ id: 'fire', mult: PART.fire });
+  if (p.person) {
+    if (p.meterOff) parts.push({ id: 'meterOff', mult: PART.meterOff });
+    parts.push(difficultyPart(p.defIQ));
+  }
+  if (style === 'pullup') {
+    parts.push({ id: 'pullup', mult: PART.pullup });
+    lateMs += PULLUP_LATE_MS;
+  }
+  const tired = fatigueOf(b.energy);
+  parts.push(tired.part);
+  lateMs += tired.lateMs;
+  return { parts, lateMs };
+}
+
+/** The style a jumper from here would be: off a recent catch standing, on the move, or set. */
+function styleOf(p: Possession, b: Body): NonNullable<Meter['style']> {
+  const speed = Math.sqrt(b.vx * b.vx + b.vz * b.vz);
+  return b.lastCatchAt !== undefined && p.t - b.lastCatchAt < 0.85 && speed < 4 ? 'catch' : speed > 6 ? 'pullup' : 'set';
+}
+
+/**
+ * The gold half-width (seconds) for this shooter on this shot under this contest: his rating's
+ * base (perfect.ts goldBase) through windowScale, so it is never under ±30 ms or over ±90 ms.
+ */
+export function greenWindow(p: Possession, b: Body, kind: ShotKind, contest: Contest, style: Meter['style'] = kind === 'layup' ? undefined : styleOf(p, b)): number {
+  return windowScale(goldBase(shotRating(b, kind)), windowParts(p, b, kind, contest, style).parts) / 1000;
+}
+
+/** The ring a jumper or a layup has right now (state, half-width, why not gold). */
+export function ringNow(p: Possession, b: Body, kind: ShotKind, contest: Contest, style?: Meter['style']): RingSpec & { beyond: number } {
+  const st = ringState(p, b, kind, contest);
+  const w = windowParts(p, b, kind, contest, style);
+  return { idealMs: 0, goldMs: windowScale(goldBase(shotRating(b, kind)), w.parts), state: st.state, ...(st.dial ? { dial: st.dial } : {}), beyond: st.beyond };
+}
+
+/** How a jumper's make chance falls away past the gold's edge: 1 / (1 + (miss / τ)²), τ 6-12 ms by rating. */
+function falloff(b: Body, kind: ShotKind, missMs: number): number {
+  const x = missMs / ext(6, 12, shotQ(shotRating(b, kind)));
+  return 1 / (1 + x * x);
+}
+
+/** The best a perfectly timed jumper does on an amber or red ring: rating-scaled, never a sure thing. */
+function ringCap(b: Body, kind: ShotKind, contest: Contest, state: RingState, dial: Dial | undefined, beyond: number): number {
+  const q = shotQ(shotRating(b, kind));
+  const dead = badgeMult(b.p, 'deadeye', shotRating(b, kind));
+  if (state === 'red') return dial === 'RANGE' ? ext(0.03, 0.12, q) : Math.min(0.15, ext(0.06, 0.14, q) + 0.01 * dead);
+  if (dial === 'PRESSURE') return contest === 'heavy' ? Math.min(0.5, ext(0.26, 0.44, q) + 0.06 * dead) : ext(0.5, 0.78, q);
+  return ext(0.3, 0.55, q) * (1 - 0.1 * clamp(beyond, 0, RANGE_RED_FT)) * CONTEST_MAKE[contest];
+}
+
+/**
+ * The chance a release `off` seconds from the ideal goes in, with a gold half-width of `green`
+ * seconds. On a gold ring a release inside it is a make (gold never lies); outside, the chance falls
+ * away steeply from the off-gold curve. On amber, timing raises it to a rating-scaled cap; red stays
+ * at 15% or under. A layup off its gold keeps the finishing curve.
+ */
+export function releaseProbability(p: Possession, b: Body, kind: ShotKind, contest: Contest, off: number, green: number, style?: Meter['style']): number {
+  const ring = ringState(p, b, kind, contest);
   const missBy = Math.max(0, Math.abs(off) - green);
-  const touch = Math.exp(-Math.pow(missBy / touchWidth(b, kind), 1.35));
-  const latePenalty = lerp(1, 0.35, missBy / 0.26);
-  const probability = (base + (perfect - base) * touch) * latePenalty;
-  return clamp(probability * (p.fire === b.idx && missBy > 0 ? 1.05 : 1), 0.01, perfect);
+  if (ring.state === 'gold' && missBy === 0) return 1;
+  if (kind === 'layup') {
+    const perfect = perfectCap(contest);
+    const base = Math.min(perfect, offGreenBase(b, kind, dist(b, RIM)) * RIM_MAKE[contest]);
+    const touch = Math.exp(-Math.pow(missBy / touchWidth(b, kind), 1.35));
+    return clamp((base + (perfect - base) * touch) * lerp(1, 0.35, missBy / 0.26), 0.01, Math.min(perfect, 0.99));
+  }
+  const ms = missBy * 1000;
+  if (ring.state === 'gold') {
+    const v = offGreenBase(b, kind, dist(b, RIM)) * CONTEST_MAKE[contest] * falloff(b, kind, ms) * (style === 'pullup' ? 0.6 : 1);
+    return clamp(v, 0.005, 0.99);
+  }
+  const cap = ringCap(b, kind, contest, ring.state, ring.dial, ring.beyond);
+  return clamp(missBy === 0 ? cap : cap * 0.8 * falloff(b, kind, ms), 0.005, cap);
 }
 
 /**
  * What a shot from here is worth to a shooter with release timing of spread `sd` (seconds): the
- * chance it goes in (green or not) times its points. For the AI's choices.
+ * chance it goes in (gold or not) times its points. For the AI's choices.
  */
-export function shotValue(p: Possession, b: Body, sd: number): { kind: ShotKind; contest: Contest; value: number } {
+export function shotValue(p: Possession, b: Body, sd: number, at?: Contest): { kind: ShotKind; contest: Contest; value: number } {
   const kind = shotKindAt(b);
-  const contest = contestOf(p, b);
-  const w = greenWindow(p, b, kind, contest);
-  // the chance of a green with a normal spread of release timing
+  // (`at`: the contest it will have at the release, when the caller reads a closeout coming)
+  const contest = at ?? contestOf(p, b);
+  const style = styleOf(p, b);
+  const w = greenWindow(p, b, kind, contest, style);
+  // the chance of a release inside the window with a normal spread of timing
   const z = w / Math.max(0.005, sd);
-  const pGreen = clamp(1 - 2 * normTail(z), 0, 1);
-  const miss = releaseProbability(p, b, kind, contest, Math.max(w, sd * 0.85), w);
-  const pm = pGreen * releaseProbability(p, b, kind, contest, 0, w) + (1 - pGreen) * miss;
+  const pIn = clamp(1 - 2 * normTail(z), 0, 1);
+  const inside = releaseProbability(p, b, kind, contest, 0, w, style);
+  const outside = releaseProbability(p, b, kind, contest, w + sd * 0.5, w, style);
+  const pm = pIn * inside + (1 - pIn) * outside;
   return { kind, contest, value: pm * (kind === 'three' ? 3 : 2) };
 }
 
@@ -435,9 +530,10 @@ export function shotChanceWith(p: Possession, b: Body, contest: Contest): number
 }
 
 function ordinaryReleaseChance(p: Possession, b: Body, kind: ShotKind, contest: Contest): number {
-  const green = greenWindow(p, b, kind, contest);
+  const style = kind === 'layup' ? undefined : styleOf(p, b);
+  const green = greenWindow(p, b, kind, contest, style);
   let sum = 0;
-  for (let i = 0; i < 7; i++) sum += releaseProbability(p, b, kind, contest, ((i + 0.5) / 7) * 2 * THUMB - THUMB, green);
+  for (let i = 0; i < 7; i++) sum += releaseProbability(p, b, kind, contest, ((i + 0.5) / 7) * 2 * THUMB - THUMB, green, style);
   return sum / 7;
 }
 
@@ -460,7 +556,8 @@ export function pressShoot(p: Possession, opts: { at?: number; provisional?: boo
   if (p.handler === null || p.ball || p.end || p.meter || p.finish) return;
   // a person's touch: the meter counts from the touch itself (its timestamp, in game time), never
   // from the 60 Hz step that happened to hear it
-  const t0 = opts.at !== undefined ? Math.min(p.t, Math.max(p.t - 0.25, opts.at)) : p.t;
+  // (a touch heard between two steps can sit up to a step ahead of the last one: plan §3.3's < 1 ms)
+  const t0 = opts.at !== undefined ? Math.min(p.t + STEP_AHEAD, Math.max(p.t - 0.25, opts.at)) : p.t;
   const b = p.bodies[p.handler];
   const d = dist(b, RIM);
   const speed = Math.hypot(b.vx, b.vz);
@@ -488,15 +585,23 @@ export function pressShoot(p: Possession, opts: { at?: number; provisional?: boo
     p.finish = { kind, t0: p.t, tUp: p.t + gather, target: inWay ? def.idx : null };
     act(b, kind === 'layup' ? 'layup' : kind === 'contact' ? 'contact' : kind === 'standdunk' ? 'standdunk' : 'dunk', p.t);
     p.events.push('gather:' + kind);
-    if (kind === 'layup') p.meter = { t0, top: LAYUP_TOP, green: greenWindow(p, b, 'layup', contestOf(p, b)), kind: 'layup', room: closest(p, b).r };
+    if (kind === 'layup') {
+      // the finish ring: it closes as he rises at the rim, LAYUP_RISE after he leaves the floor
+      const room = closest(p, b).r;
+      const ring = ringNow(p, b, 'layup', closeoutCap(contestOf(p, b), room));
+      p.meter = { t0, top: p.finish.tUp + LAYUP_RISE - t0, green: ring.goldMs / 1000, kind: 'layup', room, state: ring.state, ...(ring.dial ? { dial: ring.dial } : {}) };
+    }
     return;
   }
   const kind = shotKindAt(b);
-  const contest = contestOf(p, b);
-  const style = b.lastCatchAt !== undefined && p.t - b.lastCatchAt < 0.85 && speed < 4 ? 'catch' : speed > 6 ? 'pullup' : 'set';
-  const top = style === 'catch' ? 0.45 : style === 'pullup' ? 0.59 : JUMPER_TOP;
+  const room = closest(p, b).r;
+  const contest = closeoutCap(contestOf(p, b), room);
+  const style = styleOf(p, b);
+  const w = windowParts(p, b, kind, contest, style);
+  const ring = ringNow(p, b, kind, contest, style);
+  const top = (style === 'catch' ? 0.45 : style === 'pullup' ? 0.59 : JUMPER_TOP) + w.lateMs / 1000;
   b.shotTempo = JUMPER_TOP / top;
-  p.meter = { t0, top, style, green: greenWindow(p, b, kind, contest), kind, room: closest(p, b).r };
+  p.meter = { t0, top, style, green: ring.goldMs / 1000, kind, room, state: ring.state, ...(ring.dial ? { dial: ring.dial } : {}), late: w.lateMs / 1000 };
   if (opts.provisional) {
     // he gathers; he leaves the floor at GATHER_S unless a tap or a swipe takes it back first
     p.meter.gather = true;
@@ -505,6 +610,10 @@ export function pressShoot(p: Possession, opts: { at?: number; provisional?: boo
   }
   rise(p, b);
 }
+
+/** How far ahead of the last step a touch's own time may sit: a touch heard just before a frame
+ * can be up to two 60 Hz steps past the last one run (the part-step not yet run, and the frame). */
+const STEP_AHEAD = 0.035;
 
 /** A person's SHOOT stays a gather this long before he goes up (the tap / swipe window, 120 ms + a frame's grace). */
 export const GATHER_S = 0.125;
@@ -566,10 +675,26 @@ export function unrise(p: Possession, within = UNRISE_S): boolean {
   return true;
 }
 
-/** The top of a jump shot's meter (seconds after SHOOT): the green, and where the drawing puts
- * the release at the height of his jump. A layup's comes sooner. */
+/** The top of a jump shot's meter (seconds after SHOOT): the gold, and where the drawing puts
+ * the release at the height of his jump. */
 export const JUMPER_TOP = 0.52;
-export const LAYUP_TOP = 0.42;
+/** The finish ring closes this long after he leaves the floor (s): rising, well before the ball goes up. */
+export const LAYUP_RISE = 0.12;
+
+/**
+ * The ring follows the live contest until the release (plan §3.3): the state, why it isn't gold,
+ * and the half-width; the ideal moment and its late shift stay as they were at the press.
+ */
+export function refreshRing(p: Possession): void {
+  const m = p.meter;
+  if (!m || m.off !== undefined || p.handler === null) return;
+  const b = p.bodies[p.handler];
+  const ring = ringNow(p, b, m.kind, closeoutCap(contestOf(p, b), m.room), m.style);
+  m.state = ring.state;
+  m.green = ring.goldMs / 1000;
+  if (ring.dial) m.dial = ring.dial;
+  else delete m.dial;
+}
 
 /** A system-canceled held jumper is not a release. Committed finishes/shots keep playing. */
 export function cancelShoot(p: Possession): boolean {
@@ -665,39 +790,51 @@ function reboundJump(p: Possession, b: Body) {
  * (seconds) is taken off a person's release: a phone shows the meter a little behind and hears the
  * finger come up a little after, so what they saw when they let go was that much earlier.
  */
-export function releaseShoot(p: Possession, lag = 0) {
+export function releaseShoot(p: Possession, lag = 0, at?: number) {
   const m = p.meter;
   if (!m || p.handler === null || p.end || m.off !== undefined) return;
   const b = p.bodies[p.handler];
   // let go before the gather even left the floor: he goes up now, and it's an early release
   if (m.gather) rise(p, b);
-  const held = p.t - m.t0 - lag;
+  // the ring as it is at the release
+  refreshRing(p);
+  // a person's lift is timed from its own timestamp (game time), so a release between two steps
+  // lands exactly where it was (plan §3.3); the autopilot lets go on a step
+  const now = at !== undefined ? clamp(at, p.t - 0.25, p.t + STEP_AHEAD) : p.t;
+  const held = now - m.t0 - lag;
   const off = held - m.top;
   m.off = clamp(off / 0.25, -1, 1);
-  m.greened = Math.abs(off) <= m.green;
+  m.offMs = off * 1000;
+  m.greened = m.state === 'gold' && Math.abs(off) <= m.green;
   if (m.kind === 'layup') return; // the layup goes up at the top of the finish; its timing is kept
   shoot(p, b, m.kind, m.greened, off, m.green);
 }
 
 function shoot(p: Possession, b: Body, kind: ShotKind, greened: boolean, off: number, green: number) {
   const r = p.rand;
-  const contest = closeoutCap(contestOf(p, b), p.meter?.room);
+  const m = p.meter;
+  const contest = closeoutCap(contestOf(p, b), m?.room);
   const { d: cd, r: cr } = closest(p, b);
   const d = dist(b, RIM);
-  const pm = releaseProbability(p, b, kind, contest, off, green);
-  // A hand on the release can block a smothered shot, even with excellent timing.
-  const blockP = contest === 'smothered' && kind !== 'layup' ? clamp(0.04 + (cd.p.blk - 60) / 250 + (cd.p.ht - b.p.ht) / 120, 0.02, 0.22) : 0;
+  const state = m?.state ?? ringState(p, b, kind, contest).state;
+  const ring = { state, ...(m?.dial ? { dial: m.dial } : {}), goldMs: green * 1000, offMs: off * 1000, fatigueMs: Math.round(fatigueOf(b.energy).lateMs) };
+  // gold never lies: a release inside a gold ring goes in (no block, no rim-out)
+  const pm = greened ? 1 : releaseProbability(p, b, kind, contest, off, green, m?.style);
+  if (state === 'gold') p.moments++;
+  if (greened) p.perfects.push(b.idx);
+  // A hand on the release can block a smothered shot, even with excellent timing (a red ring).
+  const blockP = !greened && contest === 'smothered' && kind !== 'layup' ? clamp(0.04 + (cd.p.blk - 60) / 250 + (cd.p.ht - b.p.ht) / 120, 0.02, 0.22) : 0;
   if (r() < blockP && cr < 3.5) {
     act(cd, 'block', p.t);
     // swatted: he comes down off balance
     b.bumped = true;
     loose(p, b, false);
-    p.lastShot = { kind, contest, greened, off: clamp(off / 0.25, -1, 1), make: false, p: pm, and1: false };
+    p.lastShot = { kind, contest, greened, off: clamp(off / 0.25, -1, 1), make: false, p: pm, and1: false, ...ring };
     p.events.push(fgaEvent(b, kind, isThree(b) ? 3 : 2), 'blocked:' + cd.idx);
     return;
   }
-  const make = r() < pm;
-  p.lastShot = { kind, contest, greened, off: clamp(off / 0.25, -1, 1), make, p: pm, and1: false };
+  const make = r() < pm || greened;
+  p.lastShot = { kind, contest, greened, off: clamp(off / 0.25, -1, 1), make, p: pm, and1: false, ...ring };
   if (contest !== 'open') badgeEvent(p, b, 'deadeye', shotRating(b, kind));
   if (kind === 'three' && d > 26) badgeEvent(p, b, 'limitless', b.p.thr);
   if (b.dimed && b.lastCatchAt !== undefined && p.t - b.lastCatchAt < 0.9) {
@@ -732,9 +869,20 @@ function fgaEvent(b: Body, kind: ShotKind, points: number): string {
 
 /** the finish at the rim, at the top of his jump */
 function finishNow(p: Possession, b: Body, kind: ShotKind) {
-  // Codex: preserve measured layup timing for the HUD; the accuracy calculation below is unchanged.
-  const releaseOff = kind === 'layup' ? (p.meter?.off ?? 0.8) : 0;
-  const releaseGreened = kind === 'layup' && !!p.meter?.greened;
+  // the finish ring: a layup still held when it goes up is a late release (timed now)
+  const lm = kind === 'layup' ? p.meter : null;
+  if (lm && lm.off === undefined) {
+    refreshRing(p);
+    const off = p.t - lm.t0 - lm.top;
+    lm.off = clamp(off / 0.25, -1, 1);
+    lm.offMs = off * 1000;
+    lm.greened = false;
+  }
+  const releaseOff = kind === 'layup' ? (lm?.off ?? 0.8) : 0;
+  const releaseGreened = kind === 'layup' && !!lm?.greened;
+  const ring = lm ? { state: lm.state, ...(lm.dial ? { dial: lm.dial } : {}), goldMs: lm.green * 1000, offMs: lm.offMs, fatigueMs: Math.round(fatigueOf(b.energy).lateMs) } : {};
+  if (lm?.state === 'gold') p.moments++;
+  if (releaseGreened) p.perfects.push(b.idx);
   const r = p.rand;
   const contest = contestOf(p, b);
   const { d: cd, r: cr } = closest(p, b);
@@ -744,13 +892,14 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   // (not stumbling, not beaten a moment ago). Timing cannot erase a physically set rim protector.
   const set = p.t >= cd.stunUntil && !(cd.beatenAt !== undefined && p.t - cd.beatenAt < 0.6);
   let blockP = cr < 3.2 && set ? clamp((cd.p.blk - 50) / 250 + reach * 0.05 + protector, 0, 0.3) * ((3.2 - cr) / 3.2) : 0;
-  if (kind === 'layup' && p.meter?.greened) blockP *= 0.65;
+  // gold never lies: a PERFECT finish is never blocked (nor does it miss, below)
+  if (releaseGreened) blockP = 0;
   if (kind === 'dunk' || kind === 'standdunk') blockP *= 0.45;
   if (kind === 'contact') blockP *= 0.3 * lerp(1.3, 0.6, rate(b.p.ddk, 80, 99));
   if (kind === 'oop') blockP *= 0.3;
   // interior defense at the rim: a set big within 3.5 feet blocks more and makes every finish harder
   const anchor = cr < 3.5 && set ? rate(cd.p.ind, 50, 99) : null;
-  if (anchor !== null) blockP = clamp(blockP + (cd.p.ind - 60) / 320, 0, 0.35);
+  if (anchor !== null && !releaseGreened) blockP = clamp(blockP + (cd.p.ind - 60) / 320, 0, 0.35);
   if (r() < blockP) {
     badgeEvent(p, cd, 'rim-protector');
     act(cd, 'block', p.t);
@@ -758,7 +907,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
     cd.h = 0.01;
     b.bumped = true;
     loose(p, b, false);
-    p.lastShot = { kind, contest, greened: releaseGreened, off: releaseOff, make: false, p: 0, and1: false };
+    p.lastShot = { kind, contest, greened: releaseGreened, off: releaseOff, make: false, p: 0, and1: false, ...ring };
     p.events.push(fgaEvent(b, kind, 2), 'blocked:' + cd.idx);
     return;
   }
@@ -769,7 +918,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
     const m = p.meter;
     const off = m?.off !== undefined ? m.off * 0.25 : 0.2;
     greened = !!m?.greened;
-    pm = releaseProbability(p, b, 'layup', contest, off, m?.green ?? 0.05);
+    pm = greened ? 1 : releaseProbability(p, b, 'layup', contest, off, m?.green ?? 0.05);
   } else if (kind === 'contact')
     pm = lerp(0.64, 0.91, rate(b.p.ddk, 80, 99)) * (0.8 + 0.2 * badgeMult(b.p, 'posterizer')) * (contest === 'smothered' ? lerp(0.65, 0.9, rate(b.p.str - cd.p.str, -25, 25)) : 1);
   else if (kind === 'oop') pm = lerp(0.82, 0.96, rate(b.p.ddk, 60, 99)) + (has(b.p, 'lob-city') ? 0.06 : 0);
@@ -784,15 +933,15 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   if (kind !== 'oop') pm *= Math.pow(0.9, crowd + spacingHelp(p, b));
   // finishing through a hand and a body: strength against strength (Claude 2026-11-01)
   if ((contest === 'heavy' || contest === 'smothered') && kind !== 'oop' && kind !== 'contact') pm *= clamp(1 + (b.p.str - cd.p.str) / 250, 0.9, 1.1);
-  pm = clamp(pm, 0.02, greened && contest === 'open' ? 1 : 0.99);
-  const make = r() < pm;
+  pm = greened ? 1 : clamp(pm, 0.02, 0.99);
+  const make = r() < pm || greened;
   // an and-one: contact on the way up, more often the stronger he is; then he has to make the free
   // throw (FT rating: 45% for a 40, 92% for a 97)
   const contact = cr < 3 && p.t >= cd.stunUntil;
   const fouled = make && contact && r() < (kind === 'contact' ? 0.42 : lerp(0.1, 0.28, rate(b.p.str)));
   const and1 = fouled && r() < freeThrow(b.p);
   if (fouled) p.events.push('foul:' + cd.idx, and1 ? 'ft:make' : 'ft:miss');
-  p.lastShot = { kind, contest, greened, off: releaseOff, make, p: pm, and1 };
+  p.lastShot = { kind, contest, greened, off: releaseOff, make, p: pm, and1, ...ring };
   const dunk = kind !== 'layup';
   p.ball = {
     kind: 'shot',
@@ -821,6 +970,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
   p.handler = null;
   p.meter = null;
   p.events.push('finish:' + kind + (make ? ':make' : ':miss'));
+  if (greened) p.events.push('finish-green');
 }
 
 /**
@@ -1159,6 +1309,8 @@ export function step(p: Possession, dt: number, stick: Pt | null, sprintHeld?: b
 
   // a person's provisional gather leaves the floor once the tap / swipe window has passed
   if (p.meter?.gather && handler && t - (p.meter.gatherAt ?? p.meter.t0) >= GATHER_S) rise(p, handler);
+  // a person's ring follows the live contest every step (the autopilot's is read at its release)
+  if (p.person && p.meter && p.meter.off === undefined) refreshRing(p);
 
   // ISO: the ball goes to the star on the strong wing once he's there or open (or after 1.1 s)
   const iso = p.playCall?.kind === 'iso' && p.playCall.feed ? p.playCall : null;

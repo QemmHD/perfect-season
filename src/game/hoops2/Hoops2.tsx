@@ -12,9 +12,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
 import { logError } from '../../lib/errlog';
-import { crowd, sfx, tapHaptic, vibrate } from '../../lib/sound';
+import { crowd, sfx } from '../../lib/sound';
 import { radialAt, type ClusterInput } from '../hud/Cluster';
-import { feelCount, haptic } from '../hud/feel';
+import { chime, feelCount, haptic, ringTick } from '../hud/feel';
+import { makeGrade, parFor } from '../hud/grade';
+import { heatStage, HEAT } from '../heat';
+import { gameTimeAt, judge, touchClock } from '../perfect';
+import { PERFECT_EVENTS, playFeel } from './feel-events';
+import { TimingCalibrator } from './TimingCalibrator';
 import { TAP_PX } from '../hud/gestures';
 import { readGeometry } from '../hud/geometry';
 import { HeatBar } from '../hud/HeatBar';
@@ -41,17 +46,23 @@ import type { Progress, RivalLive } from '../progress';
 import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
-import { aimPass, callPlay, cancelGather, cancelShoot, crossover, driving, euroStep, jumpRebound, pass, pressShoot, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
+import { aimPass, callPlay, cancelGather, cancelShoot, contestOf, crossover, driving, euroStep, jumpRebound, pass, pressShoot, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
 import { afterPossession, CLUTCH, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, practiceStart, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
 import type { Body, Hooper, Possession, Pt, Scheme, ShotKind } from './types';
+import type { Dial, RingState } from '../perfect';
 import './coach-controls.css';
 import { useInputInterrupt } from '../useInputInterrupt';
 
 const DT = 1 / 60;
-/** what a phone's screen and touch add between what you saw and the release it hears (seconds) */
-const RELEASE_LAG = 0.03;
+/** what a phone's screen and touch add between what you saw and the release it hears (ms), until the
+ * player calibrates (TimingCalibrator: the touch prefs' offsetMs) */
+const RELEASE_LAG_MS = 25;
+/** The calibration's once-per-device offer (prefs hints.nba bit). */
+const CALIBRATE_HINT = 5;
+/** The ring-fill tick: this long before the ideal (s). */
+const RING_TICK_S = 0.2;
 
 /** What the dev server lets the QA probes read (window.__hg2): never part of a build. */
 interface QaProbe {
@@ -102,14 +113,14 @@ interface Snap {
   bodies: Body[];
   ball: Possession['ball'];
   handler: number | null;
-  fire: number;
+  heat: Possession['heat'];
   lastShot: Possession['lastShot'];
 }
 const snapOf = (p: Possession): Snap => ({
   bodies: p.bodies.map((b) => ({ ...b, trail: [] })),
   ball: p.ball ? { ...p.ball } : null,
   handler: p.handler,
-  fire: p.fire,
+  heat: p.heat,
   lastShot: p.lastShot
 });
 const MARK_TEXT: Record<Mark, string> = { '2': '2', '3': '3', A: '3', X: '–', TO: 'TO' };
@@ -128,6 +139,28 @@ function teamColor(k: Kit): string {
   const light = ((n >> 16) & 255) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11 > 200;
   return light ? k.trim : k.jersey;
 }
+/** The coverage word as a shooter rises (V2 B.1.7): what the ring is, and why when it isn't gold. */
+function coverageWord(state: RingState, dial: Dial | undefined, p: Possession): string {
+  const c = p.handler !== null ? contestOf(p, p.bodies[p.handler]) : 'open';
+  if (state === 'gold') return (c === 'light' ? 'LIGHT' : 'OPEN') + ' · RELEASE ON GOLD';
+  if (dial === 'RANGE') return state === 'red' ? 'TOO FAR · RANGE' : 'DEEP · RANGE';
+  return state === 'red' ? 'SMOTHERED · PRESSURE' : (c === 'light' ? 'LIGHT' : 'HEAVY') + ' · PRESSURE';
+}
+
+/** A release that wasn't PERFECT, in one line: the timing word and the dial it failed on. */
+export function releaseWord(ls: NonNullable<Possession['lastShot']>): string {
+  const spec = { idealMs: 0, goldMs: ls.goldMs ?? 0, state: ls.state ?? 'gold', ...(ls.dial ? { dial: ls.dial } : {}) } as const;
+  const j = judge(spec, ls.offMs ?? ls.off * 250);
+  if (spec.state === 'red') return spec.dial === 'RANGE' ? 'TOO FAR · RANGE' : 'SMOTHERED · PRESSURE';
+  if (spec.state === 'amber') return (j.step === 0 ? 'ON TIME' : j.word) + ' · ' + (spec.dial ?? 'PRESSURE');
+  return j.word + ' · TIMING';
+}
+
+/** Who took the possession's last shot (the scorer, on a make). */
+function shooterOf(p: Possession): Body | undefined {
+  return p.end && p.end.who >= 0 ? p.bodies[p.end.who] : undefined;
+}
+
 /** both fives (and the bench) with on-court tags no two men share (labels.ts) */
 function tagged(lists: Hooper[][]): Hooper[][] {
   const all = lists.flat();
@@ -325,12 +358,35 @@ export function Hoops2({
   const replayRef = useRef<Replay<Snap> | null>(null);
   /** where the dribble was in its beat last frame (the bounce sounds as it hits the floor) */
   const lastBeat = useRef(1);
+  /** game time at a touch (perfect.ts TouchClock), updated every frame, and the possession it's for */
+  const clock = useRef({ c: touchClock(), p: null as Possession | null });
+  /** PERFECTs in a row (the chime climbs a semitone each, up to 5) */
+  const perfectRun = useRef(0);
+  /** a release's PERFECT already played its double inside the touch (the event mustn't play it again) */
+  const doubleInTouch = useRef(false);
+  /** the meter the ring-fill tick has played for (its t0) */
+  const ringTicked = useRef<number | null>(null);
+  /** the first On Fire basket of the game gets the slow-motion replay */
+  const fireReplayed = useRef(false);
+  /** the 4-tap calibration: offered once before the first match on the phone, and from the pause sheet */
+  const [calib, setCalib] = useState(false);
   const [replaying, setReplaying] = useState(false);
 
   /** Everything the game says goes in the toast line: hints 0, calls and banners 1, results 2. */
   const say = (text: string, tone: Tone, ms = 1200, priority = 1) => toastApi.current?.show({ text, tone: TONE[tone], ms, priority, pop: tone === 'green' || tone === 'big' });
   const later = (fn: () => void, ms: number) => timers.current.set(fn, ms);
-  const progress = (g: HoopsGame): Progress => ({ score: g.score, drive: g.done, done: g.over, ends: g.marks.slice(), plays: g.done });
+  const progress = (g: HoopsGame): Progress => {
+    const base: Progress = { score: g.score, drive: g.done, done: g.over, ends: g.marks.slice(), plays: g.done };
+    if (!g.over || practice) return base;
+    // the final whistle: this phone's box score and match grade (plan §4.8; never on the wire)
+    const us = boxRef.current.lines('us');
+    const pog = us.reduce<(typeof us)[number] | null>((a, l) => (!a || l.pts > a.pts ? l : a), null);
+    return {
+      ...base,
+      box: { us, them: [], ...(pog && pog.pts > 0 ? { pog: pog.name } : {}) },
+      grade: makeGrade({ points: g.score, units: g.done, par: parFor(defIQ, online), turnovers: g.turnovers, perfects: g.perfects, moments: g.moments, bestHeat: g.heat.us.peak, fires: g.heat.us.fires })
+    };
+  };
   const shake = (px: number) => {
     if (!reducedMotion()) fxRef.current.shake = Math.max(fxRef.current.shake, px);
   };
@@ -339,6 +395,11 @@ export function Hoops2({
     passPend.current = null;
     setCallOpen(false);
     possRef.current = startPossession(g);
+    // a person's possession: the difficulty's and meter Off's window parts are theirs (perfect.ts)
+    possRef.current.person = !autoplayHook;
+    possRef.current.meterOff = !autoplayHook && loadPrefs().meter === 'off';
+    renderer.hud.meterOff = possRef.current.meterOff;
+    ringTicked.current = null;
     tipAt.current = performance.now();
     // the Clutch possessions: the camera sits 6% tighter (V2 B.0.4; not with reduced motion)
     renderer.clutch = g.done >= g.total - CLUTCH;
@@ -375,6 +436,9 @@ export function Hoops2({
       rescued.current = null;
       highlight.current = null;
       replayRef.current = null;
+      fireReplayed.current = false;
+      perfectRun.current = 0;
+      ringTicked.current = null;
       rec.current.clear();
       passPend.current = null;
       slowUntil.current = 0;
@@ -388,7 +452,11 @@ export function Hoops2({
       // the opponent curtain, then the tip-off (a tap skips it)
       setCurtain(true);
       all.set(() => tipOff(game), Math.max(0, Math.min(CURTAIN_MS, CURTAIN_MS - (performance.now() - roundAt))));
-    } else all.set(() => next(game), 700);
+    } else {
+      all.set(() => next(game), 700);
+      // the timing calibration, once on this phone before its first match (skippable; offline only)
+      if (!autoplayHook && !practice && !online && loadPrefs().offsetMs === undefined && firstTime('nba', CALIBRATE_HINT)) openCalib();
+    }
     return () => {
       all.clear();
       crowd.stop(0.6);
@@ -419,11 +487,19 @@ export function Hoops2({
     const fx = fxRef.current;
     const J = fx.juice!;
     const nowMs = performance.now();
+    // the haptics (feel-events.ts): a double on every PERFECT, a long on a score, a block or a turnover
+    // (none in a watched sim: the autopilot's game isn't the player's hands)
+    playFeel(p.events, { paused: pausedRef.current || !!autoplayHook, doubleDone: doubleInTouch.current });
+    doubleInTouch.current = false;
     for (const e of p.events) {
-      if (e === 'release-green') {
-        J.hitStop('green', nowMs);
-        J.addTrauma(0.1);
-        J.punch(0.012);
+      if (PERFECT_EVENTS.has(e)) {
+        // PERFECT: a one-frame hit-stop and a nudge of the camera (none with reduced motion: the
+        // ring's gold flash and the chime carry it)
+        if (!reducedMotion()) {
+          J.hitStop('perfect', nowMs);
+          J.addTrauma(0.1);
+          J.punch(0.012);
+        }
       } else if (e.startsWith('finish:') && e.endsWith(':make') && !e.includes(':layup')) {
         J.hitStop('dunk', nowMs);
         J.addTrauma(e.includes('contact') ? 0.5 : 0.36);
@@ -471,7 +547,7 @@ export function Hoops2({
         if (!autoplayHook) say(LOOK_TEXT[sc] + ' · ' + LOOK_TIP[sc], 'plain', 1500, 0);
       } else if (e.startsWith('trap:')) {
         sfx.squeak();
-        vibrate(12);
+        haptic('tick');
         say('DOUBLE TEAM! · ' + LOOK_TIP.trap, 'plain', 900);
       } else if (e.startsWith('call:')) {
         sfx.squeak();
@@ -491,19 +567,22 @@ export function Hoops2({
         sfx.whoosh();
         say('LOB!', 'plain', 600);
       } else if (e === 'catch' || e === 'oop-catch') sfx.catch();
-      else if (e === 'rise' || e.startsWith('cut:')) sfx.squeak();
-      else if (e === 'release-green') {
-        sfx.coin();
-        vibrate(15);
-        const contested = p.lastShot?.contest === 'heavy' || p.lastShot?.contest === 'smothered';
-        say(contested ? 'PERFECT TIMING · CONTESTED' : 'PERFECT!', 'green', 800);
-      } else if (e === 'release') {
+      else if (e === 'rise') {
+        sfx.squeak();
+        // the coverage word as he rises: what the ring is and why
+        const m = p.meter;
+        if (m && !autoplayHook) say(coverageWord(m.state, m.dial, p), m.state === 'gold' ? 'green' : m.state === 'red' ? 'bad' : 'plain', 650, 0);
+      } else if (e.startsWith('cut:')) sfx.squeak();
+      else if (PERFECT_EVENTS.has(e)) {
+        // the chime climbs a semitone for each PERFECT in a row (up to 5)
+        perfectRun.current = Math.min(5, perfectRun.current + 1);
+        chime(perfectRun.current);
+        say(perfectRun.current > 1 ? 'PERFECT ×' + perfectRun.current : 'PERFECT', 'green', 900, 2);
+      } else if (e === 'release' || e === 'finish:layup:miss') {
+        // the timing word and the dial a miss failed on: TIMING, PRESSURE or RANGE
         const ls = p.lastShot;
-        if (ls) {
-          const o = ls.off;
-          // off is a share of a quarter second: under 80 ms is close
-          say(Math.abs(o) < 0.32 ? (o < 0 ? 'SLIGHTLY EARLY' : 'SLIGHTLY LATE') : o < 0 ? 'VERY EARLY' : 'VERY LATE', 'plain', 700);
-        }
+        perfectRun.current = 0;
+        if (ls) say(releaseWord(ls), ls.state === 'red' ? 'bad' : 'plain', 900, 1);
       } else if (e.startsWith('gather:')) {
         const kind = e.slice(7);
         if (kind === 'contact') {
@@ -514,7 +593,6 @@ export function Hoops2({
         const [, kind, res] = e.split(':');
         if (p.lastShot?.and1) slowUntil.current = Math.max(slowUntil.current, performance.now() + 700);
         if (res === 'make' && (kind === 'dunk' || kind === 'contact' || kind === 'standdunk' || kind === 'oop')) {
-          vibrate([25, 40, 25]);
           shake(kind === 'contact' ? 5 : 3);
           if (kind === 'contact') fx.flash = 0.7;
         }
@@ -545,7 +623,6 @@ export function Hoops2({
         slowUntil.current = Math.max(slowUntil.current, performance.now() + 500);
         crowd.swell(0.8);
         sfx.block();
-        vibrate(30);
         shake(3);
         const d = p.bodies[Number(e.slice(8))];
         say('REJECTED BY ' + d.p.tag, 'bad', 1100);
@@ -566,15 +643,16 @@ export function Hoops2({
     booked.current = p;
     setLastReadout(basketballFeedback(p));
     const e = p.end!;
-    const wasFire = game.fire;
+    const stageBefore = heatStage(game.heat.us);
     const mark = afterPossession(game, p);
+    const stage = heatStage(game.heat.us);
     if (practice) {
       const ls = p.lastShot;
       practice.onAttempt({
         points: e.points,
         success: e.kind === 'make' && (practice.drill !== 'pass' || p.passes > 0),
         green: ls?.greened,
-        offset: ls ? Math.round(ls.off * 250) : undefined,
+        offset: ls ? Math.round(ls.offMs ?? ls.off * 250) : undefined,
         contest: ls?.contest,
         detail: practice.drill === 'pass' && !p.passes ? 'MOVE THE BALL FIRST' : e.text
       });
@@ -584,6 +662,14 @@ export function Hoops2({
     const shooter = e.kind === 'make' ? p.bodies[e.who] : undefined;
     if (e.kind === 'make') {
       fx.swish = 1;
+      // the net snaps down for three frames
+      renderer.netSnapUntil = performance.now() / 1000 + 0.05;
+      // the first On Fire basket of the game: the slow-motion replay
+      if (p.heat === 'fire' && !fireReplayed.current && shooterOf(p)) {
+        fireReplayed.current = true;
+        const b = shooterOf(p)!;
+        highlight.current = { t: Math.max(0, p.t - 0.6), cx: b.cx, cz: b.cz };
+      }
       const ls = p.lastShot;
       const big = ls?.kind === 'three' || ls?.kind === 'dunk' || ls?.kind === 'contact' || ls?.kind === 'oop' || ls?.kind === 'standdunk';
       if (big) {
@@ -602,17 +688,20 @@ export function Hoops2({
       const pts = shooter ? boxRef.current.lines('us').find((l) => l.id === shooter.p.id)?.pts : undefined;
       const word = ls ? SHOT_WORD[ls.kind] : 'BUCKET';
       say((shooter ? shooter.p.tag + ' · ' : '') + word + and1 + (pts !== undefined ? ' · ' + pts + ' PTS' : ' +' + (mark === 'A' ? 3 : e.points)), big || and1 ? 'big' : 'good', 1400, 2);
-      if (game.fire >= 0 && game.fire !== wasFire) later(() => say(game.ours[game.fire].tag + ' IS ON FIRE!', 'big', 1400, 2), 900);
     } else if (e.kind === 'miss') {
       sfx.groan(0.6);
       say(e.text, 'plain', 1000, 2);
     } else {
       if (e.kind === 'clock') sfx.buzzer();
       sfx.groan();
-      haptic('long');
       say(e.text, 'bad', 1300, 2);
     }
-    if (wasFire >= 0 && game.fire < 0) later(() => say('FIRE PUT OUT', 'plain', 900, 2), 1000);
+    // Heat: the stage changes in the toast line (and the crowd), after the play's own line
+    if (stage !== stageBefore && !game.over) {
+      if (stage === 'fire') later(() => (say('ON FIRE · NEXT ' + HEAT.spell + ' POSSESSIONS', 'big', 1500, 2), crowd.swell(1)), 900);
+      else if (stage === 'heating') later(() => (say('HEATING UP', 'big', 1200, 2), crowd.swell(0.6)), 900);
+      else if (stageBefore === 'fire') later(() => say('COOLED OFF', 'plain', 900, 2), 900);
+    }
     onProgress(progress(game));
     setBetween(true);
     setBoarding(false);
@@ -816,6 +905,21 @@ export function Hoops2({
           rescue(p, e);
         }
       } else acc = 0;
+      // the touch clock: a touch's timestamp becomes game time against this frame (perfect.ts)
+      if (p) {
+        const c = clock.current.c;
+        c.real = now;
+        c.game = p.t;
+        c.acc = acc;
+        c.rate = J.frozen(now) ? 0 : timeScale * (now < slowUntil.current ? 0.35 : 1);
+        clock.current.p = p;
+        // the ring-fill tick, once, in the last 200 ms before the ideal
+        const m = p.meter;
+        if (m && m.off === undefined && !m.gather && ringTicked.current !== m.t0 && m.top - (p.t - m.t0) <= RING_TICK_S && !autoplayHook) {
+          ringTicked.current = m.t0;
+          ringTick();
+        }
+      }
       if (p && !replayRef.current) {
         rec.current.push(p.t, snapOf(p));
         // the dribble on the floor: on the same beat the drawing bounces the ball
@@ -853,7 +957,7 @@ export function Hoops2({
           else
             renderer.draw(
               ctx,
-              { ...p, t: rt, bodies: snap.bodies, ball: snap.ball, handler: snap.handler, fire: snap.fire, lastShot: snap.lastShot, meter: null, finish: null, target: null },
+              { ...p, t: rt, bodies: snap.bodies, ball: snap.ball, handler: snap.handler, heat: snap.heat, lastShot: snap.lastShot, meter: null, finish: null, target: null },
               real,
               fx
             );
@@ -876,15 +980,22 @@ export function Hoops2({
   const gameAt = (ts: number) => {
     const p = possRef.current;
     if (!p) return 0;
-    const ago = performance.now() - ts;
-    return ago >= 0 && ago < 1000 ? p.t - (ago / 1000) * timeScale : p.t;
+    return clock.current.p === p ? gameTimeAt(clock.current.c, ts, performance.now()) : p.t;
   };
-  /** SHOOT let go: the release, timed from the lift's own timestamp */
+  /** SHOOT let go: the release, timed from the lift's own timestamp, less the phone's calibrated lag */
   const release = (p: Possession, ts: number) => {
-    const ago = Math.min(0.1, Math.max(0, (performance.now() - ts) / 1000)) * timeScale;
-    releaseShoot(p, RELEASE_LAG + ago);
-    // the haptic inside the touch itself (iOS plays it only there): a firmer tick for a green
-    tapHaptic(p.meter?.greened || p.lastShot?.greened ? 18 : 8);
+    const lag = (loadPrefs().offsetMs ?? RELEASE_LAG_MS) / 1000;
+    const before = p.handler;
+    const m = p.meter;
+    releaseShoot(p, lag, gameAt(ts));
+    // the haptic inside the touch itself (iOS plays it only there): a jumper's PERFECT is its double
+    // (the event's own is then skipped); a finish's PERFECT plays when it goes up
+    if (m && m.kind !== 'layup' && m.greened) {
+      haptic('double', true);
+      doubleInTouch.current = true;
+    } else if (m) haptic('tick', true);
+    boxRef.current.onStep(p, before);
+    handleEvents(p);
   };
   /** a move off a swipe on SHOOT (or a Buttons-only button): screen right is +cz from behind */
   const moveBy = (kind: 'cross' | 'step' | 'spin', side: number) => {
@@ -910,7 +1021,7 @@ export function Hoops2({
       if (replayRef.current) return endReplay();
       if (!p || p.end || pausedRef.current) return;
       if (p.ball?.kind === 'loose') {
-        if (jumpRebound(p)) tapHaptic(8);
+        if (jumpRebound(p)) haptic('tick', true);
         return;
       }
       if (p.handler === null || p.bodies[p.handler].h > 0.15) return;
@@ -919,7 +1030,7 @@ export function Hoops2({
       pressShoot(p, { at: gameAt(e.t), provisional: true });
       return;
     }
-    if (!p || p.end) return;
+    if (!p || p.end || pausedRef.current) return;
     if (e.phase === 'move') {
       if (e.gesture?.kind === 'swipe') {
         const d = e.gesture.dir;
@@ -945,7 +1056,7 @@ export function Hoops2({
       if (!p || p.end || p.handler === null || p.ball || pausedRef.current || replayRef.current) return;
       setCallOpen(false);
       passPend.current = { at: p.t + 0.12, held: true };
-      tapHaptic(8);
+      haptic('tick', true);
     } else if (e.phase === 'up') {
       if (passPend.current) passPend.current.held = false;
     } else if (e.phase === 'cancel') passPend.current = null;
@@ -1011,9 +1122,30 @@ export function Hoops2({
     timers.current.pause();
     passPend.current = null;
     const p = possRef.current;
-    if (p && !p.end) cancelGather(p);
+    // a shot held as it pauses is taken back (a system-cancelled hold is never a release)
+    if (p && !p.end) cancelShoot(p);
     crowd.stop(0.3);
     setPaused(true);
+  };
+  // the calibration freezes an offline game the way a pause does, and lets it go when it closes
+  const calibFromSheet = useRef(false);
+  const openCalib = (fromSheet = false) => {
+    calibFromSheet.current = fromSheet;
+    setSheet(false);
+    setCalib(true);
+    if (online || pausedRef.current) return;
+    pausedRef.current = true;
+    timers.current.pause();
+    passPend.current = null;
+    const p = possRef.current;
+    if (p && !p.end) cancelShoot(p);
+    setPaused(true);
+  };
+  const closeCalib = () => {
+    setCalib(false);
+    // from the pause sheet: back to it (still paused); before the first match: play
+    if (calibFromSheet.current) setSheet(true);
+    else resume();
   };
   const resume = () => {
     setSheet(false);
@@ -1048,6 +1180,11 @@ export function Hoops2({
   }, [online, autoplayHook]);
   const setControls = (controls: 'gestures' | 'buttons') => {
     savePrefs({ controls });
+    setPrefs(loadPrefs());
+  };
+  /** meter Off (×1.10 gold): only the ring's colour at his feet; from the next possession */
+  const setMeter = (meter: 'on' | 'off') => {
+    savePrefs({ meter });
     setPrefs(loadPrefs());
   };
 
@@ -1094,8 +1231,7 @@ export function Hoops2({
               rivalColor={teamColor(theirKit)}
               aside={!autoplayHook && !practice && <PlayReadout readout={lastReadout} live={!between && !g.over} resetKey={g.done} icon />}
             />
-            {/* fed zeros until heat.ts lands (nba-4) */}
-            <HeatBar you={{ v: 0, stage: 'cold' }} />
+            <HeatBar you={{ v: g.heat.us.v, stage: heatStage(g.heat.us) }} />
           </>
         )}
         {replaying && (
@@ -1133,6 +1269,18 @@ export function Hoops2({
             ]}
             onChange={setControls}
           />
+          <SheetToggle
+            label="Meter"
+            value={prefs.meter ?? 'on'}
+            options={[
+              { id: 'on', label: 'ON' },
+              { id: 'off', label: 'OFF +10%' }
+            ]}
+            onChange={setMeter}
+          />
+          <button type="button" className="ps-hud-sheet-btn" onClick={() => openCalib(true)}>
+            CALIBRATE TIMING
+          </button>
           <ul className="ps-hud-help">
             <li>
               <b>LEFT THUMB</b> anywhere low: move · past the ring: sprint
@@ -1146,8 +1294,15 @@ export function Hoops2({
             <li>
               <b>CALL</b> SCREEN · CUT · ISO (clears out for your star)
             </li>
+            <li>
+              <b>GOLD RING</b> let go as it closes on the gold: a PERFECT goes in. Amber: contested or deep. Red: smothered or too far
+            </li>
+            <li>
+              <b>HEAT</b> PERFECT +{HEAT.gain.perfect} · basket +{HEAT.gain.score} · 2+ passes +{HEAT.gain.clean} · turnover {HEAT.gain.turnover}. HEATING UP at {HEAT.up}; ON FIRE at {HEAT.fire} for {HEAT.spell} possessions: gold ×{HEAT.windowMult}
+            </li>
           </ul>
         </PauseSheet>
+        {calib && <TimingCalibrator reduced={reducedMotion()} onClose={closeCalib} />}
         {curtain && g && (
           <button type="button" className="hg2-curtain" onPointerDown={(e) => (e.stopPropagation(), skipCurtain())} aria-label={'Next game against ' + rivalName + ': tap to tip off'}>
             <span className="eyebrow">Next game</span>

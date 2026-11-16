@@ -45,6 +45,18 @@ export function releaseText(
     (milliseconds < 0 ? 'early' : 'late')
   );
 }
+/** Why a basketball shot that wasn't PERFECT missed its gold (nba-4), counterfactually: the release
+ * (TIMING), tired legs moving the window later (a release that would have been gold fresh), the
+ * defense (PRESSURE: an amber or red ring) or the distance (RANGE). Null for a PERFECT or an old shot. */
+export function missReason(shot: NonNullable<Possession['lastShot']>): 'timing' | 'fatigue' | 'contest' | 'range' | null {
+  if (shot.greened || !shot.state) return null;
+  if (shot.state !== 'gold') return shot.dial === 'RANGE' ? 'range' : 'contest';
+  const off = shot.offMs ?? shot.off * 250;
+  const late = shot.fatigueMs ?? 0;
+  return late > 0 && shot.goldMs !== undefined && Math.abs(off + late) <= shot.goldMs ? 'fatigue' : 'timing';
+}
+const RING_TEXT: Record<string, string> = { gold: 'Gold', amber: 'Amber', red: 'Red' };
+const REASON_TEXT = { timing: 'Timing', fatigue: 'Tired legs (later window)', contest: 'Pressure', range: 'Range' } as const;
 export function basketballFeedback(p: Possession): PlayFeedback {
   const e = p.end,
     shot =
@@ -53,6 +65,7 @@ export function basketballFeedback(p: Possession): PlayFeedback {
         : p.lastShot;
   const timed =
     !!shot && ['three', 'mid', 'close', 'layup'].includes(shot.kind);
+  const why = shot && timed ? missReason(shot) : null;
   const next = !shot
     ? e?.kind === 'clock'
       ? 'Use a screen or a quick pass before the shot clock expires.'
@@ -61,13 +74,17 @@ export function basketballFeedback(p: Possession): PlayFeedback {
       ? shot.make
         ? 'Keep creating that lane. The finish used the player’s dunk and contact ratings.'
         : 'Create a clearer lane or pass out when the rim defender is set.'
-      : shot.contest === 'heavy' || shot.contest === 'smothered'
-        ? 'Create space with SCREEN, a pass or STEP BACK before the next shot.'
-        : timed && !shot.greened
-          ? 'Match the release to the green slice; catch-and-shoot and moving shots have different rhythms.'
-          : shot.make
-            ? 'Keep finding that look. The timing and space were both there.'
-            : 'The timing was good. Even a clean release can miss through a contest; keep creating space.';
+      : why === 'range'
+        ? 'That was past his range: amber or red. Step inside it, or swing it to a better shooter.'
+        : why === 'contest' || (!why && (shot.contest === 'heavy' || shot.contest === 'smothered'))
+          ? 'Create space with SCREEN, a pass or STEP BACK: only an open or light look gets the gold ring.'
+          : why === 'fatigue'
+            ? 'Tired legs move the gold later. Let go a touch later, or rest him.'
+            : timed && !shot.greened
+              ? 'Release as the ring closes on the gold: a PERFECT always goes in. Catch-and-shoot and moving shots have different rhythms.'
+              : shot.make
+                ? 'Keep finding that look. The timing and space were both there.'
+                : 'The timing was good. Even a clean release can miss through a contest; keep creating space.';
   return {
     title: 'Last possession',
     result: e?.text ?? (shot?.make ? 'Basket made' : 'Shot attempt'),
@@ -78,10 +95,12 @@ export function basketballFeedback(p: Possession): PlayFeedback {
             {
               label: 'Release',
               value: timed
-                ? releaseText(shot.off * 250, shot.greened, true)
+                ? releaseText(shot.offMs ?? shot.off * 250, shot.greened, shot.offMs === undefined)
                 : 'Automatic finish',
             },
             { label: 'Coverage', value: words(shot.contest) + ' contest' },
+            ...(timed && shot.state ? [{ label: 'Ring', value: RING_TEXT[shot.state] + (shot.goldMs ? ' · ±' + Math.round(shot.goldMs) + ' ms' : '') }] : []),
+            ...(why ? [{ label: 'Missed on', value: REASON_TEXT[why] }] : []),
           ]
         : []),
       {

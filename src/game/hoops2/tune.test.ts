@@ -56,7 +56,7 @@ run('basketball v2 numbers', async () => {
           add('end:' + p.end.kind);
           afterPossession(g, p);
           poss++;
-          if (g.fire >= 0) add('fire-poss');
+          if (g.heat.us.fire > 0) add('fire-poss');
         }
         pts += g.score;
       }

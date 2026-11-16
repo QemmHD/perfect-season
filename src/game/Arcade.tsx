@@ -24,6 +24,7 @@ import type { Hooper } from './hoops2/types';
 import { type BasketballKit, type FootballKit, type Kits, kitsFor } from './uniforms';
 
 import type { Progress } from './progress';
+import { settleGrade, wireProgress } from './hud/grade';
 
 export type { Progress };
 
@@ -314,7 +315,9 @@ export const Arcade = forwardRef(function Arcade({
     if (level && !pens) return;
     sent.current = true;
     // the held arena reports at the whistle (its sheet comes up over the dimmed court)
-    window.setTimeout(() => onFinish(us, them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), hold ? 0 : level ? 2600 : 1600);
+    // the grade's FLAWLESS needs the win (plan §4.8); the grade and the box stay on this phone
+    const won = us.score > them.score || (level && !!pens?.won);
+    window.setTimeout(() => onFinish(settleGrade(us, won), them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), hold ? 0 : level ? 2600 : 1600);
   }, [us, them, pens]);
 
   useImperativeHandle(
@@ -343,7 +346,8 @@ export const Arcade = forwardRef(function Arcade({
   const progress = (p: Progress) => {
     if (taken) return;
     setMine(p);
-    onProgress(p);
+    // the host sends this to the other phone: never the grade or the box (plan §4.8)
+    onProgress(wireProgress(p));
   };
 
   // offline Quit from the pause sheet (nba-2, NBA-09): the game ends now as a loss; the possessions
@@ -356,7 +360,7 @@ export const Arcade = forwardRef(function Arcade({
     // the score says what the result does: a quit never reads as a loss with more points than them
     // (a Cup or Club Season settlement rejects that pair and would record nothing)
     const them = { ...ai, score: Math.max(ai.score, played.score + 1) };
-    onFinish({ ...played, drive: ends.length, done: true, ends }, them, 'played', { them: false, us: false }, undefined, 'us');
+    onFinish(settleGrade({ ...played, drive: ends.length, done: true, ends }, false), them, 'played', { them: false, us: false }, undefined, 'us');
   };
 
   // sim: the autopilot plays your drives at a middling level

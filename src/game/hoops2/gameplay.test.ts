@@ -66,13 +66,17 @@ describe('basketball decision and motion quality', () => {
     expect(p.lastShot?.kind).toBe('layup');expect(p.lastShot?.off).toBeCloseTo(actual!);
     expect(p.lastShot?.greened).toBe(false);
   });
-  it('keeps a blocked layup’s measured green timing instead of calling it an un-timed release',()=>{
+  // nba-4: a layup into a set rim protector is a red ring (smothered), so a perfectly timed release
+  // there is not a PERFECT any more (gold never lies: a PERFECT is never blocked). The timing kept is
+  // the measured one (off 0), not an un-timed release.
+  it('keeps a blocked layup’s measured timing instead of calling it an un-timed release',()=>{
     const p=possession();p.scheme='man';p.rand=()=>0;
     const b=p.bodies[0];b.cx=RIM.cx-3;b.cz=0;
     for(const d of p.bodies.filter(d=>d.side==='D')){d.cx=RIM.cx-2.5;d.cz=0;d.p.blk=99;d.p.ind=99;}
     pressShoot(p);p.t=p.meter!.t0+p.meter!.top;releaseShoot(p);
     for(let i=0;i<90&&!p.lastShot;i++)step(p,1/60,null);
-    expect(p.lastShot?.make).toBe(false);expect(p.lastShot?.greened).toBe(true);expect(p.lastShot?.off).toBe(0);
+    expect(p.lastShot?.make).toBe(false);expect(p.lastShot?.greened).toBe(false);expect(p.lastShot?.off).toBe(0);
+    expect(p.lastShot?.state).toBe('red');
   });
   it('does not cancel a committed shot or a finish after the player actually released', () => {
     const p = possession();
@@ -141,10 +145,16 @@ describe('basketball decision and motion quality', () => {
   it('rewards open perfect releases, grades nearby timing smoothly, and respects a smothering defender', () => {
     const p = possession(),
       b = p.bodies[0];
+    // (a three from 24 ft: in his range, so the open ring is gold)
+    b.cx = RIM.cx - 24;
+    b.cz = 0;
     const w = greenWindow(p, b, 'three', 'open');
     const at = (off: number) => releaseProbability(p, b, 'three', 'open', off, w);
+    // nba-4: gold never lies (a release inside it is a make), and off the gold it falls away steeply
     expect(at(0)).toBe(1);
-    expect(at(w + 0.001)).toBeGreaterThan(0.95);
+    expect(at(w)).toBe(1);
+    expect(at(w + 0.001)).toBeLessThan(1);
+    expect(at(w + 0.002)).toBeGreaterThan(at(w + 0.02));
     expect(at(w + 0.02)).toBeGreaterThan(at(w + 0.08));
     expect(at(w + 0.08)).toBeGreaterThan(at(w + 0.2));
     expect(releaseProbability(p, b, 'layup', 'smothered', 0, w)).toBeLessThan(0.6);
@@ -184,6 +194,8 @@ describe('basketball decision and motion quality', () => {
   it('changes timing tolerance by difficulty without changing any player attribute', () => {
     const easy = possession(-0.5),
       hard = possession(1);
+    // (nba-4: the difficulty's window part is a person's: the AI's own shots don't get wider on Rookie)
+    easy.person = hard.person = true;
     expect(greenWindow(easy, easy.bodies[0], 'three', 'open')).toBeGreaterThan(greenWindow(hard, hard.bodies[0], 'three', 'open'));
     expect(hard.bodies[0].p).toEqual(easy.bodies[0].p);
   });

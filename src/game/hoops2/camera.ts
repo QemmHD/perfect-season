@@ -62,6 +62,9 @@ export const CAM = {
   kB: 8,
   kYaw: 4,
   kZoom: 6,
+  /** the zoom's rate once the ball is inside fixedWithin: a long pass into the paint brings it home
+   * before the ball gets near the rim (the zoom stays fixed there; nba-4) */
+  kZoomHome: 24,
   /** the shot's tilt toward the rim (share of the height), Clutch's tighten, a replay's push-in */
   shotTilt: 0.02,
   /** the zoom is fixed within this many feet of the rim; past it, out toward half court (the tip-off
@@ -288,7 +291,9 @@ export function camStep(st: CamState, fr: Frame, dt: number, reduced = false): C
   const k = reduced ? 2 : 1;
   const ease = (rate: number) => 1 - Math.exp(-rate * k * Math.max(0, Math.min(0.25, dt)));
   const yaw = st.yaw + (fr.yaw - st.yaw) * ease(CAM.kYaw);
-  const zoom = st.zoom + (fr.zoom * farZoom(fr) - st.zoom) * ease(CAM.kZoom);
+  const ball = fr.subject.ball;
+  const home = Math.hypot(ball.cx - fr.rim.cx, ball.cz - fr.rim.cz) < CAM.fixedWithin;
+  const zoom = st.zoom + (fr.zoom * farZoom(fr) - st.zoom) * ease(home ? CAM.kZoomHome : CAM.kZoom);
   // a turn of the yaw orbits the camera round the rim: the rim keeps its place on screen (and its
   // size), so a turn never reads as a pan or a zoom
   const o = orbit(st, yaw, fr.rim);
