@@ -168,7 +168,11 @@ export const Arcade = forwardRef(function Arcade({
   const defenseIQ = defenseDifficulty(online, botLevel, aiDefense);
   // the match being played: the first, or a rematch in the held arena (its seed and rival)
   const [round, setRound] = useState({ n: 0, at: 0, seed: firstSeed, rivalName: firstRivalName, rivalLineup: firstRivalLineup, teams: firstTeams });
-  const { seed, rivalName, rivalLineup, teams } = round;
+  // the first match follows the host's props as before; a rematch plays what rematch() was given
+  const seed = round.n ? round.seed : firstSeed;
+  const rivalName = round.n ? round.rivalName : firstRivalName;
+  const rivalLineup = round.n ? round.rivalLineup : firstRivalLineup;
+  const teams = round.n ? round.teams : firstTeams;
   const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay || manualOnly ? 'play' : 'kickoff');
   const [mine, setMine] = useState<Progress | null>(null);
   const [attrs, setAttrs] = useState<((p: Player) => Attrs | null) | null>(null);
@@ -326,14 +330,14 @@ export const Arcade = forwardRef(function Arcade({
         setRound((r) => ({
           n: r.n + 1,
           at: performance.now(),
-          seed: next?.seed ?? r.seed + ':r' + (r.n + 1),
-          rivalName: next?.rival ?? r.rivalName,
-          rivalLineup: next?.them?.lineup ?? r.rivalLineup,
-          teams: next?.them?.teams ? { ...r.teams, ...next.them.teams } : r.teams,
+          seed: next?.seed ?? seed + ':r' + (r.n + 1),
+          rivalName: next?.rival ?? rivalName,
+          rivalLineup: next?.them?.lineup ?? rivalLineup,
+          teams: next?.them?.teams ? { ...teams, ...next.them.teams } : teams,
         }));
       },
     }),
-    [online]
+    [online, seed, rivalName, rivalLineup, teams]
   );
 
   const progress = (p: Progress) => {

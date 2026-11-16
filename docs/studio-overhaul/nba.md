@@ -5,7 +5,7 @@ Branch `claude/studio-nba`, worktree `/home/user/ps-s-nba`, dev server port **52
 [`nba-plan.md`](nba-plan.md) (revision 3, Game Design V2). This doc records what each task changed, the before and
 after numbers, the tests, the protocol line, the contracts other teams build against, and what's left.
 
-**Contents:** nba-1 (harness, baseline, QA isolation) · nba-2 (the shared controls) · Contracts for nfl / soccer / ut (plan §4, verbatim) · Contract
+**Contents:** nba-1 (harness, baseline, QA isolation) · nba-2 (the shared controls) · nba-3 (the frame: camera, HUD, clock, text, held arena) · Contracts for nfl / soccer / ut (plan §4, verbatim) · Contract
 changes · Requests to other teams · Escalations · Protocol · Touched outside my lane · Owner device checks · Left
 undone.
 
@@ -465,6 +465,233 @@ the 0.92 edge. The AI's possessions are unchanged (the golden test).
 
 ---
 
+## nba-3 · The frame: three-quarter camera, action-safe box, score bug and Heat bar, live clock, readable text, held arena (2026-11-16)
+
+### What changed
+
+What a player sees: a new broadcast camera; a glossy score bug with a Heat bar under it; a shot clock
+that counts every second; names spelled with their accents' letters; the scorer plate and one badge a
+possession in the toast line; and, in hosts that use it, the next game tipping off in the same arena.
+
+- **The camera** (`hoops2/camera.ts`, pure; the camera section of `render.ts`):
+  - **The view (V2 B.1.3):** a high three-quarter half-court view, pitched 55° down and yawed 12° off the rim line.
+  - **Placement:** the camera pans on its own axes, `a` across and `b` along, so a pan across never changes a
+    point's depth. That keeps the zoom fixed.
+  - **Framing:** the rim is pinned at 16% of the safe box down from its top (22% of the height at both V2 sizes).
+    The zoom is set by the safe box's height (39 ft of floor), so every phone frames the same floor.
+  - **The follow:** a ±3 ft dead zone across, which leans 35% toward a ball in the air. Damping is time-based
+    (`1 − e^(−k·dt)`), so 30 and 60 fps settle to within 0.5 px.
+  - **Hard limits:** the follow is clamped every frame to stay inside the safe box. The rim stays 40 px under
+    the HUD (the Heat bar, or the toast line when sideways). The handler's feet stay above the box's bottom,
+    then his head below its top. The handler keeps 34 px from the screen's sides, and the rim and backboard
+    keep 60 px.
+  - **On a shot:** it holds the shooter (the focus moves ≤ 2 ft in the test) and tilts 2% toward the rim. The
+    tilt moves the axis row, not the camera, so the zoom never moves.
+  - **Zoom:** fixed within 26 ft of the rim. Out at the tip-off walk it eases back up to 25%, so the man and the
+    rim both fit. While the ball is in the air its distance counts, so a pass into the paint brings the zoom home.
+  - **Clutch and replays:** Clutch is 6% tighter (not with reduced motion); a replay is 1.35× on its spot.
+  - **Turning the yaw:** a turn orbits the camera round the rim, so a change of sign never reads as a pan or a zoom.
+  - **The yaw rule (`yawFor`):** the sign is chosen so the man with the ball and the man guarding him
+    separate on screen, with 1 ft of hysteresis. It is the same rule on defense.
+  - **V2's "your basket at the bottom" (`v2b`)** is in the camera's math: the base yaw is π and the rim is
+    framed at the box's bottom. It is unit-tested for the defensive overlap. It shows on screen once nba-6
+    plays defensive possessions: wiring `?arcade&cam=v2b` to them is nba-6's (Left undone).
+  - **Players' drawings:** facing and look-down angle are taken relative to the yawed camera
+    (`facingIndex`, `pitchAt`). This is one hunk in the players' section of `render.ts` (Touched outside my lane).
+  - **The stick:** it turns with the camera (`stickToCourt`): up the screen is the camera's forward.
+- **The floor** (`hoops2/floor.ts`): players' court picture and wall of fans (`courtTexture`), cast through the
+  yawed camera.
+  - A screen row meets the floor on a straight line, so whole-floor rows step two adds a pixel. Only rows that
+    reach the stands are cast pixel by pixel.
+  - **NBA-29:** the last cast is reused while the camera has moved under half a pixel (`floorStats`). A cast
+    costs 0.7 ms (median) at 430×932 at 1×.
+- **HUD kit, part 2** (`src/game/hud/`, plan §4.3; nfl and soccer mount the same pieces):
+  - **`ScoreBug`:** a 232×40 capsule (200×34 on the SE). It has two skewed team blocks in the kits' colours
+    (the trim for a white away kit), big italic scores, a dark centre with the period and the possession
+    (`1ST · 5/16`), and a glowing shot clock that turns red and pulses at ≤ 5 s.
+    - It has a 3 px possession line along the bottom.
+    - In the last 4 possessions it turns gold and reads CLUTCH. OT is violet; the phase is wired in nba-6.
+    - LAST PLAY is a 44 px icon beside it, mirroring the pause button (`aside`; `PlayReadout icon`).
+    - The bug and the Heat bar CSS are in `bug.css`.
+  - **`HeatBar`:** 232×6 under the bug, with an inset track, a gold-to-red fill with moving stripes, the
+    HEATING UP tick at 66, the rival's thin violet line, and the stage word. It is fed zeros until `heat.ts` (nba-4).
+  - **`geometry.ts` `readGeometry(el)`:** reads the safe box, the HUD's bottom edge, the toast and the cluster
+    as pixels, from hidden probes positioned by the tokens. It is re-read only when the size or the
+    orientation changes.
+  - **Removed (dead after this):** the old `.hg2-bug`, the marks strip and the defense-look chip. The look
+    is read in the toast line at the start of each possession ("MAN-TO-MAN · beat your man").
+- **The shot clock (NBA-08):** written from the rAF loop straight into the bug's element, only when
+  `ceil(p.clock)` or the warning changes.
+  - The warning shows at ≤ 5 s, and `sfx.tick()` plays each new second under 4 s.
+  - A violation reads 0 before the buzzer and the toast.
+- **Text (NBA-22)** (`hoops2/labels.ts`):
+  - **`foldName`:** NFD with the combining marks dropped. Ø Ł Đ Ð ß Æ Œ Þ, Cyrillic look-alikes and curly
+    quotes are spelled out.
+  - **F35:** adds `& / : + ( ) ,` and a middle dot.
+  - **`uniqueTags`:** J.JOHNSON / M.JOHNSON, then JA. / JE., then a number. It applies across both fives and
+    the bench, at game creation, to display copies only: the engine's numbers and the AI race are untouched.
+  - **`layoutLabels`:** chips are placed by priority (the meter's words, then the handler's name, the pass
+    target, the shot %, the play call). Each is nudged up or down to find room, else left out. Chips anchored
+    off the screen's side are dropped.
+  - **Chip size:** chips are 7 art px tall (14 px) on a dark plate.
+- **The toast line:**
+  - **The scorer plate** ("CURRY · 3PT · 11 PTS", points from a `BoxTracker` that the screen now runs).
+  - **One badge pop a possession**, through `BADGE_LABEL` with original names (escalation 2): Ice Water, Deep
+    Range, Poster Maker, Lockdown, Paint Wall, Ankle Taker, Table Setter. The top tiers read Elite / Legend.
+  - The badge pops over heads are gone.
+- **The pass target (NBA-16):** a teal ring at his feet, and a chip with his name and his shot as it will be
+  when the ball gets there.
+  - The shot comes from `catchChance` (autopilot.ts): his man's closeout during the flight, the same closeout
+    `catchValue` reads, through the new `shotChanceWith`.
+  - It is read-only and takes no draw on `p.rand`. `catchValue` shares the closeout helper and its results are
+    unchanged (golden).
+- **The held arena (plan §4.8, V2 D.1):**
+  - **`Arcade` changes:** `Arcade` is now a `forwardRef`. It takes `hold` and exposes
+    `ArcadeHandle.rematch(next?)`.
+    - The first match follows the host's props exactly as before.
+    - A rematch plays a new seed (by default `<seed>:r<n>`), with an optional new rival, team or lineup.
+    - Offline only: online, `rematch` does nothing.
+  - **With `hold`:**
+    - Hoops2 reports done at the whistle itself and Arcade calls `onFinish` with no delay.
+    - The court stays mounted, dimmed by its own layer (`held.css`); the in-game final card is not shown.
+  - **On a rematch:**
+    - Hoops2 builds a new `HoopsGame` and keeps the same renderer, canvas and sprite caches
+      (`renderer.reset`).
+    - The opponent curtain shows the rival and his five, tap to skip. It counts its 1.4 s from the rematch
+      call, inside V2's 1.5 s.
+    - The rematch's AI side is worked out a possession per task (`aiPossessionsLater`, autopilot.ts) behind the
+      curtain, so it never blocks a frame.
+  - **nfl and soccer** remount on a rematch (`key`) until they adopt the in-place version.
+  - **The stub host:** `HeldLab.tsx` (`?arcade&hold`, one line in `Lab.tsx`): whistle → a 5 s stub sheet →
+    `rematch()`.
+- **Probes:** `nba-hud.mjs` (§3.8 rows live, 8 sizes), `nba-held.mjs` (§3.10 held rows), `nba-clock.mjs` (now
+  against the engine, every frame and at 20 Hz), `nba-frame-shots.mjs` (the captures). `nba-lib`'s `openLab`
+  waits on the new bug clock.
+
+### Before → after
+
+**Camera** (`camera.test.ts`, `NBA_CAM=1`: the engine's own autoplay frames through both cameras, 6 games at
+393/320 and 3 elsewhere; before = the 143eee7 camera re-implemented in the test):
+
+| Row (V2 target) | 393×852 before → after | 320×568 before → after | 430 / 375 after | 852 / 568 sideways after |
+|---|---|---|---|---|
+| Rim row (0.20-0.24) | 0.385 → **0.220** | 0.359 → **0.216** | 0.215 / 0.193 | 0.364 / 0.419 (below the top HUD) |
+| Handler's feet, median (0.50-0.55) | 0.661 → **0.536** | 0.661 → **0.522** | 0.514 / 0.501 | 0.772 / 0.778 |
+| Handler and rim in the safe box (≥ 0.98) | 0.555 → **0.996** | 0.387 → **0.994** | 0.996 / 0.991 | 0.986 / **0.891** |
+| Zoom variation near the rim (≤ 0.02) | 0.206 → **0.017** | 0.206 → **0.020** | 0.016 / 0.022 | 0.013 / 0.000 |
+| Jump-shot releases, defender hides ≤ 35% (≥ 0.90) | 1.00 → **1.00** (98) | 1.00 → **1.00** | 1.00 / 0.94 | 1.00 / 0.97 |
+| All releases (finishes too) | 0.933 → 0.882 | 0.899 → 0.882 | 0.957 / 0.852 | 0.978 / 0.957 |
+
+- **Overlap definitions:** shoulder-wide silhouettes (1.7 ft), each drawn where he is, in the air too. With
+  nba-1's 2.4 ft box, all releases score 0.824 → 0.849 at 393.
+- **Why finishes miss:** a chase-down from right behind a layup can't be split by any 12° view. Every miss is a
+  finish with the defender trailing 1-2.5 ft straight behind.
+- **Either man hiding the other:** 0.866 → 0.765 at 393 and 0.605 → 0.765 at 320. The steeper view stacks a
+  trailer under the man in front more often.
+- **The defensive yaw rule:** 1,000 synthetic releases (AI shooter 6-26 ft out, your man 2.5-5 ft toward the
+  rim, ±1.5 ft across). It holds in **977/1000** looking up the floor and **964/1000** in `v2b`, against
+  948 with one fixed sign in `v2b`.
+
+**Live, in the browser** (`nba-hud.mjs`, 900 autoplay frames a size, isolated; the safe box read by the game):
+
+| | 393 | 320 | 430 | 375 | 852L | 932L | 667L | 568L |
+|---|---|---|---|---|---|---|---|---|
+| Bug, pause, Heat bar rects ±2 px | ✓ ✓ ✓ | ✓ ✓ ✓ | | | | | | |
+| Safe box = the table (115-568 / 76-368) | ✓ | ✓ | | | | | | |
+| Rim row | 0.220 | 0.216 | 0.215 | 0.193 | 0.364 | 0.346 | 0.374 | 0.419 |
+| Handler median | 0.494 | 0.513 | 0.526 | 0.505 | 0.849 | 0.736 | 0.875 | 0.821 |
+| In the safe box | **1.000** | **0.994** | 0.994 | 0.993 | 0.981 | 0.991 | 0.968 | 0.824 |
+| Zoom variation near the rim | 0.008 | 0 | 0 | 0 | 0.004 | 0 | 0.005 | 0 |
+| Frames with a DOM element within 40 px of the rim | **0** | **0** | **0** | **0** | 4 | 0 | 12 | 107 |
+
+- **Before (nba-1, `nba-geo.mjs`):** rim 0.36 / 0.33 of the height, handler 0.66 / 0.65, safe box 0.55 / 0.41,
+  zoom variation 12.7% / 19.5%.
+- **The handler median:** the 393 live median (0.494, one 900-frame slice of one lab game) sits just under the
+  band. Over 6 simulated games it is 0.536.
+- **The sideways contacts:** all are the toast line's bottom edge meeting the rim's 40 px margin when a toast
+  is up.
+
+**Shot clock** (`nba-clock.mjs`, 20 s untouched at 393): **0 of 401** 20 Hz samples differ from
+`ceil(p.clock)`, **0** mismatch runs over a frame, the longest still value while live is **1.0 s**
+(before: "8" for 7.2 s), and the warning is on exactly at ≤ 5 s.
+
+**Text** (`labels.test.ts`):
+- **Glyph misses:** names with holes went from 122 of 3,565 to **0** (plus every tag).
+- **Duplicate tags:** courts with a duplicate tag went from 76 / 500 (nba-1's draw) to **0 / 500**. The
+  test's own draw has more than 10 courts that collide before the fix.
+- **Chip layout:** **0** overlaps in 1,000 clustered frames.
+
+**Held arena** (`nba-held.mjs`, 393×852, `?arcade&hold&auto`, each game fast-forwarded to its last possession):
+
+| Row (V2) | Before (nba-1, UT flow) | After |
+|---|---|---|
+| Whistle → onFinish (≤ 0.3 s) | 1.60 s | **0.009-0.013 s** |
+| rematch() → first live frame at 4× CPU, curtain included (≤ 1.5 s) | 2.54 s | **1.40 / 1.42 s**, one run 2.70 s |
+| A tap on the curtain → live | not skippable | **0.25 s** |
+| New canvases / renderers per rematch (0) | a new canvas and renderer every match | **0** (identity kept, 5 rematches) |
+| JS heap after the 5th rematch vs the 1st (≤ 1.10) | — | **1.035** (24.95 → 25.83 MB) |
+| Whistle → next tip-off with a 5 s sheet (≤ 10 s) | 13.05 s | **6.55 s** |
+
+The 2.70 s run: the third 4× rematch in a row came in late in each of three runs, while the first two were
+on 1.40-1.52 s. It is recorded, not explained (Left undone).
+
+**Frame budget** (`nba-perf.mjs`, autoplay, 8 s per sample):
+
+| Size | 1×: frames > 20 ms, rAF callback p99 | 4×: frames > 20 ms, callback p99 |
+|---|---|---|
+| 430×932 | 1.1% (1.1%), **12.2 ms** (13.0) | **34.5%** (48%), 39.2 ms (49.5) |
+| 320×568 | 0% (0.2%), **7.7 ms** (9.8) | **2.8%** (21%), 22.1 ms (41.4) |
+| 852×393 | 0% (0.2%), **5.9 ms** (9.9) | **9.2%** (34%), 25.2 ms (45.3) |
+
+The floor cast is 0.7 ms and a reused frame's draw is 0.2 ms (median), so the rest is the players' sprite
+drawing (players-2's near-first budget, a dependency). 320 meets §3.9. 430 and sideways improve but miss it.
+
+### Tests
+
+| Test | What it proves |
+|---|---|
+| `camera.test.ts` (6 + 1 opt-in) | the camera rows above at 393/320 (rim 0.20-0.24, handler 0.50-0.55, safe ≥ 0.98, zoom ≤ 2%, jumpers ≥ 0.90, all releases ≥ 0.85) and at 430/375/sideways (safe ≥ 0.98, 568 sideways ≥ 0.85; zoom ≤ 3.5%); 30 vs 60 fps within 0.5 px; the shooter hold ≤ 2 ft with the 2% tilt; the defensive yaw rule ≥ 90% of 1,000 releases in both orientations and never worse than a fixed sign; the stick and the facing turn with the yaw. `NBA_CAM=1` prints the before/after table |
+| `labels.test.ts` (7) | 0 glyph misses across `cards-nba.json` names and tags; the folds (Jokić, Dončić, Petrović, Marčiulionis, Ø Ł Đ ß Æ Œ, curly quotes); the V2 punctuation; unique tags (initial, two letters, number) and 0 duplicates on 500 random courts; 0 chip overlaps in 1,000 frames with the top priority where it asked; 14 px chips |
+| `held.test.ts` (3) | a possession per task gives exactly `aiPossessionsOf` (3 seeds, real squads, a bench, defIQ); it cancels; `autoplaySteps` drained is `autoplay` |
+| `determinism.test.ts` (changed) | `camera.ts`, `floor.ts` and `labels.ts` join the render-only list (they read a possession to draw it); `shotChance`'s grandfathered `hypot` moved with its body into `shotChanceWith` (the same call). Neither was a bug fix: the scan's lists followed the refactor |
+
+`golden.test.ts` and `controls.test.ts` (the AI race byte-identical) pass unchanged.
+
+### Verification (nba-3)
+
+- **Typecheck:** `bash O/heavy.sh npm run typecheck`: clean.
+- **The standard set:** `bash O/heavy.sh npx vitest run src/game/hoops2 src/game/hud src/game/stick.test.ts
+  src/game/juice.test.ts src/game/play-feedback.test.ts src/game/difficulty.test.ts src/ut/match-debrief.test.ts
+  src/engine/sport-branches.test.ts`. Result: 20 files passed, 5 skipped (opt-in), 113 tests passed. The run
+  before the determinism-list update had 1 failure, that scan.
+- **Browser** (against 5215, every host other than localhost aborted, none tried):
+  - `nba-hud.mjs` (8 sizes)
+  - `nba-clock.mjs 393 20`
+  - `nba-held.mjs`
+  - `nba-perf.mjs`
+  - `nba-frame-shots.mjs`
+- **Captures** in `O/shots/nba/nba-3/`, all looked at:
+  - `nba3-393-release`, `-scorer-plate`, `-clutch-bug`, `-ot-bug`, `-name-chips`, `-reduced-motion`
+  - `nba3-320-rim-area`, `nba3-852land`
+  - `held-393-sheet`, `held-393-curtain`
+  - `hud-<size>-play` / `-auto` for the 8 sizes
+
+### Reduced motion (plan §3.15 rows added)
+
+| Element | With reduced motion |
+|---|---|
+| clock warning | colour only (no pulse) |
+| camera easing | ×2 faster settle; no shake (as before) |
+| Clutch staging | gold bug only, no 6% tighten |
+| Heat bar | static stripes, no fill transition |
+| tip-off curtain | static card, no fades or row rises |
+| rematch dim | instant |
+
+**Protocol:** none. The changes are render, DOM, text and a held-mount flow. `golden.test.ts` and the AI-race
+golden in `controls.test.ts` are byte-identical, and the rematch's AI side is proven equal to `aiPossessionsOf`.
+
+---
+
 ## Contracts for nfl / soccer / ut
 
 The section below is plan §4, copied verbatim on 2026-11-16 (revision 3, commit `78a1c86`). nfl and soccer build against
@@ -694,6 +921,10 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
 | 2026-11-16 | §4.3 pause | `PauseButton` takes an optional `label`; `PauseSheet.tsx` also exports `SheetToggle`; new `hud/timers.ts` `PausableTimers` | sport items in the sheet; "0 timers while paused" |
 | 2026-11-16 | §4.7 prefs | new helper `firstTime(sport, bit)` | the once-per-device hints |
 | 2026-11-16 | §4.8 `Arcade.onFinish` | a sixth optional argument `forfeit?: 'us'` (offline Quit). nba-9 adds `'them'` for the online forfeit | quit = a loss in every host |
+| 2026-11-16 | §4.3 `BugProps` (nba-3) | optional `sub` (a second line under the period), `clockRef` (the host writes the clock every frame), `youColor` / `rivalColor`, `aside` (an icon beside the bug) | the live clock without re-renders; LAST PLAY in the bug |
+| 2026-11-16 | §4.3 `readGeometry` (nba-3) | also returns `hudBottom` (the Heat bar's bottom; sideways the toast line's); `intersects()` exported | the rim keeps 40 px under the HUD |
+| 2026-11-16 | §4.8 `ArcadeHandle.rematch` (nba-3) | `next?: { seed?: string; rival?: string /* name */; them?: { lineup?: Lineup; teams?: ArcadeTeams } }`: the plan's `Rival` and `Squad` types don't exist, so these are the shapes Arcade already takes. `Arcade` is a `forwardRef`; `hold` is offline only | the stub host and ut's One-More bar |
+| 2026-11-16 | `controls-geometry.css` (nba-3) | sideways `--safe-t` 64 → 100 px | the toast line sits under the bug sideways (to --sat + 94) |
 
 ---
 
@@ -736,7 +967,7 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
    - nba-3 ships one exported `BADGE_LABEL` map in `hoops2/badges.ts` with original names: Deadeye → Ice Water,
      Limitless → Deep Range, Dimer → Table Setter, Posterizer → Poster Maker, Clamps → Lockdown, Ankle Breaker → Ankle
      Taker, Rim Protector → Paint Wall. The badge tier "Hall of Fame" becomes "Elite" in display. Internal ids stay.
-   - **Lead decision:** have packs' `ut/rate.ts BADGE_NAMES` read the same map (a one-line import), so cards and the
+   - **Shipped in nba-3** (`BADGE_LABEL`, `tierLabel`). **Lead decision still open:** have packs' `ut/rate.ts BADGE_NAMES` read the same map (a one-line import), so cards and the
      in-game pop agree. If the lead declines, nba flips its pop to the card names (one constant) and records it here.
    - **Withdrawn:** the Heat-stage rename (HOT HAND / LOCKED IN). V2 names the stages HEATING UP / ON FIRE, and "Hot
      Hand" is now ut's win-streak coin bonus (D.14).
@@ -771,7 +1002,9 @@ the floating stick's own sprint ring in place of the 0.92 edge. The AI's possess
 (`fga`, `drb`, `stl`, `int`, `foul`) are pushed beside the existing ones and never change state or the order of
 `p.rand` draws. `golden.test.ts` pins it: 6 seeded AI games (score, marks, and every possession's end and final clock)
 recorded on the base `78a1c86` come out byte-identical on today's engine, nba-2 included. Any later task that moves
-them is an outcome change (re-record from that commit and add it here).
+them is an outcome change (re-record from that commit and add it here). **nba-3 adds nothing to it:** the camera, HUD,
+text and held arena are render/DOM/flow; `shotChanceWith`, `catchChance` and `autoplaySteps` are refactors with the
+golden and the AI-race golden byte-identical, and the rematch's AI side is proven equal to `aiPossessionsOf`.
 
 ---
 
@@ -792,12 +1025,32 @@ them is an outcome change (re-record from that commit and add it here).
     poses replace them, plan §4.6).
   - `src/game/hoops2/coach-controls.css` keeps the two hint rules soccer's `.hg2.sc2` hint uses and the
     football/soccer dimmed buttons, unchanged; NBA's own rules moved to the HUD kit.
+- **nba-3:**
+  - `src/game/Arcade.tsx` (shared with nfl): the sport-agnostic held-arena block (`forwardRef`, `hold`,
+    `ArcadeHandle.rematch`, the round state, `onFinish` with no delay when held) and the NBA branch (`hold`,
+    `round`, `roundAt`, the rematch's AI side a possession per task). nfl and soccer get only a `key` so a
+    rematch remounts them. The first match reads the host's props exactly as before.
+  - `src/game/Lab.tsx`: one line (`?arcade&hold` → `HeldLab`) and its import.
+  - `src/game/hoops2/render.ts`, players section: one hunk in `sprite()`. The facing and the look-down angle
+    are taken relative to the yawed camera (`facingIndex`, `pitchAt` from camera.ts); there is no look, pose or
+    cache change.
+  - `src/game/PlayReadout.tsx` and `play-readout.css` (shared with nfl): an optional `icon` mode (a 44 px
+    button). nfl's pill is unchanged.
 - One hunk in the team's own `Hoops2.tsx` worth knowing about: a dev-server-only probe (`window.__hg2`, guarded by
   `import.meta.env.DEV`, so the production build drops it) that the geometry, camera and flow probes read.
 
 ---
 
 ## Owner device checks
+
+**nba-3:**
+- The camera's look on a real phone: 55° and 12° yaw, with the court receding. Do the stands, the slanted key
+  and the steeper view read as a broadcast? Is the tip-off zoom-back noticeable?
+- The shot clock's tick under 4 s and the red pulse at 5 s.
+- Accented names on the chips (Jokić → JOKIC) and the J.JOHNSON-style tags.
+- The rematch loop once ut's sheet is wired: the curtain's 1.4 s, a tap to skip, and the dimmed arena behind
+  the sheet.
+- The Dynamic Island: re-measure the bug, LAST PLAY and the safe box once shell's `--sat` fix merges.
 
 **nba-2:**
 - Thumb reach on the owner's phone: A / B / C with the right thumb, the stick anywhere low on the left;
@@ -816,6 +1069,21 @@ ring's feel, haptics, defense, the rematch loop and accented names.
 
 ## Left undone
 
+**nba-3:**
+- **`?arcade&cam=v2b`** (V2's "your basket at the bottom" on defense): the framing and the yaw rule are in
+  `camera.ts` and tested. Wiring the flag to the defensive possessions is nba-6's (there are none to show
+  yet), including the backboard and rim drawn from behind.
+- **The OT phase** of the bug is drawn and captured (forced through the dev probe). nba-6's overtime sets it.
+- **Frame budget at 430×932 and sideways** misses §3.9: 4×, 34.5% and 9.2% of frames over 20 ms; 1× p99 at 430
+  is 12.2 ms. What's left is the players' sprite drawing, so the near-first budget (players-2) is the fix.
+  Flagged to players with these numbers.
+- **The 568×320 sideways safe box** (196 px under the bug and the toast) keeps the handler in only 89% of
+  frames. A man walking up from half court dips under it. Every other size is ≥ 98%.
+- **Finishes with a trailing defender:** at 11.8% of all releases at 393, he hides more than 35% of the
+  finisher. Jump shots: 0%.
+- **One 4× rematch in three** tipped off at 2.7 s, not 1.4 s; the cause isn't found yet.
+- **The 393 live handler median** is 0.494 in one 900-frame lab slice (0.536 over 6 simulated games).
+
 **nba-2:**
 - **A quit still pays the ordinary loss reward** in UT (30 coins, XP, season points) and the debrief
   coaches the empty possessions. That is ut's call (rewards and debrief are theirs); a quit at tip-off
@@ -827,4 +1095,4 @@ ring's feel, haptics, defense, the rematch loop and accented names.
 - Nothing from nba-1's Must list. The probes measure only what today's game has; rows for controls that don't exist yet
   (pause, Heat bar, sprint ring, gestures on A) print "absent", and the tasks that build them add their measurements.
 - `hold.heapGrowth` is measured after the 3rd autoplay game against the 1st, not after the 5th rematch: a full autoplay
-  game takes about 90 s at 1×. nba-3's held arena re-measures across 5 rematches.
+  game takes about 90 s at 1×. nba-3's held arena re-measured it across 5 rematches: 1.035.

@@ -122,7 +122,9 @@ const SHOT_WORD: Record<ShotKind, string> = { three: '3PT', mid: 'JUMPER', close
 const CURTAIN_MS = 1400;
 /** A kit's colour for the score bug: the jersey, or its trim when the jersey is white (an away kit). */
 function teamColor(k: Kit): string {
-  const n = parseInt(k.jersey.slice(1, 7), 16);
+  const hex = /^#[0-9a-f]{3}$/i.test(k.jersey) ? '#' + [...k.jersey.slice(1)].map((c) => c + c).join('') : k.jersey;
+  if (!/^#[0-9a-f]{6}/i.test(hex)) return k.jersey;
+  const n = parseInt(hex.slice(1, 7), 16);
   const light = ((n >> 16) & 255) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11 > 200;
   return light ? k.trim : k.jersey;
 }
@@ -230,7 +232,7 @@ export function Hoops2({
     // engine's numbers (the AI's race, aiPossessionsOf, plays from the untouched lists)
     const [us, them, subs] = tagged([five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), bench ?? []]);
     return newHoopsGame(us, them, seed, possessions, subs, defIQ);
-  }, [attrs, round, seed]);
+  }, [attrs, round]);
   const renderer = useMemo(() => {
     const r = new HoopsRenderer(court, [ourKit, theirKit]);
     r.reduced = reducedMotion();
@@ -465,7 +467,8 @@ export function Hoops2({
       if (e.startsWith('scheme:')) {
         // the defense's look and what beats it, read once at the start of the possession
         const sc = e.slice(7) as Scheme;
-        if (!autoplayHook) say(LOOK_TEXT[sc] + ' · ' + LOOK_TIP[sc], 'plain', 1500, 1);
+        // (at the hints' priority: a first-run hint replaces it rather than being lost behind it)
+        if (!autoplayHook) say(LOOK_TEXT[sc] + ' · ' + LOOK_TIP[sc], 'plain', 1500, 0);
       } else if (e.startsWith('trap:')) {
         sfx.squeak();
         vibrate(12);
