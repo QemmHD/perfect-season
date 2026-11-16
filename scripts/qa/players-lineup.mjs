@@ -18,12 +18,21 @@
 //   height over head-box height), against V2's 4.5/5/5.5/6 heads and 5x5, 6x6, 7x8, 12x13 boxes;
 //   `outline`: per star at 34 art px in his own look, the colours of the outer silhouette edge (the
 //   share that is V2's `#14121c`) and the inner line pixels (pixels inside the figure drawn in an
-//   outline colour, where V2 wants the part's shadow tone: 0 black inner pixels).
+//   outline colour, where V2 wants the part's shadow tone: 0 black inner pixels); and, from
+//   `rasterBody`'s per-pixel material slots (revised C.1.3 and C.7 #8), the tones drawn per main
+//   material (skin, jersey, shorts, socks: V2 asks five, the C.7 bar three) and the rim light: of the
+//   figure's pixels with nothing above-left of them (the outline ring or empty), the share drawn in
+//   the brightest tone of their own material (V2: every one).
+// - Owner-named looks (Shaq bald, Iverson cornrows and headband, Kareem goggles, Rodman dyed, Haaland
+//   long blond, Mbappe short and clean-shaven, Brady curated and reviewed) are read from the
+//   appearance record (`src/game/pixel/appearance.ts`, `appearanceFor`, players-3) and its source rows
+//   (`src/data/appearance/source/<sport>.looks.json`). Until players-3 lands they are reported
+//   "not built yet (players-3)", never judged from today's hashed looks.
 //
 //   node scripts/qa/players-lineup.mjs [--sport nba,nfl,soccer] [--tag before] [--out DIR]
 import fs from 'node:fs';
 import path from 'node:path';
-import { appUrl, emit, listOf, needServer, OUT, opts, quantile, round, SPORTS, watchErrors, withBrowser, isolate } from './players-lib.mjs';
+import { appUrl, emit, listOf, needServer, OUT, opts, quantile, ROOT, round, SPORTS, watchErrors, withBrowser, isolate } from './players-lib.mjs';
 
 const sports = listOf(opts.sport, SPORTS);
 const tag = String(opts.tag ?? 'before');
@@ -91,8 +100,31 @@ async function draw({ names, sport, withNumbers }) {
     g.fillStyle = '#fff';
     g.fillText(rc.line.name.slice(0, 18), x0 + 4, 868);
     g.fillText(`${rc.line.ht ?? '-'}${sport === 'soccer' ? 'cm' : 'in'} ${rc.line.wt ?? '-'}lb #${rc.line.num ?? '-'}`, x0 + 4, 856);
-    info.push({ name: rc.line.name, pid: rc.line.pid, season: rc.line.season, team: rc.line.abbr, ovr: rc.ovr, ht: rc.line.ht, wt: rc.line.wt ?? null, num: rc.line.num ?? null, hair: look.hair, beard: !!look.beard, skin: look.skin, hairColor: look.hairColor, lookHt: round1(look.ht), lookWt: round1(look.wt) });
+    const seasons = [...new Set([...pool.base.values()].filter((x) => x.line.name === rc.line.name && x.line.kind === 'season').map((x) => x.line.season))].sort();
+    info.push({ name: rc.line.name, pid: rc.line.pid, season: rc.line.season, seasons, team: rc.line.abbr, ovr: rc.ovr, ht: rc.line.ht, wt: rc.line.wt ?? null, num: rc.line.num ?? null, hair: look.hair, beard: !!look.beard, skin: look.skin, hairColor: look.hairColor, lookHt: round1(look.ht), lookWt: round1(look.wt) });
   });
+  // the appearance record (players-3), when it exists: the owner-named checks read it, never the
+  // hashed look the renderers draw today
+  let appearance = { built: false, error: null, byName: {} };
+  try {
+    const A = await import('/src/game/pixel/appearance.ts');
+    if (typeof A.appearanceFor !== 'function') throw new Error('appearanceFor is not exported');
+    if (typeof A.loadAppearance === 'function') await A.loadAppearance(sport);
+    appearance.built = true;
+    for (const x of info) {
+      const at = {};
+      for (const se of [x.season, ...x.seasons]) {
+        try {
+          at[se] = A.appearanceFor(sport, x.pid, se) ?? null;
+        } catch (e) {
+          at[se] = { error: String(e && e.message).slice(0, 80) };
+        }
+      }
+      appearance.byName[x.name] = { best: at[x.season] ?? null, bySeason: at };
+    }
+  } catch (e) {
+    appearance = { built: false, error: String(e && e.message).slice(0, 120), byName: {} };
+  }
   function round1(x) {
     return Math.round(x * 10) / 10;
   }
@@ -267,7 +299,39 @@ async function draw({ names, sport, withNumbers }) {
     const hex = (k) => '#' + k.toString(16).padStart(6, '0');
     return { edge, edgeV2Share: Math.round((1000 * edgeV2) / Math.max(1, edge)) / 1000, edgeColours: edgeHist.size, edgeTop: [...edgeHist.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `${hex(k)} ${Math.round((100 * n) / edge)}%`), inner, innerLinePx: innerLine, innerLineShare: Math.round((1000 * innerLine) / Math.max(1, inner)) / 1000 };
   };
-  const outline = found.map((rc) => ({ name: rc.line.name, ...outlineOfSprite(lookOf(rc.line), 34) }));
+  // V2 C.1.3 shading, from the raster's material slots: tones per main material and the rim light
+  const shadingOf = (look, px) => {
+    const r = body.rasterBody(look, mocap.mocapJoints('ready', 10, look, { ground: 'clip' }), { facing: 0.9, pitch: 0.45 }, px);
+    const W = r.w,
+      H = r.h;
+    const filled = (x, y) => x >= 0 && y >= 0 && x < W && y < H && r.slot[y * W + x] > 0;
+    const lumaOf = (c) => 0.299 * (c & 255) + 0.587 * ((c >>> 8) & 255) + 0.114 * ((c >>> 16) & 255);
+    const tones = new Map();
+    for (let i = 0; i < W * H; i++) {
+      if (!r.slot[i]) continue;
+      let t = tones.get(r.slot[i]);
+      if (!t) tones.set(r.slot[i], (t = new Map()));
+      t.set(r.px[i], (t.get(r.px[i]) ?? 0) + 1);
+    }
+    // a material's tones: colours covering at least 2 px (a stray number or eye pixel is not a tone)
+    const toneCount = (slot) => [...(tones.get(slot)?.values() ?? [])].filter((n) => n >= 2).length;
+    const brightest = new Map([...tones].map(([slot, t]) => [slot, Math.max(...[...t.keys()].map(lumaOf))]));
+    let rimPx = 0,
+      rimLit = 0;
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (!r.slot[i] || filled(x - 1, y - 1)) continue;
+        rimPx++;
+        if (lumaOf(r.px[i]) >= brightest.get(r.slot[i]) - 0.5) rimLit++;
+      }
+    const M = body.MATERIAL_SLOT;
+    const main = { skin: M.skin, jersey: M.jersey, shorts: sport === 'nfl' ? M.pants : M.shorts, socks: M.socks };
+    const perMaterial = Object.fromEntries(Object.entries(main).map(([k, slot]) => [k, toneCount(slot)]));
+    const present = Object.values(perMaterial).filter((n) => n > 0);
+    return { tonesPerMaterial: perMaterial, tonesMin: present.length ? Math.min(...present) : 0, rimPx, rimShare: Math.round((1000 * rimLit) / Math.max(1, rimPx)) / 1000 };
+  };
+  const outline = found.map((rc) => ({ name: rc.line.name, ...outlineOfSprite(lookOf(rc.line), 34), ...shadingOf(lookOf(rc.line), 34) }));
   const builds = [];
   if (sport === 'nba') {
     const who = [
@@ -325,22 +389,53 @@ async function draw({ names, sport, withNumbers }) {
       }
     numbers = n.toDataURL();
   }
-  return { url: c.toDataURL(), info, identity, builds, numbers, proportions, outline, missing: names.filter((n) => !found.some((rc) => rc.line.name === n)) };
+  return { url: c.toDataURL(), info, identity, builds, numbers, proportions, outline, appearance, missing: names.filter((n) => !found.some((rc) => rc.line.name === n)) };
 }
 
+// V2 C.1.4's option names (plan players-3 `appearance.ts`)
+const DYED = ['red', 'blue', 'green', 'pink', 'purple'];
+const LONG = ['flow', 'ponytail', 'bun', 'locs-long', 'braids', 'band-bound'];
+const SHORT = ['bald', 'buzz', 'short', 'fade'];
+const curated = (a) => !!a && a.src === 'curated';
+/**
+ * The owner-named looks (STREAM players P0), judged on the appearance record: `a` is the star's record
+ * at his best card's season, `all` every season's record, `row` his source row (`reviewed`).
+ */
 const OWNER = {
   nba: [
-    ["Shaquille O'Neal", 'shaved head', (l) => l.hair === 3],
-    ['Allen Iverson', 'cornrows', () => false],
-    ['Kareem Abdul-Jabbar', 'goggles', () => false],
-    ['Dennis Rodman', 'dyed hair', (l) => l.hairColor !== '#1d1612'],
+    ["Shaquille O'Neal", 'shaved head', ({ a }) => curated(a) && a.hair === 'bald'],
+    ['Allen Iverson', 'cornrows and a headband', ({ a }) => curated(a) && a.hair === 'cornrows' && a.head === 'band'],
+    ['Kareem Abdul-Jabbar', 'goggles', ({ a }) => curated(a) && a.eyes === 'goggles'],
+    // dyed by season: some season of his 1994-98 cards (the Spurs and Bulls years) in a V2 dyed tone
+    ['Dennis Rodman', 'dyed hair (1994-98)', ({ all }) => Object.entries(all).some(([se, x]) => +String(se).slice(0, 4) >= 1994 && +String(se).slice(0, 4) <= 1998 && curated(x) && DYED.includes(x.hairTone))],
   ],
-  nfl: [['Tom Brady', 'his own look (judged by eye in players-7)', () => null]],
+  nfl: [['Tom Brady', 'a curated Tier A row, reviewed', ({ a, row }) => curated(a) && !!row && row.reviewed === true]],
   soccer: [
-    ['Erling Haaland', 'long blond hair', (l) => l.hairColor !== '#1d1612'],
-    ['Kylian Mbappé', 'short, clean-shaven', (l) => !l.beard && (l.hair === 0 || l.hair === 1)],
+    ['Erling Haaland', 'long blond hair', ({ a }) => curated(a) && a.hairTone === 'blond' && LONG.includes(a.hair)],
+    ['Kylian Mbappé', 'short, clean-shaven', ({ a }) => curated(a) && SHORT.includes(a.hair) && a.facial === 'none'],
   ],
 };
+
+/** The star's row in the curated source file, matched by pid or name (players-3's format). */
+function sourceRow(sport, pid, name) {
+  const f = path.join(ROOT, 'src/data/appearance/source', `${sport}.looks.json`);
+  if (!fs.existsSync(f)) return null;
+  let hit = null;
+  const walk = (x) => {
+    if (hit || !x || typeof x !== 'object') return;
+    if (!Array.isArray(x) && (x.pid === pid || x.name === name)) return void (hit = x);
+    for (const v of Object.values(x)) walk(v);
+  };
+  try {
+    const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+    // a map keyed by pid
+    if (j && typeof j === 'object' && !Array.isArray(j) && j[pid] && typeof j[pid] === 'object') return j[pid];
+    walk(j);
+  } catch {
+    return null;
+  }
+  return hit;
+}
 
 await needServer();
 const results = await withBrowser(async (browser) => {
@@ -381,12 +476,16 @@ const results = await withBrowser(async (browser) => {
       return { ...p, target: { headsTall: heads, headW: bw, headH: bh }, ok: Math.abs(p.headsTall - heads) <= 0.25 && Math.abs(p.headW - bw) <= 1 && Math.abs(p.headH - bh) <= 1 };
     });
     const ol = r.outline;
-    const outline = { stars: ol.length, edgeV2ShareMin: Math.min(...ol.map((o) => o.edgeV2Share)), edgeColoursP50: quantile(ol.map((o) => o.edgeColours), 0.5), innerLinePxP50: quantile(ol.map((o) => o.innerLinePx), 0.5), innerLineShareMax: Math.max(...ol.map((o) => o.innerLineShare)), each: ol };
+    const outline = { stars: ol.length, edgeV2ShareMin: Math.min(...ol.map((o) => o.edgeV2Share)), edgeColoursP50: quantile(ol.map((o) => o.edgeColours), 0.5), innerLinePxP50: quantile(ol.map((o) => o.innerLinePx), 0.5), innerLineShareMax: Math.max(...ol.map((o) => o.innerLineShare)), tonesMin: Math.min(...ol.map((o) => o.tonesMin)), rimShareMin: Math.min(...ol.map((o) => o.rimShare)), rimShareP50: quantile(ol.map((o) => o.rimShare), 0.5), each: ol };
     const owner = (OWNER[sport] ?? []).map(([name, want, ok]) => {
       const l = r.info.find((x) => x.name === name);
-      return { name, want, correct: l ? ok(l) : null, drawnAs: l ? { hair: l.hair, beard: l.beard, hairColor: l.hairColor, skin: l.skin } : null };
+      const drawnAs = l ? { hair: l.hair, beard: l.beard, hairColor: l.hairColor, skin: l.skin } : null;
+      if (!l) return { name, want, correct: false, missing: 'no card', drawnAs };
+      if (!r.appearance.built) return { name, want, correct: null, notBuilt: 'players-3', drawnAs };
+      const rec = r.appearance.byName[name] ?? { best: null, bySeason: {} };
+      return { name, want, correct: !!ok({ a: rec.best, all: rec.bySeason, row: sourceRow(sport, l.pid, name) }), record: rec.best, drawnAs };
     });
-    out.push({ sport, sheet: file, numbersSheet: numbersFile, missing: r.missing, stars: r.info, distinctSkins: new Set(r.info.map((l) => l.skin)).size, distinctHairColors: new Set(r.info.map((l) => l.hairColor)).size, identity, torso40, torso34, proportions, outline, builds: r.builds, ownerExamples: owner, pageErrors: errors.slice(0, 3) });
+    out.push({ sport, sheet: file, numbersSheet: numbersFile, missing: r.missing, appearanceBuilt: r.appearance.built, appearanceError: r.appearance.error, stars: r.info, distinctSkins: new Set(r.info.map((l) => l.skin)).size, distinctHairColors: new Set(r.info.map((l) => l.hairColor)).size, identity, torso40, torso34, proportions, outline, builds: r.builds, ownerExamples: owner, pageErrors: errors.slice(0, 3) });
     await context.close();
   }
   return out;

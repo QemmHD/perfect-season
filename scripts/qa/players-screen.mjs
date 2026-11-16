@@ -1,27 +1,40 @@
 // Players QA (studio overhaul, players-1): what the match screen shows, measured against GAME-DESIGN-V2
-// C.1.2 (pixel size and on-screen heights) and C.2 (venues). Three parts, all three sports:
+// C.1.2 (pixel size and on-screen heights), C.2 and C.5 rule 4 (venues). V2 was revised at 13:09 on
+// 2026-11-16: these rows follow the revised text (see the team doc's V2 revision note). Three parts,
+// all three sports:
 //
-// 1. Art pixel (C.1.2: 1 art px = 1.5 design px, snapped to whole device pixels). The bodies are
-//    rastered at their art size and blitted 1:1 onto the game canvas, so one art px is one canvas
-//    px: per sport, viewport and device pixel ratio (1, 2, 3) the canvas's CSS box against its
-//    backing store gives `designPerArt` (CSS px per canvas px over the stage scale k) and
-//    `devPerArt` (device px per canvas px), and whether that is a whole number.
+// 1. Art pixel. The bodies are rastered at their art size and blitted 1:1 onto the game canvas, so
+//    one art px is one canvas px: per sport, viewport and device pixel ratio (1, 2, 3) the canvas's
+//    CSS box against its backing store gives `designPerArt` (CSS px per canvas px over the stage
+//    scale k) and `devPerArt` (device px per canvas px), and whether that is a whole number. (Whether
+//    V2 still wants 1 art px = 1.5 design px is a pending lead ruling: C.6 says the camera sets the
+//    size and replaces that rule; C.5 rule 3 and lead decision 3 still say 1.5.)
 // 2. On-screen heights (C.1.2, reported for the sport teams, who own the cameras): the probe's
 //    per-frame sprite heights (nearest body, the ball's body = the controlled player on offense,
-//    median, farthest) in design px, against NBA 51 / far 36 and NFL and soccer 34 / far 22.5.
-// 3. Venue calm (C.2), on frames sampled every 3 s of an autoplay match: every sprite blit is
-//    recorded into a mask, then the frame's pixels give
-//    - venue vs sprite lightness: mean CIE L* of every non-sprite pixel against the sprites' (V2:
-//      the venue at least 30% darker);
+//    median, farthest) in design px. V2's old flat table is now a FLOOR (controlled NBA 51, NFL and
+//    soccer 34; far 36 / 22.5) and the camera guides (NBA handler about 95, NFL QB about 70, soccer
+//    carrier about 75; far about 60 / 45 / 55) are reported beside it as information.
+// 3. Venue (C.2), on frames sampled every 3 s of an autoplay match: every sprite blit is recorded into
+//    a mask, then the frame's pixels give
+//    - venue vs sprite lightness: mean CIE L* of every non-sprite pixel against the sprites' (reported);
 //    - surface grain: Michelson contrast of luminance (p90 vs p10) in 12x12 tiles of the playing
 //      surface away from lines and sprites, median over tiles (V2: <=4%);
-//    - the crowd: the band with the most textured rows (mean |dL*| two pixels apart >= 3; flat gaps of
-//      up to 23 rows, the ribbons and facades between tiers, bridged) above the playing surface's top
-//      edge, top to bottom; its share of the screen height in
-//      portrait (V2: <=12%), and of everything above the surface; the
-//      colours they use (V2: three dark bands plus <=6% team and <=2% white flecks), and how often a
-//      pixel equals its right neighbour (V2's 2 px blocks give >=50%; 1 px noise gives little);
-//    - the vignette: corner tiles' mean L* against the centre's (V2: corners -18%).
+//    - the stands: the band with the most textured rows (mean |dL*| two pixels apart >= 3; flat gaps
+//      of up to 23 rows, the ribbons and facades between tiers, bridged) above the playing surface's
+//      top edge (the far boundary), top to bottom; its share of the screen height in portrait (C.5
+//      rule 4: the stands take about 30-40% of the height above the far boundary, read as 30-40% of the
+//      screen height, the region mockups-v2's gameplay frames fill with stands) and of everything above
+//      the surface;
+//    - softer and foggier than the play (C.2, C.7 #5): the mean |dL*| between horizontal neighbours
+//      and the mean chroma inside the stands band against the same inside the sprites (both ratios
+//      must be below 1);
+//    - the crowd's colour mix (C.2 shirts: 40% home, 22% second colour, 12% white, 12% third, the rest
+//      dark neutrals, plus six skin tones): the stands' pixels grouped into 12 hue families of 30
+//      degrees (chroma >= 12) plus neutrals; the families holding >= 3% each, the largest family's
+//      share and the near-white share (the exact shares are venue.test.ts's, on the generator);
+//    - the old calm measures, reported: the top-3 colours' share and how often a pixel equals its right
+//      neighbour;
+//    - the vignette: corner tiles' mean L* against the centre's (V2: a vignette, corners darker).
 //
 //   node scripts/qa/players-screen.mjs [--sport nba,nfl,soccer] [--vp 393,320] [--dpr-vp 393,320]
 //        [--secs 18] [--warm 5] [--tag before] [--out DIR] [--port 5214]
@@ -36,8 +49,10 @@ const warm = Number(opts.warm ?? 5);
 const tag = String(opts.tag ?? 'before');
 const seed = String(opts.seed ?? 'screen');
 
-/** V2 C.1.2 on-screen targets in design px: controlled player and far players (1 art px = 1.5). */
-export const HEIGHT_TARGETS = { nba: { controlled: 51, far: 36 }, nfl: { controlled: 34, far: 22.5 }, soccer: { controlled: 34, far: 22.5 } };
+/** V2 C.1.2 (revised): the old flat table, now the minimum legible size in design px (a floor). */
+export const HEIGHT_FLOORS = { nba: { controlled: 51, far: 36 }, nfl: { controlled: 34, far: 22.5 }, soccer: { controlled: 34, far: 22.5 } };
+/** V2 C.1.2 / C.6 camera guides at 393 in design px (information, not a gate). */
+export const HEIGHT_GUIDES = { nba: { controlled: 95, far: 60 }, nfl: { controlled: 70, far: 45 }, soccer: { controlled: 75, far: 55 } };
 
 /** The stage scale and the game canvas's geometry, in the page. */
 function canvasGeometry() {
@@ -51,9 +66,12 @@ function canvasGeometry() {
 
 /** In the page, on top of the sprite probe: record one frame's sprite blits and measure it. */
 async function installSampler({ sport }) {
-  const R = await import({ nba: '/src/game/hoops2/render.ts', nfl: '/src/game/football2/render.ts', soccer: '/src/game/soccer2/render.ts' }[sport]);
+  // the exact module copies the page runs: after a source edit the dev server serves them as
+  // `<path>?t=<stamp>`, and a bare import would patch a second, unused copy (as in installProbe)
+  const loaded = (p) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => new URL(n).pathname === p) ?? p;
+  const R = await import(loaded({ nba: '/src/game/hoops2/render.ts', nfl: '/src/game/football2/render.ts', soccer: '/src/game/soccer2/render.ts' }[sport]));
   const Cls = R[{ nba: 'HoopsRenderer', nfl: 'FootballRenderer', soccer: 'SoccerRenderer' }[sport]];
-  const body = await import('/src/game/pixel/body.ts');
+  const body = await import(loaded('/src/game/pixel/body.ts'));
   if (window.__psScreen) return;
   const S = (window.__psScreen = { want: 0, frames: [], sprites: new WeakSet() });
   const P = body.SpriteCache.prototype;
@@ -200,6 +218,48 @@ async function installSampler({ sport }) {
         if (x + 1 < W && d[i * 4] === d[i * 4 + 4] && d[i * 4 + 1] === d[i * 4 + 5] && d[i * 4 + 2] === d[i * 4 + 6]) same++;
       }
     const top3 = [...colours.values()].sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
+    // softer and foggier than the play: neighbour contrast and chroma, stands vs sprites
+    const chroma = (i) => Math.hypot(A[i], Bc[i]);
+    let ce = 0,
+      cn = 0,
+      cc = 0,
+      ccn = 0,
+      se = 0,
+      sn2 = 0,
+      sc = 0;
+    for (const y of crowdRows)
+      for (let x = 1; x < W; x++) {
+        const i = y * W + x;
+        if (near[i] || near[i - 1]) continue;
+        ce += Math.abs(L[i] - L[i - 1]);
+        cn++;
+      }
+    const families = new Float64Array(12);
+    let neutral = 0,
+      white = 0;
+    for (const y of crowdRows)
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (near[i]) continue;
+        const c = chroma(i);
+        cc += c;
+        ccn++;
+        if (c < 12) {
+          neutral++;
+          if (L[i] > 85) white++;
+        } else families[Math.floor((((Math.atan2(Bc[i], A[i]) * 180) / Math.PI + 360) % 360) / 30)]++;
+      }
+    for (let y = 0; y < H; y++)
+      for (let x = 1; x < W; x++) {
+        const i = y * W + x;
+        if (!mask[i]) continue;
+        sc += chroma(i);
+        if (!mask[i - 1]) continue;
+        se += Math.abs(L[i] - L[i - 1]);
+        sn2++;
+      }
+    const spriteChroma = sn ? sc / sn : null;
+    const famShares = ccn ? [...families].map((n) => n / ccn) : [];
     // surface grain: 12x12 tiles below the surface's top edge, surface pixels only, lines out
     const grain = [];
     const T = 12;
@@ -249,6 +309,14 @@ async function installSampler({ sport }) {
       crowdTop3Share: cpx ? +(top3 / cpx).toFixed(3) : null,
       crowdSameRightShare: cpx ? +(same / cpx).toFixed(3) : null,
       crowdL: cpx ? +(crowdL / cpx).toFixed(1) : null,
+      standsEdge: cn ? +(ce / cn).toFixed(2) : null,
+      spriteEdge: sn2 ? +(se / sn2).toFixed(2) : null,
+      standsChroma: ccn ? +(cc / ccn).toFixed(1) : null,
+      spriteChroma: spriteChroma === null ? null : +spriteChroma.toFixed(1),
+      crowdFamilies3pct: famShares.filter((x) => x >= 0.03).length,
+      crowdTopFamilyShare: famShares.length ? +Math.max(...famShares).toFixed(3) : null,
+      crowdNeutralShare: ccn ? +(neutral / ccn).toFixed(3) : null,
+      crowdWhiteShare: ccn ? +(white / ccn).toFixed(3) : null,
       grainMedianPct: grain.length ? +(100 * grain[grain.length >> 1]).toFixed(2) : null,
       grainTiles: grain.length,
       vignettePct: centre && corners.length ? +((100 * (corners.reduce((a, b) => a + b, 0) / corners.length - centre)) / centre).toFixed(1) : null,
@@ -340,15 +408,20 @@ const report = await withBrowser(async (browser) => {
       const designPerArt = g.cssW / g.w / g.k;
       const fa = probe.frameArtPx ?? {};
       const toDesign = (x) => (x === null || x === undefined ? null : round(x * designPerArt, 1));
-      const tgt = HEIGHT_TARGETS[sport];
+      const floor = HEIGHT_FLOORS[sport],
+        guide = HEIGHT_GUIDES[sport];
       const heights = {
         designPerArt: round(designPerArt, 3),
         artPx: fa,
         designPx: { nearest: toDesign(fa.nearestP50), controlled: toDesign(fa.ballP50 ?? fa.nearestP50), typical: toDesign(fa.typicalP50), far: toDesign(fa.farP50) },
-        target: tgt,
+        floor,
+        guide,
       };
-      heights.controlledVsTargetPct = heights.designPx.controlled === null ? null : round((100 * (heights.designPx.controlled - tgt.controlled)) / tgt.controlled, 1);
-      heights.farVsTargetPct = heights.designPx.far === null ? null : round((100 * (heights.designPx.far - tgt.far)) / tgt.far, 1);
+      const vs = (x, t) => (x === null ? null : round((100 * (x - t)) / t, 1));
+      heights.controlledVsFloorPct = vs(heights.designPx.controlled, floor.controlled);
+      heights.farVsFloorPct = vs(heights.designPx.far, floor.far);
+      heights.controlledVsGuidePct = vs(heights.designPx.controlled, guide.controlled);
+      heights.farVsGuidePct = vs(heights.designPx.far, guide.far);
       const rowsToScreenPct = (rows) => round((100 * rows * (g.cssH / g.h)) / g.innerH, 1);
       const venue = {
         frames: frames.length,
@@ -363,6 +436,14 @@ const report = await withBrowser(async (browser) => {
         crowdTop3Share: med(frames.map((f) => f.crowdTop3Share)),
         crowdSameRightShare: med(frames.map((f) => f.crowdSameRightShare)),
         crowdL: med(frames.map((f) => f.crowdL)),
+        standsEdge: med(frames.map((f) => f.standsEdge)),
+        spriteEdge: med(frames.map((f) => f.spriteEdge)),
+        standsChroma: med(frames.map((f) => f.standsChroma)),
+        spriteChroma: med(frames.map((f) => f.spriteChroma)),
+        crowdFamilies3pct: med(frames.map((f) => f.crowdFamilies3pct)),
+        crowdTopFamilyShare: med(frames.map((f) => f.crowdTopFamilyShare)),
+        crowdNeutralShare: med(frames.map((f) => f.crowdNeutralShare)),
+        crowdWhiteShare: med(frames.map((f) => f.crowdWhiteShare)),
         each: frames,
       };
       runs.push({ sport, vp, seed, geometry: { canvas: `${g.w}x${g.h}`, css: `${round(g.cssW, 1)}x${round(g.cssH, 1)}`, k: round(g.k, 3), viewportH: g.innerH }, heights, venue, spritePx: probe.spritePx, shots, pageErrors: errors.slice(0, 5) });

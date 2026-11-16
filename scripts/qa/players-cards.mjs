@@ -15,8 +15,15 @@
 // The card detail adds: links that open a new tab, other games' brand names, the first row of
 // key-attribute tiles against the action bar's top edge, and its label sizes.
 //
-// Last, at 393: the time to open Ultimate Team onto the club and fill its first row and every visible
-// card with portraits, at 1x and 4x CPU (the portrait-fill and UT-first-open targets).
+// The card detail also lists every text in the sheet that is cut off (scrollWidth > clientWidth with
+// hidden/clipped overflow or an ellipsis), e.g. the attribute label "Throw under pressure" (plan 3.4).
+//
+// Last, at 393: on a 140-card club (the fixture plus 100 season cards), the time to open Ultimate
+// Team onto the club and fill its first row and every visible card with portraits; the 120-card fill
+// (the grid's pages mounted by a fast flick, timed until the first 120 cards all have art); then a
+// scroll pass from the top: the club grid scrolled to the bottom at a steady 24 design px a frame,
+// with a frame sampler (p95 and max frame interval). Long tasks are observed through both. All at 1x and 4x CPU (plan 3.4 portrait-fill row; UT first open is reported, gated
+// in players-10 on a production build).
 //
 // At 393 the width sweep is repeated with reduced motion (`reducedMotion`: running animations left).
 //
@@ -401,6 +408,17 @@ const results = await withBrowser(async (browser) => {
                   const bar = d.querySelector('.ut-detail-btns');
                   const barTop = bar ? bar.getBoundingClientRect().top : null;
                   const labels = keys.map((e) => e.querySelector('i')).filter(Boolean);
+                  // every text cut off inside the sheet (labels, names, attribute rows)
+                  const cut = [];
+                  for (const e of sheet.querySelectorAll('*')) {
+                    if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+                    const st = getComputedStyle(e);
+                    const r = e.getBoundingClientRect();
+                    if (r.width < 1 || st.display === 'none' || st.visibility === 'hidden') continue;
+                    if (e.closest('[aria-hidden="true"]')) continue;
+                    const clips = /(hidden|clip)/.test(st.overflowX) || st.textOverflow === 'ellipsis';
+                    if (clips && e.scrollWidth > e.clientWidth + 1) cut.push(e.textContent.trim().slice(0, 40));
+                  }
                   return {
                     cardW: parseFloat(getComputedStyle(d.querySelector('.utc.big')).getPropertyValue('--w')),
                     targetLinks: sheet.querySelectorAll('a[target]').length,
@@ -412,6 +430,8 @@ const results = await withBrowser(async (browser) => {
                     viewportBottom: Math.round(stage.offsetHeight),
                     firstRowVisible: firstRowBottom !== null && firstRowBottom <= Math.min(barTop ?? innerHeight, innerHeight),
                     labelPxMin: labels.length ? Math.min(...labels.map((e) => parseFloat(getComputedStyle(e).fontSize))) : null,
+                    truncatedTexts: cut,
+                    throwUnderPressure: /throw under pressure/i.test(sheet.innerText) ? !cut.some((t) => /throw under pres/i.test(t)) : null,
                   };
                 },
                 { brandSrc: BRANDS.source }
@@ -424,6 +444,8 @@ const results = await withBrowser(async (browser) => {
       // opening Ultimate Team and filling the club's portraits, at 1x and 4x CPU (393 only)
       if (!opts['no-fill'] && vp === vps[0]) {
         res.fill = {};
+        // a club big enough for the 120-card fill and the scroll (the fixture plus 100 season cards)
+        await utFixture(page, sport, { extra: 100 });
         for (const rate of [1, 4]) {
           await page.goto(appUrl({ sport }), { waitUntil: 'domcontentloaded' });
           await page.locator('nav.tabs').waitFor({ timeout: 60000 });
@@ -458,6 +480,71 @@ const results = await withBrowser(async (browser) => {
                 requestAnimationFrame(tick);
               })
           );
+          // the 120-card fill: the grid's pages mounted as fast as a flick can (scrolled to the bottom
+          // each frame until 120 cards exist), timed until the first 120 all have art; then, back at
+          // the top, the scroll pass: the club grid to the bottom at 24 design px a frame (about
+          // 1,440 px/s at 60 fps), every frame interval sampled and long tasks observed throughout
+          if (!t.timeout)
+            t.scroll = await page.evaluate(
+              () =>
+                new Promise((done) => {
+                  const grid = document.querySelector('.ut-grid');
+                  if (!grid) return done({ error: 'no .ut-grid' });
+                  let sc = grid.parentElement;
+                  while (sc && !(sc.scrollHeight > sc.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+                  sc = sc ?? document.scrollingElement;
+                  const stage = document.querySelector('.stage');
+                  const k = stage && stage.offsetWidth ? stage.getBoundingClientRect().width / stage.offsetWidth : 1;
+                  const longs = [];
+                  let po = null;
+                  try {
+                    po = new PerformanceObserver((l) => {
+                      for (const e of l.getEntries()) longs.push(Math.round(e.duration));
+                    });
+                    po.observe({ type: 'longtask', buffered: false });
+                  } catch {}
+                  const atStart = grid.querySelectorAll('.utc').length;
+                  const f0 = performance.now();
+                  let fill120 = null;
+                  const fill = () => {
+                    const now = performance.now();
+                    const cards = [...grid.querySelectorAll('.utc')];
+                    if (cards.length < 120) sc.scrollTop = sc.scrollHeight;
+                    else if (cards.slice(0, 120).every((c) => c.querySelector('img.utc-px'))) {
+                      fill120 = Math.round(now - f0);
+                      return startScroll();
+                    }
+                    if (now - f0 > 20000) return startScroll();
+                    requestAnimationFrame(fill);
+                  };
+                  const fillLongs = () => longs.slice();
+                  let longsBeforeScroll = [];
+                  const startScroll = () => {
+                    longsBeforeScroll = fillLongs();
+                    sc.scrollTop = 0;
+                    const t0 = performance.now();
+                    let last = t0,
+                      frames = [];
+                    const tick = () => {
+                      const now = performance.now();
+                      frames.push(now - last);
+                      last = now;
+                      sc.scrollTop += 24 * k;
+                      const bottom = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2;
+                      if (bottom || now - t0 > 20000) {
+                        po?.disconnect();
+                        const scrollLongs = longs.slice(longsBeforeScroll.length);
+                        frames = frames.slice(2).sort((a, b) => a - b);
+                        const q = (p) => (frames.length ? Math.round(frames[Math.min(frames.length - 1, Math.floor(p * frames.length))] * 10) / 10 : null);
+                        return done({ cardsInGrid: grid.querySelectorAll('.utc').length, gridCardsAtStart: atStart, fill120Ms: fill120, fillLongTasks: longsBeforeScroll.length, frames: frames.length, frameP50Ms: q(0.5), frameP95Ms: q(0.95), frameMaxMs: q(1), longTasks: longs.length, scrollLongTasks: scrollLongs.length, longTaskMaxMs: longs.length ? Math.max(...longs) : 0, reachedBottom: bottom, scrollMs: Math.round(now - t0) });
+                      }
+                      requestAnimationFrame(tick);
+                    };
+                    requestAnimationFrame(tick);
+                  };
+                  requestAnimationFrame(fill);
+                })
+            );
           await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
           await cdp.detach().catch(() => {});
           res.fill[rate + 'x'] = t;

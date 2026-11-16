@@ -4,7 +4,11 @@
 // localhost/127.0.0.1 is aborted. Google Fonts' Archivo is answered from a local copy (PS_QA_FONT_DIR, default
 // `.cache/qa-fonts`, git-ignored) so card text measures in the real face while no request leaves the
 // machine; without that folder the font requests are aborted too and the report says
-// `fonts: "fallback"`. Pages always open with ?ns=inspect&relay=ws://localhost:7777, and the route log
+// `fonts: "fallback"`. Card-text rows in players-verify.mjs (C4, C5, C7) are N/A in fallback mode,
+// because truncation and fit depend on the face. To fill the folder: point PS_QA_FONT_DIR at the
+// overhaul's shared copy (`<overhaul scratch>/qa-fonts`, the four files below), or download the four
+// Archivo woff2 files (OFL) that https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900
+// lists for the latin and latin-ext ranges and save them under the names in `archivoCss()`. Pages always open with ?ns=inspect&relay=ws://localhost:7777, and the route log
 // (`routeLog()`) is printed with every report: `external` must stay 0.
 //
 // Options every script takes: --port 5214 (the players team's dev server), --out <dir> (screenshots
@@ -267,11 +271,13 @@ export async function needServer() {
 /**
  * A seeded Ultimate Team profile: a starter pack, three GOATs, the best 25 of one franchise, two
  * unopened gold packs, coins. Written to localStorage on the inspect namespace, then reloaded.
+ * `extra` adds that many more season cards (the best by value from any franchise), for a big club:
+ * the portrait-fill and scroll pass needs at least 120 cards.
  */
-export async function utFixture(page, sport, { coins = 10000, goats = 3 } = {}) {
+export async function utFixture(page, sport, { coins = 10000, goats = 3, extra = 0 } = {}) {
   await page.goto(appUrl({ sport }), { waitUntil: 'domcontentloaded' });
   await page.evaluate(
-    async ({ sport, coins, goats }) => {
+    async ({ sport, coins, goats, extra }) => {
       const { freshProfile, saveProfile } = await import('/src/lib/profile.ts');
       const { getPool, byValue } = await import('/src/ut/pool.ts');
       const { openPack } = await import('/src/ut/packs.ts');
@@ -292,6 +298,7 @@ export async function utFixture(page, sport, { coins = 10000, goats = 3 } = {}) 
         ...openPack(pool, 'starter', 'players-qa'),
         ...[...pool.base.values()].filter((c) => c.tier === 'goat').slice(0, goats),
         ...[...pool.base.values()].filter((c) => c.line.kind === 'season' && c.line.fr === fr).sort(byValue).slice(0, 25),
+        ...(extra ? [...pool.base.values()].filter((c) => c.line.kind === 'season' && c.line.fr !== fr).sort(byValue).slice(0, extra) : []),
       ].filter((c, i, list) => list.findIndex((x) => x.line.id === c.line.id) === i);
       const owned = cards.map((rc, i) => ({ uid: 'players-qa-' + i, cardId: rc.line.id, level: i === 0 ? 3 : 1, xp: i === 0 ? 42 : 0, at: i + 1 }));
       p.ut = {
@@ -308,7 +315,7 @@ export async function utFixture(page, sport, { coins = 10000, goats = 3 } = {}) 
       localStorage.setItem('perfect-season:fav:asked', '1');
       saveProfile(p);
     },
-    { sport, coins, goats }
+    { sport, coins, goats, extra }
   );
   await page.reload({ waitUntil: 'domcontentloaded' });
 }
@@ -557,12 +564,17 @@ export async function installProbe(page, sport, { golden = false, goldenCap = 40
             bs.lookups++;
             if (st2 === 'stale') bs.stale++;
           }
-          // the blends-under-load target: sprites of 48 px and up in the 20 frames after a start
-          if (q.e.px >= 48 && since >= 0 && since < 20) {
-            const bs = (S.bySince['48px-0-19'] ??= { lookups: 0, stale: 0 });
-            bs.lookups++;
-            if (st2 === 'stale') bs.stale++;
-          }
+          // the blends-under-load target: sprites of 48 px and up in the 20 frames after a start (and
+          // 32 px and up, for a camera that shows no 48 px body that early)
+          for (const [min, k] of [
+            [48, '48px-0-19'],
+            [32, '32px-0-19'],
+          ])
+            if (q.e.px >= min && since >= 0 && since < 20) {
+              const bs = (S.bySince[k] ??= { lookups: 0, stale: 0 });
+              bs.lookups++;
+              if (st2 === 'stale') bs.stale++;
+            }
           let b = S.bodies.get(who);
           if (!b) S.bodies.set(who, (b = { frames: 0, px: [], reqAnim: null, shownAnim: null, reqChanges: 0, shownChanges: 0, stale: 0, staleRun: 0, maxStaleRun: 0, ball: 0 }));
           b.frames++;

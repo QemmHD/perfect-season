@@ -4,7 +4,9 @@ Real-life likeness, "Broadcast Pixel" sprites, animation that looks real, and ca
 
 `O` means the overhaul scratch folder (`/tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul`). Screenshots and JSON reports live in `O/shots/players/<task>/`.
 
-**For the lead and the other teams:** the contracts are in [section 4](#4-cross-team-contracts-v1), the requests to the lead in [section 5](#5-requests-to-the-lead), and the post-merge check is `node scripts/qa/players-verify.mjs` (section 3).
+**For the lead and the other teams:** the contracts are in [section 4](#4-cross-team-contracts-v1), the requests to the lead in [section 5](#5-requests-to-the-lead), and the post-merge check is `bash O/heavy.sh node scripts/qa/players-verify.mjs --run all --port <port>` (section 3).
+
+**V2 revision note.** `GAME-DESIGN-V2.md` was revised at 13:09 on 2026-11-16, after this team's plan (12:40). The players-1 fix (section 1) brought the harness rows, the published contracts and this doc into line with the revised text: on-screen sizes are **floors** with camera guides (no team is asked to shrink), the stands take 30–40% of the screen above the far boundary, shading is five tones plus a rim light, shadows are cast silhouettes, the crowd is head-and-shirt blocks, and the visual target is `mockups-v2.html`. The plan's ledger is `players-plan.md` §0 "Revision 3.1 ledger".
 
 ---
 
@@ -23,13 +25,13 @@ Real-life likeness, "Broadcast Pixel" sprites, animation that looks real, and ca
 | `players-matchperf.mjs` | fps, p99, frames over 20/34 ms, rAF cost, long tasks, heap, sprite area at 5 viewports, 1× and 4× CPU, DPR 3 | audit `matchperf.cjs`/`heap.cjs` |
 | `players-readiness.mjs` | navigation → first drawn frame, clip and appearance arrival, frames drawn before them | audit `coldstart.cjs` |
 | `players-lineup.mjs` | the stars per sport (card portrait, own kit at 40/24 px, a shared kit), identity in one shared kit at 24/34/40/60 px, torso width by build, owner-named looks, the numbers sheet, and the **V2 rows**: heads tall and head box at 20/24/34/60 art px, the outline histogram | audit `lineup.cjs`, `silhouette.cjs`, `numbers.cjs` |
-| `players-screen.mjs` (new) | **V2 rows** on the match screen: the art pixel's design and device scale at DPR 1/2/3, on-screen sprite heights in design px against C.1.2, venue calm (grain, venue vs sprite lightness, crowd colours and blocks, vignette), crowd share of the screen height | new |
+| `players-screen.mjs` (new) | **V2 rows** on the match screen: the art pixel's design and device scale at DPR 1/2/3, on-screen sprite heights in design px against C.1.2's floors and camera guides, the venue (grain, stands vs sprites neighbour contrast and chroma, the crowd's colour families, vignette; venue vs sprite lightness reported), the stands' share of the screen height | new |
 | `players-strips.mjs` | animation strips, pose jump at hard cuts, the golden per-frame sequence under the virtual clock | audit `strips.cjs` |
 | `players-burst.mjs` | 0.25× slow-motion bursts and contact sheets | audit `burst.cjs` |
 | `players-cards.mjs` | every `UtCard` width 34–190 at 393 and 320 (box, type sizes, truncation, head size, animations), 13 UT surfaces, badge contrast for every team, CardDetail (links, brand names, tiles), UT first open and portrait fill at 1×/4×, a reduced-motion sweep | audit `utui` harness |
 | `players-keep.mjs` | the keep-list: what the audits say works must survive | likeness audit Part 4, NBA/NFL "what works" |
 | `players-slide-{nba,nfl,soccer}.ts` | foot sliding per body-frame (vite-node, seeded autopilot) | audit `soccer_slide.ts`, NBA audit method; NFL is new |
-| `players-targets.mjs` (new) | renders `mockups.html`'s three lineups and the HUD as the visual target | new |
+| `players-targets.mjs` (new) | renders the visual target `mockups-v2.html` (gameplay, juice, walkout and card frames, `target-v2-*.png`); with `--superseded` also `mockups.html`'s lineups and HUD (control geometry only) | new |
 | `players-verify.mjs` | every plan section 3 row, PASS/FAIL/N/A, plus the route log | new |
 
 **Fixes made while finishing the harness:**
@@ -42,6 +44,21 @@ Real-life likeness, "Broadcast Pixel" sprites, animation that looks real, and ca
 
 **Protocol bump needed:** none (no source change).
 
+**Fix after the independent review** (players-1 was reviewed over `1d14201..79682ba`; fixed on HEAD `2940ccd`, scripts and docs only):
+
+1. **V2 rows on the revised text (high).** S6 is now a floor check (controlled ≥51 NBA / ≥34 NFL and soccer, far ≥36 / ≥22.5 design px) with the camera guides (≈95 / 70 / 75) printed beside it, so a camera that follows V2 is never failed for being bigger. L7 is inverted to C.5 rule 4 (stands 30–40% of the screen above the far boundary; 27–43% accepted). S1 gates whole device pixels only and prints "pending the lead ruling" for the 1.5 design px half (`S1_RULING` in `players-verify.mjs`; request 7). The doc's §2.1 sentence, §4.4 and request 5 no longer ask anyone to shrink.
+2. **Visual target (medium).** `players-targets.mjs` renders `mockups-v2.html` by default: `target-v2-{nba,nfl,soccer}.png` (+ `-3x` close-ups), `target-v2-{dunk,ankle,hit,goal,walkout}.png`, `target-v2-cards.png` (+ `-2x`). The `mockups.html` captures stay, labelled "superseded: control geometry only" (§2.6).
+3. **S3, S8, L6 on the revised C.1.3 and C.2 (medium).** `players-lineup.mjs` reads `rasterBody`'s material slots: tones per main material and the rim light (the share of pixels with nothing above-left drawn in their material's brightest tone). S3 = edge `#14121c` 100%, 0 inner outline-colour px, ≥3 tones and a rim (≥90% lit), plus `shading.test.ts` (players-4) for five tones and contact shadows. S8 adds `cast-shadow.test.ts` (players-4). L6 = grain ≤4%, stands softer and foggier than the sprites (neighbour contrast and chroma ratios <1), a mixed crowd (≥3 colour families at ≥3%, none above 55%, near-white ≤20%), a vignette, plus `venue.test.ts` for C.2's exact shirt shares; "venue ≥30% darker" is reported only. §4.4's venue tokens are re-published.
+4. **L4 (medium)** reads the appearance record (`appearanceFor`, players-3) and its source rows: Iverson cornrows + headband, Kareem goggles, Haaland blond + a long silhouette, Rodman a V2 dyed tone in a 1994–98 season, Mbappé short/buzz + no facial hair, Shaq bald, Brady curated with `reviewed: true`. Until players-3 lands the row reads "not built yet (players-3)"; nothing is judged from today's hashed looks.
+5. **Fonts (medium).** Verify prints each report's font mode and marks C4, C5 and C7 N/A unless the cards report says `archivo-local`. The four Archivo woff2 files (OFL) are shared at `O/qa-fonts`: run with `PS_QA_FONT_DIR=O/qa-fonts` (the lib header says how to fetch them otherwise).
+6. **A18 (low)** no longer passes on a missing sample: it needs ≥200 lookups of ≥48 px bodies (or ≥32 px; the probe now records `32px-0-19`) in the 20 frames after a snap. Today's NFL camera shows no body ≥32 px that early, so the row reads "no sample".
+7. **C9 (low)** measures what the plan row asks: on a 140-card club (`utFixture({ extra: 100 })`), the first row, a 120-card fill and a club-grid scroll at 24 design px a frame with a frame sampler (p95, max) and a long-task observer, at 1× and 4×. UT first open is reported beside it, not gated (dev-server runs spread 2×); players-10 gates it on `vite preview`.
+8. **C5 (low)** adds every cut-off text in the CardDetail sheet (scrollWidth > clientWidth with hidden overflow or an ellipsis), so "Throw under pressure" counts.
+9. **Tests by path (low).** Verify names each proving test by its repo path (`TEST` table); a basename that also exists elsewhere under `src/` is printed as a warning, never used.
+10. **Doc (low).** Request 6 runs verify through `heavy.sh`; §10 now says 10 of 15 runs missed at 1×.
+11. **Found while re-running:** `players-screen.mjs`'s venue sampler imported a fresh copy of the renderer after source edits (the dev server serves edited modules as `?t=…`), so on players-2's tree it recorded 0 venue frames and every venue value was null. It now imports the copies the page loaded, like the probe.
+
+**Fix verification** (HEAD `2940ccd`, dev server 5214, `O/shots/players/players-1/fix/`, tag `fix`): every changed script passes `node --check`; `players-lib.test.ts` 7 pass (via heavy.sh). Re-run via heavy.sh: `players-lineup` (S3 at HEAD: edge `#14121c` 100% and 0 inner outline px in all three sports; tones per main material min 2–3, rim lit 54–64% min, so S3 waits for players-4; L4 "not built yet (players-3)" for all 7 looks: `appearance.ts` does not exist yet), `players-screen --secs 12` (S6: NBA 73.4 ≥ 51, NFL 29.8 < 34, soccer 33.7 < 34 by a hair; L7 stands 13.5–24.6% of the screen against 30–40%; the L6 venue values in §2.2), `players-sprites` (NFL: 0 lookups of a ≥32 px body in the 20 frames after a snap, so A18 reads "no sample"; NBA 714 at ≥48 px), `players-cards` with `PS_QA_FONT_DIR=O/qa-fonts` (`fonts: archivo-local`; all 13 surfaces at 393 and 320 in all three sports; "Throw under pressure" cut off in the NFL CardDetail at **393 and 320**; the fill and scroll numbers in §2.4), `players-targets --superseded …/mockups.html` (13 mockups-v2 captures at 393×852 design px and 3×, cards at 1× and 2×, plus the 7 superseded ones; 0 external requests). Verify on these reports (`--tag fix`, vitest on): **2 PASS · 38 FAIL · 7 N/A** (S1 N/A pending the ruling; S5 and A17 pass; the other N/A rows have no report in this folder because the fix did not re-run matchperf, readiness, strips, keep or the slide classifiers, whose rows did not change). A copy of the cards report marked `fonts: fallback` turns C4, C5 and C7 N/A. 0 non-localhost requests in every report (the live Supabase host blocked 297 times by the router, never reached). Looked at: `target-v2-{nba,nfl,soccer}.png`, `target-v2-cards.png` and the fix screen frames.
 
 ### players-2 · Broadcast Pixel sprite core (done)
 
@@ -106,18 +123,18 @@ Unless noted: 393×852 with insets 59/34, `deviceScaleFactor` 1, the autoplay be
 
 | Row | NBA | NFL | Soccer | V2 target |
 |---|---|---|---|---|
-| Art pixel at 393 (design px per art px; device px per art px at DPR 1/2/3) | 0.992; 1/2/3 | 0.992; 1/2/3 | 0.992; 1/2/3 | 1.5; an integer (4 or 5 on a 3× phone) |
+| Art pixel at 393 (design px per art px; device px per art px at DPR 1/2/3) | 0.992; 1/2/3 | 0.992; 1/2/3 | 0.992; 1/2/3 | an integer; 1.5 design px pending the lead ruling (V2 C.6 vs C.5 rule 3) |
 | Art pixel at 320 | 1.219; 1/2/3 | 1.219; 1/2/3 | 1.219; 1/2/3 | 1.5 |
 | Heads tall / head box (w×h, art px) at a 20, 24, 34, 60 art px sprite | 4.5 / 4×4 · 4.4 / 5×5 · 4.57 / 8×7 · 4.46 / 14×13 | same body code | same body code | 4.5 / 5×5 · 5 / 6×6 · 5.5 / 7×8 · 6 / 12×13 |
 | Outer silhouette edge pixels in `#14121c` | 0% (8 edge colours per sprite, p50: a dark version of each part) | 0% (7) | 0% (7) | 100% |
 | Inner outline-colour pixels at 34 art px (p50 per star; max share of the inside) | 36 (17.6%) | 26 (11.1%) | 34 (16.4%) | 0 (inner separations in the shadow tone) |
 | Body width at 34 art px (chest band, arms in; audit method) | Curry 15, Giannis 16, Jokić 16, Shaq 18, Bol 17, Bogues 13, Yao 18; BMI 20 vs 31: 16 vs 16 | per star in `players-lineup-before.json` | per star | Shaq − Bol ≥3 (now 1); BMI 31 ≥25% wider (now 0%) |
 | Same, at 40 px (the audit's size) | Curry 17, Giannis 19, Jokić 19, Shaq 20, Bol 20, BMI 20/31 17/19 | | | |
-| On-screen height, controlled (ball body) / nearest / median / far, design px at 393 | 75.4 / 89.3 / 63.5 / 47.6 | 27.8 / 33.7 / 27.8 / 17.9 | 39.7 / 47.6 / 27.8 / 23.8 | NBA 51 / far 36; NFL and soccer 34 / far 22.5 |
+| On-screen height, controlled (ball body) / nearest / median / far, design px at 393 | 75.4 / 89.3 / 63.5 / 47.6 | 27.8 / 33.7 / 27.8 / 17.9 | 39.7 / 47.6 / 27.8 / 23.8 | floors: NBA ≥51 / far ≥36; NFL and soccer ≥34 / far ≥22.5. Guides: NBA ≈95, NFL ≈70, soccer ≈75 |
 | Same at 320 (design px) | 75.6 / 90.2 / 63.4 / 48.8 | 29.3 / 34.1 / 26.8 / 19.5 | 39.0 / 46.3 / 29.3 / 24.4 | |
 | Sprite px p10 / p50 / p90 (art = CSS px at 393, `players-sprites`) | 44 / 64 / 88 | 22 / 28 / 42 | 20 / 32 / 50 | |
 
-On-screen heights and the crowd share are **reported, not owned**: the sport teams' cameras set them. NBA's controlled player is 48% over V2's 51 design px; NFL's is 18% under 34; soccer's 17% over.
+On-screen heights and the stands share are **reported, not owned**: the sport teams' cameras set them. Against V2's revised C.1.2 (the table is a floor, the camera guides larger), NBA's controlled player (75.4) is above its 51 floor and below the ≈95 guide; NFL's (27.8) is under its 34 floor; soccer's (39.7) is above its 34 floor and below the ≈75 guide. Bigger is what V2 now asks for.
 
 ### 2.2 Likeness and venues — `players-lineup.mjs`, `players-screen.mjs`
 
@@ -125,13 +142,15 @@ On-screen heights and the crowd share are **reported, not owned**: the sport tea
 |---|---|---|---|---|
 | Distinct skin tones / hair colours among the 12 stars | 1 / 1 | 1 / 1 | 1 / 1 | the curated looks |
 | Identity in one shared kit: pairs ≥8% different at 24 px; min pair at 34; min pair at 60 | 94% · 6.9% · 2.4% | 95% · 4.4% · 5.6% | 86% · 1.7% · 2.4% | ≥80% (NBA) / ≥75%; ≥12%; ≥8% |
-| Owner-named looks | Shaq not bald, Iverson no cornrows, Kareem no goggles, Rodman not dyed | Brady judged by eye (players-3/4) | Haaland not blond, Mbappé hashed hair | all right |
+| Owner-named looks (drawn today, from hashed looks) | Shaq not bald, Iverson no cornrows, Kareem no goggles, Rodman not dyed | Brady: no curated row | Haaland not blond, Mbappé hashed hair | all right, judged on the appearance record (L4, players-3) |
 | Missing stars in the card file | none | William Perry (no card) | none | |
 | Surface grain (Michelson, median 12×12 tile) | 14.2% | 3.0% | 2.6% | ≤4% |
-| Venue mean L* vs sprites' (negative = venue **lighter**) | −24.6% | −29.7% | −47.7% | venue ≥30% darker |
-| Crowd: top-3 colours' share; pixels equal to the right neighbour | 0.22; 0.83 | 0.12; 0.70 | 0.19; 0.83 | three bands (≥0.90); 2 px blocks (≥0.5) |
-| Corner vignette (corner tiles vs centre, L*) | −26% | −43% | −42% | −18% |
-| Crowd share of the screen height at 393 / 320 (everything above the surface) | 13.0% / 15.8% (36.9%) | 16.9% / 25.0% (34.3%) | 17.6% / 26.2% (34.0%) | ≤12% (sport teams) |
+| Venue mean L* vs sprites' (negative = venue **lighter**) | −24.6% | −29.7% | −47.7% | reported (V2 13:09 dropped "≥30% darker"; the players must be crisper and rim-lit) |
+| Crowd: top-3 colours' share; pixels equal to the right neighbour | 0.22; 0.83 | 0.12; 0.70 | 0.19; 0.83 | reported (the old three-band target is superseded) |
+| Stands vs sprites at HEAD `2940ccd` (fix run): neighbour \|dL*\| ratio; chroma ratio | 0.30; 1.03 | 0.31; 0.95 | 0.22; 0.76 | both <1 (softer and foggier than the play) |
+| Crowd colour mix at HEAD (fix run): hue families ≥3%; largest family; near-white | 3; 0.33; 0.12 | 3; 0.23; 0.02 | 4; 0.24; 0.02 | ≥3; ≤0.55; ≤0.20 (exact C.2 shirt shares in `venue.test.ts`) |
+| Corner vignette (corner tiles vs centre, L*) | −26% | −43% | −42% | darker corners (≤−15%) |
+| Stands share of the screen height at 393 / 320 (everything above the surface) | 13.0% / 15.8% (36.9%) | 16.9% / 25.0% (34.3%) | 17.6% / 26.2% (34.0%) | about 30–40% (C.5 rule 4; sport teams) |
 
 Read the venue rows together with the screenshots (`before-screen-<sport>-<vp>-<n>.png`): NBA's floor grain is the loud one; the NFL and soccer grass is already calm, but all three venues are lighter than the players on them, and every crowd is a many-coloured 1–2 px texture rather than three dark bands.
 
@@ -187,6 +206,9 @@ No appearance data exists yet, so every frame draws default looks (the second ha
 | `UtCard` outer box | exactly w × 1.4w at every width 34–190 | unchanged |
 | UT first open (tap → club ready) at 1× / 4×, median of 3 runs | NBA 2,534 / 8,942 · NFL 5,097 / 12,337 · soccer 1,590 / 3,096 ms (runs spread up to 2×: NBA 1× 2,220–4,361) | ≤ +5% (players-10 re-measures on a production build) |
 | First club row with art at 1× / 4× (last run) | NBA 76 / 129 · NFL 92 / 160 · soccer 150 / 421 ms | ≤300 / ≤900 |
+| 120-card fill at 1× / 4× (140-card club, fast flick; HEAD `2940ccd`, fix run) | NBA 382 / 2,524 · NFL 595 / 3,811 · soccer 565 / 3,319 ms | ≤1,200 / ≤3,500 |
+| Club-grid scroll frame p95 at 1× / 4× (24 design px a frame) | NBA 18.4 / 31.5 · NFL 21.8 / 74.1 · soccer 29.0 / 51.5 ms | ≤17.5 / ≤34 |
+| Long tasks over the fill and scroll at 1× / 4× (count, longest) | NBA 0 / 5 (149 ms) · NFL 2 (58 ms) / 30 (207 ms) · soccer 5 (138 ms) / 15 (227 ms) | 0 over 50 ms |
 | Surfaces reached | 13 of 13 (hub, squad, club, detail, store, Scout Market, reveal, tracker, SBC, standouts, sets, evolutions, draft) at 393 and 320 | 13 |
 | Reduced motion (393 sweep) | 0 running animations on 220 NBA, 176 NFL, 154 soccer cards | 0 |
 
@@ -196,7 +218,9 @@ No appearance data exists yet, so every frame draws default looks (the second ha
 
 ### 2.6 The visual target
 
-`target-mockups-{lineup-nba,lineup-nfl,lineup-soccer,hud}.png` (and the lineups at 4×), rendered from `O/design-v2/mockups.html` by `players-targets.mjs`. The before set beside it: `before-lineup-<sport>.png`, `before-numbers.png`, `before-ingame-<sport>-393-*.png`, `before-screen-<sport>-<vp>-*.png`, `before-anim-strips.png`, `before-burst-<sport>-sheet.png`, `before-cards-*.png`.
+**`mockups-v2.html` is the target** (BRIEF, V2 C). `players-targets.mjs` renders it into `O/shots/players/players-1/`: `target-v2-{nba,nfl,soccer}.png` (the gameplay hero frames, 393×852) and `-3x` (sprite close-ups: volume shading, rim light, cast shadows), `target-v2-{dunk,ankle,hit,goal}.png` (replay-camera juice, hero sprites at 4.5–5×), `target-v2-walkout.png`, `target-v2-cards.png` (+ `-2x`, the tier ladder and the bust). Every later "after" sheet is set beside these.
+
+*Superseded, control geometry only:* `target-mockups-{lineup-nba,lineup-nfl,lineup-soccer,hud}.png` (and the lineups at 4×), rendered from `O/design-v2/mockups.html`, the page the owner called "too simple and boring" and "too flat". Its flat, unshaded lineups are not a likeness or shading target. The before set beside it: `before-lineup-<sport>.png`, `before-numbers.png`, `before-ingame-<sport>-393-*.png`, `before-screen-<sport>-<vp>-*.png`, `before-anim-strips.png`, `before-burst-<sport>-sheet.png`, `before-cards-*.png`.
 
 ### Against the audit (±10% or explained)
 
@@ -222,13 +246,13 @@ No appearance data exists yet, so every frame draws default looks (the second ha
 
 ## 3. `players-verify.mjs`: the section 3 gate
 
-`node scripts/qa/players-verify.mjs --run none --tag before --out O/shots/players/players-1` evaluates the reports above; `--run all` (or a list) re-runs the scripts first. Every row prints PASS, FAIL or N/A with its numbers, and the route log closes the table. A row whose proving unit test doesn't exist yet FAILs as "not built yet (<task>)".
+`node scripts/qa/players-verify.mjs --run none --tag before --out O/shots/players/players-1` evaluates the reports above; `bash O/heavy.sh node scripts/qa/players-verify.mjs --run all --port <port>` (or a list) re-runs the scripts first, through the semaphore. Every row prints PASS, FAIL or N/A with its numbers, and the route log closes the table. A row whose proving unit test doesn't exist yet FAILs as "not built yet (<task>)".
 
 **Base-commit run** (`--run none --tag before`, the reports in section 2): **2 PASS · 44 FAIL · 1 N/A**, 0 external requests (route log: 45943 localhost requests across 11 reports; the live Supabase host was blocked 277 times by the router, never reached).
 
 **End-to-end run** (`node scripts/qa/players-verify.mjs --run all --quick --tag verify`, every script re-run from scratch into `O/shots/players/players-1/verify-e2e/`, 13 min 23 s): sprites ok (54 s), screen ok (85 s), matchperf ok (93 s), readiness ok (50 s), lineup ok (11 s), strips ok (71 s), cards ok (353 s), keep ok (53 s), players-slide-nba ok (10 s), players-slide-soccer ok (8 s), players-slide-nfl ok (13 s). Result **3 PASS · 43 FAIL · 1 N/A**, 0 external requests. The rows agree with the base-commit run; A6 passes in the quick run because it skips the 430 viewport (the only one over 6 Mpx).
 
-Expected today: the two PASS rows are the ones the audits say work (K1 keep-list, C9 portrait fill). A5 (1× fps) should pass on a quiet machine and fails here only from the shared CPUs (section 10). Every other row fails until its owner task lands, either on the measurement or as "not built yet" for its proving test.
+Expected today (as first run): the two PASS rows were the ones the audits say work (K1 keep-list, C9 portrait fill). After the review fix, C9 also measures the 120-card fill and the scroll, and the rows S1, S3, S6, S8, L4, L6, L7, A18, C5 and C9 changed as listed in section 1 ("Fix after the independent review"); the table below keeps the first run's targets and results, with the revised targets in the plan's §3 and in `players-verify.mjs`. A5 (1× fps) should pass on a quiet machine and fails here only from the shared CPUs (section 10). Every other row fails until its owner task lands, either on the measurement or as "not built yet" for its proving test.
 
 | ID | Row | Target | Owner | Status on the base commit | Measured |
 |---|---|---|---|---|---|
@@ -339,9 +363,11 @@ Hit tests and HUD placement use these, never `b.p.ht`, because the drawn height 
 
 ### 4.4 Ground marks and the art pixel (players-2)
 
-- `drawGroundMark(ctx, { x, y, shoulderPx, mark?: 'you'|'target'|'pressure'|'rival', color? })` in `src/game/pixel/ground.ts`: the soft shadow (`rgba(0,0,0,0.32)`, 70% of shoulder width) and, when asked, the 2 px ring in gold `#f6b93b`, teal `#4fe3c1`, red arc `#ff5d5d` or violet `#8b7cf6`. Nothing else on the field uses those four colours. `color` is the hook for ut's cosmetic ring colour (the Minutes 500/1,000-hour reward).
-- `artScale(canvas) → { backing, devPerArt, artPxFor(cssHeight) }` in `src/game/pixel/art-scale.ts`. **To the sport teams:** your cameras set the on-screen heights; V2 C.1.2's targets are in design px (NBA controlled 51, NFL and soccer controlled 34, far 36 / 22.5); `players-screen.mjs` measures them and `players-verify.mjs` row S6 reports them. Today 1 art px = 1 canvas px = about 1 design px (section 2). If players-2 picks backing A or B, the resize code sets `canvas.width = W × backing` and draws through one `setTransform(backing)`; everything else keeps CSS px. That hunk is announced here before it lands.
-- **Venue palette tokens** (players-4, V2 C.2): the surface grain at ≤4% contrast, the venue at least 30% darker than the players, the crowd in three value bands `#221d36`, `#342d52`, `#4a426e` with ≤6% team and ≤2% white flecks in 2 px blocks, corners −18%, objects higher on screen 6% darker and less saturated. Colour-only hunks through `src/game/pixel/venue.ts`, one line each, ledgered below. `crowd.excite('score'|'onfire'|'clutch')` is a no-op-safe call from players-4; reactions land in players-9.
+**Re-published in the players-1 fix (V2 revised 13:09; v1.1).**
+
+- `drawGroundMark(ctx, { x, y, shoulderPx, mark?: 'you'|'target'|'pressure'|'rival', color? })` in `src/game/pixel/ground.ts`: today the soft shadow (`rgba(0,0,0,0.32)`, 70% of shoulder width). From players-4 the same call draws V2 C.1.3's cast shadow (the sprite's silhouette sheared away from the lights at 34–42% alpha, anchored at the ground) plus a small occlusion ellipse; the signature does not change. When asked, it draws the 2 px ring in gold `#f6b93b`, teal `#4fe3c1`, red arc `#ff5d5d` or violet `#8b7cf6`. Nothing else on the field uses those four colours. `color` is the hook for ut's cosmetic ring colour (the Minutes 500/1,000-hour reward).
+- `artScale(canvas) → { backing, devPerArt, artPxFor(cssHeight) }` in `src/game/pixel/art-scale.ts`. **To the sport teams:** your cameras set the on-screen heights. V2 C.1.2 (revised) makes its table a **floor**: controlled ≥51 design px (NBA) / ≥34 (NFL, soccer), far ≥36 / ≥22.5; the camera guides at 393 are NBA handler ≈95, NFL QB ≈70, soccer carrier ≈75 (far ≈60 / 45 / 55). Bigger than the floor is right; nobody needs to shrink. `players-screen.mjs` measures them and `players-verify.mjs` row S6 reports them. Today 1 art px = 1 canvas px = about 1 design px (section 2); whether V2 still wants a fixed 1.5 design px art pixel is request 7. If players-2 picks backing A or B, the resize code sets `canvas.width = W × backing` and draws through one `setTransform(backing)`; everything else keeps CSS px. That hunk is announced here before it lands.
+- **Venue palette tokens** (players-4, V2 C.2 as revised 13:09; the three-band crowd of v1 is withdrawn): the surface grain at ≤4% contrast with baked light pools; the stands softer and foggier than the play, each tier dimmer than the one below; the crowd as head + shirt blocks of 2 px (top tier), 3 px (middle) and 5–6 px (courtside), shirts 40% home, 22% second colour, 12% white, 12% third colour, the rest dark neutrals, six skin tones, a quarter with arms up; 25–60 shimmering pixels a frame and 8–26 flashes (off under reduced motion); a corner vignette. **Stands height** is the sport teams' (C.5 rule 4: about 30–40% of the screen above the far boundary in gameplay; row L7). Colour-only hunks through `src/game/pixel/venue.ts`, one line each, ledgered below. `crowd.excite('score'|'onfire'|'clutch')` is a no-op-safe call from players-4; reactions land in players-9.
 
 ### 4.5 PlayerPortrait and WalkoutFigure (players-7, players-8)
 
@@ -393,8 +419,9 @@ The Collection screen is ut's. Players gives it `PlayerPortrait` with `variant="
    - missing NFL (26%) and soccer (7.7%) jersey numbers in the data files (L-5 backfill, the lead's data);
    - the NFL squad OL row overlapping at 320 (ut).
    - **New from players-1:** the CardDetail still shows a "2K" (NBA) / "Madden" (NFL) reference link with `target=_blank` (H6/M11; players-8 removes it); team badges under 4.5:1 ink contrast: NBA 5/55, NFL 11/47, soccer 69/250 teams (players-8).
-5. **On-screen heights and the crowd share are the sport teams'.** Rows S6 and L7 report them (section 3); the numbers today are in section 2. Please re-run `players-screen.mjs` after a camera change.
-6. **Post-merge:** run `node scripts/qa/players-verify.mjs --run all` on the merged tree (players-10 step 8).
+5. **On-screen heights and the stands share are the sport teams'.** Rows S6 (V2 C.1.2 floors: controlled ≥51 / ≥34 design px, with the ≈95 / 70 / 75 camera guides beside them) and L7 (C.5 rule 4: stands about 30–40% of the screen above the far boundary) report them (section 3); the numbers today are in section 2. Nothing asks a camera to shrink. Please re-run `players-screen.mjs` after a camera change.
+6. **Post-merge:** run `bash O/heavy.sh node scripts/qa/players-verify.mjs --run all --port <port>` on the merged tree (players-10 step 8), with `PS_QA_FONT_DIR=O/qa-fonts` so the card-text rows are measured in Archivo.
+7. **Art-pixel ruling (new, V2 13:09).** V2 now contradicts itself: C.6 says perspective scaling "replaces the flat '1.5 px per art pixel' rule in C.1.2: size is whatever the camera says", while C.5 rule 3 and lead decision 3 still say one art pixel = 1.5 design px. players-2 adopted today's grain (option C, about 1 design px per art px, whole device pixels) on measured 4× fps. Please rule `camera` (no fixed art-pixel size; S6's floors apply) or `flat-1.5`; row S1 gates only whole device pixels until then (`S1_RULING` in `players-verify.mjs`).
 
 ---
 
@@ -420,7 +447,7 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 ## 8. Deviations from STREAM, recorded
 
 - **A-5 "interpolating 15 fps clips".** Research R2 says never interpolate between cached frames (pixel joints shimmer). We sample clips natively at 30 fps for the near, large and ball bodies instead, and blend only *between clips*. V2 B.1.6's rates (handler and defender 30 fps, others 15) agree.
-- **STREAM's skin-palette crowd recolour** is replaced by V2 C.2's three dark value bands with team flecks; the front-row sprites (players-9) use the 10 skin tones, so the crowd is still not one tone.
+- **STREAM's skin-palette crowd recolour** is replaced by V2 C.2's head-and-shirt crowd (revised 13:09: shirt colours by team share and six skin tones), so the crowd is still not one tone.
 
 ## 9. Owner device checks
 
@@ -436,9 +463,9 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 
 ## 10. Left undone, and why
 
-- **players-2:** the slide classifiers still carry their own copy of the renderer's branches (they reproduce players-1 exactly); switching them to import `select-*.ts` lands with players-5, which rewrites locomotion and its classifier together. The verify row S2 still uses players-1's heads-tall definition (figure ÷ box with hair), which V2's table can't meet; `proportions.test.ts` is the gate (section 1, players-2). V2 C.1.3's five-tone shading, cast-shadow silhouettes and general rim light are newer than this task's spec (three tones); they are recorded for players-4.
+- **players-2:** the slide classifiers still carry their own copy of the renderer's branches (they reproduce players-1 exactly); switching them to import `select-*.ts` lands with players-5, which rewrites locomotion and its classifier together. The verify row S2 still uses players-1's heads-tall definition (figure ÷ box with hair), which V2's table can't meet; `proportions.test.ts` is the gate (section 1, players-2). V2 C.1.3's five-tone shading, cast-shadow silhouettes and general rim light are newer than this task's spec (three tones); they are recorded for players-4, with their gates in rows S3 (`shading.test.ts`) and S8 (`cast-shadow.test.ts`).
 
 - **The NFL golden sequence is not deterministic in the browser.** Two repeats under Playwright's virtual clock diverge at frame 29: one draws a defender in the hand-keyed `stance` pose (`st2`, the pre-snap branch of `poseOf`), the other the `ready` clip, so the play's phase differs between runs (something in the NFL bench still follows real time, or a clip arrives late). NBA and soccer are deterministic after this task's fixes. **For players-2's extraction check, the node-side `select-golden.test.ts` (seeded engine, no browser) and the three slide classifiers are the byte-identical gate**; the browser sequence stays a diff aid. Whether this is a readiness race is a players-3 question (row A7).
-- **The 4× CPU numbers are not comparable with the audit's** (dev server on a machine shared by seven teams vs the audit's production build on a quiet machine). players-10 repeats `players-matchperf.mjs` on `vite preview`; the relative rows (A5) compare like with like in the meantime. Row A5 also fails at 1× today for the same reason (55.4–59.0 fps in 9 of 15 runs while other teams ran builds and Playwright), not because of the game.
+- **The 4× CPU numbers are not comparable with the audit's** (dev server on a machine shared by seven teams vs the audit's production build on a quiet machine). players-10 repeats `players-matchperf.mjs` on `vite preview`; the relative rows (A5) compare like with like in the meantime. Row A5 also fails at 1× today for the same reason (55.4–59.0 fps in 10 of 15 runs while other teams ran builds and Playwright), not because of the game.
 - **Crowd detection is approximate.** `players-screen.mjs` finds the stands as the band of textured rows above the surface; the screenshots it saves beside the numbers are the check by eye. The numbers agree with the screenshots looked at (NFL 393: stands ≈ y 120–270 of 852, measured 16.9%).
 - **Nothing else from players-1 is left.** Every later row in section 3 belongs to the task named in its row.
