@@ -15,6 +15,7 @@ import { LABEL } from './labels';
 // takeover and tiebreak rules. The result pays coins and card XP and climbs the ladder (play.ts).
 // Online, the squads cross over the match channel (src/net/match.ts) in a queue of their own.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { bankActivity, usePlaytime } from '../lib/playtime';
 import { levelInfo } from '../engine/economy';
 import { hashString } from '../engine/rng';
 import { easternDateKey } from '../engine/season';
@@ -313,6 +314,8 @@ export default function UtMatch(props: {
   const foundAt = useRef(0);
   // a new search each time the queue starts over (a match that never connected)
   const [searchNo, setSearchNo] = useState(0);
+  // Claude 2026-11-16 (V2 E.1): MINUTES. The match's seconds are provisional until finish() banks them
+  usePlaytime(stage === 'play' ? 'match' : stage === 'result' ? 'replay' : stage === 'search' ? 'queue' : 'menu', { id: 'ut:' + req.id, sport: SPORT, kind: 'match' });
 
   const me = useMemo(() => {
     if (!pool) return null;
@@ -688,6 +691,7 @@ export default function UtMatch(props: {
   ) => {
     if (done.current || !setup || !pool) return;
     done.current = true;
+    bankActivity('ut:' + req.id, 'complete');
     const s = setup;
     // two squads exactly as good: a coin both phones read the same way off the match
     const coin = () => {

@@ -10,20 +10,26 @@ Worktree `/home/user/ps-s-ut`, branch `claude/studio-ut` (cut from live main `ac
 |---|---|---|
 | ut-0 foundation: QA harness, compat, kit with V2 tokens, labels, haptics | done | `6aad8dd` compat, `4c78ad1` harness and fixtures, `e71b88e` haptics, `b1ee784` kit and labels, `92e85c9` kit case in design px, then the dead-tap rule and this doc |
 | ut-1 progress core and the light next-best-action engine | done | see the ut-1 section |
-| ut-2 … ut-9 | not started | |
+| ut-2 MINUTES engine: ticker, profile ledger and cloud merge, ladders and league maths | done | see the ut-2 section |
+| ut-3 … ut-9 | not started | |
 
 ## Protocol
 
-**Protocol bump needed: none from team ut** (plan §9). ut-0 changes no match physics, rules, ratings, pairing or settlement: labels are display text, the kit and haptics are presentation, the harness and fixtures are QA-only.
+**Protocol bump needed: none from team ut** (plan §9). ut-0 changes no match physics, rules, ratings, pairing or settlement: labels are display text, the kit and haptics are presentation, the harness and fixtures are QA-only. ut-2 (MINUTES) reads input and time and writes its own ledger only: no match outcome, rating or queue changes.
 
 ## Touched outside my lane
 
 - `src/ut/Match.tsx` (shared): the screen title and the VS / result eyebrows read their mode names from `labels.ts` (same words). String constants only; no logic, no `UT_RULES` line.
 - ut-1: nothing outside the lane. (`src/ut/packs-claimables.ts` is a new ut file whose body packs fills at merge; see "Merge stand-ins".)
+- ut-2, `src/App.tsx` (shared; the MINUTES host lines are outside ut's App grant, plan W1): one import; `registerPlaytimeSink(update)` and the root `usePlaytime(...)` next to `update`; the `PLAY_CTX` screen map and `playId` (2 lines); one `bankActivity` in the draft `finish`; Reset progress keeps `playtime` (the onReset `setProfile` line). No other App logic changes.
+- ut-2, `src/ut/Match.tsx` (shared, ut's result path): one import, one `usePlaytime` line, one `bankActivity` line at the top of `finish()`. No `UT_RULES` change, nothing that decides a result.
+- ut-2, `src/lib/cloud-save.ts` (V2 grant `src/lib/cloud*`): the other-tab storage listener ignores the ticker's device-only `perfect-season:playtime-*` keys (one condition), so they never queue a cloud save.
 
 ## Merge stand-ins (for the lead)
 
 - `src/ut/packs-claimables.ts` (ut-1): returns zero. Packs owns the body: their new claims (calendar check-in and path claims, stamp redemption ready, Program Bag keys), with the same rows added to `inbox.ts` `inboxItems`, and no imports from pool/packs/cards/sbc/rate/squad (`claimables-graph.test.ts`).
+- **MINUTES stamps and the 25-hour Player Pick** (ut-2, `src/ut/minutes.ts`): packs' stamp field and Player Pick API are not on this branch, so a claim records an owed receipt in `playtime.owed` (`stamp:day:<ET day>:30:0`, `pick:life:life:1500`; merged as a union, never lost, never paid twice). At merge, packs (or the lead) converts each receipt once by its id. Until then the 30-minute rung pays its 75 coins and the 25-hour rung pays nothing yet.
+- **Cross-sport hook state** (ut-2): `profile.career` is not granted yet, so ut-7/ut-8 use the fallback `playtime.hook` (typed as an open record; merged by the same rule: numbers max, lists union, strings newest).
 - `claimables.ts` copies of packs-owned checks (Daily Drop `dailyStatus`, `previousDay`, `STREAK_DAYS`; login calendar `calendarStatus`; New Era; Standouts objective): if packs changes the originals, `claimables-reimpl.test.ts` names the copy to update (integration checklist item 5).
 
 ---
@@ -166,6 +172,75 @@ None. Nothing here touches match physics, ratings, pairing or settlement; the ob
 
 ---
 
+## ut-2 · MINUTES engine: the ticker, the ledger and the ladders
+
+### What changed
+
+**The ticker** `src/lib/playtime.ts` (contract W1, V2 E.1/E.2/E.8). One 1 s interval on `performance.now()` deltas (a gap after sleep counts at most 2 s) and one capture-phase input listener (`pointerdown`, `keydown`, and `pointermove` at most 4 times a second so a held joystick drag counts). A second counts only when the page is visible and focused, this tab holds the single-tab Web Lock (released on hide or blur; storage-lock fallback), the screen's context allows it, and the sport has not paused it:
+
+| Context | Counts when | Cap | Class |
+|---|---|---|---|
+| `match` | an input in the last 45 s **and** variety: in the last 60 s at least min(6, age/10) inputs, not all within 8 px of the first | none | provisional (banks with the match) |
+| `sim` | always (real time) | none | provisional |
+| `draft` | an input in the last 30 s | none | provisional |
+| `draftSim` | always | 180 s a run | provisional |
+| `replay` (result and reward screens) | always | 120 s a match | play, banked |
+| `queue` | always | 120 s a queue | menu |
+| `menu` | an input in the last 20 s | menus ≤ 25% of the day | menu |
+| `off` | never | | |
+
+Provisional seconds stay in memory and, when the page hides, in the device-only key `perfect-season:playtime-pending:v1` (no profile write). `bankActivity(id, 'complete')` banks them in one profile write, together with any menu/raw buffer, and counts a completed activity (a whole-match SIM counts as completed with its few seconds); `'forfeit'` banks only after 120 s of the match and is not a completed activity; a new activity drops an unbanked one; a second bank of the same id is a no-op, and a finished match's screen counts nothing more until the screen changes. Menu seconds bank once a minute and never while a match or run is live; raw time alone (app open, no input) writes at most every 10 minutes. A relaunch the same day resumes the parked seconds (so ut-6 can settle a killed match as a forfeit); an earlier day's are dropped.
+
+**The ledger** (pure, in `playtime.ts`): `credit(ledger, { sec, menu, raw, sport, act }, now, endowed)` rolls to the Eastern day and ISO week, applies the caps (5,400 s a day, 37,800 a week, also against a tampered `weekDays`), the menu rule (menu ≤ ⅓ of play, i.e. ≤ 25% of the day), keeps raw time apart, marks a **rested** day (first day back after 3+ days away) and, when the date goes back (or a day key repeats), freezes the day: `frozenDay` is set and only raw lifetime time grows. A new player's ledger is born with `endowed: <day>` (3 of the first 5 minutes on that day's ladder only; counted seconds and boards are untouched). `playtimeView` and `playtimeLine` ("Today 27 min · next reward at 30", "… · done for today", "Minutes paused: the date changed") are ready for ut-3 and the sports' pause sheets.
+
+**Profile** `src/lib/profile.ts`: `playtime?: Playtime` in `SHARED` (it lives in the basketball key for every sport); `settings.hideBoards?` and `settings.breakReminder?` (absent = boards shown, reminder on; no default is written, so old saves stay byte-equal). `src/App.tsx` Reset progress keeps the ledger (time played is a record, and a reset must not pay the day's rungs again).
+
+**Cloud** `src/lib/cloud-data.ts`: `mergePlaytime(a, b)` (max of every count, per day and weekday when they match; the later day's and week's values otherwise; union of claimed rungs per day/week key and of lifetime rungs; union of owed receipts; newer league with the best tier kept; hook state numbers max / lists union) and `withDeviceLedger`, which `applyProgress` runs on the basketball key: a restore keeps this phone's minutes and claims and changes nothing else (a snapshot without a ledger, onto a phone without one, is applied byte for byte). `cloud-save.ts` ignores the ticker's device keys in its other-tab listener.
+
+**Ladders and league** `src/ut/minutes.ts` (contract W5): `ladders(table)`, `LADDERS`, `MINUTES_TABLE = 'full'`; `minutesView` (three tracks, next rung, ready rungs, rested, frozen, capped), `nextRung` (nearest on any track, the day wins ties), `claimMinutes` (pure, idempotent: coins to the wallet, packs into the club of the sport you claim in with ids `minutes:<track>:<period>:<at>:<sport>:<t>`, stamps and the Player Pick as owed receipts), `minutesExtras` (the NextExtras feed for `next-action.ts`: claimable count and line, the cap, a rung ≤ 5 minutes away as a milestone), `freshForMinutes`, `rewardText`, `coinValue`. League: `leagueResult` (a tier's entries with minutes, shuffled by an FNV+avalanche hash of week and key, divisions of about 30, top/bottom 20% move, never down from Rookie or up from Hall of Fame, < 10 entries → thresholds 300/60 with everyone shown, rival = the entry above with the gap, minutes to the promotion line), `leagueReward`, `leagueSeason` (6-week seasons from 2026-W47), `seasonEndTier`.
+
+**Host wiring:** App (sink, root context, the draft run as the activity, its bank in `finish`), `ut/Match.tsx` (context by stage, bank at the top of `finish()`, so the bank write and the match's rewards are one React update).
+
+### Numbers
+
+- **Before:** no time tracking at all (no ledger, no ticker).
+- **Browser, full autoplay Squad Battles match** (`node scripts/qa/ut-minutes.mjs --sport all`, dev server 5212, 393×852 touch, isolated: `?ns=inspect&relay=ws://localhost:7777`, every non-local host aborted — only the live Supabase host was attempted and blocked —, 0 sockets refused, game at 4x speed, CPU throttled 4x, a stand-in thumb tapping a different spot every 1.5 s):
+
+| Sport | Active s | Counted s | Diff | Profile writes during play | At bank | Ticker ms/call (thread time, 4x CPU, median / p90) | Page errors |
+|---|---|---|---|---|---|---|---|
+| NBA | 35.2 | 35 | −0.46% | 0 | 1 | 0.059 / 0.875 | 0 |
+| NFL | 76.2 | 76 | −0.20% | 0 | 1 | 0.067 / 0.787 | 0 |
+| soccer | 60.6 | 60 | −0.98% | 0 | 1 | 0.068 / 0.483 | 0 |
+
+  The p90/max include slices of the CPU throttler itself; the largest single call was 2.5 ms, so the ticker causes no long task (> 50 ms). With `BroadcastChannel` as the lock the median was 0.18 ms at 4x and 0.13 ms at 1x; the Web Lock (and caching `navigator.locks`, and building the cap key only where a cap applies) took it to ≈ 0.06 ms.
+- **Size:** `playtime.ts` **3,055 B** gzip (esbuild minified, React and `engine/sport` external) ≤ 3,072. The merge rule adds 784 B gzip to `cloud-data.ts`. `minutes.ts` 2,899 B gzip; nothing imports it at runtime yet (ut-3's Minutes screen will, lazily).
+- **E.5 economy reproduced** (`minutes.test.ts`, a simulated week claimed every evening, coin-equivalents per day from the day and week ladders): casual (17 min) **96**, regular (30) **200**, engaged (60) **514**, maximum (90) **750**, three hours a day still **750**; daily ladder 250 coins + Silver + a stamp = **450**, weekly **2,100**; raw coins from time for the engaged player **221**/day (< ≈ 384 from matches). `lean` is cheaper on every row.
+- **Mixed clients** (`npx vite-node scripts/compat/old-client.ts`, 3 sports): an old save is written **byte for byte** as the live build writes it; new → old (acdf3e2) → new loses nothing; with a ledger and both settings in the shared key, both come back byte-equal from the old client in the profile keys **and** through the encrypted cloud snapshot (new capture → old apply/capture → new apply).
+
+### Tests
+
+- `src/lib/playtime.test.ts` (36, a fake page on fake timers, one named test per rule): E.1.1 visible+focused, sleep gap; E.1.2 two tabs count one (Web Lock and storage fallback); E.1.3 match 45 s / Auto-defend alone / draft 30 s / menus 20 s / SIM 4 s = 4 s / draft sim 3 min / replay and queue 2 min / paused / a finished match's screen; E.1.5 taped thumb, ±8 px auto-tapper, < 6 inputs a minute, joystick drag counts; E.1.4 0 writes in a 5-minute match and exactly 1 at bank, forfeit 119 s → 0 and 121 s → banks, unfinished match never banks, menu banks once a minute and never during a match, hide parks on the device and a relaunch resumes, an earlier day's parked seconds are dropped, raw-only writes every 10 min; E.1 menus ≤ 25%; E.2 5,400/day, 37,800/week (and a tampered week), midnight-ET and Monday rollover, `etDay`/`isoWeek` = `easternDateKey`/boards `weekKey` for 800 days, rested; E.8 date set back freezes, repeated day key freezes, a relaunch cannot reset the cap; endowed only for a new player; view and line; an hour of ticks with a full input buffer.
+- `src/ut/minutes.test.ts` (23): the tables (full, lean, power stops at 25 h, pack values = half the NBA price), the E.5 per-day values, every rung of the three ladders pays once, rungs of another day are not paid, packs land in the claiming sport's club, a frozen day pays no daily rung, two phones that both claimed before syncing never pay twice and keep every minute, rested (doubled 5/15/30 coins once, +60 weekly minutes for that week only, 2 days away is not rested), endowed, `nextRung`, `minutesExtras`, the league with 31, 60, 30, 9, 1 and 0 entries, ties, rewards and seasons.
+- `src/lib/profile-playtime.test.ts` (8): the acdf3e2 save loads with `playtime` undefined and no new settings key and saves back with none; the ledger and settings load and save in the basketball key from every sport; `mergePlaytime` same day / different days / new week / hook; a server save applied over this phone keeps its minutes and claims; byte-for-byte apply without a ledger.
+- `src/lib/soccer-playtime.test.ts` runs all three suites under soccer's run.
+- **Results:** typecheck clean. NBA `vitest run src/lib src/ut src/engine/sport-branches.test.ts`: 49 files, 566 passed. NFL the same: 563 passed, 1 failed once (`next-action.test.ts` ut-1 speed test, ≤ 2 ms, while the machine was loaded; 27/27 green on its own re-run; not touched here). Soccer `vitest run soccer sport-branches`: 12 files, 268 passed. Existing tests unedited.
+
+### Protocol
+
+None. MINUTES reads input and time and writes the ledger; nothing in a match's physics, ratings, pairing or settlement changes (plan §9 item 5).
+
+### Known limits (documented, not bugs of this task)
+
+- Two sports open at once in two tabs both hold the shared profile in memory; the last one to save writes the shared part (wallet, and now the ledger). This is the app's existing multi-tab behaviour for the wallet; only one tab ticks, but a claim made in one tab can be overwritten by a stale tab's save. Single-app use (the iPhone home-screen app) is unaffected.
+- Resolving a cloud conflict with "this phone" keeps the phone's whole save, so the other phone's minutes since the last sync are not merged in (the merge runs on the apply path, as specified). Choosing "server" merges.
+- A file backup restore (`recovery.ts restoreBackup`, outside the grant) replaces the ledger like any other field.
+
+### Owner device checks (ut-2)
+
+- A real 20-minute session of matches and menus counts about 20 minutes (Profile panel arrives in ut-3); switching to another app or locking the phone stops the count at once; a phone call mid-match does not bank the match; killing the app mid-match and relaunching the same day keeps the match's seconds pending (ut-6 settles them).
+
+---
+
 ## V2 shared pieces: interface contracts (plan §3)
 
 Other teams can code against these now. Each contract is copied into `ut.md`. Where another team's piece is not on ut's branch yet, ut keeps a ≤ 8-line local stand-in marked `// merge: replace with <team>'s <name>`, listed in `ut.md` for the lead.
@@ -183,10 +258,11 @@ export function registerPlaytimeSink(update: (fn: (p: Profile) => Profile) => vo
 export function playtimeLine(p: Profile, now?: number): string;        // "Today 27 min · next reward at 30"
 export function playtimeView(p: Profile, now?: number): PlaytimeView;  // today/week/life, counted and raw, done
 ```
-- Rules (each with a unit test): visible + focused only; one ticking tab (`BroadcastChannel` with a `localStorage` lock fallback); per-context input windows (match 45 s, draft 30 s, menus 20 s); `sim` counts real elapsed time only; draft season sim max 3 min per run; queue max 2 min; replay/reward sequences max 2 min per match; menus ≤ 25% of the day's counted total; input variety (≥ 6 events in the last 60 s of a match, not all within 8 px of one point); match and draft seconds are provisional and bank on `bankActivity('complete')` or on a forfeit after ≥ 120 s; menu seconds bank every 60 s; caps 5,400 s a day and 37,800 a week; ET day key and `weekKey()`; date going backwards or a repeated day key freezes accrual for that day.
+- **As built (ut-2):** the single-tab lock is a **Web Lock** (`navigator.locks`, same browsers as `BroadcastChannel`: Safari 15.4+, Chrome 69+) with the `localStorage` lock as the fallback. `BroadcastChannel` was built first and measured: its per-second `postMessage` was the ticker's biggest cost inside a match (≈ 0.1 ms of the 4x budget); a held lock costs nothing per second. `mergePlaytime` lives in `src/lib/cloud-data.ts` (the apply path; it keeps `playtime.ts` under 3 KB gzip). Also exported: `enterPlaytime(ctx, activity) → leave()` (the hook's body, for non-React hosts and tests), `credit`, `rollTo`, `freshPlaytime`, `etDay`, `isoWeek`, `weekday`, `DAY_RUNGS`, `DAY_CAP`, `WEEK_CAP`, `ENDOWED_SEC`.
+- Rules (each with a unit test): visible + focused only; one ticking tab (`BroadcastChannel` with a `localStorage` lock fallback; as built, a Web Lock, see above); per-context input windows (match 45 s, draft 30 s, menus 20 s); `sim` counts real elapsed time only; draft season sim max 3 min per run; queue max 2 min; replay/reward sequences max 2 min per match; menus ≤ 25% of the day's counted total; input variety (≥ 6 events in the last 60 s of a match, not all within 8 px of one point); match and draft seconds are provisional and bank on `bankActivity('complete')` or on a forfeit after ≥ 120 s; menu seconds bank every 60 s; caps 5,400 s a day and 37,800 a week; ET day key and `weekKey()`; date going backwards or a repeated day key freezes accrual for that day.
 - **Performance rule:** during a match the ticker makes **0 profile writes** (provisional seconds sit in memory and in the device-local pending key, written on `visibilitychange: hidden`); one write when the activity banks; menu writes at most every 60 s. Never on the per-frame path.
 - **Input source:** one capture-phase `pointerdown`/`keydown` listener on `document`. Sports do not have to wire anything; `setPlaytimePaused` is the only optional hook (without it, a paused match stops counting after the 45 s window).
-- **Hosts (one line each):** `App.tsx` root (`'menu'`, plus `registerPlaytimeSink`), `ut/Match.tsx` (`'match'`/`'sim'`), the draft play-out host in `App.tsx` (`'match'`), draft screens (`'draft'`). The `App.tsx` lines are outside ut's App grant and are listed under "Touched outside my lane".
+- **Hosts (one line each):** `App.tsx` root (`'menu'`, plus `registerPlaytimeSink`), `ut/Match.tsx` (`'match'`/`'sim'`), the draft play-out host in `App.tsx` (`'match'`), draft screens (`'draft'`). The `App.tsx` lines are outside ut's App grant and are listed under "Touched outside my lane". **As built:** App's one `usePlaytime` maps its screens (`search` queue, `draft` draft, `arcade` match, `reveal`/`playoffs` draftSim, `results` replay, everything else menu) with the draft run as the activity (`draft:<saveId | online matchId>`); `ut/Match.tsx` maps `play` match, `result` replay, `search` queue, the rest menu, with `ut:<req.id>` as the activity.
 
 **W2. `src/lib/haptics.ts`: three patterns (V2 B.0.5; owned by ut per DESIGN-V2-DECISIONS).**
 ```ts
@@ -269,9 +345,9 @@ grade?: { letter: 'S' | 'A' | 'B' | 'C'; perfects: number; chances: number; heat
 6. Run `scripts/ut_daily_sim.ts` on the merged engines; change only `objective-targets.ts` values.
 7. Re-run `live-match.test.ts` (3 sports) on the merged engines (defense possessions, OT, `simRest`).
 8. Re-run `verdict.test.ts` and `end-codes.test.ts` with real OT, pens and `FF`.
-9. Grant or refuse `profile.career` (§2); if refused, ut's fallback `playtime.hook` is already in place.
+9. Grant or refuse `profile.career` (§2); if refused, ut's fallback `playtime.hook` is already in place (typed and merged since ut-2).
 10. Re-run `scripts/ut_coinflow.ts` with packs' prices and odds; choose `MINUTES_TABLE`.
-11. Playtime host lines in `App.tsx` and optional `setPlaytimePaused` in each sport's pause menu; `playtimeLine()` in the pause sheets.
+11. Playtime host lines in `App.tsx` (in place since ut-2) and optional `setPlaytimePaused` in each sport's pause menu; `playtimeLine()` in the pause sheets. Convert `playtime.owed` receipts (`stamp:…`, `pick:…`) into packs' stamp field and Player Pick once, by id.
 12. `haptics.ts` adopted by nba/nfl/soccer (no direct `vibrate` from timers anywhere).
 13. Mixed clients: run the round trip with every team's merged normalizers and profile fields.
 14. Shell: real Fix A CSS instead of the injected one; the dead `.ut-season-chip` rule; `curtain: 'compact'`; the Next up strip resolved before the splash lifts.
@@ -291,7 +367,7 @@ grade?: { letter: 'S' | 'A' | 'B' | 'C'; perfects: number; chances: number; heat
 
 - **Feel:** the Next up strip and Minutes chip under the Dynamic Island fix; the 5-second end of match and the One-More reach with the right thumb; Scout Drop rhythm.
 - **Haptics:** tick on claims, long on packs; nothing fires late on an unrelated tap.
-- **MINUTES:** a real 20-minute session counts about 20 minutes; backgrounding the app stops the count; a phone call mid-match does not bank a partial match; two phones on one account never double-pay.
+- **MINUTES (engine from ut-2):** a real 20-minute session counts about 20 minutes; backgrounding the app stops the count; a phone call mid-match does not bank a partial match; two phones on one account never double-pay.
 - **App-icon badge:** `setAppBadge` on a home-screen app; it may need notification permission on iOS, which the app never asks for, so it may show nothing (acceptable).
 - **WebKit-only:** Live Now scroll-snap and edge fade; sticky chips; sheet swipe-to-close against grids.
 - **Flows:** force-quit during a Cup round and iOS eviction in the background; the first-run sheet on a fresh install; 375×667 on a real device.
