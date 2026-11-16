@@ -444,7 +444,7 @@ export function openPack(pool: Pool, kind: string, seed?: string, week = current
   const defs = packDefs(pool.sport);
   if (kind.startsWith('position:')) {
     const ch = positionChoices(pool.sport).find((c) => c.key === kind.slice(9));
-    if (!ch) return [];
+    if (!ch) throw new Error(UNKNOWN_PACK);
     const need = positionMix(pool.sport);
     return fill(
       pool,
@@ -455,8 +455,15 @@ export function openPack(pool: Pool, kind: string, seed?: string, week = current
     );
   }
   const def = defs[kind as Exclude<PackKind, 'starter'>];
-  return def ? fill(pool, def.slots, rand, undefined, week) : [];
+  // Claude (packs-1, decision D9): a kind this build doesn't know (a reward pack from a newer build,
+  // synced in a cloud save) never opens empty: it throws, so the pending pack stays until an update
+  // can open it. Before, it opened as no cards and the pending entry was spent.
+  if (!def) throw new Error(UNKNOWN_PACK);
+  return fill(pool, def.slots, rand, undefined, week);
 }
+
+/** Claude (packs-1): why a pack this build can't open stays where it is (openPack throws it). */
+export const UNKNOWN_PACK = 'Update the game to open this pack. It stays in your Store until then.';
 
 /**
  * The free starter: a card for every spot of a squad (a third of them silver, the quarterback or
@@ -491,29 +498,42 @@ function starterCards(pool: Pool, rand: Rand): RatedCard[] {
 
 // ---------- quick-sell ----------
 
+/** Claude (packs-1): every tier, lowest first, in the canonical order (pool.ts TIER_RANK). */
+export const TIER_ORDER: Tier[] = (Object.keys(TIER_RANK) as Tier[]).sort((a, b) => TIER_RANK[a] - TIER_RANK[b]);
+
 /**
- * Coins for selling a card: bronze 15-30, silver 40-80, gold 100-400, promo 500+, legend 2,500+
- * (football half that, its packs holding twice the cards). Levels count.
+ * Coins for selling a card, before the sport's `qs` factor (football 0.35, soccer 0.7): bronze 15-30,
+ * silver 40-80, gold 100-400, Standout 400-660, Hot Season 500+, Program 700+, Landmark 1,200+, Legend
+ * 2,500+, Spotlight 4,000-5,050, GOAT 6,000+. Levels count. A higher tier (TIER_RANK) is worth more at
+ * its lowest, middle and highest overall (packs-economy suite).
  */
 export function quickSellValue(rc: RatedCard): number {
-  const o = rc.ovr;
-  const sport = rc.line.sport;
+  return quickSell(rc.tier, rc.ovr, rc.line.sport);
+}
+
+/** Claude (packs-1): the quick-sell value of a card of this tier and displayed overall. */
+export function quickSell(tier: Tier, o: number, sport: UtSport): number {
   const { silver, gold } = TIER_CUTS[sport];
   const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-  let v: number;
-  if (rc.tier === 'goat') v = 5000 + 500 * Math.max(0, o - 106);
-  else if (rc.tier === 'spotlight') v = 1400 + 100 * Math.max(0, o - 100);
   // Claude rework: values follow the displayed UT scale's own ranges (ut-scale.ts)
   const scale = UT_SCALE[sport];
   const top = scale.curve[scale.curve.length - 1][1];
-  if (rc.tier === 'legend') v = 2500 + 150 * Math.max(0, o - (scale.legend[0][1] + 1));
-  else if (rc.tier === 'promo') v = 500 + 40 * Math.max(0, o - (scale.promo[0][1] - 4));
-  // Claude content editions, on the same displayed scale: Landmark ~85–93, programs, Standouts ~80–92
-  else if (rc.tier === 'landmark') v = 1200 + 60 * Math.max(0, o - (scale.legend[0][1] - 3));
-  else if (rc.tier === 'program') v = 700 + 60 * Math.max(0, o - (scale.legend[0][1] - 4));
-  else if (rc.tier === 'standout') v = 400 + 40 * Math.max(0, o - (scale.promo[0][1] - 14));
-  else if (rc.tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (top - gold)), 1.5);
-  else if (rc.tier === 'silver') v = 40 + 40 * clamp01((o - silver) / (gold - silver - 1));
+  let v: number;
+  // Claude (packs-1, audit C1): one chain. A second `if` used to overwrite the GOAT and Spotlight values
+  // with the bronze line, so a 104 Spotlight sold for 30 coins and SBC auto-fill spent it first.
+  if (tier === 'goat') v = 6000 + 500 * Math.max(0, o - 106);
+  else if (tier === 'spotlight') v = 4000 + 150 * Math.max(0, o - 100);
+  else if (tier === 'legend') v = 2500 + 150 * Math.max(0, o - (scale.legend[0][1] + 1));
+  // Claude content editions, on the same displayed scale: Landmark ~85–93, programs
+  else if (tier === 'landmark') v = 1200 + 60 * Math.max(0, o - (scale.legend[0][1] - 3));
+  else if (tier === 'program') v = 700 + 60 * Math.max(0, o - (scale.legend[0][1] - 4));
+  else if (tier === 'promo') v = 500 + 40 * Math.max(0, o - (scale.promo[0][1] - 4));
+  // Claude (packs-1): Standouts (80–93) on one absolute line, under every Hot Season. The old line
+  // (400 + 40 per point from the Hot Season knot - 14) sold a 93 Standout above a 97 Hot Season, and in
+  // soccer (knot 80) every Standout above every Hot Season.
+  else if (tier === 'standout') v = 400 + 20 * Math.max(0, o - 80);
+  else if (tier === 'gold') v = 100 + 300 * Math.pow(clamp01((o - gold) / (top - gold)), 1.5);
+  else if (tier === 'silver') v = 40 + 40 * clamp01((o - silver) / (gold - silver - 1));
   else v = 15 + 15 * clamp01((o - (silver - 15)) / 14);
   v *= PACK_SHAPE[sport].qs;
   return Math.max(5, Math.round(v / 5) * 5);

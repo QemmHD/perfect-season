@@ -3,12 +3,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { pickFor, SPORT } from '../engine/sport';
 import { sfx } from '../lib/sound';
-import { Confirm, Sheet } from '../ui/common';
+import { Sheet } from '../ui/common';
 import { UtCard } from './CardArt';
 import { IconCheck, IconWand, IconX } from './icons';
 import { packName, quickSellValue } from './packs';
 import { type Pool, seasonText } from './pool';
-import { autoFill, cardFits, checkSbc, type Req, rewardText, type Sbc, teamNeed } from './sbc';
+import { autoFill, cardFits, checkSbc, type Req, rewardText, rewardValue, type Sbc, teamNeed, tradeWarning } from './sbc';
+import './sbc-page.css';
 import { playsIn } from './squad';
 import { Lede } from './ui';
 import type { ClubCard } from './UltimateTeam';
@@ -163,10 +164,16 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
   const left = s.size - cards.length;
   const fill = () => {
     // never the cards that play: the starters and the first three off the bench (a football squad's all of them)
-    const got = autoFill(s, club.filter((c) => !playsIn(SPORT, c.slot)));
+    // Claude (packs-1): each copy's mint goes along, so a numbered card is never auto-filled
+    const spare = club.filter((c) => !playsIn(SPORT, c.slot)).map((c) => ({ ...c, mint: c.oc.mint }));
+    const got = autoFill(s, spare);
     if (!got) {
       sfx.nope();
-      onToast('Not enough cards outside your ' + pickFor(SPORT, { nba: 'starters and first three off the bench', nfl: 'squad', soccer: 'squad' }) + ' meet all of this yet.');
+      onToast(
+        autoFill(s, spare, { guard: false })
+          ? 'Auto-fill never trades special, numbered or high-value cards. Put those in by hand.'
+          : 'Not enough cards outside your ' + pickFor(SPORT, { nba: 'starters and first three off the bench', nfl: 'squad', soccer: 'squad' }) + ' meet all of this yet.'
+      );
       return;
     }
     sfx.select();
@@ -252,12 +259,10 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
         />
       )}
       {confirm && (
-        <Confirm
-          title="Trade them in?"
-          body={'These ' + s.size + ' cards leave your club for ' + rewardText(s.reward, SPORT, packName) + '.' + (fromSquad ? ' ' + fromSquad + (fromSquad === 1 ? ' of them plays' : ' of them play') + ' in your squad.' : '')}
-          yes="TRADE IN"
-          no="NOT YET"
-          tone="gold"
+        <TradeConfirm
+          s={s}
+          cards={cards}
+          fromSquad={fromSquad}
           onYes={() => {
             setConfirm(false);
             onSubmit(cards.map((c) => c.uid));
@@ -266,6 +271,59 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
         />
       )}
     </>
+  );
+}
+
+/**
+ * Claude (packs-1, audit C1, research §8.8): the trade-in confirm. It always says the cards go for good;
+ * a red row names each special, numbered, 90+ or worth-more-than-the-reward card, and then the button
+ * reads TRADE IN ANYWAY.
+ */
+function TradeConfirm({ s, cards, fromSquad, onYes, onNo }: { s: Sbc; cards: ClubCard[]; fromSquad: number; onYes: () => void; onNo: () => void }) {
+  const worth = rewardValue(s.reward, SPORT);
+  const flagged = cards.flatMap((c) => {
+    const why = tradeWarning(c.rc, c.oc.mint, worth);
+    return why ? [{ c, why }] : [];
+  });
+  return (
+    <Sheet label="Trade them in?" kind="center" onClose={onNo}>
+      {(close) => (
+        <>
+          <h2 className="disp">Trade them in?</h2>
+          <p>
+            These {s.size} cards are removed permanently. They leave your club for {rewardText(s.reward, SPORT, packName)}.
+            {fromSquad ? ' ' + fromSquad + (fromSquad === 1 ? ' of them plays' : ' of them play') + ' in your squad.' : ''}
+          </p>
+          {flagged.length > 0 && (
+            <ul className="sbc-warn" aria-label="Cards you may want to keep">
+              {flagged.map(({ c, why }) => (
+                <li key={c.uid} className="sbc-warn-row">
+                  <svg className="sbc-warn-ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                    <path d="M8 1.6 15 14.2H1z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                    <path d="M8 6v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <circle cx="8" cy="12" r="0.9" fill="currentColor" />
+                  </svg>
+                  <span className="sbc-warn-txt">
+                    <b>
+                      {c.rc.line.name} <span className="num">{c.rc.ovr}</span>
+                    </b>
+                    <small>{why}</small>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="btnrow">
+            <button className="btn" onClick={() => close()}>
+              NOT YET
+            </button>
+            <button className={'btn ' + (flagged.length ? 'danger' : 'gold')} onClick={() => close(onYes)}>
+              {flagged.length ? 'TRADE IN ANYWAY' : 'TRADE IN'}
+            </button>
+          </div>
+        </>
+      )}
+    </Sheet>
   );
 }
 
