@@ -154,6 +154,12 @@ export interface Meter {
    * for free. The AI never uses it.
    */
   gather?: boolean;
+  /** (nba-2 fix) the game time the provisional gather started at: he rises GATHER_S after this, the
+   * handler's own clock, so a late-delivered lift can't find him already up when the touch was a tap */
+  gatherAt?: number;
+  /** (nba-2 fix) what a provisional gather's rise changed, so a tap whose lift arrives a frame or
+   * three after the rise can still be taken back into a pump fake (`unrise`) */
+  rose?: { at: number; vx: number; vz: number; act: Act; actAt: number; def: number | null; dh: number; dvh: number; dAct: Act; dActAt: number };
 }
 
 export interface BallFlight {

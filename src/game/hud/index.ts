@@ -10,7 +10,7 @@ export { PauseSheet, SheetToggle } from './PauseSheet';
 export { firstTime, loadPrefs, PREFS_KEY, savePrefs, type TouchPrefs } from './prefs';
 export { chime, feelCount, haptic, ringTick, type HapticPattern } from './feel';
 export { PausableTimers } from './timers';
-export { Stick } from '../Stick';
+export { Stick } from '../StickPad';
 export * from '../stick';
 export { ScoreBug, type BugProps, type HeatView } from './ScoreBug';
 export { HeatBar, HEATING_UP } from './HeatBar';

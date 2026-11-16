@@ -176,6 +176,8 @@ interface Outcome {
   pack: string | null;
   /** past today's paid games: no coins or XP */
   capped: boolean;
+  /** (nba-2 fix) this phone quit: a loss that paid nothing */
+  forfeit?: boolean;
   /** the top rung: the next ladder is up */
   refreshed: boolean;
   /** Claude: a draft game: the run's wins after it, and whether the run is over */
@@ -836,6 +838,7 @@ export default function UtMatch(props: {
       climbed: shown.climbed,
       pack: shown.pack,
       capped: shown.capped,
+      forfeit: input.forfeit,
       refreshed: shown.refreshed,
     });
     setStage('result');
@@ -1522,7 +1525,12 @@ function ResultView({
           </small>
         </div>
       )}
-      {out.draft ? null : out.capped ? (
+      {out.draft ? null : out.forfeit ? (
+        <p className="utm-note">
+          You quit this game: it counts as a loss and pays no coins, XP or
+          season points.
+        </p>
+      ) : out.capped ? (
         <p className="utm-note">
           Today’s {PAID_GAMES_A_DAY} paid games are played: games pay coins and
           XP again tomorrow.

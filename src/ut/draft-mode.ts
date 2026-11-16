@@ -175,7 +175,7 @@ export function draftRung(pool: Pool, run: DraftRun, game: number): Rung | null 
 /** A draft match's result on the run: once per match id, only for the active run's current game. */
 export function settleDraft(
   ut: UtState,
-  r: { runId: string; game: number; won: boolean; us: number; them: number; matchId: string; at: number; day: string; how: 'played' | 'sim'; opponent: string; /** a solo QUIT: the loss ends the run, with no Season XP or objective game */ quit?: boolean }
+  r: { runId: string; game: number; won: boolean; us: number; them: number; matchId: string; at: number; day: string; how: 'played' | 'sim'; opponent: string; /** a solo QUIT: the loss ends the run, with no Season XP or objective game */ quit?: boolean; /** (nba-2 fix) nba's name for the same */ forfeit?: boolean }
 ): { ut: UtState; ok: boolean; sp: number } {
   const run = draftOf(ut);
   if (!run || run.id !== r.runId || run.done || run.games !== r.game || r.game >= DRAFT_GAMES || ut.settled?.includes(r.matchId) || !draftComplete(sameSportOf(run), run)) return { ut, ok: false, sp: 0 };
@@ -190,7 +190,8 @@ export function settleDraft(
     },
     { ...run, results, games: results.length, wins, done }
   );
-  const p = r.quit ? { ut: next, sp: 0 } : recordMatchProgress(next, { id: r.matchId, at: r.at, mode: 'draft', won: r.won, us: r.us, them: r.them, opponent: r.opponent, coins: 0, xp: 0, day: r.day, how: r.how, played: [] });
+  // a quit (soccer-2 `quit`, nba-2 `forfeit`) records the loss on the run but earns no season points
+  const p = r.quit || r.forfeit ? { ut: next, sp: 0 } : recordMatchProgress(next, { id: r.matchId, at: r.at, mode: 'draft', won: r.won, us: r.us, them: r.them, opponent: r.opponent, coins: 0, xp: 0, day: r.day, how: r.how, played: [] });
   next = p.ut;
   return { ut: next, ok: true, sp: p.sp };
 }

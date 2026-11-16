@@ -5,10 +5,10 @@
 import { describe, expect, it } from 'vitest';
 import { rng } from '../../engine/rng';
 import { autoplay } from './autopilot';
-import { callPlay, cancelGather, contestOf, crossover, driving, euroStep, GATHER_S, isoStar, newPossession, pass, PUMP_EVERY, pressShoot, pumpFake, releaseShoot, RIM, step } from './engine';
+import { callPlay, cancelGather, contestOf, crossover, driving, euroStep, GATHER_S, isoStar, newPossession, pass, PUMP_EVERY, pressShoot, pumpFake, releaseShoot, RIM, step, UNRISE_S, unrise } from './engine';
 import { newHoopsGame, POSSESSIONS } from './game';
 import { synthSquad } from './harness';
-import { offOf, slotsFor } from './HoopsControls';
+import { liftShoot, offOf, slotsFor } from './HoopsControls';
 import type { Hooper, Possession } from './types';
 
 const DT = 1 / 60;
@@ -73,7 +73,8 @@ describe('the provisional gather (SHOOT down)', () => {
     expect(p.meter?.t0).toBeCloseTo(at, 9);
     for (let i = 0; i < 4; i++) step(p, DT, null);
     expect(h.h).toBe(0);
-    while (p.t - p.meter!.t0 < GATHER_S + DT) step(p, DT, null);
+    // he rises GATHER_S after the touch was heard (the handler's clock), not after the backdated t0
+    while (p.t - p.meter!.gatherAt! < GATHER_S + DT) step(p, DT, null);
     expect(p.meter?.gather).toBeUndefined();
     expect(h.h).toBeGreaterThan(0);
   });
@@ -102,6 +103,71 @@ describe('the provisional gather (SHOOT down)', () => {
     releaseShoot(p);
     expect(p.lastShot?.off).toBeLessThan(-0.5);
     expect(p.ball?.kind === 'shot' || p.ball?.kind === 'loose').toBe(true);
+  });
+});
+
+describe('a tap is a pump fake even when its lift is heard late (review fix)', () => {
+  // The real timeline: the finger goes down at T; the page hears it L ms later (the down handler
+  // starts the gather, its meter backdated to T); the finger lifts at T + tap; the page hears the
+  // lift a frame or three later than it heard the down. Before the fix the jumper rose at T + 125 ms
+  // on the meter's backdated clock, and a 90-115 ms tap heard 35 ms late found him in the air: a shot.
+  const run = (seed: number, tapMs: number, lagMs: number, lateFrames: number) => {
+    const p = poss(seed);
+    const { h, d } = squareUp(p);
+    const heardDown = p.t;
+    pressShoot(p, { at: heardDown - lagMs / 1000, provisional: true });
+    const heardUp = heardDown + tapMs / 1000 + lateFrames * DT; // same lag on the lift, plus the late frames
+    while (p.t < heardUp - 1e-9) step(p, DT, null);
+    const out = liftShoot(p, true);
+    return { p, h, d, out };
+  };
+  it('90-115 ms taps heard 1-3 frames late, with 35 ms of handler lag: always a pump fake, never a shot', () => {
+    let n = 0;
+    for (const tapMs of [90, 95, 100, 105, 110, 113, 115])
+      for (const late of [0, 1, 2, 3])
+        for (const lagMs of [0, 35, 60]) {
+          const { p, h, d, out } = run(40 + n++, tapMs, lagMs, late);
+          expect(out).toBe('pump');
+          expect(p.ball).toBeNull();
+          expect(p.lastShot).toBeNull();
+          expect(p.meter).toBeNull();
+          expect(h.h).toBe(0);
+          expect(h.act).toBe('pump');
+          // the man who closed out with the rise came back down with it (he may still bite the fake)
+          if (!p.events.some((e) => e.startsWith('pump:bit:'))) expect(d.h).toBe(0);
+        }
+  });
+  it('the rise waits GATHER_S on the handler clock, not on the backdated meter', () => {
+    const p = poss(7);
+    const { h } = squareUp(p);
+    pressShoot(p, { at: p.t - 0.06, provisional: true });
+    // 7 frames = 117 ms of handler time: still on the floor, though the meter is already 177 ms old
+    for (let i = 0; i < Math.floor(GATHER_S / DT); i++) step(p, DT, null);
+    expect(h.h).toBe(0);
+    expect(p.meter?.gather).toBe(true);
+    step(p, DT, null);
+    expect(p.meter?.gather).toBeUndefined();
+    expect(h.h).toBeGreaterThan(0);
+  });
+  it('a hold still shoots; a lift heard after UNRISE_S, or once the shot is away, is never taken back', () => {
+    const hold = (() => {
+      const p = poss(8);
+      squareUp(p);
+      pressShoot(p, { at: p.t, provisional: true });
+      for (let i = 0; i < 18; i++) step(p, DT, null);
+      return liftShoot(p, false);
+    })();
+    expect(hold).toBe('release');
+    const p = poss(9);
+    squareUp(p);
+    pressShoot(p, { at: p.t, provisional: true });
+    while (p.meter?.gather) step(p, DT, null);
+    const rose = p.t;
+    while (p.t - rose <= UNRISE_S + DT) step(p, DT, null);
+    expect(unrise(p)).toBe(false);
+    expect(liftShoot(p, true)).toBe('release');
+    releaseShoot(p);
+    expect(unrise(p, 9)).toBe(false);
   });
 });
 

@@ -394,15 +394,15 @@ export const Arcade = forwardRef(function Arcade({
   };
 
   // offline Quit from the pause sheet (nba-2, NBA-09; football through quitPair): the game ends now as
-  // a loss; the possessions you didn't play score nothing. A quitter is never shown ahead: if what was
-  // played already beats the AI's total, the forfeit's 3-0 award applies (progress.ts awarded).
+  // a loss; the possessions you didn't play score nothing. The score says what the result does (nba-2
+  // fix): a quit never reads as a loss with more points than them (a Cup or Club Season settlement
+  // rejects that pair and would record nothing).
   // Wave 1: every sport's quit goes to the host's onQuit (a quit pays nothing in UT: ut/play.ts settle
-  // `quit`), falling back to a finished loss for hosts that pass none.
+  // `quit`), falling back to a finished loss for hosts that pass none. Soccer has its own quitNow below.
   const quitPair = (p: Progress | null, rival: Progress): [Progress, Progress] => {
     const played = p ?? { score: 0, drive: 0, done: false, ends: [] };
     const ends = [...played.ends.slice(0, TOTAL), ...Array(Math.max(0, TOTAL - played.ends.length)).fill('X')];
-    const u: Progress = { ...played, drive: ends.length, done: true, ends };
-    return u.score < rival.score ? [u, rival] : awarded(u, rival, 'us');
+    return [{ ...played, drive: ends.length, done: true, ends }, { ...rival, score: Math.max(rival.score, played.score + 1) }];
   };
   const quit = () => {
     if (sent.current || !ai) return;

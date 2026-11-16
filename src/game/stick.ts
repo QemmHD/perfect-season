@@ -1,5 +1,5 @@
 // The floating stick, shared by every sport (plan §4.2, V2 A.5). Pure: no DOM, no timers, so every
-// rule is unit-tested (stick.test.ts). Stick.tsx feeds it pointer events and reads `stickOut`.
+// rule is unit-tested (stick.test.ts). StickPad.tsx feeds it pointer events and reads `stickOut`.
 //
 // The left thumb lands anywhere in the zone (the lower-left of the screen) and the ring is born under
 // it. Pushing it moves the player: nothing inside the 12% dead zone, then a linear rescale to 1 at the

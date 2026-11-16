@@ -127,10 +127,13 @@ export function settle(
     /** soccer-2 re-review: a solo QUIT. The loss stands (record, ladder, Cup/Circuit/Season round) but it
      *  pays nothing: no coins or card XP, no paid-game slot, no Season XP, objective game or development */
     quit?: boolean;
+    /** (nba-2 fix) the same as `quit`, under nba's name (Wave 1 merge: either one means a quit) */
+    forfeit?: boolean;
   },
 ): Settled {
   const activeCircuit = r.circuit ? hqOf(ut).circuit.active : undefined;
   if (
+    ((r.forfeit || r.quit) && r.won) ||
     (r.cup &&
       (r.online ||
         r.rung ||
@@ -182,9 +185,10 @@ export function settle(
   ut = ut.hq ? ut : { ...ut, hq: hqOf(ut) };
   const today = ut.paid.day === r.day ? ut.paid.n : 0;
   const capped = today >= PAID_GAMES_A_DAY;
-  const { coins, xp } = capped || r.quit ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
+  const quit = !!(r.quit || r.forfeit);
+  const { coins, xp } = capped || quit ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
   const x = awardXp(
-    { ...ut, paid: { day: r.day, n: today + (capped || r.quit ? 0 : 1) } },
+    { ...ut, paid: { day: r.day, n: today + (capped || quit ? 0 : 1) } },
     r.played,
     xp,
   );
@@ -250,7 +254,7 @@ export function settle(
         matchId: r.matchId!,
       })
     : seasonUt;
-  const progression = r.quit ? { ut: cupUt, sp: 0 } : recordMatchProgress(cupUt, {
+  const progression = quit ? { ut: cupUt, sp: 0 } : recordMatchProgress(cupUt, {
     id: r.matchId ?? 'legacy:' + r.packId,
     at: r.at,
     mode: r.cup
