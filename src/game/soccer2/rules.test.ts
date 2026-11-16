@@ -9,9 +9,10 @@
 //    byline off a defender or the keeper is a corner played in the same attack, off an attacker a
 //    goal kick; over the touchline off a defender in the final third a quick throw-in for us, off us
 //    a throw-in for them; at most two restarts an attack.
+//  - soccer-2 (2026-11-16): the lofted through ball is a person's pass only.
 import { describe, expect, it } from 'vitest';
 import { autoplayAttack, decide, pilot } from './autopilot';
-import { bendCurl, CORNER, cornerLayout, DEAD, GHALF, GX, kickOff, PARRY, PL, pressShoot, PW, releaseShoot, RESTARTS, setAim, setCurl, setupAttack, step, THROW, TOP } from './engine';
+import { bendCurl, CORNER, cornerLayout, DEAD, GHALF, GX, kickOff, PARRY, pass, PL, pressShoot, PW, releaseShoot, RESTARTS, setAim, setCurl, setupAttack, step, THROW, TOP } from './engine';
 import { SET_PIECE_WAIT, setPieceCountdown } from './match';
 import { squadFor } from './squads.test-util';
 import type { Attack, Body, Scenario, Squad } from './types';
@@ -408,5 +409,49 @@ describe('R-2: the restarts', () => {
       }
     expect(restarted).toBeGreaterThan(0);
     expect(corners).toBeGreaterThan(0);
+  });
+});
+
+// soccer-2 (2026-11-16): THRU held plays the lofted through ball, a person's pass only (the autopilot
+// never plays it, so no AI simulation and no golden hash moves): the through ball's runner and space,
+// in the air over the line, and the action contract's `passKind: 'loftedThrough'` for players.
+describe('the lofted through ball (THRU held)', () => {
+  const lineUp = (seed: string) => {
+    const a = setupAttack('build', A, B, seed, { side: 1 });
+    kickOff(a);
+    for (let i = 0; i < 20; i++) step(a, DT, { x: 0, y: 0 });
+    return a;
+  };
+  it('goes up and over, toward a runner going forward, and is marked for the players', () => {
+    let lofted = 0;
+    for (let s = 0; s < 20; s++) {
+      const a = lineUp('loft-' + s);
+      const c = a.bodies[a.ball.owner ?? a.ctrl];
+      if (!pass(a, 'loftedThrough', { x: 0, y: 1 }, true)) continue;
+      expect(a.kick?.kind).toBe('lofted');
+      expect(a.kick?.loftedThrough).toBe(true);
+      expect(a.kick!.vh).toBeGreaterThan(2);
+      expect(a.kick!.vy).toBeGreaterThan(0);
+      for (let i = 0; i < 12 && a.kick; i++) step(a, DT, { x: 0, y: 0 });
+      expect(c.passKind).toBe('loftedThrough');
+      expect(a.ball.flight?.kind).toBe('lofted');
+      lofted++;
+    }
+    expect(lofted).toBeGreaterThan(10);
+  });
+  it('a ground THRU stays on the grass and carries no lofted mark', () => {
+    const a = lineUp('thru-ground');
+    const c = a.bodies[a.ball.owner ?? a.ctrl];
+    expect(pass(a, 'through', { x: 0, y: 1 }, true)).toBe(true);
+    expect(a.kick?.loftedThrough).toBeUndefined();
+    for (let i = 0; i < 12 && a.kick; i++) step(a, DT, { x: 0, y: 0 });
+    expect(c.passKind).toBe('through');
+  });
+  it('the autopilot never plays it', () => {
+    for (let s = 0; s < 30; s++) {
+      const a = setupAttack((['build', 'counter', 'wide'] as const)[s % 3], A, B, 'auto-' + s, { side: 1 });
+      autoplayAttack(a, 0.75, 'auto-' + s);
+      expect(a.bodies.every((b) => b.passKind !== 'loftedThrough')).toBe(true);
+    }
   });
 });

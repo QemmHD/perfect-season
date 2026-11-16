@@ -19,6 +19,18 @@
  * woodwork's clang (`sfx.post()`): soccer's under V2 F.1, synthesized, silent with the sound off. */
 export { PERFECT_MAX_STEP, perfectStep, sfx } from '../../../lib/sound';
 
+/* ---------- stand-ins until the other teams' pieces are in this branch (soccer-2) ---------- */
+
+/** nba's floating stick (`src/game/stick.ts` + `Stick.tsx`) and HUD kit (`src/game/hud/*`). */
+export { DEAD_ZONE, FOLLOW_RING, inStickZone, SPRINT_OFF, SPRINT_RING, STICK_IDLE, stickDown, stickGeom, stickIdle, stickMove, stickOut, sprintEdge, stickUp, type StickGeom, type StickOut, type StickPointer, type StickState } from './stick';
+export { PauseButton, ScoreBug, Stick, ToastLine } from './hud';
+/** nba's controls-geometry tokens, as numbers (the CSS is ./geometry.css). */
+export { type Circle, gapOf, type Geometry, geometryFor, type Insets, meets, type Rect, rectOf, safeBox } from './geometry';
+/** ut's `src/lib/haptics.ts`. */
+export { haptic, HAPTIC_PATTERN, hapticCount } from './haptics';
+/** ut's `src/lib/playtime.ts`. */
+export { playtimeState, usePlaytime } from './playtime';
+
 /* ---------- written by other teams: the interfaces soccer relies on (§5.0.2) ---------- */
 
 /** A point or a direction on screen or on the pitch. */

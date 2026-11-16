@@ -9,10 +9,19 @@ import { soccerFeedback, type PlayFeedback } from '../play-feedback';
 // and let go in the green. Level with the rival at the end: penalties. Claude 2026-11-02: the stick
 // only runs; drag your thumb on SHOOT to aim (no drag: aim assist picks the open side, low), passes
 // go where the stick points with a gentle pull toward a teammate there, and every release and miss
-// says why.
+// says why. Claude 2026-11-16 (studio overhaul soccer-2, Game Design V2 A.5): the shared control
+// grammar. A floating stick under the left thumb (push past its ring to sprint, so SPRINT leaves the
+// right thumb), the A/B/C/D cluster on the V2 geometry (A SHOOT, B PASS, C THRU with a lofted hold, D
+// for set pieces now and TRICK later), tap a teammate to pass, the score bug "YOU 1 · 67' · 5/7 · 1
+// RIV" with its clock line, the toast line in place of the hint over the goal, and the pause sheet
+// with QUIT (solo) and FORFEIT (online).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { crowd, loadSamples, sfx, vibrate } from '../../lib/sound';
+import { LOFT_HOLD, nextBend, type ControlPhase, type Slot, type SlotId, slotsFor, type Slots, targetsOf } from './controls';
+import { PauseSheet } from './PauseSheet';
+import { PausableTimers } from './timers';
+import { haptic, PauseButton, ScoreBug, Stick, type StickOut, ToastLine, usePlaytime } from './v2';
 import { reducedMotion } from '../../ui/motion';
 import { screenRunInput } from '../football2/controls';
 import { freeCanvas } from '../pixel/body';
@@ -23,11 +32,13 @@ import { WaitLine } from '../Wait';
 import { decide, pilot } from './autopilot';
 import { bendCurl, cancelShoot, ctrlOf, GX, kickOff, pass, passPlan, passTarget, PL, PW, pressShoot, releaseShoot, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step, timingWord } from './engine';
 import type { SoccerKits } from './kits';
-import { attackFor, ATTACKS, END_TEXT, minuteOf, newMatch, recordAttack, SCENARIO_HINTS, SCENARIO_NAMES, SET_PIECE_WAIT, setPieceCountdown, totalOf, type Match } from './match';
+import { attackFor, ATTACKS, END_TEXT, minuteOf, newMatch, recordAttack, SCENARIO_NAMES, scenarioToast, SET_PIECE_WAIT, setPieceCountdown, totalOf, type Match } from './match';
 import { SoccerRenderer } from './render';
 import { kickAttack, newShootout, nextKick, recordKick, score as soScore, type Shootout, type Side } from './shootout';
 import type { Attack, AttackEnd, Body, Pt, Scenario, Squad } from './types';
 import './soccer2.css';
+import './v2/geometry.css';
+import './soccer2-controls.css';
 
 type Ui = 'loading' | 'intro' | 'live' | 'after' | 'so-intro' | 'so-kick' | 'so-after' | 'final';
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
@@ -38,12 +49,18 @@ const RELEASE_LAG = 0.03;
 const AIM_DRAG = 46;
 /** a drag shorter than this (of AIM_DRAG) is no aim: the assist */
 const AIM_DEAD = 0.28;
-/** PASS held this long (s) is a lofted ball, a cross */
-const LOFT_HOLD = 0.22;
 /** The crowd builds as the ball nears goal (J-1, Claude 2026-11-10): its level, from QUIET at FAR m
  * or more to LOUD at NEAR m or less, set through crowd.level at most every CROWD_MS (in steps of
  * 0.02, so it rarely needs setting), and never while a swell is still settling. */
 const CROWD = { QUIET: 0.24, LOUD: 0.5, FAR: 35, NEAR: 12, MS: 250 };
+/** The toast line's tips (one line at 320 px; the keyword first, one name per control). */
+const TIPS = {
+  move: 'PASS · it goes where the stick points',
+  corner: 'CROSS · the stick picks your man',
+  fk: 'BEND · swipe the pitch, then SHOOT',
+  pen: 'SHOOT · drag to aim, let go in the green',
+  keep: 'THEIR KICK · pick a way to dive',
+} as const;
 
 /** What a replay needs to redraw a moment. */
 interface Snap {
@@ -77,9 +94,13 @@ export function Soccer2({
   fixedShootout,
   debug,
   start,
+  online = false,
+  quitNote,
   onProgress,
   onDone,
   onShootout,
+  onQuit,
+  onForfeit,
 }: {
   us: Squad;
   them: Squad;
@@ -102,13 +123,21 @@ export function Soccer2({
    * kick by kick instead of played, so the two phones can't settle a level match differently.
    */
   fixedShootout?: { first: Side; scored: boolean[] };
-  /** the lab's QA hook: the live attack and match each frame */
-  debug?: (a: Attack | null, m: Match, ui: string) => void;
+  /** the lab's QA hook: the live attack and match each frame, the goal mouth on screen, and the pause */
+  debug?: (a: Attack | null, m: Match, ui: string, view: { goal: { x: number; y: number; w: number; h: number } | null; paused: boolean }) => void;
   /** the lab's drills and screenshots: the man on the ball starts here (pitch metres; open play only) */
   start?: Pt;
+  /** a head to head against another phone: the pause sheet offers FORFEIT instead of QUIT */
+  online?: boolean;
+  /** the host's line under QUIT? (ut contract B; default "It counts as a loss.") */
+  quitNote?: string;
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
   onShootout?: (r: ShootoutResult) => void;
+  /** solo QUIT, confirmed: the attacks played so far (the host decides what a quit means) */
+  onQuit?: (p: Progress) => void;
+  /** online FORFEIT, confirmed: the attacks played so far (the host pads them with 'FF' and ends the match) */
+  onForfeit?: (p: Progress) => void;
 }) {
   const [lastReadout,setLastReadout] = useState<PlayFeedback|null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -133,10 +162,13 @@ export function Soccer2({
   const pilotRef = useRef(pilot(0.75, seed));
   const fxRef = useRef({ shake: 0, flash: 0 });
   const slowUntil = useRef(0);
-  const stickRef = useRef<{ id: number; x: number; y: number } | null>(null);
+  /** the left thumb's stick, as it last reported (null: no thumb on it) */
+  const stickRef = useRef<{ x: number; y: number } | null>(null);
+  const stickSprint = useRef(false);
   const keys = useRef(new Set<string>());
   const passDown = useRef<{ id: number | 'key'; t: number } | null>(null);
   const shotPointer = useRef<number | 'key' | null>(null);
+  const thruDown = useRef<{ id: number | 'key'; t: number } | null>(null);
   /** the drag on SHOOT: where the thumb went down, and the aim it gives (null: assist) */
   const shotDrag = useRef<{ x0: number; y0: number; aim: Pt | null } | null>(null);
   const [aimDot, setAimDot] = useState<Pt | null>(null);
@@ -148,13 +180,20 @@ export function Soccer2({
   const [, setTick] = useState(0);
   const [pop, setPop] = useState<{ id: number; text: string; tone: Tone; sub?: string } | null>(null);
   const popId = useRef(0);
+  /** the toast line: a tip or a call, one line above the controls (V-3: never over the goal) */
   const [hint, setHint] = useState<string | null>(null);
   const hinted = useRef(new Set<string>());
-  const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [sprinting, setSprinting] = useState(false);
   const [shooting, setShooting] = useState(false);
+  /** the buttons held down now (their pressed look) */
+  const [held, setHeld] = useState<Partial<Record<SlotId, boolean>>>({});
   const [wide, setWide] = useState(false);
-  const clockRef = useRef<HTMLElement>(null);
+  const [compact, setCompact] = useState(false);
+  /** the score bug's clock line (the attack's time left), written each frame without a render */
+  const lineRef = useRef<HTMLElement>(null);
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+  /** the beats between whistles, held while paused */
+  const timers = useMemo(() => new PausableTimers(), []);
   const rec = useRef(new Recorder<Snap>(5));
   const replayRef = useRef<Replay<Snap> | null>(null);
   const [replaying, setReplaying] = useState(false);
@@ -173,13 +212,14 @@ export function Soccer2({
   const say = (text: string, tone: Tone, ms = 1200, sub?: string) => {
     const id = ++popId.current;
     setPop({ id, text, tone, sub });
-    window.setTimeout(() => setPop((p) => (p && p.id === id ? null : p)), ms);
+    timers.later(() => setPop((p) => (p && p.id === id ? null : p)), ms);
   };
+  /** a line in the toast line for a while (once per kind of tip a match) */
   const tip = (key: string, text: string) => {
     if (autoplayHook || hinted.current.has(key)) return;
     hinted.current.add(key);
     setHint(text);
-    window.setTimeout(() => setHint((h) => (h === text ? null : h)), 4200);
+    timers.later(() => setHint((h) => (h === text ? null : h)), 4200);
   };
   /** a play lifts the crowd (crowd.swell); the level by distance waits until it has settled */
   const swell = (x: number) => {
@@ -205,15 +245,16 @@ export function Soccer2({
   const progress = (): Progress => ({ score: match.goals, drive: match.i, done: match.over, ends: match.ends.slice(), plays: match.i });
   const clearInput = () => {
     stickRef.current = null;
+    stickSprint.current = false;
     keys.current.clear();
     passDown.current = null;
+    thruDown.current = null;
     shotPointer.current = null;
     shotDrag.current = null;
     setAimDot(null);
     sprintPointer.current = null;
     swipe.current = null;
-    setKnob({ x: 0, y: 0 });
-    setSprinting(false);
+    setHeld({});
     setShooting(false);
     const a = atkRef.current;
     if (a) {
@@ -239,7 +280,10 @@ export function Soccer2({
     crowd.start(CROWD.QUIET, 'pitch');
     if (forceShootout) startShootout();
     else lineUp(0);
-    return () => crowd.stop(0.6);
+    return () => {
+      crowd.stop(0.6);
+      timers.dispose();
+    };
   }, []);
 
   const kickOffNow = () => {
@@ -250,15 +294,15 @@ export function Soccer2({
     if (uiRef.current === 'so-intro') {
       setUi('so-kick');
       setGuess(null);
-      if (usKicking.current) tip('pen', 'Hold SHOOT and drag it to aim (or use the stick) · let go in the green');
-      else tip('keep', 'Their kick · pick a way to dive, or trust your keeper');
+      if (usKicking.current) tip('pen', TIPS.pen);
+      else tip('keep', TIPS.keep);
       return;
     }
     setUi('live');
     const sc = a.scenario;
-    if (sc === 'corner') tip('corner', 'Stick picks the man · hold PASS to whip it in');
-    else if (sc === 'freekick') tip('fk', 'BEND to curl it · hold SHOOT, drag to aim, let go in the green');
-    else tip('move', 'Stick runs · PASS where you point · hold SHOOT, drag to aim');
+    if (sc === 'corner') tip('corner', TIPS.corner);
+    else if (sc === 'freekick') tip('fk', TIPS.fk);
+    else tip('move', TIPS.move);
   };
 
   // the autopilot kicks off in tests
@@ -312,7 +356,7 @@ export function Soccer2({
       } else if (e === 'freekick') {
         say('FREE KICK', 'good', 1300, 'FOULED');
         clearInput();
-        tip('fk', 'BEND to curl it · hold SHOOT, drag to aim, let go in the green');
+        tip('fk', TIPS.fk);
       } else if (e === 'advantage') say('ADVANTAGE', 'plain', 800);
       // restarts earned in play (R-2): a corner off a defender or the keeper, a quick throw-in
       else if (e === 'corner-won') {
@@ -320,7 +364,7 @@ export function Soccer2({
         swell(0.6);
         say('CORNER!', 'good', 1300, a.restarts && a.restarts > 1 ? 'ANOTHER ONE' : 'WON IT');
         clearInput();
-        tip('corner', SCENARIO_HINTS.corner);
+        tip('corner', TIPS.corner);
       } else if (e === 'throw-in') say('THROW-IN', 'plain', 900, 'QUICK ONE');
       else if (e === 'goal') {
         fxRef.current.flash = 0.45;
@@ -362,7 +406,7 @@ export function Soccer2({
     else if (e === 'T') say('TIME UP', 'plain', 1400, 'ATTACK OVER');
     else say('LOST IT', 'bad', 1400, text);
     if (e !== 'G') {
-      window.setTimeout(() => sfx.whistle(), 200);
+      timers.later(() => sfx.whistle(), 200);
       if (e !== 'O') sfx.groan(e === 'S' || e === 'W' ? 0.8 : 0.5);
     }
     const replay = e === 'G' && !reducedMotion() && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !match.over;
@@ -374,8 +418,8 @@ export function Soccer2({
         lineUp(match.i);
       }
     };
-    if (replay) window.setTimeout(() => startReplay(a, next), 1700);
-    else window.setTimeout(next, e === 'G' ? 2500 : 1800);
+    if (replay) timers.later(() => startReplay(a, next), 1700);
+    else timers.later(next, e === 'G' ? 2500 : 1800);
   };
 
   const endMatch = () => {
@@ -383,7 +427,7 @@ export function Soccer2({
     sfx.fulltime();
     if (allowShootout && r && r.done && r.score === match.goals) {
       say('ALL SQUARE', 'big', 1700, 'PENALTIES');
-      window.setTimeout(startShootout, 1500);
+      timers.later(startShootout, 1500);
       return;
     }
     setUi('final');
@@ -433,7 +477,7 @@ export function Soccer2({
       (mine ? sfx.groan : sfx.roar)(0.9);
       say(mine ? 'SAVED' : 'YOUR KEEPER SAVES!', mine ? 'bad' : 'big', 1000, taker);
     }
-    window.setTimeout(() => revealPens(scored, i + 1), 1300);
+    timers.later(() => revealPens(scored, i + 1), 1300);
   };
   const viewSo = () => {
     const so = soRef.current!;
@@ -443,7 +487,7 @@ export function Soccer2({
     const so = soRef.current!;
     viewSo();
     if (so.done) {
-      window.setTimeout(() => setUi('final'), 2300);
+      timers.later(() => setUi('final'), 2300);
       const s = soScore(so);
       onShootout?.({ us: s.us, them: s.them, winner: so.winner!, kicks: so.kicks.map((k) => ({ side: k.side, scored: k.scored, taker: k.taker.name })) });
       if (so.winner === 'us') {
@@ -478,7 +522,7 @@ export function Soccer2({
       else sfx.roar();
       say(mine ? (a.end?.kind === 'S' ? 'SAVED' : 'MISSED') : a.end?.kind === 'S' ? 'YOUR KEEPER SAVES!' : 'THEY MISS!', mine ? 'bad' : 'big', 1400);
     }
-    window.setTimeout(nextPen, 1900);
+    timers.later(nextPen, 1900);
   };
 
   /* ---------- replay ---------- */
@@ -546,34 +590,30 @@ export function Soccer2({
   };
   const live = () => (uiRef.current === 'live' || uiRef.current === 'so-kick') && !!atkRef.current && !atkRef.current.end && !(uiRef.current === 'so-kick' && !usKicking.current) && !spWait.current?.auto;
 
-  const stickAt = (e: React.PointerEvent) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const R = r.width / 2 - 24;
-    let x = (e.clientX - (r.left + r.width / 2)) / R;
-    let y = (e.clientY - (r.top + r.height / 2)) / R;
-    const l = Math.hypot(x, y);
-    if (l > 1) {
-      x /= l;
-      y /= l;
+  /** The left thumb's stick reports (V2 A.5): its push, and sprint past the ring (the tick is the stick's). */
+  const onStick = (o: StickOut) => {
+    stickRef.current = o.active ? { x: o.x, y: o.y } : null;
+    stickSprint.current = o.sprint;
+    const a = atkRef.current;
+    if (a && sprintPointer.current === null) setSprint(a, o.sprint && live());
+  };
+  /** A pass to the teammate under a tap (on the pitch or in the stick's zone). */
+  const tapPass = (cx: number, cy: number) => {
+    const a = atkRef.current;
+    const canvas = canvasRef.current;
+    if (!a || !canvas || !live()) return;
+    const r = canvas.getBoundingClientRect();
+    const id = renderer.bodyAt(a, ((cx - r.left) * renderer.W) / r.width, ((cy - r.top) * renderer.H) / r.height);
+    const c = a.ball.owner !== null ? a.bodies[a.ball.owner] : a.taker !== null ? a.bodies[a.taker] : null;
+    if (id === null || !c || id === c.id) return;
+    const to = a.bodies[id];
+    const corner = a.setPiece?.kind === 'corner';
+    if (pass(a, corner ? 'lofted' : 'ground', { x: to.x - c.x, y: to.y - c.y }, !corner)) {
+      sfx.click();
+      haptic('tick');
     }
-    stickRef.current = { id: e.pointerId, x, y };
-    setKnob({ x, y });
   };
-  const stickDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (stickRef.current) return;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    stickAt(e);
-  };
-  const stickMove = (e: React.PointerEvent) => {
-    if (stickRef.current?.id === e.pointerId) stickAt(e);
-  };
-  const stickUp = (e: React.PointerEvent) => {
-    if (stickRef.current?.id !== e.pointerId) return;
-    stickRef.current = null;
-    setKnob({ x: 0, y: 0 });
-  };
+  const press = (id: SlotId, on: boolean) => setHeld((h) => (!!h[id] === on ? h : { ...h, [id]: on }));
   const doPassDown = (id: number | 'key') => {
     if (!live() || passDown.current) return;
     passDown.current = { id, t: performance.now() };
@@ -585,13 +625,40 @@ export function Soccer2({
     const a = atkRef.current;
     if (!a || !live()) return;
     const held = (performance.now() - d.t) / 1000;
-    const corner = a.setPiece?.kind === 'corner';
-    // a person's pass is free: the stick's way, a gentle pull toward a teammate there (a corner: the stick picks the man)
-    if (pass(a, held >= LOFT_HOLD ? 'lofted' : 'ground', passDir(), !corner)) sfx.click();
+    // a person's pass is free: the stick's way, a gentle pull toward a teammate there
+    if (pass(a, held >= LOFT_HOLD ? 'lofted' : 'ground', passDir(), true)) sfx.click();
   };
-  const doThru = () => {
+  /** A set piece's CROSS (lofted, to the man the stick picks) or SHORT (along the grass): on touch-down. */
+  const setPiecePass = (lofted: boolean) => {
     const a = atkRef.current;
-    if (a && live() && pass(a, 'through', passDir(), true)) sfx.click();
+    if (!a || !live()) return false;
+    const corner = a.setPiece?.kind === 'corner';
+    if (!pass(a, lofted ? 'lofted' : 'ground', passDir(), !corner)) return false;
+    sfx.click();
+    return true;
+  };
+  const doThruDown = (id: number | 'key') => {
+    if (!live() || thruDown.current) return;
+    thruDown.current = { id, t: performance.now() };
+  };
+  /** THRU let go: a tap is the ground through ball, a hold (LOFT_HOLD) the lofted one over the line. */
+  const doThruUp = (id: number | 'key') => {
+    const d = thruDown.current;
+    if (!d || d.id !== id) return;
+    thruDown.current = null;
+    const a = atkRef.current;
+    if (!a || !live()) return;
+    const held = (performance.now() - d.t) / 1000;
+    if (pass(a, held >= LOFT_HOLD ? 'loftedThrough' : 'through', passDir(), true)) sfx.click();
+  };
+  /** D at a free kick: the bend, cycled straight → the left arrow → the right arrow (bendCurl). */
+  const cycleBend = () => {
+    const a = atkRef.current;
+    if (!a || !live() || a.setPiece?.kind !== 'freekick') return;
+    const k = Math.abs(a.curl) < 0.05 ? 0 : (Math.sign(a.curl) === Math.sign(bendCurl(-1)) ? -1 : 1);
+    setCurl(a, bendCurl(nextBend(k)));
+    sfx.click();
+    setTick((n) => n + 1);
   };
   const shootDown = (id: number | 'key', x = 0, y = 0) => {
     const a = atkRef.current;
@@ -625,34 +692,90 @@ export function Soccer2({
     // the aim is already on the meter (the drag, the stick at a set piece, the keys); none: assist
     if (a && !a.end) releaseShoot(a, null, RELEASE_LAG);
   };
+  const shootCancel = () => {
+    shotPointer.current = null;
+    shotDrag.current = null;
+    setAimDot(null);
+    setShooting(false);
+    if (atkRef.current) cancelShoot(atkRef.current);
+  };
+  // the keyboard's sprint (Shift); the touch sprint is the stick's ring
   const sprintOn = (id: number | 'key') => {
     const a = atkRef.current;
     if (!a || !live() || sprintPointer.current !== null) return;
     sprintPointer.current = id;
     setSprint(a, true);
-    setSprinting(true);
   };
   const sprintOff = (id: number | 'key') => {
     if (sprintPointer.current !== id) return;
     sprintPointer.current = null;
-    if (atkRef.current) setSprint(atkRef.current, false);
-    setSprinting(false);
+    if (atkRef.current) setSprint(atkRef.current, stickSprint.current && live());
   };
-  // keyboard: arrows/WASD run, Space shoot (hold), J pass (hold: cross), K through ball, Shift sprint
+
+  /* ---------- pause (C-5) ---------- */
+  const pausable = () => !finished.current && uiRef.current !== 'final' && uiRef.current !== 'loading';
+  const pauseAt = useRef(0);
+  const pause = () => {
+    if (pausedRef.current || !pausable()) return;
+    pausedRef.current = true;
+    pauseAt.current = performance.now();
+    clearInput();
+    timers.pause();
+    setPaused(true);
+  };
+  const resume = () => {
+    if (!pausedRef.current) return;
+    pausedRef.current = false;
+    // a replay picks up where it stopped
+    const rp = replayRef.current;
+    if (rp) rp.start += performance.now() - pauseAt.current;
+    slowUntil.current += performance.now() - pauseAt.current;
+    timers.resume();
+    setPaused(false);
+  };
+  // the phone locks or the app goes to the background: pause (never play on unseen)
+  useEffect(() => {
+    if (autoplayHook) return;
+    const hide = () => {
+      if (document.visibilityState === 'hidden') pause();
+    };
+    document.addEventListener('visibilitychange', hide);
+    window.addEventListener('pagehide', pause);
+    return () => {
+      document.removeEventListener('visibilitychange', hide);
+      window.removeEventListener('pagehide', pause);
+    };
+  }, []);
+  const leave = (how: 'quit' | 'forfeit') => {
+    if (finished.current) return;
+    finished.current = true;
+    pausedRef.current = false;
+    timers.dispose();
+    setPaused(false);
+    setUi('final');
+    sfx.click();
+    (how === 'quit' ? onQuit : onForfeit)?.(progress());
+  };
+
+  // keyboard: arrows/WASD run, Space shoot (hold), J pass (hold: lob), K through ball (hold: lofted), Shift sprint, Esc pause
   useEffect(() => {
     if (autoplayHook) return;
     const down = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
+      if (pausedRef.current) return;
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) {
         keys.current.add(k);
         e.preventDefault();
       } else if (e.repeat) return;
-      else if (k === ' ') {
+      else if (k === 'escape' || k === 'p') {
+        e.preventDefault();
+        pause();
+      } else if (k === ' ') {
         e.preventDefault();
         if (uiRef.current === 'intro' || uiRef.current === 'so-intro') kickOffNow();
         else shootDown('key');
       } else if (k === 'j') doPassDown('key');
-      else if (k === 'k') doThru();
+      else if (k === 'k') doThruDown('key');
       else if (k === 'shift') sprintOn('key');
     };
     const up = (e: KeyboardEvent) => {
@@ -660,6 +783,7 @@ export function Soccer2({
       keys.current.delete(k);
       if (k === ' ') shootUp('key');
       else if (k === 'j') doPassUp('key');
+      else if (k === 'k') doThruUp('key');
       else if (k === 'shift') sprintOff('key');
     };
     window.addEventListener('keydown', down);
@@ -669,7 +793,7 @@ export function Soccer2({
       window.removeEventListener('keyup', up);
     };
   }, []);
-  // the field: tap a teammate to pass to him; swipe across to bend a free kick
+  // the pitch: tap a teammate to pass to him; swipe across to bend a free kick
   const fieldDown = (e: React.PointerEvent) => {
     if (!live() || swipe.current) return;
     swipe.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now() };
@@ -689,18 +813,7 @@ export function Soccer2({
       setTick((n) => n + 1);
       return;
     }
-    if (Math.hypot(dx, dy) < 12 && ms < 350) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const r = canvas.getBoundingClientRect();
-      const id = renderer.bodyAt(a, ((e.clientX - r.left) * renderer.W) / r.width, ((e.clientY - r.top) * renderer.H) / r.height, 30);
-      const c = a.ball.owner !== null ? a.bodies[a.ball.owner] : a.taker !== null ? a.bodies[a.taker] : null;
-      if (id !== null && c && id !== c.id) {
-        const to = a.bodies[id];
-        const corner = a.setPiece?.kind === 'corner';
-        if (pass(a, corner ? 'lofted' : 'ground', { x: to.x - c.x, y: to.y - c.y }, !corner)) sfx.click();
-      }
-    }
+    if (Math.hypot(dx, dy) < 12 && ms < 350) tapPass(e.clientX, e.clientY);
   };
 
   /* ---------- the loop ---------- */
@@ -722,13 +835,17 @@ export function Soccer2({
         canvas.style.width = renderer.W + 'px';
         canvas.style.height = renderer.H + 'px';
         setWide(w > h);
+        // the small-phone layout, from the measured frame (not a width media query)
+        setCompact(w < 351 || h < 601);
       }
       const a = atkRef.current;
       const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
       const slow = now < slowUntil.current ? 0.35 : 1;
       const u = uiRef.current;
-      if (a && (u === 'live' || u === 'so-kick') && !a.end && !replayRef.current) {
+      // paused: nothing moves (the accumulator is dropped, so resuming never catches up); the frame stays drawn
+      if (pausedRef.current) acc = 0;
+      else if (a && (u === 'live' || u === 'so-kick') && !a.end && !replayRef.current) {
         acc += elapsed * slow;
         while (acc >= DT) {
           acc -= DT;
@@ -763,12 +880,14 @@ export function Soccer2({
         setCountdown(null);
       }
       crowdFor(a, now);
-      debug?.(a, match, u);
-      const ck = clockRef.current;
-      if (ck && a) {
-        const left = Math.max(0, Math.ceil(a.clock - a.used));
-        ck.textContent = (left < 10 ? '0:0' : '0:') + left;
-        ck.classList.toggle('low', left <= 5 && !a.end && u === 'live');
+      debug?.(a, match, u, { goal: renderer.goalMouth(), paused: pausedRef.current });
+      // the score bug's clock line: the attack's time left, red in its last 5 s
+      const line = lineRef.current;
+      if (line && a) {
+        const left = Math.max(0, a.clock - a.used);
+        const k = u === 'live' || u === 'after' ? left / a.clock : 1;
+        line.style.transform = 'scaleX(' + k.toFixed(3) + ')';
+        line.classList.toggle('low', left <= 5 && !a.end && u === 'live');
       }
       const fx = fxRef.current;
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
@@ -779,7 +898,7 @@ export function Soccer2({
       try {
         const rp = replayRef.current;
         if (rp) {
-          const rt = replayTime(rp, now);
+          const rt = replayTime(rp, pausedRef.current ? pauseAt.current : now);
           const sn = rt === null ? null : frameAt(rp.frames, rt);
           if (rt === null || !sn) endReplay();
           else renderer.draw(ctx, { ...a, t: sn.t, bodies: sn.bodies, ball: sn.ball, meter: null, release: undefined, end: a.end }, { target: null, shake: 0, flash: 0, names: false }, kitOf);
@@ -790,9 +909,22 @@ export function Soccer2({
           const corner = a.setPiece?.kind === 'corner';
           const show = !autoplayHook && onBall && !a.meter && a.setPiece?.kind !== 'penalty';
           // the pass the stick would play: its line, and the man the gentle assist would find (a corner: the man the stick picks)
-          const plan = show && dir && !corner ? passPlan(a, passDown.current && (performance.now() - passDown.current.t) / 1000 >= LOFT_HOLD ? 'lofted' : 'ground', dir) : null;
+          const heldFor = (d: { t: number } | null) => (d ? (performance.now() - d.t) / 1000 : 0);
+          const kind = thruDown.current ? 'through' : heldFor(passDown.current) >= LOFT_HOLD ? 'lofted' : 'ground';
+          const plan = show && dir && !corner ? passPlan(a, kind, dir) : null;
           const target = show && corner ? (passTarget(a, dir, 'lofted')?.id ?? null) : (plan?.to?.id ?? null);
-          renderer.draw(ctx, a, { target, pass: plan, shake: fx.shake, flash: fx.flash, names: u === 'intro' }, kitOf);
+          // the man in control is the rival's in a shootout's their-kick: a violet ring and tag, never our gold (V-3)
+          const ours = !(u.startsWith('so') && !usKicking.current);
+          // the toast line, while it shows: no tag prints under it (V-3)
+          const tl = wrap.querySelector('.sc2-toast');
+          let keepOut: { x: number; y: number; w: number; h: number }[] | undefined;
+          if (tl) {
+            const r = tl.getBoundingClientRect();
+            const cr = canvas.getBoundingClientRect();
+            const k = renderer.W / Math.max(1, cr.width);
+            keepOut = [{ x: (r.left - cr.left) * k, y: (r.top - cr.top) * k, w: r.width * k, h: r.height * k }];
+          }
+          renderer.draw(ctx, a, { target, pass: plan, shake: fx.shake, flash: fx.flash, names: u === 'intro', ours, keepOut }, kitOf);
         }
       } catch (err) {
         console.error('[soccer draw]', err);
@@ -809,96 +941,109 @@ export function Soccer2({
   const total = totalOf(match);
   const inSo = ui.startsWith('so') || (ui === 'final' && !!soRef.current);
   const playing = ui === 'live' || (ui === 'so-kick' && usKicking.current);
+  const intro = ui === 'intro' || ui === 'so-intro';
   const sp = a?.setPiece?.kind ?? null;
   const theirKick = ui === 'so-kick' && !usKicking.current;
-  const marks = match.ends;
   // between attacks the scoreboard still shows the one just played
   const shownI = ui === 'after' ? Math.max(0, match.i - 1) : Math.min(match.i, total - 1);
-  return createPortal(
-    <div className={'arcade-full hg2 sc2' + (wide ? ' wide' : '')} ref={wrapRef} onPointerDown={fieldDown} onPointerUp={fieldUp} onPointerCancel={() => (swipe.current = null)}>
-      <canvas ref={canvasRef} className="hg2-canvas" />
-      {!autoplayHook && <PlayReadout readout={lastReadout} live={playing} resetKey={match.i} />}
+  const rivalShown = rival?.name ?? rivalName;
+  const rivalTag = rivalShown.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3) || 'RIV';
+  usePlaytime('match', { paused, auto: !!autoplayHook, stoppage: !playing && !theirKick });
 
-      <div className="hg2-bug" aria-label="Score">
-        <span className="us">
-          <i>YOU</i>
-          <b className="num">{match.goals}</b>
-        </span>
-        <span className="mid">
-          {inSo && soView ? (
-            <>
-              <b>PENS</b>
-              <small className="num">
-                {soView.us}–{soView.them}
-              </small>
-            </>
-          ) : match.over ? (
-            <b>FULL TIME</b>
-          ) : (
-            <>
-              <b>{minuteOf(match, shownI)}</b>
-              <small>{SCENARIO_NAMES[match.deal[shownI]].toUpperCase()}</small>
-              <em ref={clockRef} aria-label="Time left in the attack">
-                0:30
-              </em>
-            </>
-          )}
-        </span>
-        <span className="them">
-          <i>{(rival?.name ?? rivalName).toUpperCase().slice(0, 8)}</i>
-          <b className="num">{rival ? rival.score : '–'}</b>
-        </span>
-      </div>
-      {!inSo && (
-        <div className="hg2-marks sc2-marks" aria-label={'Attack ' + Math.min(match.i + 1, total) + ' of ' + total}>
-          {Array.from({ length: total }, (_, i) => (
-            <i key={i} className={(marks[i] ? 'e-' + marks[i] : i === match.i ? 'now' : '') + (i === Math.ceil(match.attacks / 2) ? ' half' : '') + (i === match.attacks ? ' stop' : '')}>
-              {marks[i] ?? (i === match.attacks ? '+' : i === match.i ? i + 1 : '')}
-            </i>
-          ))}
-        </div>
-      )}
-      {inSo && soView && <PenTally view={soView} rivalName={rival?.name ?? rivalName} />}
+  // the cluster: before the whistle A is the whistle itself; then the phase's four slots (controls.ts)
+  const phase: ControlPhase = sp === 'penalty' || ui === 'so-kick' ? 'penalty' : sp === 'corner' ? 'corner' : sp === 'freekick' ? 'freekick' : 'attack';
+  const go: Slot = { act: 'shoot', label: ui === 'intro' ? 'KICK OFF' : usKicking.current ? 'STEP UP' : 'READY' };
+  const slots: Slots | null = autoplayHook || !a || ui === 'loading' ? null : intro ? { A: go, B: null, C: null, D: null } : playing ? slotsFor(phase) : null;
+  const bendK: -1 | 0 | 1 = !a || Math.abs(a.curl) < 0.05 ? 0 : Math.sign(a.curl) === Math.sign(bendCurl(-1)) ? -1 : 1;
+
+  // the toast line (V-3: it replaces the hint over the goal): the countdown, a tip, the attack's line
+  // before the whistle; nothing while SHOOT is held or a meter is up
+  const toast: { text: string; kind: 'plain' | 'good' | 'bad' | 'perfect'; timer?: boolean } | null =
+    autoplayHook || !a || paused || shooting || a.meter
+      ? null
+      : countdown !== null && playing
+        ? { text: 'AUTO KICK · in ' + countdown, kind: 'bad', timer: true }
+        : ui === 'intro'
+          ? { text: scenarioToast(a.scenario), kind: 'good' }
+          : ui === 'so-intro'
+            ? { text: usKicking.current ? 'YOUR KICK · ' + a.bodies[a.ctrl].p.name : TIPS.keep, kind: usKicking.current ? 'good' : 'plain' }
+            : hint && (playing || theirKick)
+              ? { text: hint, kind: 'plain' }
+              : null;
+
+  const slotDown = (id: SlotId, sl: Slot, e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (intro) {
+      haptic('tick');
+      kickOffNow();
+      return;
+    }
+    let took = false;
+    if (sl.act === 'shoot') took = shootDown(e.pointerId, e.clientX, e.clientY);
+    else if (sl.act === 'pass') {
+      doPassDown(e.pointerId);
+      took = passDown.current?.id === e.pointerId;
+    } else if (sl.act === 'thru') {
+      doThruDown(e.pointerId);
+      took = thruDown.current?.id === e.pointerId;
+    } else if (sl.act === 'cross' || sl.act === 'short') took = setPiecePass(sl.act === 'cross');
+    else if (sl.act === 'bend') {
+      cycleBend();
+      took = true;
+    }
+    if (!took) return;
+    haptic('tick');
+    press(id, true);
+    if (sl.act === 'shoot' || sl.act === 'pass' || sl.act === 'thru') e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const slotUp = (id: SlotId, sl: Slot, e: React.PointerEvent<HTMLButtonElement>) => {
+    press(id, false);
+    if (sl.act === 'shoot') shootUp(e.pointerId);
+    else if (sl.act === 'pass') doPassUp(e.pointerId);
+    else if (sl.act === 'thru') doThruUp(e.pointerId);
+  };
+  const slotCancel = (id: SlotId, sl: Slot) => {
+    press(id, false);
+    if (sl.act === 'shoot') shootCancel();
+    else if (sl.act === 'pass') passDown.current = null;
+    else if (sl.act === 'thru') thruDown.current = null;
+  };
+
+  return createPortal(
+    <div className={'arcade-full hg2 sc2 ps-geo' + (wide ? ' wide land' : '') + (compact ? ' compact' : '')} ref={wrapRef} onPointerDown={fieldDown} onPointerUp={fieldUp} onPointerCancel={() => (swipe.current = null)}>
+      <canvas ref={canvasRef} className="hg2-canvas" />
+      {/* the last play's read-out, between attacks only: in play the field's only text is the toast line, the tags and the bug (V2 C.5) */}
+      {!autoplayHook && !playing && <PlayReadout readout={lastReadout} live={playing} resetKey={match.i} />}
+      {slots && <div className="ps-scrim" aria-hidden="true" />}
+
+      <ScoreBug
+        you={match.goals}
+        rival={rival ? rival.score : null}
+        rivalTag={rivalTag}
+        minute={minuteOf(match, shownI)}
+        count={match.over ? null : shownI + 1 + '/' + total}
+        mid={inSo && soView ? <><b>PENS</b><small className="num">{soView.us}–{soView.them}</small></> : match.over ? <b>FULL TIME</b> : undefined}
+        heat={null}
+        clutch={false}
+        lineRef={lineRef}
+        label={'You ' + match.goals + ', ' + rivalShown + ' ' + (rival ? rival.score : 'to come') + (match.over ? ', full time' : ', ' + minuteOf(match, shownI) + ', attack ' + (shownI + 1) + ' of ' + total + ', ' + SCENARIO_NAMES[match.deal[shownI]])}
+      />
+      {!autoplayHook && ui !== 'final' && ui !== 'loading' && <PauseButton onPress={pause} />}
+      {inSo && soView && <PenTally view={soView} rivalName={rivalShown} />}
       {pop && (
         <div key={pop.id} className={'hg2-pop ' + pop.tone} role="status">
           {pop.text}
           {pop.sub && <small>{pop.sub}</small>}
         </div>
       )}
-      {hint && countdown === null && <div className="hg2-hint sc2-hint">{hint}</div>}
-      {countdown !== null && playing && !autoplayHook && (
-        <div className="hg2-hint sc2-hint sc2-autokick" role="timer" aria-live="polite">
-          AUTO KICK IN <b className="num">{countdown}</b>
-        </div>
-      )}
+      {toast && <ToastLine text={toast.text} kind={toast.kind} timer={toast.timer} />}
       {replaying && (
         <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
           <i />
           REPLAY
           <small>TAP TO SKIP</small>
         </button>
-      )}
-      {(ui === 'intro' || ui === 'so-intro') && a && !autoplayHook && (
-        <div className="sc2-intro" onPointerDown={(e) => e.stopPropagation()}>
-          {ui === 'intro' ? (
-            <>
-              <small>
-                {match.i >= match.attacks ? 'STOPPAGE TIME' : 'ATTACK ' + (match.i + 1) + ' OF ' + match.attacks} · {minuteOf(match)}
-              </small>
-              <b>{SCENARIO_NAMES[a.scenario]}</b>
-              <span>{SCENARIO_HINTS[a.scenario]}</span>
-            </>
-          ) : (
-            <>
-              <small>{usKicking.current ? 'YOUR KICK' : 'THEIR KICK'}</small>
-              <b>{a.bodies[a.ctrl].p.name}</b>
-              <span>{usKicking.current ? 'Hold SHOOT and drag to aim (or the stick) · let go in the green' : 'Pick a way to dive before the kick'}</span>
-            </>
-          )}
-          <button className="sc2-go" onClick={kickOffNow}>
-            {ui === 'intro' ? 'KICK OFF' : usKicking.current ? 'STEP UP' : 'READY'}
-          </button>
-        </div>
       )}
       {theirKick && !autoplayHook && (
         <div className="sc2-dive" role="group" aria-label="Dive" onPointerDown={(e) => e.stopPropagation()}>
@@ -920,80 +1065,31 @@ export function Soccer2({
           ))}
         </div>
       )}
-      {playing && !autoplayHook && a && (
-        <div className="hg2-pad sc2-pad">
-          <div className="sc2-left">
-            <div className="hg2-stick sc2-stick" onPointerDown={stickDown} onPointerMove={stickMove} onPointerUp={stickUp} onPointerCancel={stickUp} onLostPointerCapture={stickUp} aria-label="Joystick: run, aim">
-              <i style={{ transform: 'translate(' + knob.x * 30 + 'px,' + knob.y * 30 + 'px)' }} />
-            </div>
-          </div>
-          <div className="hg2-btns sc2-btns" onPointerDown={(e) => e.stopPropagation()}>
-            {sp !== 'penalty' && (
+      {!autoplayHook && a && !theirKick && ui !== 'loading' && ui !== 'final' && <Stick disabled={!playing || paused} onChange={onStick} onTap={tapPass} />}
+      {slots && (
+        <div className="sc2-cluster" role="group" aria-label="Actions">
+          {targetsOf(slots).map((id) => {
+            const sl = slots[id]!;
+            const bend = sl.act === 'bend';
+            const tone = id === 'A' ? 'gold' : id === 'B' ? 'teal' : 'glass';
+            return (
               <button
-                className="hg2-pass"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.setPointerCapture?.(e.pointerId);
-                  doPassDown(e.pointerId);
-                }}
-                onPointerUp={(e) => doPassUp(e.pointerId)}
-                onPointerCancel={() => (passDown.current = null)}
-                aria-label="Pass: tap along the grass, hold for a cross"
+                key={id + sl.act + sl.label}
+                type="button"
+                className={'sc2-ctl sc2-ctl-' + id.toLowerCase() + ' tone-' + tone + (held[id] || (sl.act === 'shoot' && shooting) ? ' down' : '') + (intro ? ' go' : '')}
+                data-slot={id}
+                data-act={sl.act}
+                aria-label={bend ? 'Bend: ' + (bendK === 0 ? 'straight' : bendK < 0 ? 'left' : 'right') + '. Tap to change' : sl.label + (sl.sub ? ' (' + sl.sub.toLowerCase() + ')' : '')}
+                onPointerDown={(e) => slotDown(id, sl, e)}
+                onPointerMove={sl.act === 'shoot' ? (e) => shootDrag(e.pointerId, e.clientX, e.clientY) : undefined}
+                onPointerUp={(e) => slotUp(id, sl, e)}
+                onPointerCancel={() => slotCancel(id, sl)}
+                onLostPointerCapture={(e) => slotUp(id, sl, e)}
               >
-                {sp === 'corner' ? 'CROSS' : 'PASS'}
-                <small>{sp === 'corner' ? 'HOLD' : 'HOLD: LOB'}</small>
-              </button>
-            )}
-            {!sp && (
-              <button
-                className="hg2-cross sc2-thru"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  doThru();
-                }}
-                aria-label="Through ball"
-              >
-                THRU
-              </button>
-            )}
-            {!sp && (
-              <button
-                className={'fb2-burst sc2-sprint' + (sprinting ? ' held' : '')}
-                aria-label="Sprint: hold"
-                aria-pressed={sprinting}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  e.currentTarget.setPointerCapture?.(e.pointerId);
-                  sprintOn(e.pointerId);
-                }}
-                onPointerUp={(e) => sprintOff(e.pointerId)}
-                onPointerCancel={(e) => sprintOff(e.pointerId)}
-                onLostPointerCapture={(e) => sprintOff(e.pointerId)}
-              >
-                SPRINT<small>HOLD</small>
-              </button>
-            )}
-            {sp !== 'corner' && (
-              <button
-                className={'hg2-shoot' + (shooting ? ' held' : '')}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  if (shootDown(e.pointerId, e.clientX, e.clientY)) e.currentTarget.setPointerCapture?.(e.pointerId);
-                }}
-                onPointerMove={(e) => shootDrag(e.pointerId, e.clientX, e.clientY)}
-                onPointerUp={(e) => shootUp(e.pointerId)}
-                onPointerCancel={() => {
-                  shotPointer.current = null;
-                  shotDrag.current = null;
-                  setAimDot(null);
-                  setShooting(false);
-                  if (atkRef.current) cancelShoot(atkRef.current);
-                }}
-                aria-label="Shoot: hold, drag to aim, and let go in the green"
-              >
-                SHOOT
-                {shooting && (
+                <span className="sc2-ctl-label">{bend ? <Arrow dir={bendK} /> : sl.label}</span>
+                {bend && <span className="sc2-ctl-sub">BEND</span>}
+                {sl.sub && <span className="sc2-ctl-sub">{sl.sub}</span>}
+                {sl.act === 'shoot' && shooting && (
                   <span className="sc2-aimpad" aria-hidden="true">
                     <i className="u" />
                     <i className="d" />
@@ -1003,27 +1099,8 @@ export function Soccer2({
                   </span>
                 )}
               </button>
-            )}
-          </div>
-          {sp === 'freekick' && (
-            <div className="sc2-bend" role="group" aria-label="Bend the free kick" onPointerDown={(e) => e.stopPropagation()}>
-              {([-1, 0, 1] as const).map((k) => (
-                <button
-                  key={k}
-                  aria-pressed={k === 0 ? Math.abs(a.curl) < 0.05 : Math.abs(a.curl) >= 0.05 && Math.sign(a.curl) === Math.sign(bendCurl(k))}
-                  onClick={() => {
-                    // the way the arrow points (bendCurl: + curl bends the ball to its left)
-                    setCurl(a, bendCurl(k));
-                    sfx.click();
-                    setTick((n) => n + 1);
-                  }}
-                  aria-label={k === 0 ? 'No bend' : k < 0 ? 'Bend left' : 'Bend right'}
-                >
-                  {k === 0 ? 'STRAIGHT' : <Arrow dir={k} />}
-                </button>
-              ))}
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
       {ui === 'final' && (
@@ -1035,6 +1112,7 @@ export function Soccer2({
           {rival && !rival.done && !soRef.current && <WaitLine rival={rival} unit="attack" total={total} />}
         </div>
       )}
+      {paused && <PauseSheet online={online} rivalName={rivalShown} quitNote={quitNote} onResume={resume} onQuit={onQuit ? () => leave('quit') : undefined} onForfeit={onForfeit ? () => leave('forfeit') : undefined} />}
       {ui === 'loading' && <div className="fg-loading">Walking out…</div>}
     </div>,
     document.body

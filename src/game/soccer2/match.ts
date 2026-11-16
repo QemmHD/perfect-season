@@ -27,7 +27,25 @@ export function setPieceCountdown(waited: number): number | null {
   return left > 0 && left <= 5 ? Math.ceil(left - 1e-9) : null;
 }
 
-export const END_TEXT: Record<AttackEnd, string> = { G: 'GOAL', S: 'SAVED', W: 'WIDE', B: 'BLOCKED', L: 'LOST IT', O: 'OFFSIDE', T: 'TIME' };
+/**
+ * How an attack ended on the match's record: the engine's seven, plus 'FF' (Claude 2026-11-16, studio
+ * overhaul soccer-2; the nba/nfl forfeit contract, plan §5.3): the attacks a player forfeited online,
+ * worth 0, padded up to the match's total. The engine never produces it.
+ */
+export type MatchEnd = AttackEnd | 'FF';
+export const FORFEIT: MatchEnd = 'FF';
+
+export const END_TEXT: Record<MatchEnd, string> = { G: 'GOAL', S: 'SAVED', W: 'WIDE', B: 'BLOCKED', L: 'LOST IT', O: 'OFFSIDE', T: 'TIME', FF: 'FORFEIT' };
+
+/** The record of a forfeited match: what was played, then 'FF' (worth 0) up to `total` attacks. */
+export function forfeitEnds(ends: readonly string[], total: number): string[] {
+  const out = ends.slice(0, total);
+  while (out.length < total) out.push(FORFEIT);
+  return out;
+}
+
+/** Did this side forfeit? Only an explicit 'FF' on the record says so, never a missing field. */
+export const forfeitBy = (ends: readonly string[]) => ends.includes(FORFEIT);
 
 export const SCENARIO_NAMES: Record<Scenario, string> = {
   build: 'Build-up',
@@ -38,14 +56,29 @@ export const SCENARIO_NAMES: Record<Scenario, string> = {
   penalty: 'Penalty',
 };
 
-export const SCENARIO_HINTS: Record<Scenario, string> = {
-  build: 'Work it forward · find a runner in behind',
-  counter: '3 on 2 · sprint at them before they get back',
-  wide: 'Overload the flank · beat your man or cross it',
-  corner: 'Pick your target · hold PASS to whip it in',
-  freekick: 'Swipe to bend it · hold SHOOT, drag to aim, let go in the green',
-  penalty: 'Hold SHOOT and drag to aim (or the stick) · let go in the green',
+/**
+ * The line each attack opens with, in the toast line (Claude 2026-11-16, soccer-2: it replaces the
+ * card over the goal, V-3): the scenario's short name, then one instruction, short enough for one line
+ * at 320 px, with one name per control (SHOOT, PASS, THRU, CROSS, BEND).
+ */
+export const SCENARIO_SHORT: Record<Scenario, string> = {
+  build: 'BUILD-UP',
+  counter: 'COUNTER',
+  wide: 'WIDE',
+  corner: 'CORNER',
+  freekick: 'FREE KICK',
+  penalty: 'PENALTY',
 };
+export const SCENARIO_HINTS: Record<Scenario, string> = {
+  build: 'find a runner in behind',
+  counter: '3 on 2 · go at them',
+  wide: 'beat your man or CROSS it',
+  corner: 'pick a man · CROSS it in',
+  freekick: 'swipe to BEND · then SHOOT',
+  penalty: 'hold SHOOT · drag to aim',
+};
+/** The toast line before the whistle: "BUILD-UP · find a runner in behind". */
+export const scenarioToast = (s: Scenario) => SCENARIO_SHORT[s] + ' · ' + SCENARIO_HINTS[s];
 
 export interface Match {
   us: Squad;
@@ -57,7 +90,7 @@ export interface Match {
   deal: Scenario[];
   /** attacks played */
   i: number;
-  ends: AttackEnd[];
+  ends: MatchEnd[];
   goals: number;
   over: boolean;
 }

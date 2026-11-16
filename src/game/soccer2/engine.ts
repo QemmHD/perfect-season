@@ -626,19 +626,23 @@ export function passPlan(a: Attack, kind: PassKind, dir: Pt | null): PassPlan | 
  * from a corner); through: into the space ahead of a runner. `free` (a person's pass, Claude
  * 2026-11-02): it goes the stick's way with a gentle assist (passPlan) instead of to the teammate
  * nearest that way; the autopilot and a corner's "stick picks the man" keep the teammate pick. */
-export function pass(a: Attack, kind: PassKind, dir: Pt | null, free = false): boolean {
+export function pass(a: Attack, how: PassKind | 'loftedThrough', dir: Pt | null, free = false): boolean {
   if (a.end || a.phase !== 'live' || a.strike || a.kick || a.meter) return false;
   const sp = a.setPiece;
   const c = ownerOf(a) ?? (sp && a.taker !== null ? a.bodies[a.taker] : null);
   if (!c || (sp && sp.kind === 'penalty')) return false;
   if (sp && dist(c, sp.spot) > 1.8) return false;
+  // the lofted through ball (THRU held; Claude 2026-11-16, soccer-2, a person's pass only: the
+  // autopilot never plays it, so no AI simulation changes): a through ball's runner and space, in the air
+  const loftThru = how === 'loftedThrough';
+  const kind: PassKind = loftThru ? 'through' : how;
   const p = c.p;
   const from = { x: a.ball.x, y: a.ball.y };
   const corner = sp?.kind === 'corner';
   const plan = free && !corner ? passPlan(a, kind, dir) : null;
   const to = plan ? plan.to : passTarget(a, dir, kind);
   if (!plan && !to) return false;
-  const lofted = kind === 'lofted' || (corner && kind !== 'ground');
+  const lofted = kind === 'lofted' || (corner && kind !== 'ground') || loftThru;
   const spot = plan ? plan.spot : passSpot(a, from, to!, kind);
   if (kind === 'through' && to) to.run = { ...spot };
   let vx: number, vy: number, vh: number;
@@ -668,7 +672,8 @@ export function pass(a: Attack, kind: PassKind, dir: Pt | null, free = false): b
     vh = kind === 'through' && d > 22 ? 0.6 : 0;
   }
   const curl = lofted && corner ? (from.x < GX ? -1 : 1) * 0.12 : 0;
-  a.kick = { at: a.t + 0.1, by: c.id, to: to ? to.id : null, kind: lofted ? (box ? 'cross' : 'lofted') : kind, vx, vy, vh, curl };
+  a.kick = { at: a.t + 0.1, by: c.id, to: to ? to.id : null, kind: lofted ? (box && !loftThru ? 'cross' : 'lofted') : kind, vx, vy, vh, curl };
+  if (loftThru) a.kick.loftedThrough = true;
   act(c, 'kick', a.t);
   if (to) a.ctrl = to.id;
   a.passStick = free && dir && Math.hypot(dir.x, dir.y) > 0.2 ? { x: dir.x, y: dir.y } : free ? null : undefined;
@@ -1310,7 +1315,7 @@ function launchPass(a: Attack) {
   b.vh = k.vh;
   b.curl = k.curl;
   b.flight = { kind: k.kind, from: by.id, to: k.to, at: a.t };
-  by.passKind = k.kind;
+  by.passKind = k.loftedThrough ? 'loftedThrough' : k.kind;
   // offside is judged now: who's past the second-last defender and the ball, in their half (never
   // from a throw-in)
   const line = offsideLine(a);

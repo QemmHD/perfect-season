@@ -16,6 +16,7 @@ import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
 import { reducedMotion } from '../../ui/motion';
 import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
+import { nearestWithin, TAP_PLAYER_PX } from './controls';
 import { shotCone, topSpeed } from './ratings';
 import type { Attack, Body, Pt } from './types';
 
@@ -38,7 +39,27 @@ export interface SoccerOverlay {
   flash: number;
   /** names over everyone (before kick-off) */
   names: boolean;
+  /**
+   * The man in control is ours (V-3, Claude 2026-11-16, soccer-2): our side gets the gold ground ring
+   * and a gold name tag; the rival's taker (their penalty in a shootout) a violet ring and tag, never
+   * ours. Default true.
+   */
+  ours?: boolean;
+  /** screen bands no tag may print over (the toast line while it shows), canvas px */
+  keepOut?: { x: number; y: number; w: number; h: number }[];
 }
+
+/** A name tag or a word over the pitch, waiting for the label pass (layoutLabels). */
+export interface Tag {
+  s: string;
+  x: number;
+  y: number;
+  color: string;
+  /** who keeps his spot when two meet: the higher stays, the lower moves up */
+  prio: number;
+}
+/** Tag colours: ours gold, a teammate teal, the rival violet (V2 C.3). */
+export const TAG = { ours: '#ffe08a', mate: '#7ff5d6', rival: '#c4b5fd', word: '#d6e5ed', white: '#ffffff' } as const;
 
 const CLIPS = ['ready', 'jog', 'run', 'sprint', 'kick', 'dive', 'fall_forward', 'fall_forward_m', 'fall_back', 'catch', 'jump', 'celebrate', 'shuffle', 'shuffle_l', 'backpedal'];
 /** the kick: the boot through the ball when the engine strikes it (0.11 s after the swing starts) */
@@ -550,10 +571,10 @@ export class SoccerRenderer {
     if (ghost) {
       const w = timingWord(ghost.off, ghost.green);
       const col = w === 'PERFECT' ? '#3ef07a' : w === 'GOOD' ? '#d6e5ed' : '#ffb04a';
-      label(ctx, w, cx, cy - R - th - 16, col, this.W);
+      this.tag(w, cx, cy - R - th - 16, col, 3);
       return;
     }
-    label(ctx, m!.first ? 'FIRST TIME' : a.setPiece?.kind === 'penalty' ? 'PENALTY' : a.setPiece ? 'FREE KICK' : 'POWER', cx, cy - R - th - 16, '#d6e5ed', this.W);
+    this.tag(m!.first ? 'FIRST TIME' : a.setPiece?.kind === 'penalty' ? 'PENALTY' : a.setPiece ? 'FREE KICK' : 'POWER', cx, cy - R - th - 16, TAG.word, 3);
     this.miniGoal(ctx, a, cx, cy - R - th - 30);
   }
 
@@ -616,7 +637,7 @@ export class SoccerRenderer {
     ctx.fillStyle = '#ffe08a';
     ctx.fillRect(px - 2, py - 2, 5, 5);
     ctx.restore();
-    if (!m.aim) label(ctx, 'AUTO', x0 + W / 2, y0 - 16, '#7ff5d6', this.W);
+    if (!m.aim) this.tag('AUTO', x0 + W / 2, y0 - 16, TAG.mate, 4);
   }
 
   /** Where the shot is going: a reticle in the goal mouth, its ring the error cone a release now would
@@ -690,7 +711,22 @@ export class SoccerRenderer {
     this.goalAt = t;
   }
 
+  /** the tags this frame, painted together after layoutLabels */
+  private tags: Tag[] = [];
+  private tag(s: string, x: number, y: number, color: string, prio: number) {
+    this.tags.push({ s, x, y, color, prio });
+  }
+
+  /** The goal mouth on screen now (posts to crossbar), for the HUD's keep-clear checks. */
+  goalMouth(): { x: number; y: number; w: number; h: number } | null {
+    if (!this.cam) return null;
+    const l = this.lens(GX - GHALF, PL, GH);
+    const r = this.lens(GX + GHALF, PL, 0);
+    return { x: Math.min(l.x, r.x), y: Math.min(l.y, r.y), w: Math.abs(r.x - l.x), h: Math.abs(r.y - l.y) };
+  }
+
   draw(ctx: CanvasRenderingContext2D, a: Attack, o: SoccerOverlay, kitOf: (b: Body) => 'us' | 'them') {
+    this.tags.length = 0;
     ctx.imageSmoothingEnabled = false;
     // a corner pulls out wide enough for the taker and the whole box; a replay pushes in
     const zt = this.replay ? 1.3 : a.setPiece?.kind === 'corner' ? 0.68 : 1;
@@ -730,9 +766,10 @@ export class SoccerRenderer {
       ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(2, Math.round(rx * Math.sin(pitchAt(this.cam!, b.y)) * 0.85)), 0, 0, Math.PI * 2);
       ctx.stroke();
     };
+    const ours = o.ours !== false;
     if (!a.end) {
-      ring(c, 'rgba(255,224,138,0.95)');
-      if (o.target !== null && a.bodies[o.target]) ring(a.bodies[o.target], 'rgba(62,240,192,0.9)', 0.5, 0.06);
+      ring(c, ours ? 'rgba(255,224,138,0.95)' : 'rgba(167,139,250,0.95)');
+      if (ours && o.target !== null && a.bodies[o.target]) ring(a.bodies[o.target], 'rgba(62,240,192,0.9)', 0.5, 0.06);
     }
     // the players and the ball, far to near
     const items: { y: number; draw: () => void }[] = [];
@@ -772,14 +809,14 @@ export class SoccerRenderer {
       // his name under his feet (over his head it would hide the ball he's about to play)
       if (!a.meter) {
         const f = this.lens(c.x, c.y);
-        label(ctx, c.p.tag, f.x, Math.round(f.y + Math.max(10, f.s * 0.42) + 6), '#ffe08a', this.W);
+        this.tag(c.p.tag, f.x, Math.round(f.y + Math.max(10, f.s * 0.42) + 6), ours ? TAG.ours : TAG.rival, 5);
       }
     }
-    if (o.target !== null && heads[o.target] && !a.end && !a.meter) {
+    if (ours && o.target !== null && heads[o.target] && !a.end && !a.meter) {
       const t = a.bodies[o.target];
-      label(ctx, t.p.tag, heads[o.target].x, heads[o.target].y - 15, '#7ff5d6', this.W);
+      this.tag(t.p.tag, heads[o.target].x, heads[o.target].y - 15, TAG.mate, 2);
     }
-    if (o.names) for (const b of a.bodies) if (b.side === 'A' && b !== c && heads[b.id]) label(ctx, b.p.tag, heads[b.id].x, heads[b.id].y - 15, '#ffffff', this.W);
+    if (o.names && ours) for (const b of a.bodies) if (b.side === 'A' && b !== c && heads[b.id]) this.tag(b.p.tag, heads[b.id].x, heads[b.id].y - 15, TAG.white, 1);
     if (o.pass && !a.meter && !a.end) this.passLine(ctx, a, o.pass);
     if (a.meter) this.aim(ctx, a);
     if (h && !a.end) this.meter(ctx, a, h);
@@ -793,8 +830,11 @@ export class SoccerRenderer {
       ctx.beginPath();
       ctx.arc(p0.x + dir * len * 0.2, p0.y + len * 0.8, len, -Math.PI / 2 - 0.5, -Math.PI / 2 + 0.5);
       ctx.stroke();
-      label(ctx, 'BEND', p0.x, p0.y - 22, '#ffd23a', this.W);
+      // the word only before SHOOT is held: with the meter up the arrow says it, and the meter's own word is there
+      if (!a.meter) this.tag('BEND', p0.x, p0.y - 22, '#ffd23a', 2);
     }
+    // every tag at once, stacked where two would print over each other ("FBENDICK", V-3)
+    for (const t of layoutLabels(this.tags.splice(0), this.W, this.H, o.keepOut)) label(ctx, t.s, t.x, t.y, t.color, this.W);
     ctx.restore();
     if (o.flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + Math.min(0.8, o.flash).toFixed(2) + ')';
@@ -803,19 +843,10 @@ export class SoccerRenderer {
   }
 
   /** The teammate nearest a screen point (for tap-to-pass), within `r` pixels. */
-  bodyAt(a: Attack, sx: number, sy: number, r: number): number | null {
-    let best: number | null = null;
-    let bd = r;
-    for (const b of a.bodies) {
-      if (b.side !== 'A') continue;
-      const f = this.lens(b.x, b.y, 0.9);
-      const d = Math.hypot(f.x - sx, f.y - sy);
-      if (d < bd) {
-        bd = d;
-        best = b.id;
-      }
-    }
-    return best;
+  bodyAt(a: Attack, sx: number, sy: number, r = TAP_PLAYER_PX): number | null {
+    if (!this.cam) return null;
+    const pts = a.bodies.filter((b) => b.side === 'A').map((b) => ({ id: b.id, ...this.lens(b.x, b.y, 0.9) }));
+    return nearestWithin(pts, sx, sy, r)?.id ?? null;
   }
 }
 
@@ -833,6 +864,48 @@ const F35: Record<string, string> = {
   A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100', G: '011100101101011', H: '101101111101101', I: '111010010010111', J: '001001001101010', K: '101101110101101', L: '100100100100111', M: '101111111101101', N: '110101101101101', O: '010101101101010', P: '110101110100100', Q: '010101101110011', R: '110101110101101', S: '011100010001110', T: '111010010010010', U: '101101101101111', V: '101101101101010', W: '101101111111101', X: '101101010101101', Y: '101101010010010', Z: '111001010100111',
   '0': '111101101101111', '1': '010110010010111', '2': '111001111100111', '3': '111001011001111', '4': '101101111001001', '5': '111100111001111', '6': '111100111101111', '7': '111001010010010', '8': '111101111101111', '9': '111101111001111', ' ': '000000000000000', '-': '000000111000000', '.': '000000000000010', "'": '010010000000000', '!': '010010010000010',
 };
+
+/** A tag's chip on screen, as `label` draws it (kept on screen; 16 px tall: 10 px letters and padding). */
+export function tagBox(s: string, x: number, y: number, W: number): { x: number; y: number; w: number; h: number } {
+  const w = (s.length * 4 - 1) * 2;
+  const x0 = Math.max(3, Math.min(W - w - 3, Math.round(x - w / 2)));
+  return { x: x0 - 3, y: y - 3, w: w + 6, h: 16 };
+}
+
+/**
+ * The label pass (V-3, Claude 2026-11-16, soccer-2): tags that would print over each other are
+ * stacked. The most important keeps its place; each other one moves up just clear of whatever it
+ * meets (down instead if that would leave the top of the screen), so "FREE KICK" over the meter and
+ * "BEND" over the ball read as two words, never "FBENDICK". Pure, for hud-layout.test.
+ */
+export function layoutLabels(tags: readonly Tag[], W: number, H: number, keepOut: readonly { x: number; y: number; w: number; h: number }[] = []): Tag[] {
+  type Box = ReturnType<typeof tagBox>;
+  const placed: { t: Tag | null; b: Box }[] = keepOut.map((b) => ({ t: null, b }));
+  const meets = (p: Box, q: Box) => p.x < q.x + q.w + 1 && q.x < p.x + p.w + 1 && p.y < q.y + q.h + 1 && q.y < p.y + p.h + 1;
+  const order = tags.map((t, i) => ({ t, i })).sort((p, q) => q.t.prio - p.t.prio || p.i - q.i);
+  for (const { t } of order) {
+    let y = t.y;
+    let up = true;
+    for (let n = 0; n < 24; n++) {
+      const b = tagBox(t.s, t.x, y, W);
+      const hit = placed.find((p) => meets(b, p.b));
+      if (!hit) break;
+      // a keep-out band (the toast line): the tag drops just below it (under a man's feet it hides nothing),
+      // or goes above it when there's no room below
+      if (!hit.t) up = hit.b.y + hit.b.h + 2 + 16 > H;
+      const yUp = hit.b.y - 17 + 3;
+      if (up && yUp >= 3) y = yUp;
+      else {
+        up = false;
+        y = hit.b.y + hit.b.h + 2 + 3;
+      }
+    }
+    y = Math.max(3, Math.min(H - 13, y));
+    const t2 = { ...t, y };
+    placed.push({ t: t2, b: tagBox(t.s, t.x, y, W) });
+  }
+  return placed.flatMap((p) => (p.t ? [p.t] : []));
+}
 
 /** A name tag: 3x5 letters doubled up, on a dark chip, kept on screen (the football field's). */
 export function label(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, color: string, W: number) {

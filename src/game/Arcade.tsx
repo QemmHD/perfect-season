@@ -12,7 +12,7 @@ import type { BotLevel, Lineup, Player } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { type Attrs, loadAttrs } from './attrs';
 import { aiDrives2, aiDrivesOf, Football2 } from './football2/Football2';
-import type { RivalLive } from './progress';
+import { type RivalLive, wireOf } from './progress';
 import { WaitLine } from './Wait';
 import { DRIVES } from './football2/drive';
 import { offenseOf } from './football2/squad';
@@ -33,8 +33,8 @@ const FOOTBALL = pick({ nba: false, nfl: true, soccer: false });
 const POINTS: Record<string, number> = pick<Record<string, number>>({
   nba: { '2': 2, '3': 3, A: 3, X: 0, TO: 0 },
   nfl: { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0, PUNT: 0, FUM: 0, SAF: 0, TIME: 0 },
-  // soccer: a goal, or saved, wide, blocked, lost, offside, time (soccer2/match.ts)
-  soccer: { G: 1, S: 0, W: 0, B: 0, L: 0, O: 0, T: 0 },
+  // soccer: a goal, or saved, wide, blocked, lost, offside, time (soccer2/match.ts); 'FF' a forfeited attack (soccer-2)
+  soccer: { G: 1, S: 0, W: 0, B: 0, L: 0, O: 0, T: 0, FF: 0 },
 });
 /** drives, possessions or attacks each (soccer: six and one in stoppage time) */
 const TOTAL = pick({ nba: POSSESSIONS, nfl: DRIVES, soccer: 7 });
@@ -112,6 +112,7 @@ export function Arcade({
   onProgress,
   onTakeover,
   onFinish,
+  onQuit,
 }: {
   /** the two drafted lineups; or `teams`, built already */
   lineup?: Lineup;
@@ -143,8 +144,10 @@ export function Arcade({
   onProgress: (p: Progress) => void;
   /** this phone let the AI finish the rival's drives from drive `k` on: tell the other phone */
   onTakeover: (k: number) => void;
-  /** `pens`: soccer, a level match settled on penalties */
-  onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens) => void;
+  /** `pens`: soccer, a level match settled on penalties; `forfeit` (merge: nba-7/nfl C1 publish the same): who forfeited online */
+  onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens, forfeit?: 'us' | 'them') => void;
+  /** ut contract B (merge: nba/nfl adopt the same): a solo match quit from the pause sheet, with what was played and the AI's */
+  onQuit?: (us: Progress, them: Progress) => void;
 }) {
   const defenseIQ = defenseDifficulty(online, botLevel, aiDefense);
   const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay || manualOnly ? 'play' : 'kickoff');
@@ -252,15 +255,23 @@ export function Arcade({
     return { name: rivalName, score: pointsThrough(ai, n), drive: n, done: n >= TOTAL };
   }, [online, rivalLive, takeover, ai, mine, stallAt]);
 
-  const us: Progress | null = taken ?? (mine?.done ? mine : null);
-  const them: Progress | null = online ? (takeover ?? (rivalLive?.done ? rivalLive : null)) : ai;
+  // soccer's online forfeit (soccer-2; merge: nba-7's forfeit block does the same for every sport):
+  // a side that forfeits sends its attacks padded with 'FF' and done, and the match ends on both phones
+  const [forfeit, setForfeit] = useState<'us' | 'them' | null>(null);
+  const rivalFF = SOCCER && online && !!rivalLive?.done && rivalLive.ends.includes('FF');
+  useEffect(() => {
+    if (rivalFF && !forfeit) setForfeit('them');
+  }, [rivalFF]);
+  const soFar = (p: Progress | null | undefined): Progress => p ?? { score: 0, drive: 0, done: false, ends: [] };
+  const us: Progress | null = taken ?? (mine?.done ? mine : forfeit === 'them' ? soFar(mine) : null);
+  const them: Progress | null = online ? (takeover ?? (rivalLive?.done ? rivalLive : forfeit === 'us' ? soFar(rivalLive) : null)) : ai;
   const sent = useRef(false);
   const how = useRef<'played' | 'sim'>('played');
   // soccer: a level match goes to penalties. Online, sims and taken-over games use the shootout both
   // phones work out the same way (the host's eleven kicks first); a match played against the AI has
   // its shootout played out on the pitch (Soccer2's onShootout).
   const [pens, setPens] = useState<Pens | null>(null);
-  const level = SOCCER && !!us && !!them && us.score === them.score;
+  const level = SOCCER && !forfeit && !!us && !!them && us.score === them.score;
   const agreed = useMemo(() => (SOCCER && sg && squads ? sg.agreedShootout(squads.us, squads.them, seed, online ? host : true) : null), [sg, squads]);
   const onPitch = !taken && how.current === 'played';
   useEffect(() => {
@@ -272,13 +283,27 @@ export function Arcade({
     if (sent.current || !us || !them) return;
     if (level && !pens) return;
     sent.current = true;
-    window.setTimeout(() => onFinish(us, them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), level ? 2600 : 1600);
+    window.setTimeout(() => onFinish(us, them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined, forfeit ?? undefined), level ? 2600 : 1600);
   }, [us, them, pens]);
 
   const progress = (p: Progress) => {
     if (taken) return;
     setMine(p);
-    onProgress(p);
+    onProgress(wireOf(p));
+  };
+  // soccer, online: FORFEIT from the pause sheet (confirmed there): what was played, padded with 'FF' to TOTAL
+  const forfeitNow = (p: Progress) => {
+    if (sent.current || forfeit) return;
+    const ends = p.ends.slice(0, TOTAL);
+    while (ends.length < TOTAL) ends.push('FF');
+    setForfeit('us');
+    progress({ ...p, ends, drive: TOTAL, done: true, forfeit: true });
+  };
+  // soccer, solo: QUIT from the pause sheet (confirmed there): the host decides what a quit means (ut contract B)
+  const quitNow = (p: Progress) => {
+    if (sent.current || !ai || !onQuit) return;
+    sent.current = true;
+    onQuit(p, ai);
   };
 
   // sim: the autopilot plays your drives at a middling level
@@ -460,9 +485,12 @@ export function Arcade({
         kits={k}
         autoplayHook={autoplay}
         fixedShootout={online && agreed ? { first: agreed.first, scored: agreed.scored } : undefined}
+        online={online}
         onProgress={progress}
         onDone={progress}
         onShootout={(r) => setPens({ us: r.us, them: r.them, won: r.winner === 'us' })}
+        onQuit={!online && onQuit ? quitNow : undefined}
+        onForfeit={online ? forfeitNow : undefined}
       />
     );
   }

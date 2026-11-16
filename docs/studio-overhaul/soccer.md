@@ -224,6 +224,65 @@ New `src/lib/sound-perfect.test.ts` (7 tests): the chime's root and fifth 70 ms 
 - `restarts` (new): a parry staged running wide of the right post becomes a corner from the right flag in the same attack ("CORNER! · WON IT", CROSS button, taker on the ball, 29.5 s left, restarts 1). A ball then sent off a defender over the touchline at y 90 gives a quick throw-in (held at 2.05 m, `kick.kind 'throw'`, restarts 2). 0 errors at 393 and 320.
 - **Seen, and left to soccer-3 (camera, V-1):** at an earned corner and a quick throw-in the camera frames the receiver, so the taker or thrower at the flag or touchline sits at or past the screen edge (the corner taker's name is cut at x 393). The dealt corner has the same framing today (audit: taker at x = 17). soccer-3's corner framing and edge arrows cover both.
 
+## soccer-2 · The shared control cluster, HUD kit, toast line, pause, quit and forfeit
+
+**What changed** (V2 A.5, C.3; audit C-1, C-5, V-3; plan soccer-2):
+- **The left thumb is a floating stick** (`v2/stick.ts` + `Stick` in `v2/hud.tsx`, stand-ins with nba's interface). A thumb down anywhere in the lower-left zone (x 0–48% of the width, y 45% down to the bottom inset) spawns the ring under it. Past 1.15× the ring is sprint, back under 1.0× ends it (hysteresis), with a `'tick'` haptic as it turns on. Release is `{0, 0}`. A thumb resting there before the whistle is tracked and drives the carrier the frame the stick enables. A quick tap in the zone that never moved the stick, or a second finger there, is a tap on the pitch (tap a teammate to pass). **SPRINT leaves the right cluster** (Shift still sprints on a keyboard).
+- **The A/B/C/D cluster** on the V2 geometry tokens (`v2/geometry.css`, nba's token names and values; `v2/geometry.ts` computes the same numbers). Slots per phase come from `controls.ts` `slotsFor`:
+  - open play: A SHOOT, B PASS (hold ≥ 0.22 s = lob/cross), C THRU (tap = ground; **hold = the lofted through ball**, new), D empty until TRICK (soccer-6);
+  - free kick: A SHOOT, B CROSS, C SHORT, **D BEND** (tap cycles straight → left → right; the swipe on the pitch still bends). The three BEND chips are gone, so a free kick has four right-thumb targets, not seven;
+  - corner: B CROSS, C SHORT; penalty: A SHOOT only;
+  - before the whistle A is KICK OFF / STEP UP / READY (it breathes, except under reduced motion), so the left thumb can already be down.
+  - Taps, the cross, SHORT and BEND fire on touch-down; PASS, THRU and SHOOT are deliberate holds and fire on release. The pressed look (6 px sink, edge collapse, a halo ring) is on touch-down.
+- **Button skin (C.3):** lit domes (three-stop radial body, a specular cap, an inner rim, a hard coloured edge below, a contact shadow and a glow): A gold with a dark label, B teal, C/D indigo glass. A bottom scrim (transparent to `rgba(7,21,33,0.55)` over 240 px). No `backdrop-filter` in the match.
+- **The lofted through ball** (`engine.ts` `pass(a, 'loftedThrough', …)`): the through ball's runner and space, in the air (lofted flight, `kick.kind 'lofted'`, `kick.loftedThrough`), and `Body.passKind: 'loftedThrough'` for players. A person's pass only: the autopilot never plays it, so golden is unchanged.
+- **HUD kit** (stand-ins in `v2/hud.tsx`): the score bug "YOU 1 · 67' 5/7 · 1 RIV" (232×40 at sat + 6 on the owner's phone; team-colour blocks with accent stripes; PENS / FULL TIME in the middle when they apply) with a 3 px line along its bottom that drains with the attack's clock (red in its last 5 s; it replaces the 0:30 read-out) and the hidden Heat-bar slot at sat + 49 (soccer-7 fills it); the pause button 44×44 top left; the **toast line** (one 28 px glass capsule, bottom edge at y 618 on the owner's phone, keyword coloured) in place of the hint card over the goal and the intro card. It carries the attack's line before the whistle ("BUILD-UP · find a runner in behind"), the tips, the AUTO KICK countdown and their-kick line, and shows nothing while SHOOT is held or a meter is up. The attack-ends row under the bug is gone (the bug's "5/7" replaces it).
+- **V-3 fixes:**
+  - **FBENDICK:** every tag on the pitch goes through one label pass (`render.ts` `layoutLabels`): the most important keeps its spot, the rest stack clear of it; and no tag prints under the toast line (it drops just below). "BEND" over the ball shows only before SHOOT is held.
+  - **Rings by side:** the gold ground ring and gold tag only for our man; the rival's taker (their penalty in a shootout) gets a violet ring and tag, and no teal pass target.
+  - **`SCENARIO_SHORT`** and one-line toasts with one name per control (SHOOT, PASS, THRU, CROSS, SHORT, BEND); nothing is ellipsised at 320.
+  - The intro card is gone (its words are in the toast line and the bug), so nothing covers name tags before kick-off.
+  - The `@media (max-width: 350px), (max-height: 600px)` rules are now the `.compact` class, set from the measured frame.
+  - The LAST PLAY read-out shows between attacks only, under the pause button (it sat in the stick zone, over the toast line).
+- **Pause (C-5)** (`PauseSheet.tsx`, `timers.ts`): the sheet has RESUME, HOW TO PLAY, CONTROLS and the playtime line when the hook gives one. While paused the loop drops its accumulator (a.t stops), input clears, and every beat between whistles (`PausableTimers`: next attack, replays, shootout kicks, pops, tips) holds its remaining time; a replay resumes where it stopped. It pauses itself on `visibilitychange: hidden` and `pagehide`. Esc / P pause on a keyboard.
+- **QUIT (solo, ut contract B):** QUIT MATCH → "QUIT? It counts as a loss." (the host's `quitNote`) → `Soccer2 onQuit(progress)` → `Arcade` calls the host's `onQuit(us, them)` with the attacks played and the AI's progress. No soccer-side settlement, no padding. Shown only when the host passes `onQuit`.
+- **FORFEIT (online):** FORFEIT → "FORFEIT? Your rival wins, and the match ends on both phones now." → `Arcade` pads your ends with `'FF'` to TOTAL, `done: true`, sends it, and finishes with `onFinish(…, forfeit 'us')`. The other phone sees the `'FF'` ends (the wire parser keeps them) and finishes at once with `forfeit 'them'`. `'FF'` is worth 0 in soccer's `POINTS` and labelled in ut's `END_LABEL`; `match.ts` has `MatchEnd`, `FORFEIT`, `forfeitEnds`, `forfeitBy` and `END_TEXT.FF = 'FORFEIT'`. `progress.ts` `wireOf(p)` sends only the five shared fields (no `forfeit`, box or grade), used by `Arcade.progress()` for every sport.
+- **Prefs** (`prefs.ts`): `perfect-season:soccer-prefs:v1` = `{ v: 1, autoDefend: false, autoSwitch: 'on', buttonsOnly: false }`, unknown fields kept, every bad value a default. Nothing reads them yet: the switches arrive with what they switch (`buttonsOnly` with the shot types in soccer-6, `autoSwitch` with defend phases in soccer-8, `autoDefend` in soccer-9). A toggle that changes nothing would mislead, so CONTROLS is a control map for now.
+- **Playtime and haptics** (stand-ins `v2/playtime.ts`, `v2/haptics.ts`): `usePlaytime('match', { paused, auto: autoplay, stoppage: between phases })`; `haptic('tick')` on an accepted button, a tap pass and the sprint edge, played only inside the player's own touch.
+
+**Before → after** (`scripts/qa/soccer-lab.mjs layout`, dev server, touch, every context isolated; screenshots in `O/shots/soccer/soccer-2/`, all looked at):
+
+| Measure | Before | After | Target |
+|---|---|---|---|
+| C1 A / B / C / D at 393×852 (sat 59 and 81), DOM centre and Ø | A at bottom-right from `hg2-btns`, SPRINT Ø62 over the stick, THRU 54, no D | A Ø92 (323, 738), B Ø64 (238, 778), C Ø48 (250, 694), D Ø48 (340, 652): exact | ±2 px |
+| C1 at 320×568 | (the 350 px media query) | A Ø84 (266, 510), B Ø56 (190, 536), C Ø44 (200, 468), D Ø44 (282, 436): exact | ±2 px |
+| Gaps A–B / A–C / A–D (393; 320) | — | 15.9 / 15.2 / 17.7; 10.3 / 14.2 / 11.7 | 10–18 |
+| Stick zone (393; 320) | a fixed 118 px stick | x 0–189, y 383–818; x 0–154, y 256–568 | as V2 |
+| Toast line bottom (393; 320) | hint card at sat + 76, over the goal | 618; 404 | 618; 404 |
+| Bug top − sat; pause | — | 6 (393), 4 (320); 44×44 | sat + 6; ≥ 44 |
+| Right-thumb targets at a free kick | 7 (PASS, SHOOT, 3 BEND) | 4 | ≤ 4 |
+| C2 thumb down → stick drawn, p95 over 50 touches (6 presets) | — | 49–69 ms (p50 34–60) | ≤ 100 ms |
+| C4 sprint speed kept while SHOOT winds up | 0.68 (the right thumb leaves SPRINT: jog 0.8 × wind-up 0.85) | **0.85** at equal stamina (raw 0.842–0.843: 0.3 s more sprinting drains stamina 0.78 → 0.71) | ≥ 0.85 |
+| C5 thumb down 500 ms before the whistle → carrier moving | never (the stick took no thumb before kick-off; it had to be lifted and put down again) | 63–89 ms after the whistle | ≤ 100 ms |
+| Pause: a.t over 3 s paused; after RESUME | — | unchanged (0.35 → 0.35); runs on (→ 1.15 after 0.8 s) | stops; runs |
+| Toast line over the goal mouth (120 frames per preset) | the hint over the goal (V-3.1) | 0 | 0 |
+| Text under 10 px; labels spilling; horizontal overflow | sub-labels 8 px | none; none; 0 px | — |
+| Reduced motion | — | A's breathing and the sheet's slide: `animation: none` | none |
+| Live hosts reached | — | 0 (every non-localhost request aborted) | 0 |
+
+Also run and green after the change (393 sat 59 and 320): the older lab parts `play`, `buttons`, `bend` (D cycles to Bend left, curl +0.75), `autokick`, `restarts` (selectors updated to the cluster). Solo QUIT: the lab's stub gets `us` (the attacks played) and `them` (7 ends). Online (lab `?online`): the sheet offers FORFEIT and no QUIT, its confirm, and the stub gets the progress. The rival's taker in a shootout: violet ring and tag (screenshot `*-rival-taker.png`).
+
+**Tests** (new): `controls.test.ts` (14: the V2 numbers at 393 and 320, gaps, ≥ 44 px, no button in the stick zone or the top third, 2,000 synthetic touches per preset and phase all in the right zone, tap misread ≤ 2% with a wobbling thumb and swipes never taps, nearest-teammate resolution ≥ 22 px, ≤ 4 targets, D empty in attack, the bend cycle, and the stand-in stick: floating, two axes, release-to-stop, the 1.15/1.0 hysteresis with one edge, the pre-held thumb, one pointer, the ring kept on screen); `hud-layout.test.ts` (6: FBENDICK at 320/375/390/393/430, 400 random tag crowds per width with no overlap and all on screen, the toast keep-out, 16 px chips, the toast line clear of the safe box, the cluster, the bug and the pause button, the Heat slot above the safe box, sideways); `prefs.test.ts` (7: defaults for absent/garbage/old shapes, round trip with unknown fields, a throwing store, and the import graph: prefs.ts imports nothing; engine, autopilot, match, shootout and ratings never reach prefs, controls or v2/); `forfeit.test.ts` (5: padding to TOTAL, 'FF' worth 0 in Arcade's soccer map and labelled in ut, forfeit only from an explicit 'FF', the wire carries no forfeit/box/grade, the wire parser keeps 'FF'); `rules.test.ts` +3 (the lofted through ball flies and is marked; a ground THRU isn't; the autopilot never plays it).
+
+**Golden unchanged** (attacks `0dde30cbc63300`, matches `07f3dde0f40f62`, shootouts `13ebc2208d1307`); agreement green.
+
+**Suite.** `PS_SPORT=soccer npx vitest run soccer sport-branches` (through `heavy.sh`): 17 files, **146/146**, Duration **119.3 s** on the shared machine under load (91.8 s on an earlier run of this task). Default sport, `npx vitest run src/game/soccer2 src/engine/sport-branches src/lib/sound`: 14 files, 130/130 (95.0 s). `npm run typecheck` clean.
+
+**Not done here, and why:**
+- The **two-phone forfeit in a browser** (two contexts on the in-process relay through a whole online soccer draft) is not scripted yet: soccer-app.mjs has no online flow. The forfeit path is covered by `forfeit.test.ts` and the lab's sheet; the two-phone run is a follow-up for soccer-10's gate.
+- **CONTROLS toggles** (`autoSwitch`, `buttonsOnly`) wait for the features they switch (above).
+- **The hosts** (`ut/Match.tsx`, `App.tsx`) don't pass `onQuit` yet, and they settle on score, not the 6th `forfeit` argument: hand-offs below. Until then QUIT shows only in hosts that pass `onQuit` (the lab), and a forfeit win depends on the hosts reading `forfeit`.
+
 ## Contracts (plan §5): what soccer publishes and what it adopts
 
 Published in soccer-1 so ut, nba, nfl, players and shell can rely on them from now on. Branches merge only at integration: where another team's piece isn't in our base, soccer writes against the interface below, and the lead keeps one copy at merge. Where another team publishes different names first, theirs win and only `src/game/soccer2/v2/` changes.
@@ -240,6 +299,8 @@ Published in soccer-1 so ut, nba, nfl, players and shell can rely on them from n
 | **(d) Small soccer hunks in nba's shared V2 files** | only once those files are in our base (V2 grant) | e.g. a D-slot label prop, a hold-to-rush prop; each listed under "Touched outside my lane" | — |
 
 #### 5.0.2 Pieces soccer CONSUMES, and the interface it writes against
+
+**Stand-ins in this branch (soccer-2), each headed `// merge: replace with …`:** `v2/stick.ts` (nba's `stick.ts`; adds the 1.0× sprint-off hysteresis through an optional `prev` argument to `stickOut`), `v2/hud.tsx` (nba's `Stick.tsx`, ScoreBug, ToastLine, PauseButton), `v2/geometry.css` + `v2/geometry.ts` (nba's `controls-geometry.css`; tokens copied with the same names and values), `v2/haptics.ts` (ut's `haptics.ts`, same `haptic(kind)`), `v2/playtime.ts` (ut's `playtime.ts`: soccer reports `paused`/`auto`/`stoppage`; maps to ut's `usePlaytime('match')` + `setPlaytimePaused`). The CSS block "v2 stand-ins" in `soccer2-controls.css` goes with `hud.tsx`.
 
 `src/game/soccer2/v2/index.ts` (new in soccer-1) is the **only** place soccer code and soccer tests import these from. Today it re-exports the sounds above and declares the interfaces below as types. The task that first needs a piece adds a stand-in beside it (`stick.ts`, `perfect.ts`, `heat.ts`, `hud.tsx`, `haptics.ts`, `playtime.ts`, `geometry.ts`), each headed `// merge: replace with <team>'s <file>, then delete this file`, and lists it here. At merge the lead points `index.ts` at the shared files and deletes the stand-ins. Nothing in the folder may be read by the engine, the AI's simulations or anything both phones compute.
 
@@ -298,13 +359,17 @@ Hit-stop through `soccer2/fx.ts` `hitStopFor(kind)` (power shot 33 ms, goal 66, 
 
 ### 5.7 shell
 
-`ps:arena-ready` dispatched once per match after the first frame (soccer-3). HUD offsets relative to `--sat`/`--sab`; layout checks at sat 59 and 81. `soccer-lazy.ts` follows `arcade.ts`'s exports, so it needs no edit. Tip lines for `src/shell/arena-tips.ts`, **draft** (final in soccer-9):
+`ps:arena-ready` dispatched once per match after the first frame (soccer-3). HUD offsets relative to `--sat`/`--sab`; layout checks at sat 59 and 81. `soccer-lazy.ts` follows `arcade.ts`'s exports, so it needs no edit. Tip lines for `src/shell/arena-tips.ts`, **draft** (final in soccer-9; revised in soccer-2 for the new controls):
 1. "Drag on SHOOT to aim; let go as the ring turns gold."
 2. "Bend free kicks with the arrows: the ball curls the way they point."
 3. "A save pushed over the line is a corner: whip it in to a big man."
 4. "Leave a set piece and AUTO KICK takes it for you after 12 seconds."
 5. "Hold PASS to loft it over the line; tap it to keep it on the grass."
 6. "Shots from 25 metres rarely beat a good keeper: work it into the box."
+7. "Put your left thumb down before the whistle: you're running the moment it blows."
+8. "Push the stick past its ring to sprint; your right thumb stays free to shoot."
+9. "Hold THRU to lift the through ball over the last defender."
+10. "Tap a teammate to pass straight to him."
 
 ### 5.8 Controls and gestures (V2 A.5, B.3.2)
 
@@ -333,19 +398,30 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 |---|---|---|---|
 | `src/game/Arcade.tsx` (~line 185) | nba/nfl shared | The soccer branch of `aiPlay` calls `sg.aiProgressFor(..., { rival, online })` instead of `sg.aiProgress(...)`: same results today (1 line). | soccer-1 |
 | `src/ut/Match.tsx` (`simBoth`, ~line 858) | ut shared | Soccer's two simulations call `sg.aiProgressFor(..., { rival, online: !!setup.online })` (3 lines). | soccer-1 |
+| `src/game/Arcade.tsx` | nba/nfl shared | soccer-2 (marked "merge: nba-7/nfl C1"): `'FF': 0` in the soccer `POINTS`; the `onQuit?(us, them)` prop (ut contract B) passed to Soccer2 offline as `quitNow`; the online forfeit block (`forfeit` state, `rivalFF` from an explicit `'FF'` end, `forfeitNow` padding to TOTAL, `us`/`them` when a side forfeits, no penalties after a forfeit); `onFinish`'s optional 6th `forfeit: 'us' \| 'them'`; `progress()` sends `wireOf(p)` (all sports: the same five fields as before) (~40 lines). | soccer-2 |
+| `src/game/progress.ts` | shared | soccer-2 (marked merge): `Progress.forfeit?` and `wireOf(p)` (+14 lines). | soccer-2 |
+| `src/ut/Match.tsx` (`END_LABEL`, soccer) | ut shared | `FF: 'FF'` (1 line). | soccer-2 |
 | `src/lib/sound.ts` | soccer owns the soccer crowd wiring; V2 F.1 gives soccer the PERFECT chime | `sfx.perfect`, `sfx.ringTick`, `sfx.post` and their constants (`PERFECT_ROOT`, `PERFECT_MAX_STEP`, `perfectStep`, `RING_TICK`): additive, about 40 lines, nothing existing changed. Tested in the new `src/lib/sound-perfect.test.ts` (default suite). | soccer-1 |
 
 ## Protocol
 
 **Protocol bump needed: soccer draft 2 → 3, UT 2 → 3, because** soccer-1 changes how attacks end and therefore the AI simulations both phones compute: R-1 (a shot or parry that dies short is a loose ball and the clock runs) and R-2 (parries go away from the goal line; corners off a defender or a parry, goal kicks and quick throw-ins played inside the attack). The golden hash was re-based for R-2 (reason in `golden.test.ts`); both phones still agree (agreement tests green). One bump covers every later soccer task too (V2 F.3); the lead does it at integration. NBA and NFL are unaffected: the only shared change is three new synthesized sounds in `sound.ts`.
 
+**soccer-2: no bump of its own.** The controls, HUD, pause and the human-only lofted through ball change no AI simulation (golden unchanged, agreement green). `'FF'` on the wire is new to soccer's online match and rides the same soccer bump (draft 2 → 3, UT 2 → 3): an old client would not recognise a forfeit and would wait for the AI to take over instead.
+
 ## Hand-offs
+
+- **ut (soccer-2):** pass `onQuit(us, them)` (and `quitNote` if the mode's note differs from "It counts as a loss.") to `<Arcade>` in `ut/Match.tsx`, and read `onFinish`'s 6th argument `forfeit` (`'them'` = a win however the score stood); add `'FF'` to the soccer letters in `match-debrief.ts`. **lead / ut (App.tsx draft host):** the same two for the draft play-out.
+- **nba / nfl:** soccer's `Arcade.tsx` hunks are marked "merge"; keep one forfeit block and one `wireOf` strip for all three sports. Soccer's stand-ins use nba's names (`stickGeom`, `stickOut`, `STICK_IDLE`…); soccer adds sprint-off hysteresis (1.0×) via `stickOut(s, g, prev)`, which the V2 contract asks for.
+- **players:** `Body.passKind: 'loftedThrough'` now occurs (THRU held): the lofted kick clip.
 
 - **shell:** the draft tip lines for `arena-tips.ts` are in §5.7 above (final in soccer-9).
 - **nba / nfl:** `sfx.perfect(streak)`, `sfx.ringTick(i)` and `sfx.post()` are ready to call from your first ring task (§5.0.1 a).
 - **players:** a quick throw-in's thrower carries `passKind: 'throw'` and act `'catch'` (arms up) while he holds the ball; route it to a throw clip if you add one (§5.5).
 
 ## Owner device checks
+
+- soccer-2: the floating stick and the sprint ring under a real thumb (does 1.15× feel like a deliberate push?); a thumb resting on the stick at the whistle; A/B/C/D reach and size with one hand on the 393 phone; the pressed feel and the tick haptic (iPhone plays it only inside the touch); the pause button by the Dynamic Island; the toast line's legibility in sunlight.
 
 - The new sounds on a real iPhone speaker: the soccer crowd building as the ball nears goal, the bounce, the woodwork clang with the crowd's "ooh" (the PERFECT chime and ring tick are heard from soccer-4).
 - An earned corner after a parry and a quick throw-in, played with a thumb: the camera's jump to the corner flag, the "CORNER!" call and the AUTO KICK countdown if you wait.

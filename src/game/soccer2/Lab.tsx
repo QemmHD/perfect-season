@@ -4,7 +4,9 @@
 // production bundle. Parameters: home=BAR&hs=2015&away=RMA&as=2017 (club codes and seasons), seed,
 // auto (autopilot), slowmo, attacks=N, scenario=corner (deal only that), pens (straight to
 // penalties), tie (the rival's score made level), def=-0.5..1 (difficulty), qa (window.__soccer),
-// start=x,y (the man on the ball starts there, pitch metres: x 0-68 across, y up to the goal at 105).
+// start=x,y (the man on the ball starts there, pitch metres: x 0-68 across, y up to the goal at 105),
+// online (the pause sheet offers FORFEIT, not QUIT). Soccer-2 (2026-11-16): QUIT and FORFEIT are
+// stubs that record what they were given on window.__quit / window.__forfeit.
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Progress } from '../progress';
 import { soccerKits } from './kits';
@@ -60,14 +62,17 @@ export default function SoccerLab() {
         start={start}
         debug={
           q.has('qa')
-            ? (a, m, ui) => {
-                (window as unknown as { __soccer: unknown }).__soccer = { a, m, ui };
+            ? (a, m, ui, view) => {
+                (window as unknown as { __soccer: unknown }).__soccer = { a, m, ui, view };
               }
             : undefined
         }
         onProgress={setMine}
         onDone={setMine}
         onShootout={(r) => ((window as unknown as { __pens: unknown }).__pens = r)}
+        online={q.has('online')}
+        onQuit={(p) => ((window as unknown as { __quit: unknown }).__quit = { us: p, them: ai })}
+        onForfeit={(p) => ((window as unknown as { __forfeit: unknown }).__forfeit = p)}
       />
       <span hidden data-progress={JSON.stringify(mine)} />
     </div>

@@ -209,6 +209,7 @@ const END_LABEL: Record<string, string> = pick({
     L: 'LOST',
     O: 'OFF',
     T: '·',
+    FF: 'FF',
   },
 });
 const END_POINTS: Record<string, number> = pick({

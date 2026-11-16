@@ -98,7 +98,7 @@ export interface Body {
   fy: number;
   /** render only (the players' action contract, docs/studio-overhaul/soccer.md §5.5): what his last
    * kick or throw was. The engine writes it and never reads it. */
-  passKind?: PassKind | 'cross' | 'throw';
+  passKind?: PassKind | 'cross' | 'throw' | 'loftedThrough';
 }
 
 export type PassKind = 'ground' | 'lofted' | 'through';
@@ -195,7 +195,7 @@ export interface Attack {
   /** a shot waiting to be struck: the leg swings, the ball goes at `at` */
   strike: null | { at: number; by: number; vx: number; vy: number; vh: number; curl: number; dip: number; info: ShotInfo };
   /** a pass waiting to be struck */
-  kick: null | { at: number; by: number; to: number | null; kind: PassKind | 'cross' | 'throw'; vx: number; vy: number; vh: number; curl: number };
+  kick: null | { at: number; by: number; to: number | null; kind: PassKind | 'cross' | 'throw'; vx: number; vy: number; vh: number; curl: number; /** a person's lofted through ball (THRU held; render only) */ loftedThrough?: true };
   /** the free ball's predicted path (a point every 1/30 s), for runs onto it and the keeper */
   path: { t: number; x: number; y: number; h: number; v: number }[] | null;
   /** when that path starts (attack time) */
