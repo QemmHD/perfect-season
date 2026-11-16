@@ -25,11 +25,11 @@
 .arcade-full.fb2:not(.wide):has(.fb2-call) .play-readout-card { top:52px; bottom:auto; transform-origin:0 0; }
 .arcade-full.wide .play-readout { top:calc(var(--sat) + 84px); bottom:auto; }
 .arcade-full.wide .play-readout-card { left:124px; top:0; bottom:auto; max-height:calc(100vh - 100px - var(--sat) - var(--sab)); transform-origin:0 0; }
-.hg2-skills { position:absolute; right:calc(var(--sar) + 14px); bottom:calc(var(--sab) + 184px); display:flex; gap:6px; z-index:12; }
-.hg2-skills button { min-width:52px; min-height:44px; padding:6px 11px; border:0; border-radius:22px; color:#fff; background:radial-gradient(circle at 40% 30%, #8a7cff, #5442d6); box-shadow:0 4px 0 #352a96, 0 7px 14px rgba(0,0,0,.4), inset 0 1px rgba(255,255,255,.3); font:italic 900 10px var(--display); letter-spacing:.5px; text-shadow:0 1px 0 rgba(0,0,0,.35); touch-action:manipulation; }
-.hg2-skills button:disabled { opacity:.42; filter:saturate(.35); }
-.hg2-skills button:active:not(:disabled) { transform:translateY(3px); box-shadow:0 1px 0 #352a96, 0 4px 10px rgba(0,0,0,.4); }
 
-.play-readout button:focus-visible,.hg2-skills button:focus-visible { outline:2px solid var(--teal); outline-offset:2px; }
+.play-readout button:focus-visible { outline:2px solid var(--teal); outline-offset:2px; }
 
-.hg2.wide .hg2-skills { bottom:calc(var(--sab) + 143px); }
+/* nba-3: LAST PLAY as a 44 px icon beside the score bug (the bug's aside slot, mirroring pause) */
+.ps-bug-aside .play-readout.icon { position:relative; inset:auto; }
+.play-readout.icon .play-readout-toggle { width:44px; height:44px; padding:0; justify-content:center; border-radius:12px; background:linear-gradient(to bottom, rgba(40,62,94,.94), rgba(7,21,33,.94)); box-shadow:inset 0 0 0 1.5px #1d3a50, inset 0 1px 0 rgba(255,255,255,.25), 0 6px 12px rgba(0,0,0,.45); -webkit-backdrop-filter:none; backdrop-filter:none; }
+.play-readout.icon .play-readout-mark { width:20px; height:20px; }
+.play-readout.icon .play-readout-card { left:auto; right:0; top:52px; bottom:auto; transform-origin:100% 0; -webkit-backdrop-filter:none; backdrop-filter:none; }

@@ -130,7 +130,7 @@ export function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { 
  * hands (the ball's in the air), so a shot tapped too quickly to be seen rising still follows through.
  */
 /** Every act the NBA selection animates (hoops2/types.ts `Act`); anything else gets a stand-in. */
-export const KNOWN_ACTS: ReadonlySet<string> = new Set<Act>(['idle', 'screen', 'run', 'dribble', 'shoot', 'layup', 'dunk', 'contact', 'standdunk', 'pass', 'catch', 'defend', 'contest', 'block', 'cross', 'stepback', 'spin', 'stumble', 'fall', 'land', 'celebrate', 'rebound']);
+export const KNOWN_ACTS: ReadonlySet<string> = new Set<Act>(['idle', 'screen', 'run', 'dribble', 'shoot', 'layup', 'dunk', 'contact', 'standdunk', 'pass', 'catch', 'defend', 'contest', 'block', 'cross', 'stepback', 'spin', 'pump', 'euro', 'stumble', 'fall', 'land', 'celebrate', 'rebound']);
 
 /**
  * What a body is doing right now, as a clip or a pose. An act this file doesn't animate yet (a V2
@@ -305,6 +305,16 @@ export function poseOf(b: Body, t: number, carrying: boolean): { key: string; po
     case 'spin': {
       const ph = timed(0.45, 6);
       return { key: 'sn' + ph, pose: P.spin(ph) };
+    }
+    // nba-2 fallbacks until players' own poses land (plan §4.6): the pump fake is the start of the
+    // jump shot and back down; the euro-step rides the crossover's weight shift
+    case 'pump': {
+      const ph = timed(0.34, 6);
+      return { key: 'pf' + ph, pose: P.jumpShot(0.3 * (ph < 0.5 ? ph * 2 : (1 - ph) * 2)) };
+    }
+    case 'euro': {
+      const ph = timed(0.34, 6);
+      return { key: 'eu' + ph, pose: P.crossover(ph) };
     }
     case 'fall': {
       // ankles broken: he stumbles, then he's down, then he scrambles up

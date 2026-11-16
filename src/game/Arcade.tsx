@@ -3,7 +3,7 @@
 // match channel; theirs comes back the same way (against the AI, its drives are played by the
 // autopilot and shown as you finish yours). The higher score wins; a tie goes to the better team.
 import { defenseDifficulty } from './difficulty';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { type ForwardedRef, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { pick } from '../engine/sport';
 import { loadSoccerGame, type SoccerGame } from '../soccer-lazy';
 import type { Squad } from './soccer2/types';
@@ -18,6 +18,7 @@ import { DRIVES } from './football2/drive';
 import { offenseOf } from './football2/squad';
 import { POSSESSIONS } from './hoops2/game';
 import { aiPossessions2, aiPossessionsOf, fiveOf, Hoops2 } from './hoops2/Hoops2';
+import { aiPossessionsLater } from './hoops2/autopilot';
 import type { Defense, Offense } from './football2/types';
 import type { Hooper } from './hoops2/types';
 import { type BasketballKit, type FootballKit, type Kits, kitsFor } from './uniforms';
@@ -91,12 +92,27 @@ export interface ArcadeTeams {
   soccerCards?: { us: CardForPitch[]; them: CardForPitch[] };
 }
 
-export function Arcade({
+/**
+ * The held arena (plan §4.8, V2 D.1; nba-3): with `hold`, a finished match stays mounted under the
+ * host's result sheet and `rematch()` plays the next one in the same arena: a new seed (and, if
+ * given, a new rival), the same renderer, behind the opponent's curtain. Offline only.
+ */
+export interface ArcadeRematch {
+  seed?: string;
+  /** the next rival's name, and their team (drafted lineup or built squads) */
+  rival?: string;
+  them?: { lineup?: Lineup; teams?: ArcadeTeams };
+}
+export interface ArcadeHandle {
+  rematch(next?: ArcadeRematch): void;
+}
+
+export const Arcade = forwardRef(function Arcade({
   lineup,
-  rivalLineup,
-  teams,
-  rivalName,
-  seed,
+  rivalLineup: firstRivalLineup,
+  teams: firstTeams,
+  rivalName: firstRivalName,
+  seed: firstSeed,
   online,
   botLevel,
   aiSkill,
@@ -109,6 +125,7 @@ export function Arcade({
   kits,
   soccerFavs,
   host = true,
+  hold = false,
   onProgress,
   onTakeover,
   onFinish,
@@ -140,13 +157,22 @@ export function Arcade({
   soccerFavs?: { mine: string | null; theirs: string | null };
   /** online: this phone is the match's host (a level soccer match's agreed penalties start with the host) */
   host?: boolean;
+  /** the held arena: report the result at the whistle and stay mounted for `rematch()` (offline) */
+  hold?: boolean;
   onProgress: (p: Progress) => void;
   /** this phone let the AI finish the rival's drives from drive `k` on: tell the other phone */
   onTakeover: (k: number) => void;
-  /** `pens`: soccer, a level match settled on penalties */
-  onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens) => void;
-}) {
+  /** `pens`: soccer, a level match settled on penalties; `forfeit`: 'us' when this phone quit (a loss) */
+  onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens, forfeit?: 'us') => void;
+}, ref: ForwardedRef<ArcadeHandle>) {
   const defenseIQ = defenseDifficulty(online, botLevel, aiDefense);
+  // the match being played: the first, or a rematch in the held arena (its seed and rival)
+  const [round, setRound] = useState({ n: 0, at: 0, seed: firstSeed, rivalName: firstRivalName, rivalLineup: firstRivalLineup, teams: firstTeams });
+  // the first match follows the host's props as before; a rematch plays what rematch() was given
+  const seed = round.n ? round.seed : firstSeed;
+  const rivalName = round.n ? round.rivalName : firstRivalName;
+  const rivalLineup = round.n ? round.rivalLineup : firstRivalLineup;
+  const teams = round.n ? round.teams : firstTeams;
   const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay || manualOnly ? 'play' : 'kickoff');
   const [mine, setMine] = useState<Progress | null>(null);
   const [attrs, setAttrs] = useState<((p: Player) => Attrs | null) | null>(null);
@@ -194,7 +220,22 @@ export function Arcade({
     const [off, def] = rival ? [rivalLineup!, lineup!] : [lineup!, rivalLineup!];
     return FOOTBALL ? aiDrives2(off, def, s, skill, a, DRIVES, defenseIQ) : aiPossessions2(off, def, s, skill, a, POSSESSIONS, defenseIQ);
   };
-  const ai = useMemo(() => (!online && attrs ? aiPlay(true, seed, aiSkill ?? AI_SKILL[botLevel], attrs) : null), [attrs]);
+  const firstAi = useMemo(() => (!online && attrs ? aiPlay(true, firstSeed, aiSkill ?? AI_SKILL[botLevel], attrs) : null), [attrs]);
+  // a rematch's AI side is worked out just after its curtain is up, so the curtain shows at once
+  const [laterAi, setLaterAi] = useState<{ n: number; p: Progress } | null>(null);
+  useEffect(() => {
+    if (round.n === 0 || online || !attrs) return;
+    const skill = aiSkill ?? AI_SKILL[botLevel];
+    const n = round.n;
+    // basketball: a possession per task, so the curtain and the tip-off never wait on it
+    if (!FOOTBALL && !SOCCER) {
+      const [off, def, sub] = teams ? [teams.rivalFive!, teams.five!, teams.rivalBench ?? []] : [fiveOf(rivalLineup!, attrs), fiveOf(lineup!, attrs), []];
+      return aiPossessionsLater(off, def, seed, skill, POSSESSIONS, sub, defenseIQ, (p) => setLaterAi({ n, p }));
+    }
+    const t = window.setTimeout(() => setLaterAi({ n, p: aiPlay(true, seed, skill, attrs) }), 30);
+    return () => clearTimeout(t);
+  }, [round.n, attrs]);
+  const ai = round.n === 0 ? firstAi : laterAi?.n === round.n ? laterAi.p : null;
 
   // Online, the AI can finish the other side's drives: when that phone goes quiet, or when you're
   // done and it stops playing. Both phones work it out the same way (same seed, same drives played
@@ -274,13 +315,47 @@ export function Arcade({
     if (sent.current || !us || !them) return;
     if (level && !pens) return;
     sent.current = true;
-    window.setTimeout(() => onFinish(us, them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), level ? 2600 : 1600);
+    // the held arena reports at the whistle (its sheet comes up over the dimmed court)
+    window.setTimeout(() => onFinish(us, them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), hold ? 0 : level ? 2600 : 1600);
   }, [us, them, pens]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      rematch(next?: ArcadeRematch) {
+        if (online) return;
+        sent.current = false;
+        how.current = 'played';
+        setMine(null);
+        setPens(null);
+        setStage('play');
+        setRound((r) => ({
+          n: r.n + 1,
+          at: performance.now(),
+          seed: next?.seed ?? seed + ':r' + (r.n + 1),
+          rivalName: next?.rival ?? rivalName,
+          rivalLineup: next?.them?.lineup ?? rivalLineup,
+          teams: next?.them?.teams ? { ...teams, ...next.them.teams } : teams,
+        }));
+      },
+    }),
+    [online, seed, rivalName, rivalLineup, teams]
+  );
 
   const progress = (p: Progress) => {
     if (taken) return;
     setMine(p);
     onProgress(p);
+  };
+
+  // offline Quit from the pause sheet (nba-2, NBA-09): the game ends now as a loss; the possessions
+  // you didn't play score nothing
+  const quit = () => {
+    if (sent.current || !ai) return;
+    sent.current = true;
+    const played = mine ?? { score: 0, drive: 0, done: false, ends: [] };
+    const ends = [...played.ends, ...Array(Math.max(0, TOTAL - played.ends.length)).fill('X')];
+    onFinish({ ...played, drive: ends.length, done: true, ends }, ai, 'played', { them: false, us: false }, undefined, 'us');
   };
 
   // sim: the autopilot plays your drives at a middling level
@@ -363,8 +438,9 @@ export function Arcade({
           </div>
         )}
         <div className="arc-how">
-          <span>Stick: move · PASS to the man you point at · CROSS breaks your man down</span>
-          <span>Hold SHOOT and let go in the green · near the rim it’s a layup, or a dunk</span>
+          <span>Left thumb anywhere low: move · push past the ring to sprint</span>
+          <span>Hold SHOOT, let go at the top · tap it: pump fake · swipe it: cross, step-back, spin</span>
+          <span>PASS to the man you aim at, hold for a lob · CALL: screen, cut or ISO · pause top-left</span>
         </div>
         {online && rivalLive?.done && (
           <p className="arc-wait">
@@ -453,6 +529,7 @@ export function Arcade({
     const k = sg.soccerKitsFor(soccerFavs?.mine ?? null, soccerFavs?.theirs ?? null);
     return (
       <sg.Soccer2
+        key={round.n}
         us={squads.us}
         them={squads.them}
         rivalName={rivalName}
@@ -470,8 +547,8 @@ export function Arcade({
   }
   if (!FOOTBALL) {
     const k = kits ?? kitsFor(null, null, 'nba');
-    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} online={online} hold={hold && !online} round={round.n} roundAt={round.at} onQuit={online ? undefined : quit} onProgress={progress} onDone={progress} />;
   }
   const k = kits ?? kitsFor(null, null, 'nfl');
-  return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
-}
+  return <Football2 key={round.n} lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+});

@@ -4,9 +4,10 @@
 // defender, move it out of a double team, and sprint (the stick at its edge) only on a drive. `skill` (0-1) is how sharp its
 // reads and its release timing are.
 import { hashString, rng } from '../../engine/rng';
-import { callPlay, canOop, crossover, dist, freeThrow, spacingHelp, stonewallChance, isThree, jumpRebound, ballPos, pass, pressShoot, releaseShoot, RIM, shotValue, step, stepback, topSpeed } from './engine';
-import { afterPossession, type HoopsGame, startPossession } from './game';
-import type { Body, Possession, Pt } from './types';
+import { callPlay, canOop, contestOf, crossover, dist, freeThrow, spacingHelp, stonewallChance, isThree, jumpRebound, ballPos, pass, pressShoot, releaseShoot, RIM, shotChanceWith, shotValue, step, stepback, topSpeed } from './engine';
+import { afterPossession, type HoopsGame, newHoopsGame, startPossession } from './game';
+import type { Progress } from '../progress';
+import type { Body, Contest, Hooper, Possession, Pt } from './types';
 
 /** the most passes it makes in a possession before it plays with the ball */
 export const MAX_PASSES = 6;
@@ -127,15 +128,34 @@ const THREE_REAL = 0.95;
  */
 export function catchValue(p: Possession, from: Body, m: Body, sd: number): number {
   const v = shotValue(p, m, sd);
+  const then = closeoutAt(p, from, m, CONTESTS.indexOf(v.contest));
+  if (then === null) return v.value;
+  // (caught in rhythm, a set shooter's window is a little wider)
+  return v.value * (CONTEST_F[CONTESTS[then]] / CONTEST_F[v.contest]) * (v.kind === 'three' ? 1.08 * THREE_REAL : 1);
+}
+
+/**
+ * The contest a catcher will have when he lets it go (an index into CONTESTS): his man closing out
+ * while the pass is in the air and he rises; null when his man is stunned or there's none.
+ */
+function closeoutAt(p: Possession, from: Body, m: Body, now: number): number | null {
   const md = p.bodies.find((o) => o.side === 'D' && o.mark === m.idx);
-  if (!md || p.t < md.stunUntil) return v.value;
+  if (!md || p.t < md.stunUntil) return null;
   const flight = Math.max(0.2, dist(from, m) / lerp(36, 50, rate(from.p.pas, 40, 99))) + 0.3;
   const room = dist(md, m) - topSpeed(md, false) * 0.45 * Math.max(0, flight - 0.1);
   const cap = room >= 5 ? 0 : room >= 3 ? 1 : room >= 1.5 ? 2 : 3;
-  const now = CONTESTS.indexOf(v.contest);
-  const then = Math.max(now, cap);
-  // (caught in rhythm, a set shooter's window is a little wider)
-  return v.value * (CONTEST_F[CONTESTS[then]] / CONTEST_F[v.contest]) * (v.kind === 'three' ? 1.08 * THREE_REAL : 1);
+  return Math.max(now, cap);
+}
+
+/**
+ * The pass target's shot % on screen (NBA-16; nba-3): his chance with an ordinary release as it will
+ * be when the ball gets there, his man closing out on the pass (the same closeout the AI reads in
+ * catchValue). Read-only: no draw on the possession's random numbers.
+ */
+export function catchChance(p: Possession, from: Body, m: Body): number {
+  const now = contestOf(p, m);
+  const then = closeoutAt(p, from, m, CONTESTS.indexOf(now));
+  return shotChanceWith(p, m, then === null ? now : (CONTESTS[then] as Contest));
 }
 
 /**
@@ -379,6 +399,16 @@ function towards(h: Body, g: Pt): Pt {
 
 /** Play a whole game with the autopilot. */
 export function autoplay(g: HoopsGame, skill: number, seed: string): HoopsGame {
+  for (const _ of autoplaySteps(g, skill, seed)) void _;
+  return g;
+}
+
+/**
+ * The same game a possession at a time (nba-3): yields after each one, so a host can spread an AI
+ * side's game over several frames (the held arena works out a rematch's AI side behind its curtain).
+ * Draining it is exactly `autoplay`.
+ */
+export function* autoplaySteps(g: HoopsGame, skill: number, seed: string): Generator<number, HoopsGame> {
   const pl = pilot(skill, seed);
   const dt = 1 / 60;
   while (!g.over) {
@@ -395,6 +425,24 @@ export function autoplay(g: HoopsGame, skill: number, seed: string): HoopsGame {
     }
     if (!p.end) p.end = { kind: 'clock', points: 0, text: 'SHOT CLOCK', who: -1 };
     afterPossession(g, p);
+    yield g.done;
   }
   return g;
+}
+
+/**
+ * The AI side's game exactly as `aiPossessionsOf` (Hoops2.tsx) plays it, a possession per task so it
+ * never blocks a frame for long: the held arena works out a rematch's AI side behind its curtain.
+ * The same seed, the same result (held.test.ts). Returns a cancel.
+ */
+export function aiPossessionsLater(offense: Hooper[], defense: Hooper[], seed: string, skill: number, possessions: number, bench: Hooper[], defIQ: number, done: (p: Progress) => void): () => void {
+  const g = newHoopsGame(offense, defense, 'ai:' + seed, possessions, bench, defIQ);
+  const it = autoplaySteps(g, skill, 'ai:' + seed);
+  let t: ReturnType<typeof setTimeout> | undefined;
+  const slice = () => {
+    if (it.next().done) done({ score: g.score, drive: g.done, done: true, ends: g.marks.slice(), plays: g.done });
+    else t = setTimeout(slice, 0);
+  };
+  t = setTimeout(slice, 0);
+  return () => clearTimeout(t);
 }

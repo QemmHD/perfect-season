@@ -1,17 +1,38 @@
 import { PlayReadout } from '../PlayReadout';
 import { basketballFeedback, type PlayFeedback } from '../play-feedback';
 import type { Practice } from '../../evolution/training';
-// Arcade basketball, the way it's played: your five on offense against the rival's five. Left thumb
-// on the stick moves the man with the ball; PASS throws to the man the stick points at (a lob to a
-// dunker on the cut); CROSS breaks down your man; hold SHOOT to rise and let go in the green.
+// Arcade basketball, the way it's played: your five on offense against the rival's five. The left
+// thumb lands anywhere low on the left and the stick is born under it (past the ring: sprint); SHOOT
+// (A, gold) starts the gather on touch-down: hold and let go at the top, tap it for a pump fake, swipe
+// off it for a crossover, step-back, spin or (driving) a euro-step; PASS (B, teal) goes to the man you
+// aim at, held it's a lob; CALL (C) opens SCREEN / CUT / ISO; tap a teammate to pass to him. Everything
+// the game says goes in the one toast line above the controls (plan §5, V2 A.5).
 // Held upright the camera looks up the floor; sideways it's the sideline view.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
 import { logError } from '../../lib/errlog';
 import { crowd, sfx, tapHaptic, vibrate } from '../../lib/sound';
+import { radialAt, type ClusterInput } from '../hud/Cluster';
+import { feelCount, haptic } from '../hud/feel';
+import { TAP_PX } from '../hud/gestures';
+import { readGeometry } from '../hud/geometry';
+import { HeatBar } from '../hud/HeatBar';
+import { PauseButton } from '../hud/PauseButton';
+import { PauseSheet, SheetToggle } from '../hud/PauseSheet';
+import { firstTime, loadPrefs, savePrefs, type TouchPrefs } from '../hud/prefs';
+import { ScoreBug } from '../hud/ScoreBug';
+import { PausableTimers } from '../hud/timers';
+import { ToastLine, ToastProvider, type Toast } from '../hud/ToastLine';
+import '../hud';
+import type { StickOut } from '../stick';
+import { HoopsControls, type HoopsCtx, offOf } from './HoopsControls';
+import './match.css';
 import { Juice } from '../juice';
-import { BADGE_NAMES } from './ratings';
+import { BADGE_LABEL, tierLabel } from './badges';
+import { BoxTracker } from './box';
+import { uniqueTags } from './labels';
+import './held.css';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
 import { freeCanvas } from '../pixel/body';
@@ -20,11 +41,11 @@ import type { Progress, RivalLive } from '../progress';
 import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
-import { aimPass, callPlay, cancelShoot, jumpRebound, crossover, pass, pressShoot, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
-import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, startPossession } from './game';
+import { aimPass, callPlay, cancelGather, cancelShoot, crossover, driving, euroStep, jumpRebound, pass, PUMP_EVERY, pressShoot, pumpFake, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
+import { afterPossession, CLUTCH, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, practiceStart, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
-import type { Body, Hooper, Possession, Pt, Scheme } from './types';
+import type { Body, Hooper, Possession, Pt, Scheme, ShotKind } from './types';
 import './coach-controls.css';
 import { useInputInterrupt } from '../useInputInterrupt';
 import { artScale } from '../pixel/art-scale';
@@ -32,6 +53,50 @@ import { artScale } from '../pixel/art-scale';
 const DT = 1 / 60;
 /** what a phone's screen and touch add between what you saw and the release it hears (seconds) */
 const RELEASE_LAG = 0.03;
+
+/** What the dev server lets the QA probes read (window.__hg2): never part of a build. */
+interface QaProbe {
+  possession(): Possession | null;
+  game(): HoopsGame | null;
+  /** a court point on the canvas (canvas pixels) and the pixels a foot there */
+  screenOf(cx: number, cz: number, h?: number): { x: number; y: number; s: number } | null;
+  canvas(): HTMLCanvasElement | null;
+  /** canvas pixels to CSS pixels */
+  zoom(): number;
+  /** engine steps run so far, whether the match is frozen, the delayed jobs waiting, haptics fired */
+  steps(): number;
+  paused(): boolean;
+  timers(): { pending: number; fired: number };
+  feel(): Record<string, number>;
+  /** the stick as the game last heard it */
+  stick(): StickOut | null;
+  /** the held arena (plan §3.10): when the last possession ended (performance.now), the renderer
+   * object (its identity must survive a rematch), the floor casts made and reused (NBA-29) */
+  whistleAt(): number | null;
+  /** when the latest possession tipped off (performance.now): the next game's first live frame */
+  tipAt(): number | null;
+  renderer(): HoopsRenderer;
+  floor(): { cast: number; reused: number };
+  /** the safe box the camera frames inside (hud/geometry.ts) */
+  geometry(): { safeTop: number; safeBottom: number; land: boolean; hudBottom: number } | null;
+  /** the flow probe's fast-forward: the possessions before `n` count as played misses, so the next
+   * one up is possession n (the held-arena loop runs in seconds instead of minutes) */
+  skipTo(n: number): void;
+  /** the score bug's phase forced, for the captures of phases the format doesn't reach yet (OT: nba-6) */
+  phase(ph: 'normal' | 'clutch' | 'ot' | null): void;
+}
+
+/** The toast line's colours for what the game says. */
+const TONE = { good: 'teal', bad: 'red', big: 'gold', green: 'gold', plain: 'plain' } as const;
+type Tone = keyof typeof TONE;
+/** The one-line hints, once per device (prefs hints.nba bits). */
+const HINTS: [number, string][] = [
+  [0, 'Left thumb: move · past the ring: sprint'],
+  [1, 'SHOOT: hold · tap: pump fake · swipe: moves'],
+  [2, 'PASS: hold for a lob · or tap a teammate'],
+  [3, 'CALL: slide to SCREEN, CUT or ISO']
+];
+const BOARD_HINT = 4;
 
 /** What a replay needs to redraw a moment of a possession. */
 interface Snap {
@@ -52,6 +117,25 @@ const MARK_TEXT: Record<Mark, string> = { '2': '2', '3': '3', A: '3', X: '–', 
 /** The defense's looks, and what beats each. */
 const LOOK_TEXT: Record<Scheme, string> = { man: 'MAN-TO-MAN', sag: 'SAGGING OFF', switch: 'SWITCHING', trap: 'TRAPPING' };
 const LOOK_TIP: Record<Scheme, string> = { man: 'beat your man', sag: 'shoot over it', switch: 'attack the mismatch', trap: 'move it early' };
+/** The scorer plate's shot word ("CURRY · 3PT · 11 PTS", V2 B.1.7). */
+const SHOT_WORD: Record<ShotKind, string> = { three: '3PT', mid: 'JUMPER', close: 'FLOATER', layup: 'LAYUP', dunk: 'DUNK', contact: 'AND-ONE SLAM', standdunk: 'DUNK', oop: 'ALLEY-OOP' };
+/** the held arena's opponent curtain (plan §4.8): up this long from the rematch call (inside V2's 1.5 s, so the tip-off lands within it on a slow phone), skippable */
+const CURTAIN_MS = 1400;
+/** A kit's colour for the score bug: the jersey, or its trim when the jersey is white (an away kit). */
+function teamColor(k: Kit): string {
+  const hex = /^#[0-9a-f]{3}$/i.test(k.jersey) ? '#' + [...k.jersey.slice(1)].map((c) => c + c).join('') : k.jersey;
+  if (!/^#[0-9a-f]{6}/i.test(hex)) return k.jersey;
+  const n = parseInt(hex.slice(1, 7), 16);
+  const light = ((n >> 16) & 255) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11 > 200;
+  return light ? k.trim : k.jersey;
+}
+/** both fives (and the bench) with on-court tags no two men share (labels.ts) */
+function tagged(lists: Hooper[][]): Hooper[][] {
+  const all = lists.flat();
+  const tags = uniqueTags(all);
+  let k = 0;
+  return lists.map((l) => l.map((h) => ({ ...h, tag: tags[k++] })));
+}
 
 /** The five from a drafted lineup, rated. */
 export function fiveOf(lineup: Lineup, attrs: (p: Player) => Attrs | null): Hooper[] {
@@ -87,6 +171,11 @@ export function Hoops2({
   court,
   autoplayHook,
   timeScale = 1,
+  online = false,
+  hold = false,
+  round = 0,
+  roundAt = 0,
+  onQuit,
   onProgress,
   onDone
 }: {
@@ -111,6 +200,19 @@ export function Hoops2({
   autoplayHook?: boolean;
   /** the lab's slow motion, for filming the moves frame by frame (1 in the app) */
   timeScale?: number;
+  /** online the match can't stop: pause opens the sheet but the game keeps going */
+  online?: boolean;
+  /** offline Quit (after its confirm): the host settles the game as a loss */
+  onQuit?: () => void;
+  /**
+   * The held arena (plan §4.8): the game reports done the moment the last possession ends, dims and
+   * stays mounted under the host's result sheet; each new `round` (with a new `seed`, maybe a new
+   * rival) re-seeds the same renderer and its drawings behind the opponent curtain.
+   */
+  hold?: boolean;
+  round?: number;
+  /** when the rematch was asked for (performance.now): the curtain's 1.5 s counts from there */
+  roundAt?: number;
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
 }) {
@@ -125,11 +227,18 @@ export function Hoops2({
       live = false;
     };
   }, []);
-  const game = useMemo<HoopsGame | null>(
-    () => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench, defIQ) : null),
-    [attrs]
-  );
-  const renderer = useMemo(() => new HoopsRenderer(court, [ourKit, theirKit]), []);
+  const game = useMemo<HoopsGame | null>(() => {
+    if (!attrs) return null;
+    // on-court tags no two men share (J.JOHNSON / M.JOHNSON): the names the chips print, never the
+    // engine's numbers (the AI's race, aiPossessionsOf, plays from the untouched lists)
+    const [us, them, subs] = tagged([five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), bench ?? []]);
+    return newHoopsGame(us, them, seed, possessions, subs, defIQ);
+  }, [attrs, round]);
+  const renderer = useMemo(() => {
+    const r = new HoopsRenderer(court, [ourKit, theirKit]);
+    r.reduced = reducedMotion();
+    return r;
+  }, []);
   // the game's drawings and its canvas let go of their memory as it closes (Safari counts a dropped
   // canvas against the page's cap until it's collected, which can be a while)
   useEffect(() => {
@@ -140,19 +249,76 @@ export function Hoops2({
     };
   }, []);
   const possRef = useRef<Possession | null>(null);
-  const stickRef = useRef<{ x: number; y: number } | null>(null);
+  /** when the last possession ended (the held arena's whistle), for the flow probe */
+  const whistleAt = useRef<number | null>(null);
+  const tipAt = useRef<number | null>(null);
+  /** the box score from the engine's own events (box.ts): the scorer plate reads it */
+  const boxRef = useRef(new BoxTracker());
+  /** the score bug's shot clock, written from the loop whenever its second changes (NBA-08) */
+  const clockRef = useRef<HTMLElement | null>(null);
+  const clockShown = useRef<{ v: string; low: boolean }>({ v: '', low: false });
+  /** the safe box (hud/geometry.ts), read again whenever the game's size or orientation changes */
+  const geoRef = useRef<{ w: number; h: number; land: boolean; box: { safeTop: number; safeBottom: number; land: boolean; hudBottom: number } } | null>(null);
+  /** a badge already popped this possession (one per possession, V2 B.1.8) */
+  const badgeShown = useRef(false);
+  /** the held arena's opponent curtain before a rematch's tip-off */
+  const [curtain, setCurtain] = useState(false);
+  /** the dev probe's forced bug phase (never set outside the dev server) */
+  const [qaPhase, setQaPhase] = useState<'normal' | 'clutch' | 'ot' | null>(null);
+  // The studio QA probes (scripts/audit/nba-geo.mjs, nba-rematch.mjs) read the camera and the live
+  // possession through this. Dev server only: Vite drops the block from the production build.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as { __hg2?: QaProbe };
+    const probe: QaProbe = {
+      possession: () => possRef.current,
+      game: () => game,
+      screenOf: (cx, cz, h) => renderer.screenOf(cx, cz, h),
+      canvas: () => canvasRef.current,
+      zoom: () => renderer.zoom,
+      steps: () => stepsRun.current,
+      paused: () => pausedRef.current,
+      timers: () => ({ pending: timers.current.pending, fired: timers.current.fired }),
+      feel: () => ({ ...feelCount }),
+      stick: () => stickRef.current,
+      whistleAt: () => whistleAt.current,
+      tipAt: () => tipAt.current,
+      renderer: () => renderer,
+      floor: () => ({ ...renderer.floorStats }),
+      geometry: () => geoRef.current?.box ?? null,
+      skipTo: (n) => {
+        if (!game) return;
+        while (game.marks.length < Math.min(n, game.total - 1)) game.marks.push('X');
+        game.done = game.marks.length;
+      },
+      phase: (ph) => setQaPhase(ph)
+    };
+    w.__hg2 = probe;
+    return () => {
+      if (w.__hg2 === probe) delete w.__hg2;
+    };
+  }, [game]);
+  /** the stick as the thumb last left it (kept between possessions: a held thumb plays at the whistle) */
+  const stickRef = useRef<StickOut | null>(null);
+  /** every delayed step of the match (next possession, replays, the buzzer): they stop with a pause */
+  const timers = useRef(new PausableTimers());
+  /** offline pause: no steps, no timers; online the sheet opens and the game goes on */
+  const pausedRef = useRef(false);
+  const [paused, setPaused] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const stepsRun = useRef(0);
+  const toastApi = useRef<{ show(t: Toast): void; clear(): void } | null>(null);
+  const [prefs, setPrefs] = useState<TouchPrefs>(() => loadPrefs());
+  const [callOpen, setCallOpen] = useState(false);
+  const ctlRef = useRef<HTMLDivElement>(null);
+  /** PASS pressed: it leaves after the 120 ms wind-up (game time), as a lob if B is still held */
+  const passPend = useRef<{ at: number; held: boolean } | null>(null);
   const pilotRef = useRef(pilot(0.75, seed));
   const fxRef = useRef<Fx>({ swish: 0, shake: 0, crowd: 0, flash: 0, juice: new Juice({ reducedMotion: reducedMotion() }) });
   const slowUntil = useRef(0);
   const [between, setBetween] = useState(true);
   const [boarding, setBoarding] = useState(false);
   const [, setTick] = useState(0);
-  const [pop, setPop] = useState<{ id: number; text: string; tone: 'good' | 'bad' | 'big' | 'plain' | 'green' } | null>(null);
-  /** the defense's look this possession, named under the scoreboard */
-  const [look, setLook] = useState<{ scheme: Scheme; trapped: boolean } | null>(null);
-  const popId = useRef(0);
-  const [knob, setKnob] = useState({ x: 0, y: 0 });
-  const [hint, setHint] = useState<string | null>(practice ? null : 'Tap a teammate to pass · hold SHOOT and release in green');
   const [wide, setWide] = useState(false);
   // instant replay: the last seconds of play, the highlight to show, the replay running
   const rec = useRef(new Recorder<Snap>(5));
@@ -162,31 +328,24 @@ export function Hoops2({
   const lastBeat = useRef(1);
   const [replaying, setReplaying] = useState(false);
 
-  const say = (text: string, tone: 'good' | 'bad' | 'big' | 'plain' | 'green', ms = 1200) => {
-    const id = ++popId.current;
-    setPop({ id, text, tone });
-    window.setTimeout(() => setPop((p) => (p && p.id === id ? null : p)), ms);
-  };
+  /** Everything the game says goes in the toast line: hints 0, calls and banners 1, results 2. */
+  const say = (text: string, tone: Tone, ms = 1200, priority = 1) => toastApi.current?.show({ text, tone: TONE[tone], ms, priority, pop: tone === 'green' || tone === 'big' });
+  const later = (fn: () => void, ms: number) => timers.current.set(fn, ms);
   const progress = (g: HoopsGame): Progress => ({ score: g.score, drive: g.done, done: g.over, ends: g.marks.slice(), plays: g.done });
   const shake = (px: number) => {
     if (!reducedMotion()) fxRef.current.shake = Math.max(fxRef.current.shake, px);
   };
 
   const next = (g: HoopsGame) => {
+    passPend.current = null;
+    setCallOpen(false);
     possRef.current = startPossession(g);
-    if (practice) {
-      const p = possRef.current,
-        h = p.bodies[0];
-      const at = practice.drill === 'finish' ? { cx: RIM.cx - 13, cz: 0 } : { cx: RIM.cx - 24.5, cz: 0 };
-      Object.assign(h, at);
-      h.home = { ...at };
-      const d = p.bodies[5];
-      Object.assign(d, { cx: at.cx + 7, cz: at.cz + 2 });
-      if (practice.drill === 'pass') {
-        p.scheme = 'trap';
-        p.events = ['scheme:trap'];
-      }
-    }
+    tipAt.current = performance.now();
+    // the Clutch possessions: the camera sits 6% tighter (V2 B.0.4; not with reduced motion)
+    renderer.clutch = g.done >= g.total - CLUTCH;
+    if (practice) practiceStart(possRef.current, practice.drill);
+    boxRef.current.begin(possRef.current, 'us');
+    badgeShown.current = false;
     const pl = pilotRef.current;
     pl.letGo = null;
     pl.driving = false;
@@ -197,27 +356,62 @@ export function Hoops2({
     setBoarding(false);
     setTick((n) => n + 1);
     if (g.done === g.total / 2) say('SECOND HALF', 'plain', 1300);
+    // the one-line hints, once per device, through the first possession
+    if (g.done === 0 && !autoplayHook) {
+      const seen = loadPrefs().hints?.nba ?? 0;
+      let k = 0;
+      for (const [bit, text] of HINTS) if (!(seen & (1 << bit))) later(() => firstTime('nba', bit) && say(text, 'plain', 2700, 0), 300 + 2900 * k++);
+    }
   };
 
   useEffect(() => {
     if (!game) return;
     crowd.start(0.24);
-    const t = window.setTimeout(() => next(game), 700);
-    const moves = window.setTimeout(() => !practice && setHint('Stick edge: sprint · use skill buttons or flick the stick for moves'), 3800);
-    const h = window.setTimeout(() => setHint(null), 7600);
+    const all = timers.current;
+    if (round > 0) {
+      // a rematch in the held arena: the same renderer and drawings, a clean slate for the play
+      renderer.reset(court, [ourKit, theirKit]);
+      possRef.current = null;
+      booked.current = null;
+      rescued.current = null;
+      highlight.current = null;
+      replayRef.current = null;
+      rec.current.clear();
+      passPend.current = null;
+      slowUntil.current = 0;
+      whistleAt.current = null;
+      pilotRef.current = pilot(0.75, seed);
+      clockShown.current = { v: '', low: false };
+      setReplaying(false);
+      setBetween(true);
+      setLastReadout(null);
+      toastApi.current?.clear();
+      // the opponent curtain, then the tip-off (a tap skips it)
+      setCurtain(true);
+      all.set(() => tipOff(game), Math.max(0, Math.min(CURTAIN_MS, CURTAIN_MS - (performance.now() - roundAt))));
+    } else all.set(() => next(game), 700);
     return () => {
-      clearTimeout(t);
-      clearTimeout(moves);
-      clearTimeout(h);
+      all.clear();
       crowd.stop(0.6);
     };
   }, [game]);
+  /** the curtain's done (or tapped): tip off */
+  const tipOff = (g: HoopsGame) => {
+    setCurtain(false);
+    if (possRef.current === null && g === game) next(g);
+  };
+  const skipCurtain = () => {
+    if (!curtain || !game) return;
+    timers.current.clear();
+    tipOff(game);
+  };
 
-  /** The stick as a direction on the court (the two cameras turn it differently). */
+  /** The stick as a direction on the court (the two cameras turn it differently); null when centred. */
   const stickOnCourt = (): Pt | null => {
     const s = stickRef.current;
-    if (!s) return null;
-    return renderer.cam?.mode === 'end' ? { cx: -s.y, cz: s.x } : { cx: s.x, cz: s.y };
+    if (!s || !s.active || s.mag === 0) return null;
+    // up the screen is the camera's forward (it's yawed 12°: camera.ts)
+    return renderer.stickToCourt(s.x, s.y);
   };
 
   /** Juice (render only): sweat at the rim, confetti, the camera's kick and hit-stop. */
@@ -260,23 +454,36 @@ export function Hoops2({
         J.addTrauma(0.14);
         J.kick(0, -1, 2);
       } else if (e.startsWith('badge:')) {
+        // one badge a possession, in the toast line (never over the rim): its name and tier
+        if (badgeShown.current) continue;
+        badgeShown.current = true;
         const [, id, idx, tier] = e.split(':');
-        renderer.pop(Number(idx), (BADGE_NAMES[id] ?? id).toUpperCase(), Number(tier), nowMs / 1000);
+        const who = p.bodies[Number(idx)];
+        const name = (BADGE_LABEL[id] ?? id).toUpperCase();
+        say((who ? who.p.tag + ' · ' : '') + name + ' · ' + tierLabel(Number(tier)).toUpperCase(), 'big', 1100, 1);
       } else if (e === 'clutch:icon') say('ICON TIME · CLUTCH', 'big', 1300);
       else if (e === 'ft:miss') say('MISSED THE FREE THROW', 'plain', 900);
     }
     for (const e of p.events) {
-      if (e.startsWith('scheme:')) setLook({ scheme: e.slice(7) as Scheme, trapped: false });
-      else if (e.startsWith('trap:')) {
-        setLook({ scheme: 'trap', trapped: true });
+      if (e.startsWith('scheme:')) {
+        // the defense's look and what beats it, read once at the start of the possession
+        const sc = e.slice(7) as Scheme;
+        // (at the hints' priority: a first-run hint replaces it rather than being lost behind it)
+        if (!autoplayHook) say(LOOK_TEXT[sc] + ' · ' + LOOK_TIP[sc], 'plain', 1500, 0);
+      } else if (e.startsWith('trap:')) {
         sfx.squeak();
         vibrate(12);
-        say('DOUBLE TEAM!', 'plain', 800);
+        say('DOUBLE TEAM! · ' + LOOK_TIP.trap, 'plain', 900);
       } else if (e.startsWith('call:')) {
         sfx.squeak();
-        say(e === 'call:screen' ? 'SCREEN & ROLL' : e === 'call:cut' ? 'CUT TO THE RIM' : 'SPREAD THE FLOOR', 'plain', 1100);
+        const star = e === 'call:iso' && p.playCall ? p.bodies[p.playCall.actor] : null;
+        say(e === 'call:screen' ? 'SCREEN & ROLL' : e === 'call:cut' ? 'CUT TO THE RIM' : star ? 'ISO · CLEAR OUT FOR ' + star.p.tag : 'SPREAD THE FLOOR', 'plain', 1100);
+      } else if (e.startsWith('pump:bit:')) {
+        sfx.squeak();
+        say('BIT ON THE FAKE · ' + p.bodies[Number(e.slice(9))].p.tag + ' IS IN THE AIR', 'good', 900);
       } else if (e === 'rim' || e === 'loose') {
         setBoarding(true);
+        if (!autoplayHook && firstTime('nba', BOARD_HINT)) say('Move to the ball · tap BOARD to jump', 'plain', 1600, 0);
         if (e === 'rim') sfx.rim();
         else sfx.squeak();
       } else if (e === 'board-jump') sfx.squeak();
@@ -373,7 +580,9 @@ export function Hoops2({
         detail: practice.drill === 'pass' && !p.passes ? 'MOVE THE BALL FIRST' : e.text
       });
     }
+    boxRef.current.onEnd(p);
     const fx = fxRef.current;
+    const shooter = e.kind === 'make' ? p.bodies[e.who] : undefined;
     if (e.kind === 'make') {
       fx.swish = 1;
       const ls = p.lastShot;
@@ -385,29 +594,40 @@ export function Hoops2({
       sfx.bucket(ls?.kind, !!big);
       crowd.swell(big ? 1 : 0.55);
       fx.crowd = big ? 1 : 0.5;
-      const shooter = p.bodies[e.who];
       if (shooter) {
         shooter.act = 'celebrate';
         shooter.actAt = p.t;
       }
-      const and1 = ls?.and1 ? ' AND ONE!' : '';
-      say(e.text + and1 + ' +' + (mark === 'A' ? 3 : e.points), big || and1 ? 'big' : 'good', 1400);
-      if (game.fire >= 0 && game.fire !== wasFire) window.setTimeout(() => say(game.ours[game.fire].tag + ' IS ON FIRE!', 'big', 1400), 900);
+      // the scorer plate: "CURRY · 3PT · 11 PTS" (his points from the box score)
+      const and1 = ls?.and1 ? ' AND ONE' : '';
+      const pts = shooter ? boxRef.current.lines('us').find((l) => l.id === shooter.p.id)?.pts : undefined;
+      const word = ls ? SHOT_WORD[ls.kind] : 'BUCKET';
+      say((shooter ? shooter.p.tag + ' · ' : '') + word + and1 + (pts !== undefined ? ' · ' + pts + ' PTS' : ' +' + (mark === 'A' ? 3 : e.points)), big || and1 ? 'big' : 'good', 1400, 2);
+      if (game.fire >= 0 && game.fire !== wasFire) later(() => say(game.ours[game.fire].tag + ' IS ON FIRE!', 'big', 1400, 2), 900);
     } else if (e.kind === 'miss') {
       sfx.groan(0.6);
-      say(e.text, 'plain', 1000);
+      say(e.text, 'plain', 1000, 2);
     } else {
       if (e.kind === 'clock') sfx.buzzer();
       sfx.groan();
-      vibrate(40);
-      say(e.text, 'bad', 1300);
+      haptic('long');
+      say(e.text, 'bad', 1300, 2);
     }
-    if (wasFire >= 0 && game.fire < 0) window.setTimeout(() => say('FIRE PUT OUT', 'plain', 900), 1000);
+    if (wasFire >= 0 && game.fire < 0) later(() => say('FIRE PUT OUT', 'plain', 900, 2), 1000);
     onProgress(progress(game));
     setBetween(true);
     setBoarding(false);
-    // the final buzzer
-    if (game.over) window.setTimeout(() => sfx.buzzer(), 500);
+    // the final buzzer; the held arena reports the result at the whistle itself (the host's sheet
+    // comes up over the dimmed court)
+    if (game.over) {
+      whistleAt.current = performance.now();
+      later(() => sfx.buzzer(), hold ? 0 : 500);
+      if (hold) {
+        onDone(progress(game));
+        setTick((n) => n + 1);
+        return;
+      }
+    }
     const proceed = () => {
       if (game.over) {
         onDone(progress(game));
@@ -419,8 +639,8 @@ export function Hoops2({
     const hl = highlight.current;
     highlight.current = null;
     // (not the game's last play: it's reported done, and the results come next)
-    if (hl && !game.over && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) window.setTimeout(() => startReplay(hl, proceed), e.kind === 'make' ? 1300 : 1000);
-    else window.setTimeout(proceed, e.kind === 'make' ? 1600 : 1250);
+    if (hl && !game.over && (!autoplayHook || REPLAYS_IN_AUTOPLAY) && !reducedMotion()) later(() => startReplay(hl, proceed), e.kind === 'make' ? 1300 : 1000);
+    else later(proceed, e.kind === 'make' ? 1600 : 1250);
   };
 
   /** Play the highlight again, slower, from closer; then on with the game. */
@@ -465,13 +685,30 @@ export function Hoops2({
       }
     }
     // the finish itself broke: straight on to the next play (or the result)
-    window.setTimeout(() => {
+    later(() => {
       if (!game.over) next(game);
       else {
         onDone(progress(game));
         setTick((n) => n + 1);
       }
     }, 1200);
+  };
+
+  /** The bug's clock: the possession's own clock rounded up, written only when it changes. */
+  const writeClock = (p: Possession | null, replay: boolean) => {
+    const el = clockRef.current;
+    if (!el) return;
+    const live = !!p && !replay;
+    const v = live ? String(Math.max(0, Math.ceil(p!.clock))) : '–';
+    const low = live && !p!.end && p!.clock <= 5;
+    const was = clockShown.current;
+    if (v === was.v && low === was.low) return;
+    // under 4 s a tick each new second (and none for the 0 of a violation: the buzzer has it)
+    if (live && !p!.end && p!.clock < 4 && v !== was.v && v !== '0') sfx.tick();
+    clockShown.current = { v, low };
+    el.textContent = v;
+    if (low) el.dataset.low = '1';
+    else delete el.dataset.low;
   };
 
   // the loop: fixed steps for the game, a draw every frame
@@ -487,18 +724,35 @@ export function Hoops2({
       if (!canvas || !wrap) return;
       const w = wrap.clientWidth;
       const h = wrap.clientHeight;
-      renderer.resize(w, h);
+      // the safe box the camera frames inside: read from the HUD's tokens when the size or the
+      // orientation changes (a layout read, so never every frame)
+      const land = wrap.classList.contains('land');
+      let geo = geoRef.current;
+      if (!geo || geo.w !== w || geo.h !== h || geo.land !== land) {
+        const g0 = readGeometry(wrap);
+        geo = geoRef.current = { w, h, land, box: { safeTop: g0.safeTop, safeBottom: g0.safeBottom, land: g0.land, hudBottom: g0.hudBottom } };
+      }
+      renderer.resize(w, h, geo.box);
       // players-2: the backing store for the art pixel (pixel/art-scale.ts; 1 canvas px per view px unless ?artpx=A)
       renderer.art = artScale(canvas, renderer.W, renderer.H);
       const bw = Math.round(renderer.W * renderer.art.backing), bh = Math.round(renderer.H * renderer.art.backing);
+      let resized = false;
       if (canvas.width !== bw || canvas.height !== bh) {
         canvas.width = bw;
         canvas.height = bh;
         canvas.style.width = renderer.W * renderer.zoom + 'px';
         canvas.style.height = renderer.H * renderer.zoom + 'px';
         setWide(w > h);
+        resized = true;
       }
       const p = possRef.current;
+      // paused: the game is frozen (no steps, no juice, the clock held); only a turned phone redraws
+      if (pausedRef.current) {
+        last = now;
+        const c = resized && p ? canvas.getContext('2d') : null;
+        if (c && p) renderer.draw(c, p, now / 1000, fxRef.current);
+        return;
+      }
       const real = now / 1000;
       const fx = fxRef.current;
       const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
@@ -545,8 +799,17 @@ export function Hoops2({
             acc -= DT;
             if (p.end) break;
             if (p.handler !== null && !p.ball && !p.meter && !p.finish) p.target = aimPass(p, stickOnCourt());
+            // PASS's wind-up is over: it goes, a lob if B is still down
+            const pp = passPend.current;
+            if (pp && p.t >= pp.at) {
+              passPend.current = null;
+              pass(p, null, pp.held);
+            }
             const stick = autoplayHook ? decide(p, pilotRef.current) : stickOnCourt();
-            step(p, DT, stick);
+            const before = p.handler;
+            step(p, DT, stick, autoplayHook ? undefined : !!stickRef.current?.sprint);
+            stepsRun.current++;
+            boxRef.current.onStep(p, before);
             handleEvents(p);
             if (p.end) {
               finish(p);
@@ -568,6 +831,15 @@ export function Hoops2({
           lastBeat.current = beat;
         } else lastBeat.current = 1;
       }
+      // the cluster's dimmed state follows the play itself, every frame (NBA-18)
+      const ctl = ctlRef.current;
+      if (ctl) {
+        const off = offOf(p, !!replayRef.current);
+        if (ctl.dataset.off !== off) ctl.dataset.off = off;
+      }
+      // the shot clock, from the possession itself every frame (NBA-08): a warning at 5, a tick each
+      // second under 4, and a violation reads 0 before the toast says so
+      writeClock(p, !!replayRef.current);
       fx.swish = Math.max(0, fx.swish - elapsed * 1.3);
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.crowd = Math.max(0, fx.crowd - elapsed * 0.45);
@@ -603,323 +875,306 @@ export function Hoops2({
     return () => cancelAnimationFrame(raf);
   }, [game]);
 
-  // ---- the controls ----
-  const stickEl = useRef<HTMLDivElement>(null);
-  const stickPointer = useRef<number | null>(null);
-  const shotPointer = useRef<number | 'keyboard' | null>(null);
-  const stickAt = (e: React.PointerEvent) => {
-    const r = stickEl.current!.getBoundingClientRect();
-    const rad = r.width / 2;
-    let x = (e.clientX - (r.left + rad)) / rad;
-    let y = (e.clientY - (r.top + rad)) / rad;
-    const l = Math.hypot(x, y);
-    if (l > 1) {
-      x /= l;
-      y /= l;
-    }
-    stickRef.current = { x, y };
-    setKnob({ x, y });
-  };
-  const stickDown = (e: React.PointerEvent) => {
-    if (!possRef.current || possRef.current.end) return;
-    if (stickPointer.current !== null) return;
-    stickPointer.current = e.pointerId;
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    stickAt(e);
-  };
-  const clearStick = () => {
-    stickPointer.current = null;
-    stickRef.current = null;
-    setKnob({ x: 0, y: 0 });
-  };
-  const stickUp = (e: React.PointerEvent) => {
-    if (e.pointerId === stickPointer.current) clearStick();
-  };
-  const beginShot = (pointer: number | 'keyboard') => {
+  // ---- the controls (plan §5): the stick, A / B / C, the CALL radial, taps on teammates ----
+  /** an input's PointerEvent.timeStamp as the possession's game time (what the touch saw) */
+  const gameAt = (ts: number) => {
     const p = possRef.current;
-    if (shotPointer.current !== null) return false;
-    if (p?.ball?.kind === 'loose') {
-      const jumped = jumpRebound(p);
-      if (jumped) shotPointer.current = pointer;
-      return jumped;
-    }
-    if (shotPointer.current !== null || !p || p.end || p.handler === null || p.bodies[p.handler].h > 0.15) return false;
-    shotPointer.current = pointer;
-    pressShoot(p);
-    return true;
+    if (!p) return 0;
+    const ago = performance.now() - ts;
+    return ago >= 0 && ago < 1000 ? p.t - (ago / 1000) * timeScale : p.t;
   };
-  const shootDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    if (beginShot(e.pointerId)) e.currentTarget.setPointerCapture?.(e.pointerId);
+  /** SHOOT let go: the release, timed from the lift's own timestamp */
+  const release = (p: Possession, ts: number) => {
+    const ago = Math.min(0.1, Math.max(0, (performance.now() - ts) / 1000)) * timeScale;
+    releaseShoot(p, RELEASE_LAG + ago);
+    // the haptic inside the touch itself (iOS plays it only there): a firmer tick for a green
+    tapHaptic(p.meter?.greened || p.lastShot?.greened ? 18 : 8);
   };
-  const shootUp = (pointer: number | 'keyboard') => {
-    if (shotPointer.current !== pointer) return;
-    shotPointer.current = null;
+  /** a move off a swipe on SHOOT (or a Buttons-only button): screen right is +cz from behind */
+  const moveBy = (kind: 'cross' | 'step' | 'spin', side: number) => {
     const p = possRef.current;
-    if (p && !p.end) {
-      releaseShoot(p, RELEASE_LAG);
-      // the haptic inside the touch itself (iOS plays it only there): a firmer tick for a green
-      tapHaptic(p.meter?.greened || p.lastShot?.greened ? 18 : 8);
-    }
-  };
-  const cancelHeldShot = () => {
-    if (shotPointer.current !== null && possRef.current) cancelShoot(possRef.current);
-    shotPointer.current = null;
-  };
-  const doPass = (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    const p = possRef.current;
-    if (p && !p.end) {
-      pass(p, null);
-      tapHaptic(8);
-    }
-  };
-  // moves by swipe, anywhere off the stick and the buttons: a flick across crosses over that way, a
-  // flick back (down the screen) steps back, a flick up or a circle spins
-  const swipe = useRef<{ id: number; pts: { x: number; y: number; t: number }[]; done: boolean } | null>(null);
-  useInputInterrupt(() => {
-    clearStick();
-    cancelHeldShot();
-    swipe.current = null;
-  });
-  const turning = (pts: { x: number; y: number }[]) => {
-    let sum = 0;
-    let prev: number | null = null;
-    let last = pts[0];
-    for (const q of pts) {
-      if (Math.hypot(q.x - last.x, q.y - last.y) < 6) continue;
-      const a = Math.atan2(q.y - last.y, q.x - last.x);
-      if (prev !== null) {
-        let d = a - prev;
-        while (d > Math.PI) d -= Math.PI * 2;
-        while (d < -Math.PI) d += Math.PI * 2;
-        sum += d;
-      }
-      prev = a;
-      last = q;
-    }
-    return sum;
-  };
-  const moveBy = (kind: 'cross' | 'back' | 'spin', dir: number) => {
-    const p = possRef.current;
-    if (!p || p.end || p.handler === null) return;
+    if (!p || p.end || p.handler === null || replayRef.current) return;
+    if (p.meter && !p.meter.gather) return; // already in the air
+    const drive = driving(p);
+    cancelGather(p);
+    if (p.meter || p.finish || p.ball) return;
     const h = p.bodies[p.handler];
-    // screen right is +cz from behind the shooter; the engine's side is measured from his line to the rim
+    const before = h.lastMoveAt;
     const toRimCx = Math.sign(RIM.cx - h.cx) || 1;
-    if (kind === 'cross') crossover(p, dir * toRimCx);
-    else if (kind === 'back') stepback(p);
-    else spin(p, dir * toRimCx);
+    if (kind === 'cross') (drive ? euroStep : crossover)(p, side * toRimCx);
+    else if (kind === 'step') stepback(p);
+    else spin(p, side * toRimCx);
+    boxRef.current.onStep(p, p.handler);
+    handleEvents(p);
+    if (before === h.lastMoveAt && !p.end) say('MOVE RECHARGING · KEEP YOUR DRIBBLE', 'plain', 650);
   };
-  const swipeDown = (e: React.PointerEvent) => {
-    if (swipe.current) return;
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    swipe.current = { id: e.pointerId, pts: [{ x: e.clientX, y: e.clientY, t: performance.now() }], done: false };
-  };
-  const swipeMove = (e: React.PointerEvent) => {
-    const sw = swipe.current;
-    if (!sw || sw.id !== e.pointerId || sw.done) return;
-    const now = performance.now();
-    sw.pts.push({ x: e.clientX, y: e.clientY, t: now });
-    const a = sw.pts[0];
-    const dx = e.clientX - a.x;
-    const dy = e.clientY - a.y;
-    const turn = turning(sw.pts);
-    let len = 0;
-    for (let i = 1; i < sw.pts.length; i++) len += Math.hypot(sw.pts[i].x - sw.pts[i - 1].x, sw.pts[i].y - sw.pts[i - 1].y);
-    if (Math.abs(turn) > 4.2 && len > 110) {
-      sw.done = true;
-      moveBy('spin', turn > 0 ? 1 : -1);
-    } else if (now - a.t < 230 && Math.hypot(dx, dy) > 48 && Math.abs(turn) < 0.9) {
-      sw.done = true;
-      if (Math.abs(dx) > Math.abs(dy)) moveBy('cross', Math.sign(dx));
-      else if (dy > 0) moveBy('back', 0);
-      else moveBy('spin', stickRef.current && Math.abs(stickRef.current.x) > 0.2 ? Math.sign(stickRef.current.x) : 1);
-    }
-  };
-  const swipeUp = (e: React.PointerEvent) => {
-    const sw = swipe.current;
-    if (sw?.id === e.pointerId) {
-      if (!sw.done && performance.now() - sw.pts[0].t < 350 && Math.hypot(e.clientX - sw.pts[0].x, e.clientY - sw.pts[0].y) < 12) {
-        const p = possRef.current,
-          canvas = canvasRef.current;
-        if (p && canvas && p.handler !== null && !p.ball) {
-          const r = canvas.getBoundingClientRect();
-          const target = renderer.teammateAt(p, ((e.clientX - r.left) * renderer.W) / r.width, ((e.clientY - r.top) * renderer.H) / r.height, 26 / renderer.zoom);
-          if (target !== null) pass(p, target);
-        }
+  const stickSide = () => (stickRef.current && Math.abs(stickRef.current.x) > 0.2 ? Math.sign(stickRef.current.x) : 1);
+  const onA = (e: ClusterInput, p: Possession | null) => {
+    if (e.phase === 'down') {
+      if (replayRef.current) return endReplay();
+      if (!p || p.end || pausedRef.current) return;
+      if (p.ball?.kind === 'loose') {
+        if (jumpRebound(p)) tapHaptic(8);
+        return;
       }
-      swipe.current = null;
+      if (p.handler === null || p.bodies[p.handler].h > 0.15) return;
+      setCallOpen(false);
+      // the gather starts on touch-down, timed from the touch; it leaves the floor at 125 ms
+      pressShoot(p, { at: gameAt(e.t), provisional: true });
+      return;
+    }
+    if (!p || p.end) return;
+    if (e.phase === 'move') {
+      if (e.gesture?.kind === 'swipe') {
+        const d = e.gesture.dir;
+        moveBy(d === 'D' ? 'step' : d === 'U' ? 'spin' : 'cross', d === 'L' ? -1 : d === 'R' ? 1 : stickSide());
+      } else if ((e.dist ?? 0) >= TAP_PX && p.meter?.gather) cancelGather(p); // drifting: not a tap, not yet a swipe
+      return;
+    }
+    if (e.phase === 'cancel') {
+      cancelShoot(p);
+      return;
+    }
+    // up: a tap before he left the floor is a pump fake; otherwise the shot goes
+    const gathering = p.meter?.gather || (p.finish && p.t < p.finish.tUp && !p.ball);
+    if (e.gesture?.kind === 'tap' && gathering) {
+      const h = p.handler !== null ? p.bodies[p.handler] : null;
+      const tooSoon = h && p.t - (h.pumpAt ?? -9) < PUMP_EVERY;
+      if (!pumpFake(p) && tooSoon) say('ONE FAKE AT A TIME', 'plain', 600);
+      handleEvents(p);
+      return;
+    }
+    if (p.meter && p.meter.off === undefined) release(p, e.t);
+  };
+  const onB = (e: ClusterInput, p: Possession | null) => {
+    if (e.phase === 'down') {
+      if (!p || p.end || p.handler === null || p.ball || pausedRef.current || replayRef.current) return;
+      setCallOpen(false);
+      passPend.current = { at: p.t + 0.12, held: true };
+      tapHaptic(8);
+    } else if (e.phase === 'up') {
+      if (passPend.current) passPend.current.held = false;
+    } else if (e.phase === 'cancel') passPend.current = null;
+  };
+  const pickCall = (id: string) => {
+    setCallOpen(false);
+    const p = possRef.current;
+    if (!p || p.end || replayRef.current || pausedRef.current) return;
+    if (callPlay(p, id as 'screen' | 'cut' | 'iso')) {
+      haptic('tick', true);
+      handleEvents(p);
+    } else {
+      const wait = Math.ceil(Math.max(0, (p.callReadyAt ?? 0) - p.t));
+      say(wait ? 'CALL READY IN ' + wait + 's' : 'CALL WHEN THE BALL IS IN HAND', 'plain', 800);
     }
   };
-  const swipeCancel = (e: React.PointerEvent) => {
-    if (swipe.current?.id === e.pointerId) swipe.current = null;
+  const onC = (e: ClusterInput) => {
+    if (e.phase === 'down') setCallOpen((o) => !o);
+    else if (e.phase === 'up' && e.x !== undefined && e.y !== undefined) {
+      // slid from CALL onto an item and lifted there
+      const id = radialAt(e.x, e.y);
+      if (id) pickCall(id);
+    }
+  };
+  const onCluster = (e: ClusterInput) => {
+    const p = possRef.current;
+    if (e.slot === 'A') onA(e, p);
+    else if (e.slot === 'B') onB(e, p);
+    else if (e.slot === 'C') onC(e);
+  };
+  /** a tap on the court: a teammate there gets the ball (a ≥ 44 px target round each man) */
+  const courtTap = (x: number, y: number) => {
+    setCallOpen(false);
+    if (replayRef.current) return endReplay();
+    const p = possRef.current;
+    const canvas = canvasRef.current;
+    if (!p || !canvas || p.end || p.handler === null || p.ball || pausedRef.current) return;
+    const r = canvas.getBoundingClientRect();
+    const target = renderer.teammateAt(p, ((x - r.left) * renderer.W) / r.width, ((y - r.top) * renderer.H) / r.height, 26 / renderer.zoom);
+    if (target !== null) pass(p, target);
+  };
+  const courtPtr = useRef<{ id: number; x: number; y: number; t: number } | null>(null);
+  const onStick = (o: StickOut) => {
+    stickRef.current = o;
+  };
+  useInputInterrupt(() => {
+    stickRef.current = null;
+    passPend.current = null;
+    courtPtr.current = null;
+    setCallOpen(false);
+    const p = possRef.current;
+    if (p) cancelShoot(p);
+  });
+
+  // ---- pause (offline: everything stops; online: the sheet, and the game goes on) ----
+  const pause = () => {
+    if (!game || game.over) return;
+    setCallOpen(false);
+    setSheet(true);
+    if (online || pausedRef.current) return;
+    pausedRef.current = true;
+    timers.current.pause();
+    passPend.current = null;
+    const p = possRef.current;
+    if (p && !p.end) cancelGather(p);
+    crowd.stop(0.3);
+    setPaused(true);
+  };
+  const resume = () => {
+    setSheet(false);
+    if (!pausedRef.current) return;
+    const span = timers.current.resume();
+    pausedRef.current = false;
+    slowUntil.current += span;
+    if (replayRef.current) replayRef.current.start += span;
+    crowd.start(0.24);
+    setPaused(false);
+  };
+  const quit = () => {
+    timers.current.clear();
+    pausedRef.current = true;
+    setSheet(false);
+    crowd.stop(0.3);
+    onQuit?.();
+  };
+  // a phone that's put away (the app switcher, a call, the lock button) pauses an offline game
+  const pauseRef = useRef(pause);
+  pauseRef.current = pause;
+  useEffect(() => {
+    if (online || autoplayHook) return;
+    const hide = () => document.hidden && pauseRef.current();
+    const gone = () => pauseRef.current();
+    document.addEventListener('visibilitychange', hide);
+    window.addEventListener('pagehide', gone);
+    return () => {
+      document.removeEventListener('visibilitychange', hide);
+      window.removeEventListener('pagehide', gone);
+    };
+  }, [online, autoplayHook]);
+  const setControls = (controls: 'gestures' | 'buttons') => {
+    savePrefs({ controls });
+    setPrefs(loadPrefs());
   };
 
   const g = game;
-  const p = possRef.current;
+  const ctx: HoopsCtx = boarding ? 'board' : between || replaying ? 'dead' : 'offense';
+  const playing = !!g && !g.over && !autoplayHook;
   // the game fills the real screen, above the app's portrait frame, so it can be played either way up
   return createPortal(
-    <div className={'arcade-full hg2' + (wide ? ' wide' : '')} ref={wrapRef}>
-      <canvas ref={canvasRef} className="hg2-canvas" />
-      {!autoplayHook && <PlayReadout readout={lastReadout} live={!between && !g?.over} resetKey={g?.done ?? 0} />}
-      {g && !g.over && !autoplayHook && !boarding && <div className="hg2-skills" aria-label="Dribble skills" onPointerDown={e=>e.stopPropagation()}>
-       {(['cross','stepback','spin'] as const).map(kind=><button key={kind} disabled={between||replaying||!p||!!p.end||!!p.ball||!!p.meter||!!p.finish||p.handler===null} onClick={()=>{
-         const q=possRef.current;if(!q||q.handler===null||q.end||q.ball||q.meter||q.finish||replaying)return;
-         const h=q.bodies[q.handler],before=h.lastMoveAt;
-         const direction=Math.sign(stickOnCourt()?.cz??0)||(h.cz>0?-1:1);
-         if(kind==='cross')crossover(q,direction);else if(kind==='spin')spin(q,direction);else stepback(q);
-         handleEvents(q);
-         if(before===h.lastMoveAt)say('MOVE RECHARGING · KEEP YOUR DRIBBLE', 'plain',650);
-       }} aria-label={kind==='cross'?'Cross over':kind==='spin'?'Spin move':'Step back'}>{kind==='cross'?'CROSS':kind==='spin'?'SPIN':'STEP BACK'}</button>)}
-      </div>}
-
-      <div className="hg2-bug" aria-label="Score">
-        <span className="us">
-          <i>YOU</i>
-          <b className="num">{g?.score ?? 0}</b>
-        </span>
-        <span className="mid">
-          {g && !g.over ? (
-            <>
-              <b>{half(g) === 1 ? '1ST' : '2ND'}</b>
-              <small className="num">
-                {Math.min(g.done + 1, g.total)}/{g.total}
-              </small>
-              <em className={'num' + (p && !between && p.clock < 5 ? ' low' : '')}>{p && !between ? Math.max(0, Math.ceil(p.clock)) : '–'}</em>
-            </>
-          ) : (
-            <b>FINAL</b>
-          )}
-        </span>
-        <span className="them">
-          <i>{(rival?.name ?? rivalName).toUpperCase().slice(0, 8)}</i>
-          <b className="num">{rival ? rival.score : '–'}</b>
-        </span>
-      </div>
-      {g && (
-        <div className="hg2-marks" aria-hidden="true">
-          {Array.from({ length: g.total }, (_, i) => (
-            <i key={i} className={(g.marks[i] ? 'm-' + g.marks[i] : i === g.done ? 'now' : '') + (i === g.total / 2 ? ' half' : '')}>
-              {g.marks[i] ? MARK_TEXT[g.marks[i]] : ''}
-            </i>
-          ))}
-        </div>
-      )}
-      {look && g && !g.over && (
-        <div key={look.scheme + look.trapped} className={'hg2-look l-' + look.scheme + (look.trapped ? ' on' : '')} role="status">
-          {LOOK_TEXT[look.scheme]}
-          <small>{look.trapped ? 'find the open man' : LOOK_TIP[look.scheme]}</small>
-        </div>
-      )}
-      {pop && (
-        <div key={pop.id} className={'hg2-pop ' + pop.tone} role="status">
-          {pop.text}
-        </div>
-      )}
-      {boarding ? <div className="hg2-hint hg2-board-hint">Move to the ball · tap BOARD to jump</div> : hint && <div className="hg2-hint">{hint}</div>}
-      {replaying && (
-        <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
-          <i />
-          REPLAY
-          <small>TAP TO SKIP</small>
-        </button>
-      )}
-      {!attrs && <div className="fg-loading">Taking the floor…</div>}
-      {g && !g.over && !autoplayHook && (
-        <div
-          className="hg2-swipe"
-          onPointerDown={swipeDown}
-          onPointerMove={swipeMove}
-          onPointerUp={swipeUp}
-          onPointerCancel={swipeCancel}
-          onLostPointerCapture={swipeCancel}
-          aria-hidden="true"
-        />
-      )}
-      {g && !g.over && !autoplayHook && (
-        <div className="hg2-coach" aria-label="Offensive play calls" style={boarding ? { visibility: 'hidden' } : undefined}>
-          {(['screen', 'cut', 'space'] as const).map((kind) => (
-            <button
-              key={kind}
-              disabled={between || !p || !!p.end}
-              onClick={() => {
-                const current = possRef.current;
-                if (!current || current.end || replaying) return;
-                if (!callPlay(current, kind)) {
-                  const wait = Math.ceil(Math.max(0, (current.callReadyAt ?? 0) - current.t));
-                  say(wait ? 'CALL READY IN ' + wait + 's' : 'CALL WHEN THE BALL IS IN HAND', 'plain', 700);
-                }
-              }}
-              aria-label={kind === 'screen' ? 'Call a screen and roll' : kind === 'cut' ? 'Call a teammate to cut to the rim' : 'Space the floor'}
-            >
-              {kind === 'screen' ? 'SCREEN' : kind === 'cut' ? 'CUT' : 'SPACE'}
-            </button>
-          ))}
-        </div>
-      )}
-      {g && !g.over && !autoplayHook && (
-        <div className="hg2-pad">
+    <div className={'arcade-full hg2 hg2-nba ps-geo' + (wide ? ' wide land' : '') + (paused ? ' paused' : '') + (prefs.controls === 'buttons' ? ' buttons' : '') + (hold && g?.over ? ' held' : '')} ref={wrapRef}>
+      <ToastProvider paused={paused} apiRef={toastApi}>
+        <canvas ref={canvasRef} className="hg2-canvas" />
+        {playing && (
           <div
-            className="hg2-stick"
-            ref={stickEl}
-            onPointerDown={stickDown}
-            onPointerMove={(e) => stickPointer.current === e.pointerId && stickAt(e)}
-            onPointerUp={stickUp}
-            onPointerCancel={stickUp}
-            onLostPointerCapture={stickUp}
-            aria-label="Move"
-          >
-            <i style={{ transform: 'translate(' + knob.x * 30 + 'px,' + knob.y * 30 + 'px)' }} />
+            className="hg2-court"
+            aria-hidden="true"
+            onPointerDown={(e) => {
+              if (!courtPtr.current) courtPtr.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
+            }}
+            onPointerUp={(e) => {
+              const c = courtPtr.current;
+              if (!c || c.id !== e.pointerId) return;
+              courtPtr.current = null;
+              if (e.timeStamp - c.t < 250 && Math.hypot(e.clientX - c.x, e.clientY - c.y) < TAP_PX) courtTap(e.clientX, e.clientY);
+            }}
+            onPointerCancel={() => (courtPtr.current = null)}
+          />
+        )}
+        {g && (
+          <>
+            <ScoreBug
+              you={g.score}
+              rival={rival?.score ?? 0}
+              youName="YOU"
+              rivalName={(rival?.name ?? rivalName).slice(0, 10)}
+              period={g.over ? 'FINAL' : half(g) === 1 ? '1ST' : '2ND'}
+              sub={g.over ? undefined : Math.min(g.done + 1, g.total) + '/' + g.total}
+              clockRef={clockRef}
+              progress={g.done / g.total}
+              phase={qaPhase ?? (!g.over && g.done >= g.total - CLUTCH ? 'clutch' : 'normal')}
+              youColor={teamColor(ourKit)}
+              rivalColor={teamColor(theirKit)}
+              aside={!autoplayHook && <PlayReadout readout={lastReadout} live={!between && !g.over} resetKey={g.done} icon />}
+            />
+            {/* fed zeros until heat.ts lands (nba-4) */}
+            <HeatBar you={{ v: 0, stage: 'cold' }} />
+          </>
+        )}
+        {replaying && (
+          <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
+            <i />
+            REPLAY
+            <small>TAP TO SKIP</small>
+          </button>
+        )}
+        {!attrs && <div className="fg-loading">Taking the floor…</div>}
+        {playing && (
+          <HoopsControls
+            ctx={ctx}
+            buttonsOnly={prefs.controls === 'buttons'}
+            callOpen={callOpen}
+            rootRef={ctlRef}
+            onStick={onStick}
+            onSprintEdge={() => haptic('tick')}
+            onCourtTap={courtTap}
+            onInput={onCluster}
+            onArc={(id) => moveBy(id as 'cross' | 'step' | 'spin', stickSide())}
+            onCall={(id) => pickCall(id)}
+            onCallClose={() => setCallOpen(false)}
+          />
+        )}
+        <ToastLine />
+        {g && !g.over && <PauseButton onPause={pause} label={online ? 'Match menu' : 'Pause'} />}
+        <PauseSheet open={sheet} online={online} onResume={resume} onQuit={!online && onQuit ? quit : undefined}>
+          <SheetToggle
+            label="Controls"
+            value={prefs.controls ?? 'gestures'}
+            options={[
+              { id: 'gestures', label: 'GESTURES' },
+              { id: 'buttons', label: 'BUTTONS' }
+            ]}
+            onChange={setControls}
+          />
+          <ul className="ps-hud-help">
+            <li>
+              <b>LEFT THUMB</b> anywhere low: move · past the ring: sprint
+            </li>
+            <li>
+              <b>SHOOT</b> hold, let go at the top · tap: pump fake · swipe: cross, step-back, spin (euro-step on a drive)
+            </li>
+            <li>
+              <b>PASS</b> to the man you aim at · hold: lob · or tap a teammate
+            </li>
+            <li>
+              <b>CALL</b> SCREEN · CUT · ISO (clears out for your star)
+            </li>
+          </ul>
+        </PauseSheet>
+        {curtain && g && (
+          <button type="button" className="hg2-curtain" onPointerDown={(e) => (e.stopPropagation(), skipCurtain())} aria-label={'Next game against ' + rivalName + ': tap to tip off'}>
+            <span className="eyebrow">Next game</span>
+            <b className="disp">VS {(rival?.name ?? rivalName).toUpperCase()}</b>
+            <span className="hg2-curtain-five">
+              {g.theirs.map((h) => (
+                <span key={h.id}>
+                  <i>{h.pos}</i>
+                  <em>{h.tag}</em>
+                  <small className="num">{h.ovr}</small>
+                </span>
+              ))}
+            </span>
+            <small>TAP TO TIP OFF</small>
+          </button>
+        )}
+        {g?.over && !hold && (
+          <div className="fg-final hg2-final" role="status">
+            <span className="eyebrow">Your possessions</span>
+            <b className="num">{g.score}</b>
+            <small>{g.marks.map((m) => MARK_TEXT[m]).join(' ')}</small>
+            {rival && !rival.done && <WaitLine rival={rival} unit="possession" total={possessions} />}
           </div>
-          <div className="hg2-btns">
-            <button
-              className="hg2-pass"
-              disabled={between || !p || !!p.end}
-              onPointerDown={doPass}
-              onKeyDown={(e) => {
-                if (!e.repeat && (e.key === 'Enter' || e.key === ' ')) doPass(e);
-              }}
-              aria-label="Pass"
-            >
-              PASS
-            </button>
-            <button
-              className="hg2-shoot"
-              disabled={between || !p || !!p.end}
-              onPointerDown={shootDown}
-              onPointerUp={(e) => shootUp(e.pointerId)}
-              onPointerCancel={cancelHeldShot}
-              onLostPointerCapture={cancelHeldShot}
-              onKeyDown={(e) => {
-                if (!e.repeat && (e.key === 'Enter' || e.key === ' ')) {
-                  e.preventDefault();
-                  beginShot('keyboard');
-                }
-              }}
-              onKeyUp={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  shootUp('keyboard');
-                }
-              }}
-              onBlur={() => {
-                if (shotPointer.current === 'keyboard') cancelHeldShot();
-              }}
-              aria-label="Shoot: hold, and let go in the green"
-            >
-              {boarding ? 'BOARD' : 'SHOOT'}
-            </button>
-          </div>
-        </div>
-      )}
-      {g?.over && (
-        <div className="fg-final hg2-final" role="status">
-          <span className="eyebrow">Your possessions</span>
-          <b className="num">{g.score}</b>
-          <small>{g.marks.map((m) => MARK_TEXT[m]).join(' ')}</small>
-          {rival && !rival.done && <WaitLine rival={rival} unit="possession" total={possessions} />}
-        </div>
-      )}
+        )}
+      </ToastProvider>
     </div>,
     document.body
   );
@@ -944,3 +1199,4 @@ export function aiPossessionsOf(offense: Hooper[], defense: Hooper[], seed: stri
   autoplay(g, skill, 'ai:' + seed);
   return { score: g.score, drive: g.done, done: true, ends: g.marks.slice(), plays: g.done };
 }
+

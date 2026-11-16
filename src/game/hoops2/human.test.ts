@@ -2,6 +2,15 @@
 // src/game/hoops2/human.test.ts): drive at the rim, cross over then drive, spot up for a three,
 // pull up from the elbow, step back into a three, kick it to the open man. Inputs carry a person's timing error (the release off the top by a few
 // dozen milliseconds), so this measures what playing feels like, not what a perfect bot gets.
+//
+// The second test (Claude 2026-11-16) is the studio plan's ladder harness (plan §3.2, §3.3, §3.6):
+// real even-78 Squad Battles fives, the harness's person with a Gaussian release error (σ HUMAN_SD,
+// default 50 ms, and the skilled σ 35 ms), every strategy plus the `mixed` median person, on each UT
+// rung (HUMAN_LEVELS=rookie,pro,allstar,legend), against the AI's own possessions at that rung
+// (skill and defense as Squad Battles sets them) for a win %. The six defender policies run beside
+// the AI's possessions and count what they would press; the engine has no defensive input until
+// nba-6/7, so their PPP must equal the idle one (checked). HUMAN_GAMES games each (default 20);
+// JSON to $HUMAN_OUT (default: the OS temp dir).
 import { CELLS } from '../../engine/data';
 import { hashString, rng } from '../../engine/rng';
 import { loadAttrs } from '../attrs';
@@ -9,6 +18,10 @@ import { aimPass, crossover, dist, isThree, pass, pressShoot, releaseShoot, RIM,
 import { afterPossession, newHoopsGame, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import type { Hooper, Possession, Pt } from './types';
+import { LEVEL, LEVELS, type Level } from '../../ut/battles';
+import { getPool } from '../../ut/pool';
+import { type BoxTeam, BoxTracker } from './box';
+import { DEF_POLICIES, defenderInput, defState, MEDIAN_SD, newTally, outPath, playSide, SKILLED_SD, squadRaw, STRATEGIES, summary, writeOut, type Strategy as HarnessStrategy } from './harness';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const testEnv = (globalThis as { process?: { env?: Record<string, string> } }).process?.env ?? {};
@@ -191,3 +204,84 @@ run('a person playing simple strategies', async () => {
       );
     }
 });
+
+/** Teams' totals summed over games. */
+function sumTeams(parts: BoxTeam[]): BoxTeam {
+  const out = { ...parts[0] };
+  for (const p of parts.slice(1)) for (const k of Object.keys(out) as (keyof BoxTeam)[]) out[k] += p[k];
+  return out;
+}
+
+run('the ladder: the median and skilled person on each rung, against the AI at that rung', async () => {
+  const pool = await getPool();
+  const games = Number(testEnv.HUMAN_GAMES ?? 20);
+  const levels = (testEnv.HUMAN_LEVELS?.split(',').map((x) => x.trim()) ?? LEVELS) as Level[];
+  const sds = testEnv.HUMAN_SD ? [Number(testEnv.HUMAN_SD)] : [MEDIAN_SD, SKILLED_SD];
+  const PRO = 0.68;
+  const out: Record<string, unknown> = { games, levels, sds };
+  const r3 = (x: number) => Math.round(x * 1000) / 1000;
+  const lines: string[] = [];
+  for (const lv of levels) {
+    const { skill, def } = { skill: PRO + LEVEL[lv].skill, def: LEVEL[lv].def };
+    const us = (i: number) => squadRaw(pool, 78, 'H78:' + (i % 10));
+    const them = (i: number) => squadRaw(pool, 78, 'R78:' + (i % 10));
+    // the AI's possessions at this rung, against your five (as aiPossessionsOf plays them), and the
+    // six defender policies counting what they'd press on the same possessions
+    const aiScores: number[] = [];
+    const aiT = newTally();
+    const aiBox: { t: BoxTeam[]; d: BoxTeam[] } = { t: [], d: [] };
+    const policy: Record<string, { pts: number; contests: number; steals: number; switches: number }> = {};
+    for (const pol of DEF_POLICIES) {
+      let pts = 0;
+      const counts = { contests: 0, steals: 0, switches: 0 };
+      for (let i = 0; i < games; i++) {
+        const A = them(i);
+        const B = us(i);
+        const g = newHoopsGame(A.five, B.five, 'ai:ladder:' + lv + i, undefined, A.bench, def);
+        const ds = defState(pol, hashString('def:' + pol + i));
+        const box = pol === 'idle' ? new BoxTracker() : undefined;
+        playSide(g, { skill, seed: 'ai:ladder:' + lv + i, box, side: 'us', tally: pol === 'idle' ? aiT : undefined, each: (p) => void defenderInput(p, ds) });
+        pts += g.score;
+        if (pol === 'idle') {
+          aiScores.push(g.score);
+          aiBox.t.push(box!.team('us'));
+          aiBox.d.push(box!.team('them'));
+        }
+        counts.contests += ds.counts.contests;
+        counts.steals += ds.counts.steals;
+        counts.switches += ds.counts.switches;
+      }
+      policy[pol] = { pts, ...counts };
+    }
+    const ai = summary(sumTeams(aiBox.t), sumTeams(aiBox.d), aiT);
+    for (const pol of DEF_POLICIES) expect(policy[pol].pts, `${lv} ${pol}: defender inputs aren't wired yet, so PPP must equal idle`).toBe(policy.idle.pts);
+    lines.push(`\n${lv}: AI offense PPP ${r3(ai.ppp)} TOV ${r3(ai.tovPct)} (skill ${r3(skill)}, def ${def})  policies: ${DEF_POLICIES.map((p) => `${p} c${policy[p].contests}/s${policy[p].steals}/w${policy[p].switches}`).join(' ')}`);
+    const rung: Record<string, unknown> = { ai: { ppp: r3(ai.ppp), tovPct: r3(ai.tovPct), scores: aiScores }, policy };
+    for (const sd of sds) {
+      for (const strat of STRATEGIES as HarnessStrategy[]) {
+        const t = newTally();
+        const ts: BoxTeam[] = [];
+        const ds: BoxTeam[] = [];
+        let wins = 0;
+        for (let i = 0; i < games; i++) {
+          const A = us(i);
+          const B = them(i);
+          const g = newHoopsGame(A.five, B.five, 'human:' + lv + strat + i, undefined, A.bench, def);
+          const box = new BoxTracker();
+          playSide(g, { skill, seed: 'human:' + lv + strat + sd + i, human: { strategy: strat, sd }, box, side: 'us', tally: t });
+          ts.push(box.team('us'));
+          ds.push(box.team('them'));
+          wins += g.score > aiScores[i] ? 1 : g.score === aiScores[i] ? 0.5 : 0;
+        }
+        const h = summary(sumTeams(ts), sumTeams(ds), t);
+        const row = { ppp: r3(h.ppp), win: r3(wins / games), green: r3(h.greenRate), tov: r3(h.tovPct), fga16: r3(h.fga16), tpaRate: r3(h.tpaRate), secPerPoss: r3(h.secPerPoss) };
+        rung[`sd${sd * 1000}.${strat}`] = row;
+        lines.push(`  σ ${sd * 1000} ${strat.padEnd(11)} PPP ${row.ppp} win ${row.win} green ${row.green} TOV ${row.tov} FGA/16 ${row.fga16} 3PA ${row.tpaRate} sec ${row.secPerPoss}`);
+      }
+    }
+    out[lv] = rung;
+  }
+  const file = outPath(testEnv.HUMAN_OUT, 'nba-human.json');
+  await writeOut(file, JSON.stringify(out, null, 1));
+  console.log(lines.join('\n') + `\n\nJSON: ${file}`);
+}, 3_600_000);

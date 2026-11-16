@@ -623,7 +623,7 @@ export function App() {
     season: TeamRating,
     bracket: Series[] | null,
     bot: { lineup: DraftState['botLineup']; rating: TeamRating } | null,
-    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; pens?: Pens }
+    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; pens?: Pens; quit?: boolean }
   ) => {
     const draft = r.draft!;
     const p0 = profileRef.current;
@@ -638,7 +638,7 @@ export function App() {
     // a played game: the score decides, a tie goes to the better team
     // soccer (Claude 2026-11-01): a level match was settled on penalties
     const byGame = arcade ? (arcade.us > arcade.them ? true : arcade.us < arcade.them ? false : arcade.pens ? arcade.pens.won : byRating) : null;
-    const vsWon = noContest ? null : forfeit ? true : arcade ? byGame : byRating;
+    const vsWon = noContest ? null : forfeit ? true : arcade?.quit ? false : arcade ? byGame : byRating;
     const g = gradeFor(season.wins);
     const out = bracket ? playoffOutcome(bracket) : null;
     const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked, vsName: oppName });
@@ -1105,10 +1105,10 @@ export function App() {
           host={r.online ? r.online.found.host : true}
           onProgress={(p) => matchRef.current?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => matchRef.current?.update((s) => ({ ...s, arcadeTook: k }))}
-          onFinish={(us, them, how, took, pens) => {
+          onFinish={(us, them, how, took, pens, quit) => {
             const season = playSeason(d.lineup);
             const botRating = rateTeam(SLOTS.map((s) => d.botLineup[s]));
-            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us, pens });
+            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us, pens, quit: quit === 'us' });
           }}
         /></React.Suspense>
       </div>

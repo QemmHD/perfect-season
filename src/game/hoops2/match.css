@@ -1,0 +1,28 @@
+/*
+ * Basketball's match chrome around the shared HUD kit (nba-2, nba-3). Every rule sits under `.hg2-nba`
+ * or a basketball-only class: football and soccer reuse the .hg2 classes. The score bug, the Heat
+ * bar and LAST PLAY (an icon beside the bug) are the HUD kit's (hud/bug.css); the defense's look is
+ * read in the toast line at the start of each possession.
+ */
+/* the court under everything: a tap on a teammate passes to him */
+.hg2-court {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+.hg2-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hg2-controls > * {
+  pointer-events: auto;
+}
+.hg2-controls > .ps-scrim,
+.hg2-controls > .ps-ctl,
+.hg2-controls > .ps-radial {
+  pointer-events: none;
+}
+.arcade-full.hg2-nba.paused .hg2-canvas {
+  filter: saturate(0.6) brightness(0.8);
+}
