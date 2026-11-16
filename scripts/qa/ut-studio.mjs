@@ -16,6 +16,12 @@
 //               with 0 page errors and the Rewards inbox it was built with; a fixture with a MINUTES
 //               ledger (profile.playtime) must still hold it, unchanged, after the app has saved
 //   deadtaps    the dead-tap walk alone (fresh context per screen), at --size (default 393)
+//   minutes     MINUTES on screen (ut-3), per sport x size and MINUTES fixture (default minutes-27,
+//               minutes-week-600, minutes-90; --fixture picks one): Home's ring chip inside the gutters
+//               with Home's scroll and PLAY bar measured; the Minutes screen's metrics (targets, text,
+//               contrast) with the next rung visible without scrolling; CLAIM feedback time, coins and
+//               packs paid once, a second tap a no-op; reduced motion (--rm) draws the rings and rail
+//               fills with no animation; the Profile panel; UT Home's ring (first fixture only)
 //   kit         the visual kit (src/ut/kit.tsx) rendered inside UT: sizes, data-primary, press and
 //               claim burst, its CSS gzip size (<= 5 KB); with --rm, burst, sheen and ring fill must
 //               compute animation none
@@ -225,11 +231,20 @@ async function mainTab(page, label) {
   await settle(page, 500);
 }
 
+/** RANKS → MINUTES (ut-3), with the lazy screen loaded. */
+async function openMinutes(page) {
+  await mainTab(page, 'RANKS');
+  await page.locator('.ranks-head .seg button').filter({ hasText: /^MINUTES$/ }).click();
+  await page.locator('.mv-hero').waitFor({ timeout: 30000 });
+  await settle(page, 500);
+}
+
 /** Home, Ranks, Profile, UT Home, every UT tab and segment, and the Rewards inbox: how to get to each from anywhere. */
 export const SCREENS = [
   { id: 'home', go: (p) => mainTab(p, 'HOME') },
   { id: 'ranks', go: (p) => mainTab(p, 'RANKS') },
   { id: 'profile', go: (p) => mainTab(p, 'PROFILE') },
+  { id: 'minutes', go: (p) => openMinutes(p) },
   { id: 'ut-home', go: (p) => utTab(p, 'HOME') },
   { id: 'play', go: (p) => utTab(p, 'PLAY') },
   { id: 'squad', go: (p) => utTab(p, 'SQUAD') },
@@ -1093,11 +1108,190 @@ async function kitCase(a) {
   return report;
 }
 
+/** Design px box of the first element matching `sel` (relative to the stage), or null. */
+const boxOf = (page, sel) =>
+  page.evaluate((sel) => {
+    const e = document.querySelector(sel);
+    const stage = document.querySelector('.stage');
+    if (!e || !stage) return null;
+    const k = stage.getBoundingClientRect().width / stage.offsetWidth || 1,
+      s = stage.getBoundingClientRect(),
+      r = e.getBoundingClientRect();
+    return { x: Math.round((r.left - s.left) / k), y: Math.round((r.top - s.top) / k), w: Math.round(r.width / k), h: Math.round(r.height / k), bottom: Math.round((r.bottom - s.top) / k) };
+  }, sel);
+/** The saved wallet (shared, basketball's key), this sport's packs and the claimed rungs. (The app drops ?sport= from the address once loaded.) */
+const stored = (page, sport) =>
+  page.evaluate((sport) => {
+    const p = JSON.parse(localStorage.getItem('perfect-season:profile:v1') || '{}');
+    const own = JSON.parse(localStorage.getItem({ nba: 'perfect-season:profile:v1', nfl: 'perfect-season:profile:nfl:v1', soccer: 'perfect-season:profile:soccer:v1' }[sport]) || '{}');
+    return { coins: p.coins, packs: (own.ut?.packs ?? []).length, claimed: p.playtime?.claimed };
+  }, sport);
+
+async function minutesCase(a) {
+  const browser = await launch();
+  const fixtures = a.fixture !== 'audit' ? [a.fixture] : ['minutes-27', 'minutes-week-600', 'minutes-90'];
+  const report = { case: 'minutes', at: new Date().toISOString(), flags: flagsOf(a), runs: [] };
+  try {
+    for (const sport of a.sport)
+      for (const size of a.size)
+        for (const fixture of fixtures) {
+          const tag = sport + '-' + SIZES[size].w + 'x' + SIZES[size].h + '-' + fixture + (a.rm ? '-rm' : '');
+          const r = { sport, size: SIZES[size].w + 'x' + SIZES[size].h, fixture };
+          const { context, page, errors, edge } = await openPhone(browser, { sport, size, fixture, rm: a.rm, cpu: a.cpu, edge: a.edge, clock: a.clock });
+          try {
+            await waitHome(page);
+            await closeDialogs(page);
+            // Home: the chip sits inside the 16 px gutters on the stat strip's one row
+            const chip = await boxOf(page, '.home .mins-chip');
+            const strip = await boxOf(page, '.home .statstrip');
+            r.home = {
+              chip,
+              chipText: await page.locator('.home .mins-chip b').textContent(),
+              strip,
+              inGutters: await page.evaluate(() => {
+                const st = document.querySelector('.stage'),
+                  k = st.getBoundingClientRect().width / st.offsetWidth || 1,
+                  x0 = st.getBoundingClientRect().left;
+                return [...document.querySelectorAll('.home .statstrip > *')].every((c) => {
+                  const b = c.getBoundingClientRect();
+                  return (b.left - x0) / k >= 15.5 && (b.right - x0) / k <= 374.5;
+                });
+              }),
+              scroll: await page.evaluate(() => {
+                const sc = document.querySelector('.home-scroll');
+                return sc.scrollHeight - sc.clientHeight;
+              }),
+              playTop: (await boxOf(page, '.home .playbar button')).y,
+              ringAnimation: await page.evaluate(() => getComputedStyle(document.querySelector('.home .mins-mini .fill')).animationName),
+            };
+            await page.screenshot({ path: path.join(a.out, tag + '-home.png') });
+            // the Minutes screen
+            const since = await page.evaluate(() => performance.now());
+            await page.locator('.home .mins-chip').click();
+            await page.locator('.mv-hero').waitFor({ timeout: 30000 });
+            await settle(page, 700);
+            const m = await captureScreen(page, { file: path.join(a.out, tag + '-minutes.png'), edge, since, errors, errorsBefore: 0, probe: false });
+            // the top bar's 8 px "LV" over the level ring is shell's (pre-existing, listed in ut.md), not this screen's
+            const own = (l) => l.filter((x) => !/^LV \d/.test(x));
+            // text the tab bar covers at the scroll edge is sampled against the bar, not its panel: not on screen
+            const covered = await page.evaluate(() => {
+              const t = document.querySelector('nav.tabs')?.getBoundingClientRect();
+              if (!t) return [];
+              return [...document.querySelectorAll('.mv *')]
+                .filter((e) => [...e.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()))
+                .filter((e) => e.getBoundingClientRect().bottom > t.top)
+                .map((e) => (e.getAttribute('aria-label') || e.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 40));
+            });
+            m.lowContrast = m.lowContrast.filter((x) => !covered.some((c) => c && x.startsWith(c)));
+            r.minutes = { small: m.small, tiny: own(m.tiny), lowContrast: m.lowContrast, clipped: m.clipped, offscreen: m.offscreen, hOverflow: m.hOverflow, topClear: m.topClear, pageErrors: m.pageErrors };
+            // the next rung (or the ready one) in view without scrolling, above the tab bar
+            r.minutes.nextRung = await page.evaluate(() => {
+              const v = document.querySelector('.shell-views').getBoundingClientRect();
+              const tabs = document.querySelector('nav.tabs')?.getBoundingClientRect();
+              const bottom = Math.min(v.bottom, tabs ? tabs.top : v.bottom);
+              const n = document.querySelector('.mv-rail .mv-node[data-state="ready"], .mv-rail .mv-node[data-state="next"]') ?? document.querySelector('.mv-hero');
+              const b = n.getBoundingClientRect();
+              const sc = n.closest('.page');
+              return { state: n.dataset.state ?? 'hero', visible: b.top >= v.top - 0.5 && b.bottom <= bottom + 0.5, scrolled: sc ? sc.scrollTop : 0 };
+            });
+            r.minutes.hero = (await page.locator('.mv-hero h2').textContent()).trim();
+            // RANKS' three segments sit inside the gutters (a sport's longer title wraps them under it)
+            r.minutes.segsInside = await page.evaluate(() => {
+              const st = document.querySelector('.stage'),
+                k = st.getBoundingClientRect().width / st.offsetWidth || 1,
+                x0 = st.getBoundingClientRect().left;
+              return [...document.querySelectorAll('.ranks-head .seg button')].every((b) => {
+                const r = b.getBoundingClientRect();
+                return (r.left - x0) / k >= 15.5 && (r.right - x0) / k <= 374.5;
+              });
+            });
+            r.minutes.animations = await page.evaluate(() => ['.mv-ring .fill', '.mv-bar i', '.mv-node[data-state="ready"] .mv-chest-art'].map((s) => [s, document.querySelector(s) ? getComputedStyle(document.querySelector(s)).animationName : 'absent']));
+            // CLAIM: feedback time, paid once, a second tap is a no-op
+            const claim = page.locator('.mv-hero .ut-k-claim');
+            if (await claim.count()) {
+              const before = await stored(page, sport);
+              const b = await claim.boundingBox();
+              await page.evaluate(() => {
+                const st = (window.__claimProbe = { t0: 0, t1: 0 });
+                window.addEventListener('pointerdown', () => (st.t0 = performance.now()), { capture: true, once: true });
+                const hero = document.querySelector('.mv-hero');
+                const btn = hero.querySelector('.ut-k-claim');
+                const mo = new MutationObserver(() => st.t0 && !st.t1 && (st.t1 = performance.now()));
+                mo.observe(hero, { subtree: true, childList: true, attributes: true, characterData: true });
+                // the burst attribute on the button counts as feedback too
+                new MutationObserver(() => st.t0 && !st.t1 && (st.t1 = performance.now())).observe(btn, { attributes: true });
+              });
+              await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+              await page.waitForTimeout(700);
+              const probe = await page.evaluate(() => window.__claimProbe);
+              const after = await stored(page, sport);
+              await page.screenshot({ path: path.join(a.out, tag + '-claimed.png') });
+              // the same spot again: the button is gone, nothing more is paid
+              await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+              await page.waitForTimeout(500);
+              const again = await stored(page, sport);
+              r.claim = {
+                feedbackMs: probe.t1 && probe.t0 ? Math.round(probe.t1 - probe.t0) : null,
+                coins: after.coins - before.coins,
+                packs: after.packs - before.packs,
+                secondTap: { coins: again.coins - after.coins, packs: again.packs - after.packs },
+                buttonGone: !(await claim.count()),
+                status: (await page.locator('.mv-claimed').textContent().catch(() => '')) || '',
+              };
+            }
+            await closeDialogs(page);
+            // Profile's playtime panel
+            await mainTab(page, 'PROFILE');
+            await page.locator('.pt-panel').scrollIntoViewIfNeeded();
+            await settle(page, 300);
+            const pm = await captureScreen(page, { file: path.join(a.out, tag + '-profile.png'), edge, since, errors, errorsBefore: 0, probe: false });
+            r.profile = { small: pm.small, tiny: own(pm.tiny), lowContrast: pm.lowContrast.filter((x) => /Playtime|Today|week|Lifetime|open|NBA|NFL|Soccer|MINUTES|BADGE|ROOKIE|STARTER/i.test(x)) };
+            // UT Home's ring (first fixture only: UT is the slow part)
+            if (fixture === fixtures[0]) {
+              await enterUt(page);
+              await page.locator('.uh-mins').waitFor({ timeout: 30000 });
+              await settle(page, 400);
+              r.utHome = { box: await boxOf(page, '.uh-mins .ut-k-mins'), text: (await page.locator('.uh-mins .ut-k-mins-text').innerText()).replace(/\s+/g, ' ') };
+              await page.screenshot({ path: path.join(a.out, tag + '-ut-home.png') });
+            }
+          } catch (e) {
+            r.fail = e.message.split('\n')[0];
+          } finally {
+            r.pageErrors = errors.slice();
+            await context.close();
+          }
+          r.ok =
+            !r.fail &&
+            !r.pageErrors.length &&
+            r.home?.inGutters &&
+            r.minutes?.nextRung?.visible &&
+            r.minutes.segsInside &&
+            !r.minutes.small.length &&
+            !r.minutes.tiny.length &&
+            !r.minutes.lowContrast.length &&
+            (!a.rm || (r.home.ringAnimation === 'none' && r.minutes.animations.every(([, n]) => n === 'none' || n === 'absent'))) &&
+            (!r.claim || (r.claim.feedbackMs !== null && r.claim.feedbackMs <= 100 && r.claim.packs > 0 && r.claim.secondTap.coins === 0 && r.claim.secondTap.packs === 0 && r.claim.buttonGone)) &&
+            !r.profile?.small.length &&
+            !r.profile?.tiny.length;
+          report.runs.push(r);
+          console.log(tag, r.ok ? 'ok' : 'FAILED', JSON.stringify({ home: r.home && { chip: r.home.chipText, scroll: r.home.scroll, playTop: r.home.playTop, inGutters: r.home.inGutters }, minutes: r.minutes && { hero: r.minutes.hero, next: r.minutes.nextRung, small: r.minutes.small.length, tiny: r.minutes.tiny.length, lowc: r.minutes.lowContrast }, claim: r.claim, ut: r.utHome?.text, fail: r.fail }));
+        }
+  } finally {
+    await browser.close();
+  }
+  report.sockets = socketReport();
+  report.blocked = [...blocked];
+  report.ok = report.sockets.ok && report.runs.every((r) => r.ok);
+  fs.writeFileSync(path.join(a.out, 'minutes-report' + (a.rm ? '-rm' : '') + '.json'), JSON.stringify(report, null, 1));
+  console.log('minutes:', report.runs.filter((r) => r.ok).length + '/' + report.runs.length, 'ok; sockets', JSON.stringify(report.sockets), 'blocked', report.blocked.join(', ') || 'none', report.ok ? 'ok' : 'FAILED');
+  return report;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const a = args(process.argv.slice(2));
-  const run = { selfcheck, fixtures: fixturesCase, deadtaps: deadtapsCase, kit: kitCase }[a._[0]];
+  const run = { selfcheck, fixtures: fixturesCase, deadtaps: deadtapsCase, kit: kitCase, minutes: minutesCase }[a._[0]];
   if (!run) {
-    console.log('usage: node scripts/qa/ut-studio.mjs selfcheck|fixtures|deadtaps|kit [--sport s] [--size 393|375|320] [--fixture name] [--no-edge] [--cpu n] [--rm] [--clock t] [--out dir] [--dead 393|all|none]');
+    console.log('usage: node scripts/qa/ut-studio.mjs selfcheck|fixtures|deadtaps|kit|minutes [--sport s] [--size 393|375|320] [--fixture name] [--no-edge] [--cpu n] [--rm] [--clock t] [--out dir] [--dead 393|all|none]');
     process.exit(1);
   }
   const r = await run(a);

@@ -32,6 +32,10 @@ import {
 } from './icons';
 import { previewId } from './preview-pack';
 import { SectionHead, stagger } from './ui';
+import { MinutesRing } from './kit';
+import type { MinutesChip } from './minutes';
+import { LABEL } from './labels';
+import './hub.css';
 export { PackArt } from './PackArt';
 
 const CONTINUE_ICON: Partial<Record<UtView, React.ReactNode>> = {
@@ -56,6 +60,9 @@ export function Hub(props: {
   inboxReady: number;
   onClaimAll: () => void;
   calendarReady: boolean;
+  /** ut-3 (V2 E.9.1): today's Minutes ring; tapping it opens RANKS → MINUTES */
+  minutes?: MinutesChip;
+  onMinutes?: () => void;
 }) {
   const { ut, rating, lineup, pool } = props;
   const h = hqOf(ut);
@@ -162,6 +169,23 @@ export function Hub(props: {
             </span>
           </button>
         )
+      )}
+      {props.minutes && (
+        <div className="uh-mins rise-in" style={stagger(i++)}>
+          <MinutesRing
+            minutes={props.minutes.minutes}
+            target={props.minutes.target}
+            reward={props.minutes.state === 'done' ? 'Great session.' : props.minutes.reward}
+            state={props.minutes.state}
+            onClick={props.onMinutes}
+            ariaLabel={
+              LABEL.minutes +
+              ': ' +
+              (props.minutes.state === 'done' ? LABEL.doneForToday + '. Great session.' : props.minutes.minutes + ' of ' + props.minutes.target + ' minutes today. ' + props.minutes.reward) +
+              (props.onMinutes ? '. Open Minutes' : '')
+            }
+          />
+        </div>
       )}
       <div
         className={'uh-inbox rise-in' + (props.inboxReady ? ' ready' : '')}

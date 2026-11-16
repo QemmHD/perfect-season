@@ -413,6 +413,8 @@ const waiting = (c: NextCtx) => c.claim.count > 0 || (c.minutes?.n ?? 0) > 0 || 
 /** "Done for today" applies: the day's goals are met and nothing waits. */
 const calmNow = (c: NextCtx) => doneToday(c) && !waiting(c);
 const DONE_LINE = 'Matches still count for your record and Season Pass';
+/** ut-3 (V2 D.11): the calm line once the day's 90 Minutes are in. */
+export const MINUTES_DONE_LINE = 'Matches still pay coins as usual and count for your Career XP';
 
 /** The One-More bar: the best next match after the one just finished (V2 D.1, D.10). */
 function oneMore(c: NextCtx, a: AfterCtx): NextAction {
@@ -518,6 +520,6 @@ export function nextUp(c: NextCtx): NextAction {
     };
   // 11/12. the best next match, or Done for today once the day's goals are met
   const play: NextAction = { id: 'play', line: c.recent.line, cta: 'PLAY', target: { app: 'match', setup: c.recent.setup }, ...(c.recent.stake ? { stake: c.recent.stake } : {}) };
-  if (calmNow(c)) return { id: 'done', line: LABEL.doneForToday + ' · ' + DONE_LINE, cta: 'KEEP PLAYING', target: play.target, done: true };
+  if (calmNow(c)) return { id: 'done', line: LABEL.doneForToday + ' · ' + (c.today.minutesCapped ? MINUTES_DONE_LINE : DONE_LINE), cta: 'KEEP PLAYING', target: play.target, done: true };
   return play;
 }

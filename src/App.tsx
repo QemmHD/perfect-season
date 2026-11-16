@@ -33,7 +33,8 @@ import { Draft, type OnlineProps } from './ui/Draft';
 import { type LbStatus, NameSheet, openBoardNext, openOnlineNext } from './ui/Leaderboard';
 import { type Gift, watchGifts } from './net/gifts';
 import { giftText, withGift } from './net/gift-apply';
-import { GauntletSheet, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, showGlobalRanks, type Tab, Tabs } from './ui/Pages';
+import { GauntletSheet, HomePage, HowToSheet, ProfilePage, RanksPage, SettingsSheet, showGlobalRanks, showMinutesRanks, type Tab, Tabs } from './ui/Pages';
+import { BreakReminder, holdBreak } from './ui/BreakReminder';
 import { type ResultInfo, Results } from './ui/Results';
 import { DailyReward, MissionsSheet } from './ui/Rewards';
 import { type Room, Search } from './ui/Search';
@@ -257,6 +258,8 @@ export function App() {
   // Claude 2026-11-16 (V2 E.1): MINUTES. Banked seconds land in the profile; each screen says what it is
   useEffect(() => registerPlaytimeSink(update), []);
   usePlaytime(PLAY_CTX[screen] ?? 'menu', run ? { id: playId(run), sport: SPORT, kind: 'draft' } : undefined);
+  // ut-3: the break reminder waits out the timed draft vote, a Gauntlet climb and Training Camp
+  useEffect(() => holdBreak('app', screen === 'vote' || screen === 'gauntlet' || screen === 'training'), [screen]);
 
   // ---------- online: presence and the leaderboard ----------
 
@@ -296,7 +299,8 @@ export function App() {
   const flushLb = async () => {
     const p = profileRef.current;
     const others = readOtherLbs().filter((o) => o.lb.dirty.length);
-    if (!NET_ON || !p.name || flushing.current || (!p.lb.dirty.length && !others.length)) return;
+    // ut-3: "Hide me from leaderboards" stops every publish; entries stay queued on this phone
+    if (!NET_ON || !p.name || p.settings.hideBoards || flushing.current || (!p.lb.dirty.length && !others.length)) return;
     flushing.current = true;
     const send = async (lb: Profile['lb']) => {
       const sent: [string, unknown][] = [];
@@ -328,7 +332,7 @@ export function App() {
   };
   useEffect(() => {
     void flushLb();
-  }, [profile.lb.dirty.join('|'), profile.name]);
+  }, [profile.lb.dirty.join('|'), profile.name, profile.settings.hideBoards]);
   useEffect(() => {
     const again = () => document.visibilityState === 'visible' && void flushLb();
     window.addEventListener('online', again);
@@ -779,7 +783,9 @@ export function App() {
     });
 
     if (r.online) endMatch(false, 30000);
-    if (rank) {
+    // ut-3: hidden from the boards (Settings), so nothing is posted: say that, not "Posting…"
+    if (rank && profileRef.current.settings.hideBoards) setLbView((m) => ({ ...m, [record.id!]: { kind: 'note', text: 'You’re hidden from the public boards (Settings).' } }));
+    else if (rank) {
       setLbView((m) => ({ ...m, [record.id!]: { kind: 'sending' } }));
       setPendingRank({ rid: record.id!, ...rank, day: r.mode === 'daily' && r.dailyKey ? r.dailyKey : todayKey, at: Date.now() });
     } else if (NET_ON && r.mode === 'daily' && !r.ranked) setLbView((m) => ({ ...m, [record.id!]: { kind: 'note', text: 'Practice run: only your first Daily is ranked.' } }));
@@ -891,13 +897,19 @@ export function App() {
     showToast('Bought 1.');
   };
   const openUltimate = () => (sfx.click(), setScreen('ut'));
-  if (tab === 'ranks') page = <RanksPage profile={profile} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setModal('name'))} />;
+  // ut-3: every Minutes chip and the Profile panel lead to RANKS → MINUTES
+  const openMinutes = () => {
+    showMinutesRanks();
+    goTab('ranks');
+  };
+  if (tab === 'ranks') page = <RanksPage profile={profile} update={update} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setModal('name'))} />;
   else if (tab === 'profile')
     page = (
       <ProfilePage
         profile={profile}
         onBuy={buyBooster}
         onUltimate={openUltimate}
+        onMinutes={openMinutes}
         onName={NET_ON ? () => (sfx.click(), setModal('name')) : undefined}
         onBinder={() => (sfx.click(), setModal('binder'))}
         onFavs={() => {
@@ -945,6 +957,7 @@ export function App() {
         onSport={goSport}
         onGauntlet={() => (sfx.click(), setModal('gauntlet'))}
         dailyResult={profile.daily && profile.daily.key === todayKey ? profile.daily.record : null}
+        onMinutes={openMinutes}
       />
     );
 
@@ -994,6 +1007,7 @@ export function App() {
           profile={profile}
           update={update}
           onExit={() => goTab('home')}
+          onMinutes={openMinutes}
           onToast={showToast}
           onPlaySquad={(req) => {
             setUtReq(req);
@@ -1337,6 +1351,7 @@ export function App() {
           )}
         </Sheet>
       )}
+      <BreakReminder on={profile.settings.breakReminder !== false} />
       {toast && <Toast key={toast.id} text={toast.text} out={toast.out} />}
       {sportTo && (
         <div className={'sportfade ' + sportTo.to} role="status" aria-label={'Switching to ' + SPORT_LABEL[sportTo.to]}>

@@ -1,0 +1,24 @@
+/* Claude, 2026-11-16 (studio overhaul, team ut, ut-3): UT Home's MINUTES ring chip, full width so the
+   whole line reads ("23 / 30 min · 75 coins + stamp next"). The chip itself is the kit's MinutesRing
+   (ut-system.css). ut-4's Hub rebuild grows this file. */
+.uh-mins {
+  flex-shrink: 0;
+}
+.uh-mins .ut-k-mins {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  padding-right: 16px;
+}
+.uh-mins .ut-k-mins-text {
+  flex: 1;
+}
+.uh-mins .ut-k-mins::after {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid var(--ps-dim);
+  border-right: 2px solid var(--ps-dim);
+  transform: rotate(45deg);
+}

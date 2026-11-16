@@ -111,6 +111,10 @@ export function mergePlaytime(a: Playtime | undefined, b: Playtime | undefined):
     if (v) m[k] = v;
   }
   if (a.owed || b.owed) m.owed = union(a.owed, b.owed);
+  // ut-3: raw seconds per weekday, the most of each when both phones are on the same week
+  if (sameWeek && (a.rawWeek || b.rawWeek)) m.rawWeek = [0, 1, 2, 3, 4, 5, 6].map((i) => mx(a.rawWeek?.[i] ?? 0, b.rawWeek?.[i] ?? 0));
+  else if (wk.rawWeek) m.rawWeek = wk.rawWeek.slice();
+  else delete m.rawWeek;
   if (a.hook || b.hook) {
     const h: Playtime["hook"] = { ...b.hook, ...a.hook };
     for (const [k, v] of Object.entries(b.hook ?? {})) {

@@ -82,6 +82,7 @@ import { Segmented } from './ui';
 import { developmentReady } from './club-management';
 import { readyEvos } from './evolutions';
 import { readyRewards, seasonReady } from './progression';
+import { freshForMinutes, minutesChip } from './minutes';
 import { setsFor } from './sets';
 import { PackOpening } from './PackOpening';
 import { openPack, packDefs, packName, quickSellValue } from './packs';
@@ -265,6 +266,8 @@ export default function UltimateTeam(props: {
   profile: Profile;
   update: (fn: (p: Profile) => Profile) => void;
   onExit: () => void;
+  /** ut-3: the Minutes chip on UT Home opens RANKS → MINUTES in the main app */
+  onMinutes?: () => void;
   onToast: (t: string) => void;
   /** play the squad: a Squad Battles rung, or online head to head (App.tsx opens Match.tsx) */
   onPlaySquad?: PlaySquad;
@@ -1921,6 +1924,8 @@ export default function UltimateTeam(props: {
         inboxReady={inboxReady}
         onClaimAll={claimEverything}
         calendarReady={calendarStatus(ut, day).ready}
+        minutes={minutesChip(profile.playtime, Date.now(), freshForMinutes(profile))}
+        onMinutes={props.onMinutes}
       />
     );
 

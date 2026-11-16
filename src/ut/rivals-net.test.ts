@@ -68,3 +68,15 @@ it('reports a pending submission on relay failure', async () => {
   mocks.publish.mockResolvedValue(0);
   expect(await publishRivals(p, '2026-W44')).toBe(false);
 });
+// Claude, 2026-11-16 (studio overhaul, ut-3): "Hide me from leaderboards" stops the Rivals standings too
+it('publishes nothing while the player is hidden from the boards; the same entry as before once shown', async () => {
+  const p = freshProfile();
+  p.name = 'Player';
+  p.ut.rivals = rivalsMatch(undefined, '2026-W44', 'm1', true);
+  mocks.publish.mockResolvedValue(1);
+  expect(await publishRivals({ ...p, settings: { ...p.settings, hideBoards: true } }, '2026-W44')).toBe(true);
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.publish).not.toHaveBeenCalled();
+  expect(await publishRivals({ ...p, settings: { ...p.settings, hideBoards: false } }, '2026-W44')).toBe(true);
+  expect(JSON.parse(mocks.sign.mock.calls[0][2])).toEqual({ v: 1, name: 'Player', points: expect.any(Number), best: expect.any(Number), w: 1, l: 0 });
+});

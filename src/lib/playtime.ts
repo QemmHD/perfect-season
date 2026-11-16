@@ -53,6 +53,8 @@ export interface Playtime {
   owed?: string[];
   /** cross-sport hook state (Scout Drops, Hot Hand, Career Road) when profile.career is not granted */
   hook?: Record<string, number | string | string[]>;
+  /** raw visible seconds per weekday of `week` (the Profile panel; absent on ledgers before ut-3) */
+  rawWeek?: number[];
 }
 
 export const DAY_CAP = 5400;
@@ -102,6 +104,7 @@ export function rollTo(p: Playtime, day: string): Playtime {
     ...p, day, daySec: 0, dayMenuSec: 0, rawDaySec: 0, week,
     weekDays: same ? p.weekDays : zeros(),
     weekActs: same ? p.weekActs : zeros(),
+    rawWeek: same ? p.rawWeek : zeros(),
     claimed: { ...p.claimed, day: [], dayKey: day, ...(same ? {} : { week: [], weekKey: week }) },
   };
   if (p.life > 0 && daysBetween(p.day, day) - 1 >= 3) q.restedDay = day;
@@ -135,11 +138,13 @@ export function credit(pt: Playtime | undefined, c: Credit, now: number, endowed
     daySec = Math.max(p.daySec, play + menu),
     gain = daySec - p.daySec,
     weekDays = p.weekDays.slice(),
-    weekActs = p.weekActs.slice();
+    weekActs = p.weekActs.slice(),
+    rawWeek = (p.rawWeek ?? zeros()).slice();
   weekDays[wd] = daySec;
   weekActs[wd] += c.act;
+  rawWeek[wd] += c.raw;
   return {
-    ...p, daySec, dayMenuSec: menu, weekDays, weekActs,
+    ...p, daySec, dayMenuSec: menu, weekDays, weekActs, rawWeek,
     rawDaySec: p.rawDaySec + c.raw,
     rawLife: p.rawLife + c.raw,
     life: p.life + gain,
@@ -150,7 +155,7 @@ export function credit(pt: Playtime | undefined, c: Credit, now: number, endowed
 
 export interface PlaytimeView {
   today: { min: number; rawMin: number; menuMin: number; frozen: boolean };
-  week: { min: number; days: number[] };
+  week: { min: number; rawMin: number; days: number[] };
   life: { hours: number; rawHours: number; bySport: Record<SportId, number> };
   done: boolean;
 }
@@ -160,23 +165,32 @@ export function playtimeView(p: Pick<Profile, 'playtime'>, now = Date.now()): Pl
   const day = etDay(now),
     pt = p.playtime,
     t = pt && pt.day === day ? pt : undefined,
-    w = pt && pt.week === isoWeek(day) ? pt.weekDays : zeros(),
+    thisWeek = !!pt && pt.week === isoWeek(day),
+    w = thisWeek ? pt.weekDays : zeros(),
+    sum = (a: number[]) => a.reduce((x, y) => x + y, 0),
     m = (s = 0) => Math.floor(s / 60),
     h = (s = 0) => Math.floor(s / 360) / 10;
   return {
     today: { min: m(t?.daySec), rawMin: m(t?.rawDaySec), menuMin: m(t?.dayMenuSec), frozen: !!pt && day < pt.day },
-    week: { min: m(w.reduce((a, b) => a + b, 0)), days: w.map(m) },
+    // raw time is at least the counted time and today's raw time (a ledger from before rawWeek has only part of the week)
+    week: { min: m(sum(w)), rawMin: m(Math.max(sum(w), thisWeek ? sum(pt.rawWeek ?? []) : 0, t?.rawDaySec ?? 0)), days: w.map(m) },
     life: { hours: h(pt?.life), rawHours: h(pt?.rawLife), bySport: { nba: h(pt?.bySport.nba), nfl: h(pt?.bySport.nfl), soccer: h(pt?.bySport.soccer) } },
     done: (t?.daySec ?? 0) >= DAY_CAP,
   };
 }
 
-/** One line for a pause sheet: "Today 27 min · next reward at 30". */
-export function playtimeLine(p: Pick<Profile, 'playtime'>, now = Date.now()): string {
+/**
+ * One line for a pause sheet: "Today 27 min · next reward at 30". It adds the seconds this phone has
+ * counted but not banked yet (`unbanked`, by default the match in progress), so a pause mid-match
+ * reads the real total.
+ */
+export function playtimeLine(p: Pick<Profile, 'playtime'>, now = Date.now(), unbanked = pendingSec()): string {
   const v = playtimeView(p, now);
   if (v.today.frozen) return 'Minutes paused: the date changed';
-  const next = DAY_RUNGS.find((r) => r > v.today.min);
-  return 'Today ' + v.today.min + ' min · ' + (next ? 'next reward at ' + next : 'done for today');
+  const pt = p.playtime,
+    min = Math.min(DAY_CAP, (pt && pt.day === etDay(now) ? pt.daySec : 0) + unbanked) / 60 | 0,
+    next = DAY_RUNGS.find((r) => r > min);
+  return 'Today ' + min + ' min · ' + (next ? 'next reward at ' + next : 'done for today');
 }
 
 // ---------- the ticker ----------
@@ -232,6 +246,8 @@ let play = 0,
   L: LockManager | undefined,
   free: (() => void) | null = null;
 const me = Math.random();
+/** the break reminder's watcher: each counting tick, the seconds counted and the screen's context */
+let watcher: ((sec: number, ctx: PlayCtx | undefined, t: number) => void) | null = null;
 const clock = () => performance.now();
 
 function onInput(e: Event) {
@@ -318,16 +334,19 @@ function tick() {
   if (a && prov) prov.age += dt;
   if (!lead(t, on)) return;
   raw += dt;
+  let counted = 0;
   if (on && h && r) {
     const key = r[1] ? h.ctx + ':' + (h.act?.id ?? h.n) : '',
       u = (key && used.get(key)) || 0;
     if ((h.ctx !== 'match' || varied(t, prov?.age ?? 0)) && (!key || u < r[1])) {
+      counted = dt;
       if (key) used.set(key, u + dt);
       if (a && prov) prov.sec += dt;
       else if (r[2] || !h.act) menu += dt;
       else play += dt;
     }
   }
+  watcher?.(counted, h?.ctx, t);
   if (!live(h) && t - flushed >= 60000 && (menu + play >= 1 || raw >= 600)) flush();
 }
 
@@ -426,6 +445,20 @@ export function bankActivity(id: string, how: 'complete' | 'forfeit'): void {
     flush(p, true);
   } else if (p && p.age >= 120) flush(p);
   else if (parked) park();
+}
+
+/** Counted seconds not in the profile yet: the activity in progress and the menu/play buffers. */
+export function pendingSec(): number {
+  return Math.floor((prov?.sec ?? 0) + play + menu);
+}
+
+/** The break reminder (src/ui/BreakReminder.tsx): told every second this tab ticks. One watcher. */
+export function watchPlaytime(fn: typeof watcher): () => void {
+  watcher = fn;
+  start();
+  return () => {
+    if (watcher === fn) watcher = null;
+  };
 }
 
 /** A sport's pause menu: nothing counts while paused. */

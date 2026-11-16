@@ -1,0 +1,242 @@
+/* Claude, 2026-11-16 (studio overhaul, team ut, ut-3): MINUTES in the main app's first-paint chunk:
+   the Home ring chip, the Profile playtime panel, the break reminder sheet and the two settings
+   notes. Archivo, teal for progress, gold for rewards. Every target >= 44 design px; under reduced
+   motion the ring shows its final value at once and nothing pulses. */
+
+/* ---------- Home: the ring chip in the stat strip ---------- */
+.statchip.mins-chip {
+  gap: 6px;
+  padding: 0 10px 0 5px;
+  color: var(--teal);
+}
+.statchip.mins-chip b {
+  font-size: 12px;
+}
+.statchip.mins-chip[data-state='ready'] {
+  border-color: rgba(245, 184, 61, 0.7);
+  background: linear-gradient(180deg, rgba(245, 184, 61, 0.16), var(--panel-2));
+}
+.statchip.mins-chip[data-state='ready'] b,
+.statchip.mins-chip[data-state='done'] b {
+  color: var(--gold);
+}
+.mins-mini {
+  flex: none;
+}
+.mins-mini circle {
+  fill: none;
+  stroke-width: 3;
+}
+.mins-mini .track {
+  stroke: rgba(143, 166, 178, 0.28);
+}
+.mins-mini .fill {
+  stroke: var(--teal);
+  stroke-linecap: round;
+  animation: mins-fill 0.6s var(--ease-out) both;
+}
+.mins-chip:not([data-state='next']) .mins-mini .fill {
+  stroke: var(--gold);
+}
+.mins-mini .mark {
+  fill: none;
+  stroke: var(--soft);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mins-chip[data-state='done'] .mins-mini .mark {
+  stroke: var(--gold);
+}
+@keyframes mins-fill {
+  from {
+    stroke-dashoffset: var(--c);
+  }
+}
+.mins-dot {
+  position: absolute;
+  top: -3px;
+  left: 18px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 10px rgba(245, 184, 61, 0.6);
+}
+
+/* ---------- Profile: the playtime panel ---------- */
+.pt-panel {
+  display: grid;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #10283a, var(--panel) 62%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px var(--line),
+    0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.pt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pt-badge {
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: rgba(245, 184, 61, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(245, 184, 61, 0.45);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.pt-badge.none {
+  background: rgba(143, 166, 178, 0.1);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--sub);
+}
+.pt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pt-grid > div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 10px 9px;
+  border-radius: 12px;
+  background: rgba(4, 18, 26, 0.6);
+  box-shadow: inset 0 0 0 1px var(--line);
+  min-width: 0;
+}
+.pt-grid small {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.pt-grid b {
+  font-size: 22px;
+  line-height: 1.05;
+  color: var(--text);
+  white-space: nowrap;
+}
+.pt-grid span {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--sub);
+}
+.pt-raw {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--soft);
+}
+.pt-raw b {
+  color: var(--text);
+}
+.pt-sports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sub);
+}
+.pt-sports b {
+  color: var(--text);
+}
+.pt-open {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(25, 227, 201, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(25, 227, 201, 0.35);
+  color: var(--teal);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-align: left;
+}
+.pt-open i {
+  font-style: normal;
+  font-size: 20px;
+}
+.pt-open:active {
+  transform: scale(0.98);
+}
+
+/* ---------- Settings: the healthy-play notes under the two switches ---------- */
+.toggle-note {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sub);
+}
+
+/* ---------- the break reminder: one line, one tap ---------- */
+.break-sheet {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.break-sheet .break-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(25, 227, 201, 0.12);
+  color: var(--teal);
+}
+.break-sheet p {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+}
+.break-sheet .btn {
+  flex: none;
+  min-width: 72px;
+  min-height: 44px;
+}
+
+/* Home's stat strip holds five chips with the Minutes ring: a little less padding and gap, so the
+   row stays inside the 16 px gutters (even at 100+ online) and Home gains no height */
+.home .statstrip {
+  gap: 5px;
+}
+.home .statstrip > .statchip {
+  padding: 0 9px;
+}
+.home .statstrip > .statchip.mins-chip {
+  padding: 0 9px 0 4px;
+}
+
+/* RANKS gained a third segment (MINUTES): when the sport's title and the three no longer fit on one
+   line ("SOCCER RANKS", "NFL RANKS"), the segments drop under the title instead of off the frame */
+.ranks-head {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mins-mini .fill {
+    animation: none;
+  }
+  .pt-open:active {
+    transform: none;
+  }
+}

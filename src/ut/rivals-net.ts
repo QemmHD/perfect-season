@@ -26,7 +26,8 @@ export async function publishRivals(
   week: string
 ): Promise<boolean> {
   const r = rivalsOf(p.ut.rivals, week);
-  if (!NET_ON || !p.name || r.w + r.l === 0) return true;
+  // ut-3: "Hide me from leaderboards" (Settings) covers the Rivals standings too
+  if (!NET_ON || !p.name || p.settings?.hideBoards || r.w + r.l === 0) return true;
   try {
     return (
       (await pool.publish(

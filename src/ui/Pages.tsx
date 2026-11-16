@@ -21,6 +21,10 @@ import { StreakChip } from './Rewards';
 import { FavoritesCard } from './Favorites';
 import { Crown, Football, Home as HomeIcon, Hoop, Lock, Ranks as RanksIcon, SoccerBall, Target, User } from './icons';
 import { FLOOR, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
+import { HomeMinutesChip, PlaytimePanel } from './playtime-ui';
+
+// ut-3: the Minutes screen (RANKS → MINUTES) loads with its segment, never at first paint
+const MinutesView = React.lazy(() => import('./MinutesView'));
 
 const SPELLED = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
 
@@ -93,18 +97,17 @@ function UtMark() {
   );
 }
 
-/** Players with the app open and players searching for a match, live: each number pops when it changes. */
+/**
+ * Players with the app open, live: the number pops when it changes. ut-3: the queue count moved off
+ * the chip to give the Minutes ring its room (Head to Head's tile shows it whenever anyone is
+ * searching); the label still says both.
+ */
 function LiveCount({ online, queue, onClick }: { online: number; queue: number; onClick?: () => void }) {
   const a = usePulse(online, 500);
-  const b = usePulse(queue, 500);
   return (
     <button className="statchip online" onClick={onClick} aria-label={online + ' players online, ' + queue + ' in the head-to-head queue: see who'}>
       <i className="livedot" aria-hidden="true" />
       <b className={'num' + (a ? ' tick' : '')}>{online}</b> online
-      <em>
-        {' · '}
-        <b className={'num' + (b ? ' tick' : '')}>{queue}</b> in queue
-      </em>
     </button>
   );
 }
@@ -144,6 +147,8 @@ export function HomePage(props: {
   onTraining: () => void;
   onResume: () => void;
   checkpoint: {count: number; mode: string; screen: string; wins?: number; at: number} | null;
+  /** ut-3: the Minutes ring chip opens RANKS → MINUTES */
+  onMinutes: () => void;
 }) {
   const [intro] = useState(() => !introPlayed);
   useEffect(() => {
@@ -202,6 +207,7 @@ export function HomePage(props: {
         <div className="statstrip">
           <StreakChip count={props.streak} onClick={props.onStreak} />
           {props.online && <LiveCount online={props.online.online} queue={props.online.searching} onClick={props.onOnline} />}
+          <HomeMinutesChip profile={p} onOpen={props.onMinutes} />
           <button className={'statchip quests' + (props.missions.claimable ? ' ready' : '')} onClick={props.onMissions} aria-label={'Missions: ' + props.missions.done + ' of 3 done'}>
             <Target size={16} />
             <b className="num">{props.missions.done}/3</b>
@@ -300,17 +306,23 @@ function untilEasternMidnight(): string {
 }
 
 /** Which Ranks view was open last, for this session. */
-let ranksView: 'global' | 'yours' = 'global';
+type RanksView = 'global' | 'yours' | 'minutes';
+let ranksView: RanksView = 'global';
 /** Show the global boards next time Ranks opens (a link to a board, or to who's online). */
 export function showGlobalRanks() {
   ranksView = 'global';
 }
+/** ut-3: show the MINUTES segment next time Ranks opens (the Minutes chips, Profile's panel). */
+export function showMinutesRanks() {
+  ranksView = 'minutes';
+}
+const RANKS_VIEWS: RanksView[] = NET_ON ? ['global', 'yours', 'minutes'] : ['yours', 'minutes'];
 
-export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: number; onName: () => void }) {
-  const [view, setView] = useState<'global' | 'yours'>(NET_ON ? ranksView : 'yours');
+export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: number; onName: () => void; update: (fn: (p: Profile) => Profile) => void }) {
+  const [view, setView] = useState<RanksView>(RANKS_VIEWS.includes(ranksView) ? ranksView : 'yours');
   const [mode, setMode] = useState<Mode | 'all'>('all');
   const runs = bestRuns(props.profile.history, mode);
-  const pickView = (v: 'global' | 'yours') => {
+  const pickView = (v: RanksView) => {
     if (v === view) return;
     sfx.click();
     ranksView = v;
@@ -321,17 +333,19 @@ export function RanksPage(props: { profile: Profile; dailyKey: string; dailyNo: 
       <div className="page">
         <div className="ranks-head">
           <h1 className="disp">{NET_ON ? pick({ nba: 'Ranks', nfl: 'NFL Ranks', soccer: 'Soccer Ranks' }) : 'Your best'}</h1>
-          {NET_ON && (
-            <span className="seg" role="group" aria-label="Leaderboard">
-              {(['global', 'yours'] as const).map((v) => (
-                <button key={v} className={view === v ? 'on' : ''} aria-pressed={view === v} onClick={() => pickView(v)}>
-                  {v === 'global' ? 'GLOBAL' : 'YOURS'}
-                </button>
-              ))}
-            </span>
-          )}
+          <span className="seg" role="group" aria-label="Leaderboard">
+            {RANKS_VIEWS.map((v) => (
+              <button key={v} className={view === v ? 'on' : ''} aria-pressed={view === v} onClick={() => pickView(v)}>
+                {v.toUpperCase()}
+              </button>
+            ))}
+          </span>
         </div>
-        {view === 'global' ? (
+        {view === 'minutes' ? (
+          <React.Suspense fallback={<div className="empty">Loading Minutes…</div>}>
+            <MinutesView profile={props.profile} update={props.update} />
+          </React.Suspense>
+        ) : view === 'global' ? (
           <GlobalBoard profile={props.profile} dailyKey={props.dailyKey} dailyNo={props.dailyNo} onName={props.onName} />
         ) : (
           <>
@@ -392,7 +406,7 @@ function BoostersSection(props: { profile: Profile; onBuy: (b: Booster) => void 
   );
 }
 
-export function ProfilePage(props: { profile: Profile; onName?: () => void; onBinder: () => void; onFavs?: () => void; onBuy: (b: Booster) => void; onUltimate?: () => void }) {
+export function ProfilePage(props: { profile: Profile; onName?: () => void; onBinder: () => void; onFavs?: () => void; onBuy: (b: Booster) => void; onUltimate?: () => void; onMinutes?: () => void }) {
   const p = props.profile;
   const lv = levelInfo(p.xp);
   const best = bestRuns(p.history, 'all', 1)[0];
@@ -470,6 +484,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
             </i>
           </button>
         )}
+        <PlaytimePanel profile={p} onOpen={props.onMinutes} />
         {props.onFavs && <FavoritesCard onEdit={props.onFavs} />}
         <button className="binder-card rise-in" onClick={props.onBinder}>
           <span className="stack" aria-hidden="true">
@@ -496,13 +511,18 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
   );
 }
 
-export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' | 'haptics' | 'hints', v: boolean) => void; onReset: () => void; onLocker: () => void; onAdmin: () => void; onClose: () => void; source: string; latest: number }) {
+type SettingKey = 'sound' | 'haptics' | 'hints' | 'breakReminder' | 'hideBoards';
+export function SettingsSheet(props: { profile: Profile; onChange: (k: SettingKey, v: boolean) => void; onReset: () => void; onLocker: () => void; onAdmin: () => void; onClose: () => void; source: string; latest: number }) {
   const [confirm, setConfirm] = useState(false);
   const [errs, setErrs] = useState(loggedErrors);
-  const row = (k: 'sound' | 'haptics' | 'hints', label: string) => (
+  const s = props.profile.settings;
+  // ut-3 (V2 D.11): the two healthy-play switches are optional fields: the reminder is on unless
+  // turned off, boards are shown unless hidden
+  const on: Record<SettingKey, boolean> = { sound: s.sound, haptics: s.haptics, hints: s.hints, breakReminder: s.breakReminder !== false, hideBoards: !!s.hideBoards };
+  const row = (k: SettingKey, label: string) => (
     <div className="toggle">
       <span>{label}</span>
-      <button role="switch" aria-checked={props.profile.settings[k]} aria-label={label} onClick={() => props.onChange(k, !props.profile.settings[k])} />
+      <button role="switch" aria-checked={on[k]} aria-label={label} onClick={() => props.onChange(k, !on[k])} />
     </div>
   );
   return (
@@ -514,6 +534,10 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
             {row('sound', 'Sound')}
             {row('haptics', 'Vibration')}
             {row('hints', 'Booster hints')}
+            {row('breakReminder', 'Session reminder')}
+            <p className="toggle-note">After an hour of play, a nudge to take a break. Never during a match.</p>
+            {NET_ON && row('hideBoards', 'Hide me from leaderboards')}
+            {NET_ON && <p className="toggle-note">Stops sending your results to the public boards. Results already posted stay up.</p>}
           </div>
           <button className="locker-entry" onClick={() => close(props.onLocker)}><span aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 17a4 4 0 0 1-.5-7.97 6.5 6.5 0 0 1 12.5-.8A4.5 4.5 0 0 1 18 17"/><path d="m8 16 3 3 5-6"/></svg></span><span><b className="disp">CLOUD SAVE</b><small>Automatic server saves. Keep your legacy.</small></span><i>›</i></button>
           {confirm ? (

@@ -1,0 +1,371 @@
+/* Claude, 2026-11-16 (studio overhaul, team ut, ut-3): the Minutes screen (MinutesView.tsx, lazy).
+   Glass panels with a bevel and layered shadows, a gold ring, chest rails with light pools under
+   the next and ready chests, and the six tier shields. V2 C.3 tokens (--ps-*) come from the kit's
+   .ps-v2 root. Text >= 10 design px and >= 4.5:1 on the panels; targets >= 44; reduced motion: the
+   ring and the rail fills show their final value at once, and nothing glows in a loop. */
+.mv {
+  display: grid;
+  gap: 12px;
+  flex-shrink: 0;
+  color: var(--ps-text);
+  --mv-glass: linear-gradient(180deg, rgba(30, 62, 92, 0.72), rgba(14, 34, 51, 0.92) 55%, rgba(9, 24, 37, 0.96));
+  --mv-bevel: inset 0 1px rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(110, 160, 200, 0.18), 0 10px 26px rgba(0, 0, 0, 0.42), 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+.mv-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: -2px;
+}
+.mv-sub p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ps-dim);
+}
+.mv-info {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -10px -10px 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ps-dim);
+}
+.mv-info:active {
+  color: var(--ps-teal);
+}
+
+/* ---------- the hero: the big ring and the one thing to know ---------- */
+.mv-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(246, 185, 59, 0.14), transparent 55%),
+    var(--mv-glass);
+  box-shadow: var(--mv-bevel);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.mv-hero[data-state='done'] {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(79, 227, 193, 0.16), transparent 55%),
+    var(--mv-glass);
+}
+.mv-hero-text {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  justify-items: start;
+}
+.mv-hero h2 {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.08;
+  font-style: italic;
+  font-weight: 900;
+}
+.mv-hero p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #c4d3dd;
+}
+.mv-hero .ut-k-claim {
+  margin-top: 4px;
+}
+.mv-claimed {
+  font-weight: 700;
+  color: var(--ps-gold) !important;
+}
+.mv-ring {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #0b1d2c 55%, #102a3f);
+  box-shadow: 0 0 24px rgba(246, 185, 59, 0.22), inset 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.mv-ring svg {
+  position: absolute;
+  inset: 0;
+}
+.mv-ring circle {
+  fill: none;
+  stroke-width: 7;
+}
+.mv-ring .track {
+  stroke: rgba(138, 163, 181, 0.2);
+}
+.mv-ring .fill {
+  stroke: var(--ps-gold);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(246, 185, 59, 0.55));
+  animation: mv-ring 0.7s var(--ease-out) both;
+}
+.mv-hero[data-state='done'] .mv-ring .fill {
+  stroke: var(--ps-teal);
+  filter: drop-shadow(0 0 4px rgba(79, 227, 193, 0.55));
+}
+@keyframes mv-ring {
+  from {
+    stroke-dashoffset: var(--c);
+  }
+}
+.mv-ring b {
+  font-size: 34px;
+  line-height: 1;
+  font-style: italic;
+  font-weight: 900;
+}
+.mv-ring small {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--ps-gold);
+}
+.mv-hero[data-state='done'] .mv-ring small {
+  color: var(--ps-teal);
+}
+
+/* ---------- rails: chests per rung ---------- */
+.mv-rail {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px 10px;
+  border-radius: 16px;
+  background: var(--mv-glass);
+  box-shadow: var(--mv-bevel);
+  flex-shrink: 0;
+}
+.mv-rail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+  color: var(--ps-dim);
+  white-space: nowrap;
+}
+.mv-rail-head b {
+  color: var(--ps-text);
+}
+.mv-rail-head em {
+  font-style: normal;
+  color: var(--ps-gold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mv-track {
+  position: relative;
+}
+.mv-bar {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 32px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(3, 12, 19, 0.85);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7), 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+.mv-bar i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3fd6b0, #9be37a 55%, var(--ps-gold));
+  box-shadow: 0 0 8px rgba(246, 185, 59, 0.45);
+  transform-origin: left;
+  transform: scaleX(var(--s));
+  animation: mv-fill 0.7s var(--ease-out) both;
+}
+@keyframes mv-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+.mv-track ol {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mv-node {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 1px;
+  min-width: 0;
+  text-align: center;
+}
+.mv-node small {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ps-dim);
+  height: 14px;
+}
+.mv-chest {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 44px;
+}
+.mv-node[data-state='locked'] .mv-chest-art {
+  filter: saturate(0.35) brightness(0.62);
+}
+.mv-node[data-state='claimed'] .mv-chest-art {
+  filter: saturate(0.6) brightness(0.8);
+}
+.mv-node[data-state='next'] .mv-chest::before,
+.mv-node[data-state='ready'] .mv-chest::before {
+  content: '';
+  position: absolute;
+  inset: 4px -2px -2px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(246, 185, 59, 0.5), transparent 68%);
+}
+.mv-node[data-state='ready'] .mv-chest-art {
+  filter: drop-shadow(0 0 6px rgba(246, 185, 59, 0.85));
+  animation: mv-glow 1.6s ease-in-out infinite;
+}
+@keyframes mv-glow {
+  50% {
+    transform: translateY(-2px) scale(1.06);
+  }
+}
+.mv-node b {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  line-height: 1.15;
+  color: #b8c8d3;
+  max-width: 100%;
+}
+.mv-node[data-state='next'] b,
+.mv-node[data-state='ready'] b,
+.mv-node[data-state='next'] small,
+.mv-node[data-state='ready'] small {
+  color: var(--ps-gold);
+}
+.mv-node[data-state='claimed'] b {
+  color: var(--ps-dim);
+}
+
+/* ---------- the league tile ---------- */
+.mv-league {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 14px 12px;
+  border-radius: 18px;
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgba(139, 124, 246, 0.16), transparent 60%),
+    var(--mv-glass);
+  box-shadow: var(--mv-bevel);
+  text-align: center;
+  flex-shrink: 0;
+}
+.mv-tiers {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+.mv-shield {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 46px;
+  filter: saturate(0.55) brightness(0.75);
+}
+.mv-shield[data-cur] {
+  filter: drop-shadow(0 0 8px rgba(79, 227, 193, 0.6));
+  transform: scale(1.12);
+}
+.mv-shield svg {
+  position: absolute;
+  inset: 1px 2px;
+}
+.mv-shield b {
+  position: relative;
+  font: italic 900 11px var(--display);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+.mv-league h3 {
+  margin: 0;
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 900;
+}
+.mv-boards {
+  margin: 0;
+}
+.mv-board-note {
+  margin: 0;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #c4d3dd;
+}
+.mv-board-note.dim {
+  font-size: 12px;
+  color: var(--ps-dim);
+}
+.mv-foot {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ps-dim);
+  text-align: center;
+}
+
+/* ---------- the explainer sheet ---------- */
+.mv-explain {
+  display: grid;
+  gap: 10px;
+}
+.mv-explain h2 {
+  margin: 0;
+}
+.mv-explain p,
+.mv-explain li {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--soft);
+}
+.mv-explain ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-ring .fill,
+  .mv-bar i,
+  .mv-node[data-state='ready'] .mv-chest-art {
+    animation: none;
+  }
+  .mv-shield[data-cur] {
+    transform: none;
+  }
+}

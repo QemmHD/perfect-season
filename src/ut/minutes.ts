@@ -168,6 +168,62 @@ export function nextRung(pt: Playtime | undefined, now: number, fresh = false): 
   return best && { track: best.track, atMin: best.at, minutesLeft: best.minutesLeft, reward: best.reward };
 }
 
+/** The short form for a chip: "75 coins + stamp", "Silver Pack", "Player Pick" (a pack names itself). */
+export function shortReward(r: MinutesReward): string {
+  const head = r.pack ? PACK_NAME[r.pack] : r.pick ? 'Player Pick' : r.coins ? r.coins.toLocaleString('en-US') + ' coins' : (r.flair ?? '');
+  return r.stamp && !r.pack ? head + ' + stamp' : head;
+}
+
+export interface MinutesChip {
+  /** 'next': counting toward a rung; 'ready': a reached rung waits; 'done': 90 today, nothing waiting */
+  state: 'next' | 'ready' | 'done';
+  /** today's counted minutes (with a new player's head start), and the rung the ring fills toward */
+  minutes: number;
+  target: number;
+  /** "75 coins + stamp next", "Silver Pack ready", "Great session." */
+  reward: string;
+  /** reached rungs waiting, every track */
+  ready: number;
+  frozen: boolean;
+  rested: boolean;
+}
+
+/**
+ * The Minutes ring chip (V2 E.9.1), for main Home and UT Home: "23 / 30 min · 75 coins + stamp next",
+ * "Silver Pack ready", and at 90 "Done for today · Great session." once nothing waits.
+ */
+export function minutesChip(pt: Playtime | undefined, now: number, fresh = false): MinutesChip {
+  const v = minutesView(pt, now, fresh),
+    min = v.day.min,
+    one = v.ready.find((r) => r.track === 'day') ?? v.ready[0],
+    base = { minutes: min, ready: v.ready.length, frozen: v.frozen, rested: v.rested };
+  if (one)
+    return {
+      ...base,
+      state: 'ready',
+      target: one.track === 'day' ? one.at : (v.day.next?.at ?? DAY_RUNGS[DAY_RUNGS.length - 1]),
+      reward: v.ready.length === 1 ? shortReward(one.reward) + ' ready' : v.ready.length + ' rewards ready',
+    };
+  const next = v.day.capped ? null : v.day.next;
+  if (!next) return { ...base, state: 'done', minutes: DAY_RUNGS[DAY_RUNGS.length - 1], target: DAY_RUNGS[DAY_RUNGS.length - 1], reward: 'Great session.' };
+  return {
+    ...base,
+    state: 'next',
+    target: next.at,
+    reward: v.frozen ? 'Paused today: the date changed' : (v.rested && next.i < 3 ? 'Rested ×2: ' : '') + shortReward(next.reward) + ' next',
+  };
+}
+
+/** Lifetime badge tiers, one per lifetime rung (E.5): Rookie at 1 hour … GOAT at 1,000. */
+export const LIFE_BADGES = ['Rookie', 'Starter', 'Pro', 'All-Star', 'MVP', 'Hall of Famer', 'Legend', 'Icon', 'GOAT'] as const;
+/** The badge earned so far (null before the first hour) and the next one with the hours to it. */
+export function lifeBadge(pt: Playtime | undefined): { badge: string | null; next: string | null; hoursToNext: number } {
+  const min = Math.floor((pt?.life ?? 0) / 60),
+    i = LIFE.filter((r) => min >= r.at).length,
+    nx = LIFE[i];
+  return { badge: i ? LIFE_BADGES[i - 1] : null, next: nx ? LIFE_BADGES[i] : null, hoursToNext: nx ? Math.ceil(((nx.at - min) / 60) * 10) / 10 : 0 };
+}
+
 const UNIT: Record<Track, string> = { day: 'today', week: 'this week', life: 'played' };
 /** What next-action.ts reads (NextExtras): the claimable rungs, the cap, and a rung ≤ 5 minutes away. */
 export function minutesExtras(pt: Playtime | undefined, now: number, fresh = false) {

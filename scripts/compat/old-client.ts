@@ -52,7 +52,7 @@ const LEDGER = {
   weekDays: [1620, 0, 0, 0, 0, 0, 0], bySport: { nba: 30000, nfl: 6000, soccer: 4000 }, acts: 110, weekActs: [5, 0, 0, 0, 0, 0, 0],
   claimed: { day: [0, 1], week: [], life: [0, 1, 2], dayKey: '2026-11-16', weekKey: '2026-W47' },
   league: { tier: 2, season: 'S1', best: 2, lastWeek: { week: '2026-W46', rank: 3, am: 310, moved: 1 } },
-  restedDay: '2026-11-16', owed: ['stamp:day:2026-11-15:30:0'], hook: { drops: 2, road: ['l5'] },
+  rawWeek: [2400, 0, 0, 0, 0, 0, 0], restedDay: '2026-11-16', owed: ['stamp:day:2026-11-15:30:0'], hook: { drops: 2, road: ['l5'] },
 };
 const NEW_SETTINGS = { hideBoards: true, breakReminder: false };
 
