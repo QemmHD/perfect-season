@@ -12,6 +12,8 @@ describe('players QA harness', () => {
     expect(ut).toMatchObject({ who: 'nfl:season:2007:bradyto01:NE|O', anim: 'st3', clip: null, frame: null, px: 20, dirs: 8 });
     const soccer = parseSpriteKey('108830:2019:BAR|A|us|mo:kick:12|3/16|38|0.6');
     expect(soccer).toMatchObject({ who: '108830:2019:BAR|A|us', clip: 'kick', frame: 12, px: 38 });
+    // players-2: a sprite drawn for another art pixel carries `|<canvas px per art px>/<backing>`
+    expect(parseSpriteKey('CLE-2010:willima01|O|mo:run:8d1w0.25l0.08|14/16|42|0.9|5/3')).toMatchObject({ who: 'CLE-2010:willima01|O', clip: 'run', fb: 14, dirs: 16, px: 42, pitch: 0.9 });
     expect(parseSpriteKey('not a sprite key')).toBeNull();
     expect(parseSpriteKey('a|b|c|x|y|z')).toBeNull();
   });

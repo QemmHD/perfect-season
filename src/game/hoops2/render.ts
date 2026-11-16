@@ -169,7 +169,7 @@ export class HoopsRenderer {
     const lean = striding ? sprintLean(b.p.spd, Math.hypot(b.vx, b.vz) / Math.max(1, topSpeed(b, false))) : 0;
     const key = (an.clip ? mocapKey(an.clip, frame, an.ground) + (an.dribble !== undefined ? 'd' + an.dribble : '') : an.key) + (heavy ? 'w' + heavy : '') + (lean ? 'l' + lean : '');
     const ownLift = !!an.clip && an.ground === 'clip';
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + '|' + this.art.canvasPerArt + '/' + this.art.backing;
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
     let spr = this.sprites.get(k);
     if (!spr) {
       // a few new drawings a frame (the man with the ball always gets his): the rest keep last frame's

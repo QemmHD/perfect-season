@@ -1,7 +1,7 @@
 // players-2: the art pixel (Game Design V2 C.1.2). Every art pixel must cover a whole number of
 // device pixels: devPerArt is an integer at every phone scale, and every blit lands on whole canvas
 // px at a whole number of canvas px per art px. Far players are rasterised at their own size.
-import { ART_C, artScaleFor, type ArtSprite, blitSprite, devPerArt, quantPx, toView } from './art-scale';
+import { ART_C, artScaleFor, type ArtSprite, blitSprite, designScale, devPerArt, quantPx, toView } from './art-scale';
 import { rasterBody } from './body';
 import { LOOKS } from './__fixtures__/looks';
 import * as P from './poses';
@@ -33,7 +33,11 @@ describe('the art pixel (V2 C.1.2)', () => {
       expect(Math.abs(d - 1.5 * k * dpr)).toBeLessThanOrEqual(0.5 + (d === 2 ? 1 : 0));
     }
     // a 3x phone at 393: 4 or 5 device px per art px
-    expect([4, 5]).toContain(devPerArt(393 / 390, 3));
+    expect([4, 5]).toContain(devPerArt(designScale(393, 852), 3));
+    // the stage scale is the short side over 390, capped at 1.2 (stage-layout.ts)
+    expect(designScale(320, 568)).toBeCloseTo(0.8205, 3);
+    expect(designScale(852, 393)).toBeCloseTo(393 / 390, 6);
+    expect(designScale(1280, 800)).toBe(1.2);
   });
 
   it('places every blit on whole canvas px at a whole scale (option A, DPR 1/2/3, k 0.82/1/1.103)', () => {

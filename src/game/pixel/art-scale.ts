@@ -40,6 +40,8 @@ export interface ArtScale {
   viewPerArt: number;
   /** the art px height to rasterise a sprite `viewH` view px tall at */
   artPxFor(viewH: number): number;
+  /** added to a sprite cache key so drawings made for another scale aren't reused ('' at today's grain) */
+  keySuffix: string;
 }
 
 /**
@@ -51,7 +53,8 @@ export function artScaleFor(option: ArtOption, devPerView: number, k: number, dp
   const backing = option === 'A' ? dpv : 1;
   const canvasPerArt = option === 'A' ? devPerArt(k, dpr) : 1;
   const viewPerArt = canvasPerArt / backing;
-  return { option, backing, canvasPerArt, viewPerArt, artPxFor: (viewH: number) => Math.max(6, Math.round(viewH / viewPerArt)) };
+  const keySuffix = canvasPerArt === 1 && backing === 1 ? '' : '|' + canvasPerArt + '/' + Math.round(backing * 1000) / 1000;
+  return { option, backing, canvasPerArt, viewPerArt, artPxFor: (viewH: number) => Math.max(6, Math.round(viewH / viewPerArt)), keySuffix };
 }
 
 /** Today's grain, before a canvas is measured. */
@@ -73,8 +76,18 @@ export function artOption(): ArtOption {
 }
 
 /**
- * Measure a game canvas: `viewW`/`viewH` are its size in view px. Reads the device pixel ratio and
- * the canvas's on-screen box (the stage's scale and a sideways phone's quarter turn included).
+ * The stage scale k: CSS px per design px (stage-layout.ts: a phone's short side over the 390 design
+ * width, the frame capped at 1.2 on a tablet or desktop).
+ */
+export function designScale(viewportW: number, viewportH: number): number {
+  const short = Math.min(viewportW, viewportH);
+  return short > 0 ? Math.min(1.2, short / DESIGN_W) : 1;
+}
+const DESIGN_W = 390;
+
+/**
+ * Measure a game canvas: `viewW`/`viewH` are its size in view px. Reads the device pixel ratio, the
+ * canvas's on-screen box (a sideways phone's quarter turn included) and the stage scale.
  */
 export function artScale(canvas: HTMLCanvasElement, viewW: number, viewH: number, option: ArtOption = artOption()): ArtScale {
   // today's grain needs no measuring (and keeps the per-frame cost at nothing)
@@ -83,8 +96,8 @@ export function artScale(canvas: HTMLCanvasElement, viewW: number, viewH: number
   const r = canvas.getBoundingClientRect();
   // CSS px per view px; the area keeps it right when the stage is turned a quarter
   const cssPerView = Math.sqrt((r.width * r.height) / Math.max(1, viewW * viewH)) || 1;
-  // the stage scale k: CSS px per design px (the view px is the design frame's px)
-  return artScaleFor(option, cssPerView * dpr, cssPerView, dpr);
+  const vv = window.visualViewport;
+  return artScaleFor(option, cssPerView * dpr, designScale(vv?.width ?? innerWidth, vv?.height ?? innerHeight), dpr);
 }
 
 /** Sprite sizes in art px step coarser as they grow, 1/2/4/6 px (fewer distinct drawings as players move in depth). */

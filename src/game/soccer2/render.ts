@@ -168,7 +168,7 @@ export class SoccerRenderer {
     const step = an.clip ? (px < 22 ? Math.max(3, an.step ?? 2) : (an.step ?? 2)) : 1;
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
     const key = an.clip ? mocapKey(an.clip, frame, 'clip') : an.key;
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + '|' + this.art.canvasPerArt + '/' + this.art.backing;
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
     let spr = this.sprites.get(k);
     if (!spr) {
       const last = this.last.get(who);

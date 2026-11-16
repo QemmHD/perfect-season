@@ -260,7 +260,7 @@ export class FootballRenderer {
     const heavy = striding ? Math.round(heaviness(b.p.wt, b.p.ht) * 4) / 4 : 0;
     const lean = striding ? sprintLean(b.p.a.SPD ?? 70, Math.hypot(b.vx, b.vy) / Math.max(1, speedOf(b.p))) : 0;
     const key = (an.clip ? mocapKey(an.clip, frame, an.ground) + (an.ball ?? '') : an.key) + (heavy ? 'w' + heavy : '') + (lean ? 'l' + lean : '');
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + '|' + this.art.canvasPerArt + '/' + this.art.backing;
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
     let spr = this.sprites.get(k);
     if (!spr) {
       // a few new drawings a frame at most (the man with the ball always gets his): past that, he

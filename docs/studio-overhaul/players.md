@@ -42,6 +42,60 @@ Real-life likeness, "Broadcast Pixel" sprites, animation that looks real, and ca
 
 **Protocol bump needed:** none (no source change).
 
+
+### players-2 · Broadcast Pixel sprite core (done)
+
+Base `79682ba` (players-1). Six commits; everything render only (proved below), so **Protocol bump needed: none**. No storage key, save field, card/edition/copy id or engine number changed.
+
+**What changed**
+
+1. **Selection extracted** (`50910ce`). `lookFor`, `animOf`, `gait`, `poseOf`, `dunkStyle`/`spins360`, the rim hang, the dribble arm and the NFL ball arm moved verbatim from the three `render.ts` files into `src/game/pixel/select-{nba,nfl,soccer}.ts`; `hoops2/render.ts` re-exports `dunkStyle`/`spins360`, `soccer2/render.ts` re-exports `lookFor`. The moved lines are byte-identical apart from `export`.
+2. **Family fallback** (`fd0bf4e`, `select-family.ts`). An act a sport doesn't animate yet resolves to one it does: the act, either half of `kind:variant`, the contract's aliases (`board`→`rebound`, `switch`→`run`, `ankle`→`fall`, `sack`→`tackle`, `keeper:dive`→`dive`…), then its family (shot, pass, kick, contact, ground, locomotion). Unclassified acts run while the body moves and hold the set pose while it stands, so nobody idles on the move. (Refinement of the contract's "otherwise the last action pose": replaying an earlier action out of context is worse than the set pose; recorded here.) Known acts take the old path untouched.
+3. **Raster split** (`1c3b077`). `Buf`/`buffer`/`put`/`capsule`/`ball` and the light moved to `raster.ts`; `drawBody` = `rasterBody` (pure: RGBA + anchors + per-pixel slot/part) + `toSprite` (canvas). The 24-sprite golden raster hash reproduced the base `e36f4a3b` exactly before any style change.
+4. **Broadcast Pixel style** (`b058e3d`).
+   - `proportions.ts`: head radius × `clamp(1.55 − artPx/120, 1.2, 1.45)` × `HEAD_FIT` 0.92 (the fit that lands V2's table on the raster), heads 0.88 as wide as tall, limbs ×1.15, drawn heights spread ×1.15 around each sport's mean (NBA 78.5 in, NFL 74, soccer 71.5), torso 8–13 art px face-on at 34 px from BMI (`8 + 5·clamp((BMI−18)/15)`), a V-taper, the arms set outside the torso (moved whole: no bone changes length), NFL pads +2.2 px per pad unit. Hair volume on the crown for short/headband/locs styles.
+   - Outline and tones: a 1 art px `#14121c` ring; inner separations, pinholes, 2-px gaps and concave corners in the farther part's shadow tone (corners turn on the diagonal); `ramp3` (`color.ts`): shadow L−22 with the hue turned 10° toward blue along the shorter arc (gold → orange, red → magenta, navy → blue), highlight L+14, ends nudged so the three tones stay distinct and never equal the outline; light from the top-left; no dithering (accidental 2×2 checkerboards are cleaned); a lit-side skin rim when skin and jersey are both dark (wired on any look; curated skin arrives in players-3).
+   - `ground.ts`: `drawGroundMark` (soft `rgba(0,0,0,0.32)` at 70% of shoulder width, 1 px halo; rings `you #f6b93b`, `target #4fe3c1`, `pressure #ff5d5d` arc, `rival #8b7cf6`, `color` override) and `groundEllipse`. The three renderers' player shadows now use it (airborne bodies shrink and fade); the rings are the HUD owners' call.
+   - The "everyone shares one skin tone" comments in `sprites.ts` and `body.ts` now describe the neutral default.
+5. **The art pixel** (`430c52a` + this task's last commit): `art-scale.ts` (`devPerArt = max(2, round(1.5·k·dpr))`, k = the stage's design scale), sprites rasterised at their own art size (far players natively), `toView`/`blitSprite` (whole canvas px position and scale), `quantPx` steps 1/2/4/6 art px restarting at each band (≤14, <30, <62, above). Cache keys gain `|cpa/backing` only away from today's grain.
+
+**The art-pixel decision (measured; plan §2, §6.4).** `players-matchperf.mjs --vp 393 --cpu 1,4 --dpr 3`, dev server, the shared machine:
+
+| Option | NBA 1× / 4× fps | NFL 1× / 4× | Soccer 1× / 4× | 4× long tasks (NBA/NFL/soccer) |
+|---|---|---|---|---|
+| Base (players-1) | 59.0 / 34.8 | 57.5 / 33.3 | 60.0 / 40.1 | 17 / 24 / 11 |
+| **A** device-resolution backing, 1.5 design px art pixel (5 device px at 393 DPR 3) | 58.7 / **14.7** | 57.9 / **18.6** | 58.5 / **19.7** | 106 / 85 / 79 |
+| **C** today's grain + the new proportions (run 1 / run 3) | 57.7 / 34.2 · 59.6 / 49.3 | 59.5 / 42.5 · 59.9 / 53.7 | 59.4 / 37.9 · 59.6 / 54.5 | 21 / 14 / 10 · 5 / 6 / 8 |
+
+A fails the §3.3 4× row by half (the ×9 backing store's fills, not the sprites), so **C is adopted** (`ADOPTED = 'C'`). B (a 2× backing) was not built: at DPR 3 it can't give a 1.5 design px art pixel a whole device-px size (3 canvas px = 4.5 device px), and at 1 view px it draws what C draws. A stays selectable with `?artpx=A` for owner device check 2. C's sprite area peak 5.78 Mpx at 393 (≤6), heap 23.4→24.3 / 19.8→20.3 / 24.6→25.6 MB.
+
+**Whole device pixels** (`players-artpx.mjs`: every sprite blit instrumented, DPR 1/2/3 × 393/320 × three sports × A and C): **0 of 126,687 blits** at a non-integer device scale or position. A draws at 2/3/5 device px per art px at 393 (DPR 1/2/3); C at 1/2/3.
+
+**Measured on the raster** (band centres; V2 C.1.1):
+
+| Figure height (art px) | Heads tall (target) | Head box w×h (target) |
+|---|---|---|
+| 18 | 4.50 (4.5) | 4×5 (5×5) |
+| 24 | 4.80 (5) | 5×5 (6×6) |
+| 34 | 5.67 (5.5) | 6×7 (7×8) |
+| 64 | 5.82 (6) | 12×13 (12×13) |
+
+Heads tall is the figure height over the skull's rows (hair volume is not head); the box includes hair. V2's own table can't hold under players-1's harness definition (figure ÷ box-with-hair: 34/8 = 4.25, never 5.5), so the verify row S2 still reads the old definition; the unit test is the gate. Between band centres the ratio drifts with pixel rounding (e.g. 5.14 at 36, 5.45 at 60), recorded for players-4.
+
+Torso at 34 art px face-on: **Shaq 13, Bol 9 (difference 4)**, BMI 31 vs 20 at 78 in: 13 vs 9 (**+44%**); Jokić 11, Giannis 11 (players-4 re-runs with real weights).
+
+**Kept identical** (the extraction acceptance): node-side golden digests over every body every other frame, base vs moved: NBA `556ad50a` (88,750 samples), NFL `ed52d518` (104,852), soccer `326e398f` (31,656). The three slide classifiers reproduce players-1 to the count: NBA 29.1% (1,129,920 frames), NFL 40.4% (2,003,766; QB idle-moving 20,418, 1.97 yd per dropback), soccer 13.7% (564,490). (The browser golden sequence includes sprite px, which players-2 changes on purpose; as players-1 recorded, the node digests are the byte-identical gate.)
+
+**Render only, proved** (`render-only.test.ts`, `render-only-soccer.test.ts`): no module reachable by static import from any sport's simulation (NBA engine/autopilot/game/ratings/badges, NFL engine/autopilot/drive/ratings/squad, soccer engine/autopilot/match/ratings/shootout) is in `src/game/pixel/` or `src/data/appearance/` (`soccer2/arcade.ts` is excluded as the lazy-load barrel that re-exports the screen); a seeded NBA, NFL and soccer game hashes the same full engine state after every step with the whole drawing pipeline (look, clip selection, proportions, art scale, a raster every 20 steps) run on every body.
+
+**Other numbers after players-2** (393, dev server): stale draws NBA 2.7% (was 4.4), NFL 40.8% (41.4; players-5), soccer 1.8% (1.9); keep-list PASS.
+
+**Harness fixes** (`scripts/qa/players-lib.mjs`, `players-artpx.mjs` new): the in-match probe now imports the exact module copies the page runs (after a source edit the dev server serves `body.ts?t=…`, and a bare import patched an unused copy: sprite area read 0); `parseSpriteKey` drops the `|cpa/backing` suffix; `--artpx A|C` passes through every match URL.
+
+**Tests added:** `select-golden.test.ts`, `select-golden-soccer.test.ts` (+ `select-golden.helpers.ts`), `select-family.test.ts`, `raster.test.ts` (hash `38046b9e`, was `e36f4a3b`), `proportions.test.ts`, `outline.test.ts`, `ground.test.ts`, `art-scale.test.ts`, `render-only.test.ts`, `render-only-soccer.test.ts` (+ `render-only.helpers.ts`), `players-lib.test.ts` (key suffix).
+
+**Looked at** (`O/shots/players/players-2/`): `after-p2-lineup-{nba,nfl,soccer}.png` beside `players-1/before-lineup-*.png` and `after-p2-vs-target-nba.png`; `after-p2-ingame-sheet.png` (three sports at 393 and 320); `p2-artpx-{A,C}-<sport>-393-dpr3.png` and the crops `crop-{A,C}-nba.png` (DPR 3 close-ups). The outline, build and head size read as V2 asks; front-on poses, hair, skin and gear are players-3/4.
+
 ---
 
 ## 2. Baselines (base commit `1d14201` = source of `acdf3e2`, dev server, players-1, 2026-11-16)
@@ -331,7 +385,7 @@ The Collection screen is ut's. Players gives it `PlayerPortrait` with `variant="
 ## 5. Requests to the lead
 
 1. **`card-face.ts` ruling.** It holds rating logic used by `rate.ts`; players only reads `faceWeights`. We ask that it move to packs (ratings), with players keeping read access.
-2. **The backing-store hunk** in `Hoops2.tsx`, `Football2.tsx` and `Soccer2.tsx` (≈4 lines each in the resize code), only if players-2 picks art-pixel option A or B: who makes it (players, announced here first, or each sport team).
+2. **The backing-store hunk** in `Hoops2.tsx`, `Football2.tsx` and `Soccer2.tsx`: players-2 made it (≈4 lines each, section 7). Option C is adopted, so it changes nothing at runtime unless `?artpx=A`; at merge keep it beside the sport teams' resize edits.
 3. **The `vite.config.ts` on-demand diff for shell** (players never edits `vite.config.ts`):
    `const onDemandModule = /[\\/](?:game[\\/]soccer2[\\/]|game[\\/]pixel[\\/]pitch\.ts|data[\\/](?:cards-(?:nba|nfl|soccer)|soccer)\.json|data[\\/]appearance[\\/]soccer\.json)/;`
 4. **Reports (players does not edit these):**
@@ -350,11 +404,18 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 
 | Task | File | Anchor | Hunk |
 |---|---|---|---|
-| — | none yet | | |
+| players-2 | `hoops2/render.ts`, `football2/render.ts`, `soccer2/render.ts` | top imports | selection imports from `pixel/select-*`; `art-scale`, `ground`, `proportions` imports; re-exports of `dunkStyle`/`spins360` (NBA) and `lookFor` (soccer) |
+| players-2 | same three | the old `lookFor` … `poseOf` block (NBA lines 41–351, NFL 56–301, soccer 42–159 at the base) | removed: moved to `pixel/select-*.ts` |
+| players-2 | same three | renderer fields `sprites`/`last` | `SpriteCache<ArtSprite>`, `last: Map<string, ArtSprite>`, `art: ArtScale = ART_C` |
+| players-2 | same three | `private sprite(` sizing lines (`const raw = …`, `const px = …`) | `drawnHeight` + `art.artPxFor` + `quantPx`; cache key `+ this.art.keySuffix`; `spr = toView(make(), this.art)` |
+| players-2 | same three | `draw(ctx…` first line | `ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);` (identity at today's grain) |
+| players-2 | same three | the player `// shadows` loop | `drawGroundMark(…)` per body |
+| players-2 | same three | player blits `ctx.drawImage(s.canvas…` | `blitSprite(ctx, s, x, y)`; NBA `headOf.right` uses `s.w` |
 
 ## 7. Touched outside my lane
 
-None (players-1 changed only `scripts/qa/players-*` and this doc).
+- **players-2, announced backing hunk** (plan §2, request 2 in section 5): `src/game/hoops2/Hoops2.tsx`, `src/game/football2/Football2.tsx`, `src/game/soccer2/Soccer2.tsx`, the resize code in the draw loop: one import of `artScale` plus 4 lines (`renderer.art = artScale(canvas, W, H)`; the backing size `bw`/`bh`; the size check and `canvas.width/height` use it). With the adopted option C the backing is 1, so the canvas is exactly as before; `?artpx=A` turns on the device-resolution backing.
+- players-1 changed only `scripts/qa/players-*` and this doc.
 
 ## 8. Deviations from STREAM, recorded
 
@@ -364,7 +425,7 @@ None (players-1 changed only `scripts/qa/players-*` and this doc).
 ## 9. Owner device checks
 
 1. "Can you tell who is who?" at a glance: the NBA five, the NFL backfield, the soccer front three, in portrait and landscape.
-2. The 5-head proportions and the 1.5 px art pixel on a real iPhone (V2 decision 3): crisp, even pixels, nothing blurred.
+2. The 5-head proportions and the art pixel on a real iPhone (V2 decision 3): crisp, even pixels, nothing blurred. Compare the adopted grain with `?artpx=A` (1.5 design px art pixel on a device-resolution canvas) in each sport: A was 15–20 fps at 4× CPU on this machine, so check whether the phone holds 60 with it before anyone switches.
 3. Calmer venues: do the players pop off the court, field and pitch?
 4. Card readability on the phone at every size; frame and foil rendering in iOS Safari.
 5. A 100+ card club scroll.
@@ -374,6 +435,8 @@ None (players-1 changed only `scripts/qa/players-*` and this doc).
 9. Skin tones of curated stars look right.
 
 ## 10. Left undone, and why
+
+- **players-2:** the slide classifiers still carry their own copy of the renderer's branches (they reproduce players-1 exactly); switching them to import `select-*.ts` lands with players-5, which rewrites locomotion and its classifier together. The verify row S2 still uses players-1's heads-tall definition (figure ÷ box with hair), which V2's table can't meet; `proportions.test.ts` is the gate (section 1, players-2). V2 C.1.3's five-tone shading, cast-shadow silhouettes and general rim light are newer than this task's spec (three tones); they are recorded for players-4.
 
 - **The NFL golden sequence is not deterministic in the browser.** Two repeats under Playwright's virtual clock diverge at frame 29: one draws a defender in the hand-keyed `stance` pose (`st2`, the pre-snap branch of `poseOf`), the other the `ready` clip, so the play's phase differs between runs (something in the NFL bench still follows real time, or a clip arrives late). NBA and soccer are deterministic after this task's fixes. **For players-2's extraction check, the node-side `select-golden.test.ts` (seeded engine, no browser) and the three slide classifiers are the byte-identical gate**; the browser sequence stays a diff aid. Whether this is a readiness race is a players-3 question (row A7).
 - **The 4× CPU numbers are not comparable with the audit's** (dev server on a machine shared by seven teams vs the audit's production build on a quiet machine). players-10 repeats `players-matchperf.mjs` on `vite preview`; the relative rows (A5) compare like with like in the meantime. Row A5 also fails at 1× today for the same reason (55.4–59.0 fps in 9 of 15 runs while other teams ran builds and Playwright), not because of the game.

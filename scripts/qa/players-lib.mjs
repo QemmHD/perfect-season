@@ -201,7 +201,9 @@ export function appUrl(params = {}) {
 /** The autoplay test bench of each sport: ?arcade&auto (NBA, NFL) or the dev ?soccer-lab&auto&qa. */
 export function matchUrl(sport, { seed = 'players', slowmo, extra = {} } = {}) {
   const bench = sport === 'soccer' ? { 'soccer-lab': true, auto: true, qa: true } : { arcade: true, auto: true };
-  return appUrl({ ...bench, sport, seed, ...(slowmo ? { slowmo } : {}), ...extra });
+  // `--artpx A|C` (players-2): every match opens with that art-pixel option (pixel/art-scale.ts)
+  const art = opts.artpx === 'A' || opts.artpx === 'C' ? { artpx: opts.artpx } : {};
+  return appUrl({ ...bench, sport, seed, ...(slowmo ? { slowmo } : {}), ...art, ...extra });
 }
 
 export async function cpu(page, rate) {
@@ -348,6 +350,8 @@ export async function dismissDialogs(page, rounds = 8) {
  */
 export function parseSpriteKey(k) {
   const p = String(k).split('|');
+  // players-2: a key for a non-default art pixel ends in `|<canvas px per art px>/<backing>`
+  if (p.length > 6 && p[p.length - 1].includes('/')) p.pop();
   if (p.length < 6) return null;
   const n = p.length;
   const fd = p[n - 3].split('/');
@@ -428,8 +432,11 @@ export async function installProbe(page, sport, { golden = false, goldenCap = 40
     async ({ sport, mod, cls, parseSrc, bucketSrc, golden, goldenCap }) => {
       const parse = new Function('return ' + parseSrc)();
       const bucket = new Function('return ' + bucketSrc)();
-      const body = await import('/src/game/pixel/body.ts');
-      const R = await import(mod);
+      // import the very module copies the page runs: after a source edit the dev server serves them
+      // as `<path>?t=<stamp>`, and a bare import would patch a second, unused copy
+      const loaded = (p) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => new URL(n).pathname === p) ?? p;
+      const body = await import(loaded('/src/game/pixel/body.ts'));
+      const R = await import(loaded(mod));
       const Cls = R[cls];
       if (window.__psProbe) return;
       const S = (window.__psProbe = {
