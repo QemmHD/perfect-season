@@ -13,12 +13,17 @@ describe('pointer ownership (decided on pointerdown, in order)', () => {
     expect(stickZone(393, 852)).toEqual({ w: 189, top: 383 });
     expect(stickZone(320, 568)).toEqual({ w: 154, top: 256 });
   });
-  it('puts a control first, then the stick zone, then an icon, then the right two thirds', () => {
+  it('puts a control first, then (in the pocket) an icon, then the stick zone, then the right two thirds', () => {
     // a control wins even inside the stick zone
     expect(ownerOf(at(1, 100, 700, { ctl: 'A' }), ctx('carrier'))).toEqual({ kind: 'control', ctl: 'A' });
     expect(ownerOf(at(1, 12, 70, { ctl: 'pause' }), ctx('pocket'))).toEqual({ kind: 'control', ctl: 'pause' });
-    // the stick zone wins over an icon drawn inside it
-    expect(ownerOf(at(1, 100, 600, { icon: 4 }), ctx('pocket'))).toEqual({ kind: 'stick' });
+    // in the pocket an icon wins over the stick zone (the back's chip sits in it on most pass plays:
+    // nfl-2 review fix); the zone still takes every other touch there
+    expect(ownerOf(at(1, 100, 600, { icon: 4 }), ctx('pocket'))).toEqual({ kind: 'icon', icon: 4 });
+    expect(ownerOf(at(1, 100, 600), ctx('pocket'))).toEqual({ kind: 'stick' });
+    // outside the pocket an icon id never takes a touch from the stick
+    expect(ownerOf(at(1, 100, 600, { icon: 4 }), ctx('carrier'))).toEqual({ kind: 'stick' });
+    expect(ownerOf(at(1, 100, 600, { icon: 4 }), ctx('pre'))).toEqual({ kind: 'stick' });
     expect(ownerOf(at(1, 300, 300, { icon: 4 }), ctx('pocket'))).toEqual({ kind: 'icon', icon: 4 });
     expect(ownerOf(at(1, 300, 300), ctx('pocket'))).toEqual({ kind: 'sling' });
     expect(ownerOf(at(1, 300, 300), ctx('carrier'))).toEqual({ kind: 'hold' });
@@ -80,6 +85,16 @@ describe('tap or drag', () => {
     expect(g.move(1, 300, 340, t + 50)).toEqual([]);
     expect(g.up(1, 290, 380, t + 400)).toEqual([]);
     expect(g.slingId()).toBeNull();
+  });
+  it('throws to a chip inside the stick zone and leaves the stick free (nfl-2 review fix)', () => {
+    const g = new Gestures();
+    expect(g.down(at(1, 90, 520, { icon: 5 }), ctx('pocket'))).toEqual([{ kind: 'icon-throw', icon: 5 }]);
+    expect(g.stickId()).toBeNull();
+    expect(g.up(1, 90, 520, t + 60)).toEqual([]);
+    // with the stick already held, a chip in the zone still throws
+    expect(g.down(at(2, 60, 760), ctx('pocket'))).toEqual([{ kind: 'stick-down', id: 2 }]);
+    expect(g.down(at(3, 120, 500, { icon: 6 }), ctx('pocket'))).toEqual([{ kind: 'icon-throw', icon: 6 }]);
+    expect(g.stickId()).toBe(2);
   });
   it('starts the slingshot on the field at 10 px, and a cancelled touch throws nothing', () => {
     const g = new Gestures();

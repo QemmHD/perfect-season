@@ -86,7 +86,8 @@ try {
     const frame = () => page.evaluate(() => window.__joy.frame);
     await mount();
     await page.getByRole('button', { name: 'SNAP', exact: true }).click();
-    const stick = page.getByRole('group', { name: /Run joystick:/ });
+    // Claude (nfl-2 review fix): the V2 floating stick (its zone is the group; the ring floats to the thumb)
+    const stick = page.getByRole('group', { name: /Movement stick:/ });
     await stick.waitFor();
     await page.waitForFunction(() => window.__joy.frame?.phase === 'run').catch(async e=>{console.log(JSON.stringify({diagnostic:await frame(),errors,screen:(await page.locator('.arcade-full').innerText()).slice(0,700)}));await shot(page,'joystick-failure-'+width);throw e;});
     // Claude (nfl-1): the back takes the handoff and runs on (the momentum carry) until the stick is
@@ -104,7 +105,7 @@ try {
       assert.ok(Math.hypot(state.vx, state.vy) < 0.1, 'A touched, centred stick stops the runner: ' + JSON.stringify(state));
       await page.mouse.up();
     }
-    const boxes = await page.locator('.fb2-stick,.fb2-burst,.fb2-mv').evaluateAll((els) =>
+    const boxes = await page.locator('.v2-stick,[data-ctl]').evaluateAll((els) =>
       els.map((el) => {
         const r = el.getBoundingClientRect();
         return { x: r.x, y: r.y, w: r.width, h: r.height };
@@ -163,30 +164,56 @@ try {
     const b = await stick.boundingBox(),
       cx = b.x + b.width / 2,
       cy = b.y + b.height / 2;
-    const burst = await page.getByRole('button', { name: 'Burst: hold to sprint' }).boundingBox();
+    // Claude (nfl-2 review fix): burst is the stick's ring by default (past 1.15 radii); with the
+    // Burst-button preference it is a hold on D, the second thumb, as Codex's check had it.
     const cdp = await context.newCDPSession(page),
       point = (id, x, y) => ({ id, x, y, radiusX: 4, radiusY: 4, force: 1 });
-    const thumb = point(1, cx, cy),
-      fast = point(2, burst.x + burst.width / 2, burst.y + burst.height / 2);
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [thumb] });
-    const held = point(1, cx + (width > height ? 32 : 0), cy + (width > height ? 0 : -32));
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [held] });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [held, fast] });
-    await page.waitForTimeout(300);
-    assert.equal(await page.getByRole('button', { name: 'Burst: hold to sprint' }).getAttribute('aria-pressed'), 'true');
-    assert.ok((await frame()).stamina < 0.99);
-    await shot(page, 'joystick-touch-burst-' + width);
-    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
-    await page.waitForTimeout(400);
-    assert.ok(Math.hypot((await frame()).vx, (await frame()).vy) < 0.1);
-    assert.equal(await page.getByRole('button', { name: 'Burst: hold to sprint' }).getAttribute('aria-pressed'), 'false');
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const fwd = (k) => (width > height ? { x: cx + k, y: cy } : { x: cx, y: cy - k });
+    {
+      const thumb = point(1, cx, cy);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [thumb] });
+      const past = fwd(80);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(1, past.x, past.y)] });
+      await page.waitForTimeout(300);
+      assert.equal(await page.locator('.v2-stick.sprint').count(), 1, 'past the ring the stick bursts');
+      assert.ok((await frame()).stamina < 0.99);
+      await shot(page, 'joystick-touch-burst-' + width);
+      await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+      await page.waitForTimeout(400);
+      assert.ok(Math.hypot((await frame()).vx, (await frame()).vy) < 0.1);
+      assert.equal(await page.locator('.v2-stick.sprint, .v2-stick.held').count(), 0, 'an interruption lets go of the stick and its burst');
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    }
+    {
+      await page.evaluate(() => localStorage.setItem('perfect-season:fb2-burst-button', '1'));
+      await mount();
+      await page.getByRole('button', { name: 'SNAP', exact: true }).click();
+      await page.waitForFunction(() => window.__joy.frame?.phase === 'run');
+      const burst = page.getByRole('button', { name: 'Burst: hold to sprint' });
+      const bb = await burst.boundingBox();
+      const sb = await stick.boundingBox();
+      const hx = sb.x + sb.width / 2,
+        hy = sb.y + sb.height / 2;
+      const held = width > height ? point(1, hx + 32, hy) : point(1, hx, hy - 32);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(1, hx, hy)] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [held] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [held, point(2, bb.x + bb.width / 2, bb.y + bb.height / 2)] });
+      await page.waitForTimeout(300);
+      assert.equal(await burst.getAttribute('aria-pressed'), 'true');
+      assert.ok((await frame()).stamina < 0.99);
+      await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+      await page.waitForTimeout(400);
+      assert.ok(Math.hypot((await frame()).vx, (await frame()).vy) < 0.1);
+      assert.equal(await burst.getAttribute('aria-pressed'), 'false');
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await page.evaluate(() => localStorage.removeItem('perfect-season:fb2-burst-button'));
+    }
     await cdp.detach();
     let normalDefenseAttempt;
     if (width === 390) {
       await mount(false);
       await page.getByRole('button', { name: 'SNAP', exact: true }).click();
-      const liveStick = page.getByRole('group', { name: /Run joystick:/ });
+      const liveStick = page.getByRole('group', { name: /Movement stick:/ });
       await liveStick.waitFor();
       const box = await liveStick.boundingBox(),
         sx = box.x + box.width / 2,

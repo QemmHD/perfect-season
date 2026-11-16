@@ -7,28 +7,38 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import './pause.css';
 
 /** The control map shown under CONTROLS (V2 §B.2.2): what each thumb does, moment by moment. */
-const MAP: { state: string; rows: [string, string][] }[] = [
-  { state: 'Before the snap', rows: [['A', 'SNAP'], ['B', 'AUDIBLE: flip the play between run and pass'], ['C · D', 'FIELD GOAL · PUNT on fourth down']] },
-  {
-    state: 'In the pocket',
-    rows: [
-      ['Stick', 'move the quarterback: slide, step up, roll out. Over the line he runs'],
-      ['Field', 'drag back anywhere on the right and let go to throw, or tap a name over a receiver'],
-      ['A', 'RUN IT inside the tackles · THROW AWAY outside them'],
-      ['C', 'TOUCH, BULLET or LOB (a second finger while you aim does the same)']
-    ]
-  },
-  {
-    state: 'With the ball',
-    rows: [
-      ['Stick', 'steer; push past the ring to burst (it costs stamina)'],
-      ['A', 'JUKE toward the stick, or swipe off A to pick the side'],
-      ['B · C', 'SPIN · POWER (a truck or a stiff arm)'],
-      ['D', 'DIVE near the sticks or the goal line · SLIDE for a quarterback'],
-      ['Hold', 'a thumb held still on the field covers the ball up']
-    ]
-  }
-];
+export function controlMap(burstButton: boolean): { state: string; rows: [string, string][] }[] {
+  return [
+    { state: 'Before the snap', rows: [['A', 'SNAP'], ['B', 'AUDIBLE: flip the play between run and pass'], ['Tray', 'fourth down: pick GO, FIELD GOAL or PUNT, then A']] },
+    {
+      state: 'In the pocket',
+      rows: [
+        ['Stick', 'move the quarterback: slide, step up, roll out. Over the line he runs'],
+        ['Field', 'drag back anywhere on the right and let go to throw, or touch a name over a receiver'],
+        ['A', 'RUN IT inside the tackles · THROW AWAY outside them'],
+        ['C', 'TOUCH, BULLET or LOB (a second finger while you aim does the same)']
+      ]
+    },
+    {
+      state: 'With the ball',
+      rows: burstButton
+        ? [
+            ['Stick', 'steer'],
+            ['A', 'JUKE toward the stick, or swipe off A to pick the side'],
+            ['B · C', 'SPIN · POWER (a truck or a stiff arm); near the sticks B is DIVE, SLIDE for a quarterback'],
+            ['D', 'hold to BURST (it costs stamina)'],
+            ['Hold', 'a thumb held still on the field covers the ball up']
+          ]
+        : [
+            ['Stick', 'steer; push past the ring to burst (it costs stamina)'],
+            ['A', 'JUKE toward the stick, or swipe off A to pick the side'],
+            ['B · C', 'SPIN · POWER (a truck or a stiff arm)'],
+            ['D', 'DIVE near the sticks or the goal line · SLIDE for a quarterback'],
+            ['Hold', 'a thumb held still on the field covers the ball up']
+          ]
+    }
+  ];
+}
 
 export function PauseMenu({
   online,
@@ -121,7 +131,7 @@ export function PauseMenu({
         )}
         {page === 'controls' && (
           <div className="fb2-pm-controls">
-            {MAP.map((m) => (
+            {controlMap(burstButton).map((m) => (
               <div key={m.state} className="fb2-pm-map">
                 <b>{m.state}</b>
                 {m.rows.map(([k, v]) => (
@@ -132,7 +142,7 @@ export function PauseMenu({
                 ))}
               </div>
             ))}
-            {toggle('BURST BUTTON', burstButton, onBurstButton, burstButton ? 'Hold D to burst; the ring does nothing' : 'Off: push the stick past its ring to burst')}
+            {toggle('BURST BUTTON', burstButton, onBurstButton, burstButton ? 'Hold D to burst, DIVE moves to B; the ring does nothing' : 'Off: push the stick past its ring to burst')}
             <button type="button" className="fb2-pm-back" onClick={() => setPage('main')}>
               BACK
             </button>

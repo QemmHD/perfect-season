@@ -69,3 +69,25 @@ export class CarryGate {
     return this.steering ? (stick ?? { x: 0, y: 0 }) : null;
   }
 }
+
+/**
+ * Which calls a practice drill allows (Training and UT Moments run Football2 with a drill): a run
+ * drill only runs, a throw drill only passes, a kick drill no play call at all, a real game anything.
+ * The tray, the book and AUDIBLE all go through this, so a run drill can never snap a pass (nfl-2
+ * review fix: AUDIBLE used to flip a rushing Moment into a pass, which then counted as a rep).
+ */
+export function callAllowed(drill: string | null | undefined, call: 'run' | 'pass'): boolean {
+  if (!drill) return true;
+  if (drill === 'run') return call === 'run';
+  if (drill === 'throw') return call === 'pass';
+  return false;
+}
+
+/** What AUDIBLE does: line up the picked card's opposite call, if the drill allows it. */
+export type Audible = { kind: 'card'; index: number } | { kind: 'book'; call: 'run' | 'pass' } | null;
+export function audibleTo(cur: { call: 'run' | 'pass' }, cards: readonly { call: 'run' | 'pass' }[], drill: string | null | undefined): Audible {
+  const call = cur.call === 'pass' ? 'run' : 'pass';
+  if (!callAllowed(drill, call)) return null;
+  const index = cards.findIndex((c) => c.call === call);
+  return index >= 0 ? { kind: 'card', index } : { kind: 'book', call };
+}

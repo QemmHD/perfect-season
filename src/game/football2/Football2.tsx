@@ -50,9 +50,9 @@ import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, PassType, Play, Pt, RunInput } from './types';
 import './rushing-controls.css';
-import { CarryGate, screenRunInput } from './controls';
+import { audibleTo, CarryGate, callAllowed, screenRunInput } from './controls';
 import { GameClock } from './clock';
-import { burstHeld, type Gesture, type GestureState, Gestures, nextPassType, stickZone } from './gestures';
+import { burstAtTouch, burstHeld, type Gesture, type GestureState, Gestures, nextPassType, stickZone } from './gestures';
 import { PauseMenu } from './PauseMenu';
 import { BURST_BUTTON, readPref, writePref } from './prefs';
 import { type IconsHandle, ReceiverIcons } from './ReceiverIcons';
@@ -299,6 +299,8 @@ export function Football2({
   const passTypeRef = useRef<PassType>('touch');
   const [bursting, setBursting] = useState(false);
   const burstPointer = useRef<number | 'keyboard' | null>(null);
+  /** removes the window listeners that end a held BURST wherever its finger lifts (nfl-2 review fix) */
+  const burstWatch = useRef<(() => void) | null>(null);
   // the three play cards for this down, and the one lined up
   const [opts, setOpts] = useState<{ choice: PlayChoice; play: Play }[]>([]);
   const [picked, setPicked] = useState(0);
@@ -357,7 +359,9 @@ export function Football2({
       g.ballOn = practice.drill === 'kick' ? Math.max(60, 80 - g.plays * 2) : 25;
       g.clock = null;
     }
-    const cs = practice?.drill === 'run' ? choices(g).filter((c) => c.call === 'run') : practice?.drill === 'throw' ? choices(g).filter((c) => c.call === 'pass') : choices(g);
+    const all = choices(g);
+    const allowed = all.filter((c) => callAllowed(practice?.drill, c.call));
+    const cs = allowed.length ? allowed : all;
     const lined = cs.map((choice) => ({ choice, play: startChoice(g, choice) }));
     setOpts(lined);
     setPicked(0);
@@ -400,7 +404,7 @@ export function Football2({
     [
       ...CONCEPTS.map((concept) => ({ call: 'pass' as const, concept, run: g.run })),
       ...(['inside', 'power', 'outside'] as const).map((run) => ({ call: 'run' as const, concept: g.concept, run }))
-    ].filter((c) => !practice || (practice.drill === 'run' ? c.call === 'run' : practice.drill === 'throw' ? c.call === 'pass' : false));
+    ].filter((c) => callAllowed(practice?.drill, c.call));
   const openBook = () => {
     if (!game || playRef.current?.phase !== 'pre') return;
     setBook(
@@ -468,9 +472,11 @@ export function Football2({
   const audible = () => {
     if (!game || (ui !== 'pre' && ui !== 'fourth') || playRef.current?.phase !== 'pre' || !opts[picked]) return;
     const cur = opts[picked].choice;
-    const i = opts.findIndex((o) => o.choice.call !== cur.call);
-    if (i >= 0) pick(i);
-    else chooseBook(cur.call === 'pass' ? { call: 'run', concept: cur.concept, run: game.run } : { call: 'pass', concept: game.concept, run: cur.run });
+    // a drill keeps to its own kind: a run drill can never audible into a pass (or a throw drill into a run)
+    const to = audibleTo(cur, opts.map((o) => o.choice), practice?.drill);
+    if (!to) return;
+    if (to.kind === 'card') pick(to.index);
+    else chooseBook(to.call === 'run' ? { call: 'run', concept: cur.concept, run: game.run } : { call: 'pass', concept: game.concept, run: cur.run });
   };
 
   /**
@@ -1121,6 +1127,12 @@ export function Football2({
         return;
       }
       icon = hits[0] ?? null;
+      // a touch that landed on a chip's own element always throws to him (never falls to the stick)
+      if (icon === null) {
+        const el = (e.target as Element | null)?.closest?.('.fb2-icon');
+        const id = el ? Number(el.getAttribute('data-icon')) : NaN;
+        if (Number.isFinite(id)) icon = id;
+      }
     }
     e.currentTarget.setPointerCapture?.(e.pointerId);
     applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, icon }, ctx));
@@ -1163,6 +1175,8 @@ export function Football2({
   };
   useInputInterrupt(letGo);
   const stopBurst = () => {
+    burstWatch.current?.();
+    burstWatch.current = null;
     burstPointer.current = null;
     burstButton.current = false;
     if (playRef.current) setBurst(playRef.current, false);
@@ -1285,6 +1299,8 @@ export function Football2({
   const steering = rushing || (ui === 'live' && phase === 'air');
   const calling = (ui === 'pre' || ui === 'fourth') && !!g && !!p;
   const canCall = calling && g!.clock !== 0 && practice?.drill !== 'kick';
+  // AUDIBLE only where both calls are allowed (never in a run or throw drill)
+  const canAudible = canCall && callAllowed(practice?.drill, 'run') && callAllowed(practice?.drill, 'pass');
   const receivers = useMemo(() => (p ? p.bodies.filter((b) => b.side === 'O' && b !== p.qb && !isLine(b)) : []), [p]);
   const trayUp = calling && !autoplayHook;
   // the tray's strip: the three suggested cards, then the rest of the book after the seam
@@ -1304,9 +1320,11 @@ export function Football2({
   }, [opts, flipped, trayUp, ui, picked]);
   const fourth: Fourth | null = ui === 'fourth' && g ? { pick: fourthPick, fg: { ok: fgOk, yards: fgDistance(g) }, punt: canCall, kickOnly: !canCall } : null;
   const bug = g ? bugModel(g, downText(g)) : null;
+  // the BURST button goes away (the run ended, the preference changed): its hold ends with it
   useEffect(() => {
-    if (!rushing) stopBurst();
-  }, [rushing]);
+    if (!rushing || !burstPref) stopBurst();
+  }, [rushing, burstPref]);
+  useEffect(() => () => burstWatch.current?.(), []);
   /** A, B, C or D: fires on touch-down; Enter or Space for a keyboard. */
   const ctl = (slot: 'a' | 'b' | 'c' | 'd', label: React.ReactNode, act: (e: React.PointerEvent | React.KeyboardEvent) => void, opts: { cls?: string; aria: string; icon?: React.ReactNode; small?: string; pressed?: boolean; extra?: Partial<React.ButtonHTMLAttributes<HTMLButtonElement>> } = { aria: '' }) => (
     <button
@@ -1390,7 +1408,8 @@ export function Football2({
           onMove={(_, sprint) => {
             // the ring takes effect at the touch, not at the next fixed step
             const live = playRef.current;
-            if (live && !burstPrefRef.current && !autoplayHook) setBurst(live, sprint);
+            const now = burstAtTouch(sprint, burstPrefRef.current);
+            if (live && now !== null && !autoplayHook) setBurst(live, now);
           }}
           onUp={(e) => e && applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp))}
           onKeyDown={(e) => keyRun(e, true)}
@@ -1490,24 +1509,39 @@ export function Football2({
               }
             )}
           {/* B */}
-          {calling && canCall && ctl('b', 'AUDIBLE', audible, { aria: 'Audible: switch the call between run and pass', icon: ICONS.audible })}
-          {running && ctl('b', 'SPIN', () => p && move3(p, 'spin'), { aria: 'Spin: evade a tackle', icon: ICONS.spin })}
+          {calling && canAudible && ctl('b', 'AUDIBLE', audible, { aria: 'Audible: switch the call between run and pass', icon: ICONS.audible })}
+          {running && !(burstPref && dMode) && ctl('b', 'SPIN', () => p && move3(p, 'spin'), { aria: 'Spin: evade a tackle', icon: ICONS.spin })}
           {/* C */}
           {passing && ctl('c', passType.toUpperCase(), cycleType, { cls: 'chip', aria: 'Throw type: ' + passType + '. Tap for the next (touch, bullet, lob)', icon: ICONS[passType], extra: { 'data-type': passType } as Partial<React.ButtonHTMLAttributes<HTMLButtonElement>> })}
           {running && ctl('c', 'POWER', () => p && move3(p, 'power'), { aria: 'Power: a truck or a stiff arm', icon: ICONS.power })}
           {/* D */}
-          {running && dMode && ctl('d', dMode === 'slide' ? 'SLIDE' : 'DIVE', () => {
+          {/* DIVE / SLIDE near the sticks: on D, or on B (in SPIN's place) with the Burst-button
+              preference, so a held BURST never changes under the thumb (nfl-2 review fix) */}
+          {running && dMode && ctl(burstPref ? 'b' : 'd', dMode === 'slide' ? 'SLIDE' : 'DIVE', () => {
               const live = playRef.current;
               if (live && giveUp(live, dMode)) tapHaptic(12);
             }, { aria: dMode === 'slide' ? 'Slide: the quarterback gives himself up' : 'Dive forward for the line', icon: ICONS.dive })}
-          {rushing && burstPref && !(running && dMode) &&
+          {rushing && burstPref &&
             ctl(
               'd',
               'BURST',
               (e) => {
                 burstButton.current = true;
                 burstPointer.current = 'pointerId' in e ? e.pointerId : 'keyboard';
-                if ('pointerId' in e) (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+                if ('pointerId' in e) {
+                  (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+                  // the lift is also watched on the window: if the button ever leaves the screen
+                  // mid-hold, its own handlers can't hear it any more
+                  burstWatch.current?.();
+                  const id = e.pointerId;
+                  const end = (ev: PointerEvent) => ev.pointerId === id && burstPointer.current === id && stopBurst();
+                  addEventListener('pointerup', end, true);
+                  addEventListener('pointercancel', end, true);
+                  burstWatch.current = () => {
+                    removeEventListener('pointerup', end, true);
+                    removeEventListener('pointercancel', end, true);
+                  };
+                }
               },
               {
                 cls: 'burst' + (bursting ? ' held' : ''),

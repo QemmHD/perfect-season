@@ -289,7 +289,8 @@ describe('core football play mechanics', () => {
 
 // ---------- the pocket (Claude, studio overhaul nfl-2) ----------
 import { BOX_HALF, coverBall, DROP_TIME, giveUp, moveWithBall, outsideBox, scramble, throwAway } from './engine';
-import { burstHeld } from './gestures';
+import { burstAtTouch, burstHeld } from './gestures';
+import { stickFrom } from './shared-v2';
 import type { Play, PlayEnd, RunInput } from './types';
 
 /** A pass play just snapped, with every defender frozen unless `live` (so nothing ends it early). */
@@ -514,23 +515,63 @@ describe('the pocket (nfl-2)', () => {
     for (let seed = 1; seed <= 500; seed++) expect(go(seed, true)).toBe(go(seed, false));
   });
 
-  it('spends identical stamina whether burst comes from the ring or from the D button (200 seeds)', () => {
-    const trace = (seed: number, viaButton: boolean) => {
-      const p = pocket(seed, true, 'run');
-      const want = rng(seed * 31);
-      let held = false;
-      const out: number[] = [];
-      for (let i = 0; i < 600 && !p.end; i++) {
-        if (i % 20 === 0) held = want() < 0.5;
-        // the same thumb, read either from the sprint ring (button preference off) or D (on); the other source is ignored
-        const ring = viaButton ? want() < 0.5 : held;
-        const button = viaButton ? held : want() < 0.5;
-        setBurst(p, burstHeld({ ring, button, buttonPref: viaButton }));
-        step(p, 1 / 60, p.phase === 'run' ? { x: 0.2, y: 0.9 } : null);
-        out.push(p.stamina);
+  // Review fix: drive the two real sources. The ring path is a scripted thumb read through the
+  // Stick's own maths (stickFrom at the 1.15 sprint ring), applied at the touch (burstAtTouch, as the
+  // Stick's onMove does) and on every fixed step (burstHeld, as the frame loop does). The button path
+  // is D's pointer state with the preference on, while the same stick is pushed about at random (it
+  // must not count). Both feed setBurst through the same calls Football2 makes.
+  const RING_O = { x: 100, y: 700 },
+    RING_R = 60;
+  /** one run with burst decided the way the screen decides it; `src` says where the thumb's intent shows */
+  const burstTrace = (seed: number, src: 'ring' | 'button' | 'ring-ignored') => {
+    const p = pocket(seed, true, 'run');
+    const want = rng(seed * 31);
+    const noise = rng(seed * 57);
+    const pref = src !== 'ring';
+    let ring = false,
+      button = false;
+    const out: number[] = [];
+    for (let i = 0; i < 600 && !p.end; i++) {
+      if (i % 20 === 0) {
+        // the player's intent this stretch: burst or not, and a thumb angle
+        const go = want() < 0.5;
+        const ang = want() * Math.PI * 2;
+        // the thumb's distance from the ring's centre: past 1.15 radii when the ring carries the intent
+        const ringIntent = src === 'ring' ? go : noise() < 0.5;
+        const mag = ringIntent ? 1.2 + noise() * 0.3 : 0.3 + noise() * 0.7;
+        const read = stickFrom(RING_O, { x: RING_O.x + Math.cos(ang) * mag * RING_R, y: RING_O.y - Math.sin(ang) * mag * RING_R }, RING_R, 1.15);
+        ring = read.sprint;
+        button = src === 'button' ? go : false;
+        // the touch itself (Stick onMove): the ring takes effect now, unless the preference is on
+        const now = burstAtTouch(read.sprint, pref);
+        if (now !== null) setBurst(p, now);
+        // D's pointerdown / pointerup (Football2's BURST button sets the same flag)
+        if (pref) setBurst(p, burstHeld({ ring, button, buttonPref: pref }));
       }
-      return out;
-    };
-    for (let seed = 1; seed <= 200; seed++) expect(trace(seed, true)).toEqual(trace(seed, false));
+      setBurst(p, burstHeld({ ring, button, buttonPref: pref }));
+      step(p, 1 / 60, p.phase === 'run' ? { x: 0.2, y: 0.9 } : null);
+      out.push(p.stamina);
+    }
+    return out;
+  };
+  it('spends identical stamina whether burst comes from the ring or from the D button (200 seeds)', () => {
+    let burned = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const viaRing = burstTrace(seed, 'ring');
+      expect(burstTrace(seed, 'button')).toEqual(viaRing);
+      if (Math.min(...viaRing) < 0.95) burned++;
+    }
+    // not vacuous: the scripted thumbs really burst on most runs
+    expect(burned).toBeGreaterThan(100);
+  });
+  it('ignores the ring when the Burst-button preference is on (D never held: no burst at all)', () => {
+    let differs = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      const ignored = burstTrace(seed, 'ring-ignored');
+      // with D never held the runner never bursts, so his stamina never drops below where it started
+      expect(Math.min(...ignored)).toBeGreaterThanOrEqual(ignored[0] - 1e-9);
+      if (JSON.stringify(ignored) !== JSON.stringify(burstTrace(seed, 'ring'))) differs++;
+    }
+    expect(differs).toBeGreaterThan(40);
   });
 });

@@ -36,6 +36,23 @@ export function PlaybookDialog({
         if (event.target === event.currentTarget) onClose();
       }}
       onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        // Claude (nfl-2 review fix): keep Tab inside the dialog. A modal <dialog> makes the page
+        // behind it inert, but Chromium lets Tab leave the first or last control for the browser's
+        // own UI, so focus wraps here instead.
+        if (event.key !== 'Tab') return;
+        const items = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
+        if (!items.length) return;
+        const first = items[0],
+          last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
     >
       <section className="fb2-playbook">{children}</section>
     </dialog>

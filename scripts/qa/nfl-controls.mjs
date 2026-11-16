@@ -3,7 +3,7 @@
 // multi-touch through the Chrome DevTools protocol. Positions and the play are read by hooking the
 // renderer's draw (QA-only; no product hook).
 //
-//   node scripts/qa/nfl-controls.mjs [A,C] [no-preference|reduce|both]
+//   node scripts/qa/nfl-controls.mjs [A,C,D,B,E] [no-preference|reduce|both]   (default A,C,D)
 //
 // Checks, each viewport:
 //   layout: A/B/C/D centres within 4 px of V2 §A.5 (A and C), every target ≥ 44 px, A–B/C/D gaps
@@ -12,13 +12,16 @@
 //   crossing the sprint ring sets p.bursting within one frame; with the Burst-button preference, D
 //     bursts and the ring doesn't
 //   name chips within 12 px of the heads, each with an effective ≥ 44×44 touch area (fanned out
-//     where two overlap); touch-down on a chip to the throw ≤ 16 ms
+//     where two overlap); EVERY visible chip, including the ones inside the stick zone (the back's),
+//     throws when touched (review fix); touch-down on a chip to the throw ≤ 16 ms
+//   before the snap: the stick's ghost spot is not under the tray or a control, and no control,
+//     the tray, the pause button or the score bug covers the RB or the slot (every view)
 //   THROW AWAY shown only outside the tackle box
 //   pause: p.t drifts 0 over 3 s; a hidden page pauses within a frame; offline quit reaches onQuit
 //   no page errors, no non-local requests
 import { launch, phone, report, serverUp, shotPath } from './nfl-lib.mjs';
 
-const VIEWS = (process.argv[2] ?? 'A,C').split(',');
+const VIEWS = (process.argv[2] ?? 'A,C,D').split(',');
 const MOTION = process.argv[3] ?? 'both';
 const TASK = process.env.NFL_TASK || 'nfl-2';
 /** V2 §A.5 centres (css px) at viewport A (393×852) and C (320×568) */
@@ -152,6 +155,7 @@ try {
       const cdp = await context.newCDPSession(page);
       const T = touches(cdp);
       const H = viewport.h;
+      const wide = viewport.w > viewport.h;
       const states = {};
       const shot = (name) => page.screenshot({ path: shotPath(TASK, name + '-' + tag) });
 
@@ -205,6 +209,29 @@ try {
         return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
       });
       const zone = { x: Math.round(ghost.x), y: Math.round(ghost.y) };
+      // the resting thumb's spot is free: nothing but the stick takes a touch there, and nothing
+      // drawn covers the back or the slot before the snap (review fix: nfl-2's strip covered both
+      // in landscape)
+      const pre = await page.evaluate((z) => {
+        const rects = [...document.querySelectorAll('[data-ctl], .fb2-tray, .v2-pause, .v2-bug')].map((el) => ({ cls: el.className, r: el.getBoundingClientRect() }));
+        const inside = (x, y) => rects.filter(({ r }) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom).map(({ cls }) => String(cls).split(' ')[0]);
+        const under = document.elementFromPoint(z.x, z.y);
+        const p = window.__play;
+        const covered = [];
+        for (const b of p.bodies) {
+          if (b.side !== 'O' || (b.slot !== 'RB' && b.slot !== 'SL')) continue;
+          const h = window.__heads[b.id];
+          if (!h) continue;
+          // the head, and the body below it
+          for (const [x, y] of [[h.x, h.y], [h.x, h.y + 14]]) {
+            const hit = inside(x, y);
+            if (hit.length) covered.push(b.slot + '@' + Math.round(x) + ',' + Math.round(y) + ':' + hit.join('/'));
+          }
+        }
+        return { ghostOwner: under?.closest('.v2-stick') ? 'stick' : String(under?.className ?? 'none'), ghostIn: inside(z.x, z.y), covered, slots: p.bodies.filter((b) => b.side === 'O' && (b.slot === 'RB' || b.slot === 'SL') && window.__heads[b.id]).length };
+      }, zone);
+      check(tag + ' before the snap the stick ghost is free (not under the tray or a control)', pre.ghostOwner === 'stick' && pre.ghostIn.length === 0, { ghost: zone, owner: pre.ghostOwner, in: pre.ghostIn });
+      check(tag + ' before the snap nothing covers the RB or the slot', pre.slots >= 1 && pre.covered.length === 0, { seen: pre.slots, covered: pre.covered });
       let preHeld = 0;
       for (let i = 0; i < 10; i++) {
         if (i) {
@@ -213,8 +240,10 @@ try {
         }
         const k = await T.down(zone.x, zone.y);
         await page.waitForTimeout(40);
-        await T.move(k, zone.x + 25, zone.y);
-        await T.move(k, zone.x + 45, zone.y);
+        // sideways for the quarterback: screen right in portrait, screen up in landscape (the
+        // side-on camera turns the field, so screen right there is upfield, which a drop refuses)
+        await T.move(k, zone.x + (wide ? 0 : 25), zone.y - (wide ? 25 : 0));
+        await T.move(k, zone.x + (wide ? 0 : 45), zone.y - (wide ? 45 : 0));
         await page.waitForTimeout(40);
         const held = await page.evaluate((z) => ({ held: !!document.querySelector('.v2-stick.held'), knob: document.querySelector('.v2-stick-ring i')?.style.transform ?? null, under: document.elementFromPoint(z.x, z.y)?.className ?? null }), zone);
         await page.evaluate(() => {
@@ -229,7 +258,7 @@ try {
         const first = await waitFor(page, (f) => f.phase !== 'pre' && f.t > 0);
         // the stick was pushed right before the snap: the first step already carries him right (a
         // scripted drop goes straight back, vx 0)
-        if (first && first.qvx > 0.05) preHeld++;
+        if (first && (wide ? Math.abs(first.qvx) : first.qvx) > 0.05) preHeld++;
         else console.log('  pre-held miss', i, JSON.stringify({ ...held, qvx: first?.qvx, t: first?.t, events: await page.evaluate(() => window.__pev) }));
         if (i === 0 && reducedMotion === 'no-preference') {
           await page.waitForTimeout(700);
@@ -246,6 +275,7 @@ try {
       await waitFor(page, (f) => f.phase === 'drop' && f.t > 0.4);
       states.pocket = await controls(page);
       let worstTip = 0;
+      let worstAt = null;
       let overlaps = 0;
       let minHit = 99;
       for (let s = 0; s < 8; s++) {
@@ -263,19 +293,23 @@ try {
             const id = Number(el.getAttribute('data-icon'));
             const r = el.getBoundingClientRect();
             const h = window.__heads[id];
-            out.push({ id, cx: r.left + r.width / 2, bottom: r.bottom, w: r.width, h: r.height, head: h && h.y - 4 >= band && h.y - 4 <= floor && h.x >= 30 && h.x <= innerWidth - 30 ? h : null, fanned: el.classList.contains('fanned') });
+            out.push({ id, cx: r.left + r.width / 2, bottom: r.bottom, w: r.width, h: r.height, sw: Math.round(el.firstElementChild?.getBoundingClientRect().width ?? 0), head: h && h.y - 4 >= band && h.y - 4 <= floor && h.x >= 30 && h.x <= innerWidth - 30 ? h : null, fanned: el.classList.contains('fanned') });
           }
           return out;
         });
         for (const c of m) {
-          if (c.head && !c.fanned) worstTip = Math.max(worstTip, Math.hypot(c.cx - c.head.x, c.bottom - c.head.y));
+          if (c.head && !c.fanned) {
+            const d = Math.hypot(c.cx - c.head.x, c.bottom - c.head.y);
+            if (d > worstTip) worstAt = { dx: +(c.cx - c.head.x).toFixed(1), dy: +(c.bottom - c.head.y).toFixed(1), head: { x: Math.round(c.head.x), y: Math.round(c.head.y) }, label: c.sw };
+            worstTip = Math.max(worstTip, d);
+          }
           minHit = Math.min(minHit, c.w, c.h);
         }
         for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) if (Math.abs(m[i].cx - m[j].cx) < 44 && Math.abs(m[i].bottom - m[j].bottom) < 44) overlaps++;
         await page.waitForTimeout(90);
         if ((await lastFrame(page))?.phase !== 'drop') break;
       }
-      check(tag + ' name chips within 12 px of the heads', worstTip <= 12, +worstTip.toFixed(1));
+      check(tag + ' name chips within 12 px of the heads', worstTip <= 12, { worst: +worstTip.toFixed(1), at: worstAt });
       if (reducedMotion === 'no-preference') await shot('pocket-chips-reticle');
       // C cycles TOUCH → BULLET → LOB
       const cBtn = states.pocket.find((c) => c.slot === 'C');
@@ -290,7 +324,7 @@ try {
       let wrong = 0;
       let sawAway = false;
       const k = await T.down(zone.x, zone.y);
-      await T.move(k, zone.x + 58, zone.y + 4);
+      await T.move(k, zone.x + (wide ? 4 : 58), zone.y + (wide ? -58 : 4));
       for (let s = 0; s < 90; s++) {
         const st = await page.evaluate(() => {
           const p = window.__play;
@@ -326,54 +360,99 @@ try {
       }
       await T.clear();
 
-      // ---- touch-down on a chip to the throw ----
+      // ---- touch-down on EVERY visible chip throws, the ones in the stick zone included (review fix) ----
       let tapMs = null;
-      for (let attempt = 0; attempt < 4 && tapMs === null; attempt++) {
-        await load(page, url, 'ctl-' + view + '-tap-' + attempt);
+      const chipRuns = { tapped: 0, thrown: 0, inZone: 0, inZoneThrown: 0, nearest: 0, misses: [] };
+      const seeds = reducedMotion === 'no-preference' ? 3 : 1;
+      const lineUpPocket = async (seed) => {
+        await load(page, url, seed);
         await pickCall(page, 'PASS');
         await snapBall(page);
-        await waitFor(page, (f) => f.phase === 'drop' && f.t > 0.6);
-        const chip = await page.evaluate(() => {
-          for (const el of document.querySelectorAll('.fb2-icon')) {
-            if (el.style.visibility === 'hidden') continue;
-            const r = el.getBoundingClientRect();
-            const x = r.left + r.width / 2,
-              y = r.top + r.height / 2;
-            // a chip inside the stick zone belongs to the stick (ownership order): tap one outside it
-            const inZone = x <= innerWidth * 0.48 && y >= innerHeight * 0.45;
-            if (r.top > 60 && !inZone && y < innerHeight * 0.75) return { x, y };
-          }
-          return null;
-        });
-        if (!chip) continue;
-        // the touch-down's own timestamp, and the moment the play's phase turns to 'air' (a setter
-        // trap on the live play object): the throw itself, not React's repaint after it
-        await page.evaluate(() => {
-          window.__tap = null;
-          const p = window.__play;
-          let phase = p.phase;
-          Object.defineProperty(p, 'phase', {
-            configurable: true,
-            get: () => phase,
-            set: (v) => {
-              if (v === 'air' && window.__tap && window.__tap.thrown === null) window.__tap.thrown = performance.now();
-              phase = v;
-            }
+        return waitFor(page, (f) => f.phase === 'drop' && f.t > 0.6);
+      };
+      const chipsNow = () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('.fb2-icon')]
+            .filter((el) => el.style.visibility !== 'hidden')
+            .map((el) => {
+              const r = el.getBoundingClientRect();
+              const x = r.left + r.width / 2,
+                y = r.top + r.height / 2;
+              return { id: Number(el.getAttribute('data-icon')), x, y, inZone: x <= innerWidth * 0.48 && y >= innerHeight * 0.45 };
+            })
+        );
+      for (let s = 0; s < seeds; s++) {
+        const seed = 'ctl-' + view + '-tap-' + s;
+        if (!(await lineUpPocket(seed))) continue;
+        const ids = (await chipsNow()).map((c) => c.id);
+        for (const id of ids) {
+          if (!(await lineUpPocket(seed))) continue;
+          const chip = (await chipsNow()).find((c) => c.id === id);
+          if (!chip) continue;
+          // the touch-down's own timestamp, and the moment the play's phase turns to 'air' (a setter
+          // trap on the live play object): the throw itself, not React's repaint after it
+          await page.evaluate(() => {
+            window.__tap = null;
+            const p = window.__play;
+            let phase = p.phase;
+            Object.defineProperty(p, 'phase', {
+              configurable: true,
+              get: () => phase,
+              set: (v) => {
+                if (v === 'air' && window.__tap && window.__tap.thrown === null) {
+                  window.__tap.thrown = performance.now();
+                  // which receiver the ball goes to: the one nearest its landing spot at the throw
+                  const to = p.ball?.to;
+                  let best = null,
+                    bd = 1e9;
+                  // (each receiver where he'll be when it lands: a led ball is ahead of him)
+                  const fl = p.ball ? p.ball.t1 - p.ball.t0 : 0;
+                  if (to) for (const b of p.bodies) if (b.side === 'O' && b !== p.qb && ['X', 'SL', 'Z', 'TE', 'RB'].includes(b.slot)) { const d = Math.hypot(b.x + b.vx * fl - to.x, b.y + b.vy * fl - to.y); if (d < bd) { bd = d; best = b.id; } }
+                  window.__tap.to = best;
+                }
+                phase = v;
+              }
+            });
+            window.addEventListener('pointerdown', (e) => (window.__tap = { down: e.timeStamp, seen: performance.now(), thrown: null, target: e.target?.closest?.('.fb2-icon') ? 'chip' : String(e.target?.className ?? '') }), { capture: true, once: true });
           });
-          window.addEventListener('pointerdown', (e) => (window.__tap = { down: e.timeStamp, seen: performance.now(), thrown: null }), { capture: true, once: true });
-        });
-        const kc = await T.down(chip.x, chip.y);
-        await T.up(kc);
-        await page.waitForTimeout(80);
-        const tap = await page.evaluate(() => ({ ...window.__tap, phase: window.__play?.phase }));
-        if (tap?.thrown) {
-          // the event's own timestamp is taken when the test injects it; on this loaded machine it can
-          // sit in the browser's input queue for a frame or two before the page sees it, so the
-          // product's latency is measured from the moment the page receives it (both are printed)
-          tapMs = +(tap.thrown - tap.seen).toFixed(1);
-          console.log('  chip: page receives the touch-down → ball in the air ' + tapMs + ' ms (event timestamp → throw ' + (tap.thrown - tap.down).toFixed(1) + ' ms)');
+          const kc = await T.down(chip.x, chip.y);
+          await T.up(kc);
+          await page.waitForTimeout(80);
+          let tap = await page.evaluate(() => ({ ...window.__tap, phase: window.__play?.phase, stickHeld: !!document.querySelector('.v2-stick.held') }));
+          // where two chips' touch areas overlap the first touch fans them out (by design); the
+          // second, on the fanned chip, throws
+          let fanned = false;
+          if (!tap?.thrown && tap?.phase === 'drop') {
+            const spread = (await chipsNow()).find((c) => c.id === id);
+            fanned = await page.evaluate((id) => !!document.querySelector('.fb2-icon.fanned[data-icon="' + id + '"]') || document.querySelectorAll('.fb2-icon.fanned').length > 0, id);
+            if (fanned && spread) {
+              await page.evaluate(() => window.addEventListener('pointerdown', (e) => (window.__tap = { down: e.timeStamp, seen: performance.now(), thrown: null, target: 'chip-after-fan' }), { capture: true, once: true }));
+              const k2 = await T.down(spread.x, spread.y);
+              await T.up(k2);
+              await page.waitForTimeout(80);
+              tap = await page.evaluate(() => ({ ...window.__tap, phase: window.__play?.phase, stickHeld: !!document.querySelector('.v2-stick.held') }));
+              chipRuns.fanned = (chipRuns.fanned ?? 0) + 1;
+            }
+          }
+          chipRuns.tapped++;
+          if (chip.inZone) chipRuns.inZone++;
+          if (tap?.thrown) {
+            chipRuns.thrown++;
+            if (chip.inZone) chipRuns.inZoneThrown++;
+            if (tap.to === id) chipRuns.nearest++;
+            if (tapMs === null) {
+              // the event's own timestamp is taken when the test injects it; on this loaded machine it can
+              // sit in the browser's input queue for a frame or two before the page sees it, so the
+              // product's latency is measured from the moment the page receives it (both are printed)
+              tapMs = +(tap.thrown - tap.seen).toFixed(1);
+              console.log('  chip: page receives the touch-down → ball in the air ' + tapMs + ' ms (event timestamp → throw ' + (tap.thrown - tap.down).toFixed(1) + ' ms)');
+            }
+          } else chipRuns.misses.push({ seed, id, inZone: chip.inZone, under: tap?.target, phase: tap?.phase, stickHeld: tap?.stickHeld });
         }
       }
+      console.log('  chips: ' + JSON.stringify(chipRuns));
+      check(tag + ' every visible chip throws when touched (in the stick zone too)', chipRuns.tapped >= 4 && chipRuns.thrown === chipRuns.tapped, { tapped: chipRuns.tapped, thrown: chipRuns.thrown, inZone: chipRuns.inZone, inZoneThrown: chipRuns.inZoneThrown, misses: chipRuns.misses.slice(0, 4) });
+      check(tag + ' a chip throws to its own receiver (nearest to the landing spot)', chipRuns.nearest >= Math.ceil(chipRuns.thrown * 0.9), { nearest: chipRuns.nearest, thrown: chipRuns.thrown });
       check(tag + ' touch-down on a chip to the throw ≤ 16 ms (from the event reaching the page)', tapMs !== null && tapMs <= 16, tapMs);
       check(tag + ' chips keep a 44×44 touch area', minHit >= 44, { minHit, overlapsSeen: overlaps });
 
@@ -409,8 +488,11 @@ try {
       // ---- right-thumb targets in every state ----
       for (const [name, list] of Object.entries(states)) {
         const right = list.filter((c) => c.x > viewport.w * 0.4);
-        const high = right.filter((c) => c.y < (H * 2) / 3);
-        check(tag + ' ≤ 4 right-thumb targets, none in the top two thirds: ' + name, right.length <= 4 && high.length === 0, { n: right.length, high: high.map((c) => c.text) });
+        // portrait: none in the top two thirds (V2 §A.5's thumb zone). Landscape has no V2 zone; held
+        // sideways the thumbs reach up the sides, and the compact cluster's top (D) sits at ~56% of
+        // the 390 px height: none in the top third there
+        const high = right.filter((c) => c.y < (wide ? H / 3 : (H * 2) / 3));
+        check(tag + ' ≤ 4 right-thumb targets, none in the top ' + (wide ? 'third' : 'two thirds') + ': ' + name, right.length <= 4 && high.length === 0, { n: right.length, high: high.map((c) => c.text + '@' + Math.round(c.y)) });
       }
 
       // ---- pause ----

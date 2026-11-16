@@ -170,6 +170,15 @@
   width: 30%;
   height: 30%;
 }
+/* THROW AWAY reads top to bottom: the icon, the small THROW, then AWAY */
+.fb2 .fb2-ctl.a.away svg {
+  order: -2;
+}
+.fb2 .fb2-ctl.a.away small {
+  order: -1;
+  font-size: 11px;
+  opacity: 0.92;
+}
 .fb2 .fb2-ctl.a.away {
   color: #fff;
   border-color: rgba(255, 190, 190, 0.5);
@@ -248,7 +257,9 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 2;
+  /* over the stick zone (3): a chip in the zone is tapped, not the stick (nfl-2 review fix); under
+     A-D (4, later in the page) */
+  z-index: 4;
 }
 .fb2 .fb2-icon {
   position: absolute;

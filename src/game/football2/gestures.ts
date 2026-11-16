@@ -4,8 +4,9 @@
 // what comes back, and gestures.test.ts drives it with synthetic sequences.
 //
 // Ownership is decided on pointerdown, in this order: a control (A/B/C/D, pause) → that control;
-// the stick zone (left 48%, lower 55%) → the stick until it lifts; a receiver icon → the icon;
-// anywhere else on the right two thirds → the slingshot (in the pocket) or the cover-ball hold
+// in the pocket, a receiver icon → the icon (a chip wins over the stick zone: the back's chip sits in
+// it on most pass plays, and a chip is drawn over the zone); the stick zone (left 48%, lower 55%) →
+// the stick until it lifts; anywhere else on the right two thirds → the slingshot (in the pocket) or the cover-ball hold
 // (carrying). Everything fires on pointerdown except holds and the slingshot's release: a receiver
 // icon throws on touch-down (an aim that starts on a chip would throw, so the slingshot starts on
 // the open field around them; the chips are only their 44 px touch areas over the heads).
@@ -55,11 +56,11 @@ export function stickZone(w: number, h: number): StickZone {
   return { w: Math.round(w * 0.48), top: Math.round(h * 0.45) };
 }
 
-/** Who owns a new touch (the order above). Receiver icons only take touches in the pocket. */
+/** Who owns a new touch (the order above). Receiver icons only take touches in the pocket, and there they win over the stick zone. */
 export function ownerOf(d: Down, c: Ctx): Owner {
   if (d.ctl) return { kind: 'control', ctl: d.ctl };
-  if (c.state !== 'idle' && d.x <= c.zone.w && d.y >= c.zone.top) return { kind: 'stick' };
   if (c.state === 'pocket' && d.icon !== null && d.icon !== undefined) return { kind: 'icon', icon: d.icon };
+  if (c.state !== 'idle' && d.x <= c.zone.w && d.y >= c.zone.top) return { kind: 'stick' };
   // before the snap the field outside the stick zone is for looking around (nfl-3)
   if (c.state === 'pre') return { kind: 'look' };
   if (d.x < c.w / 3) return { kind: 'none' };
@@ -90,6 +91,14 @@ export function nextPassType(t: PassType): PassType {
  */
 export function burstHeld(src: { ring: boolean; button: boolean; buttonPref: boolean }): boolean {
   return src.buttonPref ? src.button : src.ring;
+}
+
+/**
+ * A stick move between fixed steps: the burst to apply at the touch (the ring takes effect then, not
+ * at the next step), or null when the ring doesn't count (the Burst-button preference is on).
+ */
+export function burstAtTouch(sprint: boolean, buttonPref: boolean): boolean | null {
+  return buttonPref ? null : sprint;
 }
 
 /** What a tracked touch turned into, for Football2 to act on. */
