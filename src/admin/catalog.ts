@@ -36,10 +36,14 @@ const catalogs: Partial<Record<UtSport, Catalog>> = {},
 let revision = 0;
 export function defaultCatalog(sport: UtSport): Catalog {
   const c = JSON.parse(JSON.stringify(defaults)) as Catalog;
+  // Claude (packs-2): golds on the per-overall curve sell for more, so the Roster Builder returned 65-70%
+  // of its price (NBA 1,500 → 1,700, NFL 900 → 1,100); soccer's Captains and Dynasty fell to 35% when
+  // packs-1 moved Standout quick-sell under Hot Season (2,300 → 1,450, 4,300 → 2,700). Saved recipes keep
+  // the price they were awarded at (snapshots).
   const prices = {
-    nba: [1500, 2400, 4400],
-    nfl: [900, 1000, 1900],
-    soccer: [1000, 2300, 4300],
+    nba: [1700, 2400, 4400],
+    nfl: [1100, 1000, 1900],
+    soccer: [1000, 1450, 2700],
   }[sport];
   STUDIO_PACKS.forEach((k, i) => {
     c[k].price = prices[i];

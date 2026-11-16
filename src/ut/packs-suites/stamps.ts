@@ -70,10 +70,11 @@ export function stampsSuite(): void {
       expect(ut.content!.stamps).toEqual({ earned: 2 * Math.floor(price / 100), spent: 0 });
     });
 
-    it('earns an earned pack at its Store price: a MINUTES Silver is 4 stamps in NBA (its 400)', () => {
+    // (packs-2 re-priced the Silver Pack: NBA 400 → 500, NFL 320 → 350, soccer 380 → 450)
+    it('earns an earned pack at its Store price: a MINUTES Silver is 5 stamps in NBA (its 500)', () => {
       const ut = recordPull(freshUt(), pack('minutes:life:1h', 'silver', 0, 'reward'));
       expect(stampsBalance(ut)).toBe(Math.floor(packDefs(SPORT).silver.price / 100));
-      expect(stampsBalance(ut)).toBe(pickFor(SPORT, { nba: 4, nfl: 3, soccer: 3 }));
+      expect(stampsBalance(ut)).toBe(pickFor(SPORT, { nba: 5, nfl: 3, soccer: 4 }));
       expect(stampsBalance(recordPull(freshUt(), pack('objective:x', 'position:' + 'any', 0, 'objective')))).toBe(Math.floor(packDefs(SPORT).position.price / 100));
     });
 

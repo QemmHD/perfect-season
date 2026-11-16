@@ -13,7 +13,7 @@ import { OPTIONAL_KEYS, RECOVERY_KEYS, validateSaveValues } from '../../lib/reco
 import { pickFor, SPORT } from '../../engine/sport';
 import { legacyNormalizeContent } from '../__fixtures__/legacy-content-state';
 import { addDays } from '../calendar';
-import { awardPick, keepPick, PICK_84_NOT_YET } from '../content-packs';
+import { awardPick, keepPick } from '../content-packs';
 import { normalizeContent } from '../content-state';
 import { fcToDisplay } from '../fc-scale';
 import { openPack, PACK_SHAPE, packDefs, quickSell, quickSellValue, TIER_ORDER, UNKNOWN_PACK } from '../packs';
@@ -325,8 +325,7 @@ export function packsEconomySuite(): void {
       const kept = keepPick(ut, 'fo1', 4, at);
       expect(kept.card?.cardId).toBe(fo.options[4]);
       expect(kept.ut.content!.picks!.map((p) => p.id)).toEqual(['p82', 'pp']);
-      // Player Pick 84+ (V2) needs packs-2's gold curve: until then it refuses rather than pick uniformly
-      expect(() => awardPick(freshUt(), pool, 'pick-84', 'minutes:life:25h', at)).toThrow(PICK_84_NOT_YET);
+      // (Player Pick 84+ refused here until packs-2 landed the gold curve; the pack-curve suite covers it now)
     });
   });
 

@@ -194,6 +194,7 @@ import {
 } from './live-packs';
 import { programReward } from './live-cards';
 import { recordPull, sourceOfPending } from './pull-log';
+import { usePackActions } from './pack-actions';
 import { PullTracker } from './PullTracker';
 import type { PickState } from './content-state';
 // Claude (UI reorganisation): last, so the shell and shared pieces win over older rules
@@ -379,6 +380,7 @@ export default function UltimateTeam(props: {
     [pool, ut.owned, ut.collected, ut.collectionClaims, ut.content?.claims],
   );
   const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
+  const pa = usePackActions(ut);
 
   const setUt = (fn: (u: UtState) => UtState) =>
     update((p) => ({ ...p, ut: organizeStorage(fn(p.ut)) }));
@@ -524,7 +526,7 @@ export default function UltimateTeam(props: {
     // Claude: a Preview Pack opens exactly the cards it showed
     let cards: RatedCard[];
     try {
-      cards = preset ?? openPack(pool, kind);
+      cards = preset ?? openPack(pool, kind, undefined, undefined, pa.openOpts());
     } catch (e) {
       // Claude (packs-1, D9): a pack this build can't open stays pending (nothing below runs)
       onToast(e instanceof Error ? e.message : String(e));
@@ -582,7 +584,6 @@ export default function UltimateTeam(props: {
   // ---------- Claude: content drop 2 (Daily Drop, new packs, picks, market, sets, draft) ----------
 
   const week = weekOf(day);
-  const LIMITED: LimitedKind[] = ['elite', 'jumbo', 'standout', 'lightning'];
 
   const claimDailyDrop = () => {
     const at = Date.now();
@@ -987,12 +988,8 @@ export default function UltimateTeam(props: {
       return startPromo(kind, packDefs(SPORT).spotlight.price);
     if (kind === 'daily') return claimDailyDrop();
     if (kind === 'scout') return buyScout(packDefs(SPORT).scout.price);
-    if ((LIMITED as string[]).includes(kind))
-      return buyLimited(
-        kind as LimitedKind,
-        packDefs(SPORT)[kind as LimitedKind & keyof ReturnType<typeof packDefs>]
-          .price,
-      );
+    const limited = pa.limitOf(kind);
+    if (limited) return buyLimited(limited, packDefs(SPORT)[limited].price);
     if (profile.coins < price) {
       sfx.nope();
       onToast(

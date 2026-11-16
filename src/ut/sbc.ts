@@ -5,9 +5,9 @@
 // See docs/ULTIMATE-TEAM.md.
 import { hashString, pickOne, rng, type Rand, shuffle, trueRand } from '../engine/rng';
 import { pickFor } from '../engine/sport';
-import { openPack, packDefs, packRand, quickSell, quickSellValue } from './packs';
+import { curvePick, GOLD_CURVE, goldsOf, openPack, packDefs, packRand, quickSell, quickSellValue } from './packs';
 import { decadeOf, type Pool, TIER_RANK } from './pool';
-import { onScale } from './rate';
+import { onScale, TIER_CUTS } from './rate';
 import { UT_SCALE } from './ut-scale';
 import type { CardMint, RatedCard, Tier, UtSport } from './types';
 
@@ -556,12 +556,20 @@ export function autoFill<C extends FillCard>(s: Sbc, club: C[], opts: { guard?: 
  * The special card a challenge pays: a random one of every card that fits what it promises (its
  * tier, its overall, its franchise), drawn when it's claimed, so no two players are bound to get
  * the same one. With a `seed` (the tests) the same seed gives the same card.
+ * Claude (packs-2, the critic's cheap-route finding): a gold reward draws on the gold curve from its
+ * floor (an 84+ reward is an 85+ 42% of the time, not uniform over every 84+ gold); special tiers stay
+ * uniform within what fits.
  */
 export function rewardCard(pool: Pool, want: NonNullable<Reward['card']>, seed?: string): RatedCard | null {
   const rand = seed === undefined ? trueRand() : packRand('sbc-card:' + seed);
-  const all = Object.values(pool.buckets[want.tier]).flat();
+  const all = want.tier === 'gold' && !want.fr ? goldsOf(pool) : Object.values(pool.buckets[want.tier]).flat();
   const fit = (rc: RatedCard) => rc.ovr >= (want.minOvr ?? 0);
-  const fromFr = all.filter((rc) => fit(rc) && (!want.fr || rc.line.fr === want.fr));
+  const fromFr = want.fr ? all.filter((rc) => fit(rc) && rc.line.fr === want.fr) : [];
+  if (want.tier === 'gold') {
+    const floor = Math.max(want.minOvr ?? 0, TIER_CUTS[pool.sport].gold);
+    const c = curvePick(fromFr.length ? fromFr : goldsOf(pool), GOLD_CURVE, floor, rand);
+    if (c) return c;
+  }
   const list = fromFr.length ? fromFr : all.filter(fit);
   if (list.length) return list[Math.floor(rand() * list.length)];
   // nothing that good: the best of a Gold pack

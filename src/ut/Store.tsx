@@ -10,13 +10,13 @@ import { Sheet } from '../ui/common';
 import { Coin } from '../ui/icons';
 import { PackArt } from './Hub';
 import { IconInfo } from './icons';
-import { type Odds, type PackDef, packName, positionChoices, FEATURED_STANDOUT, type SlotTier } from './packs';
+import { curveOdds, FLOORS, GOLD_CURVE, isFloorKind, type Odds, type PackDef, packName, positionChoices, FEATURED_STANDOUT, type SlotTier } from './packs';
 import { TIER_NAMES } from './rate';
 import { fcToDisplay } from './fc-scale';
 import type { PendingPack, UtState } from './state';
 import type { UtSport } from './types';
-import { contentOf } from './content-state';
-import { buysLeft, dailyStatus, LIMITS, lightningWindow, minutesToLightning, STREAK_DAYS, type LimitedKind } from './content-packs';
+import { contentOf, type PickState } from './content-state';
+import { buysLeft, dailyStatus, GOLD_PICKS, LIMITS, lightningWindow, minutesToLightning, STREAK_DAYS, type LimitedKind } from './content-packs';
 import { marketBought, marketFor, SWAP_SIZE, swapCandidates } from './market';
 import { UtCard } from './CardArt';
 import { SectionHead, Segmented } from './ui';
@@ -58,11 +58,12 @@ function pct(p: number): string {
 /** Claude (UI reorganisation): the always-on packs, listed cheapest first. */
 const BY_PRICE = ['bronze', 'silver', 'position', 'gold', 'premium', 'spotlight'];
 
-const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'rare', 'gold', 'silver', 'bronze'];
-const slotName = (t: SlotTier) => (t === 'rare' ? 'Rare Gold' : TIER_NAMES[t]);
+const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'g88', 'g86', 'g84', 'g82', 'g80', 'g78', 'rare', 'g75', 'gold', 'silver', 'bronze'];
+/** Claude (packs-2): a gold slot reads as its floor ("Gold 78+"); any gold is just "Gold". */
+const slotName = (t: SlotTier, sport: UtSport) => (t === 'rare' || t === 'g78' ? 'Gold ' + fcToDisplay(78, sport) + '+' : t === 'g75' ? 'Gold' : isFloorKind(t) ? 'Gold ' + fcToDisplay(FLOORS[t], sport) + '+' : TIER_NAMES[t]);
 
 /** What a pack holds, slot by slot, and the chance of a promo or a legend in the whole pack. */
-function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
+function OddsSheet({ def, sport, onClose }: { def: PackDef; sport: UtSport; onClose: () => void }) {
   const rows = new Map<string, { o: Odds; n: number }>();
   for (const o of def.slots) {
     const k = JSON.stringify(o);
@@ -84,8 +85,8 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
                 <b className="num">{n}×</b>
                 <span>
                   {SLOT_ORDER.filter((t) => (o[t] ?? 0) > 0).map((t) => (
-                    <i key={t} className={'ut-tierchip t-' + t}>
-                      {slotName(t)} {pct(o[t]!)}
+                    <i key={t} className={'ut-tierchip t-' + (isFloorKind(t) || t === 'rare' ? 'gold' : t)}>
+                      {slotName(t, sport)} {pct(o[t]!)}
                     </i>
                   ))}
                 </span>
@@ -113,8 +114,14 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
             </p>
           )}
           {any('program') > 0 && <p className="note">A program card is one of this program’s cards released so far, all equally likely. The program’s cards are the same for everyone.</p>}
-          {any('rare') > 0 && <p className="note">Rare golds are the top 35% of golds at each position; a rare slot is always a gold.</p>}
-          <p className="note">Within a tier, lower overalls are more common: each point above the tier’s floor is a little rarer.</p>
+          {def.kind !== 'spotlight' && (
+            <p className="note">
+              Every gold follows one overall curve. A slot that can be any gold lands {fcToDisplay(75, sport)}–{fcToDisplay(79, sport)} {pct(goldBand(75, 80))}, {fcToDisplay(80, sport)}–
+              {fcToDisplay(82, sport)} {pct(goldBand(80, 83))}, {fcToDisplay(83, sport)}–{fcToDisplay(85, sport)} {pct(goldBand(83, 86))} and {fcToDisplay(86, sport)}+{' '}
+              {pct(goldBand(86, 100))}; a “Gold 78+” slot uses the same curve from 78 up. Rare golds are a shimmer on the top 35% at each position, not a slot.
+            </p>
+          )}
+          {def.prefer && <p className="note">Golds in this pack prefer players you don’t own yet, at the overall drawn, so these odds are the least you get.</p>}
           <button className="btn" onClick={() => close()}>
             CLOSE
           </button>
@@ -122,6 +129,23 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
       )}
     </Sheet>
   );
+}
+
+/** Claude (packs-2): a waiting pick's name on its tile ("Player Pick 84+"; Scout's Choice for the Store's own). */
+function pickLabel(p: PickState, sport: UtSport): string {
+  if (p.kind === 'standout-pick') return 'Standout Pick';
+  if (p.kind === 'new-era') return 'Icon Pick';
+  if (p.kind === 'program-pick' || p.kind === 'live-pick') return 'Program Pick';
+  const g = GOLD_PICKS[p.kind as keyof typeof GOLD_PICKS];
+  return g ? g.title + ' ' + fcToDisplay(g.floor, sport) + '+' : 'Scout’s Choice';
+}
+
+/** The share of an any-gold slot from overall `a` up to (not including) `b`, basketball's scale (the curve's own numbers). */
+function goldBand(a: number, b: number): number {
+  const odds = curveOdds(GOLD_CURVE, 75, 'nba');
+  let p = 0;
+  for (const [o, x] of odds) if (o >= a && o < b) p += x;
+  return p;
 }
 
 const hm = (m: number) => (m >= 60 * 24 ? Math.floor(m / 1440) + 'd ' + Math.floor((m % 1440) / 60) + 'h' : m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm');
@@ -198,7 +222,7 @@ export function Store(props: {
         <PackArt kind={k} label={SHORT[k]??k.toUpperCase()} sport={props.sport} small />
         <div className="ut-shop-txt">
           <strong>{props.sport === 'nfl' && k === 'position' ? 'Unit Pack' : d.name}</strong>
-          <small>{props.sport === 'nfl' && k === 'position' ? d.slots.length + ' golds (2 rare) from the unit you pick' : d.blurb}</small>
+          <small>{props.sport === 'nfl' && k === 'position' ? d.slots.length + ' golds (2 of them ' + fcToDisplay(78, props.sport) + '+) from the unit you pick' : d.blurb}</small>
           {note && <small className="ut-limit">{note}</small>}
           <button className="ut-oddsbtn" onClick={() => setOdds(d)} aria-label={d.name + ' odds'}>
             <IconInfo size={13} /> Odds
@@ -256,8 +280,8 @@ export function Store(props: {
                 )}
                 {picks.map((p) => (
                   <button key={p.id} className="ut-mine-pack" onClick={() => props.onPick(p.id)} aria-label={'Choose your player: ' + p.title}>
-                    <PackArt kind="scout" label="PICK 1 OF 3" sport={props.sport} small />
-                    <b>{p.kind === 'standout-pick' ? 'Standout Pick' : p.kind === 'new-era' ? 'Icon Pick' : 'Scout’s Choice'}</b>
+                    <PackArt kind="scout" label={'PICK 1 OF ' + p.options.length} sport={props.sport} small />
+                    <b>{pickLabel(p, props.sport)}</b>
                     <i className="ut-open">CHOOSE</i>
                   </button>
                 ))}
@@ -332,7 +356,7 @@ export function Store(props: {
           <p className="note">Coins only, never real money. Matches, objectives, SBCs and the daily chest all pay coins.</p>
         </>
       )}
-      {odds && <OddsSheet def={odds} onClose={() => setOdds(null)} />}
+      {odds && <OddsSheet def={odds} sport={props.sport} onClose={() => setOdds(null)} />}
       {choose && (
         <Sheet label="Pick a position" kind="bottom" onClose={() => setChoose(false)}>
           {(close) => (

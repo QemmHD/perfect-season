@@ -8,7 +8,8 @@ import { easternDateKey } from '../engine/season';
 import { per, promosOn } from './calendar';
 import { claimed, contentOf, withClaim, withContent, type PickState } from './content-state';
 import { promoCards } from './live-cards';
-import { packRand, SCOUT_STANDOUT } from './packs';
+import { drawGold, ownedCardIds, packRand, SCOUT_STANDOUT } from './packs';
+import { positionMix } from './squad';
 import type { Pool } from './pool';
 import { fcToDisplay } from './fc-scale';
 import { weekOf } from './sbc';
@@ -20,6 +21,10 @@ import type { OwnedCard, RatedCard, UtSport } from './types';
 // ---------- purchase limits ----------
 
 export type LimitedKind = 'elite' | 'jumbo' | 'scout' | 'standout' | 'lightning' | 'swap';
+/** Claude (packs-2): the Store packs bought under a limit (Scout's Choice and the Swap Desk are picks). */
+export const LIMITED_PACKS = ['elite', 'jumbo', 'standout', 'lightning'] as const satisfies readonly LimitedKind[];
+export type LimitedPack = (typeof LIMITED_PACKS)[number];
+export const isLimitedPack = (kind: string): kind is LimitedPack => (LIMITED_PACKS as readonly string[]).includes(kind);
 export const LIMITS: Record<LimitedKind, { per: 'day' | 'week' | 'window'; n: number }> = {
   elite: { per: 'day', n: 2 },
   jumbo: { per: 'day', n: 1 },
@@ -139,35 +144,39 @@ const NFL_GROUPS: [string, string[]][] = [
   ['Secondary', ['CB', 'S']],
 ];
 
-/** Scout's Choice: three different players, golds at basketball's 84+, deterministic from the seed. */
+/**
+ * Scout's Choice: three different players, golds at basketball's 84+, deterministic from the seed.
+ * Claude (packs-2, research §8.2): each option is a G84 draw on the gold curve (85+ 42%, 86+ 24%), so the
+ * best of three is 85+ about 81% of the time; a Weekly Standout is an option only when it is 84+ too.
+ * Basketball and soccer offer three different positions when they can; football one position group.
+ */
 export function scoutOptions(pool: Pool, seed: string, week: string): { options: RatedCard[]; group: string } {
   const rand = packRand('scout:' + seed);
   const floor = fcToDisplay(84, pool.sport);
-  let positions: string[] | null = null;
+  const need = positionMix(pool.sport);
+  let positions: string[] = Object.keys(need);
   let group = 'Any position';
   if (pool.sport === 'nfl') {
     const g = NFL_GROUPS[Math.floor(rand() * NFL_GROUPS.length)];
     positions = g[1];
     group = g[0];
   }
-  const golds = Object.entries(pool.buckets.gold)
-    .filter(([pos]) => !positions || positions.includes(pos))
-    .flatMap(([, list]) => list)
-    .filter((rc) => rc.line.kind === 'season' && rc.ovr >= floor)
-    .sort((a, b) => (a.line.id < b.line.id ? -1 : 1));
-  const standouts = standoutProgram(pool, week).cards.filter((rc) => !positions || positions.includes(rc.line.pos[0]));
+  const inGroup = new Set(positions);
+  const standouts = standoutProgram(pool, week).cards.filter((rc) => inGroup.has(rc.line.pos[0]) && rc.ovr >= floor);
   const out: RatedCard[] = [];
   const pids = new Set<string>();
   const usedPos = new Set<string>();
   for (let i = 0; i < 3; i++) {
     const so = standouts.filter((rc) => !pids.has(rc.line.pid));
-    let pick: RatedCard | undefined;
+    let pick: RatedCard | null = null;
     if (rand() < SCOUT_STANDOUT && so.length) pick = so[Math.floor(rand() * so.length)];
     else {
-      // basketball: three different positions when it can
-      const fresh = golds.filter((rc) => !pids.has(rc.line.pid) && (pool.sport === 'nfl' || !usedPos.has(rc.line.pos[0])));
-      const list = fresh.length ? fresh : golds.filter((rc) => !pids.has(rc.line.pid));
-      pick = list[Math.floor(rand() * list.length)];
+      const fresh = positions.filter((p) => pool.sport === 'nfl' || !usedPos.has(p));
+      const mix: [string, number][] = (fresh.length ? fresh : positions).map((p) => [p, need[p] ?? 1]);
+      for (let k = 0; k < 24 && !pick; k++) {
+        const c = drawGold(pool, 84, rand, mix);
+        if (c && !pids.has(c.line.pid)) pick = c;
+      }
     }
     if (!pick) break;
     pids.add(pick.line.pid);
@@ -200,36 +209,36 @@ export function pickFor(pool: Pool, kind: 'scout' | 'standout-pick' | 'swap', id
 
 /**
  * Claude (packs-1): the picks ut's rewards hand out (Rivals bounties, the weekly chest, the Season Pass).
- * Game Design V2 adds 'pick-84' (1 of 3 different golds 84+, no special: the 25-hour MINUTES milestone
- * and Rookie Week's day-7 pick). It draws on the per-overall gold curve, which lands with packs-2;
- * until then awarding one throws PICK_84_NOT_YET, so no caller can hand out a uniform 84+ pick.
+ * Game Design V2 adds 'pick-84', the Player Pick 84+ (1 of 3 different golds 84+, never a special: the
+ * 25-hour MINUTES milestone and Rookie Week's day-7 pick). packs-2 adds 'pick-85', the Stamp Scout (the
+ * stamp shelf's 120 rung: 1 of 3 golds 85+). Every gold pick draws on the per-overall gold curve.
  */
-export type AwardPickKind = 'front-office' | 'pick-82' | 'pick-84' | 'program-pick';
+export type AwardPickKind = 'front-office' | 'pick-82' | 'pick-84' | 'pick-85' | 'program-pick';
 
-/** Claude (packs-1): why a 'pick-84' can't be awarded by this build yet (packs-2 adds its curve). */
-export const PICK_84_NOT_YET = 'Player Pick 84+ is not yet available in this build.';
-
-/** Gold picks: how many options, from which overall (basketball's scale, shown on the sport's own). */
-const GOLD_PICKS: Record<'front-office' | 'pick-82', { n: number; floor: number; title: string }> = {
+/**
+ * Gold picks: how many options, from which overall (basketball's scale, shown on the sport's own), and
+ * whether they prefer golds the club doesn't own (curvePick).
+ */
+export const GOLD_PICKS: Record<Exclude<AwardPickKind, 'program-pick'>, { n: number; floor: number; title: string; prefer?: true }> = {
   'front-office': { n: 5, floor: 80, title: 'Front Office Pick' },
   'pick-82': { n: 3, floor: 82, title: 'Player Pick' },
+  'pick-84': { n: 3, floor: 84, title: 'Player Pick', prefer: true },
+  'pick-85': { n: 3, floor: 85, title: 'Stamp Scout', prefer: true },
 };
 /** Programs whose cards a Program Pick offers (the Finale and Landmark programs are SBC rewards only). */
 const PICK_PROGRAMS = new Set(['program', 'honors']);
 
-/** `n` different players among the season golds at `floor`+, the same ones for the same seed. */
-function goldOptions(pool: Pool, floor: number, n: number, seed: string): RatedCard[] {
-  const min = fcToDisplay(floor, pool.sport);
-  const golds = Object.values(pool.buckets.gold)
-    .flat()
-    .filter((rc) => rc.line.kind === 'season' && rc.ovr >= min)
-    .sort((a, b) => (a.line.id < b.line.id ? -1 : 1));
+/**
+ * `n` different players, each a gold drawn on the curve at `floor`+ (any position), the same ones for the
+ * same seed (and the same club, when `owned` asks for unowned golds first).
+ */
+export function goldOptions(pool: Pool, floor: number, n: number, seed: string, owned?: ReadonlySet<string>): RatedCard[] {
   const rand = packRand('award-pick:' + seed);
   const out: RatedCard[] = [];
   const pids = new Set<string>();
-  for (let k = 0; out.length < n && k < n * 40 && golds.length; k++) {
-    const c = golds[Math.floor(rand() * golds.length)];
-    if (pids.has(c.line.pid)) continue;
+  for (let k = 0; out.length < n && k < n * 40; k++) {
+    const c = drawGold(pool, floor, rand, undefined, owned);
+    if (!c || pids.has(c.line.pid)) continue;
     pids.add(c.line.pid);
     out.push(c);
   }
@@ -238,12 +247,13 @@ function goldOptions(pool: Pool, floor: number, n: number, seed: string): RatedC
 
 /**
  * Claude (packs-1): award a reward pick under the reward's own id. It joins the open pick sheets (face
- * down until opened, exactly one card kept with keepPick, uid `pick:<id>`), once per id. front-office:
- * 1 of 5 golds 80+; pick-82: 1 of 3 golds 82+; program-pick: 1 of 3 of the current program's released
- * cards, or a pick-82 when no program is live (and always in soccer, which has no Live Calendar yet).
+ * down until opened, exactly one card kept with keepPick, uid `pick:<id>`), once per id: a repeat id
+ * returns the same state. front-office: 1 of 5 golds 80+; pick-82: 1 of 3 golds 82+; pick-84: 1 of 3
+ * golds 84+; pick-85: 1 of 3 golds 85+; program-pick: 1 of 3 of the current program's released cards, or
+ * a pick-82 when no program is live (and always in soccer, which has no Live Calendar yet).
  */
 export function awardPick(ut: UtState, pool: Pool, kind: AwardPickKind, id: string, at: number): UtState {
-  if (kind === 'pick-84') throw new Error(PICK_84_NOT_YET);
+  if (claimed(ut, 'pick:' + id) || contentOf(ut).picks?.some((p) => p.id === id)) return ut;
   if (kind === 'program-pick') {
     const day = easternDateKey(new Date(at));
     const promo = promosOn(day)
@@ -259,7 +269,7 @@ export function awardPick(ut: UtState, pool: Pool, kind: AwardPickKind, id: stri
     return awardPick(ut, pool, 'pick-82', id, at);
   }
   const g = GOLD_PICKS[kind];
-  const options = goldOptions(pool, g.floor, g.n, kind + ':' + id);
+  const options = goldOptions(pool, g.floor, g.n, kind + ':' + id, g.prefer ? ownedCardIds(ut.owned) : undefined);
   if (!options.length) return ut;
   return addPick(ut, { id, kind, title: g.title + ' · ' + fcToDisplay(g.floor, pool.sport) + '+', options: options.map((rc) => rc.line.id), at });
 }

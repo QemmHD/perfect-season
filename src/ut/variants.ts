@@ -12,7 +12,8 @@ import { rateCard } from './rate';
 import { liftShown } from './editions';
 import type { CardLine, RatedCard } from './types';
 
-export const HOLO_CHANCE = 0.04;
+// Claude (packs-2, research §8.2): 4% → 5%, and only from a slot that rolls for its special (packs.ts holoChanceOf)
+export const HOLO_CHANCE = 0.05;
 export const HOLO_TIERS = new Set(['standout', 'promo', 'landmark', 'legend', 'program']);
 
 export const holoId = (cardId: string) => 'holo~' + cardId;

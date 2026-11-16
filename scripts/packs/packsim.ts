@@ -42,7 +42,7 @@ interface Stat {
 
 const AT_LEAST = [80, 81, 82, 83, 84, 85, 86, 87, 88];
 
-function analyse(kind: string, name: string, price: number, open: (i: number) => RatedCard[]): Stat {
+function analyse(kind: string, name: string, price: number, open: (i: number, owned?: ReadonlySet<string>) => RatedCard[]): Stat {
   const tiers: Record<string, number> = {};
   const bands: Record<string, number> = {};
   const qs: number[] = [];
@@ -55,7 +55,8 @@ function analyse(kind: string, name: string, price: number, open: (i: number) =>
   const goldOvr: Record<string, number> = {};
   const atLeast = AT_LEAST.map(() => 0);
   for (let i = 0; i < N; i++) {
-    const cs = open(i);
+    // (packs-2: the first 200 packs are one player's, who keeps everything: duplicate protection sees his club)
+    const cs = open(i, i < 200 ? seen : undefined);
     let q = 0, sp = false, b = 0, wl = 0;
     for (const rc of cs) {
       cards++;
@@ -106,9 +107,9 @@ const kinds = Object.keys(defs).filter((k) => !['spotlight', 'scout', 'position'
 for (const k of kinds) {
   if (sport === 'soccer' && k === 'spotlight') continue;
   const d = defs[k as keyof typeof defs];
-  results.push(analyse(k, d.name, d.price, (i) => openPack(pool, k, 'audit:' + k + ':' + i, week)));
+  results.push(analyse(k, d.name, d.price, (i, owned) => openPack(pool, k, 'audit:' + k + ':' + i, week, { owned })));
 }
-for (const ch of positionChoices(sport)) results.push(analyse('position:' + ch.key, defs.position.name + ' ' + ch.label, defs.position.price, (i) => openPack(pool, 'position:' + ch.key, 'audit:pos:' + ch.key + ':' + i, week)));
+for (const ch of positionChoices(sport)) results.push(analyse('position:' + ch.key, defs.position.name + ' ' + ch.label, defs.position.price, (i, owned) => openPack(pool, 'position:' + ch.key, 'audit:pos:' + ch.key + ':' + i, week, { owned })));
 results.push(analyse('starter', 'Starter', 0, (i) => openPack(pool, 'starter', 'audit:starter:' + i, week)));
 
 // Spotlight: the server's chase tier (contract rates, uniform within tier) + the client's common golds
@@ -150,7 +151,7 @@ if (sport !== 'soccer') {
     for (const p of packsOn(day)) {
       if (live.some((x) => (x as { kind: string }).kind === p.id)) continue;
       const def = livePackDef(sport, p);
-      const st = analyse(p.id, def.name, def.price, (i) => openLivePack(pool, p.id, rng(hashString('audit-live:' + p.id + ':' + i)), day, week));
+      const st = analyse(p.id, def.name, def.price, (i, owned) => openLivePack(pool, p.id, rng(hashString('audit-live:' + p.id + ':' + i)), day, week, owned));
       live.push({ ...st, day, programOdds: def.odds, extra: def.extra });
     }
   }

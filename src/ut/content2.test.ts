@@ -14,7 +14,7 @@ import { buyMarket, marketBought, marketFor, MARKET_FLOOR, swapForPick } from '.
 import { packTags } from './pack-helper';
 import { openPack, packDefs, quickSellValue } from './packs';
 import { getPool, type Pool } from './pool';
-import { isRare, rareInfo } from './rare';
+import { rareInfo } from './rare';
 import { rateCard, TIER_CUTS } from './rate';
 import { fcToDisplay as onScale } from './fc-scale';
 import { claimSet, setsFor } from './sets';
@@ -166,12 +166,13 @@ describe('packs and odds (' + SPORT + ')', () => {
     const defs = packDefs(SPORT);
     const gold = (c: RatedCard) => ['gold', 'standout', 'promo', 'legend', 'landmark'].includes(c.tier);
     for (let i = 0; i < 60; i++) {
+      // (packs-2: a pack's guarantee is an overall floor now, "golds 78+"; a rare gold is the shimmer only)
       const g = openPack(pool, 'gold', 'g' + i, W);
-      expect(g.filter((c) => isRare(c, pool)).length).toBeGreaterThanOrEqual(SPORT === 'nba' ? 1 : 2);
+      expect(g.filter((c) => c.tier !== 'gold' || c.ovr >= 78).length).toBeGreaterThanOrEqual(SPORT === 'nba' ? 1 : 2);
       const e = openPack(pool, 'elite', 'e' + i, W);
       expect(e).toHaveLength(defs.elite.slots.length);
       expect(e.every(gold)).toBe(true);
-      expect(e.filter((c) => isRare(c, pool)).length).toBeGreaterThanOrEqual(defs.elite.slots.length - 1);
+      expect(e.filter((c) => c.tier === 'gold').every((c) => c.ovr >= 82)).toBe(true);
       const j = openPack(pool, 'jumbo', 'j' + i, W);
       expect(j).toHaveLength(SPORT === 'nba' ? 16 : 32);
       for (const kind of ['standout', 'lightning']) {

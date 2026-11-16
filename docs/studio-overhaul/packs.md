@@ -8,7 +8,8 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 |---|---|---|
 | packs-1 A: baselines, contracts, critical fixes | done | see `git log` (subject "packs-1 commit A") |
 | packs-1 B: the Scout Stamp core and V2 hand-off contracts | done | see `git log` (subject "packs-1 commit B") |
-| packs-2 … packs-10 | not started | |
+| packs-2: real-pack odds for every source, Player Pick 84+, Scout Drop tables | done | see `git log` (subject "packs-2") |
+| packs-3 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
 
@@ -306,6 +307,173 @@ Earning once per opening (a replayed id and a deposited pack earn 0); a MINUTES 
 ### Protocol
 
 None. Stamps are economy only; no match reads them.
+
+## packs-2: real-pack odds for every source, Player Pick 84+ and the Scout Drop tables
+
+### What changed and why
+
+- **One per-overall gold curve (research §8.1, owner decision 4).** Every gold any source hands out is drawn by overall first: `GOLD_CURVE` (75 4.56, 76 5.02, 77 6.71, 78 13.46, 79 15.29, 80 17.67, 81 16.22, 82 15.28, 83 3.40, 84 1.38, 85 0.43, 86 0.22, 87 0.16, 88 0.15, 89 0.034, 90 0.011, 91 0.005, plus a 0.002 / 0.001 trace at 92 / 93 so soccer's few base golds that high can still drop), restricted to the slot's floor and renormalised. Then a position of the slot's mix that has a card at that overall (by the mix's weights), then a card there uniformly. Only when no position of the mix has the overall does it step to the nearest one that does (−1, +1, …; `curveStepMass` measures it: ≤ 1.5% for every floor, sport and unit). Per any-gold slot: 75–79 45.0%, 80–82 49.2%, 83–85 5.2%, 86+ 0.59% (85+ 1.0%, 88+ 0.20%). Silvers use `SILVER_CURVE` (65–69 9% each, 70–74 11% each); bronze stays flat. The old in-tier exponential (each point 20% rarer) is gone from every pack.
+- **Floor slots, not rare slots.** Slot kinds `g75 g78 g80 g82 g84 g86 g88` ("a gold 78+"). A rare gold (`rare.ts`, top 35% per position) is the shimmer only. Saved Club Collection recipes keep opening: their `gold` reads as `g75` and `rare` as `g78`.
+- **Slot lists for every source** (NBA; NFL and soccer keep their card counts, the old rare golds becoming the 78+ slots):
+
+  | Source | Slots now |
+  |---|---|
+  | Bronze / Silver | unchanged; Silver's last slot is Silver 75% / G75 25% |
+  | Gold | 2 S, 2 G75, 1 G78 that is the special slot (Standout 1.5%, Hot Season 0.5%, Legend 0.2%) |
+  | Premium | 2 S, 3 G75, 2 G78 + the premium slot on G78 (Standout 4%, Hot Season 2%, Legend 0.66%) |
+  | Jumbo | 4 S, 4 G75, 7 G78 + the premium slot |
+  | Position / Unit | (k − rare) G75 + rare G78 at the position(s), preferring unowned (NBA 2 + 1, NFL 4 + 2, soccer 3 + 1) |
+  | Elite Gold (re-spec) | 5 G82 + G84 special slot (Standout 10%, Legend 1%), preferring unowned (NFL 10 G82 + 2 G84, soccer 7 + 1) |
+  | Program Pack (`live:`) | 4 G75 + 3 G80 + program slot (program odds and extras, **Legend 0.5%**, the rest a Weekly Standout) |
+  | Program Guarantee | 5 G82 + a program card |
+  | Standout Guarantee / Lightning | G75 / G78 for the old gold / rare, + the Standout |
+  | Daily Drop | last card Silver 60% / G75 38% / Standout 2% |
+  | Starter, Club Collection, admin squads | their golds on the curve (`gold` → G75, `rare` → G78) |
+  | Spotlight / GOAT (registered) | common golds by `legacyFill`, the pre-curve draw, so every receipt rebuilds exactly |
+  | SBC `rewardCard` (gold) | the curve from its `minOvr` (84 → G84, 86 → G86, …; any other floor is the curve from that overall) |
+  | Scout's Choice | 3 options on G84; a Weekly Standout option only when it is 84+ |
+  | Picks | `front-office` 5 on G80, `pick-82` 3 on G82, **`pick-84` 3 on G84 (unowned first), `pick-85` 3 on G85 (the stamp shelf's 120 rung, open now)** |
+
+  Headliners and Franchise Vault are cut (D16): no new buyable kind.
+- **Holo 5%, only from a rolled slot.** `HOLO_CHANCE` 4% → 5% (`variants.ts`), and `holoChanceOf(slot, tier)` is 0 when the slot's chance of that tier is 1: a guaranteed Standout, program card or Club Collection Standout is never holo now.
+- **Chase duplicate protection.** With the club's card ids (`openPack(…, { owned })`), a Standout slot never gives an owned Weekly Standout and a program slot never an owned program card while any of that set is unowned (it redraws among the unowned). Position/Unit packs, Elite Gold and the 84+ / 85+ picks also prefer golds the club doesn't own: at the drawn overall at that position, then at the mix's other positions, then the nearest overall **above**, then below. A fresh club draws exactly the published curve, and the protection can only raise a published chance, so the odds sheet shows them as minimums ("these odds are the least you get").
+- **Initial re-prices (packs-3 tunes them all again).** Golds on the curve sell for more (gold mean 77.9 → 79.9), so the packs that went above 63% EV were re-priced to about 57–59%: NBA Silver 400 → 500, Gold 900 → 1,050, Position 700 → 800, Roster Builder 1,500 → 1,700; NFL Silver 320 → 350, Gold 900 → 1,000, Unit 500 → 575, Roster Builder 900 → 1,100; soccer Silver 380 → 450. Elite Gold's re-spec is priced on its value: research's 3,000 would return 42%, so NBA 2,200 → 2,600, NFL 1,500 → 1,800, soccer stays 1,900 (about 49%). Soccer's Captains and Dynasty had fallen to 35% when packs-1 moved Standout quick-sell under Hot Season: 2,300 → 1,450 and 4,300 → 2,700. `NOMINAL_PRICE` (stamps for earned packs) follows: a MINUTES Silver is now 5 / 3 / 4 stamps.
+- **`src/ut/drop-tables.ts` (V2.4 E, D14), pure: imports only the seeded rng and types.** `dropTable`, `dropOdds` (exact, every tap path enumerated), `rollDrop(seed, sport, index)` (deterministic per seed, `path` = the tier after each of the 3 taps, so the reveal plays only what was rolled), `dropValue` / `dropEv` (coins, stamps at 11, packs at their measured quick-sell value). Drop 1 is ut's Scout Reveal unchanged: Silver Pack + 100 coins, each tap upgrading the pack (→ Gold 35%, → Premium 25%, → Jumbo 15%) and **the first miss settling it** (`stopOnMiss: true`, the only reading that gives ut's published 65.0 / 26.25 / 7.44 / 1.31%). Drops 2–3 start Common, each tap upgrading Common 20% / Rare 25% / Epic 30%, a miss only spending that tap: 51.2 / 36.05 / 11.25 / 1.5%; Common 25 coins, Rare 45, Epic 60 + 3 stamps, Legendary a Silver Pack.
+- **`src/ut/pack-actions.ts`: the packs team's one hook in `UltimateTeam.tsx`.** `usePackActions(ut)` → `openOpts()` (the owned card ids, memoised on `ut.owned`) and `limitOf(kind)` (the limit kind of an Elite, Jumbo, Standout or Lightning pack, from `LIMITED_PACKS` in `content-packs.ts`). Named `limitOf` rather than the plan's `canBuy`, because the buy flow needs which limit routes the purchase, not a yes/no (it checks the count itself).
+- **Pack Tracker.** The reward picks (`front-office`, `pick-82`, `pick-84`, `pick-85`, `program-pick`) are pick groups with their own names ("Player Pick 84+"), so they no longer count as opened packs. Sources `scout-drop:` → Scout Drop, `minutes:` → Minutes, `stamps:` → Scout Stamps. A Scout Drop's pack logs under its pack kind with source `drop` and earns no stamps.
+- **Store and pick sheet.** The odds sheet names floor slots ("Gold 78+"), replaces "each point above the floor is a little rarer" with the curve's real band split, and says when a pack prefers unowned golds. A waiting pick's tile reads its kind ("Player Pick 84+", "Front Office Pick 80+") with "PICK 1 OF n" (a Front Office Pick has 5); the pick sheet's heading counts the options.
+
+### Before → after (`O/packs-out/before/` → `O/packs-out/after-packs-2/`, 10,000 seeded packs per type, week 2026-W46)
+
+EV / price uses each run's own price (the Price column is the new one). "Dup at 200" is one player opening that pack 200 times in a row and keeping everything (after: with duplicate protection, which sees his club).
+
+##### NBA
+
+| Pack | Price | EV / price (before → after) | Golds 75–79 / 80–82 / 83–85 / 86+ % after | P(≥1 86+) before → after | Dup at 200 before → after |
+|---|---|---|---|---|---|
+| Bronze Pack | 250 | 0.54 → 0.55 | 0.0 / 0.0 / 0.0 / 0.00 | 0.0 → 0.0 | 7% → 7% |
+| Silver Pack | 500 | 0.60 → 0.59 | 44.7 / 49.7 / 4.8 / 0.77 | 0.0 → 0.2 | 8% → 4% |
+| Gold Pack | 1,050 | 0.56 → 0.57 | 41.3 / 52.8 / 5.4 / 0.59 | 2.9 → 2.7 | 6% → 6% |
+| Premium Gold | 1,800 | 0.55 → 0.61 | 40.0 / 53.7 / 5.7 / 0.62 | 8.8 → 7.1 | 12% → 14% |
+| Daily Drop | 0 | — → — | 45.4 / 48.8 / 5.0 / 0.80 | 0.5 → 0.7 | 4% → 3% |
+| Elite Gold | 2,600 | 0.49 → 0.49 | 0.0 / 60.8 / 32.9 / 6.28 | 12.9 → 35.3 | 27% → 2% |
+| Jumbo Premium | 3,600 | 0.56 → 0.60 | 37.9 / 55.6 / 5.8 / 0.66 | 15.2 → 10.8 | 21% → 23% |
+| Standout Guarantee | 3,000 | 0.50 → 0.52 | 40.9 / 52.9 / 5.6 / 0.66 | 26.8 → 27.3 | 24% → 29% |
+| Lightning Standout | 2,250 | 0.67 → 0.69 | 40.6 / 53.0 / 5.7 / 0.64 | 27.4 → 25.3 | 23% → 29% |
+| Roster Builder | 1,700 | 0.54 → 0.58 | 42.4 / 51.4 / 5.5 / 0.66 | 2.1 → 2.6 | 11% → 10% |
+| Captains Pack | 2,400 | 0.51 → 0.52 | 41.1 / 52.7 / 5.6 / 0.65 | 25.9 → 25.9 | 24% → 27% |
+| Dynasty Pack | 4,400 | 0.53 → 0.53 | 40.5 / 53.2 / 5.7 / 0.64 | 47.3 → 46.0 | 32% → 37% |
+| Position Pack PG | 800 | 0.57 → 0.58 | 41.6 / 52.0 / 5.8 / 0.67 | 1.7 → 2.0 | 27% → 0% |
+| Position Pack SG | 800 | 0.54 → 0.58 | 41.5 / 52.0 / 5.8 / 0.67 | 0.9 → 2.0 | 22% → 0% |
+| Position Pack SF | 800 | 0.57 → 0.58 | 41.8 / 51.8 / 5.8 / 0.62 | 1.4 → 1.8 | 29% → 0% |
+| Position Pack PF | 800 | 0.56 → 0.58 | 41.3 / 52.4 / 5.6 / 0.61 | 1.9 → 1.8 | 24% → 0% |
+| Position Pack C | 800 | 0.57 → 0.58 | 41.4 / 52.2 / 5.8 / 0.68 | 3.7 → 2.0 | 25% → 0% |
+| Starter | 0 | — → — | 45.5 / 48.5 / 5.4 / 0.59 | 0.1 → 0.6 | 8% → 6% |
+| Spotlight Pack | 3,500 | 0.31 → 0.55 | 93.0 / 5.9 / 1.0 / 0.12 | 50.6 → 50.6 | 14% → 14% |
+
+Scout's Choice best option bands: {'86-87': 0.3378, '90-93': 0.0593, '83-85': 0.4106, '88-89': 0.1923} mean best 86.33
+
+##### NFL
+
+| Pack | Price | EV / price (before → after) | Golds 75–79 / 80–82 / 83–85 / 86+ % after | P(≥1 86+) before → after | Dup at 200 before → after |
+|---|---|---|---|---|---|
+| Bronze Pack | 175 | 0.54 → 0.55 | 0.0 / 0.0 / 0.0 / 0.00 | 0.0 → 0.0 | 8% → 8% |
+| Silver Pack | 350 | 0.50 → 0.59 | 45.6 / 48.4 / 5.5 / 0.56 | 0.0 → 0.3 | 13% → 6% |
+| Gold Pack | 1,000 | 0.51 → 0.59 | 42.9 / 51.1 / 5.4 / 0.59 | 3.4 → 7.1 | 12% → 18% |
+| Premium Gold | 1,400 | 0.50 → 0.59 | 40.6 / 53.1 / 5.7 / 0.61 | 9.1 → 12.5 | 18% → 24% |
+| Daily Drop | 0 | — → — | 45.4 / 48.8 / 5.4 / 0.47 | 1.0 → 1.2 | 6% → 2% |
+| Elite Gold | 1,800 | 0.48 → 0.49 | 0.0 / 60.3 / 33.1 / 6.55 | 14.8 → 59.4 | 40% → 23% |
+| Jumbo Premium | 2,700 | 0.50 → 0.56 | 38.4 / 55.1 / 5.8 / 0.65 | 15.5 → 18.4 | 30% → 33% |
+| Standout Guarantee | 1,800 | 0.50 → 0.55 | 41.1 / 52.7 / 5.6 / 0.62 | 50.6 → 53.4 | 26% → 33% |
+| Lightning Standout | 1,350 | 0.67 → 0.74 | 41.0 / 52.8 / 5.7 / 0.62 | 51.1 → 52.5 | 25% → 32% |
+| Roster Builder | 1,100 | 0.53 → 0.58 | 43.6 / 50.4 / 5.4 / 0.62 | 0.8 → 4.3 | 18% → 14% |
+| Captains Pack | 1,000 | 0.55 → 0.61 | 42.7 / 51.1 / 5.5 / 0.61 | 49.0 → 51.1 | 21% → 24% |
+| Dynasty Pack | 1,900 | 0.54 → 0.59 | 42.3 / 51.5 / 5.5 / 0.61 | 75.7 → 76.8 | 29% → 35% |
+| Position Pack QB · RB · K | 575 | 0.52 → 0.57 | 41.4 / 52.1 / 5.7 / 0.73 | 1.4 → 3.9 | 35% → 1% |
+| Position Pack Receivers | 575 | 0.56 → 0.57 | 41.5 / 52.1 / 5.7 / 0.63 | 2.3 → 3.6 | 33% → 0% |
+| Position Pack Offensive Line | 575 | 0.54 → 0.57 | 41.8 / 51.6 / 5.8 / 0.78 | 2.8 → 4.1 | 38% → 2% |
+| Position Pack Defensive Line | 575 | 0.55 → 0.57 | 41.5 / 52.1 / 5.7 / 0.63 | 0.9 → 3.6 | 39% → 7% |
+| Position Pack Linebackers | 575 | 0.51 → 0.57 | 41.9 / 51.7 / 5.7 / 0.67 | 1.4 → 3.7 | 47% → 18% |
+| Position Pack Secondary | 575 | 0.52 → 0.57 | 42.0 / 51.7 / 5.7 / 0.65 | 1.1 → 3.6 | 39% → 12% |
+| Starter | 0 | — → — | 44.2 / 50.4 / 4.8 / 0.55 | 0.0 → 0.5 | 14% → 12% |
+| Spotlight Pack | 3,500 | 0.19 → 0.28 | 96.7 / 3.0 / 0.3 / 0.03 | 49.8 → 49.8 | 25% → 25% |
+
+Scout's Choice best option bands: {'88-89': 0.1814, '86-87': 0.3838, '83-85': 0.4012, '90-93': 0.0336} mean best 86.21
+
+##### SOCCER
+
+| Pack | Price | EV / price (before → after) | Golds 75–79 / 80–82 / 83–85 / 86+ % after | P(≥1 86+) before → after | Dup at 200 before → after |
+|---|---|---|---|---|---|
+| Bronze Pack | 220 | 0.58 → 0.60 | 0.0 / 0.0 / 0.0 / 0.00 | 0.0 → 0.0 | 10% → 10% |
+| Silver Pack | 450 | 0.58 → 0.58 | 45.4 / 48.7 / 5.2 / 0.70 | 0.0 → 0.2 | 6% → 4% |
+| Gold Pack | 900 | 0.46 → 0.51 | 42.5 / 51.6 / 5.3 / 0.60 | 4.2 → 3.5 | 6% → 7% |
+| Premium Gold | 1,600 | 0.51 → 0.53 | 40.0 / 53.7 / 5.7 / 0.64 | 12.9 → 8.6 | 13% → 15% |
+| Daily Drop | 0 | — → — | 44.9 / 49.8 / 4.7 / 0.58 | 0.9 → 1.1 | 2% → 2% |
+| Elite Gold | 1,900 | 0.46 → 0.49 | 0.0 / 63.5 / 31.1 / 5.46 | 21.9 → 40.1 | 31% → 2% |
+| Jumbo Premium | 3,200 | 0.51 → 0.54 | 38.5 / 55.0 / 5.8 / 0.66 | 22.9 → 13.3 | 22% → 25% |
+| Standout Guarantee | 2,600 | 0.63 → 0.48 | 41.0 / 52.7 / 5.6 / 0.64 | 52.2 → 49.9 | 24% → 29% |
+| Lightning Standout | 1,950 | 0.84 → 0.64 | 40.9 / 52.8 / 5.7 / 0.64 | 50.7 → 49.0 | 23% → 28% |
+| Roster Builder | 1,000 | 0.54 → 0.62 | 42.4 / 51.3 / 5.5 / 0.66 | 2.7 → 2.6 | 6% → 8% |
+| Captains Pack | 1,450 | 0.53 → 0.55 | 41.1 / 52.7 / 5.6 / 0.65 | 48.1 → 48.7 | 22% → 25% |
+| Dynasty Pack | 2,700 | 0.55 → 0.56 | 40.5 / 53.2 / 5.7 / 0.64 | 76.1 → 74.1 | 29% → 34% |
+| Position Pack Goalkeepers | 650 | 0.49 → 0.56 | 42.7 / 50.8 / 5.8 / 0.73 | 2.5 → 2.8 | 47% → 18% |
+| Position Pack Defenders | 650 | 0.49 → 0.56 | 42.2 / 51.7 / 5.6 / 0.58 | 1.7 → 2.3 | 16% → 0% |
+| Position Pack Midfielders | 650 | 0.50 → 0.56 | 42.2 / 51.6 / 5.6 / 0.64 | 3.7 → 2.6 | 20% → 0% |
+| Position Pack Attackers | 650 | 0.50 → 0.56 | 42.2 / 51.4 / 5.8 / 0.62 | 3.9 → 2.4 | 20% → 0% |
+| Starter | 0 | — → — | 46.2 / 48.3 / 4.9 / 0.61 | 0.2 → 0.6 | 12% → 12% |
+
+Scout's Choice best option bands: {'86-87': 0.3394, '90-93': 0.064, '83-85': 0.4044, '88-89': 0.1922} mean best 86.3
+
+Live Calendar program packs (NBA): First Tip Pack EV 0.53 → 0.57, P(≥1 84+) 64%; its Guarantee 0.51 → 0.55, every gold 82+. NFL First Tip 0.51 → 0.59 (84+ in 83% of packs). The guarantee card itself never repeats while any released card is unowned (tested); the 5 golds 82+ around it do repeat more at 200 packs (35% → 55%), but a guarantee is 1 a week, so 200 is four years of them.
+
+**Against the acceptance:**
+
+| Acceptance | Result |
+|---|---|
+| G75 slot, 200,000 draws: 85+ 1.0% ± 0.08, 86+ 0.58% ± 0.06, 88+ 0.20% ± 0.04 | pass in NBA, NFL and soccer (`pack-curve` suite) |
+| Gold-pack band split 45 / 49 / 5 / 0.7 ± 2 | the any-gold slots: 45.0 / 49.2 / 5.2 / 0.6 (tested, all sports). The whole Gold pack's golds read 41.3 / 52.8 / 5.4 / 0.6 (NBA) because research's slot list makes one of its three golds a G78; that is the research's own odds sheet (Gold NBA 80+ 93%, 82+ 53%), so the 45 / 49 / 5 / 0.7 target is the per-slot curve, which holds |
+| Registered-receipt seeds rebuild identical ids (fingerprint-gated); 0 holos in guaranteed slots | the 20 frozen receipts per sport equal the packs-1 fixture (`packs-economy` suite, gated on `FOREIGN_FINGERPRINT`); 0 holos in 10,000 Standout Guarantees; 5.0% ± 0.6 holo among specials from a rolled slot |
+| Duplicates at 200 packs: Elite ≤ 20%, NFL Units ≤ 35%, guarantees 0% while any of the set is unowned | Elite NBA 27% → 2%, soccer 31% → 2%; **NFL 40% → 23%**: NFL Elite opens 2,400 cards in 200 packs from about 1,850 golds 82+, so at least 23% must repeat; the test holds NFL to that floor + 1 pt. NFL Units 33–47% → 0–18% (LB 18%). Standout and Program Guarantees 0% |
+| pick-84 over 10k awards: every option ≥ 84, three distinct, none special; repeat id a no-op | pass in all sports; it also prefers unowned golds (tested) |
+| `dropOdds` = 200k `rollDrop` ± 0.5 pt; drops 2–3 51.2 / 36.05 / 11.25 / 1.5%, drop 1 65.0 / 26.25 / 7.44 / 1.31%; drops 2–3 EV 35–45 | exact and within 0.5 pt in all sports; EV NBA 43.9, NFL 42.6, soccer 43.4 coin-equivalents |
+| pick-84 and a Scout Drop roll in the browser at 393 with 0 page errors | pass (below) |
+
+Other numbers: `rewardCard` 84+ → 85+ 42% ± 3 and 86+ 24% ± 3 (was uniform over every 84+ gold); Scout's Choice best option 85+ about 81% (three G84 golds; a Standout option only adds, so the test holds it to 78–87%), mean best 86.3; Front Office 84+ 20% and 82+ pick 84+ 30% (± 3). Elite Gold 85+ in 55% of packs (NBA; research 55%). Days to a full Gold squad (`economy.test.ts`, 400 coins a day): NBA seller 4 / keeper 6 → 4 / 7, NFL 8 / 11 → 8 / 12 (inside the test's bands; the cheap packs cost a little more now).
+
+### Tests
+
+- **`pack-curve` suite** (`packs-suites/pack-curve.ts`; `pack-curve.test.ts` NBA/NFL, `soccer-pack-curve.test.ts` soccer), 14 tests: the 200k G75 curve and band split; every floor's "x or better" within 0.5 pt of `curveOdds` over 100k draws; step mass ≤ 1.5% for every floor and every Position/Unit mix; slots add to 1 and open their count; saved `rare` / `gold` recipe slots; Elite and Gold floors; holo (0 in guarantees, 5% ± 0.6 rolled); duplicates at 200 packs (Elite, NFL LB/DL/OL); Standout and Program Guarantees never repeat while the set has an unowned card; `rewardCard` 84+; Scout's Choice; Front Office and 82+ picks; Player Pick 84+ over 10,000 awards, its exactly-once id and its unowned preference; the Stamp Scout 85+ redemption.
+- **`drop-tables` suite** (`packs-suites/drop-tables.ts`; `drop-tables.test.ts`, `soccer-drop-tables.test.ts`), 6 tests: exact published odds and drop 1's rewards; 200k rolls per drop within 0.5 pt; determinism and honest paths (no skipped tier, nothing moves after drop 1's settling miss); EV 35–45; the import list (only `../engine/rng` and `./types`); `PACK_VALUE` within 12% of real openings.
+- **Changed old tests (behaviour changed by design, never weakened):** `content2.test.ts` "opens the new packs with their guarantees" checked rare-gold counts; a guarantee is an overall floor now (golds 78+, Elite golds 82+), so it checks those. The `stamps` suite's MINUTES Silver is 5 / 3 / 4 stamps (the Silver's new price). The `packs-economy` suite's "pick-84 refuses" line (the packs-1 placeholder until this curve) moved to the pack-curve suite as the real pick. The stamps suite's "120 rung returns null" case still passes (that state is short of 120); the open rung is tested in pack-curve.
+- Typecheck clean. NBA `vitest run src/ut src/engine/sport-branches.test.ts` 301 passed; NFL 299 passed; soccer `vitest run soccer sport-branches` 129 passed.
+
+### Browser QA (packs-2)
+
+`scripts/packs/qa-picks.mjs` (dev server 5213, `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted: the only host blocked was the Supabase registry; touch, `deviceScaleFactor: 1`). In the page it awards `pick-84` under `minutes:life:25h` (a repeat is a no-op), rolls Scout Drop 1 with ut's seed shape and deposits its pack as `scout-drop:<sport>:<day>:1`, and grants a drop-2 Epic's 3 stamps through `grantStamps(…, 'drop', '<day>:2')`. Then from the Store like a player: the Player Pick 84+ tile (78×142 design px), the sheet, choose, keep, the reveal; the Scout Drop's pack opens as an ordinary pack. After: the kept card is `pick:minutes:life:25h`, no pick left, the tracker logs `pick-84/minutes` and `gold/drop` (or `silver/drop`), and the stamp balance is 3 (the drop pack earned none). 0 page errors in NBA 393 and 320 (reduced motion), NFL 393 (full motion) and soccer 320. Shots in `O/shots/packs/packs-2/`: `*-store-mine.png`, `*-pick84-facedown.png`, `*-pick84-chosen.png`, `*-pick84-cinema.png`, `*-pick84-cards.png`, `*-drop-pack-cinema.png`, `*-drop-pack-cards.png`.
+
+### Saved state and older builds
+
+No new saved field. No storage key, card or copy id, claim id or receipt changes. Unopened earned packs open on the new curve; a saved Club Collection recipe's `gold` / `rare` read as G75 / G78; a registered Spotlight or GOAT receipt rebuilds its common golds with the pre-curve draw (`legacyFill`). The Preview Pack opens exactly the cards it showed. The new pick kinds (`pick-84`, `pick-85`) are ordinary saved pick sheets (`kind` is a free string the normalizer keeps), so an older build shows and keeps them like a Scout's Choice.
+
+### Protocol
+
+None. Pack contents, odds and prices don't touch matches, and `CONTENT_PRINT` / `pool.print` are unchanged.
+
+### Touched outside my lane (packs-2)
+
+- `src/ut/UltimateTeam.tsx` (ut): the `usePackActions` import and call (2 lines), `openPack(pool, kind, undefined, undefined, pa.openOpts())` in `openNow` (1 line; `buy`, `buyLimited` and `buyLive` all open through it), and the local `LIMITED` array replaced by `pa.limitOf(kind)` (−7 / +2 lines). 5 added lines in all.
+- `src/admin/catalog.ts`: the Club Collection default prices (packs owns `src/admin/**` repo code; saved recipes keep their awarded snapshot).
+
+### Owner device checks (packs-2)
+
+- A Player Pick 84+ tile and sheet read well at phone size; the odds sheet's new curve line is readable.
+- The new prices feel fair against the bigger pulls (Gold 1,050, Silver 500, Elite 2,600 NBA).
+
+### Left for later tasks (packs-2)
+
+- packs-3: every price against the 0.45–0.60 EV band (Premium NBA sits at 0.61, Lightning at 0.69–0.74 by design, the Spotlight's commons stay pre-curve); the Market's gold draws on the curve.
+- packs-4: the odds sheets computed from these definitions (`curveOdds`, `curveStepMass`, `holoChanceOf`, `dropOdds` are the inputs), the Scout Drop and Pick 84+ sheets.
+- ut: show `dropOdds` before the first tap and play `rollDrop(...).path`; award `pick-84` under the caller's claim id.
 
 ## Requests (answers are recorded here as they arrive)
 

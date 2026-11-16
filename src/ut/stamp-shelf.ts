@@ -1,15 +1,17 @@
 // Claude (packs-1, 2026-11-16): the stamp shelf's redemption (packs-plan.md §V2.4 B). Scout Stamps buy
-// picks, never coins or packs: 50 stamps a 1-of-3 82+ gold pick (open now), 120 an 85+ Stamp Scout (needs
+// picks, never coins or packs: 50 stamps a 1-of-3 82+ gold pick, 120 an 85+ Stamp Scout (open since
 // packs-2's gold curve), 300 a Standout pick and 600 a Program pick (both open with the shelf page in
 // packs-6). Each redemption is spent exactly once under `stamps:<item>:<cost>:<uuid>` (a pinned claim, so
 // the spend survives an older build) and the pick opens through the ordinary pending-pick sheet.
-import { awardPick } from './content-packs';
+import { awardPick, type AwardPickKind } from './content-packs';
 import type { Pool } from './pool';
 import { redeemed, type ShelfItem, STAMP_SHELF, stampsBalance, withSpentStamps } from './scout-stamps';
 import type { UtState } from './state';
 
 /** The shelf items that can be redeemed in this build. */
-const OPEN: ReadonlySet<ShelfItem> = new Set(['g82']);
+const OPEN: ReadonlySet<ShelfItem> = new Set(['g82', 'scout85']);
+/** The pick each open item awards. */
+const PICK: Partial<Record<ShelfItem, AwardPickKind>> = { g82: 'pick-82', scout85: 'pick-85' };
 
 /** Whether this shelf item can be redeemed in this build (the page shows the others as coming soon). */
 export function shelfOpen(item: ShelfItem): boolean {
@@ -26,8 +28,9 @@ export function redeemStamps(ut: UtState, pool: Pool, item: ShelfItem, uuid: str
   const shelf = STAMP_SHELF.find((s) => s.item === item);
   if (!shelf || !uuid) return null;
   if (redeemed(ut, uuid)) return ut;
-  if (!shelfOpen(item) || stampsBalance(ut) < shelf.cost) return null;
-  const picked = awardPick(ut, pool, 'pick-82', 'stamps:' + item + ':' + uuid, at);
+  const kind = PICK[item];
+  if (!kind || !shelfOpen(item) || stampsBalance(ut) < shelf.cost) return null;
+  const picked = awardPick(ut, pool, kind, 'stamps:' + item + ':' + uuid, at);
   if (picked === ut) return null;
   return withSpentStamps(picked, item, shelf.cost, uuid);
 }
