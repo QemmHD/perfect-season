@@ -838,7 +838,7 @@ export default function UtMatch(props: {
       climbed: shown.climbed,
       pack: shown.pack,
       capped: shown.capped,
-      forfeit: input.forfeit,
+      forfeit: input.quit,
       refreshed: shown.refreshed,
     });
     setStage('result');
