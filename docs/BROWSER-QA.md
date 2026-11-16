@@ -78,3 +78,67 @@ The updated `cloud.mjs` enrolls development, saves a lineup and enters a Circuit
 `node scripts/qa/polish.mjs` checks batch season rewards/reload, selected-copy development recovery, pack focus/inert background, actual canceled/dragged NBA releases and input cleanup, native NFL playbook containment/Escape/focus return/choice/mirrored diagrams, interrupted throw gestures and a completed manual throw attempt. `PS_POLISH_SPORT=nba` or `nfl` selects a focused case. Future-season UI coverage mounts the real SeasonView with an explicit date instead of forging the clock. Browser fixtures stay on localhost/inspect; weak defense in the dedicated input-isolation case is never a shipped game setting. Original wallet/copy fields are still compared.
 
 Unit regressions are in `src/ut/polish.test.ts` and the basketball gameplay tests. Current online mechanics are NBA 7 / NFL 6, with unchanged data/leaderboard history. See [UT-POLISH.md](UT-POLISH.md) for confirmed reproductions, primary-source research, implementation, results and device-test limits.
+
+
+## Shell harness: isolation, phones, fixtures and the top edge — Claude, 2026-11-10 (studio overhaul, shell-1)
+
+### Isolation (every script that uses `browser.mjs`)
+
+`fixture()` contexts now abort every request and WebSocket to a host other than `localhost` / `127.0.0.1`. Google Fonts (`https://fonts.googleapis.com`, `https://fonts.gstatic.com`) stay allowed so text measures as it does on a phone; `data:` and `blob:` URLs are local. Each refused host is listed in `f.blocked`. `isolate(context)` and `allowedUrl(url)` are exported for scripts that make their own contexts. The relay passed to `fixture()` must be on this machine.
+
+This is deliberate: an earlier QA run registered cards on the live registry. Scripts that used to call the live Supabase registry or cloud saves in the `inspect` namespace (`content.mjs`, `circulation.mjs`, `cloud.mjs`) now see those calls fail as if offline, and need a local registry/cloud stand-in before they can pass again. A script that answers a backend call itself with `page.route` (as `pack-cinema.mjs` does) is unaffected, because page routes run before the context's. `cloud-backend.mjs` and `admin-registry.mjs` do not use `browser.mjs` and must not be run against live hosts during the overhaul.
+
+### Options
+
+`fixture(browser, sport, name, width, contextOptions, options)` keeps its first five arguments. The optional sixth:
+
+| Option | Default | Effect |
+|---|---|---|
+| `insets` | none | `[t, r, b, l]` pt. Sets `window.__psInsets` before the app loads; the stage reads it instead of `env()`. |
+| `height` | 844 | Viewport height. |
+| `standalone` | false | `navigator.standalone = true`, and CDP `display-mode: standalone` where Chromium supports it (it doesn't today: `f.displayMode` says so; use `edge-lib.forceStandaloneRule`). |
+| `dsf` | context default | Device scale factor. |
+| `motion` | `'reduce'` | `reducedMotion` of the context. |
+| `profile` | `'standard'` | `standard`, `heavy`, `utNoStarter`, `checkpoint` or `fresh` (see Fixtures). |
+| `serialized` | false | Use the serialized `standard` file on the dev server too (always used for the other profiles and on a build). |
+| `relay` | `ws://localhost:7777` | Must be local. |
+
+### Environment
+
+| Variable | Meaning |
+|---|---|
+| `PS_QA_URL` | The app on this machine (dev server or `vite preview` of a build). |
+| `PS_QA_BUILD_ROOT` | Set when `PS_QA_URL` serves a production build. Fixtures then come only from the serialized files; nothing imports `/src`. |
+| `PS_QA_FIXTURES` | Directory of the serialized fixtures (default `<PS_QA_ARTIFACTS>/fixtures`). The overhaul keeps them in the scratchpad, never in the repo. |
+| `PS_QA_SHOTS` | Root for `edge-headers`, `home-matrix` and `perf-ut` output (default `<PS_QA_ARTIFACTS>/shots`). |
+| `PS_QA_ARTIFACTS`, `PS_QA_PACKAGE_JSON`, `PS_QA_PROXY` | As before. |
+
+### Fixtures (`scripts/qa/fixtures.mjs`)
+
+- `node scripts/qa/fixtures.mjs make [--sports …] [--profiles …]` runs on the **dev server** only. It builds each profile through the app's own modules (`openPack`, `recordPull`, `organizeStorage`, `recordMatchProgress`, `startCircuit`, `savePreset`, …), lets the app load and re-save it, and writes the app's own localStorage values to `<PS_QA_FIXTURES>/<profile>-<sport>.json` with a summary.
+- `node scripts/qa/fixtures.mjs check` loads every fixture on the dev server or a build: Home, then Ultimate Team, with 0 page errors, the same summary as when made, no foreign keys, and an isolation probe (`fetch('https://example.com')` must be aborted and listed).
+- Keys: only `RECOVERY_KEYS` (`src/lib/recovery.ts`) without the signing key; `fixtures.test.mjs` keeps the lists equal. The init script writes only on `localhost`/`127.0.0.1`, only into storage that has no profile yet (so the app's own later writes survive reloads), and sets today's daily-chest day.
+- Profiles: `standard` (the original ~30-card player plus a pack), `heavy` (about 2,000 copies, a third levelled 2–5, 60 evolved and 2 evolving, a full 300-pack Pack Tracker log, seasons/objectives/circuit history/saved squads/development/moments/match history, 59,672 coins, Level 19), `utNoStarter` (UT opened, starter unclaimed, 0 cards), `checkpoint` (standard plus a saved draft run) and `fresh` (first launch).
+
+### Phones and the top edge (`scripts/qa/edge-lib.mjs`)
+
+- `DEVICES`: 393×852 (59/34, the owner's phone), 402×874 (62/34), 420×912 (68/34, inset to confirm on a device), 440×956 (62/34), 430×932 (59/34), 390×844 (47/34), 375×812 (50/34), 375×667 (20/0), 320×568 (20/0, regression only).
+- `edgeOf(inset)` mirrors the stage's top edge (22 pt on island phones, 19 on a 47-pt notch, 8 under a 20-pt bar). `TEXT_CLEAR` is how far below the inset text must start to be clear of the band's fade.
+- `simulateBand(page, inset)` draws the iOS 26 status-bar blur for screenshots only (pointer events pass through).
+- `auditScreen(page, device)`: `textInBand` (cap top of each visible text line above inset + TEXT_CLEAR), `controlInBand` (controls above inset + edge), `bottomCut`, `small` (< 44 design px, counting a `::before` hit area), `overlap` (intersecting hit areas), `tiny`, `lowContrast`, `docScroll`, `hOverflow`, `offscreen`, and the topmost text/control. What is covered by a sheet, pack or match does not count.
+- `homeAudit(page)`: Home's classes, every row, the PLAY bar and its fade, the gap to PLAY, overflow, and whether the last row clears the fade at scroll end. `detailBarAudit(page)`: the card-detail action bar against the sheet bottom and any text showing below it.
+- `forceStandaloneRule(page, inset)`: `index.html`'s standalone height rule without its media query (Chromium cannot emulate `display-mode`). `arcadeInsets(page, insets)`: gives `.arcade-full` the device's raw insets when it resolves none (Chromium's `env()` is 0). `contactSheet(browser, files, out)`: a labelled PNG grid.
+
+### Runners
+
+- `node scripts/qa/edge-headers.mjs [--sports] [--devices 393,…|all] [--phase before] [--band 393] [--shots 393] [--jobs 3]`: Home, Settings, UT Home and its five tabs, a card detail at top/middle/end, the pack SKIP, the Respin toast, the Draft after a spin and a match frame, per sport and phone. Output: `<PS_QA_SHOTS>/<phase>/<sport>-<device>/NN-screen.png`, `report.json`, a summary JSON and contact sheets. A production build has no soccer bench, so soccer's match frame is dev-only. About 2 minutes per sport for 9 phones.
+- `node scripts/qa/home-matrix.mjs [--sports] [--devices] [--phase]`: 4 modes × saved run off/on × online off/on × 3 sports × 9 phones. "Online" starts a signature-verifying relay on this machine with two signed stand-in players (presence and the head-to-head queue). Measurement only.
+- `node scripts/qa/perf-ut.mjs [--sports] [--profiles standard,heavy] [--rates 1,4] [--runs 3] [--cpu-profile first|all|none]`: tap → UT ready, long tasks, heap after GC and decoded bytes, medians over the runs; a production build is profiled per chunk, the dev server per named function (pool build vs first render, and rate.ts per 1,000 lines).
+
+### The shell QA snippet for other teams
+
+`scripts/qa/edge-snippet.mjs` (shared copy: `<overhaul scratchpad>/qa-snippets/shell-edge.mjs`, kept identical) shows the final top-edge geometry on a branch without the shell fix: `await applyShellEdge(context, { insets: [59, 0, 34, 0] })` before the first navigation sets `__psInsets`, the `--ps-inset-*`/`--ps-edge` variables, the stage's `--sat` (inset + edge, in frame px) and `.arcade-full`'s `--sat`/`--sab`/`--sal`/`--sar` (screen px). `rawEnvRules(page)` lists rules that read `env(safe-area-inset-*)` directly, which it cannot move.
+
+### Limits
+
+Chromium has no Dynamic Island, no iOS blur and no `display-mode: standalone` emulation; the band is a simulation and `env()` is 0. Installed-iPhone screenshots stay the final check (see `docs/studio-overhaul/shell.md`, "Owner device checks").
