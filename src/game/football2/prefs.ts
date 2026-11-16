@@ -69,3 +69,8 @@ export function writePref<T>(pref: Pref<T>, value: T): boolean {
     return false;
   }
 }
+
+// ---------- the preferences themselves ----------
+
+/** nfl-2: the old hold-BURST button on D instead of burst on the stick's ring (pause → Controls). Off by default. */
+export const BURST_BUTTON = flagPref('perfect-season:fb2-burst-button', false);

@@ -1,7 +1,7 @@
 // Claude (nfl-1): the local versions of the V2 shared contracts (C16, C17, C20, C21) behave as
 // nfl.md writes them down, so football code built on them keeps working when the real modules land.
 import { describe, expect, it } from 'vitest';
-import { calibrationLag, FIRE_SCALE, judge, MIN_HALF, stickFrom, STICK_DEAD, touchTime, usePlaytime, windowHalf } from './shared-v2';
+import { calibrationLag, controlGeometry, FIRE_SCALE, judge, MIN_HALF, stickFrom, STICK_DEAD, touchTime, usePlaytime, windowHalf } from './shared-v2';
 
 describe('shared V2 contracts, local versions', () => {
   it('reads the stick with y up, a dead zone, a capped length and the sprint ring', () => {
@@ -57,5 +57,30 @@ describe('shared V2 contracts, local versions', () => {
       p.abandon(1000);
     }).not.toThrow();
     expect(usePlaytime('match')).toBe(p);
+  });
+
+  it('lays the C15 geometry out to the V2 §A.5 table at 393×852 and 320×568, insets included (nfl-2)', () => {
+    const centre = (g: Record<string, string>, id: string, w: number, h: number) => [w - parseFloat(g['--ctl-' + id + '-right']), h - parseFloat(g['--ctl-' + id + '-bottom'])];
+    const a = controlGeometry(393, 852, { top: 59, right: 0, bottom: 34, left: 0 });
+    expect(centre(a, 'a', 393, 852)).toEqual([323, 738]);
+    expect(centre(a, 'b', 393, 852)).toEqual([238, 778]);
+    expect(centre(a, 'c', 393, 852)).toEqual([250, 694]);
+    expect(centre(a, 'd', 393, 852)).toEqual([340, 652]);
+    expect([a['--ctl-a-d'], a['--ctl-b-d'], a['--ctl-c-d'], a['--stick-d'], a['--pause-top'], a['--pause-left']]).toEqual(['92px', '64px', '48px', '120px', '63px', '12px']);
+    const c = controlGeometry(320, 568, { top: 20, right: 0, bottom: 0, left: 0 });
+    expect(centre(c, 'a', 320, 568)).toEqual([266, 510]);
+    expect(centre(c, 'b', 320, 568)).toEqual([190, 536]);
+    expect(centre(c, 'c', 320, 568)).toEqual([200, 468]);
+    expect(centre(c, 'd', 320, 568)).toEqual([282, 436]);
+    expect([c['--ctl-a-d'], c['--ctl-c-d'], c['--pause-top'], c['--pause-left']]).toEqual(['84px', '44px', '20px', '6px']);
+    // landscape takes the compact column, pushed in by the side inset
+    const d = controlGeometry(844, 390, { top: 0, right: 59, bottom: 21, left: 59 });
+    expect(d['--ctl-a-right']).toBe(54 + 59 + 'px');
+    expect(d['--ctl-a-bottom']).toBe(58 + 21 + 'px');
+    // every button stays at least 44 px on any phone between and beyond the two columns
+    for (const [w, h] of [[300, 520], [375, 667], [430, 932], [480, 1040]]) {
+      const g = controlGeometry(w, h, { top: 0, right: 0, bottom: 0, left: 0 });
+      for (const id of ['a', 'b', 'c', 'd']) expect(parseFloat(g['--ctl-' + id + '-d'])).toBeGreaterThanOrEqual(44);
+    }
   });
 });

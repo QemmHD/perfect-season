@@ -10,12 +10,68 @@
 // feedback. At the merge the lead replaces each body with a re-export from the real module (a
 // merge step listed in nfl.md); football code does not change. Nothing here reads a clock or a
 // random number, so engine code may call the maths.
+import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import { sfx, vibrate } from '../../lib/sound';
 
 /** A point or vector in screen or field units. */
 export interface Vec {
   x: number;
   y: number;
+}
+
+// ---------- C15: control geometry (nba's controls-geometry.css) ----------
+
+/** Safe-area insets in CSS px. */
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+/**
+ * The V2 §A.5 geometry for a screen, as the C15 custom properties (CSS px, inset-aware). The table
+ * has two columns, 393×852 and 320×568; a phone between them (or bigger, up to 1.25 of the step)
+ * takes the blend by whichever of its width and height is the tighter fit, so a short phone keeps
+ * compact controls. Landscape takes the compact column, pushed in by the side insets. Button centres
+ * are offsets from the screen's right and bottom edges, the stick ghost from its left and bottom.
+ * The real file switches these on `.arcade-full` from the stage; this local version is applied by
+ * Football2 as an inline style, so nothing moves when the real one lands.
+ */
+export function controlGeometry(w: number, h: number, ins: Insets): Record<string, string> {
+  const wide = w > h;
+  const k = wide ? 0 : Math.max(0, Math.min(1.25, (w - 320) / 73, (h - 568) / 284));
+  const at = (c: number, a: number) => Math.round((c + (a - c) * k) * 10) / 10;
+  const px = (v: number) => v + 'px';
+  const sab = ins.bottom,
+    sat = ins.top,
+    sar = ins.right,
+    sal = ins.left;
+  // [320 column, 393 column]: diameter, centre from the right edge, centre above the safe bottom
+  const btn = { a: [84, 92, 54, 70, 58, 80], b: [56, 64, 130, 155, 32, 40], c: [44, 48, 120, 143, 100, 124], d: [44, 48, 38, 53, 132, 166] } as const;
+  const out: Record<string, string> = {};
+  for (const [id, [d0, d1, r0, r1, b0, b1]] of Object.entries(btn)) {
+    out['--ctl-' + id + '-d'] = px(at(d0, d1));
+    out['--ctl-' + id + '-right'] = px(at(r0, r1) + sar);
+    out['--ctl-' + id + '-bottom'] = px(at(b0, b1) + sab);
+  }
+  Object.assign(out, {
+    '--stick-d': px(at(104, 120)),
+    '--stick-ghost-left': px(at(70, 84) + sal),
+    '--stick-ghost-bottom': px(at(72, 88) + sab),
+    '--stick-zone-w': px(Math.round(w * 0.48)),
+    '--stick-zone-h': px(Math.round(h * 0.55)),
+    '--safe-top': px(sat + 56),
+    '--safe-bottom': px(sab + at(200, 250)),
+    '--bug-w': px(at(200, 232)),
+    '--bug-h': px(at(34, 40)),
+    '--bug-top': px(sat + at(4, 6)),
+    '--heat-h': px(at(5, 6)),
+    '--toast-bottom': px(sab + at(164, 200)),
+    '--pause-top': px(sat + at(0, 4)),
+    '--pause-left': px(sal + at(6, 12))
+  });
+  return out;
 }
 
 // ---------- C16: the stick (nba's stick.ts) ----------
@@ -45,6 +101,126 @@ export interface StickRead {
   sprint: boolean;
   heldSince: number | null;
 }
+
+export interface StickHandle {
+  read(): StickRead;
+  /** let go (a new play, the game paused, the touch taken away) */
+  release(): void;
+}
+
+export interface StickProps {
+  /** whether the zone takes touches (pre-snap too: a thumb resting there is live at the snap) */
+  active: boolean;
+  /** draw the ring where the thumb would land (the ghost) while nothing holds it */
+  ghost?: boolean;
+  /** a word above the ghost (HOLD TO RUN) */
+  label?: string;
+  /** hide the ring until a thumb lands (pre-snap) */
+  quiet?: boolean;
+  sprintAt?: number;
+  onDown?: (e: React.PointerEvent) => void;
+  onMove?: (vec: Vec, sprint: boolean, e: React.PointerEvent) => void;
+  onUp?: (e: React.PointerEvent | null) => void;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  onKeyUp?: (e: React.KeyboardEvent) => void;
+}
+
+/**
+ * The floating stick (C16, local version of nba's Stick.tsx). It lives in the C15 zone; the ring
+ * jumps to wherever the thumb lands (kept on screen) and sits at the ghost spot otherwise. The knob
+ * and the ring move by ref, so a drag never re-renders the game. Pushing past `sprintAt` radii sets
+ * `sprint` with a haptic tick.
+ */
+export const Stick = forwardRef<StickHandle, StickProps>(function Stick(props, ref) {
+  const zone = useRef<HTMLDivElement>(null);
+  const ring = useRef<HTMLDivElement>(null);
+  const knob = useRef<HTMLElement>(null);
+  const st = useRef<{ id: number; o: Vec; r: number; vec: Vec; sprint: boolean; since: number } | null>(null);
+  const sprintAt = props.sprintAt ?? 1.15;
+  const draw = () => {
+    const s = st.current;
+    const z = zone.current,
+      rg = ring.current,
+      kb = knob.current;
+    if (!z || !rg || !kb) return;
+    z.classList.toggle('held', !!s);
+    z.classList.toggle('sprint', !!s?.sprint);
+    if (!s) {
+      rg.style.transform = '';
+      kb.style.transform = '';
+      return;
+    }
+    // the ring's centre sits on the thumb (the ring element is laid out at the ghost spot)
+    const zr = z.getBoundingClientRect();
+    const gr = rg.offsetParent === z ? { x: rg.offsetLeft + rg.offsetWidth / 2, y: rg.offsetTop + rg.offsetHeight / 2 } : { x: 0, y: 0 };
+    rg.style.transform = 'translate(' + Math.round(s.o.x - zr.left - gr.x) + 'px,' + Math.round(s.o.y - zr.top - gr.y) + 'px)';
+  };
+  const release = (e: React.PointerEvent | null) => {
+    if (!st.current) return;
+    st.current = null;
+    draw();
+    props.onUp?.(e);
+  };
+  useImperativeHandle(ref, () => ({
+    read: () => {
+      const s = st.current;
+      return s ? { vec: s.vec, sprint: s.sprint, heldSince: s.since } : { vec: null, sprint: false, heldSince: null };
+    },
+    release: () => release(null)
+  }));
+  const moveTo = (e: React.PointerEvent) => {
+    const s = st.current;
+    if (!s || s.id !== e.pointerId) return;
+    const r = stickFrom(s.o, { x: e.clientX, y: e.clientY }, s.r, sprintAt);
+    const was = s.sprint;
+    // the knob shows the thumb up to the sprint ring
+    const l = Math.min(r.mag, sprintAt);
+    const raw = r.mag > 0 ? { x: ((e.clientX - s.o.x) / s.r / r.mag) * l, y: ((s.o.y - e.clientY) / s.r / r.mag) * l } : { x: 0, y: 0 };
+    s.vec = r.vec;
+    s.sprint = r.sprint;
+    if (r.sprint && !was) haptic('tick');
+    zone.current?.classList.toggle('sprint', r.sprint);
+    const kb = knob.current;
+    if (kb) kb.style.transform = 'translate(' + Math.round(raw.x * s.r) + 'px,' + Math.round(-raw.y * s.r) + 'px)';
+    props.onMove?.(r.vec, r.sprint, e);
+  };
+  return React.createElement(
+    'div',
+    {
+      ref: zone,
+      className: 'v2-stick' + (props.active ? '' : ' off') + (props.quiet ? ' quiet' : '') + (props.ghost ? ' ghost' : ''),
+      role: 'group',
+      'aria-label': 'Movement stick: touch anywhere here and drag; push past the ring to burst. Arrow keys or WASD.',
+      tabIndex: props.active ? 0 : -1,
+      onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        if (!props.active || st.current) return;
+        e.preventDefault();
+        const d = parseFloat(getComputedStyle(e.currentTarget).getPropertyValue('--stick-d')) || 120;
+        const r = d / 2;
+        // the ring floats to the thumb, kept on screen
+        const o = { x: Math.max(r + 4, Math.min(window.innerWidth - r - 4, e.clientX)), y: Math.max(r + 4, Math.min(window.innerHeight - r - 4, e.clientY)) };
+        st.current = { id: e.pointerId, o, r, vec: { x: 0, y: 0 }, sprint: false, since: e.timeStamp };
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        draw();
+        props.onDown?.(e);
+        moveTo(e);
+      },
+      onPointerMove: moveTo,
+      onPointerUp: (e: React.PointerEvent) => st.current?.id === e.pointerId && release(e),
+      onPointerCancel: (e: React.PointerEvent) => st.current?.id === e.pointerId && release(e),
+      onLostPointerCapture: (e: React.PointerEvent) => st.current?.id === e.pointerId && release(e),
+      onKeyDown: props.onKeyDown,
+      onKeyUp: props.onKeyUp
+    },
+    React.createElement(
+      'div',
+      { ref: ring, className: 'v2-stick-ring' },
+      React.createElement('i', { ref: knob }),
+      props.label ? React.createElement('b', { className: 'v2-stick-label' }, props.label) : null
+    )
+  );
+});
 
 // ---------- C17: the gold ring (nba's perfect.ts) ----------
 
@@ -124,6 +300,29 @@ export interface ScoreBugProps {
   fireThem: boolean;
   /** 0-1, the 3 px pip line */
   progress: number;
+}
+
+/** The pause button (C19's PauseButton, local version): 44×44 at the C15 pause slot, fires on touch-down. */
+export function PauseButton({ onPause }: { onPause: () => void }) {
+  return React.createElement(
+    'button',
+    {
+      type: 'button',
+      className: 'v2-pause',
+      'data-ctl': 'pause',
+      'aria-label': 'Pause',
+      onPointerDown: (e: React.PointerEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onPause();
+      },
+      onClick: (e: React.MouseEvent) => {
+        // a keyboard press (a pointer press already paused on touch-down)
+        if (e.detail === 0) onPause();
+      }
+    },
+    React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 18 18', 'aria-hidden': true }, React.createElement('rect', { x: 3, y: 2, width: 4.5, height: 14, rx: 1.4, fill: 'currentColor' }), React.createElement('rect', { x: 10.5, y: 2, width: 4.5, height: 14, rx: 1.4, fill: 'currentColor' }))
+  );
 }
 
 // ---------- C20: haptics (ut's lib/haptics.ts) and the PERFECT chime ----------

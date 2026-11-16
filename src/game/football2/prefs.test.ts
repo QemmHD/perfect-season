@@ -1,7 +1,7 @@
 // The football preferences fall back to their defaults whatever storage does: missing, garbage,
 // blocked or throwing.
 import { afterEach, describe, expect, it } from 'vitest';
-import { choicePref, flagPref, jsonPref, readPref, writePref } from './prefs';
+import { BURST_BUTTON, choicePref, flagPref, jsonPref, readPref, writePref } from './prefs';
 
 const layout = choicePref('perfect-season:test-layout', ['field', 'panel'] as const, 'field');
 const flag = flagPref('perfect-season:test-flag', false);
@@ -78,5 +78,20 @@ describe('football preferences', () => {
     });
     expect(readPref(layout)).toBe('field');
     expect(writePref(layout, 'panel')).toBe(false);
+  });
+  it('keeps the Burst-button layout off unless it was turned on (nfl-2)', () => {
+    expect(BURST_BUTTON.key).toBe('perfect-season:fb2-burst-button');
+    install(memory());
+    expect(readPref(BURST_BUTTON)).toBe(false);
+    expect(writePref(BURST_BUTTON, true)).toBe(true);
+    expect(readPref(BURST_BUTTON)).toBe(true);
+    const s = memory();
+    install(s);
+    s.setItem(BURST_BUTTON.key, 'true');
+    expect(readPref(BURST_BUTTON)).toBe(false);
+    install(memory({ throwGet: true }));
+    expect(readPref(BURST_BUTTON)).toBe(false);
+    delete g.localStorage;
+    expect(readPref(BURST_BUTTON)).toBe(false);
   });
 });
