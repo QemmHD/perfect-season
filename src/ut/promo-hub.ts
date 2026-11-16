@@ -4,10 +4,10 @@
 // program cards work without touching ut's screens.
 //
 // What works today: upcomingDrops (the Live Calendar's next promo starts and waves), storeBadge (its
-// Daily Drop reason), programRewardCard and resolvedEditions. What fills in later, with the same
-// signatures: liveNow and launchDue (packs-7: two Friday waves a week apart, a launch per wave, saved
-// "seen" marks), Scout Stamps in storeBadge (packs-6) and the Season Pass cards (packs-7). Until then
-// they return their empty answer: no live drop, nothing due, no Season card. Game Design V2 adds Era
+// Daily Drop and Scout Stamps reasons), programRewardCard and resolvedEditions. What fills in later,
+// with the same signatures: liveNow and launchDue (packs-7: two Friday waves a week apart, a launch per
+// wave, saved "seen" marks) and the Season Pass cards (packs-7). Until then they return their empty
+// answer: no live drop, nothing due, no Season card. Game Design V2 adds Era
 // Nights (`eraNights`, the `event` drop; packs-7) and the check-in claimables (`calendarClaimables`,
 // deferred F2): both are exported now with their empty answer, so ut's Events and inbox compile.
 import { pickFor } from '../engine/sport';

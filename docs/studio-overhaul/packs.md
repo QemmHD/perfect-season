@@ -7,7 +7,7 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 | Task | State | Commits |
 |---|---|---|
 | packs-1 A: baselines, contracts, critical fixes | done | see `git log` (subject "packs-1 commit A") |
-| packs-1 B: the Scout Stamp core and V2 hand-off contracts | next commit | |
+| packs-1 B: the Scout Stamp core and V2 hand-off contracts | done | see `git log` (subject "packs-1 commit B") |
 | packs-2 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
@@ -257,6 +257,56 @@ calendarClaimables(ut, day, sport): { id; line }[]                 // [] (check-
 
 `src/ut/content-packs.ts`: `awardPick(ut, pool, kind, id, at)` with `kind: 'front-office' | 'pick-82' | 'pick-84' | 'program-pick'` (pick-84 throws `PICK_84_NOT_YET` until packs-2). `src/ut/sbc.ts`: `rewardValue(reward, sport)`, `protectedReason(card, worth)`, `tradeWarning(rc, mint, worth)`, `autoFill(s, club, { guard })`. `src/ut/packs.ts`: `quickSell(tier, ovr, sport)`, `TIER_ORDER`, `UNKNOWN_PACK`.
 
+## packs-1 commit B: the Scout Stamp core and the V2 hand-off contracts
+
+This is the first-impression dependency: ut's local MINUTES ladder pays "75 coins + a Scout Stamp" at the 30-minute rung (V2 F.4 item 8), so the real balance and the grant API ship before anything else.
+
+### What changed
+
+- **`src/ut/scout-stamps.ts` (light: no runtime imports at all, types only).**
+  - `ut.content.stamps = { earned, spent }`, optional and additive, in `ContentState` and `normalizeContent`.
+  - **Earning** (in `recordPull`, the same update that deposits a pack): 1 stamp per 100 coins of the price paid; an earned (free) pack at its Store price (`NOMINAL_PRICE`, pinned to `packDefs` by a test), so a MINUTES Silver is 4 stamps in NBA and 3 in NFL and soccer; +10 for each special edition the player already had (in the club, or pulled by an earlier logged pack). The Daily Drop and daily bonuses (Scout Drop 1), Scout Drop packs (ids `scout-drop:`), every pick (including the shelf's own), the starter and `admin-*` awards earn 0. Kinds without a Store price (Spotlight and event rewards, Live Calendar program packs, Club Collection packs) earn only for coins actually paid. Earning starts at `STAMPS_FROM` = midnight Eastern on 2026-11-27 (the planned release), with no back-pay.
+  - **Grants** (`grantStamps(ut, n, source, id)`, D13): exactly once per (source, id) through the claim `stamps-grant:<n>:<source>:<id>`; a repeat returns the same state object; `n` must be an integer 1–50 or it throws. `STAMP_GRANT = { minutes30: 5, drop: 3 }`. Stamps are per sport, like packs: the grant goes to the `ut` passed in.
+  - **Balance** (`stampsBalance`): `max(earned, earnedFloor) − max(spent, spentFloor)`, never below 0. `earnedFloor` = the stamps of the Pack Tracker's recent packs since `STAMPS_FROM` (a special counts as a duplicate when an earlier logged pack holds its card) + Σ n over `stamps-grant:` claims. `spentFloor` = Σ cost over `stamps:<item>:<cost>:<uuid>` claims. Every write builds on the floors, and `normalizeContent` keeps the field at or above them.
+  - **Pinned claims.** `withClaim` (content-state.ts) and the normalizer keep `stamps:` and `stamps-grant:` claims at the end of `claims`, so the 5,000 cap (this build's or an older one's `slice(-5000)`) drops other claims first.
+  - `stampsToNext(ut)` → `{ have, need, item }` for the next shelf item not yet affordable ("12 to your 82+ Player Pick"), null when all are in reach. `STAMP_SHELF` (50 / 120 / 300 / 600 with labels).
+- **`src/ut/stamp-shelf.ts`:** `redeemStamps(ut, pool, item, uuid, day, at)`. The 50-stamp 82+ Player Pick is open now (`awardPick('pick-82')`, pick id `stamps:g82:<uuid>`, claim `stamps:g82:50:<uuid>`); the 120, 300 and 600 rungs return null until packs-2 (the G85 curve) and packs-6 (the shelf page) open them (`shelfOpen`). A uuid already redeemed returns the same state; a short balance returns null. No UI yet (packs-6).
+- **`src/ut/packs-claimables.ts` body** (ut's published shape): `packsClaimables(ut, day, sport) → { n, ids, lines }`, one line "Scout Stamps: a pick is ready" (id `stamp-shelf:ready`) once the balance reaches 50. It imports only `scout-stamps.ts`.
+- `promo-hub.ts` `storeBadge` now lights its `stamps` reason from the real balance.
+
+**Against the published V2.4 A–C signatures:** `STAMP_SHELF` entries gain a `label` ("82+ Player Pick"), which `stampsToNext` returns as `item`; `grantStamps` is generic (`<T extends { content? }>(ut: T, …) => T`), so it accepts and returns ut's `UtState` unchanged in type; `STAMP_SHELF_MIN` (50) stays exported for `storeBadge`. Everything else is exactly as published.
+
+### Saved state and older builds
+
+| Field | Shape | If an older build strips it |
+|---|---|---|
+| `ut.content.stamps` | `{ earned, spent }` | rebuilt from the floors on the next load: granted and spent stamps exactly, pack stamps from the newest 300 packs since release |
+
+Loss bound (tested with 400 packs since release, eight 30-minute grants and a redemption): after a legacy-normalizer strip, the balance is the truth minus exactly the stamps of the 100 packs that left the recent list; grants and the spend are recovered exactly; it never exceeds the truth. One more case can lose a little: a duplicate special whose earlier copy has itself left the recent list loses its +10 in the floor. No storage key, id, claim id or existing field meaning changed. An old save without stamps normalizes exactly as the frozen older normalizer does.
+
+### Numbers
+
+| Measure | Result |
+|---|---|
+| `stampsBalance`, a full log (300 packs, 1,500 cards) + 4,060 claims, cold (no memo hit) | NBA 0.105, NFL 0.184, soccer 0.122 ms per call (budget 1 ms) |
+| A 30-minute grant | 5 stamps, once per (source, id) |
+| A MINUTES Silver (NBA / NFL / soccer) | 4 / 3 / 3 stamps |
+| A bought Gold (NBA) | 9 stamps |
+| Import walk from `scout-stamps.ts` and `packs-claimables.ts` | reaches only those two files (none of pool, packs, cards, sbc, rate, squad, content-packs, daily-hub, moments, inbox) |
+
+### Tests (suite `stamps`: `stamps.test.ts` NBA/NFL, `soccer-stamps.test.ts` soccer)
+
+Earning once per opening (a replayed id and a deposited pack earn 0); a MINUTES Silver earns its Store price; 0 for the Daily Drop, daily bonuses, picks, the shelf's pick, the starter, Scout Drop packs and admin awards; +10 only for a special already had; nothing before `STAMPS_FROM`; `NOMINAL_PRICE` equals `packDefs`. Grants once per (source, id), in order, pinned; n = 0, 51, 2.5, −1, NaN throw. `stampsToNext` and `packsClaimables`. Redemption: cost spent, exactly one pick pending, a repeat uuid a no-op, short → null, unopened rungs → null. Older builds: the strip bound above; 6,000 later claims and an older build's `slice(-5000)` keep every stamp claim, and the normalizer re-pins them; the cloud snapshot, `checkedSnapshot`, `applyProgress` and `validateSaveValues` keep the field; an old save loads exactly as before. The import walk; the 1 ms budget.
+
+### Requests for this commit (ut and players)
+
+- **ut:** at the 30-minute MINUTES rung call `grantStamps(ut, STAMP_GRANT.minutes30, 'minutes', 'day:' + day + ':30')` in the update that pays the rung. Scout Drops: `grantStamps(ut, STAMP_GRANT.drop, 'drop', day + ':' + index)` for a stamp outcome, and pending pack ids starting `scout-drop:` for a pack outcome. Rookie Week: `grantStamps(ut, n, 'rookie', 'day<k>')`. Read the badge from `packsClaimables` (and `storeBadge`), the near-miss line from `stampsToNext`. Keep your `packs-claimables.ts` shape; this body drops in.
+- **players:** confirm the D15 walkout slot props (see Requests above).
+
+### Protocol
+
+None. Stamps are economy only; no match reads them.
+
 ## Requests (answers are recorded here as they arrive)
 
 - **Lead:** assign `src/ut/ut-scale.ts` (its promo/legend knots), `scripts/fit_ut_scale.ts` and `scripts/fit_ut_balance.ts` to packs for packs-5. OWNERSHIP gives them to nobody; without the assignment packs-5 uses the rate.ts-only fallback. *Answer: pending.*
@@ -282,14 +332,21 @@ calendarClaimables(ut, day, sport): { id; line }[]                 // [] (check-
 - `src/engine/sport-branches.test.ts`: the helper-ternary pattern and its self-test.
 - `packs.test.ts`: an unknown position choice throws `UNKNOWN_PACK` (its old behaviour, an empty pack that spent the pending entry, was the D9 bug). `sbc.test.ts`: two auto-fill cases used a 1-coin dummy reward; with value protection that would protect every card, so they use a Gold pack reward (the cases test ordering, not value).
 
+## Browser QA (packs-1)
+
+`scripts/packs/qa-sbc.mjs` (dev server on 5213, `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted: the only host blocked was the Supabase registry, so nothing reached a live service; touch, `deviceScaleFactor: 1`, reduced motion; 393×852 with insets 59/34 and 320×568). Shots in `O/shots/packs/packs-1/`:
+- `nba-393-sbc-confirm.png`, `nba-320-sbc-confirm.png`, `soccer-393-sbc-confirm.png`, `soccer-320-sbc-confirm.png`: Bronze Upgrade auto-filled, then a Legend put in by hand. The confirm reads "These 5 cards are removed permanently", one red row ("Michael Jordan 92 · Legend edition · 92 overall · sells for 2,950 coins, more than the reward"; soccer Pelé 97), and TRADE IN ANYWAY. Buttons 155×48 design px. No page errors.
+- `soccer-393-sbc-list.png`, `soccer-393-sbc-sheet.png` (Kickabout), `soccer-320-sbc-sheet.png` (Back Four: "One each: FB CB CB FB"). That day's soccer list: Kickabout, Back Four and Gold Spine; no football position anywhere.
+
 ## Protocol
 
-**None** for packs-1. Quick-sell, auto-fill, the confirm, soccer SBC templates and stamps are economy and presentation. No ratings a match reads changed, and `CONTENT_PRINT` is unchanged.
+**None** for packs-1 (commits A and B). Quick-sell, auto-fill, the confirm, soccer SBC templates and Scout Stamps are economy and presentation. No ratings a match reads changed, and `CONTENT_PRINT` is unchanged.
 
 ## Touched outside my lane
 
 - `src/ut/UltimateTeam.tsx` (ut): `openNow` wraps `openPack` in try/catch and returns with a toast before its state update (D9), 8 lines.
 - `scripts/build_numbered_catalog.ts` (no owner; numbered cards are ours): a read-only `--check` flag. Without it the script behaves exactly as before.
+- `src/ut/packs-claimables.ts`: ut owns the file's existence and shape, packs its body (ut plan §4 H). Ours is created here with ut's published signature; at merge keep one file with this body.
 
 ## Owner device checks
 

@@ -4,6 +4,7 @@
 // Desk) is written once, in the same state update that deposits its cards, to `ut.content.pulls`:
 // the most recent packs in full plus uncapped running totals per pack type. The saved shape and its
 // caps are in pull-log-state.ts. Nothing here changes odds, prices, card ids or what a pack holds.
+// packs-1 (2026-11-16): the same update earns the pack's Scout Stamps (scout-stamps.ts).
 import { pickFor } from '../engine/sport';
 import { fcToDisplay } from './fc-scale';
 import { livePackDef, livePacksOn } from './live-packs';
@@ -11,6 +12,7 @@ import { fill, openPack, packDefs, packRand, positionChoices, quickSellValue, wa
 import { TIER_RANK, type Pool } from './pool';
 import { capRecent, type PullAgg, type PullEntry, type PullLog, type PulledCard } from './pull-log-state';
 import type { ContentState } from './content-state';
+import { packStamps, withEarnedStamps } from './scout-stamps';
 import type { OwnedCard, CardRetirement, RatedCard, Tier, UtSport } from './types';
 
 export type { PullAgg, PullEntry, PullLog, PulledCard };
@@ -195,7 +197,20 @@ export function recordPull<T extends Loggable>(ut: T, p: PullInput): T {
     r: capRecent([...(log?.r ?? []), entry]),
     a: { ...(log?.a ?? {}), [group]: addToAgg(log?.a[group], { ...p, price: entry.c }, group, sport) },
   };
-  return { ...ut, content: { ...c, pulls } };
+  // Claude (packs-1): Scout Stamps for this pack, in the same update (scout-stamps.ts). A special is a
+  // duplicate when the club holds its card or an earlier logged pack pulled it (the recovery floor's rule
+  // is the second half alone, so the floor never pays more than this did)
+  let had: Set<string> | undefined;
+  const stamps = packStamps(entry, (id) => {
+    if (!had) {
+      had = new Set(ut.owned?.map((o) => o.cardId));
+      for (const e of log?.r ?? []) for (const x of e.cs) had.add(x[0]);
+    }
+    return had.has(id);
+  });
+  // (counted on the state before this pack, whose floors don't hold it yet)
+  const paid = withEarnedStamps(ut, stamps);
+  return { ...paid, content: { ...(paid.content ?? {}), pulls } };
 }
 
 export function pullsOf(ut: Loggable): PullLog | null {
