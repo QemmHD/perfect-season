@@ -72,7 +72,8 @@ describe('actual-play coach feedback', () => {
       label: 'Energy at whistle',
       value: '18%',
     });
-    expect(read.next).toContain('Save BURST');
+    // nfl-3 (P-4): burst is the stick's ring now, not a BURST button
+    expect(read.next).toContain('Save the burst');
   });
   it('distinguishes an accepted flag from the raw play gain', () => {
     const read = footballFeedback(

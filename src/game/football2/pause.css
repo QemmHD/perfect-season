@@ -21,17 +21,6 @@
   pointer-events: auto;
   touch-action: none;
 }
-/* the score bug makes room for the pause button beside it (nfl-3 replaces the bug with the HUD kit's) */
-.fb2 .hg2-bug {
-  left: calc(var(--pause-left, 12px) + 52px);
-  width: min(400px, calc(100% - var(--pause-left, 12px) - 60px - var(--sar)));
-  box-sizing: border-box;
-  transform: none;
-  max-width: none;
-}
-.fb2 .hg2-bug > span.mid {
-  flex: 1;
-}
 .fb2 .v2-pause:active {
   transform: translateY(1px);
 }

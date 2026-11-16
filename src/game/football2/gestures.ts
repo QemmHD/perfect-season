@@ -48,7 +48,7 @@ export interface Down {
   icon?: number | null;
 }
 
-export type Owner = { kind: 'control'; ctl: string } | { kind: 'stick' } | { kind: 'icon'; icon: number } | { kind: 'sling' } | { kind: 'hold' } | { kind: 'none' };
+export type Owner = { kind: 'control'; ctl: string } | { kind: 'stick' } | { kind: 'icon'; icon: number } | { kind: 'sling' } | { kind: 'hold' } | { kind: 'look' } | { kind: 'none' };
 
 /** The stick zone, from the C15 rule: the left 48% of the width and the lower 55% of the height. */
 export function stickZone(w: number, h: number): StickZone {
@@ -60,6 +60,8 @@ export function ownerOf(d: Down, c: Ctx): Owner {
   if (d.ctl) return { kind: 'control', ctl: d.ctl };
   if (c.state !== 'idle' && d.x <= c.zone.w && d.y >= c.zone.top) return { kind: 'stick' };
   if (c.state === 'pocket' && d.icon !== null && d.icon !== undefined) return { kind: 'icon', icon: d.icon };
+  // before the snap the field outside the stick zone is for looking around (nfl-3)
+  if (c.state === 'pre') return { kind: 'look' };
   if (d.x < c.w / 3) return { kind: 'none' };
   if (c.state === 'pocket') return { kind: 'sling' };
   if (c.state === 'carrier') return { kind: 'hold' };
@@ -101,7 +103,10 @@ export type Gesture =
   | { kind: 'cycle' }
   | { kind: 'cover'; on: boolean }
   | { kind: 'swipe'; dir: -1 | 1 }
-  | { kind: 'a-tap' };
+  | { kind: 'a-tap' }
+  /** before the snap, a drag on the field (nfl-3): the tray collapses and the view follows the finger (px since the touch) */
+  | { kind: 'look'; dx: number; dy: number }
+  | { kind: 'look-end' };
 
 interface Track {
   owner: Owner;
@@ -114,6 +119,8 @@ interface Track {
   slinging: boolean;
   /** the cover hold is on */
   covering: boolean;
+  /** a look-around drag passed TAP_PX */
+  looking: boolean;
   /** a pending A press that is waiting to see if it's a swipe */
   aPending: boolean;
 }
@@ -164,7 +171,7 @@ export class Gestures {
       out.push({ kind: 'icon-throw', icon: owner.icon });
       owner = { kind: 'none' };
     }
-    this.tracks.set(d.id, { owner, x0: d.x, y0: d.y, t0: d.t, x: d.x, y: d.y, slinging: false, covering: false, aPending: owner.kind === 'control' && owner.ctl === 'A' && !!opts.pendingA });
+    this.tracks.set(d.id, { owner, x0: d.x, y0: d.y, t0: d.t, x: d.x, y: d.y, slinging: false, covering: false, looking: false, aPending: owner.kind === 'control' && owner.ctl === 'A' && !!opts.pendingA });
     if (owner.kind === 'stick') out.push({ kind: 'stick-down', id: d.id });
     return out;
   }
@@ -179,6 +186,10 @@ export class Gestures {
     if (k.owner.kind === 'sling' && !k.slinging && px >= TAP_PX) {
       k.slinging = true;
       out.push({ kind: 'sling-start', id, x0: k.x0, y0: k.y0 });
+    }
+    if (k.owner.kind === 'look' && (k.looking || px >= TAP_PX)) {
+      k.looking = true;
+      out.push({ kind: 'look', dx: x - k.x0, dy: y - k.y0 });
     }
     if (k.owner.kind === 'hold' && k.covering && px >= TAP_PX) {
       k.covering = false;
@@ -201,6 +212,7 @@ export class Gestures {
     this.tracks.delete(id);
     if (k.owner.kind === 'stick') out.push({ kind: 'stick-up', id });
     else if (k.slinging) out.push({ kind: 'sling-release', id });
+    if (k.looking) out.push({ kind: 'look-end' });
     if (k.covering) out.push({ kind: 'cover', on: false });
     if (k.aPending) out.push({ kind: 'a-tap' });
     return out;
@@ -214,6 +226,7 @@ export class Gestures {
     const out: Gesture[] = [];
     if (k.owner.kind === 'stick') out.push({ kind: 'stick-up', id });
     if (k.slinging) out.push({ kind: 'sling-cancel', id });
+    if (k.looking) out.push({ kind: 'look-end' });
     if (k.covering) out.push({ kind: 'cover', on: false });
     return out;
   }

@@ -313,60 +313,7 @@
   pointer-events: none;
 }
 
-/* ---------- the play-call strip (pre-snap; nfl-3 replaces it with the 124 px tray) ---------- */
-.fb2 .fb2-call.v2,
-.fb2.wide .fb2-call.v2 {
-  z-index: 5;
-  transform: none;
-  animation: fb2-strip-in 0.24s var(--ease-spring) both;
-  left: calc(var(--sal) + 8px);
-  right: calc(var(--ctl-b-right, 155px) + var(--ctl-b-d, 64px) / 2 + 10px);
-  bottom: calc(var(--sab) + 8px);
-  width: auto;
-  max-width: none;
-  padding: 6px;
-  gap: 6px;
-}
-@keyframes fb2-strip-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-}
-.fb2 .fb2-call.v2 .fb2-cards {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  touch-action: pan-x;
-  scrollbar-width: none;
-}
-.fb2 .fb2-call.v2 .fb2-cards::-webkit-scrollbar {
-  display: none;
-}
-.fb2 .fb2-call.v2 .fb2-card {
-  flex: 0 0 76px;
-  min-height: 44px;
-  scroll-snap-align: start;
-}
-.fb2 .fb2-call.v2 .fb2-card.more {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font: 900 italic 11px/1.1 var(--display);
-  color: var(--teal);
-}
-.fb2 .fb2-call.v2 .fb2-btns {
-  display: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .fb2 .fb2-call.v2 {
-    animation: none;
-  }
   .fb2 .fb2-ctl,
   .fb2 .v2-stick-ring {
     transition: none;

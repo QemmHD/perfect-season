@@ -131,19 +131,19 @@ export function Training({
     const tips = FOOTBALL
       ? drill.id === 'kick'
         ? [
-            'Tap KICK to start the meter.',
+            'Tap KICK on the gold button to start the meter.',
             'Tap as the needle crosses the center.',
             'Each kick moves a little farther out.',
           ]
         : drill.id === 'run'
           ? [
               'Choose your run, then tap SNAP.',
-              'Drag to steer. Swipe sideways to juke.',
-              'Swipe up to spin. Double-tap to truck.',
+              'The left stick steers. Push past its ring to burst.',
+              'JUKE, SPIN and POWER sit on the right.',
             ]
           : [
               'Choose a route concept, then tap SNAP.',
-              'Drag back and release to throw.',
+              'Tap a receiver’s name, or drag back and let go.',
               'Read the coverage. Throw before the rush.',
             ]
       : [

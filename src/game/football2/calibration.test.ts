@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { AUTO_PACE, type Band, fixtureTeams, HUMAN_PACE, HUMAN_SKILL, LEVELS, meanBand, newAcc, type PilotMode, playGame, playWall, quantileBand, runCase, summarize, synthTeams, TIERS, wallClock, wilson } from './sim-kit';
 import * as pacing from './pacing';
-import { REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED } from '../replay';
+import { REPLAY_AFTER, REPLAY_SPEED } from '../replay';
 
 const env = (globalThis as { process?: { env?: Record<string, string> } }).process?.env ?? {};
 
@@ -61,10 +61,11 @@ describe('calibration kit', () => {
     expect(playWall({ ...snap, after: 'score', replay: 'long-td' }, HUMAN_PACE)).toBeCloseTo(
       pacing.HUMAN_PICK + 4 + pacing.REPLAY_LEAD.score + (pacing.LONG_TD_REPLAY.before + REPLAY_AFTER) / REPLAY_SPEED + pacing.REPLAY_TAIL
     );
-    expect(playWall({ ...snap, replay: 'moment' }, HUMAN_PACE)).toBeCloseTo(pacing.HUMAN_PICK + 4 + pacing.REPLAY_LEAD.play + (REPLAY_BEFORE + REPLAY_AFTER) / REPLAY_SPEED + pacing.REPLAY_TAIL);
+    // nfl-3: a first down waits a beat longer (its line flashes); only touchdowns get a replay
+    expect(playWall({ ...snap, after: 'first' }, HUMAN_PACE)).toBeCloseTo(pacing.HUMAN_PICK + 4 + pacing.WHISTLE_TO_TRAY.first);
     // no replay without motion, or on the game's last play
-    expect(playWall({ ...snap, replay: 'moment' }, AUTO_PACE)).toBeCloseTo(pacing.AUTO_PICK + 4 + pacing.WHISTLE_TO_TRAY.play);
-    expect(playWall({ ...snap, replay: 'moment', last: true, after: 'drive' }, HUMAN_PACE)).toBeCloseTo(pacing.HUMAN_PICK + 4 + pacing.WHISTLE_TO_TRAY.drive);
+    expect(playWall({ ...snap, after: 'score', replay: 'long-td' }, AUTO_PACE)).toBeCloseTo(pacing.AUTO_PICK + 4 + pacing.WHISTLE_TO_TRAY.score);
+    expect(playWall({ ...snap, replay: 'long-td', last: true, after: 'score' }, HUMAN_PACE)).toBeCloseTo(pacing.HUMAN_PICK + 4 + pacing.WHISTLE_TO_TRAY.score);
     expect(playWall({ ...snap, trucks: 1 }, AUTO_PACE)).toBeCloseTo(pacing.AUTO_PICK + 4 + pacing.WHISTLE_TO_TRAY.play + pacing.SLOWMO.truck * (1 - pacing.SLOWMO_RATE) + pacing.TRUCK_HIT_STOP);
     const kick = { kind: 'kick' as const, secs: 0, after: 'score' as const, trucks: 0, replay: null, last: false };
     expect(playWall(kick, AUTO_PACE)).toBeCloseTo(pacing.AUTO_PICK + pacing.AUTO_KICK_AIM + pacing.KICK_RESULT + pacing.KICK_TO_TRAY);

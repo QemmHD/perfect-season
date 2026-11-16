@@ -3,11 +3,15 @@
 // game's measured length and the model can never drift apart. Nothing here touches a play's result.
 import { HITSTOP } from '../juice';
 
-/** From the whistle to the next play-call tray: an ordinary play, a drive that ended, a score. */
-export const WHISTLE_TO_TRAY = { play: 1.35, drive: 1.9, score: 2.3 } as const;
+/** From the whistle to the next play-call tray: an ordinary play, a first down (its line flashes),
+ * a drive that ended, a score (the celebration; a tap cuts it to TAP_SKIP). nfl-3 took the ordinary
+ * play from 1.35 s to 0.7 (V2 §D.1: the next snap comes quickly). */
+export const WHISTLE_TO_TRAY = { play: 0.7, first: 0.78, drive: 1.9, score: 2.3 } as const;
+/** A tap during a celebration or a replay's lead-in: the tray this soon after it. */
+export const TAP_SKIP = 0.3;
 
-/** Before a replay starts (after the whistle), for an ordinary highlight and for a score. */
-export const REPLAY_LEAD = { play: 1.1, score: 1.5 } as const;
+/** Before a long touchdown's replay starts (after the whistle; the only replay since nfl-3). */
+export const REPLAY_LEAD = { score: 1.5 } as const;
 /** From the end of a replay to the next play-call tray. */
 export const REPLAY_TAIL = 0.25;
 

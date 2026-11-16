@@ -302,6 +302,86 @@ export interface ScoreBugProps {
   progress: number;
 }
 
+/** Football's additions to the C19 bug (local until nba's kit lands; recorded in nfl.md C19). */
+export interface ScoreBugExtra {
+  usName?: string;
+  themName?: string;
+  /** no rival score to show yet (a practice or a lab game): a dash */
+  themBlank?: boolean;
+  /** a second line under the label: the down and distance and the spot */
+  sub?: string;
+  /** the drive pips along the progress line, one per drive: how each ended, or 'open' for those to come */
+  pips?: ('td' | 'fg' | 'lost' | 'none' | 'open')[];
+  /** the game clock's element, written each frame by the screen (no React state) */
+  clockRef?: React.Ref<HTMLElement>;
+  /** Clutch staging (V2 §B.0.4): the bug turns gold */
+  clutch?: boolean;
+}
+
+/**
+ * The score bug (C19's ScoreBug, local version): two team blocks and a dark centre with the label
+ * and clock, a 3 px progress line along its foot (one pip a drive, the live one filling with the
+ * field position), and the Heat bar directly under it. Sized and placed by the C15 variables
+ * (--bug-w, --bug-h, --bug-top, --heat-h). Purely presentational; never takes a touch.
+ */
+export function ScoreBug(props: ScoreBugProps & ScoreBugExtra) {
+  const h = React.createElement;
+  const pips = props.pips ?? [];
+  const live = pips.indexOf('open');
+  const heat = Math.max(0, Math.min(100, props.heatUs));
+  return h(
+    React.Fragment,
+    null,
+    h(
+      'div',
+      { className: 'v2-bug' + (props.clutch ? ' clutch' : ''), role: 'group', 'aria-label': 'Score: ' + (props.usName ?? 'You') + ' ' + props.us + ', ' + (props.themName ?? 'Rival') + ' ' + props.them + '. ' + props.label + (props.sub ? ', ' + props.sub : '') },
+      h('span', { className: 'v2-bug-team us' }, h('i', null, props.usName ?? 'YOU'), h('b', { className: 'num' }, props.us)),
+      h(
+        'span',
+        { className: 'v2-bug-mid' },
+        h('i', null, props.label, props.clock !== undefined ? h('em', { ref: props.clockRef, className: 'v2-bug-clock' }, props.clock) : null),
+        props.sub ? h('b', null, props.sub) : null
+      ),
+      h('span', { className: 'v2-bug-team them' }, h('b', { className: 'num' }, props.themBlank ? '–' : props.them), h('i', null, props.themName ?? 'RIVAL')),
+      h(
+        'span',
+        { className: 'v2-bug-line', 'aria-hidden': true },
+        pips.map((p, i) => h('i', { key: i, className: 'pip ' + p, style: i === live ? ({ '--fill': Math.round(props.progress * 100) + '%' } as React.CSSProperties) : undefined }))
+      )
+    ),
+    h(
+      'div',
+      { className: 'v2-heat' + (props.fireUs ? ' fire' : ''), role: 'meter', 'aria-label': props.fireUs ? 'On Fire' : 'Heat', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(heat) },
+      h('i', { style: { width: heat + '%' } }),
+      h('b', { className: 'v2-heat-mark' })
+    )
+  );
+}
+
+export interface ToastView {
+  id: number;
+  text: string;
+  sub?: string;
+  tone: string;
+}
+
+/**
+ * The toast line (C19's Toast, local version): one line, 28 px, a glass capsule with a glowing
+ * status dot and the keyword coloured by tone; its bottom edge sits at --toast-bottom. Only the
+ * queue (hud.ts) decides what it says.
+ */
+export function ToastLine({ toast }: { toast: ToastView | null }) {
+  const h = React.createElement;
+  if (!toast) return null;
+  return h(
+    'div',
+    { key: toast.id, className: 'v2-toast ' + toast.tone, role: 'status', 'aria-live': 'polite' },
+    h('i', { className: 'v2-toast-dot', 'aria-hidden': true }),
+    h('b', null, toast.text),
+    toast.sub ? h('span', null, toast.sub) : null
+  );
+}
+
 /** The pause button (C19's PauseButton, local version): 44×44 at the C15 pause slot, fires on touch-down. */
 export function PauseButton({ onPause }: { onPause: () => void }) {
   return React.createElement(

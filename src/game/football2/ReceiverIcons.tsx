@@ -37,6 +37,8 @@ export interface IconPlace {
   reticle: { x: number; y: number; rx: number; ry: number } | null;
   /** the clock now (ms), for the fan-out */
   now: number;
+  /** the band the chips stay in (css px, their bottom edges): under the score bug, above the toast line (nfl-3) */
+  bounds?: { top: number; bottom: number } | null;
 }
 
 export interface IconsHandle {
@@ -69,11 +71,13 @@ export const ReceiverIcons = forwardRef<IconsHandle, { receivers: Body[]; show: 
   const widths = useRef(new Map<number, number>());
   const fanUntil = useRef(0);
   useImperativeHandle(ref, () => ({
-    place({ heads, pick, reticle: rt, now }) {
+    place({ heads, pick, reticle: rt, now, bounds }) {
       const ids = receivers.map((b) => b.id).filter((id) => heads[id] && chips.current.get(id));
       const xs = ids.map((id) => heads[id].x);
       // each chip's pointer tip sits 4 px over his head; its 44×44 touch area rises from there
-      const ys = ids.map((id) => heads[id].y - 4);
+      const lo = bounds ? bounds.top + ICON_HIT : -Infinity;
+      const hi = bounds ? bounds.bottom : Infinity;
+      const ys = ids.map((id) => Math.max(lo, Math.min(hi, heads[id].y - 4)));
       const fanned = now < fanUntil.current;
       const W = window.innerWidth;
       // a chip wider than its touch area (a long surname) is kept whole on screen

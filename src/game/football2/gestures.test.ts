@@ -22,9 +22,10 @@ describe('pointer ownership (decided on pointerdown, in order)', () => {
     expect(ownerOf(at(1, 300, 300, { icon: 4 }), ctx('pocket'))).toEqual({ kind: 'icon', icon: 4 });
     expect(ownerOf(at(1, 300, 300), ctx('pocket'))).toEqual({ kind: 'sling' });
     expect(ownerOf(at(1, 300, 300), ctx('carrier'))).toEqual({ kind: 'hold' });
-    // the left third above the zone owns nothing; neither does the field before the snap
+    // the left third above the zone owns nothing; before the snap the field is for looking around (nfl-3)
     expect(ownerOf(at(1, 60, 200), ctx('pocket'))).toEqual({ kind: 'none' });
-    expect(ownerOf(at(1, 300, 300), ctx('pre'))).toEqual({ kind: 'none' });
+    expect(ownerOf(at(1, 300, 300), ctx('pre'))).toEqual({ kind: 'look' });
+    expect(ownerOf(at(1, 60, 200), ctx('pre'))).toEqual({ kind: 'look' });
     // a thumb resting in the zone before the snap already owns the stick
     expect(ownerOf(at(1, 80, 700), ctx('pre'))).toEqual({ kind: 'stick' });
     expect(ownerOf(at(1, 80, 700), ctx('idle'))).toEqual({ kind: 'none' });
@@ -38,6 +39,32 @@ describe('pointer ownership (decided on pointerdown, in order)', () => {
     expect(g.owner(2)).toEqual({ kind: 'none' });
     expect(g.up(1, 90, 700, t + 400)).toEqual([{ kind: 'stick-up', id: 1 }]);
     expect(g.stickId()).toBeNull();
+  });
+});
+
+describe('looking around before the snap (nfl-3)', () => {
+  it('a drag of 10 px on the field follows the finger, and its lift ends it; a tap does nothing', () => {
+    const g = new Gestures();
+    g.down(at(1, 250, 300), ctx('pre'));
+    expect(g.move(1, 252, 305, t + 30)).toEqual([]);
+    expect(g.move(1, 250, 330, t + 60)).toEqual([{ kind: 'look', dx: 0, dy: 30 }]);
+    // once it's looking, every move follows (even back inside 10 px of the start)
+    expect(g.move(1, 251, 302, t + 90)).toEqual([{ kind: 'look', dx: 1, dy: 2 }]);
+    expect(g.up(1, 251, 302, t + 120)).toEqual([{ kind: 'look', dx: 1, dy: 2 }, { kind: 'look-end' }]);
+    const tap = new Gestures();
+    tap.down(at(2, 250, 300), ctx('pre'));
+    expect(tap.up(2, 252, 301, t + 80)).toEqual([]);
+  });
+  it('a thumb in the stick zone before the snap still owns the stick, never the view', () => {
+    const g = new Gestures();
+    expect(g.down(at(1, 80, 700), ctx('pre'))).toEqual([{ kind: 'stick-down', id: 1 }]);
+    expect(g.move(1, 80, 600, t + 50)).toEqual([]);
+  });
+  it('a look taken away (a system gesture) ends, and nothing else fires', () => {
+    const g = new Gestures();
+    g.down(at(1, 250, 300), ctx('pre'));
+    g.move(1, 250, 340, t + 40);
+    expect(g.cancel(1)).toEqual([{ kind: 'look-end' }]);
   });
 });
 

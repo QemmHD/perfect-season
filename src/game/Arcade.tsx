@@ -171,6 +171,8 @@ export function Arcade({
         // soccer plays from the lines themselves: no attribute file to wait for
         setAttrs(() => () => null);
       });
+    // NFL in Ultimate Team: the teams arrive rated, so the attribute file isn't fetched (nfl-3)
+    else if (FOOTBALL && teams?.offense && teams.rivalDefense && teams.rivalOffense && teams.defense) setAttrs(() => () => null);
     else loadAttrs().then((f) => live && setAttrs(() => f));
     return () => {
       live = false;
@@ -397,7 +399,7 @@ export function Arcade({
         <span className="eyebrow">{online ? 'Online · Legend defense' : 'Head to head · kickoff'}</span>
         <h1 className="disp">YOUR OFFENSE VS {rivalName.toUpperCase()}</h1>
         <p>
-          {TOTAL} drives each, from your own 25. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
+          {TOTAL} drives each, starting wherever the kickoff leaves you. {rivalName} plays theirs against your defense at the same time. Most points wins; a tie goes to the better team.
         </p>
         {off && (
           <div className="arc-roster">
@@ -413,8 +415,8 @@ export function Arcade({
           </div>
         )}
         <div className="arc-how">
-          <span>Pass: drag back anywhere, let go to throw · the arc shows who it’s going to</span>
-          <span>Run: drag to steer · JUKE, SPIN or POWER at a tackler</span>
+          <span>Pass: tap a receiver’s name, or drag back on the right and let go</span>
+          <span>Run: the left stick steers, past its ring to burst · JUKE, SPIN, POWER on the right</span>
         </div>
         {online && rivalLive?.done && (
           <p className="arc-wait">

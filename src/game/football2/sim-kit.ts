@@ -11,7 +11,7 @@ import { afterPlay, DRIVES, fgDistance, kick, newGame, punt, startPlay } from '.
 import { CarryGate } from './controls';
 import { snap, step, throwAway } from './engine';
 import * as pacing from './pacing';
-import { REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED } from '../replay';
+import { REPLAY_AFTER, REPLAY_SPEED } from '../replay';
 import { depth } from './squad';
 import type { Defense, FbPlayer, Offense, Play, Pt, RunInput } from './types';
 
@@ -97,12 +97,12 @@ export interface PlayRec {
   kind: 'snap' | 'kick' | 'punt';
   /** engine seconds from the snap to the whistle (0 for kicks and punts) */
   secs: number;
-  /** what the screen does after it: an ordinary play, a drive that ended, a score */
-  after: 'play' | 'drive' | 'score';
+  /** what the screen does after it: an ordinary play, a first down, a drive that ended, a score */
+  after: 'play' | 'first' | 'drive' | 'score';
   /** trucks during the play (each runs in slow motion for a moment) */
   trucks: number;
-  /** a replayed moment, if any: a big hit, a truck or stiff arm, or a long touchdown */
-  replay: 'moment' | 'long-td' | null;
+  /** a replay, if any: since nfl-3 only a long touchdown gets one (V2 §B.2.7: touchdowns and takeaways) */
+  replay: 'long-td' | null;
   /** the game's last play (no replay, no next tray) */
   last: boolean;
 }
@@ -258,7 +258,6 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
     const thumb = human && mode.pocket ? (thumbs ??= pocketThumb('cal-t:' + seed)) : null;
     let thrown = false;
     let trucks = 0;
-    let moment = false;
     for (let k = 0; k < 1500 && !p.end; k++) {
       let lane: RunInput = decide(p, g, pl);
       if (thumb && p.phase === 'drop') {
@@ -276,10 +275,7 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
           const target = p.bodies.find((b) => b.job === 'track');
           if (target) add('tgt:' + target.slot);
           if (p.aim) add('att:' + depthOf(p.aim.y - p.los));
-        } else if (e === 'beat:truck') {
-          trucks++;
-          moment = true;
-        } else if (e === 'beat:stiff' || e === 'bighit') moment = true;
+        } else if (e === 'beat:truck') trucks++;
         if (e.startsWith('beat:') || e === 'break') add('broken');
         else if (e === 'whiff') add('whiff');
         else if (e === 'bighit') add('bighit');
@@ -337,7 +333,7 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
     }
     drivePts += a.points;
     const longTd = a.points > 0 && e.gain >= pacing.LONG_TD_REPLAY.yards;
-    plays.push({ kind: 'snap', secs: e.secs, after: a.points ? 'score' : a.driveOver ? 'drive' : 'play', trucks, replay: moment ? 'moment' : longTd ? 'long-td' : null, last: g.over });
+    plays.push({ kind: 'snap', secs: e.secs, after: a.points ? 'score' : a.driveOver ? 'drive' : a.firstDown ? 'first' : 'play', trucks, replay: longTd ? 'long-td' : null, last: g.over });
     if (a.driveOver) closeDrive(a.driveOver);
   }
   if (acc) {
@@ -512,8 +508,7 @@ export function playWallParts(r: PlayRec, pace: Pace): { live: number; after: nu
   const slow = r.trucks * (pacing.SLOWMO.truck * (1 - pacing.SLOWMO_RATE) + pacing.TRUCK_HIT_STOP);
   const live = pace.pick + r.secs + slow;
   if (pace.replays && r.replay && !r.last) {
-    const before = r.replay === 'long-td' ? pacing.LONG_TD_REPLAY.before : REPLAY_BEFORE;
-    return { live, after: pacing.REPLAY_LEAD[r.after === 'score' ? 'score' : 'play'] + (before + REPLAY_AFTER) / REPLAY_SPEED + pacing.REPLAY_TAIL };
+    return { live, after: pacing.REPLAY_LEAD.score + (pacing.LONG_TD_REPLAY.before + REPLAY_AFTER) / REPLAY_SPEED + pacing.REPLAY_TAIL };
   }
   return { live, after: pacing.WHISTLE_TO_TRAY[r.after] };
 }

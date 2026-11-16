@@ -37,6 +37,8 @@
   border: 0;
   z-index: 15;
   display: grid;
+  /* nfl-3 (P-3): one track that can shrink below the cards' content, so the playbook fits the screen */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: calc(var(--sat) + 12px) calc(var(--sar) + 12px) calc(var(--sab) + 12px) calc(var(--sal) + 12px);
   background: rgba(4, 18, 26, 0.94);
@@ -49,6 +51,8 @@
 .fb2-playbook {
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
   width: min(620px, 100%);
   max-height: 100%;
   overflow: hidden;
@@ -70,7 +74,7 @@
 }
 .fb2-playbook header small {
   color: var(--teal);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 900;
   letter-spacing: 1.4px;
 }
@@ -96,7 +100,8 @@
 }
 .fb2-book-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* three across, two where the screen is narrow (by the space, not a width query) */
+  grid-template-columns: repeat(auto-fill, minmax(max(88px, calc((100% - 16px) / 3)), 1fr));
   gap: 8px;
   overflow: auto;
   overscroll-behavior: contain;
@@ -104,6 +109,10 @@
 }
 .fb2-book-grid .fb2-card {
   min-width: 0;
+  box-sizing: border-box;
+}
+.fb2-book-grid .fb2-card small {
+  font-size: 10px;
 }
 .fb2-book-grid .fb2-card b {
   font-size: 13px;
@@ -128,10 +137,5 @@
   .fb2.wide .fb2-coach-row button {
     min-height: 36px;
     padding: 5px 9px;
-  }
-}
-@media (max-width: 350px) {
-  .fb2-book-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
