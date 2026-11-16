@@ -232,7 +232,12 @@ export function SquadView(props: {
             props.onSlot(pick.id, uid);
             setPick(null);
           }}
-          onInspect={props.onInspect}
+          // Wave 1: the picker unmounts before the card opens. Sheet.close(after) runs `after` instead of
+          // onClose, so without this the closed picker's invisible scrim stayed over Squad and the tab bar
+          onInspect={(uid) => {
+            setPick(null);
+            props.onInspect(uid);
+          }}
           onClose={() => setPick(null)}
         />
       )}

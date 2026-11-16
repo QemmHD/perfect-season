@@ -3343,6 +3343,8 @@ button:focus-visible {
 
 .scrim.closing {
   animation: fade-out 0.2s ease both;
+  /* Wave 1: a closing sheet never takes taps (a sheet left closing must not block the screen under it) */
+  pointer-events: none;
 }
 .scrim.center {
   align-items: center;
