@@ -1209,7 +1209,9 @@ export function App() {
   return (
     <>
       <Transition id={viewId} enter={enter} exitMs={260}>
-        <RecoveryBoundary where="view" resetKey={viewId} onHome={() => goTab('home')}>{body}</RecoveryBoundary>
+        {/* Wave 1 (shell-4 review fix): BACK TO HOME from a crashed online head-to-head leaves the match the
+            way the screen's own exit does (the rival is told, activeMatch is settled) */}
+        <RecoveryBoundary where="view" resetKey={viewId} onHome={() => (run?.online && matchRef.current ? leaveDraft() : goTab('home'))}>{body}</RecoveryBoundary>
       </Transition>
       {saveFailed && <div className="save-warning" role="alert"><span>Progress isn’t saving on this phone.</span><button onClick={() => setLocker(true)}>CLOUD SAVE</button><button aria-label="Retry saving" onClick={() => { if(saveProfile(profile)){setSaveFailed(false); if(run?.draft && ['draft','reveal','playoffs'].includes(screen)) writeCheckpoint(run,screen as any);} }}>RETRY</button></div>}
       {modal === 'replace' && <Sheet label="Start a new draft?" kind="center" onClose={()=>setModal(null)}>{close=><div className="save-locker"><h2 className="disp">START FRESH?</h2><p>A new solo draft replaces your unfinished run. Your cards, coins and completed records stay with you.</p><button className="btn gold" onClick={()=>{clearCheckpoint();setSaved(null);setModal(null);startDraft(nextMode);}}>START NEW DRAFT</button><button className="btn ghost" onClick={()=>close()}>KEEP MY RUN</button></div>}</Sheet>}
