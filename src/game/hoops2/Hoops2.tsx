@@ -16,9 +16,12 @@ import { crowd, sfx, tapHaptic, vibrate } from '../../lib/sound';
 import { radialAt, type ClusterInput } from '../hud/Cluster';
 import { feelCount, haptic } from '../hud/feel';
 import { TAP_PX } from '../hud/gestures';
+import { readGeometry } from '../hud/geometry';
+import { HeatBar } from '../hud/HeatBar';
 import { PauseButton } from '../hud/PauseButton';
 import { PauseSheet, SheetToggle } from '../hud/PauseSheet';
 import { firstTime, loadPrefs, savePrefs, type TouchPrefs } from '../hud/prefs';
+import { ScoreBug } from '../hud/ScoreBug';
 import { PausableTimers } from '../hud/timers';
 import { ToastLine, ToastProvider, type Toast } from '../hud/ToastLine';
 import '../hud';
@@ -26,7 +29,10 @@ import type { StickOut } from '../stick';
 import { HoopsControls, type HoopsCtx, offOf } from './HoopsControls';
 import './match.css';
 import { Juice } from '../juice';
-import { BADGE_NAMES } from './ratings';
+import { BADGE_LABEL, tierLabel } from './badges';
+import { BoxTracker } from './box';
+import { uniqueTags } from './labels';
+import './held.css';
 import { reducedMotion } from '../../ui/motion';
 import { type Attrs, loadAttrs } from '../attrs';
 import { freeCanvas } from '../pixel/body';
@@ -36,10 +42,10 @@ import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPE
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
 import { aimPass, callPlay, cancelGather, cancelShoot, crossover, driving, euroStep, jumpRebound, pass, PUMP_EVERY, pressShoot, pumpFake, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
-import { afterPossession, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, practiceStart, startPossession } from './game';
+import { afterPossession, CLUTCH, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, practiceStart, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
-import type { Body, Hooper, Possession, Pt, Scheme } from './types';
+import type { Body, Hooper, Possession, Pt, Scheme, ShotKind } from './types';
 import './coach-controls.css';
 import { useInputInterrupt } from '../useInputInterrupt';
 
@@ -63,6 +69,20 @@ interface QaProbe {
   feel(): Record<string, number>;
   /** the stick as the game last heard it */
   stick(): StickOut | null;
+  /** the held arena (plan §3.10): when the last possession ended (performance.now), the renderer
+   * object (its identity must survive a rematch), the floor casts made and reused (NBA-29) */
+  whistleAt(): number | null;
+  /** when the latest possession tipped off (performance.now): the next game's first live frame */
+  tipAt(): number | null;
+  renderer(): HoopsRenderer;
+  floor(): { cast: number; reused: number };
+  /** the safe box the camera frames inside (hud/geometry.ts) */
+  geometry(): { safeTop: number; safeBottom: number; land: boolean; hudBottom: number } | null;
+  /** the flow probe's fast-forward: the possessions before `n` count as played misses, so the next
+   * one up is possession n (the held-arena loop runs in seconds instead of minutes) */
+  skipTo(n: number): void;
+  /** the score bug's phase forced, for the captures of phases the format doesn't reach yet (OT: nba-6) */
+  phase(ph: 'normal' | 'clutch' | 'ot' | null): void;
 }
 
 /** The toast line's colours for what the game says. */
@@ -96,6 +116,23 @@ const MARK_TEXT: Record<Mark, string> = { '2': '2', '3': '3', A: '3', X: '–', 
 /** The defense's looks, and what beats each. */
 const LOOK_TEXT: Record<Scheme, string> = { man: 'MAN-TO-MAN', sag: 'SAGGING OFF', switch: 'SWITCHING', trap: 'TRAPPING' };
 const LOOK_TIP: Record<Scheme, string> = { man: 'beat your man', sag: 'shoot over it', switch: 'attack the mismatch', trap: 'move it early' };
+/** The scorer plate's shot word ("CURRY · 3PT · 11 PTS", V2 B.1.7). */
+const SHOT_WORD: Record<ShotKind, string> = { three: '3PT', mid: 'JUMPER', close: 'FLOATER', layup: 'LAYUP', dunk: 'DUNK', contact: 'AND-ONE SLAM', standdunk: 'DUNK', oop: 'ALLEY-OOP' };
+/** the held arena's opponent curtain (plan §4.8): up this long from the rematch call (inside V2's 1.5 s, so the tip-off lands within it on a slow phone), skippable */
+const CURTAIN_MS = 1400;
+/** A kit's colour for the score bug: the jersey, or its trim when the jersey is white (an away kit). */
+function teamColor(k: Kit): string {
+  const n = parseInt(k.jersey.slice(1, 7), 16);
+  const light = ((n >> 16) & 255) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11 > 200;
+  return light ? k.trim : k.jersey;
+}
+/** both fives (and the bench) with on-court tags no two men share (labels.ts) */
+function tagged(lists: Hooper[][]): Hooper[][] {
+  const all = lists.flat();
+  const tags = uniqueTags(all);
+  let k = 0;
+  return lists.map((l) => l.map((h) => ({ ...h, tag: tags[k++] })));
+}
 
 /** The five from a drafted lineup, rated. */
 export function fiveOf(lineup: Lineup, attrs: (p: Player) => Attrs | null): Hooper[] {
@@ -132,6 +169,9 @@ export function Hoops2({
   autoplayHook,
   timeScale = 1,
   online = false,
+  hold = false,
+  round = 0,
+  roundAt = 0,
   onQuit,
   onProgress,
   onDone
@@ -161,6 +201,15 @@ export function Hoops2({
   online?: boolean;
   /** offline Quit (after its confirm): the host settles the game as a loss */
   onQuit?: () => void;
+  /**
+   * The held arena (plan §4.8): the game reports done the moment the last possession ends, dims and
+   * stays mounted under the host's result sheet; each new `round` (with a new `seed`, maybe a new
+   * rival) re-seeds the same renderer and its drawings behind the opponent curtain.
+   */
+  hold?: boolean;
+  round?: number;
+  /** when the rematch was asked for (performance.now): the curtain's 1.5 s counts from there */
+  roundAt?: number;
   onProgress: (p: Progress) => void;
   onDone: (p: Progress) => void;
 }) {
@@ -175,11 +224,18 @@ export function Hoops2({
       live = false;
     };
   }, []);
-  const game = useMemo<HoopsGame | null>(
-    () => (attrs ? newHoopsGame(five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), seed, possessions, bench, defIQ) : null),
-    [attrs]
-  );
-  const renderer = useMemo(() => new HoopsRenderer(court, [ourKit, theirKit]), []);
+  const game = useMemo<HoopsGame | null>(() => {
+    if (!attrs) return null;
+    // on-court tags no two men share (J.JOHNSON / M.JOHNSON): the names the chips print, never the
+    // engine's numbers (the AI's race, aiPossessionsOf, plays from the untouched lists)
+    const [us, them, subs] = tagged([five ?? fiveOf(lineup!, attrs), rivalFive ?? fiveOf(rivalLineup!, attrs), bench ?? []]);
+    return newHoopsGame(us, them, seed, possessions, subs, defIQ);
+  }, [attrs, round, seed]);
+  const renderer = useMemo(() => {
+    const r = new HoopsRenderer(court, [ourKit, theirKit]);
+    r.reduced = reducedMotion();
+    return r;
+  }, []);
   // the game's drawings and its canvas let go of their memory as it closes (Safari counts a dropped
   // canvas against the page's cap until it's collected, which can be a while)
   useEffect(() => {
@@ -190,6 +246,22 @@ export function Hoops2({
     };
   }, []);
   const possRef = useRef<Possession | null>(null);
+  /** when the last possession ended (the held arena's whistle), for the flow probe */
+  const whistleAt = useRef<number | null>(null);
+  const tipAt = useRef<number | null>(null);
+  /** the box score from the engine's own events (box.ts): the scorer plate reads it */
+  const boxRef = useRef(new BoxTracker());
+  /** the score bug's shot clock, written from the loop whenever its second changes (NBA-08) */
+  const clockRef = useRef<HTMLElement | null>(null);
+  const clockShown = useRef<{ v: string; low: boolean }>({ v: '', low: false });
+  /** the safe box (hud/geometry.ts), read again whenever the game's size or orientation changes */
+  const geoRef = useRef<{ w: number; h: number; land: boolean; box: { safeTop: number; safeBottom: number; land: boolean; hudBottom: number } } | null>(null);
+  /** a badge already popped this possession (one per possession, V2 B.1.8) */
+  const badgeShown = useRef(false);
+  /** the held arena's opponent curtain before a rematch's tip-off */
+  const [curtain, setCurtain] = useState(false);
+  /** the dev probe's forced bug phase (never set outside the dev server) */
+  const [qaPhase, setQaPhase] = useState<'normal' | 'clutch' | 'ot' | null>(null);
   // The studio QA probes (scripts/audit/nba-geo.mjs, nba-rematch.mjs) read the camera and the live
   // possession through this. Dev server only: Vite drops the block from the production build.
   useEffect(() => {
@@ -205,7 +277,18 @@ export function Hoops2({
       paused: () => pausedRef.current,
       timers: () => ({ pending: timers.current.pending, fired: timers.current.fired }),
       feel: () => ({ ...feelCount }),
-      stick: () => stickRef.current
+      stick: () => stickRef.current,
+      whistleAt: () => whistleAt.current,
+      tipAt: () => tipAt.current,
+      renderer: () => renderer,
+      floor: () => ({ ...renderer.floorStats }),
+      geometry: () => geoRef.current?.box ?? null,
+      skipTo: (n) => {
+        if (!game) return;
+        while (game.marks.length < Math.min(n, game.total - 1)) game.marks.push('X');
+        game.done = game.marks.length;
+      },
+      phase: (ph) => setQaPhase(ph)
     };
     w.__hg2 = probe;
     return () => {
@@ -233,8 +316,6 @@ export function Hoops2({
   const [between, setBetween] = useState(true);
   const [boarding, setBoarding] = useState(false);
   const [, setTick] = useState(0);
-  /** the defense's look this possession, named under the scoreboard */
-  const [look, setLook] = useState<{ scheme: Scheme; trapped: boolean } | null>(null);
   const [wide, setWide] = useState(false);
   // instant replay: the last seconds of play, the highlight to show, the replay running
   const rec = useRef(new Recorder<Snap>(5));
@@ -256,7 +337,12 @@ export function Hoops2({
     passPend.current = null;
     setCallOpen(false);
     possRef.current = startPossession(g);
+    tipAt.current = performance.now();
+    // the Clutch possessions: the camera sits 6% tighter (V2 B.0.4; not with reduced motion)
+    renderer.clutch = g.done >= g.total - CLUTCH;
     if (practice) practiceStart(possRef.current, practice.drill);
+    boxRef.current.begin(possRef.current, 'us');
+    badgeShown.current = false;
     const pl = pilotRef.current;
     pl.letGo = null;
     pl.driving = false;
@@ -279,18 +365,50 @@ export function Hoops2({
     if (!game) return;
     crowd.start(0.24);
     const all = timers.current;
-    all.set(() => next(game), 700);
+    if (round > 0) {
+      // a rematch in the held arena: the same renderer and drawings, a clean slate for the play
+      renderer.reset(court, [ourKit, theirKit]);
+      possRef.current = null;
+      booked.current = null;
+      rescued.current = null;
+      highlight.current = null;
+      replayRef.current = null;
+      rec.current.clear();
+      passPend.current = null;
+      slowUntil.current = 0;
+      whistleAt.current = null;
+      pilotRef.current = pilot(0.75, seed);
+      clockShown.current = { v: '', low: false };
+      setReplaying(false);
+      setBetween(true);
+      setLastReadout(null);
+      toastApi.current?.clear();
+      // the opponent curtain, then the tip-off (a tap skips it)
+      setCurtain(true);
+      all.set(() => tipOff(game), Math.max(0, Math.min(CURTAIN_MS, CURTAIN_MS - (performance.now() - roundAt))));
+    } else all.set(() => next(game), 700);
     return () => {
       all.clear();
       crowd.stop(0.6);
     };
   }, [game]);
+  /** the curtain's done (or tapped): tip off */
+  const tipOff = (g: HoopsGame) => {
+    setCurtain(false);
+    if (possRef.current === null && g === game) next(g);
+  };
+  const skipCurtain = () => {
+    if (!curtain || !game) return;
+    timers.current.clear();
+    tipOff(game);
+  };
 
   /** The stick as a direction on the court (the two cameras turn it differently); null when centred. */
   const stickOnCourt = (): Pt | null => {
     const s = stickRef.current;
     if (!s || !s.active || s.mag === 0) return null;
-    return renderer.cam?.mode === 'end' ? { cx: -s.y, cz: s.x } : { cx: s.x, cz: s.y };
+    // up the screen is the camera's forward (it's yawed 12°: camera.ts)
+    return renderer.stickToCourt(s.x, s.y);
   };
 
   /** Juice (render only): sweat at the rim, confetti, the camera's kick and hit-stop. */
@@ -333,18 +451,25 @@ export function Hoops2({
         J.addTrauma(0.14);
         J.kick(0, -1, 2);
       } else if (e.startsWith('badge:')) {
+        // one badge a possession, in the toast line (never over the rim): its name and tier
+        if (badgeShown.current) continue;
+        badgeShown.current = true;
         const [, id, idx, tier] = e.split(':');
-        renderer.pop(Number(idx), (BADGE_NAMES[id] ?? id).toUpperCase(), Number(tier), nowMs / 1000);
+        const who = p.bodies[Number(idx)];
+        const name = (BADGE_LABEL[id] ?? id).toUpperCase();
+        say((who ? who.p.tag + ' · ' : '') + name + ' · ' + tierLabel(Number(tier)).toUpperCase(), 'big', 1100, 1);
       } else if (e === 'clutch:icon') say('ICON TIME · CLUTCH', 'big', 1300);
       else if (e === 'ft:miss') say('MISSED THE FREE THROW', 'plain', 900);
     }
     for (const e of p.events) {
-      if (e.startsWith('scheme:')) setLook({ scheme: e.slice(7) as Scheme, trapped: false });
-      else if (e.startsWith('trap:')) {
-        setLook({ scheme: 'trap', trapped: true });
+      if (e.startsWith('scheme:')) {
+        // the defense's look and what beats it, read once at the start of the possession
+        const sc = e.slice(7) as Scheme;
+        if (!autoplayHook) say(LOOK_TEXT[sc] + ' · ' + LOOK_TIP[sc], 'plain', 1500, 1);
+      } else if (e.startsWith('trap:')) {
         sfx.squeak();
         vibrate(12);
-        say('DOUBLE TEAM!', 'plain', 800);
+        say('DOUBLE TEAM! · ' + LOOK_TIP.trap, 'plain', 900);
       } else if (e.startsWith('call:')) {
         sfx.squeak();
         const star = e === 'call:iso' && p.playCall ? p.bodies[p.playCall.actor] : null;
@@ -451,7 +576,9 @@ export function Hoops2({
         detail: practice.drill === 'pass' && !p.passes ? 'MOVE THE BALL FIRST' : e.text
       });
     }
+    boxRef.current.onEnd(p);
     const fx = fxRef.current;
+    const shooter = e.kind === 'make' ? p.bodies[e.who] : undefined;
     if (e.kind === 'make') {
       fx.swish = 1;
       const ls = p.lastShot;
@@ -463,13 +590,15 @@ export function Hoops2({
       sfx.bucket(ls?.kind, !!big);
       crowd.swell(big ? 1 : 0.55);
       fx.crowd = big ? 1 : 0.5;
-      const shooter = p.bodies[e.who];
       if (shooter) {
         shooter.act = 'celebrate';
         shooter.actAt = p.t;
       }
-      const and1 = ls?.and1 ? ' AND ONE!' : '';
-      say(e.text + and1 + ' +' + (mark === 'A' ? 3 : e.points), big || and1 ? 'big' : 'good', 1400, 2);
+      // the scorer plate: "CURRY · 3PT · 11 PTS" (his points from the box score)
+      const and1 = ls?.and1 ? ' AND ONE' : '';
+      const pts = shooter ? boxRef.current.lines('us').find((l) => l.id === shooter.p.id)?.pts : undefined;
+      const word = ls ? SHOT_WORD[ls.kind] : 'BUCKET';
+      say((shooter ? shooter.p.tag + ' · ' : '') + word + and1 + (pts !== undefined ? ' · ' + pts + ' PTS' : ' +' + (mark === 'A' ? 3 : e.points)), big || and1 ? 'big' : 'good', 1400, 2);
       if (game.fire >= 0 && game.fire !== wasFire) later(() => say(game.ours[game.fire].tag + ' IS ON FIRE!', 'big', 1400, 2), 900);
     } else if (e.kind === 'miss') {
       sfx.groan(0.6);
@@ -484,8 +613,17 @@ export function Hoops2({
     onProgress(progress(game));
     setBetween(true);
     setBoarding(false);
-    // the final buzzer
-    if (game.over) later(() => sfx.buzzer(), 500);
+    // the final buzzer; the held arena reports the result at the whistle itself (the host's sheet
+    // comes up over the dimmed court)
+    if (game.over) {
+      whistleAt.current = performance.now();
+      later(() => sfx.buzzer(), hold ? 0 : 500);
+      if (hold) {
+        onDone(progress(game));
+        setTick((n) => n + 1);
+        return;
+      }
+    }
     const proceed = () => {
       if (game.over) {
         onDone(progress(game));
@@ -552,6 +690,23 @@ export function Hoops2({
     }, 1200);
   };
 
+  /** The bug's clock: the possession's own clock rounded up, written only when it changes. */
+  const writeClock = (p: Possession | null, replay: boolean) => {
+    const el = clockRef.current;
+    if (!el) return;
+    const live = !!p && !replay;
+    const v = live ? String(Math.max(0, Math.ceil(p!.clock))) : '–';
+    const low = live && !p!.end && p!.clock <= 5;
+    const was = clockShown.current;
+    if (v === was.v && low === was.low) return;
+    // under 4 s a tick each new second (and none for the 0 of a violation: the buzzer has it)
+    if (live && !p!.end && p!.clock < 4 && v !== was.v && v !== '0') sfx.tick();
+    clockShown.current = { v, low };
+    el.textContent = v;
+    if (low) el.dataset.low = '1';
+    else delete el.dataset.low;
+  };
+
   // the loop: fixed steps for the game, a draw every frame
   useEffect(() => {
     if (!game) return;
@@ -565,7 +720,15 @@ export function Hoops2({
       if (!canvas || !wrap) return;
       const w = wrap.clientWidth;
       const h = wrap.clientHeight;
-      renderer.resize(w, h);
+      // the safe box the camera frames inside: read from the HUD's tokens when the size or the
+      // orientation changes (a layout read, so never every frame)
+      const land = wrap.classList.contains('land');
+      let geo = geoRef.current;
+      if (!geo || geo.w !== w || geo.h !== h || geo.land !== land) {
+        const g0 = readGeometry(wrap);
+        geo = geoRef.current = { w, h, land, box: { safeTop: g0.safeTop, safeBottom: g0.safeBottom, land: g0.land, hudBottom: g0.hudBottom } };
+      }
+      renderer.resize(w, h, geo.box);
       let resized = false;
       if (canvas.width !== renderer.W || canvas.height !== renderer.H) {
         canvas.width = renderer.W;
@@ -636,8 +799,10 @@ export function Hoops2({
               pass(p, null, pp.held);
             }
             const stick = autoplayHook ? decide(p, pilotRef.current) : stickOnCourt();
+            const before = p.handler;
             step(p, DT, stick, autoplayHook ? undefined : !!stickRef.current?.sprint);
             stepsRun.current++;
+            boxRef.current.onStep(p, before);
             handleEvents(p);
             if (p.end) {
               finish(p);
@@ -665,6 +830,9 @@ export function Hoops2({
         const off = offOf(p, !!replayRef.current);
         if (ctl.dataset.off !== off) ctl.dataset.off = off;
       }
+      // the shot clock, from the possession itself every frame (NBA-08): a warning at 5, a tick each
+      // second under 4, and a violation reads 0 before the toast says so
+      writeClock(p, !!replayRef.current);
       fx.swish = Math.max(0, fx.swish - elapsed * 1.3);
       fx.shake = Math.max(0, fx.shake - elapsed * 14);
       fx.crowd = Math.max(0, fx.crowd - elapsed * 0.45);
@@ -729,6 +897,7 @@ export function Hoops2({
     if (kind === 'cross') (drive ? euroStep : crossover)(p, side * toRimCx);
     else if (kind === 'step') stepback(p);
     else spin(p, side * toRimCx);
+    boxRef.current.onStep(p, p.handler);
     handleEvents(p);
     if (before === h.lastMoveAt && !p.end) say('MOVE RECHARGING · KEEP YOUR DRIBBLE', 'plain', 650);
   };
@@ -881,12 +1050,11 @@ export function Hoops2({
   };
 
   const g = game;
-  const p = possRef.current;
   const ctx: HoopsCtx = boarding ? 'board' : between || replaying ? 'dead' : 'offense';
   const playing = !!g && !g.over && !autoplayHook;
   // the game fills the real screen, above the app's portrait frame, so it can be played either way up
   return createPortal(
-    <div className={'arcade-full hg2 hg2-nba ps-geo' + (wide ? ' wide land' : '') + (paused ? ' paused' : '') + (prefs.controls === 'buttons' ? ' buttons' : '')} ref={wrapRef}>
+    <div className={'arcade-full hg2 hg2-nba ps-geo' + (wide ? ' wide land' : '') + (paused ? ' paused' : '') + (prefs.controls === 'buttons' ? ' buttons' : '') + (hold && g?.over ? ' held' : '')} ref={wrapRef}>
       <ToastProvider paused={paused} apiRef={toastApi}>
         <canvas ref={canvasRef} className="hg2-canvas" />
         {playing && (
@@ -905,43 +1073,25 @@ export function Hoops2({
             onPointerCancel={() => (courtPtr.current = null)}
           />
         )}
-        <div className="hg2-bug" aria-label="Score">
-          <span className="us">
-            <i>YOU</i>
-            <b className="num">{g?.score ?? 0}</b>
-          </span>
-          <span className="mid">
-            {g && !g.over ? (
-              <>
-                <b>{half(g) === 1 ? '1ST' : '2ND'}</b>
-                <small className="num">
-                  {Math.min(g.done + 1, g.total)}/{g.total}
-                </small>
-                <em className={'num' + (p && !between && p.clock < 5 ? ' low' : '')}>{p && !between ? Math.max(0, Math.ceil(p.clock)) : '–'}</em>
-              </>
-            ) : (
-              <b>FINAL</b>
-            )}
-          </span>
-          <span className="them">
-            <i>{(rival?.name ?? rivalName).toUpperCase().slice(0, 8)}</i>
-            <b className="num">{rival ? rival.score : '–'}</b>
-          </span>
-        </div>
         {g && (
-          <div className="hg2-marks" aria-hidden="true">
-            {Array.from({ length: g.total }, (_, i) => (
-              <i key={i} className={(g.marks[i] ? 'm-' + g.marks[i] : i === g.done ? 'now' : '') + (i === g.total / 2 ? ' half' : '')}>
-                {g.marks[i] ? MARK_TEXT[g.marks[i]] : ''}
-              </i>
-            ))}
-          </div>
-        )}
-        {look && g && !g.over && (
-          <div key={look.scheme + look.trapped} className={'hg2-look l-' + look.scheme + (look.trapped ? ' on' : '')} role="status">
-            {LOOK_TEXT[look.scheme]}
-            <small>{look.trapped ? 'find the open man' : LOOK_TIP[look.scheme]}</small>
-          </div>
+          <>
+            <ScoreBug
+              you={g.score}
+              rival={rival?.score ?? 0}
+              youName="YOU"
+              rivalName={(rival?.name ?? rivalName).slice(0, 10)}
+              period={g.over ? 'FINAL' : half(g) === 1 ? '1ST' : '2ND'}
+              sub={g.over ? undefined : Math.min(g.done + 1, g.total) + '/' + g.total}
+              clockRef={clockRef}
+              progress={g.done / g.total}
+              phase={qaPhase ?? (!g.over && g.done >= g.total - CLUTCH ? 'clutch' : 'normal')}
+              youColor={teamColor(ourKit)}
+              rivalColor={teamColor(theirKit)}
+              aside={!autoplayHook && <PlayReadout readout={lastReadout} live={!between && !g.over} resetKey={g.done} icon />}
+            />
+            {/* fed zeros until heat.ts lands (nba-4) */}
+            <HeatBar you={{ v: 0, stage: 'cold' }} />
+          </>
         )}
         {replaying && (
           <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
@@ -967,7 +1117,6 @@ export function Hoops2({
           />
         )}
         <ToastLine />
-        {!autoplayHook && <PlayReadout readout={lastReadout} live={!between && !g?.over} resetKey={g?.done ?? 0} />}
         {g && !g.over && <PauseButton onPause={pause} label={online ? 'Match menu' : 'Pause'} />}
         <PauseSheet open={sheet} online={online} onResume={resume} onQuit={!online && onQuit ? quit : undefined}>
           <SheetToggle
@@ -994,7 +1143,23 @@ export function Hoops2({
             </li>
           </ul>
         </PauseSheet>
-        {g?.over && (
+        {curtain && g && (
+          <button type="button" className="hg2-curtain" onPointerDown={(e) => (e.stopPropagation(), skipCurtain())} aria-label={'Next game against ' + rivalName + ': tap to tip off'}>
+            <span className="eyebrow">Next game</span>
+            <b className="disp">VS {(rival?.name ?? rivalName).toUpperCase()}</b>
+            <span className="hg2-curtain-five">
+              {g.theirs.map((h) => (
+                <span key={h.id}>
+                  <i>{h.pos}</i>
+                  <em>{h.tag}</em>
+                  <small className="num">{h.ovr}</small>
+                </span>
+              ))}
+            </span>
+            <small>TAP TO TIP OFF</small>
+          </button>
+        )}
+        {g?.over && !hold && (
           <div className="fg-final hg2-final" role="status">
             <span className="eyebrow">Your possessions</span>
             <b className="num">{g.score}</b>
@@ -1027,3 +1192,4 @@ export function aiPossessionsOf(offense: Hooper[], defense: Hooper[], seed: stri
   autoplay(g, skill, 'ai:' + seed);
   return { score: g.score, drive: g.done, done: true, ends: g.marks.slice(), plays: g.done };
 }
+

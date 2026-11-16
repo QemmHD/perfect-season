@@ -7,10 +7,13 @@ export function PlayReadout({
   readout,
   live,
   resetKey,
+  icon = false,
 }: {
   readout: PlayFeedback | null;
   live: boolean;
   resetKey: number | string;
+  /** a 44 px icon beside the score bug (nba-3) instead of the labelled pill */
+  icon?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [resetKey]);
@@ -18,13 +21,14 @@ export function PlayReadout({
   if (!readout) return null;
   return (
     <aside
-      className="play-readout"
+      className={'play-readout' + (icon ? ' icon' : '')}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerUp={(e) => e.stopPropagation()}
     >
       <button
         className="play-readout-toggle"
         aria-expanded={open}
+        aria-label={icon ? 'Last play' : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         <svg
@@ -43,8 +47,8 @@ export function PlayReadout({
             strokeLinejoin="round"
           />
         </svg>
-        LAST PLAY
-        <svg
+        {!icon && 'LAST PLAY'}
+        {!icon && <svg
           className="play-readout-chev"
           width="12"
           height="12"
@@ -59,7 +63,7 @@ export function PlayReadout({
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-        </svg>
+        </svg>}
       </button>
       {open && (
         <section className="play-readout-card" aria-label="Last play breakdown">

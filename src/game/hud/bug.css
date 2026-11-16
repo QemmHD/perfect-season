@@ -1,0 +1,257 @@
+/*
+ * The score bug and the Heat bar (plan §4.3, V2 A.5 / C.3; nba-3). Positions come from the geometry
+ * tokens (controls-geometry.css, on `.ps-geo`): the bug centred, its top at --sat + --bug-t, the Heat
+ * bar at --sat + --heat-t, both --bug-w wide. Glass and gloss from gradients and shadows only (no
+ * backdrop-filter or animated filter in a match: V2 C.3's cost rule).
+ */
+.ps-bug {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: calc(var(--sat, 0px) + var(--bug-t, 6px));
+  width: var(--bug-w, 232px);
+  height: var(--bug-h, 40px);
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr minmax(62px, 0.82fr) 1fr;
+  align-items: stretch;
+  border-radius: 9px;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #1b2740, #070d1c);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 7px 16px rgba(0, 0, 0, 0.55), 0 2px 0 #02050d;
+  color: #fff;
+  font-family: var(--display, inherit);
+  font-stretch: 85%;
+  pointer-events: none;
+  user-select: none;
+}
+/* the team blocks: skewed, the team's own ramp, a top highlight, a dark bottom edge, a 4 px accent */
+.ps-bug-team {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 9px 3px;
+}
+.ps-bug-team::before {
+  content: '';
+  position: absolute;
+  inset: 0 -6px 0 -6px;
+  z-index: -1;
+  transform: skewX(-14deg);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--team) 55%, #fff) 0%, var(--team) 38%, color-mix(in srgb, var(--team) 62%, #000) 100%);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.ps-bug-team::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--team) 40%, #fff);
+  opacity: 0.55;
+}
+.ps-bug-team.t-you {
+  --team: var(--bug-you);
+  justify-content: space-between;
+}
+.ps-bug-team.t-riv {
+  --team: var(--bug-riv);
+  justify-content: space-between;
+}
+.ps-bug-team i {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 0.7px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+.ps-bug-team b {
+  font-style: italic;
+  font-weight: 900;
+  font-size: calc(var(--bug-h, 40px) * 0.56);
+  line-height: 1;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+/* the centre: the period over the possession, and the glowing clock */
+.ps-bug-mid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 4px 3px;
+  background: linear-gradient(to bottom, #0d1528, #03060f);
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.08), inset -1px 0 0 rgba(255, 255, 255, 0.08);
+}
+.ps-bug-per {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+}
+.ps-bug-per em {
+  font-style: italic;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+.ps-bug-per small {
+  font-size: 10px;
+  font-weight: 800;
+  color: #a9b8d8;
+}
+.ps-bug-clock {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: calc(var(--bug-h, 40px) - 14px);
+  padding: 0 3px;
+  border-radius: 5px;
+  font-style: normal;
+  font-weight: 900;
+  font-size: calc(var(--bug-h, 40px) * 0.42);
+  color: #ffd25e;
+  background: linear-gradient(to bottom, #2a1606, #120900);
+  box-shadow: inset 0 0 0 1px rgba(255, 196, 80, 0.35), 0 0 8px rgba(255, 180, 40, 0.25);
+  text-shadow: 0 0 6px rgba(255, 190, 60, 0.7);
+}
+.ps-bug-clock[data-low='1'] {
+  color: #ff6b6b;
+  background: linear-gradient(to bottom, #3a0a0e, #180305);
+  box-shadow: inset 0 0 0 1px rgba(255, 90, 90, 0.6), 0 0 12px rgba(255, 70, 70, 0.55);
+  text-shadow: 0 0 8px rgba(255, 80, 80, 0.9);
+  animation: ps-bug-warn 0.5s ease-in-out infinite alternate;
+}
+@keyframes ps-bug-warn {
+  to {
+    box-shadow: inset 0 0 0 1px rgba(255, 120, 120, 0.9), 0 0 16px rgba(255, 70, 70, 0.85);
+  }
+}
+/* the 3 px possession line along the bottom */
+.ps-bug-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.ps-bug-line span {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+  background: linear-gradient(to right, #8af3e3, #f6b93b);
+  transition: transform 0.4s ease-out;
+}
+/* Clutch: the bug turns gold (V2 B.0.4) */
+.ps-bug.ph-clutch {
+  box-shadow: inset 0 0 0 1.5px #f6b93b, inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 16px rgba(246, 185, 59, 0.55), 0 7px 16px rgba(0, 0, 0, 0.55);
+}
+.ps-bug.ph-clutch .ps-bug-mid {
+  background: linear-gradient(to bottom, #6b4508, #2a1600);
+}
+.ps-bug.ph-clutch .ps-bug-per em {
+  color: #ffe08a;
+  text-shadow: 0 0 8px rgba(255, 200, 80, 0.8);
+}
+/* overtime: violet */
+.ps-bug.ph-ot {
+  box-shadow: inset 0 0 0 1.5px #a78bfa, inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 14px rgba(167, 139, 250, 0.5), 0 7px 16px rgba(0, 0, 0, 0.55);
+}
+.ps-bug.ph-ot .ps-bug-mid {
+  background: linear-gradient(to bottom, #3a2a74, #160c38);
+}
+.ps-bug.ph-ot .ps-bug-per em {
+  color: #dcd0ff;
+}
+/* an icon beside the bug (NBA: LAST PLAY): 44 x 44, mirroring the pause button on the right */
+.ps-bug-aside {
+  position: absolute;
+  z-index: 4;
+  right: calc(var(--sar, 0px) + var(--pause-l, 12px));
+  top: calc(var(--sat, 0px) + var(--pause-t, 4px));
+}
+
+/* ---------- the Heat bar ---------- */
+.ps-heat {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: calc(var(--sat, 0px) + var(--heat-t, 49px));
+  width: var(--bug-w, 232px);
+  height: var(--heat-h, 6px);
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: linear-gradient(to bottom, #02050c, #111a2e);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+.ps-heat-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--heat, 0));
+  transition: transform 0.35s ease-out;
+  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.28) 0 3px, transparent 3px 7px), linear-gradient(to right, #fbbf24, #f97316 65%, #ef4444);
+  background-size: 14px 100%, 100% 100%;
+  animation: ps-heat-run 0.9s linear infinite;
+  box-shadow: 0 0 6px rgba(251, 146, 60, 0.55);
+}
+@keyframes ps-heat-run {
+  to {
+    background-position: 14px 0, 0 0;
+  }
+}
+.ps-heat.st-fire .ps-heat-fill {
+  box-shadow: 0 0 10px rgba(255, 90, 30, 0.9), 0 -3px 8px rgba(255, 140, 40, 0.7);
+}
+.ps-heat-tick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 236, 190, 0.85);
+  box-shadow: 0 0 4px rgba(255, 210, 120, 0.8);
+}
+.ps-heat-riv {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  background: #a78bfa;
+  opacity: 0.9;
+}
+.ps-heat-word {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 3px);
+  font: italic 900 10px var(--display, inherit);
+  letter-spacing: 1px;
+  color: #ffb24a;
+  text-shadow: 0 0 6px rgba(255, 140, 40, 0.8), 0 1px 0 #000;
+}
+.ps-heat.st-fire .ps-heat-word {
+  color: #ff7a3a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-bug-clock[data-low='1'],
+  .ps-heat-fill {
+    animation: none;
+  }
+  .ps-heat-fill,
+  .ps-bug-line span {
+    transition: none;
+  }
+}

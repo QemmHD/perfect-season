@@ -58,3 +58,23 @@ export function badgeTier(p: Hooper, id: string, shot?: number): number {
 export function badgeMult(p: Hooper, id: string, shot?: number): number {
   return TIER_MULT[badgeTier(p, id, shot)];
 }
+
+/**
+ * The badges' names as the court shows them (nba-3; escalation 2 in docs/studio-overhaul/nba.md):
+ * original names, never another game's. The ids, and what each badge does, are unchanged.
+ */
+export const BADGE_LABEL: Record<string, string> = {
+  posterizer: 'Poster Maker',
+  limitless: 'Deep Range',
+  deadeye: 'Ice Water',
+  clamps: 'Lockdown',
+  'rim-protector': 'Paint Wall',
+  'ankle-breaker': 'Ankle Taker',
+  dimer: 'Table Setter',
+  'lob-city': 'Lob City',
+  'heat-check': 'Heat Check',
+  icon: 'Icon',
+};
+
+/** A tier as the court shows it: the top two read Elite and Legend. */
+export const tierLabel = (tier: number) => (tier >= 5 ? 'Legend' : tier === 4 ? 'Elite' : TIER_NAMES[tier] ?? '');

@@ -113,7 +113,8 @@ export async function rect(page, sel) {
 /** The lab game (?arcade), waiting until the first possession's clock shows. */
 export async function openLab(page, params = {}) {
   await page.goto(url({ arcade: '', seed: 'nba-qa', ...params }), { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => /\d/.test(document.querySelector('.hg2-bug .mid em')?.textContent || ''), null, { timeout: 45000 });
+  // the score bug's shot clock shows a number once the first possession is live (nba-3's ScoreBug)
+  await page.waitForFunction(() => /\d/.test(document.querySelector('.ps-bug-clock')?.textContent || ''), null, { timeout: 45000 });
 }
 
 export async function shot(page, name) {

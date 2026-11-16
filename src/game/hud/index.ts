@@ -12,3 +12,6 @@ export { chime, feelCount, haptic, ringTick, type HapticPattern } from './feel';
 export { PausableTimers } from './timers';
 export { Stick } from '../Stick';
 export * from '../stick';
+export { ScoreBug, type BugProps, type HeatView } from './ScoreBug';
+export { HeatBar, HEATING_UP } from './HeatBar';
+export { readGeometry, intersects, type Geometry } from './geometry';

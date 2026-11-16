@@ -87,7 +87,8 @@
   --pause-l: 12px;
   --pause-t: 6px;
   --toast-h: 28px;
-  --safe-t: 64px;
+  /* sideways the toast line sits under the bug (to --sat + 94): the safe box starts below it */
+  --safe-t: 100px;
   --safe-b: 24px;
   --scrim-h: 160px;
 }

@@ -410,10 +410,14 @@ const THUMB = 0.07;
  * finish he'd get (layup or dunk), the block risk taken off.
  */
 export function shotChance(p: Possession, b: Body): number {
+  return shotChanceWith(p, b, contestOf(p, b));
+}
+
+/** The same with the contest given (a pass target's, as it will be once his man closes out). */
+export function shotChanceWith(p: Possession, b: Body, contest: Contest): number {
   const d = dist(b, RIM);
   const speed = Math.hypot(b.vx, b.vz);
   const toward = speed > 0.5 ? (b.vx * (RIM.cx - b.cx) + b.vz * (RIM.cz - b.cz)) / (speed * Math.max(d, 0.01)) : 0;
-  const contest = contestOf(p, b);
   if (d < 6 || (d < 11 && toward > 0.35 && speed > 6)) {
     const pp = b.p;
     let pm: number;

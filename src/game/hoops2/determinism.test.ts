@@ -152,8 +152,9 @@ function personGame(script: { ops: Op[]; sticks: (Pt | null)[] } | null, unevenS
  * puts in src/game (heat.ts, perfect.ts: scanned as soon as they land; a missing file matches nothing).
  */
 const SOURCES = import.meta.glob<string>(['./*.ts', '!./*.test.ts', '../heat.ts', '../perfect.ts'], { query: '?raw', import: 'default', eager: true });
-/** Drawing and test support: free to use any math (they never decide an outcome). */
-const NOT_SIM = new Set(['render.ts', 'hud-draw.ts', 'harness.ts', 'targets.ts']);
+/** Drawing and test support: free to use any math (they never decide an outcome; nba-3's camera,
+ * floor and labels only read a possession to draw it). */
+const NOT_SIM = new Set(['render.ts', 'hud-draw.ts', 'harness.ts', 'targets.ts', 'camera.ts', 'floor.ts', 'labels.ts']);
 /** exp/pow/log, the hyperbolics, ** and the trig family (incl. hypot): none is bit-identical between JSC and V8 */
 const TRANSCENDENTAL = /\bMath\.(exp|expm1|pow|log|log1p|log2|log10|cbrt|sinh|cosh|tanh|asinh|acosh|atanh|sin|cos|tan|asin|acos|atan|atan2|hypot)\b|\*\*/g;
 const CLOCKS = /\bMath\.random\b|\bDate\.now\b|\bperformance\.now\b|\bnew Date\b/g;
@@ -171,7 +172,8 @@ const GRANDFATHERED: Record<string, Record<string, number>> = {
     closest: 1,
     greenWindow: 3,
     releaseProbability: 2,
-    shotChance: 1,
+    // (nba-3 moved shotChance's body, and its one hypot, into shotChanceWith: the same call)
+    shotChanceWith: 1,
     normTail: 1,
     pressShoot: 1,
     finishNow: 1,

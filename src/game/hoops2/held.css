@@ -1,0 +1,153 @@
+/*
+ * The held arena (plan §4.8, V2 D.1; nba-3): after the final whistle the court stays mounted, dimmed,
+ * under the host's result sheet; a rematch tips off behind a 1.5 s opponent curtain (a tap skips it).
+ * The dim is its own layer (no filter on the canvas: V2 C.3's cost rule).
+ */
+.arcade-full.hg2-nba.held::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: radial-gradient(ellipse at 50% 35%, rgba(6, 11, 26, 0.45), rgba(6, 11, 26, 0.78));
+  animation: hg2-held-in 0.25s ease-out both;
+  pointer-events: none;
+}
+@keyframes hg2-held-in {
+  from {
+    opacity: 0;
+  }
+}
+.hg2-curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: calc(var(--sat, 0px) + 20px) calc(var(--sar, 0px) + 20px) calc(var(--sab, 0px) + 20px) calc(var(--sal, 0px) + 20px);
+  border: 0;
+  color: #f3f6ff;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(167, 139, 250, 0.35), transparent 60%),
+    radial-gradient(ellipse at 50% 85%, rgba(94, 234, 212, 0.18), transparent 55%),
+    linear-gradient(to bottom, rgba(6, 11, 26, 0.94), rgba(10, 6, 30, 0.97));
+  font-family: var(--display, inherit);
+  touch-action: manipulation;
+  animation: hg2-curtain-in 0.22s ease-out both;
+}
+.hg2-curtain .eyebrow {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #8fa2c8;
+}
+.hg2-curtain > b {
+  font: italic 900 30px var(--display, inherit);
+  font-stretch: 82%;
+  letter-spacing: 0.5px;
+  text-align: center;
+  background: linear-gradient(to bottom, #ffffff, #d6dcff 45%, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 0 #1a0f3a);
+}
+.hg2-curtain-five {
+  display: grid;
+  gap: 6px;
+  width: min(300px, 100%);
+}
+.hg2-curtain-five > span {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: linear-gradient(to bottom, rgba(40, 56, 110, 0.55), rgba(12, 18, 44, 0.72));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 14px rgba(0, 0, 0, 0.35);
+  animation: hg2-curtain-row 0.3s ease-out both;
+}
+.hg2-curtain-five > span:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.hg2-curtain-five > span:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.hg2-curtain-five > span:nth-child(4) {
+  animation-delay: 0.15s;
+}
+.hg2-curtain-five > span:nth-child(5) {
+  animation-delay: 0.2s;
+}
+.hg2-curtain-five i {
+  font: 800 11px var(--display, inherit);
+  color: #a78bfa;
+  font-style: normal;
+}
+.hg2-curtain-five em {
+  font: italic 900 15px var(--display, inherit);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hg2-curtain-five small {
+  font: italic 900 16px var(--display, inherit);
+  color: #fbbf24;
+}
+.hg2-curtain > small {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: #8fa2c8;
+}
+@keyframes hg2-curtain-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hg2-curtain-row {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arcade-full.hg2-nba.held::after,
+  .hg2-curtain,
+  .hg2-curtain-five > span {
+    animation: none;
+  }
+}
+/* the dev bench's stub result sheet (HeldLab.tsx), standing in for ut's */
+.held-lab-sheet {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--sab, 0px) + 40px);
+  z-index: 10000;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 18px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(rgba(40, 56, 110, 0.92), rgba(12, 18, 44, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 16px 30px rgba(0, 0, 0, 0.5);
+  font-family: var(--display, inherit);
+}
+.held-lab-sheet b {
+  font: italic 900 34px var(--display, inherit);
+  color: #fbbf24;
+}
+.held-lab-sheet span {
+  font-size: 22px;
+  font-weight: 900;
+}
+.held-lab-sheet small {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #8fa2c8;
+}
