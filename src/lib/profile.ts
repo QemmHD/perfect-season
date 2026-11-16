@@ -5,6 +5,7 @@ import type { Booster, BotLevel, Mode, Slot } from '../engine/types';
 import type { EntryContent } from '../net/leaderboard';
 import { freshUt, migrateUt, type UtState } from '../ut/state';
 import { markNewPlayer, stampNewEra } from '../ut/new-era';
+import type { Playtime } from './playtime';
 
 export interface RunRecord {
   /** Unique id. Older records have none. */
@@ -37,6 +38,10 @@ export interface Settings {
   sound: boolean;
   haptics: boolean;
   hints: boolean;
+  /** Claude 2026-11-16 (V2 D.11), optional: hide me from public boards (publishing stops; absent = shown) */
+  hideBoards?: boolean;
+  /** Claude 2026-11-16 (V2 D.11), optional: the break reminder after 60 active minutes (absent = on) */
+  breakReminder?: boolean;
 }
 
 /** Head-to-head record against real players: all time, and this week (`week` is its key). */
@@ -86,6 +91,8 @@ export interface Profile {
   ut: UtState;
   /** one-time gifts already collected (by id), shared by both sports */
   gifts?: string[];
+  /** Claude 2026-11-16 (V2 E.3), optional and shared: the MINUTES ledger (src/lib/playtime.ts) */
+  playtime?: Playtime;
 }
 
 /** A random v4 UUID. */
@@ -116,7 +123,9 @@ export const PROFILE_KEYS: Record<SportId, string> = { nba: KEY, nfl: NFL_KEY, s
 /** The sports this page doesn't play. */
 export const OTHER_SPORTS: SportId[] = SPORTS.filter((s) => s !== SPORT);
 /** One player across both sports: the same name, wallet, level, boosters, settings and daily chest. */
-const SHARED = ['coins', 'xp', 'inventory', 'settings', 'name', 'streak', 'rewardDay', 'botLevel', 'gifts'] as const;
+// Claude 2026-11-16: `playtime` (the MINUTES ledger) is shared too; an older client keeps it, since it
+// spreads the basketball profile it writes back
+const SHARED = ['coins', 'xp', 'inventory', 'settings', 'name', 'streak', 'rewardDay', 'botLevel', 'gifts', 'playtime'] as const;
 
 export interface VsRecord {
   name: string;
