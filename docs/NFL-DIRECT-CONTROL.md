@@ -47,3 +47,12 @@ Local full suites passed **651 tests** (342 NBA / 309 NFL; 31/63 existing skips)
 - Main/original restore were rechecked unchanged at `7285ced3e66cb76c4a38d7bda134d6554fe04d33`. Source restore before this correction is `backup/pre-nfl-direct-stick-2026-10-30` at `aad7e9b4b747527945a481ad03857a8539bc6f05`.
 
 No account reset, inventory/progress migration, backend deployment or promotion to live Pages. This provenance follow-up changes documentation only; the deployed runtime is the verified implementation above. Physical installed-iPhone feel remains an owner playtest; existing large bundle warnings remain.
+
+## The momentum carry — Claude, studio overhaul nfl-1 (2026-11-16)
+
+Direct control stays exactly as above **once the player has the carrier**: a touched stick is his velocity, and a touched, centred or released stick is `{0,0}` and brakes. What changed is the moment the ball changes hands (a catch, a handoff, a scramble). Before, an untouched stick sent `{0,0}` to the new carrier, so every catch and handoff braked to a stop unless the thumb was already down (audit C-1: 5 of 5 live catches stopped within 0.25 s; YPC with the thumb 0.35 s late fell from 4.15 to 1.06).
+
+- `controls.ts` `CarryGate` decides, per carrier: a stick already held at the change counts only on a designed handoff, or when its upfield share is ≥ 0.3 of its length. Otherwise the screen sends `null` until a **new** touch (or key press), or until the held stick moves ≥ 0.25 from where it was at the change.
+- `null` to a receiver or a scrambling quarterback is the engine's **momentum carry** (`CARRY_HOLD` 0.35 s at `CARRY_TURN` 0.6 of his turn rate, then bending upfield; drifting back, he plants and comes upfield). `null` to a designed run's back still follows its lane.
+- So the old rule "do not convert a centred human vector to null" now holds from the first touch after the change; the only `null` a human sends is for a carrier he has not taken yet. The autopilot never sends `null` to a carrier, and `determinism.test.ts` pins the AI's plays, `aiDrivesOf` and takeovers to their pre-change hashes.
+- Protocol bump needed (NFL draft 10→11, UT 11→12): human-played drives come out differently. See `docs/studio-overhaul/nfl.md`.

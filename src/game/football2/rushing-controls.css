@@ -192,3 +192,54 @@
     transition: none;
   }
 }
+
+/* Claude (nfl-1): HOLD TO RUN. While the ball is in the air and the stick is untouched, a ring pulses
+   round the stick and a label sits above it: hold the stick upfield now and the catch runs at once
+   (left alone, the catcher runs on his momentum until the thumb lands). Reduced motion: the label only. */
+.fb2 .fb2-ghost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.fb2 .fb2-ghost::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--teal);
+  box-shadow: 0 0 14px rgba(25, 227, 201, 0.45);
+  animation: fb2-ghost-pulse 1.1s ease-in-out infinite;
+}
+.fb2 .fb2-ghost b {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 6px 10px;
+  border: 1px solid rgba(25, 227, 201, 0.7);
+  border-radius: 999px;
+  background: rgba(4, 18, 26, 0.88);
+  font: 900 italic 11px/1 var(--display);
+  letter-spacing: 1.2px;
+  color: #fff;
+}
+.fb2 .fb2-stick.held .fb2-ghost {
+  display: none;
+}
+@keyframes fb2-ghost-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb2 .fb2-ghost::before {
+    display: none;
+  }
+}

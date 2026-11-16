@@ -1,6 +1,9 @@
 // Codex: run execution, physical blocking, player choice and rating/difficulty regressions.
 import { describe, expect, it } from 'vitest';
 import { hashString, rng } from '../../engine/rng';
+import { chooseCall, decide, pilot } from './autopilot';
+import { CarryGate } from './controls';
+import { afterPlay, newGame, startPlay } from './drive';
 import { lineUp, snap, step } from './engine';
 import { depth } from './squad';
 import type { Defense, Offense, RunPlay } from './types';
@@ -149,5 +152,114 @@ describe('direct human running', () => {
     expect(p.stamina).toBe(1);
     for (let i = 0; i < 60; i++) step(p, 1 / 60, { x: 0, y: 1 });
     expect(p.stamina).toBeLessThan(0.8);
+  });
+});
+
+// Claude (nfl-1): the momentum carry. A catch nobody is steering yet keeps running (C-1: it used to
+// brake to a stop unless the stick was already held), a touched stick is still direct control, and
+// the AI's own carriers never take this path.
+describe('the momentum carry after a catch', () => {
+  /** An in-stride catch in the open field, the receiver moving at (vx, vy) when the ball arrives. */
+  function openCatch(vx: number, vy: number) {
+    const { off, def } = teams();
+    const p = lineUp(off, def, 'pass', 'verts', 'inside', 35, 26.67, rng(hashString('carry')));
+    snap(p);
+    const b = p.bodies.find((x) => x.slot === 'Z')!;
+    for (const d of p.bodies.filter((x) => x.side === 'D')) Object.assign(d, { x: 2, y: 105, stunUntil: Infinity });
+    Object.assign(p, { phase: 'air', carrier: null, t: 1, rand: () => 0.3 });
+    Object.assign(b, { x: 30, y: 50, vx, vy, job: 'track' });
+    p.ball = { from: { x: 26, y: 30 }, to: { x: 30, y: 50 }, t0: 0, t1: 1, peak: 3 };
+    step(p, 1 / 60, null);
+    expect(p.carrier).toBe(b);
+    return { p, b, v0: Math.hypot(b.vx, b.vy), y0: b.y };
+  }
+  it.each([
+    [0, 8],
+    [5, 6],
+    [-4, 7],
+    [7, 3],
+    [8, 0]
+  ])('keeps a catch made running (%s,%s) going upfield: 0.85 of its speed at +0.5 s and 4+ yards in a second', (vx, vy) => {
+    const { p, b, v0, y0 } = openCatch(vx, vy);
+    for (let i = 0; i < 30; i++) step(p, 1 / 60, null);
+    expect(Math.hypot(b.vx, b.vy)).toBeGreaterThanOrEqual(0.85 * v0);
+    for (let i = 0; i < 30; i++) step(p, 1 / 60, null);
+    expect(b.y - y0).toBeGreaterThanOrEqual(4);
+    expect(p.end).toBeNull();
+  });
+  it.each([
+    [0, -3],
+    [-5, -5],
+    [3, -6]
+  ])('plants a receiver caught drifting back (%s,%s) and has him heading upfield within 0.3 s', (vx, vy) => {
+    const { p, b } = openCatch(vx, vy);
+    for (let i = 0; i < 18; i++) step(p, 1 / 60, null);
+    expect(b.vy).toBeGreaterThan(0);
+  });
+  it('brakes a touched, centred stick to a stop', () => {
+    const { p, b } = openCatch(0, 8);
+    for (let i = 0; i < 60; i++) step(p, 1 / 60, { x: 0, y: 0 });
+    expect(Math.hypot(b.vx, b.vy)).toBeLessThan(0.01);
+  });
+  it('drives a stick held upfield through the catch at once', () => {
+    const { p, b } = openCatch(0, 8);
+    const gate = new CarryGate();
+    const held = { x: 0.6, y: 0.8 };
+    // the first step with the new carrier already takes the stick
+    expect(gate.input(b.id, false, held)).toEqual(held);
+    for (let i = 0; i < 18; i++) step(p, 1 / 60, gate.input(b.id, false, held));
+    expect(b.vx).toBeGreaterThan(2);
+    expect(Math.atan2(b.vx, b.vy)).toBeCloseTo(Math.atan2(0.6, 0.8), 1);
+  });
+  it('never sends a receiver back-left after a pocket drift: upfield at +0.3 s in 20 of 20 seeded catches', () => {
+    const drift = { x: -0.7, y: -0.7 };
+    const headings: number[] = [];
+    for (let seed = 1; seed < 80 && headings.length < 20; seed++) {
+      const { off, def } = teams();
+      const concept = (['verts', 'slants', 'smash', 'flood', 'dagger', 'mesh', 'curls', 'posts'] as const)[seed % 8];
+      const p = lineUp(off, def, 'pass', concept, 'inside', 30, 26.67, rng(hashString('drift:' + seed)));
+      for (const d of p.bodies.filter((x) => x.side === 'D')) d.stunUntil = Infinity;
+      snap(p);
+      const g = newGame(off, def, 'drift:' + seed);
+      const pl = pilot(0.7, 'drift:' + seed);
+      const gate = new CarryGate();
+      let caughtAt = -1;
+      for (let i = 0; i < 600 && !p.end; i++) {
+        decide(p, g, pl);
+        const c = p.phase === 'run' ? p.carrier : null;
+        // the thumb has been drifting the quarterback back-left, and stays there through the catch
+        step(p, 1 / 60, gate.input(c ? c.id : null, false, drift));
+        if (p.phase === 'run' && caughtAt < 0) caughtAt = p.t;
+        if (caughtAt >= 0 && p.t - caughtAt >= 0.3) break;
+      }
+      if (caughtAt < 0 || p.end || !p.carrier) continue;
+      headings.push(p.carrier.vy);
+    }
+    expect(headings).toHaveLength(20);
+    expect(headings.filter((vy) => vy > 0)).toHaveLength(20);
+  });
+  it('leaves the AI unchanged: the autopilot never gives the engine null for a ball carrier', () => {
+    const { off, def } = teams();
+    let carrierSteps = 0;
+    for (let i = 0; i < 6; i++) {
+      const g = newGame(off, def, 'ai-carry:' + i);
+      const pl = pilot(0.68, 'ai-carry:' + i);
+      for (let n = 0; n < 40 && !g.over; n++) {
+        if (g.down === 4) break;
+        const p = startPlay(g, chooseCall(g, pl));
+        snap(p);
+        pl.readAt = 0;
+        for (let k = 0; k < 1500 && !p.end; k++) {
+          const steer = decide(p, g, pl);
+          if (p.phase === 'run' && p.carrier) {
+            carrierSteps++;
+            expect(typeof steer).toBe('number');
+          }
+          step(p, 1 / 60, steer);
+        }
+        afterPlay(g, p.end!);
+      }
+    }
+    expect(carrierSteps).toBeGreaterThan(500);
   });
 });
