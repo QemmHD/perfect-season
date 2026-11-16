@@ -24,10 +24,11 @@ import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
 import { reducedMotion } from '../../ui/motion';
 import { artOf, ballR, type Box, camStep, type CamState, heightK, newCamState, SPRITE_TILT, spriteScale, WALL_Y } from './camera';
-import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
+import { aimPoint, CONE_SCALE, coneMult, GH, GHALF, GX, PL, PW, ctrlOf, releaseWord, type PassPlan } from './engine';
 import { nearestWithin, TAP_PLAYER_PX } from './controls';
 import { shotCone, topSpeed } from './ratings';
-import type { Attack, Body, Pt } from './types';
+import type { Attack, Body, Pt, RingWhy } from './types';
+import { drawRing } from './v2';
 
 export interface SoccerKit {
   jersey: string;
@@ -386,7 +387,8 @@ export class SoccerRenderer {
   /** teammates outside the box: their arrows at its edge (for tap-to-pass) */
   arrows: { id: number; x: number; y: number; ang: number }[] = [];
   /** draws, sprites asked for, stale sprites reused, floor redraws; the man's and the ball's size on screen */
-  stats = { draws: 0, sprites: 0, stale: 0, floors: 0, ctrlPx: 0, ballPx: 0 };
+  /** goldArc: the gold band's drawn length (px) on the ring this frame, the smaller of the arc over his head and the ring at his feet (plan G1) */
+  stats = { draws: 0, sprites: 0, stale: 0, floors: 0, ctrlPx: 0, ballPx: 0, goldArc: 0 };
   /** set once the first frame with the pitch and the players has been drawn (shell's ps:arena-ready) */
   firstFrame = false;
   private lastDraw = 0;
@@ -770,69 +772,59 @@ export class SoccerRenderer {
     }
   }
 
-  /** The power meter: an arch over the shooter, filling as SHOOT is held, the green slice at its
-   * top and a fainter "good" band around it (closer to the green is truer); after the strike it stays
-   * a moment with a tick where it was let go and the word for it. */
-  private meter(ctx: CanvasRenderingContext2D, a: Attack, head: { x: number; y: number }) {
+  /**
+   * The gold ring (V2 B.0.1; soccer-4): a ring on the grass round the shooter's feet and a short arc
+   * over his head, both filling as SHOOT is held, with the window where the gold sits (amber or red
+   * when the ring can't be gold: the dial's word over it, TOO FAR when out of range). The gold band is
+   * never drawn under 8 px (v2/perfect.ts drawRing stretches the ring's time scale round it, never the
+   * window). After the release it stays a moment with the word for it.
+   */
+  private meter(ctx: CanvasRenderingContext2D, a: Attack, head: { x: number; y: number }, feet: { x: number; y: number; s: number }) {
     const m = a.meter;
     const r = a.release;
     const ghost = !m && r && a.t - r.at < 0.9 ? r : null;
     if (!m && !ghost) return;
     const top = m ? m.top : ghost!.top;
     const green = m ? m.green : ghost!.green;
+    const state = m ? m.ring : ghost!.ring;
     const held = m ? a.t - m.t0 : ghost!.top + ghost!.off;
-    const span = METER * 1.3;
-    const frac = Math.min(1, Math.max(0, held / span));
+    // the ring runs a little past the gold, so a late release shows as late
+    const span = top + 0.35;
+    const band = { goldFrom: (top - green) / span, goldTo: (top + green) / span, state, progress: held / span };
     const R = Math.max(24, Math.round(Math.min(this.W, this.H) * 0.085));
     const th = Math.max(7, Math.round(R * 0.27));
     const cx = head.x;
     const cy = Math.max(R + th + 64, head.y + Math.round(R * 0.25));
-    const A0 = Math.PI + 0.36;
-    const SW = Math.PI - 0.72;
-    const band = (a0: number, a1: number, rr: number, w: number, color: string) => {
-      if (a1 <= a0) return;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.arc(cx, cy, rr, a0, a1);
-      ctx.stroke();
-    };
-    const at = (t: number) => A0 + Math.min(1, Math.max(0, t / span)) * SW;
     ctx.save();
     if (ghost) ctx.globalAlpha = Math.max(0, Math.min(1, (0.9 - (a.t - ghost.at)) / 0.3));
-    ctx.lineCap = 'butt';
-    band(A0 - 0.05, A0 + SW + 0.05, R, th + 5, '#05070d');
-    band(A0 - 0.03, A0 + SW + 0.03, R, th + 2, '#e8ecf5');
-    band(A0, A0 + SW, R, th, '#1a2235');
-    // the good band (accuracy falls off smoothly away from the green: 2.2 greens is still GOOD)
-    band(at(top - green * 2.2), at(top + green * 2.2), R, th, '#33618f');
-    const glow = m ? Math.max(0, 1 - Math.abs(held - top) / 0.12) : 0;
-    band(at(top - green), at(top + green), R, th, glow > 0 ? mixHex('#1f9e4c', '#7dffab', glow) : '#1f9e4c');
-    band(at(top - green), at(top + green), R + th / 2 + 2, 2, '#3ef07a');
-    band(at(top - green), at(top + green), R - th / 2 - 2, 2, '#3ef07a');
-    const fillTo = A0 + frac * SW;
-    const u = timingMiss(held - top, green);
-    const fill = held > top + green ? (u > 2.2 ? '#ff7a4a' : '#ffb04a') : u <= 1 ? '#7dffab' : '#ffd35a';
-    band(A0, fillTo, R, th - 2, fill);
-    band(A0, fillTo, R - th / 2 + 2, 1, 'rgba(255,255,255,0.55)');
-    if (frac > 0.01) band(fillTo - 0.035, fillTo, R, th + 4, '#ffffff');
+    // on the grass: the ring round his feet (flattened by the camera's look-down)
+    const gr = Math.max(14, Math.round(feet.s * this.art * 0.62));
+    const g1 = drawRing(ctx, { x: feet.x, y: feet.y, r: gr, ry: Math.max(6, Math.round(gr * 0.42)), width: 3, ...band });
+    // over his head: the arc, the same window
+    const g2 = drawRing(ctx, { x: cx, y: cy, r: R, start: Math.PI + 0.36, sweep: Math.PI - 0.72, width: th, ...band });
+    this.stats.goldArc = Math.min(g1, g2);
     ctx.restore();
     if (ghost) {
-      const w = timingWord(ghost.off, ghost.green);
-      const col = w === 'PERFECT' ? '#3ef07a' : w === 'GOOD' ? '#d6e5ed' : '#ffb04a';
-      this.tag(w, cx, cy - R - th - 16, col, 3);
+      const w = releaseWord(ghost.off, ghost.green, ghost.ring);
+      const col = ghost.gold ? '#ffd35a' : w === 'GOOD' ? '#d6e5ed' : '#ffb04a';
+      this.tag(ghost.gold ? 'PERFECT' : w, cx, cy - R - th - 16, col, 3);
       return;
     }
-    this.tag(m!.first ? 'FIRST TIME' : a.setPiece?.kind === 'penalty' ? 'PENALTY' : a.setPiece ? 'FREE KICK' : 'POWER', cx, cy - R - th - 16, TAG.word, 3);
+    const word = state === 'red' ? 'TOO FAR' : state === 'amber' && m!.why ? RING_TAG[m!.why] : m!.first ? 'FIRST TIME' : a.setPiece?.kind === 'penalty' ? 'PENALTY' : a.setPiece ? 'FREE KICK' : 'GOLD';
+    this.tag(word, cx, cy - R - th - 16, state === 'red' ? '#ff8a8a' : state === 'amber' ? '#ffc070' : TAG.word, 3);
     this.miniGoal(ctx, a, cx, cy - R - th - 30);
   }
 
-  /** The cone (degrees, 1 sd) a release now would have: it tightens toward the green and opens past it. */
+  /** The cone (degrees, 1 sd) a release now would have: none on gold in the window (the ball goes on the
+   * reticle), else it tightens toward the window and opens past it. */
   private liveCone(a: Attack): number {
     const m = a.meter;
     const c = ctrlOf(a);
-    if (!m) return shotCone(c.p);
-    return shotCone(c.p) * coneMult(a.t - m.t0 - m.top, m.green);
+    if (!m) return shotCone(c.p) * CONE_SCALE;
+    const off = a.t - m.t0 - m.top;
+    if (m.ring === 'gold' && Math.abs(off) <= m.green) return 0;
+    const cm = coneMult(off, m.green);
+    return shotCone(c.p) * CONE_SCALE * (m.ring === 'red' ? Math.max(1, cm) : cm);
   }
 
   /** A small goal over the meter: the keeper, and where the shot is going (a dot, AUTO when it's the assist). */
@@ -898,7 +890,8 @@ export class SoccerRenderer {
     const tp = aimPoint(a, c, m.aim ?? null);
     const p = this.lens(tp.x, PL, tp.h);
     const dist = Math.hypot(tp.x - a.ball.x, PL - a.ball.y);
-    const rM = Math.max(0.2, dist * Math.tan((this.liveCone(a) * Math.PI) / 180) * 1.3);
+    // (at most the goal's half-width: a red or amber ring's cone from range would ring the whole screen)
+    const rM = Math.min(GHALF, Math.max(0.2, dist * Math.tan((this.liveCone(a) * Math.PI) / 180) * 1.3));
     const r = Math.max(5, Math.round(rM * p.s));
     const x = Math.round(p.x);
     const y = Math.round(p.y);
@@ -1154,7 +1147,10 @@ export class SoccerRenderer {
     if (o.names && ours) for (const b of a.bodies) if (b.side === 'A' && b !== c && heads[b.id]) this.tag(b.p.tag, heads[b.id].x, heads[b.id].y - 15, TAG.white, 1);
     if (o.pass && !a.meter && !a.end) this.passLine(ctx, a, o.pass);
     if (a.meter) this.aim(ctx, a);
-    if (h && !a.end) this.meter(ctx, a, h);
+    if (h && !a.end) {
+      const f = this.lens(c.x, c.y);
+      this.meter(ctx, a, h, { x: Math.round(f.x), y: Math.round(f.y), s: f.s });
+    }
     // a free kick's bend: an arrow over the ball the way it will swing
     if (a.setPiece?.kind === 'freekick' && Math.abs(a.curl) > 0.05 && !a.end) {
       const p0 = this.lens(a.ball.x, a.ball.y, 1.6);
@@ -1233,6 +1229,9 @@ export function placeArrows(mates: readonly { id: number; x: number; y: number }
   return out;
 }
 
+/** The ring's word over the arc when it can't be gold (soccer-4). */
+const RING_TAG: Record<RingWhy, string> = { range: 'TOO FAR', pressure: 'PRESSURE', first: 'ACROSS BODY', header: 'TOO FAR OUT', angle: 'TIGHT ANGLE' };
+
 /** The ground rings' colours (V2 C.1.3): you, the pass's man, the defender on the ball, the rival's taker. */
 export const RING = { gold: '#f6b93b', teal: '#4fe3c1', red: '#ff5d5d', rival: '#a78bfa' } as const;
 
@@ -1252,13 +1251,6 @@ export function ctrlTagSpot(text: string, x: number, feetY: number, headY: numbe
 
 /** Is the speed the man is moving near his top (for the drawing's sprint dust)? */
 export const sprinting = (b: Body) => Math.hypot(b.vx, b.vy) > topSpeed(b.p) * 0.92;
-
-function mixHex(a: string, b: string, k: number): string {
-  const pa = parseInt(a.slice(1), 16);
-  const pb = parseInt(b.slice(1), 16);
-  const ch = (s: number) => Math.round(((pa >> s) & 255) + ((((pb >> s) & 255) - ((pa >> s) & 255)) * k));
-  return '#' + ((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0');
-}
 
 const F35: Record<string, string> = {
   A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100', G: '011100101101011', H: '101101111101101', I: '111010010010111', J: '001001001101010', K: '101101110101101', L: '100100100100111', M: '101111111101101', N: '110101101101101', O: '010101101101010', P: '110101110100100', Q: '010101101110011', R: '110101110101101', S: '011100010001110', T: '111010010010010', U: '101101101101111', V: '101101101101010', W: '101101111111101', X: '101101010101101', Y: '101101010010010', Z: '111001010100111',

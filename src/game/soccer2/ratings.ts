@@ -91,9 +91,19 @@ export function passError(p: SoccerPlayer): number {
 export function shotCone(p: SoccerPlayer): number {
   return Math.max(0.4, lin(5.5, 1.6, rt(p.keeper ? 40 : p.a.SHO)));
 }
-/** Half the green window on the power meter (seconds): SHO 40 → 0.028, SHO 99 → 0.085. */
+/**
+ * The gold window's base half-width on SHOOT (seconds), before openness and the rest (engine.ts
+ * shotRing; the ±30 ms floor comes last, v2/perfect.ts, so SHO 60 or less sits on the floor): SHO 70 →
+ * 0.039, SHO 85 → 0.051, SHO 95 → 0.062, SHO 99 → 0.066. Narrower and steeper than the 2026-11-02 green
+ * (0.028 → 0.085, power 1.1): gold now places the ball exactly, so it must be earned, and the ring shows
+ * the rating (V2 B.3.8, plan G3: SHO 95 ≥ 1.5× SHO 70). Claude 2026-11-16, soccer-4.
+ */
 export function greenHalf(p: SoccerPlayer): number {
-  return lin(0.028, 0.085, Math.pow(Math.min(1, rt(p.keeper ? 40 : p.a.SHO)), 1.1) + Math.max(0, rt(p.a.SHO) - 1) * 0.5);
+  return lin(0.018, 0.066, Math.pow(Math.min(1, rt(p.keeper ? 40 : p.a.SHO)), 1.25) + Math.max(0, rt(p.a.SHO) - 1) * 0.5);
+}
+/** The range gate (V2 B.3.5): beyond this the ring is red (TOO FAR). SHO 40 → 24 m, SHO 99 → 34 m. */
+export function maxRange(p: SoccerPlayer): number {
+  return lin(24, 34, rt(p.keeper ? 40 : p.a.SHO));
 }
 /** A struck shot's speed at full power (m/s): SHO and PHY, 21 → 31. */
 export function shotSpeed(p: SoccerPlayer): number {
@@ -124,34 +134,39 @@ export function interceptReach(p: SoccerPlayer): number {
 export function interceptChance(p: SoccerPlayer, speed: number, defIQ: number): number {
   return clamp(0.25 + 0.42 * rt(p.a.DEF) + 0.18 * (1 - speed / 22) + 0.06 * defIQ, 0.1, 0.9);
 }
-/** A defender's chance to block a shot passing within his body's reach. */
+/** A defender's chance to block a shot passing within his body's reach (soccer-4: 0.25 → 0.62 before;
+ * a ball struck straight at a body is mostly stopped, and real open play has a quarter of shots blocked). */
 export function blockChance(p: SoccerPlayer, wall: boolean): number {
-  return wall ? 0.92 : clamp(lin(0.25, 0.62, rt(p.a.DEF)), 0.15, 0.7);
+  return wall ? 0.92 : clamp(lin(0.42, 0.8, rt(p.a.DEF)), 0.3, 0.85);
 }
 
-/** Keepers. Reaction to a strike (s): REF 40 → 0.30, 99 → 0.12. */
+/* Keepers. Soccer-4 (Claude 2026-11-16) narrowed the spread of these around a 75 keeper (whose
+   numbers barely move) so a 93 keeper is about 20-25% better than an average one, not twice as good
+   (research §7.5; plan S5: GK 93 concedes 0.70-0.85× what GK 75 does from the same shots). */
+/** Reaction to a strike (s): REF 40 → 0.22, 75 → 0.196, 99 → 0.18. */
 export function gkReaction(p: SoccerPlayer): number {
-  return Math.max(0.06, lin(0.3, 0.12, rt(p.a.REF)));
+  return Math.max(0.06, lin(0.22, 0.18, rt(p.a.REF)));
 }
 /** How far his dive carries his body sideways (m) and how long the dive takes (s). */
 export function gkDive(p: SoccerPlayer): { reach: number; time: number } {
-  return { reach: lin(1.05, 1.85, rt(p.a.DIV)), time: Math.max(0.3, lin(0.6, 0.42, rt(p.a.DIV))) };
+  return { reach: lin(1.42, 1.64, rt(p.a.DIV)), time: Math.max(0.3, lin(0.53, 0.48, rt(p.a.DIV))) };
 }
 /** Hands at full stretch beyond his body (m). */
 export function gkArm(p: SoccerPlayer): number {
-  return lin(0.85, 1.15, rt(p.a.DIV) * 0.5 + rt(p.a.REF) * 0.5);
+  return lin(0.96, 1.08, rt(p.a.DIV) * 0.5 + rt(p.a.REF) * 0.5);
 }
 /** Misreading where the shot goes (m, 1 sd): sharp reflexes read it truer. */
 export function gkMisread(p: SoccerPlayer): number {
-  return Math.max(0.05, lin(0.7, 0.3, rt(p.a.REF)));
+  return Math.max(0.05, lin(0.55, 0.42, rt(p.a.REF)));
 }
-/** Standing off his angle (m, 1 sd): POS. */
+/** Standing off his angle (m, 1 sd): POS (soccer-4: 1.3 → 0.35 before; 75 barely moves). */
 export function gkPositionError(p: SoccerPlayer): number {
-  return Math.max(0.05, lin(1.3, 0.35, rt(p.a.POS)));
+  return Math.max(0.05, lin(1.0, 0.5, rt(p.a.POS)));
 }
-/** Holding a save rather than parrying it: HAN, less for a hard shot or one at full stretch. */
+/** Holding a save rather than parrying it: HAN, less for a hard shot or one at full stretch (soccer-4:
+ * 0.38 → 0.86 before, narrowed with the other keeper effects). */
 export function gkCatch(p: SoccerPlayer, speed: number, stretch: number, high: boolean): number {
-  return clamp(lin(0.38, 0.86, rt(p.a.HAN)) - Math.max(0, speed - 16) / 34 - stretch * 0.3 - (high ? 0.12 : 0), 0.05, 0.94);
+  return clamp(lin(0.48, 0.8, rt(p.a.HAN)) - Math.max(0, speed - 16) / 34 - stretch * 0.3 - (high ? 0.12 : 0), 0.05, 0.94);
 }
 /** Guessing a penalty right (going the way it's struck). */
 export function gkPenaltyRead(p: SoccerPlayer): number {

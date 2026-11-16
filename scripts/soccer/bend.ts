@@ -1,11 +1,11 @@
 // Which way does a free kick bend for each BEND button? (studio overhaul soccer-1, ported from the
 // 2026-11-09 audit's soccer_bend.ts.) A 99-rated taker aimed at the middle of the goal, struck on the
-// green, with every defender (the wall, the markers and the keeper) moved off the ball's line, so all
+// green (soccer-4: just off the gold, see below), with every defender (the wall, the markers and the keeper) moved off the ball's line, so all
 // 40 kicks per button reach the goal line (the audit's run let the keeper and the markers stop most of
 // them: n 11 / 3 / 24); the mean of (where it crosses the line − where it was aimed). + is to the right
 // on screen (x across the pitch, as the portrait camera looks up it).
 //   bash O/heavy.sh npx vite-node scripts/soccer/bend.ts
-import { bendCurl, kickOff, PL, pressShoot, releaseShoot, setAim, setCurl, setupAttack, step, TOP } from '../../src/game/soccer2/engine';
+import { bendCurl, kickOff, PL, pressShoot, releaseShoot, setAim, setCurl, setupAttack, step } from '../../src/game/soccer2/engine';
 import { player, squad } from './lib';
 
 /** the BEND buttons' curl, as Soccer2.tsx's handler sets it (bendCurl since soccer-1: k * 0.75 before) */
@@ -28,8 +28,10 @@ for (const k of [-1, 0, 1]) {
     setCurl(a, button(k));
     pressShoot(a);
     setAim(a, { x: 0, y: 0 });
-    for (let j = 0; j < Math.round(TOP * 60); j++) step(a, 1 / 60, { x: 0, y: 0 });
-    releaseShoot(a, { x: 0, y: 0 });
+    for (let j = 0, n = Math.round(a.meter!.top * 60); j < n; j++) step(a, 1 / 60, { x: 0, y: 0 });
+    // let go a little late, off the gold (soccer-4: a gold kick lands exactly on its aim, bend solved
+    // in, so only an off-gold kick shows where a button's bend alone carries it)
+    releaseShoot(a, { x: 0, y: 0 }, 0, a.meter ? a.meter.top + 1.6 * a.meter.green : undefined);
     for (let j = 0; j < 400 && !a.end; j++) step(a, 1 / 60, { x: 0, y: 0 });
     const s = a.lastShot;
     if (s?.cross) {

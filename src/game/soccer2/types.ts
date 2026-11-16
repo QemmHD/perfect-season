@@ -1,6 +1,7 @@
 // Soccer v2 ("Attacks"): the players and one attack's state. Implemented by Claude (Anthropic),
 // 2026-11-01. Pitch metres: x across (0 to 68, the touchlines), y up the pitch from your own goal
 // line (0) to the goal you attack (105). h is height off the grass. Your side always attacks up.
+import type { RingDial, RingState } from './v2';
 
 /** A player rated from his card's face: PAC SHO PAS DRI DEF PHY, or a keeper's DIV HAN KIC REF SPD POS. */
 export interface SoccerPlayer {
@@ -98,7 +99,22 @@ export interface Body {
   fy: number;
   /** render only (the players' action contract, docs/studio-overhaul/soccer.md §5.5): what his last
    * kick or throw was. The engine writes it and never reads it. */
-  passKind?: PassKind | 'cross' | 'throw' | 'loftedThrough';
+  passKind?: PassKind | 'cross' | 'throw' | 'loftedThrough' | 'shot' | 'header' | 'pen' | 'fk' | 'clear';
+  /* ---- render only, written by the engine from deterministic geometry and never read by it, and no
+     random number is drawn for them (§5.5; soccer-4). A test randomises them every step. ---- */
+  /** the foot his last kick was struck with: the ball's side of his body across the strike */
+  kickFoot?: 'L' | 'R';
+  /** his last shot: placed, or a power shot (held past the gold); `power` 0..1 sets the backlift */
+  shotKind?: 'placed' | 'power';
+  power?: number;
+  /** how he struck it: a header (crouch, rise, neck snap), a volley (side-on swing) or on the floor */
+  contact?: 'foot' | 'head' | 'volley';
+  /** a keeper's dive: low, mid or high */
+  diveHeight?: 'low' | 'mid' | 'high';
+  /** a keeper's split step: when it landed (attack time), at least 4 frames before every strike */
+  keeperSet?: number;
+  /** a block lunge (and, from soccer-8, a slide tackle): when, and which way (unit, pitch metres) */
+  slide?: { at: number; dx: number; dy: number };
 }
 
 export type PassKind = 'ground' | 'lofted' | 'through';
@@ -124,12 +140,23 @@ export interface Ball {
   flight: null | { kind: PassKind | 'shot' | 'cross' | 'parry' | 'clear' | 'throw'; from: number; to: number | null; at: number; bounces?: number };
 }
 
-/** SHOOT held: the power meter. top is where the green slice sits (seconds after the press). */
+/** Why a ring is amber or red (soccer-4): a defender within 2 m, a first-time hit turning the ball
+ * more than 90° across the body, a header from beyond 8 m, a tight angle inside 12 m, or out of range. */
+export type RingWhy = 'pressure' | 'first' | 'header' | 'angle' | 'range';
+
+/** SHOOT held: the gold ring (V2 B.0.1; the power meter before soccer-4). top is where the gold sits
+ * (seconds after the press: the wind-up, 0.35 s at 11 m to 0.62 s at 25 m). */
 export interface Meter {
   t0: number;
   top: number;
-  /** half-width of the green, seconds */
+  /** half-width of the gold window, seconds (never under 30 ms) */
   green: number;
+  /** the ring's state now (recomputed every step while SHOOT is held): gold only when a release in
+   * the window places the ball exactly on the reticle */
+  ring: RingState;
+  /** why it isn't gold, and the dial the toast names */
+  why?: RingWhy;
+  dial?: RingDial;
   /** a first-time shot or header on an arriving ball */
   first: boolean;
   /** aim assist's target while SHOOT is held (aim space: x -1..1 across, y -1 low..1 high) */
@@ -141,7 +168,22 @@ export interface Meter {
 /** The last shot, for the HUD and the replay. */
 export interface ShotInfo {
   by: number;
+  /** a gold release (PERFECT): in the window on a gold ring, so the ball went exactly on the reticle */
   greened: boolean;
+  /** the release was inside the window (on any ring) */
+  inWindow?: boolean;
+  /** the ring at the release, and why it wasn't gold */
+  ring?: RingState;
+  why?: RingWhy;
+  /** how far out it was struck (m to the goal's centre), and how wide (rad off the centre line) */
+  d?: number;
+  ang?: number;
+  /** a keeper's parry: pushed out wide, back out in front, or round the post (bookkeeping only) */
+  parried?: 'wide' | 'front' | 'post';
+  /** the shot's xG (xg.ts), filled in by the match screen for the read-out; never read by the engine */
+  xg?: number;
+  /** a first-time hit: how far it turned the ball (degrees; 0 straight on, 180 back the way it came) */
+  turn?: number;
   /** timing: negative early, positive late (seconds off the top) */
   off: number;
   power: number;
@@ -192,8 +234,9 @@ export interface Attack {
   events: string[];
   /** fouls won (a free kick or penalty comes from them) */
   fouls: number;
-  /** a shot waiting to be struck: the leg swings, the ball goes at `at` */
-  strike: null | { at: number; by: number; vx: number; vy: number; vh: number; curl: number; dip: number; info: ShotInfo };
+  /** a shot waiting to be struck: the leg swings, the ball goes at `at`; `exact`: a gold release,
+   * re-solved from where the ball is at the strike so it crosses the line on the reticle */
+  strike: null | { at: number; by: number; vx: number; vy: number; vh: number; curl: number; dip: number; info: ShotInfo; exact?: { x: number; h: number; speed: number } };
   /** a pass waiting to be struck */
   kick: null | { at: number; by: number; to: number | null; kind: PassKind | 'cross' | 'throw'; vx: number; vy: number; vh: number; curl: number; /** a person's lofted through ball (THRU held; render only) */ loftedThrough?: true };
   /** the free ball's predicted path (a point every 1/30 s), for runs onto it and the keeper */
@@ -205,15 +248,24 @@ export interface Attack {
   /** attackers in an offside position when the last pass was played */
   offIds: number[];
   /** the keeper's read of a shot: when he goes, from where, to where */
-  gkPlan: null | { react: number; x0: number; tx: number; th: number; at: number; y0?: number; ty?: number };
+  gkPlan: null | { react: number; x0: number; tx: number; th: number; at: number; y0?: number; ty?: number; far?: boolean };
   /** a first-time hit let go before the ball arrived */
-  first: null | { off: number; greened: boolean; power: number; aim: Pt | null; green: number };
+  first: null | ShotRelease;
   /** the set-piece taker */
   taker: number | null;
   /** who struck the last shot */
   shotBy: number | null;
-  /** the last release of SHOOT, for the meter's read-out after the strike */
-  release?: { at: number; off: number; green: number; top: number };
+  /** the last release of SHOOT, for the ring's read-out after the strike */
+  release?: { at: number; off: number; green: number; top: number; ring: RingState; gold: boolean; why?: RingWhy };
+  /** gold releases in this attack (the person's and the autopilot's: Heat reads them from soccer-7) */
+  perfects?: number;
+  /** the last pass or loose ball someone brought under control: who, when and the way it was going
+   * (a pass he plays straight away is a first-time pass: harder the more it turns the ball) */
+  recv?: { by: number; at: number; dx: number; dy: number };
+  /** the keeper has come off his line in this attack to race for the ball (once an attack) */
+  rushAt?: number;
+  /** the ball in the air the keeper has called for (its flight's start): his defenders leave it to him */
+  claimFor?: number;
   /** a pass the person played: the stick's way when it went (the receiver runs onto the ball until
    * the stick moves off it) */
   passStick?: Pt | null;
@@ -223,4 +275,16 @@ export interface Attack {
    * most RESTARTS.max; and the latest one's kind (a corner's marking and headers apply after it) */
   restarts?: number;
   restart?: 'corner' | 'throw';
+}
+
+/** A release of SHOOT, judged: the offset from the gold (s), whether it was in the window, the power,
+ * the aim (null: assist), the window and the ring it was let go on. */
+export interface ShotRelease {
+  off: number;
+  inWin: boolean;
+  power: number;
+  aim: Pt | null;
+  green: number;
+  ring: RingState;
+  why?: RingWhy;
 }

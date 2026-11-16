@@ -21,6 +21,8 @@ interface ShotRec {
   greened: boolean;
   res: string;
   inBox: boolean;
+  /** the ring at the release and why it was not gold (soccer-4) */
+  ring?: string;
 }
 interface AtkRec {
   sc: Scenario;
@@ -65,7 +67,7 @@ function playAttack(a: Attack, skill: number, seed: string, shots: ShotRec[]): A
       if (e === 'shot' || e === 'header') {
         if (open) shots.push({ ...open, res: open.res || 'other' });
         const s = a.lastShot!;
-        open = { d: Math.hypot(a.ball.x - GX, PL - a.ball.y), kind: s.kind, greened: s.greened, res: '', inBox: inBox(a.ball) };
+        open = { d: Math.hypot(a.ball.x - GX, PL - a.ball.y), kind: s.kind, greened: s.greened, res: '', inBox: inBox(a.ball), ring: s.ring ? s.ring + (s.why ? ':' + s.why : '') : undefined };
         nShots++;
       } else if (open && !open.res) {
         if (e === 'goal') open.res = 'G';
@@ -164,8 +166,19 @@ function table(lvl: string, v: LevelOut) {
   console.log('shot results', Object.entries(res).map(([k, m]) => k + ' ' + pct(m, n, 0)).join('  '), ' on target (G+S)', pct((res.G || 0) + (res.S || 0), n, 0), ' save% of on-target', pct(res.S || 0, (res.G || 0) + (res.S || 0), 0));
   for (const [lo, hi] of [[0, 6], [6, 11], [11, 16.5], [16.5, 22], [22, 30], [30, 99]]) {
     const ss = shots.filter((s) => s.d >= lo && s.d < hi && s.kind !== 'pen' && s.kind !== 'fk');
-    console.log(('  open-play ' + lo + '-' + hi + ' m').padEnd(22), 'shots', String(ss.length).padStart(5), ' share', pct(ss.length, n), ' goal', pct(ss.filter((s) => s.res === 'G').length, ss.length), ' green', pct(ss.filter((s) => s.greened).length, ss.length));
+    const g = ss.filter((s) => s.res === 'G').length;
+    const sv = ss.filter((s) => s.res === 'S').length;
+    const gold = ss.filter((s) => s.greened);
+    console.log(('  open-play ' + lo + '-' + hi + ' m').padEnd(22), 'shots', String(ss.length).padStart(5), ' share', pct(ss.length, n), ' goal', pct(g, ss.length), ' green', pct(gold.length, ss.length), ' gold→goal', pct(gold.filter((s) => s.res === 'G').length, gold.length), ' on tgt', pct(g + sv, ss.length), ' blocked', pct(ss.filter((s) => s.res === 'B').length, ss.length), ' goals/on-tgt', pct(g, g + sv));
   }
+  // S2: the keeper's goals per on-target shot by distance (yards: < 6, 6-12, 12-18, 18-25, > 25), open play and free kicks
+  console.log('  S2 keeper, goals per on-target shot by yards ' + [[0, 6], [6, 12], [12, 18], [18, 25], [25, 99]].map(([lo, hi]) => {
+    const ss = shots.filter((s) => s.d / 0.9144 >= lo && s.d / 0.9144 < hi && s.kind !== 'pen' && (s.res === 'G' || s.res === 'S'));
+    return lo + '-' + hi + ' yd ' + pct(ss.filter((s) => s.res === 'G').length, ss.length, 0) + ' (n ' + ss.length + ')';
+  }).join(' | '));
+  const rings: Record<string, number> = {};
+  for (const s of shots) if (s.kind !== 'pen' && s.kind !== 'fk') rings[s.ring ?? '-'] = (rings[s.ring ?? '-'] ?? 0) + 1;
+  console.log('  rings at the release (open play)', JSON.stringify(rings));
   for (const k of ['shot', 'header', 'volley', 'fk', 'pen']) {
     const ss = shots.filter((s) => s.kind === k);
     console.log(('  kind ' + k).padEnd(22), 'shots', String(ss.length).padStart(5), ' goal', pct(ss.filter((s) => s.res === 'G').length, ss.length), ' mean dist', (ss.reduce((a, s) => a + s.d, 0) / Math.max(1, ss.length)).toFixed(1));

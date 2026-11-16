@@ -339,3 +339,42 @@ before/after numbers are there):
   `npx vite-node scripts/soccer/<name>.ts [n] [part]`); browser QA isolation, insets and the six
   device presets in `scripts/soccer/qa-isolate.mjs`; an in-process QA relay in `scripts/soccer/relay.mjs`;
   the lab's `start=x,y` puts the man on the ball at a spot.
+
+### Studio overhaul soccer-4: the gold ring on SHOOT (Claude, 2026-11-16)
+
+SHOOT is now Game Design V2's gold ring (V2 B.0.1, B.3.5). The full record, with the measurements, is
+in `docs/studio-overhaul/soccer.md` (soccer-4); in short:
+
+- **Wind-up:** `meter.top = windup(d)` = 0.35 s at 11 m or nearer, rising linearly to 0.62 s at 25 m.
+- **The window** (`shotRing`): `greenHalf(SHO)` (18 → 66 ms base, SHO 95 ≥ 1.5× SHO 70) × openness
+  (0.85 at 2 m → 1.1 from 7 m clear) × sprint 0.88 × first time 0.9 × defence sharpness, through
+  `v2/perfect.ts windowScale` (product capped ×1.45 / 90 ms, then a **±30 ms floor**).
+- **Three states,** recomputed every step while SHOOT is held: **red** beyond `maxRange` =
+  lerp(24, 34, SHO) (TOO FAR); **amber** with a defender within 2 m (PRESSURE), first time turning the
+  ball more than 90° (across the body), a header from beyond 8 m, or from wider than 0.8 rad inside
+  12 m; otherwise **gold**.
+- **Gold never lies:** a release inside the window on a gold ring is solved by `exactShot` (the real
+  60 Hz ball with drag, curl and dip) to cross the line on the reticle, and solved again at the strike
+  from where the ball really is. The keeper can still save it. Amber and red use the error cone:
+  `shotCone × CONE_SCALE (2.1) × coneMult(timing)` (red gets no tightening from timing) × range
+  (`RANGE_CONE`: ×1 at 11 m, 1.6 at 16.5, 2.4 at 20, 3.2 at 25, 4.3 at 30) × context (`CONTEXT`:
+  pressure 1.35, tight angle 1.5, headers 2 beyond 8 m / 1.4 inside, volleys 1.3) × `firstTimeMult`.
+- **Timing from the touch:** Soccer2 judges a release from the two touches' `PointerEvent.timeStamp`
+  less `deviceLagMs()` (`controls.ts holdOf`) and passes the hold in game seconds to
+  `releaseShoot(a, aim, 0, held)`. The engine never reads a timestamp; the autopilot keeps its seeded
+  release noise against the same window.
+- **First-time passes** (within 0.35 s of a control) take the same `firstTimeMult` on the pass error.
+- **Blocks** (`BLOCK`): a body 0.35 m either side, and a lunge of up to 1.2 m at 6 m/s from 0.08 s
+  after the strike (low balls only, a weaker block at full stretch); `blockChance` 0.42 → 0.80.
+- **The keeper** (`KEEPER`, ratings narrowed so a 93 concedes about 0.7× a 75): from 18 m+ more reach,
+  a quicker read; he races a one-on-one only when he gets to the next touch first and
+  otherwise comes out on the bisector; one read and one dive a shot (a new strike drops the old read);
+  he sets for the man a ball into the box is for (no pull to the near post); a cross he calls for his
+  defenders leave to him and he takes it through the crowd; parries steered by HAN (`parried` on the
+  shot for the read-out).
+- **Assist** aims at 70% of the way out to the finest spot his accuracy allows (`ASSIST.share`), so a
+  deliberate corner on gold beats it. **The autopilot** shoots from up to lerp(18, 28, SHO) m (never
+  red), from beyond 20 m only through a clear lane and less eagerly, and through bodies inside 22 m.
+- **Render-only fields** (§5.5): `kickFoot`, `passKind` (shot, header, pen, fk), `shotKind`, `power`,
+  `contact`, `diveHeight`, `keeperSet`, `slide`. `xg.ts` is display data (StatsBomb Open Data, see
+  `docs/CREDITS.md`).

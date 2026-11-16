@@ -23,11 +23,17 @@ import type { Attack, Scenario, Squad } from './types';
  *  2. soccer-1 R-2 (2026-11-16): parries go away from the goal line (round the post only from
  *     outside ±(GHALF − 0.3), wide by HAN); corners off a defender or a parry, goal kicks, quick
  *     throw-ins, at most two restarts an attack.
+ *  3. soccer-4 (2026-11-16): the gold ring on SHOOT (wind-up by distance, gold windows by SHO and
+ *     openness, gold placing the ball exactly, amber and red), the fit to real conversion (the cone by
+ *     range and context, CONE_SCALE, first-time shots and passes, block lunges, the keeper's ratings
+ *     narrowed, his range read, one read a shot, the races he goes for, crosses he calls for, setting
+ *     for the receiver, the spread once he's out), the assist at 80% and the autopilot's range appetite;
+ *     the penalty's gold narrowed (the shootouts).
  */
 const GOLDEN = {
-  attacks: '0dde30cbc63300',
-  matches: '07f3dde0f40f62',
-  shootouts: '13ebc2208d1307',
+  attacks: '1ef39a4bceedfe',
+  matches: '14489f6955b10b',
+  shootouts: '1f1b284a6ae4a2',
 };
 
 /** cyrb53: a 53-bit string hash, as hex */

@@ -102,3 +102,12 @@ export function nearestWithin<T extends { x: number; y: number }>(pts: readonly 
   }
   return best;
 }
+
+/**
+ * A SHOOT hold in game seconds, from its two touches' own timestamps (ms: `PointerEvent.timeStamp`)
+ * less the device's display lag, at the match's time scale (soccer-4, plan G5). Not rounded to the
+ * frame either touch lands in, so a release is judged to the millisecond.
+ */
+export function holdOf(pressTs: number, releaseTs: number, lagMs: number, timeScale = 1): number {
+  return (Math.max(0, releaseTs - pressTs - lagMs) / 1000) * timeScale;
+}

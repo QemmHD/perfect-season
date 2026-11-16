@@ -6,7 +6,8 @@
 // penalties), tie (the rival's score made level), def=-0.5..1 (difficulty), qa (window.__soccer),
 // start=x,y (the man on the ball starts there, pitch metres: x 0-68 across, y up to the goal at 105),
 // online (the pause sheet offers FORFEIT, not QUIT). Soccer-2 (2026-11-16): QUIT and FORFEIT are
-// stubs that record what they were given on window.__quit / window.__forfeit.
+// stubs that record what they were given on window.__quit / window.__forfeit. Soccer-4 (2026-11-16):
+// sho=N sets every one of our outfielders' SHO, gk=N every keeping stat of their keeper (ring drills).
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Progress } from '../progress';
 import { soccerKits } from './kits';
@@ -24,7 +25,13 @@ export default function SoccerLab() {
       .then((mod) => {
         const f = (mod.default ?? mod) as unknown as SoccerCardsFile;
         const { seasons } = soccerLines(f);
-        setTeams({ us: clubSquad(seasons, q.get('home') ?? 'BAR', Number(q.get('hs') ?? 2015)), them: clubSquad(seasons, q.get('away') ?? 'RMA', Number(q.get('as') ?? 2017)) });
+        const us = clubSquad(seasons, q.get('home') ?? 'BAR', Number(q.get('hs') ?? 2015));
+        const them = clubSquad(seasons, q.get('away') ?? 'RMA', Number(q.get('as') ?? 2017));
+        const sho = Number(q.get('sho'));
+        if (q.has('sho') && Number.isFinite(sho)) for (const p of [...us.def, ...us.mid, ...us.fwd]) p.a = { ...p.a, SHO: sho };
+        const gk = Number(q.get('gk'));
+        if (q.has('gk') && Number.isFinite(gk)) them.gk.a = { DIV: gk, HAN: gk, KIC: gk, REF: gk, SPD: gk, POS: gk };
+        setTeams({ us, them });
       })
       .catch((e) => setErr(String(e)));
   }, []);

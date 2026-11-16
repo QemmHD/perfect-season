@@ -509,6 +509,121 @@ The rival's plate appeared in the same mutation as the bug's new score (**0 ms**
 
 **Protocol:** none (render only; golden unchanged).
 
+## soccer-4 · The gold ring on SHOOT, fitted to real conversion
+
+**What changed** (V2 B.0.1, B.3.5, B.3.8; audit B-4, AI-1; plan soccer-4). Engine, AI and ratings change, so this rides the soccer protocol bump (below). Details of the model are in `docs/SOCCER-ENGINE.md` ("Studio overhaul soccer-4").
+
+- **The ring** (`engine.ts` `RING`, `shotRing`, `windup`; the stand-in `v2/perfect.ts` for nba's `perfect.ts`):
+  - **Wind-up:** `meter.top = windup(d)`: 0.35 s at 11 m or nearer, rising linearly to 0.62 s at 25 m (it was 0.62 s everywhere).
+  - **Window:** `greenHalf(SHO)` (18 → 66 ms; SHO 70 39 ms, 95 62 ms) × openness (0.85 at 2 m → 1.1 from 7 m clear) × sprint 0.88 × first time 0.9 × the defence's sharpness, through `windowScale` (product capped ×1.45 / 90 ms, then the **±30 ms floor**).
+  - **States**, recomputed after every step while SHOOT is held and again at the release: **red** beyond `maxRange` = lerp(24, 34, SHO) ("TOO FAR"); **amber** with a defender within 2 m ("PRESSURE"), a first-time hit turning the ball more than 90° ("ACROSS YOUR BODY"), a header from beyond 8 m, or from wider than 0.8 rad inside 12 m ("TIGHT ANGLE"); else **gold**.
+  - **Gold never lies:** a release inside the window on a gold ring is solved by `exactShot` (the real 60 Hz ball: drag, curl, dip, bounces) to cross the line on the reticle, and solved again at the strike from wherever the ball is then (he ran on during the swing, or a first-time ball dropped). No cone, no timing rise. The keeper can still save it. Amber and red use the cone; red gets nothing from good timing.
+- **Touch timing (G5):** Soccer2 records SHOOT's `PointerEvent.timeStamp` (the key's for Space), and on the release passes `holdOf(press, release, deviceLagMs(), timeScale)` (`controls.ts`) to `releaseShoot(a, aim, 0, held)`. `RELEASE_LAG` is gone. The engine never reads a timestamp. The autopilot keeps its seeded release noise, aimed at `meter.top`, judged by the same window, so the AI has PERFECTs too (`a.perfects`, for soccer-7's Heat).
+- **Feedback (G6):** over the last 200 ms before the gold, `sfx.ringTick(0..3)`. On a person's gold release, from the same pointer handler: the toast reads "PERFECT · on the gold" ("PERFECT · 3 IN A ROW" on a streak; a gold plate that pops, colour only under reduced motion: `soccer2-ring.css`), `sfx.perfect(streak)` (+1 semitone a PERFECT, to +4) and `haptic('double')`. Otherwise the word and what kept it from gold ("GOOD · PRESSURE", "LATE · TOO FAR"). While SHOOT is held the toast names the dial only when the ring can't be gold ("PRESSURE · no gold with a man on you", "TOO FAR · get closer for gold"). The old big "PERFECT!" pop is gone.
+- **The ring on screen** (`render.ts` `meter`): a flattened ring on the grass round the shooter's feet and the arc over his head, both filling to the gold, in gold, amber or red, with the word over the arc (GOLD / PRESSURE / TOO FAR / …) and, after the release, PERFECT / GOOD / EARLY / LATE. `drawRing` keeps the gold band ≥ 8 px by stretching the ring's time scale around it (never the window). The reticle's cone ring is capped at the goal's half-width (a red ring's cone from 33 m used to circle the whole screen).
+- **The fit** (revision 2's soccer-4):
+  - `RANGE_CONE` ×1 / 1.6 / 2.4 / 3.2 / 4.3 at 11 / 16.5 / 20 / 25 / 30 m; `CONTEXT` pressure 1.35, tight angle 1.5, headers 2 beyond 8 m (1.4 inside), volleys 1.3; `CONE_SCALE` 2.1 on every release that isn't gold (before, 53% of shots were on target; real 34.5%).
+  - `firstTimeMult` ×1 → 1.2 at 90° → 1.6 at 135°+, on first-time shots and on passes played within 0.35 s of a control (`a.recv`).
+  - **Blocks** (`BLOCK`): 0.35 m of body plus a lunge of up to 1.2 m at 6 m/s from 0.08 s after the strike, low balls only, weaker at full stretch (`Body.slide`); `blockChance` 0.42 → 0.80 (0.25 → 0.62).
+  - **The keeper** (`KEEPER`, `KEEP`): ratings narrowed round 75 (a 93 concedes about 0.7× a 75, research §7.5); from 18 m+ 0.15 m more reach and reaction ×0.85; one read and one dive a shot (a new strike drops the old read); a one-on-one race only when he gets to the next touch first (`'rush'`), else he comes out on the bisector to narrow it and spreads when struck within 11 m of him off his line; he sets for the receiver of a ball into the box (no pull to the near post); a cross he calls for (`a.claimFor`) his defenders leave to him and he takes it through the crowd; split step `keeperSet` ≥ 4 frames before every strike; parries steered by HAN (`lastShot.parried`).
+  - **B-4:** the assist aims 80% of the way out to the finest spot his accuracy allows (`ASSIST.share`).
+  - **The autopilot** (`SHOOTING`): shoots from up to lerp(18, 28, SHO) m, never red; beyond 20 m only through a lane clear by 1.6 m and half as eagerly; with a body in the lane still from inside 22 m.
+  - Set pieces: the free kick's and corner header's cones divided by `CONE_SCALE` so their misses are unchanged; the penalty's gold ×0.8 (a gold penalty is exact). Their fit is soccer-7's.
+- **`xg.ts`** (display and box data; never read by the engine): real conversion by distance, foot and head, central/wide, penalties 0.76, direct free kicks 0.064, from StatsBomb Open Data (CC BY-SA 4.0, `docs/CREDITS.md`). Soccer2 fills `lastShot.xg` for the read-out.
+- **`soccerFeedback`** (`play-feedback.ts`): the next-step lines TOO FAR, PRESSURE, BLOCKED, FIRST TIME ACROSS YOUR BODY, KEEPER CLAIM, PARRIED WIDE; facts Ring ("Gold", "Amber · Pressure", "Red · Too far") and xG.
+- **§5.5 fields** (render only, written from geometry, never read, no random number drawn): `kickFoot`, `passKind` (now also `shot`, `header`, `pen`, `fk`), `shotKind` (placed/power), `power`, `contact` (foot/head/volley), `diveHeight`, `keeperSet`, `slide`.
+- **Lab:** `sho=N` (our outfielders' SHO) and `gk=N` (their keeper). QA part `ring` in `scripts/qa/soccer-lab.mjs`.
+- **Harnesses:** `sim.ts` prints, per distance band, the gold share, gold → goal, on target, blocked and goals per on-target, the S2 keeper row by yards and the rings at the release. Every harness holds SHOOT for `a.meter.top`; `bend.ts` lets go just off the gold (a gold kick lands on its aim with the bend solved in): Bend left / straight / right end −2.58 / −0.16 / +2.36 m from the aim (soccer-1: −2.54 / −0.07 / +2.50).
+
+**Before → after** (same seeds; before = HEAD `3762287`, measured in a detached copy of it).
+
+`sim.ts 400 pro` (real club-season elevens, AI vs AI):
+
+| Measure | Before | After | Target (plan) |
+|---|---|---|---|
+| Goals/match; draws; 0–0 | 2.12; 25.3%; 9.8% | **1.15; 43.3%; 32.5%** | soccer-7: 2.4–2.7; 22–29%; 4–10% |
+| Shots/side | 5.42 | 5.54 | soccer-7: 9–13 |
+| On target | 53.4% | **40.7%** | interim 32–42% ✓ |
+| Goals/shot | 19.5% | **10.4%** | 9–14% ✓ |
+| Save% of on target | 63.5% | 74.5% | interim 64–72% ✗ (+2.5) |
+| Blocked | 11.6% | 12.4% | interim ≥ 18% ✗ |
+| Woodwork | 4.4% | 1.7% | 2–4% ✗ (−0.3) |
+| Shots from 16.5 m+ (open play) | 29.4% | 38.1% | A8 25–35% (soccer-7) |
+| Attack ends G/S/W/B/L/O/T | 15.1/12.5/23.1/9.0/37.3/3.0/0.0 | 8.2/10.0/31.8/9.9/36.9/3.0/0.3 | — |
+
+S1, conversion by distance (open play):
+
+| Band | 0–6 m | 6–11 m | 11–16.5 m | 16.5–22 m | 22–30 m | 30 m+ |
+|---|---|---|---|---|---|---|
+| Before | 45.9% | 36.3% | 22.6% | 15.6% | 5.4% | 4.7% |
+| **After** | 34.1% (n 44) | **23.6%** | **13.5%** | **5.8%** | 0.9% (n 108) | **0.0%** |
+| Target (H) | 35–55 | 18–32 | 8–15 | 4–8 | 1.5–4 | ≤ 1.5, monotone |
+| Gold share; gold → goal | — | 12.8%; 66.7% | 13.9%; 41.6% | 11.7%; 18.5% | 13.0%; 0% | 7.6%; 0% |
+
+Monotone. 0–6 m sits 0.9 points under its band and 22–30 m 0.6 under (small n). Rings at the AI's open-play releases: amber/pressure 1,902, gold 961, amber/header 626, amber/angle 71, amber/first 23, red 4.
+
+S2, the keeper's goals per on-target shot by yards (< 6 / 6–12 / 12–18 / 18–25 / > 25): **50.0% (n 16) / 50.8% / 30.4% / 17.9% / 2.8%** against 70–80 / 45–55 / 30–40 / 18–25 / 8–12. The middle three are in (18–25 by 0.1 short); point-blank and long range are not (long range is mostly free kicks, soccer-7).
+
+`scripts/audit_soccer_shots.ts 200` (75 v 75, a person with timing sd 0.06 s):
+
+| Row | Before | After | Target |
+|---|---|---|---|
+| 1v1 12–16 m, drag (S6) | 63.0% | 66.5% | 35–45% ✗ |
+| 1v1, timing sd 0 / 0.03 / 0.06 / 0.1 / 0.15 | 75.5 / 68.5 / 60 / 55 / 43% | 99.5 / 88.5 / 65.5 / 47 / 37.5% | timing matters more ✓ |
+| 1v1 SHO 95 vs GK 75; SHO 75 vs GK 93 | 67.0%; 28.5% | 86.0%; 59.5% | 50–58; 25–32 ✗ |
+| Edge 18–21 m, drag | 45.0% | **15.5%** | 12–18% ✓ |
+| Edge by GK 52 / 75 / 93 | 59.5 / 43 / 16.5% | 15.5 / 11.5 / 8.5% | monotone ✓ |
+| Autopilot per scenario (build / counter / wide / corner) | 10.9 / 15.9 / 14.9 / 11.4% | 6.5 / 10.4 / 11.9 / 4.5% | — |
+
+`human.ts 200` (defIQ 0):
+
+| Row | Before | After | Target |
+|---|---|---|---|
+| P2: beeline, SHOOT pressed at 30 m (build / counter / wide) | 14.0 / 17.0 / 13.5% | 7.5 / 13.0 / 7.5% | ≤ 2% ✗ (he sprints on through the 0.62 s wind-up, so he strikes from about 25 m) |
+| S8: 20 m drag to the corner vs assist (build / counter / wide) | 20.0 vs 20.5 / 39.5 vs 45.0 / 23.5 vs 24.0 | **11.0 vs 4.5 / 37.5 vs 23.0** / 16.0 vs 15.0 | gold ≥ assist + 5 ✓✓✗; assist ≥ 70% of gold ✗ |
+| B-1 counter beeline at 16 m (assist) vs Pro autopilot | 60.5% vs 18.5% | 27.5% vs 5.0% | soccer-5 |
+| Penalty low corner / high corner / centre; autopilot | 84.5 / 76.0 / 35.5; 77.0% | 73.0 / 60.5 / 39.0; 72.5% | S12 80–88 / ≤ 40 (soccer-7) |
+| Free kick far top + BEND toward goal / no bend / near low; autopilot | 3.5 / 2.5 / 2.0; 7.5% | 10.0 / 15.5 / 1.0; 10.0% | S11 skilled 6–9% (soccer-7) |
+
+`probe.ts 3000`: frozen balls 0; attacks over the clock + 15 s **0**; goals straight from a parry **0 of 219 (0.0%)** (S10 ≤ 1% ✓); after a rebound 29.7%; parries 487; a dead loose ball for 5 s+ 3 of 3,000 (0.10%, 0 before; all ended inside the clock).
+
+**G1–G6** (unit tests and the browser, below):
+- **G1:** every half-window ≥ 30 ms over 1,620 grid points (SHO 1–110, 6–30 m, a man at 0.5–9 m, defIQ −0.5/0/1, sprinting or not); the gold band drawn 8.0 px at 320 and 393 (arc and ground ring), measured in the browser (`stats.goldArc` 8.000000008).
+- **G2a:** 1,000 seeded gold releases (open play from 7–27 m, a third running on through the swing, a tenth free kicks with random bend) with the keeper and blockers out of it: **100% within 0.25 m** of the reticle (worst < 0.01 m: the solver stops at 4 mm).
+- **G2b:** no gold with a man at 0.6/1.2/1.9 m, past `maxRange` (SHO 40/70/99), on a cut-back turned more than 90° first time, or a header from beyond 8 m; and over 120 autopilot attacks, no gold ring ever showed with a man within 2 m or out of range.
+- **G3:** SHO 95's window at 16 m is 1.58× SHO 70's.
+- **G4:** `windup` exact over 11–25 m and clamped outside; `pressShoot` sets it from the shooter's distance.
+- **G5:** 400 synthetic press/release pairs at random sub-frame times judged within 1 ms; 40 engine releases between frames land to the millisecond. Browser (CDP touch): the engine's offset equals the one from the page's own `pointerdown`/`pointerup` timestamps less 30 ms to 1e-10 ms (393: +105.05 ms both ways; 320: +59.35 ms).
+- **G6:** browser, 320×568: the `sc2-perfect` mark, the toast's "PERFECT · on the gold", the double haptic (`navigator.vibrate([12, 40, 12])`) and the chime's oscillators all between the same two animation frames (frame 54 of 54). The +1 semitone a streak, capped at +4, is `sound-perfect.test.ts` (soccer-1).
+
+**Tests** (new): `perfect-soccer.test.ts` (13: G1, G2a, G2b ×3, G3, G4 ×2, G5 ×3, On Fire, a gold shot at the keeper is saved); `first-time.test.ts` (2: S9 exact; a 180° first-time pass strays 1.6 ± 0.1× a settled one); `keeper.test.ts` (5: one dive a shot, the split step ≥ 4 frames before every strike, lost races ≤ 28% (S3); claims ≥ 70% of the crosses he calls for; GK 93 concedes 0.62–0.92× a GK 75 (S5); the far-post first-time finish (S4); HAN steers parries wide (S10)); `xg-bands.test.ts` (2: xG monotone and real; drilled conversion falling with distance, long range rare (S1 guard)); `render-fields.test.ts` (2: the §5.5 fields scribbled every step change nothing over 48 attacks, and are all written in play; the engine imports no `appearance*`, no HUD, sound or render, and from `v2/` only `perfect.ts`); `src/game/play-feedback-soccer.test.ts` (4: the new lines and facts).
+
+**Old tests changed, and why:**
+- `soccer.test.ts`, `shooting.test.ts`, `rules.test.ts`: held SHOOT for the constant `TOP` (0.62 s); now for `a.meter.top`, the wind-up by distance (holding 0.62 s from 16 m is now a late release).
+- `rules.test.ts` C-4 BEND: a gold kick now lands on its aim with the bend solved in, so the bend is measured by the path's bow (Bend left bows right, i.e. bends left: +0.3 m or more; Bend right −0.3 m; straight within 0.1 m), each kick within 0.25 m of its aim. The R-1 idle-dead-ball case now wins a free kick on that seed: the autopilot takes it after `SET_PIECE_WAIT` as the match screen's AUTO KICK does. The R-2 parry case releases a little off the gold (a gold release lands exactly on aims that are never within a ball of the post).
+- `soccer.test.ts`: the keeper's reach gap DIV 92 vs 55 was required > 0.5 m (now > 0.1 m: the narrowed keeper ratings, S5); "a good finisher scores more" from 21–24 m: +0.10 and 2.5× → +0.04 and 1.6× (real conversion there is 4–8%).
+- `shooting.test.ts` "a better keeper concedes fewer": measured with the assist (a gold release dragged into the corner from 13–16 m is past any keeper: the ring's promise).
+- `setpieces.test.ts`: corner floor 6% → 3%, direct free kick floor 2% → 1%, with soccer-7 to restore them (as soccer-1 did for R-2).
+- `prefs.test.ts` import graph: the engine may reach `v2/perfect.ts` (pure, reaches nothing else), nothing else in `v2/`.
+
+**Golden re-based** (REBASES #3 in `golden.test.ts`): attacks `0dde30cbc63300` → `1ef39a4bceedfe`, matches `07f3dde0f40f62` → `14489f6955b10b`, shootouts `13ebc2208d1307` → `1f1b284a6ae4a2` (the penalty's narrower gold). Agreement green.
+
+**Browser QA** (dev server 5217; `scripts/qa/soccer-lab.mjs ring`; touch, isolated: 0 requests to live hosts, 0 page errors; screenshots in `O/shots/soccer/soccer-4/`, all looked at): 393×852 (sat 59) and 320×568.
+- `*-ring-gold.png`: the gold ring at the feet and the arc over the head, "GOLD" over it, the reticle on the assist's spot.
+- `320x568-ring-perfect.png`: PERFECT over the arc and the gold "PERFECT · on the gold" plate in the toast line. (At 393 the scripted release landed 105 ms late on the loaded machine: `393x852-sat59-ring-perfect.png` shows "GOOD".)
+- `*-ring-amber.png`: a man at 1.4 m, the amber ring, "PRESSURE" over it and "PRESSURE · no gold with a man on you" in the toast.
+- `*-ring-red.png`: 33 m with SHO 60, the red ring, "TOO FAR" over it and in the toast; after the release "LATE · TOO FAR" / "GOOD · TOO FAR".
+- Seen and fixed: the reticle's cone ring circled the whole screen on a red shot (capped at the goal's half-width).
+
+**Suite.** `PS_SPORT=soccer npx vitest run soccer sport-branches` (through `heavy.sh`): **26 files, 204/204**, Duration 104.3 s and 136.4 s on two runs with the shared machine at a load of 8–10 (over the 120 s cap on the second; the new files add about 25 s of test time, `perfect-soccer` (the 1,000 gold releases) and `keeper` the largest). Default sport: `play-feedback`, `sound-perfect`, golden, both agreement files, `juice`, `sport-branches`: 7 files, 39/39. `npm run typecheck` clean.
+
+**Not met here, with numbers (followups):**
+- Whole-match scoring: 1.15 goals a match (0–0 32.5%) at 5.5 shots a side; per-shot conversion is now real, so the plan's soccer-7 (9–13 shots a side, the V2 deal) must bring 2.4–2.7 back. Soccer must not ship online before it.
+- S6: a gold release dragged into the corner from 12–16 m beats any keeper (1v1 drag 66.5%; SHO 95 vs GK 75 86%; SHO 75 vs GK 93 59.5%) against 35–45 / 50–58 / 25–32%. That is the ring's promise (gold places it exactly), so the 1v1 number moves only with how often a person gets gold (timing sd 0.06 s gives 60% gold here) or with keepers who save placed corners.
+- P2: the 30 m beeline 7.5–13% (≤ 2%); it presses at 30 m and sprints on through the wind-up, striking from about 25 m.
+- S8 partly (gold beats the assist by +6.5 and +14.5 points in build and counter, +1 in wide; the assist reaches 41–61% of gold, not 70%).
+- Save% 74.5% (64–72), blocked 12.4% (≥ 18%), woodwork 1.7% (2–4%), S2 point-blank 50% (70–80) and beyond 25 yd 2.8% (8–12, mostly free kicks).
+
 ## Contracts (plan §5): what soccer publishes and what it adopts
 
 Published in soccer-1 so ut, nba, nfl, players and shell can rely on them from now on. Branches merge only at integration: where another team's piece isn't in our base, soccer writes against the interface below, and the lead keeps one copy at merge. Where another team publishes different names first, theirs win and only `src/game/soccer2/v2/` changes.
@@ -526,9 +641,9 @@ Published in soccer-1 so ut, nba, nfl, players and shell can rely on them from n
 
 #### 5.0.2 Pieces soccer CONSUMES, and the interface it writes against
 
-**Stand-ins in this branch (soccer-2), each headed `// merge: replace with …`:** `v2/stick.ts` (nba's `stick.ts`; adds the 1.0× sprint-off hysteresis through an optional `prev` argument to `stickOut`), `v2/hud.tsx` (nba's `Stick.tsx`, ScoreBug, ToastLine, PauseButton), `v2/geometry.css` + `v2/geometry.ts` (nba's `controls-geometry.css`; tokens copied with the same names and values), `v2/haptics.ts` (ut's `haptics.ts`, same `haptic(kind)`), `v2/playtime.ts` (ut's `playtime.ts`: soccer reports `paused`/`auto`/`stoppage`; maps to ut's `usePlaytime('match')` + `setPlaytimePaused`). The CSS block "v2 stand-ins" in `soccer2-controls.css` goes with `hud.tsx`.
+**Stand-ins in this branch (soccer-2), each headed `// merge: replace with …`:** `v2/stick.ts` (nba's `stick.ts`; adds the 1.0× sprint-off hysteresis through an optional `prev` argument to `stickOut`), `v2/hud.tsx` (nba's `Stick.tsx`, ScoreBug, ToastLine, PauseButton), `v2/geometry.css` + `v2/geometry.ts` (nba's `controls-geometry.css`; tokens copied with the same names and values), `v2/haptics.ts` (ut's `haptics.ts`, same `haptic(kind)`), `v2/playtime.ts` (ut's `playtime.ts`: soccer reports `paused`/`auto`/`stoppage`; maps to ut's `usePlaytime('match')` + `setPlaytimePaused`). The CSS block "v2 stand-ins" in `soccer2-controls.css` goes with `hud.tsx`. **soccer-4:** `v2/perfect.ts` (nba's `perfect.ts` + `hud/ring-draw.ts`: `ringWindow`, `windowScale` (product, cap ×1.45 / 90 ms, then the ±30 ms floor), `judge`, `wordFor`, `deviceLagMs`/`setDeviceLag` (default 30 ms until nba's calibration), `ringMap`/`goldArcPx`/`drawRing` (the gold band ≥ 8 px by stretching the ring's time scale, never the window); nba's names `GOLD_FLOOR_MS`, `WINDOW_CAP`, `FIRE_MULT` kept). `ringWindow` takes an optional `amber` dial for a sport's own amber causes and `parts` (nba's `WindowPart[]`).
 
-`src/game/soccer2/v2/index.ts` (new in soccer-1) is the **only** place soccer code and soccer tests import these from. Today it re-exports the sounds above and declares the interfaces below as types. The task that first needs a piece adds a stand-in beside it (`stick.ts`, `perfect.ts`, `heat.ts`, `hud.tsx`, `haptics.ts`, `playtime.ts`, `geometry.ts`), each headed `// merge: replace with <team>'s <file>, then delete this file`, and lists it here. At merge the lead points `index.ts` at the shared files and deletes the stand-ins. Nothing in the folder may be read by the engine, the AI's simulations or anything both phones compute.
+`src/game/soccer2/v2/index.ts` (new in soccer-1) is the **only** place soccer code and soccer tests import these from. Today it re-exports the sounds above and declares the interfaces below as types. The task that first needs a piece adds a stand-in beside it (`stick.ts`, `perfect.ts`, `heat.ts`, `hud.tsx`, `haptics.ts`, `playtime.ts`, `geometry.ts`), each headed `// merge: replace with <team>'s <file>, then delete this file`, and lists it here. At merge the lead points `index.ts` at the shared files and deletes the stand-ins. Nothing in the folder may be read by the engine, the AI's simulations or anything both phones compute, with one exception since soccer-4: `engine.ts` imports `ringWindow` and `windowScale` straight from `v2/perfect.ts` (pure window maths), because the AI's sims judge their own seeded releases against the same window as a person's. At merge nba's `perfect.ts` must keep those two pure, or soccer keeps its copy for the engine.
 
 | Piece (author) | What soccer relies on | Type in `v2/index.ts` |
 |---|---|---|
@@ -643,6 +758,8 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 | `src/App.tsx` (draft `onQuit`) | ut/lead shared | soccer-2 re-review: a quit settles with `how: 'sim'` (1 word). | soccer-2 fix 2 |
 | `src/lib/sound.ts` | soccer owns the soccer crowd wiring; V2 F.1 gives soccer the PERFECT chime | `sfx.perfect`, `sfx.ringTick`, `sfx.post` and their constants (`PERFECT_ROOT`, `PERFECT_MAX_STEP`, `perfectStep`, `RING_TICK`): additive, about 40 lines, nothing existing changed. Tested in the new `src/lib/sound-perfect.test.ts` (default suite). | soccer-1 |
 | `src/game/pixel/pitch.ts` | players | `onLine` is now exported (one word) so soccer's `pitchTex` draws the same markings; `pitchTexture` there is no longer used by soccer (players may adopt `PITCH`/`pitchTex` or delete it). | soccer-3 |
+| `src/game/play-feedback.ts` (`soccerFeedback` only) | nfl/soccer shared | soccer-4: the ring's next-step lines (TOO FAR, PRESSURE, BLOCKED, FIRST TIME ACROSS YOUR BODY, KEEPER CLAIM, PARRIED WIDE), the Ring and xG facts (`SOCCER_RING` map + the function body; the NBA and NFL functions untouched). | soccer-4 |
+| `docs/CREDITS.md` | shared | soccer-4: one section crediting StatsBomb Open Data (CC BY-SA 4.0) for `xg.ts` and the conversion targets. | soccer-4 |
 | `src/game/soccer2/render.ts` players section (`sprite()`) | players (shared file) | Two hooks: the sprite's look-down angle comes from `tiltAt(y)` (≤ `SPRITE_TILT` 0.6, the camera's) instead of `min(0.9, pitchAt)`, and two counters (`stats.sprites`, `stats.stale`) for the stale-draw budget. The size passed in is the camera's (`spriteScale`). | soccer-3 |
 
 ## Protocol
@@ -657,7 +774,13 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 
 **soccer-3: no bump.** Camera, pitch, rings, arrows, juice, goal moments and Clutch staging are render only: golden unchanged, agreement green, `juice-soccer.test.ts` proves identical outcomes.
 
+**Protocol bump needed: soccer draft 2 → 3, UT 2 → 3, because** soccer-4 changes shot windows (the wind-up by distance, gold by SHO and openness, gold placing the ball exactly, amber and red), the shot, keeper and pass model (the cone by range and context, first-time shots and passes, blocks, the keeper's ratings, reads, races, claims and spread, the assist) and the AI's simulations (the autopilot's range and release against the wind-up). Golden re-based (REBASES #3); agreement green, so both phones of a new client still agree; old and new clients would not. The same single soccer bump covers it. **Do not release soccer online with soccer-4 alone:** the whole-match scoring is soccer-7's fit (below).
+
 ## Hand-offs
+
+- **nba (soccer-4):** soccer's `v2/perfect.ts` follows your `perfect.ts` names (`GOLD_FLOOR_MS`, `WINDOW_CAP`, `windowScale(baseMs, parts)`, `FIRE_MULT`) and adds `ringWindow({ …, amber?, parts? })`, `judge(pressTs, releaseTs, targetMs, win, lagMs)`, `wordFor`, `deviceLagMs`/`setDeviceLag`, `ringMap`/`goldArcPx`/`drawRing`. Soccer's engine imports `ringWindow` and `windowScale` directly (pure), so at merge keep those pure and dependency-free, or soccer keeps its copy for the engine. Your calibrator should call `setDeviceLag(ms)` (or soccer reads yours through `v2/index.ts`).
+- **players (soccer-4):** the §5.5 fields now written: `kickFoot` (shots and passes), `passKind` also `shot`/`header`/`pen`/`fk`, `shotKind` + `power` (backlift 4–10 frames), `contact` (`head`/`volley`/`foot`), `diveHeight` (low < 0.6 m, mid < 1.4 m, high), `keeperSet` (the split step, ≥ 4 frames before every strike) and `slide` (a block lunge: `{ at, dx: ±1, dy: 0 }`). Route them when your clips are in.
+- **soccer-7 (whole-match fit):** per-shot conversion is now real football's (S1), so goals per match fell to 1.15 (0–0 32.5%) with 5.5 shots a side. The plan's 9–13 shots a side (A5) and the V2 deal are what bring 2.4–2.7 goals back; also the set-piece floors relaxed here (corners, direct free kicks), save% 74.5 → 64–72, blocked 12.4 → 18+, woodwork 1.7 → 2–4.
 
 - **players (soccer-3):** the stale-draw budget at V2 sizes. Every man on the soccer screen is now 30–45 px, where `sprite()`'s LOD gives 16 facings and a clip frame every 2 steps. Stale draws are 11.8% at 4× CPU (7.3% before, when far men were small). A cheaper LOD for men away from the ball (8 facings, every 3rd frame) and pre-warming each attack's sprites before the whistle are yours; V3 fixes only the sizes. `PITCH` in `soccer2/render.ts` is the palette to retune under your venue grant, and the camera passes sprites `spriteScale(s, ART)` (2.5 px/m steps) at `SPRITE_TILT` 0.6.
 - **shell (soccer-3):** soccer dispatches `ps:arena-ready` (`window`, `detail: { sport: 'soccer' }`) once per match after the first frame with the pitch and players.
@@ -672,6 +795,8 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 - **players:** a quick throw-in's thrower carries `passKind: 'throw'` and act `'catch'` (arms up) while he holds the ball; route it to a throw clip if you add one (§5.5).
 
 ## Owner device checks
+
+- soccer-4: the gold ring under a real thumb: is the ±30–66 ms window fair, and does the 30 ms default display lag feel right on the phone (nba's calibration will set it per device); the ring's closing ticks, the PERFECT chime climbing on a streak, and the double haptic on gold (iPhone plays it only inside the release touch, so a first-time hit still held as the ball arrives gets the word and the chime but no haptic); legibility of the ground ring and the arc in sunlight; whether "TOO FAR" and "PRESSURE" read in time to change your mind.
 
 - soccer-3: the 34 m frame and readability with the bigger sprites beside the real Dynamic Island (sat 59); the edge arrows as tap targets; the heartbeat haptic in Clutch (iPhone plays it only during your touches); the post shiver and the hit-stop feel (do 66 ms on a goal read as weight or as a hitch?); frame pacing on the phone itself (the dev box was overloaded).
 

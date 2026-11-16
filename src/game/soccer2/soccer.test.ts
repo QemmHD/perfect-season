@@ -3,7 +3,7 @@
 import cardsText from '../../data/cards-soccer.json?raw';
 import { describe, expect, it } from 'vitest';
 import { autoplayAttack, decide, pilot } from './autopilot';
-import { groundSpeedFor, GX, kickOff, loftVelocity, pass, PL, pressShoot, releaseShoot, setupAttack, shotVelocity, step, stepBall, TOP, tracePath } from './engine';
+import { groundSpeedFor, GX, kickOff, loftVelocity, pass, PL, pressShoot, releaseShoot, setupAttack, shotVelocity, step, stepBall, tracePath } from './engine';
 import { autoplayMatch, dealOf, newMatch, recordAttack, totalOf } from './match';
 import { clubSquad, gkDive, gkReaction, greenHalf, passError, rateSoccerLine, rt, shotCone, soccerLines, squadFrom, tackleWin, topSpeed, type SoccerCardsFile } from './ratings';
 import { newShootout, recordKick, simShootout, score, takers } from './shootout';
@@ -111,7 +111,9 @@ describe('ratings', () => {
     expect(greenHalf(at('SHO', 95))).toBeGreaterThan(greenHalf(at('SHO', 55)) * 1.8);
     const k = (v: number) => player('GK', v);
     expect(gkReaction(k(92))).toBeLessThan(gkReaction(k(55)));
-    expect(gkDive(k(92)).reach).toBeGreaterThan(gkDive(k(55)).reach + 0.5);
+    // soccer-4 narrowed the keeper's spread (a 93 about 20-25% better than a 75, research §7.5): the
+    // 0.5 m reach gap this asked for made an elite keeper twice as good
+    expect(gkDive(k(92)).reach).toBeGreaterThan(gkDive(k(55)).reach + 0.1);
     expect(tackleWin(player('CB', 90), player('W', 60), false, 0)).toBeGreaterThan(0.75);
     expect(tackleWin(player('CB', 60), player('W', 90), false, 0)).toBeLessThan(0.25);
     expect(tackleWin(player('CB', 99), player('W', 1), false, 1)).toBeLessThanOrEqual(0.9);
@@ -142,7 +144,7 @@ function shootingDrill(att: Squad, def: Squad, seed: string, x: number, y: numbe
 /** Shoot with this timing (seconds off the green's centre) and let the shot play out. */
 function shoot(a: Attack, off: number, aim: { x: number; y: number } | null): Attack {
   pressShoot(a);
-  const hold = Math.round((TOP + off) * 60);
+  const hold = Math.round((a.meter!.top + off) * 60);
   for (let i = 0; i < hold; i++) step(a, 1 / 60, { x: 0, y: 0 });
   releaseShoot(a, aim);
   for (let i = 0; i < 60 * 40 && !a.end; i++) step(a, 1 / 60, { x: 0, y: 0 });
@@ -204,8 +206,10 @@ describe('ratings decide attacks', () => {
     // (studio overhaul soccer-1, R-2: the margin was +0.12; part of it was the elite finisher's
     // on-target shots parried into the keeper's own net, the bug R-2 fixes. soccer-4 refits the SHO
     // curve: plan S1/S6)
-    expect(elite).toBeGreaterThan(poor + 0.1);
-    expect(elite).toBeGreaterThan(poor * 2.5);
+    // soccer-4 fitted conversion from 20 m+ to real football's (4-8% at 16.5-22 m, 1.5-4% beyond), so
+    // the margins this drill (21-24 m out) can show are smaller than the old +0.10 and 2.5×
+    expect(elite).toBeGreaterThan(poor + 0.04);
+    expect(elite).toBeGreaterThan(poor * 1.6);
   });
   it('an elite keeper saves more of the same shots', () => {
     const saved = (v: number) =>

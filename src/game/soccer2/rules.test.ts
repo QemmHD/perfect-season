@@ -10,9 +10,11 @@
 //    goal kick; over the touchline off a defender in the final third a quick throw-in for us, off us
 //    a throw-in for them; at most two restarts an attack.
 //  - soccer-2 (2026-11-16): the lofted through ball is a person's pass only.
+//  - soccer-4 (2026-11-16): holds go to the meter's own wind-up (meter.top by distance, not the old
+//    constant TOP), and BEND is measured on gold kicks by the path's bow (a gold kick lands on the aim).
 import { describe, expect, it } from 'vitest';
 import { autoplayAttack, decide, pilot } from './autopilot';
-import { bendCurl, CORNER, cornerLayout, DEAD, GHALF, GX, kickOff, PARRY, pass, PL, pressShoot, PW, releaseShoot, RESTARTS, setAim, setCurl, setupAttack, step, THROW, TOP } from './engine';
+import { bendCurl, CORNER, cornerLayout, DEAD, GHALF, GX, kickOff, PARRY, pass, PL, pressShoot, PW, releaseShoot, RESTARTS, setAim, setCurl, setupAttack, step, THROW } from './engine';
 import { SET_PIECE_WAIT, setPieceCountdown } from './match';
 import { squadFor } from './squads.test-util';
 import type { Attack, Body, Scenario, Squad } from './types';
@@ -38,7 +40,7 @@ function shotFrom(seed: string, x: number, y: number): Attack {
   for (const b of a.bodies) if (b.side === 'D' && b.role !== 'gk') b.y = Math.min(b.y, y - 6);
   pressShoot(a);
   setAim(a, { x: 0, y: -0.5 });
-  for (let i = 0; i < Math.round(TOP * 60); i++) step(a, DT, { x: 0, y: 0 });
+  for (let i = 0, n = Math.round(a.meter!.top * 60); i < n; i++) step(a, DT, { x: 0, y: 0 });
   releaseShoot(a, null);
   for (let i = 0; i < 30 && a.ball.flight?.kind !== 'shot'; i++) step(a, DT, { x: 0, y: 0 });
   return a;
@@ -84,9 +86,16 @@ describe('R-1: a dead shot is a loose ball', () => {
     for (let i = 0; i < 60; i++) step(a, DT, { x: 0, y: 0 });
     expect(a.ball.flight?.kind).not.toBe('shot');
     expect(a.used - used0).toBeGreaterThan(0.9);
-    for (let i = 0; i < 60 * 60 && !a.end; i++) step(a, DT, { x: 0, y: 0 });
+    // (a set piece won meanwhile is taken for him after SET_PIECE_WAIT, as the match screen's AUTO KICK
+    // does; soccer-4: this seed now wins a free kick on the loose ball)
+    const pl = pilot(0.68, 'idle-dead-auto');
+    let waiting = 0;
+    for (let i = 0; i < 60 * 60 && !a.end; i++) {
+      waiting = a.setPiece ? waiting + DT : 0;
+      step(a, DT, a.setPiece && waiting >= SET_PIECE_WAIT ? decide(a, pl) : { x: 0, y: 0 });
+    }
     expect(a.end).not.toBeNull();
-    expect(a.t).toBeLessThan(a.clock + 15);
+    expect(a.t).toBeLessThan(a.clock + 15 + SET_PIECE_WAIT);
   });
 
   it('a looping ball that has bounced twice is loose; a hard, true shot stays the keeper’s', () => {
@@ -151,8 +160,14 @@ describe('set pieces left untaken', () => {
   });
 });
 
-/** a kick at the middle of the goal with every defender moved off its line: where it crosses */
-function bentKick(i: number, curl: number): number | null {
+/**
+ * A kick at the middle of the goal with every defender moved off its line, released on the gold
+ * (soccer-4: a gold release now lands on the reticle, bend included, so the bend shows in its path):
+ * how far it crosses from the aim, and its bow, the ball's distance across from the straight line
+ * between where it was struck and where it crossed, halfway there (+ right on screen). A ball that
+ * bends left has to start out right of that line: Bend left bows right, Bend right bows left.
+ */
+function bentKick(i: number, curl: number): { miss: number; bow: number } | null {
   const a = setupAttack('freekick', squadFor('bend-a', 92), squadFor('bend-d', 60), 'bend' + i, { side: 1 });
   for (const b of a.bodies)
     if (b.side === 'D') {
@@ -164,10 +179,21 @@ function bentKick(i: number, curl: number): number | null {
   setCurl(a, curl);
   pressShoot(a);
   setAim(a, { x: 0, y: 0 });
-  for (let j = 0; j < Math.round(TOP * 60); j++) step(a, DT, { x: 0, y: 0 });
-  releaseShoot(a, { x: 0, y: 0 });
-  for (let j = 0; j < 400 && !a.end; j++) step(a, DT, { x: 0, y: 0 });
-  return a.lastShot?.cross ? a.lastShot.cross.x - a.lastShot.aim.x : null;
+  const top = a.meter!.top;
+  for (let j = 0; j < Math.round(top * 60) - 1; j++) step(a, DT, { x: 0, y: 0 });
+  releaseShoot(a, { x: 0, y: 0 }, 0, top);
+  const path: { x: number; y: number }[] = [];
+  for (let j = 0; j < 400 && !a.end; j++) {
+    step(a, DT, { x: 0, y: 0 });
+    if (a.ball.flight?.kind === 'shot') path.push({ x: a.ball.x, y: a.ball.y });
+  }
+  const cross = a.lastShot?.cross;
+  if (!cross || path.length < 4 || !a.lastShot?.greened) return null;
+  const s0 = path[0];
+  const midY = (s0.y + PL) / 2;
+  const m = path.reduce((p, q) => (Math.abs(q.y - midY) < Math.abs(p.y - midY) ? q : p));
+  const chord = s0.x + ((cross.x - s0.x) * (m.y - s0.y)) / (PL - s0.y);
+  return { miss: Math.abs(cross.x - a.lastShot.aim.x), bow: m.x - chord };
 }
 
 describe('C-4: BEND bends the way its arrow points (x across the pitch: + right on screen)', () => {
@@ -178,15 +204,16 @@ describe('C-4: BEND bends the way its arrow points (x across the pitch: + right 
     // the swipe across the pitch (Soccer2: -dx / 140) agrees: a swipe right is bendCurl's right
     expect(Math.sign(-60 / 140)).toBe(Math.sign(bendCurl(1)));
   });
-  it('over 40 kicks each: Bend left ends 1.5 m+ left of the aim, Bend right 1.5 m+ right, straight within 0.5 m', () => {
-    const mean = (k: number) => {
-      const xs = Array.from({ length: 40 }, (_, i) => bentKick(i, bendCurl(k))).filter((v): v is number => v !== null);
-      expect(xs.length).toBe(40);
-      return xs.reduce((s, v) => s + v, 0) / xs.length;
+  it('over 40 gold kicks each: on the aim, Bend left bending left (bowing right), Bend right bending right, straight straight', () => {
+    const run = (k: number) => {
+      const ks = Array.from({ length: 40 }, (_, i) => bentKick(i, bendCurl(k))).filter((v): v is { miss: number; bow: number } => v !== null);
+      expect(ks.length).toBe(40);
+      for (const q of ks) expect(q.miss).toBeLessThan(0.25);
+      return ks.reduce((s, v) => s + v.bow, 0) / ks.length;
     };
-    expect(mean(-1)).toBeLessThan(-1.5);
-    expect(mean(1)).toBeGreaterThan(1.5);
-    expect(Math.abs(mean(0))).toBeLessThan(0.5);
+    expect(run(-1)).toBeGreaterThan(0.3);
+    expect(run(1)).toBeLessThan(-0.3);
+    expect(Math.abs(run(0))).toBeLessThan(0.1);
   });
 });
 
@@ -237,8 +264,10 @@ function parries(def: Squad, n: number, tag: string) {
     pressShoot(a);
     // across the goal, low to high: the keeper gets to most of them, and parries some
     setAim(a, { x: -0.8 + ((i * 7) % 17) / 10, y: -0.9 + ((i * 3) % 13) / 8 });
-    for (let k = 0; k < Math.round(TOP * 60); k++) step(a, DT, { x: 0, y: 0 });
-    releaseShoot(a, null);
+    // let go a little late, off the gold (soccer-4: a gold release lands exactly on its aim, and none of
+    // these aims is within a ball of the post, so only an off-gold strike can be parried round it)
+    for (let k = 0, n = Math.round(a.meter!.top * 60); k < n; k++) step(a, DT, { x: 0, y: 0 });
+    releaseShoot(a, null, 0, a.meter!.top + 1.6 * a.meter!.green);
     for (let k = 0; k < 180 && !a.end; k++) {
       const before = a.events.length;
       step(a, DT, { x: 0, y: 0 });

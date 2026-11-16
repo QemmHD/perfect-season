@@ -28,6 +28,7 @@ import {
   interceptReach,
   JOG,
   jumpReach,
+  maxRange,
   passError,
   rt,
   shotCone,
@@ -35,7 +36,12 @@ import {
   tackleWin,
   topSpeed,
 } from './ratings';
-import type { Act, Attack, AttackEnd, Ball, Body, PassKind, Pt, Scenario, ShotInfo, SoccerPlayer, Squad } from './types';
+import type { Act, Attack, AttackEnd, Ball, Body, Meter, PassKind, Pt, RingWhy, Scenario, ShotInfo, ShotRelease, SoccerPlayer, Squad } from './types';
+// The gold ring's window maths (pure: v2/perfect.ts, nba's perfect.ts at merge). It is the one V2
+// piece the engine reads, imported from its own file so the engine's graph stays free of the HUD and
+// the sound (the rest of ./v2 is input and presentation).
+import { ringWindow, type WindowPart } from './v2/perfect';
+import type { RingDial, RingState } from './v2';
 
 /* ---------- the pitch (metres) ---------- */
 export const PW = 68;
@@ -648,7 +654,12 @@ export function pass(a: Attack, how: PassKind | 'loftedThrough', dir: Pt | null,
   let vx: number, vy: number, vh: number;
   // the passer's error: off line by PAS (worse on the run and under pressure)
   const pressed = nearestDefender(a, c).d < 2.2;
-  const err = (passError(p) * (pressed ? 1.35 : 1) * (a.sprinting ? 1.15 : 1) * Math.PI) / 180;
+  // a first-time pass (played straight off the touch that brought it under control) is harder the
+  // more it turns the ball (soccer-4, plan S9: the same multiplier as a first-time shot)
+  const rv = a.recv && a.recv.by === c.id && a.t - a.recv.at < FIRST_TIME.window ? a.recv : null;
+  const pd = norm(spot.x - from.x, spot.y - from.y);
+  const ft = rv ? firstTimeMult((Math.acos(clamp(rv.dx * pd.x + rv.dy * pd.y, -1, 1)) * 180) / Math.PI) : 1;
+  const err = (passError(p) * (pressed ? 1.35 : 1) * (a.sprinting ? 1.15 : 1) * ft * Math.PI) / 180;
   const ang = gauss(a.rand) * err;
   const d = dist(from, spot);
   const dirv = norm(spot.x - from.x, spot.y - from.y);
@@ -675,13 +686,96 @@ export function pass(a: Attack, how: PassKind | 'loftedThrough', dir: Pt | null,
   a.kick = { at: a.t + 0.1, by: c.id, to: to ? to.id : null, kind: lofted ? (box && !loftThru ? 'cross' : 'lofted') : kind, vx, vy, vh, curl };
   if (loftThru) a.kick.loftedThrough = true;
   act(c, 'kick', a.t);
+  c.kickFoot = footFor(c, a.ball, spot);
   if (to) a.ctrl = to.id;
   a.passStick = free && dir && Math.hypot(dir.x, dir.y) > 0.2 ? { x: dir.x, y: dir.y } : free ? null : undefined;
   a.events.push('windup-pass');
   return true;
 }
 
-/** Press SHOOT: the power meter starts (on the ball, at a set piece, or for a first-time hit). */
+/* ---------- the gold ring on SHOOT (Claude 2026-11-16, studio overhaul soccer-4; V2 B.0.1, B.3.5) ---------- */
+
+/**
+ * The ring's rules. Wind-up: `meter.top` = lerp(windLo, windHi, (d − windNear)/(windFar − windNear)),
+ * clamped (0.35 s at 11 m or nearer, 0.62 s at 25 m or further). Amber (no guarantee: timing only
+ * narrows the cone): a defender within `pressure` m; a first-time hit that turns the ball more than
+ * `firstAcross`° across the body; a header from beyond `headerFar` m; inside `wideIn` m from wider than
+ * `wideAng` rad off the goal's centre line. Red (TOO FAR): beyond maxRange(SHO) (ratings.ts, 24–34 m).
+ * The window's parts: openness (`openLo` at `pressure` m to `openHi` from `openAt` m clear), on the
+ * sprint `sprint`, a first-time hit `first`, the defence's sharpness `defIQ` a point, and the set-piece
+ * factors; v2/perfect.ts caps the product and floors it at ±30 ms.
+ */
+export const RING = {
+  windLo: 0.35,
+  windHi: 0.62,
+  windNear: 11,
+  windFar: 25,
+  pressure: 2,
+  firstAcross: 90,
+  headerFar: 8,
+  wideIn: 12,
+  wideAng: 0.8,
+  openLo: 0.85,
+  openHi: 1.1,
+  openAt: 7,
+  sprint: 0.88,
+  first: 0.9,
+  defIQ: 0.12,
+};
+
+/** The wind-up: where the gold sits (s after the press) for a shot from `d` m (plan G4). */
+export const windup = (d: number): number => lerp(RING.windLo, RING.windHi, (d - RING.windNear) / (RING.windFar - RING.windNear));
+
+/** The ring for a shot, read now (pure: the attack's own state only, so the AI's sims and the person
+ * see the same ring). `first`: a first-time hit on the ball coming to him (judged at its meet point). */
+export interface RingRead {
+  state: RingState;
+  why?: RingWhy;
+  dial?: RingDial;
+  /** the gold window's half-width, s (≥ 0.030) */
+  green: number;
+  /** where it is struck from, and how far that is from the goal's centre */
+  from: Pt & { h: number };
+  d: number;
+  /** a first-time hit's turn (degrees) */
+  turn: number;
+}
+
+export function shotRing(a: Attack, c: Body, first: boolean): RingRead {
+  const sp = a.setPiece;
+  let from = { x: a.ball.x, y: a.ball.y, h: a.ball.h };
+  let turn = 0;
+  if (first) {
+    const m = meetPoint(a, c, jumpReach(c.p));
+    if (m) from = { x: m.x, y: m.y, h: m.h };
+    const v = norm(a.ball.vx, a.ball.vy);
+    const to = norm(GX - from.x, PL - from.y);
+    turn = (Math.acos(clamp(v.x * to.x + v.y * to.y, -1, 1)) * 180) / Math.PI;
+  }
+  const d = dist(from, goalC);
+  const header = first && from.h > 1.2;
+  const near = sp ? 99 : nearestDefender(a, from).d;
+  const parts: WindowPart[] = [{ id: 'open', mult: lerp(RING.openLo, RING.openHi, (near - RING.pressure) / (RING.openAt - RING.pressure)) }];
+  if (sp?.kind === 'penalty') parts.push({ id: 'pen', mult: SP_TUNE.penGreen });
+  if (sp?.kind === 'freekick') parts.push({ id: 'fk', mult: SP_TUNE.fkGreen });
+  if (!sp && Math.hypot(c.vx, c.vy) > topSpeed(c.p) * 0.9) parts.push({ id: 'sprint', mult: RING.sprint });
+  if (first) parts.push({ id: 'first', mult: RING.first });
+  parts.push({ id: 'defIQ', mult: 1 - RING.defIQ * a.defIQ });
+  const inRange = sp?.kind === 'penalty' || d <= maxRange(c.p);
+  const contested = !sp && near < RING.pressure;
+  let why: RingWhy | undefined;
+  let amber: RingDial | undefined;
+  if (first && !header && turn > RING.firstAcross) [why, amber] = ['first', 'TIMING'];
+  else if (header && d > RING.headerFar) [why, amber] = ['header', 'RANGE'];
+  else if (!sp && d < RING.wideIn && Math.abs(Math.atan2(from.x - GX, Math.max(0.3, PL - from.y))) > RING.wideAng) [why, amber] = ['angle', 'RANGE'];
+  const w = ringWindow({ baseHalfMs: greenHalf(c.p) * 1000, rating01: rt(c.p.a.SHO), contested, inRange, fire: false, amber, parts });
+  if (w.state === 'red') why = 'range';
+  else if (w.state === 'amber' && contested) why = 'pressure';
+  else if (w.state === 'gold') why = undefined;
+  return { state: w.state, why, dial: w.dial, green: w.goldHalfMs / 1000, from, d, turn };
+}
+
+/** Press SHOOT: the ring starts winding up (on the ball, at a set piece, or for a first-time hit). */
 export function pressShoot(a: Attack): boolean {
   if (a.end || a.phase !== 'live' || a.meter || a.strike || a.kick) return false;
   const c = ctrlOf(a);
@@ -690,42 +784,55 @@ export function pressShoot(a: Attack): boolean {
   const taking = !!sp && a.taker === c.id && sp.kind !== 'corner';
   const incoming = !own && !sp && a.ball.flight && a.ball.flight.to === c.id;
   if (!own && !taking && !incoming) return false;
-  let green = greenHalf(c.p);
-  const near = nearestDefender(a, c).d;
-  if (!sp && near < 2) green *= 0.75;
-  // set-piece tuning (Claude 2026-11-01, docs/SOCCER.md): penalties about 75%, not 79%
-  if (sp?.kind === 'penalty') green *= SP_TUNE.penGreen;
-  if (sp?.kind === 'freekick') green *= SP_TUNE.fkGreen;
-  if (Math.hypot(c.vx, c.vy) > topSpeed(c.p) * 0.9) green *= 0.88;
-  green *= 1 - 0.12 * a.defIQ;
-  a.meter = { t0: a.t, top: TOP, green: Math.max(0.012, green), first: !!incoming, assist: assistAim(a, c) };
+  const r = shotRing(a, c, !!incoming);
+  a.meter = { t0: a.t, top: windup(r.d), green: r.green, ring: r.state, why: r.why, dial: r.dial, first: !!incoming, assist: assistAim(a, c) };
+  // the keeper sees the backlift: his split step lands now (render: well before the strike)
+  keeperOf(a).keeperSet = a.t;
   a.events.push('meter');
   return true;
 }
 
-/** Let go of SHOOT: the strike, timed against the green. `aim` is where in the goal (x -1 left post
- * to 1 right, y -1 low to 1 high: the drag on SHOOT, or the stick at a set piece), or null for aim
- * assist (the open side, low). `lag` (s) comes off a person's release (the screen shows the meter a
- * beat behind). */
-export function releaseShoot(a: Attack, aim: Pt | null, lag = 0): boolean {
+/** The ring follows the play while SHOOT is held (a defender closing turns it amber; one who's beaten
+ * gives it back): the state only, the window and the wind-up stay as they were at the press. */
+function refreshRing(a: Attack, m: Meter) {
+  const r = shotRing(a, ctrlOf(a), m.first && a.ball.owner !== a.ctrl);
+  m.ring = r.state;
+  m.why = r.why;
+  m.dial = r.dial;
+}
+
+/** Judge a release `held` s after the press against the meter (pure). */
+export function judgeRelease(m: Meter, held: number, aim: Pt | null): ShotRelease {
+  const off = held - m.top;
+  return { off, inWin: Math.abs(off) <= m.green, power: clamp(held / m.top, 0.3, 1.35), aim, green: m.green, ring: m.ring, why: m.why };
+}
+
+/**
+ * Let go of SHOOT: the strike, judged against the ring. `aim` is where in the goal (x -1 left post to
+ * 1 right, y -1 low to 1 high: the drag on SHOOT, or the stick at a set piece), or null for aim assist.
+ * `held` (game s): how long a person held it, judged from the touches' own timestamps less the
+ * device's lag (Soccer2, v2/perfect.ts judge) so it isn't rounded to a frame; without it the hold is
+ * the attack's own clock less `lag` (the autopilot, the harnesses, the keyboard).
+ */
+export function releaseShoot(a: Attack, aim: Pt | null, lag = 0, held?: number): boolean {
   const m = a.meter;
   if (!m || a.end) return false;
   const c = ctrlOf(a);
-  const held = Math.max(0, a.t - lag - m.t0);
-  const off = held - m.top;
-  const greened = Math.abs(off) <= m.green;
-  const power = clamp(held / m.top, 0.3, 1.35);
-  a.meter = null;
-  a.release = { at: a.t, off, green: m.green, top: m.top };
+  const h = held !== undefined && Number.isFinite(held) ? Math.max(0, held) : Math.max(0, a.t - lag - m.t0);
   if (!aim && m.aim) aim = m.aim;
-  const want = aim ?? m.assist ?? null;
+  refreshRing(a, m);
+  const r = judgeRelease(m, h, aim);
+  const gold = r.inWin && r.ring === 'gold';
+  a.meter = null;
+  a.release = { at: a.t, off: r.off, green: m.green, top: m.top, ring: m.ring, gold, why: m.why };
+  if (gold) a.perfects = (a.perfects ?? 0) + 1;
   if (m.first && a.ball.owner !== c.id) {
-    a.first = { off, greened, power, aim, green: m.green };
-    a.events.push(greened ? 'release-green' : 'release');
+    a.first = r;
+    a.events.push(gold ? 'release-green' : 'release');
     return true;
   }
-  strikeShot(a, c, off, greened, power, want, m.green, false, !aim);
-  a.events.push(greened ? 'release-green' : 'release');
+  strikeShot(a, c, { ...r, aim: aim ?? m.assist ?? null }, false, !aim);
+  a.events.push(gold ? 'release-green' : 'release');
   return true;
 }
 
@@ -757,8 +864,10 @@ export const bendCurl = (k: number): number => (k === 0 ? 0 : -k * 0.75);
 
 /** Half the goal's width the aim spans: full aim is 0.56 m inside the post. */
 export const AIM_X = 3.1;
-/** Aim assist's height (aim space: low); how far across it goes depends on the range and his SHO. */
-export const ASSIST = { y: -0.75 };
+/** Aim assist's height (aim space: low); how far across it goes depends on the range and his SHO.
+ * `share` (B-4, soccer-4): it aims at this share of the way out to the finest spot his accuracy allows,
+ * so a person's deliberate corner on a gold release beats it, and the assist stays a safe default. */
+export const ASSIST = { y: -0.75, share: 0.8 };
 
 /**
  * Aim assist (no drag): the side of the goal the keeper leaves open, with a little preference for
@@ -769,7 +878,7 @@ export function assistAim(a: Attack, shooter: Body, was?: Pt): Pt {
   // finisher's assist goes nearer the corner than a defender's
   const d = Math.hypot(GX - shooter.x, PL - shooter.y);
   const margin = clamp(2 * d * Math.tan((shotCone(shooter.p) * 0.6 * rangeCone(d) * Math.PI) / 180), 0.7, 1.6);
-  const ax = clamp((GHALF - margin) / AIM_X, 0.45, 0.95);
+  const ax = clamp((ASSIST.share * (GHALF - margin)) / AIM_X, 0.3, 0.95);
   const o = openSide(a, shooter);
   let side = o.side;
   // hold the side it picked unless the other opens up clearly (the reticle doesn't flicker)
@@ -811,10 +920,37 @@ export function aimPoint(a: Attack, shooter: Body, aim: Pt | null): { x: number;
   return { x: GX + clamp(v.x, -1, 1) * AIM_X, h: 0.3 + clamp((v.y + 1) / 2, 0, 1) * 1.75 };
 }
 
-/** Range makes a shot harder to place: the cone grows from 12 m (x2 at 20 m, at most x2.25 from 22 m). */
+/** Range makes a shot harder to place (soccer-4, fitted to real conversion by distance): ×1 at 11 m
+ * or nearer, 1.6 at 16.5 m, 2.4 at 20 m, 3.2 at 25 m, 4.3 at 30 m, then 0.22 a metre. */
+export const RANGE_CONE: readonly (readonly [number, number])[] = [
+  [11, 1],
+  [16.5, 1.6],
+  [20, 2.4],
+  [25, 3.2],
+  [30, 4.3],
+];
 export function rangeCone(d: number): number {
-  return 1 + clamp((d - 12) / 8, 0, 1.25);
+  const t = RANGE_CONE;
+  if (d <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) if (d <= t[i][0]) return lerp(t[i - 1][1], t[i][1], (d - t[i - 1][0]) / (t[i][0] - t[i - 1][0]));
+  return t[t.length - 1][1] + (d - t[t.length - 1][0]) * 0.22;
 }
+
+/** The cone's context multipliers (soccer-4; each is also an amber cause on the ring): a defender
+ * within 2 m, a tight angle inside 12 m, a header from beyond 8 m (inside it `headerNear`), a volley. */
+export const CONTEXT = { pressure: 1.35, wide: 1.5, headerFar: 2, headerNear: 1.4, volley: 1.3 };
+/** Every release that isn't gold has its cone scaled by this (soccer-4): before the ring, nearly every
+ * shot was on target (53%, real 34.5%); now gold is where the precision lives. */
+export const CONE_SCALE = 2.1;
+
+/** A first-time hit (a shot, or a pass played straight off a touch) is harder to keep true the more it
+ * turns the ball: ×1 straight on, ×1.2 at 90°, ×1.6 at 135° or more (plan S9). */
+export function firstTimeMult(turnDeg: number): number {
+  const t = clamp(turnDeg, 0, 180);
+  return t <= 90 ? lerp(1, 1.2, t / 90) : lerp(1.2, 1.6, (t - 90) / 45);
+}
+/** A pass played within `window` s of bringing the ball under control is a first-time pass. */
+export const FIRST_TIME = { window: 0.35 };
 
 /** A release's distance from the green's centre in green half-widths (0 dead centre, 1 the slice's edge). */
 export function timingMiss(off: number, green: number): number {
@@ -828,10 +964,16 @@ export function timingMiss(off: number, green: number): number {
 export function coneMult(off: number, green: number): number {
   return Math.min(3.2, 0.5 + 0.35 * Math.pow(timingMiss(off, green), 1.15));
 }
-/** The read-out word for a release. */
+/** The read-out word for a release's timing alone (in the window: PERFECT). */
 export function timingWord(off: number, green: number): 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE' {
   const u = timingMiss(off, green);
   return u <= 1 ? 'PERFECT' : u <= 2.2 ? 'GOOD' : off < 0 ? 'EARLY' : 'LATE';
+}
+/** The word for a release on its ring: PERFECT only on gold (gold never lies); in the window on an
+ * amber or red ring it is GOOD. */
+export function releaseWord(off: number, green: number, ring: RingState | undefined): 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE' {
+  const w = timingWord(off, green);
+  return w === 'PERFECT' && ring && ring !== 'gold' ? 'GOOD' : w;
 }
 
 /** Why a shot didn't go in, in a few words for the HUD (null: nothing worth saying). */
@@ -839,8 +981,10 @@ export function shotVerdict(a: Attack): string | null {
   const s = a.lastShot;
   const e = a.end;
   if (!s || !e || e.kind === 'G') return null;
-  const w = timingWord(s.off, s.green ?? 0.05);
+  const w = releaseWord(s.off, s.green ?? 0.05, s.ring);
   const at = s.cross ?? s.aim;
+  // out of range: the ring said so
+  if (s.ring === 'red' && (e.kind === 'W' || e.kind === 'S')) return 'TOO FAR · GET CLOSER';
   if (e.kind === 'W') {
     if (w === 'LATE') return at.h > GH ? 'LATE RELEASE · IT ROSE OVER' : 'LATE RELEASE · DRAGGED WIDE';
     if (w === 'EARLY') return 'EARLY RELEASE · SCUFFED WIDE';
@@ -857,57 +1001,152 @@ export function shotVerdict(a: Attack): string | null {
   return null;
 }
 
-function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: number, aim: Pt | null, green: number, header = false, assisted = false) {
+/** Which foot a kick is struck with: the side of his body the ball is on, across the kick's line
+ * (render only: §5.5 `kickFoot`). */
+function footFor(c: Body, ball: Pt, to: Pt): 'L' | 'R' {
+  const u = norm(to.x - c.x, to.y - c.y);
+  const side = (ball.x - c.x) * u.y - (ball.y - c.y) * u.x;
+  return side > 0 ? 'R' : 'L';
+}
+
+/**
+ * Where a struck ball crosses the goal line under the game's own physics (60 Hz steps, drag, curl,
+ * dip, bounces), interpolated across the step the way the goal-line check does; null if it never gets
+ * there. Pure: the gold solve below and the tests use it.
+ */
+export function lineCross(from: Pt & { h: number }, v: { vx: number; vy: number; vh: number }, curl: number, dip: number): { x: number; h: number; t: number } | null {
+  const q: Ball = { x: from.x, y: from.y, h: from.h, vx: v.vx, vy: v.vy, vh: v.vh, curl, dip, owner: null, last: null, flight: null };
+  let t = 0;
+  while (t < 6) {
+    const px = q.x;
+    const py = q.y;
+    const ph = q.h;
+    stepBall(q, 1 / 60);
+    t += 1 / 60;
+    if (py < PL && q.y >= PL) {
+      const k = (PL - py) / Math.max(1e-6, q.y - py);
+      return { x: px + (q.x - px) * k, h: ph + (q.h - ph) * k, t };
+    }
+    if (q.vy <= 0.05) return null;
+  }
+  return null;
+}
+
+/**
+ * A gold release: the velocity at speed `v` that puts the ball exactly on (tx, th) at the goal line,
+ * curl and dip included (V2 B.0.1: gold places the ball on the reticle). Solved by stepping the real
+ * ball and correcting the heading and the rise; it never draws a random number.
+ */
+export function exactShot(from: Pt & { h: number }, tx: number, th: number, v: number, curl: number, dip: number): { vx: number; vy: number; vh: number } {
+  const d = Math.max(1, Math.hypot(tx - from.x, PL - from.y));
+  let ang = Math.atan2(tx - from.x, PL - from.y);
+  let vh = shotVelocity(from, tx, th, v, dip).vh;
+  for (let it = 0; it < 12; it++) {
+    const vel = { vx: Math.sin(ang) * v, vy: Math.cos(ang) * v, vh };
+    const hit = lineCross(from, vel, curl, dip);
+    if (!hit) {
+      vh += 1;
+      continue;
+    }
+    const ex = tx - hit.x;
+    const eh = th - hit.h;
+    if (Math.abs(ex) < 0.004 && Math.abs(eh) < 0.004) break;
+    ang += Math.atan2(ex * Math.cos(ang), d);
+    vh += eh / Math.max(0.15, hit.t);
+  }
+  return { vx: Math.sin(ang) * v, vy: Math.cos(ang) * v, vh };
+}
+
+/**
+ * The strike, from a judged release. Gold (in the window on a gold ring): the ball goes exactly where
+ * the reticle is (cone 0; the keeper can still save it). Otherwise the error cone: the shooter's SHO,
+ * the timing (red gets no tightening from it), the range and the context (pressure, a tight angle,
+ * headers, volleys, across the body, a first-time turn). `incoming`: the way the ball was coming for a
+ * first-time hit.
+ */
+function strikeShot(a: Attack, c: Body, r: ShotRelease, header = false, assisted = false, incoming: Pt | null = null) {
   const sp = a.setPiece;
   const kind: ShotInfo['kind'] = header ? 'header' : sp?.kind === 'penalty' ? 'pen' : sp?.kind === 'freekick' ? 'fk' : a.ball.h > 0.4 ? 'volley' : 'shot';
+  const gold = r.inWin && r.ring === 'gold';
+  const aim = r.aim;
   let tgt = aimPoint(a, c, aim);
-  // a header without an aim goes where his head sends it: one side or the other, any height
-  if (header && (!aim || Math.hypot(aim.x, aim.y) < 0.15)) tgt = { x: GX + (a.rand() < 0.5 ? -1 : 1) * (1 + a.rand() * 1.9), h: 0.3 + a.rand() * 1.4 };
+  // a header without an aim goes where his head sends it: one side or the other, any height (a gold
+  // one goes where the reticle showed: the assist)
+  if (header && !gold && (!aim || Math.hypot(aim.x, aim.y) < 0.15)) tgt = { x: GX + (a.rand() < 0.5 ? -1 : 1) * (1 + a.rand() * 1.9), h: 0.3 + a.rand() * 1.4 };
   let th = tgt.h;
-  // the further from the green's centre, the worse the contact (continuous, Claude 2026-11-02): late
-  // gets under it and it rises; early is weak and low
-  const slack = 0.3 * green;
-  const late = Math.max(0, off - slack);
-  const early = Math.max(0, -off - slack);
-  th += late * 8;
-  if (early > 0) th = Math.max(0.15, th - early * 2);
+  const off = r.off;
+  const green = r.green;
+  if (!gold) {
+    // the further from the window's centre, the worse the contact (continuous, Claude 2026-11-02):
+    // late gets under it and it rises; early is weak and low
+    const slack = 0.3 * green;
+    const late = Math.max(0, off - slack);
+    const early = Math.max(0, -off - slack);
+    th += late * 8;
+    if (early > 0) th = Math.max(0.15, th - early * 2);
+  }
   const base = header ? headerSpeed(c.p) : shotSpeed(c.p);
+  const power = r.power;
   const pf = power < 1 ? lerp(0.62, 1, (power - 0.3) / 0.7) : Math.min(1.08, 1 + (power - 1) * 0.3);
   const speed = base * pf * (kind === 'volley' ? 0.92 : 1) * (kind === 'pen' ? 0.95 : 1) * (kind === 'fk' ? 0.92 : 1);
-  const pressed = !sp && nearestDefender(a, c).d < 1.6;
-  let cone = shotCone(c.p) * coneMult(off, green);
-  if (pressed) cone *= 1.3;
-  if (kind === 'header') cone *= 2.4;
-  if (kind === 'volley') cone *= 1.3;
-  if (kind === 'pen') cone *= SP_TUNE.penCone;
-  if (kind === 'fk') cone *= SP_TUNE.fkCone;
-  // a header from a corner: under a crowd of bodies, a worse contact than an open-play cross
-  if (kind === 'header' && cornerPlay(a)) cone *= SP_TUNE.cornerHeaderCone;
   const from = { x: a.ball.x, y: a.ball.y, h: Math.max(0.11, a.ball.h) };
-  // across his body: a shot well away from the way he's running is harder to keep true; and from
-  // range it's harder to place (Claude 2026-11-02)
-  if (kind === 'shot' || kind === 'volley') {
-    cone *= rangeCone(dist(from, goalC));
-    const f = facingOf(c);
-    const to = norm(tgt.x - from.x, PL - from.y);
-    const ang = (Math.acos(clamp(f.x * to.x + f.y * to.y, -1, 1)) * 180) / Math.PI;
-    cone *= 1 + clamp((ang - 55) / 90, 0, 1) * 0.5;
+  const d = dist(from, goalC);
+  const to = norm(tgt.x - from.x, PL - from.y);
+  const turn = incoming ? (Math.acos(clamp(incoming.x * to.x + incoming.y * to.y, -1, 1)) * 180) / Math.PI : 0;
+  let cone = 0;
+  if (!gold) {
+    const cm = coneMult(off, green);
+    cone = shotCone(c.p) * CONE_SCALE * (r.ring === 'red' ? Math.max(1, cm) : cm);
+    if (!sp && nearestDefender(a, c).d < RING.pressure) cone *= CONTEXT.pressure;
+    if (kind === 'header') cone *= d > RING.headerFar ? CONTEXT.headerFar : CONTEXT.headerNear;
+    if (kind === 'volley') cone *= CONTEXT.volley;
+    if (kind === 'pen') cone *= SP_TUNE.penCone;
+    if (kind === 'fk') cone *= SP_TUNE.fkCone;
+    // a header from a corner: under a crowd of bodies, a worse contact than an open-play cross
+    if (kind === 'header' && cornerPlay(a)) cone *= SP_TUNE.cornerHeaderCone;
+    // from range it's harder to place; across his body (a shot well away from the way he's running)
+    // harder to keep true; from a tight angle close in, harder to find the gap; and a first-time hit
+    // the more it turns the ball (Claude 2026-11-02, soccer-4)
+    if (kind === 'shot' || kind === 'volley') {
+      cone *= rangeCone(d);
+      const f = facingOf(c);
+      const ang = (Math.acos(clamp(f.x * to.x + f.y * to.y, -1, 1)) * 180) / Math.PI;
+      cone *= 1 + clamp((ang - 55) / 90, 0, 1) * 0.5;
+      if (!sp && d < RING.wideIn && Math.abs(Math.atan2(from.x - GX, Math.max(0.3, PL - from.y))) > RING.wideAng) cone *= CONTEXT.wide;
+    }
+    if (incoming && kind !== 'header') cone *= firstTimeMult(turn);
   }
   // a free kick is struck with topspin: it gets up over the wall and comes down again
   const dip = kind === 'fk' ? 5 : 0;
-  const v = shotVelocity(from, tgt.x, th, speed, dip);
-  const eh = (gauss(a.rand) * cone * Math.PI) / 180;
-  const ev = (gauss(a.rand) * cone * 0.6 * Math.PI) / 180;
-  const ch = Math.cos(eh);
-  const shh = Math.sin(eh);
-  const vx = v.vx * ch - v.vy * shh;
-  const vy = v.vx * shh + v.vy * ch;
-  const vh = v.vh + ev * speed;
   // open play: a touch of finesse bend back toward the far post; a free kick: the swipe's curl
-  const curl = kind === 'fk' ? a.curl * 0.3 : kind === 'shot' && greened ? -Math.sign(tgt.x - from.x) * 0.04 : 0;
-  const info: ShotInfo = { by: c.id, greened, off, power, speed, aim: { x: tgt.x, h: tgt.h }, cross: null, cone, kind, green, assisted, gkX: keeperOf(a).x };
-  a.strike = { at: a.t + (header ? 0.04 : 0.11), by: c.id, vx, vy, vh, curl, dip, info };
+  const curl = kind === 'fk' ? a.curl * 0.3 : kind === 'shot' && gold ? -Math.sign(tgt.x - from.x) * 0.04 : 0;
+  let vx: number, vy: number, vh: number;
+  if (gold) ({ vx, vy, vh } = exactShot(from, tgt.x, th, speed, curl, dip));
+  else {
+    const v = shotVelocity(from, tgt.x, th, speed, dip);
+    const eh = (gauss(a.rand) * cone * Math.PI) / 180;
+    const ev = (gauss(a.rand) * cone * 0.6 * Math.PI) / 180;
+    const ch = Math.cos(eh);
+    const shh = Math.sin(eh);
+    vx = v.vx * ch - v.vy * shh;
+    vy = v.vx * shh + v.vy * ch;
+    vh = v.vh + ev * speed;
+  }
+  const info: ShotInfo = { by: c.id, greened: gold, inWindow: r.inWin, ring: r.ring, why: r.why, d, ang: Math.atan2(from.x - GX, Math.max(0.3, PL - from.y)), turn: incoming ? turn : undefined, off, power, speed, aim: { x: tgt.x, h: tgt.h }, cross: null, cone, kind, green, assisted, gkX: keeperOf(a).x };
+  a.strike = { at: a.t + (header ? 0.04 : 0.11), by: c.id, vx, vy, vh, curl, dip, info, exact: gold ? { x: tgt.x, h: th, speed } : undefined };
+  // the keeper's read of the last shot is over: he reads this one as it's struck (one dive a shot)
+  a.gkPlan = null;
   act(c, header ? 'header' : 'kick', a.t);
+  // the action contract (render only, §5.5)
+  c.passKind = kind === 'pen' ? 'pen' : kind === 'fk' ? 'fk' : header ? 'header' : 'shot';
+  c.contact = header ? 'head' : kind === 'volley' ? 'volley' : 'foot';
+  c.shotKind = power > 1.04 ? 'power' : 'placed';
+  c.power = clamp((power - 0.3) / 1.05, 0, 1);
+  if (!header) c.kickFoot = footFor(c, a.ball, { x: tgt.x, y: PL });
+  // the keeper's split step (render only): it has landed at least 4 frames before the ball is struck
+  const gk = keeperOf(a);
+  const at = a.strike.at - 4 / 60;
+  if (gk.keeperSet === undefined || a.t - gk.keeperSet > 1 || gk.keeperSet > at) gk.keeperSet = Math.min(a.t, at);
   a.shotBy = c.id;
 }
 
@@ -919,14 +1158,17 @@ function strikeShot(a: Attack, c: Body, off: number, greened: boolean, power: nu
  * about 75%. Measured by src/game/soccer2/setpieces.test.ts.
  */
 export const SP_TUNE = {
-  penGreen: 1.06,
+  penGreen: 0.8,
+  // soccer-4: the free kick's and the corner header's cones divided by CONE_SCALE (2.1), which every
+  // release that isn't gold now carries, so their misses are what they were (their own fit is
+  // soccer-7's); the penalty keeps its cone and a narrower gold (a gold penalty is exact)
   penCone: 0.95,
   penRead: 0.07,
   fkGreen: 0.7,
-  fkCone: 3.0,
+  fkCone: 1.43,
   fkReact: 0.55,
   fkRead: 0.4,
-  cornerHeaderCone: 3.8,
+  cornerHeaderCone: 1.8,
   cornerDuel: 0.8,
   /** how close a marker has to be to go up with the header (open-play crosses 1.5 m) */
   cornerMark: 3.2,
@@ -937,11 +1179,21 @@ export const SP_TUNE = {
  * Keeper tuning for the aim-assist update (Claude 2026-11-02): with shots no longer going at him by
  * default, he narrows tight angles and gets across on a long shot he has time for.
  */
-export const KEEP = { tightDepth: 1.3, shuffle: 3.2, tightX: 9, chargeAt: 6, narrow: 0.3, setSlow: 0.8, rushFrom: 18, spreadIn: 8, spread: [1.0, 1.12] as [number, number] };
+export const KEEP = { tightDepth: 1.3, shuffle: 3.2, narrow: 0.3, setSlow: 0.8, rushFrom: 18, spreadIn: 11, spreadOff: 2, spread: [1.15, 1.6] as [number, number] };
+
+/**
+ * The keeper against range and in a race (soccer-4). From `farFrom` m or more he has time to read it:
+ * his reach is `farReach` m bigger and his reaction ×`farReact`. He comes off his line for a one-on-one
+ * only when he gets to the ball's next touch (where it will be `look` s on) first, allowing `reach` m
+ * of stretch; otherwise he holds the angle. On a ball played into the box he sets for the man it's for
+ * (where he'll meet it), not for the ball in the air, so he isn't pulled to the near post first. A
+ * cross he calls for he takes through the crowd within `claimReach` m, up to `claimH` m.
+ */
+export const KEEPER = { farFrom: 18, farReach: 0.15, farReact: 0.85, claimReach: 1.6, claimH: 2.75, look: 0.4, reach: 1.0, setFor: 25 };
 
 /** Where the keeper stands: on the bisector of the angle the posts make from the ball, off his line by how far away it is. */
 export function keeperSpot(a: Attack, _gk: Body, err: number): Pt {
-  const b = a.ball.owner !== null ? a.bodies[a.ball.owner] : a.ball;
+  const b = a.ball.owner !== null ? a.bodies[a.ball.owner] : (setForPass(a) ?? a.ball);
   const bx = clamp(b.x, 0, PW);
   const by = Math.min(b.y, PL - 0.5);
   const u1 = norm(GX - GHALF - bx, PL - by);
@@ -957,6 +1209,16 @@ export function keeperSpot(a: Attack, _gk: Body, err: number): Pt {
   // a free kick: the wall has the near post, he shades toward the far one
   if (a.setPiece?.kind === 'freekick') x = GX + Math.sign(GX - a.setPiece.spot.x) * 0.35;
   return { x: clamp(x + err, GX - GHALF - 1, GX + GHALF + 1), y: Math.max(by + 1, yk) > PL ? PL - 0.3 : yk };
+}
+
+/** A pass on its way to an attacker near goal: where that man will meet it (the keeper sets for him). */
+function setForPass(a: Attack): Pt | null {
+  const f = a.ball.flight;
+  if (!f || f.to === null || f.kind === 'shot' || f.kind === 'parry' || f.kind === 'clear') return null;
+  const q = a.bodies[f.to];
+  if (!q || q.side !== 'A' || dist(q, goalC) > KEEPER.setFor) return null;
+  const m = a.path ? meetPoint(a, q, jumpReach(q.p)) : null;
+  return m ? { x: m.x, y: m.y } : q;
 }
 
 /** The keeper reads a strike: when he moves, where he goes. A penalty: he guesses at the kick. */
@@ -983,6 +1245,7 @@ function planKeeper(a: Attack) {
     a.gkPlan = { react: a.t + 0.1, x0: gk.x, tx: GX + guess * 2.1, th: 0.4 + a.rand() * 1.2, at: cross.t + a.t };
     return;
   }
+  const far = dist(path[0] ?? cross, goalC) >= KEEPER.farFrom;
   const mis = gkMisread(gk.p) * (1 + 0.6 * Math.max(0, (cross.v - 22) / 10)) * (a.lastShot?.kind === 'fk' ? SP_TUNE.fkRead : 1);
   // he goes for the point where it passes him, misread across its line (Claude 2026-11-02: across
   // the pitch as well as along his line, for a shot from near the byline)
@@ -990,8 +1253,10 @@ function planKeeper(a: Attack) {
   const across = norm(-(cross.y - s0.y), cross.x - s0.x);
   const e = gauss(a.rand) * mis;
   a.gkPlan = {
-    // a direct free kick: the keeper is set and sees it struck (he reacts a little sooner)
-    react: a.t + gkReaction(gk.p) * (1 - 0.15 * a.defIQ) * (a.lastShot?.kind === 'fk' ? SP_TUNE.fkReact : 1) + a.rand() * 0.04,
+    far,
+    // a direct free kick: the keeper is set and sees it struck (he reacts a little sooner); from range
+    // he has longer to read it
+    react: a.t + gkReaction(gk.p) * (1 - 0.15 * a.defIQ) * (a.lastShot?.kind === 'fk' ? SP_TUNE.fkReact : 1) * (far ? KEEPER.farReact : 1) + a.rand() * 0.04,
     x0: gk.x,
     y0: gk.y,
     tx: cross.x + across.x * e,
@@ -1025,6 +1290,7 @@ function keeperInFlight(a: Attack, gk: Body) {
   gk.y = ny;
   if (want > 0.9) {
     act(gk, 'dive', plan.react);
+    gk.diveHeight = plan.th < 0.6 ? 'low' : plan.th < 1.4 ? 'mid' : 'high';
     gk.h = Math.min(plan.th, 1.6) * 0.5 * Math.sin(Math.min(1, tau / dv.time) * Math.PI);
   } else if (plan.th > 1.9) {
     act(gk, 'catch', plan.react);
@@ -1058,8 +1324,10 @@ function keeperSave(a: Attack, gk: Body, prev: Pt & { h: number }) {
   // close in (struck within 9 m of him) he spreads himself, big, rather than diving (Claude
   // 2026-11-02): a one-on-one he's come out for isn't an open goal either side of him
   const o = a.path?.[0];
-  const spread = !diving && !!o && Math.hypot(o.x - gk.x, o.y - gk.y) < KEEP.spreadIn && a.lastShot?.kind !== 'pen';
-  const ax = diving ? arm + 0.15 : spread ? lerp(KEEP.spread[0], KEEP.spread[1], rt(gk.p.a.DIV)) : 0.9;
+  // (soccer-4: only once he has come off his line to narrow it, `spreadOff` m or more; a goalmouth
+  // scramble on his line is the dive's job)
+  const spread = !diving && !!o && Math.hypot(o.x - gk.x, o.y - gk.y) < KEEP.spreadIn && PL - gk.y >= KEEP.spreadOff && a.lastShot?.kind !== 'pen';
+  const ax = (diving ? arm + 0.15 : spread ? lerp(KEEP.spread[0], KEEP.spread[1], rt(gk.p.a.DIV)) : 0.9) + (plan?.far ? KEEPER.farReach : 0);
   const cy = diving ? clamp(plan?.th ?? 0.8, 0.35, 1.7) : spread ? 0.75 : 1.2;
   const ay = diving ? 0.9 : spread ? 1.1 : 1.4;
   // he had no time to move at all: only what comes at him
@@ -1110,6 +1378,7 @@ function keeperSave(a: Attack, gk: Body, prev: Pt & { h: number }) {
   const sp = speed * lerp(0.25, 0.45, a.rand());
   const roundPost = out && Math.abs(bx - GX) > GHALF - PARRY.postIn;
   const dir = !out ? norm(away * (0.3 + a.rand() * 0.8), -1) : roundPost ? norm(wide * 0.9, 0.45) : norm(away * 0.9, -0.35);
+  if (a.lastShot) a.lastShot.parried = !out ? 'front' : roundPost ? 'post' : 'wide';
   b.x = bx;
   b.y = gk.y - 0.2;
   b.h = bh;
@@ -1211,7 +1480,8 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
 
   // the meter held too long: it goes anyway (and goes over)
   if (a.meter && t - a.meter.t0 > METER * 1.3) releaseShoot(a, null);
-  // aim assist follows the keeper while SHOOT is held (it keeps its side unless the other opens up)
+  // aim assist follows the keeper while SHOOT is held (it keeps its side unless the other opens up),
+  // and the ring follows the play (a man closing turns it amber)
   if (a.meter) a.meter.assist = assistAim(a, ctrlOf(a), a.meter.assist);
 
   const owner = ownerOf(a);
@@ -1280,6 +1550,9 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
     overTheTouchline(a);
     return;
   }
+  // the ring follows the play (a man closing turns it amber), read where everyone and the ball now
+  // are: a release before the next step is judged on exactly what the ring shows
+  if (a.meter) refreshRing(a, a.meter);
   // the clock (a shot in the air finishes first)
   const flying = a.strike || (ball.flight && (ball.flight.kind === 'shot' || ball.flight.kind === 'parry') && Math.hypot(ball.vx, ball.vy) > 2);
   if (a.used >= a.clock && !flying && !a.kick && !(a.meter && t - a.meter.t0 < 0.7)) endAttack(a, 'T', 'TIME UP');
@@ -1373,6 +1646,14 @@ function launchShot(a: Attack) {
   b.curl = s.curl;
   b.dip = s.dip;
   b.h = Math.max(0.11, b.h);
+  // a gold release: solved again from where the ball really is as the foot meets it (he ran on, or a
+  // first-time ball dropped, during the swing), so it still crosses the line on the reticle
+  if (s.exact) {
+    const v = exactShot({ x: b.x, y: b.y, h: b.h }, s.exact.x, s.exact.h, s.exact.speed, s.curl, s.dip);
+    b.vx = v.vx;
+    b.vy = v.vy;
+    b.vh = v.vh;
+  }
   b.flight = { kind: 'shot', from: s.by, to: null, at: a.t };
   a.lastShot = s.info;
   setPath(a, tracePath(b, 3));
@@ -1408,7 +1689,9 @@ function duringFlight(a: Attack, prev: Pt & { h: number }) {
       if (q.h <= 0) q.vh = 0;
     }
   if (f?.kind === 'shot' || f?.kind === 'parry') {
-    // a body in the way: crossing his line within his reach
+    // a body in the way: crossing his line within his reach. An outfielder lunges at it (soccer-4,
+    // BLOCK): his reach grows from his body's half-width once he has seen it struck, at the cost of a
+    // weaker block at full stretch, and only low (a lunge doesn't get up to a rising ball)
     for (const q of a.bodies) {
       if (q.side !== 'D' || q.role === 'gk' || q.tried === 1) continue;
       const crossed = (prev.y - q.y) * (b.y - q.y) <= 0;
@@ -1418,9 +1701,14 @@ function duringFlight(a: Attack, prev: Pt & { h: number }) {
       const bh = prev.h + (b.h - prev.h) * k;
       const wall = q.act === 'wall';
       const reachH = wall ? q.p.ht / 100 + q.h : q.p.ht / 100 - 0.05;
-      if (Math.abs(bx - q.x) < (wall ? 0.42 : 0.45) && bh < reachH) {
+      const body = wall ? 0.42 : BLOCK.body + BALL_R;
+      const lunge = wall ? 0 : clamp((a.t - f.at - BLOCK.react) * BLOCK.speed, 0, BLOCK.lunge);
+      const gap = Math.abs(bx - q.x);
+      const stretch = gap > body ? (gap - body) / Math.max(1e-6, BLOCK.lunge) : 0;
+      if (gap < body + lunge && bh < (stretch > 0 ? BLOCK.lungeH : reachH)) {
         q.tried = 1;
-        if (a.rand() < blockChance(q.p, wall)) {
+        if (stretch > 0) q.slide = { at: a.t, dx: Math.sign(bx - q.x), dy: 0 };
+        if (a.rand() < blockChance(q.p, wall) * (1 - BLOCK.stretch * stretch)) {
           b.vx = (a.rand() - 0.5) * 8;
           b.vy = -Math.abs(b.vy) * 0.3;
           b.vh = 2 + a.rand() * 3;
@@ -1487,6 +1775,13 @@ function duringFlight(a: Attack, prev: Pt & { h: number }) {
 }
 
 /**
+ * Blocks (soccer-4): an outfielder's body is `body` m either side of him (plus the ball); `react` s
+ * after the strike he lunges toward it at `speed` m/s, at most `lunge` m further, below `lungeH` m,
+ * and a block at full stretch is `stretch` less likely to hold.
+ */
+export const BLOCK = { body: 0.35, react: 0.08, speed: 6, lunge: 1.2, lungeH: 0.95, stretch: 0.35 };
+
+/**
  * When a shot or a parry has died (R-1, Claude 2026-11-10, studio overhaul soccer-1): rolling slower
  * than `speed` (m/s, along the grass) below `h` (m), or bounced `bounces` times. Until then a shot is
  * the keeper's and the blockers' business (nobody else may touch it), and a shot or a parry still
@@ -1519,6 +1814,21 @@ function contact(a: Attack) {
   // a shot in the air is the keeper's and the blockers' business (duringFlight)
   if (f?.kind === 'shot') return;
   const speed = Math.hypot(b.vx, b.vy);
+  // a ball in the air the keeper has called for: he comes through the crowd for it (he leaps and
+  // reaches KEEPER.claimReach m, up to KEEPER.claimH), ahead of anyone's head (soccer-4, plan S3)
+  if (f && a.claimFor === f.at && (f.kind === 'cross' || f.kind === 'lofted' || f.kind === 'through')) {
+    const gk = keeperOf(a);
+    if (a.t >= gk.stunUntil && Math.hypot(gk.x - b.x, gk.y - b.y) <= KEEPER.claimReach && b.h <= KEEPER.claimH) {
+      b.owner = gk.id;
+      b.last = gk.id;
+      b.flight = null;
+      a.path = null;
+      act(gk, 'catch', a.t);
+      a.events.push('claim');
+      endAttack(a, 'S', 'KEEPER CLAIMS');
+      return;
+    }
+  }
   const fresh = (q: Body) => !(f && q.id === f.from && a.t - f.at < 0.3);
   const cands = a.bodies
     .filter((q) => a.t >= q.stunUntil && fresh(q) && q.act !== 'wall')
@@ -1538,6 +1848,8 @@ function contact(a: Attack) {
       return;
     }
     if (q.side === 'D') {
+      // the keeper has called for it: his defenders leave it to him
+      if (f && a.claimFor === f.at) continue;
       const reach = interceptReach(q.p);
       const high = b.h > 0.9;
       if (d > reach || b.h > (high ? jumpReach(q.p) : 0.9) || (high && b.vh > 0)) continue;
@@ -1595,18 +1907,22 @@ function contact(a: Attack) {
     if (firstGo) {
       let fs = a.first;
       if (!fs && a.meter) {
+        // still held as it arrives: struck on the ring as it is now
         const m = a.meter;
-        const held = a.t - m.t0;
-        fs = { off: held - m.top, greened: Math.abs(held - m.top) <= m.green, power: clamp(held / m.top, 0.3, 1.35), aim: m.aim ?? null, green: m.green };
-        a.release = { at: a.t, off: fs.off, green: m.green, top: m.top };
+        refreshRing(a, m);
+        fs = judgeRelease(m, a.t - m.t0, m.aim ?? null);
+        const gold = fs.inWin && fs.ring === 'gold';
+        a.release = { at: a.t, off: fs.off, green: m.green, top: m.top, ring: m.ring, gold, why: m.why };
+        if (gold) a.perfects = (a.perfects ?? 0) + 1;
         a.meter = null;
       }
       a.first = null;
       if (fs) {
+        const incoming = norm(b.vx, b.vy);
         b.vx *= 0.2;
         b.vy *= 0.2;
         b.owner = null;
-        strikeShot(a, q, fs.off, fs.greened, fs.power, fs.aim, fs.green, b.h > 1.2, !fs.aim);
+        strikeShot(a, q, fs, b.h > 1.2, !fs.aim, incoming);
         b.flight = { kind: 'shot', from: q.id, to: null, at: a.t };
         b.vx = 0;
         b.vy = 0;
@@ -1627,6 +1943,8 @@ function contact(a: Attack) {
       a.events.push('heavy-touch');
       return;
     }
+    // how it came to him, for a first-time pass straight off this touch
+    if (speed > 2) a.recv = { by: q.id, at: a.t, dx: b.vx / speed, dy: b.vy / speed };
     b.owner = q.id;
     b.last = q.id;
     b.flight = null;
@@ -2158,16 +2476,26 @@ function keeper(a: Attack, gk: Body, dt: number) {
   if (owner && owner.side === 'A' && far < KEEP.rushFrom && !a.setPiece) {
     const toGoal = norm(GX - owner.x, PL - owner.y);
     const blocked = a.bodies.some((d) => d.role === 'def' && a.t >= d.stunUntil && (d.x - owner.x) * toGoal.x + (d.y - owner.y) * toGoal.y > 0.5 && Math.abs((d.x - owner.x) * toGoal.y - (d.y - owner.y) * toGoal.x) < 2.2);
+    // he races for it only if he gets to its next touch first (soccer-4); otherwise he comes out to a
+    // set spot on the angle's bisector (narrowing the goal), and never charges a race he'd lose
+    const next = { x: owner.x + owner.vx * KEEPER.look, y: owner.y + owner.vy * KEEPER.look };
+    const first = Math.max(0, dist(gk, next) - KEEPER.reach) / topSpeed(gk.p) <= KEEPER.look;
     if (!blocked && Math.abs(owner.x - GX) < 18) {
-      const lead = 0.35;
-      let tx = owner.x + owner.vx * lead;
-      let ty = owner.y + owner.vy * lead + 0.9;
-      if (far > KEEP.chargeAt && Math.abs(owner.x - GX) > KEEP.tightX) {
+      let tx: number;
+      let ty: number;
+      if (first) {
+        if (a.rushAt === undefined) {
+          a.rushAt = a.t;
+          a.events.push('rush');
+        }
+        tx = owner.x + owner.vx * 0.35;
+        ty = owner.y + owner.vy * 0.35 + 0.9;
+      } else {
         const u1 = norm(GX - GHALF - owner.x, PL - owner.y);
         const u2 = norm(GX + GHALF - owner.x, PL - owner.y);
         const bis = norm(u1.x + u2.x, u1.y + u2.y);
         const along = bis.y > 0.05 ? (PL - owner.y) / bis.y : far;
-        const out = clamp(far * KEEP.narrow, 1.2, 5);
+        const out = clamp(far * KEEP.narrow, 1.2, Math.min(5, along - 1.5));
         tx = owner.x + bis.x * (along - out);
         ty = owner.y + bis.y * (along - out);
       }
@@ -2182,10 +2510,16 @@ function keeper(a: Attack, gk: Body, dt: number) {
     const m = meetPoint(a, gk, 2.5);
     // from a corner he commands a little more of his box
     const corner = cornerPlay(a);
+    // (a call he can no longer make good is off: his defenders play it again)
+    if (a.claimFor === f.at) a.claimFor = undefined;
     if (m && m.y > PL - (corner ? SP_TUNE.cornerClaimDepth : 7.5) && Math.abs(m.x - GX) < (corner ? 11 : 10)) {
       const rivals = a.bodies.filter((q) => q.side === 'A').map((q) => meetPoint(a, q, 2.4)?.t ?? 9);
-      const mine = Math.max(0, dist(gk, m) - 1) / topSpeed(gk.p);
+      // when the ball gets to the point he can meet it (soccer-4: before, his running time to it was
+      // set against the attackers' arrival times, so he called for crosses that were headed first)
+      const mine = Math.max(0, dist(gk, m) - 0.6) / (topSpeed(gk.p) * 0.95) <= m.t ? m.t : Infinity;
       if (mine < Math.min(...rivals) - 0.05) {
+        // "keeper's!": his own defenders leave it to him (soccer-4, plan S3)
+        a.claimFor = f.at;
         steer(gk, m.x, m.y, topSpeed(gk.p), dt);
         return;
       }

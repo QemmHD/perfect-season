@@ -11,7 +11,11 @@
 // win and only this folder changes.
 //
 // Nothing in here may be read by the engine, the AI's simulations or anything both phones compute:
-// these are input, presentation and bookkeeping pieces (V2 F.3: no protocol bump on their own).
+// these are input, presentation and bookkeeping pieces (V2 F.3: no protocol bump on their own). The one
+// exception (soccer-4) is the gold ring's window maths, `ringWindow`/`windowScale` in perfect.ts: pure
+// and deterministic, imported by engine.ts straight from ./perfect (never through this file, which
+// pulls in the HUD and the sound), because the AI's simulations judge their own seeded releases against
+// the same window a person's are (plan §5.0.2). Changing that maths changes outcomes: protocol bump.
 
 /* ---------- in this branch ---------- */
 
@@ -30,6 +34,8 @@ export { type Circle, gapOf, type Geometry, geometryFor, type Insets, meets, typ
 export { haptic, HAPTIC_PATTERN, hapticCount, heartbeat } from './haptics';
 /** ut's `src/lib/playtime.ts`. */
 export { playtimeState, usePlaytime } from './playtime';
+/** nba's gold ring (`src/game/perfect.ts` + `hud/ring-draw.ts`; soccer-4). */
+export { DEFAULT_LAG_MS, deviceLagMs, drawRing, FIRE_MULT, GOLD_ARC_MIN_PX, GOLD_FLOOR_MS, GOOD_SPAN, goldArcPx, judge, RING_COLORS, ringMap, ringWindow, setDeviceLag, WINDOW_CAP, type WindowPart, windowScale, wordFor } from './perfect';
 
 /* ---------- written by other teams: the interfaces soccer relies on (§5.0.2) ---------- */
 

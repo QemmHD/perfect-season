@@ -5,7 +5,7 @@
 //   bash O/heavy.sh npx vite-node scripts/soccer/<name>.ts [n] [part]
 import cardsRaw from '../../src/data/cards-soccer.json';
 import { hashString, rng } from '../../src/engine/rng';
-import { ctrlOf, GX, kickOff, openSide, ownerOf, PL, pressShoot, releaseShoot, setAim, setCurl, setSprint, snapAim, step, TOP } from '../../src/game/soccer2/engine';
+import { ctrlOf, GX, kickOff, openSide, ownerOf, PL, pressShoot, releaseShoot, setAim, setCurl, setSprint, snapAim, step } from '../../src/game/soccer2/engine';
 import { clubSquad, soccerLines, type SoccerCardsFile } from '../../src/game/soccer2/ratings';
 import type { Attack, Pt, SoccerPlayer, SoccerPos, Squad } from '../../src/game/soccer2/types';
 
@@ -97,7 +97,7 @@ export function beeline(a: Attack, st: Strat, r: () => number): Attack {
     let stick: Pt | null = { x: 0, y: 0 };
     if (a.setPiece && a.taker === c.id && !a.meter && !a.strike) {
       if (pressShoot(a)) {
-        holdUntil = a.t + TOP + gauss(r) * st.sd;
+        holdUntil = a.t + a.meter!.top + gauss(r) * st.sd;
         const pen = a.setPiece?.kind === 'penalty';
         if (st.setPiece === 'low') aim = snapAim({ x: r() < 0.5 ? -0.9 : 0.9, y: -0.8 });
         else {
@@ -113,7 +113,7 @@ export function beeline(a: Attack, st: Strat, r: () => number): Attack {
       stick = dir;
       setSprint(a, st.sprint && a.stamina > 0.08);
       if (!a.meter && holdUntil < 0 && d <= st.shootAt && pressShoot(a)) {
-        holdUntil = a.t + TOP + gauss(r) * st.sd;
+        holdUntil = a.t + a.meter!.top + gauss(r) * st.sd;
         if (st.drag) {
           aim = snapAim({ x: openSide(a, c).side * 0.95, y: -0.85 });
           setAim(a, aim);
@@ -136,7 +136,7 @@ export function setPieceHuman(a: Attack, aimv: Pt, sd: number, r: () => number, 
   if (curl) setCurl(a, curl);
   if (!pressShoot(a)) return a;
   setAim(a, snapAim(aimv));
-  const hold = Math.max(1, Math.round((TOP + gauss(r) * sd) * 60));
+  const hold = Math.max(1, Math.round((a.meter!.top + gauss(r) * sd) * 60));
   for (let i = 0; i < hold && a.meter; i++) step(a, 1 / 60, { x: 0, y: 0 });
   if (a.meter) releaseShoot(a, snapAim(aimv));
   for (let i = 0; i < 60 * 150 && !a.end; i++) step(a, 1 / 60, { x: 0, y: 0 });

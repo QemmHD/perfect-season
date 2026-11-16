@@ -5,8 +5,8 @@
 // who's onside), crosses from wide and shoots when it has the angle. Its skill (0-1) is how
 // sharp those reads are and how close to the green it lets the meter go.
 import { hashString, rng } from '../../engine/rng';
-import { AIM_X, ctrlOf, dist, GX, inBox, kickOff, nearestDefender, offsideLine, ownerOf, pass, PL, pressShoot, releaseShoot, setCurl, setSprint, step, TOP } from './engine';
-import { rt } from './ratings';
+import { AIM_X, ctrlOf, dist, GX, inBox, kickOff, nearestDefender, offsideLine, ownerOf, pass, PL, pressShoot, releaseShoot, setCurl, setSprint, step } from './engine';
+import { maxRange, rt } from './ratings';
 import type { Attack, Body, PassKind, Pt } from './types';
 
 export interface Pilot {
@@ -53,22 +53,31 @@ function openness(a: Attack, from: Pt, q: Body, to: Pt = q): { man: number; lane
   return { man, lane };
 }
 
+/**
+ * The pilot's shooting range and its appetite from distance (soccer-4, audit AI-1): it shoots from up
+ * to lerp(near, far) m by SHO (never past the ring's range gate, never red), from beyond `long` m only
+ * when the lane to goal is clear by `lane` m, and then with `longGo` of the usual willingness. With a
+ * body in the lane it still shoots from inside `through` m (a real side's shots are a quarter blocked).
+ */
+export const SHOOTING = { near: 18, far: 28, long: 20, lane: 1.6, longGo: 0.45, through: 22 };
+
 /** A shot from here is on: close enough for him, an angle, nobody in the way. */
 function shotOn(a: Attack, c: Body): boolean {
   const d = dist(c, { x: GX, y: PL });
-  const range = lerp(16, 26, rt(c.p.a.SHO));
+  const range = Math.min(maxRange(c.p) - 0.5, lerp(SHOOTING.near, SHOOTING.far, rt(c.p.a.SHO)));
   if (d > range || c.y > PL - 1.5) return false;
   const angle = Math.abs(Math.atan2(c.x - GX, PL - c.y));
   if (angle > 1.05 && d > 7) return false;
   if (d < 10) return true;
-  // a body on the line to the goal
+  // a body on the line to the goal (from range, the lane must be wide open)
+  const lane = d > SHOOTING.long ? SHOOTING.lane : 1.1;
   for (const q of a.bodies) {
     if (q.side !== 'D' || q.role === 'gk') continue;
     const ahead = q.y > c.y + 0.5;
     if (!ahead) continue;
     const k = (q.y - c.y) / Math.max(1, PL - c.y);
     const lx = c.x + (GX - c.x) * k;
-    if (Math.abs(q.x - lx) < 1.1) return d < 13;
+    if (Math.abs(q.x - lx) < lane) return d < SHOOTING.through;
   }
   return true;
 }
@@ -125,9 +134,10 @@ export function decide(a: Attack, pl: Pilot): Pt | null {
 }
 
 function beginShot(a: Attack, pl: Pilot, aim: Pt | null, timing = 1) {
-  if (!pressShoot(a)) return;
+  if (!pressShoot(a) || !a.meter) return;
   const sd = lerp(0.12, 0.028, pl.skill) / timing;
-  pl.releaseAt = Math.max(0.15, TOP + gauss(pl.rand) * sd);
+  // aimed at the gold (the wind-up depends on the range), judged by the same ring as a person's
+  pl.releaseAt = Math.max(0.15, a.meter.top + gauss(pl.rand) * sd);
   pl.aim = aim;
 }
 
@@ -137,7 +147,8 @@ function think(a: Attack, pl: Pilot, c: Body) {
   const pressure = nearestDefender(a, c).d;
   const noise = (1 - pl.skill) * 0.45;
   // shoot when it's on (a sharper pilot waits for a better look)
-  if (shotOn(a, c) && (dist(c, goal) < 13 || r() < lerp(0.45, 0.8, pl.skill))) {
+  const dGoal = dist(c, goal);
+  if (shotOn(a, c) && (dGoal < 13 || r() < lerp(0.45, 0.8, pl.skill) * (dGoal > SHOOTING.long ? SHOOTING.longGo : 1))) {
     const gk = a.bodies.find((b) => b.role === 'gk')!;
     const s = Math.abs(gk.x - GX) > 0.3 ? Math.sign(GX - gk.x) : c.x < GX ? 1 : -1;
     // (x in the old 3.3 m aim scale, so its shots go where they did before the 2026-11-02 aim change)

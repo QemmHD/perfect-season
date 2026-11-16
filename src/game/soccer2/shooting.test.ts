@@ -5,7 +5,7 @@
 // a person's pass goes the stick's way with only a gentle pull toward a teammate; a receiver whose
 // stick is still held the way of the pass runs onto it; a shootout kick goes where it's dragged.
 import { describe, expect, it } from 'vitest';
-import { assistAim, coneMult, GX, kickOff, openSide, pass, PASS_ASSIST, passPlan, PL, pressShoot, releaseShoot, setAim, setupAttack, snapAim, step, timingMiss, timingWord, TOP } from './engine';
+import { assistAim, coneMult, GX, kickOff, openSide, pass, PASS_ASSIST, passPlan, PL, pressShoot, releaseShoot, setAim, setupAttack, snapAim, step, timingMiss, timingWord } from './engine';
 import { greenHalf } from './ratings';
 import { kickAttack, newShootout } from './shootout';
 import type { Attack, Body, SoccerPlayer, SoccerPos, Squad } from './types';
@@ -68,12 +68,12 @@ function oneOnOne(att: Squad, def: Squad, seed: string, i: number): Attack {
   a.sprinting = false;
   return a;
 }
-/** A person's shot: run on at goal, SHOOT held for TOP + off, dragged to the open side's low corner (or assist). */
+/** A person's shot: run on at goal, SHOOT held for the wind-up + off, dragged to the open side's low corner (or assist). */
 function shot(a: Attack, off: number, drag: boolean): Attack {
   const c = a.bodies[a.ctrl];
   if (!pressShoot(a)) return a;
   if (drag) setAim(a, snapAim({ x: openSide(a, c).side * 0.95, y: -0.85 }));
-  const hold = Math.max(1, Math.round((TOP + off) * 60));
+  const hold = Math.max(1, Math.round((a.meter!.top + off) * 60));
   for (let i = 0; i < hold && a.meter && !a.end; i++) step(a, 1 / 60, { x: 0, y: 1 });
   if (a.meter) releaseShoot(a, null);
   for (let i = 0; i < 60 * 8 && !a.end && !(a.lastShot && a.lastShot.cross); i++) step(a, 1 / 60, { x: 0, y: 0 });
@@ -193,10 +193,13 @@ describe('ratings still decide', () => {
     expect(assisted).toBeLessThan(0.75);
   });
   it('a better keeper concedes fewer of the same chances', () => {
+    // (soccer-4) with the aim assist: a gold release dragged into the corner from 13-16 m is past any
+    // keeper (gold places it exactly; that's the ring's promise), so his rating shows on the shots he
+    // can reach, which the assist's safer spot is
     const keeper = (v: number) => squad(75, { gk: { DIV: v, HAN: v, REF: v, POS: v, SPD: v } });
-    const weak = finish(squad(75), keeper(52), 'gk-');
-    const avg = finish(squad(75), keeper(75), 'gk-');
-    const elite = finish(squad(75), keeper(93), 'gk-');
+    const weak = finish(squad(75), keeper(52), 'gk-', false);
+    const avg = finish(squad(75), keeper(75), 'gk-', false);
+    const elite = finish(squad(75), keeper(93), 'gk-', false);
     expect(weak).toBeGreaterThan(avg + 0.08);
     expect(avg).toBeGreaterThan(elite + 0.08);
   });
@@ -284,7 +287,7 @@ describe('the shootout with the new aim', () => {
       for (let k = 0; k < 40; k++) step(a, 1 / 60, { x: 0, y: 0 });
       expect(pressShoot(a)).toBe(true);
       setAim(a, snapAim({ x: -0.9, y: -0.8 }));
-      for (let k = 0; k < Math.round(TOP * 60); k++) step(a, 1 / 60, { x: 0, y: 0 });
+      for (let k = 0, n = Math.round(a.meter!.top * 60); k < n; k++) step(a, 1 / 60, { x: 0, y: 0 });
       releaseShoot(a, null);
       for (let k = 0; k < 600 && !a.end; k++) step(a, 1 / 60, { x: 0, y: 0 });
       expect(a.end).not.toBeNull();

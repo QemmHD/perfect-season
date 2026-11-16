@@ -72,8 +72,12 @@ describe('the import graph: nothing both phones compute reads prefs or the V2 ad
     expect([...reach('./prefs.ts')]).toEqual(['./prefs.ts']);
   });
   it('the engine, the autopilot, the match, the shootout and the ratings never reach prefs.ts, controls.ts or v2/', () => {
+    // (soccer-4: one exception, the gold ring's pure window maths in v2/perfect.ts, which reaches nothing
+    // else: the AI's simulations judge their own releases against the same window as a person's)
+    const ALLOWED = new Set(['./v2/perfect.ts']);
+    expect([...reach('./v2/perfect.ts')]).toEqual(['./v2/perfect.ts']);
     for (const f of ['./engine.ts', './autopilot.ts', './match.ts', './shootout.ts', './ratings.ts']) {
-      const hits = [...reach(f)].filter((m) => m.endsWith('/prefs.ts') || m.startsWith('./v2/') || m === './controls.ts');
+      const hits = [...reach(f)].filter((m) => (m.endsWith('/prefs.ts') || m.startsWith('./v2/') || m === './controls.ts') && !ALLOWED.has(m));
       expect(hits, f).toEqual([]);
     }
   });

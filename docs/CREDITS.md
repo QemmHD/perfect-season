@@ -143,3 +143,13 @@ built from:
 
 All overall ratings and face stats are our own model and estimates. They are not taken from or
 fitted to any video game. Club colors are plain identity colors; no crests, kits or photos are used.
+
+## Shot data (soccer expected goals)
+
+Soccer's expected-goals curve (`src/game/soccer2/xg.ts`, display and box data only) and the
+conversion-by-distance targets the shooting model is fitted to come from our own analysis of
+**StatsBomb Open Data** (https://github.com/statsbomb/open-data), licensed under
+**CC BY-SA 4.0** (https://creativecommons.org/licenses/by-sa/4.0/): 70,426 shots (65,931 in open
+play), read through the Hugging Face mirror `ClementeH/statsbomb-open-data-shots`. The derived
+tables (conversion by distance for feet and heads, the central/wide factor, the set-piece rates)
+are shared under the same licence. No StatsBomb branding or event data is shipped.

@@ -12,7 +12,9 @@
 // autopilot takes it), `confetti` (a shootout: the rival's goal throws confetti in the rival's kit),
 // `restarts` (R-2, 2026-11-16: a keeper's parry staged running wide of the post, the corner it earns
 // lined up in the same attack, then a ball off a defender over the touchline and the quick throw-in).
-// Parts: all | smoke | play | buttons | auto | sets | pens | bend | autokick | confetti | restarts | layout.
+// soccer-4 (2026-11-16): `ring` (the gold ring: gold let go on the gold with the word, chime and
+// haptic frames and the judged offset against the touches' timestamps; amber under pressure; red TOO FAR).
+// Parts: all | smoke | play | buttons | auto | sets | pens | bend | autokick | confetti | restarts | layout | ring.
 import { launch, base, artifacts } from './browser.mjs';
 import { blocked, blockedLine, computedSat, phone, PRESETS, urlFor } from '../soccer/qa-isolate.mjs';
 import fs from 'node:fs';
@@ -354,6 +356,114 @@ for (const p of [preset('393x852-sat59'), preset('320x568')]) {
     errorsAll.push(...errors);
     if (!theirGoal) errorsAll.push(tag + ': no rival goal in the shootout to check the confetti');
     await context.close();
+  }
+  if (part('ring')) {
+    // soccer-4: the gold ring on SHOOT. A shooter alone 18 m out (the defence moved off him through the
+    // QA hook): the ring gold, SHOOT let go on the gold through a real touch, then the word, the chime
+    // and the double haptic in the same frame (G6); the judged hold against the touches' own timestamps
+    // (G5); the gold band's drawn length (G1). Then amber (a man within 1.5 m: PRESSURE) and red (33 m
+    // with SHO 60: TOO FAR). Screenshots of each.
+    const rig = async (page) => page.evaluate(() => {
+      // what fired, and when: the touches' timestamps, the toast's word, the haptic, the chime's oscillators, the frames
+      const w = window;
+      w.__ring = { touches: [], frames: [], toast: [], vib: [], osc: [] };
+      for (const t of ['pointerdown', 'pointerup']) window.addEventListener(t, (e) => w.__ring.touches.push({ t, ts: e.timeStamp }), { capture: true });
+      const f = (t) => { w.__ring.frames.push(t); requestAnimationFrame(f); };
+      requestAnimationFrame(f);
+      const v = navigator.vibrate?.bind(navigator);
+      navigator.vibrate = (p) => { w.__ring.vib.push({ at: performance.now(), p }); return v ? v(p) : true; };
+      const st = OscillatorNode.prototype.start;
+      OscillatorNode.prototype.start = function (...a) { w.__ring.osc.push(performance.now()); return st.apply(this, a); };
+      new MutationObserver(() => { const el = document.querySelector('.sc2-toast'); if (el) w.__ring.toast.push({ at: performance.now(), text: el.textContent }); }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    });
+    const clearOf = (page, near) => page.evaluate((near) => {
+      const a = window.__soccer.a;
+      const c = a.bodies[a.ctrl];
+      let first = true;
+      for (const b of a.bodies) if (b.side === 'D' && b.role !== 'gk') {
+        if (near && first) { b.x = c.x + near; b.y = c.y + 0.4; b.vx = b.vy = 0; b.stunUntil = 1e9; first = false; continue; }
+        b.x = 3; b.y = 40; b.vx = b.vy = 0; b.stunUntil = 1e9;
+      }
+    }, near);
+    const meter = (page) => page.evaluate(() => { const m = window.__soccer.a.meter; const a = window.__soccer.a; return m ? { held: a.t - m.t0, top: m.top, green: m.green, ring: m.ring, why: m.why ?? null } : null; });
+    // gold
+    {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-ring', scenario: 'build', start: '30,87', sho: '92' });
+      await rig(page);
+      await page.locator('.sc2-ctl.go').tap({ force: true });
+      await page.waitForSelector('.sc2-ctl[data-act="shoot"]');
+      await clearOf(page, 0);
+      await page.waitForTimeout(150);
+      const shoot = await center(page, '.sc2-ctl[data-act="shoot"]');
+      await touch(cdp, 'touchStart', [{ ...shoot, id: 5 }]);
+      let m = await meter(page);
+      await page.waitForTimeout(Math.max(0, (m.top - 0.16) * 1000));
+      m = await meter(page);
+      await page.screenshot({ path: `${out}/${tag}-ring-gold.png` });
+      const view = await page.evaluate(() => window.__soccer.view.stats.goldArc);
+      // let go on the gold: wait until the hold is within a few ms of the top
+      for (let k = 0; k < 60; k++) { m = await meter(page); if (!m || m.held >= m.top - 0.012) break; await page.waitForTimeout(4); }
+      await touch(cdp, 'touchEnd', []);
+      await page.waitForTimeout(80);
+      await page.screenshot({ path: `${out}/${tag}-ring-perfect.png` });
+      const rel = await page.evaluate(() => { const a = window.__soccer.a; return { release: a.release ?? null, mark: performance.getEntriesByName('sc2-perfect').map((e) => e.startTime), ring: window.__ring }; });
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${out}/${tag}-ring-after.png` });
+      // G5: the engine's offset against the touches' own timestamps (the device lag is the 30 ms default)
+      const tt = rel.ring.touches.filter((x) => x.t === 'pointerdown' || x.t === 'pointerup');
+      const up = tt.filter((x) => x.t === 'pointerup').pop();
+      const down = tt.filter((x) => x.t === 'pointerdown' && (!up || x.ts <= up.ts)).pop();
+      const judgedMs = down && up && rel.release ? (up.ts - down.ts - 30 - rel.release.top * 1000) : null;
+      // G6: the mark, the toast's PERFECT, the haptic and the chime between the same two frames
+      const at = rel.mark[0];
+      const frames = rel.ring.frames;
+      const frameOf = (t) => frames.filter((f) => f <= t).length;
+      const toast = rel.ring.toast.find((x) => /PERFECT/.test(x.text));
+      const vib = rel.ring.vib.find((x) => Array.isArray(x.p));
+      const osc = rel.ring.osc.find((x) => at !== undefined && x >= at - 1);
+      const g6 = at === undefined ? null : { frame: frameOf(at), toast: toast ? frameOf(toast.at) : null, haptic: vib ? frameOf(vib.at) : null, chime: osc !== undefined ? frameOf(osc) : null, toastText: toast?.text ?? null };
+      report.push({ tag, step: 'ring-gold', meterAtShot: m, goldArcPx: view, release: rel.release, judgedOffMs: judgedMs, engineOffMs: rel.release ? rel.release.off * 1000 : null, g6, errors });
+      errorsAll.push(...errors);
+      await context.close();
+    }
+    // amber: a man within 1.5 m
+    {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-ring-amber', scenario: 'build', start: '30,87' });
+      await page.locator('.sc2-ctl.go').tap({ force: true });
+      await page.waitForSelector('.sc2-ctl[data-act="shoot"]');
+      await clearOf(page, 1.4);
+      await page.waitForTimeout(120);
+      const shoot = await center(page, '.sc2-ctl[data-act="shoot"]');
+      await touch(cdp, 'touchStart', [{ ...shoot, id: 5 }]);
+      await page.waitForTimeout(260);
+      const m = await meter(page);
+      await page.screenshot({ path: `${out}/${tag}-ring-amber.png` });
+      const toast = await page.locator('.sc2-toast').first().textContent().catch(() => null);
+      await touch(cdp, 'touchEnd', []);
+      report.push({ tag, step: 'ring-amber', meter: m, toast, goldArcPx: await page.evaluate(() => window.__soccer.view.stats.goldArc), errors });
+      errorsAll.push(...errors);
+      await context.close();
+    }
+    // red: 33 m out with SHO 60
+    {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-ring-red', scenario: 'build', start: '34,72', sho: '60' });
+      await page.locator('.sc2-ctl.go').tap({ force: true });
+      await page.waitForSelector('.sc2-ctl[data-act="shoot"]');
+      await clearOf(page, 0);
+      await page.waitForTimeout(120);
+      const shoot = await center(page, '.sc2-ctl[data-act="shoot"]');
+      await touch(cdp, 'touchStart', [{ ...shoot, id: 5 }]);
+      await page.waitForTimeout(380);
+      const m = await meter(page);
+      await page.screenshot({ path: `${out}/${tag}-ring-red.png` });
+      const toast = await page.locator('.sc2-toast').first().textContent().catch(() => null);
+      await touch(cdp, 'touchEnd', []);
+      await page.waitForTimeout(120);
+      const after = await page.locator('.sc2-toast').first().textContent().catch(() => null);
+      report.push({ tag, step: 'ring-red', meter: m, toast, after, errors });
+      errorsAll.push(...errors);
+      await context.close();
+    }
   }
   if (part('restarts')) {
     // R-2: the live attack object (window.__soccer.a) is staged the way rules.test.ts does it: the ball

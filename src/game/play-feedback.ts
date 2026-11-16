@@ -132,33 +132,50 @@ export function footballFeedback(
     next,
   };
 }
+/** What kept a soccer ring from gold, in the read-out (soccer-4). */
+const SOCCER_RING: Record<string, string> = { pressure: 'Pressure', first: 'Across the body', header: 'Header too far out', angle: 'Tight angle', range: 'Too far' };
+/** Claude 2026-11-16 (studio overhaul soccer-4): the gold ring's reasons, blocks, claims and parries. */
 export function soccerFeedback(a: Attack): PlayFeedback {
   const s = a.lastShot,
     e = a.end;
+  const text = e?.text ?? '';
   const next =
     e?.kind === 'O'
       ? 'Release the pass before your runner crosses the last defender, or use a runner starting deeper.'
       : e?.kind === 'T'
         ? 'Move the ball forward earlier. A quick pass can beat a defender without spending sprint energy.'
         : e?.kind === 'B'
-          ? 'A defender was close to the strike. Pass across the box or take a touch into space before shooting.'
-          : s && !s.greened
-            ? 'Aim with the SHOOT thumb while the stick keeps your run; release closer to the green slice.'
-            : e?.kind === 'G'
-              ? 'Keep creating that angle. Watch the keeper before repeating the same finish.'
-              : s
-                ? 'The release was well timed. Find the side the keeper leaves open rather than shooting straight at him.'
-                : 'Use PASS to move away from pressure, or THRU for a runner moving into the space behind the defense.';
+          ? 'BLOCKED. A defender was in the lane. Pass across the box or take a touch into space before shooting.'
+          : s && s.ring === 'red'
+            ? 'TOO FAR. Past his range the ring is red and can never be gold. Carry it closer before you shoot.'
+            : s && !s.greened && s.why === 'pressure'
+              ? 'PRESSURE. With a defender within 2 m the ring can’t be gold. Take a touch away from him or pass first.'
+              : s && !s.greened && s.why === 'first'
+                ? 'FIRST TIME ACROSS YOUR BODY. Turning the ball over 90° first time can’t be gold. Meet it facing goal, or take a touch.'
+                : text.startsWith('KEEPER CLAIMS')
+                  ? 'KEEPER CLAIM. He reached the cross first. Play it away from him, behind the defence or to the far post.'
+                  : s?.parried === 'wide'
+                    ? 'PARRIED WIDE. A good save, pushed away from goal. Aim further from where he stands.'
+                    : s && !s.greened
+                      ? 'Release on the gold: that’s the only release that puts the ball exactly on your aim.'
+                      : e?.kind === 'G'
+                        ? 'Keep creating that angle. Watch the keeper before repeating the same finish.'
+                        : s
+                          ? 'A gold release goes exactly where you aim. Pick the side the keeper leaves open, not the one he stands on.'
+                          : 'Use PASS to move away from pressure, or THRU for a runner moving into the space behind the defense.';
+  const ring = s ? (s.greened ? 'Gold' : s.ring === 'red' ? 'Red · Too far' : s.why ? 'Amber · ' + (SOCCER_RING[s.why] ?? s.why) : s.ring === 'gold' ? 'Gold · missed the window' : 'Amber') : '';
   return {
     title: 'Last attack',
-    result: e?.text ?? 'Attack complete',
+    result: text || 'Attack complete',
     facts: [
       { label: 'Attack', value: words(a.scenario) },
       ...(s
         ? [
             { label: 'Shot', value: words(s.kind) },
+            { label: 'Ring', value: ring },
             { label: 'Release', value: releaseText(s.off * 1000, s.greened) },
             { label: 'Aim', value: s.assisted ? 'Assisted' : 'Manual' },
+            ...(s.xg !== undefined ? [{ label: 'xG', value: s.xg.toFixed(2) }] : []),
           ]
         : []),
       { label: 'Sprint energy', value: Math.round(a.stamina * 100) + '%' },

@@ -22,10 +22,10 @@ import { soccerFeedback, type PlayFeedback } from '../play-feedback';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { crowd, loadSamples, sfx, vibrate } from '../../lib/sound';
-import { LOFT_HOLD, nextBend, type ControlPhase, type Slot, type SlotId, slotsFor, type Slots, targetsOf } from './controls';
+import { holdOf, LOFT_HOLD, nextBend, type ControlPhase, type Slot, type SlotId, slotsFor, type Slots, targetsOf } from './controls';
 import { PauseSheet } from './PauseSheet';
 import { PausableTimers } from './timers';
-import { haptic, heartbeat, PauseButton, ScoreBug, Stick, type StickOut, ToastLine, usePlaytime } from './v2';
+import { deviceLagMs, haptic, heartbeat, PauseButton, ScoreBug, Stick, type StickOut, ToastLine, usePlaytime } from './v2';
 import { momentOf, SoccerFx } from './fx';
 import { reducedMotion } from '../../ui/motion';
 import { screenRunInput } from '../football2/controls';
@@ -35,22 +35,23 @@ import { frameAt, Recorder, type Replay, REPLAY_SPEED, replayTime, REPLAYS_IN_AU
 import { useInputInterrupt } from '../useInputInterrupt';
 import { WaitLine } from '../Wait';
 import { decide, pilot } from './autopilot';
-import { bendCurl, cancelShoot, ctrlOf, GX, kickOff, pass, passPlan, passTarget, PL, PW, pressShoot, releaseShoot, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step, timingWord } from './engine';
+import { bendCurl, cancelShoot, ctrlOf, GX, kickOff, pass, passPlan, passTarget, PL, PW, pressShoot, releaseShoot, releaseWord, setAim, setCurl, setSprint, settle, shotVerdict, snapAim, step } from './engine';
 import type { SoccerKits } from './kits';
 import { attackFor, ATTACKS, END_TEXT, isStoppage, minuteOf, newMatch, recordAttack, SCENARIO_HINTS, SCENARIO_NAMES, scenarioToast, SET_PIECE_WAIT, setPieceCountdown, totalOf, type Match } from './match';
 import { SoccerRenderer } from './render';
+import { xgOf } from './xg';
 import { kickAttack, newShootout, nextKick, recordKick, score as soScore, type Shootout, type Side } from './shootout';
-import type { Attack, AttackEnd, Body, Pt, Scenario, Squad } from './types';
+import type { Attack, AttackEnd, Body, Pt, RingWhy, Scenario, Squad } from './types';
 import './soccer2.css';
 import './v2/geometry.css';
 import './soccer2-controls.css';
 import './soccer2-moments.css';
+import './soccer2-ring.css';
 
 type Ui = 'loading' | 'intro' | 'live' | 'after' | 'so-intro' | 'so-kick' | 'so-after' | 'final';
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
 
 const DT = 1 / 60;
-const RELEASE_LAG = 0.03;
 /** how far (CSS px) a drag on SHOOT goes for full aim across or up */
 const AIM_DRAG = 46;
 /** a drag shorter than this (of AIM_DRAG) is no aim: the assist */
@@ -72,6 +73,20 @@ const TIPS = {
   pen: 'SHOOT · drag to aim, let go in the green',
   keep: 'THEIR KICK · pick a way to dive',
 } as const;
+
+/** The gold ring in the toast line (soccer-4, V2 B.0.1): why a ring is amber or red while SHOOT is
+ * held (the dial), and the name for it in a release's word ("GOOD · PRESSURE"). */
+const RING_LINE: Record<RingWhy, string> = {
+  range: 'TOO FAR · get closer for gold',
+  pressure: 'PRESSURE · no gold with a man on you',
+  first: 'FIRST TIME · across your body',
+  header: 'HEADER · too far out for gold',
+  angle: 'TIGHT ANGLE · no gold from here',
+};
+const RING_WORD: Record<RingWhy, string> = { range: 'TOO FAR', pressure: 'PRESSURE', first: 'ACROSS YOUR BODY', header: 'TOO FAR OUT', angle: 'TIGHT ANGLE' };
+/** How long a release's word stays in the toast line (ms); the ring's closing ticks (s before the gold). */
+const RELEASE_MS = 950;
+const TICKS = { from: 0.2, every: 0.05, n: 4 };
 
 /** What a replay needs to redraw a moment. */
 interface Snap {
@@ -194,6 +209,17 @@ export function Soccer2({
   /** the drag on SHOOT: where the thumb went down, and the aim it gives (null: assist) */
   const shotDrag = useRef<{ x0: number; y0: number; aim: Pt | null } | null>(null);
   const [aimDot, setAimDot] = useState<Pt | null>(null);
+  /** SHOOT's touch-down: its own timestamp (PointerEvent.timeStamp, or the key's), for the release's judging */
+  const shotPress = useRef<number | null>(null);
+  /** consecutive PERFECT releases (the chime climbs a semitone each, to +4) */
+  const perfectStreak = useRef(0);
+  /** the closing ring's ticks played for this hold, and the release last given its word */
+  const ringTicked = useRef(-1);
+  const lastFed = useRef<Attack['release'] | null>(null);
+  /** the held ring's state and why (for the toast's dial line), and a release's word in the toast */
+  const [ringLine, setRingLine] = useState('');
+  const ringKey = useRef('');
+  const [releaseToast, setReleaseToast] = useState<{ id: number; text: string; kind: 'perfect' | 'good' | 'bad' } | null>(null);
   const sprintPointer = useRef<number | 'key' | null>(null);
   const swipe = useRef<{ id: number; x0: number; y0: number; t0: number } | null>(null);
   const [ui, setUi] = useState<Ui>('loading');
@@ -239,6 +265,31 @@ export function Soccer2({
     const id = ++popId.current;
     setPop({ id, text, tone, sub });
     timers.later(() => setPop((p) => (p && p.id === id ? null : p)), ms);
+  };
+  /**
+   * A person's release, the moment it is judged (V2 B.0.1, plan G6): on gold the word PERFECT in the
+   * toast line, the chime a semitone higher for each PERFECT in a row (to +4) and the double haptic, all
+   * from the same input handler, so they land in the same frame; else the word, and on an amber or red
+   * ring what kept it from gold. Each release once.
+   */
+  const feedRelease = (a: Attack) => {
+    const r = a.release;
+    if (!r || lastFed.current === r) return;
+    lastFed.current = r;
+    const id = ++popId.current;
+    if (r.gold) {
+      perfectStreak.current++;
+      sfx.perfect(perfectStreak.current);
+      haptic('double');
+      performance.mark?.('sc2-perfect');
+      setReleaseToast({ id, text: 'PERFECT' + (perfectStreak.current > 1 ? ' · ' + perfectStreak.current + ' IN A ROW' : ' · on the gold'), kind: 'perfect' });
+    } else {
+      perfectStreak.current = 0;
+      const w = releaseWord(r.off, r.green, r.ring);
+      const why = r.ring !== 'gold' && r.why ? ' · ' + RING_WORD[r.why] : '';
+      setReleaseToast({ id, text: w + why, kind: w === 'GOOD' ? 'good' : 'bad' });
+    }
+    timers.later(() => setReleaseToast((t) => (t && t.id === id ? null : t)), RELEASE_MS);
   };
   /** a line in the toast line for a while (once per kind of tip a match) */
   const tip = (key: string, text: string) => {
@@ -288,6 +339,7 @@ export function Soccer2({
     passDown.current = null;
     thruDown.current = null;
     shotPointer.current = null;
+    shotPress.current = null;
     shotDrag.current = null;
     setAimDot(null);
     sprintPointer.current = null;
@@ -370,14 +422,16 @@ export function Soccer2({
       }
       if (e === 'pass' || e === 'cross') sfx.kick();
       else if (e === 'shot' || e === 'header') {
+        // the read-out's xG (display only: xg.ts; the engine never reads it)
+        const ls = a.lastShot;
+        if (ls && ls.d !== undefined) ls.xg = xgOf({ d: ls.d, ang: ls.ang ?? 0, kind: ls.kind });
         sfx.kick();
         swell(0.5);
-      } else if (e === 'release-green') say('PERFECT!', 'green', 700);
-      else if (e === 'release' && a.release) {
-        const w = timingWord(a.release.off, a.release.green);
-        say(w === 'GOOD' ? 'GOOD' : w === 'EARLY' ? 'EARLY' : 'LATE', w === 'GOOD' ? 'plain' : 'bad', 650);
-      }
-      else if (e === 'control' || e === 'chest') sfx.catch();
+      } else if (e === 'release-green' || e === 'release') {
+        // a person's first-time hit still held as the ball arrived is judged by the engine (the word
+        // and the chime here; the haptic needs the touch's own handler, so it plays only on a release)
+        if (shotPointer.current !== null) feedRelease(a);
+      } else if (e === 'control' || e === 'chest') sfx.catch();
       else if (e === 'bounce') sfx.bounce();
       else if (e === 'save-catch' || e === 'claim' || e === 'smother') {
         sfx.catch();
@@ -741,10 +795,12 @@ export function Soccer2({
     sfx.click();
     setTick((n) => n + 1);
   };
-  const shootDown = (id: number | 'key', x = 0, y = 0) => {
+  const shootDown = (id: number | 'key', x = 0, y = 0, ts = performance.now()) => {
     const a = atkRef.current;
     if (!a || !live() || shotPointer.current !== null) return false;
     if (!pressShoot(a)) return false;
+    shotPress.current = ts;
+    ringTicked.current = -1;
     shotPointer.current = id;
     shotDrag.current = { x0: x, y0: y, aim: null };
     setAimDot(null);
@@ -763,15 +819,22 @@ export function Soccer2({
     setAim(a, aim);
     setAimDot(l < AIM_DEAD ? null : { x: Math.max(-1, Math.min(1, v.x)), y: Math.max(-1, Math.min(1, -v.y)) });
   };
-  const shootUp = (id: number | 'key') => {
+  /**
+   * Let go of SHOOT. The release is judged from the two touches' own timestamps less the device's
+   * display lag (v2/perfect.ts deviceLagMs), so it isn't rounded to the frame it lands in (plan G5),
+   * and handed to the engine as a hold in game seconds: the engine never reads a timestamp.
+   */
+  const shootUp = (id: number | 'key', ts = performance.now()) => {
     if (shotPointer.current !== id) return;
     shotPointer.current = null;
     shotDrag.current = null;
     setAimDot(null);
     setShooting(false);
     const a = atkRef.current;
+    const t0 = shotPress.current;
+    shotPress.current = null;
     // the aim is already on the meter (the drag, the stick at a set piece, the keys); none: assist
-    if (a && !a.end) releaseShoot(a, null, RELEASE_LAG);
+    if (a && !a.end && t0 !== null && releaseShoot(a, null, 0, holdOf(t0, ts, deviceLagMs(), timeScale))) feedRelease(a);
   };
   const shootCancel = () => {
     shotPointer.current = null;
@@ -859,7 +922,7 @@ export function Soccer2({
       } else if (k === ' ') {
         e.preventDefault();
         if (uiRef.current === 'intro' || uiRef.current === 'so-intro') kickOffNow();
-        else shootDown('key');
+        else shootDown('key', 0, 0, e.timeStamp);
       } else if (k === 'j') doPassDown('key');
       else if (k === 'k') doThruDown('key');
       else if (k === 'shift') sprintOn('key');
@@ -867,7 +930,7 @@ export function Soccer2({
     const up = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       keys.current.delete(k);
-      if (k === ' ') shootUp('key');
+      if (k === ' ') shootUp('key', e.timeStamp);
       else if (k === 'j') doPassUp('key');
       else if (k === 'k') doThruUp('key');
       else if (k === 'shift') sprintOff('key');
@@ -976,6 +1039,21 @@ export function Soccer2({
           }
         }
         rec.current.push(a.t, snapOf(a));
+        // the person's ring: its closing ticks over the last 200 ms before the gold, and its state for
+        // the toast's dial line (set only when it changes)
+        const m = a.meter;
+        if (m && shotPointer.current !== null && !autoplayHook) {
+          const i = Math.floor((a.t - m.t0 - (m.top - TICKS.from)) / TICKS.every);
+          if (i >= 0 && i < TICKS.n && i > ringTicked.current) {
+            ringTicked.current = i;
+            sfx.ringTick(i);
+          }
+        }
+        const rk = m && shotPointer.current !== null ? m.ring + ':' + (m.why ?? '') : '';
+        if (rk !== ringKey.current) {
+          ringKey.current = rk;
+          setRingLine(rk);
+        }
         // an untaken set piece: the countdown to the autopilot taking it (whole seconds, set on change)
         const sw = spWait.current;
         const cd = sw && !sw.auto && !autoplayHook ? setPieceCountdown(a.t - sw.at) : null;
@@ -1095,9 +1173,17 @@ export function Soccer2({
 
   // the toast line (V-3: it replaces the hint over the goal): the countdown, a tip, the attack's line
   // before the whistle; nothing while SHOOT is held or a meter is up
+  // while SHOOT is held: only the ring's dial, when it can't be gold; just after a release: its word
+  const heldWhy = shooting && ringLine && !ringLine.startsWith('gold') ? (ringLine.split(':')[1] as RingWhy | '') : '';
   const toast: { text: string; kind: 'plain' | 'good' | 'bad' | 'perfect'; timer?: boolean } | null =
-    autoplayHook || !a || paused || shooting || a.meter
+    autoplayHook || !a || paused
       ? null
+      : heldWhy
+        ? { text: RING_LINE[heldWhy], kind: heldWhy === 'range' ? 'bad' : 'good' }
+      : shooting || a.meter
+      ? null
+      : releaseToast
+        ? { text: releaseToast.text, kind: releaseToast.kind }
       : countdown !== null && playing
         ? { text: 'AUTO KICK · in ' + countdown, kind: 'bad', timer: true }
         : ui === 'intro'
@@ -1123,7 +1209,7 @@ export function Soccer2({
       return;
     }
     let took = false;
-    if (sl.act === 'shoot') took = shootDown(e.pointerId, e.clientX, e.clientY);
+    if (sl.act === 'shoot') took = shootDown(e.pointerId, e.clientX, e.clientY, e.timeStamp);
     else if (sl.act === 'pass') {
       doPassDown(e.pointerId);
       took = passDown.current?.id === e.pointerId;
@@ -1143,7 +1229,7 @@ export function Soccer2({
   const slotUp = (id: SlotId, sl: Slot, e: React.PointerEvent<HTMLButtonElement>) => {
     slotPointerAt.current = performance.now();
     press(id, false);
-    if (sl.act === 'shoot') shootUp(e.pointerId);
+    if (sl.act === 'shoot') shootUp(e.pointerId, e.timeStamp);
     else if (sl.act === 'pass') doPassUp(e.pointerId);
     else if (sl.act === 'thru') doThruUp(e.pointerId);
   };

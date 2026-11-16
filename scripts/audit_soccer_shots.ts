@@ -4,7 +4,7 @@
 // scenario. Run: npx vite-node scripts/audit_soccer_shots.ts [n]
 import cardsRaw from '../src/data/cards-soccer.json';
 import { autoplayAttack } from '../src/game/soccer2/autopilot';
-import { GX, kickOff, pass, PL, pressShoot, releaseShoot, setupAttack, openSide, setAim, snapAim, step, TOP } from '../src/game/soccer2/engine';
+import { GX, kickOff, pass, PL, pressShoot, releaseShoot, setupAttack, openSide, setAim, snapAim, step, windup } from '../src/game/soccer2/engine';
 import { clubSquad, soccerLines, type SoccerCardsFile } from '../src/game/soccer2/ratings';
 import type { Attack, Body, Pt, Scenario, SoccerPlayer, SoccerPos, Squad } from '../src/game/soccer2/types';
 import { rng, hashString } from '../src/engine/rng';
@@ -121,7 +121,7 @@ export function humanShot(a: Attack, sd: number, thumb: Thumb, r: () => number):
   if (a.ball.flight) {
     for (let i = 0; i < 240 && !a.end && a.ball.flight && a.ball.owner === null; i++) {
       const d = Math.hypot(a.ball.x - c.x, a.ball.y - c.y);
-      if (d - 1.4 < Math.hypot(a.ball.vx, a.ball.vy) * (TOP + 0.15)) break;
+      if (d - 1.4 < Math.hypot(a.ball.vx, a.ball.vy) * (windup(Math.hypot(c.x - GX, PL - c.y)) + 0.15)) break;
       step(a, 1 / 60, null);
     }
     if (a.ball.flight?.to !== c.id) return a;
@@ -130,7 +130,7 @@ export function humanShot(a: Attack, sd: number, thumb: Thumb, r: () => number):
   // the drag goes on as SHOOT is pressed (it counts for a first-time hit still held at contact)
   const pre = openSide(a, c).side;
   if (thumb === 'drag' || thumb === 'bad') setAim(a, snapAim({ x: (thumb === 'drag' ? pre : -pre) * 0.95, y: -0.85 }));
-  const hold = Math.max(1, Math.round((TOP + off) * 60));
+  const hold = Math.max(1, Math.round((a.meter!.top + off) * 60));
   for (let i = 0; i < hold && !a.end && a.meter; i++) step(a, 1 / 60, a.ball.flight ? null : RUN[thumb]);
   // the person looks at the keeper as he lets go
   const side = openSide(a, c).side;
