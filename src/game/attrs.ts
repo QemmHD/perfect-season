@@ -67,8 +67,10 @@ let cache: Promise<(p: Player) => Attrs | null> | null = null;
  * A lookup from player to attributes; resolves to one that returns null when there's no file.
  * When the file exists but can't be downloaded (offline before it was cached, or a newer build
  * removed it), it also resolves to that null lookup, unless `strict`: then it rejects, so a match
- * shows the recovery screen instead of playing without real ratings (shell-4). A failed download
- * is tried again on the next call.
+ * shows the recovery screen instead of playing without real ratings (shell-4). The failed promise
+ * isn't kept here, but browsers (Chrome, Safari) keep a failed dynamic import in the page's module
+ * map, so in the app a new try normally needs a page reload (the recovery card's RELOAD); within
+ * the same page the next call usually fails again at once.
  */
 export function loadAttrs(strict = false): Promise<(p: Player) => Attrs | null> {
   const load = (cache ??= (async () => {

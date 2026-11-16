@@ -217,22 +217,38 @@ None. CSS, a focus helper and QA only; nothing reaches an engine or a match resu
 
 ## shell-4 · Recovery and save safety: error boundaries, match load failures, `arena.ts`, M8 danger zone (done)
 
+### Review fixes (2026-11-16)
+
+An independent review of `52f347e..817e507` found 1 medium and 7 low issues. All 8 are fixed; none was disputed.
+
+- **(medium) BACK TO HOME skipped the screen's own exit.** The view boundary sent every screen to `goTab('home')`. In an online head-to-head (screens `draft`, `vote`, `arcade`) that skipped `leaveDraft()`: the `MatchConn` stayed open, the rival was never told, `profile.activeMatch` stayed set, and the next launch recorded the forfeit ("You left the match against X…"). The card meanwhile said "Nothing was saved from it". Now:
+  - App routes the button per screen. `draft`/`vote`/`arcade` go through `leaveDraft()`, which closes the match and records the forfeit at that moment, or clears `activeMatch` when the rival had already left. `utmatch` goes back to Ultimate Team, as the match's own `onExit` does, and the button says **BACK TO ULTIMATE TEAM** (new `homeLabel` prop). Every other screen goes Home.
+  - New `online` prop: set when `run.online` is set on those three screens and the rival hasn't left, gone or been dropped (the same test `leaveDraft` uses). The arena card then drops "Nothing was saved from it" and shows a red line, **"This online match counts as a loss."** RELOAD also leads to a loss, through the boot forfeit, so the line is true for both buttons.
+  - Measured (`recovery.mjs --parts online`): two isolated phones on a signature-checking relay on an ephemeral port meet, draft, vote PLAY and kick off. Phone A's arena crashes. A's card shows the loss line. After BACK TO HOME: `activeMatch` null, `h2h.l` 0 → 1, `h2h.w` unchanged, toast "Match against Shell QA B counts as a loss.". After a relaunch, `h2h.l` is still 1: no second forfeit at boot. `--parts draft` (vs the AI, 3 sports): "This match stopped", no loss line, "Nothing was saved from it", BACK TO HOME lands on Home, progress deep-equal, recovery 1 frame after the arena's insertion.
+- **(low) Lazy screen chunks ended on the old bare `ScreenMissing` panel.** `lazyScreen` now rethrows to the view boundary when offline, or when `reloadForMissingFiles()` already reloaded within the minute. Otherwise it reloads once and keeps the screen's loading state up until the reload lands. `ScreenMissing` is deleted. The Admin sheet (a lazy screen outside the view) has its own boundary, whose button reads CLOSE. Measured (`--parts lazy`, UltimateTeam's chunk aborted, 3 sports): offline → "You're offline" with RELOAD and BACK TO HOME, 0 reloads; online → one reload into the live build, then the card ("Part of the game didn't load") on the next tap and 0 further reloads. Never the old panel.
+- **(low) `arenaActive()` lagged the DOM by one microtask.** It read the `MutationObserver`'s cached element, so it was false between React's commit of the portal and the observer callback. That window holds layout effects and the arena's first commit. `active()`/`element()` now scan `<body>`'s children synchronously; the observer only drives `onArenaChange`. Cost on the real page: 0.24 µs a call (100,000 calls, 3 body children), and `arenaActive()` is true immediately after an `appendChild`, before any microtask. Arena QA 7/7, 0 mismatches, 0 observer calls in the 60 s windows.
+- **(low) The retry claim.** `loadAttrs()` keeps no failed promise, but Chrome and Safari cache a failed dynamic import in the page's module map, so within one page the next try usually fails again at once. In practice a retry needs a reload. The `attrs.ts` comment and this doc now say so. The offline copy now reads "Connect to the internet, then tap RELOAD." (it was "Connect once, then try again.").
+- **(low) The conflict tick.** In the `conflict` phase cloud sync saves nothing (`cloud-sync.ts` `sync()`), so an erase doesn't replace the server copy. The line now says so ("…saves nothing until you do. Erasing empties this phone only; if you then choose KEEP THIS PHONE in Cloud Save, the empty profile becomes your server save."). The tick reads "I understand this phone's progress is erased now. The server copy stays until I choose in Cloud Save."
+- **(low) A tap on the locked ERASE did nothing visible.** It now names what is missing in a one-line hint under the buttons ("To unlock it, type ERASE and tick the box." / "…tick the box above." / "…type ERASE in the box above."). The hint is `role=status`, and the button's `aria-describedby` points at it. The missing step(s) get a red ring, plus a 320 ms shake unless reduced motion is on, and the hint scrolls into view (a no-op when it is already visible). The hint line keeps its height when empty. Measured (`settings-danger.mjs`, 3 sports): the right hint for each missing step, the ring on exactly the missing step(s), the hint on screen after the tap (the sheet scrolls up 33 px the first time, 0 after), 0 localStorage writes, and 0 requests. Screenshot `danger-<sport>-nudge.png`.
+- **(low) No QA drove a draft match.** `recovery.mjs` gains `draft`, `online` and `lazy` parts, built on shell-5's draft loop (SPIN → SHOW PLAYERS → first row → slot until the Vote).
+- **(low) The nfl-3 merge.** Integration note under "Touched outside my lane". The `chunk` part now falls back to a draft match when a UT match never asks for the attribute file. `--chunk-via draft` forces that path, and it passes today in all 3 sports (11–37 ms from the failed request to the card).
+
 ### What changed
 
 - **No blank screens: `RecoveryBoundary`** (`src/shell/Recovery.tsx`, `recovery.css`).
   - It uses `getDerivedStateFromError` and `componentDidCatch` → `logError('boundary:' + where, e)`, so the error shows in Settings → "Problems on this phone". That on-phone error log (`ps-errors`) is not part of any profile, and the boundary never touches a save, `update` or the cloud.
-  - **Placements:** the root, around the App/Lab branch inside `Stage` (`main.tsx`); App's view body inside `<Transition id={viewId}>` (`resetKey={viewId}`, BACK TO HOME → `goTab('home')`); and App's tab body inside `<Transition id={tab}>`. The tab one shows no BACK TO HOME on Home itself. That is two one-line wraps plus an import in `App.tsx`. React portals keep their React parent, so an error inside any match's body-portaled `.arcade-full` (Arcade, Training Camp, Moments, UT matches) reaches the view boundary. That boundary unmounts the arena along with the view (measured: 0 arenas left after the card shows).
+  - **Placements:** the root, around the App/Lab branch inside `Stage` (`main.tsx`); App's view body inside `<Transition id={viewId}>` (`resetKey={viewId}`; BACK TO HOME takes the screen's own exit, see "Review fixes"); and App's tab body inside `<Transition id={tab}>`. The tab one shows no BACK TO HOME on Home itself. That is two one-line wraps plus an import in `App.tsx`. React portals keep their React parent, so an error inside any match's body-portaled `.arcade-full` (Arcade, Training Camp, Moments, UT matches) reaches the view boundary. That boundary unmounts the arena along with the view (measured: 0 arenas left after the card shows).
   - **The card.** A beveled glass card with a lit rim and an SVG mark. Two variants:
     - full screen (root and view): z 60, owns the status-bar band (`html:has(.recovery-screen) .status-plate { display: none }`);
     - panel (tab): between the top bar and the tab bar, so the player keeps the app's chrome.
   - When a match was on screen it uses the arena variant: dark arena floor, red mark, "This match stopped". RELOAD is focused. Every button is 48 design px tall. Reduced motion drops the 0.24 s rise. There is no fade, so the card is readable in its first frame.
   - **Missing downloads** (`isChunkError`: the Chrome, Safari, Firefox and Vite wordings):
     - online: "Part of the game didn't load. A download didn't finish, or a new version is out." RELOAD calls `reloadForMissingFiles()`, which falls back to a plain reload if it already tried within the minute;
-    - offline: "You're offline. This needs one download. Connect once, then try again." The copy follows `online`/`offline` events live.
+    - offline: "You're offline. This needs one download. Connect to the internet, then tap RELOAD." The copy follows `online`/`offline` events live.
   - **QA hook, dev server only:** `?qa-crash=root|view|tab|ut|arena`. It is behind `import.meta.env.DEV`, so production builds drop it; shell-10 confirms it is absent from the build. `root`, `view` and `tab` throw at once, `ut` when the UT view opens, `arena` when a match's arena enters the page.
 - **Match load failures** (`src/game/Arcade.tsx`, 4 lines; `src/game/attrs.ts`, small).
   - Arcade's loader effect gets `loadErr` state and a `.catch` on both loaders: `loadSoccerGame()`, and `loadAttrs(true)` for NBA/NFL. `if (loadErr) throw loadErr.e` sends a failed match download to the view boundary. This hunk is away from nba/nfl's 449–474 rework.
-  - `loadAttrs()` used to swallow a failed download and cache a lookup that returns null for every player. A match then played on fallback ratings, and an online match could disagree with the other phone. The new `strict` mode rejects instead. The non-strict default (used directly by `Hoops2`/`Football2` for Training Camp and Moments) still resolves to the null lookup, as before. In both modes a failed download is now retried on the next call instead of staying cached for the session.
+  - `loadAttrs()` used to swallow a failed download and cache a lookup that returns null for every player. A match then played on fallback ratings, and an online match could disagree with the other phone. The new `strict` mode rejects instead. The non-strict default (used directly by `Hoops2`/`Football2` for Training Camp and Moments) still resolves to the null lookup, as before. Neither mode keeps a failed promise, but browsers keep a failed dynamic import in the page's module map, so in the app a new try normally needs a page reload (the card's RELOAD). Within the same page the next call usually fails again at once (review fix: the first version said the next call retried).
 - **"A match is on screen", for the whole app** (`src/shell/arena.ts`).
   - One `MutationObserver` on `<body>` with `{ childList: true }`, **not subtree**, started on import (from `main.tsx` through `Recovery.tsx`). In-game DOM updates never reach it.
   - Exports: `arenaActive()`, `arenaElement()`, `onArenaChange(cb)` and `shellWork(kind)`. `shellWork` returns `false` while a match is on and counts the refusal in `window.__psShellWorkDuringArena[kind]`. shell-6/7/8 call it before every timer, slice, fetch and warm.
@@ -272,10 +288,10 @@ Screenshots (looked at): `O/shots/shell/shell-4/recovery/` (`crash-<sport>-<root
 
 ### Tests
 
-- `src/shell/arena.test.ts` (12): the observer watches only `<body>`'s children; it is active from insertion to removal; it ignores other body children; two overlapping arenas; an arena already present at start; unsubscribe and stop; `shellWork` counts per kind and only during a match; and a static guard that Hoops2, Football2 and Soccer2 still `return createPortal(<div className={'arcade-full …'}…>, document.body)`.
-- `src/shell/danger.test.ts` (10): `canErase`; `eraseSummary` from the live profile, other sports from raw JSON (only their keys are read), corrupt, odd-shaped, null or blocked saves → 0 and no throw, an old profile without `ut`; `cloudLine` for every phase; `ago`.
-- `src/shell/recovery.test.ts` (4): `isChunkError` wordings; `loadAttrs(true)` rejects on a failed download while the lenient call still gets the null lookup; the next call retries and then caches (NBA and NFL; skipped for soccer, which has no attribute file).
-- QA: `scripts/qa/recovery.mjs` (crash, chunk, arena) and `scripts/qa/settings-danger.mjs`. Neither ever taps ERASE EVERYTHING, SAVE NOW or CLAIM.
+- `src/shell/arena.test.ts` (13; the review fix adds 1: active and `element()` are right as soon as the arena is in `<body>`, before the observer reports, and false as soon as it is gone): the observer watches only `<body>`'s children; it is active from insertion to removal; it ignores other body children; two overlapping arenas; an arena already present at start; unsubscribe and stop; `shellWork` counts per kind and only during a match; and a static guard that Hoops2, Football2 and Soccer2 still `return createPortal(<div className={'arcade-full …'}…>, document.body)`.
+- `src/shell/danger.test.ts` (11; the review fix adds 1: the conflict line never says the server copy is replaced, and says it stays until the player chooses): `canErase`; `eraseSummary` from the live profile, other sports from raw JSON (only their keys are read), corrupt, odd-shaped, null or blocked saves → 0 and no throw, an old profile without `ut`; `cloudLine` for every phase; `ago`.
+- `src/shell/recovery.test.ts` (4): `isChunkError` wordings; `loadAttrs(true)` rejects on a failed download while the lenient call still gets the null lookup; no failed load is kept (the next call imports again), then it caches (NBA and NFL; skipped for soccer, which has no attribute file).
+- QA: `scripts/qa/recovery.mjs` (crash, chunk, arena; the review fix adds draft, online, lazy and `--chunk-via`) and `scripts/qa/settings-danger.mjs` (the review fix adds the locked-tap hint). Neither ever taps an unlocked ERASE EVERYTHING, SAVE NOW or CLAIM. The locked ERASE is tapped only after it reads `aria-disabled`, and its handler erases only when unlocked.
 
 ### Verification
 
@@ -284,6 +300,14 @@ Screenshots (looked at): `O/shots/shell/shell-4/recovery/` (`crash-<sport>-<root
 - `PS_QA_URL=http://localhost:5211/ PS_QA_FIXTURES=O/fixtures PS_QA_SHOTS=O/shots/shell bash O/heavy.sh node scripts/qa/recovery.mjs`: arena 7/7 (full run). `… --parts crash,chunk`: chunk 3/3 and crash 14/15. The one failure was NBA `ut`: the card showed in 1 frame, but the BACK TO HOME tap timed out while Vite was re-optimizing its dependencies on the first run after a server restart (`Re-optimizing dependencies because vite config has changed` in the log). `… --parts crash --sports nba,nba,nba` straight after: 15/15.
 - `… node scripts/qa/settings-danger.mjs`: 6/6 (393 and 320, 3 sports).
 - 0 page errors other than the injected ones. Every non-localhost request was aborted by the isolation; the only host tried was the cloud-save endpoint, by the app's own startup and offline retry.
+- **Review fix re-run** (dev server 5211, same isolation, `O/shots/shell/shell-4/recovery/` and `…/danger/`):
+  - typecheck clean;
+  - vitest `src/shell src/engine/sport-branches src/game/attrs.test.ts`: NBA 51 passed and 1 skipped; NFL 50 passed; soccer 49 passed and 2 skipped;
+  - `recovery.mjs --parts crash,draft,lazy` (3 sports): 24/24;
+  - `--parts chunk` (UT path): 3/3. `--parts chunk --chunk-via draft`: 3/3;
+  - `--parts arena`: 7/7;
+  - `--parts online --sports nba` (with `PS_QA_WS_PACKAGE_JSON` pointing at a scratch package that has `ws`; relay `ws://localhost:<ephemeral>`): 1/1;
+  - `settings-danger.mjs`: 6/6.
 
 ### Protocol bump needed
 
@@ -293,7 +317,13 @@ None. The boundary and the loader catch change nothing in a running match. `stri
 
 - `src/game/Arcade.tsx` (nba/nfl): 4 lines in the loader effect (1 state, 2 `.catch`es, 1 throw).
 - `src/game/attrs.ts` (nba/nfl): `loadAttrs(strict = false)`. Its body is unchanged except the `try/catch`, which moved out to the returned promise. Not in the task's file list; the acceptance ("an aborted attrs chunk ends in recovery") cannot be met while `loadAttrs` swallows the failure.
-- `src/App.tsx` (ut/shared): 1 import and 2 one-line wraps.
+- `src/App.tsx` (ut/shared): 1 import and 2 one-line wraps. Review fix: `lazyScreen`'s catch rethrows to the boundary (offline, or a reload already tried) and `ScreenMissing` is deleted; 2 lines choose the view boundary's exit and label per screen and its `online` flag; and the Admin sheet's lazy load gets its own boundary (CLOSE).
+- **Integration note for the lead: `src/game/Arcade.tsx` and nfl-3.** nfl-3 (`origin/claude/studio-nfl`) inserts `else if (FOOTBALL && teams?.offense && teams.rivalDefense && teams.rivalOffense && teams.defense) setAttrs(() => () => null);` between exactly the two lines shell-4 rewrote, so the merge conflicts there. Resolve it as:
+  - soccer's branch: keep `.catch((e) => live && setLoadErr({ e }))` after `loadSoccerGame().then(…)`;
+  - nfl-3's Ultimate Team branch: keep it as nfl wrote it (no file is fetched);
+  - the last branch: `else loadAttrs(true).then((f) => live && setAttrs(() => f)).catch((e) => live && setLoadErr({ e }));`.
+
+  After the merge, NFL Ultimate Team matches never ask for `nfl-attrs.json`, so `recovery.mjs --parts chunk` finds `aborted = 0` there. It then reruns the NFL case through a draft match automatically (reported as `via: "draft"`, `utPreRated: true`).
 - `src/ui/Pages.tsx`: shell's granted Reset hunk (the old confirm block and its `confirm` state replaced; 1 import; `<DangerZone>` last in Settings).
 
 ### Owner device checks
@@ -301,10 +331,11 @@ None. The boundary and the loader catch change nothing in a running match. `stri
 - Settings → ADVANCED: the panel shows your real coins, level and cards per sport, and its cloud line matches the Cloud Save screen. Typing ERASE shows capitals with no autocorrect, the keyboard leaves the word, the tick and both buttons visible, and KEEP MY PROGRESS closes it with nothing changed. **Never tap ERASE EVERYTHING on the owner's phone.**
 - After a future deploy, a match opened from a screen that was already loaded before the deploy either plays or shows "Part of the game didn't load", never a stuck "Walking out…".
 - In airplane mode, open a sport's match whose files were never downloaded: "You're offline" with RELOAD and BACK TO HOME.
+- Settings → ADVANCED: tap ERASE EVERYTHING before typing anything. The hint under the buttons says what's missing, the field and the tick get a red ring and a short shake, and nothing is erased.
 
 ### Left for later tasks
 
-- **Draft matches in QA.** The arena signal is DOM-based, so it is mount-point independent, and draft matches mount the same `Arcade` and engines as UT matches inside the same view boundary. `recovery.mjs` drives UT matches, Training Camp and Moments, but not a 1-v-1 draft to its match: that needs a scripted draft. → shell-10 (or shell-5's walker, which already walks Draft → Vote → PLAY).
+- ~~Draft matches in QA~~: done in the review fix (`--parts draft`, `online`).
 - D7 (above).
 
 ## Early-ship unit (shell-1 + shell-2 + shell-3): handoff to the lead

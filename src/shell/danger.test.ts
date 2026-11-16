@@ -86,12 +86,21 @@ describe('cloudLine', () => {
   });
 
   it('treats every live phase as "on"', () => {
-    for (const phase of ['starting', 'pending', 'saving', 'restoring', 'offline', 'conflict'] as CloudPhase[]) {
+    for (const phase of ['starting', 'pending', 'saving', 'restoring', 'offline'] as CloudPhase[]) {
       const l = cloudLine(st(phase), now);
       expect(l.on).toBe(true);
       expect(l.tick).toMatch(/replaced/);
     }
     expect(cloudLine(st('offline'), now).text).toMatch(/next time this phone connects/);
+  });
+
+  it('never claims a conflict’s server copy is replaced: nothing saves until the player chooses', () => {
+    const l = cloudLine(st('conflict'), now);
+    expect(l.on).toBe(true);
+    expect(l.tick).not.toMatch(/replaced/);
+    expect(l.tick).toMatch(/server copy stays until I choose in Cloud Save/);
+    expect(l.text).toMatch(/saves nothing until you do/);
+    expect(l.text).toMatch(/empties this phone only/);
   });
 
   it('says there is no other copy when this phone isn’t cloud-saving', () => {

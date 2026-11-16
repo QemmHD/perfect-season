@@ -65,6 +65,23 @@ describe('arena tracker', () => {
     expect(seen).toEqual([true, false]);
   });
 
+  it('is right before the observer reports (React commits and may throw before its microtask)', () => {
+    const f = fakeBody([node('status-plate')]);
+    const t = trackArenas(f.body, f.MO);
+    const seen: boolean[] = [];
+    t.onChange((a) => seen.push(a));
+    const a = node('arcade-full', 'fb2');
+    // in the DOM, observer not yet run: the window an arena's first commit or mount effects run in
+    (f.body.children as ArenaNode[]).push(a);
+    expect(t.active()).toBe(true);
+    expect(t.element()).toBe(a);
+    expect(seen).toEqual([]);
+    // and gone from the DOM before the observer hears of it
+    (f.body.children as ArenaNode[]).pop();
+    expect(t.active()).toBe(false);
+    expect(t.element()).toBe(null);
+  });
+
   it('ignores other body children (sheets, overlays, text)', () => {
     const f = fakeBody();
     const t = trackArenas(f.body, f.MO);

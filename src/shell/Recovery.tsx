@@ -2,12 +2,16 @@
 //
 // RecoveryBoundary catches a render error anywhere below it and shows a recovery card instead of an
 // empty page: RELOAD and BACK TO HOME, with copy that knows a missing download (a newer build went
-// live, or the phone is offline) from a plain bug. It never writes a save; the error is kept in the
+// live, or the phone is offline) from a plain bug. The boundary never writes a save itself; the error is kept in the
 // on-phone error log (Settings → "Problems on this phone"), which is not part of any profile.
 //
-// Placed three times: the root (main.tsx), and around App's view and tab bodies. React portals keep
-// their React parent, so an error inside a match's body-portaled `.arcade-full` (Arcade, Training
-// Camp, Moments, UT matches) reaches the view boundary, which unmounts the arena with the view.
+// Placed at the root (main.tsx), around App's view and tab bodies, and around the Admin sheet. The
+// view boundary's BACK TO HOME takes each screen's own exit (review fix): a draft, Vote or draft
+// match goes through App's leaveDraft (which closes an online match and records its forfeit at
+// once), a UT match back to UT (the button then reads BACK TO ULTIMATE TEAM), anything else to Home. An online match's card says it is a loss.
+// React portals keep their React parent, so an error inside a match's body-portaled `.arcade-full`
+// (Arcade, Training Camp, Moments, UT matches) reaches the view boundary, which unmounts the arena
+// with the view.
 import React, { useEffect, useRef, useSyncExternalStore } from 'react';
 import { logError } from '../lib/errlog';
 import { reloadForMissingFiles } from '../lib/update';
@@ -26,8 +30,13 @@ interface Props {
   where: Where;
   /** a new value (the next screen) clears a caught error */
   resetKey?: string;
-  /** BACK TO HOME; without it only RELOAD is offered */
+  /** BACK TO HOME; without it only RELOAD is offered. It should leave the screen the way the screen's
+   *  own exit does (App routes it per screen: a draft match through leaveDraft, a UT match to UT). */
   onHome?: () => void;
+  /** the back button's words, when it doesn't go Home (a UT match goes back to Ultimate Team) */
+  homeLabel?: string;
+  /** an online head-to-head match is under this boundary: leaving it (either button) counts as a loss */
+  online?: boolean;
   children: React.ReactNode;
 }
 interface State {
@@ -58,7 +67,7 @@ export class RecoveryBoundary extends React.Component<Props, State> {
   };
 
   render() {
-    if (this.state.failed) return <RecoveryCard {...this.state} where={this.props.where} onHome={this.props.onHome ? this.home : undefined} />;
+    if (this.state.failed) return <RecoveryCard {...this.state} where={this.props.where} online={!!this.props.online} homeLabel={this.props.homeLabel} onHome={this.props.onHome ? this.home : undefined} />;
     return (
       <>
         {QA_CRASH && <QaCrash where={this.props.where} screen={this.props.resetKey} />}
@@ -88,7 +97,7 @@ const useOnline = () =>
     () => navigator.onLine
   );
 
-function RecoveryCard({ chunk, arena, where, onHome }: State & { where: Where; onHome?: () => void }) {
+function RecoveryCard({ chunk, arena, where, online: h2h, homeLabel = 'BACK TO HOME', onHome }: State & { where: Where; online: boolean; homeLabel?: string; onHome?: () => void }) {
   const online = useOnline();
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => first.current?.focus({ preventScroll: true }), []);
@@ -96,9 +105,9 @@ function RecoveryCard({ chunk, arena, where, onHome }: State & { where: Where; o
   const body = chunk
     ? online
       ? 'A download didn’t finish, or a new version is out. Reload to get it.'
-      : 'This needs one download. Connect once, then try again.'
+      : 'This needs one download. Connect to the internet, then tap RELOAD.'
     : arena
-      ? 'The match hit a problem and couldn’t go on. Nothing was saved from it.'
+      ? 'The match hit a problem and couldn’t go on.' + (h2h ? '' : ' Nothing was saved from it.')
       : 'This screen hit a problem and stopped. Reload to start it fresh.';
   return (
     <div className={'recovery recovery-' + (where === 'tab' ? 'panel' : 'screen') + (arena ? ' recovery-arena' : '')} role="alert" aria-live="assertive">
@@ -113,6 +122,7 @@ function RecoveryCard({ chunk, arena, where, onHome }: State & { where: Where; o
         </svg>
         <h2 className="disp">{title}</h2>
         <p>{body}</p>
+        {h2h && <p className="recovery-loss">This online match counts as a loss.</p>}
         <p className="recovery-safe">Your coins, cards and progress are safe on this phone.</p>
         <div className="recovery-actions">
           <button ref={first} className="btn primary" onClick={() => reload(chunk)}>
@@ -120,7 +130,7 @@ function RecoveryCard({ chunk, arena, where, onHome }: State & { where: Where; o
           </button>
           {onHome && (
             <button className="btn" onClick={onHome}>
-              BACK TO HOME
+              {homeLabel}
             </button>
           )}
         </div>

@@ -7,6 +7,10 @@
 // `arena.test.ts` checks that the engines still portal to <body>; if one ever renders inline, this
 // needs a subtree observer scoped to #root instead.
 //
+// `active()` reads `<body>`'s children synchronously (review fix), so it is right from the moment
+// React inserts the arena, before the observer's microtask: a crash in the arena's first commit or
+// mount effects is labelled "This match stopped" too. The observer only drives `onArenaChange`.
+//
 // Shell work (timers, sliced parsing, cache warming, prefetch) asks `shellWork(kind)` first and
 // defers while a match is on: the match keeps the phone's whole frame budget. A call made during an
 // arena is counted in `window.__psShellWorkDuringArena[kind]`, so QA can prove none slipped through.
@@ -67,8 +71,12 @@ export function trackArenas(body: ArenaBody, Ctor: ObserverCtor): ArenaTracker {
   el = scan();
   observer.observe(body, { childList: true });
   return {
-    active: () => el !== null,
-    element: () => el,
+    // read from <body> itself, not from `el`: the observer reports in a microtask after the DOM
+    // changes, and React commits a portal, runs its layout effects and may throw (an arena crashing on
+    // its first commit) before that microtask. A scan of body's few children costs well under 1 us.
+    // `el` stays the observer's view, for the onChange notifications only.
+    active: () => scan() !== null,
+    element: () => scan(),
     onChange(cb) {
       listeners.add(cb);
       return () => {

@@ -59,7 +59,7 @@ export function eraseSummary(profile: Profile, current: SportId, read: (key: str
 }
 
 export interface CloudLine {
-  /** this phone has (or is about to have) a copy on the server, which the erase will replace */
+  /** this phone has (or is about to have) a copy on the server (the erase replaces it, except in a conflict) */
   on: boolean;
   /** the live state, one sentence */
   text: string;
@@ -82,6 +82,9 @@ export function ago(iso: string | null, now: number): string | null {
 
 const REPLACED = 'I understand my cloud save will be replaced too.';
 const NO_COPY = 'I understand this phone isn’t cloud-saving, so there is no other copy.';
+// a conflict holds every cloud save until the player chooses (cloud-sync.ts sync()), so an erase
+// empties this phone only; the server copy stays until they pick a copy in Cloud Save (review fix)
+const CONFLICT = 'I understand this phone’s progress is erased now. The server copy stays until I choose in Cloud Save.';
 
 /** The cloud save's state, as the danger zone says it. */
 export function cloudLine(status: CloudStatus, now: number): CloudLine {
@@ -97,7 +100,11 @@ export function cloudLine(status: CloudStatus, now: number): CloudLine {
     case 'offline':
       return { on: true, text: 'Cloud save is on, but the server can’t be reached. Your server copy is replaced the next time this phone connects.', tick: REPLACED };
     case 'conflict':
-      return { on: true, text: 'Cloud save is waiting for you to choose between two copies. Settle that in Cloud Save first if you want to keep one.', tick: REPLACED };
+      return {
+        on: true,
+        text: 'Cloud save is waiting for you to choose between two copies, and saves nothing until you do. Erasing empties this phone only; if you then choose KEEP THIS PHONE in Cloud Save, the empty profile becomes your server save.',
+        tick: CONFLICT,
+      };
     case 'blocked':
     default:
       return { on: false, text: 'This phone isn’t cloud-saving. There is no other copy of your progress.', tick: NO_COPY };

@@ -288,6 +288,30 @@
     0 6px 18px -6px rgba(255, 122, 122, 0.6);
 }
 
+/* a tap on the locked ERASE (review fix): the missing step(s) get a red ring, and this line says what
+   is missing. It keeps its height when empty, so the hint appearing never moves the buttons. */
+.danger-type input.need {
+  border-color: var(--red);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 0 0 3px rgba(255, 122, 122, 0.3);
+}
+.danger-tick.need .danger-box {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(255, 122, 122, 0.3);
+}
+.danger-tick.need {
+  color: #ffd0d0;
+}
+.danger-panel .danger-hint {
+  min-height: 17px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  color: #ffb3b3;
+}
+
 @keyframes danger-in {
   from {
     transform: translateY(6px);

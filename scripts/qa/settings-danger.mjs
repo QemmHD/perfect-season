@@ -1,7 +1,8 @@
 // Claude (studio overhaul, shell-4, 2026-11-16): Settings → Advanced → Erase all progress (audit M8),
 // in the real app. Isolated like every shell run: ?ns=inspect, the local relay, every other host
-// aborted, serialized fixture players only. It NEVER taps ERASE EVERYTHING or SAVE NOW: it proves the
-// erase can't happen by accident, and that looking at it changes nothing.
+// aborted, serialized fixture players only. It NEVER taps an unlocked ERASE EVERYTHING, or SAVE NOW: it
+// proves the erase can't happen by accident, and that looking at it changes nothing. It taps the LOCKED
+// button three times (checked aria-disabled just before each tap) to see the hint name the missing step.
 //
 //   node scripts/qa/settings-danger.mjs [--sports nba,nfl,soccer]
 //
@@ -11,8 +12,9 @@
 // amounts must equal the stored saves (coins, level, cards and draft runs per sport); ERASE stays
 // aria-disabled after any 2 of the 3 actions and only unlocks after all 3; with a 310 px visual
 // viewport (the keyboard up) the word field, the tick and both buttons are on screen; KEEP closes the
-// panel with the profile deep-equal; every control is ≥ 44 px. Screenshots: collapsed, open, typed,
-// ticked, keyboard, and the open panel at 320 × 568.
+// panel with the profile deep-equal; every control is ≥ 44 px; a tap on the locked ERASE shows a hint
+// naming exactly the missing step(s), rings them, and is on screen (review fix). Screenshots:
+// collapsed, open, nudge, typed, ticked, keyboard, and the open panel at 320 × 568.
 // Output: <PS_QA_SHOTS>/shell-4/danger/danger.json and the screenshots there.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -128,12 +130,36 @@ async function run(browser, sport, width = 393, height = 852) {
     out.locked = { opened: await eraseOff(page) };
     await input.fill('eras');
     out.locked.partialWord = await eraseOff(page);
+    // a tap on the locked ERASE (review fix) says what is missing; tapped only while it reads locked,
+    // and its handler erases only when unlocked, so this never erases
+    const eraseBtn = page.getByRole('button', { name: 'ERASE EVERYTHING' });
+    const hint = page.locator('.danger-hint');
+    const nudge = async () => {
+      assert.equal(await eraseOff(page), 'true', 'ERASE must read locked before a nudge tap');
+      const y0 = (await rect(eraseBtn)).y;
+      await eraseBtn.click({ force: true }); // Playwright skips aria-disabled buttons; a finger does not
+      await page.waitForTimeout(600); // the hint's smooth scroll into view
+      const h = await rect(hint);
+      return {
+        hintOnScreen: h.y >= 0 && h.b <= (await page.evaluate(() => innerHeight)),
+        hint: ((await hint.textContent()) || '').trim(),
+        word: await input.evaluate((e) => e.classList.contains('need')),
+        tick: await tick.evaluate((e) => e.classList.contains('need')),
+        moved: (await rect(eraseBtn)).y - y0,
+        describedBy: !!(await eraseBtn.getAttribute('aria-describedby')),
+      };
+    };
+    out.hintBefore = ((await hint.textContent()) || '').trim();
+    out.nudge = { both: await nudge() };
+    await page.screenshot({ path: path.join(OUT, `danger-${tag}-nudge.png`) });
     await input.fill('erase');
     out.locked.wordOnly = await eraseOff(page);
+    out.nudge.tickMissing = await nudge();
     await page.screenshot({ path: path.join(OUT, `danger-${tag}-typed.png`) });
     await input.fill('');
     await tick.click();
     out.locked.tickOnly = await eraseOff(page);
+    out.nudge.wordMissing = await nudge();
     await input.fill('ERASE');
     out.locked.all3 = await eraseOff(page);
     await page.screenshot({ path: path.join(OUT, `danger-${tag}-ticked.png`) });
@@ -180,6 +206,12 @@ async function run(browser, sport, width = 393, height = 852) {
       out.amountsMatch &&
       ['opened', 'partialWord', 'wordOnly', 'tickOnly'].every((k) => out.locked[k] === 'true') &&
       out.locked.all3 === 'false' &&
+      out.hintBefore === '' &&
+      /type ERASE and tick/.test(out.nudge.both.hint) && out.nudge.both.word && out.nudge.both.tick &&
+      /tick the box/.test(out.nudge.tickMissing.hint) && !out.nudge.tickMissing.word && out.nudge.tickMissing.tick &&
+      /type ERASE in the box/.test(out.nudge.wordMissing.hint) && out.nudge.wordMissing.word && !out.nudge.wordMissing.tick &&
+      // the hint may scroll the sheet up by its own line (it sits under the buttons), never more
+      Object.values(out.nudge).every((n) => n.hintOnScreen && Math.abs(n.moved) <= 40 && n.describedBy) &&
       out.keyboardVisible &&
       out.minTarget >= 44 &&
       out.keepClosed &&
@@ -205,7 +237,7 @@ try {
     ]) {
       const r = await run(browser, sport, w, h);
       report.runs.push(r);
-      console.log(JSON.stringify({ sport, w, pass: r.pass, fail: r.fail, writes: r.writes?.length, off: r.requestsOff, locked: r.locked, kb: r.keyboardVisible, min: r.minTarget }));
+      console.log(JSON.stringify({ sport, w, pass: r.pass, fail: r.fail, nudge: r.nudge && Object.fromEntries(Object.entries(r.nudge).map(([k, n]) => [k, n.hint])), writes: r.writes?.length, off: r.requestsOff, locked: r.locked, kb: r.keyboardVisible, min: r.minTarget }));
     }
   }
 } finally {

@@ -58,25 +58,17 @@ type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playo
 
 /**
  * A screen's code, fetched when it's first opened. If this build's files are gone (a newer build
- * went live and cleared them), reload into it rather than leave the app blank.
+ * went live and cleared them), reload into it rather than leave the app blank. Offline, or when that
+ * reload already ran in the last minute, the error goes to the recovery card (shell-4 review fix):
+ * "You're offline" / "Part of the game didn't load", with RELOAD and BACK TO HOME.
  */
 function lazyScreen<C extends React.ComponentType<any>>(load: () => Promise<{ default: C }>) {
   return React.lazy(() =>
-    load().catch(() => {
-      reloadForMissingFiles();
-      return { default: ScreenMissing as unknown as C };
+    load().catch((e) => {
+      if (!navigator.onLine || !reloadForMissingFiles()) throw e;
+      // the reload is on its way: keep the screen's loading state up until it lands
+      return new Promise<{ default: C }>(() => undefined);
     })
-  );
-}
-
-function ScreenMissing() {
-  return (
-    <div className="screen ut-loading" role="alert">
-      <p>This screen didn’t load. A new version may be out.</p>
-      <button className="btn primary" onClick={() => location.reload()}>
-        RELOAD
-      </button>
-    </div>
   );
 }
 
@@ -1193,10 +1185,15 @@ export function App() {
     );
   }
 
+  // shell-4 review fix: BACK TO HOME takes the screen's own exit. A draft match goes through
+  // leaveDraft (an online one is closed and its forfeit recorded now, not at the next launch).
+  const inDraftMatch = screen === 'draft' || screen === 'vote' || screen === 'arcade';
+  const recoveryHome = inDraftMatch ? () => leaveDraft() : screen === 'utmatch' ? () => setScreen('ut') : () => goTab('home');
+
   return (
     <>
       <Transition id={viewId} enter={enter} exitMs={260}>
-        <RecoveryBoundary where="view" resetKey={viewId} onHome={() => goTab('home')}>{body}</RecoveryBoundary>
+        <RecoveryBoundary where="view" resetKey={viewId} onHome={recoveryHome} homeLabel={screen === 'utmatch' ? 'BACK TO ULTIMATE TEAM' : undefined} online={!!run?.online && inDraftMatch && !opp?.left && !opp?.gone && !droppedRef.current}>{body}</RecoveryBoundary>
       </Transition>
       {saveFailed && <div className="save-warning" role="alert"><span>Progress isn’t saving on this phone.</span><button onClick={() => setLocker(true)}>CLOUD SAVE</button><button aria-label="Retry saving" onClick={() => { if(saveProfile(profile)){setSaveFailed(false); if(run?.draft && ['draft','reveal','playoffs'].includes(screen)) writeCheckpoint(run,screen as any);} }}>RETRY</button></div>}
       {modal === 'replace' && <Sheet label="Start a new draft?" kind="center" onClose={()=>setModal(null)}>{close=><div className="save-locker"><h2 className="disp">START FRESH?</h2><p>A new solo draft replaces your unfinished run. Your cards, coins and completed records stay with you.</p><button className="btn gold" onClick={()=>{clearCheckpoint();setSaved(null);setModal(null);startDraft(nextMode);}}>START NEW DRAFT</button><button className="btn ghost" onClick={()=>close()}>KEEP MY RUN</button></div>}</Sheet>}
@@ -1221,7 +1218,7 @@ export function App() {
           }}
         />
       )}
-      {modal === 'admin' && <React.Suspense fallback={<AdminLoading onClose={() => setModal(null)} />}><AdminSheet profile={profile} update={update} onToast={showToast} onClose={() => setModal(null)} /></React.Suspense>}
+      {modal === 'admin' && <RecoveryBoundary where="view" resetKey="admin" onHome={() => setModal(null)} homeLabel="CLOSE"><React.Suspense fallback={<AdminLoading onClose={() => setModal(null)} />}><AdminSheet profile={profile} update={update} onToast={showToast} onClose={() => setModal(null)} /></React.Suspense></RecoveryBoundary>}
       {modal === 'admingift' && adminGift && (
         <Sheet label="A gift for you" kind="center" onClose={() => (collectAdminGift(adminGift), setModal(null))}>
           {(close) => (

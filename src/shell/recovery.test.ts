@@ -48,7 +48,7 @@ describe.skipIf(SPORT === 'soccer')('loadAttrs(strict)', () => {
     expect(lenient({ id: 'p1' } as never)).toBe(null);
   });
 
-  it('tries the download again on the next call, and then caches it', async () => {
+  it('keeps no failed load of its own (the next call imports again; in the app the browser may still need a reload), then caches', async () => {
     const { loadAttrs } = await import('../game/attrs');
     await expect(loadAttrs(true)).rejects.toThrow();
     state.fail = false;

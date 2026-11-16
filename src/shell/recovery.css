@@ -113,6 +113,16 @@ html:has(.recovery-screen) .status-plate {
   font-size: 13px;
   color: var(--sub);
 }
+/* an online head-to-head match: leaving it is a recorded loss, said plainly (shell-4 review fix) */
+.recovery-card .recovery-loss {
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 122, 122, 0.32);
+  background: rgba(255, 122, 122, 0.1);
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffd0d0;
+}
 .recovery-actions {
   align-self: stretch;
   display: flex;

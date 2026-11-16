@@ -1,7 +1,8 @@
 // Claude (studio overhaul, shell-4, 2026-11-16): Settings → Advanced → Erase all progress (audit M8).
 // It used to be one confirm away. Now an erase takes at least three deliberate actions before the
 // last tap: open Advanced, type ERASE, and tick an acknowledgement worded by the cloud save's live
-// state. The panel shows the real amounts that go and what stays. KEEP MY PROGRESS is the primary
+// state. A tap on the locked ERASE says what is missing (review fix): a one-line hint under the
+// buttons, a red ring on the missing step(s) and, unless reduced motion is on, a short shake. The panel shows the real amounts that go and what stays. KEEP MY PROGRESS is the primary
 // action. Nothing here writes storage or sends a request; ERASE EVERYTHING calls the unchanged
 // reset handler (App.tsx).
 import React, { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -39,8 +40,29 @@ function ErasePanel({ id, profile, onKeep, onErase }: { id: string; profile: Pro
   const sum = useMemo(() => eraseSummary(profile, SPORT), []);
   const keep = useRef<HTMLButtonElement>(null);
   const confirm = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLSpanElement>(null);
+  const hintId = useId();
   const word = canErase(typed);
   const ready = word && ack;
+  // a tap on the locked ERASE: show what is still missing
+  const [nudged, setNudged] = useState(false);
+  const needWord = nudged && !word;
+  const needTick = nudged && !ack;
+  const hint = !nudged || ready ? null : needWord && needTick ? 'To unlock it, type ' + ERASE_WORD + ' and tick the box.' : needWord ? 'To unlock it, type ' + ERASE_WORD + ' in the box above.' : 'To unlock it, tick the box above.';
+  const hintEl = useRef<HTMLParagraphElement>(null);
+  const locked = () => {
+    setNudged(true);
+    const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // the hint sits under the buttons, which can be the last thing on screen: bring it up (a no-op
+    // when it is already visible)
+    requestAnimationFrame(() => hintEl.current?.scrollIntoView({ block: 'nearest', behavior: still ? 'auto' : 'smooth' }));
+    if (still) return;
+    for (const el of [!word && field.current, !ack && box.current]) {
+      if (el && typeof el.animate === 'function')
+        el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(5px)' }, { transform: 'translateX(-3px)' }, { transform: 'translateX(0)' }], { duration: 320, easing: 'ease-out' });
+    }
+  };
   useEffect(() => {
     keep.current?.focus({ preventScroll: true });
     keep.current?.scrollIntoView({ block: 'nearest' });
@@ -84,10 +106,11 @@ function ErasePanel({ id, profile, onKeep, onErase }: { id: string; profile: Pro
             Type <b>{ERASE_WORD}</b> to confirm
           </span>
           <input
+            ref={field}
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             onFocus={showConfirm}
-            className={word ? 'ok' : ''}
+            className={word ? 'ok' : needWord ? 'need' : ''}
             autoCapitalize="characters"
             autoComplete="off"
             autoCorrect="off"
@@ -97,9 +120,9 @@ function ErasePanel({ id, profile, onKeep, onErase }: { id: string; profile: Pro
             maxLength={12}
           />
         </label>
-        <label className="danger-tick">
+        <label className={'danger-tick' + (needTick ? ' need' : '')}>
           <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-          <span className="danger-box" aria-hidden="true">
+          <span className="danger-box" aria-hidden="true" ref={box}>
             <svg width="16" height="16" viewBox="0 0 16 16">
               <path d="m3.5 8.5 3 3 6-7" />
             </svg>
@@ -110,10 +133,13 @@ function ErasePanel({ id, profile, onKeep, onErase }: { id: string; profile: Pro
           <button ref={keep} className="btn primary" onClick={onKeep}>
             KEEP MY PROGRESS
           </button>
-          <button className="btn danger" aria-disabled={!ready} onClick={() => ready && onErase()}>
+          <button className="btn danger" aria-disabled={!ready} aria-describedby={hint ? hintId : undefined} onClick={() => (ready ? onErase() : locked())}>
             ERASE EVERYTHING
           </button>
         </div>
+        <p className="danger-hint" id={hintId} ref={hintEl} role="status" aria-live="polite">
+          {hint}
+        </p>
       </div>
     </div>
   );
