@@ -2,12 +2,15 @@
 // pixel grid with a depth test (so the near arm passes in front of the chest and the far one behind
 // it), shaded in three tones from a light above and in front, then outlined. The grid is drawn
 // scaled up with smoothing off, so every pixel stays crisp. Uniform colors, number, hair and size
-// all come from the look, so any player can wear any team's home or away set.
-import type { Appearance } from './appearance';
+// all come from the look, so any player can wear any team's home or away set; his head, hair and
+// gear come from his appearance record (head.ts, studio overhaul players-4).
+import type { Appearance, Arm, Leg, Socks } from './appearance';
 import { luma, OUTLINE, type RGB, mix, onColor, ramp3, rgb } from './color';
+import { paintHead } from './head';
 import { headCols, headRows, LIMB_SCALE, padsWidthPx, snapCentre, torsoWidthPx } from './proportions';
-import { ball, type Buf, buffer, capsule } from './raster';
+import { type Buf, buffer, capsule } from './raster';
 import { type Joints, joints, type P2, type Pose, project, type Shape, shapeOf, type V3, type View } from './rig';
+import { ARMGEAR, ARM_L, ARM_R, BAND, BUZZ, EYE, FRAME, GLOVE, HAIR, HAIR_HANG, HAIR_VOL, HEAD, HELMET, JERSEY, LEG_L, LEG_R, LEGGEAR, LENS, MASK, MOUTH, NUM, NUMLINE, PANTS, SHOE, SHORTS, SKIN, SKINDARK, SLOTS, SOCK, SOLE, STRIPE, STUBBLE, TORSO, TOWEL, TRIM } from './slots';
 
 export interface Look {
   sport: 'nba' | 'nfl' | 'soccer';
@@ -38,36 +41,18 @@ export interface Look {
   gloves?: string;
   /** the appearance record this look was made from (looks.ts), for drawing its full detail */
   app?: Appearance;
+  /** gear colours resolved against the kit (looks.ts): head gear, arm and leg gear */
+  gear?: { head?: string; arm?: string; leg?: string };
   /** a cosmetic ground-ring colour (Ultimate Team rewards), for the ground mark */
   ring?: string;
+  /** made with the sport's appearance data in (false: before it arrived, so only the defaults) */
+  withData?: boolean;
 }
-
-// palette slots
-const SKIN = 1;
-const JERSEY = 2;
-const TRIM = 3;
-const SHORTS = 4;
-const SOCK = 5;
-const SHOE = 6;
-const HAIR = 7;
-const HELMET = 8;
-const MASK = 9;
-const PANTS = 10;
-const EYE = 11;
-const NUM = 12;
-const NUMLINE = 13;
-const STRIPE = 14;
-const BAND = 15;
-const SOLE = 16;
-const SKINDARK = 17;
-const BUZZ = 18;
-const GLOVE = 19;
-const SLOTS = 20;
 
 /** The main materials' palette slots, for tests and tools that read a Raster's `slot`. */
 export const MATERIAL_SLOT = { skin: SKIN, jersey: JERSEY, trim: TRIM, shorts: SHORTS, socks: SOCK, shoes: SHOE, hair: HAIR, helmet: HELMET, pants: PANTS } as const;
 
-// 3x5 and 4x7 digits for jersey numbers
+// jersey-number fonts: 3x5 below 34 art px, 4x7 from 34 to 59, 6x10 from 60 (V2 L-5)
 const D35: Record<string, string> = {
   '0': '111101101101111',
   '1': '010110010010111',
@@ -92,59 +77,82 @@ const D47: Record<string, string> = {
   '8': '0110100110010110100110010110',
   '9': '0110100110010111000100010110',
 };
+const rows610 = (r: string[]) => r.join('').replace(/#/g, '1').replace(/\./g, '0');
+const D610: Record<string, string> = {
+  '0': rows610(['.####.', '##..##', '##..##', '##..##', '##..##', '##..##', '##..##', '##..##', '##..##', '.####.']),
+  '1': rows610(['..##..', '.###..', '####..', '..##..', '..##..', '..##..', '..##..', '..##..', '..##..', '######']),
+  '2': rows610(['.####.', '##..##', '....##', '....##', '...##.', '..##..', '.##...', '##....', '##....', '######']),
+  '3': rows610(['.####.', '##..##', '....##', '....##', '..###.', '....##', '....##', '....##', '##..##', '.####.']),
+  '4': rows610(['...##.', '..###.', '.####.', '##.##.', '##.##.', '######', '...##.', '...##.', '...##.', '...##.']),
+  '5': rows610(['######', '##....', '##....', '#####.', '....##', '....##', '....##', '....##', '##..##', '.####.']),
+  '6': rows610(['.####.', '##..##', '##....', '##....', '#####.', '##..##', '##..##', '##..##', '##..##', '.####.']),
+  '7': rows610(['######', '....##', '....##', '...##.', '...##.', '..##..', '..##..', '..##..', '..##..', '..##..']),
+  '8': rows610(['.####.', '##..##', '##..##', '##..##', '.####.', '##..##', '##..##', '##..##', '##..##', '.####.']),
+  '9': rows610(['.####.', '##..##', '##..##', '##..##', '.#####', '....##', '....##', '....##', '##..##', '.####.']),
+};
+export interface NumberFont {
+  w: number;
+  h: number;
+  glyphs: Record<string, string>;
+}
+export const NUMBER_FONTS: Record<'s' | 'm' | 'l', NumberFont> = { s: { w: 3, h: 5, glyphs: D35 }, m: { w: 4, h: 7, glyphs: D47 }, l: { w: 6, h: 10, glyphs: D610 } };
 
-/** Paint the number onto the torso's pixels, squeezed by how square-on the chest is to us. */
-function number(b: Buf, n: number, cx: number, cy: number, width: number, squeeze: number) {
+/** The fonts a sprite of `px` art px tries, biggest first: its own size's, then the smaller ones. */
+export function numberFonts(px: number): NumberFont[] {
+  const { s, m, l } = NUMBER_FONTS;
+  return px >= 60 ? [l, m, s] : px >= 34 ? [m, s] : [s];
+}
+
+/** A number's pixels in a font: [x, y] from its top-left, `gap` columns between digits. */
+export function numberBitmap(n: number, font: NumberFont, gap: number): { w: number; px: [number, number][] } {
   const s = String(n);
-  const big = width >= 13 && s.length <= 2;
-  const font = big ? D47 : D35;
-  const fw = big ? 4 : 3;
-  const fh = big ? 7 : 5;
-  const gap = 1;
-  const total = s.length * fw + (s.length - 1) * gap;
-  if (total * Math.max(0.55, squeeze) > width + 1) return;
-  const cols: number[] = [];
+  const px: [number, number][] = [];
   for (let i = 0; i < s.length; i++) {
-    for (let c = 0; c < fw; c++) cols.push(i * (fw + gap) + c);
+    const g = font.glyphs[s[i]];
+    for (let r = 0; r < font.h; r++) for (let c = 0; c < font.w; c++) if (g[r * font.w + c] === '1') px.push([i * (font.w + gap) + c, r]);
   }
-  // squeeze: drop columns evenly when the chest is turned
-  const keepW = Math.max(1, Math.round(total * Math.max(0.55, squeeze)));
-  const lit = new Set<string>();
-  for (let i = 0; i < s.length; i++) {
-    const glyph = font[s[i]];
-    for (let r = 0; r < fh; r++)
-      for (let c = 0; c < fw; c++) {
-        if (glyph[r * fw + c] !== '1') continue;
-        const col = i * (fw + gap) + c;
-        const x = Math.round(cx - keepW / 2 + (col * keepW) / total);
-        const y = Math.round(cy - fh / 2 + r);
-        lit.add(x + ',' + y);
+  return { w: s.length * font.w + (s.length - 1) * gap, px };
+}
+
+/**
+ * Paint the number onto the jersey, centred on (cx, cy): exact glyphs or nothing, never a scramble.
+ * The size's own font first, then smaller ones; a chest turned from us closes the gap between digits
+ * (never a glyph's columns); turned past `squeeze` 0.6, or with nowhere it fits whole on the jersey
+ * (an arm across it), it isn't drawn. Its trim border goes on only where the chest has room.
+ */
+function number(b: Buf, n: number, cx: number, cy: number, squeeze: number, px: number) {
+  if (squeeze < 0.6) return;
+  // the shirt's own pixels before the number goes on
+  let shirt = 0;
+  for (let i = 0; i < b.slot.length; i++) if (b.slot[i] === JERSEY) shirt++;
+  const fonts = numberFonts(px);
+  for (const font of fonts)
+    for (const gap of squeeze < 0.9 ? [1, 0] : [1]) {
+      const bm = numberBitmap(n, font, gap);
+      const x0 = Math.round(cx - bm.w / 2);
+      const y0 = Math.round(cy - font.h / 2);
+      const fits = bm.px.every(([x, y]) => {
+        const xx = x0 + x;
+        const yy = y0 + y;
+        if (xx < 0 || yy < 0 || xx >= b.w || yy >= b.h) return false;
+        const sl = b.slot[yy * b.w + xx];
+        return sl === JERSEY || sl === TRIM;
+      });
+      if (!fits) continue;
+      const lit = new Set(bm.px.map(([x, y]) => (y0 + y) * b.w + x0 + x));
+      // a one-pixel border in the trim color around the digits, where it lands on the jersey
+      const border = new Set<number>();
+      for (const i of lit) {
+        const x = i % b.w;
+        for (const k of [x + 1 < b.w ? i + 1 : -1, x > 0 ? i - 1 : -1, i + b.w, i - b.w]) if (k >= 0 && k < b.slot.length && !lit.has(k) && b.slot[k] === JERSEY) border.add(k);
       }
-  }
-  for (const k of lit) {
-    const [x, y] = k.split(',').map(Number);
-    if (x < 0 || y < 0 || x >= b.w || y >= b.h) continue;
-    const i = y * b.w + x;
-    if (b.slot[i] !== JERSEY && b.slot[i] !== TRIM) continue;
-    b.slot[i] = NUM;
-    b.tone[i] = Math.min(2, b.tone[i] + 0);
-  }
-  // a one-pixel border in the trim color around the digits, where it lands on the jersey
-  for (const k of lit) {
-    const [x, y] = k.split(',').map(Number);
-    for (const [dx, dy] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ]) {
-      const xx = x + dx;
-      const yy = y + dy;
-      if (xx < 0 || yy < 0 || xx >= b.w || yy >= b.h || lit.has(xx + ',' + yy)) continue;
-      const i = yy * b.w + xx;
-      if (b.slot[i] === JERSEY) b.slot[i] = NUMLINE;
+      for (const i of lit) b.slot[i] = NUM;
+      // the border only where the chest has room for it: with it the shirt must still show twice as
+      // much shirt as number (the arms and the chin land on it after), or its shading goes (a turned
+      // or narrow chest; V2 C.7 #8). The number's colour reads on the jersey without it (onColor)
+      if (shirt - lit.size - border.size >= 2 * lit.size) for (const k of border) b.slot[k] = NUMLINE;
+      return;
     }
-  }
 }
 
 export interface Sprite {
@@ -219,6 +227,24 @@ export function shapeFor(look: Look): Shape {
   return shapeOf({ ht: look.ht, wt: look.wt }, look.sport === 'nfl' ? (look.pads ?? 1) : 0);
 }
 
+/** Where the sock starts up the shin (0 the knee, 1 the ankle) for a record's sock height: basketball
+ * crew socks and soccer's socks to the knee are the old defaults. */
+function sockTop(sport: Look['sport'], socks: Socks | undefined): number {
+  const soccer = sport === 'soccer';
+  switch (socks) {
+    case 'low':
+      return soccer ? 0.72 : 0.88;
+    case 'high':
+      return soccer ? 0.1 : 0.45;
+    case 'over-knee':
+      return 0;
+    case 'crew':
+      return soccer ? 0.45 : 0.78;
+    default:
+      return soccer ? 0.1 : 0.78;
+  }
+}
+
 /** Joints handed in (motion capture, mocap.ts) rather than a pose to build them from. */
 function isJoints(p: Pose | Joints): p is Joints {
   return typeof (p as Joints).pelvis === 'object';
@@ -246,7 +272,7 @@ export interface Raster {
   handR: { x: number; y: number };
   top: number;
   /** per pixel: the material slot (0 empty) and the body part (1-2 legs, 3 torso, 4-5 arms, 6 head,
-   * 7 hair volume), for tests and tools; the outline ring is slot 0 */
+   * 7 hair volume, 8 hair hanging below the head; slots.ts), for tests and tools; the outline ring is slot 0 */
   slot: Uint8Array;
   part: Uint8Array;
 }
@@ -285,20 +311,28 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   // limbs drawn x1.15 thicker than the rig (V2 C.1.1)
   const bulkR = (r: number) => R(r * LIMB_SCALE);
 
-  // ---- legs ----
+  // ---- legs: socks to his record's height, his knee and leg gear ----
+  const app = look.app;
   const legs = (side: 'L' | 'R', bias: number, part: number) => {
     const hip = side === 'L' ? hipL : hipR;
     const knee = P(side === 'L' ? 'kneeL' : 'kneeR');
     const ankle = P(side === 'L' ? 'ankleL' : 'ankleR');
     const toe = P(side === 'L' ? 'toeL' : 'toeR');
+    const gear: Leg = (side === 'L' ? app?.legL : app?.legR) ?? 'none';
     if (nfl) {
-      // pants to below the knee, then the sock
+      // pants to below the knee, then the sock (low socks show the calf)
+      const low = app?.socks === 'low' || app?.socks === 'crew';
       capsule(b, ox, oy, hip, knee, bulkR(s.rThigh * 1.05), bulkR(s.rThigh * 0.8), () => PANTS, part, bias);
-      capsule(b, ox, oy, knee, ankle, bulkR(s.rShin * 1.05), bulkR(s.rShin * 0.8), (t) => (t < 0.18 ? PANTS : SOCK), part, bias);
+      capsule(b, ox, oy, knee, ankle, bulkR(s.rShin * 1.05), bulkR(s.rShin * 0.8), (t) => (t < 0.18 ? PANTS : low && t < 0.62 ? (gear === 'tights' || gear === 'calf' ? LEGGEAR : SKIN) : SOCK), part, bias);
     } else {
       // shorts to just above the knee (longer from the 90s on would need the era; one length for all)
-      capsule(b, ox, oy, knee, ankle, bulkR(s.rShin * (soccer ? 1.08 : 1)), bulkR(s.rShin * 0.75), (t) => (t > (soccer ? 0.1 : 0.78) ? SOCK : SKIN), part, bias);
-      capsule(b, ox, oy, hip, knee, bulkR(s.rThigh * 0.95), bulkR(s.rThigh * 0.72), () => SKIN, part, bias);
+      const sockAt = sockTop(look.sport, app?.socks);
+      const shin = (t: number) => (t > sockAt ? SOCK : gear === 'tights' || (gear === 'calf' && t > 0.18) || ((gear === 'kneesleeve' || gear === 'brace') && t < 0.3) ? LEGGEAR : SKIN);
+      const thigh = (t: number) => (gear === 'tights' || ((gear === 'kneesleeve' || gear === 'brace') && t > 0.7) ? LEGGEAR : app?.socks === 'over-knee' && t > 0.82 ? SOCK : SKIN);
+      capsule(b, ox, oy, knee, ankle, bulkR(s.rShin * (soccer ? 1.08 : 1)), bulkR(s.rShin * 0.75), shin, part, bias);
+      capsule(b, ox, oy, hip, knee, bulkR(s.rThigh * 0.95), bulkR(s.rThigh * 0.72), thigh, part, bias);
+      // a knee pad: a block over the knee, proud of the leg
+      if (gear === 'kneepad') capsule(b, ox, oy, { ...knee, d: knee.d + 0.3 }, { ...knee, d: knee.d + 0.3 }, bulkR(s.rShin * 1.25), bulkR(s.rShin * 1.25), () => LEGGEAR, part, bias);
       // the shorts: a loose tube over the thigh, ending just above the knee with a trim hem
       const hl = soccer ? 0.6 : 0.8;
       const hem = { x: hip.x + (knee.x - hip.x) * hl, y: hip.y + (knee.y - hip.y) * hl, d: hip.d + (knee.d - hip.d) * hl + 0.6 };
@@ -307,8 +341,8 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
     // the shoe: a chunky toe
     capsule(b, ox, oy, ankle, toe, R(0.024), R(0.02), (t) => (t > 0.15 ? SHOE : SOCK), part, bias + 0.05);
   };
-  legs('L', biasL, 1);
-  legs('R', biasR, 2);
+  legs('L', biasL, LEG_L);
+  legs('R', biasR, LEG_R);
 
   // ---- torso: a rounded block from the hips to the shoulders, as wide as they look from here ----
   const half = (a: P2, c: P2) => Math.hypot(a.x - c.x, a.y - c.y) / 2;
@@ -339,19 +373,47 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
     const wr = P(side === 'L' ? 'wrL' : 'wrR');
     const hd = P(side === 'L' ? 'handL' : 'handR');
     const sleeve = nfl || soccer ? (look.sleeves === 'long' ? 2 : soccer ? 0.5 : 0.45) : 0;
-    capsule(b, ox, oy, sh, el, bulkR(s.rUpper * (nfl ? 1.15 : 1)), bulkR(s.rUpper * 0.85), (t) => (t < sleeve ? JERSEY : SKIN), part, bias);
-    capsule(b, ox, oy, el, wr, bulkR(s.rFore), bulkR(s.rFore * 0.82), () => (sleeve > 1 ? JERSEY : SKIN), part, bias);
+    // arm gear (his record): a full sleeve, a shooting sleeve from mid-arm, an elbow sleeve, long
+    // sleeves under a basketball jersey; wristbands and tape from 34 art px, where they read
+    const gear: Arm = (side === 'L' ? app?.armL : app?.armR) ?? 'none';
+    const fine = px >= 34;
+    const under = gear === 'long' ? JERSEY : ARMGEAR;
+    const upper = (t: number) => (t < sleeve ? JERSEY : gear === 'sleeve' || gear === 'long' || (gear === 'shooter' && t > 0.45) || (gear === 'elbow' && t > 0.72) ? under : SKIN);
+    const fore = (t: number) =>
+      sleeve > 1 ? JERSEY : gear === 'sleeve' || gear === 'shooter' || gear === 'long' || (gear === 'elbow' && t < 0.28) ? under : fine && gear === 'wrist' && t > 0.74 ? ARMGEAR : fine && gear === 'tape' && t > 0.78 ? TOWEL : SKIN;
+    capsule(b, ox, oy, sh, el, bulkR(s.rUpper * (nfl ? 1.15 : 1)), bulkR(s.rUpper * 0.85), upper, part, bias);
+    capsule(b, ox, oy, el, wr, bulkR(s.rFore), bulkR(s.rFore * 0.82), fore, part, bias);
     capsule(b, ox, oy, wr, hd, bulkR(s.rFore * (look.gloves ? 1.35 : 1.08)), bulkR(s.rFore * (look.gloves ? 1.5 : 1.18)), () => (look.gloves ? GLOVE : SKIN), part, bias + 0.05);
   };
-  arms('L', biasL, 4);
-  arms('R', biasR, 5);
+  arms('L', biasL, ARM_L);
+  arms('R', biasR, ARM_R);
+
+  // his forward, up and right as screen directions (x right, y up, z toward us), for the head and gear
+  const cp = Math.cos(view.pitch);
+  const sp = Math.sin(view.pitch);
+  const fwdW = { x: Math.cos(view.facing), z: Math.sin(view.facing) };
+  const fwdS = { x: fwdW.x, y: -fwdW.z * sp, z: fwdW.z * cp };
+  const upS = { x: 0, y: cp, z: sp };
+  const rightS = { x: -fwdW.z, y: -fwdW.x * sp, z: fwdW.x * cp };
+
+  // ---- the kit's trim at the collar: jersey round the neck (V2 C.1.6: base, trim, number) ----
+  for (let i = b.w; i < b.slot.length - b.w; i++)
+    if (b.slot[i] === JERSEY && b.part[i] === TORSO && [i - 1, i + 1, i - b.w, i + b.w].some((k) => b.slot[k] === SKIN && b.part[k] === TORSO)) b.slot[i] = TRIM;
 
   // ---- the jersey number, on the chest or back when we see it square enough ----
   const squeeze = Math.abs(front);
   if (look.num !== null && squeeze > 0.35 && view.pitch < 1.2) {
     const cx = ox + (shMid.x * 0.6 + hipMid.x * 0.4);
     const cy = oy + (shMid.y * 0.62 + hipMid.y * 0.38);
-    number(b, look.num, cx, cy, shHalf * 2 * squeeze - 2, squeeze);
+    number(b, look.num, cx, cy, squeeze, px);
+  }
+
+  // ---- football: a towel tucked into the front of the pants (from 24 art px) ----
+  if (nfl && app?.towel && px >= 24) {
+    const k = hipHalf * 0.85;
+    const side = rightNear ? 0.35 : -0.35;
+    const top: P2 = { x: hipMid.x + fwdS.x * k + rightS.x * k * side, y: hipMid.y - fwdS.y * k - rightS.y * k * side, d: hipMid.d + fwdS.z * k + rightS.z * k * side + 0.4 };
+    capsule(b, ox, oy, top, { ...top, y: top.y + px * 0.1 }, Math.max(0.7, px * 0.022), Math.max(0.7, px * 0.026), () => TOWEL, TORSO, 0.1);
   }
 
   // ---- head: the 5-head hero's (proportions.ts), set on the neck at its drawn size ----
@@ -365,119 +427,19 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   const head: P2 = { x: neck.x + (head0.x - neck.x) * grow, y: neck.y + (head0.y - neck.y) * grow, d: neck.d + (head0.d - neck.d) * grow };
   head.x = snapCentre(head.x + ox, cols) - ox;
   head.y = snapCentre(head.y + oy, rows) - oy;
-  const cp = Math.cos(view.pitch);
-  const sp = Math.sin(view.pitch);
-  // his up, forward and right, as screen directions (x right, y up, z toward us)
-  const fwdW = { x: Math.cos(view.facing), z: Math.sin(view.facing) };
-  const fwdS = { x: fwdW.x, y: -fwdW.z * sp, z: fwdW.z * cp };
-  const upS = { x: 0, y: cp, z: sp };
-  const rightS = { x: -fwdW.z, y: -fwdW.x * sp, z: fwdW.x * cp };
-  if (nfl) {
-    const hc: P2 = { x: head.x, y: head.y - hr * 0.1, d: head.d };
-    const r = hr * 1.2;
-    ball(
-      b,
-      ox,
-      oy,
-      hc,
-      r,
-      (nx, ny, nz) => {
-        const f = nx * fwdS.x + ny * fwdS.y + nz * fwdS.z;
-        const u = nx * upS.x + ny * upS.y + nz * upS.z;
-        const rt = nx * rightS.x + ny * rightS.y + nz * rightS.z;
-        // the facemask: bars across the front, low
-        if (f > 0.55 && u < 0.25) return MASK;
-        // the stripe down the middle of the crown
-        if (Math.abs(rt) < 0.17 && u > 0.1 && f < 0.6) return STRIPE;
-        return HELMET;
-      },
-      6
-    );
-    // the face behind the mask, where it shows (front-on views)
-    const faceDepth = fwdS.z;
-    if (faceDepth > 0.2) {
-      const fx = Math.round(ox + hc.x + fwdS.x * r * 0.55);
-      const fy = Math.round(oy + hc.y - fwdS.y * r * 0.55 + r * 0.05);
-      for (const [dx, dy] of [
-        [0, 0],
-        [-1, 0],
-        [1, 0],
-      ]) {
-        const i = (fy + dy) * b.w + fx + dx;
-        if (b.slot[i] === MASK) b.slot[i] = SKIN;
-      }
-    }
-  } else {
-    const style = look.hair;
-    const hc: P2 = head;
-    // the hair's volume over the skull (short, headband, locs): a slightly bigger ball behind it, kept
-    // to the crown, the sides above the ears and the nape, so the hair sits on the head, not painted on
-    const volume = style === 0 || style === 4 || style === 5 ? 1.12 : 0;
-    if (volume) {
-      const vc: P2 = { x: hc.x - fwdS.x * hr * 0.1, y: hc.y - upS.y * hr * 0.26, d: hc.d + upS.z * hr * 0.26 - fwdS.z * hr * 0.1 - hr * 0.9 };
-      ball(
-        b,
-        ox,
-        oy,
-        vc,
-        hr * volume,
-        (nx, ny, nz) => {
-          const u = nx * upS.x + ny * upS.y + nz * upS.z;
-          const f = nx * fwdS.x + ny * fwdS.y + nz * fwdS.z;
-          return u > 0.3 || (f < -0.35 && u > -0.5) ? HAIR : 0;
-        },
-        7,
-        hw * 1.04
-      );
-    }
-    ball(
-      b,
-      ox,
-      oy,
-      hc,
-      hr,
-      (nx, ny, nz) => {
-        // where on his head this pixel is: forward, up and to his right (each -1 to 1)
-        const f = nx * fwdS.x + ny * fwdS.y + nz * fwdS.z;
-        const u = nx * upS.x + ny * upS.y + nz * upS.z;
-        const r = nx * rightS.x + ny * rightS.y + nz * rightS.z;
-        const ar = Math.abs(r);
-        // the face
-        if (f > 0.45) {
-          if (u > -0.02 && u < 0.26 && ar > 0.1 && ar < 0.56) return EYE;
-          if (u >= 0.26 && u < 0.42 && ar > 0.08 && ar < 0.6) return style === 3 ? SKINDARK : HAIR;
-          if (f > 0.68 && ar < 0.3 && u > -0.6 && u < -0.38) return SKINDARK;
-          if (look.beard && u < -0.32 && ar < 0.78) return HAIR;
-        }
-        // the ears
-        if (ar > 0.8 && Math.abs(u) < 0.24 && f > -0.35 && f < 0.32) return SKINDARK;
-        if (style === 3) return SKIN;
-        // the hairline: high at the forehead, low at the nape
-        const hairline = 0.4 + 0.24 * f;
-        const hair = u > hairline || (f < -0.5 && u > -0.3);
-        if (style === 4 && !hair && u > hairline - 0.2 && u <= hairline) return BAND;
-        if (hair) return style === 1 ? BUZZ : HAIR;
-        return SKIN;
-      },
-      6,
-      hw,
-      3
-    );
-    if (style === 2) {
-      // a high top: a block of hair on the crown, set behind the skull so the face and hairline stay whole
-      const top: P2 = { x: hc.x - fwdS.x * hr * 0.1, y: hc.y - upS.y * hr * 0.7, d: hc.d - hr };
-      capsule(b, ox, oy, top, { ...top, y: top.y - hr * 0.45 }, hr * 0.82, hr * 0.8, () => HAIR, 7, 0.1);
-    } else if (style === 5) {
-      // locs down the back of the head
-      const back: P2 = { x: hc.x - fwdS.x * hr * 0.55, y: hc.y + hr * 0.1, d: hc.d - fwdS.z * hr * 0.55 - 0.5 };
-      capsule(b, ox, oy, back, { ...back, x: back.x - fwdS.x * hr * 0.2, y: back.y + hr * 0.95 }, hr * 0.62, hr * 0.42, () => HAIR, 7, -0.05);
-    }
-  }
+  paintHead(b, ox, oy, head, hr, { fwd: fwdS, up: upS, right: rightS, hw }, look, px);
   // ---- colors ----
   const pal = palette(look);
   // dark skin on a dark kit: a 1 px lit-side rim on the skin, so his arms don't sink into the jersey
   const rim = luma(rgb(look.skin)) < 95 && luma(rgb(look.jersey)) < 95;
-  return finish(b, pal, ox, oy, P('handL'), P('handR'), Math.round(oy + head.y - hr * 1.3), rim);
+  // the top of the head: the highest pixel of the head, its hair or its helmet
+  let top = Math.round(oy + head.y - hr * 1.3);
+  for (let i = 0; i < b.slot.length; i++)
+    if (b.slot[i] && (b.part[i] === HEAD || b.part[i] === HAIR_VOL || b.part[i] === HAIR_HANG)) {
+      top = Math.floor(i / b.w);
+      break;
+    }
+  return finish(b, pal, ox, oy, P('handL'), P('handR'), top, rim);
 }
 
 function palette(look: Look): RGB[][] {
@@ -505,12 +467,26 @@ function palette(look: Look): RGB[][] {
   set(STRIPE, rgb(look.stripe ?? look.trim));
   set(MASK, rgb(look.mask ?? '#9aa0a6'));
   set(PANTS, rgb(look.pants ?? '#e8e8e8'));
-  set(BAND, trim);
+  // gear: head gear, sleeves and leg gear in the record's colours (looks.ts), else the kit's trim,
+  // white and black
+  set(BAND, look.gear?.head ? rgb(look.gear.head) : trim);
+  set(ARMGEAR, rgb(look.gear?.arm ?? '#f2f2ee'));
+  set(LEGGEAR, rgb(look.gear?.leg ?? '#1b1b1f'));
+  set(TOWEL, [244, 244, 240]);
   set(GLOVE, rgb(look.gloves ?? look.skin));
+  // goggles: a clear lens in a dark frame; football visors clear, smoked or tinted amber
+  const eyes = look.app?.eyes;
+  set(LENS, eyes === 'visor-dark' ? [34, 37, 46] : eyes === 'visor-tint' ? [214, 148, 58] : [196, 228, 238]);
+  set(FRAME, [58, 61, 70]);
+  own(MOUTH, [236, 242, 238]);
   // the nose and the ears: the skin's own shadow tone, so skin stays three tones
   const sk = ramp3(skin, true);
   ramps[SKINDARK] = [sk[0], sk[0], sk[0]];
-  own(BUZZ, mix(rgb(look.hairColor), skin, 0.35));
+  // hair cut close shows the scalp through it; a dyed colour (Rodman's red) is meant to be seen, so
+  // it shows through far less
+  const dyed = ['red', 'blue', 'green', 'pink', 'purple', 'platinum', 'team'].includes(look.app?.hairTone ?? '');
+  own(BUZZ, mix(rgb(look.hairColor), skin, dyed ? 0.12 : 0.35));
+  own(STUBBLE, mix(rgb(look.hairColor), skin, 0.55));
   // the number: the trim color if it reads on the jersey, else black or white
   const num = onColor(jersey, [trim, [255, 255, 255], [20, 20, 24]]);
   // the number is a marking inside the jersey, not an edge: a black number stays black
@@ -537,8 +513,8 @@ function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, to
   const pack = (c: RGB) => (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
   const col = pal.map((tones) => (tones ? tones.map(pack) : [0, 0, 0]));
   const line = pack(OUTLINE) >>> 0;
-  // hair volume and the head are one shape: no line between them
-  const grp = (p: number) => (p === 7 ? 6 : p);
+  // hair (volume and hanging) and the head are one shape: no line between them
+  const grp = (p: number) => (p === HAIR_VOL || p === HAIR_HANG ? HEAD : p);
   const out = new Uint32Array(w * h);
   const T = 1.6;
   for (let y = 0; y < h; y++)

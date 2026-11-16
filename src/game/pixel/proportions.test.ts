@@ -126,14 +126,16 @@ describe('the 5-head hero (V2 C.1.1)', () => {
       it("keeps the head box near V2's (+-1 px of the band's box, or of it scaled to the head's rows)", () => {
         const rowsAtCentre = (lo + hi) / 2 / heads;
         const near = (v: number, t: number, k: number) => v >= Math.min(t, t * k) - 1 && v <= Math.max(t, t * k) + 1;
-        // with hair: short, headband, locs; bald and buzz have no hair over the skull and the high top's
-        // height is its own (checked by width only)
+        // with hair: short, headband, locs; bald and buzz have no hair standing off the skull's sides
+        // front-on (players-4: a buzz cut stands a pixel off the crown and the back, V2 C.5 rule 2) and
+        // the high top's height is its own (checked by width only)
         const withHair = ms.filter(({ hair }) => hair === 0 || hair === 4 || hair === 5);
         const okBox = withHair.filter(({ m }) => near(m.boxW, box[0], m.skull / rowsAtCentre) && near(m.boxH, box[1], m.skull / rowsAtCentre)).length;
         expect(okBox / withHair.length).toBeGreaterThanOrEqual(0.9);
-        // without hair at the sides (bald, buzz, high top) the head is V2's box less the hair: up to 2 px narrower
+        // bald, buzz and the high top: V2's box less the hair at the sides (up to 2 px narrower), or, on
+        // a big head where a close crop shows a pixel past the skull's sides (players-4), V2's box
         const bare = ms.filter(({ hair }) => hair === 1 || hair === 2 || hair === 3);
-        const okW = bare.filter(({ m }) => near(m.boxW + 1, box[0], m.skull / rowsAtCentre)).length;
+        const okW = bare.filter(({ m }) => near(m.boxW + 1, box[0], m.skull / rowsAtCentre) || near(m.boxW, box[0], m.skull / rowsAtCentre)).length;
         expect(okW / bare.length).toBeGreaterThanOrEqual(0.9);
       });
     }

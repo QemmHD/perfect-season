@@ -44,8 +44,9 @@ export function put(b: Buf, x: number, y: number, d: number, slot: number, tone:
 /**
  * A limb: a rounded segment from a to b whose radius goes from ra to rb. `slotAt(t)` picks the
  * material along it (t 0 at a, 1 at b), so one thigh can be shorts at the top and skin at the knee.
+ * `over`: a body part it always covers, whatever its depth (hair lying on his back when we see it).
  */
-export function capsule(b: Buf, ox: number, oy: number, a: P2, c: P2, ra: number, rb: number, slotAt: (t: number) => number, part: number, bias = 0) {
+export function capsule(b: Buf, ox: number, oy: number, a: P2, c: P2, ra: number, rb: number, slotAt: (t: number) => number, part: number, bias = 0, over = -1) {
   const ax = a.x + ox;
   const ay = a.y + oy;
   const bx = c.x + ox;
@@ -75,11 +76,12 @@ export function capsule(b: Buf, ox: number, oy: number, a: P2, c: P2, ra: number
       const ny = -ey / rr;
       const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
       const depth = a.d + (c.d - a.d) * t + nz * rr;
+      if (over >= 0 && x >= 0 && y >= 0 && x < b.w && y < b.h && b.slot[y * b.w + x] && b.part[y * b.w + x] === over) b.depth[y * b.w + x] = -1e9;
       put(b, x, y, depth, slotAt(t), toneOf(nx, ny, nz, bias), part);
     }
 }
 
-export function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: (nx: number, ny: number, nz: number) => number, part: number, sx = 1, over = -1) {
+export function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: (nx: number, ny: number, nz: number, x: number, y: number) => number, part: number, sx = 1, over = -1) {
   // `sx` narrows it across (a head is taller than it is wide); `over`: a body part this ball always
   // covers, whatever its depth (the head sits on the torso and neck: a chin never sinks into the chest)
   const cx = c.x + ox;
@@ -93,8 +95,9 @@ export function ball(b: Buf, ox: number, oy: number, c: P2, r: number, slotFor: 
       const nx = ex / r;
       const ny = -ey / r;
       const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
-      // slot 0 from slotFor: no pixel here (a partial shell, such as hair volume)
-      const slot = slotFor(nx, ny, nz);
+      // slot 0 from slotFor: no pixel here (a partial shell, such as hair volume); x and y are the grid
+      // pixel, for patterns that must stay put on the grid (cornrow partings, curls)
+      const slot = slotFor(nx, ny, nz, x, y);
       if (!slot) continue;
       const i = y * b.w + x;
       if (over >= 0 && x >= 0 && y >= 0 && x < b.w && y < b.h && b.slot[i] && b.part[i] === over) b.depth[i] = -1e9;

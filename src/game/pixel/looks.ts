@@ -3,10 +3,10 @@
 // the match (`matchLook`) and the cards (`cardLook`), so a man looks the same on both: one build
 // formula (`buildOf`), one hair, one skin.
 //
-// The legacy `hair`/`beard`/`skin`/`hairColor` fields are filled from the record, so today's raster
-// draws curated looks as they are; `app` carries the whole record for the detail the raster learns
-// next (players-4: the 18 silhouettes, facial hair, gear).
-import { type Accent, type Appearance, appearanceFor, buildOf, type BuildCtx, hairHex, NEUTRAL_SKIN, type Ref, skinTone, type Sport } from './appearance';
+// The legacy `hair`/`beard`/`skin`/`hairColor` fields are filled from the record (tools that read
+// them, the cache keys); `app` carries the whole record, which the raster draws (head.ts: the 18
+// silhouettes, facial hair, head gear; body.ts: arm and leg gear, socks, the towel).
+import { type Accent, type Appearance, appearanceFor, appearanceLoaded, buildOf, type BuildCtx, hairHex, NEUTRAL_SKIN, type Ref, skinTone, type Sport } from './appearance';
 import type { Look } from './body';
 import type { CardLine } from '../../ut/types';
 import { pickFor } from '../../engine/sport';
@@ -98,6 +98,9 @@ function fromApp(sport: Sport, app: Appearance, kit: KitColors, htIn: number, wt
     shorts: kit.shorts,
     socks: kit.socks,
     shoes: accentHex(app.shoe, kit),
+    // gear colours against this kit: a headband white unless curated, sleeves white, leg gear black
+    withData: appearanceLoaded(sport),
+    gear: { head: accentHex(app.headC ?? 'white', kit), arm: accentHex(app.armC ?? 'white', kit), leg: accentHex(app.legC ?? 'black', kit) },
     app,
   };
 }
@@ -125,6 +128,14 @@ export function matchLook(sport: Sport, ref: Ref | null, kit: KitColors, ctx: Ma
   if (ctx.cosmetic?.shoes) look.shoes = ctx.cosmetic.shoes;
   if (ctx.cosmetic?.ring) look.ring = ctx.cosmetic.ring;
   return look;
+}
+
+/**
+ * A match look made before the sport's appearance data arrived (the first-frame gate gave up on a slow
+ * network): the renderer makes it again, and redraws the body through its sprite budget.
+ */
+export function staleLook(look: Look): boolean {
+  return look.withData === false && appearanceLoaded(look.sport);
 }
 
 /** Relative luminance 0–1 of a #rrggbb colour. */

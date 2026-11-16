@@ -15,7 +15,10 @@ const VIEWS = [
 const POSES = [P.idle(0.25), P.run(0.375, 1), P.jumpShot(0.5), P.stance(true), P.kickLeg(0.5), P.dive(0.6)];
 const SIZES = [34, 60, 24, 34, 22, 40];
 
-const RASTER_HASH = 'd53fc0a0';
+// players-4: the head (head.ts: hair silhouettes, face, gear), the collar trim and the exact-or-hidden
+// numbers redraw these sprites on purpose (the fixtures' legacy looks: short, buzz, high top, bald,
+// headband, locs)
+const RASTER_HASH = '88fb19d9';
 
 function setHash(): string {
   let h = 0x811c9dc5;
