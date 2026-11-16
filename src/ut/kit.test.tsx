@@ -49,13 +49,20 @@ function fakeButton() {
 }
 
 type ButtonProps = {
-  onPointerDown: (e: unknown) => void;
+  onPointerDown?: (e: unknown) => void;
+  onPointerCancel?: (e: unknown) => void;
   onClick: (e: unknown) => void;
   disabled?: boolean;
   className: string;
 };
 /** ClaimButton has no hooks, so calling it gives the <button> element and its real handlers. */
 const claim = (p: Parameters<typeof ClaimButton>[0]) => ClaimButton(p) as React.ReactElement<ButtonProps>;
+/** A browser touch on an element: pointerdown, then either a click (a tap) or a pointercancel (a scroll). */
+function touch(el: React.ReactElement<ButtonProps>, ends: 'tap' | 'scroll', target: unknown = fakeButton()) {
+  el.props.onPointerDown?.({ isPrimary: true, pointerType: 'touch' });
+  if (ends === 'scroll') el.props.onPointerCancel?.({ isPrimary: true, pointerType: 'touch' });
+  else el.props.onClick({ currentTarget: target, detail: 1 });
+}
 
 beforeEach(() => {
   sound.haptic.mockClear();
@@ -63,7 +70,7 @@ beforeEach(() => {
   motion.reduced = false;
 });
 
-describe('ClaimButton: the haptic fires only from its pointer handler', () => {
+describe('ClaimButton: the haptic fires only on a finished tap (click), never on pointerdown', () => {
   it('rendering never fires a haptic or a sound', () => {
     const html = renderToStaticMarkup(<ClaimButton onClaim={() => {}} />);
     expect(html).toContain('class="ut-k-claim"');
@@ -71,55 +78,61 @@ describe('ClaimButton: the haptic fires only from its pointer handler', () => {
     expect(sound.haptic).not.toHaveBeenCalled();
     expect(sound.coin).not.toHaveBeenCalled();
   });
-  it('pointerdown ticks once; the claim on click never ticks', () => {
+  it('pointerdown alone never ticks (it may be the start of a scroll)', () => {
+    const el = claim({ onClaim: () => {} });
+    el.props.onPointerDown?.({ isPrimary: true, pointerType: 'touch' });
+    expect(sound.haptic).not.toHaveBeenCalled();
+  });
+  it('a scroll that starts on the button (pointerdown, pointercancel, no click) never ticks or claims', () => {
     const onClaim = vi.fn();
-    const el = claim({ onClaim });
-    el.props.onPointerDown({ isPrimary: true });
-    expect(sound.haptic).toHaveBeenCalledTimes(1);
-    expect(sound.haptic).toHaveBeenCalledWith('tick');
+    touch(claim({ onClaim }), 'scroll');
+    expect(sound.haptic).not.toHaveBeenCalled();
     expect(onClaim).not.toHaveBeenCalled();
+  });
+  it('a tap ticks once, claims once, plays the coin sound and the burst', () => {
+    const onClaim = vi.fn();
     const btn = fakeButton();
-    el.props.onClick({ currentTarget: btn });
+    touch(claim({ onClaim }), 'tap', btn);
+    expect(sound.haptic.mock.calls).toEqual([['tick']]);
     expect(onClaim).toHaveBeenCalledTimes(1);
     expect(sound.coin).toHaveBeenCalledTimes(1);
-    expect(sound.haptic).toHaveBeenCalledTimes(1);
     expect(btn.attrs.has('data-burst')).toBe(true);
   });
-  it('keyboard or assistive activation (click with no pointer) claims without a haptic', () => {
+  it('keyboard or assistive activation (click with detail 0) claims without a haptic', () => {
     const onClaim = vi.fn();
-    claim({ onClaim }).props.onClick({ currentTarget: fakeButton() });
+    claim({ onClaim }).props.onClick({ currentTarget: fakeButton(), detail: 0 });
     expect(onClaim).toHaveBeenCalledTimes(1);
     expect(sound.haptic).not.toHaveBeenCalled();
   });
   it('a claim that grants a pack plays the long pattern', () => {
-    claim({ onClaim: () => {}, pack: true }).props.onPointerDown({ isPrimary: true });
+    touch(claim({ onClaim: () => {}, pack: true }), 'tap');
     expect(sound.haptic.mock.calls).toEqual([['long']]);
   });
-  it('a disabled button never ticks', () => {
+  it('a disabled button is disabled (the browser sends it no click, so it never ticks)', () => {
     const el = claim({ onClaim: () => {}, disabled: true });
-    el.props.onPointerDown({ isPrimary: true });
     expect(el.props.disabled).toBe(true);
+    el.props.onPointerDown?.({ isPrimary: true });
     expect(sound.haptic).not.toHaveBeenCalled();
   });
   it('no spark burst under reduced motion (the claim and sound still happen)', () => {
     motion.reduced = true;
     const onClaim = vi.fn();
     const btn = fakeButton();
-    claim({ onClaim }).props.onClick({ currentTarget: btn });
+    claim({ onClaim }).props.onClick({ currentTarget: btn, detail: 1 });
     expect(btn.attrs.has('data-burst')).toBe(false);
     expect(onClaim).toHaveBeenCalledTimes(1);
     expect(sound.coin).toHaveBeenCalledTimes(1);
   });
-  it('kit.tsx calls haptic() only inside onPointerDown handlers, and never sound.ts haptics directly', () => {
+  it('kit.tsx calls haptic() only inside onClick handlers, has no onPointerDown, and never calls sound.ts haptics directly', () => {
     const src = KIT_SOURCE;
     const calls = [...src.matchAll(/\bhaptic\(/g)];
     expect(calls.length).toBe(2);
     for (const c of calls) {
       const line = src.slice(src.lastIndexOf('\n', c.index) + 1, src.indexOf('\n', c.index));
       const before = src.slice(0, c.index);
-      expect(before.lastIndexOf('onPointerDown'), line).toBeGreaterThan(before.lastIndexOf('onClick'));
+      expect(before.lastIndexOf('onClick'), line).toBeGreaterThan(before.lastIndexOf('<button'));
     }
-    expect(src).not.toMatch(/tapHaptic|vibrate\(/);
+    expect(src).not.toMatch(/onPointerDown|tapHaptic|vibrate\(/);
   });
 });
 
@@ -217,9 +230,20 @@ describe('V2 C.3 tokens', () => {
   it('are defined with the design values, only on the UT screen, .ps-v2 surfaces and the kit pieces themselves', () => {
     const first = KIT_CSS.indexOf('--ps-bg:');
     const scope = KIT_CSS.slice(Math.max(KIT_CSS.lastIndexOf('}', first) + 1, KIT_CSS.lastIndexOf('*/', first) + 2), first);
-    expect(scope.trim()).toBe(":where(.screen.ut, .ps-v2, [class^='ut-k-']) {");
+    expect(scope.trim()).toBe(":where(.screen.ut, .ps-v2),\n:where([class*='ut-k-']):not(:where(.screen.ut, .ps-v2) *) {");
     for (const [k, v] of Object.entries(TOKENS)) expect(KIT_CSS).toContain('--ps-' + k + ': ' + v + ';');
     expect(KIT_CSS).not.toMatch(/:root\s*\{/);
+  });
+  it('a kit piece inside a themed root inherits them (so a parent can re-tint), and matches by any class position', () => {
+    expect(KIT_CSS).not.toContain("[class^='ut-k-']");
+    expect(KIT_CSS.match(/:where\(\[class\*='ut-k-'\]\):not\(:where\(\.screen\.ut, \.ps-v2\) \*\)/g)).toHaveLength(2);
+  });
+  it('press feedback reaches [data-pressed] only inside .screen.ut and .ps-v2, never app-wide', () => {
+    expect(KIT_CSS).not.toMatch(/[,(]\s*\[data-pressed/);
+    expect((KIT_CSS.match(/\.screen\.ut \[data-pressed='true'\], \.ps-v2 \[data-pressed='true'\]/g) ?? []).length).toBe(2);
+  });
+  it('the clipped primary button draws its keyboard focus ring inside the shape', () => {
+    expect(KIT_CSS).toMatch(/\.ut-k-primary:focus-visible \{\s*box-shadow:\s*inset/);
   });
   it('the kit draws with them: no raw brand colours from the old palette in kit rules', () => {
     for (const old of ['var(--teal)', 'var(--gold)', 'var(--text)', 'var(--sub)', 'var(--soft)', 'var(--panel-3)', '#19e3c9', '#f5b83d']) expect(KIT_CSS, old).not.toContain(old);
@@ -251,18 +275,24 @@ describe('MinutesRing', () => {
 });
 
 describe('GoldBar', () => {
-  type BarProps = { onPointerDown: () => void; onClick: () => void; 'data-primary'?: string };
   it('eyebrow, title, stake and one accessible name', () => {
     const html = renderToStaticMarkup(<GoldBar eyebrow="Next up" title="3 min to 75 coins" stake="+ a Scout Stamp" onClick={() => {}} />);
     expect(html).toContain('<small>Next up</small><b>3 min to 75 coins</b><em>+ a Scout Stamp</em>');
     expect(html).toContain('aria-label="Next up: 3 min to 75 coins. + a Scout Stamp"');
     expect(html).not.toContain('data-primary');
   });
-  it('primary only when asked (the One-More bar), and a tick from its own pointer handler', () => {
-    const el = GoldBar({ eyebrow: 'Next up · loaded', title: "Play '86 Boston", onClick: () => {}, primary: true }) as React.ReactElement<BarProps>;
+  it('primary only when asked (the One-More bar); a tap ticks once, a scroll that starts on it never does', () => {
+    const onClick = vi.fn();
+    const el = GoldBar({ eyebrow: 'Next up · loaded', title: "Play '86 Boston", onClick, primary: true }) as React.ReactElement<ButtonProps & { 'data-primary'?: string }>;
     expect(el.props['data-primary']).toBe('');
-    el.props.onPointerDown();
+    touch(el, 'scroll');
+    expect(sound.haptic).not.toHaveBeenCalled();
+    expect(onClick).not.toHaveBeenCalled();
+    touch(el, 'tap');
     expect(sound.haptic.mock.calls).toEqual([['tick']]);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    el.props.onClick({ detail: 0 });
+    expect(sound.haptic).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenCalledTimes(2);
   });
 });
-

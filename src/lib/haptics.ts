@@ -45,7 +45,7 @@ function listen() {
   const w = win();
   if (listening || !w?.addEventListener) return;
   listening = true;
-  for (const type of ['pointerdown', 'touchstart', 'keydown'])
+  for (const type of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'keydown'])
     w.addEventListener(
       type,
       (e) => {
@@ -84,8 +84,9 @@ export function hapticsAvailable(): boolean {
 
 /**
  * Play one of the three patterns, if the player is touching the screen right now and has haptics
- * on. Call it from the input handler itself (onPointerDown, onClick, a key handler); from anywhere
- * else it does nothing.
+ * on. Call it from the input handler itself, never from a timer; from anywhere else it does
+ * nothing. For a button, call it from onClick (a finished tap), not onPointerDown: a pointerdown may
+ * be the start of a scroll, and a scroll must never buzz.
  */
 export function haptic(kind: Haptic): void {
   if (!gestureActive()) return;

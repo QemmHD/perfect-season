@@ -115,11 +115,11 @@ function burst(el: HTMLElement) {
 }
 
 /**
- * The gold CLAIM button. The haptic fires only inside its own pointer handler, while the finger is
- * on it (iOS allows a tick only inside a gesture; a haptic called later would land on an unrelated
- * tap): a tick, or the long pattern when the claim grants a pack (`pack`). The claim itself (and its
- * spark burst and coin sound) happens on click, so keyboard and assistive activation claim too,
- * silently.
+ * The gold CLAIM button. The haptic fires inside its own click handler: a click is a finished tap,
+ * so a scroll that starts on the button (pointerdown, then pointercancel, no click) never buzzes,
+ * and it is still a trusted gesture, so iOS plays the tick at once (sound.ts counts the pointerup
+ * just before it). A tick, or the long pattern when the claim grants a pack (`pack`). Keyboard and
+ * assistive activation (a click with `detail` 0) claim too, silently.
  */
 export function ClaimButton(props: { onClaim: () => void; label?: string; disabled?: boolean; ariaLabel?: string; pack?: boolean }) {
   return (
@@ -128,10 +128,8 @@ export function ClaimButton(props: { onClaim: () => void; label?: string; disabl
       className="ut-k-claim"
       disabled={props.disabled}
       aria-label={props.ariaLabel}
-      onPointerDown={() => {
-        if (!props.disabled) haptic(props.pack ? 'long' : 'tick');
-      }}
       onClick={(e) => {
+        if (e.detail !== 0) haptic(props.pack ? 'long' : 'tick');
         burst(e.currentTarget);
         sfx.coin();
         props.onClaim();
@@ -307,8 +305,11 @@ export function GoldBar(props: {
       className="ut-k-gold"
       data-primary={props.primary ? '' : undefined}
       aria-label={props.ariaLabel ?? props.eyebrow + ': ' + props.title + (props.stake ? '. ' + props.stake : '')}
-      onPointerDown={() => haptic('tick')}
-      onClick={props.onClick}
+      onClick={(e) => {
+        // on the finished tap, never on pointerdown: a scroll that starts on the bar must not buzz
+        if (e.detail !== 0) haptic('tick');
+        props.onClick();
+      }}
     >
       {props.art && (
         <i className="ut-k-gold-art" aria-hidden="true">

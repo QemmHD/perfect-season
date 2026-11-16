@@ -4,11 +4,13 @@
    progress rings, empty states, the Minutes ring and the gold bar. Existing identity: Archivo
    condensed italic, teal for actions, gold for rewards. Game Design V2 C.3 (2026-11-16): the --ps-*
    colour tokens and UI motion of 120-180 ms ease-out, defined only on the UT screen (.screen.ut), on
-   .ps-v2 surfaces of the main app and on the kit's own pieces (so one inside a portal still has
-   them), so nothing outside those roots changes. Every target is
+   .ps-v2 surfaces of the main app and on a kit piece that sits outside both (one inside a portal
+   still has them; inside a themed root it inherits, so a parent that re-tints a token reaches it),
+   so nothing outside those roots changes. Every target is
    >= 44 design px; every animation is off under reduced motion (colour stays). Kept under 5 KB gzip
    (scripts/qa/ut-studio.mjs kit checks it). */
-:where(.screen.ut, .ps-v2, [class^='ut-k-']) {
+:where(.screen.ut, .ps-v2),
+:where([class*='ut-k-']):not(:where(.screen.ut, .ps-v2) *) {
   --ps-bg: #071521;
   --ps-panel: #0e2233;
   --ps-stroke: #1d3a50;
@@ -35,7 +37,8 @@
   --ut-sheet: 180ms;
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(.screen.ut, .ps-v2, [class^='ut-k-']) {
+  :where(.screen.ut, .ps-v2),
+  :where([class*='ut-k-']):not(:where(.screen.ut, .ps-v2) *) {
     --ut-push: 0ms;
     --ut-pop: 0ms;
     --ut-tab: 0ms;
@@ -80,7 +83,7 @@
 }
 
 /* ---------- press feedback: within a frame, on every UT control without its own :active ---------- */
-:where(.screen.ut button:not(:disabled):active, .ps-v2 button:not(:disabled):active, .screen.ut [data-pressable]:active, [data-pressed='true']) {
+:where(.screen.ut button:not(:disabled):active, .ps-v2 button:not(:disabled):active, .screen.ut [data-pressable]:active, .screen.ut [data-pressed='true'], .ps-v2 [data-pressed='true']) {
   transform: scale(0.97);
   filter: brightness(1.08);
 }
@@ -272,6 +275,13 @@
   font-size: 22px;
   letter-spacing: 1px;
   line-height: 1;
+}
+/* the clip-path cuts any outline away, so keyboard and switch focus draws a ring inside the shape:
+   a dark line, then a light one, readable on teal, gold and the dark page */
+.ut-k-primary:focus-visible {
+  box-shadow:
+    inset 0 0 0 2px var(--ps-bg),
+    inset 0 0 0 5px var(--ps-text);
 }
 .ut-k-primary.gold {
   background: linear-gradient(180deg, #ffd978, #e09a1c);
@@ -508,7 +518,7 @@
     animation: none;
     transition: none;
   }
-  :where(.screen.ut button:not(:disabled):active, .ps-v2 button:not(:disabled):active, .screen.ut [data-pressable]:active, [data-pressed='true']) {
+  :where(.screen.ut button:not(:disabled):active, .ps-v2 button:not(:disabled):active, .screen.ut [data-pressable]:active, .screen.ut [data-pressed='true'], .ps-v2 [data-pressed='true']) {
     transform: none;
   }
 }

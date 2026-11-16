@@ -147,6 +147,16 @@ export async function openPhone(browser, { sport, size, fixture = 'audit', rm = 
   const page = await context.newPage();
   const fx = typeof fixture === 'string' ? readFixture(sport, fixture) : fixture;
   await useFixture(context, page, fx, { clock });
+  // after the fixture is seeded: count the app's own localStorage writes per key (window.__psWrites),
+  // so a check can prove the app really saved, not just that the stored value survived
+  await context.addInitScript(() => {
+    const writes = (window.__psWrites = {});
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (this === window.localStorage) writes[k] = (writes[k] ?? 0) + 1;
+      return set.call(this, k, v);
+    };
+  });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   if (cpu > 1) {
@@ -807,9 +817,14 @@ async function fixturesCase(a) {
           // after the app has loaded, migrated and saved, it must be exactly what the fixture held
           const want = f.name === 'fresh' ? undefined : readFixture(sport, f.name).storage['perfect-season:profile:v1']?.playtime;
           if (want !== undefined) {
-            const have = await page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:v1') ?? 'null')?.playtime);
-            r.playtimeKept = JSON.stringify(have) === JSON.stringify(want);
-            r.steps.push('playtime ' + (r.playtimeKept ? 'kept' : 'CHANGED'));
+            const { have, writes } = await page.evaluate(() => ({
+              have: JSON.parse(localStorage.getItem('perfect-season:profile:v1') ?? 'null')?.playtime,
+              writes: window.__psWrites?.['perfect-season:profile:v1'] ?? 0,
+            }));
+            // a round trip only counts if the app rewrote the key at least once
+            r.profileWrites = writes;
+            r.playtimeKept = writes >= 1 && JSON.stringify(have) === JSON.stringify(want);
+            r.steps.push('playtime ' + (writes < 1 ? 'NOT SAVED' : r.playtimeKept ? 'kept over ' + writes + ' writes' : 'CHANGED'));
             if (!r.playtimeKept) r.ok = false;
           }
           await page.screenshot({ path: path.join(a.out, 'fixture-' + sport + '-' + f.name + '.png') });
@@ -906,8 +921,10 @@ async function kitCase(a) {
               h(kit.ClaimButton, { onClaim: () => claimed++ }),
               h(kit.EmptyState, { icon: h(icons.IconGift, { size: 28 }), line: 'Nothing to claim right now. Win a match to fill this up.', cta: { label: 'PLAY', onClick: () => {} } }),
               h('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } }, h(kit.MinutesRing, { minutes: 27, target: 30, reward: '75 coins + stamp next', onClick: () => {} }), h(kit.MinutesRing, { minutes: 60, target: 60, reward: 'Silver Pack ready', state: 'ready', onClick: () => {} }), h(kit.MinutesRing, { minutes: 90, target: 90, reward: 'Great session.', state: 'done' })),
-              h(kit.GoldBar, { eyebrow: 'Next up', title: '3 min to 75 coins', stake: '+ a Scout Stamp', onClick: () => {} }),
+              h(kit.GoldBar, { eyebrow: 'Next up', title: '3 min to 75 coins', stake: '+ a Scout Stamp', onClick: () => (window.__goldClicks = (window.__goldClicks ?? 0) + 1) }),
               h(kit.PrimaryButton, { onClick: () => {}, sub: 'About 5 min' }, 'Play match'),
+              // room to scroll, so a touch-drag that starts on the gold bar really scrolls the list
+              h('div', { 'aria-hidden': true, style: { height: 1400 } }),
             ),
           );
           await new Promise((res) => setTimeout(res, 300));
@@ -948,18 +965,102 @@ async function kitCase(a) {
         await settle(page, 400);
         await page.screenshot({ path: path.join(a.out, 'kit-' + sport + '-' + SIZES[size].w + (a.rm ? '-rm' : '') + '.png') });
         // press feedback on a real UT control with no :active rule of its own (a tab bar button):
-        // its computed style a frame after mouse down (the press is swallowed, nothing navigates)
+        // its computed style after mouse down (the press is swallowed, nothing navigates). One frame is
+        // too early (every run read 'none none'), and a fixed wait is flaky on a loaded machine, so it
+        // polls each frame for up to 600 ms until the style moves off its rest value.
+        // The kit host covers the tab bar, so it is taken out (display: none) for this probe (a press on it would land
+        // on the host, not the tab).
+        await page.evaluate(() => (document.getElementById('__kit').style.display = 'none'));
         const tab = page.locator('.ut-tabs button').nth(1);
         const tb = await tab.boundingBox();
         await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2);
-        const look = () => tab.evaluate((e) => getComputedStyle(e).transform + ' ' + getComputedStyle(e).filter);
+        const look = () => tab.evaluate((e) => ({ transform: getComputedStyle(e).transform, filter: getComputedStyle(e).filter }));
         const rest = await look();
+        // what is under the pointer (a covering layer would swallow the press and fail the probe)
+        const hit = await page.evaluate(([x, y]) => {
+          const e = document.elementFromPoint(x, y);
+          return e ? (e.closest('button')?.className || e.tagName) + (e.closest('.ut-tabs button') ? ' (tab)' : ' (NOT the tab)') : 'nothing';
+        }, [tb.x + tb.width / 2, tb.y + tb.height / 2]);
         await page.evaluate(() => window.addEventListener('click', (e) => (e.stopImmediatePropagation(), e.preventDefault()), { capture: true, once: true }));
         await page.mouse.down();
-        await page.evaluate(() => new Promise((res) => requestAnimationFrame(res)));
+        await tab
+          .evaluate(
+            (e, r) =>
+              new Promise((res) => {
+                const t0 = performance.now();
+                const poll = () => {
+                  const cs = getComputedStyle(e);
+                  if (cs.transform !== r.transform || cs.filter !== r.filter || performance.now() - t0 > 600) res();
+                  else requestAnimationFrame(poll);
+                };
+                requestAnimationFrame(poll);
+              }),
+            rest,
+          )
+          .catch(() => {});
+        await page.waitForTimeout(250); // let any transition on the control finish while still held
         const pressed = await look();
         await page.mouse.up();
-        r.press = { rest, pressed };
+        // reduced motion keeps the brightness but never scales; otherwise the press scales to 0.97
+        const pressOk = a.rm ? pressed.transform === 'none' && pressed.filter !== rest.filter : pressed.transform !== rest.transform && /0\.97/.test(pressed.transform);
+        r.press = { rest, pressed, hit, ok: pressOk };
+        await page.evaluate(() => (document.getElementById('__kit').style.display = 'grid'));
+        // scope: [data-pressed] outside the UT screen and .ps-v2 is left alone; a kit piece outside
+        // both carries the tokens itself (the portal fallback), and one inside inherits a re-tint
+        r.scope = await page.evaluate(() => {
+          const out = document.createElement('div');
+          out.setAttribute('data-pressed', 'true');
+          document.body.append(out);
+          const portal = document.createElement('span');
+          portal.className = 'x ut-k-count';
+          document.body.append(portal);
+          const tint = document.createElement('div');
+          tint.style.setProperty('--ps-teal', '#123456');
+          tint.innerHTML = '<span class="ut-k-count"></span>';
+          document.getElementById('__kit').append(tint);
+          const res = {
+            outsidePressed: getComputedStyle(out).transform + ' ' + getComputedStyle(out).filter,
+            portalTeal: getComputedStyle(portal).getPropertyValue('--ps-teal').trim(),
+            retinted: getComputedStyle(tint.firstChild).getPropertyValue('--ps-teal').trim(),
+          };
+          out.remove();
+          portal.remove();
+          tint.remove();
+          return res;
+        });
+        r.scope.ok = r.scope.outsidePressed === 'none none' && r.scope.portalTeal === '#4fe3c1' && r.scope.retinted === '#123456';
+        // haptics: a touch-drag that starts on the gold bar scrolls and never buzzes; a tap buzzes once
+        // (the fixtures save haptics off, so the probe turns them on in the app's own sound.ts)
+        await page.evaluate(async () => {
+          window.__vib = [];
+          navigator.vibrate = (p) => (window.__vib.push(p), true);
+          window.__goldClicks = 0;
+          (await import('/src/lib/sound.ts')).setFeedback(false, true);
+        });
+        const gold = page.locator('#__kit .ut-k-gold');
+        await gold.scrollIntoViewIfNeeded();
+        const gb = await gold.boundingBox();
+        const cdp = await context.newCDPSession(page);
+        const gx = Math.round(gb.x + gb.width / 2),
+          gy = Math.round(gb.y + gb.height / 2);
+        const scrollBefore = await page.evaluate(() => document.getElementById('__kit').scrollTop);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: gx, y: gy }] });
+        for (let i = 1; i <= 12; i++) {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: gx, y: gy - i * 20 }] });
+          await page.waitForTimeout(16);
+        }
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForTimeout(400);
+        const drag = await page.evaluate(() => ({ vib: window.__vib.length, clicks: window.__goldClicks, scroll: document.getElementById('__kit').scrollTop }));
+        await gold.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(200);
+        const gb2 = await gold.boundingBox();
+        await page.touchscreen.tap(gb2.x + gb2.width / 2, gb2.y + gb2.height / 2);
+        await page.waitForTimeout(300);
+        const tap = await page.evaluate(() => ({ vib: window.__vib.slice(), clicks: window.__goldClicks }));
+        await cdp.detach();
+        r.haptic = { drag: { scrolled: drag.scroll - scrollBefore, vibrations: drag.vib, clicks: drag.clicks }, tap: { vibrations: tap.vib.length - drag.vib, clicks: tap.clicks - drag.clicks, pattern: tap.vib.at(-1) } };
+        r.haptic.ok = r.haptic.drag.scrolled > 0 && r.haptic.drag.vibrations === 0 && r.haptic.drag.clicks === 0 && r.haptic.tap.clicks === 1 && r.haptic.tap.vibrations === 1;
         r.pageErrors = errors.slice();
         report.runs.push({ sport, size, ...r });
         console.log(sport, size, JSON.stringify(r));
@@ -981,6 +1082,9 @@ async function kitCase(a) {
         r.mins.every(([w, hh]) => w >= 44 && hh >= 44) &&
         r.tokens.join() === '#071521,#4fe3c1,#f6b93b,#8aa3b5' &&
         r.claimed === 1 &&
+        r.press.ok &&
+        r.scope.ok &&
+        r.haptic.ok &&
         !r.pageErrors.length &&
         (a.rm ? Object.values(r.animation).every((n) => n === 'none') : r.animation.burst === 'ut-k-burst' && r.animation.ring === 'ut-k-ring'),
     );

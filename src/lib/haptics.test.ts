@@ -152,6 +152,17 @@ describe('engines without window.event: the recent-input window and user activat
     vi.useRealTimers();
     expect(vibrateSpy).toHaveBeenCalledTimes(1);
   });
+  it('a pointerup or touchend also opens the window (the click after a long press counts)', () => {
+    vi.useFakeTimers({ toFake: ['performance', 'setTimeout'] });
+    withoutEvent(() => {
+      for (const fn of fakeWindow.listeners.get('pointerdown') ?? []) fn({ type: 'pointerdown', isTrusted: true } as Event);
+      vi.advanceTimersByTime(h.GESTURE_WINDOW_MS + 500);
+      for (const t of ['pointerup', 'touchend']) for (const fn of fakeWindow.listeners.get(t) ?? []) fn({ type: t, isTrusted: true } as Event);
+      h.haptic('tick');
+    });
+    vi.useRealTimers();
+    expect(vibrateSpy).toHaveBeenCalledTimes(1);
+  });
   it('an inactive user-activation flag vetoes it', () => {
     fakeNavigator.userActivation = { isActive: false };
     withoutEvent(() => {
