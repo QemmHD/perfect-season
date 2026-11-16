@@ -2,7 +2,7 @@
 // tests. It reads who's open and throws him the ball in stride, picks the lane with room on a run,
 // uses the runner's best move against a tackler, kicks in range and punts when it must.
 import { hashString, rng } from '../../engine/rng';
-import { dist, FIELD_W, flightTime, isLine, maxThrow, moveEdge, moveWithBall, projectRoute, rt, sight, snap, step, throwTo, windupOf } from './engine';
+import { BOX_HALF, DROP_TIME, dist, FIELD_W, flightTime, isLine, maxThrow, moveEdge, moveWithBall, outsideBox, projectRoute, rt, sight, snap, step, throwAway, throwTo, windupOf } from './engine';
 import { afterPlay, fgDistance, fgInRange, type Game, kick, kickWindow, punt, startPlay } from './drive';
 import type { Body, Move, Play, Pt } from './types';
 
@@ -20,6 +20,9 @@ export interface Pilot {
   /** how the runner misjudges each lane right now (yards, by his ball-carrier vision), and when it's re-read */
   laneNoise: number[];
   laneAt: number;
+  /** nfl-2: a person in the pocket, who can only throw it away outside the tackle box (the human
+   * proxy with `pocket`); the AI keeps its old sideline throw, so its drives are unchanged */
+  legalOnly?: boolean;
 }
 
 export function pilot(skill: number, seed: string): Pilot {
@@ -101,6 +104,11 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
     const hurried = p.t - pl.felt >= 0.3 - 0.2 * pl.skill;
     const bail = hurried ? options.sort((a, b) => b.open - a.open)[0] : undefined;
     let choice = open[0] ?? (bail && bail.open >= 1.4 ? bail : undefined);
+    // a person outside the tackle box throws it away rather than force a tight one
+    if (pl.legalOnly && hurried && !open[0] && outsideBox(p) && (!choice || choice.open < 2.2) && throwAway(p)) {
+      pl.readAt = 0;
+      return null;
+    }
     // a green passer sometimes locks onto the wrong man
     if (choice && pl.rand() < (1 - pl.skill) * 0.35) choice = options[Math.floor(pl.rand() * options.length)];
     if (choice) {
@@ -115,9 +123,12 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
       throwTo(p, { x: choice.at.x + ux * along - uy * across, y: choice.at.y + uy * along + ux * across });
       pl.readAt = 0;
     } else if (hurried) {
-      // nobody's open and he's about to be hit: throw it away
-      throwTo(p, { x: p.qb.x < FIELD_W / 2 ? -3 : FIELD_W + 3, y: p.los + 6 });
-      pl.readAt = 0;
+      // nobody's open and he's about to be hit: throw it away (a person only can from outside the
+      // tackle box; inside it he keeps moving and looking)
+      if (!pl.legalOnly) {
+        throwTo(p, { x: p.qb.x < FIELD_W / 2 ? -3 : FIELD_W + 3, y: p.los + 6 });
+        pl.readAt = 0;
+      } else if (throwAway(p)) pl.readAt = 0;
     }
     return null;
   }
@@ -167,6 +178,54 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
     return best;
   }
   return null;
+}
+
+/**
+ * A person's left thumb in the pocket (Claude, nfl-2), for the calibration kit's human proxy: when
+ * a rusher has beaten his man, the thumb reacts a beat later (0.25-0.5 s) and takes the
+ * quarterback away from him: sideways out of the pocket (stepping up from an edge rusher, backing
+ * off an inside one, never up to the line), then drifting once he's clear of the tackle box. Out
+ * there, with the rush still on him or a second gone, half the time he throws it away rather than
+ * wait. On one dropback in ten he rolls out on purpose once he's set. Seeded; the AI's own
+ * quarterback never uses it (it holds his spot, so the AI's drives are unchanged).
+ */
+export function pocketThumb(seed: string) {
+  const r = rng(hashString('thumb:' + seed));
+  let play: Play | null = null;
+  let seenAt = Infinity;
+  let react = 0;
+  let side = 0;
+  let bail = 0;
+  let rollout = false;
+  return (p: Play): { steer: Pt | null; away: boolean } => {
+    if (p !== play) {
+      play = p;
+      seenAt = Infinity;
+      react = 0.25 + r() * 0.25;
+      side = 0;
+      bail = r();
+      // now and then he rolls out on purpose once he's set, to buy time and a throwing lane
+      rollout = r() < 0.1;
+      if (rollout) side = r() < 0.5 ? -1 : 1;
+    }
+    const qb = p.qb;
+    if (p.phase !== 'drop' || p.call !== 'pass' || p.carrier !== qb) return { steer: null, away: false };
+    let near: Body | null = null;
+    for (const b of p.bodies) if (b.side === 'D' && b.job === 'rush' && p.t >= b.winAt && (!near || dist(b, qb) < dist(near, qb))) near = b;
+    if (rollout && seenAt === Infinity && p.t >= DROP_TIME) seenAt = p.t - react;
+    if (!near && seenAt === Infinity) return { steer: null, away: false };
+    if (seenAt === Infinity) seenAt = p.t;
+    if (p.t - seenAt < react) return { steer: null, away: false };
+    // away from him, and once he's picked a side he keeps it (unless the sideline is there): out of
+    // the pocket and past the tackle box, then drifting while he looks
+    if (!side) side = Math.sign(qb.x - (near?.x ?? p.bx)) || (qb.x < p.bx ? -1 : 1);
+    if ((side < 0 && qb.x < 5) || (side > 0 && qb.x > FIELD_W - 5)) side = -side;
+    // an edge rusher is beaten by stepping up into the pocket; an inside one by backing off him
+    const up = near && Math.abs(near.x - qb.x) > 1.5 ? 0.45 : -0.25;
+    const clear = Math.abs(qb.x - p.bx) > BOX_HALF + 1;
+    const steer = { x: side * (clear ? 0.45 : 1), y: qb.y > p.los - 2.5 ? -0.3 : clear ? 0 : up };
+    return { steer, away: outsideBox(p) && (p.pressure > 0.4 || p.t - seenAt > 1.1) && bail < 0.5 };
+  };
 }
 
 /** Play a whole game headless. */

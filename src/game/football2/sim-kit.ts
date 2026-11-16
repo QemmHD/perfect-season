@@ -6,10 +6,10 @@
 // summarizes it as bands with their sample sizes and 95% intervals, and it adds up a game's real
 // length from the same pacing constants the screen waits out.
 import fixtures from '../../../docs/studio-overhaul/nfl-calibration/fixtures.json';
-import { chooseCall, decide, fourthDown, pilot } from './autopilot';
+import { chooseCall, decide, fourthDown, pilot, pocketThumb } from './autopilot';
 import { afterPlay, DRIVES, fgDistance, kick, newGame, punt, startPlay } from './drive';
 import { CarryGate } from './controls';
-import { snap, step } from './engine';
+import { snap, step, throwAway } from './engine';
 import * as pacing from './pacing';
 import { REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED } from '../replay';
 import { depth } from './squad';
@@ -79,6 +79,8 @@ export interface PilotMode {
   defIQ: number;
   stickDelay?: number;
   neverStick?: boolean;
+  /** nfl-2: the human proxy moves in the pocket with his thumb and throws it away outside the box (autopilot pocketThumb) */
+  pocket?: boolean;
 }
 
 /** The shipped levels: the AI's skill and the defense's difficulty (Arcade AI_SKILL, difficulty DEFENSE_LEVEL). */
@@ -196,8 +198,10 @@ function humanStick(mode: PilotMode) {
 export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc, drives = DRIVES): GameResult {
   const g = newGame(teams.off, teams.def, 'cal:' + seed, drives, mode.defIQ);
   const pl = pilot(mode.skill, 'cal-p:' + seed);
+  if (mode.pocket) pl.legalOnly = true;
   const human = mode.kind === 'human';
   const withStick = human && (mode.stickDelay !== undefined || !!mode.neverStick);
+  let thumbs: ReturnType<typeof pocketThumb> | null = null;
   const c = acc?.c ?? {};
   const add = (k: string, n = 1) => (c[k] = (c[k] ?? 0) + n);
   const plays: PlayRec[] = [];
@@ -251,13 +255,20 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
     snap(p);
     pl.readAt = human ? 1.5 + pl.rand() * 1.4 : 0;
     const stick = withStick ? humanStick(mode) : null;
+    const thumb = human && mode.pocket ? (thumbs ??= pocketThumb('cal-t:' + seed)) : null;
     let thrown = false;
     let trucks = 0;
     let moment = false;
     for (let k = 0; k < 1500 && !p.end; k++) {
-      const lane = decide(p, g, pl);
+      let lane: RunInput = decide(p, g, pl);
+      if (thumb && p.phase === 'drop') {
+        const th = thumb(p);
+        if (th.away) throwAway(p);
+        else lane = th.steer;
+      }
       step(p, DT, stick ? stick(p, lane) : lane);
       for (const e of p.events) {
+        if (e === 'throwaway') add('throwaway');
         if (e === 'throw' || e === 'throw-pressure') {
           thrown = true;
           add('att');
