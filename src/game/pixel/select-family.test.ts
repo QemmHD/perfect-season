@@ -63,13 +63,23 @@ describe('the family fallback for unknown acts', () => {
 
 describe('the stand-in reaches the drawing', () => {
   it('NBA: an unknown act on a moving body draws a stride, standing it draws the set pose', async () => {
-    const { animOf } = await import('./select-nba');
     const body = (act: string, vx: number) => ({ p: { ht: 78, wt: 215, id: 'p1', num: 1, ddk: 60, vrt: 60, str: 60, spd: 80 }, act, actAt: 0, vx, vz: 0, h: 0, idx: 0, face: 0 }) as never;
     const look = { sport: 'nba', ht: 78, wt: 215 } as never;
     const memo = () => ({ gait: { t: 0, frac: 0 }, last: null });
-    // clips aren't loaded in this test, so the hand-keyed poses answer: 'rn' a stride, 'id' idle
-    expect(animOf(body('zzz', 12), 1, false, look, memo(), null).key.slice(0, 2)).toBe('rn');
-    expect(animOf(body('zzz', 0), 1, false, look, memo(), null).key.slice(0, 2)).toBe('id');
-    expect(animOf(body('board', 0), 0.3, false, look, memo(), null).key.slice(0, 2)).toBe('co');
+    // before the clips arrive the hand-keyed poses answer: 'rn' a stride, 'id' idle. select-nba.ts
+    // starts loading them as it is evaluated (players-3), so a fresh copy with that load held back
+    vi.resetModules();
+    vi.doMock('./ready', () => ({ preloadPixels: () => undefined }));
+    const held = await import('./select-nba');
+    expect(held.animOf(body('zzz', 12), 1, false, look, memo(), null).key.slice(0, 2)).toBe('rn');
+    expect(held.animOf(body('zzz', 0), 1, false, look, memo(), null).key.slice(0, 2)).toBe('id');
+    expect(held.animOf(body('board', 0), 0.3, false, look, memo(), null).key.slice(0, 2)).toBe('co');
+    vi.doUnmock('./ready');
+    vi.resetModules();
+    // and once they're in, the recorded strides
+    const { animOf } = await import('./select-nba');
+    await (await import('./ready')).pixelReady('nba');
+    expect(['jog', 'run', 'sprint']).toContain(animOf(body('zzz', 12), 1, false, look, memo(), null).clip);
+    expect(['jog', 'run', 'sprint']).not.toContain(animOf(body('zzz', 0), 1, false, look, memo(), null).clip);
   });
 });

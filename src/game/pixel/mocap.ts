@@ -6,14 +6,15 @@
 // and uses that player's own bone lengths (shapeOf), so a 6'1" guard and a 7'0" center shoot the
 // same recorded jump shot each with his own limbs, feet on the floor.
 //
-// Clips load lazily (each is its own small file); the index (durations, events, root motion) is
+// Clips load lazily: each sport's in one bundle (`preloadClips`, started by ready.ts as the game
+// chunk loads), any other clip from its own small file. The index (durations, events, root motion) is
 // here up front, so a game can plan with the metadata before the frames arrive. Every clip faces
 // +x (the body's forward, the way the game's `facing` points); clips ending in _l / _m are the
 // left-right mirrors of their twins, made at load.
 //
 // The jump shot, released exactly when the game says (T seconds after the shot starts):
 //
-//   await loadClips(['jumpshot', 'fall_back'])                      // once, before tip-off
+//   await preloadClips('nba')                                        // once, before tip-off
 //   const clipT = warp(clipMeta('jumpshot'), { release: T })(since) // since = now - shot start
 //   const f = frameAt('jumpshot', clipT)                            // a whole frame (cacheable)
 //   const key = id + '|' + mocapKey('jumpshot', f, 'pin') + '|' + facing16 + '|' + px
@@ -31,6 +32,7 @@
 import INDEX from '../../data/mocap/index.json';
 import { type Look, shapeFor } from './body';
 import type { Joints, Shape, V3 } from './rig';
+import type { SportId } from '../../engine/sport';
 
 /** A human's hip-to-ankle length as a share of his height: the clips measure in leg lengths. */
 export const LEG_PER_HEIGHT = 0.48;
@@ -84,7 +86,8 @@ export interface ClipMeta {
   mirrorOf?: string;
 }
 
-interface ClipFile {
+/** A clip as stored in src/data/mocap (and bundled by clips-<sport>.ts). */
+export interface ClipFile {
   name: string;
   src: string;
   bones: string[];
@@ -126,9 +129,59 @@ export function clipMeta(name: string): ClipMeta {
   return m;
 }
 
-const FILES = import.meta.glob<{ default: ClipFile }>(['../../data/mocap/*.json', '!../../data/mocap/index.json']);
+/**
+ * The clips each sport plays, bundled per sport (src/data/mocap/clips-<sport>.ts) so a match gets
+ * them in one or two requests before its first frame (ready.ts) rather than one file each. The
+ * bundles' import lists and the glob's exclusions below must name the same clips
+ * (readiness.test.ts).
+ */
+export const BUNDLED: Record<SportId, readonly string[]> = {
+  nba: ['backpedal', 'celebrate', 'fall_back', 'getup', 'jog', 'jumpshot', 'layup', 'ready', 'run', 'shuffle', 'slip', 'sprint', 'stumble'],
+  nfl: ['backpedal', 'block', 'catch', 'catch_run', 'celebrate', 'dive', 'fall_back', 'fall_forward', 'jog', 'kick', 'ready', 'run', 'shuffle', 'sprint', 'throw'],
+  soccer: ['backpedal', 'catch', 'celebrate', 'dive', 'fall_back', 'fall_forward', 'jog', 'jump', 'kick', 'ready', 'run', 'shuffle', 'sprint'],
+};
+const BUNDLES: Record<SportId, (() => Promise<{ default: Record<string, ClipFile> }>) | null> = {
+  nba: () => import('../../data/mocap/clips-nba'),
+  nfl: () => import('../../data/mocap/clips-nfl'),
+  // the single-file artifact build plays NBA and NFL only
+  soccer: __SOCCER__ ? () => import('../../data/mocap/clips-soccer') : null,
+};
+/** Every clip no sport bundles yet (the galleries' and the next tasks' clips): one file each. A clip in
+ * a bundle stays out of this glob, or the build would split it into a file of its own again. */
+const FILES = import.meta.glob<{ default: ClipFile }>([
+  '../../data/mocap/*.json',
+  '!../../data/mocap/index.json',
+  '!../../data/mocap/{backpedal,block,catch,catch_run,celebrate,dive,fall_back,fall_forward,getup,jog,jump,jumpshot,kick,layup,ready,run,shuffle,slip,sprint,stumble,throw}.json',
+]);
+/** The clips loose in their own files (for the bundle test). */
+export const LOOSE_CLIPS: readonly string[] = Object.keys(FILES).map((k) => k.replace(/^.*\/|\.json$/g, ''));
 const loaded = new Map<string, Clip>();
 const loading = new Map<string, Promise<Clip>>();
+const bundles = new Map<SportId, Promise<string[]>>();
+
+/** A clip and its mirrored twin, if it has one. */
+const withMirror = (base: string) => [base, ...(META[base]?.mirror ? [META[base].mirror!] : [])];
+
+/** Every clip name a sport's bundle provides (mirrors included). */
+export function clipsFor(sport: SportId): string[] {
+  return BUNDLED[sport].flatMap(withMirror);
+}
+
+/** Load a sport's clip bundle (once): resolves with the names now playable. */
+export function preloadClips(sport: SportId): Promise<string[]> {
+  let p = bundles.get(sport);
+  if (!p) {
+    const load = BUNDLES[sport];
+    p = (load ? load() : Promise.reject(new Error('no clip bundle for ' + sport))).then((mod) => {
+      for (const [base, f] of Object.entries(mod.default))
+        for (const name of withMirror(base)) if (!loaded.has(name)) loaded.set(name, decode(name, META[name], f, name !== base));
+      return clipsFor(sport);
+    });
+    p.catch(() => bundles.delete(sport));
+    bundles.set(sport, p);
+  }
+  return p;
+}
 
 function decode(name: string, meta: ClipMeta, f: ClipFile, mirror: boolean): Clip {
   const bin = atob(f.data);
@@ -188,6 +241,8 @@ export function loadClip(name: string): Promise<Clip> {
   if (!p) {
     const meta = clipMeta(name);
     const base = meta.mirrorOf ?? name;
+    const sport = (Object.keys(BUNDLED) as SportId[]).find((sp) => BUNDLES[sp] && BUNDLED[sp].includes(base));
+    if (sport) return preloadClips(sport).then(() => loaded.get(name)!);
     const file = FILES['../../data/mocap/' + base + '.json'];
     if (!file) return Promise.reject(new Error('no mocap file for ' + name));
     p = file().then((mod) => {

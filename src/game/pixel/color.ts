@@ -80,6 +80,12 @@ function fromHsl(h: number, s: number, l: number): RGB {
   return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
 }
 
+/** The same colour with its HSL saturation multiplied by `k` (capped at full saturation). */
+export function saturate(c: RGB, k: number): RGB {
+  const [h, s, l] = toHsl(c.map(clamp255) as RGB);
+  return fromHsl(h, Math.min(1, s * k), l);
+}
+
 const same = (a: RGB, b: RGB) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 
 /**

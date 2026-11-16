@@ -3,6 +3,7 @@
 // it), shaded in three tones from a light above and in front, then outlined. The grid is drawn
 // scaled up with smoothing off, so every pixel stays crisp. Uniform colors, number, hair and size
 // all come from the look, so any player can wear any team's home or away set.
+import type { Appearance } from './appearance';
 import { luma, OUTLINE, type RGB, mix, onColor, ramp3, rgb } from './color';
 import { headRadiusPx, LIMB_SCALE, padsWidthPx, torsoWidthPx } from './proportions';
 import { ball, type Buf, buffer, capsule } from './raster';
@@ -35,6 +36,10 @@ export interface Look {
   sleeves?: 'short' | 'long';
   /** soccer: a keeper's gloves */
   gloves?: string;
+  /** the appearance record this look was made from (looks.ts), for drawing its full detail */
+  app?: Appearance;
+  /** a cosmetic ground-ring colour (Ultimate Team rewards), for the ground mark */
+  ring?: string;
 }
 
 // palette slots

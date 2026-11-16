@@ -5,14 +5,15 @@
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-nba.ts.
 import { drawBody, type Look, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
-import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
+import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
+import { drawGate } from '../pixel/ready';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
-import { AT_RIM, type Anim, animOf, CLIPS, dribbleArm, hangOf, lookFor, type Memo, spins360 } from '../pixel/select-nba';
+import { AT_RIM, type Anim, animOf, dribbleArm, hangOf, lookFor, type Memo, spins360 } from '../pixel/select-nba';
 import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import { type Juice, squashStretch } from '../juice';
 import { ballPos, contestOf, RIM, RIM_H, shotChance, topSpeed } from './engine';
@@ -87,11 +88,7 @@ export class HoopsRenderer {
   constructor(
     private theme: CourtTheme,
     private kits: [Kit, Kit]
-  ) {
-    loadClips(CLIPS).catch(() => {
-      // the hand-keyed poses carry on
-    });
-  }
+  ) {}
 
   /** Game pixels are screen pixels: fine pixel art, crisp on any phone. */
   resize(cssW: number, cssH: number) {
@@ -359,6 +356,8 @@ export class HoopsRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, p: Possession, real: number, fx: Fx) {
+    // the first frame waits for the clips and looks (players-3, pixel/ready.ts)
+    if (!drawGate('nba')) return;
     ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     this.budget = 4;
     ctx.imageSmoothingEnabled = false;

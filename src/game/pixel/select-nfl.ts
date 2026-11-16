@@ -5,12 +5,17 @@
 import { DEFAULT_HAIR, DEFAULT_SKIN, type Look } from './body';
 import { clipMeta, getClip, type Ground, legScale, warp } from './mocap';
 import * as P from './poses';
+import { preloadPixels } from './ready';
 import type { Joints, Pose } from './rig';
 import { NFL_STANDINS, standIn } from './select-family';
 import { heaviness } from './style';
 import { isLine, speedOf } from '../football2/engine';
 import type { Act, Body, Play } from '../football2/types';
 import type { FbKit } from '../football2/render';
+
+// this page's clips and looks start loading now, as the game chunk is evaluated, long before the first
+// frame (players-3, ready.ts)
+preloadPixels('nfl');
 
 export function lookFor(b: Body, kit: FbKit): Look {
   const big = isLine(b) || b.p.pos === 'DT' || b.p.pos === 'DE';
@@ -116,7 +121,8 @@ export function poseOf(b: Body, t: number, p: Play): { key: string; pose: Pose }
   }
 }
 
-/** The motion-capture clips the field uses (mocap.ts). They load with the renderer; until they're in,
+/** The motion-capture clips the field uses (mocap.ts). They arrive in the NFL bundle before the first frame
+ * (ready.ts); if they never do,
  * the hand-keyed poses stand in (and keep the stances, the backpedal and the moves with the ball). */
 export const CLIPS = ['ready', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'block', 'throw', 'catch', 'catch_run', 'dive', 'fall_back', 'fall_back_m', 'fall_forward', 'fall_forward_m', 'kick', 'celebrate'];
 

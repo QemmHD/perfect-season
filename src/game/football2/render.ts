@@ -5,13 +5,14 @@
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-nfl.ts.
 import { drawBody, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { drawField, type FieldCam, fieldAt, fieldCam, fieldFacing, type FieldTheme } from '../pixel/field';
-import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
+import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
+import { drawGate } from '../pixel/ready';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import type { Look } from '../pixel/body';
-import { animOf, ballArm, CLIPS, lookFor, type Memo } from '../pixel/select-nfl';
+import { animOf, ballArm, lookFor, type Memo } from '../pixel/select-nfl';
 import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, throwErrorRadius, windupOf } from './engine';
 import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import type { Juice } from '../juice';
@@ -114,11 +115,7 @@ export class FootballRenderer {
   constructor(
     private theme: FieldTheme,
     private kits: [FbKit, FbKit]
-  ) {
-    loadClips(CLIPS).catch(() => {
-      // the hand-keyed poses carry on
-    });
-  }
+  ) {}
 
   /** Game pixels are screen pixels (crisp on any phone); upright gets the perspective camera. */
   resize(cssW: number, cssH: number) {
@@ -417,6 +414,8 @@ export class FootballRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, p: Play, ballOn: number, o: FbOverlay) {
+    // the first frame waits for the clips and looks (players-3, pixel/ready.ts)
+    if (!drawGate('nfl')) return;
     ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     ctx.imageSmoothingEnabled = false;
     this.aiming = !!o.aim;

@@ -10,13 +10,14 @@
 // that tightens as the meter nears the green, and the release read-out (PERFECT / GOOD / EARLY / LATE).
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-soccer.ts.
 import { drawBody, freeCanvas, type Look, SpriteCache, CanvasOut } from '../pixel/body';
-import { frameAt, loadClips, mocapJoints, mocapKey } from '../pixel/mocap';
+import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
+import { drawGate } from '../pixel/ready';
 import { drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { pitchTexture, type PitchTheme } from '../pixel/pitch';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
-import { animOf, CLIPS, heightM, lookFor, type Memo } from '../pixel/select-soccer';
+import { animOf, heightM, lookFor, type Memo } from '../pixel/select-soccer';
 import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
 import { shotCone, topSpeed } from './ratings';
 import type { Attack, Body, Pt } from './types';
@@ -74,11 +75,7 @@ export class SoccerRenderer {
   constructor(
     private theme: PitchTheme,
     private kits: { us: SoccerKit; them: SoccerKit; usGk: SoccerKit; themGk: SoccerKit },
-  ) {
-    loadClips(CLIPS).catch(() => {
-      // the hand-keyed poses carry on
-    });
-  }
+  ) {}
 
   dispose() {
     this.sprites.dispose();
@@ -581,6 +578,8 @@ export class SoccerRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, a: Attack, o: SoccerOverlay, kitOf: (b: Body) => 'us' | 'them') {
+    // the first frame waits for the clips and looks (players-3, pixel/ready.ts)
+    if (!drawGate('soccer')) return;
     ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     ctx.imageSmoothingEnabled = false;
     // a corner pulls out wide enough for the taker and the whole box; a replay pushes in

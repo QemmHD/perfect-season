@@ -5,10 +5,15 @@
 import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, hairFor, type Look } from './body';
 import { clipMeta, getClip, legScale, warp } from './mocap';
 import * as P from './poses';
+import { preloadPixels } from './ready';
 import type { Pose } from './rig';
 import { SOCCER_STANDINS, standIn } from './select-family';
 import type { Act, Body } from '../soccer2/types';
 import type { SoccerKit } from '../soccer2/render';
+
+// this page's clips and looks start loading now, as the game chunk is evaluated, long before the first
+// frame (players-3, ready.ts)
+preloadPixels('soccer');
 
 export const CLIPS = ['ready', 'jog', 'run', 'sprint', 'kick', 'dive', 'fall_forward', 'fall_forward_m', 'fall_back', 'catch', 'jump', 'celebrate', 'shuffle', 'shuffle_l', 'backpedal'];
 /** the kick: the boot through the ball when the engine strikes it (0.11 s after the swing starts) */

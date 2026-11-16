@@ -6,12 +6,17 @@
 import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, hairFor, type Look } from './body';
 import { clipMeta, getClip, type Ground, legScale, warp } from './mocap';
 import * as P from './poses';
+import { preloadPixels } from './ready';
 import type { Joints, Pose } from './rig';
 import { NBA_STANDINS, standIn } from './select-family';
 import { heaviness } from './style';
 import { JUMPER_TOP, RIM_H } from '../hoops2/engine';
 import type { Act, Body, Possession } from '../hoops2/types';
 import type { Kit } from '../hoops2/render';
+
+// this page's clips and looks start loading now, as the game chunk is evaluated, long before the first
+// frame (players-3, ready.ts)
+preloadPixels('nba');
 
 /**
  * The dunk he throws down, by his ratings (2K-style animation tiers): through contact, a posterizer;
@@ -48,7 +53,8 @@ export function lookFor(b: Body, kit: Kit): Look {
   };
 }
 
-/** The motion-capture clips the court uses (mocap.ts). They load with the renderer; until they're in,
+/** The motion-capture clips the court uses (mocap.ts). They arrive in the NBA bundle before the first frame
+ * (ready.ts); if they never do,
  * the hand-keyed poses below stand in. */
 export const CLIPS = ['jumpshot', 'layup', 'ready', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'celebrate', 'stumble', 'stumble_m', 'fall_back', 'fall_back_m', 'slip', 'slip_m', 'getup'];
 

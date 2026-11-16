@@ -404,12 +404,15 @@ const curated = (a) => !!a && a.src === 'curated';
 const OWNER = {
   nba: [
     ["Shaquille O'Neal", 'shaved head', ({ a }) => curated(a) && a.hair === 'bald'],
-    ['Allen Iverson', 'cornrows and a headband', ({ a }) => curated(a) && a.hair === 'cornrows' && a.head === 'band'],
-    ['Kareem Abdul-Jabbar', 'goggles', ({ a }) => curated(a) && a.eyes === 'goggles'],
+    // looks change across a career (the record's eras): judged on the card seasons the look belongs to,
+    // since his best card can predate it (Iverson's cornrows from 2000, Kareem's goggles from 1975)
+    ['Allen Iverson', 'cornrows and a headband', ({ all }) => Object.values(all).some((x) => curated(x) && x.hair === 'cornrows' && x.head === 'band')],
+    ['Kareem Abdul-Jabbar', 'goggles', ({ all }) => Object.values(all).some((x) => curated(x) && x.eyes === 'goggles')],
     // dyed by season: some season of his 1994-98 cards (the Spurs and Bulls years) in a V2 dyed tone
     ['Dennis Rodman', 'dyed hair (1994-98)', ({ all }) => Object.entries(all).some(([se, x]) => +String(se).slice(0, 4) >= 1994 && +String(se).slice(0, 4) <= 1998 && curated(x) && DYED.includes(x.hairTone))],
   ],
-  nfl: [['Tom Brady', 'a curated Tier A row, reviewed', ({ a, row }) => curated(a) && !!row && row.reviewed === true]],
+  // players-3's rows record who reviewed them and when (a non-empty `reviewed` note)
+  nfl: [['Tom Brady', 'a curated Tier A row, reviewed', ({ a, row }) => curated(a) && !!row && typeof row.reviewed === 'string' && row.reviewed.length > 0]],
   soccer: [
     ['Erling Haaland', 'long blond hair', ({ a }) => curated(a) && a.hairTone === 'blond' && LONG.includes(a.hair)],
     ['Kylian Mbappé', 'short, clean-shaven', ({ a }) => curated(a) && SHORT.includes(a.hair) && a.facial === 'none'],

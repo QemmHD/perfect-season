@@ -143,3 +143,13 @@ built from:
 
 All overall ratings and face stats are our own model and estimates. They are not taken from or
 fitted to any video game. Club colors are plain identity colors; no crests, kits or photos are used.
+
+## Player appearance (studio overhaul, players-3)
+
+- **Skin tones:** the 10-tone Monk Skin Tone Scale by Dr. Ellis Monk and Google, licensed CC BY 4.0
+  (skintone.google). `src/game/pixel/appearance.ts` uses its base hexes, 12% more saturated in game.
+- **Preferred foot (soccer):** the `foot` column of `players.csv` from transfermarkt-datasets (CC0), read
+  by `scripts/build_appearance.ts --soccer-feet`.
+- **Curated looks** cite public Wikimedia Commons photos (through each player's Wikidata image) only as
+  the reference a skin tone was picked from; no photo is copied into the game or the repository
+  (they are fetched into the git-ignored `.cache/` for review).

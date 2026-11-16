@@ -59,8 +59,9 @@ function readinessHooks() {
   }
 }
 
-// dev: /src/data/mocap/run.json?import ; production: /assets/run-<hash>.js (clip names as in mocap.ts)
-const CLIP = /\/data\/mocap\/(?!index)[\w-]+\.json|\/assets\/(?:ready|jog|run|sprint|walk|jumpshot|layup|throw|catch|catch_run|dive|block|kick|backpedal|shuffle|celebrate|fall_back|fall_forward|stumble|slip|getup|getup_front|dribble|crossover|cut|stiff_arm|jump)-[\w-]{6,}\.js$/;
+// dev: /src/data/mocap/run.json?import ; production: /assets/run-<hash>.js (clip names as in mocap.ts) or,
+// from players-3, the per-sport bundle /assets/clips-<sport>-<hash>.js
+const CLIP = /\/data\/mocap\/(?!index)[\w-]+\.json|\/assets\/clips-(?:nba|nfl|soccer)-[\w-]{6,}\.js$|\/assets\/(?:ready|jog|run|sprint|walk|jumpshot|layup|throw|catch|catch_run|dive|block|kick|backpedal|shuffle|celebrate|fall_back|fall_forward|stumble|slip|getup|getup_front|dribble|crossover|cut|stiff_arm|jump)-[\w-]{6,}\.js$/;
 const LOOKS = /\/data\/appearance\/|\/assets\/(?:appearance|looks)[\w-]*\.(?:js|json)$/;
 const GAME = /(Hoops2|Football2|Soccer2|SoccerLab|Lab|render|arcade)[\w.-]*\.(?:tsx?|js)(\?|$)/;
 
