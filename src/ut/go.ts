@@ -22,8 +22,11 @@ export interface GoTarget {
   odds?: true;
 }
 
-/** Where a counter moves. `ut` decides "open the packs you have" against "the Store". */
-export function goForCounter(counter: Counter | 'collect', sport: UtSport, ut?: UtState): GoTarget {
+/**
+ * Where a counter moves. `ut` decides "open the packs you have" against "the Store". Null when no
+ * screen of this sport moves it (soccer's Moments: see `goNote`), never a GO to a screen that can't.
+ */
+export function goForCounter(counter: Counter | 'collect', sport: UtSport, ut?: UtState): GoTarget | null {
   switch (counter) {
     case 'games':
     case 'wins':
@@ -36,8 +39,9 @@ export function goForCounter(counter: Counter | 'collect', sport: UtSport, ut?: 
     case 'sbcs':
       return { view: 'sbc', label: 'SBC' };
     case 'moments':
-      // soccer has no Moments: its Moments objective can't move, so lead to a match instead
-      return sport === 'soccer' ? { view: 'battles', label: 'PLAY' } : { view: 'moments', label: 'PLAY' };
+      // soccer has no Moments, and only claiming a Moment (moments.ts claimMoment) moves this counter:
+      // a GO anywhere would be a disguised dead end (audit H5), so soccer gets a note instead (goNote)
+      return sport === 'soccer' ? null : { view: 'moments', label: 'PLAY' };
     case 'development':
       return { view: 'development', label: 'TRAIN' };
     case 'collect':
@@ -49,6 +53,15 @@ export function goForCounter(counter: Counter | 'collect', sport: UtSport, ut?: 
 export function goForObjective(o: Objective, sport: UtSport, ut?: UtState): GoTarget | null {
   if (o.claimed || o.progress >= o.target) return null;
   return goForCounter(o.counter, sport, ut);
+}
+
+/**
+ * A short, non-tappable note for an unfinished objective no screen of this sport can move (shown where
+ * the GO would be, instead of a claim button). Display only: the objective's id and reward stay.
+ */
+export function goNote(o: Objective, sport: UtSport): string | null {
+  if (o.claimed || o.progress >= o.target) return null;
+  return o.counter === 'moments' && sport === 'soccer' ? 'Moments are in NBA and NFL' : null;
 }
 
 /** The ways a missing card can be earned, best first (the ethics rule above). */

@@ -131,7 +131,7 @@ All browser numbers: `scripts/qa/ut-studio.mjs` against the dev server on port 5
 
 **Stamps** `src/ut/stamps.ts`: `ensureStudio(ut, day)` writes `studio:since:<ET day>` and `pid:<12 base36>` (from `crypto.getRandomValues`) into `hq.claims` once; `studioSince` (the earliest, if two phones race) and `playerKey`. `UltimateTeam.tsx` calls it on the first UT open of this build.
 
-**GO targets** `src/ut/go.ts`: `GoTarget = { view, label, odds? }`; `goForCounter` (games/wins/points → Squad Battles PLAY; online wins → Rivals; packs → OPEN your packs, else the Store with odds; SBCs → SBC; Moments → Moments, in soccer a match instead; development → TRAIN; collect → the cards route); `goForObjective` (null once complete or claimed); `goForCards` with **the ethics rule** (SBC, then Scout Market, then a pick, the Store last and flagged `odds`); `openUtAt(view, open)` for the main app.
+**GO targets** `src/ut/go.ts`: `GoTarget = { view, label, odds? }`; `goForCounter` (games/wins/points → Squad Battles PLAY; online wins → Rivals; packs → OPEN your packs, else the Store with odds; SBCs → SBC; Moments → Moments, in soccer no GO but a note (ut-1 review fix); development → TRAIN; collect → the cards route); `goForObjective` (null once complete or claimed); `goForCards` with **the ethics rule** (SBC, then Scout Market, then a pick, the Store last and flagged `odds`); `openUtAt(view, open)` for the main app.
 
 **GO chips on Objectives and Daily** (`Clubhouse.tsx` ObjectivesView, `DailyHubView.tsx`, new `GoLink.tsx` + `progress-go.css`): every unfinished objective's dead "IN PROGRESS" chip is now the kit's `GoChip` leading where it moves; a Store route says "ODDS SHOWN" under the chip. Daily's unfinished rows get the same chip next to their count, and the all-three bonus leads to the first objective still open. Objectives opens on the first group that holds a ready reward, and "1 REWARD READY" is singular.
 
@@ -169,6 +169,37 @@ None. Nothing here touches match physics, ratings, pairing or settlement; the ob
 ### Owner device checks (ut-1)
 
 - GO chips on Objectives and Daily under the thumb at 375 and 320 widths; the "ODDS SHOWN" line reads at arm's length.
+
+### ut-1 review fixes (independent review of `8033a4b..c2297d3`)
+
+Fixed on HEAD `42e2ad2` (after ut-2). Every finding was reproduced first.
+
+- **Medium, fixed: the One-More bar said "Done for today" with rewards waiting.** `oneMore` went calm whenever the day's goals were met. The reviewer's two cases were (1) all three dailies ready but unclaimed, then a Squad Battles win, which gave `done:after:battles` with `claim.count` 2; and (2) the paid cap reached with the Daily Drop and calendar waiting, then a one-point loss, which gave "Done for today · Lost by 1 point". The bar now goes calm only when the day's goals are met **and** nothing waits: no claimable row, Minutes rung, other sport's rewards, starter pack, unopened pack or pick (`calmNow`). The plain branch uses the same rule. The fuzz test now gives each of the 400 clubs a random `after` (mode, score, loss streak, FLAWLESS, rung, difficulty, run) and random Minutes, Daily Drop and starter states. It checks both surfaces and asserts `!done` and no "Done for today" line whenever anything waits. It also asserts that both surfaces still go calm when nothing waits (more than 10 each), so the property is not vacuous.
+- **Medium, fixed: a rung pack already paid this week was shown as a stake.** New `rungPays(battles, rung, level, paidLeft)` follows play.ts exactly. A win on rung `cleared` climbs and pays, `Battles.tsx` shows the pack only from `cleared` up, a capped match pays no pack, and another difficulty starts its ladder at rung 1. `NextCtx` gains `battles: { cleared, level }` (this week's, from `battlesNow`, which now also returns `cleared`). The recent match, every One-More rung line (easier, harder, next) and the near-miss chip all go through `rungPays`. A win on the top rung now offers rung 1 of the refreshed ladder (play.ts `refreshed`), not "Legend rung 8 of 8 · 1 win to Premium Pack". The `after` context is documented as taking the save **as settled by that match**; the rule gives the same answer on the pre-settlement save, except across a ladder refresh. Results: an old save with `cleared = 8` gives "Pro rung 8 of 8" with no stake; replaying a cleared rung gives no pack line; the 8 paid games played give no pack.
+- **Medium, fixed: soccer's "Big-moment player" GO opened Squad Battles.** Only claiming a Moment moves that counter, and soccer has none. `goForCounter('moments', 'soccer')` and so `goForObjective` now return `null`. The new `goNote(o, sport)` draws a quiet note in the GO's place, "Moments are in NBA and NFL" (`.hq-objective-note`, 11 px, `--ps-dim`), never the claim button. Display only: the objective's id `lifetime:moments-4` and its Premium Pack + 300 SP are unchanged. NBA and NFL keep the Moments PLAY chip.
+- **Medium, fixed: the 2 ms speed test was flaky under load.** The expensive parts are now memoised by array identity, with a length check that also catches a test's in-place `push`: the receipts `Set` (`claimSetOf`), the collected-card count (`collectedCount`) and `poolSig`'s two bags. The app replaces these arrays and never mutates them (grep: no `owned`/`claims`/`collected` push, splice or sort in app code). Measured in vite-node under load average 7-9 on the reviewer's shape (3,000 owned with realistic ids, 2,600 discovered, 6,200 hq receipts, 365 banked days, 52 weeks), median of 101 runs:
+
+  | | before | after |
+  |---|---|---|
+  | `objectiveDeck` | 1.40 ms (p90 2.71) | 0.29 ms (p90 0.36) |
+  | `poolSig` | 0.34 ms | 0.03 ms |
+  | `utClaimables` | 1.52 ms (p90 2.32) | 0.30 ms (p90 0.42) |
+  | `nextCtxOf + nextUp` | 1.51 ms (p90 2.77) | 0.42 ms (p90 0.61) |
+  | `nearMisses` | 1.13 ms | 0.35 ms |
+
+  The suite's speed test now builds that realistic club, reads the 10th percentile of 41 runs (the cost of the work, not of a neighbour's build), and also bounds `nearMisses` at 2 ms. In vitest it reads 0.38 / 0.32 / 0.27 ms. I did not add the optional per-`(hq, day)` deck cache: hq is mutated in place by tests, and the past-day walk costs about 0.25 ms now.
+- **Low, fixed: the daily-bonus stake was hard-coded twice and the two disagreed** ("100 coins + Silver Pack" against "100 coins"). `DAILY_BONUS_REWARD` and `DAILY_BONUS_LINE` in next-action.ts are pinned to `daily-hub.ts DAILY_BONUS` in `claimables-reimpl.test.ts`, and both the strip line and the chip are built from them. The Daily hub's bonus row also builds its pack name from `DAILY_BONUS`.
+- **Low, fixed: the Season Pass near-miss chip led to the Season Pass screen,** where no SP can be earned. It now leads to Squad Battles (PLAY), where SP is earned.
+- **Low, fixed: single-reward wording.** "Daily Drop · day 1 to claim" now reads "Daily Drop · day 1 · ready", and the same goes for "Collection reward · ready".
+- **Low, fixed: the Daily bonus row showed a CLAIM that could not be pressed** when all three objectives were done but some were still unclaimed. It now shows a `CLAIM ABOVE` GO chip (the kit's chip, 32 px with a 44 px hit area). The chip scrolls to the first ready objective's CLAIM and focuses it, with no smooth scroll under reduced motion. Once all three are claimed, the real CLAIM appears.
+- **Browser** (the existing team dev server on 5212, isolated phone from `ut-studio.mjs`: touch, iPhone insets, local relay, 0 non-local sockets of 36): soccer and NBA × 393×852 and 320×568.
+  - Soccer's Moments row shows the note (123×24 px at 320, 11 px text), no GO and no claim button, with no overflow. NBA's shows PLAY.
+  - With all three dailies done and none claimed, the bonus row shows CLAIM ABOVE. A tap scrolls to the first ready CLAIM and focuses it, at top 288 of 568 and 473 of 852. After the three claims the row shows CLAIM.
+  - 0 page errors. Screenshots and the script: `O/shots/ut/ut-1/review-fix/`.
+- **Tests added:** next-action: the two review cases; rung pays only on the first clear (replay, `cleared = 8`, last week's ladder); the top Legend rung FLAWLESS case; no pack at the paid cap; the settled save reads the same; the extended fuzz; memo follows replaced arrays and an in-place push; near-miss bonus stake and Season Pass GO; no rung chip once paid or capped. claimables-reimpl: the bonus pin. progress-core: soccer Moments has no GO and has the note, with id and reward unchanged, and the counter loop expects `null` for soccer Moments.
+- **Results:** `npm run typecheck` clean. NBA `vitest run src/ut src/ui src/engine/sport-branches`: 40 files, 464 passed (11 skipped). NFL `next-action claimables progress-core objectives inbox overhaul`: 8 files, 162 passed. Soccer `vitest run soccer sport-branches`: 12 files, 277 passed.
+- **Protocol bump needed: none.** These changes are presentation and the light read-side only; settlement, rewards and ids are unchanged.
+- **Owner device check:** CLAIM ABOVE scrolls smoothly to the first CLAIM, and the soccer Moments note reads at arm's length.
 
 ---
 

@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { SPORT } from '../engine/sport';
 import { utClaimables } from './claimables';
-import { goForCards, goForCounter, goForObjective, openUtAt } from './go';
+import { goForCards, goForCounter, goForObjective, goNote, openUtAt } from './go';
 import { COUNTERS, freshHQ, normalizeHQ } from './hq-state';
 import { viewInfo } from './nav';
 import { objectiveDeck } from './objectives';
@@ -67,6 +67,13 @@ describe('GO targets (' + SPORT + ')', () => {
     const hidden = SPORT === 'soccer' ? ['league', 'events', 'moments'] : [];
     for (const c of [...COUNTERS, 'collect' as const]) {
       const g = goForCounter(c, SPORT);
+      // soccer has no Moments, and nothing else moves that counter: no GO at all (goNote says why)
+      if (SPORT === 'soccer' && c === 'moments') {
+        expect(g).toBeNull();
+        continue;
+      }
+      expect(g, c).not.toBeNull();
+      if (!g) continue;
       expect(viewInfo(g.view).title, c).toBeTruthy();
       expect(hidden).not.toContain(g.view);
       expect(g.label.length).toBeLessThanOrEqual(8);
@@ -91,6 +98,18 @@ describe('GO targets (' + SPORT + ')', () => {
     const deck = objectiveDeck(ut, DAY);
     expect(goForObjective(deck.find((o) => o.id.endsWith(':show-up'))!, SPORT)).toBeNull();
     expect(goForObjective(deck.find((o) => o.id.endsWith(':winner'))!, SPORT)).toEqual({ view: 'battles', label: 'PLAY' });
+  });
+  it("soccer's Moments objective: no GO to a screen that can't move it, a note instead (id and reward unchanged)", () => {
+    const ut = freshUt();
+    ut.hq = freshHQ();
+    const m = objectiveDeck(ut, DAY).find((o) => o.id === 'lifetime:moments-4')!;
+    expect(m.reward).toEqual({ pack: 'premium', sp: 300 });
+    for (const sport of ['nba', 'nfl', 'soccer'] as const) {
+      expect(goForObjective(m, sport), sport).toEqual(sport === 'soccer' ? null : { view: 'moments', label: 'PLAY' });
+      expect(goNote(m, sport), sport).toBe(sport === 'soccer' ? 'Moments are in NBA and NFL' : null);
+    }
+    expect(goNote({ ...m, progress: 4 }, 'soccer')).toBeNull(); // done: it shows CLAIM
+    for (const o of objectiveDeck(ut, DAY).filter((o) => o.counter !== 'moments')) expect(goNote(o, 'soccer')).toBeNull();
   });
   it('openUtAt remembers the view UT opens on', () => {
     let opened = false;

@@ -19,3 +19,11 @@
   gap: 10px;
   flex: 0 0 auto;
 }
+/* ut-1 review: an objective no screen of this sport moves (soccer's Moments) says so, quietly */
+.hq-objective-note {
+  max-width: 150px;
+  font: 700 11px/1.35 var(--body);
+  font-style: normal;
+  text-align: right;
+  color: var(--ps-dim, #8aa3b5);
+}

@@ -48,7 +48,7 @@ import {
 import { DEVELOPMENT_PATHS, developmentReady } from './club-management';
 import type { UtSport } from './types';
 import { GoLink } from './GoLink';
-import { goForObjective } from './go';
+import { goForObjective, goNote } from './go';
 export function HQArrow() {
   return (
     <svg
@@ -861,6 +861,8 @@ export function ObjectivesView({
       <div className="hq-objectives">
         {rows.map((o) => {
           const go = goForObjective(o, sport, ut);
+          // ut-1 review: a goal no screen of this sport moves says so, never a GO or a claim
+          const note = go ? null : goNote(o, sport);
           return (
             <div
               key={o.id}
@@ -897,6 +899,8 @@ export function ObjectivesView({
                 <small>{rewardLabel(o.reward)}</small>
                 {go ? (
                   <GoLink go={go} what={o.text} onGo={onGo} />
+                ) : note ? (
+                  <i className="hq-objective-note">{note}</i>
                 ) : (
                   <button
                     className="chip"

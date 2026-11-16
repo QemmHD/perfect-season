@@ -10,6 +10,8 @@ import type { UtState } from './state';
 import type { UtSport } from './types';
 import { goForObjective } from './go';
 import { GoLink } from './GoLink';
+import { GoChip } from './kit';
+import { reducedMotion } from '../ui/motion';
 import type { UtView } from './UltimateTeam';
 
 export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; onDrop: () => void; onCalendar: () => void; onObjective: (id: string) => void; onBonus: () => void; onGo: (view: UtView) => void }) {
@@ -21,8 +23,18 @@ export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; 
   // the bonus leads to the first of today's three still to finish (none: claim them above first)
   const bonusGo = objectives.map((o) => goForObjective(o, props.sport, ut)).find(Boolean) ?? null;
   const bonusDone = !bonusReady && objectives.length > 0 && objectives.every((o) => o.claimed) && !!ut.content?.claims?.includes('daily-bonus:' + day);
+  // Claude 2026-11-16 (ut-1 review): all three done but not all claimed: the bonus row says so and
+  // leads to the first CLAIM above, instead of a CLAIM that can't be pressed
+  const firstReady = objectives.find((o) => !o.claimed && o.progress >= o.target);
+  const page = React.useRef<HTMLDivElement>(null);
+  const toFirstReady = () => {
+    const b = page.current?.querySelector<HTMLButtonElement>('[data-first-ready]');
+    if (!b) return;
+    b.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
+    b.focus({ preventScroll: true });
+  };
   return (
-    <div className="page ut-dailyhub">
+    <div className="page ut-dailyhub" ref={page}>
       <div className={'ut-daily' + (drop.ready ? ' ready' : '')}>
         <PackArt kind="daily" label="DAILY" sport={props.sport} small />
         <span className="ut-daily-txt">
@@ -81,7 +93,7 @@ export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; 
             {o.claimed ? (
               <i className="ut-dobj-state">DONE</i>
             ) : ready ? (
-              <button className="btn gold" onClick={() => props.onObjective(o.id)}>
+              <button className="btn gold" data-first-ready={o === firstReady ? '' : undefined} onClick={() => props.onObjective(o.id)}>
                 CLAIM
               </button>
             ) : (
@@ -99,13 +111,15 @@ export function DailyHubView(props: { ut: UtState; day: string; sport: UtSport; 
         <span>
           <b>All three bonus</b>
           <small>
-            <Coin size={11} /> {DAILY_BONUS.coins} + Silver Pack for finishing today’s three
+            <Coin size={11} /> {DAILY_BONUS.coins} + {rewardLabel({ pack: DAILY_BONUS.pack })} for finishing today’s three
           </small>
         </span>
         {bonusDone ? (
           <i className="ut-dobj-state">DONE</i>
         ) : !bonusReady && bonusGo ? (
           <GoLink go={bonusGo} what="finish today's three objectives" onGo={props.onGo} />
+        ) : !bonusReady && firstReady ? (
+          <GoChip label="CLAIM ABOVE" ariaLabel="Claim today's objectives above first, then the bonus" onClick={toFirstReady} />
         ) : (
           <button className="btn gold" disabled={!bonusReady} onClick={props.onBonus}>
             CLAIM
