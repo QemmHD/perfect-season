@@ -12,9 +12,11 @@ import { deriveEditionLine, landmarkId, LANDMARK_CAP, LANDMARK_FLOOR, parseEditi
 import { landmarkCatalog, LANDMARK_ATTRS, type LandmarkType } from './landmarks';
 import { buyMarket, marketBought, marketFor, MARKET_FLOOR, swapForPick } from './market';
 import { packTags } from './pack-helper';
+import { flashWindowsOf } from './flash';
+import { weekOf } from './sbc';
 import { openPack, packDefs, quickSellValue } from './packs';
 import { getPool, type Pool } from './pool';
-import { isRare, rareInfo } from './rare';
+import { rareInfo } from './rare';
 import { rateCard, TIER_CUTS } from './rate';
 import { fcToDisplay as onScale } from './fc-scale';
 import { claimSet, setsFor } from './sets';
@@ -166,12 +168,13 @@ describe('packs and odds (' + SPORT + ')', () => {
     const defs = packDefs(SPORT);
     const gold = (c: RatedCard) => ['gold', 'standout', 'promo', 'legend', 'landmark'].includes(c.tier);
     for (let i = 0; i < 60; i++) {
+      // (packs-2: a pack's guarantee is an overall floor now, "golds 78+"; a rare gold is the shimmer only)
       const g = openPack(pool, 'gold', 'g' + i, W);
-      expect(g.filter((c) => isRare(c, pool)).length).toBeGreaterThanOrEqual(SPORT === 'nba' ? 1 : 2);
+      expect(g.filter((c) => c.tier !== 'gold' || c.ovr >= 78).length).toBeGreaterThanOrEqual(SPORT === 'nba' ? 1 : 2);
       const e = openPack(pool, 'elite', 'e' + i, W);
       expect(e).toHaveLength(defs.elite.slots.length);
       expect(e.every(gold)).toBe(true);
-      expect(e.filter((c) => isRare(c, pool)).length).toBeGreaterThanOrEqual(defs.elite.slots.length - 1);
+      expect(e.filter((c) => c.tier === 'gold').every((c) => c.ovr >= 82)).toBe(true);
       const j = openPack(pool, 'jumbo', 'j' + i, W);
       expect(j).toHaveLength(SPORT === 'nba' ? 16 : 32);
       for (const kind of ['standout', 'lightning']) {
@@ -221,14 +224,16 @@ describe('Daily Drop, limits and picks', () => {
     expect(buysLeft(ut, 'elite', '2026-11-02', at)).toBe(2);
     ut = recordBuy(ut, 'standout', DAY, at);
     expect(buysLeft(ut, 'standout', '2026-10-31', at)).toBe(0); // same ISO week
-    expect(lightningWindow(at)).toBeNull();
-    expect(buysLeft(ut, 'lightning', DAY, at)).toBe(0);
-    const open = Date.parse('2026-11-01T17:30:00Z'); // Sunday 12:30 Eastern
-    expect(lightningWindow(open)?.id).toBe('2026-11-01:12');
-    expect(minutesToLightning(at)).toBe(30);
-    expect(buysLeft(ut, 'lightning', DAY, open)).toBe(1);
-    ut = recordBuy(ut, 'lightning', DAY, open);
-    expect(buysLeft(ut, 'lightning', DAY, open)).toBe(0);
+    // Claude (packs-3): two seeded windows a weekend now (flash.ts), not all four of 12-2 and 8-10 pm
+    const win = flashWindowsOf(weekOf(DAY))[0];
+    expect(lightningWindow(win.start - 30 * 60000)).toBeNull();
+    expect(buysLeft(ut, 'lightning', DAY, win.start - 30 * 60000)).toBe(0);
+    const open = win.start + 30 * 60000;
+    expect(lightningWindow(open)?.id).toBe(win.id);
+    expect(minutesToLightning(win.start - 30 * 60000)).toBe(30);
+    expect(buysLeft(ut, 'lightning', win.day, open)).toBe(1);
+    ut = recordBuy(ut, 'lightning', win.day, open);
+    expect(buysLeft(ut, 'lightning', win.day, open)).toBe(0);
     expect(lightningWindow(Date.parse('2026-11-03T17:30:00Z'))).toBeNull(); // a Tuesday
   });
 

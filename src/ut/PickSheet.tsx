@@ -11,6 +11,9 @@ import { seasonText } from './pool';
 import { TIER_NAMES } from './rate';
 import { isRare } from './rare';
 
+/** Claude (packs-2): how many face down (a Front Office Pick has five). */
+const COUNT: Record<number, string> = { 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five' };
+
 export function PickSheet({ pool, pick, onKeep, onLater }: { pool: Pool; pick: PickState; onKeep: (index: number) => void; onLater: () => void }) {
   const cards = useMemo(() => pick.options.map((id) => pool.base.get(id) ?? null), [pool, pick]);
   const still = useMemo(reducedMotion, []);
@@ -37,7 +40,7 @@ export function PickSheet({ pool, pick, onKeep, onLater }: { pool: Pool; pick: P
   return (
     <div className="ut-pick-screen" role="dialog" aria-modal="true" aria-label={pick.title} tabIndex={-1} ref={modal} onKeyDown={(e) => e.key === 'Escape' && onLater()}>
       <span className="eyebrow">{pick.title}</span>
-      <h2 className="disp">{!flipped ? 'Three players. Keep one.' : !all ? 'Scouting…' : chosen === null ? 'Who joins your club?' : 'Keep ' + (cards[chosen]?.line.name ?? 'him') + '?'}</h2>
+      <h2 className="disp">{!flipped ? (COUNT[cards.length] ?? cards.length) + ' players. Keep one.' : !all ? 'Scouting…' : chosen === null ? 'Who joins your club?' : 'Keep ' + (cards[chosen]?.line.name ?? 'him') + '?'}</h2>
       <div className="ut-pick-row">
         {cards.map((rc, i) => (
           <button

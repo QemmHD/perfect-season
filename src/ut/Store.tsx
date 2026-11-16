@@ -10,14 +10,17 @@ import { Sheet } from '../ui/common';
 import { Coin } from '../ui/icons';
 import { PackArt } from './Hub';
 import { IconInfo } from './icons';
-import { type Odds, type PackDef, packName, positionChoices, FEATURED_STANDOUT, type SlotTier } from './packs';
+import { curveOdds, FLOORS, GOLD_CURVE, isFloorKind, type Odds, type PackDef, knownPack, packName, positionChoices, FEATURED_STANDOUT, type SlotTier } from './packs';
 import { TIER_NAMES } from './rate';
 import { fcToDisplay } from './fc-scale';
 import type { PendingPack, UtState } from './state';
 import type { UtSport } from './types';
-import { contentOf } from './content-state';
-import { buysLeft, dailyStatus, LIMITS, lightningWindow, minutesToLightning, STREAK_DAYS, type LimitedKind } from './content-packs';
-import { marketBought, marketFor, SWAP_SIZE, swapCandidates } from './market';
+import { contentOf, type PickState } from './content-state';
+import { buysLeft, dailyStatus, GOLD_PICKS, LIMITS, lightningWindow, minutesToLightning, STREAK_DAYS, type LimitedKind } from './content-packs';
+import { marketBought, marketFor, type MarketTag, swapCandidates, swapSize } from './market';
+import { LIGHTNING_DISCOUNT, nextLightning } from './flash';
+import { flashDeals, flashLeft } from './pack-actions';
+import './store.css';
 import { UtCard } from './CardArt';
 import { SectionHead, Segmented } from './ui';
 import type { CalPack } from './calendar';
@@ -58,11 +61,12 @@ function pct(p: number): string {
 /** Claude (UI reorganisation): the always-on packs, listed cheapest first. */
 const BY_PRICE = ['bronze', 'silver', 'position', 'gold', 'premium', 'spotlight'];
 
-const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'rare', 'gold', 'silver', 'bronze'];
-const slotName = (t: SlotTier) => (t === 'rare' ? 'Rare Gold' : TIER_NAMES[t]);
+const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'g88', 'g86', 'g84', 'g82', 'g80', 'g78', 'rare', 'g75', 'gold', 'silver', 'bronze'];
+/** Claude (packs-2): a gold slot reads as its floor ("Gold 78+"); any gold is just "Gold". */
+const slotName = (t: SlotTier, sport: UtSport) => (t === 'rare' || t === 'g78' ? 'Gold ' + fcToDisplay(78, sport) + '+' : t === 'g75' ? 'Gold' : isFloorKind(t) ? 'Gold ' + fcToDisplay(FLOORS[t], sport) + '+' : TIER_NAMES[t]);
 
 /** What a pack holds, slot by slot, and the chance of a promo or a legend in the whole pack. */
-function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
+function OddsSheet({ def, sport, onClose }: { def: PackDef; sport: UtSport; onClose: () => void }) {
   const rows = new Map<string, { o: Odds; n: number }>();
   for (const o of def.slots) {
     const k = JSON.stringify(o);
@@ -84,8 +88,8 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
                 <b className="num">{n}×</b>
                 <span>
                   {SLOT_ORDER.filter((t) => (o[t] ?? 0) > 0).map((t) => (
-                    <i key={t} className={'ut-tierchip t-' + t}>
-                      {slotName(t)} {pct(o[t]!)}
+                    <i key={t} className={'ut-tierchip t-' + (isFloorKind(t) || t === 'rare' ? 'gold' : t)}>
+                      {slotName(t, sport)} {pct(o[t]!)}
                     </i>
                   ))}
                 </span>
@@ -113,8 +117,14 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
             </p>
           )}
           {any('program') > 0 && <p className="note">A program card is one of this program’s cards released so far, all equally likely. The program’s cards are the same for everyone.</p>}
-          {any('rare') > 0 && <p className="note">Rare golds are the top 35% of golds at each position; a rare slot is always a gold.</p>}
-          <p className="note">Within a tier, lower overalls are more common: each point above the tier’s floor is a little rarer.</p>
+          {def.kind !== 'spotlight' && (
+            <p className="note">
+              Every gold follows one overall curve. A slot that can be any gold lands {fcToDisplay(75, sport)}–{fcToDisplay(79, sport)} {pct(goldBand(75, 80))}, {fcToDisplay(80, sport)}–
+              {fcToDisplay(82, sport)} {pct(goldBand(80, 83))}, {fcToDisplay(83, sport)}–{fcToDisplay(85, sport)} {pct(goldBand(83, 86))} and {fcToDisplay(86, sport)}+{' '}
+              {pct(goldBand(86, 100))}; a “Gold 78+” slot uses the same curve from 78 up. Rare golds are a shimmer on the top 35% at each position, not a slot.
+            </p>
+          )}
+          {def.prefer && <p className="note">Golds in this pack prefer players you don’t own yet, at the overall drawn or higher, never lower, so these odds are the least you get.</p>}
           <button className="btn" onClick={() => close()}>
             CLOSE
           </button>
@@ -124,7 +134,70 @@ function OddsSheet({ def, onClose }: { def: PackDef; onClose: () => void }) {
   );
 }
 
+/** Claude (packs-2): a waiting pick's name on its tile ("Player Pick 84+"; Scout's Choice for the Store's own). */
+function pickLabel(p: PickState, sport: UtSport): string {
+  if (p.kind === 'standout-pick') return 'Standout Pick';
+  if (p.kind === 'new-era') return 'Icon Pick';
+  if (p.kind === 'program-pick' || p.kind === 'live-pick') return 'Program Pick';
+  const g = GOLD_PICKS[p.kind as keyof typeof GOLD_PICKS];
+  return g ? g.title + ' ' + fcToDisplay(g.floor, sport) + '+' : 'Scout’s Choice';
+}
+
+/** The share of an any-gold slot from overall `a` up to (not including) `b`, basketball's scale (the curve's own numbers). */
+function goldBand(a: number, b: number): number {
+  const odds = curveOdds(GOLD_CURVE, 75, 'nba');
+  let p = 0;
+  for (const [o, x] of odds) if (o >= a && o < b) p += x;
+  return p;
+}
+
 const hm = (m: number) => (m >= 60 * 24 ? Math.floor(m / 1440) + 'd ' + Math.floor((m % 1440) / 60) + 'h' : m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm');
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const clock = (h: number) => (h % 12 || 12) + (h < 12 ? ' am' : ' pm');
+
+/** Claude (packs-3): when the next Lightning window opens, and which two slots this weekend has. */
+function lightningNote(now: number): string {
+  const w = nextLightning(now);
+  if (!w) return '';
+  const day = DAYS[new Date(w.day + 'T12:00:00Z').getUTCDay()];
+  return 'Lightning Standout (' + Math.round(LIGHTNING_DISCOUNT * 100) + '% off) opens in ' + hm(minutesToLightning(now)) + ': ' + day + ' ' + clock(w.hour) + '–' + clock(w.hour + 2) + ' Eastern. Two surprise windows every weekend.';
+}
+
+/** Claude (packs-3): a named flash sale's deals while its window is open (1 each per player). */
+function FlashSale({ sport, ut, coins, now, onBuy }: { sport: UtSport; ut: UtState; coins: number; now: number; onBuy: (key: string) => void }) {
+  const deals = flashDeals(sport, now);
+  if (!deals.length) return null;
+  return (
+    <section className="ut-flash" aria-label={deals[0].sale + ' flash sale'}>
+      <span className="ut-flash-head">
+        <span className="eyebrow">FLASH SALE</span>
+        <b className="disp">{deals[0].sale}</b>
+        <small>Ends in {hm(Math.max(1, Math.ceil((deals[0].end - now) / 60000)))} · one of each per player</small>
+      </span>
+      {deals.map((d) => {
+        const left = flashLeft(ut, d.key);
+        const short = coins < d.price;
+        return (
+          <div key={d.key} className="ut-shopitem ut-flash-item">
+            <PackArt kind={d.kind.startsWith('live:') ? 'live' : d.kind} label={d.kind.startsWith('live:') ? 'PROGRAM' : (SHORT[d.kind] ?? 'PACK')} sport={sport} small />
+            <div className="ut-shop-txt">
+              <strong>{d.name}</strong>
+              <small>
+                <s className="num">{d.was.toLocaleString('en-US')}</s> <b className="ut-flash-off">−{Math.round(d.off * 100)}%</b>
+              </small>
+              <small className="ut-limit">{left ? '1 left in this sale' : 'Bought in this sale'}</small>
+            </div>
+            <button className={'btn ut-buy' + (short || !left ? ' short' : ' gold')} aria-disabled={short || !left} aria-label={'Buy ' + d.name + ' for ' + d.price + ' coins, ' + Math.round(d.off * 100) + ' percent off'} onClick={() => onBuy(d.key)}>
+              <Coin size={14} />
+              <span className="num">{d.price.toLocaleString('en-US')}</span>
+            </button>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
 
 function DailyDrop({ ut, day, sport, onClaim }: { ut: UtState; day: string; sport: UtSport; onClaim: () => void }) {
   const s = dailyStatus(ut, day);
@@ -176,6 +249,8 @@ export function Store(props: {
   preview?: React.ReactNode;
   /** Claude wave 3: buy a Live Calendar program pack */
   onLive?: (pack: CalPack) => void;
+  /** Claude (packs-3): buy a named flash sale's deal, by its key */
+  onFlash?: (key: string) => void;
 }) {
   const [odds, setOdds] = useState<PackDef | null>(null);
   const [choose, setChoose] = useState(false);
@@ -198,7 +273,7 @@ export function Store(props: {
         <PackArt kind={k} label={SHORT[k]??k.toUpperCase()} sport={props.sport} small />
         <div className="ut-shop-txt">
           <strong>{props.sport === 'nfl' && k === 'position' ? 'Unit Pack' : d.name}</strong>
-          <small>{props.sport === 'nfl' && k === 'position' ? d.slots.length + ' golds (2 rare) from the unit you pick' : d.blurb}</small>
+          <small>{props.sport === 'nfl' && k === 'position' ? d.slots.length + ' golds (2 of them ' + fcToDisplay(78, props.sport) + '+) from the unit you pick' : d.blurb}</small>
           {note && <small className="ut-limit">{note}</small>}
           <button className="ut-oddsbtn" onClick={() => setOdds(d)} aria-label={d.name + ' odds'}>
             <IconInfo size={13} /> Odds
@@ -256,22 +331,32 @@ export function Store(props: {
                 )}
                 {picks.map((p) => (
                   <button key={p.id} className="ut-mine-pack" onClick={() => props.onPick(p.id)} aria-label={'Choose your player: ' + p.title}>
-                    <PackArt kind="scout" label="PICK 1 OF 3" sport={props.sport} small />
-                    <b>{p.kind === 'standout-pick' ? 'Standout Pick' : p.kind === 'new-era' ? 'Icon Pick' : 'Scout’s Choice'}</b>
+                    <PackArt kind="scout" label={'PICK 1 OF ' + p.options.length} sport={props.sport} small />
+                    <b>{pickLabel(p, props.sport)}</b>
                     <i className="ut-open">CHOOSE</i>
                   </button>
                 ))}
-                {props.pending.map((p) => (
-                  <button key={p.id} className="ut-mine-pack" onClick={() => props.onPending(p.id)} aria-label={'Open your ' + packName(props.sport, p.kind)}>
-                    <PackArt kind={p.kind} label={SHORT[p.kind.split(':')[0]] ?? 'PACK'} sport={props.sport} small />
-                    <b>{packName(props.sport, p.kind).replace(/ Pack$/, '')}</b>
-                    <i className="ut-open">OPEN</i>
-                  </button>
-                ))}
+                {props.pending.map((p) =>
+                  // Claude (packs-1 fix): a reward pack from a newer build says so before the tap (it stays saved)
+                  knownPack(props.sport, p.kind) ? (
+                    <button key={p.id} className="ut-mine-pack" onClick={() => props.onPending(p.id)} aria-label={'Open your ' + packName(props.sport, p.kind)}>
+                      <PackArt kind={p.kind} label={SHORT[p.kind.split(':')[0]] ?? 'PACK'} sport={props.sport} small />
+                      <b>{packName(props.sport, p.kind).replace(/ Pack$/, '')}</b>
+                      <i className="ut-open">OPEN</i>
+                    </button>
+                  ) : (
+                    <button key={p.id} className="ut-mine-pack ut-mine-new" onClick={() => props.onPending(p.id)} aria-label="New pack: update the game to open it. It stays saved until then.">
+                      <PackArt kind={p.kind} label="NEW" sport={props.sport} small />
+                      <b>New Pack</b>
+                      <i className="ut-open ut-update">UPDATE TO OPEN</i>
+                    </button>
+                  ),
+                )}
               </div>
             </>
           )}
           <DailyDrop ut={props.ut} day={props.day} sport={props.sport} onClaim={() => props.onBuy('daily', 0)} />
+          {props.onFlash && <FlashSale sport={props.sport} ut={props.ut} coins={props.coins} now={now} onBuy={props.onFlash} />}
           {STUDIO_PACKS.some(k=>catalogOf(props.sport)[k].enabled)&&<><SectionHead title="Club Collection"/><div className="ut-shop">{STUDIO_PACKS.map(k=>item(k))}</div></>}
           {(() => {
             // Claude wave 3: this season's program packs (Live Calendar)
@@ -283,7 +368,7 @@ export function Store(props: {
                 <SectionHead title={'This Season' + (season ? ' · ' + season.name : '')} />
                 <div className="ut-shop">
                   {live.map((p) => {
-                    const d = livePackDef(props.sport, p);
+                    const d = livePackDef(props.sport, p, now);
                     const left = liveBuysLeft(props.ut, p, props.day);
                     const short = props.coins < d.price;
                     return (
@@ -292,6 +377,11 @@ export function Store(props: {
                         <div className="ut-shop-txt">
                           <strong>{d.name}</strong>
                           <small>{d.blurb}</small>
+                          {d.boost && (
+                            <small className="ut-boost">
+                              <b>BOOSTED</b> program odds ×1.5 for {hm(Math.max(1, Math.ceil((d.boost.until - now) / 60000)))}
+                            </small>
+                          )}
                           <small className="ut-limit">{(left ? left + ' left ' : 'Limit reached ') + (p.tpl === 'guarantee' ? 'this week' : 'today') + ' · until ' + p.end.slice(5).replace('-', '/')}</small>
                           <button className="ut-oddsbtn" onClick={() => setOdds(d)} aria-label={d.name + ' odds'}>
                             <IconInfo size={13} /> Odds
@@ -316,7 +406,7 @@ export function Store(props: {
           <div className="ut-shop">
             {lw ? item('lightning', 'Lightning window · ' + hm(lw.minutesLeft) + ' left · ' + limitNote('lightning'), left('lightning') ? undefined : 'limit') : null}
             {item('standout', limitNote('standout'), left('standout') ? undefined : 'limit')}
-            {!lw && <p className="ut-lightning-next">Lightning Standout (25% off) opens in {hm(minutesToLightning(now))}: weekends 12–2 pm and 8–10 pm Eastern.</p>}
+            {!lw && <p className="ut-lightning-next">{lightningNote(now)}</p>}
             {item('elite', limitNote('elite'), left('elite') ? undefined : 'limit')}
             {item('jumbo', limitNote('jumbo'), left('jumbo') ? undefined : 'limit')}
           </div>
@@ -332,7 +422,7 @@ export function Store(props: {
           <p className="note">Coins only, never real money. Matches, objectives, SBCs and the daily chest all pay coins.</p>
         </>
       )}
-      {odds && <OddsSheet def={odds} onClose={() => setOdds(null)} />}
+      {odds && <OddsSheet def={odds} sport={props.sport} onClose={() => setOdds(null)} />}
       {choose && (
         <Sheet label="Pick a position" kind="bottom" onClose={() => setChoose(false)}>
           {(close) => (
@@ -358,17 +448,20 @@ export function Store(props: {
   );
 }
 
-const TAG: Record<string, string> = { silver: 'SILVER', gold: 'GOLD', rare: 'RARE GOLD', promo: 'HOT SEASON', standout: 'STANDOUT' };
+/** Claude (packs-3): what the market sells now (Hot Season and Standouts no longer). */
+const TAG: Partial<Record<MarketTag, string>> = { silver: 'SILVER', gold: 'GOLD', rare: 'GOLD 78+', high: 'SCOUTED' };
 
 /** Claude: the Scout Market (twelve fixed-price cards a day, each once) and the Swap Desk. */
 function Market(props: { pool: Pool; ut: UtState; day: string; coins: number; stored: ClubCard[]; onMarket: (i: number) => void; onSwap: () => void }) {
   const items = marketFor(props.pool, props.day);
   const bought = marketBought(props.ut, props.day);
   const dupes = swapCandidates(props.stored);
-  const swapsLeft = buysLeft(props.ut, 'swap', props.day, Date.now());
+  const now = Date.now();
+  const swapsLeft = buysLeft(props.ut, 'swap', props.day, now);
+  const size = swapSize(now, props.pool.sport);
   return (
     <>
-      <p className="ut-lede">Twelve scouted cards a day at fixed prices, the same for everyone. Each can be bought once; new cards at midnight Eastern.</p>
+      <p className="ut-lede">Twelve scouted base cards a day at fixed prices, the same for everyone, one of them an {fcToDisplay(83, props.pool.sport)}–{fcToDisplay(86, props.pool.sport)}. Each can be bought once; new cards at midnight Eastern.</p>
       <div className="ut-market">
         {items.map((it) => {
           const rc = props.pool.base.get(it.cardId);
@@ -377,7 +470,7 @@ function Market(props: { pool: Pool; ut: UtState; day: string; coins: number; st
           return (
             <button key={it.i} className={'ut-market-item' + (sold ? ' sold' : '')} disabled={sold} onClick={() => props.onMarket(it.i)} aria-label={(sold ? 'Bought: ' : 'Buy ') + rc.line.name + ' for ' + it.price + ' coins'}>
               <UtCard rc={rc} w={66} />
-              <i className={'ut-market-tag t-' + it.tag}>{TAG[it.tag]}</i>
+              <i className={'ut-market-tag t-' + it.tag}>{TAG[it.tag] ?? 'GOLD'}</i>
               <span className={'ut-market-price' + (props.coins < it.price && !sold ? ' short' : '')}>
                 {sold ? (
                   'BOUGHT'
@@ -394,19 +487,19 @@ function Market(props: { pool: Pool; ut: UtState; day: string; coins: number; st
       <div className="ut-swap">
         <span className="ut-swap-txt">
           <span className="eyebrow">SWAP DESK</span>
-          <b className="disp">{SWAP_SIZE} duplicate golds → Scout’s Choice</b>
+          <b className="disp">{size} duplicate golds → Scout’s Choice</b>
           <small>
-            Trades your cheapest {SWAP_SIZE} spare golds from Duplicate Storage (never squad cards) for a pick of three {fcToDisplay(84, props.pool.sport)}+ golds. You have {dupes.length}. {swapsLeft} of 3 swaps left today.
+            Trades your cheapest {size} spare golds from Duplicate Storage (never squad cards) for a pick of three {fcToDisplay(84, props.pool.sport)}+ golds. You have {dupes.length}. {swapsLeft ? 'One swap a day: ready.' : 'One swap a day: back tomorrow.'}
           </small>
           {dupes.length > 0 && (
             <span className="ut-swap-cards" aria-hidden="true">
-              {dupes.slice(0, SWAP_SIZE).map((c) => (
+              {dupes.slice(0, size).map((c) => (
                 <UtCard key={c.uid} rc={c.rc} w={34} />
               ))}
             </span>
           )}
         </span>
-        <button className="btn primary" aria-disabled={dupes.length < SWAP_SIZE || !swapsLeft} onClick={props.onSwap}>
+        <button className="btn primary" aria-disabled={dupes.length < size || !swapsLeft} onClick={props.onSwap}>
           SWAP
         </button>
       </div>

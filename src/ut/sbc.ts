@@ -4,10 +4,13 @@
 // repeatables (five cards in for a better card) that can be done as often as you like.
 // See docs/ULTIMATE-TEAM.md.
 import { hashString, pickOne, rng, type Rand, shuffle, trueRand } from '../engine/rng';
-import { openPack, packRand, quickSellValue } from './packs';
+import { pickFor } from '../engine/sport';
+import { curvePick, GOLD_CURVE, goldsOf, openPack, packDefs, packRand, quickSell, quickSellValue } from './packs';
 import { decadeOf, type Pool, TIER_RANK } from './pool';
-import { onScale } from './rate';
-import type { RatedCard, Tier, UtSport } from './types';
+import { onScale, TIER_CUTS } from './rate';
+import { UT_SCALE } from './ut-scale';
+import { cheapestFodder, goldRewardValue } from './value';
+import type { CardMint, RatedCard, Tier, UtSport } from './types';
 
 export type Req =
   /** every card at least this overall */
@@ -250,7 +253,6 @@ function context(pool: Pool, seed: string): Ctx {
 
 type Template = (c: Ctx) => Omit<Sbc, 'id' | 'kind'>;
 
-const nba = (c: Ctx) => c.pool.sport === 'nba';
 /** a threshold written on basketball's scale, in this sport's */
 const sc = (c: Ctx, x: number) => onScale(x, c.pool.sport);
 
@@ -262,7 +264,7 @@ const EASY: Template[] = [
   },
   () => ({ title: 'Silver Lining', blurb: 'Swap some silver for something shinier.', size: 4, reqs: [{ k: 'tier', tier: 'silver', n: 3 }], reward: { pack: 'silver' } }),
   (c) => ({ title: 'Bronze Age', blurb: 'Clear out the bench.', size: 5, reqs: [{ k: 'minOvr', ovr: sc(c, 50) }], reward: { pack: 'silver' } }),
-  (c) => ({ title: nba(c) ? 'Pickup Game' : 'Scrimmage', blurb: 'Any five who can play a little.', size: 5, reqs: [{ k: 'teamOvr', ovr: sc(c, 56) }], reward: { pack: 'silver' } }),
+  (c) => ({ title: pickFor(c.pool.sport, { nba: 'Pickup Game', nfl: 'Scrimmage', soccer: 'Kickabout' }), blurb: 'Any five who can play a little.', size: 5, reqs: [{ k: 'teamOvr', ovr: sc(c, 56) }], reward: { pack: 'silver' } }),
   (c) => {
     const [a, b] = shuffle(c.decades, c.rand);
     return { title: 'Then and Now', blurb: 'Two from the ' + a + 's, two from the ' + b + 's.', size: 4, reqs: [{ k: 'decade', decade: a, n: 2 }, { k: 'decade', decade: b, n: 2 }], reward: { pack: 'silver' } };
@@ -287,17 +289,22 @@ const MEDIUM: Template[] = [
     return { title: 'Decade Draft', blurb: 'Four from the ' + d + 's, and they can play.', size: 5, reqs: [{ k: 'decade', decade: d, n: 4 }, { k: 'teamOvr', ovr: sc(c, 66) }], reward: { pack: 'gold' } };
   },
   () => ({ title: 'Golden Pair', blurb: 'Two golds and a shared era.', size: 4, reqs: [{ k: 'tier', tier: 'gold', n: 2 }, { k: 'sameDecade', n: 3 }], reward: { pack: 'gold' } }),
+  // Claude (packs-1, audit H4): one answer per sport (soccer used to get football's positions)
   (c) =>
-    nba(c)
-      ? { title: 'Backcourt', blurb: 'A point guard and a shooting guard, and a third.', size: 3, reqs: [{ k: 'positions', pos: ['PG', 'SG'] }, { k: 'teamOvr', ovr: sc(c, 68) }], reward: { pack: 'gold' } }
-      : { title: 'Pass Catchers', blurb: 'Two receivers and a tight end.', size: 3, reqs: [{ k: 'positions', pos: ['WR', 'WR', 'TE'] }, { k: 'teamOvr', ovr: sc(c, 68) }], reward: { pack: 'gold' } },
+    pickFor<Omit<Sbc, 'id' | 'kind'>>(c.pool.sport, {
+      nba: { title: 'Backcourt', blurb: 'A point guard and a shooting guard, and a third.', size: 3, reqs: [{ k: 'positions', pos: ['PG', 'SG'] }, { k: 'teamOvr', ovr: sc(c, 68) }], reward: { pack: 'gold' } },
+      nfl: { title: 'Pass Catchers', blurb: 'Two receivers and a tight end.', size: 3, reqs: [{ k: 'positions', pos: ['WR', 'WR', 'TE'] }, { k: 'teamOvr', ovr: sc(c, 68) }], reward: { pack: 'gold' } },
+      soccer: { title: 'Front Three', blurb: 'Two wingers and a striker.', size: 3, reqs: [{ k: 'positions', pos: ['W', 'ST', 'W'] }, { k: 'teamOvr', ovr: sc(c, 68) }], reward: { pack: 'gold' } },
+    }),
 ];
 
 const HARD: Template[] = [
   (c) =>
-    nba(c)
-      ? { title: 'A Full Five', blurb: 'A real lineup, and a good one.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'premium' } }
-      : { title: 'Skill Set', blurb: 'A whole offense around the quarterback.', size: 5, reqs: [{ k: 'positions', pos: ['QB', 'RB', 'WR', 'WR', 'TE'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'premium' } },
+    pickFor<Omit<Sbc, 'id' | 'kind'>>(c.pool.sport, {
+      nba: { title: 'A Full Five', blurb: 'A real lineup, and a good one.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'premium' } },
+      nfl: { title: 'Skill Set', blurb: 'A whole offense around the quarterback.', size: 5, reqs: [{ k: 'positions', pos: ['QB', 'RB', 'WR', 'WR', 'TE'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'premium' } },
+      soccer: { title: 'Back Four', blurb: 'A whole back line, and a good one.', size: 4, reqs: [{ k: 'positions', pos: ['FB', 'CB', 'CB', 'FB'] }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'premium' } },
+    }),
   (c) => {
     const f = pickOne(c.frs, c.rand);
     return { title: f.name + ' Legacy', blurb: 'Three from one franchise, all good ones.', size: 3, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 3 }, { k: 'minOvr', ovr: sc(c, 68) }], reward: { card: { tier: 'gold', minOvr: sc(c, 78), fr: f.fr } } };
@@ -305,9 +312,11 @@ const HARD: Template[] = [
   (c) => ({ title: 'Golden Era', blurb: 'Five from one decade, four of them gold.', size: 5, reqs: [{ k: 'sameDecade', n: 5 }, { k: 'tier', tier: 'gold', n: 4 }], reward: { card: { tier: 'gold', minOvr: sc(c, 82) } } }),
   (c) => ({ title: 'Deep Bench', blurb: 'Eight cards, five of them gold.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 72) }], reward: { pack: 'premium' } }),
   (c) =>
-    nba(c)
-      ? { title: 'Frontcourt', blurb: 'A gold three, four and five.', size: 3, reqs: [{ k: 'positions', pos: ['SF', 'PF', 'C'] }, { k: 'tier', tier: 'gold', n: 3 }], reward: { pack: 'premium' } }
-      : { title: 'No Fly Zone', blurb: 'A gold secondary.', size: 4, reqs: [{ k: 'positions', pos: ['CB', 'CB', 'S', 'S'] }, { k: 'tier', tier: 'gold', n: 4 }], reward: { pack: 'premium' } },
+    pickFor<Omit<Sbc, 'id' | 'kind'>>(c.pool.sport, {
+      nba: { title: 'Frontcourt', blurb: 'A gold three, four and five.', size: 3, reqs: [{ k: 'positions', pos: ['SF', 'PF', 'C'] }, { k: 'tier', tier: 'gold', n: 3 }], reward: { pack: 'premium' } },
+      nfl: { title: 'No Fly Zone', blurb: 'A gold secondary.', size: 4, reqs: [{ k: 'positions', pos: ['CB', 'CB', 'S', 'S'] }, { k: 'tier', tier: 'gold', n: 4 }], reward: { pack: 'premium' } },
+      soccer: { title: 'Midfield Engine', blurb: 'A gold holder, box-to-box and playmaker.', size: 3, reqs: [{ k: 'positions', pos: ['DM', 'CM', 'AM'] }, { k: 'tier', tier: 'gold', n: 3 }], reward: { pack: 'premium' } },
+    }),
 ];
 
 const WEEKLY: Template[] = [
@@ -320,9 +329,11 @@ const WEEKLY: Template[] = [
     return { title: 'The ' + d + 's All-Stars', blurb: 'Six golds from one decade.', size: 6, reqs: [{ k: 'decade', decade: d, n: 6 }, { k: 'tier', tier: 'gold', n: 6 }], reward: { pack: 'premium' } };
   },
   (c) =>
-    nba(c)
-      ? { title: 'Gold Standard', blurb: 'A gold five at every position.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'tier', tier: 'gold', n: 5 }], reward: { pack: 'premium', card: { tier: 'gold', minOvr: sc(c, 82) } } }
-      : { title: 'Gold Front Seven', blurb: 'A gold front seven.', size: 7, reqs: [{ k: 'positions', pos: ['DE', 'DE', 'DT', 'DT', 'LB', 'LB', 'LB'] }, { k: 'tier', tier: 'gold', n: 7 }], reward: { pack: 'premium', card: { tier: 'gold', minOvr: sc(c, 82) } } },
+    pickFor<Omit<Sbc, 'id' | 'kind'>>(c.pool.sport, {
+      nba: { title: 'Gold Standard', blurb: 'A gold five at every position.', size: 5, reqs: [{ k: 'positions', pos: ['PG', 'SG', 'SF', 'PF', 'C'] }, { k: 'tier', tier: 'gold', n: 5 }], reward: { pack: 'premium', card: { tier: 'gold', minOvr: sc(c, 82) } } },
+      nfl: { title: 'Gold Front Seven', blurb: 'A gold front seven.', size: 7, reqs: [{ k: 'positions', pos: ['DE', 'DE', 'DT', 'DT', 'LB', 'LB', 'LB'] }, { k: 'tier', tier: 'gold', n: 7 }], reward: { pack: 'premium', card: { tier: 'gold', minOvr: sc(c, 82) } } },
+      soccer: { title: 'Gold Spine', blurb: 'A gold keeper, centre-back, holder and striker.', size: 4, reqs: [{ k: 'positions', pos: ['GK', 'CB', 'DM', 'ST'] }, { k: 'tier', tier: 'gold', n: 4 }], reward: { pack: 'premium', card: { tier: 'gold', minOvr: sc(c, 82) } } },
+    }),
   (c) => ({ title: 'Team Builders', blurb: 'Eight cards, one era, real chemistry.', size: 8, reqs: [{ k: 'sameDecade', n: 6 }, { k: 'sameFr', n: 3 }, { k: 'teamOvr', ovr: sc(c, 70) }], reward: { pack: 'premium' } }),
   (c) => ({ title: 'Hall of Fame Class', blurb: 'Eight golds, and good ones.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium', card: { tier: 'promo' } } }),
   (c) => {
@@ -336,16 +347,41 @@ const WEEKLY: Template[] = [
   () => ({ title: 'Hot Season Hunt', blurb: 'Six cards: five golds, three teammates.', size: 6, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'sameFr', n: 3 }], reward: { card: { tier: 'promo' } } }),
 ];
 
-/** Upgrades (cards in for a better pack: twice a day each) and repeatables (five cards in for a
- * better card: as often as you like). */
+/** Upgrades (cards in for a better pack: twice a day each) and repeatables (cards in for a better card:
+ * as often as you like). */
 export const UPGRADE_TIMES = 2;
+
+/**
+ * Claude (packs-3, research §8.8, packs-plan D10): each upgrade's size and requirement, per sport, on the
+ * displayed scale. Tuned so the reward is worth 1.1-1.3 times the cheapest cards that meet them for a Daily
+ * Upgrade, and 0.9-1.1 times for a repeatable (sbcValue; the exploits suite holds every sport to it).
+ * Before, NBA's Bronze Upgrade paid 3.3 times its five cards, NFL's Silver Upgrade 6.7 times, and Golden
+ * Hour turned eight 80s into an 83+ (2.2 times): a cheap route to 83+ golds. `team` is a team-overall
+ * requirement, `min` an every-card minimum; `reward` the gold reward's floor. Ids and list order are unchanged.
+ */
+interface Tune {
+  size: number;
+  team?: number;
+  min?: number;
+  reward?: number;
+}
+export const UPGRADE_TUNE: Record<UtSport, { bronze: Tune; silver: Tune; gold: Tune; toGold: Tune; golden: Tune; elite: Tune }> = {
+  nba: { bronze: { size: 7, min: 62 }, silver: { size: 6, team: 73 }, gold: { size: 6, team: 79 }, toGold: { size: 5, team: 71 }, golden: { size: 4, team: 83, reward: 84 }, elite: { size: 5, min: 83, reward: 85 } },
+  // football's silvers sell for a third as much, so its Silver Upgrade takes golds too ("silver or better")
+  nfl: { bronze: { size: 6, team: 73 }, silver: { size: 8, team: 80 }, gold: { size: 9, min: 82 }, toGold: { size: 6, team: 70 }, golden: { size: 3, team: 83, reward: 84 }, elite: { size: 4, min: 83, reward: 85 } },
+  soccer: { bronze: { size: 5, team: 69 }, silver: { size: 7, team: 74 }, gold: { size: 8, team: 79 }, toGold: { size: 5, min: 69 }, golden: { size: 4, team: 83, reward: 84 }, elite: { size: 5, min: 83, reward: 85 } },
+};
+const WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
+const tuneReqs = (t: Tune, tier: Tier): Req[] => [{ k: 'tier', tier, n: t.size }, ...(t.team ? [{ k: 'teamOvr' as const, ovr: t.team }] : []), ...(t.min ? [{ k: 'minOvr' as const, ovr: t.min }] : [])];
+const tuneText = (t: Tune) => (t.team ? ', team ' + t.team + '+' : t.min ? ', each ' + t.min + '+' : '');
+const upper = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 const UPGRADES: [Template, number][] = [
-  [() => ({ title: 'Bronze Upgrade', blurb: 'Any five cards for a Silver pack.', size: 5, reqs: [{ k: 'tier', tier: 'bronze', n: 5 }], reward: { pack: 'silver' } }), UPGRADE_TIMES],
-  [() => ({ title: 'Silver Upgrade', blurb: 'Five silvers (or better) for a Gold pack.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { pack: 'gold' } }), UPGRADE_TIMES],
-  [(c) => ({ title: 'Gold Upgrade', blurb: 'Five good golds for a Premium pack.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium' } }), UPGRADE_TIMES],
-  [() => ({ title: 'Silver to Gold', blurb: 'Five silvers for a gold.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { card: { tier: 'gold' } } }), Infinity],
-  [(c) => ({ title: 'Golden Hour', blurb: 'Eight golds for a better one.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 77) }], reward: { card: { tier: 'gold', minOvr: sc(c, 84) } } }), Infinity],
-  [(c) => ({ title: 'Elite Pull', blurb: 'Eight strong golds for a star.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 83) }], reward: { card: { tier: 'gold', minOvr: sc(c, 88) } } }), Infinity],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].bronze; return { title: 'Bronze Upgrade', blurb: upper(WORDS[t.size]) + ' cards' + tuneText(t) + ' for a Silver pack.', size: t.size, reqs: tuneReqs(t, 'bronze'), reward: { pack: 'silver' } }; }, UPGRADE_TIMES],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].silver; return { title: 'Silver Upgrade', blurb: upper(WORDS[t.size]) + ' silvers or better' + tuneText(t) + ' for a Gold pack.', size: t.size, reqs: tuneReqs(t, 'silver'), reward: { pack: 'gold' } }; }, UPGRADE_TIMES],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].gold; return { title: 'Gold Upgrade', blurb: upper(WORDS[t.size]) + ' golds' + tuneText(t) + ' for a Premium pack.', size: t.size, reqs: tuneReqs(t, 'gold'), reward: { pack: 'premium' } }; }, UPGRADE_TIMES],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].toGold; return { title: 'Silver to Gold', blurb: upper(WORDS[t.size]) + ' silvers' + tuneText(t) + ' for a gold.', size: t.size, reqs: tuneReqs(t, 'silver'), reward: { card: { tier: 'gold' } } }; }, Infinity],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].golden; return { title: 'Golden Hour', blurb: upper(WORDS[t.size]) + ' golds' + tuneText(t) + ' for a better one.', size: t.size, reqs: tuneReqs(t, 'gold'), reward: { card: { tier: 'gold', minOvr: t.reward } } }; }, Infinity],
+  [(c) => { const t = UPGRADE_TUNE[c.pool.sport].elite; return { title: 'Elite Pull', blurb: upper(WORDS[t.size]) + ' strong golds' + tuneText(t) + ' for a star.', size: t.size, reqs: tuneReqs(t, 'gold'), reward: { card: { tier: 'gold', minOvr: t.reward } } }; }, Infinity],
 ];
 
 /**
@@ -378,6 +414,35 @@ export function sbcsFor(pool: Pool, day: string, done: Record<string, unknown> =
   return [...dailies, ...weekly, ...upgrades];
 }
 
+// ---------- the SBC value rules (Claude, packs-3; research §8.8, packs-plan D10) ----------
+
+/**
+ * A challenge's value out ÷ value in, at acquisition cost (value.ts): the reward (a pack at its Store
+ * price, a gold card at the cost of the pack route that pays the same draw, plus coins) over the
+ * cheapest cards that meet its tier, minimum and team-overall requirements. The Daily Upgrades pay
+ * 1.1–1.3 times what goes in, the repeatables 0.9–1.1 (a fair swap, never a cheap route).
+ * Null for a challenge this model doesn't price (franchise, decade or position requirements).
+ */
+export function sbcValue(s: Pick<Sbc, 'size' | 'reqs' | 'reward'>, sport: UtSport): { input: number; output: number; ratio: number; fodder: number[] } | null {
+  let tier: Tier | undefined;
+  let minOvr: number | undefined;
+  let teamOvr: number | undefined;
+  for (const r of s.reqs) {
+    if (r.k === 'tier' && r.n >= s.size) tier = r.tier;
+    else if (r.k === 'minOvr') minOvr = r.ovr;
+    else if (r.k === 'teamOvr') teamOvr = r.ovr;
+    else if (r.k !== 'tier') return null;
+  }
+  const w = s.reward;
+  if (w.standout || w.program || w.cardId || (w.card && w.card.tier !== 'gold')) return null;
+  const defs = packDefs(sport);
+  let output = w.coins ?? 0;
+  if (w.pack) output += (w.pack.startsWith('position:') ? defs.position : defs[w.pack as keyof typeof defs])?.price ?? defs.premium.price;
+  if (w.card) output += goldRewardValue(sport, Math.max(w.card.minOvr ?? 0, TIER_CUTS[sport].gold));
+  const f = cheapestFodder(sport, { size: s.size, tier, minOvr, teamOvr });
+  return { input: f.value, output, ratio: output / f.value, fodder: f.ovrs };
+}
+
 // ---------- filling a challenge from the club ----------
 
 /** A card in the club, as auto-fill sees it: `slot` is where it plays in the squad, if it does. */
@@ -386,6 +451,43 @@ export interface FillCard {
   rc: RatedCard;
   slot: string | null;
   storage?: boolean;
+  /** Claude (packs-1): a registered, numbered copy (its OwnedCard's mint) */
+  mint?: CardMint;
+  /** Claude (packs-1): a locked favourite (ut.content.locked) */
+  locked?: boolean;
+}
+
+/**
+ * Claude (packs-1, audit C1): the least a challenge's reward is worth in coins. Packs count at their
+ * Store price (a pack the Store doesn't sell, at a Premium's), cards at the quick-sell value of the
+ * least they can be, plus any coins. Auto-fill never trades a card that quick-sells for more, and the
+ * confirm names one put in by hand.
+ */
+export function rewardValue(w: Reward, sport: UtSport): number {
+  const defs = packDefs(sport);
+  const priced = w.pack ? (w.pack.startsWith('position:') ? defs.position : defs[w.pack as keyof typeof defs]) : undefined;
+  let v = w.coins ?? 0;
+  if (w.pack) v += priced?.price || defs.premium.price;
+  if (w.card) v += w.card.tier === 'promo' ? quickSell('promo', UT_SCALE[sport].promo[0][1], sport) : quickSell('gold', w.card.minOvr ?? UT_SCALE[sport].cuts.gold, sport);
+  if (w.standout) v += quickSell('standout', 0, sport);
+  if (w.program) v += quickSell('program', 0, sport);
+  if (w.cardId) v += quickSell('landmark', 0, sport);
+  return v;
+}
+
+/** Claude (packs-1): a special edition (a Weekly Standout and above: anything rarer than a gold). */
+export const isSpecialTier = (t: Tier) => TIER_RANK[t] > TIER_RANK.gold;
+
+/**
+ * Claude (packs-1, audit C1): why auto-fill leaves a card out (null: it may take it). Special editions,
+ * the Finale, numbered and locked copies, and cards worth more than the reward are only ever traded
+ * when the player puts them in by hand.
+ */
+export function protectedReason(c: FillCard, worth: number): 'special' | 'numbered' | 'locked' | 'value' | null {
+  if (isSpecialTier(c.rc.tier) || c.rc.line.programKind === 'finale') return 'special';
+  if (c.mint) return 'numbered';
+  if (c.locked) return 'locked';
+  return quickSellValue(c.rc) > worth ? 'value' : null;
 }
 
 /**
@@ -410,16 +512,44 @@ export function cardFits(r: Req, c: RatedCard, size?: number): boolean {
   }
 }
 
+/** Claude (packs-1): why a card in a trade-in is worth a second look (the confirm's red row), or null. */
+export function tradeWarning(rc: RatedCard, mint: CardMint | undefined, worth: number): string | null {
+  const why: string[] = [];
+  if (isSpecialTier(rc.tier) || rc.line.programKind === 'finale') why.push((rc.line.programKind === 'finale' ? 'Finale' : TIER_NAME[rc.tier]) + ' edition');
+  if (mint) why.push('numbered #' + mint.serial);
+  // (the row already shows the overall: say why it matters, not the number again)
+  if (rc.ovr >= 90) why.push('90+ rated');
+  const qs = quickSellValue(rc);
+  if (qs > worth) why.push('sells for ' + qs.toLocaleString('en-US') + ' coins, more than the reward');
+  return why.length ? why.join(' · ') : null;
+}
+
 /**
- * Fill a challenge from the club, cheapest cards first and squad cards last. Each try starts from a
+ * Claude (packs-1 fix, review finding 4): after a guarded autoFill found nothing, whether a protected card
+ * could have taken a spot (it meets everything each card must). One cheap pass over the club, never a
+ * second full search: auto-fill on a big soccer club already takes seconds on the failing path.
+ */
+export function guardBlocked<C extends FillCard>(s: Sbc, club: C[]): boolean {
+  const worth = new Map<UtSport, number>();
+  const valueFor = (sport: UtSport) => worth.get(sport) ?? worth.set(sport, rewardValue(s.reward, sport)).get(sport)!;
+  return club.some((c) => !!protectedReason(c, valueFor(c.rc.line.sport)) && s.reqs.every((r) => cardFits(r, c.rc, s.size)));
+}
+
+/**
+ * Fill a challenge from the club, cheapest cards first and squad cards last, never a protected card
+ * (protectedReason). Each try starts from a
  * core (a franchise, a decade, or both, for the "same" and "from" requirements; the biggest
  * first), seats the positions, fills up, then raises the team overall with the cheapest swaps that
  * do it. The first set that passes wins; null when none does.
  */
-export function autoFill<C extends FillCard>(s: Sbc, club: C[]): string[] | null {
+export function autoFill<C extends FillCard>(s: Sbc, club: C[], opts: { guard?: boolean } = {}): string[] | null {
   const cheap = (a: C, b: C) => (a.slot ? 1 : 0) - (b.slot ? 1 : 0) || quickSellValue(a.rc) - quickSellValue(b.rc) || Number(!!b.storage) - Number(!!a.storage) || a.rc.ovr - b.rc.ovr;
+  // Claude (packs-1): never a protected card (`guard: false` only asks whether one would have done it)
+  const worth = new Map<UtSport, number>();
+  const valueFor = (sport: UtSport) => worth.get(sport) ?? worth.set(sport, rewardValue(s.reward, sport)).get(sport)!;
+  const allowed = opts.guard === false ? club : club.filter((c) => !protectedReason(c, valueFor(c.rc.line.sport)));
   // only cards that meet what every card must (an overall floor, a tier for all, ...)
-  const cands = club.filter((c) => s.reqs.every((r) => cardFits(r, c.rc, s.size))).sort(cheap);
+  const cands = allowed.filter((c) => s.reqs.every((r) => cardFits(r, c.rc, s.size))).sort(cheap);
   const has = (k: Req['k']) => s.reqs.some((r) => r.k === k);
   const byFr = has('sameFr') || has('fr');
   const byDec = has('sameDecade') || has('decade');
@@ -451,8 +581,13 @@ export function autoFill<C extends FillCard>(s: Sbc, club: C[]): string[] | null
       return true;
     };
     // the positions: a matching over the core (cheapest first), so a two-position card doesn't
-    // take a spot another one needs
-    if (posReq) for (const i of matchPositions(posReq.pos, rcs(core))) if (i >= 0) add(core[i]);
+    // take a spot another one needs. Claude (packs-1): one copy per player (the cheapest), so the
+    // matching never seats one man twice (two of his seasons at DE) and leaves a spot empty
+    if (posReq) {
+      const seen = new Set<string>();
+      const seats = core.filter((c) => !seen.has(c.rc.line.pid) && !!seen.add(c.rc.line.pid));
+      for (const i of matchPositions(posReq.pos, rcs(seats))) if (i >= 0) add(seats[i]);
+    }
     // "at least n" of a tier, a franchise, a decade: the cheapest n that are
     for (const r of s.reqs) {
       if (r.k !== 'tier' && r.k !== 'fr' && r.k !== 'decade') continue;
@@ -488,12 +623,20 @@ export function autoFill<C extends FillCard>(s: Sbc, club: C[]): string[] | null
  * The special card a challenge pays: a random one of every card that fits what it promises (its
  * tier, its overall, its franchise), drawn when it's claimed, so no two players are bound to get
  * the same one. With a `seed` (the tests) the same seed gives the same card.
+ * Claude (packs-2, the critic's cheap-route finding): a gold reward draws on the gold curve from its
+ * floor (an 84+ reward is an 85+ 42% of the time, not uniform over every 84+ gold); special tiers stay
+ * uniform within what fits.
  */
 export function rewardCard(pool: Pool, want: NonNullable<Reward['card']>, seed?: string): RatedCard | null {
   const rand = seed === undefined ? trueRand() : packRand('sbc-card:' + seed);
-  const all = Object.values(pool.buckets[want.tier]).flat();
+  const all = want.tier === 'gold' && !want.fr ? goldsOf(pool) : Object.values(pool.buckets[want.tier]).flat();
   const fit = (rc: RatedCard) => rc.ovr >= (want.minOvr ?? 0);
-  const fromFr = all.filter((rc) => fit(rc) && (!want.fr || rc.line.fr === want.fr));
+  const fromFr = want.fr ? all.filter((rc) => fit(rc) && rc.line.fr === want.fr) : [];
+  if (want.tier === 'gold') {
+    const floor = Math.max(want.minOvr ?? 0, TIER_CUTS[pool.sport].gold);
+    const c = curvePick(fromFr.length ? fromFr : goldsOf(pool), GOLD_CURVE, floor, rand);
+    if (c) return c;
+  }
   const list = fromFr.length ? fromFr : all.filter(fit);
   if (list.length) return list[Math.floor(rand() * list.length)];
   // nothing that good: the best of a Gold pack

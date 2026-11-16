@@ -125,6 +125,8 @@ import {
   contentOf,
   isLocked,
   lockedSet,
+  PICKS_FULL,
+  picksFull,
   toggleLock,
   withClaim,
 } from './content-state';
@@ -136,6 +138,7 @@ import {
   dailyStatus,
   keepPick,
   pickFor,
+  LIMITS,
   recordBuy,
   type LimitedKind,
 } from './content-packs';
@@ -155,7 +158,7 @@ import {
   startDraft,
   tokenReady,
 } from './draft-mode';
-import { buyMarket, SWAP_SIZE, swapCandidates, swapForPick } from './market';
+import { buyMarket, swapCandidates, swapForPick, swapSize } from './market';
 import { packTags, type HelperTag } from './pack-helper';
 import { FEATURED_STANDOUT } from './packs';
 import { claimSet } from './sets';
@@ -194,6 +197,7 @@ import {
 } from './live-packs';
 import { programReward } from './live-cards';
 import { recordPull, sourceOfPending } from './pull-log';
+import { flashDeal, flashLeft, recordFlash, usePackActions } from './pack-actions';
 import { PullTracker } from './PullTracker';
 import type { PickState } from './content-state';
 // Claude (UI reorganisation): last, so the shell and shared pieces win over older rules
@@ -379,6 +383,7 @@ export default function UltimateTeam(props: {
     [pool, ut.owned, ut.collected, ut.collectionClaims, ut.content?.claims],
   );
   const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
+  const pa = usePackActions(ut);
 
   const setUt = (fn: (u: UtState) => UtState) =>
     update((p) => ({ ...p, ut: organizeStorage(fn(p.ut)) }));
@@ -522,7 +527,14 @@ export default function UltimateTeam(props: {
     window.setTimeout(() => (busy.current = false), 600);
     // truly random cards (`seed` only names the pack and its cards' ids)
     // Claude: a Preview Pack opens exactly the cards it showed
-    const cards = preset ?? openPack(pool, kind);
+    let cards: RatedCard[];
+    try {
+      cards = preset ?? openPack(pool, kind, undefined, undefined, pa.openOpts());
+    } catch (e) {
+      // Claude (packs-1, D9): a pack this build can't open stays pending (nothing below runs)
+      onToast(e instanceof Error ? e.message : String(e));
+      return;
+    }
     const at = Date.now();
     const owned = ownedCardsForPack(cards, seed, at);
     const helper = packTags(pool, ut, lineup, cards);
@@ -575,7 +587,6 @@ export default function UltimateTeam(props: {
   // ---------- Claude: content drop 2 (Daily Drop, new packs, picks, market, sets, draft) ----------
 
   const week = weekOf(day);
-  const LIMITED: LimitedKind[] = ['elite', 'jumbo', 'standout', 'lightning'];
 
   const claimDailyDrop = () => {
     const at = Date.now();
@@ -615,9 +626,7 @@ export default function UltimateTeam(props: {
         kind === 'lightning'
           ? 'The Lightning window is closed. It opens on weekend afternoons and evenings.'
           : 'You’ve reached this pack’s limit. It resets ' +
-              (kind === 'standout' || kind === 'scout'
-                ? 'next week.'
-                : 'tomorrow.'),
+              (LIMITS[kind].per === 'week' ? 'next week.' : 'tomorrow.'),
       );
       return;
     }
@@ -652,6 +661,8 @@ export default function UltimateTeam(props: {
     const at = Date.now();
     if (buysLeft(ut, 'scout', day, at) <= 0)
       return onToast('Three Scout’s Choice picks a week. More next week.');
+    // Claude (packs-1 fix): a 51st open pick would be dropped on the next load, coins spent
+    if (picksFull(ut)) return onToast(PICKS_FULL);
     if (profile.coins < price) {
       sfx.nope();
       return onToast(
@@ -664,7 +675,7 @@ export default function UltimateTeam(props: {
     const pick = pickFor(pool, 'scout', id, week, at);
     sfx.coin();
     update((p) =>
-      p.coins < price || buysLeft(p.ut, 'scout', day, at) <= 0
+      p.coins < price || buysLeft(p.ut, 'scout', day, at) <= 0 || picksFull(p.ut)
         ? p
         : {
             ...p,
@@ -739,14 +750,16 @@ export default function UltimateTeam(props: {
   const swap = () => {
     if (!pool) return;
     const locked = lockedSet(ut);
-    const uids = swapCandidates(stored.filter((c) => !locked.has(c.uid)))
-      .slice(0, SWAP_SIZE)
-      .map((c) => c.uid);
     const at = Date.now();
+    const uids = swapCandidates(stored.filter((c) => !locked.has(c.uid)))
+      .slice(0, swapSize(at, SPORT))
+      .map((c) => c.uid);
     const id = newId();
     if (!swapForPick(ut, pool, uids, id, day, at))
       return onToast(
-        'The Swap Desk takes five duplicate golds from storage, three times a day.',
+        'The Swap Desk takes ' +
+          swapSize(at, SPORT) +
+          ' duplicate golds from storage, once a day.',
       );
     update((p) => {
       const r = swapForPick(p.ut, pool, uids, id, day, at);
@@ -834,7 +847,9 @@ export default function UltimateTeam(props: {
   };
 
   const startPreview = () =>
-    setUt((u) => withPreviewSeed(u, newId().replace(/-/g, '').slice(0, 12)));
+    setUt((u) =>
+      withPreviewSeed(u, newId().replace(/-/g, '').slice(0, 12), week),
+    );
   const buyPreview = () => {
     if (!pool) return;
     const id = previewId(ut);
@@ -858,7 +873,7 @@ export default function UltimateTeam(props: {
       (p) => ({
         ...p,
         coins: p.coins - price,
-        ut: nextPreview(p.ut, true, at),
+        ut: nextPreview(p.ut, true, at, week),
       }),
       false,
       (p) => p.coins >= price && previewId(p.ut) === id,
@@ -868,8 +883,8 @@ export default function UltimateTeam(props: {
   };
   const skipPreview = () => {
     const at = Date.now();
-    setUt((u) => nextPreview(u, false, at));
-    onToast('Skipped. Your next preview is ready in an hour.');
+    setUt((u) => nextPreview(u, false, at, week));
+    onToast('Skipped. Your next preview is ready in 24 hours.');
   };
 
   const submitStreamCards = (id: string, uids: string[]) => {
@@ -961,6 +976,30 @@ export default function UltimateTeam(props: {
     );
   };
 
+  // Claude (packs-3): a named flash sale's deal (pack-actions.ts), 1 per player per sale day
+  const buyFlash = (key: string) => {
+    if (!pool) return;
+    const at = Date.now();
+    const d = flashDeal(SPORT, key, at);
+    if (!d) return onToast('This flash sale has ended.');
+    if (!flashLeft(ut, key)) return onToast('One of each per player in this sale.');
+    if (d.kind === 'scout' && picksFull(ut)) return onToast(PICKS_FULL);
+    if (profile.coins < d.price) {
+      sfx.nope();
+      return onToast('Not enough coins yet: ' + (d.price - profile.coins).toLocaleString('en-US') + ' more.');
+    }
+    const ok = (p: typeof profile) => p.coins >= d.price && flashLeft(p.ut, key);
+    const pay = (p: typeof profile) => ({ ...p, coins: p.coins - d.price, ut: recordFlash(p.ut, key) });
+    sfx.coin();
+    if (d.kind === 'scout') {
+      const id = 'scout:' + newId();
+      const pick = pickFor(pool, 'scout', id, week, at);
+      update((p) => (ok(p) && !picksFull(p.ut) ? { ...pay(p), ut: addPick(pay(p).ut, pick) } : p));
+      return setPickOpen(id);
+    }
+    openNow(d.kind, newId(), d.name, pay, false, ok, undefined, { price: d.price, source: 'store' });
+  };
+
   const claimObjectivePick = () => {
     if (!pool) return;
     const at = Date.now();
@@ -980,12 +1019,8 @@ export default function UltimateTeam(props: {
       return startPromo(kind, packDefs(SPORT).spotlight.price);
     if (kind === 'daily') return claimDailyDrop();
     if (kind === 'scout') return buyScout(packDefs(SPORT).scout.price);
-    if ((LIMITED as string[]).includes(kind))
-      return buyLimited(
-        kind as LimitedKind,
-        packDefs(SPORT)[kind as LimitedKind & keyof ReturnType<typeof packDefs>]
-          .price,
-      );
+    const limited = pa.limitOf(kind);
+    if (limited) return buyLimited(limited, packDefs(SPORT)[limited].price);
     if (profile.coins < price) {
       sfx.nope();
       onToast(
@@ -1034,6 +1069,14 @@ export default function UltimateTeam(props: {
     )
       return startPromo(pp.kind, 0, pp.id);
     // Claude: a reward Scout's Choice / Standout pick becomes a pick sheet (its id is the pack's)
+    // Claude (packs-1 fix): not while 50 picks are open (the pack stays waiting, nothing is lost)
+    if (
+      (pp.kind.startsWith('live-pick:') ||
+        pp.kind === 'scout' ||
+        pp.kind === 'standout-pick') &&
+      picksFull(ut)
+    )
+      return onToast(PICKS_FULL);
     // Claude wave 3: a Live Calendar program pick
     if (pp.kind.startsWith('live-pick:') && pool) {
       const pick = livePick(pool, pp.kind, pp.id, day, Date.now());
@@ -1201,8 +1244,9 @@ export default function UltimateTeam(props: {
           at: Date.now(),
         }
       : null;
+    // Claude (packs-1 fix): `sbc:` names an SBC reward pack (Scout Stamps: a trade-in earns none)
     const pack = s.reward.pack
-      ? { id: newId(), kind: s.reward.pack, at: Date.now() }
+      ? { id: 'sbc:' + s.id + ':' + newId(), kind: s.reward.pack, at: Date.now() }
       : null;
     update((p) => {
       const current = new Set(p.ut.owned.map((c) => c.uid));
@@ -1799,6 +1843,7 @@ export default function UltimateTeam(props: {
           onStandouts={() => go('standouts')}
           onTracker={() => go('tracker')}
           onLive={buyLive}
+          onFlash={buyFlash}
           preview={
             <PreviewPack
               pool={pool}

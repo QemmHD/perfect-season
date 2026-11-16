@@ -4,6 +4,7 @@
 // the whole profile keys) carries it with no backend change. Every reward is claimed under a stable
 // id in `claims` exactly once. See docs/UT-CONTENT-2.md.
 import { normalizePulls, type PullLog } from './pull-log-state';
+import { addClaim, normalizeStamps, pinClaims } from './scout-stamps';
 
 /** An open pick sheet: persisted until one card is kept, so closing the app never loses it. */
 export interface PickState {
@@ -62,10 +63,16 @@ export interface ContentState {
   streams?: Record<string, number>;
   /** wave 2: the login calendar (daily-hub.ts): days claimed so far in the cycle and the last day */
   calendar?: { day: string; n: number };
-  /** wave 2: the Preview Pack (preview-pack.ts): a per-player seed, the preview number, a cooldown */
-  preview?: { seed: string; n: number; until?: number };
+  /** wave 2: the Preview Pack (preview-pack.ts): a per-player seed, the preview number, a cooldown;
+   * Claude (packs-3): `wk`, the week the preview was made in (optional: an older build drops it, and the
+   * preview then reads the current week until the next one is made; harmless) */
+  preview?: { seed: string; n: number; until?: number; wk?: string };
   /** Claude: the Pack Tracker (pull-log-state.ts, docs/PULL-TRACKER.md): recent packs and per-type totals */
   pulls?: PullLog;
+  /** Claude (packs-1): Scout Stamps earned (packs, grants) and spent (scout-stamps.ts). Never read alone:
+   * the balance also has floors from `pulls` and the `stamps-grant:` / `stamps:` claims, so an older build
+   * that drops this field loses no granted or spent stamp (packs-plan.md D7, D13) */
+  stamps?: { earned: number; spent: number };
 }
 
 const str = (x: unknown): x is string => typeof x === 'string';
@@ -101,14 +108,26 @@ function runOf(x: unknown): DraftRun | undefined {
   };
 }
 
+/**
+ * The most open pick sheets a save keeps (normalizeContent keeps the first this many, in every build).
+ * Claude (packs-1 fix): anything that adds a pick checks `picksFull` first, so a 51st pick is never
+ * paid for (coins, stamps or a reward claim) and then dropped on the next load.
+ */
+export const PICKS_MAX = 50;
+/** What the player is told when a new pick can't be kept yet. */
+export const PICKS_FULL = 'You have 50 picks waiting. Choose from some of them in Your packs first.';
+/** Whether the open pick sheets are at PICKS_MAX (no new pick can be kept until one is opened). */
+export const picksFull = (ut: WithContent): boolean => (ut.content?.picks?.length ?? 0) >= PICKS_MAX;
+
 /** Any saved `content` as valid state (unknown fields go, bad entries drop, nothing resets). */
 export function normalizeContent(raw: unknown): ContentState | undefined {
   if (!rec(raw)) return undefined;
   const out: ContentState = {};
   if (rec(raw.daily) && str(raw.daily.day)) out.daily = { day: raw.daily.day, streak: int(raw.daily.streak, 0, 7), total: int(raw.daily.total, 0, 1e6) };
   if (rec(raw.buys)) out.buys = Object.fromEntries(Object.entries(raw.buys).filter(([, v]) => typeof v === 'number').map(([k, v]) => [k, int(v, 0, 1000)]));
-  if (Array.isArray(raw.picks)) out.picks = raw.picks.map(pickOf).filter((p): p is PickState => !!p).slice(0, 50);
-  if (Array.isArray(raw.claims)) out.claims = strs(raw.claims);
+  if (Array.isArray(raw.picks)) out.picks = raw.picks.map(pickOf).filter((p): p is PickState => !!p).slice(0, PICKS_MAX);
+  // Claude (packs-1): the stamp claims are kept at the end, so the 5,000 cap never drops them
+  if (Array.isArray(raw.claims)) out.claims = pinClaims(strs(raw.claims, Infinity));
   if (rec(raw.market) && str(raw.market.day))
     out.market = { day: raw.market.day, bought: Array.isArray(raw.market.bought) ? [...new Set(raw.market.bought.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 64))] : [] };
   if (rec(raw.soWins) && str(raw.soWins.week)) out.soWins = { week: raw.soWins.week, ids: strs(raw.soWins.ids, 50) };
@@ -126,11 +145,14 @@ export function normalizeContent(raw: unknown): ContentState | undefined {
   if (rec(raw.streams)) out.streams = Object.fromEntries(Object.entries(raw.streams).filter(([, v]) => typeof v === 'number').map(([k, v]) => [k, int(v, 0, 1e9)]));
   if (rec(raw.calendar) && str(raw.calendar.day)) out.calendar = { day: raw.calendar.day, n: int(raw.calendar.n, 0, 1e6) };
   if (rec(raw.preview) && str(raw.preview.seed))
-    out.preview = { seed: raw.preview.seed, n: int(raw.preview.n, 0, 1e9), ...(typeof raw.preview.until === 'number' ? { until: int(raw.preview.until, 0, Number.MAX_SAFE_INTEGER) } : {}) };
+    out.preview = { seed: raw.preview.seed, n: int(raw.preview.n, 0, 1e9), ...(typeof raw.preview.until === 'number' ? { until: int(raw.preview.until, 0, Number.MAX_SAFE_INTEGER) } : {}), ...(typeof raw.preview.wk === 'string' && /^\d{4}-W\d{2}$/.test(raw.preview.wk) ? { wk: raw.preview.wk } : {}) };
   if (rec(raw.pulls)) {
     const pulls = normalizePulls(raw.pulls);
     if (pulls) out.pulls = pulls;
   }
+  // Claude (packs-1): never below the floors the pull log and the claims prove
+  const stamps = normalizeStamps(raw.stamps, out);
+  if (stamps) out.stamps = stamps;
   if (Array.isArray(raw.locked)) out.locked = strs(raw.locked, 2000);
   if (rec(raw.era)) out.era = { eligible: raw.era.eligible === true };
   if (rec(raw.draft)) {
@@ -163,7 +185,8 @@ export function claimed(ut: WithContent, id: string): boolean {
 export function withClaim<T extends WithContent>(ut: T, id: string): T {
   const c = contentOf(ut);
   if (c.claims?.includes(id)) return ut;
-  return { ...ut, content: { ...c, claims: [...(c.claims ?? []), id].slice(-5000) } };
+  // Claude (packs-1): the newest 5,000, the Scout Stamp claims kept at the end (scout-stamps.ts addClaim)
+  return { ...ut, content: { ...c, claims: addClaim(c.claims, id) } };
 }
 
 export function withContent<T extends WithContent>(ut: T, fn: (c: ContentState) => ContentState): T {

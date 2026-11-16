@@ -4,13 +4,15 @@
 // Desk) is written once, in the same state update that deposits its cards, to `ut.content.pulls`:
 // the most recent packs in full plus uncapped running totals per pack type. The saved shape and its
 // caps are in pull-log-state.ts. Nothing here changes odds, prices, card ids or what a pack holds.
+// packs-1 (2026-11-16): the same update earns the pack's Scout Stamps (scout-stamps.ts).
 import { pickFor } from '../engine/sport';
 import { fcToDisplay } from './fc-scale';
 import { livePackDef, livePacksOn } from './live-packs';
-import { fill, openPack, packDefs, packRand, positionChoices, quickSellValue, walkoutLevel, type Odds, type PackDef, type SlotTier } from './packs';
+import { fill, legacyFill, openPack, packDefs, packRand, positionChoices, quickSellValue, walkoutLevel, type Odds, type PackDef, type SlotTier } from './packs';
 import { TIER_RANK, type Pool } from './pool';
 import { capRecent, type PullAgg, type PullEntry, type PullLog, type PulledCard } from './pull-log-state';
 import type { ContentState } from './content-state';
+import { packStamps, withEarnedStamps } from './scout-stamps';
 import type { OwnedCard, CardRetirement, RatedCard, Tier, UtSport } from './types';
 
 export type { PullAgg, PullEntry, PullLog, PulledCard };
@@ -34,7 +36,8 @@ export function ovrBucket(ovr: number, sport: UtSport): number {
 }
 
 /** Picks: one card kept from a sheet (they never counted in `packsOpened`). */
-const PICK_GROUPS = new Set(['scout', 'standout-pick', 'swap', 'new-era', 'calendar', 'live-pick']);
+// (packs-2: the reward picks of content-packs.ts awardPick too; a Scout Drop's pack is its pack kind)
+const PICK_GROUPS = new Set(['scout', 'standout-pick', 'swap', 'new-era', 'calendar', 'live-pick', 'front-office', 'pick-82', 'pick-84', 'pick-85', 'program-pick']);
 export const isPickGroup = (g: string) => PICK_GROUPS.has(g);
 
 /** The pack type a pack's totals go under: unit/position packs together, a Preview Pack apart from
@@ -54,6 +57,11 @@ export function groupName(group: string, name: string, sport: UtSport): string {
     preview: 'Preview Pack',
     'event-spotlight': 'Spotlight Reward',
     'live-pick': 'Program Pick',
+    'program-pick': 'Program Pick',
+    'front-office': 'Front Office Pick',
+    'pick-82': 'Player Pick 82+',
+    'pick-84': 'Player Pick 84+',
+    'pick-85': 'Stamp Scout 85+',
     scout: "Scout's Choice",
     'standout-pick': 'Standout Pick',
     swap: 'Swap Desk Pick',
@@ -73,10 +81,14 @@ export function sourceOfPending(id: string): string {
     ['collection:', 'collection'],
     ['calendar:', 'calendar'],
     ['daily-bonus:', 'daily'],
+    ['scout-drop:', 'drop'],
+    ['minutes:', 'minutes'],
+    ['stamps:', 'stamps'],
     ['daily-gold:', 'daily'],
     ['daily-', 'daily'],
     ['draft:', 'draft'],
     ['stream:', 'sbc'],
+    ['sbc:', 'sbc'],
     ['objective:', 'objective'],
     ['moment:', 'moment'],
     ['circuit:', 'circuit'],
@@ -110,6 +122,9 @@ export const SOURCE_LABEL: Record<string, string> = {
   rivals: 'Rivals',
   swap: 'Swap Desk',
   bundle: 'New Era',
+  drop: 'Scout Drop',
+  minutes: 'Minutes',
+  stamps: 'Scout Stamps',
 };
 
 /** A pack (or pick) as it opened: what the tracker writes. `uid` is the uid prefix (see PullEntry.u). */
@@ -195,7 +210,20 @@ export function recordPull<T extends Loggable>(ut: T, p: PullInput): T {
     r: capRecent([...(log?.r ?? []), entry]),
     a: { ...(log?.a ?? {}), [group]: addToAgg(log?.a[group], { ...p, price: entry.c }, group, sport) },
   };
-  return { ...ut, content: { ...c, pulls } };
+  // Claude (packs-1): Scout Stamps for this pack, in the same update (scout-stamps.ts). A special is a
+  // duplicate when the club holds its card or an earlier logged pack pulled it (the recovery floor's rule
+  // is the second half alone, so the floor never pays more than this did)
+  let had: Set<string> | undefined;
+  const stamps = packStamps(entry, (id) => {
+    if (!had) {
+      had = new Set(ut.owned?.map((o) => o.cardId));
+      for (const e of log?.r ?? []) for (const x of e.cs) had.add(x[0]);
+    }
+    return had.has(id);
+  });
+  // (counted on the state before this pack, whose floors don't hold it yet)
+  const paid = withEarnedStamps(ut, stamps);
+  return { ...paid, content: { ...(paid.content ?? {}), pulls } };
 }
 
 export function pullsOf(ut: Loggable): PullLog | null {
@@ -262,10 +290,11 @@ export function expectedFor(pool: Pool, group: string, day: string, week: string
         done = 0;
       for (let i = 0; i < n; i++) {
         const seed = 'tracker-expect:' + group + ':' + i;
+        // (a Spotlight's golds are the registered receipt's pre-curve draw: packs.ts legacyFill)
         const cards =
           group === 'spotlight'
             ? def
-              ? fill(pool, def.slots, packRand(seed), undefined, week)
+              ? [...legacyFill(pool, def.slots.length - 1, packRand(seed)), ...fill(pool, def.slots.slice(-1), packRand(seed + ':chase'), undefined, week)]
               : []
             : openPack(pool, group === 'preview' ? 'premium' : group === 'position' ? 'position:' + choices[i % choices.length].key : group, seed, week);
         if (!cards.length) continue;

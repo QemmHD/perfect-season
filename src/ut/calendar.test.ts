@@ -218,8 +218,10 @@ describe('program pack economy (' + SPORT + ')', () => {
       const N = 150;
       for (let i = 0; i < N; i++) v += openLivePack(pool, pk.id, packRand('ev' + pk.id + i), day).reduce((a, c) => a + quickSellValue(c), 0);
       const ratio = v / N / def.price;
-      expect(ratio).toBeGreaterThan(0.4);
-      expect(ratio).toBeLessThan(0.65);
+      // Claude (packs-3, audit H3): a Program Guarantee costs 2.2 program packs or more now (it cost
+      // about one before), a chase item that returns about a quarter; the pack itself stays near half
+      expect(ratio).toBeGreaterThan(pk.tpl === 'guarantee' ? 0.2 : 0.4);
+      expect(ratio).toBeLessThan(pk.tpl === 'guarantee' ? 0.35 : 0.65);
     }
   });
 });
