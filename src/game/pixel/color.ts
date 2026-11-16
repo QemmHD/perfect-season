@@ -109,6 +109,55 @@ export function deltaE(a: RGB, b: RGB): number {
   return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
 }
 
+/**
+ * How far apart two colours look by CIEDE2000 (Sharma, Wu and Dalal's formulation): the hue and
+ * chroma corrections make two reds or two navies read as close as they look, where CIE76 overstates
+ * saturated differences. About 1 is a just-visible step; kits closer than 25 clash (V2 C.1.6).
+ */
+export function deltaE2000(a: RGB, b: RGB): number {
+  return deltaE2000Lab(toLab(a), toLab(b));
+}
+
+/** CIEDE2000 between two CIE L*a*b* colours. */
+export function deltaE2000Lab([L1, a1, b1]: readonly number[], [L2, a2, b2]: readonly number[]): number {
+  const rad = Math.PI / 180;
+  const C1 = Math.hypot(a1, b1);
+  const C2 = Math.hypot(a2, b2);
+  const Cm = (C1 + C2) / 2;
+  const G = 0.5 * (1 - Math.sqrt(Cm ** 7 / (Cm ** 7 + 25 ** 7)));
+  const a1p = (1 + G) * a1;
+  const a2p = (1 + G) * a2;
+  const C1p = Math.hypot(a1p, b1);
+  const C2p = Math.hypot(a2p, b2);
+  const hue = (x: number, y: number) => (x === 0 && y === 0 ? 0 : ((Math.atan2(y, x) / rad) + 360) % 360);
+  const h1 = hue(a1p, b1);
+  const h2 = hue(a2p, b2);
+  const dL = L2 - L1;
+  const dC = C2p - C1p;
+  let dh = 0;
+  if (C1p * C2p !== 0) {
+    dh = h2 - h1;
+    if (dh > 180) dh -= 360;
+    else if (dh < -180) dh += 360;
+  }
+  const dH = 2 * Math.sqrt(C1p * C2p) * Math.sin((dh / 2) * rad);
+  const Lm = (L1 + L2) / 2;
+  const Cpm = (C1p + C2p) / 2;
+  let hm = h1 + h2;
+  if (C1p * C2p !== 0) {
+    if (Math.abs(h1 - h2) > 180) hm += h1 + h2 < 360 ? 360 : -360;
+    hm /= 2;
+  }
+  const T = 1 - 0.17 * Math.cos((hm - 30) * rad) + 0.24 * Math.cos(2 * hm * rad) + 0.32 * Math.cos((3 * hm + 6) * rad) - 0.2 * Math.cos((4 * hm - 63) * rad);
+  const dTheta = 30 * Math.exp(-(((hm - 275) / 25) ** 2));
+  const Rc = 2 * Math.sqrt(Cpm ** 7 / (Cpm ** 7 + 25 ** 7));
+  const Sl = 1 + (0.015 * (Lm - 50) ** 2) / Math.sqrt(20 + (Lm - 50) ** 2);
+  const Sc = 1 + 0.045 * Cpm;
+  const Sh = 1 + 0.015 * Cpm * T;
+  const Rt = -Math.sin(2 * dTheta * rad) * Rc;
+  return Math.sqrt((dL / Sl) ** 2 + (dC / Sc) ** 2 + (dH / Sh) ** 2 + Rt * (dC / Sc) * (dH / Sh));
+}
+
 /** No kit tone comes closer to the outline than this (delta E), so the silhouette never sinks into a dark kit. */
 export const OUTLINE_CLEARANCE = 10;
 /**

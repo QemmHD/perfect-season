@@ -4,7 +4,7 @@
 // and each keeper in a color neither outfield set nor the other keeper wears.
 import { luma, rgb } from '../pixel/color';
 import type { PitchTheme } from '../pixel/pitch';
-import { colorDistance, colorsClash } from '../uniforms';
+import { CHANGE_COLORS, clearOf, colorDistance, colorsClash } from '../uniforms';
 import type { SoccerKit } from './render';
 
 export interface ClubColors {
@@ -49,8 +49,9 @@ export function soccerKits(me: ClubColors, them: ClubColors): SoccerKits {
   const home = homeKit(them);
   const away = awayKit(them);
   const clash = colorsClash(me.c1, them.c1) || (me.c1 === them.c1 && me.c2 === them.c2);
-  const rivalAway = clash && colorDistance(me.c1, away.jersey) > colorDistance(me.c1, home.jersey);
-  const theirs = rivalAway ? away : home;
+  // (players-4, V2 C.1.6: within delta E 25 the rival always changes, to the first kit that reads)
+  const rivalAway = clash;
+  const theirs = rivalAway ? clearOf(us.jersey, [away, ...CHANGE_COLORS(them.c2).map((c) => ({ ...away, jersey: c, shorts: c, socks: c }))]) : home;
   const usGk = keeperKit([us.jersey, theirs.jersey]);
   const themGk = keeperKit([us.jersey, theirs.jersey, usGk.jersey]);
   return { us, them: theirs, usGk, themGk, rivalAway, pitch: { homeC1: them.c1, homeC2: them.c2, awayC1: me.c1 } };

@@ -1,14 +1,17 @@
 // What each side wears in a head to head, from the two players' favorite teams: each in his team's
 // home (colored) set, except that the rival changes into his away set when both picked the same
-// team or the two home jerseys are too alike to tell apart. The court belongs to the defending side,
-// so your offense plays on the rival's home floor. Pure: each phone works out its own view.
+// team or the two home jerseys are too alike to tell apart (V2 C.1.6: primaries within CIEDE2000
+// delta E 25). A kit is jersey base + trim + number; the body raster gives each its three-tone ramp.
+// The court belongs to the defending side, so your offense plays on the rival's home floor. Pure:
+// each phone works out its own view. Render only: kits never reach the simulation.
 import { type TeamInfo, teamOf, teamsOf } from '../data/teams';
 import { hashString, rng } from '../engine/rng';
-import type { SportId } from '../engine/sport';
+import { pickFor, type SportId } from '../engine/sport';
 import type { Kit as BasketballKit } from './hoops2/render';
-import { hex, luma, onColor, type RGB, rgb } from './pixel/color';
+import { deltaE2000, hex, luma, onColor, type RGB, rgb } from './pixel/color';
 import type { CourtTheme } from './pixel/court';
 import type { FieldTheme } from './pixel/field';
+import { MARK_COLOR } from './pixel/ground';
 
 export type { BasketballKit };
 
@@ -58,14 +61,22 @@ export function colorDistance(a: string, b: string): number {
   return Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db);
 }
 
-/** Closer than this, two jerseys read as the same team on the court. */
-export const CLASH_DISTANCE = 140;
+/** Closer than this (CIEDE2000), two jerseys read as the same team on the court (V2 C.1.6). */
+export const CLASH_DE = 25;
 /** Two very dark jerseys (black, navy) are hard to tell apart whatever their hue. */
 const DARK = 50;
 
-export function colorsClash(a: string, b: string): boolean {
-  return colorDistance(a, b) < CLASH_DISTANCE || (luma(rgb(a)) < DARK && luma(rgb(b)) < DARK);
+/** How far apart two kit colours look (CIEDE2000 delta E). */
+export function kitDeltaE(a: string, b: string): number {
+  return deltaE2000(rgb(a), rgb(b));
 }
+
+export function colorsClash(a: string, b: string): boolean {
+  return kitDeltaE(a, b) < CLASH_DE || (luma(rgb(a)) < DARK && luma(rgb(b)) < DARK);
+}
+
+/** The ground rings' colours (ground.ts): no kit may be one of them, so "you" always reads as you. */
+export const RING_COLORS: readonly string[] = Object.values(MARK_COLOR);
 
 const isWhite = (c: string) => luma(rgb(c)) > 225;
 
@@ -105,11 +116,25 @@ export function kitsFor(myFav: string | null, rivalFav: string | null, sport: Sp
   const mine = homeKit(me, sport);
   const home = homeKit(them, sport);
   const away = awayKit(them, sport);
-  // the same team, or two jerseys too alike: the rival changes, unless his away set is no better
+  // the same team, or two jerseys too alike: the rival changes into his away set, or (when that is
+  // no better against yours) a change kit in his second colour, white or charcoal
   const same = me.abbr === them.abbr && me !== HOUSE;
-  const clash = same || colorsClash(me.c1, them.c1);
-  const rivalAway = clash && (same || colorDistance(me.c1, them.alt) > colorDistance(me.c1, them.c1));
-  return { mine, theirs: rivalAway ? away : home, court: courtOf(them), rivalAway, field: fieldOf(me, them) };
+  const rivalAway = same || colorsClash(me.c1, them.c1);
+  if (!rivalAway) return { mine, theirs: home, court: courtOf(them), rivalAway, field: fieldOf(me, them) };
+  const change = (c: string): Kit => ({ ...away, jersey: c, trim: kitDeltaE(c, them.c1) < CLASH_DE ? them.c2 : them.c1, ...pickFor<Partial<Kit>>(sport, { nba: { shorts: c }, nfl: {}, soccer: { shorts: c } }) });
+  const theirs = clearOf(mine.jersey, [away, ...CHANGE_COLORS(them.c2).map(change)]);
+  return { mine, theirs, court: courtOf(them), rivalAway, field: fieldOf(me, them) };
+}
+
+/** The change kits' shirt colours after the away set, in order: the team's second colour, white, charcoal. */
+export const CHANGE_COLORS = (second: string): string[] => [second, WHITE, '#1D2230'];
+
+/**
+ * The first of a rival's kits (away set first, then the change kits) whose jersey doesn't clash with
+ * yours; if every one does, the farthest from yours. Every sport's kits go through this (soccer2/kits.ts too).
+ */
+export function clearOf<K extends { jersey: string }>(mine: string, options: readonly K[]): K {
+  return options.find((k) => !colorsClash(mine, k.jersey)) ?? options.reduce((a, b) => (kitDeltaE(mine, b.jersey) > kitDeltaE(mine, a.jersey) ? b : a));
 }
 
 /** The end zones: the nickname across each, yours behind your offense. */
