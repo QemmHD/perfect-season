@@ -14,6 +14,7 @@
 //   packEv(pool, slots)     a pack's mean quick-sell value, exactly, from its slots: the EV band.
 // The coin values are pure functions of the pack definitions and the curve; packEv reads the pool.
 import { fcToDisplay } from './fc-scale';
+import { premiumChanceAtLeast, routeCost } from './odds';
 import { curveOdds, FEATURED_STANDOUT, FLOORS, GOLD_CURVE, isFloorKind, type Odds, packDefs, quickSell, quickSellValue, SILVER_CURVE, type SlotTier } from './packs';
 import type { Pool } from './pool';
 import { positionMix } from './squad';
@@ -27,39 +28,9 @@ import type { RatedCard, Tier, UtSport } from './types';
 /** From this displayed overall up, a gold is valued at its route cost (basketball's 83, each sport's scale). */
 export const ROUTE_FROM = 83;
 
-const routeCache = new Map<string, number>();
-
-/** The chance one Premium Gold holds at least one gold of displayed overall `ovr` or better (exact). */
-export function premiumChanceAtLeast(sport: UtSport, ovr: number): number {
-  const def = packDefs(sport).premium;
-  let none = 1;
-  for (const slot of def.slots) {
-    let p = 0;
-    for (const [k, w] of Object.entries(slot)) {
-      if (!w || !isFloorKind(k)) continue;
-      const odds = curveOdds(GOLD_CURVE, fcToDisplay(FLOORS[k], sport), sport);
-      let hit = 0;
-      for (const [o, x] of odds) if (o >= ovr) hit += x;
-      p += w * hit;
-    }
-    none *= 1 - p;
-  }
-  return 1 - none;
-}
-
-/**
- * D10: the coins a gold of displayed overall `ovr`+ costs by its cheapest pack route (Premium Gold
- * price ÷ the chance a Premium has one). Infinity above the curve's top (no pack route at all).
- */
-export function routeCost(sport: UtSport, ovr: number): number {
-  const key = sport + ':' + ovr + ':' + packDefs(sport).premium.price;
-  const got = routeCache.get(key);
-  if (got !== undefined) return got;
-  const p = premiumChanceAtLeast(sport, ovr);
-  const v = p > 0 ? Math.round(packDefs(sport).premium.price / p) : Infinity;
-  routeCache.set(key, v);
-  return v;
-}
+// Claude (packs-4): routeCost and premiumChanceAtLeast moved to odds.ts, the one source of published
+// numbers; they are re-exported here so every caller keeps its import.
+export { premiumChanceAtLeast, routeCost };
 
 /**
  * D5's ladder rungs (basketball coins) for the special tiers, until packs-6 measures the ladder: the

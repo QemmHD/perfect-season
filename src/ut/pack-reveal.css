@@ -383,3 +383,9 @@
   animation-duration: 14s;
   opacity: 0.45;
 }
+
+/* Claude (packs-4, audit M8): the Pack Helper's RARE tag on a rare gold (the shimmer; pack-helper.ts) */
+.ut-helper-tag.h-rare {
+  background: linear-gradient(110deg, #fff3c4 0%, #f5b83d 45%, #fff8de 60%, #d89a1f 100%);
+  color: #2a1a00;
+}

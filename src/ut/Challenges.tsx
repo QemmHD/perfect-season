@@ -10,6 +10,9 @@ import { packName, quickSellValue } from './packs';
 import { type Pool, seasonText } from './pool';
 import { autoFill, cardFits, checkSbc, guardBlocked, type Req, rewardText, rewardValue, type Sbc, teamNeed, tradeWarning } from './sbc';
 import './sbc-page.css';
+import { isRandomReward } from './odds';
+import { LazyOddsSheet, useOddsPreload } from './odds-lazy';
+import './odds-sheet.css';
 import { playsIn } from './squad';
 import { Lede } from './ui';
 import type { ClubCard } from './UltimateTeam';
@@ -85,6 +88,7 @@ const reqLabel = (r: Req) => {
 };
 
 export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string, number>; club: ClubCard[]; day: string; onSubmit: (s: Sbc, uids: string[]) => void; onToast: (t: string) => void; extra?: React.ReactNode; onStandouts?: () => void }) {
+  useOddsPreload();
   const [open, setOpen] = useState<Sbc | null>(null);
   const [left, setLeft] = useState(() => [timeLeft(false), timeLeft(true)]);
   useEffect(() => {
@@ -146,15 +150,16 @@ export function Challenges(props: { pool: Pool; sbcs: Sbc[]; done: Record<string
           ))}
         </div>
       )}
-      {open && <SbcSheet s={open} club={props.club} onClose={() => setOpen(null)} onSubmit={(uids) => (setOpen(null), props.onSubmit(open, uids))} onToast={props.onToast} />}
+      {open && <SbcSheet pool={props.pool} s={open} club={props.club} onClose={() => setOpen(null)} onSubmit={(uids) => (setOpen(null), props.onSubmit(open, uids))} onToast={props.onToast} />}
     </div>
   );
 }
 
-function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubCard[]; onClose: () => void; onSubmit: (uids: string[]) => void; onToast: (t: string) => void }) {
+function SbcSheet({ pool, s, club, onClose, onSubmit, onToast }: { pool: Pool; s: Sbc; club: ClubCard[]; onClose: () => void; onSubmit: (uids: string[]) => void; onToast: (t: string) => void }) {
   const [picked, setPicked] = useState<(string | null)[]>(() => Array.from({ length: s.size }, () => null));
   const [slotAt, setSlotAt] = useState<number | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [odds, setOdds] = useState(false);
   const byUid = useMemo(() => new Map(club.map((c) => [c.uid, c])), [club]);
   const cards = picked.map((u) => (u ? byUid.get(u) : undefined)).filter((c): c is ClubCard => !!c);
   const check = checkSbc(s, cards.map((c) => c.rc));
@@ -188,7 +193,15 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
               <div className="ut-sbcsheet-title">
                 <span className="eyebrow">{s.kind === 'daily' ? 'Daily challenge' : s.kind === 'weekly' ? 'Weekly challenge' : s.left ? 'Upgrade · ' + s.left + ' left today' : 'Repeatable · as often as you like'}</span>
                 <h2 className="disp">{s.title}</h2>
-                <small>Reward: {rewardText(s.reward, SPORT, packName)}</small>
+                <span className="ut-sbc-rewardline">
+                  <small>Reward: {rewardText(s.reward, SPORT, packName)}</small>
+                  {/* Claude (packs-4): a random reward shows its odds before it is claimed */}
+                  {isRandomReward(s.reward) && (
+                    <button className="ps-odds-chip" onClick={() => setOdds(true)} aria-label="Reward odds">
+                      ODDS
+                    </button>
+                  )}
+                </span>
               </div>
               <span className={'ut-sbc-rating' + (teamReq && cards.length ? (team.now >= teamReq.ovr ? ' ok' : ' low') : '')} aria-label={'Team overall ' + (cards.length ? team.now : 'none yet') + (teamReq ? ', needs ' + teamReq.ovr : '')}>
                 <i className="eyebrow">Team</i>
@@ -258,6 +271,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
           onClose={() => setSlotAt(null)}
         />
       )}
+      {odds && <LazyOddsSheet pool={pool} sport={SPORT} source={{ type: 'reward', reward: s.reward }} onClose={() => setOdds(false)} />}
       {confirm && (
         <TradeConfirm
           s={s}

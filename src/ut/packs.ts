@@ -510,7 +510,125 @@ export function drawGold(pool: Pool, floor: number, rand: Rand, mix?: [string, n
   return uniform(here, rand);
 }
 
+// ---------- the exact chances of the draws above (odds.ts publishes them) ----------
+
+/** Add `p` at `o` in a distribution. */
+const addAt = (m: Map<number, number>, o: number, p: number) => m.set(o, (m.get(o) ?? 0) + p);
+
+/**
+ * Claude (packs-4): the exact chance that curvePick(list, curve, floor) lands on each displayed overall,
+ * resolving every drawn overall the way curvePick does (nearest present, never below the floor or above
+ * the curve's top). Mass that resolves to nothing (curvePick's null) is left out, so it sums to ≤ 1.
+ */
+export function curveDist(list: readonly RatedCard[], curve: Curve, floor: number): Map<number, number> {
+  const out = new Map<number, number>();
+  if (!list.length) return out;
+  const sport = list[0].line.sport;
+  const idx = byOvr(list);
+  const top = curveTop(curve, sport);
+  for (const [o, p] of curveOdds(curve, floor, sport)) {
+    const at = nearestPresent(idx, o, floor, top);
+    if (at !== null) addAt(out, at, p);
+  }
+  return out;
+}
+
+const goldDistCache = new WeakMap<Pool, Map<string, Map<number, number>>>();
+/**
+ * Claude (packs-4): the exact chance that drawGold(pool, floor, …, mix) — a fresh club, no duplicate
+ * protection — gives a gold of each displayed overall. The same steps as drawGold: an overall on the gold
+ * curve from `floor` (basketball's number), resolved to the nearest overall any position of the mix has,
+ * and the whole pool's golds when the mix has nothing in range. Cached per pool, floor and mix.
+ */
+export function goldDist(pool: Pool, floor: number, mix?: [string, number][]): Map<number, number> {
+  let byKey = goldDistCache.get(pool);
+  if (!byKey) goldDistCache.set(pool, (byKey = new Map()));
+  const key = floor + '|' + (mix ? mix.map(([p, w]) => p + ':' + w).join(',') : '*');
+  const got = byKey.get(key);
+  if (got) return got;
+  const sport = pool.sport;
+  const lo = fcToDisplay(floor, sport);
+  const golds = pool.buckets.gold;
+  const m = (mix ?? Object.entries(positionMix(sport))).filter(([p]) => golds[p]?.length);
+  const all = byOvr(goldsOf(pool, m.map(([p]) => p)));
+  const top = curveTop(GOLD_CURVE, sport);
+  const out = new Map<number, number>();
+  let miss = 0;
+  for (const [o, p] of curveOdds(GOLD_CURVE, lo, sport)) {
+    const at = nearestPresent(all, o, lo, top);
+    if (at === null) miss += p;
+    else addAt(out, at, p);
+  }
+  // drawGold's fallback: the mix has nothing that high, so any position on the curve
+  if (miss > 0 && m.length !== Object.keys(golds).length) for (const [o, p] of curveDist(goldsOf(pool), GOLD_CURVE, lo)) addAt(out, o, miss * p);
+  byKey.set(key, out);
+  return out;
+}
+
+const goldCardCache = new WeakMap<Pool, Map<string, Map<RatedCard, number>>>();
+/**
+ * Claude (packs-4): goldDist card by card: the chance drawGold (a fresh club) gives each gold. At the drawn
+ * overall a position of the mix that has it (by the mix's weights), then a card there uniformly; the whole
+ * pool's golds when the mix has nothing in range. odds.ts uses it to count a pack's no-repeat redraws.
+ */
+export function goldCardDist(pool: Pool, floor: number, mix?: [string, number][]): Map<RatedCard, number> {
+  let byKey = goldCardCache.get(pool);
+  if (!byKey) goldCardCache.set(pool, (byKey = new Map()));
+  const key = floor + '|' + (mix ? mix.map(([p, w]) => p + ':' + w).join(',') : '*');
+  const got = byKey.get(key);
+  if (got) return got;
+  const sport = pool.sport;
+  const lo = fcToDisplay(floor, sport);
+  const golds = pool.buckets.gold;
+  const m = (mix ?? Object.entries(positionMix(sport))).filter(([p]) => golds[p]?.length);
+  const all = byOvr(goldsOf(pool, m.map(([p]) => p)));
+  const top = curveTop(GOLD_CURVE, sport);
+  const out = new Map<RatedCard, number>();
+  const add = (rc: RatedCard, p: number) => out.set(rc, (out.get(rc) ?? 0) + p);
+  let miss = 0;
+  for (const [o, p] of curveOdds(GOLD_CURVE, lo, sport)) {
+    const at = nearestPresent(all, o, lo, top);
+    if (at === null) {
+      miss += p;
+      continue;
+    }
+    const here = m.filter(([pos]) => byOvr(golds[pos]).get(at)?.length);
+    const tot = here.reduce((a, [, w]) => a + w, 0);
+    for (const [pos, w] of here) {
+      const list = byOvr(golds[pos]).get(at)!;
+      for (const rc of list) add(rc, (p * w) / tot / list.length);
+    }
+  }
+  if (miss > 0 && m.length !== Object.keys(golds).length) {
+    const idx = byOvr(goldsOf(pool));
+    for (const [o, p] of curveDist(goldsOf(pool), GOLD_CURVE, lo)) for (const rc of idx.get(o)!) add(rc, (miss * p) / idx.get(o)!.length);
+  }
+  byKey.set(key, out);
+  return out;
+}
+
+/** Claude (packs-4): the exact overall chances of the pre-curve gold draw (legacyGold: a registered pack's golds). */
+export function legacyGoldDist(pool: Pool): Map<number, number> {
+  const out = new Map<number, number>();
+  const mix = Object.entries(positionMix(pool.sport));
+  const tot = mix.reduce((a, [, w]) => a + w, 0);
+  const floor = TIER_CUTS[pool.sport].gold;
+  for (const [pos, w] of mix) {
+    const list = pool.buckets.gold[pos];
+    if (!list?.length) continue;
+    const ws = list.map((rc) => Math.pow(RARER, Math.max(0, rc.ovr - floor) * STEP[pool.sport]));
+    const sum = ws.reduce((a, x) => a + x, 0);
+    list.forEach((rc, i) => addAt(out, rc.ovr, ((w / tot) * ws[i]) / sum));
+  }
+  return out;
+}
+
 const TIERS_DOWN: Tier[] = ['goat', 'spotlight', 'legend', 'promo', 'gold', 'silver', 'bronze'];
+/** Claude (packs-4): the tier a draw of `tier` falls back to when its bucket is empty (drawCard's order). */
+export const tierBelow = (tier: Tier): Tier | null => {
+  const i = TIERS_DOWN.indexOf(tier);
+  return i >= 0 && i + 1 < TIERS_DOWN.length ? TIERS_DOWN[i + 1] : null;
+};
 
 /** One card of a tier in a position's bucket: golds and silvers on their curves, the rest uniform. */
 function fromBucket(list: RatedCard[], tier: Tier, rand: Rand): RatedCard {

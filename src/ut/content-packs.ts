@@ -121,7 +121,7 @@ export const dailyPackId = (sport: UtSport, day: string) => 'daily-' + sport + '
 // ---------- picks: three face down, keep one ----------
 
 /** Football's Scout's Choice comes from one position group. */
-const NFL_GROUPS: [string, string[]][] = [
+export const NFL_GROUPS: [string, string[]][] = [
   ['Quarterbacks', ['QB']],
   ['Running backs', ['RB']],
   ['Pass catchers', ['WR', 'TE']],
@@ -233,6 +233,23 @@ export function goldOptions(pool: Pool, floor: number, n: number, seed: string, 
 }
 
 /**
+ * What a Program Pick on `day` offers from: the newest live program (or Honors) with released cards, and
+ * the cards its three options are drawn from (its non-featured cards when there are three, all of them
+ * otherwise). Null when none is live: the pick is then a Player Pick 82+. Claude (packs-4): shared with
+ * odds.ts pickTable, so the published table and the award read one rule.
+ */
+export function programPickSource(pool: Pool, day: string): { name: string; cards: RatedCard[] } | null {
+  const promo = promosOn(day)
+    .filter((p) => PICK_PROGRAMS.has(p.kind))
+    .sort((a, b) => (a.start < b.start ? 1 : a.start > b.start ? -1 : 0))
+    .find((p) => promoCards(pool, p.id, day).length);
+  if (!promo) return null;
+  const released = promoCards(pool, promo.id, day);
+  const plain = released.filter((rc) => !rc.line.featured);
+  return { name: per(promo.name, pool.sport) ?? 'Program', cards: plain.length >= 3 ? plain : released };
+}
+
+/**
  * Claude (packs-1): award a reward pick under the reward's own id. It joins the open pick sheets (face
  * down until opened, exactly one card kept with keepPick, uid `pick:<id>`), once per id: a repeat id
  * returns the same state. front-office: 1 of 5 golds 80+; pick-82: 1 of 3 golds 82+; pick-84: 1 of 3
@@ -246,16 +263,10 @@ export function awardPick(ut: UtState, pool: Pool, kind: AwardPickKind, id: stri
   if (claimed(ut, 'pick:' + id) || contentOf(ut).picks?.some((p) => p.id === id)) return ut;
   if (picksFull(ut)) return null;
   if (kind === 'program-pick') {
-    const day = easternDateKey(new Date(at));
-    const promo = promosOn(day)
-      .filter((p) => PICK_PROGRAMS.has(p.kind))
-      .sort((a, b) => (a.start < b.start ? 1 : a.start > b.start ? -1 : 0))
-      .find((p) => promoCards(pool, p.id, day).length);
-    if (promo) {
-      const released = promoCards(pool, promo.id, day);
-      const plain = released.filter((rc) => !rc.line.featured);
-      const options = shuffle(plain.length >= 3 ? plain : released, rng(hashString('program-pick:' + id))).slice(0, 3);
-      return addPick(ut, { id, kind, title: (per(promo.name, pool.sport) ?? 'Program') + ' Pick', options: options.map((rc) => rc.line.id), at });
+    const src = programPickSource(pool, easternDateKey(new Date(at)));
+    if (src) {
+      const options = shuffle(src.cards, rng(hashString('program-pick:' + id))).slice(0, 3);
+      return addPick(ut, { id, kind, title: src.name + ' Pick', options: options.map((rc) => rc.line.id), at });
     }
     return awardPick(ut, pool, 'pick-82', id, at);
   }

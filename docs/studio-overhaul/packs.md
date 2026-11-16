@@ -12,7 +12,8 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 | packs-1 review fixes (SBC stamps, pick cap, confirm, auto-fill, unknown pack tile) | done | see `git log` (subject "packs-1 review fixes") |
 | packs-3: prices, limits and exploits | done | see `git log` (subject "packs-3") |
 | packs-2 review fixes (protection never lowers a published chance; acceptance wording; holo doc) | done | see `git log` (subject "packs-2 review fixes") |
-| packs-4 … packs-10 | not started | |
+| packs-4: odds engine and disclosure (sheets everywhere, BuyConfirm, picks, rewards, Scout Drops, tracker, RARE) | done | see `git log` (subject "packs-4") |
+| packs-5 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
 
@@ -713,6 +714,94 @@ Fixed on top of packs-3. No storage key, card or copy id, claim id or receipt ch
 ### Owner device checks (packs-2 review fixes)
 
 - After the update installs, the current Preview Pack shows different cards once (and today's Daily Drop, if unopened). Expected; nothing owned changes. Worth one line in the release notes.
+
+## packs-4: odds engine and disclosure
+
+Base `651b0cc` (the worktree was clean: no leftover work from the restart).
+
+### What changed and why
+
+- **`src/ut/odds.ts`: the one source of published numbers (owner decision 4, "clear odds sheets").** Every chance is computed from the definitions that fill real packs, with the same steps as the draws. New exact mirrors sit next to the draws in `packs.ts`: `goldDist` / `goldCardDist` (drawGold: curve overall → nearest overall the mix has → position by weight → card; the whole pool when the mix has nothing in range), `curveDist` (curvePick), `legacyGoldDist` (the registered Spotlight's pre-curve golds) and `tierBelow` (drawCard's empty-tier fall).
+  - `oddsFor(pool, kind, at)` / `oddsTable(pool, def, ctx)`: "chance of at least one" by overall band (80, 82, 83, 84, 85, 86, 88+ on the sport's scale), by tier (special tiers always, bronze/silver/gold when not certain), the featured card (this week's Featured Standout, or a program's headliner) and holo; `perSlot`, `boosted` (`now`, `base`, `until`), `effectiveProgram` (null until packs-6's pity), generated `notes` and `updated` (the later of `ODDS_UPDATED` = 2026-11-16, the Weekly Standout week's Monday and a program's latest released wave). Kinds: every Store kind, `position` (a random choice: the mean of the choices, with "each position's own chances differ from these by at most N points") and `position:<key>`, `live:` / `live-plus:` (boosted inside a Friday boost), Club Collection kinds and `studio:` recipes, `preview`, `spotlight` (null in soccer). Memoised per (pool, kind, day/week, boost, Club Collection recipe).
+  - Two pack effects the slot product alone gets wrong are counted: **two or more guaranteed Standouts in one pack** (a Club Collection Dynasty) are drawn without replacement (an exact recursion over the sets of Standouts drawn: fill never repeats a player and keeps the 6th draw); and **in-pack no-repeat redraws of golds** (first order: each card's chance × the chance it isn't taken yet, renormalised). The second moved a soccer Goalkeepers pack's 83+ from 22.18% to 22.24% (40,000 real packs: 22.54%).
+  - `pickTable(pool, kind, at)`: Scout's Choice and the Swap Desk (NFL: the mean over the 7 position groups; the Standout option only when that group has an 84+ Standout), Front Office 80+, Player Picks 82+ / **84+**, Stamp Scout 85+, Standout Pick (hypergeometric: each Standout equally likely), Program Pick (the same `programPickSource` the award uses; a Player Pick 82+ when no program is live), `live-pick:<promo>:<n>`, the login calendar's gold pick, and the stamp shelf's items as `shelf:g82 | scout85 | standouts | program`. `hasPickOdds(kind)` says which saved picks have a table (all but the one-time Icon pick).
+  - `rewardOdds(pool, reward, at)`: an SBC or objective reward (a gold on the curve from its floor, from its franchise when named; a Hot Season; a Weekly Standout; a program card; any pack it pays) as one table. `isRandomReward(w)`. ut's MINUTES, league and Rookie Week rewards pass `{ pack }` or a pick kind.
+  - `dropSheet(sport, index)`: each tap's upgrade chance, the exact final odds (`dropOdds`, unchanged numbers) with each tier's reward in words, the EV and the honest-reveal note.
+  - `routeCost` and `premiumChanceAtLeast` moved here from `value.ts` (re-exported there, so every caller keeps its import; same numbers).
+  - `fmtPct(p)`: "less than 0.1%" under 0.1%, "100%" from 99.5%, one decimal under 10%, whole numbers above; `oneIn(p)` adds "1 in 150" under 1%. `confirmFor(price, prefs)` and `headline(table)` for the buy confirm.
+- **`OddsSheet.tsx` + `odds-sheet.css` (lazy) replace the Store's old sheet.** A bottom sheet: header (what it is), a scrolling body (By overall, By edition with the featured row and holo, each a glass table row with a tier-coloured bar and "1 in N" under 1%; the BOOSTED banner; the generated notes; a PER CARD / PER OPTION toggle with the slot chips), and a footer that never scrolls: "Each pack is independent. Updated 16 Nov 2026." and CLOSE (44 px). `odds-lazy.tsx`: `LazyOddsSheet` (React.lazy; once the module is preloaded it renders with no Suspense round trip), `preloadOdds` / `useOddsPreload` (fetched in an idle moment after a screen's first paint) and `useOddsHost` (the open sheet's state lives in a tiny host, so opening a sheet never re-renders the whole Store). The Store also computes its tiles' sheets one per idle moment after it paints.
+- **Where a sheet opens:** every Store tile's Odds (Spotlight, Bronze to Jumbo, Standout/Lightning, Club Collection, Scout's Choice as a pick table), flash-sale deals, program packs (boosted), the Daily Drop, every waiting pack and pick under Your packs (an ODDS chip under each tile; not the starter, admin awards or an event Spotlight), the Preview Pack, the buy confirm's VIEW ODDS, the pick sheet itself (ODDS by its title; it opens above the full-screen pick), the SBC sheet's reward line for a random reward, and the Pack Tracker's ODDS SHEET on each tracked pack. ut's Scout Drop screen and random rewards use the exported lazy sheet (contract below).
+- **BuyConfirm (in `Store.tsx`)** for every Store purchase of 1,500 coins or more (tiles, program packs, flash deals; Spotlight too): pack art, price "of your N", the three most telling "at least one" rows from the sheet (the best band hit at least 1 in 20, the best at least 1 in 200, the rarest special), VIEW ODDS, CANCEL, BUY. "Don't ask again for packs under 10,000 coins" is a 44-px checkbox saved as `ut.content.prefs.skipBuyConfirm` through the Store's new `onPrefs`; from 10,000 coins it is never offered and never honoured ("Packs of 10,000 coins or more always ask first."). A purchase that can't go through (short of coins, at its limit) skips the confirm, so its own message explains why. The Preview Pack's BUY THESE does not ask (the player has already seen the exact cards).
+- **Pack Tracker.** `expectedFor` reads the exact sheet (r86, r90, special) and the exact quick-sell value (`packEv` / `livePackEv`; the Position pack's mean over its choices; Spotlight from the registered draw) instead of simulating 160 packs on the phone; `Expected.packs` is 0 now. The footnote says expected rates are each pack's published odds, and "Values are counted when pulled: … an early Spotlight or GOAT pull still reads 30 coins" (`PullAgg.q` keeps pull-time quick-sell). The walkout-rule footnote waits for packs-9, which changes the rule.
+- **Pack Helper (M8): RARE** on a rare gold (`pack-helper.ts`, `isRare`; a gold-foil tag in `pack-reveal.css`). Rare is the shimmer only, said on every sheet with golds.
+- **Daily Drop (L2):** its line reads "A gold 38%, a Weekly Standout 2.0%." from its sheet, with an Odds link.
+- **Refactors in our files:** `content-packs.ts` exports `NFL_GROUPS` and `programPickSource(pool, day)` (the Program Pick's promo and option list, now shared by `awardPick` and `pickTable`; the award's options are unchanged for the same seed).
+
+### Numbers (before → after)
+
+| Measure | Before (base `651b0cc`) | After |
+|---|---|---|
+| What a pack's sheet shows | per-slot tier chips; "in this pack" only for Standout / Hot Season / Legend | bands 80–88+, every tier, featured card, holo, per card, boost, generated notes, updated date |
+| Sheets that exist | Store tiles and program packs only | + Daily Drop, waiting packs and picks, Preview, flash deals, buy confirm, pick sheet, SBC reward, tracker, Scout Drop (ut), shelf picks |
+| Sheet vs 10,000 seeded opens (bands, tiers, featured / holo) | not tested | every sold item, Daily, Preview, Position/Unit choices, program pack boosted and not, a Program Guarantee, Club Collection defaults, Spotlight receipts: within ±1.5 pt / ±0.5 pt in NBA, NFL and soccer |
+| Picks vs 10,000 option draws | not tested | every gold pick, Scout's / Swap, Standout, Program and live picks within ±1.5 pt; the login calendar's pick 4,000 draws within ±2.4 pt (3σ) |
+| SBC rewards vs 10,000 `rewardCard` draws | not tested | every tier and floor of the 60-day catalogue (and a franchise reward) within ±1.5 pt |
+| Spotlight tier rows | "20%", "0.05%" typed in a note | exactly `SPOTLIGHT_RATES` (0.2, 0.0005, 0.02) |
+| `oddsTable` (warm, 1×) | n/a | 0.1–7.3 ms (worst: soccer Gold 7.3, NFL Silver 5.9) |
+| Tile tap → visible sheet at 4× CPU (dev server, Playwright touch) | not measured | 29–95 ms in every sport at 393 and 320 (the first open of a session 68–94 ms) |
+| Pack Tracker expectation | 160 simulated packs per type, 8–60 ms each at 1× | exact, 1–32 ms once the pool's caches exist |
+
+Sample sheets (NBA): Premium Gold 82+ 80%, 83+ 35%, 85+ 9.3%, 88+ 4.3%, Legend 0.7% (1 in 150), Hot Season 2.0%, Standout 4.0%, featured Standout 0.4%, holo 0.3%. Jumbo Premium 86+ 10%, 88+ 5.7%. Player Pick 84+ (best of 3) 85+ 81%, 86+ 57%, 88+ 23%; Scout's Choice NFL 85+ 82%, 88+ 20%. Cup Contenders Pack inside its Friday boost: program card 45% (normally 30%).
+
+### Tests (suite `odds`: `packs-suites/odds.ts`; `odds.test.ts` NBA/NFL, `soccer-odds.test.ts` soccer), 18 tests
+
+- fmtPct and oneIn cases; every sold Store kind + Daily Drop + Club Collection defaults against 10,000 seeded opens; every Position/Unit choice (10,000 each) and the random-choice sheet is their mean; Preview = Premium; program pack boosted and not (10,000 each) and a guarantee (4,000, program 100%); Spotlight rows exact and 10,000 registered receipts (chase tier by the contract's `chaseTier`).
+- Picks: gold picks, the shelf's items equal their picks, Scout's / Swap, Standout, Program, live and calendar picks.
+- Rewards: every random SBC reward of the 60-day catalogue; a pack reward equals the pack's sheet; pack + card together; coins only is null; a program reward against `programReward`.
+- Scout Drops: the sheet's final odds `toBe` `dropOdds` for drops 1–3, each tap's chance, each tier's reward listed.
+- Route cost within 5% of the step-resolved Premium odds (`goldDist`); the tracker's expectations equal the sheet; every sheet ≤ 20 ms after warm-up; the confirm's thresholds (1,500; "Don't ask again" never at 10,000+, never honoured there); old saves: no `prefs` → the confirm asks; `prefs` survives today's normalizer, an older build drops only it.
+- `content2.test.ts`: RARE marks a rare gold and nothing else (new test).
+- **Changed old test:** `pull-tracker.test.ts` "compares with the published odds": `expectedFor` no longer takes a simulated pack count and returns `packs: 0`, because its numbers are exact now (the old 60/160-pack simulation was the behaviour this task replaces).
+- Typecheck clean. NBA `vitest run src/ut src/admin src/engine/sport-branches.test.ts` 362 passed (15 skipped); NFL 360 passed (16 skipped); soccer `vitest run soccer sport-branches` 172 passed. Suite time per sport: NBA 56 s, soccer 45 s, **NFL 79 s** (over the plan's 60 s: its 24-card packs × 10,000; see "Left for later").
+
+### Browser QA (packs-4)
+
+`scripts/packs/qa-odds-sheets.mjs` (dev server 5213, `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted: the only host blocked was the Supabase registry; touch, `deviceScaleFactor: 1`; clock 2026-11-27 18:30 Eastern, inside the s2 Friday boost and the Black Friday flash sale). Runs: NBA 393 (reduced) and 320 (full), NFL 393 (full) and 320 (reduced), soccer 393 (reduced) and 320 (full). In each it opens, like a player: four Store tiles at 4× CPU (timed), the Premium sheet and PER CARD, the Daily Drop, a waiting Player Pick 84+ and a waiting Premium, the pick screen's own ODDS (checked on top of the pick screen), Scout's Choice, a boosted program pack, the Preview Pack, the buy confirm (Jumbo flash deal) and its VIEW ODDS, then CANCEL (coins unchanged), the Pack Tracker's footnote and a tracked pack's sheet, and an SBC's reward odds. Every sheet and the confirm: **0 controls under 44 design px, 0 texts under 10, no overflow, the footer always on screen, 0 page errors.** The only sub-10-px text is the decorative, `aria-hidden` pack-art label on the small pack art (waiting tiles, the confirm's art), which is packs-8's H3 label fix. Shots: `O/shots/packs/packs-4/<sport>-<width>-{store-top, premium-sheet, premium-percard, daily-sheet, pick84-sheet, waiting-premium-sheet, pick-screen-sheet, scout-sheet, program-sheet, buy-confirm, buy-confirm-odds, tracker-foot, sbc-reward-sheet}.png`.
+
+### Saved state and older builds
+
+| Field | Shape | If an older build strips it |
+|---|---|---|
+| `ut.content.prefs` | `{ skipBuyConfirm?: true }` | the buy confirm asks again (a preference only; harmless) |
+
+No storage key, card or copy id, claim id, receipt or pack draw changed. `odds.ts` only reads definitions; no RNG is consumed.
+
+### The odds contract for ut (V2.4 G, as shipped)
+
+- Show a sheet: `import { LazyOddsSheet } from './odds-lazy'` and render `<LazyOddsSheet pool={pool} sport={SPORT} source={…} onClose={…} />` (optionally `useOddsPreload()` on the screen, or `useOddsHost(pool, sport)` for a long screen). Sources: `{ type: 'drop', index: 1 | 2 | 3 }` (Scout Drops: show it before the first tap; `pool` may be null), `{ type: 'reward', reward: { pack: 'silver' } }` (a MINUTES, league or Rookie Week pack, or any SBC-style `Reward`), `{ type: 'pick', kind: 'pick-84' }` (the 25-hour pick, Rookie Week's pick; also `'shelf:g82'` etc. for the stamp shelf), `{ type: 'pack', kind }`.
+- Pure numbers: `dropSheet(sport, index)`, `rewardOdds(pool, reward, at)`, `pickTable(pool, kind, at)`, `oddsFor(pool, kind, at)`, `fmtPct(p)`, `isRandomReward(w)`, `hasPickOdds(kind)` from `odds.ts`.
+
+### Protocol
+
+None. Sheets, the confirm, the tracker's expectations and the RARE tag change no pack contents, prices, ratings or matches; `CONTENT_PRINT` and `pool.print` are unchanged.
+
+### Touched outside my lane (packs-4)
+
+- `src/ut/UltimateTeam.tsx` (ut), 2 added lines: `withPrefs` in the `content-state` import and `onPrefs={(prefs) => setUt((u) => withPrefs(u, prefs))}` on `<Store>`.
+
+### Owner device checks (packs-4)
+
+- The odds sheet reads well on the phone: the bars, "1 in 150", the notes, PER CARD, and the footer (CLOSE) always reachable with the thumb.
+- The buy confirm on a Jumbo or Elite purchase, "Don't ask again" (it should stop asking under 10,000 coins and keep asking above), and that it never feels in the way on cheaper packs (under 1,500 coins it never shows).
+- The RARE tag on a rare gold in a pack's reveal.
+
+### Left for later (packs-4)
+
+- packs-6: `effectiveProgram` (pity) on program sheets, and the stamp shelf page opening `shelf:<item>` sheets (the tables exist and are tested).
+- packs-9: the tracker footnote "walkout counts before <date> used the old rule", once the walkout rule changes.
+- packs-8: the pack-art label legibility (H3) on the small art the confirm and waiting tiles use.
+- The NFL odds suite runs 79 s (the plan's budget is 60 s per sport); packs-10 can trim the calendar-pick draws or share openings with the exploits suite.
+- Tap-to-sheet was measured on the dev server (unminified React); packs-10 re-measures on the production build.
 
 ## Requests (answers are recorded here as they arrive)
 

@@ -5,13 +5,15 @@ import { pickFor } from '../engine/sport';
 // Claude 2026-11-01: sections (Daily Drop · Featured · Gold · Bronze & Silver · Online), the new
 // packs with their limits, open pick sheets under Your packs, and the MARKET tab (Scout Market and
 // Swap Desk). Odds sheets list every slot including rare golds and Weekly Standouts.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Sheet } from '../ui/common';
 import { Coin } from '../ui/icons';
 import { PackArt } from './Hub';
 import { IconInfo } from './icons';
-import { curveOdds, FLOORS, GOLD_CURVE, isFloorKind, type Odds, type PackDef, knownPack, packName, positionChoices, FEATURED_STANDOUT, type SlotTier } from './packs';
-import { TIER_NAMES } from './rate';
+import { type PackDef, knownPack, packName, positionChoices } from './packs';
+import { confirmFor, fmtPct, hasPickOdds, headline, oddsFor, oneIn, type OddsRow, pickTable } from './odds';
+import { type OddsSource, useOddsHost, useOddsPreload } from './odds-lazy';
+import './odds-sheet.css';
 import { fcToDisplay } from './fc-scale';
 import type { PendingPack, UtState } from './state';
 import type { UtSport } from './types';
@@ -48,91 +50,8 @@ const SHORT: Record<string, string> = {
   'live-pick': 'PICK',
 };
 
-function pct(p: number): string {
-  return p >= 0.995
-    ? '100%'
-    : p >= 0.1
-      ? Math.round(p * 100) + '%'
-      : p >= 0.01
-        ? (Math.round(p * 1000) / 10).toString().replace(/\.0$/, '') + '%'
-        : (Math.round(p * 10000) / 100).toString() + '%';
-}
-
 /** Claude (UI reorganisation): the always-on packs, listed cheapest first. */
 const BY_PRICE = ['bronze', 'silver', 'position', 'gold', 'premium', 'spotlight'];
-
-const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'g88', 'g86', 'g84', 'g82', 'g80', 'g78', 'rare', 'g75', 'gold', 'silver', 'bronze'];
-/** Claude (packs-2): a gold slot reads as its floor ("Gold 78+"); any gold is just "Gold". */
-const slotName = (t: SlotTier, sport: UtSport) => (t === 'rare' || t === 'g78' ? 'Gold ' + fcToDisplay(78, sport) + '+' : t === 'g75' ? 'Gold' : isFloorKind(t) ? 'Gold ' + fcToDisplay(FLOORS[t], sport) + '+' : TIER_NAMES[t]);
-
-/** What a pack holds, slot by slot, and the chance of a promo or a legend in the whole pack. */
-function OddsSheet({ def, sport, onClose }: { def: PackDef; sport: UtSport; onClose: () => void }) {
-  const rows = new Map<string, { o: Odds; n: number }>();
-  for (const o of def.slots) {
-    const k = JSON.stringify(o);
-    const r = rows.get(k);
-    if (r) r.n++;
-    else rows.set(k, { o, n: 1 });
-  }
-  const any = (t: SlotTier) => 1 - def.slots.reduce((a, o) => a * (1 - (o[t] ?? 0)), 1);
-  const pick = def.kind === 'scout';
-  return (
-    <Sheet label={def.name + ' odds'} kind="center" onClose={onClose}>
-      {(close) => (
-        <div className="ut-odds">
-          <h2 className="disp">{def.name}</h2>
-          <p>{def.blurb.replace(/\.+$/, '')}.</p>
-          <div className="ut-odds-rows">
-            {Array.from(rows.values()).map(({ o, n }, i) => (
-              <div key={i} className="ut-odds-row">
-                <b className="num">{n}×</b>
-                <span>
-                  {SLOT_ORDER.filter((t) => (o[t] ?? 0) > 0).map((t) => (
-                    <i key={t} className={'ut-tierchip t-' + (isFloorKind(t) || t === 'rare' ? 'gold' : t)}>
-                      {slotName(t, sport)} {pct(o[t]!)}
-                    </i>
-                  ))}
-                </span>
-              </div>
-            ))}
-          </div>
-          {pick && <p className="note">These are the odds of each of the three face-down options. You keep exactly one of them; the other two are never added to your club.</p>}
-          {any('goat') > 0 && (
-            <p className="note">
-              GOAT: {pct(any('goat'))} per pack (1 in 2,000). Spotlight: {pct(any('spotlight'))}. This is the chance of any GOAT edition; one specific GOAT is rarer. Odds reset
-              each pack; no guaranteed GOAT after 2,000 packs. Special editions are chosen uniformly within their tier.
-            </p>
-          )}
-          {!pick && (any('legend') > 0 || any('standout') > 0 || any('promo') > 0) && (
-            <p className="note">
-              In this pack: {any('standout') > 0 ? 'a Weekly Standout ' + pct(any('standout')) : ''}
-              {any('promo') > 0 ? (any('standout') > 0 ? ', ' : '') + 'a Hot Season ' + pct(any('promo')) : ''}
-              {any('legend') > 0 ? ', a Legend ' + pct(any('legend')) + ' (about 1 in ' + Math.round(1 / any('legend')) + ')' : ''}.
-            </p>
-          )}
-          {any('standout') > 0 && (
-            <p className="note">
-              A Standout is one of this week’s Weekly Standouts: the Featured Standout {pct(FEATURED_STANDOUT)} of the time, otherwise any of the others equally. Owned Standouts keep their week
-              forever.
-            </p>
-          )}
-          {any('program') > 0 && <p className="note">A program card is one of this program’s cards released so far, all equally likely. The program’s cards are the same for everyone.</p>}
-          {def.kind !== 'spotlight' && (
-            <p className="note">
-              Every gold follows one overall curve. A slot that can be any gold lands {fcToDisplay(75, sport)}–{fcToDisplay(79, sport)} {pct(goldBand(75, 80))}, {fcToDisplay(80, sport)}–
-              {fcToDisplay(82, sport)} {pct(goldBand(80, 83))}, {fcToDisplay(83, sport)}–{fcToDisplay(85, sport)} {pct(goldBand(83, 86))} and {fcToDisplay(86, sport)}+{' '}
-              {pct(goldBand(86, 100))}; a “Gold 78+” slot uses the same curve from 78 up. Rare golds are a shimmer on the top 35% at each position, not a slot.
-            </p>
-          )}
-          {def.prefer && <p className="note">Golds in this pack prefer players you don’t own yet, at the overall drawn or higher, never lower, so these odds are the least you get.</p>}
-          <button className="btn" onClick={() => close()}>
-            CLOSE
-          </button>
-        </div>
-      )}
-    </Sheet>
-  );
-}
 
 /** Claude (packs-2): a waiting pick's name on its tile ("Player Pick 84+"; Scout's Choice for the Store's own). */
 function pickLabel(p: PickState, sport: UtSport): string {
@@ -141,14 +60,6 @@ function pickLabel(p: PickState, sport: UtSport): string {
   if (p.kind === 'program-pick' || p.kind === 'live-pick') return 'Program Pick';
   const g = GOLD_PICKS[p.kind as keyof typeof GOLD_PICKS];
   return g ? g.title + ' ' + fcToDisplay(g.floor, sport) + '+' : 'Scout’s Choice';
-}
-
-/** The share of an any-gold slot from overall `a` up to (not including) `b`, basketball's scale (the curve's own numbers). */
-function goldBand(a: number, b: number): number {
-  const odds = curveOdds(GOLD_CURVE, 75, 'nba');
-  let p = 0;
-  for (const [o, x] of odds) if (o >= a && o < b) p += x;
-  return p;
 }
 
 const hm = (m: number) => (m >= 60 * 24 ? Math.floor(m / 1440) + 'd ' + Math.floor((m % 1440) / 60) + 'h' : m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm');
@@ -165,7 +76,7 @@ function lightningNote(now: number): string {
 }
 
 /** Claude (packs-3): a named flash sale's deals while its window is open (1 each per player). */
-function FlashSale({ sport, ut, coins, now, onBuy }: { sport: UtSport; ut: UtState; coins: number; now: number; onBuy: (key: string) => void }) {
+function FlashSale({ sport, ut, coins, now, onBuy, onOdds }: { sport: UtSport; ut: UtState; coins: number; now: number; onBuy: (key: string, price: number, name: string, kind: string) => void; onOdds: (s: OddsSource) => void }) {
   const deals = flashDeals(sport, now);
   if (!deals.length) return null;
   return (
@@ -187,8 +98,11 @@ function FlashSale({ sport, ut, coins, now, onBuy }: { sport: UtSport; ut: UtSta
                 <s className="num">{d.was.toLocaleString('en-US')}</s> <b className="ut-flash-off">−{Math.round(d.off * 100)}%</b>
               </small>
               <small className="ut-limit">{left ? '1 left in this sale' : 'Bought in this sale'}</small>
+              <button className="ut-oddsbtn" onClick={() => onOdds(d.kind === 'scout' ? { type: 'pick', kind: 'scout' } : { type: 'pack', kind: d.kind })} aria-label={d.name + ' odds'}>
+                <IconInfo size={13} /> Odds
+              </button>
             </div>
-            <button className={'btn ut-buy' + (short || !left ? ' short' : ' gold')} aria-disabled={short || !left} aria-label={'Buy ' + d.name + ' for ' + d.price + ' coins, ' + Math.round(d.off * 100) + ' percent off'} onClick={() => onBuy(d.key)}>
+            <button className={'btn ut-buy' + (short || !left ? ' short' : ' gold')} aria-disabled={short || !left} aria-label={'Buy ' + d.name + ' for ' + d.price + ' coins, ' + Math.round(d.off * 100) + ' percent off'} onClick={() => onBuy(d.key, short || !left ? 0 : d.price, d.name, d.kind)}>
               <Coin size={14} />
               <span className="num">{d.price.toLocaleString('en-US')}</span>
             </button>
@@ -199,8 +113,17 @@ function FlashSale({ sport, ut, coins, now, onBuy }: { sport: UtSport; ut: UtSta
   );
 }
 
-function DailyDrop({ ut, day, sport, onClaim }: { ut: UtState; day: string; sport: UtSport; onClaim: () => void }) {
+function DailyDrop({ ut, day, sport, pool, onClaim, onOdds }: { ut: UtState; day: string; sport: UtSport; pool: Pool; onClaim: () => void; onOdds: () => void }) {
   const s = dailyStatus(ut, day);
+  // Claude (packs-4, audit L2): the drop's own chances, from its odds sheet (computed after the first paint)
+  const [chance, setChance] = useState<{ gold: number; standout: number } | null>(null);
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const o = oddsFor(pool, 'daily');
+      if (o) setChance({ gold: o.tiers.find((r) => r.key === 't-gold')?.p ?? 0, standout: o.tiers.find((r) => r.key === 't-standout')?.p ?? 0 });
+    }, 0);
+    return () => clearTimeout(t);
+  }, [pool, day]);
   return (
     <div className={'ut-daily' + (s.ready ? ' ready' : '')}>
       <PackArt kind="daily" label="DAILY" sport={sport} small />
@@ -214,7 +137,12 @@ function DailyDrop({ ut, day, sport, onClaim }: { ut: UtState; day: string; spor
             </i>
           ))}
         </span>
-        <small>Day 7 adds a Gold Pack. Miss a day and the streak starts over.</small>
+        <small>
+          {chance ? 'A gold ' + fmtPct(chance.gold) + ', a Weekly Standout ' + fmtPct(chance.standout) + '. ' : ''}Day 7 adds a Gold Pack. Miss a day and the streak starts over.
+        </small>
+        <button className="ut-oddsbtn" onClick={onOdds} aria-label="Daily Drop odds">
+          <IconInfo size={13} /> Odds
+        </button>
       </span>
       {s.ready && (
         <button className="btn gold ut-daily-btn" onClick={onClaim}>
@@ -222,6 +150,118 @@ function DailyDrop({ ut, day, sport, onClaim }: { ut: UtState; day: string; spor
         </button>
       )}
     </div>
+  );
+}
+
+const isPickKind = (kind: string) => kind === 'scout' || kind === 'standout-pick' || kind.startsWith('live-pick:');
+/** A waiting pack whose contents are drawn (not the starter, an admin award or a single event reward). */
+const hasPackOdds = (kind: string) => kind !== 'starter' && !kind.startsWith('admin-') && !kind.startsWith('event-spotlight:');
+
+/** A purchase waiting on the buy confirm. */
+interface Ask {
+  name: string;
+  price: number;
+  /** its pack art */
+  art: string;
+  label: string;
+  source: OddsSource;
+  go: () => void;
+}
+
+/** One "at least one" row (the odds sheet's look, odds-sheet.css). */
+function ConfirmRow({ r }: { r: OddsRow }) {
+  const one = oneIn(r.p);
+  return (
+    <div className={'ps-odds-row' + (r.key.startsWith('t-') ? ' tone-' + r.key.slice(2) : '')} role="row">
+      <span className="ps-odds-label" role="rowheader">
+        {r.label}
+      </span>
+      <span className="ps-odds-bar" aria-hidden="true">
+        <i style={{ width: Math.max(1.5, Math.min(100, r.p * 100)) + '%' }} />
+      </span>
+      <b className="ps-odds-pct num" role="cell">
+        {fmtPct(r.p)}
+        {one && <small>{one}</small>}
+      </b>
+    </div>
+  );
+}
+
+/**
+ * Claude (packs-4, packs-plan item 4): the buy confirm for a pack of CONFIRM_FROM (1,500) coins or more: its
+ * art and price, the three most telling "at least one" chances, VIEW ODDS, BUY and CANCEL. "Don't ask again"
+ * is offered only under 10,000 coins (odds.ts confirmFor) and saved through `onPrefs`.
+ */
+function BuyConfirm({ pool, sport, coins, ask, prefs, onOdds, onPrefs, onClose }: { pool: Pool; sport: UtSport; coins: number; ask: Ask; prefs?: { skipBuyConfirm?: boolean }; onOdds: () => void; onPrefs?: (p: { skipBuyConfirm?: boolean }) => void; onClose: () => void }) {
+  const [skip, setSkip] = useState(false);
+  const rows = useMemo(() => {
+    const t = ask.source.type === 'pick' ? pickTable(pool, ask.source.kind) : ask.source.type === 'pack' ? oddsFor(pool, ask.source.kind) : null;
+    return t ? headline(t) : [];
+  }, [pool, ask]);
+  const policy = confirmFor(ask.price, prefs);
+  return (
+    <Sheet label={'Buy ' + ask.name} kind="center" onClose={onClose}>
+      {(close) => (
+        <div className="ps-confirm">
+          <div className="ps-confirm-top">
+            <PackArt kind={ask.art} label={ask.label} sport={sport} small />
+            <span>
+              <span className="eyebrow">BUY WITH COINS</span>
+              <h2 className="disp">{ask.name}</h2>
+              <span className="ps-confirm-price">
+                <Coin size={16} />
+                <span className="num">{ask.price.toLocaleString('en-US')}</span>
+                <small>of your {coins.toLocaleString('en-US')}</small>
+              </span>
+            </span>
+          </div>
+          {rows.length > 0 && (
+            <div className="ps-odds-group" role="table" aria-label="Chance of at least one">
+              <span className="ps-odds-sub" role="presentation">
+                {ask.source.type === 'pick' ? 'Chance of at least one among the options' : 'Chance of at least one in this pack'}
+              </span>
+              {rows.map((r) => (
+                <ConfirmRow key={r.key} r={r} />
+              ))}
+            </div>
+          )}
+          {policy.canSkip ? (
+            <button className="ps-confirm-skip" role="checkbox" aria-checked={skip} onClick={() => setSkip((x) => !x)}>
+              <i aria-hidden="true">
+                {skip && (
+                  <svg viewBox="0 0 12 12" width="12" height="12">
+                    <path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </i>
+              Don’t ask again for packs under 10,000 coins
+            </button>
+          ) : (
+            <p className="ps-confirm-note">Packs of 10,000 coins or more always ask first.</p>
+          )}
+          <div className="ps-confirm-btns">
+            <button className="btn ps-confirm-odds" onClick={onOdds}>
+              VIEW ODDS
+            </button>
+            <button className="btn" onClick={() => close()}>
+              CANCEL
+            </button>
+            <button
+              className="btn gold"
+              onClick={() =>
+                close(() => {
+                  if (skip && policy.canSkip) onPrefs?.({ skipBuyConfirm: true });
+                  onClose();
+                  ask.go();
+                })
+              }
+            >
+              BUY
+            </button>
+          </div>
+        </div>
+      )}
+    </Sheet>
   );
 }
 
@@ -251,8 +291,36 @@ export function Store(props: {
   onLive?: (pack: CalPack) => void;
   /** Claude (packs-3): buy a named flash sale's deal, by its key */
   onFlash?: (key: string) => void;
+  /** Claude (packs-4): save Store preferences (the buy confirm's "Don't ask again") */
+  onPrefs?: (prefs: { skipBuyConfirm?: boolean }) => void;
 }) {
-  const [odds, setOdds] = useState<PackDef | null>(null);
+  const { open: setOdds, host: oddsHost } = useOddsHost(props.pool, props.sport);
+  const [ask, setAsk] = useState<Ask | null>(null);
+  useOddsPreload();
+  // Claude (packs-4): after the first paint, the Store's sheets are computed one per idle moment (memoised in
+  // odds.ts), so a tap only has to draw the sheet
+  useEffect(() => {
+    const kinds = ['premium', 'gold', 'jumbo', 'elite', 'standout', 'silver', 'bronze', 'daily', 'position', ...livePacksOn(props.day).map((p) => p.id)];
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    let id = 0;
+    let i = 0;
+    const next = () => {
+      if (i >= kinds.length) return;
+      oddsFor(props.pool, kinds[i++]);
+      id = w.requestIdleCallback ? w.requestIdleCallback(next, { timeout: 3000 }) : window.setTimeout(next, 50);
+    };
+    id = w.requestIdleCallback ? w.requestIdleCallback(next, { timeout: 3000 }) : window.setTimeout(next, 300);
+    return () => (w.cancelIdleCallback ? w.cancelIdleCallback(id) : clearTimeout(id));
+  }, [props.pool, props.day]);
+  /**
+   * Claude (packs-4): a purchase of CONFIRM_FROM coins or more asks first (BuyConfirm), unless the player
+   * chose "Don't ask again" and it costs under 10,000. One that can't go through (short of coins, at its
+   * limit) goes straight on, so its own message explains why.
+   */
+  const guard = (a: Omit<Ask, 'go'>, go: () => void, blocked: boolean) => {
+    if (blocked || !confirmFor(a.price, contentOf(props.ut).prefs).ask) return go();
+    setAsk({ ...a, go });
+  };
   const [choose, setChoose] = useState(false);
   const [tab, setTab] = useState<'packs' | 'market'>('packs');
   const [now, setNow] = useState(() => Date.now());
@@ -275,7 +343,7 @@ export function Store(props: {
           <strong>{props.sport === 'nfl' && k === 'position' ? 'Unit Pack' : d.name}</strong>
           <small>{props.sport === 'nfl' && k === 'position' ? d.slots.length + ' golds (2 of them ' + fcToDisplay(78, props.sport) + '+) from the unit you pick' : d.blurb}</small>
           {note && <small className="ut-limit">{note}</small>}
-          <button className="ut-oddsbtn" onClick={() => setOdds(d)} aria-label={d.name + ' odds'}>
+          <button className="ut-oddsbtn" onClick={() => setOdds(k === 'scout' ? { type: 'pick', kind: 'scout' } : { type: 'pack', kind: k })} aria-label={d.name + ' odds'}>
             <IconInfo size={13} /> Odds
           </button>
         </div>
@@ -283,7 +351,13 @@ export function Store(props: {
           className={'btn ut-buy' + (short || disabled ? ' short' : ' gold')}
           aria-disabled={short || !!disabled}
           aria-label={'Buy ' + d.name + ' for ' + d.price + ' coins'}
-          onClick={() => (k === 'position' ? (short ? props.onBuy(k, d.price) : setChoose(true)) : props.onBuy(k, d.price))}
+          onClick={() =>
+            k === 'position'
+              ? short
+                ? props.onBuy(k, d.price)
+                : setChoose(true)
+              : guard({ name: d.name, price: d.price, art: k, label: SHORT[k] ?? k.toUpperCase(), source: k === 'scout' ? { type: 'pick', kind: 'scout' } : { type: 'pack', kind: k } }, () => props.onBuy(k, d.price), short || !!disabled)
+          }
         >
           <Coin size={14} />
           <span className="num">{d.price.toLocaleString('en-US')}</span>
@@ -330,20 +404,34 @@ export function Store(props: {
                   </button>
                 )}
                 {picks.map((p) => (
-                  <button key={p.id} className="ut-mine-pack" onClick={() => props.onPick(p.id)} aria-label={'Choose your player: ' + p.title}>
-                    <PackArt kind="scout" label={'PICK 1 OF ' + p.options.length} sport={props.sport} small />
-                    <b>{pickLabel(p, props.sport)}</b>
-                    <i className="ut-open">CHOOSE</i>
-                  </button>
+                  <span key={p.id} className="ut-mine-cell">
+                    <button className="ut-mine-pack" onClick={() => props.onPick(p.id)} aria-label={'Choose your player: ' + p.title}>
+                      <PackArt kind="scout" label={'PICK 1 OF ' + p.options.length} sport={props.sport} small />
+                      <b>{pickLabel(p, props.sport)}</b>
+                      <i className="ut-open">CHOOSE</i>
+                    </button>
+                    {hasPickOdds(p.kind) && (
+                      <button className="ps-odds-chip" onClick={() => setOdds({ type: 'pick', kind: p.kind })} aria-label={pickLabel(p, props.sport) + ' odds'}>
+                        ODDS
+                      </button>
+                    )}
+                  </span>
                 ))}
                 {props.pending.map((p) =>
                   // Claude (packs-1 fix): a reward pack from a newer build says so before the tap (it stays saved)
                   knownPack(props.sport, p.kind) ? (
-                    <button key={p.id} className="ut-mine-pack" onClick={() => props.onPending(p.id)} aria-label={'Open your ' + packName(props.sport, p.kind)}>
-                      <PackArt kind={p.kind} label={SHORT[p.kind.split(':')[0]] ?? 'PACK'} sport={props.sport} small />
-                      <b>{packName(props.sport, p.kind).replace(/ Pack$/, '')}</b>
-                      <i className="ut-open">OPEN</i>
-                    </button>
+                    <span key={p.id} className="ut-mine-cell">
+                      <button className="ut-mine-pack" onClick={() => props.onPending(p.id)} aria-label={'Open your ' + packName(props.sport, p.kind)}>
+                        <PackArt kind={p.kind} label={SHORT[p.kind.split(':')[0]] ?? 'PACK'} sport={props.sport} small />
+                        <b>{packName(props.sport, p.kind).replace(/ Pack$/, '')}</b>
+                        <i className="ut-open">OPEN</i>
+                      </button>
+                      {hasPackOdds(p.kind) && (
+                        <button className="ps-odds-chip" onClick={() => setOdds(isPickKind(p.kind) ? { type: 'pick', kind: p.kind } : { type: 'pack', kind: p.kind })} aria-label={packName(props.sport, p.kind) + ' odds'}>
+                          ODDS
+                        </button>
+                      )}
+                    </span>
                   ) : (
                     <button key={p.id} className="ut-mine-pack ut-mine-new" onClick={() => props.onPending(p.id)} aria-label="New pack: update the game to open it. It stays saved until then.">
                       <PackArt kind={p.kind} label="NEW" sport={props.sport} small />
@@ -355,8 +443,19 @@ export function Store(props: {
               </div>
             </>
           )}
-          <DailyDrop ut={props.ut} day={props.day} sport={props.sport} onClaim={() => props.onBuy('daily', 0)} />
-          {props.onFlash && <FlashSale sport={props.sport} ut={props.ut} coins={props.coins} now={now} onBuy={props.onFlash} />}
+          <DailyDrop ut={props.ut} day={props.day} sport={props.sport} pool={props.pool} onClaim={() => props.onBuy('daily', 0)} onOdds={() => setOdds({ type: 'pack', kind: 'daily' })} />
+          {props.onFlash && (
+            <FlashSale
+              sport={props.sport}
+              ut={props.ut}
+              coins={props.coins}
+              now={now}
+              onOdds={setOdds}
+              onBuy={(key, price, name, kind) =>
+                guard({ name, price, art: kind.startsWith('live:') ? 'live' : kind, label: kind.startsWith('live:') ? 'PROGRAM' : (SHORT[kind] ?? 'PACK'), source: kind === 'scout' ? { type: 'pick', kind } : { type: 'pack', kind } }, () => props.onFlash!(key), !price)
+              }
+            />
+          )}
           {STUDIO_PACKS.some(k=>catalogOf(props.sport)[k].enabled)&&<><SectionHead title="Club Collection"/><div className="ut-shop">{STUDIO_PACKS.map(k=>item(k))}</div></>}
           {(() => {
             // Claude wave 3: this season's program packs (Live Calendar)
@@ -383,11 +482,18 @@ export function Store(props: {
                             </small>
                           )}
                           <small className="ut-limit">{(left ? left + ' left ' : 'Limit reached ') + (p.tpl === 'guarantee' ? 'this week' : 'today') + ' · until ' + p.end.slice(5).replace('-', '/')}</small>
-                          <button className="ut-oddsbtn" onClick={() => setOdds(d)} aria-label={d.name + ' odds'}>
+                          <button className="ut-oddsbtn" onClick={() => setOdds({ type: 'pack', kind: p.id })} aria-label={d.name + ' odds'}>
                             <IconInfo size={13} /> Odds
                           </button>
                         </div>
-                        <button className={'btn ut-buy' + (short || !left ? ' short' : ' gold')} aria-disabled={short || !left} aria-label={'Buy ' + d.name + ' for ' + d.price + ' coins'} onClick={() => props.onLive!(p)}>
+                        <button
+                          className={'btn ut-buy' + (short || !left ? ' short' : ' gold')}
+                          aria-disabled={short || !left}
+                          aria-label={'Buy ' + d.name + ' for ' + d.price + ' coins'}
+                          onClick={() =>
+                            guard({ name: d.name, price: d.price, art: p.tpl === 'guarantee' ? 'live-plus' : 'live', label: p.tpl === 'guarantee' ? 'GUARANTEE' : 'PROGRAM', source: { type: 'pack', kind: p.id } }, () => props.onLive!(p), short || !left)
+                          }
+                        >
                           <Coin size={14} />
                           <span className="num">{d.price.toLocaleString('en-US')}</span>
                         </button>
@@ -422,7 +528,8 @@ export function Store(props: {
           <p className="note">Coins only, never real money. Matches, objectives, SBCs and the daily chest all pay coins.</p>
         </>
       )}
-      {odds && <OddsSheet def={odds} sport={props.sport} onClose={() => setOdds(null)} />}
+      {ask && <BuyConfirm pool={props.pool} sport={props.sport} coins={props.coins} ask={ask} prefs={contentOf(props.ut).prefs} onOdds={() => setOdds(ask.source)} onPrefs={props.onPrefs} onClose={() => setAsk(null)} />}
+      {oddsHost}
       {choose && (
         <Sheet label="Pick a position" kind="bottom" onClose={() => setChoose(false)}>
           {(close) => (

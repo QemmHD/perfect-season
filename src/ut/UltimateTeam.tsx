@@ -129,6 +129,7 @@ import {
   picksFull,
   toggleLock,
   withClaim,
+  withPrefs,
 } from './content-state';
 import {
   addPick,
@@ -1844,6 +1845,7 @@ export default function UltimateTeam(props: {
           onTracker={() => go('tracker')}
           onLive={buyLive}
           onFlash={buyFlash}
+          onPrefs={(prefs) => setUt((u) => withPrefs(u, prefs))}
           preview={
             <PreviewPack
               pool={pool}

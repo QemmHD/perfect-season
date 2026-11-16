@@ -157,14 +157,17 @@ describe('pack tracker log (' + SPORT + ')', () => {
     expect(untrackedPacks(ut)).toBe(3);
   });
 
-  it('compares with the published odds through the real pack code', () => {
-    const exp = expectedFor(pool, 'premium', '2026-11-01', '2026-W44', 60)!;
-    expect(exp.packs).toBe(60);
+  // Claude (packs-4): the expectations are exact now (odds.ts), not 60/160 simulated packs, so `packs` is 0
+  it('compares with the published odds (the exact odds sheet)', () => {
+    const exp = expectedFor(pool, 'premium', '2026-11-01', '2026-W44')!;
+    expect(exp.packs).toBe(0);
     expect(exp.special).toBeCloseTo(specialOdds(packDefs(SPORT).premium), 10);
     expect(exp.qs).toBeGreaterThan(0);
     expect(exp.r86).toBeGreaterThanOrEqual(exp.r90);
     expect(expectedFor(pool, 'scout', '2026-11-01', '2026-W44')).toBeNull();
-    expect(expectedFor(pool, 'position', '2026-11-01', '2026-W44', 12)!.packs).toBe(12);
+    const pos = expectedFor(pool, 'position', '2026-11-01', '2026-W44')!;
+    expect(pos.r86).toBeGreaterThan(0);
+    expect(pos.qs).toBeGreaterThan(0);
   });
 });
 

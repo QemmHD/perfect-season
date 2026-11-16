@@ -2,13 +2,17 @@
 // before the pack: NEW (an edition never discovered), UPGRADE +N (beats the starter at a squad spot
 // the card can play, by N overall), SET (moves an open Set Collection), SBC FODDER (a spare copy of
 // an edition you already own, or a bronze/silver you've seen). Display only.
+// Claude (packs-4, audit M8): RARE on a rare gold, the shimmer (rare.ts: the top 35% of each position's
+// season golds). Rare is a look, not a slot or a better chance; the face's shimmer itself is the players
+// team's (CardArt).
 import type { Pool } from './pool';
+import { isRare } from './rare';
 import { setTagger } from './sets';
 import { canPlay, type Lineup, slotsFor } from './squad';
 import type { UtState } from './state';
 import type { RatedCard } from './types';
 
-export type HelperTag = { k: 'new' | 'upgrade' | 'set' | 'fodder'; text: string };
+export type HelperTag = { k: 'new' | 'rare' | 'upgrade' | 'set' | 'fodder'; text: string };
 
 export function packTags(pool: Pool, before: UtState, lineup: Lineup, cards: RatedCard[]): HelperTag[][] {
   const seen = new Set([...(before.collected ?? []), ...before.owned.map((c) => c.cardId)]);
@@ -22,6 +26,7 @@ export function packTags(pool: Pool, before: UtState, lineup: Lineup, cards: Rat
     inPack.set(rc.line.id, copies + 1);
     const isNew = !seen.has(rc.line.id) && copies === 0;
     if (isNew) tags.push({ k: 'new', text: 'NEW' });
+    if (isRare(rc, pool)) tags.push({ k: 'rare', text: 'RARE' });
     let up = 0;
     for (const sl of starters) {
       if (!canPlay(sl, rc)) continue;

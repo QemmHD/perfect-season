@@ -31,6 +31,9 @@ import type { RatedCard, Tier, UtSport } from './types';
 import type { ClubCard } from './UltimateTeam';
 import { EmptyState, Lede, Segmented } from './ui';
 import './pull-tracker.css';
+import { easternAt } from './flash';
+import { LazyOddsSheet } from './odds-lazy';
+import './odds-sheet.css';
 
 type Section = 'packs' | 'recent' | 'all';
 type TierF = 'any' | 'bronze' | 'silver' | 'gold' | 'gold+' | '86' | 'special';
@@ -160,8 +163,8 @@ export function PullTracker(props: { pool: Pool; ut: UtState; sport: UtSport; da
             <PackSummary key={g} group={g} a={a} pool={pool} sport={sport} day={props.day} week={props.week} />
           ))}
           <p className="note">
-            Return is the quick-sell value of what paid packs gave you, against the coins they cost. Expected rates come from each pack’s published slot odds, drawn through the same code as a real
-            pack. Small samples swing a lot.
+            Return is the quick-sell value of what paid packs gave you, against the coins they cost. Expected rates are each pack’s published odds, the same numbers as its odds sheet. Small
+            samples swing a lot. Values are counted when pulled: a card pulled before a quick-sell change keeps the value it had then (an early Spotlight or GOAT pull still reads 30 coins).
           </p>
         </div>
       ) : f.section === 'recent' ? (
@@ -178,6 +181,8 @@ function PackSummary({ group, a, pool, sport, day, week }: { group: string; a: P
   const exp = useMemo(() => expectedFor(pool, group, day, week), [pool, group, week]);
   const def = defFor(sport, group, day);
   const [kind, label] = artOf(group);
+  // Claude (packs-4): the pack's odds sheet, from its expectations row
+  const [odds, setOdds] = useState(false);
   const best = a.b ? pool.base.get(a.b[0]) : null;
   const you = (x: number) => (a.n ? x / a.n : 0);
   const free = !a.pd;
@@ -227,6 +232,12 @@ function PackSummary({ group, a, pool, sport, day, week }: { group: string; a: P
         ))}
       </div>
       {pick && <p className="ut-trk-foot">You keep one of the options you see, so a pick has no pack odds to compare.</p>}
+      {exp && (
+        <button className="ps-odds-chip ut-trk-odds" onClick={() => setOdds(true)} aria-label={a.nm + ' odds'}>
+          ODDS SHEET
+        </button>
+      )}
+      {odds && <LazyOddsSheet pool={pool} sport={sport} source={{ type: 'pack', kind: group }} at={easternAt(day, 12)} onClose={() => setOdds(false)} />}
       <div className="ut-trk-ovr" aria-label="Cards by overall">
         {OVR_LABELS.map((l, i) => (
           <span key={l} className={'b' + i + (a.o[i] ? '' : ' zero')}>

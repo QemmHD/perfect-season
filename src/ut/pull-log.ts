@@ -8,7 +8,11 @@
 import { pickFor } from '../engine/sport';
 import { fcToDisplay } from './fc-scale';
 import { livePackDef, livePacksOn } from './live-packs';
-import { fill, legacyFill, openPack, packDefs, packRand, positionChoices, quickSellValue, walkoutLevel, type Odds, type PackDef, type SlotTier } from './packs';
+import { legacyGoldDist, packDefs, positionChoices, quickSell, quickSellValue, walkoutLevel, type Odds, type PackDef, type SlotTier } from './packs';
+import { easternAt } from './flash';
+import { oddsFor } from './odds';
+import { positionMix } from './squad';
+import { livePackEv, packEv, slotQs } from './value';
 import { TIER_RANK, type Pool } from './pool';
 import { capRecent, type PullAgg, type PullEntry, type PullLog, type PulledCard } from './pull-log-state';
 import type { ContentState } from './content-state';
@@ -258,7 +262,7 @@ export function specialOdds(def: Pick<PackDef, 'slots'>): number {
 }
 
 export interface Expected {
-  /** packs simulated */
+  /** Claude (packs-4): 0, the numbers are exact now (they were simulated over 160 packs) */
   packs: number;
   /** chance of at least one 86+ / 90+ in a pack */
   r86: number;
@@ -268,49 +272,40 @@ export interface Expected {
   qs: number;
 }
 
-const expectCache = new Map<string, Expected | null>();
 /**
- * What a pack type is expected to return by its published odds: `n` packs drawn with fixed seeds
- * through the same code that fills real packs (openPack / fill), so it follows the odds sheet's
- * slots and the within-tier weighting exactly. Picks, the starter and event rewards have none.
+ * What a pack type is expected to return by its published odds. Claude (packs-4): exact, from the same
+ * odds sheet the Store shows (odds.ts oddsFor) and the pack's exact quick-sell value (value.ts packEv /
+ * livePackEv), instead of 160 seeded packs simulated on the phone. A Position/Unit pack is a choice picked
+ * at random (the sheet's mean). Picks, the starter and event rewards have none.
  */
-export function expectedFor(pool: Pool, group: string, day: string, week: string, n = 160): Expected | null {
-  const key = pool.sport + '|' + group + '|' + week + '|' + n;
-  if (expectCache.has(key)) return expectCache.get(key)!;
-  let out: Expected | null = null;
-  if (!isPickGroup(group) && group !== 'starter' && group !== 'event-spotlight') {
-    const def = defFor(pool.sport, group, day);
-    const choices = positionChoices(pool.sport);
-    const e = ovrEdges(pool.sport);
-    try {
-      let h86 = 0,
-        h90 = 0,
-        sp = 0,
-        qs = 0,
-        done = 0;
-      for (let i = 0; i < n; i++) {
-        const seed = 'tracker-expect:' + group + ':' + i;
-        // (a Spotlight's golds are the registered receipt's pre-curve draw: packs.ts legacyFill)
-        const cards =
-          group === 'spotlight'
-            ? def
-              ? [...legacyFill(pool, def.slots.length - 1, packRand(seed)), ...fill(pool, def.slots.slice(-1), packRand(seed + ':chase'), undefined, week)]
-              : []
-            : openPack(pool, group === 'preview' ? 'premium' : group === 'position' ? 'position:' + choices[i % choices.length].key : group, seed, week);
-        if (!cards.length) continue;
-        done++;
-        if (cards.some((rc) => rc.ovr >= e[3])) h86++;
-        if (cards.some((rc) => rc.ovr >= e[4])) h90++;
-        if (cards.some((rc) => isSpecial(rc.tier))) sp++;
-        qs += cards.reduce((s, rc) => s + quickSellValue(rc), 0);
-      }
-      out = done ? { packs: done, r86: h86 / done, r90: h90 / done, special: def ? specialOdds(def) : sp / done, qs: qs / done } : null;
-    } catch {
-      out = null;
-    }
+export function expectedFor(pool: Pool, group: string, day: string, week: string): Expected | null {
+  if (isPickGroup(group) || group === 'starter' || group === 'event-spotlight') return null;
+  const at = easternAt(day, 12);
+  const t = oddsFor(pool, group, at);
+  if (!t) return null;
+  const sport = pool.sport;
+  let qs: number;
+  if (group.startsWith('live:') || group.startsWith('live-plus:')) qs = livePackEv(pool, group, day)?.ev ?? 0;
+  else if (group === 'position') {
+    const need = positionMix(sport);
+    const choices = positionChoices(sport);
+    qs = choices.reduce((a, c) => a + packEv(pool, packDefs(sport).position.slots, { week, mix: c.positions.map((p) => [p, need[p] ?? 1]) }), 0) / choices.length;
+  } else {
+    const def = defFor(sport, group, day);
+    qs = def && group !== 'spotlight' ? packEv(pool, def.slots, { week }) : expectedSpotlightQs(pool, week);
   }
-  expectCache.set(key, out);
-  return out;
+  return { packs: 0, r86: t.r86, r90: t.r90, special: t.special, qs };
+}
+
+/** A Spotlight's mean quick-sell value: its golds by the registered (pre-curve) draw, its last card the registry's. */
+function expectedSpotlightQs(pool: Pool, week: string): number {
+  const def = packDefs(pool.sport).spotlight;
+  let gold = 0;
+  for (const [o, p] of legacyGoldDist(pool)) gold += p * quickSell('gold', o, pool.sport);
+  const chase = def.slots[def.slots.length - 1];
+  let last = 0;
+  for (const [t, p] of Object.entries(chase) as [SlotTier, number][]) last += p * (t === 'gold' ? gold : slotQs(pool, t, { week }));
+  return gold * (def.slots.length - 1) + last;
 }
 
 // ---------- every card pulled ----------

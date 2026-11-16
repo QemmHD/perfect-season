@@ -73,6 +73,10 @@ export interface ContentState {
    * the balance also has floors from `pulls` and the `stamps-grant:` / `stamps:` claims, so an older build
    * that drops this field loses no granted or spent stamp (packs-plan.md D7, D13) */
   stamps?: { earned: number; spent: number };
+  /** Claude (packs-4): per-player Store preferences. `skipBuyConfirm`: "Don't ask again" on the buy confirm
+   * (never honoured at 10,000 coins or more, odds.ts confirmFor). A preference only: an older build drops it
+   * and the confirm simply asks again (harmless) */
+  prefs?: { skipBuyConfirm?: boolean };
 }
 
 const str = (x: unknown): x is string => typeof x === 'string';
@@ -154,6 +158,7 @@ export function normalizeContent(raw: unknown): ContentState | undefined {
   const stamps = normalizeStamps(raw.stamps, out);
   if (stamps) out.stamps = stamps;
   if (Array.isArray(raw.locked)) out.locked = strs(raw.locked, 2000);
+  if (rec(raw.prefs)) out.prefs = raw.prefs.skipBuyConfirm === true ? { skipBuyConfirm: true } : {};
   if (rec(raw.era)) out.era = { eligible: raw.era.eligible === true };
   if (rec(raw.draft)) {
     const d = raw.draft;
@@ -191,6 +196,11 @@ export function withClaim<T extends WithContent>(ut: T, id: string): T {
 
 export function withContent<T extends WithContent>(ut: T, fn: (c: ContentState) => ContentState): T {
   return { ...ut, content: fn(contentOf(ut)) };
+}
+
+/** Claude (packs-4): the state with Store preferences merged in (BuyConfirm's "Don't ask again"). */
+export function withPrefs<T extends WithContent>(ut: T, prefs: NonNullable<ContentState['prefs']>): T {
+  return withContent(ut, (c) => ({ ...c, prefs: { ...c.prefs, ...prefs } }));
 }
 
 /** A locked (favourite) copy: quick-sell, SBCs, the Swap Desk and dupe bars all leave it alone. */

@@ -10,6 +10,9 @@ import type { Pool } from './pool';
 import { seasonText } from './pool';
 import { TIER_NAMES } from './rate';
 import { isRare } from './rare';
+import { hasPickOdds } from './odds';
+import { LazyOddsSheet } from './odds-lazy';
+import './odds-sheet.css';
 
 /** Claude (packs-2): how many face down (a Front Office Pick has five). */
 const COUNT: Record<number, string> = { 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five' };
@@ -19,6 +22,8 @@ export function PickSheet({ pool, pick, onKeep, onLater }: { pool: Pool; pick: P
   const still = useMemo(reducedMotion, []);
   const [flipped, setFlipped] = useState(still ? cards.length : 0);
   const [chosen, setChosen] = useState<number | null>(null);
+  // Claude (packs-4): what the options were drawn from (odds.ts pickTable)
+  const [odds, setOdds] = useState(false);
   const modal = useRef<HTMLDivElement>(null);
   useEffect(() => modal.current?.focus({ preventScroll: true }), []);
   useEffect(() => {
@@ -39,7 +44,14 @@ export function PickSheet({ pool, pick, onKeep, onLater }: { pool: Pool; pick: P
   const w = 96;
   return (
     <div className="ut-pick-screen" role="dialog" aria-modal="true" aria-label={pick.title} tabIndex={-1} ref={modal} onKeyDown={(e) => e.key === 'Escape' && onLater()}>
-      <span className="eyebrow">{pick.title}</span>
+      <span className="ut-pick-top">
+        <span className="eyebrow">{pick.title}</span>
+        {hasPickOdds(pick.kind) && (
+          <button className="ps-odds-chip" onClick={() => setOdds(true)} aria-label={pick.title + ' odds'}>
+            ODDS
+          </button>
+        )}
+      </span>
       <h2 className="disp">{!flipped ? (COUNT[cards.length] ?? cards.length) + ' players. Keep one.' : !all ? 'Scouting…' : chosen === null ? 'Who joins your club?' : 'Keep ' + (cards[chosen]?.line.name ?? 'him') + '?'}</h2>
       <div className="ut-pick-row">
         {cards.map((rc, i) => (
@@ -89,6 +101,7 @@ export function PickSheet({ pool, pick, onKeep, onLater }: { pool: Pool; pick: P
         </button>
       </div>
       <p className="note">Only the player you keep joins your club. Your pick waits in the Store if you leave.</p>
+      {odds && <LazyOddsSheet pool={pool} sport={pool.sport} source={{ type: 'pick', kind: pick.kind }} onClose={() => setOdds(false)} />}
     </div>
   );
 }

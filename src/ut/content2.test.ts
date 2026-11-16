@@ -12,6 +12,7 @@ import { deriveEditionLine, landmarkId, LANDMARK_CAP, LANDMARK_FLOOR, parseEditi
 import { landmarkCatalog, LANDMARK_ATTRS, type LandmarkType } from './landmarks';
 import { buyMarket, marketBought, marketFor, MARKET_FLOOR, swapForPick } from './market';
 import { packTags } from './pack-helper';
+import { isRare } from './rare';
 import { flashWindowsOf } from './flash';
 import { weekOf } from './sbc';
 import { openPack, packDefs, quickSellValue } from './packs';
@@ -401,6 +402,15 @@ describe('pack helper and chemistry pips (' + SPORT + ')', () => {
     const low = { ...g[1], ovr: 10 };
     const slot = pool.sport === 'nba' ? a.line.pos[0] : undefined;
     if (slot) expect(packTags(pool, ut, { [slot]: low }, [a])[0].find((t) => t.k === 'upgrade')?.text).toBe('UPGRADE +' + (a.ovr - 10));
+  });
+
+  // Claude (packs-4): RARE marks a rare gold (the shimmer), and nothing else
+  it('tags rare golds RARE', () => {
+    const rare = Object.values(pool.buckets.gold).flat().find((x) => isRare(x, pool))!;
+    const plain = Object.values(pool.buckets.gold).flat().find((x) => !isRare(x, pool))!;
+    const [r, p] = packTags(pool, migrateUt(freshUt()), {}, [rare, plain]);
+    expect(r.find((t) => t.k === 'rare')?.text).toBe('RARE');
+    expect(p.some((t) => t.k === 'rare')).toBe(false);
   });
 
   it('gives each filled spot 0-3 pips from its own links', () => {
