@@ -509,6 +509,93 @@ The rival's plate appeared in the same mutation as the bug's new score (**0 ms**
 
 **Protocol:** none (render only; golden unchanged).
 
+### soccer-3 review fixes (2026-11-16)
+
+An independent review of `d861656..bc9ea0e` found two high, one medium and three low issues. All six are fixed on the current HEAD (after soccer-4), except the corner width, where a waiver is needed (see below). Render and camera only: golden unchanged, no protocol change.
+
+- **(high) The camera hard-cut on every pass.** The anchor was the subject's body. On a pass the subject became the receiver, so the receiver was drawn in one frame where the passer had been.
+  - **Now:** the lens's anchor is a ground point (`CamState.gx/gy`) that glides after the man on the ball. It eases 20% a frame, at most 1.2 m a frame, and is never cut. Each frame the anchor's screen spot is re-expressed through last frame's camera, so moving the anchor does not move the picture.
+  - The hard limits (carrier in the safe box, stands ≤ 12%, goal mouth inside 30 m) now pull the frame in at ≤ 14 px a frame instead of snapping. The whole picture moves ≤ 15 px a frame. The stands' 12% still holds every frame.
+  - A zoom step scales about the screen's middle, not the anchor.
+  - `CamState.subj/switches` count the subject changes the frame glided over.
+  - **Measured** (`scripts/soccer/cam.ts` motion column, new; and a before/after probe through the HEAD and new `camStep`: 40 real-squad autopilot attacks × 5 scenarios, 65k frames, 421 subject switches):
+
+    | Per-frame screen motion of fixed pitch points | 393×852 before | after | 320×568 before | after |
+    |---|---|---|---|---|
+    | p50 | 0.7 px | 0.6 | 0.8 | 0.6 |
+    | p99 | 10.5 | 11.6 | 8.5 | 9.1 |
+    | p99.9 | **232.0** | **16.0** | **198.4** | **14.0** |
+    | max | 325.6 | 22.6 | 275.7 | 17.4 |
+    | On a subject switch: median / max | 135.7 / 325.6 | **8.6 / 17.8** | 115.5 / 275.7 | **7.4 / 17.4** |
+
+  - `cam.ts 60`, every preset, mid-attack: motion p99.9 7.8–19.4 px, max 9.7–26.7 px (the max is a corner's zoom step). The carrier is in the safe box in **99.2–100%** of frames (it was 100% by construction, because he was the clamped anchor). The misses are the glide just after a pass: about 0.2 s while the frame pulls the receiver in. The goal is fully in frame inside 25 m in 99.9–100% of frames. Zoom changes are ≤ 1.31 a second, the stands ≤ 12.0% and tags over a control 0%.
+  - `camera.test.ts` V2 now asserts at 393 and 320 that the camera glided over at least one switch, the fixed points' motion p99.9 ≤ 20 px and max ≤ 30 px.
+- **(high) Frame pacing was worse than the baseline.**
+  - **The floor is reused while the picture only shifts.** It is drawn into a canvas 24 px wider and 72 px taller on each side than the screen. `floorShift(c0, c1)` (pure, tested) projects a grid of ground points and the far stand through the old and new cameras. While one whole-pixel offset matches everything to within 1.5 px (under a texel of the half-resolution floor), the floor is blitted at that offset. Otherwise it is redrawn; just after a redraw 2.5 px is allowed, so it is redrawn at most every other frame. The shift lens's row is a pure vertical blit.
+  - **The sprite budget stays at 5,** with 12 before the whistle so the line-up's sprites are built while nothing moves.
+  - **A man more than 15 m from the ball is drawn at the cheaper detail:** 8 facings, every third clip frame, sizes in 4 px steps instead of 2.
+  - **Measured** (`perf.cjs`, dev lab autopilot at 393×852 DPR 3, 10 s per run, isolated, run back to back at a load of 4–8 on 4 CPUs; floor redraws are out of all draws):
+
+    | Run | 4× fps / p99 / longest task | 6× fps / p99 / longest task | Stale sprites 4× / 6× | Floor redraws 4× / 6× |
+    |---|---|---|---|---|
+    | Baseline `d861656` (twice) | 57.3 / 33.4 / 73 ms; 58.6 / 33.4 / 53 ms | 51.4 / 50.1 / 87; 53.8 / 50.0 / 60 | (no counter) | (every camera move) |
+    | HEAD `c15e435` (twice) | 58.0 / 33.4 / 85; 57.0 / 33.4 / 139 | 44.3 / 66.7 / 111; 42.8 / 83.4 / 122 | 3.3% / 12.8%; 3.7% / 14.9% | 50% / 44% |
+    | Fixed, at 1 px (twice) | 58.3 / 33.3 / none; 56.6 / 50.1 / 107 | 49.2 / 66.7 / 80; 41.1 / 99.9 / 139 (load 6.8) | 2.4% / 4.2%; 2.8% / 6.6% | 28% / 27% |
+    | Fixed with the 4 px far sizes (twice) | 58.1 / 33.4 / 80; 55.7 / 50.0 / 88 (load 8.4) | 53.9 / 50.0 / 84; 46.5 / 66.7 / 111 | **2.1% / 3.2%**; 2.6% / 5.2% | 28% / 26% |
+
+    | **Final** (4 px far sizes and the 1.5 px floor tolerance; three runs, load 4.5–6.5) | **58.0 / 33.4 / 113; 58.2 / 33.4 / 60; 58.9 / 33.3 / none** | **51.1 / 50.1 / 88; 53.3 / 50.0 / 77; 54.5 / 50.0 / 73** | **2.4% / 3.8%; 2.1% / 3.7%; 2.0% / 3.5%** | **23–24% / 22–24%** |
+
+    Over the same autopilot attacks offline, the 1.5 px tolerance cuts floor redraws from 41.7% (1 px) to 33.9% of live frames. (The lab's share is lower because it includes the still frames before each whistle.)
+  - **Met:** "not worse than the baseline": the final build's 4× runs (58.0–58.9 fps, p99 33.3–33.4 ms) match `d861656`'s (57.3–58.6, 33.4), and at 6× it is at the baseline's level (51.1–54.5 fps vs 51.4–53.8, p99 50 ms both). No long task over 200 ms in any run (longest 113 ms). The floor is redrawn about half as often as at HEAD. Stale draws are 2.0–2.4% at 4× and 3.5–3.8% at 6×, against HEAD's 3.3–3.7% and 12.8–14.9%.
+  - **Not met on this machine:** stale ≤ 1%, and fps ≥ 58 with p99 ≤ 33.4 at 6×. 6× swings ±6 fps between identical runs here. The rest of the stale draws come from new attacks (the kits swap, so every man's sprites are new) and from running clips at V2's 30–45 px sizes. The players team's LOD at V2 sizes is the follow-up (below). A measurement on an idle machine is part of the soccer-10 gate.
+  - One earlier batch of these runs was thrown out: `kill` on `npx`'s PID left its vite child serving the baseline tree on 5217, so every run measured the baseline. The runner now starts `node_modules/.bin/vite` itself and prints the server's working directory.
+- **(medium) Corner framing.** The relaxed asserts are gone. `camera.test.ts` again asks at a corner on every preset, both mirrors:
+  - 4 of 5 teammates on screen;
+  - the taker 20 px or more inside his edge, ≥ 22 px tall;
+  - the whole goal mouth on screen;
+  - the goal line in the upper third.
+  - **Now:** `cornerZoom` picks the tightest zoom step (from 1 out to 0.75) at which the taker stands 20 px inside his edge, the whole goal mouth is on screen and at least four of his five box men are too. The box's men and the mouth may use the whole screen across (the HUD's sides don't matter at a dead ball). The goal line goes as low as the stands' 12% allows.
+  - **Kick-off frames (`cam.ts`):**
+
+    | | 393 / 393 sat 81 / 430 | 390×844 | 375×667 | 320×568 |
+    |---|---|---|---|---|
+    | Zoom, metres across at the flag's row | 0.80, 40.0 m | 0.75, 42.4 m | 0.75, 41.9 m | 0.75, 42.7 m |
+    | Taker x (mirror) | 20 (373); 430: 22 (408) | 21 (369) | 22 (353) | 22 (298) |
+    | Taker height | 27 px | 27 | 27 | 23 |
+    | Mates on screen | 4/5 | 5/5 | 4/5 | 4/5 |
+    | Goal mouth | all on screen, 72 / 78 px | all, 67 | all, 65 | all, 55 |
+    | Goal line y (H/3) | 150 (284); 164 (311) | 146 | 123 | 105 (189) |
+
+    Before, the taker was at x = 16 at 320 and 375, the mouth was cut on the mirrored corner at 393, 430, 375 and 320, and only 3/5 teammates were on screen at 320.
+  - **Waiver needed (for the lead or planner to sign off): 32–36 m across at the corner.**
+    - The taker stands at the flag, on the goal line. The far post is on the same row, 37.7 m from that flag (`GX + GHALF`).
+    - With the taker 20 px inside his edge and the far post on screen, that row must show at least 37.7 × W / (W − 22) ≈ **40 m** at 393.
+    - So V1's 32–36 m, its taker x in [20, W − 20] and the full goal mouth the review asks for cannot all hold at once. The build keeps the taker, the mouth and 4/5 men, and lets the width go to 40–42.7 m.
+    - The review's alternative (the near post at 0.35 W with the taker at x ≥ 20) needs about 100 m across.
+    - **The goal line cannot drop to 0.3 H.** The far stand's base sits a fixed 48 px (at 393) above the goal line at this scale and tilt. With the stands at ≤ 12% of H, the goal line is at most at y 150. The lower ~55% of a corner frame is grass, by V2's own numbers. In the screenshots the box now spans the width with no crushed tags.
+    - `docs/studio-overhaul/soccer-plan.md` holds an uncommitted revision that is not mine, so the waiver is recorded here for the planner to carry into V1.
+- **(low) Edge arrows and name tags.**
+  - The arrows are placed before the label pass, and their chevron and chip rects are keep-outs (`arrowRects`), so no tag prints over a chip. They are painted after the tags.
+  - A man who has an arrow gets no name tag (the pass target's included), so NEYMAR is no longer clamped next to N11.
+  - "Under the thumbs" now means only a man whose body is under one of `frameInfo.controls` (the buttons and the stick), or below the screen. A man in plain view under the box gets none (the mid-pitch "B5").
+  - Tests: `camera.test.ts` checks that every arrowed man is off the screen, above the box or under a control, and that tags placed against an arrow's keep-outs never meet them.
+- **(low) A goal plate hid the toast line.**
+  - The plates now stack just above the toast line (`.sc2-plates.over`, 6 px gap) instead of replacing it, so a set piece's "AUTO KICK · in N" countdown stays up when the rival scores.
+  - Our plate is up 2.4 s, under the 2.5 s gap to the next attack's intro.
+  - The label pass's keep-outs re-measure when the toast appears under a plate.
+- **(low) The word mark on the boards was garbled.**
+  - The boards behind the goal line now stand upright: a strip drawn once (F35 letters, one texel per letter pixel) and blitted as a rectangle 0.9 m tall (lifted like the goal frame) at PL + 4.8 m. The camera never yaws, so that rectangle is exact.
+  - The texture under them is only their dark footing.
+  - "PERFECT SEASON" reads in open play at 393 and 320 (screenshots below).
+
+**Re-checked:**
+- `PS_SPORT=soccer npx vitest run soccer sport-branches` (heavy.sh): 26 files, **208/208**, 141 s at a load of about 6 (the two agreement files 61 s and 83 s of it). Golden and agreement green. `npm run typecheck` clean.
+- `camera.test.ts` 16 tests (+4: floor reuse ×3, arrow keep-outs).
+- **Browser** (dev 5217, touch, isolated, 0 requests to live hosts; `O/shots/soccer/soccer-3-fix/`, all looked at):
+  - `fix-*`: corner, build and free kick, before the whistle and mid-attack, at 393×852 sat 59, 375×667 and 320×568;
+  - `plates-*`: a goal plate stacked above a set piece's countdown at 393 and 320 (plate y 556–584, toast 590–618 at 393; no overlap).
+- Probes: `O/scratchpad/s3fix/motion.ts` (before/after motion), `floorsim.ts` (redraw rate by tolerance), `perfrun.sh`/`perfall.sh`/`perfab.sh` (pacing), `plates.mjs`.
+
 ## soccer-4 · The gold ring on SHOOT, fitted to real conversion
 
 **What changed** (V2 B.0.1, B.3.5, B.3.8; audit B-4, AI-1; plan soccer-4). Engine, AI and ratings change, so this rides the soccer protocol bump (below). Details of the model are in `docs/SOCCER-ENGINE.md` ("Studio overhaul soccer-4").
@@ -761,6 +848,7 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 | `src/game/play-feedback.ts` (`soccerFeedback` only) | nfl/soccer shared | soccer-4: the ring's next-step lines (TOO FAR, PRESSURE, BLOCKED, FIRST TIME ACROSS YOUR BODY, KEEPER CLAIM, PARRIED WIDE), the Ring and xG facts (`SOCCER_RING` map + the function body; the NBA and NFL functions untouched). | soccer-4 |
 | `docs/CREDITS.md` | shared | soccer-4: one section crediting StatsBomb Open Data (CC BY-SA 4.0) for `xg.ts` and the conversion targets. | soccer-4 |
 | `src/game/soccer2/render.ts` players section (`sprite()`) | players (shared file) | Two hooks: the sprite's look-down angle comes from `tiltAt(y)` (≤ `SPRITE_TILT` 0.6, the camera's) instead of `min(0.9, pitchAt)`, and two counters (`stats.sprites`, `stats.stale`) for the stale-draw budget. The size passed in is the camera's (`spriteScale`). | soccer-3 |
+| `src/game/soccer2/render.ts` players section (`sprite()`, the draw call) | players (shared file) | soccer-3 review fix: a `far` flag (a man > 15 m from the ball: 8 facings, every third clip frame, sizes in 4 px steps), and the new-sprite budget 5 always (12 before the whistle), no longer 3 after a long frame (~6 lines). Players may fold this into their LOD. | soccer-3 fix |
 
 ## Protocol
 
@@ -783,6 +871,8 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 - **soccer-7 (whole-match fit):** per-shot conversion is now real football's (S1), so goals per match fell to 1.15 (0–0 32.5%) with 5.5 shots a side. The plan's 9–13 shots a side (A5) and the V2 deal are what bring 2.4–2.7 goals back; also the set-piece floors relaxed here (corners, direct free kicks), save% 74.5 → 64–72, blocked 12.4 → 18+, woodwork 1.7 → 2–4.
 
 - **players (soccer-3):** the stale-draw budget at V2 sizes. Every man on the soccer screen is now 30–45 px, where `sprite()`'s LOD gives 16 facings and a clip frame every 2 steps. Stale draws are 11.8% at 4× CPU (7.3% before, when far men were small). A cheaper LOD for men away from the ball (8 facings, every 3rd frame) and pre-warming each attack's sprites before the whistle are yours; V3 fixes only the sizes. `PITCH` in `soccer2/render.ts` is the palette to retune under your venue grant, and the camera passes sprites `spriteScale(s, ART)` (2.5 px/m steps) at `SPRITE_TILT` 0.6.
+- **players (soccer-3 review fix):** soccer now does the interim part in `sprite()` itself (the `far` flag: men > 15 m from the ball at 8 facings, every 3rd clip frame, 4 px size steps; 12 new sprites a frame before the whistle; the budget stays 5). Stale draws are 2.0–2.4% at 4× and 3.5–3.8% at 6×, still above the 1% target. What's left is yours: a clip-cycle pre-warm when a new attack swaps the kits, and the LOD at V2 sizes. Fold soccer's `far` hunk into it.
+- **planner / lead (soccer-3 review fix):** sign off or amend V1's corner line. The taker 20 px inside his edge plus the whole goal mouth needs about 40 m across at the flag's row (geometry in the review-fix section). The build gives 40.0–42.7 m.
 - **shell (soccer-3):** soccer dispatches `ps:arena-ready` (`window`, `detail: { sport: 'soccer' }`) once per match after the first frame with the pitch and players.
 - **nba (soccer-3):** the hidden `.sc2-safe` probe reads the action-safe box from the tokens (`--safe-t`, `--safe-b`); at merge it reads yours.
 

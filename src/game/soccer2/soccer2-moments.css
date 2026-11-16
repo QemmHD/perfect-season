@@ -29,6 +29,14 @@
   bottom: auto;
   top: calc(var(--sat) + var(--heat-t) + var(--heat-h) + 8px);
 }
+/* with the toast line up (a set piece's countdown, the next attack's intro), the plates stack just above
+ * it instead of replacing it (soccer-3 review fix) */
+.sc2-plates.over {
+  bottom: calc(var(--toast-b) + var(--toast-h) + 6px);
+}
+.ps-geo.land .sc2-plates.over {
+  top: calc(var(--sat) + var(--heat-t) + var(--heat-h) + var(--toast-h) + 14px);
+}
 /* the scorer's plate: ours teal, theirs violet */
 .sc2-plate {
   flex: none;

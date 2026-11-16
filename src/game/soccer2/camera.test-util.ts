@@ -107,6 +107,18 @@ export interface MidStats {
   tagFrames: number;
   tagHits: number;
   standsMax: number;
+  /** subject changes (a pass's receiver, a taker) the camera glided over */
+  switches: number;
+  /** each frame's screen motion (px) of fixed pitch points (the last anchor, the goal's centre, the
+   * penalty spot: the most any of them on screen moved), first frames of attacks left out */
+  moves: number[];
+}
+
+/** The q-th quantile (0-1) of a list of numbers. */
+export function quantile(xs: readonly number[], q: number): number {
+  if (!xs.length) return 0;
+  const v = [...xs].sort((p, r) => p - r);
+  return v[Math.min(v.length - 1, Math.max(0, Math.ceil(q * v.length) - 1))];
 }
 
 /** Autopilot attacks drawn at 60 fps through camStep: the V2 shares. */
@@ -114,15 +126,28 @@ export function midAttack(p: Preset, sc: Scenario, pairs: [Squad, Squad][], seed
   const view = viewOf(p, clutch);
   const ctrls = controlRects(p);
   const art = artOf(p.W);
-  const out: MidStats = { frames: 0, inBox: 0, nearFrames: 0, goalIn: 0, seconds: 0, zoomChanges: 0, tagFrames: 0, tagHits: 0, standsMax: 0 };
+  const out: MidStats = { frames: 0, inBox: 0, nearFrames: 0, goalIn: 0, seconds: 0, zoomChanges: 0, tagFrames: 0, tagHits: 0, standsMax: 0, switches: 0, moves: [] };
+  const onScr = (q: { x: number; y: number }) => q.x >= 0 && q.x <= p.W && q.y >= 0 && q.y <= p.H;
   pairs.forEach(([us, them], i) => {
     const a = setupAttack(sc, us, them, seedTag + sc + i, {});
     const pl = pilot(0.68, seedTag + 'p' + i);
     const st = newCamState();
     kickOff(a);
+    let prev: PCam | null = null;
     for (let n = 0; !a.end && n < 60 * 60; n++) {
       step(a, 1 / 60, decide(a, pl));
+      const fixed = [{ x: st.gx, y: st.gy }, { x: GX, y: PL }, { x: GX, y: PL - 11 }];
       const cam = camStep(st, a, view, 1 / 60, a.t);
+      if (prev) {
+        let mv = 0;
+        for (const f of fixed) {
+          const q0 = project(prev, f.x, f.y);
+          const q1 = project(cam, f.x, f.y);
+          if (onScr(q0) && onScr(q1)) mv = Math.max(mv, Math.hypot(q1.x - q0.x, q1.y - q0.y));
+        }
+        out.moves.push(mv);
+      }
+      prev = cam;
       const c = subjectOf(a);
       if (c.side !== 'A') continue;
       const q = project(cam, c.x, c.y);
@@ -142,6 +167,7 @@ export function midAttack(p: Preset, sc: Scenario, pairs: [Squad, Squad][], seed
     }
     out.seconds += a.t;
     out.zoomChanges += st.changes;
+    out.switches += st.switches;
   });
   return out;
 }

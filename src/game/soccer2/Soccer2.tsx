@@ -316,8 +316,12 @@ export function Soccer2({
     c.level = level;
     crowd.level(level);
   };
-  /** a goal plate in the toast line for a while */
-  const showPlate = (side: 'us' | 'them', text: string, ms = 2600) => {
+  /**
+   * A goal plate for a while, stacked just above the toast line (soccer-3 review fix: it used to replace
+   * the line, hiding a set piece's AUTO KICK countdown when the rival scored, and ours outlived the
+   * 2.5 s gap to the next attack's intro). Ours is up 2.4 s.
+   */
+  const showPlate = (side: 'us' | 'them', text: string, ms = 2400) => {
     const id = ++popId.current;
     setPlates((ps) => [...ps.slice(-1), { id, side, text }]);
     timers.later(() => setPlates((ps) => ps.filter((q) => q.id !== id)), ms);
@@ -978,7 +982,7 @@ export function Soccer2({
     const sb = stickBase.current;
     const stick = sb ? [box({ left: sb.x - sb.r, top: sb.y - sb.r, width: sb.r * 2, height: sb.r * 2 })] : Array.from(wrap.querySelectorAll('.ps-stick-ghost')).map((el) => box(el.getBoundingClientRect()));
     renderer.frameInfo.controls = [...Array.from(wrap.querySelectorAll('.sc2-ctl, .sc2-bug, .sc2-pause')).map((el) => box(el.getBoundingClientRect())), ...stick];
-    // the label pass's keep-outs (V-3; soccer-2 fix): the toast line (or the plates in its place) and every
+    // the label pass's keep-outs (V-3; soccer-2 fix): the toast line (and the plates above it) and every
     // control, so no tag prints under a DOM button. Read here, never per frame.
     keepRef.current = [...Array.from(wrap.querySelectorAll('.sc2-toast, .sc2-plates')).map((el) => box(el.getBoundingClientRect())), ...renderer.frameInfo.controls];
   };
@@ -1262,7 +1266,7 @@ export function Soccer2({
 
   // the keep-outs move only when the toast, the plates, the cluster or the frame change: measure then,
   // and again once the toast's slide-in has settled (soccer-2 fix: no layout reads every frame)
-  const keepKey = (toast?.text ?? '') + '|' + plates.length + '|' + (slots ? targetsOf(slots).join('') : '') + '|' + compact + wide + ui;
+  const keepKey = (toast?.text ?? '') + '|' + plates.length + (toast ? 'o' : '') + '|' + (slots ? targetsOf(slots).join('') : '') + '|' + compact + wide + ui;
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
@@ -1303,8 +1307,8 @@ export function Soccer2({
           {pop.sub && <small>{pop.sub}</small>}
         </div>
       )}
-      {plates.length > 0 ? (
-        <div className="sc2-plates" role="status" aria-live="polite">
+      {plates.length > 0 && (
+        <div className={'sc2-plates' + (toast ? ' over' : '')} role="status" aria-live="polite">
           {plates.map((q) => (
             <div key={q.id} className={'sc2-plate ' + q.side}>
               <i aria-hidden="true" />
@@ -1312,9 +1316,8 @@ export function Soccer2({
             </div>
           ))}
         </div>
-      ) : (
-        toast && <ToastLine text={toast.text} kind={toast.kind} timer={toast.timer} />
       )}
+      {toast && <ToastLine text={toast.text} kind={toast.kind} timer={toast.timer} />}
       {replaying && (
         <button className="replay-banner" onPointerDown={(e) => (e.stopPropagation(), endReplay())} aria-label="Instant replay: tap to skip">
           <i />

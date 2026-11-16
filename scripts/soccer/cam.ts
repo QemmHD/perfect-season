@@ -5,10 +5,12 @@
 //    V2 action-safe box, teammates on screen, the stands' share of the height, the goal mouth's width
 //    (inside 30 m), the corner taker's size and place;
 //  - V2, mid-attack over N autopilot attacks per scenario at 60 fps: the carrier in the safe box, the
-//    goal fully in frame inside 25 m, zoom changes a second, the name tag over a control;
+//    goal fully in frame inside 25 m, zoom changes a second, the name tag over a control, and the
+//    per-frame screen motion of fixed pitch points (p50 / p99 / p99.9 / max px, with the subject
+//    switches it glided over: soccer-3 review fix, a pass used to cut the picture);
 //  - V3: the controlled man's height, the smallest man on screen, the ball.
 //   bash O/heavy.sh npx vite-node scripts/soccer/cam.ts [attacks per scenario=200] [presets: all|main]
-import { kickOffRow, midAttack, PRESETS, SCENARIOS } from '../../src/game/soccer2/camera.test-util';
+import { kickOffRow, midAttack, PRESETS, quantile, SCENARIOS } from '../../src/game/soccer2/camera.test-util';
 import { setupAttack } from '../../src/game/soccer2/engine';
 import { clubSquad, soccerLines, type SoccerCardsFile } from '../../src/game/soccer2/ratings';
 import type { Scenario } from '../../src/game/soccer2/types';
@@ -51,7 +53,8 @@ for (const p of which === 'main' ? PRESETS.filter((q) => q.name.startsWith('393'
       '| goal in frame inside 25 m ' + pct(m.goalIn, m.nearFrames) + ' of ' + m.nearFrames,
       '| zoom changes ' + (m.zoomChanges / Math.max(1e-6, m.seconds)).toFixed(2) + '/s',
       '| tag over a control ' + pct(m.tagHits, m.tagFrames),
-      '| stands max ' + (m.standsMax * 100).toFixed(1) + '%'
+      '| stands max ' + (m.standsMax * 100).toFixed(1) + '%',
+      '| motion px/frame p50 ' + quantile(m.moves, 0.5).toFixed(1) + ' p99 ' + quantile(m.moves, 0.99).toFixed(1) + ' p99.9 ' + quantile(m.moves, 0.999).toFixed(1) + ' max ' + quantile(m.moves, 1).toFixed(1) + ' over ' + m.switches + ' switches'
     );
   }
 }

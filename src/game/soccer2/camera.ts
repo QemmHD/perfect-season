@@ -4,17 +4,21 @@
 //
 // Portrait is a high, steep, long-lens broadcast view:
 //  - about 34 m across at the carrier's row (32 m on a 320 px phone), looking down at 0.9 rad;
-//  - the man on the ball is the camera's anchor: he sits on the lens axis, so moving the framing up or
-//    down the screen is a rigid shift (a shift lens) and every constraint below is a simple interval;
+//  - the lens's anchor is a ground point that glides after the man on the ball (never cut: a pass's
+//    receiver or a new taker takes over without the picture jumping; soccer-3 review fix). The anchor
+//    sits on the lens axis, so moving the framing up or down the screen is a rigid shift (a shift
+//    lens) and every constraint below is a simple interval;
 //  - the frame follows 85% of the ball's x and looks ahead (velocity × 0.6 s, at most 6 m, plus 3 m
 //    toward the goal);
 //  - the framing pass keeps the carrier, the stands (≤ 12% of the height) and, inside 30 m, the goal
 //    mouth in V2's action-safe box (y 115-568 at 393×852) as hard limits, then fits his two nearest
 //    options and as many other teammates as it can across;
-//  - zoom eases out (at most 15%) only for a through ball's target or a corner, in 0.05 steps, at most
-//    four changes a second (one cut under reduced motion); the stoppage attack (Clutch) sits 6% tighter;
-//  - corners are framed from the flag's side with the goal line in the upper third; penalties put the
-//    goal in the upper third.
+//  - zoom eases out (at most 15%) only for a through ball's target, in 0.05 steps, at most four
+//    changes a second (one cut under reduced motion); the stoppage attack (Clutch) sits 6% tighter;
+//  - corners are framed from the flag's side: the taker 20 px inside his edge, the whole goal mouth and
+//    four of his five box men on screen, the goal line in the upper third. That needs about 40 m across
+//    at the flag's row (zoom 0.75-0.85; the waiver in the team doc), since the flag and the far post are
+//    36.8 m apart; penalties put the goal in the upper third.
 // Landscape keeps the earlier camera (it is not the default: the app is portrait-locked).
 //
 // The lens is long (half-angle 0.2 rad) for a measured reason: the goal mouth must stay ≥ 60 px wide
@@ -67,6 +71,26 @@ export const CAM = {
   ease: { x: 0.08, y: 0.09 },
   /** margins inside the safe box for the carrier's feet: above (his body), below, either side (px) */
   feet: { top: 34, bottom: 6, side: 14 },
+  /**
+   * The lens's ground anchor follows the man on the ball, eased (share per 60 Hz frame, at most `anchorMax`
+   * m a frame), and is never cut: when the subject changes (a pass's receiver, a set piece's taker) the
+   * picture stays where it is and the anchor glides over (soccer-3 review fix: a pass used to jump the
+   * picture by the pass's length).
+   */
+  anchorEase: 0.2,
+  anchorMax: 1.2,
+  /** the hard framing limits pull the frame at most this many px per 60 Hz frame (no cut on a switch) */
+  clampRate: 14,
+  /** and the anchor's screen spot moves at most this many px per 60 Hz frame in all (the picture glides) */
+  maxMove: 15,
+  /**
+   * Corners: the flag's row is framed this many metres across (about 40, a zoom of 0.80-0.85), because
+   * the taker at the flag and the far post are 36.8 m apart: at 32-36 m across the taker and the whole
+   * goal mouth cannot both be on screen (team doc, soccer-3 review fixes: the corner width waiver).
+   */
+  cornerZoomMin: 0.75,
+  /** the corner taker's distance from his screen edge (px) */
+  cornerEdge: 20,
 } as const;
 
 /** The far stand's base (pitch metres along): the texture's wall in render.ts stands here. */
@@ -176,12 +200,19 @@ export interface CamState {
   changes: number;
   /** the attack this state framed last (a new attack starts framed, not eased) */
   key: unknown;
+  /** the lens's ground anchor (pitch m), eased toward the subject; and the scale used last frame */
+  gx: number;
+  gy: number;
+  s: number;
+  /** the subject the frame is on (a body id), and how many times it has changed (a pass, a new taker) */
+  subj: number;
+  switches: number;
   /** landscape's eased aim */
   land: Pt | null;
   landZoom: number;
 }
 
-export const newCamState = (): CamState => ({ ax: 0, ay: 0, zoom: 1, zoomAt: -Infinity, changes: 0, key: null, land: null, landZoom: 1 });
+export const newCamState = (): CamState => ({ ax: 0, ay: 0, zoom: 1, zoomAt: -Infinity, changes: 0, key: null, gx: 0, gy: 0, s: 0, subj: -1, switches: 0, land: null, landZoom: 1 });
 
 /** The man the camera frames: the one on the ball, else the set-piece taker, else the one the stick has. */
 export function subjectOf(a: Attack): Body {
@@ -250,7 +281,7 @@ function spansFor(W: number, H: number, a: Pt, s: number, w: Want): { x: Span; y
 
 /** The scale the frame wants now (zoom 1, before Clutch): 1, or out to 0.85 for a through ball or a corner. */
 export function zoomWanted(a: Attack, view: CamView): number {
-  if (a.setPiece?.kind === 'corner') return CAM.zoomMin;
+  if (a.setPiece?.kind === 'corner') return cornerZoom(a, view);
   const t = throughTarget(a);
   if (!t) return 1;
   const c = subjectOf(a);
@@ -266,50 +297,91 @@ export function zoomWanted(a: Attack, view: CamView): number {
   return CAM.zoomMin;
 }
 
+/**
+ * A corner's zoom: the tightest step (from 1 out to cornerZoomMin) at which the taker stands
+ * cornerEdge px or more inside his edge of the screen, the whole goal mouth is on screen and at least
+ * four of his five teammates in the box are too.
+ */
+export function cornerZoom(a: Attack, view: CamView): number {
+  const c = subjectOf(a);
+  const s0 = baseScale(view.W) * (view.clutch ? CAM.clutch : 1);
+  const { W, H } = view;
+  const scr: Box = { x: 2, y: 0, w: W - 4, h: H };
+  const mates = a.bodies.filter((b) => b.side === c.side && b.role !== 'gk' && b !== c);
+  const need = Math.min(4, mates.length);
+  let z = 1;
+  for (; z >= CAM.cornerZoomMin - 1e-9; z -= CAM.zoomStep) {
+    const s = s0 * z;
+    let xs = spansFor(W, H, c, s, { x: c.x, y: c.y, box: { x: CAM.cornerEdge, y: 0, w: W - 2 * CAM.cornerEdge, h: H } }).x;
+    for (const g of goalPts(heightK(W))) xs = meet(xs, spansFor(W, H, c, s, { ...g, box: scr }).x);
+    if (!ok(xs)) continue;
+    // the teammates the span can still take, nearest the taker's side first
+    const order = mates.map((b) => ({ b, q: spansFor(W, H, c, s, { x: b.x, y: b.y, box: scr }).x })).sort((p, q) => Math.abs(p.b.x - c.x) - Math.abs(q.b.x - c.x));
+    let n = 0;
+    for (const { q } of order) {
+      const m = meet(xs, q);
+      if (ok(m)) {
+        xs = m;
+        n++;
+      }
+    }
+    if (n >= need) break;
+  }
+  return Math.round(Math.max(CAM.cornerZoomMin, z) / CAM.zoomStep) * CAM.zoomStep;
+}
+
 /** The carrier's feet stay this far inside the safe box. */
 const inner = (b: Box): Box => ({ x: b.x + CAM.feet.side, y: b.y + CAM.feet.top, w: Math.max(1, b.w - 2 * CAM.feet.side), h: Math.max(1, b.h - CAM.feet.top - CAM.feet.bottom) });
 
 /**
- * The framing pass: where the anchor (the carrier's feet) should sit on screen this frame, at scale
- * `s`. Priority: the carrier (always), the stands (≤ 12%), the goal mouth inside 30 m, then his
- * options (and a through ball's man). The resting spot is the look-ahead's.
+ * The framing pass: where the lens's anchor `g` (a ground point near the man on the ball; the man
+ * himself when omitted) should sit on screen this frame, at scale `s`. Priority: the carrier (always),
+ * the stands (≤ 12%), the goal mouth inside 30 m and at every set piece, then his options (and a
+ * through ball's man). The resting spot is the look-ahead's.
  */
-export function frameFor(a: Attack, view: CamView, s: number): { ax: number; ay: number; hard: { x: Span; y: Span } } {
+export function frameFor(a: Attack, view: CamView, s: number, g?: Pt): { ax: number; ay: number; hard: { x: Span; y: Span }; stands: number } {
   const { W, H, safe } = view;
   const c = subjectOf(a);
+  const at = g ?? c;
   const hk = heightK(W);
   const box = safe;
-  const must = spansFor(W, H, c, s, { x: c.x, y: c.y, box: inner(box) });
-  // where he rests: the look-ahead point on the carrier's row, the frame centred on 90% of its x
+  const sp = a.setPiece;
+  const corner = sp?.kind === 'corner';
+  // a corner's taker stands cornerEdge px inside his edge (the zoom made room for the goal and the box)
+  const mustBox = corner ? { ...inner(box), x: Math.max(box.x, CAM.cornerEdge), w: Math.min(box.x + box.w, W - CAM.cornerEdge) - Math.max(box.x, CAM.cornerEdge) } : inner(box);
+  const must = spansFor(W, H, at, s, { x: c.x, y: c.y, box: mustBox });
+  // where he rests: the look-ahead point on the carrier's row, the frame centred on 85% of its x
   const v = Math.hypot(c.vx, c.vy);
   const k = v * CAM.lookT > CAM.lookMax ? CAM.lookMax / (v * CAM.lookT) : 1;
   const toGoal = Math.max(1e-6, Math.hypot(GX - c.x, PL - c.y));
   const look = { x: c.x + c.vx * CAM.lookT * k + ((GX - c.x) / toGoal) * CAM.lookGoal, y: c.y + c.vy * CAM.lookT * k + ((PL - c.y) / toGoal) * CAM.lookGoal };
-  const sp = a.setPiece;
   const centre = GX + (look.x - GX) * CAM.follow;
-  let ax = W / 2 + (c.x - centre) * s;
+  // a reference camera with the anchor in the middle of the screen: a point's screen x moves by
+  // (its scale / s) × the anchor's x, and every screen y moves with the anchor's y
+  const ref = anchoredCam(W, H, at, W / 2, H / 2, s);
+  const pc = project(ref, c.x, c.y);
+  const kc = pc.s / s;
+  const axFor = (want: number) => W / 2 + (want - pc.x) / kc;
+  let ax = axFor(W / 2 + (c.x - centre) * pc.s);
   // the look-ahead point sits on the resting row; he sits that much below it
   const rest = box.y + box.h * CAM.row;
-  const ref = anchoredCam(W, H, c, W / 2, H / 2, s);
   const lookOff = project(ref, look.x, look.y).y - H / 2;
   let ay = rest - lookOff;
-  // a corner: the flag's side, the taker near his edge, the goal line in the upper third
-  if (sp?.kind === 'corner') {
-    const flagLeft = sp.spot.x < GX;
-    ax = flagLeft ? 30 : W - 30;
-    const goalLine = project(ref, GX, PL).y - H / 2;
-    ay = Math.max(box.y + 30, H * 0.26) - goalLine;
-  } else if (sp?.kind === 'penalty') {
-    const goalLine = project(ref, GX, PL).y - H / 2;
-    ay = Math.max(box.y + 40, H * 0.25) - goalLine;
-  }
+  const goalLine = project(ref, GX, PL).y - H / 2;
+  if (corner) {
+    // from the flag's side: the taker near his edge, the goal line as low in the upper third as the
+    // stands allow (the stands' limit below holds it)
+    ax = axFor(sp.spot.x < GX ? CAM.cornerEdge + 2 : W - CAM.cornerEdge - 2);
+    ay = H * 0.3 - goalLine;
+  } else if (sp?.kind === 'penalty') ay = Math.max(box.y + 40, H * 0.25) - goalLine;
   // the stands: the far wall's base at most CAM.stands of the height down
   const wallOff = project(ref, GX, WALL_Y).y - H / 2;
   const stands: Span = [-Infinity, H * CAM.stands - wallOff];
   // the stands win over his feet's top margin (the man on the goal line at a corner): then only his
   // feet need be inside the box
   let yHard = meet(must.y, stands);
-  if (!ok(yHard)) yHard = meet(spansFor(W, H, c, s, { x: c.x, y: c.y, box: { ...box, h: box.h - CAM.feet.bottom } }).y, stands);
+  if (!ok(yHard)) yHard = meet(spansFor(W, H, at, s, { x: c.x, y: c.y, box: { ...box, h: box.h - CAM.feet.bottom } }).y, stands);
+  const standsHold = ok(yHard);
   if (!ok(yHard)) yHard = must.y;
   // the goal mouth inside 30 m (and at every set piece near it)
   const dGoal = Math.hypot(c.x - GX, PL - c.y);
@@ -318,8 +390,10 @@ export function frameFor(a: Attack, view: CamView, s: number): { ax: number; ay:
   if (dGoal <= CAM.goalNear || sp) {
     let gx = xs;
     let gy = ys;
-    for (const g of goalPts(hk)) {
-      const q = spansFor(W, H, c, s, { ...g, box });
+    // at a corner the mouth may use the whole screen across (the box is the action, not the HUD's sides)
+    const gBox = corner ? { x: 2, y: box.y, w: W - 4, h: box.h } : box;
+    for (const q0 of goalPts(hk)) {
+      const q = spansFor(W, H, at, s, { ...q0, box: gBox });
       gx = meet(gx, q.x);
       gy = meet(gy, q.y);
     }
@@ -335,16 +409,18 @@ export function frameFor(a: Attack, view: CamView, s: number): { ax: number; ay:
   for (const b of a.bodies)
     if (b.side === c.side && b.role !== 'gk' && b !== c && b !== tt && !opts.includes(b) && b.y > c.y - 12) wants.push({ b, both: false });
   wants.sort((p, q) => Number(q.both) - Number(p.both) || Math.hypot(p.b.x - c.x, p.b.y - c.y) - Math.hypot(q.b.x - c.x, q.b.y - c.y));
+  // at a corner the box's men may stand anywhere across the screen
+  const mBox = corner ? { x: 2, y: box.y, w: W - 4, h: box.h } : box;
   for (const { b, both } of wants) {
-    const q = spansFor(W, H, c, s, { x: b.x, y: b.y, box });
+    const q = spansFor(W, H, at, s, { x: b.x, y: b.y, box: mBox });
     const nx = meet(xs, q.x);
     // another teammate is worth a small pan only: the frame keeps following the ball
-    if (ok(nx) && (both || Math.abs(clampTo(ax, nx) - ax) <= W * CAM.panFor)) xs = nx;
+    if (ok(nx) && (both || corner || Math.abs(clampTo(ax, nx) - ax) <= W * CAM.panFor)) xs = nx;
     if (!both) continue;
     const ny = meet(ys, q.y);
     if (ok(ny)) ys = ny;
   }
-  return { ax: clampTo(ax, xs), ay: clampTo(ay, ys), hard };
+  return { ax: clampTo(ax, xs), ay: clampTo(ay, ys), hard, stands: standsHold ? stands[1] : Infinity };
 }
 
 /** The scale in effect (px per metre at the carrier): base × zoom × Clutch. */
@@ -374,6 +450,7 @@ export function camStep(st: CamState, a: Attack, view: CamView, dt: number, t: n
     return anchoredCam(W, H, p, W / 2, view.safe.y + view.safe.h * 0.55, s);
   }
   const fresh = st.key !== a;
+  const c = subjectOf(a);
   // the zoom: whole steps toward what the frame wants, one step at most every zoomGap s (a new attack
   // or reduced motion: straight there, one change)
   const want = Math.round(zoomWanted(a, view) / CAM.zoomStep) * CAM.zoomStep;
@@ -387,21 +464,65 @@ export function camStep(st: CamState, a: Attack, view: CamView, dt: number, t: n
     st.changes++;
   }
   const s = scaleOf(view, st.zoom);
-  const goal = frameFor(a, view, s);
+  const n = Math.max(0, Math.min(6, dt * 60));
   if (fresh) {
-    st.ax = goal.ax;
-    st.ay = goal.ay;
+    st.gx = c.x;
+    st.gy = c.y;
+  } else {
+    // the anchor glides toward the man on the ball, and the anchor's screen spot is re-expressed so the
+    // picture does not move with it: last frame's camera shows the new anchor where (ax, ay) now are
+    if (c.id !== st.subj) st.switches++;
+    const prev = anchoredCam(W, H, { x: st.gx, y: st.gy }, st.ax, st.ay, st.s || s);
+    const dx = c.x - st.gx;
+    const dy = c.y - st.gy;
+    const d = Math.hypot(dx, dy);
+    const e = 1 - Math.pow(1 - CAM.anchorEase, n);
+    const m = Math.min(d * e, CAM.anchorMax * Math.max(1, n));
+    if (d > 1e-9) {
+      st.gx += (dx / d) * m;
+      st.gy += (dy / d) * m;
+      const q = project(prev, st.gx, st.gy);
+      st.ax = q.x;
+      st.ay = q.y;
+    }
+  }
+  st.subj = c.id;
+  // a zoom step scales the picture about the screen's middle, not the anchor (at a corner the anchor is
+  // the taker at the screen's edge, and the far side would swing by twice as much)
+  if (!fresh && st.s && Math.abs(s - st.s) > 1e-9) {
+    const k = s / st.s;
+    st.ax = W / 2 + (st.ax - W / 2) * k;
+    st.ay = H / 2 + (st.ay - H / 2) * k;
+  }
+  const g = { x: st.gx, y: st.gy };
+  const goal = frameFor(a, view, s, g);
+  if (fresh) {
+    st.ax = clampTo(goal.ax, goal.hard.x);
+    st.ay = clampTo(goal.ay, goal.hard.y);
     st.key = a;
   } else {
-    const n = Math.max(0, Math.min(6, dt * 60));
+    const x0 = st.ax;
+    const y0 = st.ay;
     st.ax += (goal.ax - st.ax) * (1 - Math.pow(1 - CAM.ease.x, n));
     st.ay += (goal.ay - st.ay) * (1 - Math.pow(1 - CAM.ease.y, n));
+    // the easing never lets the man on the ball leave the safe box, the stands grow past 12% or (inside
+    // 30 m) the goal mouth leave the frame; after a switch the limits pull the frame in at clampRate px a
+    // frame, so the picture glides rather than cuts
+    const r = CAM.clampRate * Math.max(1, n);
+    const pull = (v: number, span: Span) => v + Math.max(-r, Math.min(r, clampTo(v, span) - v));
+    st.ax = pull(st.ax, goal.hard.x);
+    st.ay = pull(st.ay, goal.hard.y);
+    const mv = Math.hypot(st.ax - x0, st.ay - y0);
+    const cap = CAM.maxMove * Math.max(1, n);
+    if (mv > cap) {
+      st.ax = x0 + ((st.ax - x0) * cap) / mv;
+      st.ay = y0 + ((st.ay - y0) * cap) / mv;
+    }
+    // the stands' 12% holds every frame (the anchor's glide keeps that limit's own motion to a pixel or two)
+    st.ay = Math.min(st.ay, goal.stands);
   }
-  // the easing never lets the man on the ball leave the safe box, the stands grow past 12% or (inside
-  // 30 m) the goal mouth leave the frame
-  st.ax = clampTo(st.ax, goal.hard.x);
-  st.ay = clampTo(st.ay, goal.hard.y);
-  return anchoredCam(W, H, subjectOf(a), st.ax, st.ay, s);
+  st.s = s;
+  return anchoredCam(W, H, g, st.ax, st.ay, s);
 }
 
 /** The stands' share of the screen height for a camera: the far wall's base row over the height. */

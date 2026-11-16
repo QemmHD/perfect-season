@@ -114,6 +114,86 @@ export const PITCH = {
   wallK: 5,
 } as const;
 
+/** The boards behind the goal line: where they stand (pitch m along) and how tall (m, before heightK). */
+const BOARD_Y = PL + 4.8;
+const BOARD_H = 0.9;
+/** Men further than this from the ball (m) are drawn at the cheaper sprite detail. */
+const FAR_LOD = 15;
+/** The floor canvas's margin past the screen on each side (px), for blits at an offset (floorShift). */
+const FLOOR_M = { x: 24, y: 72 } as const;
+
+/**
+ * The upright boards' strip (soccer-3 review fix): the word mark in F35 letters, one canvas pixel per
+ * letter pixel, 4.5 px a metre, with a lit top edge. Drawn once; boards() scales it onto the screen.
+ */
+function boardStrip(lengthM: number): HTMLCanvasElement {
+  const k = 4.5;
+  const w = Math.ceil(lengthM * k);
+  const h = 8;
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  const g = cv.getContext('2d')!;
+  g.fillStyle = PITCH.board;
+  g.fillRect(0, 0, w, h);
+  const text = rgb(PITCH.boardText);
+  g.fillStyle = 'rgb(' + mix(rgb(PITCH.board), text, 0.35).join(',') + ')';
+  g.fillRect(0, 0, w, 1);
+  g.fillStyle = PITCH.boardText;
+  const word = PITCH.boardWords.toUpperCase();
+  for (let x = 2, i = 0; x < w - 3; x += 4, i++) {
+    const glyph = F35[word[i % word.length]];
+    if (!glyph) continue;
+    for (let cy = 0; cy < 5; cy++) for (let cx = 0; cx < 3; cx++) if (glyph[cy * 3 + cx] === '1') g.fillRect(x + cx, 2 + cy, 1, 1);
+  }
+  return cv;
+}
+
+/**
+ * How the last floor would sit under the camera `c1` if blitted at an offset (soccer-3 review fix):
+ * ground points under a grid of `c0`'s screen, and the far stand, projected through both cameras. The
+ * offset is whole pixels (the middle of the points' moves); `err` the most any point would be out.
+ * Pure, for tests.
+ */
+export function floorShift(c0: PCam, c1: PCam): { dx: number; dy: number; err: number } {
+  const none = { dx: 0, dy: 0, err: Infinity };
+  if (c0.W !== c1.W || c0.H !== c1.H || Math.abs(c0.f - c1.f) > 1e-6 || Math.abs(c0.pitch - c1.pitch) > 1e-9) return none;
+  const cs = Math.cos(c0.pitch);
+  const sn = Math.sin(c0.pitch);
+  const wallBase = project(c0, c0.cx, WALL_Y).y;
+  const pts: { x: number; y: number; h: number }[] = [];
+  for (const fy of [0, 0.15, 0.35, 0.6, 0.85, 1])
+    for (const fx of [0, 0.5, 1]) {
+      const sx = fx * c0.W;
+      const sy = fy * c0.H;
+      if (sy <= wallBase + 1) continue;
+      const b = (c0.hy - sy) / c0.f;
+      const den = sn - b * cs;
+      if (den <= 1e-4) continue;
+      const t = c0.ch / den;
+      pts.push({ x: c0.cx + ((sx - c0.W / 2) * t) / c0.f, y: c0.cy + t * (cs + b * sn), h: 0 });
+    }
+  // the far stand where it is on screen: its base and halfway up, in the middle and at either edge
+  if (wallBase > 0) {
+    const zw = project(c0, c0.cx, WALL_Y).z;
+    for (const ex of [-1, 0, 1]) for (const h of [0, PITCH.wallH / 2]) pts.push({ x: c0.cx + (ex * c0.W * zw) / (2 * c0.f), y: WALL_Y, h });
+  }
+  const d: { x: number; y: number }[] = [];
+  for (const p of pts) {
+    const q0 = project(c0, p.x, p.y, p.h);
+    if (q0.y < -4 || q0.y > c0.H + 4) continue;
+    const q1 = project(c1, p.x, p.y, p.h);
+    d.push({ x: q1.x - q0.x, y: q1.y - q0.y });
+  }
+  if (!d.length) return none;
+  const mid = (v: number[]) => Math.round((Math.min(...v) + Math.max(...v)) / 2);
+  const dx = mid(d.map((p) => p.x));
+  const dy = mid(d.map((p) => p.y));
+  let err = 0;
+  for (const p of d) err = Math.max(err, Math.hypot(p.x - dx, p.y - dy));
+  return { dx, dy, err };
+}
+
 /** The texture's span (metres): the pitch, its run-off and boards, the fans along the touchlines. */
 const TX0 = -16;
 const TX1 = 84;
@@ -133,13 +213,11 @@ export function pitchTex(theme: PitchTheme): FieldTex {
   const line = rgb(PITCH.line);
   const pool = rgb(PITCH.poolC);
   const board = rgb(PITCH.board);
-  const boardText = rgb(PITCH.boardText);
   const bands = PITCH.crowd.map(rgb);
   const dark: RGB = [14, 22, 16];
-  const word = PITCH.boardWords.toUpperCase();
-  // the boards behind the goal line, 1.25 m deep: the word mark in 2-texel letter pixels
-  const BOARD_Y0 = PL + 4.6;
-  const BOARD_Y1 = BOARD_Y0 + 1.25;
+  // the ground under the upright boards behind the goal line (they are drawn standing: boards())
+  const BOARD_Y0 = BOARD_Y - 0.4;
+  const BOARD_Y1 = BOARD_Y + 0.6;
   const fan = (side: number, row: number, seat: number): RGB => {
     const n = noise(seat, row, side);
     const band = bands[Math.max(0, 2 - Math.min(2, Math.floor(row / 3)))];
@@ -164,15 +242,8 @@ export function pitchTex(theme: PitchTheme): FieldTex {
         if (x < 0 || x > PW || y < 0 || y > PL) col = mix(col, dark, PITCH.runoff);
         if (onLine(x, y)) col = mix(col, line, PITCH.lineA);
       } else if (y > BOARD_Y0 && y < BOARD_Y1 && x > -6 && x < PW + 6) {
-        // the boards behind the goal: a lit top edge and the word mark (letters read upright from the camera)
-        const gy = Math.floor((BOARD_Y1 - y) * k) - 2;
-        const gx = Math.floor((x + 6) * k);
-        col = gy < 0 ? mix(board, boardText, 0.35) : board;
-        const ch = Math.floor(gx / 8);
-        const g = F35[word[ch % word.length]];
-        const cx = Math.floor((gx % 8) / 2);
-        const cy = Math.floor(gy / 2);
-        if (g && cx < 3 && cy >= 0 && cy < 5 && g[cy * 3 + cx] === '1') col = boardText;
+        // the boards' footing behind the goal (the boards themselves stand upright: boards())
+        col = mix(board, dark, 0.4);
       } else if (x > -6 && x < PW + 6 && y > -6 && y < PL + 6) {
         // the boards along the touchlines: home colours in panels with a light strip
         const along = ((Math.floor(y / 3.2) % 2) + 2) % 2;
@@ -374,8 +445,17 @@ export class SoccerRenderer {
    * may print over (the buttons, the stick, the bug, pause), the stoppage attack (Clutch).
    */
   frameInfo: { safe: Box | null; controls: Box[]; clutch: boolean } = { safe: null, controls: [], clutch: false };
-  /** the floor drawn last, and the camera it was drawn for (redrawn only when that changes) */
-  private floorKey = '';
+  /**
+   * The camera the floor was last drawn for (soccer-3 review fix): the floor is drawn into a canvas a
+   * margin larger than the screen and blitted at an offset while that offset matches the camera's
+   * motion to within a pixel everywhere on the screen (floorShift), so the shift lens's eased row and
+   * small pans cost a blit, not a redraw. Just after a redraw it may be 2.5 px out for a frame (the
+   * floor is drawn at half resolution), so open play redraws it at most every other frame.
+   */
+  private floorCam: PCam | null = null;
+  private floorFresh = false;
+  /** the upright boards' strip (the word mark), drawn once */
+  private boardStrip: HTMLCanvasElement | null = null;
   /** the night vignette and depth haze, drawn once per screen size */
   private overlay: HTMLCanvasElement | null = null;
   /** the 3-frame net bulge: frames drawn since the goal */
@@ -410,6 +490,8 @@ export class SoccerRenderer {
     this.floor = null;
     freeCanvas(this.overlay);
     this.overlay = null;
+    freeCanvas(this.boardStrip);
+    this.boardStrip = null;
   }
 
   /** a new attack (or a shootout kick by the other side): the kits swap with the sides */
@@ -423,7 +505,7 @@ export class SoccerRenderer {
     this.H = H;
     freeCanvas(this.floor?.canvas);
     this.floor = null;
-    this.floorKey = '';
+    this.floorCam = null;
     freeCanvas(this.overlay);
     this.overlay = null;
     const land = W > H;
@@ -447,7 +529,8 @@ export class SoccerRenderer {
     return Math.min(SPRITE_TILT, pitchAt(this.cam!, y));
   }
 
-  private sprite(b: Body, t: number, s: number, kitSide: 'us' | 'them'): Sprite {
+  /** `far`: a man well away from the ball, drawn at the cheaper detail (8 facings, every third clip frame) */
+  private sprite(b: Body, t: number, s: number, kitSide: 'us' | 'them', far = false): Sprite {
     const who = b.p.id + '|' + b.side + '|' + kitSide;
     let memo = this.memos.get(who);
     if (!memo) {
@@ -468,8 +551,9 @@ export class SoccerRenderer {
     memo.faceAt = t;
     dir = memo.face;
     const raw = Math.max(8, Math.round(heightM(b) * s));
-    const px = raw > 14 ? raw - (raw % 2) : raw;
-    const dirs = px < 22 ? 8 : 16;
+    // sizes in 2 px steps (4 px for a man far from the ball: fewer sizes to build as men move in depth)
+    const px = raw > 14 ? raw - (raw % (far ? 4 : 2)) : raw;
+    const dirs = px < 22 || far ? 8 : 16;
     const facing = Math.atan2(-dir.y, dir.x);
     const fb = (Math.round((facing / (Math.PI * 2)) * dirs) + dirs) % dirs;
     const pitch = Math.round(this.tiltAt(b.y) / 0.15) * 0.15;
@@ -481,7 +565,7 @@ export class SoccerRenderer {
       this.looks.set(who, look);
     }
     const an = animOf(b, t, look, memo);
-    const step = an.clip ? (px < 22 ? Math.max(3, an.step ?? 2) : (an.step ?? 2)) : 1;
+    const step = an.clip ? (px < 22 || far ? Math.max(3, an.step ?? 2) : (an.step ?? 2)) : 1;
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
     const key = an.clip ? mocapKey(an.clip, frame, 'clip') : an.key;
     const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
@@ -516,32 +600,53 @@ export class SoccerRenderer {
 
   /**
    * The floor (grass, boards, the far stand, the sky), drawn at half resolution into an offscreen
-   * canvas and redrawn only when the camera has moved by a pixel or more (V2 C.6: a still camera costs
-   * one blit).
+   * canvas FLOOR_M px larger than the screen on every side, and redrawn only when blitting the last one
+   * at an offset would be more than a pixel out somewhere (V2 C.6: a still camera costs one blit; the
+   * shift lens's row and the follow's small moves cost a blit too; 1.5 px out at most, under a texel of the half-resolution floor).
    */
   private drawGround(ctx: CanvasRenderingContext2D) {
     if (!this.tex) this.tex = pitchTex(this.theme);
     const q = 2;
+    const M = FLOOR_M;
     if (!this.floor) {
       const canvas = document.createElement('canvas');
-      canvas.width = Math.ceil(this.W / q);
-      canvas.height = Math.ceil(this.H / q);
+      canvas.width = Math.ceil((this.W + 2 * M.x) / q);
+      canvas.height = Math.ceil((this.H + 2 * M.y) / q);
       const img = canvas.getContext('2d')!.createImageData(canvas.width, canvas.height);
       this.floor = { canvas, img, px: new Uint32Array(img.data.buffer) };
-      this.floorKey = '';
+      this.floorCam = null;
     }
     const fl = this.floor;
     const c = this.cam!;
-    // the camera to about a pixel (a tenth of a metre at 9-12 px a metre), the axis row, the lens
-    const px = 10;
-    const key = [Math.round(c.cx * px), Math.round(c.cy * px), Math.round(c.ch * px), Math.round(c.hy), Math.round(c.f), c.pitch.toFixed(3)].join(',');
-    if (key !== this.floorKey) {
-      this.floorKey = key;
+    const sh = this.floorCam ? floorShift(this.floorCam, c) : null;
+    const tol = this.floorFresh ? 2.5 : 1.5;
+    if (!sh || sh.err > tol || Math.abs(sh.dx) > M.x - 1 || Math.abs(sh.dy) > M.y - 1) {
       this.stats.floors++;
-      drawFloor(c, this.tex, fl.px, q);
+      drawFloor({ ...c, W: c.W + 2 * M.x, H: c.H + 2 * M.y, hy: c.hy + M.y }, this.tex, fl.px, q);
       fl.canvas.getContext('2d')!.putImageData(fl.img, 0, 0);
+      this.floorCam = c;
+      this.floorFresh = true;
+      ctx.drawImage(fl.canvas, -M.x, -M.y, fl.canvas.width * q, fl.canvas.height * q);
+      return;
     }
-    ctx.drawImage(fl.canvas, 0, 0, fl.canvas.width * q, fl.canvas.height * q);
+    this.floorFresh = false;
+    ctx.drawImage(fl.canvas, sh.dx - M.x, sh.dy - M.y, fl.canvas.width * q, fl.canvas.height * q);
+  }
+
+  /**
+   * The boards behind the goal line, standing upright (soccer-3 review fix: the word mark painted flat on
+   * the grass foreshortened to garbled glyphs). The camera never yaws, so a board at one depth is a
+   * plain rectangle on screen: one scaled blit of a strip drawn once, its height lifted like the goal's.
+   */
+  private boards(ctx: CanvasRenderingContext2D) {
+    const x0 = -6;
+    const x1 = PW + 6;
+    const lo = this.lens(x0, BOARD_Y, 0);
+    const hi = this.lens(x1, BOARD_Y, BOARD_H);
+    if (hi.y > this.H || lo.y < 0 || lo.x > this.W || hi.x < 0) return;
+    if (!this.boardStrip) this.boardStrip = boardStrip(x1 - x0);
+    const h = Math.max(4, Math.round(lo.y - hi.y));
+    ctx.drawImage(this.boardStrip, Math.round(lo.x), Math.round(hi.y), Math.round(hi.x - lo.x), h);
   }
 
   /** The night vignette (corners darker) and the depth haze (the top of the screen darker and greyer),
@@ -979,8 +1084,10 @@ export class SoccerRenderer {
     const now = performance.now();
     const dt = this.lastDraw ? Math.min(0.1, (now - this.lastDraw) / 1000) : 1 / 60;
     this.lastDraw = now;
-    // new sprites this frame: five, or three when the last frame ran long (a slow phone catching up)
-    this.budget = dt > 0.025 ? 3 : 5;
+    // new sprites this frame: five (soccer-3 review fix: no longer three after a long frame, which only
+    // turned the next frames' sprites stale); before the whistle twelve, so the line-up's sprites are all
+    // built while nothing moves
+    this.budget = a.phase === 'pre' ? 12 : 5;
     this.cam = camStep(this.camSt, a, { W: this.W, H: this.H, safe: this.safe(), clutch: this.frameInfo.clutch, reduced: reducedMotion(), replay: this.replay }, dt, a.t);
   }
 
@@ -1002,15 +1109,18 @@ export class SoccerRenderer {
 
   /**
    * Teal edge arrows (V2 B.3.2, the mockup's "R9"): every teammate off the screen, under the bug or
-   * under the thumbs gets a chevron at the action-safe box's edge, pointing at him, with his initial and
-   * number. Tapping one passes to him.
+   * under one of the thumbs' controls gets a chevron at the action-safe box's edge, pointing at him, with
+   * his initial and number. Tapping one passes to him. Placed before the tags (they keep clear of the
+   * arrows, and a man with an arrow has no tag), painted after them.
    */
-  private edgeArrows(ctx: CanvasRenderingContext2D, a: Attack, c: Body) {
+  private placeEdgeArrows(a: Attack, c: Body) {
     const mates = a.bodies.filter((b) => b.side === c.side && b !== c && b.role !== 'gk').map((b) => ({ id: b.id, ...this.lens(b.x, b.y) }));
-    this.arrows = placeArrows(mates, this.safe(), this.W);
-    for (const { id, x, y, ang } of this.arrows) {
-      const b = a.bodies[id];
-      const text = (b.p.tag[0] ?? '?') + (b.p.num ?? '');
+    this.arrows = placeArrows(mates, this.safe(), this.W, this.H, this.frameInfo.controls);
+  }
+
+  private paintArrows(ctx: CanvasRenderingContext2D, a: Attack) {
+    for (const r of this.arrows) {
+      const { x, y, ang } = r;
       ctx.save();
       ctx.translate(x, y);
       // the chevron, pointing out toward him
@@ -1031,10 +1141,8 @@ export class SoccerRenderer {
       ctx.fill();
       ctx.restore();
       // the chip: his initial and number, on the inside of the arrow
-      const w = (text.length * 4 - 1) * 2;
-      const tx = Math.round(x - Math.cos(ang) * (w / 2 + 8));
-      const ty = Math.round(y - Math.sin(ang) * 10) - 5;
-      label(ctx, text, tx, ty, '#062a24', this.W, '#4fe3c1');
+      const chip = arrowChip(arrowText(a.bodies[r.id]), r);
+      label(ctx, chip.text, chip.x, chip.y, '#062a24', this.W, '#4fe3c1');
     }
   }
 
@@ -1053,6 +1161,7 @@ export class SoccerRenderer {
     ctx.save();
     ctx.translate(jx, jy);
     this.drawGround(ctx);
+    if (this.W <= this.H) this.boards(ctx);
     this.net(ctx, a);
     const ballBehind = a.ball.y > PL + 0.05;
     if (ballBehind) this.ball(ctx, a);
@@ -1103,7 +1212,10 @@ export class SoccerRenderer {
         draw: () => {
           const f = this.lens(b.x, b.y, b.h);
           if (f.y < -90 || f.y > this.H + 120 || f.x < -90 || f.x > this.W + 90) return;
-          const spr = this.sprite(b, a.t, this.W > this.H ? this.lens(b.x, b.y).s : spriteScale(this.lens(b.x, b.y).s, this.art), kitOf(b));
+          // more than FAR_LOD m from the ball: the cheaper detail (soccer-3 review fix; V2 sizes put every
+          // man at 30-45 px, where the full detail needs more new sprites a frame than the budget)
+          const far = b !== c && Math.hypot(b.x - a.ball.x, b.y - a.ball.y) > FAR_LOD;
+          const spr = this.sprite(b, a.t, this.W > this.H ? this.lens(b.x, b.y).s : spriteScale(this.lens(b.x, b.y).s, this.art), kitOf(b), far);
           const x = Math.round(f.x - spr.ax);
           const y = Math.round(f.y - spr.ay);
           ctx.drawImage(spr.canvas, x, y);
@@ -1118,6 +1230,11 @@ export class SoccerRenderer {
     for (const it of items) it.draw();
     this.particles(ctx, a, kitOf);
     if (this.W <= this.H) this.drawOverlay(ctx);
+    // teammates outside the box: arrows at its edge (ours, in open play and at set pieces), placed now so
+    // the tags below keep clear of them
+    if (ours && !a.end && this.W <= this.H) this.placeEdgeArrows(a, c);
+    else this.arrows.length = 0;
+    const arrowed = new Set(this.arrows.map((r) => r.id));
     // the man you're on: his name; his stamina once sprinting has cost some
     const h = heads[c.id];
     if (h && !a.end) {
@@ -1140,11 +1257,11 @@ export class SoccerRenderer {
         this.tag(c.p.tag, f.x, spot.ty, ours ? TAG.ours : TAG.rival, 5);
       }
     }
-    if (ours && o.target !== null && heads[o.target] && !a.end && !a.meter) {
+    if (ours && o.target !== null && heads[o.target] && !arrowed.has(o.target) && !a.end && !a.meter) {
       const t = a.bodies[o.target];
       this.tag(t.p.tag, heads[o.target].x, heads[o.target].y - 15, TAG.mate, 2);
     }
-    if (o.names && ours) for (const b of a.bodies) if (b.side === 'A' && b !== c && heads[b.id]) this.tag(b.p.tag, heads[b.id].x, heads[b.id].y - 15, TAG.white, 1);
+    if (o.names && ours) for (const b of a.bodies) if (b.side === 'A' && b !== c && heads[b.id] && !arrowed.has(b.id)) this.tag(b.p.tag, heads[b.id].x, heads[b.id].y - 15, TAG.white, 1);
     if (o.pass && !a.meter && !a.end) this.passLine(ctx, a, o.pass);
     if (a.meter) this.aim(ctx, a);
     if (h && !a.end) {
@@ -1164,11 +1281,11 @@ export class SoccerRenderer {
       // the word only before SHOOT is held: with the meter up the arrow says it, and the meter's own word is there
       if (!a.meter) this.tag('BEND', p0.x, p0.y - 22, '#ffd23a', 2);
     }
-    // teammates outside the box: arrows at its edge (ours, in open play and at set pieces)
-    if (ours && !a.end && this.W <= this.H) this.edgeArrows(ctx, a, c);
-    else this.arrows.length = 0;
-    // every tag at once, stacked where two would print over each other ("FBENDICK", V-3)
-    for (const t of layoutLabels(this.tags.splice(0), this.W, this.H, o.keepOut)) label(ctx, t.s, t.x, t.y, t.color, this.W);
+    // every tag at once, stacked where two would print over each other ("FBENDICK", V-3), clear of the
+    // edge arrows and their chips; then the arrows over everything
+    const keep = [...(o.keepOut ?? []), ...this.arrows.flatMap((r) => arrowRects(arrowText(a.bodies[r.id]), r, this.W))];
+    for (const t of layoutLabels(this.tags.splice(0), this.W, this.H, keep)) label(ctx, t.s, t.x, t.y, t.color, this.W);
+    this.paintArrows(ctx, a);
     ctx.restore();
     if (o.flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + Math.min(reducedMotion() ? 0.3 : 0.8, o.flash).toFixed(2) + ')';
@@ -1194,22 +1311,45 @@ export class SoccerRenderer {
   }
 }
 
-/** Does a teammate at screen point `f` get an edge arrow: off the screen across, above the safe box
- * (under the bug) or well below it (under the thumbs)? */
-export const arrowFor = (f: { x: number; y: number }, box: Box, W: number) => f.x < 6 || f.x > W - 6 || f.y < box.y - 10 || f.y > box.y + box.h + 40;
+/**
+ * Does a teammate whose feet are at screen point `f` get an edge arrow: off the screen (across or below),
+ * above the safe box (under the bug), or below it with his body under one of the thumbs' controls
+ * (`controls`: the buttons, the stick). A man in plain view below the box gets none (soccer-3 review fix).
+ */
+export function arrowFor(f: { x: number; y: number }, box: Box, W: number, H: number, controls: readonly Box[] = []): boolean {
+  if (f.x < 6 || f.x > W - 6 || f.y < box.y - 10 || f.y > H - 6) return true;
+  if (f.y <= box.y + box.h) return false;
+  const body = { x: f.x - 8, y: f.y - 30, w: 16, h: 30 };
+  return controls.some((r) => body.x < r.x + r.w && r.x < body.x + body.w && body.y < r.y + r.h && r.y < body.y + body.h);
+}
+
+/** An arrow's chip text: his initial and number ("P7"). */
+export const arrowText = (b: Body) => (b.p.tag[0] ?? '?') + (b.p.num ?? '');
+
+/** Where an arrow's chip is printed: on the inside of the chevron. */
+export function arrowChip(text: string, r: { x: number; y: number; ang: number }) {
+  const w = (text.length * 4 - 1) * 2;
+  return { text, x: Math.round(r.x - Math.cos(r.ang) * (w / 2 + 8)), y: Math.round(r.y - Math.sin(r.ang) * 10) - 5 };
+}
+
+/** The screen an arrow takes, chevron and chip: the label pass keeps the tags off it. */
+export function arrowRects(text: string, r: { x: number; y: number; ang: number }, W: number): Box[] {
+  const chip = arrowChip(text, r);
+  return [{ x: r.x - 14, y: r.y - 14, w: 28, h: 28 }, tagBox(text, chip.x, chip.y, W)];
+}
 
 /**
  * Where the edge arrows go: for each teammate `arrowFor` picks, on the line from the safe box's centre
  * to him, 20 px inside its edge; two never closer than 30 × 24 px (the later moves along the edge).
  * Pure, for camera.test.
  */
-export function placeArrows(mates: readonly { id: number; x: number; y: number }[], box: Box, W: number): { id: number; x: number; y: number; ang: number }[] {
+export function placeArrows(mates: readonly { id: number; x: number; y: number }[], box: Box, W: number, H: number, controls: readonly Box[] = []): { id: number; x: number; y: number; ang: number }[] {
   const m = 20;
   const cx = box.x + box.w / 2;
   const cy = box.y + box.h / 2;
   const out: { id: number; x: number; y: number; ang: number }[] = [];
   for (const f of mates) {
-    if (!arrowFor(f, box, W)) continue;
+    if (!arrowFor(f, box, W, H, controls)) continue;
     const dx = f.x - cx;
     const dy = f.y - cy;
     const k = Math.min(dx ? (box.w / 2 - m) / Math.abs(dx) : Infinity, dy ? (box.h / 2 - m) / Math.abs(dy) : Infinity);
