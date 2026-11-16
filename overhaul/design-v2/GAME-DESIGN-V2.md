@@ -343,7 +343,9 @@ V2 changes against the plan: the shot types and skill moves from the plan's **Ap
 
 **The problem, measured.** Every player has the same skin tone `#a8714f` and hash-picked hair, so looks are confidently wrong (L-1). Shaq and Manute Bol share a 20 px torso (L-2). There is no appearance data for any of 19,938 players (L-3). Every card shows the same 54 px mannequin (L-4). Numbers are unreadable below 26 px (L-5). Players in soccer are 10–42 px tall and the goal is 45 px wide (soccer V-4). The crowd is a static noise texture that is brighter and busier than the players in front of it (see `audit-shots/nba/390-03-meter-rising.png`).
 
-**The direction in one line:** chunky, big-headed, hard-outlined pixel athletes on calm, darker venues, lit like a night broadcast, so the eye lands on the players first and on *who* each one is second.
+**The direction in one line:** chunky, big-headed, volume-shaded pixel athletes in a **lit, layered, perspective arena**, with broadcast-grade chrome, so the screen looks like key art from a top mobile sports game and the eye still lands on the players first and on *who* each one is second.
+
+**The visual target is `mockups-v2.html`** (screenshots `mockups-v2-*.png` beside it). It replaces `mockups.html`, which the owner judged "too simple and boring" and "too flat"; that first page remains useful only for control geometry. Everything in the target is drawn by code on a canvas or in CSS, at a size that fits the bundle rule, and section C.6 maps each effect to our renderer with its per-frame cost. C.7 is the checklist every team must pass.
 
 ### C.1 Player sprites
 
@@ -360,7 +362,7 @@ A real athlete is about 7.5 heads tall. At 34 px that leaves a 4 px head, which 
 
 Implementation in the code-drawn rig (`pixel/body.ts`): scale the head capsule radius by `headScale = clamp(1.55 − px/120, 1.2, 1.45)` and limb radii by 1.15; body height from data is unchanged, so height differences survive. Height spread is exaggerated ×1.15 around the sport's mean, and weight drives torso width from 8 to 13 px at NBA size so that Shaq and Bol cannot share an outline (L-2). **Render-only: no protocol bump.**
 
-**C.1.2 Pixel size.** One art pixel = 1.5 design px at match scale (4–5 device px on a 3× iPhone), nearest-neighbour, snapped to whole device pixels. Target on-screen heights at 393 wide:
+**C.1.2 Pixel size.** Sprite size now comes from the perspective camera (C.6): the on-screen scale is the projected scale snapped to quarter steps, so near players are larger than far ones. As a guide at 393 wide: NBA handler about 95 px tall (2.5×), near players up to 110 px, baseline players about 60 px; NFL quarterback about 70 px, linemen 55 px, deep defenders 45 px; soccer carrier about 75 px, far defenders 55 px; replay heroes 170–190 px. Nearest-neighbour, snapped to device pixels. The table below is the **minimum** legible size for each role (the old flat rule), kept as a floor:
 
 | Sport | Controlled player | Other near players | Far players | Ball |
 |---|---|---|---|---|
@@ -372,8 +374,8 @@ Far players are **drawn at their own native size** (level of detail), never scal
 
 **C.1.3 Outline and shading.**
 - Outer silhouette: 1 art px, colour `#14121c` (near-black violet), on every sprite. Inner separations use the part's shadow tone, not black.
-- Three tones per material: base, shadow (lightness −22%, hue rotated 10° toward blue), highlight (lightness +14%). One light from the top-left. No dithering below 56 px.
-- A soft elliptical ground shadow, `rgba(0,0,0,0.32)`, 70% of shoulder width. The controlled player adds a 2 px **gold ground ring `#f6b93b`**; your pass target a teal ring `#4fe3c1`; the on-ball defender a red arc `#ff5d5d`.
+- **Five tones per material** from one light direction (up-left): bright highlight, highlight, base, shadow (toward violet), deep shadow. Limbs and torsos are shaded as rounded volumes, not flat fills. **Rim light:** every silhouette pixel with nothing above-left of it takes the bright highlight. **Contact shadow:** where a nearer limb overlaps a farther one, the pixel below-right goes to deep shadow. No dithering below 56 px.
+- **A cast shadow, not a blob:** the sprite's own silhouette sheared across the floor away from the lights at about 34–42% alpha, plus a small dark occlusion ellipse at the feet. Airborne players and the ball visibly separate from their shadows. The controlled player adds a 2 px **gold ground ring `#f6b93b`**; your pass target a teal ring `#4fe3c1`; the on-ball defender a red arc `#ff5d5d`.
 - Dark skin on dark kits gets a 1 px rim highlight on the lit side [research likeness §3.2].
 
 **C.1.4 What carries identity, in priority order** [research likeness §2.4]: build and height → hair silhouette → hair colour → head gear → skin tone → facial hair → asymmetric limb gear → socks and shoes → number (≥ 28 px only) → handedness → signature motion.
@@ -392,46 +394,65 @@ Far players are **drawn at their own native size** (level of detail), never scal
 
 **C.1.6 Kits.** Original two-colour kits per franchise identity (home/away), drawn as jersey base + trim stripe + number. Three-tone ramps generated from the base. NFL helmets carry a centre stripe and a blank side (no logos). Clashing kits are resolved by an automatic away swap when the two primaries are within ΔE 25.
 
-### C.2 Venues
+### C.2 Venues: a lit arena with depth, not a flat backdrop
 
-**Principle: the venue is 30% darker and 50% calmer than the players.** Values are starting points.
+**Principle (revised after owner feedback: "too simple and boring", "too flat").** The venue is a **layered, lit, perspective space**. It is rich and alive, and the players still win the eye because they are **crisper, brighter and rim-lit**, while everything behind them is slightly softer, foggier and lower in contrast. Richness comes from layers, light and motion, never from noise on the playing surface. `mockups-v2.html` is the target; every effect in it is code-drawn canvas and is mapped to our renderer in C.6.
+
+**The five layers, back to front** (each moves a little differently when the camera drifts):
+
+| # | Layer | What is in it | Parallax | Focus |
+|---|---|---|---|---|
+| 1 | Roof and lights | truss, lamp arrays or light towers, bloom discs, light beams | 0.3× | soft |
+| 2 | Stands | two or three tiers of crowd, aisles, tunnels, flags, a scrolling LED ribbon between tiers, a jumbotron (NBA) | 0.4× | slightly soft (depth of field) |
+| 3 | Boundary | courtside LED boards, baseline wall, ad boards, goalposts, goal and net, stanchion and backboard, benches | 0.7–1× | crisp |
+| 4 | Playing surface and players | perspective floor texture, light pools, reflections, shadows, sprites, ball, rings, particles | 1× | crisp |
+| 5 | Foreground (replays and menus only) | dark, blurred fans' heads and raised phones, photographers | 1.8× | very soft |
+
+**Surfaces** (starting values):
 
 | Element | NBA court | NFL field | Soccer pitch |
 |---|---|---|---|
-| Playing surface | planks `#c98f52` / `#bf8548` alternating every 6 px, grain at 4% contrast (today's grain is far louder) | mow stripes `#2f8f46` / `#2a8240` every 5 yards | mow stripes `#2e9a4a` / `#288a41` every 5.5 m |
-| Lines | `#f4ead8`, 2 px | `#eaf5ea`, 2 px; yard numbers 14 px tall in a simple block font, only every 10 yards, 60% opacity | `#f2fff2` at 85%, 2 px |
-| Team colour | the paint and the centre circle, at 85% saturation | end zones, with the team *name* in block type (no logo) | none on the pitch; boards carry it |
-| Surround | 10 px apron in team dark | 8 px white sideline + team-dark bench strip | 6 px run-off + ad boards with original word marks |
-| Sheen | a vertical light pool: +8% lightness under the rim | – | – |
+| Base | planks `#d69e62` ↔ `#ba7c42`, per-plank tint from a hash, dark seam every plank | mow stripes `#2c9246` / `#247e3c` every 5 yards, ±8% grass noise | bands `#34a04e` / `#2a8c42` every 5.5 m crossed with a faint checker |
+| Lines | `#f4ecdc` | `#eef4ee`; hash marks; **big yard numbers painted in the texture** | `#ecfaec` |
+| Team colour | the paint and centre circle; apron in team dark with a light border | end zone in team colour with diagonal tone stripes | ad boards and stands |
+| Gloss | **specular streak down the middle plus player reflections at 16–22% alpha** | none; light pools only | none; light pools only |
+| Light pools | 4–5 warm pools baked into the texture, up to +50% toward `#fff6d6` | 3–4 cooler pools | 3–4 pools |
+| Distance fog | surface blends toward `#463c78` beyond 60 ft | toward `#3c5a78` beyond 70 yd | toward `#466e6e` beyond 52 m |
 
-- **Lighting:** a night-game vignette: corners −18% lightness; four soft light pools on the surface. A 1 px bright rim on the top-left of every sprite ties them to the lights.
-- **Crowd:** three value bands only (`#221d36`, `#342d52`, `#4a426e`) with 6% team-colour flecks and 2% white flecks (phones). Drawn in 2 px blocks, not 1 px noise. The front three rows are sprites that **stand, bounce and wave** in 4-frame loops on scores, On Fire and Clutch [research likeness §0.14]. The crowd never takes more than 12% of the screen height in portrait (soccer V-2).
-- **Depth:** objects higher on the screen are 6% darker and 6% less saturated, so the near action pops.
-- **Sidelines:** two bench sprites and one coach per team; a referee sprite in NBA and NFL. Static, 4-frame idles.
+**Crowd.** People are drawn as head + shirt blocks: 2 px in the top tier, 3 px in the middle, 5–6 px courtside (depth by size). Shirt colours: 40% home, 22% second colour, 12% white, 12% third colour, the rest dark neutrals; six skin tones; a quarter have arms up. Each tier is dimmer and foggier than the one below it. **Motion:** 25–60 shimmering pixels per frame, 8–26 camera flashes cycling as four-point stars with bloom, coloured smoke rising in soccer after a goal, a section wave on scores. The first courtside row may be real 4-frame sprites (P1).
 
-### C.3 UI chrome
+**Light.** A night game. Lamp arrays or towers with additive bloom; 2–4 broad beams falling onto the surface at 10–13% alpha; a haze band where the surface meets the stands; a vignette to 60–70% at the corners; a scrim under the controls. Reduced motion keeps all of it except drift, flashes and shimmer.
 
-Keep the existing brand: deep navy, teal, italic condensed headlines (see `owner-iphone-home.jpg`). Tighten it into tokens:
+**Camera drift.** A slow ±4–6 px sine (period about 18 s) so the layers part slightly. Off under reduced motion and during a timed input (the gold ring must never move under the thumb).
+
+**Boards and screens.** LED ribbons scroll pixel text (score, the moment, "PERFECT SEASON") with a gloss band and a soft glow. The NBA jumbotron shows the moment word. All text is original; no league or sponsor marks.
+
+### C.3 UI chrome: broadcast-grade, with depth
+
+Keep the brand (deep navy, teal, gold, italic condensed headlines; see `owner-iphone-home.jpg`) and give every surface **material**: bevels, gloss, glow, layered shadows.
 
 | Token | Value | Use |
 |---|---|---|
-| `--bg` | `#071521` | app background |
-| `--panel` | `#0e2233` | cards, sheets |
-| `--stroke` | `#1d3a50` | 1 px panel borders |
-| `--teal` | `#4fe3c1` | brand, primary, "you" |
-| `--gold` | `#f6b93b` | PERFECT, coins, the A button, Clutch |
-| `--violet` | `#8b7cf6` | the rival |
-| `--red` | `#ff5d5d` | pressure, danger |
-| `--text` / `--dim` | `#f2f7fa` / `#8aa3b5` | text |
+| `--bg` | `#060b1a` over three large colour washes (indigo, magenta, teal) | app background: never a flat fill |
+| `--panel` | glass: `linear-gradient(rgba(40,56,110,.55), rgba(12,18,44,.72))`, 1 px `rgba(255,255,255,.14)` border, inner top highlight, 12–26 px drop shadow | cards, sheets, rows |
+| `--teal` | `#5eead4` (ramp `#d6fff6` → `#0f9f88`) | brand, "you", teammate target, PASS |
+| `--gold` | `#fbbf24` (ramp `#fff3c4` → `#d97706`, edge `#92500a`) | PERFECT, coins, the A button, Clutch, primary CTAs |
+| `--violet` / `--red` | `#a78bfa` / `#ff5d5d` | the rival / pressure and danger |
+| `--text` / `--dim` | `#f3f6ff` / `#8fa2c8` | text |
 
-- **In-match buttons:** A is gold with a dark label; B is teal; C and D are dark glass (`rgba(7,21,33,0.72)` with a 1.5 px `--stroke` ring) with a white icon and a 10 px label. All controls sit on a bottom gradient scrim (transparent → `rgba(7,21,33,0.55)` over 240 px) so they read on any surface without hiding it.
-- **Score bug:** one 232×40 capsule: YOU score, period/clock, RIVAL score; the Heat bar underneath. No second and third rows of chips. The possession/drive/attack pips move *into* the bug as a thin 3 px progress line.
-- **Pixel font:** add `& / : + '` and fold diacritics so Jokić, Dončić and "CATCH & SHOOT" print correctly (NBA-22) [plan nba-2].
-- **Motion:** 120–180 ms ease-out for UI; the PERFECT word scales 1.0 → 1.25 → 1.0 in 220 ms; reduced motion removes scale and shake but keeps colour and sound.
+- **Scorebug.** Two skewed team blocks in the team's own colour ramp with a top highlight, a dark bottom edge and a 4 px accent stripe; abbreviations, big italic scores, timeout pips; a dark centre block with period, game clock and a glowing shot/play clock. **The Heat bar** sits under it: an inset track, a gold-to-red fill with moving highlight stripes, a tick at the HEATING UP mark, and flame particles at the leading edge (all along the bar when ON FIRE).
+- **Buttons are objects.** Each is a lit dome: a three-stop radial gradient, a specular cap, an inner rim, a hard coloured edge 8 px below (the "side" of the button), a contact shadow and a coloured glow. A is gold, B teal, C/D indigo glass, defensive A red. Icons sit above the label. **Pressed** = 6 px down, edge collapsed, inner shadow, a bright halo ring pulsing outward. The stick is a glass ring with a glossy teal knob and a rotating dashed gold sprint ring.
+- **Moment banners** (PERFECT!, ON FIRE, ANKLE BREAKER, BIG HIT, GOLAZO!): a skewed ribbon with moving stripes, and italic condensed type with a four-stop metal gradient, a dark stroke, a hard 5 px extrusion and a glow; they pop in with overshoot (scale 0.6 → 1.16 → 1) and are joined by sparkles and a 100–140 ms screen flash. One colour family per moment: gold, fire, ice blue, red, green-and-gold.
+- **Toast line:** a glass capsule with a glowing status dot; the keyword is coloured.
+- **Meta screens:** glass panels over the colour-wash backdrop; progress **rings** with a glow; reward **chests** with a lid, band and lock (closed, glowing-next, opened); tier **shields**; a hero card with key art, a live countdown and a breathing gold CTA; the PLAY button with a foil sweep; promotion and relegation zones tinted green and red.
+- **Pixel font:** add `& / : + '` and fold diacritics (NBA-22) [plan nba-2].
+- **Motion:** 120–180 ms ease-out; count-ups tick with rising pitch; reduced motion removes movement and keeps colour, glow and sound.
 - **Top edge:** the solid status plate from the shell early-ship unit [plan shell-2/3] is the frame every screen sits in.
+- **Cost rule for chrome:** no `backdrop-filter` and no animated `filter` in a match (they force full-screen recomposition every frame on phones); glass is done with translucent gradients, borders and shadows. Menus may use one blurred layer if it is static.
 
 ### C.4 Card art
 
+- **Cards are objects with depth.** They tilt in 3D (CSS `perspective`, ±15°), a foil band sweeps as they turn, premium tiers add a prismatic holo layer and an aura, and rotating rays sit behind the bust. Each tier has its own metal: bronze, brushed steel, gold, bright gold with sheen, ember (promo), prismatic (GOAT).
 - **The card shows the player, not a mannequin (L-4).** A **pixel bust** from the same appearance record at card scale (head 26×28 art px): hair, skin, beard, head gear, kit and number, in a **signature pose** chosen by position and motion DNA (shooter at the set point, QB cocked to throw, striker mid-strike) [plan players-6].
 - **Frame ladder** by edition with distinct silhouettes, not only colours: Bronze/Silver/Gold flat frames; Rare Gold with a bevel and sheen; Standout with a diagonal slash; Program with the program's pattern; Hot Season with a heat gradient; Legend with a carved stone-and-gold frame; Spotlight with a holo prism; GOAT with a full-bleed animated background [plan players-3; research ultimate-team §8.10].
 - **Anatomy:** OVR top-left (≥ 20 px at the 80 px card width), position under it, bust centre, name plate, three headline stats, edition mark, serial. Era shown as a small year chip.
@@ -442,12 +463,83 @@ Keep the existing brand: deep navy, teal, italic condensed headlines (see `owner
 1. Sprites: 5–5.5 heads tall at match size; 1 px `#14121c` outline; 3 tones per material; light from top-left.
 2. Head first: hair silhouette must change the head's outline by at least 1 px on two sides.
 3. One art pixel = 1.5 design px; never scale a sprite by a non-integer device factor; draw LOD sizes natively.
-4. Venues: surfaces −30% contrast against sprites; crowd in three dark bands; stands ≤ 12% of screen height.
+4. Venues are layered and lit (C.2): perspective surface with baked light pools, a multi-tier crowd that shimmers and flashes, LED ribbons, beams, haze, vignette. Surfaces stay clean so sprites read; the stands are softer and foggier than the play. In gameplay the stands take about 30–40% of the height above the far boundary; in replays they tower.
 5. Rings: gold = you/perfect, teal = teammate target, red = pressure, violet = rival. Nothing else uses those four colours on the field.
 6. Text on the field: only the toast line, name chips (pixel font, 7 px cap height, dark plate) and the score bug.
 7. No logos, tattoos, or brand marks. Original kit colours and word marks only.
 
-`mockups.html` shows the lineup concept at match size and at 4× zoom.
+`mockups-v2.html` is the visual target for scenes, sprites, HUD, cards and menus; `mockups.html` keeps the first lineup sketch and the control geometry table.
+
+### C.6 Depth: how each effect maps to our renderer, and what it costs
+
+**Depth is a hard requirement.** No sport is drawn top-down or flat. The engines already project through `src/game/pixel/persp.ts` (`pcam`, `project`, `drawFloor`, `fieldTexture`, `courtTexture`, `standsWall`); V2 uses that module harder, it does not replace it. Budget: the audit measured about 2 ms a frame for the NBA scene at 1× and 51–57 fps at 4× CPU slowdown, so **everything below must fit in ≤ 6 ms a frame on the owner's phone and add no per-frame allocation**. The mock-up page itself spends about 2 ms per live scene on a desktop CPU (9 scenes ≈ 12–24 ms measured in headless Chromium), with every effect on.
+
+**Cameras** (the mock-up's numbers; `th` = pitch below horizontal, heights and distances in the sport's unit):
+
+| Sport, view | Pitch | Height | Behind | What the player sees |
+|---|---|---|---|---|
+| NBA gameplay (three-quarter broadcast) | 44° | 30 ft | 4 ft behind half court | far baseline ≈ 0.62× the width at the arc; rim at ≈ 28% of screen height; handler ≈ 59% |
+| NFL gameplay (behind the QB, raised) | 42° | 36 yd | 36 yd behind the line | line of scrimmage ≈ 59% (above the tray); far end zone and goalpost at ≈ 38%; field narrows to 0.6× |
+| Soccer gameplay (elevated broadcast) | 40° | 26 m | 22 m behind the ball | ≈ 33 m across at the carrier; goal line at ≈ 41% |
+| Replay / juice (low sideline) | 13° | 6 ft | 14 ft | hero sprites at 4.5–5×, surface as a low receding band, stands towering |
+
+Players scale with distance: sprite scale = projected scale × a per-sport constant, snapped to quarter steps. NBA near players are about 3× (≈ 110 px tall), the handler 2.5× (≈ 95 px), baseline players 1.5×. This **replaces the flat "1.5 px per art pixel" rule in C.1.2**: size is whatever the camera says, and LOD sprites are drawn natively at each quarter step.
+
+| Depth effect | How it is drawn in our canvas renderer | Per-frame cost | Notes |
+|---|---|---|---|
+| Perspective surface | `drawFloor(pcam, tex)` already does this per texel. Bake lines, numbers, light pools, gloss and distance fog **into the `FieldTex` once**. Cache the drawn floor in an offscreen canvas keyed by the quantised camera [plan soccer-3 does this; adopt in all three] | 0 when the camera is still; one blit (≈ 0.2 ms) when it is | camera drift translates the cached floor by whole pixels; a real re-projection happens only on zoom |
+| Players scale with depth | `project().s` × constant, snapped to 0.25; sprites come from `SpriteCache` at native LOD sizes | already paid | needs the near-first budget [plan players-2] |
+| Volume shading, rim light | in `pixel/body.ts` when the sprite is rasterised: 5 tones per material from one light direction (-0.58, -0.81); every silhouette pixel with nothing above-left takes the highlight tone; a nearer limb over a farther one darkens the pixel below-right (contact shadow) | 0 per frame (baked in the cached sprite) | costs about 15% more per sprite build |
+| Cast shadows, angled | draw the sprite's cached **silhouette** (one extra canvas per cached sprite, built once) with an affine shear `transform(s, 0, 0.62·s, 0.30·s, x, y)` at 34–42% alpha | one `drawImage` per player: ≈ 0.01 ms each | airborne poses separate from their shadow automatically, because the shear is anchored at the ground |
+| Ambient occlusion at the feet | one small dark radial ellipse per player | ≈ 0.005 ms each | may be pre-rendered once and blitted |
+| Ball height | the ball is projected with its height; its shadow is projected at height 0 | 2 draws | the gap between them is the height cue on jump shots, lobs, passes and punts |
+| Court reflections (NBA) | the same sprite drawn flipped at 72% height and 16–22% alpha under the feet | one `drawImage` per player | off on low-power devices |
+| Light pools, gloss, fog | baked into the floor texture | 0 | – |
+| Beams, bloom, haze, vignette, control scrim | **pre-rendered once into one full-screen overlay canvas** per venue | one full-screen blit: ≈ 0.3–0.6 ms | additive beams are composited at build time, not per frame |
+| Stands with depth of field | `standsWall` output rendered at one-third resolution, upscaled once with a 1–1.5 px blur into a cached canvas | one blit | parallax = draw at `dx × 0.4` |
+| LED ribbons | a small canvas of pixel text scrolled by offset | 1–2 `fillRect` runs: < 0.1 ms | redraw every third frame |
+| Crowd shimmer and flashes | 25–60 `fillRect`s and up to 3 star sprites | < 0.2 ms | render-only randomness (allowed) |
+| Parallax and drift | layer x offsets from one sine | 0 | disabled during timed inputs and under reduced motion |
+| Foreground silhouettes | one cached, pre-blurred canvas, replays and menus only | one blit | never in live play |
+| Particles (flames, confetti, turf, dust, sparks) | a pooled array, ≤ 120 live, drawn as snapped squares | ≈ 0.2–0.4 ms at the cap | additive blend only for fire and sparks |
+| Afterimages and smears | 3–4 extra `drawImage`s of the cached sprite at low alpha, additive | ≈ 0.05 ms | replays, dunks, crossovers, bicycle kicks |
+| Screen flash, shake, hit-stop | one translucent rect; a canvas translate; the existing `juice.ts` | ≈ 0 | reduced motion: flash ≤ 30% alpha, no shake |
+
+**Total added per frame:** about 1–1.5 ms on a desktop core for a 10-player NBA scene (measured in the mock-up at ≈ 2 ms per scene with everything on), which leaves the audit's headroom intact if the overlay, stands and floor are cached as specified. **What is not allowed in a match:** per-frame `ctx.filter` blurs, `backdrop-filter`, per-frame gradient creation for full-screen fills, or re-running `drawFloor` when the camera has not moved.
+
+**UI depth** is CSS and costs nothing in the match loop: beveled buttons are static gradients and shadows; cards tilt with `perspective` + `rotateX/rotateY` and a moving foil gradient (`mix-blend-mode: overlay`), used on card detail, the squad screen and the walkout, not in long lists; the pack walkout flips one card in 3D over rotating light rays.
+
+### C.7 The visual quality bar (every team checks its screens against this before review)
+
+**Depth**
+1. The camera is a perspective camera: the far end of the surface is visibly narrower than the near end, and a far player is at most 0.65× the height of a near one.
+2. Every player has a cast shadow angled the same way, an occlusion blob at the feet, and a lit edge on the same side.
+3. The ball's shadow separates from the ball whenever it is in the air.
+4. At least four layers are visible (lights, stands, boundary, play), and they shift against each other when the camera drifts.
+5. The stands are softer and foggier than the players; nothing behind the play is sharper than the play.
+6. Light is visible: lamps with bloom, at least two beams, pools on the surface, haze at the horizon, a vignette.
+
+**Players**
+7. Two stars of the same size can be told apart at match size without reading the number.
+8. Every sprite shows at least three tones per material plus a rim highlight; no flat-filled limbs.
+9. The pose reads in silhouette: a jump shot, a dive, a kick are recognisable when filled black.
+
+**Life**
+10. Something moves in every second of a live match that the player did not cause: crowd shimmer, a flash, a ribbon, a breathing sprite.
+11. Every PERFECT has a ring burst, a sound and a haptic; every score has a banner, a flash and a crowd reaction.
+12. Heat is always visible, and ON FIRE is unmistakable from across a room.
+
+**Chrome**
+13. No flat circles and no flat rectangles: every button has a highlight, an edge, a shadow and a pressed state; every panel has a border, an inner highlight and a drop shadow.
+14. The scorebug carries team colours, scores, period, clock and shot/play clock, and survives being read at arm's length.
+15. Cards make you want them: a metal frame, a pattern, a lit bust in a real pose, a foil that moves.
+16. Every menu screen has one hero with art and one obvious primary button.
+
+**Discipline**
+17. 60 fps on the owner's phone with all of the above on; the frame sampler [plan shell-6] shows no frame over 20 ms in a 10-second match sample.
+18. No raster assets in the bundle: venues, sprites, cards, chests and banners are canvas, SVG or CSS.
+19. Reduced motion still looks finished: lighting, shading and colour stay; drift, shake, flashes and particles go.
+20. No league, team, sponsor or publisher marks anywhere; no tattoos or brand logos on players.
 
 ---
 
@@ -862,11 +954,11 @@ File ownership follows `OWNERSHIP.md`. `src/net/**` and cloud code belong to the
 7. **Protocol:** the re-rate changes ratings used in matches: **all three sports bump** (already recorded in the packs plan).
 
 #### players (the owner's "players don't look how they should" lands here: this team moves up)
-1. **CHANGE (players-4/5), now the team's first priority:** adopt the **5-head hero proportions**, the 1.5 px art pixel, native LOD sizes, the `#14121c` outline and 3-tone ramps (C.1). Update the silhouette tests so Shaq and Bol differ by ≥ 3 px in torso width at 34 px.
+1. **CHANGE (players-4/5), now the team's first priority:** adopt the **5-head hero proportions**, camera-driven sprite scale with native LOD sizes, the `#14121c` outline, **5-tone volume shading with rim light and contact shadows, cached silhouettes for cast shadows** (C.1, C.6), and pass the C.7 checklist. Update the silhouette tests so Shaq and Bol differ by ≥ 3 px in torso width at 34 px.
 2. **CHANGE (players-7):** Tier A coverage adds "every player in the first-run flow and each sport's starter pack".
 3. **KEEP and protect (players-2):** the near-first sprite budget. It is a hard dependency: 81% of the nearest NFL sprites are stale today (A-1).
 4. **CHANGE (players-8/9):** implement the frame plans in B.1.6, B.2.6 and B.3.6 in this order: locomotion without skating → NFL juke/throw/handoff/sack → soccer touch/shot/keeper/slide → NBA crossover/step-back/contest → celebrations. Use the five unused mocap clips first (A-3).
-5. **ADD (P1, into players-9):** crowd front rows as 4-frame sprites, bench and coach idles, the venue palette from C.2 (in `persp.ts`/floor drawing, shared with the sport teams).
+5. **ADD (P0 for the first-impression slice, into players-8):** the venue kit in `persp.ts`: baked light pools, gloss and fog in `FieldTex`, the cached floor, the soft multi-tier stands with shimmer and flashes, LED ribbons, the pre-rendered light overlay, parallax drift (C.2, C.6). Crowd front rows as 4-frame sprites and bench/coach idles stay P1.
 6. **CHANGE (players-3/6):** card faces use the signature-pose pixel bust; frame silhouettes per C.4.
 7. **CUT / defer:** `PlayerPortrait` on every secondary surface (keep cards, squad, walkout, match intro; defer binder and poster); the long tail of celebration variants beyond 4 per sport.
 8. **Protocol:** none (render-only; keep the import-graph test that proves it).
@@ -942,7 +1034,7 @@ The smallest set that makes someone who played last week say "this is a differen
 | 3 | Cameras and the action-safe box | nba, nfl, soccer | you can finally see the play (NBA-20, NFL P-1/V-1, soccer V-1) |
 | 4 | NFL momentum carry; soccer frozen ball, parry and bend bugs; NBA live shot clock | nfl, soccer, nba | the worst "it's broken" moments (C-1, R-1, R-2, C-4, NBA-08) |
 | 5 | The gold ring with honest windows, the PERFECT chime and haptic, the toast line | nba → nfl, soccer | the game's new verb (NBA-14/15) |
-| 6 | 5-head sprites, appearance data with Tier A for first-run and starter players, calmer venues | players | "players don't look how they should" (L-1 to L-4, NBA-26, V-2, A-2) |
+| 6 | 5-head volume-shaded sprites with rim light and cast shadows, appearance data with Tier A for first-run and starter players, the lit layered venue kit (C.2, C.6), broadcast HUD and premium buttons (C.3) | players + each sport | "players don't look how they should" (L-1 to L-4, NBA-26, V-2, A-2) |
 | 7 | Near-first sprite budget + locomotion without skating | players | "animations, movement" (A-1, NBA-23, A-5) |
 | 8 | One-More bar, "Next up" on Home, Minutes ring with the daily and weekly ladders (local), "Done for today" | ut + shell | the hook and the owner's time rewards [eng #1, #5, #9] |
 

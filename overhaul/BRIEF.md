@@ -61,3 +61,26 @@ Read the repo's `CLAUDE.md` first. Its rules are hard constraints.
 ## GAME DESIGN V2 (2026-11-16, binding together with the owner decisions above)
 
 The owner asked for a redesign "by a huge margin": gameplay, animations, movement, buttons, art, players' looks, an addictive hook, and a time-played leaderboard with rewards. The design bible is `design-v2/GAME-DESIGN-V2.md`, the visual target is `design-v2/mockups.html`, and the lead's decisions on its F.6 questions are in `DESIGN-V2-DECISIONS.md`. Each team's add/change/cut list is in section F.2.
+
+## OWNER FEEDBACK ON THE VISUALS (2026-11-16, binding)
+
+The owner saw the first V2 mockups and said: "The mock up looks too simple and boring."
+
+**The visual target is now `design-v2/mockups-v2.html`,** plus the "visual quality bar" checklist in GAME-DESIGN-V2 section C. While mockups-v2 is still being made, aim ABOVE the first mockups: a top mobile sports game, never a wireframe. That means:
+- **Venues:** lit arenas and stadiums with depth.
+- **Crowds:** detailed and animated.
+- **Players:** fully shaded with highlights.
+- **HUD and buttons:** glossy broadcast HUD and premium buttons with depth and glow.
+- **Juice:** particles and banners for PERFECT, ON FIRE and big hits.
+- **Cards:** metallic and foil card art.
+- **Menus:** meta screens with art, chests and motion.
+
+Flat, plain or placeholder-looking UI fails review.
+- **Owner, also: "too flat".** Depth is required everywhere:
+  - perspective broadcast cameras with the field receding
+  - players scaled by depth, with angled cast shadows, rim light and volume-shaded sprites
+  - ball shadows that show height
+  - light pools, bloom, haze and parallax layers
+  - UI with bevels, layered shadows, glass panels, and 3D card tilt and flips
+
+  Flat top-down scenes and flat UI fail review.
