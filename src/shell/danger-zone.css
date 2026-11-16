@@ -1,0 +1,303 @@
+/* Claude (studio overhaul, shell-4, 2026-11-16): Settings → Advanced → Erase all progress
+   (src/shell/DangerZone.tsx, audit M8). Styled apart from the rest of Settings: a red-tinted plate
+   with a bevel and a warning rim. Design px in the 390 frame; every control is at least 44 tall. */
+
+.danger {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.danger-toggle {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 140px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+.danger-toggle:active {
+  background: rgba(143, 166, 178, 0.08);
+}
+.danger-toggle svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s var(--ease-out, ease-out);
+}
+.danger.open .danger-toggle {
+  color: var(--soft);
+  border-color: var(--line);
+}
+.danger.open .danger-toggle svg {
+  transform: rotate(180deg);
+}
+
+.danger-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 14px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 122, 122, 0.42);
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 122, 122, 0.13), transparent 70%),
+    linear-gradient(180deg, #2a1219, #170b10);
+  box-shadow:
+    inset 0 1px rgba(255, 190, 190, 0.12),
+    inset 0 -1px rgba(0, 0, 0, 0.45),
+    0 12px 26px -14px rgba(0, 0, 0, 0.8);
+  animation: danger-in 0.22s var(--ease-out, ease-out) both;
+}
+.danger-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 14% auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 122, 122, 0.85), transparent);
+}
+
+.danger-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.danger-head svg {
+  flex: none;
+  fill: rgba(255, 122, 122, 0.16);
+  stroke: var(--red);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.danger-head h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: #ffd0d0;
+}
+
+.danger-panel p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--soft);
+}
+.danger-panel .danger-lead {
+  color: #ffd0d0;
+  font-weight: 700;
+}
+.danger-loses {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 122, 122, 0.22);
+  background: rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+.danger-loses li {
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--text);
+}
+.danger-loses li + li {
+  border-top: 1px solid rgba(255, 122, 122, 0.14);
+}
+.danger-loses b {
+  font-weight: 800;
+}
+.danger-sport {
+  display: inline-block;
+  min-width: 58px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--red);
+}
+.danger-panel .danger-also,
+.danger-panel .danger-keeps {
+  font-size: 12px;
+  color: var(--sub);
+}
+.danger-keeps b {
+  color: var(--teal);
+}
+
+.danger-panel .danger-cloud {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(143, 166, 178, 0.08);
+  color: var(--soft);
+  font-size: 12px;
+}
+.danger-cloud svg {
+  flex: none;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--sub);
+  stroke-width: 1.6;
+}
+.danger-cloud.on svg {
+  stroke: var(--gold);
+}
+
+.danger-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* the scroll target when the keyboard opens: a little room under the buttons */
+  scroll-margin-bottom: 8px;
+}
+.danger-type {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--sub);
+}
+.danger-type b {
+  color: #ffd0d0;
+  letter-spacing: 1px;
+}
+.danger-type input {
+  box-sizing: border-box;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 122, 122, 0.4);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--text);
+  /* 16 px or more: iOS doesn't zoom the page on focus */
+  font: 800 18px var(--body);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  outline: none;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.danger-type input:focus {
+  border-color: var(--red);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 0 0 3px rgba(255, 122, 122, 0.22);
+}
+.danger-type input.ok {
+  border-color: var(--red);
+  color: #ffd0d0;
+}
+
+.danger-tick {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 4px 2px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--soft);
+}
+.danger-tick input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.danger-box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1.5px solid rgba(255, 122, 122, 0.6);
+  background: rgba(0, 0, 0, 0.35);
+}
+.danger-box svg {
+  fill: none;
+  stroke: #2a1219;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.danger-tick input:checked + .danger-box {
+  background: var(--red);
+  border-color: var(--red);
+}
+.danger-tick input:checked + .danger-box svg {
+  opacity: 1;
+}
+.danger-tick input:focus-visible + .danger-box {
+  box-shadow: 0 0 0 3px rgba(255, 122, 122, 0.35);
+}
+
+.danger-actions {
+  display: flex;
+  gap: 8px;
+}
+.danger-actions .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 48px;
+  height: auto;
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 1.1;
+  text-align: center;
+}
+.danger-actions .btn.primary {
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.35),
+    0 6px 16px -8px var(--teal-glow);
+}
+.danger-actions .btn.danger {
+  background: linear-gradient(180deg, rgba(255, 122, 122, 0.16), rgba(255, 122, 122, 0.06));
+}
+.danger-actions .btn.danger[aria-disabled='true'] {
+  opacity: 0.45;
+  filter: saturate(0.5);
+}
+.danger-actions .btn.danger[aria-disabled='false'] {
+  background: var(--red);
+  color: #2a0a10;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.3),
+    0 6px 18px -6px rgba(255, 122, 122, 0.6);
+}
+
+@keyframes danger-in {
+  from {
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .danger-panel {
+    animation: none;
+  }
+  .danger-toggle svg {
+    transition: none;
+  }
+}

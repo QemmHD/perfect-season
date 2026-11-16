@@ -15,6 +15,7 @@ import type { OnlineCount } from '../net/match';
 import { NET_ON } from '../net/nostr';
 import { Fit, lastName, Sheet } from './common';
 import { ArenaHero } from './Hero';
+import { DangerZone } from '../shell/DangerZone';
 import { usePulse } from './motion';
 import { GlobalBoard } from './Leaderboard';
 import { StreakChip } from './Rewards';
@@ -499,7 +500,6 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
 }
 
 export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' | 'haptics' | 'hints', v: boolean) => void; onReset: () => void; onLocker: () => void; onAdmin: () => void; onClose: () => void; source: string; latest: number }) {
-  const [confirm, setConfirm] = useState(false);
   const [errs, setErrs] = useState(loggedErrors);
   const row = (k: 'sound' | 'haptics' | 'hints', label: string) => (
     <div className="toggle">
@@ -518,20 +518,6 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
             {row('hints', 'Booster hints')}
           </div>
           <button className="locker-entry" onClick={() => close(props.onLocker)}><span aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 17a4 4 0 0 1-.5-7.97 6.5 6.5 0 0 1 12.5-.8A4.5 4.5 0 0 1 18 17"/><path d="m8 16 3 3 5-6"/></svg></span><span><b className="disp">CLOUD SAVE</b><small>Automatic server saves. Keep your legacy.</small></span><i>›</i></button>
-          {confirm ? (
-            <div className="btnrow">
-              <button className="btn" onClick={() => setConfirm(false)}>
-                KEEP MY PROGRESS
-              </button>
-              <button className="btn danger" onClick={() => close(props.onReset)}>
-                ERASE EVERYTHING
-              </button>
-            </div>
-          ) : (
-            <button className="btn" onClick={() => setConfirm(true)}>
-              RESET PROGRESS
-            </button>
-          )}
           <p className="note">
             {pick({
               soccer: 'Forty big clubs of the Premier League, LaLiga, Serie A, Bundesliga, Ligue 1, Eredivisie and Primeira Liga, 1950s to ' + props.latest + ': ' + props.source + '. From 2012–13 every player with 900+ league minutes, with real goals and assists; earlier lines are club spells and estimated ratings.',
@@ -562,6 +548,7 @@ export function SettingsSheet(props: { profile: Profile; onChange: (k: 'sound' |
           <button className="ut-link settings-admin" onClick={() => close(props.onAdmin)}>
             ADMIN
           </button>
+          <DangerZone profile={props.profile} onErase={() => close(props.onReset)} />
         </>
       )}
     </Sheet>

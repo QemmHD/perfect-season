@@ -152,6 +152,7 @@ export function Arcade({
   const [attrs, setAttrs] = useState<((p: Player) => Attrs | null) | null>(null);
   // soccer: the engine, loaded on first use; its elevens (Ultimate Team's, or from the drafts)
   const [sg, setSg] = useState<SoccerGame | null>(null);
+  const [loadErr, setLoadErr] = useState<{ e: unknown } | null>(null); // shell-4: a match file that can't download shows the recovery screen (src/shell/Recovery.tsx)
   useEffect(() => {
     let live = true;
     if (SOCCER)
@@ -160,12 +161,13 @@ export function Arcade({
         setSg(m);
         // soccer plays from the lines themselves: no attribute file to wait for
         setAttrs(() => () => null);
-      });
-    else loadAttrs().then((f) => live && setAttrs(() => f));
+      }).catch((e) => live && setLoadErr({ e }));
+    else loadAttrs(true).then((f) => live && setAttrs(() => f)).catch((e) => live && setLoadErr({ e }));
     return () => {
       live = false;
     };
   }, []);
+  if (loadErr) throw loadErr.e;
   const squads = useMemo(() => {
     if (!sg) return null;
     if (teams?.soccer) return teams.soccer;
