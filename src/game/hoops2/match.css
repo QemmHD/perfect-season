@@ -1,0 +1,82 @@
+/*
+ * Basketball's match chrome around the shared HUD kit (nba-2). Every rule sits under `.hg2-nba`, the
+ * basketball root only: football and soccer reuse the .hg2 classes. The score bug takes its V2 width
+ * and height from the geometry tokens until nba-3's ScoreBug replaces it; the row of possession marks
+ * and the defense's look sit under it, clear of the pause button; LAST PLAY moves out of the stick's
+ * zone to the top-left, under the look.
+ */
+.arcade-full.hg2-nba .hg2-bug {
+  box-sizing: border-box;
+  top: calc(var(--sat) + var(--bug-t));
+  width: var(--bug-w);
+  height: var(--bug-h);
+  justify-content: space-between;
+}
+.arcade-full.hg2-nba .hg2-bug {
+  font-stretch: 85%;
+}
+/* the V2 width holds the three blocks; the marks row under it shows which possession it is */
+.arcade-full.hg2-nba .hg2-bug > span {
+  min-width: 0;
+  gap: 5px;
+  padding: 3px 8px;
+}
+.arcade-full.hg2-nba .hg2-bug .mid {
+  gap: 5px;
+  padding: 3px 6px;
+}
+.arcade-full.hg2-nba .hg2-bug .mid small {
+  display: none;
+}
+.arcade-full.hg2-nba .hg2-bug i {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  max-width: 54px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arcade-full.hg2-nba .hg2-bug b {
+  font-size: 20px;
+}
+.arcade-full.hg2-nba .hg2-bug .mid b {
+  font-size: 12px;
+}
+/* under the bug and clear of the pause button */
+.arcade-full.hg2-nba .hg2-marks {
+  top: calc(var(--sat) + max(var(--bug-t) + var(--bug-h), var(--pause-t) + 44px) + 5px);
+}
+.arcade-full.hg2-nba .hg2-look {
+  top: calc(var(--sat) + max(var(--bug-t) + var(--bug-h), var(--pause-t) + 44px) + 26px);
+}
+.arcade-full.hg2-nba:not(.wide) .play-readout {
+  top: calc(var(--sat) + max(var(--bug-t) + var(--bug-h), var(--pause-t) + 44px) + 50px);
+  bottom: auto;
+}
+.arcade-full.hg2-nba:not(.wide) .play-readout-card {
+  top: 52px;
+  bottom: auto;
+  transform-origin: 0 0;
+}
+/* the court under everything: a tap on a teammate passes to him */
+.hg2-court {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+.hg2-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hg2-controls > * {
+  pointer-events: auto;
+}
+.hg2-controls > .ps-scrim,
+.hg2-controls > .ps-ctl,
+.hg2-controls > .ps-radial {
+  pointer-events: none;
+}
+.arcade-full.hg2-nba.paused .hg2-canvas {
+  filter: saturate(0.6) brightness(0.8);
+}

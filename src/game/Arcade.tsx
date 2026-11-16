@@ -143,8 +143,8 @@ export function Arcade({
   onProgress: (p: Progress) => void;
   /** this phone let the AI finish the rival's drives from drive `k` on: tell the other phone */
   onTakeover: (k: number) => void;
-  /** `pens`: soccer, a level match settled on penalties */
-  onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens) => void;
+  /** `pens`: soccer, a level match settled on penalties; `forfeit`: 'us' when this phone quit (a loss) */
+  onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens, forfeit?: 'us') => void;
 }) {
   const defenseIQ = defenseDifficulty(online, botLevel, aiDefense);
   const [stage, setStage] = useState<'kickoff' | 'play'>(autoplay || manualOnly ? 'play' : 'kickoff');
@@ -281,6 +281,16 @@ export function Arcade({
     onProgress(p);
   };
 
+  // offline Quit from the pause sheet (nba-2, NBA-09): the game ends now as a loss; the possessions
+  // you didn't play score nothing
+  const quit = () => {
+    if (sent.current || !ai) return;
+    sent.current = true;
+    const played = mine ?? { score: 0, drive: 0, done: false, ends: [] };
+    const ends = [...played.ends, ...Array(Math.max(0, TOTAL - played.ends.length)).fill('X')];
+    onFinish({ ...played, drive: ends.length, done: true, ends }, ai, 'played', { them: false, us: false }, undefined, 'us');
+  };
+
   // sim: the autopilot plays your drives at a middling level
   const sim = () => {
     if (!attrs || manualOnly) return;
@@ -361,8 +371,9 @@ export function Arcade({
           </div>
         )}
         <div className="arc-how">
-          <span>Stick: move · PASS to the man you point at · CROSS breaks your man down</span>
-          <span>Hold SHOOT and let go in the green · near the rim it’s a layup, or a dunk</span>
+          <span>Left thumb anywhere low: move · push past the ring to sprint</span>
+          <span>Hold SHOOT, let go at the top · tap it: pump fake · swipe it: cross, step-back, spin</span>
+          <span>PASS to the man you aim at, hold for a lob · CALL: screen, cut or ISO · pause top-left</span>
         </div>
         {online && rivalLive?.done && (
           <p className="arc-wait">
@@ -468,7 +479,7 @@ export function Arcade({
   }
   if (!FOOTBALL) {
     const k = kits ?? kitsFor(null, null, 'nba');
-    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;
+    return <Hoops2 lineup={lineup} rivalLineup={rivalLineup} five={teams?.five} rivalFive={teams?.rivalFive} bench={teams?.bench} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as BasketballKit} theirKit={k.theirs as BasketballKit} court={k.court} autoplayHook={autoplay} online={online} onQuit={online ? undefined : quit} onProgress={progress} onDone={progress} />;
   }
   const k = kits ?? kitsFor(null, null, 'nfl');
   return <Football2 lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress} />;

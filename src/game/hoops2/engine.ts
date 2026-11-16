@@ -47,6 +47,13 @@ const SPOTS: Record<string, Pt> = {
   C: { cx: 40, cz: -6.5 }
 };
 /** spacing spots to drift to when the ball goes inside */
+/** ISO: where the four clear to, from the rim (cx) and on the weak side (cz, mirrored by the call's side). */
+const ISO_SPOTS: Pt[] = [
+  { cx: -3, cz: 20 },
+  { cx: -17, cz: 18 },
+  { cx: -26, cz: 6 },
+  { cx: -7, cz: 9 }
+];
 const DRIFT: Pt[] = [
   { cx: 44.6, cz: -22 },
   { cx: 44.6, cz: 22 },
@@ -242,18 +249,19 @@ export function openness(p: Possession, b: Body): number {
  */
 export function contestOf(p: Possession, s: Body): Contest {
   const { d, r } = closest(p, s);
-  if (p.t < d.stunUntil) return r < 3 ? 'light' : 'open';
-  const reach = (d.p.ht - s.p.ht) / 12 + (d.p.vrt - s.p.vrt) / 120 + (d.h > 1 ? 0.6 : 0);
+  // "make him land": a man who bit on the pump fake and is still in the air contests one tier
+  // lighter than he would have standing in the same spot (nba-2)
+  const baited = d.baitedAt !== undefined && d.h > 0.2 && p.t - d.baitedAt < 1.2;
+  if (p.t < d.stunUntil && !baited) return r < 3 ? 'light' : 'open';
+  const reach = (d.p.ht - s.p.ht) / 12 + (d.p.vrt - s.p.vrt) / 120 + (d.h > 1 && !baited ? 0.6 : 0);
   const clampDef = 0.6 * badgeMult(d.p, 'clamps');
   const toward = unit({ cx: RIM.cx - s.cx, cz: RIM.cz - s.cz });
   const behind = (d.cx - s.cx) * toward.cx + (d.cz - s.cz) * toward.cz < -0.7;
   // perimeter defense closes the gap: 30 points of PRD is a foot of contest (it was half that),
   // centred on a 70 defender
   const eff = r - reach * 0.7 - clampDef - (d.p.prd - 70) / 30 + (behind ? 1.8 : 0);
-  if (eff >= 4.2) return 'open';
-  if (eff >= 2.6) return 'light';
-  if (eff >= 1.0) return 'heavy';
-  return 'smothered';
+  const grade: Contest = eff >= 4.2 ? 'open' : eff >= 2.6 ? 'light' : eff >= 1.0 ? 'heavy' : 'smothered';
+  return baited ? CONTESTS[Math.max(0, CONTESTS.indexOf(grade) - 1)] : grade;
 }
 
 const CONTESTS: Contest[] = ['open', 'light', 'heavy', 'smothered'];
@@ -444,8 +452,11 @@ function normTail(z: number): number {
  * his ratings: a dunker throws it down, a posterizer dunks through a defender in his way, anyone
  * else lays it up.
  */
-export function pressShoot(p: Possession) {
+export function pressShoot(p: Possession, opts: { at?: number; provisional?: boolean } = {}) {
   if (p.handler === null || p.ball || p.end || p.meter || p.finish) return;
+  // a person's touch: the meter counts from the touch itself (its timestamp, in game time), never
+  // from the 60 Hz step that happened to hear it
+  const t0 = opts.at !== undefined ? Math.min(p.t, Math.max(p.t - 0.25, opts.at)) : p.t;
   const b = p.bodies[p.handler];
   const d = dist(b, RIM);
   const speed = Math.hypot(b.vx, b.vz);
@@ -473,7 +484,7 @@ export function pressShoot(p: Possession) {
     p.finish = { kind, t0: p.t, tUp: p.t + gather, target: inWay ? def.idx : null };
     act(b, kind === 'layup' ? 'layup' : kind === 'contact' ? 'contact' : kind === 'standdunk' ? 'standdunk' : 'dunk', p.t);
     p.events.push('gather:' + kind);
-    if (kind === 'layup') p.meter = { t0: p.t, top: LAYUP_TOP, green: greenWindow(p, b, 'layup', contestOf(p, b)), kind: 'layup', room: closest(p, b).r };
+    if (kind === 'layup') p.meter = { t0, top: LAYUP_TOP, green: greenWindow(p, b, 'layup', contestOf(p, b)), kind: 'layup', room: closest(p, b).r };
     return;
   }
   const kind = shotKindAt(b);
@@ -481,7 +492,21 @@ export function pressShoot(p: Possession) {
   const style = b.lastCatchAt !== undefined && p.t - b.lastCatchAt < 0.85 && speed < 4 ? 'catch' : speed > 6 ? 'pullup' : 'set';
   const top = style === 'catch' ? 0.45 : style === 'pullup' ? 0.59 : JUMPER_TOP;
   b.shotTempo = JUMPER_TOP / top;
-  p.meter = { t0: p.t, top, style, green: greenWindow(p, b, kind, contest), kind, room: closest(p, b).r };
+  p.meter = { t0, top, style, green: greenWindow(p, b, kind, contest), kind, room: closest(p, b).r };
+  if (opts.provisional) {
+    // he gathers; he leaves the floor at GATHER_S unless a tap or a swipe takes it back first
+    p.meter.gather = true;
+    return;
+  }
+  rise(p, b);
+}
+
+/** A person's SHOOT stays a gather this long before he goes up (the tap / swipe window, 120 ms + a frame's grace). */
+export const GATHER_S = 0.125;
+
+/** The jumper goes up: the jump, and the nearest defender closing out with him. */
+function rise(p: Possession, b: Body) {
+  if (p.meter?.gather) delete p.meter.gather;
   act(b, 'shoot', p.t);
   b.vh = 12.5;
   b.h = 0.01;
@@ -504,9 +529,73 @@ export const LAYUP_TOP = 0.42;
 
 /** A system-canceled held jumper is not a release. Committed finishes/shots keep playing. */
 export function cancelShoot(p: Possession): boolean {
+  // a gather that never left the floor goes back for free; a finish already under way plays on
+  if (p.meter?.gather && cancelGather(p)) return true;
   if (!p.meter || p.meter.off !== undefined || p.handler === null || p.finish || p.ball || p.end) return false;
   p.meter = null;
   act(p.bodies[p.handler], 'land', p.t);
+  return true;
+}
+
+/**
+ * Take back a gather that hasn't left the floor (a person's SHOOT turned into a tap or a swipe): the
+ * provisional jumper, or a finish still on its gather steps. Free: no time, no animation to wait out.
+ */
+export function cancelGather(p: Possession): boolean {
+  if (p.handler === null || p.ball || p.end) return false;
+  const b = p.bodies[p.handler];
+  if (p.meter?.gather) {
+    p.meter = null;
+    return true;
+  }
+  if (p.finish && p.t < p.finish.tUp && b.h === 0 && b.vh === 0 && p.finish.kind !== 'oop') {
+    p.finish = null;
+    p.meter = null;
+    act(b, 'dribble', p.t);
+    return true;
+  }
+  return false;
+}
+
+/** One pump fake per this many seconds, and how long the ball stays up. */
+export const PUMP_EVERY = 0.8;
+export const PUMP_T = 0.34;
+
+/**
+ * A pump fake (SHOOT tapped, nba-2): the ball comes up and he stays down. His closest defender bites
+ * (leaves his feet) by the shooter's threat from there against the defender's perimeter defense and
+ * the defense's discipline, a seeded draw. A man who bit and is still in the air contests a tier
+ * lighter (contestOf). Never a shot; at most one per PUMP_EVERY.
+ */
+export function pumpFake(p: Possession): boolean {
+  if (p.handler === null || p.ball || p.end) return false;
+  const h = p.bodies[p.handler];
+  if (h.h > 0.05 || (p.meter && !p.meter.gather) || (p.finish && !(p.t < p.finish.tUp))) return false;
+  cancelGather(p);
+  if (p.t - (h.pumpAt ?? -9) < PUMP_EVERY) return false;
+  h.pumpAt = p.t;
+  act(h, 'pump', p.t);
+  h.vx *= 0.4;
+  h.vz *= 0.4;
+  const { d, r } = closest(p, h);
+  if (r < 7 && p.t >= d.stunUntil && d.h === 0) {
+    const near = dist(h, RIM) < 10;
+    const threat = near ? (h.p.lay + h.p.cls) / 2 : shotRating(h, shotKindAt(h));
+    const bite = clamp(0.2 + (threat - 70) / 110 - (d.p.prd - 70) / 160 - 0.12 * p.defIQ + (r < 4 ? 0.06 : 0), 0.04, 0.62);
+    if (p.rand() < bite) {
+      d.baitedAt = p.t;
+      act(d, 'contest', p.t);
+      d.vh = lerp(10, 13.5, rate(d.p.vrt));
+      d.h = 0.01;
+      // in the air he can't change direction: he comes down where he jumped
+      d.stunUntil = p.t + ((2 * d.vh) / 34) * 0.9;
+      d.vx *= 0.3;
+      d.vz *= 0.3;
+      p.events.push('pump:bit:' + d.idx);
+      return true;
+    }
+  }
+  p.events.push('pump');
   return true;
 }
 
@@ -536,6 +625,8 @@ export function releaseShoot(p: Possession, lag = 0) {
   const m = p.meter;
   if (!m || p.handler === null || p.end || m.off !== undefined) return;
   const b = p.bodies[p.handler];
+  // let go before the gather even left the floor: he goes up now, and it's an early release
+  if (m.gather) rise(p, b);
   const held = p.t - m.t0 - lag;
   const off = held - m.top;
   m.off = clamp(off / 0.25, -1, 1);
@@ -692,7 +783,7 @@ function finishNow(p: Possession, b: Body, kind: ShotKind) {
  * Pass to a teammate (or, with none given, to the one the stick points at or the most open). To a
  * dunker cutting to the rim it's a lob: an alley-oop.
  */
-export function pass(p: Possession, to: number | null) {
+export function pass(p: Possession, to: number | null, lob = false) {
   if (p.handler === null || p.ball || p.end || p.meter || p.finish) return;
   const h = p.bodies[p.handler];
   const target = to ?? p.target ?? bestOpen(p, h);
@@ -700,18 +791,22 @@ export function pass(p: Possession, to: number | null) {
   const rcv = p.bodies[target];
   const dRim = dist(rcv, RIM);
   const cutting = rcv.cutUntil > p.t || (Math.hypot(rcv.vx, rcv.vz) > 8 && rcv.vx * (RIM.cx - rcv.cx) + rcv.vz * (RIM.cz - rcv.cz) > 0);
-  const oop = dRim < 13 && cutting && canOop(rcv.p);
+  // PASS held (nba-2): a lob. To a dunker near the rim it's an alley-oop even before he cuts;
+  // to anyone else it's a lofted pass over the hands, slower and harder to jump
+  const oop = dRim < 13 && (cutting || lob) && canOop(rcv.p);
+  const high = lob && !oop;
   const lead = oop ? { cx: RIM.cx - 1.6 * Math.sign(RIM.cx - rcv.cx || 1), cz: rcv.cz * 0.25 } : { cx: rcv.cx + rcv.vx * 0.3, cz: rcv.cz + rcv.vz * 0.3 };
   // a good passer's ball gets there sooner (and is harder to jump)
-  const flight = oop ? Math.max(0.55, dist(h, lead) / 30) : Math.max(0.2, dist(h, lead) / lerp(36, 50, rate(h.p.pas)));
+  const flight = oop ? Math.max(0.55, dist(h, lead) / 30) : Math.max(0.2, dist(h, lead) / lerp(36, 50, rate(h.p.pas))) * (high ? 1.35 : 1);
   p.ball = {
     kind: oop ? 'lob' : 'pass',
     from: { cx: h.cx, cz: h.cz, h: 4.6 },
     to: { cx: lead.cx, cz: lead.cz, h: oop ? RIM_H + 1.5 : 4.4 },
     t0: p.t,
     t1: p.t + flight,
-    arc: oop ? 4 : 0.8,
-    who: target
+    arc: oop ? 4 : high ? 3.2 : 0.8,
+    who: target,
+    ...(high ? { high: true } : {})
   };
   act(h, 'pass', p.t);
   // a Dimer's pass sets the catch-and-shoot up (by his tier)
@@ -861,6 +956,47 @@ export function spin(p: Possession, dir: number) {
   shakeMan(p, h, 0.04 + (h.p.str - 60) / 600);
 }
 
+/** Driving at the rim: moving fast, mostly toward it, inside 24 ft (a swipe is a euro-step then). */
+export function driving(p: Possession): boolean {
+  if (p.handler === null) return false;
+  const h = p.bodies[p.handler];
+  const speed = Math.hypot(h.vx, h.vz);
+  const d = dist(h, RIM);
+  if (speed < 5 || d > 24) return false;
+  return (h.vx * (RIM.cx - h.cx) + h.vz * (RIM.cz - h.cz)) / (speed * Math.max(d, 0.01)) > 0.45;
+}
+
+/**
+ * A euro-step (a swipe on SHOOT while driving, nba-2): a long step one way and the gather the other,
+ * still going at the rim. It shares the moves' cool-down and beats his man by the finishing touch
+ * against the defense. `dir` +1 is his right.
+ */
+export function euroStep(p: Possession, dir: number) {
+  if (p.handler === null || p.ball || p.end) return;
+  cancelGather(p);
+  if (p.meter || p.finish) return;
+  const h = p.bodies[p.handler];
+  if (h.h > 0.05 || p.t - lastMove(h) < 1.3) return;
+  act(h, 'euro', p.t);
+  h.lastMoveAt = p.t;
+  const toRim = unit({ cx: RIM.cx - h.cx, cz: RIM.cz - h.cz });
+  const side = { cx: -toRim.cz * dir, cz: toRim.cx * dir };
+  const burst = topSpeed(h, true) * 0.95;
+  h.vx = toRim.cx * burst * 0.75 + side.cx * burst * 0.6;
+  h.vz = toRim.cz * burst * 0.75 + side.cz * burst * 0.6;
+  shakeMan(p, h, 0.06 + (h.p.lay - 60) / 500);
+}
+
+/**
+ * The card an ISO is run for (nba-2): the five's go-to scorer, by overall and then his best way to
+ * score. nba-8 swaps this for the real usage split (hoops2/usage.ts).
+ */
+export function isoStar(p: Possession): Body {
+  const five = p.bodies.filter((b) => b.side === 'O');
+  const usage = (b: Body) => b.p.ovr + Math.max(b.p.thr, b.p.mid, (b.p.lay + b.p.ddk) / 2) / 10;
+  return five.reduce((a, b) => (usage(b) > usage(a) ? b : a));
+}
+
 // ---------- the step ----------
 
 /** The stick past this share of its reach sprints; the stamina a second of it costs, and refills. */
@@ -868,18 +1004,25 @@ export const SPRINT_AT = 0.92;
 const BURST_DRAIN = 0.34;
 const BURST_FILL = 0.2;
 
-/**
- * Advance by dt. `stick` is where the handler wants to go, as a court direction (length up to 1),
- * or null to stand.
- */
-/** Call the aimed teammate through, bring a big to the ball, or spread the floor. */
-export function callPlay(p: Possession, kind: 'screen' | 'cut' | 'space'): boolean {
-  if (p.end || p.handler === null || p.ball || p.meter || p.finish || p.clock < 1) return false;
+/** Call the aimed teammate through, bring a big to the ball, spread the floor, or clear out for the star (ISO). */
+export function callPlay(p: Possession, kind: 'screen' | 'cut' | 'space' | 'iso'): boolean {
+  if (p.end || p.handler === null || p.ball || (p.meter && !p.meter.gather) || p.finish || p.clock < 1) return false;
   if (kind !== 'space' && p.t < (p.callReadyAt ?? 0)) return false;
   const handler = p.bodies[p.handler];
   const mates = p.bodies.filter((b) => b.side === 'O' && b !== handler);
   if (!mates.length) return false;
   for (const b of mates) b.cutUntil = 0;
+  if (kind === 'iso') {
+    // ISO (nba-2): the four clear to the weak side and the star gets the ball on the strong wing
+    const star = isoStar(p);
+    const side = (star === handler ? handler.cz : star.cz) >= 0 ? 1 : -1;
+    const target = { cx: RIM.cx - 21, cz: side * 12 };
+    p.playCall = { kind, actor: star.idx, target, until: p.t + 6, sides: {}, from: p.t, side, feed: star !== handler };
+    p.callReadyAt = p.t + 4.5;
+    p.target = star.idx;
+    p.events.push('call:iso');
+    return true;
+  }
   const toward = unit({ cx: RIM.cx - handler.cx, cz: RIM.cz - handler.cz });
   const score = (b: Body) => (b.p.pos === 'C' ? 7 : b.p.pos === 'PF' ? 6 : 0) + b.p.str / 10 - dist(b, handler) * 0.6;
   const actor =
@@ -921,7 +1064,13 @@ function plantedScreen(p: Possession, b: Body): boolean {
   return !!c && c.kind === 'screen' && c.actor === b.idx && c.until > p.t && c.plantedAt !== undefined && !c.rolling && Math.hypot(b.vx, b.vz) < 2;
 }
 
-export function step(p: Possession, dt: number, stick: Pt | null) {
+/**
+ * Advance by dt. `stick` is where the controlled man wants to go, as a court direction (length up to
+ * 1), or null to stand. `sprint`: a person's floating stick says sprint itself (pushed past 1.15 x its
+ * ring, nba-2) and its direction already has its dead zone taken out; left out (the autopilot, the
+ * recorded tests), the old rule holds: the stick past SPRINT_AT sprints, under 0.12 is centred.
+ */
+export function step(p: Possession, dt: number, stick: Pt | null, sprintHeld?: boolean) {
   if (p.end) return;
   p.t += dt;
   const t = p.t;
@@ -963,6 +1112,20 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
   // switching: two defenders whose men cross swap them
   if (p.scheme === 'switch' && Math.floor(t * 4) !== Math.floor((t - dt) * 4)) switchMarks(p);
 
+  // a person's provisional gather leaves the floor once the tap / swipe window has passed
+  if (p.meter?.gather && handler && t - p.meter.t0 >= GATHER_S) rise(p, handler);
+
+  // ISO: the ball goes to the star on the strong wing once he's there or open (or after 1.1 s)
+  const iso = p.playCall?.kind === 'iso' && p.playCall.feed ? p.playCall : null;
+  if (iso && handler && !p.meter && !p.finish && !p.ball && handler.idx !== iso.actor && handler.h === 0) {
+    const star = p.bodies[iso.actor];
+    const since = t - (iso.from ?? t);
+    if (since > 1.1 || (since >= 0.4 && (dist(star, iso.target) < 4 || openness(p, star) > 4))) {
+      iso.feed = false;
+      pass(p, star.idx);
+    }
+  } else if (iso && handler && handler.idx === iso.actor) iso.feed = false;
+
   // the finish at the rim: gather, rise, then it goes up at the top
   if (p.finish && handler) {
     const f = p.finish;
@@ -998,24 +1161,24 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
       continue;
     }
     if (b === controlled) {
-      if (p.meter && p.meter.kind !== 'layup') {
+      if (p.meter && p.meter.kind !== 'layup' && !p.meter.gather) {
         b.vx *= 0.85;
         b.vz *= 0.85;
         // held too long: it goes up on the way down
         if (t - p.meter.t0 > p.meter.top + 0.3 && p.meter.off === undefined) releaseShoot(p);
       } else if (!p.finish) {
         const assist = rebounder && p.ball ? unit({ cx: p.ball.to.cx - b.cx, cz: p.ball.to.cz - b.cz }) : null;
-        const s = stick && Math.hypot(stick.cx, stick.cz) > 0.12 ? stick : assist && dist(b, p.ball!.to) > 1 ? { cx: assist.cx * 0.82, cz: assist.cz * 0.82 } : null;
+        const s = stick && Math.hypot(stick.cx, stick.cz) > (sprintHeld === undefined ? 0.12 : 0.01) ? stick : assist && dist(b, p.ball!.to) > 1 ? { cx: assist.cx * 0.82, cz: assist.cz * 0.82 } : null;
         // the stick at its edge: a sprint while the stamina lasts (faster for a fast man), which
         // refills when he eases off
         const mag = s ? Math.min(1, Math.hypot(s.cx, s.cz)) : 0;
-        const sprint = mag >= SPRINT_AT && b.burst > 0.04;
+        const sprint = (sprintHeld === undefined ? mag >= SPRINT_AT : sprintHeld && mag > 0.5) && b.burst > 0.04;
         p.sprinting = sprint;
         b.burst = clamp(b.burst + (sprint ? -BURST_DRAIN : BURST_FILL) * dt, 0, 1);
         const sp = topSpeed(b, !!handler) * (sprint ? lerp(1.12, 1.22, rate(b.p.spd, 30, 99)) : 1);
         const want = s ? { x: (s.cx / mag) * sp * mag, z: (s.cz / mag) * sp * mag } : { x: 0, z: 0 };
         const a = accelOf(b) * dt;
-        const moveDuration = b.act === 'cross' ? 0.28 : b.act === 'stepback' ? 0.3 : b.act === 'spin' ? 0.38 : 0;
+        const moveDuration = b.act === 'cross' ? 0.28 : b.act === 'stepback' ? 0.3 : b.act === 'spin' ? 0.38 : b.act === 'euro' ? 0.34 : b.act === 'pump' ? PUMP_T : 0;
         const movingSkill = moveDuration > 0 && t - b.actAt < moveDuration;
         if (!movingSkill) {
           b.vx += clamp(want.x - b.vx, -a, a);
@@ -1135,11 +1298,12 @@ export function step(p: Possession, dt: number, stick: Pt | null) {
         ball.tried ??= [];
         for (const d of p.bodies) {
           if (d.side !== 'D' || t < d.stunUntil || ball.tried.includes(d.idx)) continue;
-          if (dist(d, at) < (ball.kind === 'lob' ? 1.1 : 1.4) + 0.25 * p.defIQ) {
+          const lofted = ball.kind === 'lob' || !!ball.high;
+          if (dist(d, at) < (lofted ? 1.1 : 1.4) + 0.25 * p.defIQ) {
             ball.tried.push(d.idx);
             const passer = p.bodies.find((b) => b.side === 'O' && b.act === 'pass');
             const dimer = passer ? (1 - 0.4 * badgeMult(passer.p, 'dimer')) * lerp(1.4, 0.6, rate(passer.p.pas)) : 1;
-            if (r() < (0.03 + 0.16 * rate(d.p.stl, 40, 99)) * dimer * (ball.kind === 'lob' ? 0.5 : 1) * (1 + 0.6 * p.defIQ)) {
+            if (r() < (0.03 + 0.16 * rate(d.p.stl, 40, 99)) * dimer * (lofted ? 0.5 : 1) * (1 + 0.6 * p.defIQ)) {
               p.events.push('int:' + d.idx);
               end(p, 'int', 0, 'PICKED OFF BY ' + d.p.tag, ball.who);
               return;
@@ -1246,6 +1410,16 @@ function offBall(p: Possession, b: Body, handler: Body | null, inside: boolean, 
       b.vh = lerp(11.5, 15.5, rate(b.p.vrt));
       b.h = 0.01;
       act(b, 'rebound', t);
+    }
+  } else if (call?.kind === 'iso') {
+    const side = call.side ?? 1;
+    if (call.actor === b.idx) steer(b, call.target.cx, call.target.cz, topSpeed(b, false) * 0.95, dt);
+    else {
+      // the weak side: corner, wing, top and the dunker spot, by his place among the four
+      const four = p.bodies.filter((m) => m.side === 'O' && m.idx !== call.actor && m !== handler);
+      const k = Math.max(0, four.indexOf(b));
+      const spot = ISO_SPOTS[k % ISO_SPOTS.length];
+      steer(b, RIM.cx + spot.cx, spot.cz * -side, topSpeed(b, false) * 0.8, dt);
     }
   } else if (call?.kind === 'screen' && call.actor === b.idx && handler) {
     if (call.plantedAt === undefined && dist(b, call.target) < 1.15 && Math.hypot(b.vx, b.vz) < 2) call.plantedAt = t;

@@ -5,7 +5,7 @@ Branch `claude/studio-nba`, worktree `/home/user/ps-s-nba`, dev server port **52
 [`nba-plan.md`](nba-plan.md) (revision 3, Game Design V2). This doc records what each task changed, the before and
 after numbers, the tests, the protocol line, the contracts other teams build against, and what's left.
 
-**Contents:** nba-1 (harness, baseline, QA isolation) · Contracts for nfl / soccer / ut (plan §4, verbatim) · Contract
+**Contents:** nba-1 (harness, baseline, QA isolation) · nba-2 (the shared controls) · Contracts for nfl / soccer / ut (plan §4, verbatim) · Contract
 changes · Requests to other teams · Escalations · Protocol · Touched outside my lane · Owner device checks · Left
 undone.
 
@@ -254,6 +254,155 @@ SPACE strip at the top of the screen, and the landscape hint sitting on the hand
 
 ---
 
+## nba-2 · The shared controls: geometry tokens, floating stick, A/B/C/D cluster, gestures on A, CALL with ISO, tap-to-pass, toast line, pause (2026-11-16)
+
+### What changed
+
+The whole control layer of a basketball game, rebuilt on V2 A.5's thumb geometry, as shared pieces nfl
+and soccer mount too ([`shared-controls.md`](shared-controls.md) has the mounting guide and a 20-line
+example).
+
+- **Shared files (plan §4.1-4.3, §4.7):** `src/game/controls-geometry.css` (the A.5 table as tokens on
+  `.ps-geo`, interpolated with `clamp()` between the 320 and 393 values; `.ps-geo.land` for sideways),
+  `src/game/stick.ts` + `Stick.tsx`, and `src/game/hud/` `gestures.ts`, `Cluster.tsx` (with `Radial`),
+  `ToastLine.tsx`, `PauseButton.tsx`, `PauseSheet.tsx`, `prefs.ts`, `feel.ts`, `timers.ts`, `hud.css`,
+  `index.ts`.
+- **Look (V2 C.3, the mockup's NBA phone):** A is a lit gold sphere with the ball icon and a dark label,
+  B teal with the pass arrow, C dark glass with a 1.5 px stroke ring, a white SVG play icon and a 10 px
+  label; SVG direction labels round A (▲ SPIN, ◀ CROSS, ▼ STEP); the floating stick is a teal knob in a
+  dashed gold ring that turns gold past the sprint ring; a bottom scrim; the pause button and sheet are
+  bevelled glass with a gold RESUME.
+- **NBA wiring** (`hoops2/HoopsControls.tsx` maps the plan §5 contexts to slots; the loop stays in
+  `Hoops2.tsx`):
+  - **SHOOT (A):** touch-down starts a provisional gather with the meter timed from the touch's own
+    timestamp (`pressShoot(p, { at, provisional: true })`); he leaves the floor at 125 ms. A tap is a
+    **pump fake** (`pumpFake`), a swipe takes the gather back for free and is the move: ← / → crossover,
+    ↓ step-back, ↑ spin, and **euro-step** (`euroStep`) on ← / → while driving. The release is timed from
+    the lift's timestamp too.
+  - **PASS (B):** a 120 ms wind-up to the man the stick aims at (else the most open); still held at
+    120 ms it's a **lob**: an alley-oop to a dunker near the rim even before he cuts, a lofted pass to
+    anyone else (slower, half as easy to jump).
+  - **CALL (C):** a radial with **SCREEN / CUT / ISO**, fanned up and right of C so it never reaches the
+    stick's zone. Slide from C and lift on an item, or tap the item. **ISO** (`callPlay(p, 'iso')`)
+    clears the other four to the weak side and gets the ball to the top-usage card on the strong wing
+    (`isoStar`: overall, then his best way to score; nba-8 swaps in the real usage split).
+  - **Tap a teammate** to pass to him (a 52 px circle round each man): anywhere outside the stick's
+    zone, or anywhere while the stick is held by another finger. A stick finger can never pass.
+  - **BOARD** in a rebound race (B and C hidden); dead balls dim the cluster; D is hidden.
+  - **The dimmed state comes from the loop** every frame (`offOf` → `data-off`), NBA-18.
+  - **Buttons-only** (pause sheet → Controls): tap = pump, hold = shot, no swipes; CROSS / STEP / SPIN as
+    three 46 px buttons round D's spot, firing on down.
+- **The engine** (`engine.ts`, protocol below): the provisional gather and `cancelGather`; `pumpFake`
+  (one per 0.8 s; his closest defender bites from `p.rand` by the shooter's threat from there against
+  his perimeter defense and the defense's discipline, and leaves his feet); **"make him land"**: a man who
+  bit and is still in the air contests one tier lighter; `euroStep` and `driving`; `pass(p, to, lob)`;
+  `callPlay(p, 'iso')` with the weak-side clear-out and the feed; `step(p, dt, stick, sprintHeld?)`, so
+  the floating stick's own sprint ring (1.15 R) decides sprint for a person, while the autopilot and the
+  tests keep the old rule. `render.ts` draws `pump` and `euro` with existing poses until players' land.
+- **The toast line** replaces the hint strip and the mid-court `.hg2-pop` banners: one line above the
+  controls (bottom edge 618 at 393×852), priorities hints 0 / calls and banners 1 / results 2. The
+  one-line hints show once per device (prefs `hints.nba`): the stick, SHOOT, PASS, CALL, and BOARD.
+- **Pause (offline):** the 44 px button top-left; `PausableTimers` carries every delayed match step (the
+  next possession, replays, the buzzer, the fire banners, the hints); stepping and the juice freeze; the
+  toast's clock stops; a hidden page or `pagehide` pauses by itself. The sheet has RESUME, Controls
+  (Gestures / Buttons), a four-line controls guide, and QUIT GAME → "QUIT THIS GAME? It counts as a
+  loss." → `onQuit`. `Arcade.tsx` ends the game at once with the unplayed possessions as empty marks and
+  `onFinish(..., forfeit 'us')`; the draft host and UT's `Match.tsx` settle it as a loss whatever the
+  score. **Online** the button opens the same sheet titled "THE GAME KEEPS GOING" with Resume only
+  (forfeit lands in nba-9).
+- **Haptics through `feel.ts`:** `tick` on the sprint edge and the CALL pick, `long` on a turnover.
+- **Copy:** `Arcade.tsx`'s NBA tip-off card describes the new controls; the score bug takes its V2
+  width (232 / 200) and drops the "5/16" (the marks row under it shows it); LAST PLAY moves out of the
+  stick's zone to the top-left, under the look chip.
+- **Removed (dead after this):** the CROSS / STEP BACK / SPIN button row and its CSS, the SCREEN / CUT /
+  SPACE strip and its CSS, the court-swipe layer, the fixed stick. SPACE is now ISO (V2).
+
+### Before → after (`scripts/audit/nba-controls.mjs`, CDP touch, the dev server on 5215, isolated)
+
+Before = nba-1's `nba-geo.mjs` baseline above. After = run on 2026-11-16 (JSON and captures in
+`O/shots/nba/nba-2/`).
+
+| Row | 393×852 (59/34): before → after | 320×568 (20/0): before → after | V2 |
+|---|---|---|---|
+| A Ø, centre | 100 (329, 756) → **92 (323, 738)** | 100 (256, 506) → **84 (266, 510)** | exact |
+| B Ø, centre | 70 (246, 685) → **64 (238, 778)** | 70 (173, 435) → **56 (190, 536)** | exact |
+| C Ø, centre | a strip at (122, 190) → **48 (250, 694)** | (92, 151) → **44 (200, 468)** | exact |
+| D (hidden in NBA; token rect) | 3 buttons at (195, 612) → **48 (340, 652)** | → **44 (282, 436)** | exact |
+| Stick ghost Ø, centre | 128 (78, 742), fixed → **120 (84, 730)**, floating | 114 (71, 492) → **104 (70, 496)** | exact |
+| Stick zone | the ring only → **x 0-188.6, y 383.4-818** | → **x 0-153.6, y 255.6-568** | 0-189, 383-818 / 0-154, 256-568 |
+| Pause | absent → **44×44 at (12, 63)** | → **(6, 20)** | exact |
+| Score bug | 281×34 at (56, 67) → **232×40 at (80, 65)** | 228×29 → **200×34 at (60, 24)** | exact |
+| Toast line bottom / height | the hint at 258 / 38 → **618 / 28** | 231 / 50 → **404 / 24** | exact |
+| Edge gaps A-B / A-C / A-D | 24 / 531 / 124 → **15.9 / 15.2 / 17.7** | 24 / 319 / 124 → **10.3 / 14.2 / 11.7** | 10-18 |
+| Rects off by more than 2 px | — → **0** | → **0** | 0 |
+| Right-thumb targets / highest top | 6 / 0.20 of the height → **3 / 0.786** | 6 / 0.23 → **3 / 0.785** | ≤ 4 / ≥ 0.667 |
+| Overlaps, smallest target | 0, 44 → **0, 44** (Buttons-only too) | → **0, 44** | 0, ≥ 44 |
+| Handler under a control (tip-off + 30 frames of a drive) | 23% of frames → **0** | **84%** → **0** | never |
+
+- **The other six sizes** (430×932, 375×667, 852×393, 932×430, 667×375, 568×320): 0 overlaps, smallest
+  target 44, nothing outside the insets (the stick's zone now starts at `--sal`), the handler under no
+  control at tip-off.
+- **Pre-held thumb (NBA-12):** a thumb pushed 300 ms before the whistle moves the handler **3.6 ft in the
+  first 300 ms** of game time (before: 0 ft for the whole possession; V2 > 1.5).
+- **Stick response:** the ring is drawn and the game's input set in the **same frame** as the touch (0
+  frames); a move reaches the game **1 frame** later (before: 2 frames at 393, 3 at 320; V2 ≤ 1).
+- **Sprint edge:** a push out past 1.15 R and wobbling out there fired **exactly 1** `tick`.
+- **Two pointers:** the stick held and SHOOT pressed together: the handler moved 2.7 ft and the shot
+  went up.
+- **Accidental passes from 24 stick touches** (taps and drags all over the zone): **0**.
+- **Gestures in the game:** tap → `pump` (no shot), hold → the shot, L / R → crossover, U → spin, D →
+  step-back. Tap a teammate → a pass to him; B held → a lofted pass (`high`); B tapped → a pass.
+- **CALL → ISO:** the star had the ball **0.79 s** after the pick (1.08 s of game time; V2 ≤ 2 s).
+- **Pause:** over 10 s, **0 engine steps, 0 timer callbacks**, the clock held; the paused-and-resumed
+  autoplay game ended with **the same marks** as the uninterrupted one (`2 X 2 2 X A 2 X 2 2 X 2 2 2 X 2`).
+  A hidden page paused the UT game by itself (0 steps in 3 s). **Quit** in a Squad Battles game → the
+  result screen says **LOSS** (0-11).
+- **0 page errors.** Requests to other hosts: none from the lab; the UT fixture's own call to the live
+  Supabase host was aborted (as in nba-1).
+
+### Tests (all new; the standard set is green, see Verification)
+
+| Test | What it proves |
+|---|---|
+| `src/game/stick.test.ts` (9) | spawn in the zone only, home band, a second finger ignored; 12% dead zone and the linear rescale; sprint at 1.15 R with exactly one edge per push out; no sprint ring when asked; the ring follows past 1.6 R and turns back at once; never-null output; a held direction survives; fixed (permanent) mode |
+| `src/game/hud/gestures.test.ts` (6) | 200 jittered gestures per class (tap, hold, four swipes) through the cluster's own tracker: **0-4 misreads per class allowed, ≤ 2%**; the thresholds; `down` delivered on the finger's down; two fingers tracked on separate slots; a swipe goes out once; the OS cancel clears everything |
+| `src/game/hud/prefs.test.ts` (5) | missing / corrupt / old-shape / bad fields → defaults; read-modify-write with the per-sport maps merged; no other key touched; a hint once per device; no storage at all |
+| `src/game/hud/pause.test.ts` (3) | 10 s of pause run 0 callbacks, each job then runs after the time it had left, in order; jobs set while paused wait; cancel / clear; double pause / resume are no-ops |
+| `src/game/hoops2/controls.test.ts` (13) | the gather's meter runs from the touch and rises at GATHER_S; a swipe cancels it at no cost and the move goes at once; an early lift still shoots; the pump fake never shoots, one per 0.8 s, baits by rating (95 shooter on a 60 defender far more than 55 on 95), and a bitten man in the air contests a tier lighter; the euro-step on a drive; the lob and the lofted pass; **ISO puts the ball in the star's hands within 2 s in > 95% of 120 seeds** and the four clear out; the §5 slots; the loop's dimmed state; **the AI's race is byte-identical to nba-1** (18 seeded autopilot games against a golden recorded at `0e788b1`) |
+
+`cluster.test.ts` in the plan became the tracker half of `gestures.test.ts` (the install has no jsdom,
+and adding one is a heavy dependency); the DOM half is the browser probe's two-pointer and gesture
+checks.
+
+### Verification (nba-2)
+
+- `bash O/heavy.sh npm run typecheck`: clean.
+- The standard set (plan §2) through heavy.sh: 16 files passed, 5 skipped (opt-in), 104 tests passed;
+  the one failure on the first run (`gameplay.test.ts`, "does not cancel a committed shot or a finish")
+  was a real regression, fixed: an OS cancel now takes back only a jumper's gather, and a finish already
+  under way plays on as before. Re-run: `gameplay`, `controls`, `hud`, `stick` 51/51.
+- `node scripts/audit/nba-controls.mjs` against the dev server on 5215 (all sections, then `--only=play,quit`
+  after the last edits): the numbers above, 0 page errors.
+
+### Reduced motion (plan §3.15 rows)
+
+| Element | With reduced motion |
+|---|---|
+| toast-line words | no pop scale, no slide-in; colour kept |
+| CALL radial | instant (no spring) |
+| pause sheet | no fade or rise |
+| buttons | no press-sink |
+| stick ghost | no fade |
+
+Captured at 393×852 with `reducedMotion: 'reduce'` (`ctl-393-reduced-motion.png`).
+
+**Protocol bump needed: NBA draft + UT**, because a person's possessions now play differently: the pump
+fake and "make him land" change contests, ISO moves the four and feeds the star, the euro-step and the
+lob are new actions, the gather is timed from the touch, and the floating stick's sprint ring replaces
+the 0.92 edge. The AI's possessions are unchanged (the golden test).
+
+---
+
 ## Contracts for nfl / soccer / ut
 
 The section below is plan §4, copied verbatim on 2026-11-16 (revision 3, commit `78a1c86`). nfl and soccer build against
@@ -477,6 +626,12 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
 |---|---|---|---|
 | 2026-11-16 | all of §4 | First publication, copied verbatim from the plan (revision 3) | nba-1: day-one contracts |
 | 2026-11-16 | §4.8 `BoxLine` | `pure` renamed to `perfect`; `perfect3` added (PERFECT releases on three-point attempts). Neither had shipped. | V2's PERFECT vocabulary; ut's card-mastery feat ("10 PERFECT threes") |
+| 2026-11-16 | §4.3 `ClusterInput` | optional `dist`, `x`, `y` added (how far the finger has travelled, where it is) | a provisional action is taken back once a finger drifts; the radial's slide-and-lift |
+| 2026-11-16 | §4.3 toast | `ToastProvider({ paused, apiRef, children })` exported; `ToastLine()` reads it | the toast's clock stops with a pause; the match loop says things through `apiRef` |
+| 2026-11-16 | §4.2 stick | `geomFrom(el, opts?)` takes `{ floating, sprint }`; new `stickGeom(zone, ghost, ringR, opts?)` and the `DEAD_ZONE` / `SPRINT_RING` / `FOLLOW_RING` constants | one place for the ratios |
+| 2026-11-16 | §4.3 pause | `PauseButton` takes an optional `label`; `PauseSheet.tsx` also exports `SheetToggle`; new `hud/timers.ts` `PausableTimers` | sport items in the sheet; "0 timers while paused" |
+| 2026-11-16 | §4.7 prefs | new helper `firstTime(sport, bit)` | the once-per-device hints |
+| 2026-11-16 | §4.8 `Arcade.onFinish` | a sixth optional argument `forfeit?: 'us'` (offline Quit). nba-9 adds `'them'` for the online forfeit | quit = a loss in every host |
 
 ---
 
@@ -547,7 +702,10 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
 ## Protocol
 
 **Protocol bump needed: NBA draft 10 → 11, UT NBA 10 → 11 because** of the outcome changes the later tasks append here
-(gold windows, fouls, format, Heat, moves, transition, usage, eras, OT). **nba-1 adds nothing to it:** its engine events
+(gold windows, fouls, format, Heat, moves, transition, usage, eras, OT). **nba-2 adds:** a person's possessions play differently: the pump fake and "make him land" (contest
+grades), ISO's clear-out and feed, the euro-step, PASS held for a lob, the gather timed from the touch, and
+the floating stick's own sprint ring in place of the 0.92 edge. The AI's possessions are byte-identical
+(`controls.test.ts`), so the AI race and `aiPossessionsOf` are unchanged. **nba-1 adds nothing to it:** its engine events
 (`fga`, `drb`, `stl`, `int`, `foul`) are pushed beside the existing ones and never change state or the order of
 `p.rand` draws; `determinism.test.ts` proves seeded games come out identical with and without them.
 
@@ -556,6 +714,20 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
 ## Touched outside my lane
 
 - None in nba-1. Every file is the team's: `src/game/hoops2/**` and `scripts/audit/nba-*.mjs`.
+- **nba-2:**
+  - `src/game/Arcade.tsx` (shared with nfl): `onFinish` takes an optional sixth `forfeit?: 'us'`; an
+    offline `quit()` that ends the game as a loss with the unplayed possessions as `X`; Hoops2 gets
+    `online` and `onQuit`; the NBA tip-off card's controls copy. NBA branch only.
+  - `src/App.tsx` (shared): the draft host passes `quit` into `finish`, and `vsWon` is false for a quit
+    (2 lines).
+  - `src/ut/Match.tsx` (shared): `finish` takes `forfeit`; a quit settles as `{ won: false }` (4 lines).
+    ut decides whether a quit should still pay the loss reward (see Left undone).
+  - `src/game/play-readout.css` (shared with nfl): removed the dead `.hg2-skills` rules (NBA's old
+    move buttons).
+  - `src/game/hoops2/render.ts`, players section: two fallback poses, `pump` and `euro` (players' own
+    poses replace them, plan §4.6).
+  - `src/game/hoops2/coach-controls.css` keeps the two hint rules soccer's `.hg2.sc2` hint uses and the
+    football/soccer dimmed buttons, unchanged; NBA's own rules moved to the HUD kit.
 - One hunk in the team's own `Hoops2.tsx` worth knowing about: a dev-server-only probe (`window.__hg2`, guarded by
   `import.meta.env.DEV`, so the production build drops it) that the geometry, camera and flow probes read.
 
@@ -563,12 +735,30 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
 
 ## Owner device checks
 
+**nba-2:**
+- Thumb reach on the owner's phone: A / B / C with the right thumb, the stick anywhere low on the left;
+  the CALL radial's reach (SCREEN / CUT / ISO up and right of C).
+- The sprint ring: does pushing past it feel deliberate, and is the haptic tick felt (iOS plays one tick,
+  only inside a touch; the sprint edge comes from a move, so iOS may play it on the next touch)?
+- Gestures on SHOOT under a real thumb: taps that should be pump fakes, swipes that should be moves
+  (thresholds 120 ms / 12 px / 36 px in 250 ms).
+- Auto-pause when a call comes in or the app is switched away, and Resume.
+- The Dynamic Island: re-measure the pause button and the bug once shell's `--sat` fix merges.
+
 None for nba-1 (test and QA infrastructure only). Plan §11's list starts with nba-2: thumb reach, the sprint ring, the
 ring's feel, haptics, defense, the rematch loop and accented names.
 
 ---
 
 ## Left undone
+
+**nba-2:**
+- **A quit still pays the ordinary loss reward** in UT (30 coins, XP, season points) and the debrief
+  coaches the empty possessions. That is ut's call (rewards and debrief are theirs); a quit at tip-off
+  is no faster than a SIM where SIM is offered, but Circuit, Club Season and Cups don't offer SIM.
+- The euro-step and the pump fake use fallback poses until players' `euro` and `pump` land.
+- The radial's open animation and the euro-step were on the cut line; both shipped.
+- The online forfeit (the sheet's Forfeit) is nba-9's, as planned.
 
 - Nothing from nba-1's Must list. The probes measure only what today's game has; rows for controls that don't exist yet
   (pause, Heat bar, sprint ring, gestures on A) print "absent", and the tasks that build them add their measurements.

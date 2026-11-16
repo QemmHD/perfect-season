@@ -316,6 +316,16 @@ function poseOf(b: Body, t: number, carrying: boolean): { key: string; pose: Pos
       const ph = timed(0.45, 6);
       return { key: 'sn' + ph, pose: P.spin(ph) };
     }
+    // nba-2 fallbacks until players' own poses land (plan §4.6): the pump fake is the start of the
+    // jump shot and back down; the euro-step rides the crossover's weight shift
+    case 'pump': {
+      const ph = timed(0.34, 6);
+      return { key: 'pf' + ph, pose: P.jumpShot(0.3 * (ph < 0.5 ? ph * 2 : (1 - ph) * 2)) };
+    }
+    case 'euro': {
+      const ph = timed(0.34, 6);
+      return { key: 'eu' + ph, pose: P.crossover(ph) };
+    }
     case 'fall': {
       // ankles broken: he stumbles, then he's down, then he scrambles up
       if (since < 0.35) {

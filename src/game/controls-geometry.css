@@ -1,0 +1,93 @@
+/*
+ * The V2 A.5 controls geometry (plan §4.1), shared by every sport's match and by ut's result sheet.
+ * Tokens only: hosts add `ps-geo` to `.arcade-full` (which already carries the safe-area insets
+ * --sat/--sab/--sal/--sar). Each size interpolates linearly with the viewport width between its 320
+ * and 393 values and clamps outside that range, so there are no width media queries. Landscape is the
+ * JS class `.ps-geo.land` (the 393 sizes, anchored to the corners inside the side insets).
+ *
+ * Offsets are measured from the safe-inset edge to the element's outer edge:
+ *   right gap  -> right:  calc(var(--sar) + var(--ctl-a-r))
+ *   bottom gap -> bottom: calc(var(--sab) + var(--ctl-a-b))
+ */
+.ps-geo {
+  /* A: SHOOT / CONTEST / BOARD / FT (gold) */
+  --ctl-a-d: clamp(84px, calc(84px + (100vw - 320px) * 8 / 73), 92px);
+  --ctl-a-r: clamp(12px, calc(12px + (100vw - 320px) * 12 / 73), 24px);
+  --ctl-a-b: clamp(16px, calc(16px + (100vw - 320px) * 18 / 73), 34px);
+  /* B: PASS / STEAL (teal) */
+  --ctl-b-d: clamp(56px, calc(56px + (100vw - 320px) * 8 / 73), 64px);
+  --ctl-b-r: clamp(102px, calc(102px + (100vw - 320px) * 21 / 73), 123px);
+  --ctl-b-b: clamp(4px, calc(4px + (100vw - 320px) * 4 / 73), 8px);
+  /* C: CALL / SWITCH (glass) */
+  --ctl-c-d: clamp(44px, calc(44px + (100vw - 320px) * 4 / 73), 48px);
+  --ctl-c-r: clamp(98px, calc(98px + (100vw - 320px) * 21 / 73), 119px);
+  --ctl-c-b: clamp(78px, calc(78px + (100vw - 320px) * 22 / 73), 100px);
+  /* D: the fourth slot (glass; hidden in NBA) */
+  --ctl-d-d: clamp(44px, calc(44px + (100vw - 320px) * 4 / 73), 48px);
+  --ctl-d-r: clamp(16px, calc(16px + (100vw - 320px) * 13 / 73), 29px);
+  --ctl-d-b: clamp(110px, calc(110px + (100vw - 320px) * 32 / 73), 142px);
+  /* the stick: ghost ring diameter, left gap (+ --sal), bottom gap (+ --sab), and its spawn zone */
+  --stick-d: clamp(104px, calc(104px + (100vw - 320px) * 16 / 73), 120px);
+  --stick-l: clamp(18px, calc(18px + (100vw - 320px) * 6 / 73), 24px);
+  --stick-b: clamp(20px, calc(20px + (100vw - 320px) * 8 / 73), 28px);
+  --stick-zone-w: 48vw;
+  --stick-zone-top: 45vh;
+  /* the score bug (centred; top = --sat + --bug-t) and the Heat bar under it (width = --bug-w) */
+  --bug-w: clamp(200px, calc(200px + (100vw - 320px) * 32 / 73), 232px);
+  --bug-h: clamp(34px, calc(34px + (100vw - 320px) * 6 / 73), 40px);
+  --bug-t: clamp(4px, calc(4px + (100vw - 320px) * 2 / 73), 6px);
+  --heat-h: clamp(5px, calc(5px + (100vw - 320px) * 1 / 73), 6px);
+  --heat-t: clamp(40px, calc(40px + (100vw - 320px) * 9 / 73), 49px);
+  /* the pause button, 44 x 44: left gap (+ --sal), top gap (+ --sat) */
+  --pause-l: clamp(6px, calc(6px + (100vw - 320px) * 6 / 73), 12px);
+  --pause-t: clamp(0px, calc((100vw - 320px) * 4 / 73), 4px);
+  /* the toast line: its bottom edge above the viewport's bottom, and its height */
+  --toast-b: clamp(164px, calc(164px + (100vw - 320px) * 70 / 73), 234px);
+  --toast-h: clamp(24px, calc(24px + (100vw - 320px) * 4 / 73), 28px);
+  /* the action-safe box: top below --sat; bottom edge above the viewport's bottom */
+  --safe-t: 56px;
+  --safe-b: clamp(200px, calc(200px + (100vw - 320px) * 84 / 73), 284px);
+  /* the bottom scrim under the controls */
+  --scrim-h: 240px;
+
+  /* V2 C.3 colours */
+  --ps-gold: #f6b93b;
+  --ps-teal: #4fe3c1;
+  --ps-red: #ff5d5d;
+  --ps-violet: #8b7cf6;
+  --ps-glass: rgba(7, 21, 33, 0.72);
+  --ps-stroke: #1d3a50;
+}
+
+/* Sideways: the 393 sizes, anchored to the corners inside the side insets; the toast moves under the
+ * score bug and the safe box sits below the bug. Set from JS (`land`), never from a media query. */
+.ps-geo.land {
+  --ctl-a-d: 92px;
+  --ctl-a-r: 24px;
+  --ctl-a-b: 20px;
+  --ctl-b-d: 64px;
+  --ctl-b-r: 123px;
+  --ctl-b-b: 8px;
+  --ctl-c-d: 48px;
+  --ctl-c-r: 119px;
+  --ctl-c-b: 86px;
+  --ctl-d-d: 48px;
+  --ctl-d-r: 29px;
+  --ctl-d-b: 128px;
+  --stick-d: 120px;
+  --stick-l: 24px;
+  --stick-b: 20px;
+  --stick-zone-w: 40vw;
+  --stick-zone-top: 30vh;
+  --bug-w: 232px;
+  --bug-h: 40px;
+  --bug-t: 6px;
+  --heat-h: 6px;
+  --heat-t: 49px;
+  --pause-l: 12px;
+  --pause-t: 6px;
+  --toast-h: 28px;
+  --safe-t: 64px;
+  --safe-b: 24px;
+  --scrim-h: 160px;
+}

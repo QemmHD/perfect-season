@@ -71,7 +71,11 @@ export type Act =
   | 'fall'
   | 'land'
   | 'celebrate'
-  | 'rebound';
+  | 'rebound'
+  /** a pump fake: the ball comes up, he stays down (nba-2) */
+  | 'pump'
+  /** a euro-step on the drive: one long step one way, the gather the other (nba-2) */
+  | 'euro';
 
 export interface Body {
   idx: number;
@@ -115,6 +119,10 @@ export interface Body {
   dimed?: number;
   reboundAt?: number;
   shotTempo?: number;
+  /** his last pump fake (one per PUMP_EVERY seconds) */
+  pumpAt?: number;
+  /** a defender who bit on a pump fake and left his feet: until he lands his contest is a tier lighter */
+  baitedAt?: number;
   trail: Pt[];
 }
 
@@ -140,6 +148,12 @@ export interface Meter {
   /** the result once released: -1 very early .. 1 very late, and whether it was green */
   off?: number;
   greened?: boolean;
+  /**
+   * The provisional gather (a person's SHOOT, nba-2): the meter runs from the touch, but he doesn't
+   * leave the floor until GATHER_S, so a tap (pump fake) or a swipe (a move) can still take it back
+   * for free. The AI never uses it.
+   */
+  gather?: boolean;
 }
 
 export interface BallFlight {
@@ -154,6 +168,8 @@ export interface BallFlight {
   points?: number;
   shot?: ShotKind;
   tried?: number[];
+  /** a lofted pass (PASS held, to a man who can't finish an alley-oop): slower, over the hands */
+  high?: boolean;
 }
 
 export type EndKind = 'make' | 'miss' | 'steal' | 'int' | 'block' | 'clock' | 'out';
@@ -198,7 +214,19 @@ export interface Possession {
   /** the handler is sprinting (the stick at its edge) */
   sprinting: boolean;
   /** A coach call moves real teammates; it never changes ratings or shot odds. */
-  playCall?: { kind: 'screen' | 'cut' | 'space'; actor: number; target: Pt; until: number; plantedAt?: number; rolling?: boolean; sides: Record<number, number> };
+  playCall?: {
+    kind: 'screen' | 'cut' | 'space' | 'iso';
+    actor: number;
+    target: Pt;
+    until: number;
+    plantedAt?: number;
+    rolling?: boolean;
+    sides: Record<number, number>;
+    /** ISO: when it was called, the strong side (+1 / -1), and whether the ball still has to go to the star */
+    from?: number;
+    side?: number;
+    feed?: boolean;
+  };
   callReadyAt?: number;
   /** The player controlled during a physical rebound race, with neutral-stick assistance. */
   rebounder?: number;
