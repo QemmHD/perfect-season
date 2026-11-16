@@ -158,7 +158,7 @@ describe('settleInputs: what Arcade settles on, in the same render', () => {
   it('Arcade reads it in the render and passes the derived side, not the state', () => {
     const arcade = read('src/game/Arcade.tsx');
     expect(arcade).toMatch(/const \{ ff, us, them, level, final \} = settleInputs\(/);
-    expect(arcade).toMatch(/ff \?\? undefined\), level \? 2600 : 1600\);\n  \}, \[us, them, pens, ff\]\);/);
+    expect(arcade).toMatch(/ff \?\? undefined\), hold \? 0 : level \? 2600 : 1600\);\n  \}, \[us, them, pens, ff\]\);/);
     expect(arcade).not.toMatch(/forfeit \? awarded\(us, them, forfeit\)/);
   });
 });

@@ -179,9 +179,17 @@ export interface CamState {
   /** landscape's eased aim */
   land: Pt | null;
   landZoom: number;
+  /** the man the anchor was on last frame, and where on the pitch he stood, with the scale it drew at
+   * (Wave 1, soccer-3 review fix: a new man on the ball re-anchors on where he already is on screen,
+   * so a pass pans instead of cutting) */
+  subj?: Body | null;
+  subjAt?: Pt | null;
+  sPrev?: number;
+  /** seconds left in which the safe-box clamp catches up by a pan instead of a snap (after a change of man) */
+  settle?: number;
 }
 
-export const newCamState = (): CamState => ({ ax: 0, ay: 0, zoom: 1, zoomAt: -Infinity, changes: 0, key: null, land: null, landZoom: 1 });
+export const newCamState = (): CamState => ({ ax: 0, ay: 0, zoom: 1, zoomAt: -Infinity, changes: 0, key: null, land: null, landZoom: 1, subj: null, subjAt: null, sPrev: 0, settle: 0 });
 
 /** The man the camera frames: the one on the ball, else the set-piece taker, else the one the stick has. */
 export function subjectOf(a: Attack): Body {
@@ -388,6 +396,21 @@ export function camStep(st: CamState, a: Attack, view: CamView, dt: number, t: n
   }
   const s = scaleOf(view, st.zoom);
   const goal = frameFor(a, view, s);
+  const sub = subjectOf(a);
+  if (!fresh && st.subj && st.subj !== sub && st.subjAt && st.sPrev) {
+    // the anchor moves to another man (a pass, a tackle): put it where last frame's camera already shows
+    // him, so the picture stays put and the easing below pans to the new framing
+    const prev = anchoredCam(W, H, st.subjAt, st.ax, st.ay, st.sPrev);
+    const q = project(prev, sub.x, sub.y);
+    if (Number.isFinite(q.x) && Number.isFinite(q.y)) {
+      st.ax = q.x;
+      st.ay = q.y;
+      st.settle = 0.4;
+    }
+  }
+  st.subj = sub;
+  st.subjAt = { x: sub.x, y: sub.y };
+  st.sPrev = s;
   if (fresh) {
     st.ax = goal.ax;
     st.ay = goal.ay;
@@ -399,9 +422,20 @@ export function camStep(st: CamState, a: Attack, view: CamView, dt: number, t: n
   }
   // the easing never lets the man on the ball leave the safe box, the stands grow past 12% or (inside
   // 30 m) the goal mouth leave the frame
-  st.ax = clampTo(st.ax, goal.hard.x);
-  st.ay = clampTo(st.ay, goal.hard.y);
-  return anchoredCam(W, H, subjectOf(a), st.ax, st.ay, s);
+  const hx = clampTo(st.ax, goal.hard.x);
+  const hy = clampTo(st.ay, goal.hard.y);
+  if (!fresh && (st.settle ?? 0) > 0 && !view.reduced) {
+    // just after a change of man: pan across into the box fast (about 0.1 s for a 100 px correction)
+    st.settle = Math.max(0, (st.settle ?? 0) - dt);
+    const lim = W * 0.06 * Math.max(1, Math.min(6, dt * 60));
+    st.ax += Math.max(-lim, Math.min(lim, hx - st.ax));
+    // the rows are held at once: they keep the stands and the goal mouth inside their limits
+    st.ay = hy;
+  } else {
+    st.ax = hx;
+    st.ay = hy;
+  }
+  return anchoredCam(W, H, sub, st.ax, st.ay, s);
 }
 
 /** The stands' share of the screen height for a camera: the far wall's base row over the height. */

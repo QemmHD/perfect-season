@@ -23,7 +23,7 @@ import { drawFloor, type FieldTex, levels, type PCam, pitchAt, project, skyRamp 
 import { onLine, type PitchTheme } from '../pixel/pitch';
 import { noise, PixBuf } from '../pixel/pixbuf';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
-import { drawGroundMark } from '../pixel/ground';
+import { drawGroundMark, MARK_COLOR } from '../pixel/ground';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import { animOf, heightM, lookFor, type Memo } from '../pixel/select-soccer';
 import { reducedMotion } from '../../ui/motion';
@@ -920,7 +920,7 @@ export class SoccerRenderer {
       ctx.lineTo(2, 10);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = '#4fe3c1';
+      ctx.fillStyle = MARK_COLOR.target;
       ctx.beginPath();
       ctx.moveTo(12, 0);
       ctx.lineTo(4, -7);
@@ -932,7 +932,7 @@ export class SoccerRenderer {
       const w = (text.length * 4 - 1) * 2;
       const tx = Math.round(x - Math.cos(ang) * (w / 2 + 8));
       const ty = Math.round(y - Math.sin(ang) * 10) - 5;
-      label(ctx, text, tx, ty, '#062a24', this.W, '#4fe3c1');
+      label(ctx, text, tx, ty, '#062a24', this.W, MARK_COLOR.target);
     }
   }
 
@@ -1124,7 +1124,8 @@ export function placeArrows(mates: readonly { id: number; x: number; y: number }
 }
 
 /** The ground rings' colours (V2 C.1.3): you, the pass's man, the defender on the ball, the rival's taker. */
-export const RING = { gold: '#f6b93b', teal: '#4fe3c1', red: '#ff5d5d', rival: '#a78bfa' } as const;
+// the ground-mark palette is players' (pixel/ground.ts MARK_COLOR), so the rings and the marks always agree
+export const RING = { gold: MARK_COLOR.you, teal: MARK_COLOR.target, red: MARK_COLOR.pressure, rival: '#a78bfa' } as const;
 
 /**
  * Where the controlled man's name tag goes: under his feet, or over his head when under his feet

@@ -116,3 +116,47 @@ describe('V2: mid-attack framing over autopilot attacks', () => {
     expect(controlRects(PRESETS[0])).toHaveLength(7);
   });
 });
+
+// Wave 1 (soccer-3 review fix): a pass moves the anchor to the receiver without a cut. A fixed point
+// on the pitch moves only as far as the easing (and the safe-box clamp) carries it in one frame.
+describe('no cut when the ball changes hands', () => {
+  it('a fixed pitch point never jumps between frames at a change of man (zoom steps aside)', async () => {
+    const { decide, pilot } = await import('./autopilot');
+    const { kickOff, step, PL: L, GX: X } = await import('./engine');
+    const { subjectOf } = await import('./camera');
+    const p = PRESETS[0];
+    const view = viewOf(p);
+    const jumps: number[] = [];
+    let changes = 0;
+    for (let i = 0; i < 12; i++) {
+      const a = setupAttack((['build', 'counter', 'wide'] as Scenario[])[i % 3], squadFor('cut-a' + i, 72 + (i % 4) * 4), squadFor('cut-b' + i, 70), 'cut' + i, {});
+      const pl = pilot(0.68, 'cutp' + i);
+      const st = newCamState();
+      kickOff(a);
+      let prev: { x: number; y: number } | null = null;
+      let prevSub = subjectOf(a);
+      let prevZoom = st.zoom;
+      for (let n = 0; !a.end && n < 60 * 60; n++) {
+        step(a, 1 / 60, decide(a, pl));
+        const cam = camStep(st, a, view, 1 / 60, a.t);
+        const q = project(cam, X, L - 11);
+        const sub = subjectOf(a);
+        if (prev && sub !== prevSub && st.zoom === prevZoom) {
+          changes++;
+          jumps.push(Math.hypot(q.x - prev.x, q.y - prev.y));
+        }
+        prev = { x: q.x, y: q.y };
+        prevSub = sub;
+        prevZoom = st.zoom;
+      }
+    }
+    jumps.sort((a, b) => a - b);
+    if (process.env.CAM_PROBE) console.log('CAMPROBE', changes, [0.5, 0.75, 0.9, 0.99, 1].map((k) => jumps[Math.min(jumps.length - 1, Math.floor(jumps.length * k))].toFixed(1)).join(' '));
+    expect(changes).toBeGreaterThan(20);
+    // before the fix (anchor handed to the receiver's spot): median 135 px, p90 270, max 298 at 393 wide;
+    // with it: median 11.6, p90 41.6, max 64.5 (the rest is the row clamp that keeps the stands and the goal in)
+    expect(jumps[Math.floor(jumps.length / 2)]).toBeLessThanOrEqual(16);
+    expect(jumps[Math.floor(jumps.length * 0.9)]).toBeLessThanOrEqual(50);
+    expect(jumps[jumps.length - 1]).toBeLessThanOrEqual(80);
+  });
+});
