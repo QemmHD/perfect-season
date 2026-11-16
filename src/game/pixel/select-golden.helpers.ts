@@ -7,8 +7,9 @@ import { aiOpponent } from '../../ut/battles';
 import { getPool } from '../../ut/pool';
 import { fiveOfSquad, squadFromWire } from '../../ut/teams';
 import { frameAt, loadClips } from './mocap';
-import type { Look } from './body';
+import { beardFor, DEFAULT_HAIR, DEFAULT_SKIN, hairFor, type Look } from './body';
 import type { Pose } from './rig';
+import { isLine } from '../football2/engine';
 
 /** FNV-1a over a stream of strings, as 8 hex digits. */
 export class Digest {
@@ -236,3 +237,24 @@ export async function goldenSoccer(sel: SoccerSel, attacks = 16): Promise<{ dige
   }
   return { digest: d.hex(), samples: d.n };
 }
+
+// ---- players-4: the looks the renderers drew before matchLook ----
+// `lookFor` now builds each body's look from his appearance record (looks.ts `matchLook`), so the
+// select-* digests change on purpose. These are the three `lookFor`s exactly as they stood at
+// players-3 (4b13e67..4dc58d0): run with them, the select-* modules must still hash to the old
+// digests, which proves players-4 changed the look and nothing in clip, pose or gait selection.
+export const LEGACY_LOOK = {
+  nba(b: any, kit: any): Look {
+    return { sport: 'nba', ht: b.p.ht, wt: b.p.wt, num: b.p.num, hair: hairFor(b.p.id), beard: beardFor(b.p.id), skin: DEFAULT_SKIN, hairColor: DEFAULT_HAIR, jersey: kit.jersey, trim: kit.trim, shorts: kit.shorts, socks: kit.socks, shoes: kit.shoes };
+  },
+  nfl(b: any, kit: any): Look {
+    const big = isLine(b) || b.p.pos === 'DT' || b.p.pos === 'DE';
+    return { sport: 'nfl', ht: b.p.ht, wt: b.p.wt, num: b.p.num, hair: 0, skin: DEFAULT_SKIN, hairColor: DEFAULT_HAIR, jersey: kit.jersey, trim: kit.trim, shorts: kit.pants, socks: kit.socks, shoes: kit.shoes, helmet: kit.helmet, stripe: kit.stripe, mask: kit.mask, pants: kit.pants, pads: big ? 1.25 : 1 };
+  },
+  soccer(b: any, kit: any, keeperKit: any): Look {
+    const gk = b.role === 'gk';
+    const k = gk ? keeperKit : kit;
+    const ht = b.p.ht / 2.54;
+    return { sport: 'soccer', ht, wt: Math.round(23 * Math.pow(b.p.ht / 100, 2) * 2.2046), num: b.p.num ?? (gk ? 1 : null), hair: hairFor(b.p.id), beard: beardFor(b.p.id), skin: DEFAULT_SKIN, hairColor: DEFAULT_HAIR, jersey: k.jersey, trim: k.trim, shorts: k.shorts, socks: k.socks, shoes: k.shoes, sleeves: gk ? 'long' : 'short', gloves: gk ? (k.gloves ?? '#f2f2ee') : undefined };
+  },
+};

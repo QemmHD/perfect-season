@@ -2,7 +2,9 @@
 // a body is drawn with (helmet, pads), the motion-capture clip or hand-keyed pose it shows each frame,
 // its stride and the ball arm. Render only: it reads the engine's bodies and never writes them. The
 // select-golden test proves every choice here is the one the renderer made before the move.
-import { DEFAULT_HAIR, DEFAULT_SKIN, type Look } from './body';
+import { refOf } from './appearance';
+import type { Look } from './body';
+import { matchLook } from './looks';
 import { clipMeta, getClip, type Ground, legScale, warp } from './mocap';
 import * as P from './poses';
 import { preloadPixels } from './ready';
@@ -17,27 +19,11 @@ import type { FbKit } from '../football2/render';
 // frame (players-3, ready.ts)
 preloadPixels('nfl');
 
+/** His look in this kit: his appearance record (looks.ts), his engine build, pads by position. */
 export function lookFor(b: Body, kit: FbKit): Look {
   const big = isLine(b) || b.p.pos === 'DT' || b.p.pos === 'DE';
-  return {
-    sport: 'nfl',
-    ht: b.p.ht,
-    wt: b.p.wt,
-    num: b.p.num,
-    hair: 0,
-    skin: DEFAULT_SKIN,
-    hairColor: DEFAULT_HAIR,
-    jersey: kit.jersey,
-    trim: kit.trim,
-    shorts: kit.pants,
-    socks: kit.socks,
-    shoes: kit.shoes,
-    helmet: kit.helmet,
-    stripe: kit.stripe,
-    mask: kit.mask,
-    pants: kit.pants,
-    pads: big ? 1.25 : 1,
-  };
+  const colors = { jersey: kit.jersey, trim: kit.trim, shorts: kit.pants, socks: kit.socks, shoes: kit.shoes, helmet: kit.helmet, stripe: kit.stripe, mask: kit.mask, pants: kit.pants };
+  return matchLook('nfl', refOf('nfl', b.p.id), colors, { id: b.p.id, num: b.p.num, ht: b.p.ht, wt: b.p.wt, pos: b.p.pos, pads: big ? 1.25 : 1 });
 }
 
 export function poseOf(b: Body, t: number, p: Play): { key: string; pose: Pose } {

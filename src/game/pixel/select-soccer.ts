@@ -2,7 +2,9 @@
 // a body is drawn with (a keeper's kit and gloves), the motion-capture clip or hand-keyed pose it
 // shows each frame and its stride. Render only: it reads the engine's bodies and never writes them.
 // The select-golden test proves every choice here is the one the renderer made before the move.
-import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, hairFor, type Look } from './body';
+import { refOf } from './appearance';
+import type { Look } from './body';
+import { matchLook } from './looks';
 import { clipMeta, getClip, legScale, warp } from './mocap';
 import * as P from './poses';
 import { preloadPixels } from './ready';
@@ -44,24 +46,8 @@ export const heightM = (b: Body) => b.p.ht / 100;
 export function lookFor(b: Body, kit: SoccerKit, keeperKit: SoccerKit): Look {
   const gk = b.role === 'gk';
   const k = gk ? keeperKit : kit;
-  const ht = b.p.ht / 2.54;
-  return {
-    sport: 'soccer',
-    ht,
-    wt: Math.round(23 * Math.pow(b.p.ht / 100, 2) * 2.2046),
-    num: b.p.num ?? (gk ? 1 : null),
-    hair: hairFor(b.p.id),
-    beard: beardFor(b.p.id),
-    skin: DEFAULT_SKIN,
-    hairColor: DEFAULT_HAIR,
-    jersey: k.jersey,
-    trim: k.trim,
-    shorts: k.shorts,
-    socks: k.socks,
-    shoes: k.shoes,
-    sleeves: gk ? 'long' : 'short',
-    gloves: gk ? (k.gloves ?? '#f2f2ee') : undefined,
-  };
+  // one build with his card (buildOf: his height, his position's weight), his appearance record
+  return matchLook('soccer', refOf('soccer', b.p.id), k, { id: b.p.id, num: b.p.num ?? (gk ? 1 : null), ht: b.p.ht, pos: b.p.pos, gk });
 }
 
 /** A stride: jog, run or sprint by his speed, at the rate his feet keep up with the grass. */

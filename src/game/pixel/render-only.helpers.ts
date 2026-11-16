@@ -3,13 +3,15 @@
 // 1. importGraph: the files each sport's simulation reaches by static import. None may be in
 //    src/game/pixel/ or src/data/appearance/: the engines can't call drawing code at all.
 // 2. stepDigests: a seeded game run twice, once bare and once with the whole drawing pipeline
-//    (look, clip selection, proportions, the art pixel, a raster now and then) run on every body every
-//    step. The engine state is hashed after every step; the two runs must hash the same.
+//    (look via matchLook and the appearance record, clip selection, proportions, the art pixel, the
+//    crowd hook, a raster now and then) run on every body every step. The engine state is hashed after every step; the two runs must hash the same.
 // Test code only: nothing in the app imports this file.
 import { Digest } from './select-golden.helpers';
 import { drawnHeight, shoulderWidthPx } from './proportions';
 import { artScaleFor, quantPx } from './art-scale';
 import { rasterBody, type Look } from './body';
+import { loadAppearance } from './appearance';
+import { excite } from './crowd';
 import { frameAt, loadClips, mocapJoints } from './mocap';
 import type { Memo as NbaMemo } from './select-nba';
 import type { Memo as NflMemo } from './select-nfl';
@@ -66,6 +68,8 @@ function drawPass(look: Look, sel: () => { clip?: string; ct?: number; step?: nu
   const a = artScaleFor('A', 3, 1, 3);
   const px = quantPx(a.artPxFor(heightViewPx), a.viewPerArt);
   shoulderWidthPx(look.ht, look.wt, px, look.pads ?? 0);
+  // the crowd hook the sport teams call on a score, ON FIRE or Clutch (players-4: a no-op until players-9)
+  excite('score', 0);
   if (raster) {
     const pose = an.clip ? mocapJoints(an.clip, frameAt(an.clip, an.ct ?? 0, an.step ?? 2), look, { ground: 'clip' }) : (an.pose as never);
     rasterBody(look, pose, { facing: 1.1, pitch: 0.5 }, px);
@@ -81,6 +85,8 @@ export async function stepDigestsNba(withDrawing: boolean): Promise<{ digest: st
   const { afterPossession, newHoopsGame, startPossession } = await import('../hoops2/game');
   const { step } = await import('../hoops2/engine');
   await loadClips(sel.CLIPS);
+  // the curated looks in (matchLook draws them), when drawing
+  if (withDrawing) await loadAppearance('nba');
   const pool = await getPool();
   const kit = { jersey: '#1d428a', trim: '#ffc72c', shorts: '#1d428a', socks: '#f2f2f2', shoes: '#1b1b1f' };
   const d = new Digest();
@@ -120,6 +126,8 @@ export async function stepDigestsNfl(withDrawing: boolean): Promise<{ digest: st
   const { NFL_SLOTS } = await import('../../ut/squad');
   const { offenseOfSquad, defenseOfSquad } = await import('../../ut/teams');
   await loadClips(sel.CLIPS);
+  // the curated looks in (matchLook draws them), when drawing
+  if (withDrawing) await loadAppearance('nfl');
   const cards = (await loadCards('nfl')).lines.map((c) => rateCard(c));
   const sq: Record<string, { line: (typeof cards)[number]['line']; level: number }> = {};
   const used = new Set<string>();
@@ -163,6 +171,8 @@ export async function stepDigestsSoccer(withDrawing: boolean): Promise<{ digest:
   const { dealOf, ATTACKS } = await import('../soccer2/match');
   const { clubSquad, soccerLines } = await import('../soccer2/ratings');
   await loadClips(sel.CLIPS);
+  // the curated looks in (matchLook draws them), when drawing
+  if (withDrawing) await loadAppearance('soccer');
   const { seasons } = soccerLines(cardsRaw as never);
   const clubs = [...new Set(seasons.map((l) => l.fr + '|' + l.season))];
   const squads: ReturnType<typeof clubSquad>[] = [];

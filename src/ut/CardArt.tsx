@@ -1,4 +1,3 @@
-import { pickFor } from '../engine/sport';
 // An Ultimate Team card: a tier frame (bronze, silver, gold, Hot Season, Legend), the overall and
 // position, the team and season, and the player himself in pixel art: the same rigged body the
 // played games draw, in that season's team colors and his own number, drawn small and scaled up
@@ -6,7 +5,10 @@ import { pickFor } from '../engine/sport';
 import './card-editions.css';
 import { CardStamp } from './CardSerial';
 import React, { useEffect, useState } from 'react';
-import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, drawBody, freeCanvas, hairFor, type Look } from '../game/pixel/body';
+import { drawBody, freeCanvas } from '../game/pixel/body';
+import { appearanceLoaded, loadAppearance } from '../game/pixel/appearance';
+import { SPORT } from '../engine/sport';
+import { cardLook } from '../game/pixel/looks';
 import { celebrate, idle } from '../game/pixel/poses';
 import { useTilt } from '../ui/Card';
 import { shortSeason } from './pool';
@@ -15,64 +17,23 @@ import { isRare } from './rare';
 import { weekLabel } from './editions';
 import type { CardLine, RatedCard, CardMint } from './types';
 
-const lum = (hex: string): number => {
-  const h = hex.replace('#', '');
-  if (h.length < 6) return 0.5;
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-
-/** The player in his season's uniform. */
-export function lookOf(line: CardLine): Look {
-  const ht = line.ht ?? pickFor(line.sport, { nba: 79, nfl: 74, soccer: 71 });
-  const wt = line.wt ?? pickFor(line.sport, { nba: 215, nfl: 230, soccer: 165 });
-  const base = {
-    ht,
-    wt,
-    num: line.num,
-    hair: hairFor(line.pid),
-    beard: beardFor(line.pid),
-    skin: DEFAULT_SKIN,
-    hairColor: DEFAULT_HAIR,
-    jersey: line.c1,
-    trim: line.c2,
-    shoes: '#1b1b1f',
-  };
-  if (line.sport === 'nba') return { ...base, sport: 'nba', shorts: line.c1, socks: '#f2f2f2' };
-  if (line.sport === 'soccer') {
-    // Claude 2026-11-01: soccer heights are in centimetres; club colors only (no real kits), a keeper
-    // in a keeper's colors with gloves
-    const keeper = line.pos[0] === 'GK';
-    const shirt = keeper ? '#b6f23a' : line.c1;
-    const hIn = line.ht ? line.ht / 2.54 : 71;
-    return { ...base, ht: hIn, wt: Math.round(hIn * 2.35), sport: 'soccer', jersey: shirt, trim: keeper ? '#16161c' : line.c2, shorts: keeper ? shirt : lum(line.c2) > 0.75 ? line.c2 : line.c1, socks: shirt, sleeves: keeper ? 'long' : 'short', ...(keeper ? { gloves: '#f2f2ee' } : {}) };
-  }
-  const big = ['OT', 'OG', 'C', 'DE', 'DT'].includes(line.pos[0]);
-  // pants: white against a dark jersey, the trim color against a light one
-  const pants = lum(line.c1) < 0.5 ? '#e8e8e4' : line.c2;
-  return {
-    ...base,
-    sport: 'nfl',
-    shorts: pants,
-    socks: line.c1,
-    helmet: line.c1,
-    stripe: line.c2,
-    mask: lum(line.c1) < 0.35 ? '#c9ccd0' : '#2a2d33',
-    pants,
-    pads: big ? 1.25 : 1,
-    sleeves: 'short',
-  };
-}
+// this page's sport's looks start loading with the Ultimate Team chunk, so the first portraits have them
+void loadAppearance(SPORT);
 
 const portraits = new Map<string, string>();
 
-/** The portrait as an image URL: drawn once per card and pose, then cached. */
+/**
+ * The portrait as an image URL: the player in his season's uniform with his appearance record and the
+ * match's build (looks.ts `cardLook`), drawn once per card and pose, then cached. Drawn before the
+ * sport's appearance data is in, it shows the defaults and isn't kept (usePortrait waits for the data).
+ */
 export function portraitUrl(line: CardLine, pose: 'stand' | 'cheer' = 'stand'): string {
   const k = line.id + ':' + pose;
   let url = portraits.get(k);
   if (url) return url;
+  const keep = appearanceLoaded(line.sport);
   try {
-    const look = lookOf(line);
+    const look = cardLook(line);
     const px = Math.round((54 * Math.max(68, Math.min(88, look.ht))) / 80);
     const sp = drawBody(look, pose === 'cheer' ? celebrate(0.25) : idle(0.15), { facing: 1.2, pitch: 0.1 }, px);
     // trim to a fixed frame so every card's player stands on the same line
@@ -90,6 +51,7 @@ export function portraitUrl(line: CardLine, pose: 'stand' | 'cheer' = 'stand'): 
   } catch {
     url = '';
   }
+  if (!keep) return url;
   // the oldest go first (a Map keeps the order they came in)
   if (portraits.size >= 1500) portraits.delete(portraits.keys().next().value!);
   portraits.set(k, url);
@@ -116,21 +78,25 @@ function usePortrait(line: CardLine, pose: 'stand' | 'cheer', now: boolean): str
   const have = portraits.get(k);
   const url = have ?? (now ? portraitUrl(line, pose) : null);
   useEffect(() => {
-    if (url !== null) return;
+    if (url !== null && portraits.has(k)) return;
     let live = true;
-    todo.push(() => {
+    // the sport's looks first (one small chunk, usually in already), then a turn in the queue
+    void loadAppearance(line.sport).then(() => {
       if (!live) return;
-      portraitUrl(line, pose);
-      redraw((n) => n + 1);
+      todo.push(() => {
+        if (!live) return;
+        portraitUrl(line, pose);
+        redraw((n) => n + 1);
+      });
+      if (!pumping) {
+        pumping = true;
+        requestAnimationFrame(pump);
+      }
     });
-    if (!pumping) {
-      pumping = true;
-      requestAnimationFrame(pump);
-    }
     return () => {
       live = false;
     };
-  }, [k, url === null]);
+  }, [k, url === null || !portraits.has(k)]);
   return url;
 }
 

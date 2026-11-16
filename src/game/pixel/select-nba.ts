@@ -3,7 +3,9 @@
 // dunk style, the rim hang and the dribble arm. Render only: it reads the engine's bodies and never
 // writes them. The renderer keeps the camera, the sprite cache and the drawing; the select-golden test
 // proves every choice here is the one the renderer made before the move.
-import { DEFAULT_HAIR, DEFAULT_SKIN, beardFor, hairFor, type Look } from './body';
+import { refOf } from './appearance';
+import type { Look } from './body';
+import { matchLook } from './looks';
 import { clipMeta, getClip, type Ground, legScale, warp } from './mocap';
 import * as P from './poses';
 import { preloadPixels } from './ready';
@@ -35,22 +37,9 @@ export function dunkStyle(b: Body): P.DunkStyle {
 /** an elite dunker spins a 360 on some of his windmill-tier dunks (by his id: the same man, the same dunk) */
 export const spins360 = (b: Body) => b.act === 'dunk' && dunkStyle(b) === 'windmill' && b.p.id.charCodeAt(0) % 2 === 1;
 
+/** His look in this kit: his appearance record (looks.ts), his engine height and weight. */
 export function lookFor(b: Body, kit: Kit): Look {
-  return {
-    sport: 'nba',
-    ht: b.p.ht,
-    wt: b.p.wt,
-    num: b.p.num,
-    hair: hairFor(b.p.id),
-    beard: beardFor(b.p.id),
-    skin: DEFAULT_SKIN,
-    hairColor: DEFAULT_HAIR,
-    jersey: kit.jersey,
-    trim: kit.trim,
-    shorts: kit.shorts,
-    socks: kit.socks,
-    shoes: kit.shoes,
-  };
+  return matchLook('nba', refOf('nba', b.p.id), kit, { id: b.p.id, num: b.p.num, ht: b.p.ht, wt: b.p.wt, pos: b.p.pos });
 }
 
 /** The motion-capture clips the court uses (mocap.ts). They arrive in the NBA bundle before the first frame

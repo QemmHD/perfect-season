@@ -1,6 +1,7 @@
 // Players QA (studio overhaul, players-1): can you tell who is who? Port of the audit's lineup.cjs,
 // silhouette.cjs and numbers.cjs (L-1, L-2, L-5), drawing real stars exactly as the app does
-// (CardArt `lookOf`/`portraitUrl`, `drawBody` on the mocap `ready` clip at match sizes).
+// (CardArt `lookOf`, from players-4 looks.ts `cardLook`, and `portraitUrl`; `drawBody` on the mocap
+// `ready` clip at match sizes).
 //
 // Outputs per sport:
 // - `<tag>-lineup-<sport>.png`: row 1 card portraits, rows 2-3 own kit at 40 and 24 px, row 4 all
@@ -46,7 +47,16 @@ const STARS = {
 /** Runs in the page: everything the lineup needs, drawn with the app's own modules. */
 async function draw({ names, sport, withNumbers }) {
   const { getPool } = await import('/src/ut/pool.ts');
-  const { lookOf, portraitUrl } = await import('/src/ut/CardArt.tsx');
+  const CA = await import('/src/ut/CardArt.tsx');
+  const { portraitUrl } = CA;
+  // the card look: CardArt's `lookOf` before players-4, looks.ts `cardLook` (with the sport's
+  // appearance data loaded) from players-4 on
+  let lookOf = CA.lookOf;
+  if (!lookOf) {
+    const looks = await import('/src/game/pixel/looks.ts');
+    await (await import('/src/game/pixel/appearance.ts')).loadAppearance(sport);
+    lookOf = looks.cardLook;
+  }
   const body = await import('/src/game/pixel/body.ts');
   const mocap = await import('/src/game/pixel/mocap.ts');
   const P = await import('/src/game/pixel/poses.ts');
