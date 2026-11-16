@@ -6,6 +6,7 @@ import { watchErrors } from './lib/errlog';
 import { registerServiceWorker } from './lib/update';
 import { Stage } from './stage';
 import './styles.css';
+import './shell/plates.css';
 
 // the arcade games' test bench (?arcade), loaded only when asked for
 const Lab = React.lazy(() => import('./game/Lab'));

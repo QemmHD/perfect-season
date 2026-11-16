@@ -508,3 +508,281 @@ export async function contactSheet(browser, files, out, { cols = 6, tile = 220, 
   await context.close();
   return out;
 }
+
+// ---------- shell-3: the status plate and the header plates ----------
+
+/** '#0b2733' / 'rgb(1, 2, 3)' / 'rgba(1, 2, 3, 0.5)' → [r, g, b, a], or null. */
+export function parseColor(s) {
+  if (!s) return null;
+  const t = String(s).trim();
+  const hex = t.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    const h = hex[1].length === 3 ? [...hex[1]].map((c) => c + c).join('') : hex[1];
+    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).concat(1);
+  }
+  const m = t.match(/rgba?\(([^)]+)\)/);
+  if (!m) return null;
+  const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+  return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+}
+
+/** Luma of a gamma-encoded sRGB colour, 0..255 (Rec. 709 weights): what "band luminance" compares. */
+export const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+/** WCAG 2 contrast ratio of two sRGB colours. */
+export function contrastRatio(a, b) {
+  const L = ([r, g, b]) => {
+    const f = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const x = L(a),
+    y = L(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/** sRGB (D65) → CIE L*a*b*. */
+export function srgbToLab([r, g, b]) {
+  const lin = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const [R, G, B] = [lin(r), lin(g), lin(b)];
+  const X = (0.4124564 * R + 0.3575761 * G + 0.1804375 * B) / 0.95047,
+    Y = 0.2126729 * R + 0.7151522 * G + 0.072175 * B,
+    Z = (0.0193339 * R + 0.119192 * G + 0.9503041 * B) / 1.08883;
+  const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+}
+
+/** CIEDE2000 colour difference of two L*a*b* colours (Sharma, Wu and Dalal 2005). */
+export function deltaE2000Lab([L1, a1, b1], [L2, a2, b2]) {
+  const rad = Math.PI / 180;
+  const C1 = Math.hypot(a1, b1),
+    C2 = Math.hypot(a2, b2),
+    Cm = (C1 + C2) / 2;
+  const G = 0.5 * (1 - Math.sqrt(Cm ** 7 / (Cm ** 7 + 25 ** 7)));
+  const ap1 = (1 + G) * a1,
+    ap2 = (1 + G) * a2;
+  const Cp1 = Math.hypot(ap1, b1),
+    Cp2 = Math.hypot(ap2, b2);
+  const hue = (b, a) => (b === 0 && a === 0 ? 0 : ((Math.atan2(b, a) / rad) + 360) % 360);
+  const hp1 = hue(b1, ap1),
+    hp2 = hue(b2, ap2);
+  const dL = L2 - L1,
+    dC = Cp2 - Cp1;
+  let dh = 0;
+  if (Cp1 * Cp2 !== 0) dh = Math.abs(hp2 - hp1) <= 180 ? hp2 - hp1 : hp2 - hp1 > 180 ? hp2 - hp1 - 360 : hp2 - hp1 + 360;
+  const dH = 2 * Math.sqrt(Cp1 * Cp2) * Math.sin((dh / 2) * rad);
+  const Lm = (L1 + L2) / 2,
+    Cpm = (Cp1 + Cp2) / 2;
+  let hm = hp1 + hp2;
+  if (Cp1 * Cp2 !== 0) hm = Math.abs(hp1 - hp2) <= 180 ? (hp1 + hp2) / 2 : hp1 + hp2 < 360 ? (hp1 + hp2 + 360) / 2 : (hp1 + hp2 - 360) / 2;
+  const T = 1 - 0.17 * Math.cos((hm - 30) * rad) + 0.24 * Math.cos(2 * hm * rad) + 0.32 * Math.cos((3 * hm + 6) * rad) - 0.2 * Math.cos((4 * hm - 63) * rad);
+  const dTheta = 30 * Math.exp(-(((hm - 275) / 25) ** 2));
+  const Rc = 2 * Math.sqrt(Cpm ** 7 / (Cpm ** 7 + 25 ** 7));
+  const Sl = 1 + (0.015 * (Lm - 50) ** 2) / Math.sqrt(20 + (Lm - 50) ** 2),
+    Sc = 1 + 0.045 * Cpm,
+    Sh = 1 + 0.015 * Cpm * T;
+  const Rt = -Math.sin(2 * dTheta * rad) * Rc;
+  return Math.sqrt((dL / Sl) ** 2 + (dC / Sc) ** 2 + (dH / Sh) ** 2 + Rt * (dC / Sc) * (dH / Sh));
+}
+export const deltaE2000 = (rgb1, rgb2) => deltaE2000Lab(srgbToLab(rgb1), srgbToLab(rgb2));
+
+/**
+ * Mean absolute per-pixel luma difference of two equally sized luma arrays, as a percentage of 255
+ * (the "band luminance" comparison: A + B + C against A alone).
+ */
+export function meanLumaDiffPct(a, b) {
+  if (!a?.length || a.length !== b?.length) return null;
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]);
+  return (s / a.length / 255) * 100;
+}
+
+/**
+ * Real pixels of what is on screen (a viewport screenshot decoded in the page): RGB at points, and per
+ * region the mean RGB, the mean luma and (with `lumas`) every pixel's luma. Coordinates in CSS px.
+ */
+export async function readPixels(page, { points = [], regions = [] } = {}) {
+  const b64 = (await page.screenshot()).toString('base64');
+  return page.evaluate(
+    async ({ b64, points, regions }) => {
+      const img = new Image();
+      img.src = 'data:image/png;base64,' + b64;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0);
+      const s = img.width / innerWidth;
+      const px = (x, y) => {
+        const d = g.getImageData(Math.min(img.width - 1, Math.max(0, Math.round(x * s))), Math.min(img.height - 1, Math.max(0, Math.round(y * s))), 1, 1).data;
+        return [d[0], d[1], d[2]];
+      };
+      const region = ({ x0 = 0, y0, x1 = innerWidth, y1, lumas = false }) => {
+        const X0 = Math.round(x0 * s),
+          Y0 = Math.round(y0 * s),
+          w = Math.max(1, Math.round(x1 * s) - X0),
+          h = Math.max(1, Math.round(y1 * s) - Y0);
+        const d = g.getImageData(X0, Y0, w, h).data;
+        const n = d.length / 4,
+          sum = [0, 0, 0],
+          out = lumas ? new Array(n) : null;
+        let ls = 0;
+        for (let i = 0; i < n; i++) {
+          const r = d[i * 4],
+            gg = d[i * 4 + 1],
+            b = d[i * 4 + 2];
+          sum[0] += r;
+          sum[1] += gg;
+          sum[2] += b;
+          const l = 0.2126 * r + 0.7152 * gg + 0.0722 * b;
+          ls += l;
+          if (out) out[i] = Math.round(l * 10) / 10;
+        }
+        return { mean: sum.map((v) => Math.round((v / n) * 10) / 10), luma: Math.round((ls / n) * 100) / 100, n, ...(out ? { lumas: out } : {}) };
+      };
+      return { points: points.map(([x, y]) => px(x, y)), regions: regions.map(region) };
+    },
+    { b64, points, regions }
+  );
+}
+
+/** Turns the status plate (B) and the header plates (C) off, leaving Fix A: the "A alone" control. */
+export const PLATES_OFF_CSS =
+  '.status-plate{display:none!important}.shell-top{background:none!important;box-shadow:none!important}.topbar::before{content:none!important}';
+export async function platesOff(page, off) {
+  await page.evaluate(
+    ([css, off]) => {
+      document.getElementById('__ps-plates-off')?.remove();
+      if (off) document.head.append(Object.assign(document.createElement('style'), { id: '__ps-plates-off', textContent: css }));
+    },
+    [PLATES_OFF_CSS, off]
+  );
+}
+
+/**
+ * The status plate and the header on top (audit C1, shell-3 acceptance):
+ *  - status: the fixed `.status-plate` (display, top, height, colour)
+ *  - header: the visible `.shell-top` or `.topbar` (UT `.ut-top` included); `probes` hit-test
+ *    x = 20 / mid / W − 23 at y = 2, inset + edge − 2 and the header's bottom − 2, each `ok` when it
+ *    lands on the header (its `::before` plate reports as the header); `opaque` when every colour of
+ *    its plate is solid; `hairline` (the plate's bottom) against `firstRow` (the next box's top);
+ *    `plateTop`/`plateBot`/`line` colours; `textContrast` (min WCAG ratio of header text drawn on
+ *    the plate) and `lineContrast` (hairline against the plate bottom)
+ */
+export const platesAudit = (page, device) => {
+  const d = typeof device === 'string' || typeof device === 'number' ? DEVICES[device] : device;
+  return page.evaluate(
+    ({ insets, edge }) => {
+      const [t] = insets;
+      const W = innerWidth;
+      const r1 = (n) => Math.round(n * 10) / 10;
+      const col = (s) => {
+        const m = String(s).match(/rgba?\(([^)]+)\)/);
+        if (!m) return null;
+        const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+        return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+      };
+      const colors = (s) => (String(s).match(/rgba?\([^)]+\)/g) || []).map(col);
+      const L = ([r, g, b]) => {
+        const f = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const cr = (a, b) => (Math.max(L(a), L(b)) + 0.05) / (Math.min(L(a), L(b)) + 0.05);
+      const sp = document.querySelector('.status-plate');
+      const status = sp
+        ? (() => {
+            const s = getComputedStyle(sp),
+              r = sp.getBoundingClientRect();
+            return { display: s.display, top: r1(r.top), height: r1(r.height), color: col(s.backgroundColor), z: s.zIndex, pointerEvents: s.pointerEvents };
+          })()
+        : null;
+      const label = (e) => (e ? (e.id ? '#' + e.id : e.tagName.toLowerCase() + (e.classList.length ? '.' + [...e.classList].slice(0, 3).join('.') : '')) : null);
+      const isHeader = (e) => e.matches('.shell-top') || (e.matches('.topbar') && !e.closest('.shell-top'));
+      const visible = [...document.querySelectorAll('.shell-top, .topbar')].filter(isHeader).filter((e) => {
+        const r = e.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return false;
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.bottom - 2);
+        return !!hit && (hit === e || e.contains(hit));
+      });
+      const h = visible.pop();
+      if (!h) return { status, header: null };
+      const r = h.getBoundingClientRect();
+      const own = getComputedStyle(h),
+        pre = getComputedStyle(h, '::before');
+      const plateStyle = own.backgroundImage !== 'none' ? own : pre.content !== 'none' ? pre : null;
+      const stops = plateStyle ? colors(plateStyle.backgroundImage) : [];
+      const shadows = plateStyle ? plateStyle.boxShadow.split(/,(?![^(]*\))/) : [];
+      const line = col(shadows.find((x) => /inset/.test(x)) || '');
+      const plateTop = stops[0] || null,
+        plateBot = stops[stops.length - 1] || null;
+      const xs = [20, Math.round((W * 195) / 393), W - 23];
+      const ys = [2, t + edge - 2, r.bottom - 2].filter((y, i) => i !== 1 || y > 2);
+      const probes = [];
+      for (const y of ys)
+        for (const x of xs) {
+          const hit = document.elementFromPoint(x, y);
+          probes.push({ x, y: r1(y), hit: label(hit), ok: !!hit && (hit === h || h.contains(hit)) });
+        }
+      let next = h.nextElementSibling;
+      while (next && next.getBoundingClientRect().height < 1) next = next.nextElementSibling;
+      if (h.matches('.shell-top')) next = h.parentElement.querySelector('.shell-views') || next;
+      const firstRow = next ? r1(next.getBoundingClientRect().top) : null;
+      // header text drawn straight on the plate (text on its own opaque chip is the chip's business)
+      const onPlate = (e) => {
+        for (let n = e; n && n !== h; n = n.parentElement) {
+          const c = col(getComputedStyle(n).backgroundColor);
+          if (c && c[3] > 0.85) return false;
+        }
+        return true;
+      };
+      const texts = [];
+      const walker = document.createTreeWalker(h, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.textContent.trim() ? 1 : 3) });
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const e = n.parentElement;
+        if (!e || !plateBot || !onPlate(e)) continue;
+        const s = getComputedStyle(e);
+        if (s.display === 'none' || s.visibility === 'hidden') continue;
+        const c = col(s.color);
+        // gradient-clipped text (the UT title) is as strong as its weakest stop
+        const fills = c && c[3] > 0 ? [c] : colors(s.backgroundImage).filter((x) => x[3] > 0);
+        for (const f of fills) texts.push({ text: n.textContent.trim().slice(0, 24), ratio: Math.round(cr(f, plateBot) * 100) / 100 });
+      }
+      texts.sort((a, b) => a.ratio - b.ratio);
+      return {
+        status,
+        header: {
+          el: label(h),
+          top: r1(r.top),
+          bottom: r1(r.bottom),
+          opaque: stops.length > 0 && stops.every((c) => c[3] === 1),
+          plateTop,
+          plateBot,
+          line,
+          probes,
+          probesOk: probes.every((p) => p.ok),
+          hairline: r1(r.bottom),
+          firstRow,
+          hairlineOff: firstRow === null ? null : r1(firstRow - r.bottom),
+          textContrast: texts[0]?.ratio ?? null,
+          weakest: texts.slice(0, 3),
+          lineContrast: line && plateBot ? Math.round(cr(line, plateBot) * 100) / 100 : null,
+        },
+      };
+    },
+    { insets: d.insets, edge: edgeOf(d.insets[0]) }
+  );
+};
+
+/** The H1 hit test: what is 4 pt above the bottom sheet's bottom edge (it must be the action bar). */
+export const detailBarHit = (page) =>
+  page.evaluate(() => {
+    const bar = [...document.querySelectorAll('.sheet .ut-detail-btns')].pop();
+    const sheet = bar?.closest('.sheet');
+    if (!bar || !sheet) return null;
+    const s = sheet.getBoundingClientRect();
+    const xs = [s.left + 12, (s.left + s.right) / 2, s.right - 12];
+    return xs.map((x) => {
+      const e = document.elementFromPoint(x, s.bottom - 4);
+      return !!e && (e === bar || bar.contains(e));
+    });
+  });

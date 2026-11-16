@@ -2,6 +2,8 @@
 // ships on. For each sport and phone it walks the screens whose headers sit under the status bar
 // (Home, Settings, Ultimate Team's six tabs, a card detail at its top/middle/end, a toast, a pack
 // opening with SKIP, the Draft after a spin, and a match frame) and records edge-lib's audit of each.
+// shell-3 (2026-11-16): every screen also records the status plate and the header plate on top
+// (edge-lib platesAudit: opaque from y = 0, the hit probes, the hairline, the contrasts).
 //
 //   node scripts/qa/edge-headers.mjs [--sports nba,nfl,soccer] [--devices 393,402,…|all]
 //     [--phase before] [--band 393|all|none] [--shots 393|all|none] [--jobs 3] [--profile standard]
@@ -15,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { artifacts, base, buildRoot, dismissPack, fixture, launch } from './browser.mjs';
-import { arcadeInsets, auditScreen, closeDialogs, contactSheet, detailBarAudit, DEVICE_IDS, DEVICES, expectedLayout, homeAudit, settle, simulateBand, clearBand } from './edge-lib.mjs';
+import { arcadeInsets, auditScreen, closeDialogs, contactSheet, detailBarAudit, DEVICE_IDS, DEVICES, expectedLayout, homeAudit, platesAudit, settle, simulateBand, clearBand } from './edge-lib.mjs';
 import { openUt, waitForHome } from './fixtures.mjs';
 
 const argv = process.argv.slice(2);
@@ -68,6 +70,13 @@ async function runDevice(browser, sport, dev) {
     await settle(page, settleMs);
     const audit = await auditScreen(page, dev);
     const extra = measure ? await measure() : {};
+    // shell-3: the status plate and the header plate on this screen (header null when none is on top)
+    const pl = await platesAudit(page, dev);
+    const h = pl.header;
+    extra.plates = {
+      status: pl.status && { display: pl.status.display, top: pl.status.top, height: pl.status.height, color: pl.status.color },
+      header: h && { el: h.el, opaque: h.opaque, probesOk: h.probesOk, failedProbes: h.probes.filter((p) => !p.ok), hairlineOff: h.hairlineOff, textContrast: h.textContrast, weakest: h.weakest, lineContrast: h.lineContrast },
+    };
     const file = String(++n).padStart(2, '0') + '-' + name;
     const finding = audit.textInBand.length > 0 || audit.controlInBand.length > 0 || audit.bottomCut.length > 0 || !!extra?.finding;
     const shots = [];
@@ -248,7 +257,16 @@ const summary = results.map((r) => ({
       s.screen,
       s.fail || s.skipped
         ? { fail: s.fail, skipped: s.skipped }
-        : { topMost: s.audit.topMost.y, capTopMost: s.audit.capTopMost.y, textInBand: s.audit.textInBand.length, controlInBand: s.audit.controlInBand.length, bottomCut: s.audit.bottomCut.length, ...(s.detailBar ? { barGap: s.detailBar.gap, textBelowBar: s.detailBar.textBelowBar.length } : {}), ...(s.arcade ? { arcade: s.arcade.mode } : {}) },
+        : {
+            topMost: s.audit.topMost.y,
+            capTopMost: s.audit.capTopMost.y,
+            textInBand: s.audit.textInBand.length,
+            controlInBand: s.audit.controlInBand.length,
+            bottomCut: s.audit.bottomCut.length,
+            ...(s.detailBar ? { barGap: s.detailBar.gap, textBelowBar: s.detailBar.textBelowBar.length } : {}),
+            ...(s.arcade ? { arcade: s.arcade.mode } : {}),
+            ...(s.plates ? { status: s.plates.status ? s.plates.status.display + ' ' + s.plates.status.height : null, plate: s.plates.header ? { el: s.plates.header.el, ok: s.plates.header.opaque && s.plates.header.probesOk && Math.abs(s.plates.header.hairlineOff ?? 9) <= 1, text: s.plates.header.textContrast, line: s.plates.header.lineContrast } : null } : {}),
+          },
     ])
   ),
 }));

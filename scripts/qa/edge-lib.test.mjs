@@ -1,7 +1,7 @@
 // Claude (studio overhaul, shell-1, 2026-11-10): the pure parts of the shell QA harness. The page
 // helpers are exercised by edge-headers.mjs / home-matrix.mjs runs (docs/studio-overhaul/shell.md).
 import { describe, expect, it } from 'vitest';
-import { DEVICE_IDS, DEVICES, edgeOf, expectedLayout, fitFor, homeClassFor, textClearOf, TEXT_CLEAR } from './edge-lib.mjs';
+import { contrastRatio, deltaE2000, deltaE2000Lab, DEVICE_IDS, DEVICES, edgeOf, expectedLayout, fitFor, homeClassFor, luma, meanLumaDiffPct, parseColor, srgbToLab, textClearOf, TEXT_CLEAR } from './edge-lib.mjs';
 import { edgeOf as snippetEdgeOf } from './edge-snippet.mjs';
 import { fitFor as appFitFor, stageBox, topEdge } from '../../src/stage-layout';
 
@@ -77,5 +77,36 @@ describe('expectedLayout mirrors the stage', () => {
 
   it('names Home’s classes from Pages.tsx thresholds', () => {
     expect([homeClassFor(619), homeClassFor(620), homeClassFor(729.9), homeClassFor(730), homeClassFor(815.9), homeClassFor(816)]).toEqual(['short', 'snug', 'snug', '', '', 'tall']);
+  });
+});
+
+// Claude (studio overhaul, shell-3, 2026-11-16): the colour maths the plate acceptance is measured with.
+describe('edge-lib colour maths (shell-3 plate probes)', () => {
+  it('computes CIEDE2000 like the reference data (Sharma, Wu and Dalal 2005)', () => {
+    const pairs = [
+      [[50, 2.6772, -79.7751], [50, 0, -82.7485], 2.0425],
+      [[50, -1.3802, -84.2814], [50, 0, -82.7485], 1.0],
+      [[50, 2.5, 0], [73, 25, -18], 27.1492],
+      [[2.0776, 0.0795, -1.135], [0.9033, -0.0636, -0.5514], 0.9082],
+      [[63.0109, -31.0961, -5.8663], [62.8187, -29.7946, -4.0864], 1.263],
+    ];
+    for (const [a, b, want] of pairs) expect(deltaE2000Lab(a, b)).toBeCloseTo(want, 3);
+    expect(deltaE2000([24, 38, 37], [24, 38, 37])).toBe(0);
+    expect(srgbToLab([255, 255, 255])[0]).toBeCloseTo(100, 2);
+  });
+
+  it('parses colours, and gives WCAG contrast and luma', () => {
+    expect(parseColor('#0b2b38')).toEqual([11, 43, 56, 1]);
+    expect(parseColor('rgba(2, 8, 12, 0.78)')).toEqual([2, 8, 12, 0.78]);
+    expect(parseColor('rgb(4 18 26 / 0.5)')).toEqual([4, 18, 26, 0.5]);
+    expect(parseColor('none')).toBeNull();
+    expect(contrastRatio([255, 255, 255], [0, 0, 0])).toBeCloseTo(21, 5);
+    expect(luma([255, 255, 255])).toBeCloseTo(255, 6);
+  });
+
+  it('compares band luminance as a mean per-pixel difference in % of 255', () => {
+    expect(meanLumaDiffPct([10, 20, 30], [10, 20, 30])).toBe(0);
+    expect(meanLumaDiffPct([0, 0], [255, 0])).toBe(50);
+    expect(meanLumaDiffPct([1], [1, 2])).toBeNull();
   });
 });

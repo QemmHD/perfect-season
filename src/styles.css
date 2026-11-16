@@ -500,7 +500,7 @@ button:focus-visible {
     conic-gradient(var(--teal) calc(var(--p) * 360deg), var(--line) 0);
 }
 .level-ring span {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 1px;
   color: var(--sub);

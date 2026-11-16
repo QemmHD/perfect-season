@@ -3,7 +3,8 @@
 // Claude (studio overhaul, shell-2, 2026-11-16): every phone of the shell plan with its own insets, in
 // Safari and with the standalone height rule forced (CDP cannot emulate display-mode); nothing a player
 // reads or taps starts inside the status-bar band on Home or Ultimate Team Home; the Settings diagnostics
-// show the edge; and each sport's in-game score bug sits below inset + edge.
+// show the edge; and each sport's in-game score bug sits below inset + edge. shell-3: the status plate
+// is the inset tall at y = 0 on every phone and 0 tall sideways.
 import assert from 'node:assert/strict';
 import { base, launch, fixture, shot } from './browser.mjs';
 import { auditScreen, DEVICE_IDS, DEVICES, edgeOf, forceStandaloneRule, settle } from './edge-lib.mjs';
@@ -41,6 +42,9 @@ try {
    assert.equal(a.textInBand.length,0,fail('Home text in the band at '+id,a));assert.equal(a.controlInBand.length,0,fail('Home control in the band at '+id,a));
    assert.ok(a.topMost.y>=t+edgeOf(t)-0.25,'Home topmost '+a.topMost.y+' at '+id);
    band[id]={home:a.topMost.y};
+   // shell-3: the status plate covers exactly the inset, from y = 0, on every phone
+   const sp=await f.page.evaluate(()=>{const e=document.querySelector('.status-plate'),r=e.getBoundingClientRect();return {top:r.top,h:r.height,display:getComputedStyle(e).display};});
+   assert.equal(sp.display,'block','status plate hidden on Home at '+id);assert.ok(sp.top===0&&Math.abs(sp.h-t)<0.5,'status plate '+JSON.stringify(sp)+' at '+id);
    await shot(f.page,`screen-fit-${standalone?'standalone':'safari'}-${w}x${h}`);
   }
   // Settings → diagnostics name the inset and the edge (what the owner reads off a real phone)
@@ -57,6 +61,7 @@ try {
   await f.page.setViewportSize({width:852,height:393});await f.page.evaluate(()=>{window.__fitVisual={width:852,height:393,offsetLeft:0,offsetTop:0,scale:1};window.__psInsets=[0,34,0,59];window.__fitAngle=90;window.dispatchEvent(new Event('orientationchange'));visualViewport.dispatchEvent(new Event('resize'));});await f.page.waitForTimeout(400);const rotated=await measure();assert.equal(rotated.rot,'-90');assert.ok(Math.abs(rotated.stage.w-852)<1);assert.ok(Math.abs(rotated.stage.h-393)<1);await shot(f.page,`screen-fit-${standalone?'standalone':'safari'}-rotated`);
   // sideways the status bar is hidden: no edge, and the published edge follows
   assert.equal(await f.page.evaluate(()=>document.documentElement.style.getPropertyValue('--ps-edge')),'0px');
+  assert.equal(await f.page.evaluate(()=>document.querySelector('.status-plate').getBoundingClientRect().height),0,'status plate sideways');
   // Ultimate Team Home: its header clears the band on every phone too
   await resize(393,852);await f.page.waitForTimeout(400);
   await openUt(f.page);await settle(f.page,600);

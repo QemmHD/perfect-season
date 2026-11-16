@@ -1125,6 +1125,13 @@
   background: linear-gradient(180deg, rgba(10, 31, 42, 0), var(--panel) 28%);
   gap: 8px;
 }
+/* Claude (studio overhaul, shell-3, H1): in a bottom sheet the bar's bottom edge is the sheet's. The
+   sheet pads its bottom by 18px + the home-indicator inset and sticky positions inside that padding,
+   so -18px alone left the bar floating one inset (34 pt) high with stats showing under it. */
+.sheet.bottom .ut-detail-btns {
+  bottom: calc(-18px - var(--sab, 0px));
+  margin-bottom: calc(-18px - var(--sab, 0px));
+}
 .ut-detail-btns .btn {
   min-width: 0;
   white-space: nowrap;

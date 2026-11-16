@@ -1,0 +1,77 @@
+/* Claude (studio overhaul, shell-3, 2026-11-16): the iPhone top edge's surfaces (audit C1, Fix B and
+   Fix C part 1; docs/studio-overhaul/shell.md "Early-ship unit").
+   - The header plate API (lead decision D4): shell owns these surfaces and tokens, ut owns what sits
+     on them. A header reads --plate-top above the safe-area inset line, fades to --plate-bot by its
+     bottom and ends on a 1 px --plate-line hairline. UT uses the -ut set. No noise, no backdrop-filter.
+   - The status plate (index.html, outside the scaled stage) is one flat colour under the iOS status
+     bar, exactly the inset tall. Its colour follows what is on screen: the header plate's top colour
+     where there is a header (so there is no seam), the app background on screens without one,
+     transparent while a sheet's scrim is open (the band then shows the scrimmed header, like the rest
+     of the screen), and none at all on the immersive screens that own the band (pack opening, launch
+     splash, versus splash, season reveal). Matches portal to <body> at z-index 50 and cover it.
+   Sizes are in frame px inside the stage (--sat, --inset-top) and screen px outside it (--ps-inset-top). */
+:root {
+  --plate-top: #08222d;
+  --plate-bot: #0b2b38;
+  --plate-line: #1f4e5b;
+  --plate-top-ut: #182625;
+  --plate-bot-ut: #1c2c2a;
+  --plate-line-ut: #4b4229;
+  --plate-shadow: 0 10px 18px -12px rgba(0, 0, 0, 0.8);
+}
+
+/* ---------- Fix B: the status plate ---------- */
+/* the colour is set on the plate itself, never as an inherited property on <html>, so a state change
+   restyles one element. UT's rule follows the main one at the same specificity and wins; the open
+   sheet's rule outranks both. The base rule says `html` so it outranks index.html's inline base
+   wherever the build puts this file. */
+html .status-plate {
+  height: var(--ps-inset-top, env(safe-area-inset-top, 0px));
+  background-color: var(--plate-top);
+  transition: background-color 0.22s ease;
+}
+/* without :has() (Safari before 15.4) the plate stays in the main screens' colour, matching Home */
+@supports selector(:has(a)) {
+  html .status-plate {
+    background-color: var(--bg);
+  }
+}
+html:has(.shell-top, .topbar) .status-plate {
+  background-color: var(--plate-top);
+}
+html:has(.ut-top) .status-plate {
+  background-color: var(--plate-top-ut);
+}
+html:has(.scrim:not(.closing)) .status-plate {
+  background-color: transparent;
+}
+html:has(.ut-open-screen, .splash, .vs-splash, .screen.reveal) .status-plate {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html .status-plate {
+    transition: none;
+  }
+}
+
+/* ---------- Fix C: header plates from y = 0 ---------- */
+.shell-top,
+.screen > .topbar::before {
+  background: linear-gradient(180deg, var(--plate-top) 0, var(--plate-top) var(--inset-top, 0px), var(--plate-bot));
+  box-shadow: inset 0 -1px 0 var(--plate-line), var(--plate-shadow);
+}
+/* a screen's own top bar sits under the screen's --sat padding: its plate reaches up to y = 0 */
+.screen > .topbar {
+  position: relative;
+  isolation: isolate;
+}
+.screen > .topbar::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: calc(-1 * var(--sat, 0px)) 0 0;
+}
+.screen > .ut-top::before {
+  background: linear-gradient(180deg, var(--plate-top-ut) 0, var(--plate-top-ut) var(--inset-top, 0px), var(--plate-bot-ut));
+  box-shadow: inset 0 -1px 0 var(--plate-line-ut), var(--plate-shadow);
+}

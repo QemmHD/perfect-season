@@ -45,9 +45,24 @@
           min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px)));
         }
       }
+      /* Claude (studio overhaul, shell-3): the status plate's base, here so it paints from the first
+         frame in the launch colour. src/shell/plates.css (html .status-plate, which outranks this)
+         gives it the inset QA can set and the colour of what is on screen. */
+      .status-plate {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: env(safe-area-inset-top, 0px);
+        background: #04121a;
+        z-index: 2;
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
+    <!-- Claude (studio overhaul, shell-3): one flat plate under the iOS status bar, outside the scaled stage -->
+    <div class="status-plate" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
   </body>
