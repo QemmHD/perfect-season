@@ -7,7 +7,9 @@ import { registerServiceWorker } from './lib/update';
 import { Stage } from './stage';
 import './styles.css';
 import './shell/plates.css';
+import './shell/targets.css';
 import { RecoveryBoundary } from './shell/Recovery';
+import { watchKeyboard } from './shell/keyboard';
 
 // the arcade games' test bench (?arcade), loaded only when asked for
 const Lab = React.lazy(() => import('./game/Lab'));
@@ -22,6 +24,8 @@ const Gallery = React.lazy(() => (PIXEL === 'court' ? import('./game/pixel/Scene
 const GALLERY = PIXEL !== null;
 
 watchErrors();
+// shell-5: a field the keyboard would hide scrolls back into view inside its own column
+watchKeyboard();
 
 // iOS Safari only shows :active press states when the page listens for touches
 document.addEventListener('touchstart', () => {}, { passive: true });

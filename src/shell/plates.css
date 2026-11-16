@@ -1,16 +1,19 @@
-/* Claude (studio overhaul, shell-3, 2026-11-16): the iPhone top edge's surfaces (audit C1, Fix B and
-   Fix C part 1; docs/studio-overhaul/shell.md "Early-ship unit").
+/* Claude (studio overhaul, shell-3 and shell-5, 2026-11-16): the iPhone top edge's surfaces (audit C1,
+   Fix B and Fix C; docs/studio-overhaul/shell.md "Early-ship unit" and "shell-5").
    - The header plate API (lead decision D4): shell owns these surfaces and tokens, ut owns what sits
      on them. A header reads --plate-top above the safe-area inset line, fades to --plate-bot by its
-     bottom and ends on a 1 px --plate-line hairline. UT uses the -ut set. No noise, no backdrop-filter.
+     bottom and ends on a 1 px --plate-line hairline with a centred --plate-accent highlight. UT (and the
+     gold Playoffs header) use the -ut set. A 4% grain tile (--plate-noise, an inline SVG, no raster)
+     sits on a contain:paint pseudo-element over the plate. No backdrop-filter.
    - The status plate (index.html, outside the scaled stage) is one flat colour under the iOS status
      bar, exactly the inset tall. It is opaque only where a header plate sits under it, in that plate's
      top colour (so there is no seam at the inset line). Everywhere else it is transparent and the band
-     shows the screen itself, as with Fix A alone: screens without a header (Draft, Playoffs, Welcome,
-     Vote, Search: a flat strip would cut their own top gradients), an open sheet's scrim, and the
-     full-screen overlays drawn over a header screen (Champions, GameCast, the UT player pick, the
-     Rivals promotion, the sport switch). The immersive screens that own the band (pack opening, launch
-     splash, versus splash, season reveal) hide it. Matches portal to <body> at z-index 50 and cover it.
+     shows the screen itself, as with Fix A alone: screens without a header (Welcome, Vote: a flat
+     strip would cut their own top gradients), an open sheet's scrim, and the full-screen overlays
+     drawn over a header screen (Champions, GameCast, the UT player pick, the Rivals promotion, the
+     sport switch). The immersive screens that own the band (pack opening, launch splash, versus splash,
+     season reveal) hide it. Matches portal to <body> at z-index 50 and cover it; their own scrim is
+     .arcade-full::after below.
    Sizes are in frame px inside the stage (--sat, --inset-top) and screen px outside it (--ps-inset-top). */
 :root {
   --plate-top: #08222d;
@@ -19,14 +22,15 @@
   --plate-top-ut: #182625;
   --plate-bot-ut: #1c2c2a;
   --plate-line-ut: #4b4229;
+  --plate-accent: rgba(25, 227, 201, 0.5);
+  --plate-accent-ut: rgba(245, 184, 61, 0.5);
   --plate-shadow: 0 10px 18px -12px rgba(0, 0, 0, 0.8);
+  --plate-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
 }
 
 /* ---------- Fix B: the status plate ---------- */
-/* the colour is set on the plate itself, never as an inherited property on <html>, so a state change
-   restyles one element. UT's rule follows the main one at the same specificity and wins; the overlay
-   rule outranks both. The base rule says `html` so it outranks index.html's inline base
-   wherever the build puts this file. */
+/* the colour is set on the plate itself (not inherited from <html>), so a state change restyles one
+   element. Later rules win at equal specificity; `html` outranks index.html's inline base. */
 html .status-plate {
   height: var(--ps-inset-top, env(safe-area-inset-top, 0px));
   background-color: var(--plate-top);
@@ -38,10 +42,10 @@ html .status-plate {
     background-color: transparent;
   }
 }
-html:has(.shell-top, .topbar) .status-plate {
+html:has(.shell-top, .topbar, .draft-head, .evo-top) .status-plate {
   background-color: var(--plate-top);
 }
-html:has(.ut-top) .status-plate {
+html:has(.ut-top, .po-head) .status-plate {
   background-color: var(--plate-top-ut);
 }
 html:has(.scrim:not(.closing), .champ, .cast, .ut-pick-screen, .promotion, .sportfade) .status-plate {
@@ -57,23 +61,90 @@ html:has(.ut-open-screen, .splash, .vs-splash, .screen.reveal) .status-plate {
 }
 
 /* ---------- Fix C: header plates from y = 0 ---------- */
+/* a header already at y = 0 (the main TopBar, Training Camp's bar) carries the plate itself; a screen's
+   own header sits under the screen's --sat padding and gets a ::before plate reaching up to y = 0.
+   Sub-page headers: the Draft and Search bar (.draft-head) and the Playoffs title (.po-head). The vote
+   screen's .vote-head is centred mid-screen, not at --sat, so it gets none (shell.md, shell-5). */
 .shell-top,
-.screen > .topbar::before {
+.evo-screen > .evo-top,
+.screen > :is(.topbar, .draft-head)::before {
   background: linear-gradient(180deg, var(--plate-top) 0, var(--plate-top) var(--inset-top, 0px), var(--plate-bot));
   box-shadow: inset 0 -1px 0 var(--plate-line), var(--plate-shadow);
 }
-/* a screen's own top bar sits under the screen's --sat padding: its plate reaches up to y = 0 */
-.screen > .topbar {
+.screen > :is(.topbar, .draft-head, .po-head) {
   position: relative;
   isolation: isolate;
 }
-.screen > .topbar::before {
+.screen > :is(.topbar, .draft-head, .po-head)::before,
+.screen > :is(.topbar, .draft-head, .po-head)::after {
   content: '';
   position: absolute;
   z-index: -1;
   inset: calc(-1 * var(--sat, 0px)) 0 0;
 }
-.screen > .ut-top::before {
+.screen > :is(.ut-top, .po-head)::before {
   background: linear-gradient(180deg, var(--plate-top-ut) 0, var(--plate-top-ut) var(--inset-top, 0px), var(--plate-bot-ut));
   box-shadow: inset 0 -1px 0 var(--plate-line-ut), var(--plate-shadow);
+}
+/* Training Camp's bar drew from y = 0 with an 18 px pad (its screen drops the --sat padding), so its
+   HOME button sat in the band: it now starts below inset + edge like every other header */
+.evo-screen > .evo-top {
+  position: relative;
+  isolation: isolate;
+  padding-top: calc(var(--sat, 0px) + 12px);
+  border-bottom: 0;
+}
+
+/* the premium pass: grain and the centred highlight on the hairline, on a pseudo-element that never
+   scrolls and paints on its own (contain: paint), above the plate and below the header's contents. The
+   grain fades in below the inset line, so the flat status plate above meets the plate with no seam */
+.shell-top::before,
+.evo-screen > .evo-top::before,
+.screen > :is(.topbar, .draft-head, .po-head)::after {
+  background:
+    linear-gradient(90deg, transparent 18%, var(--plate-accent) 50%, transparent 82%) 0 100% / 100% 1px no-repeat,
+    var(--plate-noise);
+  /* inline: a :root token would resolve --inset-top on :root, where it is unset */
+  -webkit-mask-image: linear-gradient(transparent var(--inset-top, 0px), #000 calc(var(--inset-top, 0px) + 14px));
+  mask-image: linear-gradient(transparent var(--inset-top, 0px), #000 calc(var(--inset-top, 0px) + 14px));
+  contain: paint;
+}
+.shell-top::before,
+.evo-screen > .evo-top::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+}
+.screen > :is(.ut-top, .po-head)::after {
+  background:
+    linear-gradient(90deg, transparent 18%, var(--plate-accent-ut) 50%, transparent 82%) 0 100% / 100% 1px no-repeat,
+    var(--plate-noise);
+}
+
+/* toasts: opaque, with the plate's hairline highlight on top (they sit at --sat + 6, below the band) */
+.toast {
+  background: linear-gradient(180deg, #123544, #0d2632);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- the match HUD scrim ---------- */
+/* matches cover the status plate, so each arena darkens its own status-bar strip: y 0 to the raw inset
+   (never --sat), fading out at the inset line so it draws no edge, under nothing the HUD shows (every
+   HUD item sits below inset + edge). One rule per sport, each shipped only after the sprite check
+   (edge-walk.mjs hudScrim: no player, ball or rim pixel drawn under it in 20 sampled frames). */
+.arcade-full.hg2:not(.fb2, .sc2)::after,
+.arcade-full.fb2::after,
+.arcade-full.sc2::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--ps-inset-top, env(safe-area-inset-top, 0px));
+  background: linear-gradient(180deg, rgba(2, 8, 12, 0.86), rgba(2, 8, 12, 0.6) 62%, rgba(2, 8, 12, 0));
+  pointer-events: none;
 }

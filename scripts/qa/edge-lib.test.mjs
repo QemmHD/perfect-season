@@ -1,7 +1,7 @@
 // Claude (studio overhaul, shell-1, 2026-11-10): the pure parts of the shell QA harness. The page
 // helpers are exercised by edge-headers.mjs / home-matrix.mjs runs (docs/studio-overhaul/shell.md).
 import { describe, expect, it } from 'vitest';
-import { contrastRatio, deltaE2000, deltaE2000Lab, DEVICE_IDS, DEVICES, edgeOf, expectedLayout, fitFor, homeClassFor, luma, meanLumaDiffPct, parseColor, srgbToLab, textClearOf, TEXT_CLEAR } from './edge-lib.mjs';
+import { contrastRatio, deltaE2000, deltaE2000Lab, DEVICE_IDS, DEVICES, edgeOf, expectedLayout, fitFor, homeClassFor, luma, meanLumaDiffPct, parseColor, percentile, srgbToLab, stripSprites, textClearOf, TEXT_CLEAR } from './edge-lib.mjs';
 import { edgeOf as snippetEdgeOf } from './edge-snippet.mjs';
 import { fitFor as appFitFor, stageBox, topEdge } from '../../src/stage-layout';
 
@@ -108,5 +108,42 @@ describe('edge-lib colour maths (shell-3 plate probes)', () => {
     expect(meanLumaDiffPct([10, 20, 30], [10, 20, 30])).toBe(0);
     expect(meanLumaDiffPct([0, 0], [255, 0])).toBe(50);
     expect(meanLumaDiffPct([1], [1, 2])).toBeNull();
+  });
+});
+
+// Claude (studio overhaul, shell-5, 2026-11-16): the walker's tap-timing percentile and the HUD scrim's
+// sprite check on the status-bar strip.
+describe('edge-lib walker maths (shell-5)', () => {
+  it('takes the nearest-rank percentile and ignores missing values', () => {
+    const v = Array.from({ length: 20 }, (_, i) => i + 1);
+    expect(percentile(v, 95)).toBe(19);
+    expect(percentile(v, 100)).toBe(20);
+    expect(percentile([5, null, 40, NaN], 50)).toBe(5);
+    expect(percentile([], 95)).toBeNull();
+  });
+
+  // a strip w × h filled with a vertical sky gradient, optionally with a sprite and a crowd row
+  const strip = (w, h, { sprite = null, crowdRow = null } = {}) => {
+    const a = new Uint8Array(w * h * 4);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        a.set([10, 20 + y, 40 + y, 255], i);
+        if (crowdRow === y) a.set([(x * 53) % 256, (x * 97) % 256, (x * 31) % 256, 255], i);
+      }
+    if (sprite) for (let y = sprite.y; y < sprite.y + 6; y++) for (let x = sprite.x; x < sprite.x + 4; x++) a.set([224, 122, 43, 255], (y * w + x) * 4);
+    return a;
+  };
+  it('finds nothing on a clean sky, and a ball-sized run of pixels drawn on it', () => {
+    expect(stripSprites(strip(120, 30), 120, 30)).toEqual({ spritePx: 0, busyRows: 0, spriteRows: 0, firstSpriteRow: null });
+    const r = stripSprites(strip(120, 30, { sprite: { x: 50, y: 10 } }), 120, 30);
+    expect(r.spritePx).toBe(24);
+    expect(r.spriteRows).toBe(6);
+    expect(r.firstSpriteRow).toBe(10);
+  });
+  it('counts rows with no dominant colour (a crowd) apart, without calling them sprites', () => {
+    const r = stripSprites(strip(120, 30, { crowdRow: 20 }), 120, 30);
+    expect(r.busyRows).toBe(1);
+    expect(r.spritePx).toBe(0);
   });
 });

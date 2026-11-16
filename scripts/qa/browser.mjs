@@ -70,9 +70,11 @@ export async function launch() {
  *  - serialized: use the serialized file for 'standard' on the dev server too (faster, and the same
  *    player the production-build runs get)
  *  - relay: the Nostr relay URL (default ws://localhost:7777); it must be on this machine
+ *  - init: a function added with context.addInitScript before the first page loads (shell-5: the
+ *    walker's tap-timing recorder), so it runs again after every reload
  */
 export async function fixture(browser, sport = 'nba', name = 'Codex QA', width = 390, contextOptions = {}, options = {}) {
-  const { insets = null, height = 844, standalone = false, dsf = null, motion = 'reduce', profile = 'standard', serialized: useFile = false, relay = 'ws://localhost:7777' } = options;
+  const { insets = null, height = 844, standalone = false, dsf = null, motion = 'reduce', profile = 'standard', serialized: useFile = false, relay = 'ws://localhost:7777', init = null } = options;
   if (!LOCAL_HOSTS.includes(new URL(relay).hostname)) throw Error('QA relays are restricted to localhost.');
   const context = await browser.newContext({
     viewport: { width, height },
@@ -90,6 +92,7 @@ export async function fixture(browser, sport = 'nba', name = 'Codex QA', width =
       },
       { insets, standalone }
     );
+  if (init) await context.addInitScript(init);
   const serialized = !!buildRoot || useFile || profile !== 'standard';
   const made = serialized ? await inject(context, profile, sport, name) : null;
   const page = await context.newPage(),

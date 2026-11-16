@@ -338,7 +338,8 @@ const measureScreen = (page, d) =>
             ? { left: box.left + Math.min(0, px(pb.left)) * sc, right: box.right - Math.min(0, px(pb.right)) * sc, top: box.top + Math.min(0, px(pb.top)) * sc, bottom: box.bottom - Math.min(0, px(pb.bottom)) * sc }
             : { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
         controls.push({ e, box, hit, sc });
-        if (box.top < t + edge - 0.25) controlInBand.push({ label: label(e), top: r1(box.top) });
+        // shell-5: the visible part decides (a control scrolled up under its sheet's top edge is clipped there)
+        if (vis.top < t + edge - 0.25) controlInBand.push({ label: label(e), top: r1(vis.top) });
         if (!inScroller(e)) {
           if (box.top < topMost.y) topMost = { y: box.top, label: label(e) };
           if (box.bottom > H - b + 0.5 && box.top < H) bottomCut.push({ label: label(e), bottom: r1(box.bottom) });
@@ -358,7 +359,20 @@ const measureScreen = (page, d) =>
           if (a.e.contains(q.e) || q.e.contains(a.e)) continue;
           const ow = Math.min(a.hit.right, q.hit.right) - Math.max(a.hit.left, q.hit.left),
             oh = Math.min(a.hit.bottom, q.hit.bottom) - Math.max(a.hit.top, q.hit.top);
-          if (ow > 1 && oh > 1) overlap.push(label(a.e) + ' × ' + label(q.e) + ' ' + Math.round(ow) + 'x' + Math.round(oh));
+          if (!(ow > 1 && oh > 1)) continue;
+          // shell-5: a control scrolled under a bar (the UT tab bar, a sticky chip row, the booster tray)
+          // is not an ambiguous tap: the bar's own box covers it there. Only hit areas that reach into a
+          // visible neighbour count.
+          const cx = (Math.max(a.hit.left, q.hit.left) + Math.min(a.hit.right, q.hit.right)) / 2,
+            cy = (Math.max(a.hit.top, q.hit.top) + Math.min(a.hit.bottom, q.hit.bottom)) / 2;
+          const at = document.elementFromPoint(cx, cy);
+          const owner = at && (a.e === at || a.e.contains(at)) ? a : at && (q.e === at || q.e.contains(at)) ? q : null;
+          const other = owner === a ? q : a;
+          const inBox = (c) => cx >= c.box.left && cx <= c.box.right && cy >= c.box.top && cy <= c.box.bottom;
+          const vis = clip(other.e, other.box);
+          const otherShown = !!vis && cx >= vis.left && cx <= vis.right && cy >= vis.top && cy <= vis.bottom;
+          if (owner && inBox(owner) && (inScroller(other.e) || !otherShown)) continue;
+          overlap.push(label(a.e) + ' × ' + label(q.e) + ' ' + Math.round(ow) + 'x' + Math.round(oh));
         }
       const bar = (sel) => {
         const e = document.querySelector(sel);
@@ -664,7 +678,8 @@ export async function readPixels(page, { points = [], regions = [] } = {}) {
 
 /** Turns the status plate (B) and the header plates (C) off, leaving Fix A: the "A alone" control. */
 export const PLATES_OFF_CSS =
-  '.status-plate{display:none!important}.shell-top{background:none!important;box-shadow:none!important}.topbar::before{content:none!important}';
+  '.status-plate{display:none!important}.shell-top,.evo-screen>.evo-top{background:none!important;box-shadow:none!important}' +
+  ':is(.shell-top,.evo-top)::before,:is(.topbar,.draft-head,.po-head)::before,:is(.topbar,.draft-head,.po-head)::after{content:none!important}';
 export async function platesOff(page, off) {
   await page.evaluate(
     ([css, off]) => {
@@ -678,7 +693,8 @@ export async function platesOff(page, off) {
 /**
  * The status plate and the header on top (audit C1, shell-3 acceptance):
  *  - status: the fixed `.status-plate` (display, top, height, colour)
- *  - header: the visible `.shell-top` or `.topbar` (UT `.ut-top` included); `probes` hit-test
+ *  - header: the visible `.shell-top` or `.topbar` (UT `.ut-top` included), or (shell-5) a sub-page
+ *    header (`.draft-head`, `.po-head`, Training Camp's `.evo-top`); `probes` hit-test
  *    x = 20 / mid / W − 23 at y = 2, inset + edge − 2 and the header's bottom − 2, each `ok` when it
  *    lands on the header (its `::before` plate reports as the header); `opaque` when every colour of
  *    its plate is solid; `hairline` (the plate's bottom) against `firstRow` (the next box's top);
@@ -713,8 +729,9 @@ export const platesAudit = (page, device) => {
           })()
         : null;
       const label = (e) => (e ? (e.id ? '#' + e.id : e.tagName.toLowerCase() + (e.classList.length ? '.' + [...e.classList].slice(0, 3).join('.') : '')) : null);
-      const isHeader = (e) => e.matches('.shell-top') || (e.matches('.topbar') && !e.closest('.shell-top'));
-      const visible = [...document.querySelectorAll('.shell-top, .topbar')].filter(isHeader).filter((e) => {
+      // shell-5: the sub-page headers (Draft/Search, Playoffs) and Training Camp's bar have plates too
+      const isHeader = (e) => e.matches('.shell-top, .screen > .draft-head, .screen > .po-head, .evo-screen > .evo-top') || (e.matches('.topbar') && !e.closest('.shell-top'));
+      const visible = [...document.querySelectorAll('.shell-top, .topbar, .draft-head, .po-head, .evo-top')].filter(isHeader).filter((e) => {
         const r = e.getBoundingClientRect();
         if (r.width < 1 || r.height < 1) return false;
         const hit = document.elementFromPoint(r.left + r.width / 2, r.bottom - 2);
@@ -802,3 +819,315 @@ export const detailBarHit = (page) =>
       return !!e && (e === bar || bar.contains(e));
     });
   });
+
+// ---------- shell-5: tap timing, frames, the HUD scrim's sprite check, edge states, preserve ----------
+
+/**
+ * Installed before the app loads (fixture `init`): Event Timing entries for every interaction
+ * (input → next paint: the entry's duration, max per interactionId) and a ring of requestAnimationFrame
+ * timestamps, so the walker can read the frames of the 600 ms after any tap.
+ */
+export function tapTimingInit() {
+  if (window.__psTiming) return;
+  const T = (window.__psTiming = { events: [], frames: new Float64Array(8192), n: 0 });
+  try {
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) if (e.interactionId) T.events.push({ id: e.interactionId, name: e.name, start: e.startTime, dur: e.duration });
+    }).observe({ type: 'event', durationThreshold: 16, buffered: true });
+  } catch {
+    T.unsupported = true;
+  }
+  const tick = (t) => {
+    T.frames[T.n++ % 8192] = t;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+/** The page clock, for marking a tap (performance.now()). */
+export const pageNow = (page) => page.evaluate(() => performance.now());
+
+/**
+ * What one tap did: the slowest Event Timing entry of each interaction that started at or after `t0`
+ * (input → next paint, ms; Chromium reports only those of 16 ms and up, so a missing entry means a tap
+ * that painted in under 16 ms), and the frames of the `window` ms after the tap: intervals over 33 ms
+ * and the average rate. Waits until the window has passed.
+ */
+export async function readTap(page, t0, window = 600) {
+  await page.waitForFunction(([t0, w]) => performance.now() - t0 > w + 40, [t0, window], { timeout: 10000 }).catch(() => {});
+  return page.evaluate(
+    ([t0, w]) => {
+      const T = window.__psTiming;
+      if (!T) return null;
+      const per = new Map();
+      for (const e of T.events) if (e.start >= t0 - 1 && e.start <= t0 + w) per.set(e.id, Math.max(per.get(e.id) ?? 0, e.dur));
+      const ts = [];
+      const n = Math.min(T.n, 8192);
+      for (let i = T.n - n; i < T.n; i++) {
+        const t = T.frames[i % 8192];
+        if (t >= t0 && t <= t0 + w) ts.push(t);
+      }
+      ts.sort((a, b) => a - b);
+      const gaps = ts.slice(1).map((t, i) => t - ts[i]);
+      const span = ts.length > 1 ? ts[ts.length - 1] - ts[0] : 0;
+      return {
+        inp: per.size ? Math.max(...per.values()) : null,
+        interactions: per.size,
+        frames: ts.length,
+        long: gaps.filter((g) => g > 33.4).length,
+        worst: gaps.length ? Math.round(Math.max(...gaps) * 10) / 10 : null,
+        fps: span > 0 ? Math.round(((ts.length - 1) / span) * 1000 * 10) / 10 : null,
+        unsupported: !!T.unsupported,
+      };
+    },
+    [t0, window]
+  );
+}
+
+/** p-th percentile (0..100) of a list of numbers, nearest rank; null for an empty list. */
+export function percentile(list, p) {
+  const v = list.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  if (!v.length) return null;
+  return v[Math.min(v.length - 1, Math.max(0, Math.ceil((p / 100) * v.length) - 1))];
+}
+
+/**
+ * Sprites under the status-bar strip of a match frame. `rgba` is the strip's pixels (w × h). The strip
+ * is the arena's sky and roof: each row is nearly one colour (its mode, colours quantized to 16 levels a
+ * channel), so a player, the ball or the rim drawn there is a run of pixels far from its row's mode.
+ * Rows with no dominant colour (a crowd) can't be judged this way and are counted as `busyRows`.
+ */
+export function stripSprites(rgba, w, h, { share = 0.6, far = 48, keepMask = false } = {}) {
+  let spritePx = 0,
+    busyRows = 0;
+  const rows = [];
+  const mask = keepMask ? new Uint8Array(w * h) : null;
+  for (let y = 0; y < h; y++) {
+    const counts = new Map();
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const key = (rgba[i] >> 4) * 256 + (rgba[i + 1] >> 4) * 16 + (rgba[i + 2] >> 4);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    let mode = 0,
+      best = -1;
+    for (const [k, c] of counts)
+      if (c > best) {
+        best = c;
+        mode = k;
+      }
+    if (best / w < share) {
+      busyRows++;
+      continue;
+    }
+    // the mode's own mean colour, from the pixels in its bucket
+    const sum = [0, 0, 0];
+    let n = 0;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if ((rgba[i] >> 4) * 256 + (rgba[i + 1] >> 4) * 16 + (rgba[i + 2] >> 4) !== mode) continue;
+      sum[0] += rgba[i];
+      sum[1] += rgba[i + 1];
+      sum[2] += rgba[i + 2];
+      n++;
+    }
+    const m = sum.map((s) => s / n);
+    let out = 0;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (Math.max(Math.abs(rgba[i] - m[0]), Math.abs(rgba[i + 1] - m[1]), Math.abs(rgba[i + 2] - m[2])) > far) {
+        out++;
+        if (mask) mask[y * w + x] = 1;
+      }
+    }
+    spritePx += out;
+    if (out) rows.push(y);
+  }
+  return { spritePx, busyRows, spriteRows: rows.length, firstSpriteRow: rows.length ? rows[0] : null, ...(mask ? { mask } : {}) };
+}
+
+/**
+ * Splits the outlying pixels of several frames of the same strip into the backdrop's own details (the
+ * stands' lights: the same pixels in every frame) and what moves (players, the ball, a rim in a moving
+ * camera): `moving[i]` counts frame i's outliers that are not outliers in every frame.
+ */
+export function splitStatic(masks) {
+  if (!masks.length) return { staticPx: 0, moving: [] };
+  const n = masks[0].length,
+    all = new Uint8Array(n).fill(1);
+  for (const m of masks) for (let i = 0; i < n; i++) all[i] &= m[i];
+  let staticPx = 0;
+  for (let i = 0; i < n; i++) staticPx += all[i];
+  return { staticPx, moving: masks.map((m) => m.reduce((s, v, i) => s + (v && !all[i] ? 1 : 0), 0)) };
+}
+
+/** The status-bar strip (y 0..insetTop) of what is on screen, as raw RGBA (screen px at the page's scale). */
+export async function stripPixels(page, insetTop) {
+  const png = await page.screenshot({ clip: { x: 0, y: 0, width: await page.evaluate(() => innerWidth), height: insetTop } });
+  const { w, h, b64 } = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = 'data:image/png;base64,' + b64;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, img.width, img.height).data;
+    let s = '';
+    for (let i = 0; i < d.length; i += 0x8000) s += String.fromCharCode.apply(null, d.subarray(i, i + 0x8000));
+    return { w: img.width, h: img.height, b64: btoa(s) };
+  }, png.toString('base64'));
+  return { w, h, rgba: Buffer.from(b64, 'base64') };
+}
+
+/** Hides the match HUD scrim (.arcade-full::after) so the sprite check sees the canvas under it. */
+export async function scrimOff(page, off) {
+  await page.evaluate((off) => {
+    document.getElementById('__ps-scrim-off')?.remove();
+    if (off) document.head.append(Object.assign(document.createElement('style'), { id: '__ps-scrim-off', textContent: '.arcade-full::after{display:none!important}' }));
+  }, off);
+}
+
+/** The HUD scrim on screen: its box in screen px and colour stops, or null when there is none. */
+export const hudScrim = (page) =>
+  page.evaluate(() => {
+    const a = document.querySelector('.arcade-full');
+    if (!a) return null;
+    const s = getComputedStyle(a, '::after');
+    if (s.content === 'none' || s.display === 'none') return { shown: false };
+    const r = a.getBoundingClientRect();
+    return { shown: true, top: Math.round((r.top + parseFloat(s.top)) * 10) / 10, height: Math.round(parseFloat(s.height) * 10) / 10, background: s.backgroundImage.slice(0, 120), pointerEvents: s.pointerEvents };
+  });
+
+/**
+ * The visual viewport as the iPhone keyboard leaves it (screen-fit.mjs's override: the layout viewport
+ * stays the phone, visualViewport.height shrinks), or back to the full screen with `height` null.
+ */
+export async function keyboardViewport(page, height) {
+  await page.evaluate((height) => {
+    if (!window.__psVV) {
+      window.__psVV = { height: null };
+      for (const key of ['width', 'height', 'offsetLeft', 'offsetTop', 'scale'])
+        Object.defineProperty(visualViewport, key, {
+          configurable: true,
+          get: () => ({ width: innerWidth, height: window.__psVV.height ?? innerHeight, offsetLeft: 0, offsetTop: 0, scale: 1 })[key],
+        });
+    }
+    window.__psVV.height = height;
+    window.dispatchEvent(new Event('resize'));
+    visualViewport.dispatchEvent(new Event('resize'));
+  }, height);
+  // the stage remeasures at 100 and 350 ms, the app's keyboard reveal looks again at 420 ms
+  await settle(page, 700);
+}
+
+/**
+ * With the keyboard up (visual height `vh`): is the focused input inside what the player sees, and
+ * which of the named primary buttons are (fully inside 0..vh, on top, not covered)?
+ */
+export const keyboardAudit = (page, vh, buttons) =>
+  page.evaluate(
+    ([vh, buttons]) => {
+      const r1 = (n) => Math.round(n * 10) / 10;
+      const seen = (e) => {
+        if (!e) return null;
+        const r = e.getBoundingClientRect();
+        const inside = r.top >= -0.5 && r.bottom <= vh + 0.5 && r.width > 0 && r.height > 0;
+        const hit = inside ? document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2) : null;
+        return { top: r1(r.top), bottom: r1(r.bottom), visible: inside && !!hit && (hit === e || e.contains(hit) || hit.contains(e)) };
+      };
+      const focused = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+      const all = [...document.querySelectorAll('button, [role=button]')];
+      return {
+        focused: focused ? { tag: focused.tagName.toLowerCase(), label: focused.getAttribute('aria-label') || focused.getAttribute('placeholder') || '', ...seen(focused) } : null,
+        buttons: buttons.map((name) => {
+          const e = all.find((b) => (b.getAttribute('aria-label') || b.textContent || '').trim().toUpperCase().startsWith(name.toUpperCase()));
+          return { name, found: !!e, ...(e ? seen(e) : {}) };
+        }),
+      };
+    },
+    [vh, buttons]
+  );
+
+/** Rotates the phone as screen-fit.mjs does (the portrait lock's counter-rotation), or back to portrait. */
+export async function rotate(page, device, sideways) {
+  const d = typeof device === 'string' || typeof device === 'number' ? DEVICES[device] : device;
+  const [t, , b] = d.insets;
+  if (sideways) await page.setViewportSize({ width: d.h, height: d.w });
+  else await page.setViewportSize({ width: d.w, height: d.h });
+  await page.evaluate(
+    ({ sideways, w, h, insets }) => {
+      if (!window.__psRot) {
+        window.__psRot = true;
+        Object.defineProperty(window, 'orientation', { configurable: true, get: () => window.__fitAngle ?? 0 });
+      }
+      window.__fitAngle = sideways ? 90 : 0;
+      window.__psInsets = insets;
+      window.dispatchEvent(new Event('orientationchange'));
+      window.dispatchEvent(new Event('resize'));
+      visualViewport.dispatchEvent(new Event('resize'));
+    },
+    { sideways, w: d.w, h: d.h, insets: sideways ? [0, b, 0, t] : d.insets }
+  );
+  await settle(page, 500);
+}
+
+/** Sideways: the stage's rotation, the published edge (0 sideways) and whether the frame and bars fit the screen. */
+export const rotatedAudit = (page) =>
+  page.evaluate(() => {
+    const st = document.querySelector('.stage');
+    const r = st.getBoundingClientRect();
+    const W = innerWidth,
+      H = innerHeight;
+    const within = (e) => {
+      if (!e) return null;
+      const q = e.getBoundingClientRect();
+      return q.left >= -0.5 && q.top >= -0.5 && q.right <= W + 0.5 && q.bottom <= H + 0.5;
+    };
+    return {
+      rot: st.dataset.rot ?? null,
+      edge: getComputedStyle(document.documentElement).getPropertyValue('--ps-edge').trim(),
+      stage: { w: Math.round(r.width), h: Math.round(r.height) },
+      stageFits: within(st),
+      playFits: within(document.querySelector('.home .playbar')),
+      tabsFit: within(document.querySelector('nav.tabs')),
+      docScroll: document.scrollingElement.scrollHeight - H,
+      hOverflow: document.documentElement.scrollWidth - W,
+    };
+  });
+
+/**
+ * Preserve checks on the current screen (audit §6): children of a scrolling `.page` (or sheet) that
+ * clip their own content (squeezed: overflow hidden and shorter than what they hold), the UT back label
+ * and EXIT text, and the PLAY bar's rect.
+ */
+export const preserveAudit = (page) =>
+  page.evaluate(() => {
+    const r1 = (n) => Math.round(n * 10) / 10;
+    const squeezed = [];
+    for (const col of document.querySelectorAll('.page, .sheet, .page-view')) {
+      for (const c of col.children) {
+        const s = getComputedStyle(c);
+        if (s.display === 'none' || !/(hidden|clip)/.test(s.overflowY)) continue;
+        if (c.scrollHeight > c.clientHeight + 1 && c.clientHeight > 0) squeezed.push(((c.className && String(c.className)) || c.tagName).slice(0, 40) + ' ' + c.clientHeight + '/' + c.scrollHeight);
+      }
+    }
+    const back = document.querySelector('.ut-back');
+    const play = document.querySelector('.home .playbar');
+    const pr = play?.getBoundingClientRect();
+    return {
+      squeezed: squeezed.slice(0, 8),
+      back: back ? back.textContent.trim().replace(/\s+/g, ' ') : null,
+      play: pr ? { top: r1(pr.top), bottom: r1(pr.bottom), left: r1(pr.left), right: r1(pr.right) } : null,
+    };
+  });
+
+/** A sticky call to action (Cups' GO bar, the card detail's action bar): its position and whether it is on screen. */
+export const stickyAudit = (page, selector) =>
+  page.evaluate((selector) => {
+    const e = [...document.querySelectorAll(selector)].pop();
+    if (!e) return null;
+    const r = e.getBoundingClientRect();
+    return { position: getComputedStyle(e).position, top: Math.round(r.top), bottom: Math.round(r.bottom), onScreen: r.top >= 0 && r.bottom <= innerHeight + 0.5 };
+  }, selector);

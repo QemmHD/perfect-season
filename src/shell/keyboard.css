@@ -1,0 +1,15 @@
+/* Claude (studio overhaul, shell-5, 2026-11-16): screens whose field sits low, while the keyboard is up.
+   The keyboard shrinks the stage to the part of the screen above it, which puts the stage in its compact
+   fit (.fit-compact: under 650 frame px of room; no phone is that short upright without a keyboard, the
+   320 × 568 SE has 658). keyboard.ts then scrolls the focused field into view inside its column.
+   - Search's friend code: the screen gets a scrolling column, so the code field and JOIN can be reached.
+   - Welcome: NEXT stays pinned at the bottom of the visible part while the name field is centred. */
+.fit-compact .screen.search {
+  overflow-y: auto;
+}
+.fit-compact .welcome > .actionbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(4, 18, 26, 0), var(--bg) 14px);
+}

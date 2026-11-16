@@ -1,0 +1,34 @@
+/* Claude (studio overhaul, shell-5, 2026-11-16): 44-pt tap areas for the Draft's small controls (audit
+   M6). The buttons keep their look; an invisible ::before grows the tap area to 44 design px tall,
+   using the app's existing pattern (styles.css "44pt hit areas"). Each grows only into the gap around
+   it, so no two tap areas overlap, down to 320 × 568 (k = 0.82, the compact layout):
+   - the respin row: 38 px (normal), 36 (tight), 34 (compact) tall, --respin-gap (8 / 8 / 6 px) of
+     padding above, the stat row below, 14 px between the two buttons. Half of the missing height goes
+     above and half below: at most 5 px each way, and nothing grows sideways.
+   - the boosters (DOUBLE / TRADE / PRIME): 40 px (36 compact) in the drawer's tray, 8 px of tray padding
+     above and 10 below, 8 px apart. They grow 2 px (4 compact) up and down, nothing sideways.
+   Pack SKIP, QUICK SELL DUPES, TAP TO CONTINUE, the UT season chip and the pack grid's card actions are
+   being rebuilt by packs and ut; their 44-pt items are acceptance items in shell.md, not rules here. */
+.respin,
+.boost {
+  position: relative;
+}
+.respin::before,
+.boost::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+.respin::before {
+  top: min(0px, calc((var(--respin-h, 38px) - 44px) / 2));
+  bottom: min(0px, calc((var(--respin-h, 38px) - 44px) / 2));
+}
+.boost::before {
+  top: -2px;
+  bottom: -2px;
+}
+.fit-compact .boost::before {
+  top: -4px;
+  bottom: -4px;
+}

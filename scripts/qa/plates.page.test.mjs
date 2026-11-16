@@ -28,6 +28,7 @@ const plates = read('src/shell/plates.css');
 const styles = read('src/styles.css');
 const voteCss = read('src/ui/vote.css');
 const nav = read('src/ut/nav.css');
+const targets = read('src/shell/targets.css');
 const tokens = Object.fromEntries([...plates.matchAll(/(--plate-[a-z-]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2]]));
 const rgbOf = (hex) => 'rgb(' + [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ') + ')';
 // index.html's own inline <style> (html/body and the status plate's base) comes first, as in the app
@@ -259,5 +260,135 @@ describe.skipIf(!run)('H1: the card-detail bar in a bottom sheet (real Chromium,
     const [top] = await measure(34);
     expect(top.gap).toBeGreaterThan(30);
     expect(top.onBar).toBe(false);
+  });
+});
+
+// shell-5: the sub-page plates, the opaque toast, the HUD scrim and the respin row's tap areas
+describe.skipIf(!run)('shell-5: sub-page plates, toast, HUD scrim, respin tap areas (real Chromium, static page)', () => {
+  let browser, page;
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+    const context = await browser.newContext({ viewport: { width: 393, height: 852 } });
+    await context.route('**/*', (r) => r.abort());
+    page = await context.newPage();
+  });
+  afterAll(async () => {
+    await browser?.close();
+  });
+  const set = async (body, css = '') => {
+    await page.setContent(page0(body, css));
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  };
+  const draftCss = [ruleOf(styles, '.draft'), ruleOf(styles, '.draft-head'), ruleOf(styles, '.playoffs'), ruleOf(styles, '.po-head')].join('\n') + '.draft-head{--head-h:52px}';
+  const px = async (y0, y1) => {
+    const shot = await page.screenshot({ clip: { x: 0, y: y0, width: 393, height: y1 - y0 } });
+    return page.evaluate(async ([b64, n]) => {
+      const img = new Image();
+      img.src = 'data:image/png;base64,' + b64;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      return [0, n - 1].map((y) => [20, 195, 370].map((x) => [...g.getImageData(x, y, 1, 1).data.slice(0, 3)]));
+    }, [shot.toString('base64'), y1 - y0]);
+  };
+
+  it('the Draft bar: an opaque plate from y = 0 under the status plate, no seam at the inset line, taps land on the bar', async () => {
+    await set('<div class="screen draft"><div class="draft-head"><button style="width:44px;height:44px">B</button><span>ROUND 1 / 5</span></div><div class="reels" style="height:200px"></div></div>', draftCss);
+    const st = await page.evaluate(() => getComputedStyle(document.querySelector('.status-plate')).backgroundColor);
+    expect(st).toBe(rgbOf(tokens['--plate-top']));
+    const hits = await page.evaluate(() => [2, 79, 128].flatMap((y) => [20, 195, 370].map((x) => document.elementFromPoint(x, y)?.closest('.draft-head') ? 1 : 0)));
+    expect(hits.every((h) => h === 1)).toBe(true);
+    const [above, below] = await px(57, 61);
+    for (let i = 0; i < 3; i++) expect(deltaE2000(above[i], below[i])).toBeLessThanOrEqual(2);
+    // the plate ends on the hairline at the bar's bottom (81 + 52 = 133)
+    const bottom = await page.evaluate(() => document.querySelector('.draft-head').getBoundingClientRect().bottom);
+    expect(bottom).toBe(133);
+  });
+
+  it('the Playoffs title sits on the gold plate set, and the status plate matches it', async () => {
+    await set('<div class="screen playoffs"><div class="po-head"><span>PLAYOFFS</span></div></div>', draftCss);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.status-plate')).backgroundColor)).toBe(rgbOf(tokens['--plate-top-ut']));
+    const [above, below] = await px(57, 61);
+    for (let i = 0; i < 3; i++) expect(deltaE2000(above[i], below[i])).toBeLessThanOrEqual(2);
+  });
+
+  it('the grain is a 4% layer: the plate stays within 2% of its flat colour, with real variation', async () => {
+    await set('<div class="screen draft"><div class="draft-head" style="height:200px"></div></div>', draftCss);
+    // below the inset line and its 14 px fade (the status plate covers the band): rows of the plate
+    const shot = await page.screenshot({ clip: { x: 100, y: 90, width: 96, height: 40 } });
+    const lum = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = 'data:image/png;base64,' + b64;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, img.width, img.height).data;
+      // the spread along each row (the plate's gradient runs down the rows, the grain along them)
+      let spread = 0;
+      for (let y = 0; y < img.height; y++) {
+        const l = [];
+        for (let x = 0; x < img.width; x++) {
+          const i = (y * img.width + x) * 4;
+          l.push(0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]);
+        }
+        spread = Math.max(spread, Math.max(...l) - Math.min(...l));
+      }
+      return { spread };
+    }, shot.toString('base64'));
+    // a 4% grey layer over the plate (luma ~30) moves a pixel by at most 0.04 × 255 ≈ 10
+    expect(lum.spread).toBeGreaterThan(0.5);
+    expect(lum.spread).toBeLessThanOrEqual(11);
+  });
+
+  it('the toast is opaque', async () => {
+    // the app's own toast rule first, then plates.css's (the order main.tsx loads them in)
+    await set('<div class="screen draft"><div class="toast" role="status">Spin first, then you can respin.</div></div>', draftCss + ruleOf(styles, '.toast') + ruleOf(plates, '.toast'));
+    const t = await page.evaluate(() => {
+      const s = getComputedStyle(document.querySelector('.toast'));
+      return { bg: s.backgroundImage, color: s.backgroundColor };
+    });
+    // a gradient of two opaque hex stops (computed as rgb()), and no translucent fill under it
+    expect(t.bg).toMatch(/^linear-gradient\(rgb\(\d+, \d+, \d+\), rgb\(\d+, \d+, \d+\)\)$/);
+  });
+
+  it('each sport\'s match scrim covers exactly y 0 to the raw inset, and nothing sideways', async () => {
+    for (const cls of ['arcade-full hg2', 'arcade-full hg2 fb2', 'arcade-full hg2 sc2']) {
+      await set(`<div class="${cls}" style="position:fixed;inset:0;z-index:50"><canvas width="393" height="852"></canvas></div>`);
+      const r = await page.evaluate(() => {
+        const s = getComputedStyle(document.querySelector('.arcade-full'), '::after');
+        return { content: s.content, top: s.top, height: s.height, pe: s.pointerEvents };
+      });
+      expect(r, cls).toEqual({ content: '""', top: '0px', height: '59px', pe: 'none' });
+    }
+    await set('<div class="arcade-full hg2 wide" style="position:fixed;inset:0;z-index:50"></div>');
+    await page.evaluate(() => document.documentElement.style.setProperty('--ps-inset-top', '0px'));
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.arcade-full'), '::after').height)).toBe('0px');
+  });
+
+  it('the respin row at its compact size: each tap area is 44 tall, the two never meet, and they stay inside the gap above', async () => {
+    const css = [ruleOf(styles, '.respins'), ruleOf(styles, '.respin'), targets].join('\n') + '.stage{--respin-h:34px;--respin-gap:6px}.reels{height:120px}';
+    await set('<div class="screen draft"><div class="reels"></div><div class="respins"><button class="respin">TEAM</button><button class="respin era">DECADE</button></div><div class="cats" style="height:30px"></div></div>', css);
+    const r = await page.evaluate(() => {
+      const box = (e) => e.getBoundingClientRect();
+      const reels = box(document.querySelector('.reels'));
+      return [...document.querySelectorAll('.respin')].map((b) => {
+        const q = box(b),
+          s = getComputedStyle(b, '::before');
+        const top = q.top + parseFloat(s.top),
+          bottom = q.bottom - parseFloat(s.bottom);
+        return { h: bottom - top, left: q.left, right: q.right, top, reelsBottom: reels.bottom };
+      });
+    });
+    for (const b of r) {
+      expect(b.h).toBeGreaterThanOrEqual(44);
+      expect(b.top).toBeGreaterThanOrEqual(b.reelsBottom);
+    }
+    expect(r[0].right).toBeLessThan(r[1].left);
   });
 });
