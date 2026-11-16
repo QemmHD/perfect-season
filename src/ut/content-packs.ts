@@ -6,7 +6,6 @@ import { pickFor as bySport } from '../engine/sport';
 import { hashString, rng, shuffle } from '../engine/rng';
 import { easternDateKey } from '../engine/season';
 import { per, promosOn } from './calendar';
-import { lightningWindow, nextLightning } from './flash';
 import { claimed, contentOf, picksFull, withClaim, withContent, type PickState } from './content-state';
 import { promoCards } from './live-cards';
 import { drawGold, ownedCardIds, packRand, SCOUT_STANDOUT } from './packs';
@@ -21,10 +20,9 @@ import type { OwnedCard, RatedCard, UtSport } from './types';
 
 // ---------- purchase limits ----------
 
-export type LimitedKind = 'elite' | 'jumbo' | 'scout' | 'standout' | 'lightning' | 'swap' | 'roster' | 'captains' | 'dynasty';
-/** Claude (packs-2): the Store packs bought under a limit (Scout's Choice and the Swap Desk are picks).
- * Claude (packs-3, audit H2): the Club Collection packs too (roster 2 a day, captains 1 a day, dynasty 1 a week). */
-export const LIMITED_PACKS = ['elite', 'jumbo', 'standout', 'lightning', 'roster', 'captains', 'dynasty'] as const satisfies readonly LimitedKind[];
+export type LimitedKind = 'elite' | 'jumbo' | 'scout' | 'standout' | 'lightning' | 'swap';
+/** Claude (packs-2): the Store packs bought under a limit (Scout's Choice and the Swap Desk are picks). */
+export const LIMITED_PACKS = ['elite', 'jumbo', 'standout', 'lightning'] as const satisfies readonly LimitedKind[];
 export type LimitedPack = (typeof LIMITED_PACKS)[number];
 export const isLimitedPack = (kind: string): kind is LimitedPack => (LIMITED_PACKS as readonly string[]).includes(kind);
 export const LIMITS: Record<LimitedKind, { per: 'day' | 'week' | 'window'; n: number }> = {
@@ -33,25 +31,40 @@ export const LIMITS: Record<LimitedKind, { per: 'day' | 'week' | 'window'; n: nu
   scout: { per: 'week', n: 3 },
   standout: { per: 'week', n: 1 },
   lightning: { per: 'window', n: 1 },
-  // Claude (packs-3, audit C2): one swap a day (it was 3: 21 Scout's Choice picks a week from duplicates)
-  swap: { per: 'day', n: 1 },
-  roster: { per: 'day', n: 2 },
-  captains: { per: 'day', n: 1 },
-  dynasty: { per: 'week', n: 1 },
+  swap: { per: 'day', n: 3 },
 };
 
-/**
- * Weekend Lightning windows, Eastern time. Claude (packs-3, research §8.2): 2 of the 4 weekend slots each
- * week (Sat 12–2 pm and 8–10 pm, Sun 1–3 pm and 7–9 pm), seeded by the week, the same for everyone
- * (flash.ts). Before, every weekend had all four of Sat/Sun 12–2 pm and 8–10 pm.
- */
-export { lightningWindow } from './flash';
+/** Weekend Lightning windows, Eastern time: Saturday and Sunday, 12–2 pm and 8–10 pm. */
+export const LIGHTNING_HOURS = [12, 20];
+export const LIGHTNING_LENGTH_H = 2;
+
+function easternParts(at: number): { day: string; weekday: number; hour: number; minute: number } {
+  const d = new Date(at);
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(d);
+    const g = (t: string) => parts.find((p) => p.type === t)?.value ?? '0';
+    return { day: g('year') + '-' + g('month') + '-' + g('day'), weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(g('weekday')), hour: Number(g('hour')) % 24, minute: Number(g('minute')) };
+  } catch {
+    return { day: d.toISOString().slice(0, 10), weekday: d.getUTCDay(), hour: d.getUTCHours(), minute: d.getUTCMinutes() };
+  }
+}
+
+/** The Lightning window open at `at` ("2026-11-07:12"), with minutes left, or null. */
+export function lightningWindow(at: number): { id: string; minutesLeft: number } | null {
+  const e = easternParts(at);
+  if (e.weekday !== 0 && e.weekday !== 6) return null;
+  for (const h of LIGHTNING_HOURS)
+    if (e.hour >= h && e.hour < h + LIGHTNING_LENGTH_H) return { id: e.day + ':' + h, minutesLeft: (h + LIGHTNING_LENGTH_H - e.hour) * 60 - e.minute };
+  return null;
+}
 
 /** Minutes until the next Lightning window opens (0 while one is open). */
 export function minutesToLightning(at: number): number {
   if (lightningWindow(at)) return 0;
-  const w = nextLightning(at);
-  return w ? Math.max(1, Math.ceil((w.start - at) / 60000)) : 0;
+  const e = easternParts(at);
+  const start = at - e.minute * 60000;
+  for (let h = 1; h <= 24 * 8; h++) if (lightningWindow(start + h * 3600000)) return Math.max(1, h * 60 - e.minute);
+  return 0;
 }
 
 export function limitKey(kind: LimitedKind, day: string, at: number): string | null {
@@ -75,7 +88,7 @@ export function recordBuy(ut: UtState, kind: LimitedKind, day: string, at: numbe
   if (!key) return ut;
   const week = weekOf(day);
   return withContent(ut, (c) => {
-    const kept = Object.fromEntries(Object.entries(c.buys ?? {}).filter(([k]) => k.includes(day) || k.includes(week) || k.startsWith('flash:') || (kind === 'lightning' && k.startsWith('lightning:'))).slice(-40));
+    const kept = Object.fromEntries(Object.entries(c.buys ?? {}).filter(([k]) => k.includes(day) || k.includes(week) || (kind === 'lightning' && k.startsWith('lightning:'))).slice(-40));
     return { ...c, buys: { ...kept, [key]: (kept[key] ?? 0) + 1 } };
   });
 }

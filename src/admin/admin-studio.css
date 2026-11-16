@@ -661,14 +661,3 @@
   border-radius: 50%;
   background: rgba(25, 227, 201, 0.1);
 }
-/* Claude (packs-3): the Store Packs editor's minimum price line under the price field */
-.admin-studio .adm-min {
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--sub);
-  text-transform: none;
-}
-.admin-studio .adm-min.low {
-  color: var(--red, #ff6b6b);
-  font-weight: 700;
-}

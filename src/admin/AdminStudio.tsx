@@ -6,11 +6,9 @@ import React, { useState } from "react";
 import { SPORT, SPORT_NAME } from "../engine/sport";
 import type { Profile } from "../lib/profile";
 import {
-  belowFloor,
   catalogOf,
   checkedCatalog,
   defaultCatalog,
-  floorPrice,
   STUDIO_PACKS,
   STUDIO_TIERS,
   type Catalog,
@@ -113,10 +111,7 @@ export function PackStudio({
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   const p = draft[kind],
-    // Claude (packs-3): a price under a pack's minimum (floorPrice) can't be published
-    min = floorPrice(SPORT, p.counts),
-    below = belowFloor(draft, SPORT),
-    valid = below.length ? null : checkedCatalog(draft),
+    valid = checkedCatalog(draft),
     total = Object.values(p.counts).reduce((a, b) => a + b, 0),
     edit = (fn: (c: Catalog) => void) =>
       setDraft((c) => {
@@ -285,17 +280,7 @@ export function PackStudio({
                       c[kind].price = Number(e.target.value);
                     })
                   }
-                  aria-describedby="adm-price-min"
                 />
-                <small
-                  id="adm-price-min"
-                  className={"adm-min" + (p.price < min ? " low" : "")}
-                >
-                  Minimum {min.toLocaleString("en-US")} coins
-                  {p.price < min
-                    ? ": raise the price to publish. A Weekly Standout never sells for less than the Standout Guarantee asks."
-                    : ""}
-                </small>
               </label>
             </div>
           </details>
@@ -362,11 +347,7 @@ export function PackStudio({
       )}
       {!valid && (
         <p className="adm-error" role="alert">
-          {below.length
-            ? below.map((k) => draft[k].name).join(", ") +
-              (below.length > 1 ? " are" : " is") +
-              " under the minimum price."
-            : "Use a name, 500–100,000 coins and 1–40 cards per pack."}
+          Use a name, 500–100,000 coins and 1–40 cards per pack.
         </p>
       )}
       <p className="adm-note" role="status">

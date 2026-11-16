@@ -2,13 +2,7 @@
 import { finalizeEvent, getPublicKey, verifyEvent } from "nostr-tools/pure";
 import { ADMIN_PUBKEY } from "../net/gifts";
 import { pool, NET_ON, NS_SUFFIX, KIND_APP, type Event } from "../net/nostr";
-import {
-  belowFloor,
-  checkedCatalog,
-  floorPrice,
-  setCatalog,
-  type Catalog,
-} from "./catalog";
+import { checkedCatalog, setCatalog, type Catalog } from "./catalog";
 import type { UtSport } from "../ut/types";
 const tag = "ps-admin-catalog" + NS_SUFFIX;
 const latest: Partial<Record<UtSport, Event>> = {};
@@ -37,7 +31,7 @@ export function catalogEventOf(e: Event, admin = ADMIN_PUBKEY) {
       !e.tags.some((t) => t[0] === "d" && t[1] === tag + ":" + c.sport)
     )
       return null;
-    const catalog = checkedCatalog(c.catalog, c.sport as UtSport);
+    const catalog = checkedCatalog(c.catalog);
     return catalog ? { sport: c.sport as UtSport, catalog } : null;
   } catch {
     return null;
@@ -92,15 +86,6 @@ export async function publishCatalog(
   const checked = checkedCatalog(catalog);
   if (!checked)
     throw Error("Use 1–40 cards, counts 0–20 and a price of 500–100,000.");
-  // Claude (packs-3): never publish a price under a pack's minimum (floorPrice)
-  const low = belowFloor(checked, sport)[0];
-  if (low)
-    throw Error(
-      checked[low].name +
-        " needs at least " +
-        floorPrice(sport, checked[low].counts).toLocaleString("en-US") +
-        " coins.",
-    );
   const e = finalizeEvent(
     {
       kind: KIND_APP,

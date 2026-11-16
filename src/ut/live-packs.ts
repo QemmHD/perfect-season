@@ -15,7 +15,6 @@ import { FINALE_KIND, promoCards } from './live-cards';
 import { fill, type Odds, type PackDef } from './packs';
 import type { Pool } from './pool';
 import { fcToDisplay } from './fc-scale';
-import { boosted, boostOf } from './flash';
 import { weekOf } from './sbc';
 import type { UtState } from './state';
 import type { RatedCard, UtSport } from './types';
@@ -29,71 +28,48 @@ const G82: Odds = { g82: 1 };
 export const LEGEND_PROGRAM = 0.005;
 const rep = (n: number, o: Odds) => Array.from({ length: n }, () => o);
 
+export const PROGRAM_PRICE = 5000;
 export const GUARANTEE_PRICE = 12000;
 /**
- * The schedule's prices were planned on a larger coin scale; ours pays 60/30 a match. A guarantee scales
- * its scheduled price by this factor (and never costs under GUARANTEE_OVER × the program pack, below).
+ * The schedule's prices were planned on a larger coin scale; ours pays 60/30 a match. Each template
+ * scales its scheduled price so a base program pack's quick-sell value lands near half its price
+ * (FC research: 45-60%); the pricier elite-tier packs keep their relative premium (lower EV, rarer hits).
  */
-export const PRICE_FACTOR: Record<UtSport, Record<string, number>> = { nba: { guarantee: 0.27 }, nfl: { guarantee: 0.155 }, soccer: { guarantee: 0.22 } };
-/**
- * Claude (packs-3, audit H3 and M5): one program-pack price per sport. Every program pack returns about the
- * same quick-sell value whatever its odds (NBA 1,690-1,800 coins: a rarer program card is offset by the
- * Standouts it replaces), so the schedule's premium for low-odds packs only made them poor value (Ring
- * Night returned 40%). At these prices every scheduled program pack returns 0.51-0.55, its Friday boost
- * keeps it under 0.60, and a named flash sale's 25% off keeps it at or under 0.75. Soccer has no Live
- * Calendar yet; its price follows its Premium (the same ratio as basketball's) for when it has one.
- */
-export const LIVE_PROGRAM_PRICE: Record<UtSport, number> = { nba: 3300, nfl: 2000, soccer: 2800 };
-/** A Program Guarantee costs at least this many program packs (audit H3: 3,200 against a 3,000 pack before). */
-export const GUARANTEE_OVER = 2.2;
-const ceil100 = (x: number) => Math.ceil(x / 100) * 100;
+export const PRICE_FACTOR: Record<UtSport, Record<string, number>> = { nba: { program: 0.6, guarantee: 0.27 }, nfl: { program: 0.36, guarantee: 0.155 }, soccer: { program: 0.5, guarantee: 0.22 } };
 /** A program pack's golds 80+ (`rare`, the old rare golds) and any golds, and a guarantee's golds 82+, per sport. Soccer has no calendar yet: kept for when it does. */
 const LIVE_SHAPE: Record<UtSport, { rare: number; gold: number; guarantee: number }> = { nba: { rare: 3, gold: 4, guarantee: 5 }, nfl: { rare: 6, gold: 9, guarantee: 11 }, soccer: { rare: 4, gold: 5, guarantee: 7 } };
 
 /** The pack's promo id (`live:s4-honors-y2` → `s4-honors-y2`). */
 export const promoOfPack = (kind: string) => kind.replace(/^live(-plus|-pick)?:/, '').split(':')[0];
 
-/**
- * A program pack's published shape: slots, price, and how its program slot divides. With `at`, a pack
- * inside its promo's Friday boost (flash.ts) carries the boosted program chance (× 1.5, at most 60%) and
- * `boost.until`; the Legend chance stays and the Weekly Standout share shrinks.
- */
-export function livePackDef(sport: UtSport, pack: Pick<CalPack, 'id' | 'tpl' | 'name' | 'price' | 'programOdds' | 'extraOdds'>, at?: number): PackDef & { odds: number; extra: [string, number][]; boost: { until: number } | null } {
+/** A program pack's published shape: slots, price, and how its program slot divides. */
+export function livePackDef(sport: UtSport, pack: Pick<CalPack, 'id' | 'tpl' | 'name' | 'price' | 'programOdds' | 'extraOdds'>): PackDef & { odds: number; extra: [string, number][] } {
   const tpl = schedule()?.defaults.packTemplates[pack.tpl] ?? {};
   const guarantee = pack.tpl === 'guarantee';
-  const base = guarantee ? 1 : (pack.programOdds ?? tpl.programOdds ?? 0.3);
+  const odds = guarantee ? 1 : (pack.programOdds ?? tpl.programOdds ?? 0.3);
   // the Finale never fills a pack slot (owner decision: SBC-only)
-  const extra0 = Object.entries(pack.extraOdds ?? {}).filter(([id]) => promoById(id)?.kind !== FINALE_KIND && promoById(id)?.kind !== 'season-finale');
-  const extraP0 = extra0.reduce((a, [, p]) => a + p, 0);
-  const boost = !guarantee && at !== undefined ? boostOf(promoOfPack(pack.id), sport, at) : null;
-  // (the whole program share is boosted, each promo of it in proportion)
-  const k = boost && base + extraP0 > 0 ? boosted(base + extraP0) / (base + extraP0) : 1;
-  const odds = base * k;
-  const extra: [string, number][] = extra0.map(([id, p]) => [id, p * k]);
-  const extraP = extraP0 * k;
+  const extra = Object.entries(pack.extraOdds ?? {}).filter(([id]) => promoById(id)?.kind !== FINALE_KIND && promoById(id)?.kind !== 'season-finale');
+  const extraP = extra.reduce((a, [, p]) => a + p, 0);
   const legend = Math.min(LEGEND_PROGRAM, Math.max(0, 1 - odds - extraP));
   const slot: Odds = guarantee ? { program: 1 } : { program: odds + extraP, legend, standout: 1 - odds - extraP - legend };
   const ls = LIVE_SHAPE[sport];
   const slots = guarantee ? [...rep(ls.guarantee, G82), slot] : [...rep(ls.gold, G75), ...rep(ls.rare, G80), slot];
   const name = per(pack.name, sport) ?? pack.id;
-  const program = LIVE_PROGRAM_PRICE[sport];
-  const price = guarantee ? Math.max(Math.round(((pack.price ?? tpl.price ?? GUARANTEE_PRICE) * (PRICE_FACTOR[sport].guarantee ?? 1)) / 100) * 100, ceil100(GUARANTEE_OVER * program)) : program;
   return {
     kind: pack.id as PackDef['kind'],
     name,
-    price,
+    price: Math.round(((pack.price ?? tpl.price ?? (guarantee ? GUARANTEE_PRICE : PROGRAM_PRICE)) * (PRICE_FACTOR[sport][pack.tpl] ?? 1)) / 100) * 100,
     blurb: guarantee
       ? slots.length + ' cards: ' + (slots.length - 1) + ' golds ' + fcToDisplay(82, sport) + '+ and one program card guaranteed'
-      : slots.length + ' cards: ' + (ls.rare + ls.gold) + ' golds (' + ls.rare + ' of them ' + fcToDisplay(80, sport) + '+) and a program slot (' + Math.round((odds + extraP) * 100) + '% a program card' + (boost ? ', boosted' : '') + ', ' + Math.round(legend * 1000) / 10 + '% a Legend, otherwise a Weekly Standout)',
+      : slots.length + ' cards: ' + (ls.rare + ls.gold) + ' golds (' + ls.rare + ' of them ' + fcToDisplay(80, sport) + '+) and a program slot (' + Math.round((odds + extraP) * 100) + '% a program card, ' + Math.round(legend * 1000) / 10 + '% a Legend, otherwise a Weekly Standout)',
     slots,
     odds,
     extra,
-    boost,
   };
 }
 
 /** The pack definition for a pack id, from the schedule (any cycle). */
-export function packOfKind(kind: string): (CalPack & { cycleId: string }) | null {
+function packOf(kind: string): (CalPack & { cycleId: string }) | null {
   const s = schedule();
   if (!s) return null;
   const m = /^(.*?)(-y\d+)?$/.exec(kind)!;
@@ -103,16 +79,15 @@ export function packOfKind(kind: string): (CalPack & { cycleId: string }) | null
 
 export function livePackName(sport: UtSport, kind: string): string {
   if (kind.startsWith('live-pick:')) return (per(promoById(promoOfPack(kind))?.name, sport) ?? 'Program') + ' Pick';
-  const p = packOfKind(kind);
+  const p = packOf(kind);
   return p ? (per(p.name, sport) ?? 'Program Pack') : 'Program Pack';
 }
 
-/** Open a program pack: its slots, the program slot drawn from the released cards of its promos (boosted when `at` is in a boost). */
-export function openLivePack(pool: Pool, kind: string, rand: Rand, day: string, week = weekOf(day), owned?: ReadonlySet<string>, at?: number): RatedCard[] {
-  const p = packOfKind(kind);
+/** Open a program pack: its slots, the program slot drawn from the released cards of its promos. */
+export function openLivePack(pool: Pool, kind: string, rand: Rand, day: string, week = weekOf(day), owned?: ReadonlySet<string>): RatedCard[] {
+  const p = packOf(kind);
   if (!p) return [];
-  // (packs-3: opened at `at`, inside a Friday boost the program slot is the boosted one)
-  const def = livePackDef(pool.sport, p, at);
+  const def = livePackDef(pool.sport, p);
   const promo = promoOfPack(kind);
   const draw = (r: Rand, have?: ReadonlySet<string>): RatedCard | null => {
     // which promo this slot is (the pack's own, or one of its extras), in proportion to their odds

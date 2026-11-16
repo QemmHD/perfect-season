@@ -25,22 +25,8 @@ import { stampsBalance } from '../scout-stamps';
 import { standoutProgram } from '../standouts';
 import { freshUt, migrateUt, type UtState } from '../state';
 import type { CardMint, RatedCard, Tier } from '../types';
-import { diffSnapshot, digest, type PacksSnapshot, sbcDays, snapshotEditions, takeSnapshot } from './snapshot';
-import { onScale } from '../rate';
+import { diffSnapshot, type PacksSnapshot, snapshotEditions, takeSnapshot } from './snapshot';
 
-/** The six upgrades exactly as they were before packs-3 (for the catalogue fixture). */
-function legacyUpgrades(day: string): Sbc[] {
-  const sc = (x: number) => onScale(x, SPORT);
-  const t: Omit<Sbc, 'id' | 'kind'>[] = [
-    { title: 'Bronze Upgrade', blurb: 'Any five cards for a Silver pack.', size: 5, reqs: [{ k: 'tier', tier: 'bronze', n: 5 }], reward: { pack: 'silver' } },
-    { title: 'Silver Upgrade', blurb: 'Five silvers (or better) for a Gold pack.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { pack: 'gold' } },
-    { title: 'Gold Upgrade', blurb: 'Five good golds for a Premium pack.', size: 5, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'teamOvr', ovr: sc(78) }], reward: { pack: 'premium' } },
-    { title: 'Silver to Gold', blurb: 'Five silvers for a gold.', size: 5, reqs: [{ k: 'tier', tier: 'silver', n: 5 }], reward: { card: { tier: 'gold' } } },
-    { title: 'Golden Hour', blurb: 'Eight golds for a better one.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(77) }], reward: { card: { tier: 'gold', minOvr: sc(84) } } },
-    { title: 'Elite Pull', blurb: 'Eight strong golds for a star.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(83) }], reward: { card: { tier: 'gold', minOvr: sc(88) } } },
-  ];
-  return t.map((x, i) => ({ ...x, id: 'u:' + day + ':' + i + ':0', kind: 'upgrade' as const, ...(i < 3 ? { left: 2 } : {}) }));
-}
 const FIXTURES = import.meta.glob<PacksSnapshot>('../__fixtures__/packs-before/*.json', { import: 'default' });
 const fixture = () => FIXTURES['../__fixtures__/packs-before/' + SPORT + '.json']();
 const MINT: CardMint = { serial: 7, totalAtPull: 7, requestId: 'packs-test', namespace: 'inspect' };
@@ -228,9 +214,8 @@ export function packsEconomySuite(): void {
       // a rating module another team owns moved: the fixture can't tell our changes from theirs
       if (now.foreignFingerprint !== before.foreignFingerprint) throw new Error('foreign rating modules changed: run scripts/packs/rebaseline.ts, review the OVR diff, accept (' + JSON.stringify(diffSnapshot(before, now).foreign) + ')');
       const diff = diffSnapshot(before, now);
-      // quick-sell: Spotlight, GOAT and Standout (packs-1); soccer's SBC catalogue: the five templates (packs-1);
-      // every day's upgrades (packs-3 value rules: the next test proves nothing else in the catalogue moved)
-      const allowed: Record<string, (path: string) => boolean> = { qs: (p) => ['spotlight', 'goat', 'standout'].includes(p), sbcs: () => true };
+      // quick-sell: Spotlight, GOAT and Standout (packs-1); soccer's SBC catalogue: the five templates (packs-1)
+      const allowed: Record<string, (path: string) => boolean> = { qs: (p) => ['spotlight', 'goat', 'standout'].includes(p), sbcs: () => SPORT === 'soccer' };
       const unexpected = Object.entries(diff).flatMap(([sec, paths]) => paths.filter((p) => !allowed[sec]?.(p)).map((p) => sec + '.' + p));
       expect(unexpected).toEqual([]);
       expect(diff.qs?.length).toBeGreaterThan(0);
@@ -239,11 +224,8 @@ export function packsEconomySuite(): void {
     it('keeps the 60-day SBC catalogue (NBA, NFL) and every started Live Calendar entry', async () => {
       const before = await fixture();
       const now = takeSnapshot(pool);
-      // Claude (packs-3): the six upgrades are retuned by the SBC value rules (sbc.ts UPGRADE_TUNE); with the
-      // upgrades as they were, every day's catalogue (dailies, weeklies, ids and order) is the fixture's
-      const legacy = Object.fromEntries(sbcDays().map((day) => [day, digest(JSON.stringify([...sbcsFor(pool, day).filter((x) => x.kind !== 'upgrade'), ...legacyUpgrades(day)]))]));
       if (SPORT === 'soccer') expect(Object.keys(now.sbcs)).toEqual(Object.keys(before.sbcs));
-      else expect(legacy).toEqual(before.sbcs);
+      else expect(now.sbcs).toEqual(before.sbcs);
       expect(now.started).toEqual(before.started);
       expect(Object.keys(now.started).length).toBe(11);
       expect(now.receipts).toEqual(before.receipts);

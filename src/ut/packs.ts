@@ -113,15 +113,10 @@ export const CONTENT_PRICES: Record<UtSport, { scout: number; elite: number; jum
   // Claude (packs-2): Elite Gold re-specced to golds 82+ with an 84+ last slot (research §8.2). Research
   // priced it 3,000, but its quick-sell value is about 1,270 (NFL 875, soccer 925), so 3,000 would return
   // 42%: it is 2,600 (NFL 1,500 → 1,800, soccer unchanged 1,900), about 49%. packs-3 tunes it again.
-  // Claude (packs-3, research §8.2): every sold pack returns 45–60% of its price (EV band, exploits suite),
-  // and a pack a named flash sale discounts stays at or under 75% even at the sale price: Jumbo is sold
-  // 30% off in sales, so it sits near 0.51 (NBA 3,600 → 4,200, NFL 2,700 → 3,000, soccer 3,200 → 3,300);
-  // the Standout Guarantee near 0.52–0.55 so its Lightning copy (25% off) stays at 0.69–0.74.
-  nba: { scout: 650, elite: 2600, jumbo: 4200, standout: 3000, lightning: 2250 },
-  nfl: { scout: 250, elite: 1800, jumbo: 3000, standout: 1800, lightning: 1350 },
+  nba: { scout: 650, elite: 2600, jumbo: 3600, standout: 3000, lightning: 2250 },
+  nfl: { scout: 250, elite: 1800, jumbo: 2700, standout: 1800, lightning: 1350 },
   // soccer (Claude 2026-11-01): eleven starters, about 1.4 times basketball's cards a pack, each worth 0.7 as much sold
-  // (packs-3: soccer's Standout Guarantee 2,600 → 2,400 returned 48%; Lightning keeps 25% off, 1,800)
-  soccer: { scout: 500, elite: 1900, jumbo: 3300, standout: 2400, lightning: 1800 },
+  soccer: { scout: 500, elite: 1900, jumbo: 3200, standout: 2600, lightning: 1950 },
 };
 
 /**
@@ -137,8 +132,7 @@ export const PACK_SHAPE = {
   // packs that went over 60% EV are re-priced to about 57-59% (Silver 400 → 500, Gold 900 → 1,050,
   // Position 700 → 800; NFL Silver 320 → 350, Gold 900 → 1,000, Unit 500 → 575; soccer Silver 380 → 450).
   // packs-3 tunes every price again against its EV band.
-  // Claude (packs-3): Premium 1,800 → 1,900 (it returned 61%, above the 45–60% band).
-  nba: { price: { bronze: 250, silver: 500, gold: 1050, premium: 1900, position: 800 }, bronze: [4, 1], silver: [1, 3, 1], gold: [2, 2, 1], premium: [2, 5, 1], position: 3, qs: 1, rare: { gold: 1, premium: 3, position: 1 } },
+  nba: { price: { bronze: 250, silver: 500, gold: 1050, premium: 1800, position: 800 }, bronze: [4, 1], silver: [1, 3, 1], gold: [2, 2, 1], premium: [2, 5, 1], position: 3, qs: 1, rare: { gold: 1, premium: 3, position: 1 } },
   // football: 23 starters to fill, so two to three times the cards, each worth about a third as much sold
   nfl: {
     price: { bronze: 175, silver: 350, gold: 1000, premium: 1400, position: 575 },
@@ -563,8 +557,6 @@ export interface OpenOpts {
   /** the club's card ids (ownedCardIds): Standout and program slots never repeat an owned card while
    * any of their set is unowned, and a `prefer` pack's golds prefer an unowned card (curvePick) */
   owned?: ReadonlySet<string>;
-  /** Claude (packs-3): when it opens (ms; default now): a program pack inside its Friday boost opens boosted */
-  at?: number;
 }
 
 /** A Weekly Standout; one the player owns is redrawn among the week's he doesn't (chase protection). */
@@ -741,7 +733,7 @@ export function openPack(pool: Pool, kind: string, seed?: string, week = current
   // Claude: Scout's Choice is a pick of three, not a pack (content-packs.ts pickOptions)
   if (kind === 'scout' || kind === 'standout-pick' || kind.startsWith('live-pick:')) throw new Error('This is a pick, not a pack.');
   // Claude wave 3: Live Calendar program packs (live-packs.ts)
-  if (kind.startsWith('live:') || kind.startsWith('live-plus:')) return openLivePack(pool, kind, rand, easternDateKey(opts.at === undefined ? undefined : new Date(opts.at)), week, opts.owned, opts.at ?? Date.now());
+  if (kind.startsWith('live:') || kind.startsWith('live-plus:')) return openLivePack(pool, kind, rand, easternDateKey(), week, opts.owned);
   // The rare slot is rolled and numbered by the shared registry, never by this local RNG.
   if (kind === 'spotlight' || kind.startsWith('event-spotlight:')) throw new Error('This pack needs the shared card registry.');
   if (kind === 'admin-goat') throw new Error('This pack needs an admin award and the card registry.');

@@ -40,13 +40,10 @@ export function defaultCatalog(sport: UtSport): Catalog {
   // of its price (NBA 1,500 → 1,700, NFL 900 → 1,100); soccer's Captains and Dynasty fell to 35% when
   // packs-1 moved Standout quick-sell under Hot Season (2,300 → 1,450, 4,300 → 2,700). Saved recipes keep
   // the price they were awarded at (snapshots).
-  // Claude (packs-3, audit H2): no Club Collection pack sells a Weekly Standout for less than the Standout
-  // Guarantee does (floorPrice), so Captains and Dynasty rose: NBA 2,400 → 2,500 and 4,400 → 4,800, NFL
-  // 1,000 → 1,200 and 1,900 → 2,200, soccer 1,450 → 1,700 and 2,700 → 3,200 (all inside the 45-60% band).
   const prices = {
-    nba: [1700, 2500, 4800],
-    nfl: [1100, 1200, 2200],
-    soccer: [1100, 1700, 3200],
+    nba: [1700, 2400, 4400],
+    nfl: [1100, 1000, 1900],
+    soccer: [1000, 1450, 2700],
   }[sport];
   STUDIO_PACKS.forEach((k, i) => {
     c[k].price = prices[i];
@@ -58,54 +55,10 @@ export function defaultCatalog(sport: UtSport): Catalog {
     }
   return c;
 }
-/**
- * Claude (packs-3, audit H2): what one card of each recipe tier is worth in a Club Collection pack's
- * minimum price. `silver`, `gold` and `rare` are a slot's mean quick-sell value (value.ts slotQs: a silver,
- * a gold, a gold 78+); `standout` is the coins the Standout Guarantee asks for its Standout: its price less
- * its golds' quick-sell value ÷ 0.6. The pack-economy tests pin these to the live definitions.
- */
-export const STUDIO_VALUE: Record<
-  UtSport,
-  Record<(typeof STUDIO_TIERS)[number], number>
-> = {
-  nba: { silver: 61, gold: 151, rare: 159, standout: 1196 },
-  nfl: { silver: 21.4, gold: 53.6, rare: 56.8, standout: 428 },
-  soccer: { silver: 42.8, gold: 89.6, rare: 93.1, standout: 883 },
-};
-/** The share of its quick-sell value a pack's price may not go under (a pack returns at most 60%). */
-export const STUDIO_EV_MAX = 0.6;
-/**
- * The least a Club Collection pack may cost: each Standout at the Standout Guarantee's price for one,
- * the rest at their quick-sell value ÷ 0.6, rounded up to 100 coins. A live catalog priced below it still
- * loads, at this price; the Store Packs editor shows it and refuses to publish under it.
- */
-export function floorPrice(
-  sport: UtSport,
-  counts: StudioPack["counts"],
-): number {
-  const v = STUDIO_VALUE[sport];
-  const rest =
-    (counts.silver * v.silver + counts.gold * v.gold + counts.rare * v.rare) /
-    STUDIO_EV_MAX;
-  return Math.max(
-    500,
-    Math.ceil((counts.standout * v.standout + rest) / 100) * 100,
-  );
-}
 export function catalogOf(sport: UtSport): Catalog {
   return catalogs[sport] ?? defaultCatalog(sport);
 }
-/** Claude (packs-3): the packs of a catalog priced under their floorPrice (the editor refuses to publish them). */
-export function belowFloor(catalog: Catalog, sport: UtSport): StudioKind[] {
-  return STUDIO_PACKS.filter(
-    (k) => catalog[k].price < floorPrice(sport, catalog[k].counts),
-  );
-}
-/**
- * A catalog's packs, checked; with `sport`, each price is raised to its floorPrice (packs-3), so a catalog
- * published before the floor existed (or below it) still loads and never undercuts the Standout Guarantee.
- */
-export function checkedCatalog(raw: unknown, sport?: UtSport): Catalog | null {
+export function checkedCatalog(raw: unknown): Catalog | null {
   if (!raw || typeof raw !== "object") return null;
   const out = {} as Catalog;
   for (const k of STUDIO_PACKS) {
@@ -137,9 +90,7 @@ export function checkedCatalog(raw: unknown, sport?: UtSport): Catalog | null {
     if (total < 1 || total > 40) return null;
     out[k] = {
       name: p.name.trim(),
-      price: sport
-        ? Math.min(100000, Math.max(p.price, floorPrice(sport, counts)))
-        : p.price,
+      price: p.price,
       enabled: p.enabled,
       counts,
     };
@@ -147,7 +98,7 @@ export function checkedCatalog(raw: unknown, sport?: UtSport): Catalog | null {
   return out;
 }
 export function setCatalog(sport: UtSport, catalog: Catalog) {
-  const checked = checkedCatalog(catalog, sport);
+  const checked = checkedCatalog(catalog);
   if (!checked) throw Error("Invalid pack catalog");
   catalogs[sport] = checked;
   revision++;
