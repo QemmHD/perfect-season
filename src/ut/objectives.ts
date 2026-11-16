@@ -110,12 +110,34 @@ export const LIFETIME: [id: string, title: string, counter: Counter | 'collect',
   ['online-5', 'Against the world.', 'onlineWins', 5, { pack: 'premium', sp: 300 }],
 ];
 
+// Claude, 2026-11-16 (ut-1 review): memoised by array identity (saves are replaced, never mutated,
+// in the app; the length check also catches a test's in-place push), so a long-lived club's thousands
+// of receipts and cards are walked once per change, not on every badge, strip and One-More read.
+const claimSets = new WeakMap<readonly string[], { n: number; set: ReadonlySet<string> }>();
+/** `claims` as a Set, built once per receipts array. */
+export function claimSetOf(claims: readonly string[]): ReadonlySet<string> {
+  const hit = claimSets.get(claims);
+  if (hit && hit.n === claims.length) return hit.set;
+  const set = new Set(claims);
+  claimSets.set(claims, { n: claims.length, set });
+  return set;
+}
+const collectedCounts = new WeakMap<object, { owned: number; collected: readonly string[] | undefined; n: number; count: number }>();
+/** Different cards ever collected (discovered editions plus every owned copy's card), once per change. */
+export function collectedCount(ut: Pick<UtState, 'owned' | 'collected'>): number {
+  const hit = collectedCounts.get(ut.owned);
+  if (hit && hit.owned === ut.owned.length && hit.collected === ut.collected && hit.n === (ut.collected?.length ?? 0)) return hit.count;
+  const count = new Set([...(ut.collected ?? []), ...ut.owned.map((c) => c.cardId)]).size;
+  collectedCounts.set(ut.owned, { owned: ut.owned.length, collected: ut.collected, n: ut.collected?.length ?? 0, count });
+  return count;
+}
+
 export function objectiveDeck(ut: UtState, day: string): Objective[] {
   const h = hqOf(ut),
     week = weekKey(day),
     out: Objective[] = [],
     // a Set, not h.claims.includes per objective: a long-lived club has thousands of receipts
-    claims = new Set(h.claims);
+    claims = claimSetOf(h.claims);
   const period = (group: 'daily' | 'weekly', key: string, defs: ObjectiveDef[], counts: Totals, current: boolean) => {
     for (const [id, title, counter, target, reward] of defs) {
       const claim = group + ':' + key + ':' + id,
@@ -154,7 +176,7 @@ export function objectiveDeck(ut: UtState, day: string): Objective[] {
   };
   period('daily', day, DAILY, h.days[day] ?? emptyTotals(), true);
   period('weekly', week, WEEKLY, h.weeks[week] ?? emptyTotals(), true);
-  const collected = new Set([...(ut.collected ?? []), ...ut.owned.map((c) => c.cardId)]).size;
+  const collected = collectedCount(ut);
   for (const [id, title, counter, target, reward] of LIFETIME) {
     const key = 'lifetime:' + id,
       progress = counter === 'collect' ? collected : h.totals[counter];

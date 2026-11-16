@@ -128,6 +128,17 @@ function bag(ids: Iterable<string>): string {
   }
   return n + '.' + sum.toString(36) + '.' + x.toString(36);
 }
+// Claude, 2026-11-16 (ut-1 review): a bag per array, once (arrays are replaced, never mutated, in the
+// app; the length check also catches an in-place push): a 3,000-card club hashed every read cost 0.3 ms.
+const bags = new WeakMap<object, { n: number; bag: string }>();
+function bagOf<T>(list: readonly T[], id: (x: T) => string): string {
+  const hit = bags.get(list);
+  if (hit && hit.n === list.length) return hit.bag;
+  const b = bag(list.map(id));
+  bags.set(list, { n: list.length, bag: b });
+  return b;
+}
+const EMPTY: readonly string[] = [];
 /**
  * The signature of everything the pool rows read: owned editions, discovered editions, set and
  * collection receipts, and Moments progress. ≤ 80 characters.
@@ -143,8 +154,8 @@ export function poolSig(ut: UtState, sport: UtSport): string {
     if (m.claimed) taken++;
   }
   return [
-    sport + bag(ut.owned.map((c) => c.cardId)),
-    bag(ut.collected ?? []),
+    sport + bagOf(ut.owned, (c) => c.cardId),
+    bagOf(ut.collected ?? EMPTY, (c) => c),
     setClaims + '.' + (ut.collectionClaims?.length ?? 0) + '.' + done + '.' + taken,
   ]
     .join(':')

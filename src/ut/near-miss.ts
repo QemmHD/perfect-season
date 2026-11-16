@@ -6,7 +6,7 @@
 // Light like next-action.ts (claimables-graph.test.ts).
 import { easternClock } from './claimables';
 import type { GoTarget } from './go';
-import { battlesNow, CIRCUIT_GAMES, CIRCUIT_STEPS, dailyLeft, packName, plural, rivalsNext, RUNG_PACKS, RUNGS } from './next-action';
+import { battlesNow, CIRCUIT_GAMES, CIRCUIT_STEPS, DAILY_BONUS_LINE, dailyLeft, packName, paidLeftOf, plural, rivalsNext, rungPays } from './next-action';
 import { hqOf, seasonFor, SEASON_STEP, SEASON_TIERS, weekKey } from './objectives';
 import type { UtState } from './state';
 import type { UtSport } from './types';
@@ -50,17 +50,18 @@ export function nearMisses(ut: UtState, sport: UtSport, now: number, extras: Nea
   // today's three objectives: the last one
   const d = dailyLeft(ut, day);
   if (d && (d.unit !== 'point' || d.left <= 12))
-    out.push({ id: 'daily', steps: d.unit === 'point' ? 1 : d.left, text: plural(d.left, d.unit) + " to today's bonus", go: { view: 'battles', label: 'PLAY' }, stake: '100 coins' });
-  // Season Pass: the next level, within half a level
+    out.push({ id: 'daily', steps: d.unit === 'point' ? 1 : d.left, text: plural(d.left, d.unit) + " to today's bonus", go: { view: 'battles', label: 'PLAY' }, stake: DAILY_BONUS_LINE });
+  // Season Pass: the next level, within half a level. SP is earned by playing, so the chip leads to a
+  // match (the Season Pass screen only shows the track)
   const s = h.seasons[seasonFor(day).id],
     xp = s?.xp ?? 0,
     tier = Math.floor(xp / SEASON_STEP) + 1,
     left = tier * SEASON_STEP - xp;
   if (tier <= SEASON_TIERS && left <= SEASON_STEP / 2)
-    out.push({ id: 'pass', steps: Math.ceil(left / SP_PER_WIN), text: left + ' SP to level ' + tier, go: { view: 'season', label: 'PASS' } });
-  // Squad Battles: the next rung that pays a pack
+    out.push({ id: 'pass', steps: Math.ceil(left / SP_PER_WIN), text: left + ' SP to level ' + tier, go: { view: 'battles', label: 'PLAY' } });
+  // Squad Battles: the next rung, while it still pays its pack (first clear this week, paid games left)
   const b = battlesNow(ut, week),
-    rungPack = ut.battles.week === week && ut.battles.cleared >= RUNGS ? undefined : RUNG_PACKS[b.level][b.rung];
+    rungPack = rungPays(b, b.rung, b.level, paidLeftOf(ut, day));
   if (rungPack) out.push({ id: 'battles', steps: 1, text: '1 win to ' + packName(rungPack, sport), go: { view: 'battles', label: 'PLAY' } });
   for (const x of extras.sets ?? [])
     if (x.left >= 1) out.push({ id: 'set:' + x.id, steps: x.left, text: plural(x.left, 'card') + ' away · ' + x.title, go: { view: 'sets', label: 'SETS' } });

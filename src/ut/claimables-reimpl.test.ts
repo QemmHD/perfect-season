@@ -13,7 +13,7 @@ import { claimed } from './content-state';
 import { dailyStatus, previousDay, STREAK_DAYS } from './content-packs';
 import { standoutObjectiveId, standoutWins } from './content-progress';
 import { cupClaimId, cupOf } from './cup';
-import { CALENDAR_DAYS, calendarStatus } from './daily-hub';
+import { CALENDAR_DAYS, calendarStatus, DAILY_BONUS } from './daily-hub';
 import { NEW_ERA_ID, newEraReady } from './new-era';
 import * as N from './next-action';
 import { seasonReady } from './objectives';
@@ -65,5 +65,9 @@ describe('next-action.ts constants equal the rules they mirror', () => {
     for (const l of LEVELS) expect(N.RUNG_PACKS[l]).toEqual(LEVEL[l].packs);
     expect(N.CIRCUIT_GAMES).toBe(CG);
     expect(N.CIRCUIT_STEPS).toEqual(CIRCUIT_PRIZES.map((p) => [p.wins, p.title]));
+  });
+  it("today's all-three bonus (daily-hub.ts DAILY_BONUS), shown on the strip and the near-miss chip", () => {
+    expect(N.DAILY_BONUS_REWARD).toEqual(DAILY_BONUS);
+    expect(N.DAILY_BONUS_LINE).toBe(DAILY_BONUS.coins + ' coins + ' + N.packName(DAILY_BONUS.pack));
   });
 });

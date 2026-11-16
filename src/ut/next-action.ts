@@ -20,11 +20,13 @@
 //   11  the best next match in your recent mode
 //   12  Done for today (when the day's goals are met)
 // It never says "Done for today" while anything is claimable: claims come first and Done is last.
+// The One-More bar keeps the same rule: it turns calm only when nothing waits to be claimed or opened.
 //
 // With `ctx.after` (a finished match) it returns the One-More target instead (V2 D.10): a lower rung
 // or a drill after a third straight loss, REMATCH after a loss by one score, the harder rung after a
 // FLAWLESS win, otherwise the next game of the run or ladder. Done for today keeps the match one tap
-// away but stops pushing.
+// away but stops pushing. With `after`, pass the save as settled by that match (the One-More bar is
+// shown after the tally); a rung's pack is named only while that rung still pays it (rungPays).
 //
 // Slots later tasks fill take their value from `extras` and are null until then: Minutes rungs
 // (ut-2), the weekly league line and Career Road level (ut-8), the Daily Play (B1), program waves
@@ -63,6 +65,8 @@ export const CIRCUIT_STEPS: [wins: number, title: string][] = [
 ];
 /** cup.ts: a Cup is three knockout rounds */
 export const CUP_ROUNDS = 3;
+/** daily-hub.ts DAILY_BONUS: today's all-three bonus */
+export const DAILY_BONUS_REWARD = { coins: 100, pack: 'silver' };
 /** "One score": a loss this close offers REMATCH first (points; a basket, a touchdown, a goal) */
 export const ONE_SCORE: Record<UtSport, number> = { nba: 3, nfl: 8, soccer: 1 };
 
@@ -166,6 +170,8 @@ export interface NextCtx {
   packs: number;
   picks: number;
   recent: { setup: MatchSetupRef; line: string; stake?: string };
+  /** Squad Battles this week: rungs cleared on this week's ladder (0–RUNGS) and the saved difficulty (battlesNow) */
+  battles: { cleared: number; level: Difficulty };
   today: { dailiesDone: boolean; paidLeft: number; minutesCapped: boolean };
   after?: AfterCtx;
 }
@@ -188,17 +194,37 @@ export const plural = (n: number, one: string, many = one + 's') => n + ' ' + (n
 const SPOTLIGHT_NAME: Record<UtSport, string> = { nba: 'Spotlight Pack', nfl: 'Spotlight Pack', soccer: 'Elite Gold Pack' };
 export const packName = (kind: string, sport?: UtSport) =>
   kind === 'spotlight' && sport ? SPOTLIGHT_NAME[sport] : kind[0].toUpperCase() + kind.slice(1) + ' Pack';
+/** "100 coins + Silver Pack": today's all-three bonus, built from DAILY_BONUS_REWARD */
+export const DAILY_BONUS_LINE = DAILY_BONUS_REWARD.coins + ' coins + ' + packName(DAILY_BONUS_REWARD.pack);
 
 // ---------- reading the save ----------
 
-export function battlesNow(ut: UtState, week: string): { rung: number; level: Difficulty } {
+/**
+ * Squad Battles this week: the next rung to play (`rung`), rungs cleared so far (`cleared`: 0 on a new
+ * week; RUNGS on an old save that cleared the whole ladder before it refreshed) and the difficulty.
+ */
+export function battlesNow(ut: UtState, week: string): { rung: number; cleared: number; level: Difficulty } {
   const b = ut.battles,
     level = DIFFICULTIES.includes(b.level as Difficulty) ? (b.level as Difficulty) : 'pro';
   const cleared = b.week === week ? b.cleared : 0;
-  return { rung: Math.min(cleared, RUNGS - 1), level };
+  return { rung: Math.min(cleared, RUNGS - 1), cleared, level };
 }
-function battlesLine(rung: number, level: Difficulty): { line: string; stake?: string } {
-  const pack = RUNG_PACKS[level][rung];
+/** play.ts PAID_GAMES_A_DAY left today (a capped match pays no coins, XP or rung pack). */
+export function paidLeftOf(ut: UtState, day: string): number {
+  return Math.max(0, PAID_CAP - (ut.paid.day === day ? ut.paid.n : 0));
+}
+/**
+ * The pack a win on `rung` of `level` would pay, if any. A rung pays only the first time it is
+ * cleared on this week's ladder (play.ts: a win on rung `cleared` climbs; Battles.tsx shows the pack
+ * only from `cleared` up) and never once the day's paid games are played. Another difficulty starts
+ * its ladder at rung 1 (Battles.tsx onLevel), so all its rungs are still to clear.
+ */
+export function rungPays(b: { cleared: number; level: Difficulty }, rung: number, level: Difficulty, paidLeft: number): string | undefined {
+  if (paidLeft <= 0) return undefined;
+  return rung >= (level === b.level ? b.cleared : 0) ? RUNG_PACKS[level][rung] : undefined;
+}
+/** A rung's line, and its stake when it still pays a pack (`pack`, from rungPays). */
+function battlesLine(rung: number, level: Difficulty, pack?: string): { line: string; stake?: string } {
   return {
     line: LABEL.squadBattles + ' · ' + DIFFICULTY_NAME[level] + ' rung ' + (rung + 1) + ' of ' + RUNGS,
     ...(pack ? { stake: packName(pack) } : {}),
@@ -301,7 +327,7 @@ export function dailyLeft(ut: UtState, day: string, deck = objectiveDeck(ut, day
 }
 function dailyLastOf(ut: UtState, day: string, deck: ReturnType<typeof objectiveDeck>): NextCtx['dailyLast'] {
   const d = dailyLeft(ut, day, deck);
-  return d ? { line: plural(d.left, d.unit) + " to today's three objectives", stake: '100 coins + Silver Pack' } : null;
+  return d ? { line: plural(d.left, d.unit) + " to today's three objectives", stake: DAILY_BONUS_LINE } : null;
 }
 
 /** The next Season Pass tier that pays a pack, when the SP left is within 30% of the way there. */
@@ -325,11 +351,11 @@ function passOf(ut: UtState, day: string, sport: UtSport): NextCtx['pass'] {
   return null;
 }
 
-function recentOf(ut: UtState, sport: UtSport, week: string): NextCtx['recent'] {
+function recentOf(ut: UtState, sport: UtSport, week: string, paidLeft: number): NextCtx['recent'] {
   const h = hqOf(ut).history,
     last = h[h.length - 1]?.mode;
   const b = battlesNow(ut, week);
-  const battles = (): NextCtx['recent'] => ({ setup: { mode: 'battles', rung: b.rung, level: b.level }, ...battlesLine(b.rung, b.level) });
+  const battles = (): NextCtx['recent'] => ({ setup: { mode: 'battles', rung: b.rung, level: b.level }, ...battlesLine(b.rung, b.level, rungPays(b, b.rung, b.level, paidLeft)) });
   switch (last) {
     case 'online':
       return { setup: { mode: 'rivals' }, line: LABEL.rivals + ' · ' + DIVISIONS[divisionOf(rivalsOf(ut.rivals, week).points)].name };
@@ -347,7 +373,9 @@ export function nextCtxOf(ut: UtState, sport: UtSport, now: number, extras: Next
     deck = objectiveDeck(ut, day),
     claim = utClaimables(ut, day, week, sport, now, deck);
   const today = deck.filter((o) => o.group === 'daily' && o.period === day);
-  const rivalsM = rivalsMilestone(ut, week);
+  const rivalsM = rivalsMilestone(ut, week),
+    paidLeft = paidLeftOf(ut, day),
+    b = battlesNow(ut, week);
   return {
     sport,
     day,
@@ -366,10 +394,11 @@ export function nextCtxOf(ut: UtState, sport: UtSport, now: number, extras: Next
     wave: extras.wave ?? null,
     packs: claim.packs,
     picks: claim.picks,
-    recent: recentOf(ut, sport, week),
+    recent: recentOf(ut, sport, week, paidLeft),
+    battles: { cleared: b.cleared, level: b.level },
     today: {
       dailiesDone: today.length > 0 && today.every((o) => o.claimed || o.progress >= o.target),
-      paidLeft: Math.max(0, PAID_CAP - (ut.paid.day === day ? ut.paid.n : 0)),
+      paidLeft,
       minutesCapped: !!extras.minutesCapped,
     },
     ...(extras.after ? { after: extras.after } : {}),
@@ -379,23 +408,29 @@ export function nextCtxOf(ut: UtState, sport: UtSport, now: number, extras: Next
 // ---------- the choice ----------
 
 const doneToday = (c: NextCtx) => c.today.dailiesDone || c.today.paidLeft === 0 || c.today.minutesCapped;
+/** Rewards waiting to be claimed or opened, here or in another sport: never "Done for today" over these. */
+const waiting = (c: NextCtx) => c.claim.count > 0 || (c.minutes?.n ?? 0) > 0 || c.elsewhere.length > 0 || c.starter || c.packs > 0 || c.picks > 0;
+/** "Done for today" applies: the day's goals are met and nothing waits. */
+const calmNow = (c: NextCtx) => doneToday(c) && !waiting(c);
 const DONE_LINE = 'Matches still count for your record and Season Pass';
 
 /** The One-More bar: the best next match after the one just finished (V2 D.1, D.10). */
 function oneMore(c: NextCtx, a: AfterCtx): NextAction {
-  const calm = doneToday(c);
+  const calm = calmNow(c);
   const wrap = (x: NextAction): NextAction => (calm ? { ...x, id: 'done:' + x.id, cta: 'KEEP PLAYING', done: true, line: LABEL.doneForToday + ' · ' + x.line } : x);
-  const level = a.level ?? 'pro',
-    rung = a.rung ?? 0;
+  const level = a.level ?? c.battles.level,
+    rung = a.rung ?? 0,
+    // a rung's pack, only while that rung still pays it (never a replay of a cleared rung)
+    line = (r: number, l: Difficulty) => battlesLine(r, l, rungPays(c.battles, r, l, c.today.paidLeft));
   if (!a.won && a.lossStreak >= 3) {
     if (a.mode === 'battles' && rung > 0) {
-      const l = battlesLine(rung - 1, level);
+      const l = line(rung - 1, level);
       return wrap({ id: 'after:easier', line: 'Reset the rhythm · ' + l.line, cta: 'PLAY', target: { app: 'match', setup: { mode: 'battles', rung: rung - 1, level } }, ...(l.stake ? { stake: l.stake } : {}) });
     }
     const easier = DIFFICULTIES[DIFFICULTIES.indexOf(level) - 1];
     if (a.mode === 'battles' && easier) {
-      const l = battlesLine(0, easier);
-      return wrap({ id: 'after:easier', line: 'Try ' + DIFFICULTY_NAME[easier] + ' · ' + l.line, cta: 'PLAY', target: { app: 'match', setup: { mode: 'battles', rung: 0, level: easier } } });
+      const l = line(0, easier);
+      return wrap({ id: 'after:easier', line: 'Try ' + DIFFICULTY_NAME[easier] + ' · ' + l.line, cta: 'PLAY', target: { app: 'match', setup: { mode: 'battles', rung: 0, level: easier } }, ...(l.stake ? { stake: l.stake } : {}) });
     }
     if (c.sport !== 'soccer')
       return wrap({ id: 'after:drill', line: 'Sharpen up in a ' + LABEL.moments.slice(0, -1) + ' drill · 60 s', cta: 'DRILL', target: ut$('moments') });
@@ -410,7 +445,7 @@ function oneMore(c: NextCtx, a: AfterCtx): NextAction {
   if (a.won && a.flawless && a.mode === 'battles') {
     const up = rung + 1 < RUNGS ? { rung: rung + 1, level } : DIFFICULTIES[DIFFICULTIES.indexOf(level) + 1] ? { rung: 0, level: DIFFICULTIES[DIFFICULTIES.indexOf(level) + 1] } : null;
     if (up) {
-      const l = battlesLine(up.rung, up.level);
+      const l = line(up.rung, up.level);
       return wrap({ id: 'after:harder', line: 'FLAWLESS · step up: ' + l.line, cta: 'PLAY', target: { app: 'match', setup: { mode: 'battles', ...up } }, ...(l.stake ? { stake: l.stake } : {}) });
     }
   }
@@ -419,8 +454,9 @@ function oneMore(c: NextCtx, a: AfterCtx): NextAction {
     return wrap({ id: 'after:run:' + a.mode, line: run?.line ?? MODE_LABEL[a.mode], cta: 'NEXT', target: { app: 'match', setup: { mode: a.mode } } });
   }
   if (a.mode === 'battles') {
-    const next = a.won ? Math.min(rung + 1, RUNGS - 1) : rung;
-    const l = battlesLine(next, level);
+    // a win on the top rung brings the next ladder up at rung 1 (play.ts `refreshed`)
+    const next = a.won ? (rung + 1 < RUNGS ? rung + 1 : 0) : rung;
+    const l = line(next, level);
     return wrap({ id: 'after:battles', line: (l.stake ? '1 win to ' + l.stake + ' · ' : '') + l.line, cta: 'NEXT', target: { app: 'match', setup: { mode: 'battles', rung: next, level } }, ...(l.stake ? { stake: l.stake } : {}) });
   }
   return wrap({ id: 'after:recent', line: c.recent.line, cta: 'PLAY', target: { app: 'match', setup: c.recent.setup }, ...(c.recent.stake ? { stake: c.recent.stake } : {}) });
@@ -433,7 +469,7 @@ export function nextUp(c: NextCtx): NextAction {
   const minutes = c.minutes?.n ?? 0,
     claims = c.claim.count + minutes;
   if (claims > 0) {
-    const line = claims === 1 ? (minutes ? c.minutes!.line : (c.claim.lines[0] ?? '1 reward') + ' to claim') : plural(claims, 'reward') + ' to claim';
+    const line = claims === 1 ? (minutes ? c.minutes!.line : (c.claim.lines[0] ?? '1 reward') + ' · ready') : plural(claims, 'reward') + ' to claim';
     // the Daily Drop streak ends at Eastern midnight: the claim that keeps it is drawn amber
     const risk = c.claim.streakAtRisk;
     return {
@@ -482,6 +518,6 @@ export function nextUp(c: NextCtx): NextAction {
     };
   // 11/12. the best next match, or Done for today once the day's goals are met
   const play: NextAction = { id: 'play', line: c.recent.line, cta: 'PLAY', target: { app: 'match', setup: c.recent.setup }, ...(c.recent.stake ? { stake: c.recent.stake } : {}) };
-  if (doneToday(c)) return { id: 'done', line: LABEL.doneForToday + ' · ' + DONE_LINE, cta: 'KEEP PLAYING', target: play.target, done: true };
+  if (calmNow(c)) return { id: 'done', line: LABEL.doneForToday + ' · ' + DONE_LINE, cta: 'KEEP PLAYING', target: play.target, done: true };
   return play;
 }
