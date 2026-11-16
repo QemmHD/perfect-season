@@ -8,15 +8,22 @@
 // green slice and the aim in the goal mouth with the shot's error cone. Claude 2026-11-02: the pass
 // line, the aim reticle and a small goal over the meter (where it's going, past the keeper), a ring
 // that tightens as the meter nears the green, and the release read-out (PERFECT / GOOD / EARLY / LATE).
-import { DEFAULT_HAIR, DEFAULT_SKIN, drawBody, freeCanvas, hairFor, beardFor, type Look, type Sprite, SpriteCache, CanvasOut } from '../pixel/body';
-import { clipMeta, frameAt, getClip, legScale, loadClips, mocapJoints, mocapKey, warp } from '../pixel/mocap';
+// What each player looks like and which clip or pose he shows is chosen in pixel/select-soccer.ts.
+import { drawBody, freeCanvas, type Look, SpriteCache, CanvasOut } from '../pixel/body';
+import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
+import { drawGate } from '../pixel/ready';
 import { drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { pitchTexture, type PitchTheme } from '../pixel/pitch';
-import * as P from '../pixel/poses';
-import type { Pose } from '../pixel/rig';
+import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
+import { drawGroundMark } from '../pixel/ground';
+import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
+import { animOf, heightM, lookFor, type Memo } from '../pixel/select-soccer';
 import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
 import { shotCone, topSpeed } from './ratings';
 import type { Attack, Body, Pt } from './types';
+
+/** moved to pixel/select-soccer.ts (players-2); re-exported for the QA tools that import it here */
+export { lookFor } from '../pixel/select-soccer';
 
 export interface SoccerKit {
   jersey: string;
@@ -39,124 +46,8 @@ export interface SoccerOverlay {
   names: boolean;
 }
 
-const CLIPS = ['ready', 'jog', 'run', 'sprint', 'kick', 'dive', 'fall_forward', 'fall_forward_m', 'fall_back', 'catch', 'jump', 'celebrate', 'shuffle', 'shuffle_l', 'backpedal'];
-/** the kick: the boot through the ball when the engine strikes it (0.11 s after the swing starts) */
-const KICK = warp(clipMeta('kick'), { contact: 0.11 });
-/** a slide tackle or a keeper's dive: off his feet at once, down 0.45 s later */
-const DIVE = warp(clipMeta('dive'), { takeoff: 0.02, impact: 0.42, ground: 0.6 });
-const FALL = warp(clipMeta('fall_forward'), { impact: 0.3, ground: 0.5 });
-/** a header: the jump's top at contact */
-const JUMP = warp(clipMeta('jump'), { takeoff: 0.0, apex: 0.18 });
-
-interface Anim {
-  key: string;
-  pose: Pose;
-  clip?: string;
-  ct?: number;
-  step?: number;
-}
-
-interface Memo {
-  gait: { t: number; frac: number };
-  face: { x: number; y: number };
-  faceAt: number;
-}
-
-const has = (name: string) => !!getClip(name);
-const heightM = (b: Body) => b.p.ht / 100;
-
-export function lookFor(b: Body, kit: SoccerKit, keeperKit: SoccerKit): Look {
-  const gk = b.role === 'gk';
-  const k = gk ? keeperKit : kit;
-  const ht = b.p.ht / 2.54;
-  return {
-    sport: 'soccer',
-    ht,
-    wt: Math.round(23 * Math.pow(b.p.ht / 100, 2) * 2.2046),
-    num: b.p.num ?? (gk ? 1 : null),
-    hair: hairFor(b.p.id),
-    beard: beardFor(b.p.id),
-    skin: DEFAULT_SKIN,
-    hairColor: DEFAULT_HAIR,
-    jersey: k.jersey,
-    trim: k.trim,
-    shorts: k.shorts,
-    socks: k.socks,
-    shoes: k.shoes,
-    sleeves: gk ? 'long' : 'short',
-    gloves: gk ? (k.gloves ?? '#f2f2ee') : undefined,
-  };
-}
-
-/** A stride: jog, run or sprint by his speed, at the rate his feet keep up with the grass. */
-function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { clip: string; ct: number } | null {
-  if (!has('jog') || !has('run') || !has('sprint')) return null;
-  const ms = (name: string) => clipMeta(name).root.speed * legScale(look) * heightM(b);
-  let clip = 'jog';
-  let best = Infinity;
-  for (const c of ['jog', 'run', 'sprint']) {
-    const d = Math.abs(Math.log(speed / ms(c)));
-    if (d < best) {
-      best = d;
-      clip = c;
-    }
-  }
-  const rate = Math.max(0.65, Math.min(1.7, speed / ms(clip)));
-  const dt = t - m.gait.t;
-  if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + (dt * rate) / clipMeta(clip).duration) % 1;
-  m.gait.t = t;
-  return { clip, ct: m.gait.frac * clipMeta(clip).duration };
-}
-
-function animOf(b: Body, t: number, look: Look, m: Memo): Anim {
-  const since = t - b.actAt;
-  const speed = Math.hypot(b.vx, b.vy);
-  const fallback: Anim = { key: 'id' + Math.floor(((t * 0.5) % 1) * 4), pose: P.idle(Math.floor(((t * 0.5) % 1) * 4) / 4) };
-  const clip = (name: string, ct: number, step = 2): Anim => (has(name) ? { key: '', pose: fallback.pose, clip: name, ct, step } : fallback);
-  switch (b.act) {
-    case 'kick':
-      if (since < 0.55) return clip('kick', KICK(since), 1);
-      break;
-    case 'tackle':
-      if (since < 0.9) return clip('dive', DIVE(since));
-      break;
-    case 'dive':
-      return clip('dive', DIVE(since));
-    case 'down':
-      return clip(b.id % 2 ? 'fall_forward_m' : 'fall_forward', FALL(since));
-    case 'header':
-      if (since < 0.7) return clip('jump', JUMP(since), 1);
-      break;
-    case 'catch':
-      return clip('catch', Math.min(clipMeta('catch').events.catch, since + 0.2), 1);
-    case 'celebrate':
-      if (speed > 2) {
-        const g = gait(b, t, look, m, speed);
-        if (g) return clip(g.clip, g.ct);
-      }
-      return clip('celebrate', since);
-    case 'wall':
-      return b.h > 0.05 ? clip('jump', JUMP(0.12 + b.h * 0.1), 1) : clip('ready', t + b.id * 0.37, 3);
-    default:
-      break;
-  }
-  if (speed > 1) {
-    // a defender facing the ball while he gets back: the backpedal / shuffle
-    const forward = b.vx * m.face.x + b.vy * m.face.y;
-    const lateral = -b.vx * m.face.y + b.vy * m.face.x;
-    if (b.side === 'D' && speed < 4.5 && forward < -0.5 && Math.abs(forward) > Math.abs(lateral) && has('backpedal')) {
-      const dt = t - m.gait.t;
-      if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + (dt * 1.1) / clipMeta('backpedal').duration) % 1;
-      m.gait.t = t;
-      return clip('backpedal', m.gait.frac * clipMeta('backpedal').duration);
-    }
-    const g = gait(b, t, look, m, speed);
-    if (g) return clip(g.clip, g.ct);
-    const ph = Math.floor((((t * (1.2 + speed * 0.15)) % 1) + 1) % 1 * 8) / 8;
-    return { key: 'rn' + ph, pose: P.run(ph, speed > 5 ? 1 : 0.6) };
-  }
-  return clip('ready', t + b.id * 0.37, 3);
-}
+/** his drawn height in metres (V2's spread around the game's mean height) */
+const drawnM = (b: Body) => (drawnHeight('soccer', b.p.ht / 2.54) * 2.54) / 100;
 
 export class SoccerRenderer {
   W = 0;
@@ -165,10 +56,12 @@ export class SoccerRenderer {
   private cam: PCam | null = null;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache(700);
+  private sprites = new SpriteCache<ArtSprite>(700);
+  /** the art pixel (pixel/art-scale.ts), set by the screen from its canvas each frame */
+  art: ArtScale = ART_C;
   private looks = new Map<string, Look>();
   private memos = new Map<string, Memo>();
-  private last = new Map<string, Sprite>();
+  private last = new Map<string, ArtSprite>();
   private budget = 0;
   private follow: Pt | null = null;
   private bits: { x: number; y: number; h: number; vx: number; vy: number; vh: number; life: number; color: string; size: number }[] = [];
@@ -182,11 +75,7 @@ export class SoccerRenderer {
   constructor(
     private theme: PitchTheme,
     private kits: { us: SoccerKit; them: SoccerKit; usGk: SoccerKit; themGk: SoccerKit },
-  ) {
-    loadClips(CLIPS).catch(() => {
-      // the hand-keyed poses carry on
-    });
-  }
+  ) {}
 
   dispose() {
     this.sprites.dispose();
@@ -237,7 +126,7 @@ export class SoccerRenderer {
     return project(this.cam!, x, y, h);
   }
 
-  private sprite(b: Body, t: number, s: number, kitSide: 'us' | 'them'): Sprite {
+  private sprite(b: Body, t: number, s: number, kitSide: 'us' | 'them'): ArtSprite {
     const who = b.p.id + '|' + b.side + '|' + kitSide;
     let memo = this.memos.get(who);
     if (!memo) {
@@ -257,8 +146,10 @@ export class SoccerRenderer {
     }
     memo.faceAt = t;
     dir = memo.face;
-    const raw = Math.max(8, Math.round(heightM(b) * s));
-    const px = raw > 14 ? raw - (raw % 2) : raw;
+    // drawn with V2's height spread around the game's mean (render only: the engine keeps b.p.ht)
+    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
+    const raw = Math.max(8, this.art.artPxFor(drawnM(b) * s));
+    const px = quantPx(raw);
     const dirs = px < 22 ? 8 : 16;
     const facing = Math.atan2(-dir.y, dir.x);
     const fb = (Math.round((facing / (Math.PI * 2)) * dirs) + dirs) % dirs;
@@ -274,7 +165,7 @@ export class SoccerRenderer {
     const step = an.clip ? (px < 22 ? Math.max(3, an.step ?? 2) : (an.step ?? 2)) : 1;
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
     const key = an.clip ? mocapKey(an.clip, frame, 'clip') : an.key;
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch;
+    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
     let spr = this.sprites.get(k);
     if (!spr) {
       const last = this.last.get(who);
@@ -283,12 +174,12 @@ export class SoccerRenderer {
       const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
       const make = () => (an.clip ? drawBody(look!, mocapJoints(an.clip, frame, look!, { ground: 'clip' }), view, px) : drawBody(look!, { ...an.pose, lift: 0 }, view, px));
       try {
-        spr = make();
+        spr = toView(make(), this.art);
       } catch (e) {
         if (!(e instanceof CanvasOut)) throw e;
         this.sprites.dispose(this.last.values());
         try {
-          spr = make();
+          spr = toView(make(), this.art);
         } catch {
           if (last) return last;
           throw e;
@@ -687,6 +578,9 @@ export class SoccerRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, a: Attack, o: SoccerOverlay, kitOf: (b: Body) => 'us' | 'them') {
+    // the first frame waits for the clips and looks (players-3, pixel/ready.ts)
+    if (!drawGate('soccer')) return;
+    ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     ctx.imageSmoothingEnabled = false;
     // a corner pulls out wide enough for the taker and the whole box; a replay pushes in
     const zt = this.replay ? 1.3 : a.setPiece?.kind === 'corner' ? 0.68 : 1;
@@ -707,14 +601,11 @@ export class SoccerRenderer {
     const ballBehind = a.ball.y > PL + 0.05;
     if (ballBehind) this.ball(ctx, a);
     this.frame(ctx);
-    // shadows
+    // shadows (pixel/ground.ts: V2's soft contact shadow, shrinking as he rises)
     for (const b of a.bodies) {
       const f = this.lens(b.x, b.y);
-      const rx = Math.max(2, Math.round(f.s * 0.36));
-      ctx.fillStyle = 'rgba(8,26,8,0.4)';
-      ctx.beginPath();
-      ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(1, Math.round(rx * Math.sin(pitchAt(this.cam!, b.y)) * 0.8)), 0, 0, Math.PI * 2);
-      ctx.fill();
+      const look = this.looks.get(b.p.id + '|' + b.side + '|' + kitOf(b));
+      drawGroundMark(ctx, { x: f.x, y: f.y, shoulderPx: shoulderWidthPx(b.p.ht / 2.54, look?.wt ?? Math.round(23 * heightM(b) ** 2 * 2.2046), drawnM(b) * f.s), pitch: pitchAt(this.cam!, b.y), lift: b.h / heightM(b) });
     }
     const c = ctrlOf(a);
     const ring = (b: Body, color: string, k = 0.58, w = 0.08) => {
@@ -742,7 +633,7 @@ export class SoccerRenderer {
           const spr = this.sprite(b, a.t, this.lens(b.x, b.y).s, kitOf(b));
           const x = Math.round(f.x - spr.ax);
           const y = Math.round(f.y - spr.ay);
-          ctx.drawImage(spr.canvas, x, y);
+          blitSprite(ctx, spr, x, y);
           heads[b.id] = { x: Math.round(f.x), y: y + spr.top };
         },
       });
