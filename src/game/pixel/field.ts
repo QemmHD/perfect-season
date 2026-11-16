@@ -6,7 +6,9 @@
 // and 100..110), h up.
 import { mix, type RGB, rgb } from './color';
 import { textWidth, text } from './court';
+import { type Band, crowdAt, crowdPalette } from './crowd';
 import { noise, PixBuf } from './pixbuf';
+import { grass, lineOver, lit, POOL, type Pool, teamPaint, VENUE } from './venue';
 
 export const FIELD_W = 53.33;
 
@@ -69,9 +71,12 @@ export interface FieldTheme {
   awayName: string;
 }
 
-const GRASS: RGB[] = [
-  [62, 138, 58],
-  [70, 150, 64],
+/** Four soft pools of stadium light over the field (venue.ts). */
+const FIELD_POOLS: Pool[] = [
+  { x: 13, y: 30, r: 22, k: POOL },
+  { x: 40, y: 30, r: 22, k: POOL },
+  { x: 13, y: 70, r: 22, k: POOL },
+  { x: 40, y: 70, r: 22, k: POOL },
 ];
 
 /**
@@ -101,18 +106,19 @@ export function drawField(c: FieldCam, theme: FieldTheme, opts: { crowd?: boolea
       let col: RGB;
       if (x < -6 || x > FIELD_W + 6 || y < -12 || y > 112) col = mix([40, 82, 40], dark, 0.35);
       else if (x < -1.2 || x > FIELD_W + 1.2 || y < -10 || y > 110) col = [52, 104, 50];
-      else if (x < 0 || x > FIELD_W) col = [246, 246, 240];
-      else if (y < 0) col = mix(home, [0, 0, 0], 0.08);
-      else if (y > 100) col = mix(away, [0, 0, 0], 0.08);
+      else if (x < 0 || x > FIELD_W) col = rgb(VENUE.nfl.lines);
+      else if (y < 0) col = teamPaint(home);
+      else if (y > 100) col = teamPaint(away);
       else {
-        // mowed in five-yard stripes, with a little texture
-        const stripe = Math.floor(y / 5) % 2;
-        const n = noise(Math.floor(x * 3), Math.floor(y * 3), 3) * 0.06 - 0.03;
-        col = mix(GRASS[stripe], n > 0 ? [180, 220, 140] : [20, 50, 20], Math.abs(n));
+        // mowed in five-yard stripes (venue.ts tokens), the least texture
+        col = grass(VENUE.nfl.mow, Math.floor(y / 5), noise(Math.floor(x * 3), Math.floor(y * 3), 3) * 0.06 - 0.03);
       }
-      buf.set(sx, sy, PixBuf.pack(col));
+      // lit by the pools, the far end 6% darker
+      buf.set(sx, sy, PixBuf.pack(lit(col, x, y, FIELD_POOLS, (y + 10) / 120)));
     }
-  const white = PixBuf.pack([248, 248, 240]);
+  const white = PixBuf.pack(rgb(VENUE.nfl.lines));
+  // the yard numbers painted at 60% into the grass
+  const numberInk = PixBuf.pack(lineOver(mix(rgb(VENUE.nfl.mow[0]), rgb(VENUE.nfl.mow[1]), 0.5), VENUE.nfl.lines, VENUE.nfl.numbers));
   const seg = (x0: number, y0: number, x1: number, y1: number, col = white) => {
     const a = fieldAt(cam, x0, y0);
     const b = fieldAt(cam, x1, y1);
@@ -135,7 +141,7 @@ export function drawField(c: FieldCam, theme: FieldTheme, opts: { crowd?: boolea
     for (const nx of [9, FIELD_W - 9]) {
       const at = fieldAt(cam, nx, y);
       const w = textWidth(label, nScale);
-      text(buf, label, Math.round(at.x - w / 2), Math.round(at.y - (7 * nScale * (side ? sp : sp)) / 2), nScale, white, sp);
+      text(buf, label, Math.round(at.x - w / 2), Math.round(at.y - (7 * nScale * (side ? sp : sp)) / 2), nScale, numberInk, sp);
     }
   }
   // the end zones: each team's name across its own
@@ -149,18 +155,22 @@ export function drawField(c: FieldCam, theme: FieldTheme, opts: { crowd?: boolea
   ez(-5, theme.homeName, theme.homeC2);
   ez(105, theme.awayName, theme.awayC2);
   // the stands beyond the far sideline (side) or beyond the far end zone (end)
+  // the stands: three dark bands by tier, nearest lightest, flecked with the home colour and white
+  // (crowd.ts)
+  const fans = crowdPalette(home);
   const crowdBand = (x0: number, y0: number, w: number, h: number) => {
     const fanW = Math.max(3, Math.round(c.k * 0.32));
     const fanH = Math.round(fanW * 1.5);
-    const shirts: RGB[] = [home, away, [235, 235, 235], [40, 44, 60], mix(home, [255, 255, 255], 0.3)];
-    for (let row = 0, y = y0 + h - fanH; y > y0 - fanH; row++, y -= fanH - 1)
+    buf.rect(x0, y0, w, h, PixBuf.pack(fans.bands[2]));
+    const rows = Math.max(1, Math.ceil(h / (fanH - 1)));
+    for (let row = 0, y = y0 + h - fanH; y > y0 - fanH; row++, y -= fanH - 1) {
+      const band = Math.min(2, Math.floor((row / rows) * 3)) as Band;
       for (let i = 0, x = x0 + (row % 2) * 2; x < x0 + w; i++, x += fanW + 1) {
-        const n = noise(i, row, 9);
-        if (n < 0.06) continue;
-        const dim = Math.min(0.45, row * 0.04);
-        buf.rect(x, y + Math.round(fanH * 0.4), fanW, fanH - Math.round(fanH * 0.4), PixBuf.pack(mix(shirts[Math.floor(noise(i, row, 2) * shirts.length)], dark, dim)));
-        buf.rect(x + 1, y, Math.max(1, fanW - 2), Math.round(fanH * 0.4), PixBuf.pack(mix([196, 150, 112], dark, dim + noise(i, row, 4) * 0.3)));
+        if (noise(i, row, 9) < 0.06) continue;
+        buf.rect(x, y + Math.round(fanH * 0.4), fanW, fanH - Math.round(fanH * 0.4), PixBuf.pack(crowdAt(fans, x, y + fanH, band, 2)));
+        buf.rect(x + 1, y, Math.max(1, fanW - 2), Math.round(fanH * 0.4), PixBuf.pack(fans.bands[Math.max(0, band - 1)]));
       }
+    }
   };
   if (opts.crowd === false) {
     // no stands (a texture for the perspective camera)

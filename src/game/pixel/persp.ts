@@ -4,10 +4,11 @@
 // drawn a row at a time from a top-down picture of it (like the old consoles' "mode 7"), and past
 // the far end there's a wall of fans. Units are the sport's: yards for the field, feet for the court.
 import { mix, type RGB, rgb } from './color';
+import { crowdAt, crowdPalette } from './crowd';
 import { type CourtCam, type CourtTheme, drawCourt } from './court';
 import { drawField, FIELD_W, type FieldCam, type FieldTheme } from './field';
 import { freeCanvas } from './body';
-import { noise, PixBuf } from './pixbuf';
+import { PixBuf } from './pixbuf';
 
 export interface PCam {
   W: number;
@@ -110,7 +111,10 @@ export function standsWall(h: number, k: number, tiers: { pad: number; ribbon: n
   const wall = new Uint32Array(wallW * wallH);
   const { home, away, trim } = colors;
   const darkC: RGB = [14, 18, 26];
-  const shirts: RGB[] = [home, away, away, [230, 230, 230], [44, 48, 66], mix(away, [255, 255, 255], 0.3), trim];
+  // the fans: three dark bands, the lower bowl's near and far halves and the upper deck, flecked with
+  // the home colour and white (crowd.ts, V2 C.2)
+  const fans = crowdPalette(home);
+  const midBowl = (tiers.ribbon + tiers.facade) / 2;
   for (let y = 0; y < wallH; y++) {
     const yd = h - y / k;
     for (let x = 0; x < wallW; x++) {
@@ -119,19 +123,7 @@ export function standsWall(h: number, k: number, tiers: { pad: number; ribbon: n
       else if (yd < tiers.ribbon) c = Math.floor(x / 24) % 2 ? mix(away, [255, 255, 255], 0.15) : trim;
       else if (yd >= tiers.facade && yd < tiers.facade + tiers.facadeH) c = yd < tiers.facade + tiers.facadeH / 3 ? [30, 34, 46] : Math.floor(x / 40) % 3 === 0 ? mix(trim, [255, 255, 255], 0.3) : mix(away, darkC, 0.2);
       else if (yd >= tiers.roof) c = yd < tiers.roof + 0.75 * (4 / k) && x % 32 < 5 ? [255, 250, 220] : [22, 25, 34];
-      else {
-        // fans, a row every three texels, heads on top, a few empty seats
-        const rowN = Math.floor(y / 3);
-        const seat = Math.floor((x + (rowN % 2)) / 2);
-        const n = noise(seat, rowN, 5);
-        if (y % 3 === 2 && n < 0.5) c = [34, 38, 52];
-        else if (n < 0.07) c = [40, 44, 60];
-        else if (y % 3 === 0) c = mix([200, 156, 118], [74, 46, 30], noise(seat, rowN, 8) * 0.85);
-        else c = shirts[Math.floor(noise(seat, rowN, 2) * shirts.length)];
-        // the upper deck sits back in the dark
-        const upper = tiers.facade + tiers.facadeH;
-        c = mix(c, darkC, yd > upper ? 0.25 + ((yd - upper) / Math.max(1, tiers.roof - upper)) * 0.35 : 0.08);
-      }
+      else c = crowdAt(fans, x, y, yd < midBowl ? 0 : yd < tiers.facade ? 1 : 2);
       wall[y * wallW + x] = pack(c);
     }
   }
@@ -176,18 +168,15 @@ export function courtTexture(theme: CourtTheme): FieldTex {
   const c: CourtCam = { mode: 'end', W: half * 2 * k, H: (top - bottom) * k, k, pitch: Math.PI / 2, cam: top, origin: half * k, top: 0 };
   const buf = new PixBuf(c.W, c.H);
   drawCourt(buf, c, theme, 0, 0, false);
-  // courtside: rows of seats beyond the sidelines, fans seen from above
-  const c1 = rgb(theme.c1);
+  // courtside: rows of seats beyond the sidelines seen from above, the crowd's nearest band with the
+  // aisles between the rows in its darkest (crowd.ts)
+  const fans = crowdPalette(theme.c1);
   for (let y = 0; y < c.H; y++)
     for (let x = 0; x < c.W; x++) {
       const cz = (x - c.origin) / k;
       if (Math.abs(cz) < 31) continue;
-      const row = Math.floor((Math.abs(cz) - 31) / 2.2);
-      const seat = Math.floor(y / 12);
-      const n = noise(seat, row, Math.sign(cz) + 3);
       const inRow = (Math.abs(cz) - 31) % 2.2;
-      const col: RGB = inRow < 0.5 ? [22, 24, 34] : n < 0.1 ? [40, 44, 60] : (y % 12) < 5 ? mix([200, 156, 118], [74, 46, 30], noise(seat, row, 8)) : mix(([c1, [230, 230, 230], [44, 48, 66], [30, 70, 120]] as RGB[])[Math.floor(n * 4)], [14, 18, 26], 0.2);
-      buf.set(x, y, PixBuf.pack(col));
+      buf.set(x, y, PixBuf.pack(inRow < 0.5 ? fans.bands[2] : crowdAt(fans, x, y, 0, Math.sign(cz) + 3)));
     }
   const canvas = document.createElement('canvas');
   canvas.width = c.W;

@@ -4,7 +4,9 @@
 // Court feet: cx along the court (0 midcourt, 47 the baseline under the hoop), cz across it
 // (-25 to 25), h up from the floor. Everything is plotted pixel by pixel (pixbuf.ts).
 import { mix, type RGB, rgb } from './color';
+import { type Band, crowdAt, crowdPalette } from './crowd';
 import { noise, PixBuf } from './pixbuf';
+import { lit, plankColor, POOL, type Pool, teamDark, teamPaint, VENUE } from './venue';
 
 export const RIM = { cx: 41.75, cz: 0, h: 10 };
 export const COURT_LEN = 47;
@@ -77,11 +79,13 @@ export interface CourtTheme {
   abbr: string;
 }
 
-const WOOD: RGB[] = [
-  [214, 160, 102],
-  [205, 150, 93],
-  [222, 170, 112],
-  [199, 143, 88],
+/** The court's light: a pool under the rim (+8%) and four soft pools over the half court (venue.ts). */
+const COURT_POOLS: Pool[] = [
+  { x: 41.75, y: 0, r: 9, k: VENUE.nba.rimPool * 2 },
+  { x: 30, y: -13, r: 13, k: POOL },
+  { x: 30, y: 13, r: 13, k: POOL },
+  { x: 10, y: -13, r: 13, k: POOL },
+  { x: 10, y: 13, r: 13, k: POOL },
 ];
 
 const FONT: Record<string, string> = {
@@ -160,10 +164,11 @@ export function drawCourt(buf: PixBuf, c: CourtCam, theme: CourtTheme, crowd = 0
     buf.fill(PixBuf.pack(dark));
     drawCrowd(buf, c, wallY, c1, c2, crowd, t);
   }
-  // the floor: each pixel finds its spot on the court
-  const apron = mix(c1, [0, 0, 0], 0.18);
-  const outer = mix(c1, [0, 0, 0], 0.5);
-  const paint = mix(c1, [0, 0, 0], 0.08);
+  // the floor: each pixel finds its spot on the court (V2 C.2 venue tokens, venue.ts: calm planks,
+  // the paint at 85%, the apron in the team's dark, pools of light, the far end 6% darker)
+  const apron = teamDark(c1);
+  const outer = mix(apron, [0, 0, 0], 0.35);
+  const paint = teamPaint(c1);
   for (let y = wallY; y < c.H; y++) {
     for (let x = 0; x < c.W; x++) {
       const { cx, cz } = floorAt(c, x + 0.5, y + 0.5);
@@ -173,26 +178,23 @@ export function drawCourt(buf: PixBuf, c: CourtCam, theme: CourtTheme, crowd = 0
       else if (cx > COURT_LEN || acz > 25 || cx < -COURT_LEN) col = apron;
       else if (cx > COURT_LEN - 19 && acz < 8) col = paint;
       else {
-        // planks run the length of the court, about 4 inches wide here so they read
-        const band = Math.floor((cz + 30) * 3);
-        const base = WOOD[((band % 4) + 4) % 4];
+        // planks run the length of the court, six texels (9 inches) wide, each its own shade
+        const band = Math.floor(((cz + 30) * 8) / VENUE.nba.plank);
         const seg = Math.floor((cx + 20 + band * 1.7) / 6);
-        const seam = noise(band, seg) < 0.5 && Math.abs(((cx + 20 + band * 1.7) % 6) - 0) < 0.12;
-        const grain = noise(Math.floor(cx * 2), band, 11) * 0.07 - 0.035;
-        col = seam ? mix(base, [80, 45, 20], 0.32) : mix(base, grain > 0 ? [255, 230, 190] : [90, 50, 20], Math.abs(grain));
+        col = plankColor(band, noise(band, seg) + (noise(Math.floor(cx * 2), band, 11) - 0.5) * 0.1);
       }
-      buf.set(x, y, PixBuf.pack(col));
+      buf.set(x, y, PixBuf.pack(lit(col, cx, cz, COURT_POOLS, (cx + 26) / (COURT_LEN + 26))));
     }
   }
   if (stands) drawBoard(buf, c, theme, wallY, t);
   // the midcourt logo: the home team's letters lying on the floor
   const mid = at(c, 0, 0);
   const logoScale = Math.max(2, Math.round(c.k * 0.8));
-  buf.fillEllipse(mid.x, mid.y, c.k * 6, c.k * 6 * sp, PixBuf.pack(mix(c1, [0, 0, 0], 0.06)));
+  buf.fillEllipse(mid.x, mid.y, c.k * 6, c.k * 6 * sp, PixBuf.pack(lit(paint, 0, 0, COURT_POOLS, 26 / (COURT_LEN + 26))));
   const lw = textWidth(theme.abbr, logoScale);
   text(buf, theme.abbr, Math.round(mid.x - lw / 2), Math.round(mid.y - (7 * logoScale * sp) / 2), logoScale, PixBuf.pack(c2), sp);
   // the lines
-  const white = PixBuf.pack([246, 242, 232]);
+  const white = PixBuf.pack(rgb(VENUE.nba.lines));
   const seg = (a: [number, number], b: [number, number]) => {
     const p = at(c, a[0], a[1]);
     const q = at(c, b[0], b[1]);
@@ -243,26 +245,20 @@ export function drawCourt(buf: PixBuf, c: CourtCam, theme: CourtTheme, crowd = 0
   }
 }
 
-function drawCrowd(buf: PixBuf, c: CourtCam, wallY: number, c1: RGB, c2: RGB, crowd: number, t: number) {
+function drawCrowd(buf: PixBuf, c: CourtCam, wallY: number, c1: RGB, _c2: RGB, crowd: number, t: number) {
   const fanW = Math.max(4, Math.round(c.k * 0.62));
   const fanH = Math.round(fanW * 1.5);
-  const shirts: RGB[] = [c1, c1, c1, c2, [235, 235, 235], [40, 44, 60], mix(c1, [255, 255, 255], 0.3), [30, 70, 120], [60, 60, 66]];
-  const skins: RGB[] = [
-    [233, 196, 160],
-    [198, 145, 105],
-    [168, 113, 79],
-    [120, 80, 55],
-    [88, 58, 40],
-  ];
-  const dark: RGB = [14, 18, 30];
+  // three dark bands by tier, the nearest lightest, flecked in 2 px blocks (crowd.ts)
+  const fans = crowdPalette(c1);
+  buf.rect(0, 0, c.W, wallY, PixBuf.pack(fans.bands[2]));
   const rows = Math.max(1, Math.ceil((wallY - c.k * 1.2) / (fanH - 1)));
   for (let row = 0, y = wallY - fanH - Math.round(c.k * 1.2); y > -fanH; row++, y -= fanH - 1) {
-    const dim = Math.min(0.5, (row / rows) * 0.55);
+    const band = Math.min(2, Math.floor((row / rows) * 3)) as Band;
     for (let i = -1, x = (row % 2) * (fanW >> 1) - fanW; x < c.W + fanW; i++, x += fanW + 1) {
       const n = noise(i, row, 7);
       if (n < 0.07) continue;
-      const shirt = mix(shirts[Math.floor(noise(i, row, 3) * shirts.length)], dark, dim);
-      const skin = mix(skins[Math.floor(noise(i, row, 5) * skins.length)], dark, dim);
+      const shirt = crowdAt(fans, x, y + fanH, band, 1);
+      const skin = fans.bands[Math.max(0, band - 1)];
       const jump = crowd > 0 ? Math.round(Math.max(0, Math.sin(t * 13 + n * 9)) * crowd * 2.4) : Math.round(Math.max(0, Math.sin(t * 2 + n * 30) - 0.96) * 30);
       const yy = y - jump;
       const head = Math.round(fanH * 0.42);

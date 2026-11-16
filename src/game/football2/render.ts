@@ -13,6 +13,8 @@ import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, proje
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import type { Look } from '../pixel/body';
 import { animOf, ballArm, lookFor, type Memo } from '../pixel/select-nfl';
+import { staleLook } from '../pixel/looks';
+import { drawVignette } from '../pixel/venue';
 import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, throwErrorRadius, windupOf } from './engine';
 import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import type { Juice } from '../juice';
@@ -244,7 +246,9 @@ export class FootballRenderer {
     // seen from high up close: the rig reads best no steeper than this
     const pitch = Math.round(Math.min(0.9, L.pitch(b.y)) / 0.15) * 0.15;
     let look = this.looks.get(who);
-    if (!look) {
+    if (!look || staleLook(look)) {
+      // (a look made before the appearance data arrived: the drawings go, redrawn through the budget)
+      if (look) this.sprites.dispose(this.last.values());
       look = lookFor(b, this.kits[b.side === 'O' ? 0 : 1]);
       this.looks.set(who, look);
     }
@@ -303,6 +307,7 @@ export class FootballRenderer {
       ctx.fillStyle = '#10160f';
       ctx.fillRect(0, 0, this.W, this.H);
       ctx.drawImage(fld.canvas, Math.round(c.ax - origin.x), Math.round(c.ay - origin.y));
+      drawVignette(ctx, this.W, this.H);
       return;
     }
     if (!this.tex) this.tex = fieldTexture(this.theme);
@@ -319,6 +324,8 @@ export class FootballRenderer {
     drawFloor(this.persp!, this.tex, fl.px, q);
     fl.canvas.getContext('2d')!.putImageData(fl.img, 0, 0);
     ctx.drawImage(fl.canvas, 0, 0, fl.canvas.width * q, fl.canvas.height * q);
+    // the venue's corners darkened (players-4, venue.ts: colour only, one cached blit)
+    drawVignette(ctx, this.W, this.H);
   }
 
   /** Goal posts at the back of an end zone: yellow, a crossbar at 10 ft, uprights to 35 ft. */

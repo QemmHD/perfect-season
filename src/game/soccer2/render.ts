@@ -18,6 +18,8 @@ import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } fro
 import { drawGroundMark } from '../pixel/ground';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import { animOf, heightM, lookFor, type Memo } from '../pixel/select-soccer';
+import { staleLook } from '../pixel/looks';
+import { drawVignette } from '../pixel/venue';
 import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
 import { shotCone, topSpeed } from './ratings';
 import type { Attack, Body, Pt } from './types';
@@ -155,7 +157,9 @@ export class SoccerRenderer {
     const fb = (Math.round((facing / (Math.PI * 2)) * dirs) + dirs) % dirs;
     const pitch = Math.round(Math.min(0.9, pitchAt(this.cam!, b.y)) / 0.15) * 0.15;
     let look = this.looks.get(who);
-    if (!look) {
+    if (!look || staleLook(look)) {
+      // (a look made before the appearance data arrived: the drawings go, redrawn through the budget)
+      if (look) this.sprites.dispose(this.last.values());
       const kit = kitSide === 'us' ? this.kits.us : this.kits.them;
       const gk = kitSide === 'us' ? this.kits.usGk : this.kits.themGk;
       look = lookFor(b, kit, gk);
@@ -205,6 +209,8 @@ export class SoccerRenderer {
     drawFloor(this.cam!, this.tex, fl.px, q);
     fl.canvas.getContext('2d')!.putImageData(fl.img, 0, 0);
     ctx.drawImage(fl.canvas, 0, 0, fl.canvas.width * q, fl.canvas.height * q);
+    // the venue's corners darkened (players-4, venue.ts: colour only, one cached blit)
+    drawVignette(ctx, this.W, this.H);
   }
 
   /** The net (behind the frame): its back, sides and roof, in a mesh, bulging where the ball hit. */

@@ -14,6 +14,8 @@ import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
 import { AT_RIM, type Anim, animOf, dribbleArm, hangOf, lookFor, type Memo, spins360 } from '../pixel/select-nba';
+import { staleLook } from '../pixel/looks';
+import { drawVignette } from '../pixel/venue';
 import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import { type Juice, squashStretch } from '../juice';
 import { ballPos, contestOf, RIM, RIM_H, shotChance, topSpeed } from './engine';
@@ -148,7 +150,9 @@ export class HoopsRenderer {
     const pitch = Math.round(Math.min(0.9, pitchAt(this.pc, b.cx)) / 0.15) * 0.15;
     const who = b.p.id + '|' + b.side;
     let look = this.looks.get(who);
-    if (!look) {
+    if (!look || staleLook(look)) {
+      // (a look made before the appearance data arrived: the drawings go, redrawn through the budget)
+      if (look) this.sprites.dispose(this.last.values());
       look = lookFor(b, kit);
       this.looks.set(who, look);
     }
@@ -218,6 +222,8 @@ export class HoopsRenderer {
     drawFloor(this.pc, this.tex, fl.px, q);
     fl.canvas.getContext('2d')!.putImageData(fl.img, 0, 0);
     ctx.drawImage(fl.canvas, 0, 0, fl.canvas.width * q, fl.canvas.height * q);
+    // the venue's corners darkened (players-4, venue.ts: colour only, one cached blit)
+    drawVignette(ctx, this.W, this.H);
   }
 
   /** The stanchion and the backboard, behind everything near the hoop. */

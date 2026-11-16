@@ -7,7 +7,9 @@
 import { mix, type RGB, rgb } from './color';
 import { freeCanvas } from './body';
 import { type FieldTex, levels, skyRamp, standsWall } from './persp';
+import { crowdAt, crowdPalette } from './crowd';
 import { noise, PixBuf } from './pixbuf';
+import { grass, lineOver, lit, POOL, type Pool, teamDark, VENUE } from './venue';
 
 export const PITCH_W = 68;
 export const PITCH_L = 105;
@@ -22,9 +24,12 @@ export interface PitchTheme {
   awayC1: string;
 }
 
-const GRASS: RGB[] = [
-  [54, 132, 56],
-  [64, 146, 62],
+/** Four soft pools of floodlight over the pitch (venue.ts). */
+const PITCH_POOLS: Pool[] = [
+  { x: 17, y: 26, r: 24, k: POOL },
+  { x: 51, y: 26, r: 24, k: POOL },
+  { x: 17, y: 79, r: 24, k: POOL },
+  { x: 51, y: 79, r: 24, k: POOL },
 ];
 
 /** The texture's span (metres): wide enough for the boards and fans either side. */
@@ -75,9 +80,9 @@ export function pitchTexture(theme: PitchTheme): FieldTex {
   const buf = new PixBuf(W, H);
   const home = rgb(theme.homeC1);
   const trim = rgb(theme.homeC2);
-  const away = rgb(theme.awayC1);
   const dark: RGB = [14, 22, 16];
-  const white = PixBuf.pack([246, 248, 240]);
+  const fans = crowdPalette(home);
+  const { mow, stripe: every, lines, lineAlpha } = VENUE.soccer;
   for (let ty = 0; ty < H; ty++) {
     const y = Y1 - (ty + 0.5) / k;
     for (let tx = 0; tx < W; tx++) {
@@ -85,35 +90,28 @@ export function pitchTexture(theme: PitchTheme): FieldTex {
       let col: RGB;
       const inside = x >= -4 && x <= PITCH_W + 4 && y >= -4 && y <= PITCH_L + 4;
       if (inside) {
-        // mowed in stripes across the pitch, a slight check along it, a little texture
-        const stripe = ((Math.floor((y + 0.0001) / 5.25) % 2) + 2) % 2;
+        // mowed in stripes across the pitch every 5.5 m, a faint check along it, the least texture
+        // (venue.ts tokens), lit by the pools and darker toward the far goal
+        const stripe = Math.floor((y + 0.0001) / every);
         const across = ((Math.floor((x + 0.0001) / 8.5) % 2) + 2) % 2;
-        const n = noise(Math.floor(x * 3), Math.floor(y * 3), 3) * 0.06 - 0.03;
-        col = mix(GRASS[stripe], across ? [80, 160, 70] : [40, 110, 50], 0.05);
-        col = mix(col, n > 0 ? [180, 220, 140] : [20, 50, 20], Math.abs(n));
+        col = grass(mow, stripe, noise(Math.floor(x * 3), Math.floor(y * 3), 3) * 0.06 - 0.03);
+        col = mix(col, across ? [80, 160, 70] : [40, 110, 50], 0.025);
         // the run-off a shade darker, worn in front of the goals
         if (x < 0 || x > PITCH_W || y < 0 || y > PITCH_L) col = mix(col, dark, 0.14);
-        if (onLine(x, y)) {
-          buf.set(tx, ty, white);
-          continue;
-        }
+        if (onLine(x, y)) col = lineOver(col, lines, lineAlpha);
+        col = lit(col, x, y, PITCH_POOLS, y / PITCH_L);
       } else if (x > -6 && x < PITCH_W + 6 && y > -6 && y < PITCH_L + 6) {
         // the boards along the touchlines: the home colors in panels with a light strip
         const along = ((Math.floor(y / 3.2) % 2) + 2) % 2;
-        col = Math.abs(x - -5) < 0.6 || Math.abs(x - (PITCH_W + 5)) < 0.6 ? (along ? mix(trim, [255, 255, 255], 0.2) : home) : [28, 34, 38];
+        col = Math.abs(x - -5) < 0.6 || Math.abs(x - (PITCH_W + 5)) < 0.6 ? (along ? mix(trim, [255, 255, 255], 0.2) : teamDark(home)) : [28, 34, 38];
       } else if (x > -8 && x < PITCH_W + 8 && y > -8 && y < PITCH_L + 8) col = [24, 28, 34];
       else {
-        // the fans from above, in rows: shirts mostly home, some away, heads every few texels
+        // the fans from above: rows in the crowd's three bands, nearest lightest, the gangways between
+        // rows in the darkest (crowd.ts)
         const side = x < 0 ? x + 8 : x - (PITCH_W + 8);
         const row = Math.floor(Math.abs(side) / 0.9);
-        const seat = Math.floor(y / 0.55);
-        const n = noise(seat, row, x < 0 ? 1 : 2);
         const inRow = Math.abs(side) % 0.9;
-        const shirts: RGB[] = [home, home, trim, away, [230, 230, 230], [44, 48, 66]];
-        if (inRow < 0.22) col = [20, 22, 30];
-        else if (n < 0.08) col = [40, 44, 60];
-        else if (Math.floor(y * k) % 4 < 2 && inRow < 0.5) col = mix([200, 156, 118], [74, 46, 30], noise(seat, row, 8) * 0.85);
-        else col = mix(shirts[Math.floor(noise(seat, row, 5) * shirts.length)], dark, 0.22 + Math.min(0.4, Math.abs(side) * 0.02));
+        col = inRow < 0.22 ? fans.bands[2] : crowdAt(fans, tx, ty, row < 3 ? 0 : row < 6 ? 1 : 2, x < 0 ? 1 : 2);
       }
       buf.set(tx, ty, PixBuf.pack(col));
     }
