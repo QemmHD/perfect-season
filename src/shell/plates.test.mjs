@@ -33,6 +33,8 @@ const lum = (hex) => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+// the open sheet and the full-screen overlays the band must show through (shell.md, D4 message)
+const OVERLAYS = '.scrim:not(.closing), .champ, .cast, .ut-pick-screen, .promotion, .sportfade';
 const appToken = (name) => {
   const m = styles.match(new RegExp(name + ':\\s*(#[0-9a-f]{6})', 'i'));
   if (!m) throw Error('no app token ' + name);
@@ -90,12 +92,31 @@ describe('plates.css', () => {
     // UT follows the main rule at the same specificity (and wins); the open sheet's rule comes last too
     const at = (sel) => plates.indexOf(sel + ' .status-plate');
     expect(at('html:has(.shell-top, .topbar)')).toBeLessThan(at('html:has(.ut-top)'));
-    expect(at('html:has(.ut-top)')).toBeLessThan(at('html:has(.scrim:not(.closing))'));
+    expect(at('html:has(.ut-top)')).toBeLessThan(at('html:has(' + OVERLAYS + ')'));
+  });
+
+  it('is transparent by default, so screens without a header keep their own top (no flat strip)', () => {
+    // the :has() browsers' base; the header rules after it make it opaque only over a header plate
+    expect(plates).toMatch(/@supports selector\(:has\(a\)\) \{\s*html \.status-plate \{\s*background-color: transparent;\s*\}\s*\}/);
+    const at = (sel) => plates.indexOf(sel + ' .status-plate');
+    expect(plates.indexOf('@supports selector(:has(a))')).toBeLessThan(at('html:has(.shell-top, .topbar)'));
+    // the base outside @supports (no :has(), old Safari) keeps the main plate colour, matching Home
+    expect(rule(plates, 'html .status-plate')).toMatch(/background-color:\s*var\(--plate-top\)/);
+  });
+
+  it('turns transparent over the full-screen overlays drawn over a header screen, with plain-class :has() arguments', () => {
+    const r = rule(plates, 'html:has(' + OVERLAYS + ') .status-plate');
+    expect(r).toMatch(/background-color:\s*transparent/);
+    for (const cls of ['.champ', '.cast', '.ut-pick-screen', '.promotion', '.sportfade']) expect(OVERLAYS.split(', ')).toContain(cls);
+    // no combinators inside any :has() (cheaper invalidation)
+    const args = [...plates.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/:has\(((?:[^()]|\([^()]*\))*)\)/g)].flatMap((m) => m[1].split(/,\s*/));
+    expect(args.length).toBeGreaterThan(10);
+    for (const a of args) expect(a).toMatch(/^[.a-z0-9_-]+(:not\(\.[a-z0-9_-]+\))?$/i);
   });
 
   it('steps aside on the immersive screens and under an open sheet, and never animates under reduced motion', () => {
     expect(rule(plates, 'html:has(.ut-open-screen, .splash, .vs-splash, .screen.reveal) .status-plate')).toMatch(/display:\s*none/);
-    expect(rule(plates, 'html:has(.scrim:not(.closing)) .status-plate')).toMatch(/background-color:\s*transparent/);
+    expect(rule(plates, 'html:has(' + OVERLAYS + ') .status-plate')).toMatch(/background-color:\s*transparent/);
     expect(plates).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*html \.status-plate \{\s*transition: none;/);
     expect(rule(plates, 'html .status-plate')).toMatch(/height:\s*var\(--ps-inset-top, env\(safe-area-inset-top, 0px\)\)/);
   });

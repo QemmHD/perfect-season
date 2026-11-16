@@ -4,11 +4,13 @@
      on them. A header reads --plate-top above the safe-area inset line, fades to --plate-bot by its
      bottom and ends on a 1 px --plate-line hairline. UT uses the -ut set. No noise, no backdrop-filter.
    - The status plate (index.html, outside the scaled stage) is one flat colour under the iOS status
-     bar, exactly the inset tall. Its colour follows what is on screen: the header plate's top colour
-     where there is a header (so there is no seam), the app background on screens without one,
-     transparent while a sheet's scrim is open (the band then shows the scrimmed header, like the rest
-     of the screen), and none at all on the immersive screens that own the band (pack opening, launch
-     splash, versus splash, season reveal). Matches portal to <body> at z-index 50 and cover it.
+     bar, exactly the inset tall. It is opaque only where a header plate sits under it, in that plate's
+     top colour (so there is no seam at the inset line). Everywhere else it is transparent and the band
+     shows the screen itself, as with Fix A alone: screens without a header (Draft, Playoffs, Welcome,
+     Vote, Search: a flat strip would cut their own top gradients), an open sheet's scrim, and the
+     full-screen overlays drawn over a header screen (Champions, GameCast, the UT player pick, the
+     Rivals promotion, the sport switch). The immersive screens that own the band (pack opening, launch
+     splash, versus splash, season reveal) hide it. Matches portal to <body> at z-index 50 and cover it.
    Sizes are in frame px inside the stage (--sat, --inset-top) and screen px outside it (--ps-inset-top). */
 :root {
   --plate-top: #08222d;
@@ -22,8 +24,8 @@
 
 /* ---------- Fix B: the status plate ---------- */
 /* the colour is set on the plate itself, never as an inherited property on <html>, so a state change
-   restyles one element. UT's rule follows the main one at the same specificity and wins; the open
-   sheet's rule outranks both. The base rule says `html` so it outranks index.html's inline base
+   restyles one element. UT's rule follows the main one at the same specificity and wins; the overlay
+   rule outranks both. The base rule says `html` so it outranks index.html's inline base
    wherever the build puts this file. */
 html .status-plate {
   height: var(--ps-inset-top, env(safe-area-inset-top, 0px));
@@ -33,7 +35,7 @@ html .status-plate {
 /* without :has() (Safari before 15.4) the plate stays in the main screens' colour, matching Home */
 @supports selector(:has(a)) {
   html .status-plate {
-    background-color: var(--bg);
+    background-color: transparent;
   }
 }
 html:has(.shell-top, .topbar) .status-plate {
@@ -42,7 +44,7 @@ html:has(.shell-top, .topbar) .status-plate {
 html:has(.ut-top) .status-plate {
   background-color: var(--plate-top-ut);
 }
-html:has(.scrim:not(.closing)) .status-plate {
+html:has(.scrim:not(.closing), .champ, .cast, .ut-pick-screen, .promotion, .sportfade) .status-plate {
   background-color: transparent;
 }
 html:has(.ut-open-screen, .splash, .vs-splash, .screen.reveal) .status-plate {
