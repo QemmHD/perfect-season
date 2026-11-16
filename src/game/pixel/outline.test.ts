@@ -3,7 +3,9 @@
 // part's shadow tone), exactly three tones per material below 56 art px, lit from the top-left, no
 // dithering, and the lit-side rim for dark skin on a dark kit.
 import { MATERIAL_SLOT, rasterBody, type Look, type Raster } from './body';
-import { OUTLINE, ramp3, rgb } from './color';
+import { NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS } from '../../data/teams';
+import { skinTone } from './appearance';
+import { deltaE, luma, OUTLINE, OUTLINE_CLEARANCE, ramp3, rgb } from './color';
 import * as P from './poses';
 import { LOOKS } from './__fixtures__/looks';
 
@@ -48,7 +50,7 @@ describe('the outline and the tones (V2 C.1.3)', () => {
         const r = rasterBody(look, P.idle(0.25), view, px);
         for (const [name, hex] of [['jersey', look.jersey], ['skin', look.skin], ['shorts', look.shorts]] as const) {
           const slot = MATERIAL_SLOT[name];
-          const tones = new Set(ramp3(rgb(hex)).map(pack));
+          const tones = new Set(ramp3(rgb(hex), name === 'skin').map(pack));
           const seen = new Set<number>();
           for (let i = 0; i < r.px.length; i++) if (r.slot[i] === slot) seen.add(r.px[i] >>> 0);
           for (const c of seen) expect(tones.has(c), `${name} at ${px}: a colour outside its ramp`).toBe(true);
@@ -85,6 +87,49 @@ describe('the outline and the tones (V2 C.1.3)', () => {
     }
   });
 
+  // a black or near-black kit (Nets, Spurs, Raiders, Saints, Steelers, Juventus, every #101820
+  // helmet and mask) must not swallow the outline, and its inner separations must not read as black
+  it('keeps every team colour clear of the outline: each tone delta E >= 10 and lighter', () => {
+    const colours = new Set<string>(['#9aa0a6', '#e8e8e8', '#000000', '#101820']);
+    for (const t of [...NBA_TEAMS, ...NFL_TEAMS, ...SOCCER_TEAMS]) for (const c of [t.c1, t.c2, t.alt, t.helmet, t.mask, t.pants]) if (c) colours.add(c.toLowerCase());
+    expect(colours.size).toBeGreaterThan(100);
+    for (const hex of colours) {
+      const tones = ramp3(rgb(hex));
+      tones.forEach((c, k) => {
+        expect(deltaE(c, OUTLINE), `${hex} tone ${k}`).toBeGreaterThanOrEqual(OUTLINE_CLEARANCE);
+        expect(luma(c), `${hex} tone ${k}`).toBeGreaterThan(luma(OUTLINE));
+      });
+      // and the three stay three distinct steps
+      expect(deltaE(tones[0], tones[1]), `${hex} shadow/base`).toBeGreaterThanOrEqual(5);
+      expect(deltaE(tones[1], tones[2]), `${hex} base/light`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('keeps a white kit white: the base as it is, the highlight pure white', () => {
+    for (const hex of ['#ffffff', '#f6f6f2', '#fafafa']) {
+      const [s, m, l] = ramp3(rgb(hex));
+      expect(Math.min(...m)).toBeGreaterThanOrEqual(240);
+      expect(l).toEqual([255, 255, 255]);
+      expect(luma(s)).toBeLessThan(luma(m) - 30);
+    }
+  });
+
+  it("keeps skin and hair their own base (identity), with the skin's shadow still off the outline", () => {
+    for (let i = 0; i < 10; i++) {
+      const base = rgb(skinTone(i));
+      const [s, m] = ramp3(base, true);
+      expect(m).toEqual(base);
+      expect(luma(s), `skin ${i}`).toBeGreaterThan(luma(OUTLINE));
+      expect(luma(s)).toBeLessThan(luma(m));
+    }
+    // the darkest two Monk tones stay two tones
+    expect(deltaE(ramp3(rgb(skinTone(8)), true)[1], ramp3(rgb(skinTone(9)), true)[1])).toBeGreaterThan(5);
+    // black hair stays black (a base this near the outline has no room for a shadow above it) and
+    // black and dark brown hair stay two colours
+    for (const hex of ['#1d1612', '#3b2a20']) expect(ramp3(rgb(hex), true)[1]).toEqual(rgb(hex));
+    expect(deltaE(ramp3(rgb('#1d1612'), true)[1], ramp3(rgb('#3b2a20'), true)[1])).toBeGreaterThan(8);
+  });
+
   it('lights the torso from the top-left', () => {
     const look = LOOKS[0];
     const r = rasterBody(look, P.idle(0), VIEWS[0], 48);
@@ -117,7 +162,7 @@ describe('the outline and the tones (V2 C.1.3)', () => {
     const dark: Look = { ...LOOKS[0], skin: '#3a312a', jersey: '#111111', shorts: '#111111' };
     const hi = (look: Look) => {
       const r = rasterBody(look, P.idle(0), VIEWS[0], 34);
-      const [, , light] = ramp3(rgb(look.skin)).map(pack);
+      const [, , light] = ramp3(rgb(look.skin), true).map(pack);
       let rimPx = 0, edgePx = 0;
       for (let y = 1; y < r.h; y++)
         for (let x = 1; x < r.w; x++) {

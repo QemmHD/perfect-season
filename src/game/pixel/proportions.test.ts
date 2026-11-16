@@ -1,11 +1,14 @@
 // players-2: Broadcast Pixel proportions (Game Design V2 C.1.1), measured on the raster.
-// Heads tall = the figure's height (outline excluded) over the skull's (the head ball's rows; the hair
-// volume over it is not head). Head box = the head and hair pixels' bounding box (V2's "with hair").
-// V2's table holds one number per band, so it is checked at each band's centre height.
+// Heads tall = the figure's height (feet to crown; the outline and the hair over the skull excluded, so
+// a high top or an afro doesn't make a player more heads tall) over the skull's rows (the head ball).
+// Head box = the head and hair pixels' bounding box (V2's "with hair").
+// V2's table holds one number per band; it is checked at each band's centre and swept over every
+// figure height in the band with all six hair styles (a head is whole pixels, so at 18 art px one row
+// is 1.1 heads: the sweep asks for the nearest whole row, and +-0.25 heads where a row is finer).
 import { rasterBody, shapeFor, type Look } from './body';
 import { legScale } from './mocap';
 import * as P from './poses';
-import { bmi, drawnHeight, headScale, MEAN_HEIGHT_IN, torsoWidthPx } from './proportions';
+import { bmi, drawnHeight, HEAD_TABLE, headCols, headRows, MEAN_HEIGHT_IN, snapCentre, targetHeads, torsoWidthPx } from './proportions';
 
 const plain: Look = { sport: 'nba', ht: 78, wt: 215, num: 23, hair: 0, beard: false, skin: '#a8714f', hairColor: '#1d1612', jersey: '#1d428a', trim: '#ffc72c', shorts: '#1d428a', socks: '#f2f2f2', shoes: '#1b1b1f' };
 const front = { facing: Math.PI / 2, pitch: 0.45 };
@@ -17,19 +20,20 @@ function measure(look: Look, px: number) {
     for (let x = 0; x < r.w; x++) {
       const i = y * r.w + x;
       if (!r.slot[i]) continue;
-      y0 = Math.min(y0, y);
-      y1 = Math.max(y1, y);
       const p = r.part[i];
+      if (p !== 7) y0 = Math.min(y0, y);
+      y1 = Math.max(y1, y);
       if (p === 6) (s0 = Math.min(s0, y)), (s1 = Math.max(s1, y));
       if (p === 6 || p === 7) (bx0 = Math.min(bx0, x)), (bx1 = Math.max(bx1, x)), (by0 = Math.min(by0, y)), (by1 = Math.max(by1, y));
     }
   const figure = y1 - y0 + 1;
-  return { figure, heads: figure / (s1 - s0 + 1), boxW: bx1 - bx0 + 1, boxH: by1 - by0 + 1 };
+  const skull = s1 - s0 + 1;
+  return { figure, skull, heads: figure / skull, boxW: bx1 - bx0 + 1, boxH: by1 - by0 + 1 };
 }
 
 /** the grid height whose drawn figure is `artH` tall (the idle pose and the camera's pitch shorten it) */
 function atFigure(look: Look, artH: number) {
-  for (let px = artH; px < artH * 1.4; px++) {
+  for (let px = Math.floor(artH * 0.9); px < artH * 1.5; px++) {
     const m = measure(look, px);
     if (m.figure >= artH) return m;
   }
@@ -58,11 +62,27 @@ function torsoWidth(look: Look, px = 34) {
 }
 
 describe('the 5-head hero (V2 C.1.1)', () => {
-  it('scales the head by V2 formula, clamped', () => {
-    expect(headScale(18)).toBeCloseTo(1.4, 5);
-    expect(headScale(34)).toBeCloseTo(1.55 - 34 / 120, 5);
-    expect(headScale(8)).toBe(1.45);
-    expect(headScale(64)).toBe(1.2);
+  it("reads V2's table: a band's heads across the band, linear between bands", () => {
+    expect(targetHeads(12)).toBe(4.5);
+    expect(targetHeads(18)).toBe(4.5);
+    expect(targetHeads(21)).toBeCloseTo(4.75, 6);
+    expect(targetHeads(24)).toBe(5);
+    expect(targetHeads(29)).toBeCloseTo(5.25, 6);
+    expect(targetHeads(36)).toBe(5.5);
+    expect(targetHeads(46)).toBeCloseTo(5.75, 6);
+    expect(targetHeads(64)).toBe(6);
+    expect(targetHeads(120)).toBe(6);
+  });
+
+  it('sizes the head in whole rows, round when small, and centres it on the grid', () => {
+    for (let px = 10; px <= 120; px++) expect(Number.isInteger(headRows(0.084, px))).toBe(true);
+    expect(headRows(0.084, 10)).toBe(3);
+    expect(headCols(4)).toBe(4);
+    expect(headCols(11)).toBe(11);
+    expect(snapCentre(10.3, 4)).toBe(10);
+    expect(snapCentre(10.3, 5)).toBe(10.5);
+    // a taller player's smaller rig head (rig.ts) still draws smaller at the same grid size
+    expect(headRows(0.078, 80)).toBeLessThan(headRows(0.084, 80));
   });
 
   it.each([
@@ -76,6 +96,48 @@ describe('the 5-head hero (V2 C.1.1)', () => {
     expect(Math.abs(m.boxW - w)).toBeLessThanOrEqual(1);
     expect(Math.abs(m.boxH - h)).toBeLessThanOrEqual(1);
   });
+
+  // every figure height in each band, with all six hair styles (short, buzz, high top, bald, headband, locs)
+  describe.each(HEAD_TABLE.map(([lo, hi, heads], i) => ({ lo, hi, heads, box: [[5, 5], [6, 6], [7, 8], [12, 13]][i] })))(
+    'figures $lo-$hi art px',
+    ({ lo, hi, heads, box }) => {
+      const ms: { hair: number; artH: number; m: ReturnType<typeof measure> }[] = [];
+      for (let artH = lo; artH <= hi; artH++) for (let hair = 0; hair < 6; hair++) ms.push({ hair, artH, m: atFigure({ ...plain, hair }, artH) });
+
+      it('draws the head the nearest whole row to the figure over the band heads', () => {
+        const near = ms.filter(({ m }) => Math.abs(m.figure / heads - m.skull) <= 0.6).length;
+        expect(near / ms.length).toBeGreaterThanOrEqual(0.95);
+      });
+
+      it('averages the band heads tall (+-0.1)', () => {
+        const mean = ms.reduce((a, { m }) => a + m.heads, 0) / ms.length;
+        expect(Math.abs(mean - heads)).toBeLessThanOrEqual(0.1);
+      });
+
+      // where the head is 9 rows or more (56+ art px). Two heights in 17 (57, 63) have no whole row
+      // within 0.25 heads (57/9 = 6.33, 57/10 = 5.70), so 15 of 17 is the most whole rows allow.
+      it('keeps the most heights whole rows allow within +-0.25 heads, at 9 rows and up', () => {
+        if (lo / heads < 9) return; // one row is over 0.9 heads here; the nearest-row check holds it
+        const ok = ms.filter(({ m }) => Math.abs(m.heads - heads) <= 0.25).length;
+        expect(ok / ms.length).toBeGreaterThanOrEqual(15 / 17 - 1e-9);
+      });
+
+      // V2's box is for the band-centre head; a head drawn a whole row bigger or smaller keeps its shape
+      it("keeps the head box near V2's (+-1 px of the band's box, or of it scaled to the head's rows)", () => {
+        const rowsAtCentre = (lo + hi) / 2 / heads;
+        const near = (v: number, t: number, k: number) => v >= Math.min(t, t * k) - 1 && v <= Math.max(t, t * k) + 1;
+        // with hair: short, headband, locs; bald and buzz have no hair over the skull and the high top's
+        // height is its own (checked by width only)
+        const withHair = ms.filter(({ hair }) => hair === 0 || hair === 4 || hair === 5);
+        const okBox = withHair.filter(({ m }) => near(m.boxW, box[0], m.skull / rowsAtCentre) && near(m.boxH, box[1], m.skull / rowsAtCentre)).length;
+        expect(okBox / withHair.length).toBeGreaterThanOrEqual(0.9);
+        // without hair at the sides (bald, buzz, high top) the head is V2's box less the hair: up to 2 px narrower
+        const bare = ms.filter(({ hair }) => hair === 1 || hair === 2 || hair === 3);
+        const okW = bare.filter(({ m }) => near(m.boxW + 1, box[0], m.skull / rowsAtCentre)).length;
+        expect(okW / bare.length).toBeGreaterThanOrEqual(0.9);
+      });
+    }
+  );
 
   it('gives Shaq and Manute Bol different torsos at 34 art px', () => {
     const shaq = torsoWidth({ ...plain, ht: 85, wt: 325 });
