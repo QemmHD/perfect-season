@@ -1,0 +1,29 @@
+/* Claude, 2026-11-16 (studio overhaul, team ut-1): GO chips on Objectives and Daily (GoLink.tsx).
+   The chip itself is the kit's .ut-k-go (ut-system.css: 32 px, a 44 px hit area). */
+.ut-golink {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+.ut-golink-odds {
+  font: 800 10px/1 var(--body);
+  letter-spacing: 0.6px;
+  color: var(--ps-dim, #8aa3b5);
+}
+/* Daily: the progress count sits beside its GO */
+.ut-dobj-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+/* ut-1 review: an objective no screen of this sport moves (soccer's Moments) says so, quietly */
+.hq-objective-note {
+  max-width: 150px;
+  font: 700 11px/1.35 var(--body);
+  font-style: normal;
+  text-align: right;
+  color: var(--ps-dim, #8aa3b5);
+}

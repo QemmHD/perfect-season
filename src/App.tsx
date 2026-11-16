@@ -22,6 +22,7 @@ import { dailyNumber, easternDateKey, lineupKey, playSeason, type Season } from 
 import { type Booster, type BotLevel, type Mode, type Player, type PlayoffTeam, type Slot, SLOTS } from './engine/types';
 import { addVs, freshProfile, type H2HStats, loadProfile, newId, type Profile, OTHER_SPORTS, readOtherLbs, resetOtherSport, type RunRecord, saveProfile, updateOtherLb } from './lib/profile';
 import { setFeedback, sfx, vibrate } from './lib/sound';
+import { bankActivity, type PlayCtx, registerPlaytimeSink, usePlaytime } from './lib/playtime';
 import { applyUpdate, justUpdated, newerVersionLive, reloadForMissingFiles } from './lib/update';
 import { type BoardKind, boardTag, fetchBoard, prune, publishEntry, renamed, type Span, weekKey, withH2H, withRun } from './net/leaderboard';
 import { type ArcadeState, cleanRoomCode, type Found, MatchConn, type OnlineCount, type OnlinePick, onCounts, setMyRecord, setPresence, startPresence } from './net/match';
@@ -129,6 +130,10 @@ interface OppView {
   fav: string | null;
 }
 
+/** MINUTES: what each draft-run screen counts as (src/lib/playtime.ts); every other screen is a menu. */
+const PLAY_CTX: Partial<Record<Screen, PlayCtx>> = { search: 'queue', draft: 'draft', arcade: 'match', reveal: 'draftSim', playoffs: 'draftSim', results: 'replay' };
+/** A draft run's MINUTES activity id, unique across launches (an online run has its match id). */
+const playId = (r: Run) => 'draft:' + (r.saveId ?? r.online?.found.matchId ?? r.id);
 const MODE_LABEL: Record<Mode, string> = { classic: 'Classic', blind: 'Blind', daily: 'Daily', '1v1': '1 vs 1' };
 const NO_PICKS: OnlinePick[] = [];
 /** the other side's colors in a head-to-head game: the rival purple */
@@ -250,6 +255,9 @@ export function App() {
   };
 
   const update = (fn: (p: Profile) => Profile) => setProfile((p) => fn(p));
+  // Claude 2026-11-16 (V2 E.1): MINUTES. Banked seconds land in the profile; each screen says what it is
+  useEffect(() => registerPlaytimeSink(update), []);
+  usePlaytime(PLAY_CTX[screen] ?? 'menu', run ? { id: playId(run), sport: SPORT, kind: 'draft' } : undefined);
 
   // ---------- online: presence and the leaderboard ----------
 
@@ -803,6 +811,7 @@ export function App() {
       showdown,
       arcade: arcade ? { ...arcade, tiebreak: arcade.us === arcade.them } : undefined,
     };
+    bankActivity(playId(r), noContest ? 'forfeit' : 'complete');
     setRun({ ...r, result });
     setScreen('results');
   };
@@ -1212,7 +1221,8 @@ export function App() {
           onChange={(k, v) => update((p) => ({ ...p, settings: { ...p.settings, [k]: v } }))}
           onReset={() => {
             // keep your name, and your entries on the boards stay yours (in both sports)
-            setProfile({ ...freshProfile(), name: profile.name, lb: profile.lb, h2h: profile.h2h, streak: profile.streak, rewardDay: profile.rewardDay });
+            // (the MINUTES ledger stays too: time played is a record, and a reset must not pay its rungs twice)
+            setProfile({ ...freshProfile(), name: profile.name, lb: profile.lb, h2h: profile.h2h, streak: profile.streak, rewardDay: profile.rewardDay, ...(profile.playtime ? { playtime: profile.playtime } : {}) });
             clearCheckpoint(); setSaved(null);
             for (const other of OTHER_SPORTS) try { localStorage.removeItem('perfect-season:checkpoint:' + other); } catch {}
             resetOtherSport();

@@ -186,7 +186,9 @@ export function startCloudSaving(
   const otherTab = (e: StorageEvent) => {
     if (
       e.key?.startsWith("perfect-season:") &&
-      !e.key.startsWith("perfect-season:cloud:")
+      !e.key.startsWith("perfect-season:cloud:") &&
+      // Claude 2026-11-16: the MINUTES ticker's device-only lock and pending keys are not progress
+      !e.key.startsWith("perfect-season:playtime-")
     )
       queue();
   };

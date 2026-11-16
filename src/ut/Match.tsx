@@ -7,6 +7,7 @@ import { withLeagueForm } from './league-form';
 import { Promotion } from './Rivals';
 import { divisionOf, rivalsOf } from './rivals';
 import { publishRivals } from './rivals-net';
+import { LABEL } from './labels';
 // Ultimate Team's played matches: Squad Battles against this week's AI ladder, and online head to
 // head against a squad near yours (by overall: within 3, wider by 2 every 10 seconds up to 10, then
 // an AI squad at your level steps in). The two squads become the arcade game's teams (teams.ts):
@@ -14,6 +15,7 @@ import { publishRivals } from './rivals-net';
 // takeover and tiebreak rules. The result pays coins and card XP and climbs the ladder (play.ts).
 // Online, the squads cross over the match channel (src/net/match.ts) in a queue of their own.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { bankActivity, usePlaytime } from '../lib/playtime';
 import { levelInfo } from '../engine/economy';
 import { hashString } from '../engine/rng';
 import { easternDateKey } from '../engine/season';
@@ -312,6 +314,8 @@ export default function UtMatch(props: {
   const foundAt = useRef(0);
   // a new search each time the queue starts over (a match that never connected)
   const [searchNo, setSearchNo] = useState(0);
+  // Claude 2026-11-16 (V2 E.1): MINUTES. The match's seconds are provisional until finish() banks them
+  usePlaytime(stage === 'play' ? 'match' : stage === 'result' ? 'replay' : stage === 'search' ? 'queue' : 'menu', { id: 'ut:' + req.id, sport: SPORT, kind: 'match' });
 
   const me = useMemo(() => {
     if (!pool) return null;
@@ -687,6 +691,7 @@ export default function UtMatch(props: {
   ) => {
     if (done.current || !setup || !pool) return;
     done.current = true;
+    bankActivity('ut:' + req.id, 'complete');
     const s = setup;
     // two squads exactly as good: a coin both phones read the same way off the match
     const coin = () => {
@@ -1090,18 +1095,18 @@ export default function UtMatch(props: {
     return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
   const title = req.cup
-    ? 'Club Cups'
+    ? LABEL.clubCups
     : req.draft
-      ? 'UT Draft'
+      ? LABEL.utDraft
       : req.league
-        ? 'Club Season'
+        ? LABEL.clubSeason
         : req.circuit
-          ? 'Champions Circuit'
+          ? LABEL.championsCircuit
           : req.event
-            ? 'Legends Events'
+            ? LABEL.legendsEvents
             : req.mode === 'online'
-              ? 'Rivals'
-              : 'Squad Battles';
+              ? LABEL.rivals
+              : LABEL.squadBattles;
   return (
     <div className={'screen ut utm utm-s-' + stage}>
       <div className="topbar ut-top">
@@ -1111,7 +1116,7 @@ export default function UtMatch(props: {
             onClick={leave}
             aria-label="Back to Ultimate Team"
           >
-            <Back size={16} /> UT
+            <Back size={16} /> {LABEL.ut}
           </button>
         ) : (
           <span className="pill-btn utm-ghost" aria-hidden="true" />
@@ -1289,15 +1294,15 @@ function SideCard({ side, you }: { side: Side; you: boolean }) {
 function VsView({ setup }: { setup: Setup }) {
   const r = setup.rung;
   const eyebrow = setup.cup
-    ? 'Club Cups · ' + CUP_ROUNDS[setup.cup.round]
+    ? LABEL.clubCups + ' · ' + CUP_ROUNDS[setup.cup.round]
     : setup.league
-      ? 'Club Season · ' + (setup.level?.name ?? '')
+      ? LABEL.clubSeason + ' · ' + (setup.level?.name ?? '')
       : setup.event
-        ? 'Legends Events · ' + setup.event.title
+        ? LABEL.legendsEvents + ' · ' + setup.event.title
         : setup.online
-          ? 'Head to head · online'
+          ? LABEL.headToHead + ' · online'
           : r && r.i >= 0
-            ? 'Squad Battles · ' +
+            ? LABEL.squadBattles + ' · ' +
               (setup.level ? setup.level.name + ' · ' : '') +
               'rung ' +
               (r.i + 1) +
@@ -1385,21 +1390,21 @@ function ResultView({
     <div className="page utm-result">
       <span className="eyebrow wide">
         {setup.cup
-          ? 'Club Cups · ' + CUP_ROUNDS[setup.cup.round]
+          ? LABEL.clubCups + ' · ' + CUP_ROUNDS[setup.cup.round]
           : setup.draft
-            ? 'UT Draft · Game ' + (setup.draft.game + 1) + ' / ' + DRAFT_GAMES
+            ? LABEL.utDraft + ' · Game ' + (setup.draft.game + 1) + ' / ' + DRAFT_GAMES
             : setup.league
-              ? 'Club Season · league results and standings updated'
+              ? LABEL.clubSeason + ' · league results and standings updated'
               : setup.circuit
-                ? 'Solo Champions Circuit · Match ' +
+                ? 'Solo ' + LABEL.championsCircuit + ' · Match ' +
                   (setup.circuit.round + 1) +
                   ' / 6'
                 : setup.event
                   ? setup.event.title
                   : ladder
-                    ? 'Squad Battles · rung ' + (r!.i + 1)
+                    ? LABEL.squadBattles + ' · rung ' + (r!.i + 1)
                     : setup.online
-                      ? 'Head to head'
+                      ? LABEL.headToHead
                       : 'Vs an AI squad'}
       </span>
       <h1 className={'disp utm-verdict ' + (out.won ? 'win' : 'loss')}>

@@ -12,8 +12,18 @@ import type { UtSport } from './types';
 /** The id of the "a pick is ready" line: a pointer to the stamp shelf, never a claim. */
 export const STAMPS_READY = 'stamp-shelf:ready';
 
+/** What packs adds to ut's claimables (ut-1's seam shape): how many, stable ids, and the inbox lines. */
+export interface PacksClaimables {
+  /** claimable items (inbox rows) */
+  n: number;
+  /** stable item ids, as the inbox lists them */
+  ids: string[];
+  /** one short line per item, for the badge's "Next up" text */
+  lines: string[];
+}
+
 /** What packs adds to ut's claimables: how many, stable ids, and the inbox lines. */
-export function packsClaimables(ut: WithContent, _day: string, _sport: UtSport): { n: number; ids: string[]; lines: string[] } {
+export function packsClaimables(ut: WithContent, _day: string, _sport: UtSport): PacksClaimables {
   const ids: string[] = [];
   const lines: string[] = [];
   if (stampsBalance(ut) >= STAMP_SHELF_MIN) {

@@ -1,0 +1,524 @@
+/* Claude, 2026-11-10 (studio overhaul, team ut): the Ultimate Team visual kit (kit.tsx).
+   Tokens (plates, glows, an 8 px grid, 20 px display titles), one motion spec, press feedback and
+   the shared pieces: section titles, reward chips, GO chips, CLAIM and primary buttons, countdowns,
+   progress rings, empty states, the Minutes ring and the gold bar. Existing identity: Archivo
+   condensed italic, teal for actions, gold for rewards. Game Design V2 C.3 (2026-11-16): the --ps-*
+   colour tokens and UI motion of 120-180 ms ease-out, defined only on the UT screen (.screen.ut), on
+   .ps-v2 surfaces of the main app and on a kit piece that sits outside both (one inside a portal
+   still has them; inside a themed root it inherits, so a parent that re-tints a token reaches it),
+   so nothing outside those roots changes. Every target is
+   >= 44 design px; every animation is off under reduced motion (colour stays). Kept under 5 KB gzip
+   (scripts/qa/ut-studio.mjs kit checks it). */
+:where(.screen.ut, .ps-v2),
+:where([class*='ut-k-']):not(:where(.screen.ut, .ps-v2) *) {
+  --ps-bg: #071521;
+  --ps-panel: #0e2233;
+  --ps-stroke: #1d3a50;
+  --ps-teal: #4fe3c1;
+  --ps-gold: #f6b93b;
+  --ps-violet: #8b7cf6;
+  --ps-red: #ff5d5d;
+  --ps-text: #f2f7fa;
+  --ps-dim: #8aa3b5;
+  --ut-s1: 8px;
+  --ut-s2: 16px;
+  --ut-s3: 24px;
+  --ut-s4: 32px;
+  --ut-r2: 14px;
+  --ut-title: 20px;
+  --ut-plate: linear-gradient(180deg, #13304a, var(--ps-panel) 58%, #0a1a28);
+  --ut-plate-hi: inset 0 1px rgba(255, 255, 255, 0.07), inset 0 0 0 1px var(--ps-stroke);
+  --ut-glow-gold: 0 0 18px rgba(246, 185, 59, 0.42);
+  --ut-chip: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+  --ut-amber: #ffbe4d;
+  --ut-push: 180ms;
+  --ut-pop: 140ms;
+  --ut-tab: 120ms;
+  --ut-sheet: 180ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.screen.ut, .ps-v2),
+  :where([class*='ut-k-']):not(:where(.screen.ut, .ps-v2) *) {
+    --ut-push: 0ms;
+    --ut-pop: 0ms;
+    --ut-tab: 0ms;
+    --ut-sheet: 0ms;
+  }
+}
+
+/* ---------- motion: push (forward), pop (back), tab (crossfade), sheet ---------- */
+.ut-push-in {
+  animation: ut-k-push var(--ut-push) var(--ease-out) both;
+}
+.ut-pop-in {
+  animation: ut-k-pop var(--ut-pop) var(--ease-out) both;
+}
+.ut-tab-in {
+  animation: ut-k-fade var(--ut-tab) linear both;
+}
+.ut-sheet-in {
+  animation: ut-k-sheet var(--ut-sheet) var(--ease-out) both;
+}
+@keyframes ut-k-push {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes ut-k-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+@keyframes ut-k-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ut-k-sheet {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+/* ---------- press feedback: within a frame, on every UT control without its own :active ---------- */
+:where(.screen.ut button:not(:disabled):active, .ps-v2 button:not(:disabled):active, .screen.ut [data-pressable]:active, .screen.ut [data-pressed='true'], .ps-v2 [data-pressed='true']) {
+  transform: scale(0.97);
+  filter: brightness(1.08);
+}
+
+/* ---------- section title ---------- */
+.ut-k-sec {
+  display: flex;
+  align-items: center;
+  gap: var(--ut-s1);
+  min-height: 32px;
+  margin: var(--ut-s3) 0 var(--ut-s1);
+}
+.ut-k-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: italic 900 var(--ut-title) / 1.05 var(--display);
+  font-stretch: 68%;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ps-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ut-k-sec small {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ps-dim);
+}
+
+/* ---------- reward chip ---------- */
+.ut-k-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 999px;
+  background: var(--ut-chip), rgba(6, 24, 32, 0.9);
+  box-shadow: var(--ut-plate-hi);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ps-dim);
+  white-space: nowrap;
+}
+.ut-k-reward > i {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 50%;
+  background: rgba(246, 185, 59, 0.14);
+  color: var(--ps-gold);
+}
+.ut-k-reward[data-kind='sp'] > i,
+.ut-k-reward[data-kind='xp'] > i {
+  background: rgba(79, 227, 193, 0.13);
+  color: var(--ps-teal);
+}
+.ut-k-reward b {
+  color: var(--ps-text);
+}
+
+/* ---------- GO chip: compact, with an invisible 44 px hit area ---------- */
+.ut-k-go {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  min-width: 52px;
+  padding: 0 8px 0 12px;
+  border: 1px solid rgba(79, 227, 193, 0.55);
+  border-radius: 999px;
+  background: rgba(79, 227, 193, 0.1);
+  color: var(--ps-teal);
+  font: italic 900 13px var(--display);
+  font-stretch: 78%;
+  letter-spacing: 0.8px;
+}
+.ut-k-go::before {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
+}
+
+/* ---------- CLAIM (gold, sheen while waiting, sparks on claim) ---------- */
+.ut-k-claim,
+.ut-k-primary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  border: 0;
+  font-family: var(--display);
+  font-stretch: 68%;
+  font-style: italic;
+  font-weight: 900;
+  text-transform: uppercase;
+  isolation: isolate;
+}
+.ut-k-claim {
+  min-height: 44px;
+  min-width: 96px;
+  padding: 0 var(--ut-s2);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffd978, var(--ps-gold) 55%, #e09a1c);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.5), var(--ut-glow-gold);
+  color: var(--gold-ink);
+  font-size: 17px;
+  letter-spacing: 0.8px;
+  overflow: visible;
+}
+.ut-k-claim::before,
+.ut-k-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%) -150% 0 / 250% 100% no-repeat;
+  animation: ut-k-sheen 2.6s 0.6s ease-in-out infinite;
+  pointer-events: none;
+}
+.ut-k-claim::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #fff3c4 0 3px, transparent 4px) 50% 2px / 8px 8px no-repeat,
+    radial-gradient(circle, #ffd978 0 3px, transparent 4px) 90% 30% / 8px 8px no-repeat,
+    radial-gradient(circle, #fff3c4 0 2px, transparent 3px) 86% 82% / 6px 6px no-repeat,
+    radial-gradient(circle, #ffd978 0 3px, transparent 4px) 40% 96% / 8px 8px no-repeat,
+    radial-gradient(circle, #fff3c4 0 2px, transparent 3px) 6% 64% / 6px 6px no-repeat,
+    radial-gradient(circle, #ffd978 0 3px, transparent 4px) 12% 16% / 8px 8px no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+.ut-k-claim[data-burst]::after {
+  animation: ut-k-burst 0.6s var(--ease-out) both;
+}
+.ut-k-claim:disabled {
+  background: var(--ps-panel);
+  box-shadow: inset 0 0 0 1px var(--ps-stroke);
+  color: var(--ps-dim);
+}
+.ut-k-claim:disabled::before,
+.ut-k-primary:disabled::before {
+  display: none;
+}
+@keyframes ut-k-sheen {
+  0%,
+  45% {
+    background-position: -150% 0;
+  }
+  100% {
+    background-position: 250% 0;
+  }
+}
+@keyframes ut-k-burst {
+  0% {
+    opacity: 1;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+/* ---------- the one primary action of a screen ---------- */
+.ut-k-primary {
+  flex-direction: column;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 var(--ut-s3);
+  clip-path: polygon(2.5% 0, 100% 0, 97.5% 100%, 0 100%);
+  background: linear-gradient(180deg, #7af0d4, var(--ps-teal) 55%, #2fbf9f);
+  color: var(--teal-ink);
+  font-size: 22px;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+/* the clip-path cuts any outline away, so keyboard and switch focus draws a ring inside the shape:
+   a dark line, then a light one, readable on teal, gold and the dark page */
+.ut-k-primary:focus-visible {
+  box-shadow:
+    inset 0 0 0 2px var(--ps-bg),
+    inset 0 0 0 5px var(--ps-text);
+}
+.ut-k-primary.gold {
+  background: linear-gradient(180deg, #ffd978, #e09a1c);
+  color: var(--gold-ink);
+}
+.ut-k-primary small {
+  font: 700 11px var(--body);
+  letter-spacing: 0.6px;
+  margin-top: 3px;
+  opacity: 0.85;
+}
+.ut-k-primary:disabled {
+  background: var(--ps-panel);
+  color: var(--ps-dim);
+}
+
+/* ---------- countdown (amber in the last 24 h) ---------- */
+.ut-k-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(143, 166, 178, 0.12);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ps-dim);
+  white-space: nowrap;
+}
+.ut-k-count[data-tone='amber'] {
+  background: rgba(255, 190, 77, 0.14);
+  color: var(--ut-amber);
+}
+
+/* ---------- progress ring ---------- */
+.ut-k-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+.ut-k-ring > svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.ut-k-ring > svg circle {
+  fill: none;
+  stroke-width: 4;
+  stroke: rgba(143, 166, 178, 0.2);
+}
+.ut-k-ring > svg circle + circle {
+  stroke: var(--ps-teal);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 180ms var(--ease-out);
+  animation: ut-k-ring 0.6s var(--ease-out) both;
+}
+.ut-k-ring[data-done] circle + circle {
+  stroke: var(--ps-gold);
+}
+@keyframes ut-k-ring {
+  from {
+    stroke-dashoffset: var(--c);
+  }
+}
+.ut-k-ring b {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ---------- empty state: icon, one line, one way forward ---------- */
+.ut-k-empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: var(--ut-s4) var(--ut-s3);
+  border-radius: var(--ut-r2);
+  background: var(--ut-plate);
+  box-shadow: var(--ut-plate-hi);
+  text-align: center;
+}
+.ut-k-empty > i {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(79, 227, 193, 0.1);
+  color: var(--ps-teal);
+}
+.ut-k-empty p {
+  margin: 0;
+  max-width: 280px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ps-dim);
+}
+.ut-k-empty .ut-k-go {
+  height: 44px;
+  padding: 0 14px 0 18px;
+}
+
+/* ---------- MINUTES ring chip: ring, "23 / 30 min", the reward line ---------- */
+.ut-k-mins {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 4px 14px 4px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ut-chip), var(--ps-panel);
+  box-shadow: var(--ut-plate-hi), 0 4px 12px rgba(0, 0, 0, 0.35);
+  color: var(--ps-text);
+  text-align: left;
+}
+.ut-k-mins-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+.ut-k-mins-text b {
+  font: italic 900 15px var(--display);
+  font-stretch: 78%;
+}
+.ut-k-mins-text small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ps-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ut-k-mins[data-state='ready'] .ut-k-mins-text small,
+.ut-k-mins[data-state='done'] .ut-k-mins-text b {
+  color: var(--ps-gold);
+}
+.ut-k-mins[data-state='ready'] circle + circle {
+  stroke: var(--ps-gold);
+}
+.ut-k-dot {
+  position: absolute;
+  top: 3px;
+  left: 33px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ps-gold);
+  box-shadow: 0 0 0 2px var(--ps-panel), var(--ut-glow-gold);
+}
+
+/* ---------- the gold bar: "Next up" on Home, the One-More bar after a match ---------- */
+.ut-k-gold {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 10px 8px 14px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  isolation: isolate;
+  background: linear-gradient(180deg, #ffe39a, var(--ps-gold) 48%, #d98d16);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.7), inset 0 -2px rgba(120, 66, 0, 0.45), 0 1px 0 #7a4a06, 0 8px 22px rgba(0, 0, 0, 0.45), var(--ut-glow-gold);
+  color: var(--gold-ink);
+  text-align: left;
+}
+.ut-k-gold::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.5) 50%, transparent 65%) -150% 0 / 250% 100% no-repeat;
+  animation: ut-k-sheen 3.2s 0.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.ut-k-gold-art {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  height: 40px;
+}
+.ut-k-gold-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.1;
+}
+.ut-k-gold-text small {
+  font: 800 11px var(--body);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.ut-k-gold-text b {
+  font: italic 900 19px var(--display);
+  font-stretch: 68%;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.ut-k-gold-text :is(small, b, em) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ut-k-gold-text em {
+  font: 700 12px var(--body);
+}
+.ut-k-gold-go {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(38, 26, 0, 0.88);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.18);
+  color: var(--ps-gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ut-push-in,
+  .ut-pop-in,
+  .ut-tab-in,
+  .ut-sheet-in,
+  .ut-k-claim::before,
+  .ut-k-primary::before,
+  .ut-k-claim[data-burst]::after,
+  .ut-k-gold::before,
+  .ut-k-ring > svg circle + circle {
+    animation: none;
+    transition: none;
+  }
+  :where(.screen.ut button:not(:disabled):active, .ps-v2 button:not(:disabled):active, .screen.ut [data-pressable]:active, .screen.ut [data-pressed='true'], .ps-v2 [data-pressed='true']) {
+    transform: none;
+  }
+}

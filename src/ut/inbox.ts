@@ -39,6 +39,7 @@ import {
 import { claimSet, setsFor } from './sets';
 import { STANDOUT_OBJECTIVE_WINS } from './standouts';
 import type { UtState } from './state';
+import { POOL_ROWS } from './claimables';
 
 export interface InboxItem {
   id: string;
@@ -255,6 +256,14 @@ export function inboxItems(
       claimable: false,
     });
   return out;
+}
+
+/**
+ * Claude 2026-11-16 (ut-1): the pool-dependent claimable rows (Sets, Collection milestones, Moments)
+ * among `items`, for the light count's cache (claimables.ts writePoolCache).
+ */
+export function poolRowCount(items: InboxItem[]): number {
+  return items.filter((i) => i.claimable && (POOL_ROWS as readonly string[]).includes(i.id)).length;
 }
 
 /** Every claimable count for the badges. */

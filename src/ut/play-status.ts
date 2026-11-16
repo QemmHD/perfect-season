@@ -7,6 +7,7 @@ import { battlesThisWeek, LEVEL_NAME, levelOf, RUNGS } from './battles';
 import { circuitOf, CIRCUIT_ENTRIES, CIRCUIT_GAMES } from './circuit';
 import { draftOf, tokenReady, DRAFT_GAMES } from './draft-mode';
 import { eventsFor } from './events';
+import { MODE_LABEL } from './labels';
 import { seasonGames } from './league';
 import { momentsFor } from './moments';
 import type { Pool } from './pool';
@@ -205,13 +206,5 @@ export function continueRun(
   );
 }
 
-export const MODE_NAME: Record<string, string> = {
-  cup: 'Club Cups',
-  league: 'Club Season',
-  battles: 'Squad Battles',
-  circuit: 'Champions Circuit',
-  events: 'Legends Events',
-  moments: 'Moments',
-  draft: 'UT Draft',
-  rivals: 'Rivals',
-};
+/** Claude 2026-11-10 (studio overhaul): the names come from labels.ts, wording unchanged. */
+export const MODE_NAME: Record<string, string> = { ...MODE_LABEL };

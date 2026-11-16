@@ -1,0 +1,6567 @@
+{
+ "about": "An old (acdf3e2, live on 2026-11-08) nba save with every field family, as localStorage holds it. Built by scripts/compat/build-fixtures.ts with the old tree; never edit by hand.",
+ "sport": "nba",
+ "source": "acdf3e2",
+ "day": "2026-11-08",
+ "storage": {
+  "perfect-season:profile:v1": {
+   "v": 1,
+   "coins": 48210,
+   "xp": 23150,
+   "inventory": {
+    "double": 2,
+    "trade": 1,
+    "prime": 3
+   },
+   "settings": {
+    "sound": false,
+    "haptics": true,
+    "hints": false
+   },
+   "firstRun": false,
+   "mode": "blind",
+   "botLevel": "allstar",
+   "history": [
+    {
+     "id": "compat-run-1",
+     "at": "2026-11-07T20:00:00.000Z",
+     "mode": "classic",
+     "wins": 61,
+     "rating": 88.2,
+     "grade": "A",
+     "tier": "Contender",
+     "playoff": "Finals",
+     "series": 3,
+     "title": false,
+     "perfect": false,
+     "lineup": []
+    }
+   ],
+   "daily": null,
+   "stats": {
+    "games": 31,
+    "titles": 4,
+    "perfect": 1,
+    "undefeated": 0,
+    "vsWins": 9,
+    "legends": 2,
+    "h2hGames": 15
+   },
+   "name": "Compat Fixture",
+   "lb": {
+    "entries": {},
+    "dirty": []
+   },
+   "collection": {
+    "nba:legend:1974:debusda01:NYK": 1,
+    "nba:legend:1974:hayesel01:WAS": 2,
+    "nba:legend:1974:mcadobo01:LAC": 3,
+    "nba:legend:1975:barryri01:GSW": 4,
+    "nba:legend:1975:fraziwa01:NYK": 5
+   },
+   "gauntlet": {
+    "week": "2026-W45",
+    "best": 4,
+    "allBest": 7,
+    "clears": 1
+   },
+   "h2h": {
+    "w": 9,
+    "l": 6,
+    "streak": 2,
+    "best": 5,
+    "week": "2026-W45",
+    "ww": 2,
+    "wl": 1,
+    "wstreak": 2
+   },
+   "streak": {
+    "count": 6,
+    "last": "2026-11-08",
+    "best": 12
+   },
+   "rewardDay": "2026-11-08",
+   "missions": {
+    "day": "2026-11-08",
+    "progress": [
+     2,
+     1,
+     0
+    ],
+    "claimed": [
+     true,
+     false,
+     false
+    ]
+   },
+   "activeMatch": null,
+   "ut": {
+    "v": 1,
+    "content": {
+     "daily": {
+      "day": "2026-11-08",
+      "streak": 4,
+      "total": 23
+     },
+     "buys": {
+      "elite:2026-11-08": 1,
+      "scout:2026-W45": 2
+     },
+     "picks": [
+      {
+       "id": "compat-scout-nba",
+       "kind": "scout",
+       "title": "Scout's Choice",
+       "options": [
+        "nba:legend:1974:debusda01:NYK",
+        "nba:legend:1974:hayesel01:WAS",
+        "nba:legend:1974:mcadobo01:LAC"
+       ],
+       "at": 1794149880000
+      }
+     ],
+     "claims": [
+      "pick:compat-old-pick",
+      "set:compat-set",
+      "daily-bonus:2026-11-07",
+      "draft:compat-old-draft",
+      "new-era:nba"
+     ],
+     "market": {
+      "day": "2026-11-08",
+      "bought": [
+       0,
+       2
+      ]
+     },
+     "soWins": {
+      "week": "2026-W45",
+      "ids": [
+       "compat-match-0",
+       "compat-match-2"
+      ]
+     },
+     "evo": {
+      "compat-nba-3": {
+       "done": [
+        "rising-1"
+       ],
+       "active": {
+        "id": "rising-2",
+        "games": 2,
+        "wins": 1,
+        "at": 1794143000000
+       }
+      }
+     },
+     "evoSeen": [
+      "rising-1",
+      "rising-2"
+     ],
+     "streams": {
+      "compat-stream": 140
+     },
+     "calendar": {
+      "day": "2026-11-07",
+      "n": 3
+     },
+     "preview": {
+      "seed": "compat-seed-nba",
+      "n": 2,
+      "until": 1794153600000
+     },
+     "pulls": {
+      "since": 1792422000000,
+      "r": [
+       {
+        "id": "compat-gold-old",
+        "k": "gold",
+        "n": "Gold Pack",
+        "c": 7500,
+        "s": "store",
+        "at": 1794063600000,
+        "u": "compat-pull:",
+        "cs": [
+         [
+          "nba:legend:1981:coopemi01:LAL",
+          81,
+          "gold"
+         ],
+         [
+          "nba:legend:1981:johnsma02:LAL",
+          77,
+          "gold"
+         ]
+        ]
+       }
+      ],
+      "a": {
+       "gold": {
+        "nm": "Gold Pack",
+        "n": 1,
+        "pd": 1,
+        "c": 7500,
+        "q": 640,
+        "qp": 640,
+        "k": 2,
+        "t": {
+         "gold": 2
+        },
+        "o": [
+         0,
+         1,
+         1,
+         0,
+         0,
+         0
+        ],
+        "sp": 0,
+        "lg": 0,
+        "w": 0,
+        "h86": 0,
+        "h90": 0,
+        "hs": 0,
+        "b": [
+         "nba:legend:1981:coopemi01:LAL",
+         81,
+         "gold",
+         1794063600000
+        ],
+        "f": 1794063600000,
+        "l": 1794063600000
+       }
+      }
+     },
+     "locked": [
+      "compat-nba-0"
+     ],
+     "era": {
+      "eligible": true
+     },
+     "draft": {
+      "active": {
+       "id": "compat-draft-nba",
+       "at": 1794147000000,
+       "week": "2026-W45",
+       "paid": "token",
+       "captains": [
+        "nba:legend:1975:barryri01:GSW",
+        "nba:legend:1975:fraziwa01:NYK",
+        "nba:legend:1976:abdulka01:LAL",
+        "nba:legend:1976:westppa01:PHX",
+        "nba:legend:1977:busedo01:IND"
+       ],
+       "squad": {
+        "PF": "nba:legend:1977:jonesbo01:DEN",
+        "SF": "nba:legend:1977:maravpe01:UTA",
+        "SG": "nba:legend:1977:waltobi01:POR"
+       },
+       "pick": {
+        "slot": "PG",
+        "options": [
+         "nba:legend:1978:dantlad01:IND",
+         "nba:legend:1979:porteke01:DET",
+         "nba:legend:1980:ervinju01:PHI",
+         "nba:legend:1980:gervige01:SAS",
+         "nba:legend:1980:richami01:NYK"
+        ]
+       },
+       "games": 1,
+       "wins": 1,
+       "results": [
+        true
+       ],
+       "done": false
+      },
+      "tokenWeek": "2026-W45",
+      "history": [
+       {
+        "id": "compat-old-draft",
+        "wins": 3,
+        "at": 1793631600000
+       }
+      ]
+     }
+    },
+    "league": {
+     "active": {
+      "v": 1,
+      "id": "compat-season-nba",
+      "sport": "nba",
+      "number": 1,
+      "level": "pro",
+      "at": 1794063600000,
+      "anchor": 82,
+      "clubOvr": 82,
+      "adaptive": -0.016752723708164163,
+      "round": 2,
+      "phase": "regular",
+      "teams": [
+       {
+        "id": 0,
+        "abbr": "ATL",
+        "name": "Your Club",
+        "base": 82,
+        "form": 0,
+        "w": 1,
+        "l": 1,
+        "pf": 189,
+        "pa": 189,
+        "last": [
+         true,
+         false
+        ],
+        "players": []
+       },
+       {
+        "id": 1,
+        "abbr": "BOS",
+        "name": "Boston Celtics",
+        "base": 80,
+        "form": 0.03345210500053736,
+        "w": 1,
+        "l": 1,
+        "pf": 40,
+        "pa": 46,
+        "last": [
+         true,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2017:horfoal01:BOS",
+          "slot": "C",
+          "name": "Al Horford",
+          "base": 78,
+          "form": -0.3055104607432632,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2013:garneke01:BOS",
+          "slot": "PF",
+          "name": "Kevin Garnett",
+          "base": 78,
+          "form": 0.08611261776378594,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 5,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:brownja02:BOS",
+          "slot": "SF",
+          "name": "Jaylen Brown",
+          "base": 78,
+          "form": -0.12012157221594615,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 0,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2013:piercpa01:BOS",
+          "slot": "SG",
+          "name": "Paul Pierce",
+          "base": 79,
+          "form": -0.3861139374216066,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1972:whitejo01:BOS",
+          "slot": "PG",
+          "name": "Jo Jo White",
+          "base": 78,
+          "form": -0.25497635483998327,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2016:crowdja01:BOS",
+          "slot": "B1",
+          "name": "Jae Crowder",
+          "base": 78,
+          "form": -0.4098556600337848,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1976:scottch01:BOS",
+          "slot": "B2",
+          "name": "Charlie Scott",
+          "base": 78,
+          "form": -0.064871955977194,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1986:johnsde01:BOS",
+          "slot": "B3",
+          "name": "Dennis Johnson",
+          "base": 78,
+          "form": 0.4656726906640455,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2016:bradlav01:BOS",
+          "slot": "B4",
+          "name": "Avery Bradley",
+          "base": 78,
+          "form": -0.28248310149312017,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2005:davisri01:BOS",
+          "slot": "B5",
+          "name": "Ricky Davis",
+          "base": 78,
+          "form": -0.5746545767433942,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 2,
+        "abbr": "BKN",
+        "name": "Brooklyn Nets",
+        "base": 82,
+        "form": 0.014139687248732047,
+        "w": 1,
+        "l": 1,
+        "pf": 24,
+        "pa": 20,
+        "last": [
+         false,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1990:bowiesa01:BKN",
+          "slot": "C",
+          "name": "Sam Bowie",
+          "base": 80,
+          "form": -0.054796101959344076,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:martike01:BKN",
+          "slot": "PF",
+          "name": "Kenyon Martin",
+          "base": 80,
+          "form": 0.20931228643574362,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:jefferi01:BKN",
+          "slot": "SF",
+          "name": "Richard Jefferson",
+          "base": 80,
+          "form": -0.38941255865818525,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2023:bridgmi01:BKN",
+          "slot": "SG",
+          "name": "Mikal Bridges",
+          "base": 80,
+          "form": -0.06014790488048165,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1998:cassesa01:BKN",
+          "slot": "PG",
+          "name": "Sam Cassell",
+          "base": 80,
+          "form": 0.12108667214502013,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1993:anderke01:BKN",
+          "slot": "B1",
+          "name": "Kenny Anderson",
+          "base": 80,
+          "form": 0.013340994970314185,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:portemi01:BKN",
+          "slot": "B2",
+          "name": "Michael Porter Jr.",
+          "base": 80,
+          "form": 0.5316309184351936,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:vanhoke01:BKN",
+          "slot": "B3",
+          "name": "Keith Van Horn",
+          "base": 80,
+          "form": 0.151302699996531,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:gillke01:BKN",
+          "slot": "B4",
+          "name": "Kendall Gill",
+          "base": 80,
+          "form": -0.4990624190229923,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1997:willija01:BKN",
+          "slot": "B5",
+          "name": "Jayson Williams",
+          "base": 80,
+          "form": -0.04602140365689991,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 3,
+        "abbr": "CHA",
+        "name": "Charlotte Hornets",
+        "base": 78,
+        "form": 0.7687014181543373,
+        "w": 2,
+        "l": 0,
+        "pf": 43,
+        "pa": 34,
+        "last": [
+         true,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2007:mayse01:CHA",
+          "slot": "C",
+          "name": "Sean May",
+          "base": 76,
+          "form": 0.23591059577946114,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2022:bridgmi02:CHA",
+          "slot": "PF",
+          "name": "Miles Bridges",
+          "base": 76,
+          "form": 0.23983778680633436,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1989:tripuke01:CHA",
+          "slot": "SF",
+          "name": "Kelly Tripucka",
+          "base": 76,
+          "form": 0.2707695858126183,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:whiteco01:CHA",
+          "slot": "SG",
+          "name": "Coby White",
+          "base": 76,
+          "form": 0.7028980650450629,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:sextoco01:CHA",
+          "slot": "PG",
+          "name": "Collin Sexton",
+          "base": 76,
+          "form": 0.2740561069534687,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2007:knighbr01:CHA",
+          "slot": "B1",
+          "name": "Brevin Knight",
+          "base": 76,
+          "form": -0.052075499483756685,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2023:roziete01:CHA",
+          "slot": "B2",
+          "name": "Terry Rozier",
+          "base": 76,
+          "form": -0.10732552951052779,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:batumni01:CHA",
+          "slot": "B3",
+          "name": "Nicolas Batum",
+          "base": 76,
+          "form": 0.022166234124079393,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1991:gilliar01:CHA",
+          "slot": "B4",
+          "name": "Armen Gilliam",
+          "base": 76,
+          "form": 0.3498300670921803,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1996:geigema01:CHA",
+          "slot": "B5",
+          "name": "Matt Geiger",
+          "base": 76,
+          "form": 0.2594937656704337,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 4,
+        "abbr": "CHI",
+        "name": "Chicago Bulls",
+        "base": 81,
+        "form": 0.7243475460673814,
+        "w": 2,
+        "l": 0,
+        "pf": 26,
+        "pa": 19,
+        "last": [
+         true,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2005:chandty01:CHI",
+          "slot": "C",
+          "name": "Tyson Chandler",
+          "base": 79,
+          "form": 0.35397519084833223,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1990:grantho01:CHI",
+          "slot": "PF",
+          "name": "Horace Grant",
+          "base": 79,
+          "form": 0.4898732633741911,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1970:sloanje01:CHI",
+          "slot": "SF",
+          "name": "Jerry Sloan",
+          "base": 79,
+          "form": 0.728373045675321,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2025:whiteco01:CHI",
+          "slot": "SG",
+          "name": "Coby White",
+          "base": 79,
+          "form": -0.06381158221677281,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:hinriki01:CHI",
+          "slot": "PG",
+          "name": "Kirk Hinrich",
+          "base": 79,
+          "form": 0.25620444849267265,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 5,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2017:wadedw01:CHI",
+          "slot": "B1",
+          "name": "Dwyane Wade",
+          "base": 79,
+          "form": 0.4331988842651248,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1975:thurmna01:CHI",
+          "slot": "B2",
+          "name": "Nate Thurmond",
+          "base": 79,
+          "form": 0.48000171482991427,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2015:rosede01:CHI",
+          "slot": "B3",
+          "name": "Derrick Rose",
+          "base": 79,
+          "form": 0.5684472951857373,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1980:theusre01:CHI",
+          "slot": "B4",
+          "name": "Reggie Theus",
+          "base": 79,
+          "form": 0.008732917837426107,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2012:noahjo01:CHI",
+          "slot": "B5",
+          "name": "Joakim Noah",
+          "base": 79,
+          "form": 0.43907579843197014,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 5,
+        "abbr": "CLE",
+        "name": "Cleveland Cavaliers",
+        "base": 83,
+        "form": 0.041308992678413314,
+        "w": 1,
+        "l": 1,
+        "pf": 29,
+        "pa": 35,
+        "last": [
+         true,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2005:ilgauzy01:CLE",
+          "slot": "C",
+          "name": "Zydrunas Ilgauskas",
+          "base": 81,
+          "form": 0.29228025400685864,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 2,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1991:nancela01:CLE",
+          "slot": "PF",
+          "name": "Larry Nance",
+          "base": 81,
+          "form": 0.21694376002600269,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1981:mitchmi01:CLE",
+          "slot": "SF",
+          "name": "Mike Mitchell",
+          "base": 81,
+          "form": 0.06393353749486401,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 1,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2014:irvinky01:CLE",
+          "slot": "SG",
+          "name": "Kyrie Irving",
+          "base": 81,
+          "form": -0.184758548491878,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2025:garlada01:CLE",
+          "slot": "PG",
+          "name": "Darius Garland",
+          "base": 81,
+          "form": 0.03875995771634175,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 5,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1989:harpero01:CLE",
+          "slot": "B1",
+          "name": "Ron Harper",
+          "base": 81,
+          "form": -0.46708891457356505,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:mobleev01:CLE",
+          "slot": "B2",
+          "name": "Evan Mobley",
+          "base": 81,
+          "form": 0.3060516701132059,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:millean02:CLE",
+          "slot": "B3",
+          "name": "Andre Miller",
+          "base": 81,
+          "form": -0.10496298008915037,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2017:loveke01:CLE",
+          "slot": "B4",
+          "name": "Kevin Love",
+          "base": 81,
+          "form": 0.15459906211458155,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2025:allenja01:CLE",
+          "slot": "B5",
+          "name": "Jarrett Allen",
+          "base": 80,
+          "form": 0.044287874744832506,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 6,
+        "abbr": "DAL",
+        "name": "Dallas Mavericks",
+        "base": 82,
+        "form": 0.05303708326949802,
+        "w": 1,
+        "l": 1,
+        "pf": 44,
+        "pa": 41,
+        "last": [
+         false,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2010:nowitdi01:DAL",
+          "slot": "C",
+          "name": "Dirk Nowitzki",
+          "base": 80,
+          "form": -0.16171081063996715,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1988:tarplro01:DAL",
+          "slot": "PF",
+          "name": "Roy Tarpley",
+          "base": 81,
+          "form": -0.22942461265630743,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1987:aguirma01:DAL",
+          "slot": "SF",
+          "name": "Mark Aguirre",
+          "base": 81,
+          "form": 0.36687335467238263,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 6,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:finlemi01:DAL",
+          "slot": "SG",
+          "name": "Michael Finley",
+          "base": 81,
+          "form": -0.5058282820657612,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:nashst01:DAL",
+          "slot": "PG",
+          "name": "Steve Nash",
+          "base": 80,
+          "form": 0.09478739451645658,
+          "stats": {
+           "games": 2,
+           "points": 11,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1993:jacksji01:DAL",
+          "slot": "B1",
+          "name": "Jim Jackson",
+          "base": 80,
+          "form": 0.3323410880876705,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2020:porzikr01:DAL",
+          "slot": "B2",
+          "name": "Kristaps Porziņģis",
+          "base": 80,
+          "form": -0.07058888138048354,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1998:bradlsh01:DAL",
+          "slot": "B3",
+          "name": "Shawn Bradley",
+          "base": 80,
+          "form": -0.18270233694054183,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2007:howarjo01:DAL",
+          "slot": "B4",
+          "name": "Josh Howard",
+          "base": 81,
+          "form": -0.10531060578916221,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1990:harpede01:DAL",
+          "slot": "B5",
+          "name": "Derek Harper",
+          "base": 81,
+          "form": -0.06938210944235323,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 7,
+        "abbr": "DEN",
+        "name": "Denver Nuggets",
+        "base": 86,
+        "form": 0.13090594008375583,
+        "w": 1,
+        "l": 1,
+        "pf": 25,
+        "pa": 19,
+        "last": [
+         false,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2021:jokicni01:DEN",
+          "slot": "C",
+          "name": "Nikola Jokić",
+          "base": 86,
+          "form": -0.09283463232805406,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 1,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:anthoca01:DEN",
+          "slot": "PF",
+          "name": "Carmelo Anthony",
+          "base": 83,
+          "form": 0.53550137398759,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1983:englial01:DEN",
+          "slot": "SF",
+          "name": "Alex English",
+          "base": 84,
+          "form": 0.11539272314468946,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:iversal01:DEN",
+          "slot": "SG",
+          "name": "Allen Iverson",
+          "base": 84,
+          "form": 0.016040814823197073,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1988:leverfa01:DEN",
+          "slot": "PG",
+          "name": "Fat Lever",
+          "base": 83,
+          "form": -0.23981596007762365,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:mcdyean01:DEN",
+          "slot": "B1",
+          "name": "Antonio McDyess",
+          "base": 84,
+          "form": 0.05507160237003117,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1978:thompda01:DEN",
+          "slot": "B2",
+          "name": "David Thompson",
+          "base": 84,
+          "form": -0.32962728898935023,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1978:isselda01:DEN",
+          "slot": "B3",
+          "name": "Dan Issel",
+          "base": 83,
+          "form": -0.1053797216653824,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:mutomdi01:DEN",
+          "slot": "B4",
+          "name": "Dikembe Mutombo",
+          "base": 83,
+          "form": 0.12542435456477105,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1991:adamsmi01:DEN",
+          "slot": "B5",
+          "name": "Michael Adams",
+          "base": 83,
+          "form": -0.17119313803371045,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 8,
+        "abbr": "DET",
+        "name": "Detroit Pistons",
+        "base": 82,
+        "form": 0.7213340614746795,
+        "w": 2,
+        "l": 0,
+        "pf": 50,
+        "pa": 39,
+        "last": [
+         true,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1984:laimbbi01:DET",
+          "slot": "C",
+          "name": "Bill Laimbeer",
+          "base": 80,
+          "form": 0.5787179843723774,
+          "stats": {
+           "games": 2,
+           "points": 10,
+           "rebounds": 3,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:wallabe01:DET",
+          "slot": "PF",
+          "name": "Ben Wallace",
+          "base": 81,
+          "form": -0.10024490992203347,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:thompau01:DET",
+          "slot": "SF",
+          "name": "Ausar Thompson",
+          "base": 80,
+          "form": 0.5801981091887877,
+          "stats": {
+           "games": 2,
+           "points": 10,
+           "rebounds": 3,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2005:billuch01:DET",
+          "slot": "SG",
+          "name": "Chauncey Billups",
+          "base": 80,
+          "form": 0.3298873700487614,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1963:ohldo01:DET",
+          "slot": "PG",
+          "name": "Don Ohl",
+          "base": 80,
+          "form": 0.9375497049795092,
+          "stats": {
+           "games": 2,
+           "points": 13,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1970:bingda01:DET",
+          "slot": "B1",
+          "name": "Dave Bing",
+          "base": 80,
+          "form": 0.2656185896635056,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2003:hamilri01:DET",
+          "slot": "B2",
+          "name": "Richard Hamilton",
+          "base": 80,
+          "form": 0.6492595821112395,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2009:iversal01:DET",
+          "slot": "B3",
+          "name": "Allen Iverson",
+          "base": 80,
+          "form": 0.19441236922200775,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2020:drumman01:DET",
+          "slot": "B4",
+          "name": "Andre Drummond",
+          "base": 80,
+          "form": 0.5437608773741871,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1983:tripuke01:DET",
+          "slot": "B5",
+          "name": "Kelly Tripucka",
+          "base": 80,
+          "form": 0.6002591871354729,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 9,
+        "abbr": "GSW",
+        "name": "Golden State Warriors",
+        "base": 84,
+        "form": -0.6156546898040814,
+        "w": 0,
+        "l": 2,
+        "pf": 38,
+        "pa": 44,
+        "last": [
+         false,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1994:webbech01:GSW",
+          "slot": "C",
+          "name": "Chris Webber",
+          "base": 82,
+          "form": -0.007037264133295612,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1965:thurmna01:GSW",
+          "slot": "PF",
+          "name": "Nate Thurmond",
+          "base": 82,
+          "form": -0.21252632372589278,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1997:sprewla01:GSW",
+          "slot": "SF",
+          "name": "Latrell Sprewell",
+          "base": 81,
+          "form": -0.3976971314581619,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 6,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:butleji01:GSW",
+          "slot": "SG",
+          "name": "Jimmy Butler",
+          "base": 82,
+          "form": -0.12183206781076103,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1991:hardati01:GSW",
+          "slot": "PG",
+          "name": "Tim Hardaway",
+          "base": 82,
+          "form": -0.4052086111743174,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1960:arizipa01:GSW",
+          "slot": "B1",
+          "name": "Paul Arizin",
+          "base": 82,
+          "form": 0.20880281199552111,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2006:davisba01:GSW",
+          "slot": "B2",
+          "name": "Baron Davis",
+          "base": 82,
+          "form": 0.11313336054738604,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1988:mullich01:GSW",
+          "slot": "B3",
+          "name": "Chris Mullin",
+          "base": 82,
+          "form": -0.14705154987387364,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1982:kingbe01:GSW",
+          "slot": "B4",
+          "name": "Bernard King",
+          "base": 82,
+          "form": -0.782953480089642,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:thompkl01:GSW",
+          "slot": "B5",
+          "name": "Klay Thompson",
+          "base": 82,
+          "form": 0.06641358053162688,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 10,
+        "abbr": "HOU",
+        "name": "Houston Rockets",
+        "base": 85,
+        "form": 0.6171233022241742,
+        "w": 2,
+        "l": 0,
+        "pf": 45,
+        "pa": 30,
+        "last": [
+         true,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1978:malonmo01:HOU",
+          "slot": "C",
+          "name": "Moses Malone",
+          "base": 83,
+          "form": -0.06159578673789785,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 1,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1972:hayesel01:HOU",
+          "slot": "PF",
+          "name": "Elvin Hayes",
+          "base": 83,
+          "form": 0.02355361857265084,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:mcgratr01:HOU",
+          "slot": "SF",
+          "name": "Tracy McGrady",
+          "base": 83,
+          "form": 0.5470291590379269,
+          "stats": {
+           "games": 2,
+           "points": 10,
+           "rebounds": 6,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1996:drexlcl01:HOU",
+          "slot": "SG",
+          "name": "Clyde Drexler",
+          "base": 83,
+          "form": 0.10722256664683533,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:francst01:HOU",
+          "slot": "PG",
+          "name": "Steve Francis",
+          "base": 83,
+          "form": 0.15184969169717566,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1997:barklch01:HOU",
+          "slot": "B1",
+          "name": "Charles Barkley",
+          "base": 83,
+          "form": 0.40476377992294726,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2016:hardeja01:HOU",
+          "slot": "B2",
+          "name": "James Harden",
+          "base": 83,
+          "form": 0.7859606042146683,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1985:olajuha01:HOU",
+          "slot": "B3",
+          "name": "Hakeem Olajuwon",
+          "base": 83,
+          "form": 0.6352646021680907,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:duranke01:HOU",
+          "slot": "B4",
+          "name": "Kevin Durant",
+          "base": 84,
+          "form": -0.14598428309187286,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:paulch01:HOU",
+          "slot": "B5",
+          "name": "Chris Paul",
+          "base": 83,
+          "form": 0.4931800643760711,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 11,
+        "abbr": "IND",
+        "name": "Indiana Pacers",
+        "base": 88,
+        "form": 0.6611758850303351,
+        "w": 2,
+        "l": 0,
+        "pf": 39,
+        "pa": 25,
+        "last": [
+         true,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2004:onealje01:IND",
+          "slot": "C",
+          "name": "Jermaine O'Neal",
+          "base": 85,
+          "form": 0.3597338686552377,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 2,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2017:georgpa01:IND",
+          "slot": "PF",
+          "name": "Paul George",
+          "base": 83,
+          "form": 0.729890365882186,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:legend:1978:dantlad01:IND",
+          "slot": "SF",
+          "name": "Adrian Dantley",
+          "base": 89,
+          "form": 0.3155276718459705,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2024:halibty01:IND",
+          "slot": "SG",
+          "name": "Tyrese Haliburton",
+          "base": 83,
+          "form": 0.2920686529951867,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:legend:1977:busedo01:IND",
+          "slot": "PG",
+          "name": "Don Buse",
+          "base": 89,
+          "form": 0.5933165677725731,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:oladivi01:IND",
+          "slot": "B1",
+          "name": "Victor Oladipo",
+          "base": 82,
+          "form": 0.48189086157325656,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2024:siakapa01:IND",
+          "slot": "B2",
+          "name": "Pascal Siakam",
+          "base": 82,
+          "form": 0.17278098669052125,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1979:englial01:IND",
+          "slot": "B3",
+          "name": "Alex English",
+          "base": 81,
+          "form": 0.09682955782171343,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:kiddja01:PHX",
+          "slot": "B4",
+          "name": "Jason Kidd",
+          "base": 86,
+          "form": 0.5884850801672787,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2011:wadedw01:MIA",
+          "slot": "B5",
+          "name": "Dwyane Wade",
+          "base": 86,
+          "form": 0.12755640030801302,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 12,
+        "abbr": "LAC",
+        "name": "Los Angeles Clippers",
+        "base": 80,
+        "form": 0.06137406291715325,
+        "w": 1,
+        "l": 1,
+        "pf": 46,
+        "pa": 48,
+        "last": [
+         true,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1998:austiis01:LAC",
+          "slot": "C",
+          "name": "Isaac Austin",
+          "base": 78,
+          "form": 0.38222032367813263,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2007:maggeco01:LAC",
+          "slot": "PF",
+          "name": "Corey Maggette",
+          "base": 78,
+          "form": 0.053098952298079205,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1994:wilkido01:LAC",
+          "slot": "SF",
+          "name": "Dominique Wilkins",
+          "base": 78,
+          "form": 0.016481378181864112,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1974:smithra01:LAC",
+          "slot": "SG",
+          "name": "Randy Smith",
+          "base": 78,
+          "form": 0.5280671106762119,
+          "stats": {
+           "games": 2,
+           "points": 10,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2006:cassesa01:LAC",
+          "slot": "PG",
+          "name": "Sam Cassell",
+          "base": 78,
+          "form": 0.21695783528222565,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1985:waltobi01:LAC",
+          "slot": "B1",
+          "name": "Bill Walton",
+          "base": 78,
+          "form": -0.03983593270592392,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1990:mannida01:LAC",
+          "slot": "B2",
+          "name": "Danny Manning",
+          "base": 78,
+          "form": -0.3517900490429252,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1978:natersw01:LAC",
+          "slot": "B3",
+          "name": "Swen Nater",
+          "base": 78,
+          "form": -0.2602401906153187,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1974:marinja01:LAC",
+          "slot": "B4",
+          "name": "Jack Marin",
+          "base": 78,
+          "form": -0.049421852296590796,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2013:bledser01:LAC",
+          "slot": "B5",
+          "name": "Eric Bledsoe",
+          "base": 77,
+          "form": 0.2702223228277638,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 13,
+        "abbr": "LAL",
+        "name": "Los Angeles Lakers",
+        "base": 82,
+        "form": -0.6171233022241742,
+        "w": 0,
+        "l": 2,
+        "pf": 30,
+        "pa": 47,
+        "last": [
+         false,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1993:divacvl01:LAL",
+          "slot": "C",
+          "name": "Vlade Divac",
+          "base": 80,
+          "form": -0.2424634824721143,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1996:campbel01:LAL",
+          "slot": "PF",
+          "name": "Elden Campbell",
+          "base": 80,
+          "form": -0.07133730245567863,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 6,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1998:bryanko01:LAL",
+          "slot": "SF",
+          "name": "Kobe Bryant",
+          "base": 80,
+          "form": -0.03903323460090908,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:reaveau01:LAL",
+          "slot": "SG",
+          "name": "Austin Reaves",
+          "base": 81,
+          "form": -0.3486981365401298,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1972:goodrga01:LAL",
+          "slot": "PG",
+          "name": "Gail Goodrich",
+          "base": 80,
+          "form": -0.38143248690105974,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1988:scottby01:LAL",
+          "slot": "B1",
+          "name": "Byron Scott",
+          "base": 80,
+          "form": -0.4228576097354293,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:odomla01:LAL",
+          "slot": "B2",
+          "name": "Lamar Odom",
+          "base": 80,
+          "form": -0.4834864720419049,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1974:smithel01:LAL",
+          "slot": "B3",
+          "name": "Elmore Smith",
+          "base": 81,
+          "form": -0.6616547638490797,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:bynuman01:LAL",
+          "slot": "B4",
+          "name": "Andrew Bynum",
+          "base": 81,
+          "form": -0.5784554305063561,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:ricegl01:LAL",
+          "slot": "B5",
+          "name": "Glen Rice",
+          "base": 80,
+          "form": -0.31527034016940747,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 14,
+        "abbr": "MEM",
+        "name": "Memphis Grizzlies",
+        "base": 82,
+        "form": 0.6855616591669983,
+        "w": 2,
+        "l": 0,
+        "pf": 33,
+        "pa": 22,
+        "last": [
+         true,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2004:gasolpa01:MEM",
+          "slot": "C",
+          "name": "Pau Gasol",
+          "base": 80,
+          "form": 0.59696862784104,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2023:jacksja02:MEM",
+          "slot": "PF",
+          "name": "Jaren Jackson Jr.",
+          "base": 80,
+          "form": -0.19100081288989337,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 6,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1998:abdursh01:MEM",
+          "slot": "SF",
+          "name": "Shareef Abdur-Rahim",
+          "base": 80,
+          "form": -0.0699035400424009,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2025:banede01:MEM",
+          "slot": "SG",
+          "name": "Desmond Bane",
+          "base": 80,
+          "form": 0.22568006491858805,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2016:conlemi01:MEM",
+          "slot": "PG",
+          "name": "Mike Conley",
+          "base": 80,
+          "form": 0.606784712605293,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2016:gasolma01:MEM",
+          "slot": "B1",
+          "name": "Marc Gasol",
+          "base": 80,
+          "form": 0.12035839379820984,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2011:randoza01:MEM",
+          "slot": "B2",
+          "name": "Zach Randolph",
+          "base": 80,
+          "form": 0.6197537809541449,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:bibbymi01:MEM",
+          "slot": "B3",
+          "name": "Mike Bibby",
+          "base": 80,
+          "form": -0.024353313218243355,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:moranja01:MEM",
+          "slot": "B4",
+          "name": "Ja Morant",
+          "base": 81,
+          "form": 0.5298420454418287,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2012:gayru01:MEM",
+          "slot": "B5",
+          "name": "Rudy Gay",
+          "base": 79,
+          "form": 0.5069872162422164,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 15,
+        "abbr": "MIA",
+        "name": "Miami Heat",
+        "base": 84,
+        "form": -0.010283059534067274,
+        "w": 1,
+        "l": 1,
+        "pf": 37,
+        "pa": 34,
+        "last": [
+         false,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2026:adebaba01:MIA",
+          "slot": "C",
+          "name": "Bam Adebayo",
+          "base": 82,
+          "form": 0.5861333487596363,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 6,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2023:butleji01:MIA",
+          "slot": "PF",
+          "name": "Jimmy Butler",
+          "base": 83,
+          "form": -0.23143899616034083,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:ricegl01:MIA",
+          "slot": "SF",
+          "name": "Glen Rice",
+          "base": 81,
+          "form": -0.16155704206191002,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2013:wadedw01:MIA",
+          "slot": "SG",
+          "name": "Dwyane Wade",
+          "base": 83,
+          "form": 0.11791573030787204,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1997:hardati01:MIA",
+          "slot": "PG",
+          "name": "Tim Hardaway",
+          "base": 83,
+          "form": -0.28644658344977847,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:mournal01:MIA",
+          "slot": "B1",
+          "name": "Alonzo Mourning",
+          "base": 83,
+          "form": 0.5505972573891281,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2006:onealsh01:MIA",
+          "slot": "B2",
+          "name": "Shaquille O'Neal",
+          "base": 84,
+          "form": 0.15946773531232028,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2017:whiteha01:MIA",
+          "slot": "B3",
+          "name": "Hassan Whiteside",
+          "base": 81,
+          "form": 0.08679480538181963,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:jonesed02:MIA",
+          "slot": "B4",
+          "name": "Eddie Jones",
+          "base": 81,
+          "form": 0.12051416894644498,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2025:herroty01:MIA",
+          "slot": "B5",
+          "name": "Tyler Herro",
+          "base": 81,
+          "form": -0.11544373307060453,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 16,
+        "abbr": "MIL",
+        "name": "Milwaukee Bucks",
+        "base": 84,
+        "form": -0.0396142419731591,
+        "w": 1,
+        "l": 1,
+        "pf": 42,
+        "pa": 40,
+        "last": [
+         true,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1976:smithel01:MIL",
+          "slot": "C",
+          "name": "Elmore Smith",
+          "base": 82,
+          "form": -0.6188800029423709,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1985:cummite01:MIL",
+          "slot": "PF",
+          "name": "Terry Cummings",
+          "base": 82,
+          "form": 0.019877343841393766,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2021:middlkh01:MIL",
+          "slot": "SF",
+          "name": "Khris Middleton",
+          "base": 82,
+          "form": -0.2899199008042614,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2006:reddmi01:MIL",
+          "slot": "SG",
+          "name": "Michael Redd",
+          "base": 82,
+          "form": 0.14168235154002903,
+          "stats": {
+           "games": 2,
+           "points": 10,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2023:holidjr01:MIL",
+          "slot": "PG",
+          "name": "Jrue Holiday",
+          "base": 81,
+          "form": 0.20124422005768863,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 3,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2000:allenra02:MIL",
+          "slot": "B1",
+          "name": "Ray Allen",
+          "base": 82,
+          "form": 0.07844550035204739,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1986:moncrsi01:MIL",
+          "slot": "B2",
+          "name": "Sidney Moncrief",
+          "base": 82,
+          "form": 0.14322465919386596,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1980:johnsma01:MIL",
+          "slot": "B3",
+          "name": "Marques Johnson",
+          "base": 82,
+          "form": -0.1624204677160829,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2024:lillada01:MIL",
+          "slot": "B4",
+          "name": "Damian Lillard",
+          "base": 82,
+          "form": 0.4668987746719271,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:bakervi01:MIL",
+          "slot": "B5",
+          "name": "Vin Baker",
+          "base": 81,
+          "form": 0.2489151760112494,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 17,
+        "abbr": "MIN",
+        "name": "Minnesota Timberwolves",
+        "base": 85,
+        "form": -0.7366526625500842,
+        "w": 0,
+        "l": 2,
+        "pf": 32,
+        "pa": 42,
+        "last": [
+         false,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1998:garneke01:MIN",
+          "slot": "C",
+          "name": "Kevin Garnett",
+          "base": 83,
+          "form": -0.34250748004412357,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 1,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2020:townska01:MIN",
+          "slot": "PF",
+          "name": "Karl-Anthony Towns",
+          "base": 83,
+          "form": 0.07525684593131686,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:butleji01:MIN",
+          "slot": "SF",
+          "name": "Jimmy Butler",
+          "base": 82,
+          "form": 0.050971657726308836,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2024:edwaran01:MIN",
+          "slot": "SG",
+          "name": "Anthony Edwards",
+          "base": 84,
+          "form": -0.248298842250043,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:cassesa01:MIN",
+          "slot": "PG",
+          "name": "Sam Cassell",
+          "base": 83,
+          "form": -0.593950724418517,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 0,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:jeffeal01:MIN",
+          "slot": "B1",
+          "name": "Al Jefferson",
+          "base": 83,
+          "form": -0.7115774330614135,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2012:loveke01:MIN",
+          "slot": "B2",
+          "name": "Kevin Love",
+          "base": 82,
+          "form": -0.07703439177349211,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1997:guglito01:MIN",
+          "slot": "B3",
+          "name": "Tom Gugliotta",
+          "base": 82,
+          "form": -0.48855325270220634,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:randlju01:MIN",
+          "slot": "B4",
+          "name": "Julius Randle",
+          "base": 80,
+          "form": -0.5042580186152832,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2024:goberru01:MIN",
+          "slot": "B5",
+          "name": "Rudy Gobert",
+          "base": 80,
+          "form": 0.02766912205275146,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 18,
+        "abbr": "NOP",
+        "name": "New Orleans Pelicans",
+        "base": 86,
+        "form": -0.022795996084162495,
+        "w": 1,
+        "l": 1,
+        "pf": 30,
+        "pa": 33,
+        "last": [
+         false,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2017:davisan02:NOP",
+          "slot": "C",
+          "name": "Anthony Davis",
+          "base": 85,
+          "form": 0.38923126870803537,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:antetgi01:MIL",
+          "slot": "PF",
+          "name": "Giannis Antetokounmpo",
+          "base": 87,
+          "form": 0.3666333272917196,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1989:jordami01:CHI",
+          "slot": "SF",
+          "name": "Michael Jordan",
+          "base": 87,
+          "form": 0.15805423784218725,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:iversal01:PHI",
+          "slot": "SG",
+          "name": "Allen Iverson",
+          "base": 87,
+          "form": -0.1182099577492103,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 6,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2009:paulch01:NOP",
+          "slot": "PG",
+          "name": "Chris Paul",
+          "base": 85,
+          "form": -0.023757227803394218,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 1,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:davisba01:NOP",
+          "slot": "B1",
+          "name": "Baron Davis",
+          "base": 84,
+          "form": -0.20683607726041228,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:couside01:NOP",
+          "slot": "B2",
+          "name": "DeMarcus Cousins",
+          "base": 83,
+          "form": 0.3419406105013564,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2017:jamesle01:CLE",
+          "slot": "B3",
+          "name": "LeBron James",
+          "base": 87,
+          "form": 0.08641364930141718,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1964:roberos01:SAC",
+          "slot": "B4",
+          "name": "Oscar Robertson",
+          "base": 87,
+          "form": 0.5178418227363377,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1996:malonka01:UTA",
+          "slot": "B5",
+          "name": "Karl Malone",
+          "base": 87,
+          "form": -0.1299415496174246,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 19,
+        "abbr": "NYK",
+        "name": "New York Knicks",
+        "base": 83,
+        "form": -0.635701330305908,
+        "w": 0,
+        "l": 2,
+        "pf": 37,
+        "pa": 53,
+        "last": [
+         false,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2000:cambyma01:NYK",
+          "slot": "C",
+          "name": "Marcus Camby",
+          "base": 81,
+          "form": -0.5084017459661945,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 5,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2021:randlju01:NYK",
+          "slot": "PF",
+          "name": "Julius Randle",
+          "base": 81,
+          "form": -0.901163652492246,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1971:debusda01:NYK",
+          "slot": "SF",
+          "name": "Dave DeBusschere",
+          "base": 81,
+          "form": -0.10391091529701499,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1960:gueriri01:NYK",
+          "slot": "SG",
+          "name": "Richie Guerin",
+          "base": 82,
+          "form": -0.34069450814325947,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 3,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1977:fraziwa01:NYK",
+          "slot": "PG",
+          "name": "Walt Frazier",
+          "base": 82,
+          "form": 0.08143021878237391,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1996:masonan01:NYK",
+          "slot": "B1",
+          "name": "Anthony Mason",
+          "base": 81,
+          "form": 0.21997428362853821,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:ewingpa01:NYK",
+          "slot": "B2",
+          "name": "Patrick Ewing",
+          "base": 81,
+          "form": -0.40133570302426813,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1966:bellawa01:NYK",
+          "slot": "B3",
+          "name": "Walt Bellamy",
+          "base": 82,
+          "form": -0.039866632549651004,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1982:lucasma01:NYK",
+          "slot": "B4",
+          "name": "Maurice Lucas",
+          "base": 81,
+          "form": -0.3965194347953424,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:marbust01:NYK",
+          "slot": "B5",
+          "name": "Stephon Marbury",
+          "base": 82,
+          "form": -0.5068683427875862,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 20,
+        "abbr": "OKC",
+        "name": "Oklahoma City Thunder",
+        "base": 85,
+        "form": -0.09740962686302401,
+        "w": 1,
+        "l": 1,
+        "pf": 32,
+        "pa": 39,
+        "last": [
+         true,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1984:sikmaja01:OKC",
+          "slot": "C",
+          "name": "Jack Sikma",
+          "base": 82,
+          "form": 0.10088432533871383,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1972:haywosp01:OKC",
+          "slot": "PF",
+          "name": "Spencer Haywood",
+          "base": 83,
+          "form": 0.2530736269095913,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2015:duranke01:OKC",
+          "slot": "SF",
+          "name": "Kevin Durant",
+          "base": 83,
+          "form": -0.25215252076908945,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2005:allenra02:OKC",
+          "slot": "SG",
+          "name": "Ray Allen",
+          "base": 83,
+          "form": -0.40552022269535803,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2015:westbru01:OKC",
+          "slot": "PG",
+          "name": "Russell Westbrook",
+          "base": 83,
+          "form": 0.09462257938291882,
+          "stats": {
+           "games": 2,
+           "points": 10,
+           "rebounds": 2,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1982:willigu01:OKC",
+          "slot": "B1",
+          "name": "Gus Williams",
+          "base": 83,
+          "form": -0.20658999046441168,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:paytoga01:OKC",
+          "slot": "B2",
+          "name": "Gary Payton",
+          "base": 83,
+          "form": 0.20220062792822718,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2023:gilgesh01:OKC",
+          "slot": "B3",
+          "name": "Shai Gilgeous-Alexander",
+          "base": 84,
+          "form": -0.05553010013084858,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1994:kempsh01:OKC",
+          "slot": "B4",
+          "name": "Shawn Kemp",
+          "base": 82,
+          "form": 0.057119991712831,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2025:willija06:OKC",
+          "slot": "B5",
+          "name": "Jalen Williams",
+          "base": 82,
+          "form": -0.28431336554829034,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 21,
+        "abbr": "ORL",
+        "name": "Orlando Magic",
+        "base": 85,
+        "form": -0.7774774337600145,
+        "w": 0,
+        "l": 2,
+        "pf": 40,
+        "pa": 51,
+        "last": [
+         false,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2012:howardw01:ORL",
+          "slot": "C",
+          "name": "Dwight Howard",
+          "base": 85,
+          "form": -0.40217861142202765,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2025:banchpa01:ORL",
+          "slot": "PF",
+          "name": "Paolo Banchero",
+          "base": 81,
+          "form": 0.024934805133309947,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 1,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:mcgratr01:ORL",
+          "slot": "SF",
+          "name": "Tracy McGrady",
+          "base": 85,
+          "form": 0.09139854239944813,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:hardaan01:ORL",
+          "slot": "SG",
+          "name": "Anfernee Hardaway",
+          "base": 83,
+          "form": -0.08380257740211361,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2005:francst01:ORL",
+          "slot": "PG",
+          "name": "Steve Francis",
+          "base": 82,
+          "form": 0.02436700625333204,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1993:onealsh01:ORL",
+          "slot": "B1",
+          "name": "Shaquille O'Neal",
+          "base": 85,
+          "form": -0.11854831395260992,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:wagnefr01:ORL",
+          "slot": "B2",
+          "name": "Franz Wagner",
+          "base": 81,
+          "form": -0.31959981368724255,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:banede01:ORL",
+          "slot": "B3",
+          "name": "Desmond Bane",
+          "base": 80,
+          "form": -0.028976662282459542,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2019:vucevni01:ORL",
+          "slot": "B4",
+          "name": "Nikola Vučević",
+          "base": 80,
+          "form": -0.6449179393682629,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:turkohe01:ORL",
+          "slot": "B5",
+          "name": "Hedo Türkoğlu",
+          "base": 80,
+          "form": -0.3273731039786712,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 22,
+        "abbr": "PHI",
+        "name": "Philadelphia 76ers",
+        "base": 89,
+        "form": 0.5125543766060128,
+        "w": 2,
+        "l": 0,
+        "pf": 32,
+        "pa": 21,
+        "last": [
+         true,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1968:chambwi01:PHI",
+          "slot": "C",
+          "name": "Wilt Chamberlain",
+          "base": 88,
+          "form": 0.4549004624588705,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 3,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:legend:1972:cunnibi01:PHI",
+          "slot": "PF",
+          "name": "Billy Cunningham",
+          "base": 89,
+          "form": 0.31170986375415144,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 5,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1980:ervinju01:PHI",
+          "slot": "SF",
+          "name": "Julius Erving",
+          "base": 87,
+          "form": 0.7113826612106682,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:iversal01:PHI",
+          "slot": "SG",
+          "name": "Allen Iverson",
+          "base": 87,
+          "form": -0.00366087539291564,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 6,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:maxeyty01:PHI",
+          "slot": "PG",
+          "name": "Tyrese Maxey",
+          "base": 84,
+          "form": 0.7155785383519753,
+          "stats": {
+           "games": 2,
+           "points": 8,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1983:malonmo01:PHI",
+          "slot": "B1",
+          "name": "Moses Malone",
+          "base": 87,
+          "form": 0.6247314061192796,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2024:embiijo01:PHI",
+          "slot": "B2",
+          "name": "Joel Embiid",
+          "base": 86,
+          "form": -0.13719995379392053,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:legend:1964:greerha01:PHI",
+          "slot": "B3",
+          "name": "Hal Greer",
+          "base": 89,
+          "form": 0.40752681961152704,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:legend:1987:barklch01:PHI",
+          "slot": "B4",
+          "name": "Charles Barkley",
+          "base": 90,
+          "form": 0.826799976445362,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1960:schaydo01:PHI",
+          "slot": "B5",
+          "name": "Dolph Schayes",
+          "base": 83,
+          "form": 0.3093721502475441,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 23,
+        "abbr": "PHX",
+        "name": "Phoenix Suns",
+        "base": 83,
+        "form": -0.03434754606738133,
+        "w": 1,
+        "l": 1,
+        "pf": 30,
+        "pa": 29,
+        "last": [
+         true,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2010:stoudam01:PHX",
+          "slot": "C",
+          "name": "Amar'e Stoudemire",
+          "base": 81,
+          "form": 0.15390855610126802,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1990:chambto01:PHX",
+          "slot": "PF",
+          "name": "Tom Chambers",
+          "base": 81,
+          "form": 0.1507171542703936,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 4,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:mariosh01:PHX",
+          "slot": "SF",
+          "name": "Shawn Marion",
+          "base": 81,
+          "form": 0.21640006546279927,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 1,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2020:bookede01:PHX",
+          "slot": "SG",
+          "name": "Devin Booker",
+          "base": 81,
+          "form": -0.05419443804235615,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 5,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1992:johnske02:PHX",
+          "slot": "PG",
+          "name": "Kevin Johnson",
+          "base": 81,
+          "form": 0.0961886593529446,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1999:guglito01:PHX",
+          "slot": "B1",
+          "name": "Tom Gugliotta",
+          "base": 81,
+          "form": 0.051017436318658314,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1980:daviswa03:PHX",
+          "slot": "B2",
+          "name": "Walter Davis",
+          "base": 81,
+          "form": 0.0729255916872993,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1992:hornaje01:PHX",
+          "slot": "B3",
+          "name": "Jeff Hornacek",
+          "base": 81,
+          "form": 0.35289510193895546,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:barklch01:PHX",
+          "slot": "B4",
+          "name": "Charles Barkley",
+          "base": 81,
+          "form": 0.1392498885370791,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1974:scottch01:PHX",
+          "slot": "B5",
+          "name": "Charlie Scott",
+          "base": 81,
+          "form": 0.010589605250023365,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 24,
+        "abbr": "POR",
+        "name": "Portland Trail Blazers",
+        "base": 78,
+        "form": -0.6660611006594952,
+        "w": 0,
+        "l": 2,
+        "pf": 30,
+        "pa": 39,
+        "last": [
+         false,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1995:dudlech02:POR",
+          "slot": "C",
+          "name": "Chris Dudley",
+          "base": 76,
+          "form": -0.3448453451232718,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2011:batumni01:POR",
+          "slot": "PF",
+          "name": "Nicolas Batum",
+          "base": 75,
+          "form": -0.3930029473980623,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 1,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1991:robincl02:POR",
+          "slot": "SF",
+          "name": "Clifford Robinson",
+          "base": 76,
+          "form": -0.24687776811114914,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 5,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2022:powelno01:POR",
+          "slot": "SG",
+          "name": "Norman Powell",
+          "base": 76,
+          "form": -0.4089385222369539,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 5,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1985:paxsoji02:POR",
+          "slot": "PG",
+          "name": "Jim Paxson",
+          "base": 76,
+          "form": -0.17189322044474215,
+          "stats": {
+           "games": 2,
+           "points": 7,
+           "rebounds": 5,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1974:nealll01:POR",
+          "slot": "B1",
+          "name": "Lloyd Neal",
+          "base": 76,
+          "form": -0.35029814790803937,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1972:petrige01:POR",
+          "slot": "B2",
+          "name": "Geoff Petrie",
+          "base": 76,
+          "form": 0.10380905159041279,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2021:nurkiju01:POR",
+          "slot": "B3",
+          "name": "Jusuf Nurkić",
+          "base": 76,
+          "form": -0.5328369675107301,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2006:przybjo01:POR",
+          "slot": "B4",
+          "name": "Joel Przybilla",
+          "base": 76,
+          "form": -0.592861478209123,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:willibu01:POR",
+          "slot": "B5",
+          "name": "Buck Williams",
+          "base": 76,
+          "form": -0.8998362581344321,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 25,
+        "abbr": "SAC",
+        "name": "Sacramento Kings",
+        "base": 82,
+        "form": -0.6868937109841629,
+        "w": 0,
+        "l": 2,
+        "pf": 17,
+        "pa": 28,
+        "last": [
+         false,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:1976:laceysa01:SAC",
+          "slot": "C",
+          "name": "Sam Lacey",
+          "base": 80,
+          "form": -0.6479650223650547,
+          "stats": {
+           "games": 2,
+           "points": 3,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1982:robincl01:SAC",
+          "slot": "PF",
+          "name": "Cliff Robinson",
+          "base": 80,
+          "form": -0.2399801671444016,
+          "stats": {
+           "games": 2,
+           "points": 3,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:stojape01:SAC",
+          "slot": "SF",
+          "name": "Peja Stojaković",
+          "base": 80,
+          "form": 0.09817247245816338,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 6,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2019:hieldbu01:SAC",
+          "slot": "SG",
+          "name": "Buddy Hield",
+          "base": 80,
+          "form": -0.6343814898321236,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 4,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1971:vanlino01:SAC",
+          "slot": "PG",
+          "name": "Norm Van Lier",
+          "base": 80,
+          "form": -0.3980696007886224,
+          "stats": {
+           "games": 2,
+           "points": 3,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2005:webbech01:SAC",
+          "slot": "B1",
+          "name": "Chris Webber",
+          "base": 80,
+          "form": -0.17292390537876637,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2021:foxde01:SAC",
+          "slot": "B2",
+          "name": "De'Aaron Fox",
+          "base": 80,
+          "form": -0.26149853017702707,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:martike02:SAC",
+          "slot": "B3",
+          "name": "Kevin Martin",
+          "base": 80,
+          "form": -0.27958427294772126,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2017:gayru01:SAC",
+          "slot": "B4",
+          "name": "Rudy Gay",
+          "base": 80,
+          "form": -0.4929114958165214,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1986:theusre01:SAC",
+          "slot": "B5",
+          "name": "Reggie Theus",
+          "base": 80,
+          "form": 0.013138236028514744,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 26,
+        "abbr": "SAS",
+        "name": "San Antonio Spurs",
+        "base": 79,
+        "form": 0.00004420822019440829,
+        "w": 1,
+        "l": 1,
+        "pf": 48,
+        "pa": 41,
+        "last": [
+         false,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2005:nestera01:SAS",
+          "slot": "C",
+          "name": "Rasho Nesterović",
+          "base": 77,
+          "form": 0.0003161702193319599,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 1,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1990:cummite01:SAS",
+          "slot": "PF",
+          "name": "Terry Cummings",
+          "base": 77,
+          "form": 0.11135070263408123,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 3,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2023:vassede01:SAS",
+          "slot": "SF",
+          "name": "Devin Vassell",
+          "base": 77,
+          "form": 0.05469704153575,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 5,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2021:murrade01:SAS",
+          "slot": "SG",
+          "name": "Dejounte Murray",
+          "base": 77,
+          "form": 0.029569126243703087,
+          "stats": {
+           "games": 2,
+           "points": 9,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1992:stricro02:SAS",
+          "slot": "PG",
+          "name": "Rod Strickland",
+          "base": 77,
+          "form": -0.009996829316020014,
+          "stats": {
+           "games": 2,
+           "points": 12,
+           "rebounds": 2,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:johnsav01:SAS",
+          "slot": "B1",
+          "name": "Avery Johnson",
+          "base": 77,
+          "form": 0.15579938480947164,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:anderde01:SAS",
+          "slot": "B2",
+          "name": "Derek Anderson",
+          "base": 77,
+          "form": -0.19029560024254022,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1987:greenda01:SAS",
+          "slot": "B3",
+          "name": "Dave Greenwood",
+          "base": 77,
+          "form": -0.25861750144567336,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2012:leonaka01:SAS",
+          "slot": "B4",
+          "name": "Kawhi Leonard",
+          "base": 77,
+          "form": 0.17589347154404966,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:gayru01:SAS",
+          "slot": "B5",
+          "name": "Rudy Gay",
+          "base": 77,
+          "form": 0.28596686282977457,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 27,
+        "abbr": "TOR",
+        "name": "Toronto Raptors",
+        "base": 84,
+        "form": 0.6248924717781055,
+        "w": 2,
+        "l": 0,
+        "pf": 27,
+        "pa": 20,
+        "last": [
+         true,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2007:boshch01:TOR",
+          "slot": "C",
+          "name": "Chris Bosh",
+          "base": 84,
+          "form": 0.6522585566862824,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 5,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2024:siakapa01:TOR",
+          "slot": "PF",
+          "name": "Pascal Siakam",
+          "base": 82,
+          "form": 0.07888590736308723,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2004:cartevi01:TOR",
+          "slot": "SF",
+          "name": "Vince Carter",
+          "base": 83,
+          "form": 0.05924115522114952,
+          "stats": {
+           "games": 2,
+           "points": 4,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2017:derozde01:TOR",
+          "slot": "SG",
+          "name": "DeMar DeRozan",
+          "base": 82,
+          "form": 0.3542032295921224,
+          "stats": {
+           "games": 2,
+           "points": 6,
+           "rebounds": 2,
+           "assists": 1,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2017:lowryky01:TOR",
+          "slot": "PG",
+          "name": "Kyle Lowry",
+          "base": 81,
+          "form": 0.41688048947338674,
+          "stats": {
+           "games": 2,
+           "points": 5,
+           "rebounds": 2,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:barnesc01:TOR",
+          "slot": "B1",
+          "name": "Scottie Barnes",
+          "base": 82,
+          "form": 0.231445975538902,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2008:caldejo01:TOR",
+          "slot": "B2",
+          "name": "José Calderón",
+          "base": 81,
+          "form": 0.6486916047228501,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2000:mcgratr01:TOR",
+          "slot": "B3",
+          "name": "Tracy McGrady",
+          "base": 81,
+          "form": 0.7607564876448364,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2001:davisan01:TOR",
+          "slot": "B4",
+          "name": "Antonio Davis",
+          "base": 81,
+          "form": 0.2906607943974436,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1998:stoudda01:TOR",
+          "slot": "B5",
+          "name": "Damon Stoudamire",
+          "base": 80,
+          "form": 0.36625217174515134,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 28,
+        "abbr": "UTA",
+        "name": "Utah Jazz",
+        "base": 83,
+        "form": -0.08948396816548965,
+        "w": 1,
+        "l": 1,
+        "pf": 113,
+        "pa": 107,
+        "last": [
+         false,
+         true
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2020:goberru01:UTA",
+          "slot": "C",
+          "name": "Rudy Gobert",
+          "base": 81,
+          "form": 0.30746012444446613,
+          "stats": {
+           "games": 2,
+           "points": 26,
+           "rebounds": 5,
+           "assists": 6,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2010:boozeca01:UTA",
+          "slot": "PF",
+          "name": "Carlos Boozer",
+          "base": 81,
+          "form": -0.2034974615172646,
+          "stats": {
+           "games": 2,
+           "points": 25,
+           "rebounds": 2,
+           "assists": 2,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2015:haywago01:UTA",
+          "slot": "SF",
+          "name": "Gordon Hayward",
+          "base": 81,
+          "form": 0.21835341781281778,
+          "stats": {
+           "games": 2,
+           "points": 19,
+           "rebounds": 2,
+           "assists": 5,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1979:maravpe01:UTA",
+          "slot": "SG",
+          "name": "Pete Maravich",
+          "base": 81,
+          "form": -0.2588814141063845,
+          "stats": {
+           "games": 2,
+           "points": 23,
+           "rebounds": 3,
+           "assists": 4,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:georgke01:UTA",
+          "slot": "PG",
+          "name": "Keyonte George",
+          "base": 81,
+          "form": -0.4136313097728704,
+          "stats": {
+           "games": 2,
+           "points": 20,
+           "rebounds": 3,
+           "assists": 6,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1987:malonka01:UTA",
+          "slot": "B1",
+          "name": "Karl Malone",
+          "base": 81,
+          "form": 0.18366154967565085,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1986:eatonma01:UTA",
+          "slot": "B2",
+          "name": "Mark Eaton",
+          "base": 81,
+          "form": -0.08608054490070788,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2018:mitchdo01:UTA",
+          "slot": "B3",
+          "name": "Donovan Mitchell",
+          "base": 81,
+          "form": 0.029517453720234288,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2005:kirilan01:UTA",
+          "slot": "B4",
+          "name": "Andrei Kirilenko",
+          "base": 82,
+          "form": 0.26407059902455654,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1998:stockjo01:UTA",
+          "slot": "B5",
+          "name": "John Stockton",
+          "base": 82,
+          "form": -0.10156338336002083,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       },
+       {
+        "id": 29,
+        "abbr": "WAS",
+        "name": "Washington Wizards",
+        "base": 79,
+        "form": -0.5605406366804035,
+        "w": 0,
+        "l": 2,
+        "pf": 101,
+        "pa": 114,
+        "last": [
+         false,
+         false
+        ],
+        "players": [
+         {
+          "cardId": "nba:season:2014:gortama01:WAS",
+          "slot": "C",
+          "name": "Marcin Gortat",
+          "base": 77,
+          "form": -0.22097164455335597,
+          "stats": {
+           "games": 2,
+           "points": 22,
+           "rebounds": 3,
+           "assists": 4,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2019:parkeja01:WAS",
+          "slot": "PF",
+          "name": "Jabari Parker",
+          "base": 77,
+          "form": -0.8353297778228298,
+          "stats": {
+           "games": 2,
+           "points": 19,
+           "rebounds": 4,
+           "assists": 3,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2026:georgky01:WAS",
+          "slot": "SF",
+          "name": "Kyshawn George",
+          "base": 77,
+          "form": -0.41092439361196004,
+          "stats": {
+           "games": 2,
+           "points": 24,
+           "rebounds": 3,
+           "assists": 5,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2015:bealbr01:WAS",
+          "slot": "SG",
+          "name": "Bradley Beal",
+          "base": 77,
+          "form": -0.46643051659222695,
+          "stats": {
+           "games": 2,
+           "points": 18,
+           "rebounds": 4,
+           "assists": 5,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1970:monroea01:WAS",
+          "slot": "PG",
+          "name": "Earl Monroe",
+          "base": 77,
+          "form": -0.33810678681917494,
+          "stats": {
+           "games": 2,
+           "points": 18,
+           "rebounds": 4,
+           "assists": 4,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2010:jamisan01:WAS",
+          "slot": "B1",
+          "name": "Antawn Jamison",
+          "base": 77,
+          "form": -0.6389171596314758,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1973:cheniph01:WAS",
+          "slot": "B2",
+          "name": "Phil Chenier",
+          "base": 77,
+          "form": -0.014232031848840473,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:2000:whiteja01:WAS",
+          "slot": "B3",
+          "name": "Jahidi White",
+          "base": 77,
+          "form": 0.12247033481243993,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1995:muresgh01:WAS",
+          "slot": "B4",
+          "name": "Gheorghe Mureșan",
+          "base": 77,
+          "form": -0.7400368063976989,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         },
+         {
+          "cardId": "nba:season:1983:mahorri01:WAS",
+          "slot": "B5",
+          "name": "Rick Mahorn",
+          "base": 77,
+          "form": -0.48014050091486427,
+          "stats": {
+           "games": 2,
+           "points": 0,
+           "rebounds": 0,
+           "assists": 0,
+           "yards": 0,
+           "touchdowns": 0,
+           "tackles": 0,
+           "sacks": 0
+          }
+         }
+        ]
+       }
+      ],
+      "results": [
+       {
+        "key": "compat-season-nba:r:0:0:29",
+        "phase": "regular",
+        "round": 0,
+        "h": 0,
+        "a": 29,
+        "hs": 101,
+        "as": 92,
+        "winner": 0
+       },
+       {
+        "key": "compat-season-nba:r:0:28:1",
+        "phase": "regular",
+        "round": 0,
+        "h": 28,
+        "a": 1,
+        "hs": 16,
+        "as": 19,
+        "winner": 1
+       },
+       {
+        "key": "compat-season-nba:r:0:2:27",
+        "phase": "regular",
+        "round": 0,
+        "h": 2,
+        "a": 27,
+        "hs": 11,
+        "as": 14,
+        "winner": 27
+       },
+       {
+        "key": "compat-season-nba:r:0:26:3",
+        "phase": "regular",
+        "round": 0,
+        "h": 26,
+        "a": 3,
+        "hs": 18,
+        "as": 20,
+        "winner": 3
+       },
+       {
+        "key": "compat-season-nba:r:0:4:25",
+        "phase": "regular",
+        "round": 0,
+        "h": 4,
+        "a": 25,
+        "hs": 15,
+        "as": 11,
+        "winner": 4
+       },
+       {
+        "key": "compat-season-nba:r:0:24:5",
+        "phase": "regular",
+        "round": 0,
+        "h": 24,
+        "a": 5,
+        "hs": 14,
+        "as": 16,
+        "winner": 5
+       },
+       {
+        "key": "compat-season-nba:r:0:6:23",
+        "phase": "regular",
+        "round": 0,
+        "h": 6,
+        "a": 23,
+        "hs": 18,
+        "as": 22,
+        "winner": 23
+       },
+       {
+        "key": "compat-season-nba:r:0:22:7",
+        "phase": "regular",
+        "round": 0,
+        "h": 22,
+        "a": 7,
+        "hs": 11,
+        "as": 8,
+        "winner": 22
+       },
+       {
+        "key": "compat-season-nba:r:0:8:21",
+        "phase": "regular",
+        "round": 0,
+        "h": 8,
+        "a": 21,
+        "hs": 25,
+        "as": 21,
+        "winner": 8
+       },
+       {
+        "key": "compat-season-nba:r:0:20:9",
+        "phase": "regular",
+        "round": 0,
+        "h": 20,
+        "a": 9,
+        "hs": 24,
+        "as": 22,
+        "winner": 20
+       },
+       {
+        "key": "compat-season-nba:r:0:10:19",
+        "phase": "regular",
+        "round": 0,
+        "h": 10,
+        "a": 19,
+        "hs": 28,
+        "as": 19,
+        "winner": 10
+       },
+       {
+        "key": "compat-season-nba:r:0:18:11",
+        "phase": "regular",
+        "round": 0,
+        "h": 18,
+        "a": 11,
+        "hs": 10,
+        "as": 17,
+        "winner": 11
+       },
+       {
+        "key": "compat-season-nba:r:0:12:17",
+        "phase": "regular",
+        "round": 0,
+        "h": 12,
+        "a": 17,
+        "hs": 25,
+        "as": 21,
+        "winner": 12
+       },
+       {
+        "key": "compat-season-nba:r:0:16:13",
+        "phase": "regular",
+        "round": 0,
+        "h": 16,
+        "a": 13,
+        "hs": 27,
+        "as": 18,
+        "winner": 16
+       },
+       {
+        "key": "compat-season-nba:r:0:14:15",
+        "phase": "regular",
+        "round": 0,
+        "h": 14,
+        "a": 15,
+        "hs": 13,
+        "as": 10,
+        "winner": 14
+       },
+       {
+        "key": "compat-season-nba:r:1:28:0",
+        "phase": "regular",
+        "round": 1,
+        "h": 28,
+        "a": 0,
+        "hs": 97,
+        "as": 88,
+        "winner": 28
+       },
+       {
+        "key": "compat-season-nba:r:1:29:27",
+        "phase": "regular",
+        "round": 1,
+        "h": 29,
+        "a": 27,
+        "hs": 9,
+        "as": 13,
+        "winner": 27
+       },
+       {
+        "key": "compat-season-nba:r:1:26:1",
+        "phase": "regular",
+        "round": 1,
+        "h": 26,
+        "a": 1,
+        "hs": 30,
+        "as": 21,
+        "winner": 26
+       },
+       {
+        "key": "compat-season-nba:r:1:2:25",
+        "phase": "regular",
+        "round": 1,
+        "h": 2,
+        "a": 25,
+        "hs": 13,
+        "as": 6,
+        "winner": 2
+       },
+       {
+        "key": "compat-season-nba:r:1:24:3",
+        "phase": "regular",
+        "round": 1,
+        "h": 24,
+        "a": 3,
+        "hs": 16,
+        "as": 23,
+        "winner": 3
+       },
+       {
+        "key": "compat-season-nba:r:1:4:23",
+        "phase": "regular",
+        "round": 1,
+        "h": 4,
+        "a": 23,
+        "hs": 11,
+        "as": 8,
+        "winner": 4
+       },
+       {
+        "key": "compat-season-nba:r:1:22:5",
+        "phase": "regular",
+        "round": 1,
+        "h": 22,
+        "a": 5,
+        "hs": 21,
+        "as": 13,
+        "winner": 22
+       },
+       {
+        "key": "compat-season-nba:r:1:6:21",
+        "phase": "regular",
+        "round": 1,
+        "h": 6,
+        "a": 21,
+        "hs": 26,
+        "as": 19,
+        "winner": 6
+       },
+       {
+        "key": "compat-season-nba:r:1:20:7",
+        "phase": "regular",
+        "round": 1,
+        "h": 20,
+        "a": 7,
+        "hs": 8,
+        "as": 17,
+        "winner": 7
+       },
+       {
+        "key": "compat-season-nba:r:1:8:19",
+        "phase": "regular",
+        "round": 1,
+        "h": 8,
+        "a": 19,
+        "hs": 25,
+        "as": 18,
+        "winner": 8
+       },
+       {
+        "key": "compat-season-nba:r:1:18:9",
+        "phase": "regular",
+        "round": 1,
+        "h": 18,
+        "a": 9,
+        "hs": 20,
+        "as": 16,
+        "winner": 18
+       },
+       {
+        "key": "compat-season-nba:r:1:10:17",
+        "phase": "regular",
+        "round": 1,
+        "h": 10,
+        "a": 17,
+        "hs": 17,
+        "as": 11,
+        "winner": 10
+       },
+       {
+        "key": "compat-season-nba:r:1:16:11",
+        "phase": "regular",
+        "round": 1,
+        "h": 16,
+        "a": 11,
+        "hs": 15,
+        "as": 22,
+        "winner": 11
+       },
+       {
+        "key": "compat-season-nba:r:1:12:15",
+        "phase": "regular",
+        "round": 1,
+        "h": 12,
+        "a": 15,
+        "hs": 21,
+        "as": 27,
+        "winner": 15
+       },
+       {
+        "key": "compat-season-nba:r:1:14:13",
+        "phase": "regular",
+        "round": 1,
+        "h": 14,
+        "a": 13,
+        "hs": 20,
+        "as": 12,
+        "winner": 14
+       }
+      ],
+      "seeds": [],
+      "bracket": [],
+      "playoffRound": 0
+     },
+     "history": []
+    },
+    "cup": {
+     "claims": [
+      "cup:nba:2026-W44:open"
+     ],
+     "trophies": {
+      "open": 1,
+      "silver": 0,
+      "chemistry": 0
+     },
+     "history": [
+      {
+       "id": "compat-cup-old-nba",
+       "kind": "open",
+       "sport": "nba",
+       "week": "2026-W44",
+       "level": "pro",
+       "at": 1793545200000,
+       "wins": 3,
+       "outcome": "champion"
+      }
+     ],
+     "active": {
+      "id": "compat-cup-nba",
+      "kind": "silver",
+      "week": "2026-W45",
+      "sport": "nba",
+      "level": "pro",
+      "anchor": 78,
+      "entryLevels": {
+       "compat-nba-1": 4
+      },
+      "at": 1794149100000,
+      "round": 1,
+      "results": [
+       {
+        "id": "compat-cup-m1",
+        "won": true,
+        "us": 3,
+        "them": 1,
+        "at": 1794149400000
+       }
+      ],
+      "done": false
+     }
+    },
+    "hq": {
+     "totals": {
+      "games": 4,
+      "wins": 3,
+      "points": 243,
+      "onlineWins": 1,
+      "packs": 14,
+      "sbcs": 0,
+      "moments": 0,
+      "development": 0
+     },
+     "days": {
+      "2026-11-07": {
+       "games": 2,
+       "wins": 1,
+       "points": 112,
+       "onlineWins": 0,
+       "packs": 0,
+       "sbcs": 0,
+       "moments": 0,
+       "development": 0
+      },
+      "2026-11-08": {
+       "games": 2,
+       "wins": 2,
+       "points": 131,
+       "onlineWins": 1,
+       "packs": 0,
+       "sbcs": 0,
+       "moments": 0,
+       "development": 0
+      }
+     },
+     "weeks": {
+      "2026-W45": {
+       "games": 4,
+       "wins": 3,
+       "points": 243,
+       "onlineWins": 1,
+       "packs": 0,
+       "sbcs": 0,
+       "moments": 0,
+       "development": 0
+      }
+     },
+     "seasons": {
+      "season:1": {
+       "xp": 7500,
+       "claimed": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        10,
+        25
+       ]
+      }
+     },
+     "claims": [
+      "daily:2026-11-08:show-up",
+      "weekly:2026-W44:wins10",
+      "daily:2026-11-06:games3",
+      "season-banked:season:1"
+     ],
+     "journal": [
+      "match:compat-match-0",
+      "match:compat-match-1",
+      "match:compat-match-2",
+      "match:compat-match-3"
+     ],
+     "history": [
+      {
+       "id": "compat-match-0",
+       "at": 1794135600000,
+       "mode": "battle",
+       "won": true,
+       "us": 64,
+       "them": 51,
+       "opponent": "Rung 1",
+       "coins": 120,
+       "xp": 40
+      },
+      {
+       "id": "compat-match-1",
+       "at": 1794139200000,
+       "mode": "circuit",
+       "won": false,
+       "us": 48,
+       "them": 55,
+       "opponent": "Circuit 2",
+       "coins": 120,
+       "xp": 40
+      },
+      {
+       "id": "compat-match-2",
+       "at": 1794142800000,
+       "mode": "league",
+       "won": true,
+       "us": 70,
+       "them": 66,
+       "opponent": "Season game",
+       "coins": 120,
+       "xp": 40
+      },
+      {
+       "id": "compat-match-3",
+       "at": 1794146400000,
+       "mode": "online",
+       "won": true,
+       "us": 61,
+       "them": 59,
+       "opponent": "Rival",
+       "coins": 120,
+       "xp": 40
+      }
+     ],
+     "cardStats": {
+      "compat-nba-1": {
+       "games": 4,
+       "wins": 3
+      },
+      "compat-nba-5": {
+       "games": 4,
+       "wins": 3
+      },
+      "compat-nba-3": {
+       "games": 4,
+       "wins": 3
+      }
+     },
+     "presets": [
+      {
+       "id": 0,
+       "name": "Main squad",
+       "squad": {
+        "PF": "compat-nba-1",
+        "SF": "compat-nba-5",
+        "SG": "compat-nba-3",
+        "PG": "compat-nba-6",
+        "C": "compat-nba-11",
+        "B1": "compat-nba-2",
+        "B2": "compat-nba-4",
+        "B3": "compat-nba-8",
+        "B4": "compat-nba-7",
+        "B5": "compat-nba-9"
+       },
+       "at": 1794142800000
+      },
+      {
+       "id": 2,
+       "name": "Bench mob",
+       "squad": {
+        "PF": "compat-nba-1",
+        "SF": "compat-nba-5"
+       },
+       "at": 1794146400000
+      }
+     ],
+     "development": {
+      "active": {
+       "uid": "compat-nba-1",
+       "path": "captain",
+       "games": 2,
+       "wins": 1,
+       "points": 30,
+       "at": 1794142800000
+      },
+      "completed": {
+       "compat-nba-5": {
+        "path": "breakout",
+        "at": 1793890800000
+       }
+      }
+     },
+     "moments": {
+      "nba:first-light": {
+       "best": 3,
+       "completedAt": 1794063600000,
+       "claimed": true
+      },
+      "nba:paint": {
+       "best": 1
+      }
+     },
+     "circuit": {
+      "week": "2026-W45",
+      "entries": 2,
+      "best": 4,
+      "claimed": [
+       3
+      ],
+      "active": {
+       "id": "compat-circuit-nba",
+       "games": 3,
+       "wins": 2,
+       "results": [
+        true,
+        false,
+        true
+       ],
+       "at": 1794144600000
+      }
+     },
+     "circuitHistory": {
+      "2026-W44": {
+       "entries": 3,
+       "best": 5,
+       "claimed": [
+        3,
+        5
+       ]
+      }
+     }
+    },
+    "rivals": {
+     "week": "2026-W45",
+     "points": 42,
+     "best": 42,
+     "peak": 160,
+     "w": 5,
+     "l": 2,
+     "seen": [
+      "compat-opponent-1",
+      "compat-opponent-2"
+     ],
+     "rewards": [
+      {
+       "id": "2026-W44:1",
+       "week": "2026-W44",
+       "division": 1,
+       "pack": "silver",
+       "coins": 100
+      }
+     ],
+     "claimed": [
+      "2026-W44:1"
+     ]
+    },
+    "settled": [
+     "compat-match-0",
+     "compat-match-1",
+     "cup:compat-cup-m1"
+    ],
+    "owned": [
+     {
+      "uid": "compat-nba-0",
+      "cardId": "nba:season:1960:chambwi01:GSW",
+      "level": 4,
+      "xp": 120,
+      "at": 1791558001000,
+      "mint": {
+       "serial": 7,
+       "totalAtPull": 31,
+       "activeAtPull": 29,
+       "requestId": "compat-request-nba",
+       "namespace": "inspect"
+      }
+     },
+     {
+      "uid": "compat-nba-1",
+      "cardId": "nba:season:1960:heinsto01:BOS",
+      "level": 5,
+      "xp": 0,
+      "at": 1791558002000
+     },
+     {
+      "uid": "compat-nba-2",
+      "cardId": "nba:season:1960:arizipa01:GSW",
+      "level": 2,
+      "xp": 35,
+      "at": 1791558003000
+     },
+     {
+      "uid": "compat-nba-3",
+      "cardId": "nba:season:1960:braunca01:NYK",
+      "level": 1,
+      "xp": 0,
+      "at": 1791558004000
+     },
+     {
+      "uid": "compat-nba-4",
+      "cardId": "nba:season:1960:costela01:PHI",
+      "level": 1,
+      "xp": 0,
+      "at": 1791558005000
+     },
+     {
+      "uid": "compat-nba-5",
+      "cardId": "nba:season:1960:bayloel01:LAL",
+      "level": 1,
+      "xp": 0,
+      "at": 1791558006000
+     },
+     {
+      "uid": "compat-nba-6",
+      "cardId": "nba:season:1960:cousybo01:BOS",
+      "level": 1,
+      "xp": 0,
+      "at": 1791558007000
+     },
+     {
+      "uid": "compat-nba-7",
+      "cardId": "nba:season:1960:dukeswa01:DET",
+      "level": 1,
+      "xp": 0,
+      "at": 1791558008000
+     },
+     {
+      "uid": "compat-nba-8",
+      "cardId": "nba:season:1960:embrywa01:SAC",
+      "level": 1,
+      "xp": 0,
+      "at": 1791558009000
+     },
+     {
+      "uid": "compat-nba-9",
+      "cardId": "nba:season:1960:golato01:GSW",
+      "level": 1,
+      "xp": 0,
+      "at": 1791558010000
+     },
+     {
+      "uid": "compat-nba-10",
+      "cardId": "nba:season:1960:braunca01:NYK",
+      "level": 1,
+      "xp": 10,
+      "at": 1791558011000
+     },
+     {
+      "uid": "compat-nba-11",
+      "cardId": "nba:goat:1962:chambwi01:GSW",
+      "level": 3,
+      "xp": 60,
+      "at": 1791558012000
+     }
+    ],
+    "retirements": [
+     {
+      "uid": "compat-sold-nba",
+      "cardId": "nba:legend:1982:johnsde01:PHX",
+      "level": 2,
+      "reason": "sold",
+      "mint": {
+       "serial": 3,
+       "totalAtPull": 9,
+       "requestId": "compat-sold-request",
+       "namespace": "inspect"
+      }
+     }
+    ],
+    "collected": [
+     "nba:legend:1974:debusda01:NYK",
+     "nba:legend:1974:hayesel01:WAS",
+     "nba:legend:1974:mcadobo01:LAC",
+     "nba:legend:1975:barryri01:GSW",
+     "nba:legend:1975:fraziwa01:NYK",
+     "nba:legend:1976:abdulka01:LAL",
+     "nba:legend:1976:westppa01:PHX",
+     "nba:legend:1977:busedo01:IND",
+     "nba:legend:1977:jonesbo01:DEN",
+     "nba:legend:1977:maravpe01:UTA",
+     "nba:legend:1977:waltobi01:POR",
+     "nba:legend:1978:dantlad01:IND",
+     "nba:season:1960:chambwi01:GSW",
+     "nba:season:1960:heinsto01:BOS",
+     "nba:season:1960:arizipa01:GSW",
+     "nba:season:1960:braunca01:NYK",
+     "nba:season:1960:costela01:PHI",
+     "nba:season:1960:bayloel01:LAL",
+     "nba:season:1960:cousybo01:BOS",
+     "nba:season:1960:dukeswa01:DET",
+     "nba:season:1960:embrywa01:SAC",
+     "nba:season:1960:golato01:GSW",
+     "nba:goat:1962:chambwi01:GSW"
+    ],
+    "collectionClaims": [
+     "editions:25"
+    ],
+    "registeredOpenings": [
+     "compat-registered-nba"
+    ],
+    "events": {
+     "immortals": 2
+    },
+    "pendingPromo": {
+     "id": "compat-promo-nba",
+     "kind": "event-spotlight:immortals",
+     "price": 0,
+     "packId": "compat-promo-pack",
+     "at": 1794149940000
+    },
+    "duplicateStorage": [
+     "compat-nba-10"
+    ],
+    "squad": {
+     "PF": "compat-nba-1",
+     "SF": "compat-nba-5",
+     "SG": "compat-nba-3",
+     "PG": "compat-nba-6",
+     "C": "compat-nba-11",
+     "B1": "compat-nba-2",
+     "B2": "compat-nba-4",
+     "B3": "compat-nba-8",
+     "B4": "compat-nba-7",
+     "B5": "compat-nba-9"
+    },
+    "packsOpened": 14,
+    "starterClaimed": true,
+    "sbc": {
+     "done": {
+      "starter-five": 1793372400000,
+      "weekly:2026-W44": 1793804400000
+     }
+    },
+    "packs": [
+     {
+      "id": "compat-gold-nba",
+      "kind": "gold",
+      "at": 1794149400000
+     },
+     {
+      "id": "compat-gift-nba",
+      "kind": "jumbo",
+      "at": 1794149700000,
+      "voucher": {
+       "index": 0,
+       "event": {
+        "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "pubkey": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "created_at": 1762600000,
+        "kind": 1,
+        "tags": [],
+        "content": "",
+        "sig": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+       }
+      }
+     }
+    ],
+    "sold": {
+     "cards": 37,
+     "coins": 4210
+    },
+    "battles": {
+     "week": "2026-W45",
+     "cleared": 3,
+     "best": 6,
+     "round": 2,
+     "level": "allstar"
+    },
+    "record": {
+     "w": 41,
+     "l": 17,
+     "h2hW": 9,
+     "h2hL": 6
+    },
+    "paid": {
+     "day": "2026-11-08",
+     "n": 3
+    }
+   },
+   "gifts": [
+    "testers-2026-10",
+    "new-era-2026-11"
+   ],
+   "vs": {
+    "compat-rival-key": {
+     "name": "Rival",
+     "w": 3,
+     "l": 2
+    }
+   }
+  }
+ }
+}

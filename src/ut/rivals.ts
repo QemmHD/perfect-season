@@ -67,6 +67,8 @@ export const DIVISIONS = [
 ];
 const nat = (x: unknown) =>
   typeof x === 'number' && Number.isFinite(x) ? Math.max(0, Math.floor(x)) : 0;
+/** Rivals points a win earns (a loss costs 12). Claude 2026-11-16 (ut-1): named for next-action.ts. */
+export const RIVALS_WIN_RP = 30;
 export function divisionOf(points: number) {
   return Math.max(0, DIVISIONS.filter((d) => points >= d.at).length - 1);
 }
@@ -115,7 +117,7 @@ export function rivalsMatch(
 ): RivalsState {
   const r = rivalsOf(raw, week);
   if (r.seen.includes(id)) return r;
-  const points = Math.max(0, r.points + (won ? 30 : -12)),
+  const points = Math.max(0, r.points + (won ? RIVALS_WIN_RP : -12)),
     best = Math.max(r.best, points),
     w = r.w + (won ? 1 : 0);
   const next = {
