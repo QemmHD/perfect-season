@@ -135,6 +135,19 @@ const clearOf = (c: RGB, by: number) => luma(c) > luma(OUTLINE) && deltaE(c, OUT
  * - `identity` (skin, hair): see IDENTITY_CLEARANCE.
  */
 export function ramp3(base: RGB, identity = false): [RGB, RGB, RGB] {
+  // a palette is built for every sprite drawn, from a handful of kit colours: computed once each
+  const key = ((clamp255(base[0]) << 16) | (clamp255(base[1]) << 8) | clamp255(base[2])) * 2 + (identity ? 1 : 0);
+  const hit = RAMPS.get(key);
+  if (hit) return [[...hit[0]], [...hit[1]], [...hit[2]]];
+  const out = rampOf(base, identity);
+  if (RAMPS.size > 4096) RAMPS.clear();
+  RAMPS.set(key, out);
+  return [[...out[0]], [...out[1]], [...out[2]]];
+}
+
+const RAMPS = new Map<number, [RGB, RGB, RGB]>();
+
+function rampOf(base: RGB, identity: boolean): [RGB, RGB, RGB] {
   const [h, s, l0] = toHsl(base.map(clamp255) as RGB);
   const l = Math.min(LIGHT_BASE, l0);
   const toBlue = ((240 - h + 540) % 360) - 180;
