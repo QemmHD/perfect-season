@@ -57,3 +57,7 @@ Read the repo's `CLAUDE.md` first. Its rules are hard constraints.
 4. **Pack odds are realistic, with protection:** real-UT-style odds (most golds 75–82, 83+ a real hit, cheap 94–97 routes cut back) plus bad-luck protection (guaranteed program cards, Scout Stamps) and clear odds sheets.
 5. **Re-rate everything accurately.** Corrected ratings apply to every card, owned or not, even when an owned card's numbers drop. Still never change ids, never remove an owned card, and document every change to a displayed overall.
 6. **Shipping:** the iPhone top-edge fix ships early, as soon as it passes review; everything else ships together after full QA, straight to live.
+
+## GAME DESIGN V2 (2026-11-16, binding together with the owner decisions above)
+
+The owner asked for a redesign "by a huge margin": gameplay, animations, movement, buttons, art, players' looks, an addictive hook, and a time-played leaderboard with rewards. The design bible is `design-v2/GAME-DESIGN-V2.md`, the visual target is `design-v2/mockups.html`, and the lead's decisions on its F.6 questions are in `DESIGN-V2-DECISIONS.md`. Each team's add/change/cut list is in section F.2.

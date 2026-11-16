@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perfect Season V2 mock-ups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,75..100,400..900;1,75..100,400..900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#071521; --panel:#0e2233; --panel2:#132c41; --stroke:#1d3a50;
+  --teal:#4fe3c1; --gold:#f6b93b; --violet:#8b7cf6; --red:#ff5d5d;
+  --text:#f2f7fa; --dim:#8aa3b5; --ink:#14121c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#040d15;color:var(--text);font-family:"Archivo","Helvetica Neue",Arial,sans-serif}
+body{padding:28px 16px 80px}
+main{max-width:1320px;margin:0 auto}
+h1{font-style:italic;font-weight:900;font-stretch:80%;font-size:40px;line-height:1;margin:0 0 6px;letter-spacing:.5px}
+h1 b{color:var(--teal)}
+h2{font-style:italic;font-weight:900;font-stretch:80%;font-size:26px;margin:56px 0 4px;color:var(--teal);text-transform:uppercase}
+h3{font-size:14px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin:0 0 6px}
+p.lead{color:var(--dim);max-width:820px;line-height:1.5;margin:6px 0 18px;font-size:15px}
+.note{color:var(--dim);font-size:13px;line-height:1.45;max-width:312px;margin:8px 0 0}
+.note b{color:var(--text)}
+.row{display:flex;flex-wrap:wrap;gap:28px 26px;align-items:flex-start}
+.cell{width:312px}
+.cell.small{width:256px}
+.wrap{width:312px;height:675px;position:relative}
+.wrap.small{width:256px;height:454px}
+.phone{width:390px;height:844px;transform:scale(.8);transform-origin:0 0;border-radius:44px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 0 0 3px #223647,0 18px 50px rgba(0,0,0,.6)}
+.phone.small{width:320px;height:568px;border-radius:26px}
+.phone svg{display:block}
+.island{position:absolute;left:50%;top:11px;width:120px;height:34px;margin-left:-60px;background:#000;border-radius:20px;z-index:5}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--dim);margin:10px 0 22px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:6px}
+/* lineup */
+.lineup{display:flex;flex-wrap:wrap;gap:18px}
+.who{background:var(--panel);border:1px solid var(--stroke);border-radius:14px;padding:14px 14px 12px;width:200px}
+.who .pair{display:flex;align-items:flex-end;gap:14px;height:226px;border-radius:10px;padding:10px;justify-content:center}
+.who .nm{font-weight:800;font-style:italic;font-stretch:85%;font-size:17px;margin-top:10px}
+.who .tr{font-size:12px;color:var(--dim);line-height:1.4;margin-top:3px;min-height:50px}
+.who .sz{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;display:flex;justify-content:space-between;margin-top:6px}
+.court{background:linear-gradient(#c98f52,#bf8548)} .turf{background:linear-gradient(#2f8f46,#2a8240)} .pitch{background:linear-gradient(#2e9a4a,#288a41)}
+/* menu screens */
+.scr{position:absolute;inset:0;padding:62px 16px 0;font-size:14px}
+.top{display:flex;align-items:center;gap:10px;height:44px}
+.lv{width:40px;height:40px;border-radius:50%;border:3px solid var(--teal);display:grid;place-items:center;font-weight:900;font-style:italic;font-size:15px}
+.pill{background:var(--panel);border:1px solid var(--stroke);border-radius:22px;height:36px;padding:0 12px;display:flex;align-items:center;gap:7px;font-weight:700;font-size:13px}
+.coin{width:14px;height:14px;border-radius:50%;background:var(--gold);box-shadow:inset 0 0 0 3px #c98a17}
+.spacer{flex:1}
+.logo{font-style:italic;font-weight:900;font-stretch:78%;font-size:44px;line-height:.9;text-align:center;margin:14px 0 12px}
+.logo b{color:var(--teal);display:block}
+.seg{display:flex;background:var(--panel);border:1px solid var(--stroke);border-radius:22px;padding:4px;margin:0 30px}
+.seg span{flex:1;text-align:center;font-weight:800;font-size:12px;letter-spacing:1.5px;padding:8px 0;border-radius:18px;color:var(--dim)}
+.seg span.on{color:var(--text);box-shadow:inset 0 0 0 1.5px var(--teal);background:#0f2f3a}
+.hero{margin:12px 0;border:1px solid var(--stroke);border-radius:16px;background:radial-gradient(120% 140% at 50% 0,#12384a,#0b1e2e);padding:14px;display:flex;justify-content:space-between;align-items:center}
+.hero .big{font-style:italic;font-weight:900;font-stretch:78%;font-size:34px;color:var(--gold);line-height:1}
+.hero small{display:block;font-size:10px;letter-spacing:2px;color:var(--dim);margin-top:3px}
+.chips{display:flex;gap:8px;margin-bottom:12px}
+.chips .pill{height:34px;font-size:12px;padding:0 10px}
+.ring{width:26px;height:26px;border-radius:50%;background:conic-gradient(var(--gold) 0 80%,#24445a 0);display:grid;place-items:center}
+.ring::after{content:attr(data-n);width:19px;height:19px;border-radius:50%;background:var(--panel);display:grid;place-items:center;font-size:10px;font-weight:800}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode{background:var(--panel);border:1px solid var(--stroke);border-radius:12px;padding:12px;min-height:66px}
+.mode b{font-style:italic;font-weight:900;font-stretch:80%;font-size:19px;display:block}
+.mode span{font-size:11px;color:var(--dim)}
+.mode.on{box-shadow:inset 0 0 0 2px var(--teal)}
+.nextup{margin-top:14px;border-radius:14px;border:1.5px solid var(--gold);background:linear-gradient(90deg,#2b2412,#13283a);padding:10px 12px;display:flex;align-items:center;gap:10px}
+.nextup .ey{font-size:10px;letter-spacing:2px;color:var(--gold);font-weight:800}
+.nextup .tx{font-weight:800;font-size:15px;line-height:1.15}
+.nextup .go{margin-left:auto;background:var(--gold);color:#201400;font-weight:900;font-style:italic;border-radius:10px;padding:10px 12px;font-size:14px;min-width:54px;text-align:center}
+.play{margin-top:10px;background:linear-gradient(#a6f5e3,#4fe3c1);color:#06241d;font-weight:900;font-style:italic;font-stretch:80%;font-size:30px;text-align:center;padding:16px 0;transform:skewX(-8deg);border-radius:4px}
+.tabs{position:absolute;left:0;right:0;bottom:0;height:86px;padding-bottom:26px;display:flex;border-top:1px solid var(--stroke);background:#06111b}
+.tabs span{flex:1;display:grid;place-items:center;font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--dim)}
+.tabs span.on{color:var(--teal)} .tabs span.ut{color:var(--gold)}
+.h{font-style:italic;font-weight:900;font-stretch:80%;font-size:28px;margin:6px 0 2px}
+.sub{color:var(--dim);font-size:12px;margin-bottom:10px}
+.track{background:var(--panel);border:1px solid var(--stroke);border-radius:14px;padding:10px 12px 12px;margin-bottom:9px}
+.track .hd{display:flex;justify-content:space-between;font-size:11px;letter-spacing:1.5px;font-weight:800;color:var(--dim);margin-bottom:9px}
+.track .hd b{color:var(--text)}
+.rail{position:relative;height:46px}
+.rail .bar{position:absolute;left:8px;right:8px;top:9px;height:6px;border-radius:3px;background:#24445a}
+.rail .fill{position:absolute;left:8px;top:9px;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--teal),var(--gold))}
+.rung{position:absolute;top:0;width:60px;margin-left:-30px;text-align:center;font-size:9.5px;color:var(--dim);line-height:1.2}
+.rung i{display:block;width:24px;height:24px;border-radius:50%;margin:0 auto 3px;background:#17344a;border:2px solid #2c5370;font-style:normal;font-size:9px;font-weight:800;line-height:20px;color:var(--dim)}
+.rung.done i{background:var(--teal);border-color:var(--teal);color:#06241d}
+.rung.next i{background:var(--gold);border-color:#fff3c9;color:#201400;transform:scale(1.2);box-shadow:0 0 12px rgba(246,185,59,.7)}
+.rung.next{color:var(--text)}
+.tog{display:flex;gap:6px;margin:12px 0 8px}
+.tog span{font-size:11px;font-weight:800;letter-spacing:1.5px;padding:7px 12px;border-radius:14px;border:1px solid var(--stroke);color:var(--dim)}
+.tog span.on{background:var(--teal);color:#06241d;border-color:var(--teal)}
+.brow{display:flex;align-items:center;gap:8px;height:36px;border-bottom:1px solid #12283a;font-size:13px}
+.brow .rk{width:22px;text-align:center;font-weight:900;font-style:italic;color:var(--dim)}
+.brow .tier{font-size:9px;font-weight:800;letter-spacing:1px;border-radius:5px;padding:2px 5px;background:#24445a;color:var(--text)}
+.brow .tier.mvp{background:var(--gold);color:#201400} .brow .tier.as{background:var(--violet)}
+.brow .m{margin-left:auto;font-weight:800}
+.brow.me{background:#0f2f3a;border-radius:10px;border:1.5px solid var(--teal);padding:0 6px;margin:4px -6px;height:46px}
+.brow.me small{display:block;font-size:10px;color:var(--gold);font-weight:700}
+.split{height:4px;border-radius:2px;display:flex;overflow:hidden;width:60px}
+.split b:nth-child(1){background:#f59e42;flex:5}.split b:nth-child(2){background:#7fb069;flex:3}.split b:nth-child(3){background:#5aa9e6;flex:2}
+/* post-match */
+.dim{position:absolute;inset:0;background:linear-gradient(rgba(7,21,33,.55),rgba(7,21,33,.96) 40%)}
+.res{position:absolute;left:0;right:0;top:92px;text-align:center}
+.res .w{font-style:italic;font-weight:900;font-stretch:76%;font-size:62px;color:var(--teal);line-height:.9}
+.res .sc{font-weight:900;font-size:24px;margin-top:4px}
+.res .gr{display:inline-flex;gap:10px;margin-top:10px}
+.badge{border-radius:10px;border:1px solid var(--stroke);background:var(--panel);padding:7px 10px;font-size:11px;letter-spacing:1px;color:var(--dim);font-weight:800}
+.badge b{display:block;font-size:20px;color:var(--gold);font-style:italic;letter-spacing:0}
+.tally{position:absolute;left:16px;right:16px;top:300px}
+.tl{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--stroke);border-radius:12px;padding:9px 12px;margin-bottom:7px;font-size:13px;font-weight:700}
+.tl .pb{flex:1;height:6px;border-radius:3px;background:#24445a;position:relative;overflow:hidden}
+.tl .pb b{position:absolute;left:0;top:0;bottom:0;background:var(--teal)}
+.tl .pb b.new{background:var(--gold)}
+.tl .v{min-width:66px;text-align:right;color:var(--gold)}
+.tl.pop{border-color:var(--gold);box-shadow:0 0 14px rgba(246,185,59,.35)}
+.onemore{position:absolute;left:16px;right:16px;bottom:54px;border-radius:22px;background:linear-gradient(#ffd27a,#f6b93b);color:#201400;padding:14px 18px;box-shadow:0 6px 0 #b77d12,0 12px 30px rgba(246,185,59,.3)}
+.onemore .ey{font-size:10px;font-weight:900;letter-spacing:2px;opacity:.75}
+.onemore .tx{font-style:italic;font-weight:900;font-stretch:80%;font-size:26px;line-height:1}
+.onemore .st{font-size:12px;font-weight:700;margin-top:3px}
+.sec{position:absolute;left:0;right:0;bottom:20px;display:flex;justify-content:center;gap:26px;font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--dim)}
+table.geo{border-collapse:collapse;font-size:13px;margin-top:8px}
+table.geo td,table.geo th{border:1px solid var(--stroke);padding:6px 10px;text-align:left}
+table.geo th{color:var(--gold);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+</style>
+</head>
+<body>
+<main>
+<h1><b>PERFECT</b> SEASON · V2 MOCK-UPS</h1>
+<p class="lead">Companion to <b>GAME-DESIGN-V2.md</b>. Everything here is original concept art drawn in SVG and CSS: no team, league or publisher marks. Real player names appear only as labels for the archetypes. Phone frames are 390×844 shown at 80%. These are layout and style targets, not screenshots of a build.</p>
+
+<h2>1 · In-match HUD and controls</h2>
+<p class="lead">One control grammar for three sports: a floating stick under the left thumb (push past the ring to sprint), and at most four right-thumb targets. <b>A</b> is always the timed action and never moves. The controlled player, the target and the gold ring always sit inside the action-safe box above the controls.</p>
+<div class="legend">
+  <span><i style="background:var(--gold)"></i>gold = you, PERFECT window, button A</span>
+  <span><i style="background:var(--teal)"></i>teal = teammate target, button B</span>
+  <span><i style="background:var(--red)"></i>red = pressure</span>
+  <span><i style="background:var(--violet)"></i>violet = rival</span>
+  <span><i style="background:none;border:1.5px dashed #fff"></i>dashed box = action-safe area (guide only)</span>
+</div>
+<div class="row" id="hud"></div>
+
+<h3 style="margin-top:34px">Control geometry at 390×844 (insets 47/34) and 320×568 (insets 20/0)</h3>
+<table class="geo">
+<tr><th>Element</th><th>390×844</th><th>320×568</th></tr>
+<tr><td>A · primary</td><td>Ø92 at (320, 730)</td><td>Ø84 at (266, 510)</td></tr>
+<tr><td>B · secondary</td><td>Ø64 at (235, 770)</td><td>Ø56 at (190, 536)</td></tr>
+<tr><td>C · context</td><td>Ø48 at (247, 686)</td><td>Ø44 at (200, 468)</td></tr>
+<tr><td>D · context</td><td>Ø48 at (337, 644)</td><td>Ø44 at (282, 436)</td></tr>
+<tr><td>Stick ring (ghost)</td><td>Ø120 at (84, 722)</td><td>Ø104 at (70, 496)</td></tr>
+<tr><td>Action-safe box</td><td>y 103–560</td><td>y 76–368</td></tr>
+</table>
+
+<h2>2 · Character lineup: "Broadcast Pixel"</h2>
+<p class="lead">Five-heads-tall athletes with a hard <code>#14121c</code> outline and three tones per material. Identity is carried, in order, by build, hair silhouette, hair colour, head gear, skin tone, facial hair and asymmetric gear. Each archetype is shown at match size (1.5 px per art pixel) and at 4× zoom. All of it is generated from one small appearance record per player, the way the in-game code-drawn rig would do it. No logos, tattoos or brand marks.</p>
+<h3>Basketball · 34 art px</h3><div class="lineup" id="l-nba"></div>
+<h3 style="margin-top:22px">Football · 23 art px</h3><div class="lineup" id="l-nfl"></div>
+<h3 style="margin-top:22px">Soccer · 23 art px</h3><div class="lineup" id="l-soc"></div>
+
+<h2>3 · MINUTES: time-played tracks and the board</h2>
+<p class="lead">Active minutes (capped at 90 a day) fill three ladders: today, this week and career. The same capped minutes drive a weekly league with promotion and relegation. Sized to the real economy: an hour a day earns a Silver Pack a day and a Gold Pack a week, and time never pays more coins than the matches do.</p>
+<div class="row">
+  <div class="cell">
+    <div class="wrap"><div class="phone"><div class="island"></div>
+      <div class="scr">
+        <div class="top"><div class="pill">‹ RANKS</div><div class="spacer"></div><div class="pill"><span class="coin"></span>59,672</div></div>
+        <div class="h">MINUTES</div>
+        <div class="sub">Active play only · in a match or a draft · resets midnight ET</div>
+        <div class="track"><div class="hd"><span>TODAY · <b>27 MIN</b></span><span>3 MIN TO 75 + STAMP</span></div>
+          <div class="rail"><div class="bar"></div><div class="fill" style="width:42%"></div>
+            <div class="rung done" style="left:10%"><i>5</i>25</div>
+            <div class="rung done" style="left:28%"><i>15</i>50</div>
+            <div class="rung next" style="left:50%"><i>30</i>75 + stamp</div>
+            <div class="rung" style="left:72%"><i>60</i>Silver Pack</div>
+            <div class="rung" style="left:92%"><i>90</i>Done</div></div></div>
+        <div class="track"><div class="hd"><span>THIS WEEK · <b>161 MIN</b></span><span>GOLD PACK AT 300</span></div>
+          <div class="rail"><div class="bar"></div><div class="fill" style="width:40%"></div>
+            <div class="rung done" style="left:10%"><i>60</i>150</div>
+            <div class="rung done" style="left:28%"><i>150</i>Silver</div>
+            <div class="rung next" style="left:52%"><i>300</i>Gold Pack</div>
+            <div class="rung" style="left:73%"><i>450</i>400</div>
+            <div class="rung" style="left:92%"><i>600</i>Premium</div></div></div>
+        <div class="track"><div class="hd"><span>CAREER · <b>8.6 H</b> · STARTER</span><span>NEXT: PRO FRAME</span></div>
+          <div class="rail"><div class="bar"></div><div class="fill" style="width:44%"></div>
+            <div class="rung done" style="left:10%"><i>1h</i>Gold</div>
+            <div class="rung done" style="left:30%"><i>5h</i>1,000</div>
+            <div class="rung next" style="left:52%"><i>10h</i>Premium</div>
+            <div class="rung" style="left:74%"><i>25h</i>Pick 84+</div>
+            <div class="rung" style="left:92%"><i>50h</i>Banner</div></div></div>
+        <div class="track" style="padding:9px 12px;border-color:var(--teal)"><div class="hd" style="margin:0"><span><b>PRO LEAGUE</b> · 3/12</span><span style="color:var(--gold)">PROMOTE: 2ND · 2D 4H</span></div></div>
+        <div class="tog" style="margin-top:8px"><span class="on">LEAGUE</span><span>GLOBAL</span><span>ALL-TIME</span></div>
+        <div class="brow"><span class="rk">1</span><span class="tier mvp">MAX</span>KOBE4EVER<span class="m">270 min</span></div>
+        <div class="brow"><span class="rk">2</span><span class="tier as">▲</span>MAYA<span class="m">173 min</span></div>
+        <div class="brow me"><span class="rk" style="color:var(--teal)">3</span><span class="tier">YOU</span><div>YOU<small>12 min behind MAYA · rival</small></div><div class="split" title="split by sport"><b></b><b></b><b></b></div><span class="m">161 min</span></div>
+        <div class="brow"><span class="rk">4</span><span class="tier">·</span>DRE_33<span class="m">118 min</span></div>
+        <div class="brow" style="opacity:.7"><span class="rk">·</span><span class="tier" style="background:none;border:1px dashed #456">YOU</span>your last week<span class="m">80 min</span></div>
+      </div>
+    </div></div>
+    <p class="note"><b>The Minutes screen</b> (a new tab under RANKS). Next rung is enlarged on every track. The league tile shows the promotion line and time left. The board pins your row, names your rival and the gap, marks MAX at the cap, and keeps a ghost row for your last week so it is never empty.</p>
+  </div>
+
+  <div class="cell">
+    <div class="wrap"><div class="phone"><div class="island"></div>
+      <div id="postbg"></div><div class="dim"></div>
+      <div class="res"><div class="w">WIN</div><div class="sc">31 – 27 · vs '96 Chicago</div>
+        <div class="gr"><div class="badge">GRADE<b>A</b></div><div class="badge">PERFECTS<b>9</b></div><div class="badge">BEST HEAT<b>ON FIRE</b></div></div></div>
+      <div class="tally">
+        <div class="tl"><span class="coin"></span>Coins<div class="pb"></div><span class="v">+90</span></div>
+        <div class="tl">Daily 2/3<div class="pb"><b style="width:33%"></b><b class="new" style="left:33%;width:33%"></b></div><span class="v">1 to go</span></div>
+        <div class="tl">Season Pass<div class="pb"><b style="width:58%"></b><b class="new" style="left:58%;width:9%"></b></div><span class="v">+120 SP</span></div>
+        <div class="tl pop"><div class="ring" data-n="30" style="background:conic-gradient(var(--gold) 0 100%,#24445a 0)"></div>+4 min · 30 today<div class="pb"><b style="width:86%"></b><b class="new" style="left:86%;width:14%"></b></div><span class="v">75 + stamp</span></div>
+        <div class="tl" style="justify-content:center;color:var(--teal);border-color:var(--teal)">CLAIM ALL · 3</div>
+      </div>
+      <div class="onemore"><div class="ey">NEXT UP · LOADED</div><div class="tx">PLAY '86 BOSTON ›</div><div class="st">Rung 5 of 8 · 1 win to a Gold Pack</div></div>
+      <div class="sec"><span>BOX SCORE</span><span>HOME</span></div>
+    </div></div>
+    <p class="note"><b>Post-match, 5 seconds.</b> Result and grade, then one tally where coins, objectives, Season Pass and the Minutes ring fill together. The gold One-More bar sits where the A button was, with the next match already chosen and loaded. It never auto-starts.</p>
+  </div>
+
+  <div class="cell">
+    <div class="wrap"><div class="phone"><div class="island"></div>
+      <div class="scr">
+        <div class="top"><div class="lv">19</div><div style="font-size:11px;color:var(--dim)"><b style="color:var(--text);letter-spacing:1.5px">LEVEL 19</b><br>510/620 XP</div><div class="spacer"></div><div class="pill"><span class="coin"></span>59,672</div></div>
+        <div class="logo"><b>PERFECT</b>SEASON</div>
+        <div class="seg"><span class="on">NBA</span><span>NFL</span><span>SOCCER</span></div>
+        <div class="hero"><div><div class="big">11–0</div><small>PERFECT SEASON RUN</small></div><div style="text-align:right;font-size:12px;color:var(--dim)">Next milestone<br><b style="color:var(--text)">16–0 · gold nameplate</b></div></div>
+        <div class="chips"><div class="pill" style="color:var(--gold)">W4</div><div class="pill"><div class="ring" data-n="27"></div>MIN</div><div class="pill"><span style="width:8px;height:8px;border-radius:50%;background:#49d17a"></span>1 online</div><div class="pill">2/3</div></div>
+        <div class="modes"><div class="mode on"><b>CLASSIC</b><span>Stats visible</span></div><div class="mode"><b>BLIND</b><span>Stats hidden · +50%</span></div><div class="mode"><b>DAILY #15</b><span>Same spins for everyone</span></div><div class="mode"><b>HEAD TO HEAD</b><span>Live vs real players</span></div></div>
+        <div class="nextup"><div><div class="ey">NEXT UP</div><div class="tx">3 min to 75 coins + a Scout Stamp</div></div><div class="go">GO ›</div></div>
+        <div class="play">PLAY</div>
+      </div>
+      <div class="tabs"><span class="on">HOME</span><span class="ut">ULTIMATE TEAM</span><span>RANKS</span><span>PROFILE</span></div>
+    </div></div>
+    <p class="note"><b>Home with "Next up".</b> The four mode tiles keep their names. One gold strip above PLAY states the single best next action across draft and Ultimate Team (claims → unfinished run → expiring → Daily Play → near rung …). The Minutes ring joins the chip row. The hero shows the Perfect Season run.</p>
+  </div>
+
+  <div class="cell">
+    <div class="wrap"><div class="phone"><div class="island"></div>
+      <div class="scr">
+        <div class="top"><div class="pill">‹ HOME</div><div class="spacer"></div><div class="pill"><span class="coin"></span>59,672</div></div>
+        <div class="h" style="color:var(--gold)">ULTIMATE TEAM</div>
+        <div style="border-radius:18px;border:1.5px solid var(--gold);background:radial-gradient(120% 120% at 20% 0,#3a2c0e,#10263a);padding:16px;margin:8px 0 12px">
+          <div style="font-size:10px;letter-spacing:2px;color:var(--gold);font-weight:800">NEXT BEST ACTION</div>
+          <div style="font-style:italic;font-weight:900;font-stretch:80%;font-size:30px;line-height:1;margin:6px 0">DAILY PLAY IS READY</div>
+          <div style="color:var(--dim);font-size:13px;line-height:1.4">Down 2 · 14 seconds · ball in your star's hands. Same scenario for everyone today. 3 scored tries.</div>
+          <div style="display:flex;gap:8px;margin-top:12px;align-items:center"><div style="background:var(--gold);color:#201400;font-weight:900;font-style:italic;font-size:18px;border-radius:12px;padding:12px 22px">PLAY · 60 s</div><div style="font-size:12px;color:var(--dim)">75 coins · 1 daily tick</div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <div class="pill" style="height:40px;border-color:var(--gold)">1 win to Finalist ›</div>
+          <div class="pill" style="height:40px">3 min to stamp ›</div>
+          <div class="pill" style="height:40px">120 SP ›</div>
+        </div>
+        <div class="track"><div class="hd"><span>LIVE NOW</span><span>ENDS FRI</span></div><div style="display:flex;gap:8px"><div class="mode" style="flex:1"><b>ERA NIGHT</b><span>'90s weekend · 3 squads</span></div><div class="mode" style="flex:1"><b>CIRCUIT</b><span>2 entries left</span></div></div></div>
+        <div class="track"><div class="hd"><span>TODAY</span><span><b>2 / 3</b> OBJECTIVES</span></div><div style="font-size:13px;line-height:1.9">✓ Win a match<br>✓ 3 PERFECT releases<br><span style="color:var(--gold)">○ Reach ON FIRE once</span></div></div>
+        <div class="track" style="text-align:center;color:var(--dim);font-size:12px">When these are done the hero says <b style="color:var(--text)">"Done for today"</b> and stops pushing.</div>
+      </div>
+    </div></div>
+    <p class="note"><b>Ultimate Team hub hero.</b> One card, one button, chosen by a fixed published priority list. Near-miss chips only show true distances. A calm "Done for today" state closes the daily loop.</p>
+  </div>
+</div>
+</main>
+
+<script>
+/* ---------- colour helpers ---------- */
+const INK='#14121c';
+function hx(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function sh(h,f){const [r,g,b]=hx(h);const c=v=>Math.max(0,Math.min(255,Math.round(v)));
+  return f<0? `rgb(${c(r*(1+f))},${c(g*(1+f))},${c(Math.min(255,b*(1+f)+10))})` : `rgb(${c(r+(255-r)*f)},${c(g+(255-g)*f)},${c(b+(255-b)*f)})`;}
+/* 3x5 digits */
+const DIG={0:'111101101101111',1:'010110010010111',2:'111001111100111',3:'111001111001111',4:'101101111001001',5:'111100111001111',6:'111100111101111',7:'111001010010010',8:'111101111101111',9:'111101111001111'};
+
+/* ---------- the sprite generator: one appearance record in, a pixel grid out ---------- */
+function build(o){
+  const W=23,cx=11,small=o.sport!=='nba';
+  const headW=7, headH=small?6:7, T=small?6:8+(o.ht>1?1:0), SH=small?(o.sport==='nfl'?4:3):5;
+  const L=(small?3:7)+(o.ht||0), SK=small?(o.sport==='nfl'?2:3):2, SHOE=small?1:2;
+  const y0=4, H=y0+headH+1+T+SH+L+SK+SHOE+1;
+  const g=Array.from({length:H},()=>Array(W).fill(null));
+  const R=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)if(j>=0&&j<H&&i>=0&&i<W)g[j][i]=c;};
+  const P=(x,y,c)=>R(x,y,1,1,c);
+  const sw=o.build||11, half=(sw-1)/2, left=cx-half, right=cx+half;
+  const skin=o.skin, hc=o.hairColor||'#1d1612';
+  const hxL=cx-3, hy=y0;
+  /* ----- torso / arms / legs first, head last so hair overlaps ----- */
+  const ty=y0+headH+1;
+  R(cx-1,ty-1,3,1,skin);                                   // neck
+  const pad=o.sport==='nfl'?1:0;
+  for(let r=0;r<T;r++){const inset=r>=T-3?1:0; R(left+inset,ty+r,sw-2*inset,1,o.jersey);}
+  if(pad){R(left-1,ty,sw+2,2,o.jersey);R(left-1,ty,sw+2,1,sh(o.jersey,.18));}
+  R(left,ty+T-1,sw,0,o.jersey);
+  if(o.stripe){for(let i=left+1;i<right;i+=2)R(i,ty,1,T,o.trim);}      // soccer stripes
+  if(!small){P(cx-1,ty,skin);P(cx,ty,skin);P(cx+1,ty,skin);R(left,ty,1,T-3,o.trim);R(right,ty,1,T-3,o.trim);}
+  else if(o.sport==='soccer'){P(cx,ty,o.trim);}
+  // number
+  if(o.num!=null){const s=String(o.num), w=s.length*4-1, nx=cx-Math.floor(w/2), ny=ty+(small?1:2);
+    [...s].forEach((d,k)=>{const b=DIG[d];for(let j=0;j<5;j++)for(let i=0;i<3;i++)if(b[j*3+i]==='1'&&ny+j<ty+T)P(nx+k*4+i,ny+j,o.numColor||o.trim);});}
+  // arms
+  const armLen=small?6:10, ax1=left-2-pad, ax2=right+1+pad;
+  const arm=(ax,side)=>{R(ax,ty+1,2,armLen,skin);
+    if(o.sport==='soccer')R(ax,ty+1,2,2,o.jersey);
+    if(o.sport==='nfl'){R(ax,ty+1,2,1,o.jersey); if(o.gloves)R(ax,ty+armLen-1,2,2,o.gloves);}
+    if(o.sleeve===side||o.sleeve==='B')R(ax,ty+2,2,armLen-3,o.sleeveColor||'#f2f2f2');
+    if(o.wrist===side||o.wrist==='B')R(ax,ty+armLen-2,2,1,o.wristColor||'#f2f2f2');
+    if(o.armband===side)R(ax,ty+2,2,1,'#ffe04a');};
+  arm(ax1,'R');arm(ax2,'L');
+  // shorts / pants
+  const sy=ty+T, bw=sw; R(cx-(bw-1)/2,sy,bw,SH,o.shorts); P(cx,sy+SH-1,null);
+  if(!small){R(cx-(bw-1)/2,sy,1,SH,o.trim);R(cx+(bw-1)/2,sy,1,SH,o.trim);}
+  // legs
+  const ly=sy+SH, lw=3, lx1=cx-4, lx2=cx+2;
+  const legC=o.sport==='nfl'?o.shorts:skin;
+  R(lx1,ly,lw,L,legC);R(lx2,ly,lw,L,legC);
+  if(o.tights==='L'||o.tights==='B')R(lx2,ly,lw,L,o.tightsColor||'#1b1b22');
+  if(o.tights==='R'||o.tights==='B')R(lx1,ly,lw,L,o.tightsColor||'#1b1b22');
+  if(o.knee)R(lx1,ly+Math.floor(L/2),lw,1,'#f2f2f2');
+  const ky=ly+L; R(lx1,ky,lw,SK,o.socks);R(lx2,ky,lw,SK,o.socks);
+  const fy=ky+SK; R(lx1-1,fy,lw+1,SHOE,o.shoes);R(lx2,fy,lw+1,SHOE,o.shoes);
+  if(o.towel)R(cx-1,sy,2,3,'#f5f5f5');
+  /* ----- head ----- */
+  if(o.sport==='nfl'){
+    const hel=o.helmet;
+    R(hxL,hy,headW,headH,hel);P(hxL,hy,null);P(hxL+headW-1,hy,null);
+    R(cx,hy,1,2,o.helmetStripe||sh(hel,.5));
+    R(cx-2,hy+2,5,1,o.visor||skin); if(!o.visor){P(cx-1,hy+2,INK);P(cx+1,hy+2,INK);}
+    R(cx-2,hy+3,5,2,skin); R(cx-2,hy+3,5,1,'#c9ccd4'); P(cx,hy+4,'#c9ccd4'); R(cx-2,hy+5,5,1,'#c9ccd4');
+    if(o.beard)R(cx-1,hy+4,3,1,hc);
+    if(o.hair==='locs'){R(hxL-1,hy+headH-1,2,4,hc);R(hxL+headW-1,hy+headH-1,2,4,hc);}
+    if(o.hair==='flow'){R(hxL,hy+headH,1,2,hc);R(hxL+headW-1,hy+headH,1,2,hc);}
+    if(o.hair==='curly'){R(hxL-1,hy+headH-2,1,3,hc);R(hxL+headW,hy+headH-2,1,3,hc);}
+  } else {
+    R(hxL,hy,headW,headH,skin);P(hxL,hy,null);P(hxL+headW-1,hy,null);P(hxL,hy+headH-1,null);P(hxL+headW-1,hy+headH-1,null);
+    const ey=hy+(small?2:3);
+    // facial hair
+    if(o.beard==='full'){R(hxL,ey+1,headW,headH-(ey-hy)-1,hc);P(hxL,hy+headH-1,null);P(hxL+headW-1,hy+headH-1,null);R(cx-1,ey+1,3,1,skin);}
+    if(o.beard==='long'){R(hxL,ey+1,headW,headH-(ey-hy),hc);R(cx-2,hy+headH,5,2,hc);R(cx-1,ey+1,3,1,skin);}
+    if(o.beard==='goatee'){R(cx-1,hy+headH-2,3,2,hc);P(cx,hy+headH-2,skin);}
+    if(o.beard==='stubble'){R(hxL+1,hy+headH-2,headW-2,2,sh(skin,-.18));}
+    P(cx-2,ey,INK);P(cx+2,ey,INK);
+    if(o.mouthguard)R(cx-1,hy+headH-2,3,1,'#f8f8f8');
+    // hair
+    const top=(rows,w,xo=0)=>R(cx-Math.floor(w/2)+xo,hy-rows,w,rows,hc);
+    const cap=(rows=1)=>{R(hxL+1,hy,headW-2,rows,hc);R(hxL,hy+1,1,Math.max(1,rows),hc);R(hxL+headW-1,hy+1,1,Math.max(1,rows),hc);};
+    switch(o.hair){
+      case 'bald': P(cx-1,hy,sh(skin,.25));P(cx,hy,sh(skin,.25));break;
+      case 'buzz': cap(1);break;
+      case 'short': top(1,5);cap(1);break;
+      case 'fade': top(1,5);R(hxL+1,hy,headW-2,1,hc);break;
+      case 'hightop': top(3,7);cap(1);break;
+      case 'afro': top(3,9);top(1,7,0);R(hxL-1,hy-1,1,4,hc);R(hxL+headW,hy-1,1,4,hc);cap(1);break;
+      case 'cornrows': cap(1);for(let i=hxL+1;i<hxL+headW-1;i+=2){P(i,hy,sh(hc,.35));} R(hxL+1,hy-1,headW-2,1,hc);for(let i=hxL+2;i<hxL+headW-1;i+=2)P(i,hy-1,sh(hc,.35));R(hxL,hy+headH-1,1,2,hc);R(hxL+headW-1,hy+headH-1,1,2,hc);break;
+      case 'locs': top(2,7);cap(2);R(hxL-1,hy,1,headH+3,hc);R(hxL+headW,hy,1,headH+3,hc);R(hxL,hy+3,1,headH,hc);R(hxL+headW-1,hy+3,1,headH,hc);break;
+      case 'curlylong': top(2,9);P(cx-4,hy-3,hc);P(cx-1,hy-3,hc);P(cx+2,hy-3,hc);cap(2);R(hxL-2,hy,2,headH+2,hc);R(hxL+headW,hy,2,headH+2,hc);P(hxL-2,hy+headH+2,hc);P(hxL+headW+1,hy+headH+2,hc);break;
+      case 'flow': top(1,7);cap(2);R(hxL-1,hy+1,1,headH,hc);R(hxL+headW,hy+1,1,headH,hc);break;
+      case 'bun': top(1,7);cap(1);R(cx-1,hy-3,3,2,hc);break;
+      case 'ponytail': top(1,7);cap(2);R(hxL+headW,hy+2,2,2,hc);R(hxL+headW+1,hy+4,1,4,hc);break;
+      case 'mohawk': top(3,3);R(cx-1,hy,3,1,hc);break;
+      case 'curlytop': top(2,7);P(cx-3,hy-3,hc);P(cx-1,hy-3,hc);P(cx+1,hy-3,hc);P(cx+3,hy-3,hc);R(hxL+1,hy,headW-2,1,hc);break;
+      case 'receding': R(hxL,hy+1,1,2,hc);R(hxL+headW-1,hy+1,1,2,hc);P(cx,hy,hc);break;
+    }
+    if(o.band){R(hxL,hy+1,headW,1,o.band);}
+    if(o.goggles){R(hxL,ey,headW,1,'#20242c');P(cx-2,ey,'#9fd8ff');P(cx+2,ey,'#9fd8ff');}
+  }
+  return g;
+}
+/* shade + outline + emit rects */
+function render(g,s,crisp=true){
+  const H=g.length,W=g[0].length; const at=(x,y)=>(y>=0&&y<H&&x>=0&&x<W)?g[y][x]:null;
+  let out='';
+  const col=(x,y)=>{const c=g[y][x]; if(c===INK||c.startsWith('rgb'))return c;
+    if(!at(x+1,y)||!at(x,y+1)&&y<H-2) return sh(c,-.22);
+    if(!at(x-1,y)&&!at(x,y-1)) return sh(c,.16);
+    if(!at(x-1,y)) return sh(c,.10);
+    return c;};
+  for(let y=-1;y<=H;y++){let run=null;
+    for(let x=-1;x<=W+1;x++){
+      let c=null;
+      if(x<=W){ if(at(x,y)) c=col(x,y); else if(at(x-1,y)||at(x+1,y)||at(x,y-1)||at(x,y+1)) c=INK; }
+      if(run&&run.c===c){run.w++;continue;}
+      if(run&&run.c) out+=`<rect x="${(run.x+1)*s}" y="${(y+1)*s}" width="${run.w*s}" height="${s}" fill="${run.c}"/>`;
+      run=c?{x,c,w:1}:null;
+    }}
+  return {svg:out,w:(W+2)*s,h:(H+2)*s,crisp};
+}
+function spriteSVG(o,s){const r=render(build(o),s);return `<svg width="${r.w}" height="${r.h}" viewBox="0 0 ${r.w} ${r.h}" shape-rendering="${s>=3?'crispEdges':'geometricPrecision'}">${r.svg}</svg>`;}
+function spriteG(o,s,x,y,shadow=true){const r=render(build(o),s);const fx=x-r.w/2, fy=y-r.h+s; // feet at (x,y)
+  return (shadow?`<ellipse cx="${x}" cy="${y}" rx="${r.w*.3}" ry="${r.w*.1}" fill="rgba(0,0,0,.32)"/>`:'')+`<g transform="translate(${fx},${fy})" shape-rendering="crispEdges">${r.svg}</g>`;}
+
+/* ---------- kits (original colours, no marks) ---------- */
+const K={
+  bay:{jersey:'#1f4fb8',trim:'#f6c531',shorts:'#1f4fb8',socks:'#f2f2f2',shoes:'#f2f2f2',numColor:'#f6c531'},
+  wine:{jersey:'#7b1f3a',trim:'#f2b632',shorts:'#7b1f3a',socks:'#1b1b22',shoes:'#1b1b22',numColor:'#f2b632'},
+  royal:{jersey:'#5b2d91',trim:'#f6c531',shorts:'#5b2d91',socks:'#f2f2f2',shoes:'#f2f2f2',numColor:'#f6c531'},
+  philly:{jersey:'#1b1b22',trim:'#d7263d',shorts:'#1b1b22',socks:'#f2f2f2',shoes:'#d7263d',numColor:'#f2f2f2'},
+  mile:{jersey:'#12284b',trim:'#f4c430',shorts:'#12284b',socks:'#f2f2f2',shoes:'#12284b',numColor:'#f4c430'},
+  bulls:{jersey:'#c8102e',trim:'#1b1b22',shorts:'#c8102e',socks:'#f2f2f2',shoes:'#1b1b22',numColor:'#f2f2f2'},
+  white:{jersey:'#eef0f3',trim:'#c8102e',shorts:'#eef0f3',socks:'#eef0f3',shoes:'#c8102e',numColor:'#c8102e'},
+};
+/* ---------- archetypes ---------- */
+const NBA=[
+ {n:'Stephen Curry',t:'Slim guard build · short dark hair · goatee · mouthguard · low white shoes',o:{sport:'nba',ht:-1,build:9,skin:'#d9b88c',hair:'short',hairColor:'#3b2a20',beard:'goatee',mouthguard:1,num:30,...K.bay}},
+ {n:'LeBron James',t:'Wide, tall frame · headband · full beard · one arm sleeve · wristband',o:{sport:'nba',ht:1,build:13,skin:'#825c43',hair:'buzz',beard:'full',band:'#f2f2f2',sleeve:'L',sleeveColor:'#1b1b22',wrist:'R',num:23,...K.wine}},
+ {n:"Shaquille O'Neal",t:'Tallest and widest silhouette · bald · big shoes',o:{sport:'nba',ht:3,build:15,skin:'#604134',hair:'bald',num:34,...K.royal}},
+ {n:'Allen Iverson',t:'Smallest frame · cornrows · headband · shooting sleeve · tights',o:{sport:'nba',ht:-2,build:9,skin:'#825c43',hair:'cornrows',band:'#d7263d',sleeve:'R',sleeveColor:'#f2f2f2',tights:'L',num:3,...K.philly}},
+ {n:'Nikola Jokić',t:'Heavy, tall frame · light skin · short brown hair · stubble',o:{sport:'nba',ht:2,build:15,skin:'#f0d9c4',hair:'short',hairColor:'#6a4a32',beard:'stubble',num:15,...K.mile}},
+ {n:'Dennis Rodman',t:'Lean forward · dyed hair (changes by era) · knee pad',o:{sport:'nba',ht:1,build:11,skin:'#825c43',hair:'buzz',hairColor:'#3fae5a',knee:1,num:91,...K.bulls}},
+];
+const NFL=[
+ {n:'Patrick Mahomes',t:'QB frame · curly hair out of the helmet · headband look via helmet stripe · towel',o:{sport:'nfl',build:9,skin:'#a07e56',helmet:'#c8102e',helmetStripe:'#f6c531',hair:'curly',hairColor:'#3b2a20',jersey:'#c8102e',trim:'#f6c531',shorts:'#f2f2f2',socks:'#c8102e',shoes:'#f2f2f2',num:15,numColor:'#f2f2f2',towel:1}},
+ {n:'Derrick Henry',t:'Huge back · long locs out of the helmet · dark visor · gloves',o:{sport:'nfl',build:13,ht:1,skin:'#604134',helmet:'#12284b',helmetStripe:'#7fb7e6',visor:'#11141a',hair:'locs',jersey:'#12284b',trim:'#7fb7e6',shorts:'#12284b',socks:'#f2f2f2',shoes:'#f2f2f2',num:22,numColor:'#f2f2f2',gloves:'#7fb7e6'}},
+ {n:'Tom Brady',t:'Tall pocket QB · light skin · clean look · no visor',o:{sport:'nfl',build:9,ht:1,skin:'#eecfb4',helmet:'#c9ccd4',helmetStripe:'#c8102e',jersey:'#12284b',trim:'#c9ccd4',shorts:'#c9ccd4',socks:'#12284b',shoes:'#1b1b22',num:12,numColor:'#f2f2f2'}},
+ {n:'Offensive lineman',t:'Widest pads · bare arms · no number focus: reads as a wall',o:{sport:'nfl',build:15,skin:'#825c43',helmet:'#1b1b22',jersey:'#1b1b22',trim:'#f6c531',shorts:'#f6c531',socks:'#1b1b22',shoes:'#1b1b22',num:72,numColor:'#f6c531',beard:1}},
+];
+const SOC=[
+ {n:'Lionel Messi',t:'Shortest frame · dark short hair · auburn beard · captain armband',o:{sport:'soccer',ht:-1,build:9,skin:'#f0d9c4',hair:'short',hairColor:'#3b2a20',beard:'full',armband:'L',jersey:'#74c0ee',trim:'#f2f2f2',stripe:1,shorts:'#1b1b22',socks:'#f2f2f2',shoes:'#f2f2f2',num:10,numColor:'#12284b'}},
+ {n:'Erling Haaland',t:'Tall and broad · long blond hair in a ponytail',o:{sport:'soccer',ht:1,build:11,skin:'#f6e3d3',hair:'ponytail',hairColor:'#d6b36a',jersey:'#8fd0f5',trim:'#12284b',shorts:'#f2f2f2',socks:'#8fd0f5',shoes:'#f6c531',num:9,numColor:'#12284b'}},
+ {n:'Ronaldinho',t:'Long curly hair · hair band · low socks look · bright boots',o:{sport:'soccer',build:9,skin:'#825c43',hair:'curlylong',band:'#f2f2f2',jersey:'#f4d21f',trim:'#1f8a4c',shorts:'#1f4fb8',socks:'#f2f2f2',shoes:'#f2f2f2',num:10,numColor:'#1f8a4c'}},
+ {n:'Kylian Mbappé',t:'Sprinter frame · buzz cut · high socks · neon boots',o:{sport:'soccer',build:9,skin:'#604134',hair:'buzz',jersey:'#12284b',trim:'#d7263d',shorts:'#12284b',socks:'#12284b',shoes:'#c6ff3a',num:7,numColor:'#f2f2f2'}},
+ {n:'Goalkeeper',t:'Contrasting kit · gloves · taller frame · stands out from 22 players',o:{sport:'soccer',ht:1,build:11,skin:'#d9b88c',hair:'fade',hairColor:'#6a4a32',beard:'stubble',jersey:'#c6ff3a',trim:'#1b1b22',shorts:'#1b1b22',socks:'#c6ff3a',shoes:'#1b1b22',num:1,numColor:'#1b1b22',wrist:'B',wristColor:'#f2f2f2'}},
+];
+function lineup(id,list,bg){document.getElementById(id).innerHTML=list.map(p=>`<div class="who"><div class="pair ${bg}">${spriteSVG(p.o,1.5)}${spriteSVG(p.o,6)}</div><div class="sz"><span>match size</span><span>4× zoom</span></div><div class="nm">${p.n}</div><div class="tr">${p.t}</div></div>`).join('');}
+lineup('l-nba',NBA,'court');lineup('l-nfl',NFL,'turf');lineup('l-soc',SOC,'pitch');
+
+/* ---------- HUD pieces ---------- */
+const F='font-family="Archivo,Arial,sans-serif" font-style="italic" font-weight="900"';
+function crowd(w,y0,h,team){let s=`<rect x="0" y="0" width="${w}" height="${y0+h}" fill="#17132a"/>`;const cols=['#221d36','#342d52','#4a426e'];
+  let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  for(let y=y0;y<y0+h;y+=4)for(let x=0;x<w;x+=4){const r=rnd();const c=r<.06?team:r<.08?'#cfd3e6':cols[Math.floor(rnd()*3)];s+=`<rect x="${x}" y="${y}" width="4" height="4" fill="${c}"/>`;}
+  s+=`<rect x="0" y="${y0+h-10}" width="${w}" height="10" fill="${team}" opacity=".55"/>`;return s;}
+function bug(W,top,l,mid,r,heat){const bw=W<360?200:232,x=(W-bw)/2,px=W<360?6:12;return `
+  <rect x="${x}" y="${top}" width="${bw}" height="40" rx="12" fill="#0b1c2b" stroke="#1d3a50"/>
+  <text x="${x+10}" y="${top+25}" fill="#4fe3c1" font-size="10" ${F}>YOU</text><text x="${x+36}" y="${top+29}" fill="#4fe3c1" font-size="23" ${F}>${l}</text>
+  <text x="${x+bw/2}" y="${top+25}" fill="#f6b93b" font-size="12" text-anchor="middle" ${F}>${mid}</text>
+  <text x="${x+bw-34}" y="${top+29}" fill="#8b7cf6" font-size="23" text-anchor="end" ${F}>${r}</text><text x="${x+bw-30}" y="${top+25}" fill="#8b7cf6" font-size="10" ${F}>RIV</text>
+  <rect x="${x}" y="${top+43}" width="${bw}" height="6" rx="3" fill="#1a3044" stroke="#071521"/><rect x="${x}" y="${top+43}" width="${bw*heat}" height="6" rx="3" fill="url(#heat)"/>
+  <text x="${x+bw/2}" y="${top+60}" text-anchor="middle" fill="#f6b93b" font-size="9" ${F}>${heat>=1?'ON FIRE':heat>.66?'HEATING UP':''}</text>
+  <rect x="${px}" y="${top-2}" width="44" height="44" rx="12" fill="#0b1c2b" stroke="#1d3a50"/><rect x="${px+15}" y="${top+11}" width="5" height="18" fill="#f2f7fa"/><rect x="${px+24}" y="${top+11}" width="5" height="18" fill="#f2f7fa"/>`;}
+function btn(cx,cy,d,kind,label,sub){const r=d/2;const fills={A:['url(#gA)','#201400'],B:['url(#gB)','#06241d'],C:['rgba(7,21,33,.72)','#f2f7fa']};const [f,t]=fills[kind];
+  return `<circle cx="${cx}" cy="${cy+ (kind==='C'?0:4)}" r="${r}" fill="${kind==='A'?'#b77d12':kind==='B'?'#1f9e84':'none'}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${f}" stroke="${kind==='C'?'#3b6280':'rgba(255,255,255,.55)'}" stroke-width="1.5"/>
+  <text x="${cx}" y="${cy+(sub?2:d*.07)}" text-anchor="middle" fill="${t}" font-size="${kind==='A'?d*.2:kind==='B'?d*.22:d*.21}" ${F}>${label}</text>${sub?`<text x="${cx}" y="${cy+d*.2}" text-anchor="middle" fill="${t}" opacity=".7" font-size="8" font-weight="800" font-family="Archivo,Arial">${sub}</text>`:''}`;}
+function stick(cx,cy,d,kx=0,ky=0){return `<circle cx="${cx}" cy="${cy}" r="${d/2*1.15}" fill="none" stroke="#f6b93b" stroke-opacity=".35" stroke-dasharray="3 5"/><circle cx="${cx}" cy="${cy}" r="${d/2}" fill="rgba(7,21,33,.35)" stroke="rgba(255,255,255,.35)" stroke-width="1.5"/><circle cx="${cx+kx}" cy="${cy+ky}" r="${d*.22}" fill="url(#gB)" stroke="rgba(255,255,255,.6)"/>`;}
+function scrim(W,H){return `<rect x="0" y="${H-250}" width="${W}" height="250" fill="url(#scrim)"/>`;}
+function toast(W,y,txt,col='#f2f7fa'){return `<rect x="${W/2-120}" y="${y-28}" width="240" height="28" rx="14" fill="rgba(7,21,33,.82)" stroke="#1d3a50"/><text x="${W/2}" y="${y-9}" text-anchor="middle" fill="${col}" font-size="13" ${F}>${txt}</text>`;}
+function safe(W,y1,y2){return `<rect x="6" y="${y1}" width="${W-12}" height="${y2-y1}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-dasharray="6 6" rx="8"/>`;}
+function ringGround(x,y,rx,gold=true,frac=.2,rot=-70){const ry=rx*.36;const c=2*Math.PI*rx;return `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2"/><ellipse cx="${x}" cy="${y}" rx="${rx*.55}" ry="${ry*.55}" fill="none" stroke="${gold?'#f6b93b':'#ff5d5d'}" stroke-width="3"/>`;}
+function arcMeter(x,y,r,fill,gs,ge){ // semicircle meter above head, angles in 0..1 across 180deg
+  const pt=t=>{const a=Math.PI*(1-t);return [x+r*Math.cos(a),y-r*Math.sin(a)];};
+  const seg=(a,b,c,w)=>{const [x1,y1]=pt(a),[x2,y2]=pt(b);return `<path d="M${x1} ${y1} A${r} ${r} 0 0 1 ${x2} ${y2}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;};
+  const [nx,ny]=pt(fill);
+  return seg(0,1,'rgba(7,21,33,.85)',12)+seg(0,fill,'#f2f7fa',6)+seg(gs,ge,'#f6b93b',10)+`<circle cx="${nx}" cy="${ny}" r="5" fill="#fff" stroke="#14121c" stroke-width="2"/>`;}
+const DEFS=`<defs>
+  <radialGradient id="gA" cx=".35" cy=".3"><stop offset="0" stop-color="#ffe2a0"/><stop offset="1" stop-color="#f6b93b"/></radialGradient>
+  <radialGradient id="gB" cx=".35" cy=".3"><stop offset="0" stop-color="#a6f5e3"/><stop offset="1" stop-color="#35c9a8"/></radialGradient>
+  <linearGradient id="heat"><stop offset="0" stop-color="#f6b93b"/><stop offset="1" stop-color="#ff5d2e"/></linearGradient>
+  <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#071521" stop-opacity="0"/><stop offset="1" stop-color="#071521" stop-opacity=".62"/></linearGradient>
+  <radialGradient id="vig" cx=".5" cy=".45" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".38"/></radialGradient>
+  <radialGradient id="pool" cx=".5" cy=".5"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>`;
+const G390={A:[320,730,92],B:[235,770,64],C:[247,686,48],D:[337,644,48],S:[84,722,120],top:53,toast:610,s1:103,s2:560};
+const G320={A:[266,510,84],B:[190,536,56],C:[200,468,44],D:[282,436,44],S:[70,496,104],top:26,toast:404,s1:76,s2:368};
+
+/* ---------- NBA court scene ---------- */
+function nbaScene(W,H,G,opts={}){
+  const k=W/390, hor=H*.17, rimY=H*.225;
+  const away={...K.white}, home={...K.bay};
+  const P=(o,x,y,s=1.5)=>spriteG(o,s*k,x*k,y*(H/844));
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${DEFS}`;
+  s+=crowd(W,0,hor,'#c8102e');
+  // floor (three-quarter, slight yaw)
+  s+=`<polygon points="${-30*k},${H} ${40*k},${hor} ${W-20*k},${hor} ${W+50*k},${H}" fill="#c98f52"/>`;
+  for(let i=0;i<26;i++){const x=40+i*13;s+=`<line x1="${x*k}" y1="${hor}" x2="${(-30+i*17.3)*k}" y2="${H}" stroke="#bf8548" stroke-width="${1.2*k}"/>`;}
+  s+=`<polygon points="${-30*k},${H} ${40*k},${hor} ${40*k},${hor+10} ${-22*k},${H}" fill="#7a1024"/><rect x="0" y="${hor-3}" width="${W}" height="6" fill="#5c0c1b"/>`;
+  // paint + arc
+  const py2=H*.47;
+  s+=`<polygon points="${150*k},${hor+2} ${252*k},${hor+2} ${268*k},${py2} ${128*k},${py2}" fill="#c8102e" opacity=".85" stroke="#f4ead8" stroke-width="2"/>`;
+  s+=`<ellipse cx="${198*k}" cy="${py2}" rx="${46*k}" ry="${14*k}" fill="none" stroke="#f4ead8" stroke-width="2"/>`;
+  s+=`<path d="M${52*k} ${hor+2} Q${40*k} ${H*.66} ${198*k} ${H*.67} Q${352*k} ${H*.66} ${348*k} ${hor+2}" fill="none" stroke="#f4ead8" stroke-width="2"/>`;
+  s+=`<ellipse cx="${200*k}" cy="${H*.3}" rx="${150*k}" ry="${60*k}" fill="url(#pool)"/>`;
+  // backboard and rim
+  s+=`<rect x="${172*k}" y="${rimY-44*k}" width="${58*k}" height="${34*k}" fill="rgba(235,245,255,.75)" stroke="#14121c" stroke-width="2"/><rect x="${192*k}" y="${rimY-28*k}" width="${18*k}" height="${13*k}" fill="none" stroke="#d7263d" stroke-width="2"/>
+  <ellipse cx="${201*k}" cy="${rimY-6*k}" rx="${11*k}" ry="${3.5*k}" fill="none" stroke="#ff7a1a" stroke-width="3"/><path d="M${191*k} ${rimY-5*k} l${4*k} ${14*k} h${12*k} l${4*k} -${14*k}" fill="none" stroke="#f2f2f2" stroke-opacity=".8"/>`;
+  // players: defense (white) and offense (bay)
+  const d=(n,x,y,extra={})=>P({sport:'nba',build:11,skin:'#825c43',hair:'short',num:n,...away,...extra},x,y,1.25);
+  s+=d(5,150,250,{skin:'#d9b88c',hair:'fade'})+d(21,262,268,{hair:'afro',ht:1,build:13})+d(11,84,330,{skin:'#604134',hair:'buzz'})+d(8,318,340,{skin:'#f0d9c4',hairColor:'#d6b36a'});
+  s+=P({...NBA[1].o,...home,num:23},292,300,1.3)+P({...NBA[4].o,...home,num:15},176,292,1.3)+P({...NBA[3].o,...home,num:3,band:'#f6c531'},64,372,1.35)+P({...NBA[5].o,...home,num:91},338,392,1.35);
+  // on-ball defender, drawn beside (not behind) the handler thanks to the yawed camera
+  s+=`<path d="M${218*k} ${(opts.hy-40)*(H/844)} a${24*k} ${8*k} 0 0 1 ${44*k} 0" fill="none" stroke="#ff5d5d" stroke-width="3"/>`;
+  s+=d(2,242,opts.hy-34,{skin:'#604134',hair:'hightop',ht:0});
+  // pass target ring + name
+  s+=`<ellipse cx="${64*k}" cy="${372*(H/844)}" rx="${17*k}" ry="${6*k}" fill="none" stroke="#4fe3c1" stroke-width="2.5"/>`;
+  // handler with gold ring + arc meter
+  const hx_=190*k, hy_=opts.hy*(H/844);
+  s+=ringGround(hx_,hy_,30*k,true);
+  s+=P({...NBA[0].o},190,opts.hy,1.5);
+  s+=arcMeter(hx_,hy_-64*k,27*k,.60,.62,.82);
+  s+=`<rect x="${hx_-27}" y="${hy_+10}" width="54" height="13" rx="3" fill="#14121c"/><text x="${hx_}" y="${hy_+20}" text-anchor="middle" fill="#f6c531" font-size="9" font-weight="800" font-family="monospace">CURRY</text>`;
+  s+=`<rect width="${W}" height="${H}" fill="url(#vig)"/>`+scrim(W,H);
+  s+=bug(W,G.top,opts.you??14,opts.mid??'Q2 · :09',opts.riv??12,opts.heat??.74);
+  s+=toast(W,G.toast,opts.toast??'OPEN · release on gold','#f6b93b');
+  s+=stick(G.S[0],G.S[1],G.S[2],8,-16)+btn(G.A[0],G.A[1],G.A[2],'A','SHOOT')+btn(G.B[0],G.B[1],G.B[2],'B','PASS')+btn(G.C[0],G.C[1],G.C[2],'C','CALL');
+  // swipe hints around A
+  s+=`<g fill="#f6b93b" font-size="9" font-weight="800" font-family="Archivo,Arial" text-anchor="middle" opacity=".9"><text x="${G.A[0]+14}" y="${G.A[1]-G.A[2]/2-8}">▲ SPIN</text><text x="${Math.min(G.A[0],W-62)}" y="${Math.min(G.A[1]+G.A[2]/2+16,H-8)}">◀ CROSS ▶ · ▼ STEP</text></g>`;
+  if(opts.safe!==false) s+=safe(W,G.s1,G.s2);
+  return s+'</svg>';
+}
+
+/* ---------- NFL field ---------- */
+function field(W,H,losY,yard){let s=crowd(W,0,H*.1,'#12284b');const top=H*.1;
+  s+=`<rect x="0" y="${top}" width="${W}" height="${H-top}" fill="#2f8f46"/>`;
+  for(let i=0;i<12;i++){const y=losY-360+i*72; if(i%2===0)s+=`<rect x="0" y="${Math.max(top,y)}" width="${W}" height="${72-Math.max(0,top-y)}" fill="#2a8240"/>`;}
+  for(let i=-5;i<8;i++){const y=losY-i*72; if(y>top&&y<H){s+=`<line x1="14" x2="${W-14}" y1="${y}" y2="${y}" stroke="#eaf5ea" stroke-opacity=".8" stroke-width="2"/>`;
+    const n=yard+i*10; if(n>0&&n<=50&&i!==0)s+=`<text x="40" y="${y-8}" fill="#eaf5ea" opacity=".55" font-size="16" ${F}>${n}</text><text x="${W-40}" y="${y-8}" text-anchor="end" fill="#eaf5ea" opacity=".55" font-size="16" ${F}>${n}</text>`;}
+    for(let j=1;j<5;j++){const yy=y-j*14.4; if(yy>top&&yy<H)s+=`<line x1="${W*.36}" x2="${W*.36+8}" y1="${yy}" y2="${yy}" stroke="#eaf5ea" stroke-opacity=".5"/><line x1="${W*.64-8}" x2="${W*.64}" y1="${yy}" y2="${yy}" stroke="#eaf5ea" stroke-opacity=".5"/>`;}}
+  s+=`<rect x="0" y="${top}" width="8" height="${H}" fill="#f2f2f2"/><rect x="${W-8}" y="${top}" width="8" height="${H}" fill="#f2f2f2"/>`;
+  s+=`<line x1="8" x2="${W-8}" y1="${losY}" y2="${losY}" stroke="#5aa9e6" stroke-width="2.5"/><line x1="8" x2="${W-8}" y1="${losY-58}" y2="${losY-58}" stroke="#f6c531" stroke-width="2.5"/>`;
+  return s;}
+const OFF={sport:'nfl',build:11,skin:'#825c43',helmet:'#c8102e',helmetStripe:'#f6c531',jersey:'#c8102e',trim:'#f6c531',shorts:'#f2f2f2',socks:'#c8102e',shoes:'#f2f2f2',numColor:'#f2f2f2'};
+const DEF={sport:'nfl',build:11,skin:'#604134',helmet:'#12284b',helmetStripe:'#7fb7e6',jersey:'#eef0f3',trim:'#12284b',shorts:'#12284b',socks:'#eef0f3',shoes:'#1b1b22',numColor:'#12284b'};
+function nflPre(W,H,G){
+  const los=H*.45; let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${DEFS}`+field(W,H,los,35);
+  const p=(o,x,y,sc=1.45)=>spriteG(o,sc,x,y);
+  // defense shell
+  [[44,los-56,24],[322,los-66,29],[140,los-170,20],[262,los-170,31],[112,los-70,54],[200,los-78,52],[290,los-70,58]].forEach(([x,y,n])=>s+=p({...DEF,num:n},x,y,1.3));
+  [[150,91],[183,97],[216,95],[249,99]].forEach(([x,n])=>s+=p({...DEF,num:n,build:13},x,los-8,1.4));
+  // offense
+  [[130,71],[164,66],[198,60],[232,68],[266,74]].forEach(([x,n])=>s+=p({...OFF,num:n,build:15},x,los+46,1.45));
+  const rec=[[36,los+46,'KELCE','#4fe3c1',87],[88,los+58,'RICE','#f472b6',80],[310,los+46,'HILL','#5aa9e6',10],[358,los+56,'MOSS','#f6c531',84]];
+  rec.forEach(([x,y,n,c,num])=>{s+=p({...OFF,num,build:9},x,y,1.45);});
+  // route art
+  s+=`<g fill="none" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7"><path d="M36 ${los} V${los-120} L110 ${los-170}" stroke="#4fe3c1"/><path d="M88 ${los} V${los-74} H190" stroke="#f472b6"/><path d="M310 ${los} V${los-210}" stroke="#5aa9e6"/><path d="M358 ${los} V${los-96} L318 ${los-66}" stroke="#f6c531"/></g>`;
+  rec.forEach(([x,y,n,c])=>{s+=`<rect x="${x-20}" y="${y-64}" width="40" height="14" rx="4" fill="${c}"/><text x="${x}" y="${y-53}" text-anchor="middle" fill="#14121c" font-size="9" font-weight="900" font-family="Archivo,Arial">${n}</text>`;});
+  s+=ringGround(198,los+104,24,true)+p({...NFL[0].o},198,los+104,1.5)+p({...OFF,num:25,build:11},246,los+112,1.45);
+  s+=`<rect width="${W}" height="${H}" fill="url(#vig)"/>`+scrim(W,H);
+  s+=bug(W,G.top,7,'1ST &amp; 10',3,.4);
+  // play tray: 124 px, three cards + AUDIBLE (B) and SNAP (A)
+  const ty=H-34-124-8;
+  s+=`<rect x="10" y="${ty}" width="${W-20}" height="124" rx="16" fill="rgba(7,21,33,.9)" stroke="#1d3a50"/>`;
+  const cards=[['MESH','PASS · SHORT',true],['FOUR VERTS','PASS · DEEP',false],['POWER','RUN',false]];
+  cards.forEach(([n,t,on],i)=>{const x=20+i*82;s+=`<rect x="${x}" y="${ty+10}" width="74" height="104" rx="10" fill="${on?'#143246':'#0e2233'}" stroke="${on?'#f6b93b':'#1d3a50'}" stroke-width="${on?2:1}"/>
+    <path d="M${x+14} ${ty+70} v-26 l16 -10 M${x+37} ${ty+70} v-34 M${x+60} ${ty+70} v-20 l-14 -8" fill="none" stroke="${on?'#f6b93b':'#6f8ea3'}" stroke-width="2"/>
+    <text x="${x+37}" y="${ty+90}" text-anchor="middle" fill="#f2f7fa" font-size="11" ${F}>${n}</text><text x="${x+37}" y="${ty+104}" text-anchor="middle" fill="#8aa3b5" font-size="8" font-weight="800" font-family="Archivo,Arial">${t}</text>`;});
+  s+=btn(322,ty+66,88,'A','SNAP')+`<text x="266" y="${ty+24}" fill="#8aa3b5" font-size="9" font-weight="800" font-family="Archivo,Arial">swipe ◀ for the book</text>`;
+  s+=toast(W,ty-10,'COVER 3 look · MESH beats it','#4fe3c1');
+  s+=safe(W,G.s1,ty-44);
+  return s+'</svg>';
+}
+function nflRun(W,H,G){
+  const los=H*.62; let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${DEFS}`+field(W,H,los,35);
+  const p=(o,x,y,sc=1.45)=>spriteG(o,sc,x,y);
+  [[70,200,24],[320,170,29],[250,260,31]].forEach(([x,y,n])=>s+=p({...DEF,num:n},x,y,1.25));
+  [[110,470,71],[150,500,66]].forEach(([x,y,n])=>s+=p({...OFF,num:n,build:15},x,y,1.45));
+  s+=p({...DEF,num:54,build:13},120,452,1.4);
+  // lane arrow
+  s+=`<path d="M214 420 Q250 330 300 250" fill="none" stroke="#f2f7fa" stroke-opacity=".35" stroke-width="10" stroke-linecap="round"/>`;
+  // tackler with the gold window
+  s+=`<ellipse cx="238" cy="352" rx="34" ry="12" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2"/><ellipse cx="238" cy="352" rx="20" ry="7" fill="none" stroke="#f6b93b" stroke-width="4"/>`;
+  s+=p({...DEF,num:52,build:13},238,352,1.45);
+  s+=`<rect x="262" y="318" width="54" height="16" rx="4" fill="#f6b93b"/><text x="289" y="330" text-anchor="middle" fill="#14121c" font-size="10" font-weight="900" font-family="Archivo,Arial">JUKE NOW</text>`;
+  // carrier
+  s+=ringGround(206,440,26,true)+p({...NFL[1].o,helmet:'#c8102e',helmetStripe:'#f6c531',jersey:'#c8102e',trim:'#f6c531',shorts:'#f2f2f2',socks:'#c8102e',gloves:'#f6c531'},206,440,1.5);
+  s+=`<rect x="179" y="450" width="54" height="13" rx="3" fill="#14121c"/><text x="206" y="460" text-anchor="middle" fill="#f6c531" font-size="9" font-weight="800" font-family="monospace">HENRY</text><rect x="181" y="466" width="50" height="4" rx="2" fill="#14121c"/><rect x="181" y="466" width="34" height="4" rx="2" fill="#4fe3c1"/>`;
+  s+=`<rect width="${W}" height="${H}" fill="url(#vig)"/>`+scrim(W,H);
+  s+=bug(W,G.top,7,'2ND &amp; 4',3,.82);
+  s+=toast(W,G.toast,'Momentum carries · steer when ready');
+  s+=stick(G.S[0],G.S[1],G.S[2],20,-30)+btn(G.A[0],G.A[1],G.A[2],'A','JUKE')+btn(G.B[0],G.B[1],G.B[2],'B','SPIN')+btn(G.C[0],G.C[1],G.C[2],'C','POWER','HOLD')+btn(G.D[0],G.D[1],G.D[2],'C','DIVE');
+  s+=`<text x="${G.S[0]}" y="${G.S[1]-G.S[2]/2-16}" text-anchor="middle" fill="#f6b93b" font-size="9" font-weight="800" font-family="Archivo,Arial">past the ring = BURST</text>`;
+  s+=safe(W,G.s1,G.s2);
+  return s+'</svg>';
+}
+/* ---------- Soccer ---------- */
+function soccer(W,H,G){
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${DEFS}`+crowd(W,0,H*.14,'#f4d21f');const top=H*.14;
+  s+=`<rect x="0" y="${top}" width="${W}" height="${H-top}" fill="#2e9a4a"/>`;
+  for(let i=0;i<9;i++)if(i%2)s+=`<rect x="0" y="${top+i*96}" width="${W}" height="96" fill="#288a41"/>`;
+  s+=`<rect x="0" y="${top}" width="${W}" height="14" fill="#143a22"/>`;for(let x=6;x<W;x+=64)s+=`<rect x="${x}" y="${top+2}" width="52" height="10" fill="${x%128<64?'#f2f7fa':'#f6b93b'}" opacity=".85"/>`;
+  const gl=top+42; // goal line
+  s+=`<line x1="0" x2="${W}" y1="${gl}" y2="${gl}" stroke="#f2fff2" stroke-opacity=".85" stroke-width="2"/>
+  <rect x="${W/2-150}" y="${gl}" width="300" height="150" fill="none" stroke="#f2fff2" stroke-opacity=".85" stroke-width="2"/><rect x="${W/2-70}" y="${gl}" width="140" height="52" fill="none" stroke="#f2fff2" stroke-opacity=".85" stroke-width="2"/>
+  <path d="M${W/2-60} ${gl+150} a70 40 0 0 0 120 0" fill="none" stroke="#f2fff2" stroke-opacity=".85" stroke-width="2"/><circle cx="${W/2}" cy="${gl+104}" r="2.5" fill="#f2fff2"/>`;
+  // goal with net
+  s+=`<rect x="${W/2-42}" y="${gl-26}" width="84" height="26" fill="rgba(255,255,255,.14)" stroke="#f2f2f2" stroke-width="3"/>`;for(let x=-36;x<40;x+=8)s+=`<line x1="${W/2+x}" x2="${W/2+x}" y1="${gl-24}" y2="${gl}" stroke="#fff" stroke-opacity=".35"/>`;
+  const p=(o,x,y,sc=1.45)=>spriteG(o,sc,x,y);
+  const them={sport:'soccer',build:9,skin:'#d9b88c',hair:'short',jersey:'#eef0f3',trim:'#12284b',shorts:'#eef0f3',socks:'#eef0f3',shoes:'#1b1b22',numColor:'#12284b'};
+  s+=p({...SOC[4].o},W/2+6,gl+18,1.4);
+  [[110,250,4,{}],[188,238,5,{skin:'#604134',hair:'buzz'}],[270,252,2,{hair:'fade',hairColor:'#d6b36a'}],[330,300,3,{skin:'#825c43'}],[150,372,6,{hair:'bald'}]].forEach(([x,y,n,e])=>s+=p({...them,num:n,...e},x,y,1.35));
+  const us={jersey:'#f4d21f',trim:'#1f8a4c',shorts:'#1f4fb8',socks:'#f2f2f2',numColor:'#1f8a4c'};
+  // runner + through lane
+  s+=`<path d="M210 470 Q262 380 300 232" fill="none" stroke="#4fe3c1" stroke-width="3" stroke-dasharray="3 8" stroke-linecap="round"/><polygon points="300,222 292,240 308,238" fill="#4fe3c1"/>`;
+  s+=`<ellipse cx="292" cy="330" rx="16" ry="6" fill="none" stroke="#4fe3c1" stroke-width="2.5"/>`+p({...SOC[3].o,...us,shoes:'#c6ff3a',num:7},292,330,1.4);
+  s+=p({...SOC[1].o,...us,num:9},96,318,1.4);
+  // edge arrow for off-screen teammate
+  s+=`<g><polygon points="6,430 20,420 20,440" fill="#4fe3c1"/><rect x="22" y="421" width="26" height="18" rx="5" fill="#4fe3c1"/><text x="35" y="434" text-anchor="middle" fill="#06241d" font-size="10" font-weight="900" font-family="Archivo,Arial">R9</text></g>`;
+  // carrier with ball one touch ahead + pressure
+  s+=ringGround(200,486,26,true)+p({...SOC[2].o},200,486,1.5);
+  s+=`<ellipse cx="214" cy="462" rx="5" ry="2" fill="rgba(0,0,0,.35)"/><circle cx="214" cy="456" r="4.5" fill="#f8f8f8" stroke="#14121c" stroke-width="1.5"/>`;
+  s+=`<rect x="162" y="496" width="76" height="13" rx="3" fill="#14121c"/><text x="200" y="506" text-anchor="middle" fill="#f6c531" font-size="9" font-weight="800" font-family="monospace">RONALDINHO</text>`;
+  s+=`<path d="M146 400 a26 9 0 0 1 44 0" fill="none" stroke="#ff5d5d" stroke-width="3"/>`+p({...them,num:8,skin:'#604134',hair:'hightop'},168,428,1.4);
+  s+=`<rect width="${W}" height="${H}" fill="url(#vig)"/>`+scrim(W,H);
+  s+=bug(W,G.top,1,"67' · 5/7",1,.55);
+  s+=toast(W,G.toast,'THRU · release as he breaks the line','#4fe3c1');
+  s+=stick(G.S[0],G.S[1],G.S[2],6,-34)+btn(G.A[0],G.A[1],G.A[2],'A','SHOOT')+btn(G.B[0],G.B[1],G.B[2],'B','PASS','HOLD: LOB')+btn(G.C[0],G.C[1],G.C[2],'C','THRU')+btn(G.D[0],G.D[1],G.D[2],'C','TRICK');
+  s+=`<g fill="#f6b93b" font-size="9" font-weight="800" font-family="Archivo,Arial" text-anchor="middle"><text x="${G.A[0]-70}" y="${G.A[1]-70}">flick ▲ CHIP</text><text x="${G.A[0]-18}" y="${G.A[1]+62}">curve = FINESSE</text></g>`;
+  s+=safe(W,G.s1,G.s2);
+  return s+'</svg>';
+}
+
+const hud=document.getElementById('hud');
+function cell(svg,title,note,small){return `<div class="cell ${small?'small':''}"><div class="wrap ${small?'small':''}"><div class="phone ${small?'small':''}">${small?'':'<div class="island"></div>'}${svg}</div></div><p class="note"><b>${title}</b> ${note}</p></div>`;}
+hud.innerHTML=
+ cell(nbaScene(390,844,G390,{hy:470}),'NBA · offense.','Three-quarter camera with a 12° yaw so the on-ball defender (red arc) stands beside the handler, not behind him. The gold segment on the arc is the real window, never under 8 px. Swipe off SHOOT for moves. CALL opens SCREEN / CUT / ISO under the thumb.')+
+ cell(nflPre(390,844,G390),'NFL · pre-snap.','Line of scrimmage at 45% of the height: the whole formation and the defensive shell stay visible above a 124 px tray. Three suggested cards, SNAP on A. Receivers carry name chips in their route colour; after the snap, tap a chip or sling.')+
+ cell(nflRun(390,844,G390),'NFL · ball carrier.','The runner keeps his momentum until the thumb lands. The tackler\'s wind-up ring shows the gold window: JUKE or SPIN inside it for a PERFECT move. POWER charges a truck. Burst is the stick pushed past its ring.')+
+ cell(soccer(390,844,G390),'Soccer · attack.','About 34 m across instead of 17: runner, options and goal are all in frame; an off-screen teammate shows as an edge arrow. The ball sits a touch ahead of the boot. SHOOT variants are gestures on A; TRICK is a visible button.')+
+ cell(nbaScene(320,568,G320,{hy:330,toast:'SMOTHERED · no gold · pass',heat:.3,mid:'CLUTCH',you:27,riv:28}),'320×568 check.','The same layout on the smallest phone: A Ø84, B Ø56, C Ø44. The handler stays above the controls inside the safe box. The toast names the dial that failed (PRESSURE): amber ring, no gold offered.',true);
+document.getElementById('postbg').innerHTML=nbaScene(390,844,G390,{hy:470,safe:false,heat:1,you:31,riv:27,mid:'FINAL'});
+</script>
+</body>
+</html>

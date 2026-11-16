@@ -77,3 +77,13 @@ The first matching rule wins. "Shared" files may be edited by the teams named, i
 - `CLAUDE.md`, `README.md`, `docs/CODEX-UPDATE-LOG.md`
 - `src/net/**` and `src/lib/cloud*`
 - The `src/data/*.json` player data files: edit only through their build scripts, and only if your brief says so.
+
+## V2 grants (2026-11-16): these override the rules above
+
+- **ut** may edit, additively only, with old-save and tag-stability tests:
+  - `src/lib/profile.ts`, `src/lib/cloud*` (the `playtime` field and its merge rule)
+  - `src/net/leaderboard.ts` (the `minutes` and `play` board branches; existing tags stay byte-identical)
+  - new files `src/lib/playtime.ts`, `src/lib/haptics.ts`, `src/ut/minutes.ts`
+- **nba:** new files `src/game/controls-geometry.css`, `src/game/Stick.tsx`, `stick.ts`, `perfect.ts`, `heat.ts` and `src/game/hud/*` (V2 F.1). nfl and soccer consume them and may make small hunks in them.
+- **nfl and soccer:** until nba's shared pieces land in their branch, write against the interface contract in nba's plan, or keep a thin local adapter. The lead reconciles at integration.
+- **players:** venue palette changes in `src/game/pixel/persp.ts` / court / field / pitch drawing, as V2 C.2 asks.

@@ -117,3 +117,7 @@ The owner says: "fix packs to make them more how real packs work for odds and fo
 ## Owner decisions
 
 Read the "OWNER DECISIONS (2026-11-09)" section at the end of BRIEF.md. It is binding and overrides this brief where they differ.
+
+## Game Design V2
+
+Read the GAME DESIGN V2 section at the end of BRIEF.md, `design-v2/GAME-DESIGN-V2.md` (your F.2 list) and `DESIGN-V2-DECISIONS.md`. They are binding.
