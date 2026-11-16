@@ -10,7 +10,7 @@ import { Sheet } from '../ui/common';
 import { Coin } from '../ui/icons';
 import { PackArt } from './Hub';
 import { IconInfo } from './icons';
-import { curveOdds, FLOORS, GOLD_CURVE, isFloorKind, type Odds, type PackDef, packName, positionChoices, FEATURED_STANDOUT, type SlotTier } from './packs';
+import { curveOdds, FLOORS, GOLD_CURVE, isFloorKind, type Odds, type PackDef, knownPack, packName, positionChoices, FEATURED_STANDOUT, type SlotTier } from './packs';
 import { TIER_NAMES } from './rate';
 import { fcToDisplay } from './fc-scale';
 import type { PendingPack, UtState } from './state';
@@ -285,13 +285,22 @@ export function Store(props: {
                     <i className="ut-open">CHOOSE</i>
                   </button>
                 ))}
-                {props.pending.map((p) => (
-                  <button key={p.id} className="ut-mine-pack" onClick={() => props.onPending(p.id)} aria-label={'Open your ' + packName(props.sport, p.kind)}>
-                    <PackArt kind={p.kind} label={SHORT[p.kind.split(':')[0]] ?? 'PACK'} sport={props.sport} small />
-                    <b>{packName(props.sport, p.kind).replace(/ Pack$/, '')}</b>
-                    <i className="ut-open">OPEN</i>
-                  </button>
-                ))}
+                {props.pending.map((p) =>
+                  // Claude (packs-1 fix): a reward pack from a newer build says so before the tap (it stays saved)
+                  knownPack(props.sport, p.kind) ? (
+                    <button key={p.id} className="ut-mine-pack" onClick={() => props.onPending(p.id)} aria-label={'Open your ' + packName(props.sport, p.kind)}>
+                      <PackArt kind={p.kind} label={SHORT[p.kind.split(':')[0]] ?? 'PACK'} sport={props.sport} small />
+                      <b>{packName(props.sport, p.kind).replace(/ Pack$/, '')}</b>
+                      <i className="ut-open">OPEN</i>
+                    </button>
+                  ) : (
+                    <button key={p.id} className="ut-mine-pack ut-mine-new" onClick={() => props.onPending(p.id)} aria-label="New pack: update the game to open it. It stays saved until then.">
+                      <PackArt kind={p.kind} label="NEW" sport={props.sport} small />
+                      <b>New Pack</b>
+                      <i className="ut-open ut-update">UPDATE TO OPEN</i>
+                    </button>
+                  ),
+                )}
               </div>
             </>
           )}

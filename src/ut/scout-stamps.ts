@@ -1,6 +1,6 @@
 // Claude (packs-1, 2026-11-16): Scout Stamps, the packs team's bad-luck protection (docs/studio-overhaul/
 // packs-plan.md D7 and D13, packs.md "Scout Stamps"). Packs earn stamps that never expire (1 per 100 coins
-// of the pack's price; an earned pack at its Store price; +10 for a special edition the player already
+// of the pack's price; an earned pack at its Store price, an SBC reward pack nothing; +10 for a special edition the player already
 // had), ut's rewards grant them (the 30-minute MINUTES rung, Scout Drops, Rookie Week), and the stamp shelf
 // (stamp-shelf.ts) turns them into picks.
 //
@@ -86,12 +86,21 @@ export const NOMINAL_PRICE: Record<'nba' | 'nfl' | 'soccer', Record<string, numb
 const BASE_TIERS = new Set(['bronze', 'silver', 'gold']);
 const PICK_KINDS = new Set(['scout', 'standout-pick', 'swap', 'new-era', 'calendar']);
 
-/** A pack that never earns stamps: the Daily Drop and daily bonuses (Scout Drop 1), Scout Drops 2-3,
- * picks (including the shelf's own), the starter and admin awards. */
-function earnsNothing(e: Pick<PullEntry, 'id' | 'k' | 's'>): boolean {
+/**
+ * A pack that never earns stamps: the Daily Drop and daily bonuses (Scout Drop 1), Scout Drops 2-3,
+ * picks (including the shelf's own), the starter and admin awards, and SBC reward packs.
+ * Claude (packs-1 fix, review finding 1): an SBC pack is paid for with traded-in cards, not coins, so it
+ * earns nothing: at its Store price the daily Upgrades alone paid about 62 stamps a day from junk (NBA),
+ * and a full day of SBCs about 100-120, more than an 82+ Player Pick a day. Its pending id is
+ * `sbc:<challenge>:<uuid>` from this release (source 'sbc'), a Streamlined SBC's `stream:…` (source 'sbc').
+ */
+export function earnsNothing(e: Pick<PullEntry, 'id' | 'k' | 's'>): boolean {
   return (
     e.k === 'daily' ||
     e.s === 'daily' ||
+    e.s === 'sbc' ||
+    e.id.startsWith('sbc:') ||
+    e.id.startsWith('stream:') ||
     e.k === 'starter' ||
     e.k.startsWith('admin-') ||
     e.id.startsWith('pick:') ||

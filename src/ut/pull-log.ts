@@ -88,6 +88,7 @@ export function sourceOfPending(id: string): string {
     ['daily-', 'daily'],
     ['draft:', 'draft'],
     ['stream:', 'sbc'],
+    ['sbc:', 'sbc'],
     ['objective:', 'objective'],
     ['moment:', 'moment'],
     ['circuit:', 'circuit'],

@@ -8,7 +8,7 @@ import { UtCard } from './CardArt';
 import { IconCheck, IconWand, IconX } from './icons';
 import { packName, quickSellValue } from './packs';
 import { type Pool, seasonText } from './pool';
-import { autoFill, cardFits, checkSbc, type Req, rewardText, rewardValue, type Sbc, teamNeed, tradeWarning } from './sbc';
+import { autoFill, cardFits, checkSbc, guardBlocked, type Req, rewardText, rewardValue, type Sbc, teamNeed, tradeWarning } from './sbc';
 import './sbc-page.css';
 import { playsIn } from './squad';
 import { Lede } from './ui';
@@ -170,7 +170,7 @@ function SbcSheet({ s, club, onClose, onSubmit, onToast }: { s: Sbc; club: ClubC
     if (!got) {
       sfx.nope();
       onToast(
-        autoFill(s, spare, { guard: false })
+        guardBlocked(s, spare)
           ? 'Auto-fill never trades special, numbered or high-value cards. Put those in by hand.'
           : 'Not enough cards outside your ' + pickFor(SPORT, { nba: 'starters and first three off the bench', nfl: 'squad', soccer: 'squad' }) + ' meet all of this yet.'
       );
@@ -295,7 +295,13 @@ function TradeConfirm({ s, cards, fromSquad, onYes, onNo }: { s: Sbc; cards: Clu
             {fromSquad ? ' ' + fromSquad + (fromSquad === 1 ? ' of them plays' : ' of them play') + ' in your squad.' : ''}
           </p>
           {flagged.length > 0 && (
-            <ul className="sbc-warn" aria-label="Cards you may want to keep">
+            <p className="sbc-warn-count">
+              <b className="num">{flagged.length}</b> {flagged.length === 1 ? 'card' : 'cards'} you may want to keep
+              {flagged.length > 3 ? <span> · scroll to see all</span> : null}
+            </p>
+          )}
+          {flagged.length > 0 && (
+            <ul className={'sbc-warn' + (flagged.length > 3 ? ' more' : '')} aria-label="Cards you may want to keep">
               {flagged.map(({ c, why }) => (
                 <li key={c.uid} className="sbc-warn-row">
                   <svg className="sbc-warn-ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">

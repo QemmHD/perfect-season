@@ -106,13 +106,24 @@ function runOf(x: unknown): DraftRun | undefined {
   };
 }
 
+/**
+ * The most open pick sheets a save keeps (normalizeContent keeps the first this many, in every build).
+ * Claude (packs-1 fix): anything that adds a pick checks `picksFull` first, so a 51st pick is never
+ * paid for (coins, stamps or a reward claim) and then dropped on the next load.
+ */
+export const PICKS_MAX = 50;
+/** What the player is told when a new pick can't be kept yet. */
+export const PICKS_FULL = 'You have 50 picks waiting. Choose from some of them in Your packs first.';
+/** Whether the open pick sheets are at PICKS_MAX (no new pick can be kept until one is opened). */
+export const picksFull = (ut: WithContent): boolean => (ut.content?.picks?.length ?? 0) >= PICKS_MAX;
+
 /** Any saved `content` as valid state (unknown fields go, bad entries drop, nothing resets). */
 export function normalizeContent(raw: unknown): ContentState | undefined {
   if (!rec(raw)) return undefined;
   const out: ContentState = {};
   if (rec(raw.daily) && str(raw.daily.day)) out.daily = { day: raw.daily.day, streak: int(raw.daily.streak, 0, 7), total: int(raw.daily.total, 0, 1e6) };
   if (rec(raw.buys)) out.buys = Object.fromEntries(Object.entries(raw.buys).filter(([, v]) => typeof v === 'number').map(([k, v]) => [k, int(v, 0, 1000)]));
-  if (Array.isArray(raw.picks)) out.picks = raw.picks.map(pickOf).filter((p): p is PickState => !!p).slice(0, 50);
+  if (Array.isArray(raw.picks)) out.picks = raw.picks.map(pickOf).filter((p): p is PickState => !!p).slice(0, PICKS_MAX);
   // Claude (packs-1): the stamp claims are kept at the end, so the 5,000 cap never drops them
   if (Array.isArray(raw.claims)) out.claims = pinClaims(strs(raw.claims, Infinity));
   if (rec(raw.market) && str(raw.market.day))

@@ -462,10 +462,22 @@ export function tradeWarning(rc: RatedCard, mint: CardMint | undefined, worth: n
   const why: string[] = [];
   if (isSpecialTier(rc.tier) || rc.line.programKind === 'finale') why.push((rc.line.programKind === 'finale' ? 'Finale' : TIER_NAME[rc.tier]) + ' edition');
   if (mint) why.push('numbered #' + mint.serial);
-  if (rc.ovr >= 90) why.push(rc.ovr + ' overall');
+  // (the row already shows the overall: say why it matters, not the number again)
+  if (rc.ovr >= 90) why.push('90+ rated');
   const qs = quickSellValue(rc);
   if (qs > worth) why.push('sells for ' + qs.toLocaleString('en-US') + ' coins, more than the reward');
   return why.length ? why.join(' · ') : null;
+}
+
+/**
+ * Claude (packs-1 fix, review finding 4): after a guarded autoFill found nothing, whether a protected card
+ * could have taken a spot (it meets everything each card must). One cheap pass over the club, never a
+ * second full search: auto-fill on a big soccer club already takes seconds on the failing path.
+ */
+export function guardBlocked<C extends FillCard>(s: Sbc, club: C[]): boolean {
+  const worth = new Map<UtSport, number>();
+  const valueFor = (sport: UtSport) => worth.get(sport) ?? worth.set(sport, rewardValue(s.reward, sport)).get(sport)!;
+  return club.some((c) => !!protectedReason(c, valueFor(c.rc.line.sport)) && s.reqs.every((r) => cardFits(r, c.rc, s.size)));
 }
 
 /**

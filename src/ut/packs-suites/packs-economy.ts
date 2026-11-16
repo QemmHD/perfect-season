@@ -16,11 +16,11 @@ import { addDays } from '../calendar';
 import { awardPick, keepPick } from '../content-packs';
 import { normalizeContent } from '../content-state';
 import { fcToDisplay } from '../fc-scale';
-import { openPack, PACK_SHAPE, packDefs, quickSell, quickSellValue, TIER_ORDER, UNKNOWN_PACK } from '../packs';
+import { knownPack, openPack, PACK_SHAPE, packDefs, positionChoices, quickSell, quickSellValue, TIER_ORDER, UNKNOWN_PACK } from '../packs';
 import { getPool, type Pool, TIER_RANK } from '../pool';
 import { calendarClaimables, eraNights, type LiveDrop, programRewardCard, resolvedEditions, seasonPassCard, storeBadge, upcomingDrops } from '../promo-hub';
 import { rateCard } from '../rate';
-import { autoFill, type FillCard, protectedReason, rewardValue, type Sbc, sbcsFor, tradeWarning } from '../sbc';
+import { autoFill, type FillCard, guardBlocked, protectedReason, rewardValue, type Sbc, sbcsFor, tradeWarning } from '../sbc';
 import { stampsBalance } from '../scout-stamps';
 import { standoutProgram } from '../standouts';
 import { freshUt, migrateUt, type UtState } from '../state';
@@ -157,6 +157,11 @@ export function packsEconomySuite(): void {
       expect(protectedReason({ uid: 'l', rc: legend, slot: null }, 1e9)).toBe('special');
       expect(autoFill({ ...s, reqs: [] }, [{ uid: 'l', rc: legend, slot: null }])).toBeNull();
       expect(autoFill({ ...s, reqs: [] }, [{ uid: 'l', rc: legend, slot: null }], { guard: false })).toEqual(['l']);
+      // the toast's question without a second search: did a protected card fit?
+      expect(guardBlocked({ ...s, reqs: [] }, [{ uid: 'l', rc: legend, slot: null }])).toBe(true);
+      expect(guardBlocked({ ...s, reqs: [] }, cheap)).toBe(false);
+      expect(guardBlocked(s, [{ ...cheap[0], locked: true }])).toBe(cheap[0].rc.ovr >= star.rc.ovr);
+      expect(guardBlocked(s, [star])).toBe(protectedReason(star, worth) !== null);
       // a card reward is worth the least card it can be
       expect(rewardValue({ card: { tier: 'gold', minOvr: 84 } }, SPORT)).toBe(quickSell('gold', 84, SPORT));
       expect(rewardValue({ pack: 'premium', card: { tier: 'gold', minOvr: 82 } }, SPORT)).toBe(packDefs(SPORT).premium.price + quickSell('gold', 82, SPORT));
@@ -169,7 +174,8 @@ export function packsEconomySuite(): void {
       expect(tradeWarning(plain, undefined, worth)).toBeNull();
       expect(tradeWarning(plain, MINT, worth)).toBe('numbered #7');
       const top = Object.values(pool.buckets.gold).flat().find((rc) => rc.ovr >= 90);
-      if (top) expect(tradeWarning(top, undefined, worth)).toContain(top.ovr + ' overall');
+      if (top) expect(tradeWarning(top, undefined, worth)).toContain('90+ rated');
+      if (top) expect(tradeWarning(top, undefined, worth)).not.toContain(top.ovr + ' overall');
       const hs = Object.values(pool.buckets.promo).flat()[0];
       expect(tradeWarning(hs, undefined, worth)).toContain('Hot Season edition');
       expect(tradeWarning(hs, undefined, 1)).toMatch(/sells for [\d,]+ coins, more than the reward$/);
@@ -260,6 +266,10 @@ export function packsEconomySuite(): void {
       // catches it before its update runs). On the base (claude/studio-overhaul) it opened as no cards
       // and the pending pack was gone: docs/studio-overhaul/packs.md, "D9".
       expect(() => openPack(pool, pending.kind, pending.id)).toThrow(UNKNOWN_PACK);
+      // and the Store's tile says so before the tap ("New Pack · UPDATE TO OPEN")
+      expect(knownPack(SPORT, pending.kind)).toBe(false);
+      for (const k of [...Object.keys(packDefs(SPORT)), 'starter', 'scout', 'standout-pick', 'spotlight', 'live:s1-first-tip', 'admin-icon', 'position:' + positionChoices(SPORT)[0].key]) expect(knownPack(SPORT, k), k).toBe(true);
+      expect(knownPack(SPORT, 'position:nowhere')).toBe(false);
       vi.unstubAllGlobals();
     });
   });
@@ -308,16 +318,16 @@ export function packsEconomySuite(): void {
 
     it('awards Front Office, 82+ and Program picks once per id, one card kept', () => {
       const at = Date.UTC(2026, 10, 15, 17);
-      let ut: UtState = awardPick(freshUt(), pool, 'front-office', 'fo1', at);
+      let ut: UtState = awardPick(freshUt(), pool, 'front-office', 'fo1', at)!;
       const fo = ut.content!.picks![0];
       expect(fo.options).toHaveLength(5);
       const opts = fo.options.map((id) => pool.base.get(id)!);
       expect(opts.every((rc) => rc.tier === 'gold' && rc.ovr >= fcToDisplay(80, SPORT))).toBe(true);
       expect(new Set(opts.map((rc) => rc.line.pid)).size).toBe(5);
       expect(awardPick(ut, pool, 'front-office', 'fo1', at)).toBe(ut);
-      ut = awardPick(ut, pool, 'pick-82', 'p82', at);
+      ut = awardPick(ut, pool, 'pick-82', 'p82', at)!;
       expect(ut.content!.picks![1].options.every((id) => pool.base.get(id)!.ovr >= fcToDisplay(82, SPORT))).toBe(true);
-      ut = awardPick(ut, pool, 'program-pick', 'pp', at);
+      ut = awardPick(ut, pool, 'program-pick', 'pp', at)!;
       const pp = ut.content!.picks![2];
       expect(pp.options).toHaveLength(3);
       // a program is live on 2026-11-15 in NBA and NFL; soccer has no calendar, so it falls back to 82+

@@ -201,7 +201,7 @@ export function packCurveSuite(): void {
       const t = Date.UTC(2026, 11, 1, 17);
       const fresh = freshUt();
       for (let i = 0; i < 10000; i++) {
-        const ut = awardPick(fresh, pool, 'pick-84', 'minutes:life:25h:' + i, t);
+        const ut = awardPick(fresh, pool, 'pick-84', 'minutes:life:25h:' + i, t)!;
         const pick = ut.content!.picks![0];
         expect(pick.kind).toBe('pick-84');
         const opts = pick.options.map((id) => pool.base.get(id)!);
@@ -209,7 +209,7 @@ export function packCurveSuite(): void {
         if (opts.some((c) => c.tier !== 'gold' || c.ovr < at(84))) throw new Error('pick-84 option out of range: ' + pick.options.join(','));
         if (new Set(opts.map((c) => c.line.pid)).size !== 3) throw new Error('pick-84 repeats a player: ' + pick.options.join(','));
       }
-      const once = awardPick(fresh, pool, 'pick-84', 'minutes:life:25h', t);
+      const once = awardPick(fresh, pool, 'pick-84', 'minutes:life:25h', t)!;
       expect(once.content!.picks!.map((p) => p.title)).toEqual(['Player Pick · ' + at(84) + '+']);
       expect(awardPick(once, pool, 'pick-84', 'minutes:life:25h', t)).toBe(once);
     });
@@ -224,7 +224,7 @@ export function packCurveSuite(): void {
       const ut: UtState = { ...freshUt(), owned: club };
       const owned = ownedCardIds(club);
       for (let i = 0; i < 300; i++) {
-        const pick = awardPick(ut, pool, 'pick-84', 'prefer:' + i, t).content!.picks![0];
+        const pick = awardPick(ut, pool, 'pick-84', 'prefer:' + i, t)!.content!.picks![0];
         expect(pick.options.some((id) => owned.has(id))).toBe(false);
       }
     });

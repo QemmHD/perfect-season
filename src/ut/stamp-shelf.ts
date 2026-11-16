@@ -21,8 +21,9 @@ export function shelfOpen(item: ShelfItem): boolean {
 /**
  * Spend stamps on a shelf item: the balance drops by its cost and exactly one pick sheet is pending
  * (pick id `stamps:<item>:<uuid>`). A uuid already redeemed returns the same state (a retried tap or a
- * replayed update changes nothing). Null when the item isn't open yet, the balance is short, or the pool
- * has nothing to offer. `day` is the Eastern date the Standout and Program picks will draw from.
+ * replayed update changes nothing). Null when the item isn't open yet, the balance is short, the open
+ * pick sheets are full (PICKS_MAX: the new pick would be dropped on the next load), or the pool has
+ * nothing to offer. `day` is the Eastern date the Standout and Program picks will draw from.
  */
 export function redeemStamps(ut: UtState, pool: Pool, item: ShelfItem, uuid: string, _day: string, at: number): UtState | null {
   const shelf = STAMP_SHELF.find((s) => s.item === item);
@@ -30,7 +31,8 @@ export function redeemStamps(ut: UtState, pool: Pool, item: ShelfItem, uuid: str
   if (redeemed(ut, uuid)) return ut;
   const kind = PICK[item];
   if (!kind || !shelfOpen(item) || stampsBalance(ut) < shelf.cost) return null;
+  // null (nothing spent) when the pick sheets are full (PICKS_MAX) or the pool has nothing to offer
   const picked = awardPick(ut, pool, kind, 'stamps:' + item + ':' + uuid, at);
-  if (picked === ut) return null;
+  if (!picked || picked === ut) return null;
   return withSpentStamps(picked, item, shelf.cost, uuid);
 }

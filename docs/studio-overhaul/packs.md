@@ -9,6 +9,7 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 | packs-1 A: baselines, contracts, critical fixes | done | see `git log` (subject "packs-1 commit A") |
 | packs-1 B: the Scout Stamp core and V2 hand-off contracts | done | see `git log` (subject "packs-1 commit B") |
 | packs-2: real-pack odds for every source, Player Pick 84+, Scout Drop tables | done | see `git log` (subject "packs-2") |
+| packs-1 review fixes (SBC stamps, pick cap, confirm, auto-fill, unknown pack tile) | done | see `git log` (subject "packs-1 review fixes") |
 | packs-3 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
@@ -200,7 +201,7 @@ export function grantStamps(ut, n: number, source: 'minutes' | 'drop' | 'rookie'
 
 **C. `src/ut/packs-claimables.ts` body (packs-1 B; ut owns the file's existence and shape).** `packsClaimables(ut, day, sport): { n: number; ids: string[]; lines: string[] }`. This round: one line when `stampsBalance ≥ 50` ("Scout Stamps: a pick is ready"). It never counts the Daily Drop (ut re-implements it). The check-in lines are F2, so they are not in it.
 
-**D. `src/ut/content-packs.ts` picks (packs-1 A; curve in packs-2).** `awardPick(ut, pool, kind, id, at): UtState`, with `kind: 'front-office' | 'pick-82' | 'pick-84' | 'program-pick'`. **[V2]** `'pick-84'` = 1 of 3 different golds, 84+, on the G84 curve, with no special: the 25-hour MINUTES milestone and the Rookie Week day-7 pick. Exactly once per `id` (the caller's claim id, for example `minutes:life:25h`). The pick sheet opens through the existing pending-pick path.
+**D. `src/ut/content-packs.ts` picks (packs-1 A; curve in packs-2).** `awardPick(ut, pool, kind, id, at): UtState` (since the review fixes `UtState | null`: null when the 50 open picks are full or nothing can be offered; write no claim then), with `kind: 'front-office' | 'pick-82' | 'pick-84' | 'program-pick'`. **[V2]** `'pick-84'` = 1 of 3 different golds, 84+, on the G84 curve, with no special: the 25-hour MINUTES milestone and the Rookie Week day-7 pick. Exactly once per `id` (the caller's claim id, for example `minutes:life:25h`). The pick sheet opens through the existing pending-pick path.
 
 **E. `src/ut/drop-tables.ts` (packs-2; pure, light, no pool).**
 ```ts
@@ -474,6 +475,77 @@ None. Pack contents, odds and prices don't touch matches, and `CONTENT_PRINT` / 
 - packs-3: every price against the 0.45–0.60 EV band (Premium NBA sits at 0.61, Lightning at 0.69–0.74 by design, the Spotlight's commons stay pre-curve); the Market's gold draws on the curve.
 - packs-4: the odds sheets computed from these definitions (`curveOdds`, `curveStepMass`, `holoChanceOf`, `dropOdds` are the inputs), the Scout Drop and Pick 84+ sheets.
 - ut: show `dropOdds` before the first tap and play `rollDrop(...).path`; award `pick-84` under the caller's claim id.
+
+## packs-1 review fixes (after the independent review of 9fd5180..c78475d)
+
+Fixed on top of packs-2. No storage key, card or copy id, claim id or receipt changes; no new saved field.
+
+### What changed and why
+
+- **SBC reward packs earn no Scout Stamps (medium).** An SBC pack is paid for with traded-in cards, yet it earned stamps at its full Store price because its pending id was a bare `newId()` (source `reward`). The reviewer measured about 119 stamps a day in NBA and 101 in NFL and soccer from a full day of SBCs. The two-a-day Upgrades alone paid 62 a day in NBA from junk. That is more than one 82+ Player Pick a day and about 6 times the plan's pace target (50 every 3 days or less). Now:
+  - New SBC reward packs get the pending id `sbc:<challenge id>:<uuid>` (`UltimateTeam.tsx`, one line). This is additive: existing pending ids stay as they are. `sourceOfPending` reads `sbc:` as `sbc`, the source the Streamlined SBCs' `stream:` packs already had.
+  - `earnsNothing` (now exported) returns true for source `sbc` and for ids starting `sbc:` or `stream:`. A Streamlined SBC pack is also paid for with cards, and it used to earn stamps at its Store price too. The special-duplicate +10 is off for these packs as well.
+  - The `stamps` suite adds two cases. First, an SBC Silver (`sbc:` and `stream:` ids) earns 0, while a MINUTES or objective Silver still earns its Store price (NBA 5, NFL 3, soccer 4 since packs-2's prices). Second, a pace test over 14 days of `sbcsFor`: SBC packs now pay 0 stamps. The same packs under the old ids pay more than 50/3 a day, so the measured problem is real on this catalogue.
+  - Packs that were already pending under a random id when the update arrives still earn as before. That is a small, one-time amount: `STAMPS_FROM` is the release instant, so nothing earned before it counts.
+- **A full pick list never eats stamps or coins (low, real).** `normalizeContent` keeps the first 50 open picks, so a 51st pick was dropped on the next load after its stamps, coins or reward claim were spent. Changes:
+  - `content-state.ts` now exports `PICKS_MAX = 50`, `picksFull(ut)` and the toast text `PICKS_FULL`.
+  - **Contract change for ut:** `awardPick` now returns `UtState | null`. It returns null when the picks are full or the pool has no option, so the caller writes no claim and the reward stays claimable. A repeat id still returns the same state.
+  - `redeemStamps` returns null in the same case, with nothing spent.
+  - In `UltimateTeam.tsx`, the Scout's Choice purchase refuses with the toast before charging coins, both in the handler and inside the update. A pending Scout's Choice, Standout or Live Calendar pick pack stays pending, with the toast, instead of turning into a pick that would be dropped.
+- **Trade-in confirm (low).**
+  - A count line now sits above the red rows ("4 cards you may want to keep · scroll to see all").
+  - With more than three rows, the list fades at the bottom, so a hidden 4th card is no longer a surprise.
+  - The 90+ reason reads "90+ rated" instead of repeating the overall shown in the row title ("Michael Jordan 92 · 92 overall" before).
+- **Auto-fill's failing path no longer searches twice (low).**
+  - Before, the toast choice ran a second full `autoFill` with `guard: false`.
+  - Now it uses `guardBlocked(s, club)` (sbc.ts): one pass that asks whether any protected card meets everything each card must (`cardFits`).
+- **A pack this build doesn't know says so before the tap (low).** `knownPack(sport, kind)` (packs.ts) mirrors what `openPack` handles. An unknown kind (a reward from a newer build) gets:
+  - a "New Pack" tile with NEW pack art;
+  - a gold "UPDATE TO OPEN" tag on two lines inside the 78 px tile;
+  - the aria-label "New pack: update the game to open it. It stays saved until then."
+
+  Tapping still shows the D9 toast, and the pack stays saved.
+- **Pick tiles (low): already fixed by packs-2, so no change here.** `pickLabel` names Front Office, Player Pick 82+/84+, Stamp Scout 85+ and Program picks, and the art reads `PICK 1 OF ` + the option count. The 1-of-5 Front Office Pick shows "PICK 1 OF 5". The shelf's `stamps:g82:<uuid>` pick is kind `pick-82`, so it reads "Player Pick 82+".
+
+### Tests
+
+- `stamps` suite (all three sports), three new cases:
+  - an SBC pack earns 0, while MINUTES and objective packs still earn;
+  - the 14-day SBC pace;
+  - with 50 picks open, `redeemStamps` spends nothing and `awardPick` (front-office, program-pick) returns null; with 49 picks the redemption goes through and survives the normalizer.
+- `packs-economy` suite:
+  - `guardBlocked` cases next to the protection test;
+  - the confirm's 90+ wording (no repeated overall);
+  - D9: `knownPack` is false for `headliners` and for an unknown position choice, and true for every `packDefs` kind, the starter, picks, Spotlight, Live and admin packs.
+- `pack-curve` and `packs-economy` callers use `awardPick(...)!` for the new nullable return.
+
+### Browser QA
+
+`scripts/packs/qa-fixes-1.mjs`, isolated as for packs-1: dev server on 5213, `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted, touch, `deviceScaleFactor: 1`, reduced motion. Results are below.
+
+Run with NBA at 393×852 (insets 59/34) and at 320×568. Shots are in `O/shots/packs/packs-1-fixes/`. Both sizes gave the same results:
+- **Your packs** (`nba-393-your-packs.png`). The four tiles read:
+  - "PICK 1 OF 5 · Front Office Pick 80+ · CHOOSE";
+  - "PICK 1 OF 3 · Player Pick 82+ · CHOOSE" (the shelf's `stamps:g82:` pick);
+  - "NEW · New Pack · UPDATE TO OPEN" (kind `headliners`);
+  - "GOLD · Gold · OPEN".
+
+  The new tile is 78×142 design px, with its two-line tag inside it. Tapping it shows "Update the game to open this pack. It stays in your Store until then." The saved pending kinds are still `headliners,gold` afterwards.
+- **Auto-fill.** On a spare club of 40 special editions, AUTO-FILL answered in 80–91 ms: "Auto-fill never trades special, numbered or high-value cards. Put those in by hand." The toast came from `guardBlocked`, with no second search.
+- **Trade-in confirm** (`nba-393-sbc-confirm.png`, `nba-320-sbc-confirm.png`). Fresh Faces had 8 specials put in by hand. The count line reads "8 cards you may want to keep · scroll to see all". The list scrolls (583 of 246 px shown), and the fourth row fades out under the third. The rows read "Luka Dončić 96 · Hot Season edition · 90+ rated · sells for 740 coins, more than the reward", with no repeated overall.
+- No page errors. The only host blocked was the Supabase registry: nothing reached a live service.
+
+### Touched outside my lane (review fixes)
+
+- `src/ut/UltimateTeam.tsx` (ut), 13 lines:
+  - the SBC reward pack's id (`'sbc:' + s.id + ':' + newId()`);
+  - the `picksFull` / `PICKS_FULL` import;
+  - the Scout's Choice purchase guard (handler and update);
+  - the pending-pick guard in `openPending`.
+
+### Protocol
+
+None. Stamps, picks, the confirm and the Store tile are economy and presentation.
 
 ## Requests (answers are recorded here as they arrive)
 

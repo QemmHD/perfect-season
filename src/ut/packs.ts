@@ -767,6 +767,19 @@ export function openPack(pool: Pool, kind: string, seed?: string, week = current
   return fill(pool, def.slots, rand, undefined, week, undefined, { ...opts, prefer: def.prefer });
 }
 
+/**
+ * Claude (packs-1 fix, review finding 6): whether this build knows a pending pack's kind (openPack can
+ * open it, or it is a pick or a registry pack). An unknown kind is a reward from a newer build: the Store
+ * labels it "New Pack · UPDATE TO OPEN" instead of a generic "Pack" that only explains itself on a tap.
+ */
+export function knownPack(sport: UtSport, kind: string): boolean {
+  if (kind === 'starter' || kind === 'scout' || kind === 'standout-pick' || kind === 'spotlight' || kind === 'admin-goat' || kind === 'admin-icon' || kind === 'admin-squad' || kind === 'admin-icon-team') return true;
+  if (['live-pick:', 'live:', 'live-plus:', 'event-spotlight:', 'admin-card:', 'studio:'].some((p) => kind.startsWith(p))) return true;
+  if (readPackSnapshot(kind)) return true;
+  if (kind.startsWith('position:')) return positionChoices(sport).some((c) => c.key === kind.slice(9));
+  return Object.prototype.hasOwnProperty.call(packDefs(sport), kind);
+}
+
 /** Claude (packs-1): why a pack this build can't open stays where it is (openPack throws it). */
 export const UNKNOWN_PACK = 'Update the game to open this pack. It stays in your Store until then.';
 

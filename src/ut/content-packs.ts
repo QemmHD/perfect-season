@@ -6,7 +6,7 @@ import { pickFor as bySport } from '../engine/sport';
 import { hashString, rng, shuffle } from '../engine/rng';
 import { easternDateKey } from '../engine/season';
 import { per, promosOn } from './calendar';
-import { claimed, contentOf, withClaim, withContent, type PickState } from './content-state';
+import { claimed, contentOf, picksFull, withClaim, withContent, type PickState } from './content-state';
 import { promoCards } from './live-cards';
 import { drawGold, ownedCardIds, packRand, SCOUT_STANDOUT } from './packs';
 import { positionMix } from './squad';
@@ -251,9 +251,13 @@ export function goldOptions(pool: Pool, floor: number, n: number, seed: string, 
  * returns the same state. front-office: 1 of 5 golds 80+; pick-82: 1 of 3 golds 82+; pick-84: 1 of 3
  * golds 84+; pick-85: 1 of 3 golds 85+; program-pick: 1 of 3 of the current program's released cards, or
  * a pick-82 when no program is live (and always in soccer, which has no Live Calendar yet).
+ * Claude (packs-1 fix): null when nothing can be awarded: the open pick sheets are full (PICKS_MAX; the
+ * normalizer would drop a 51st on the next load) or the pool has no option. The caller then writes no
+ * claim and keeps the reward claimable.
  */
-export function awardPick(ut: UtState, pool: Pool, kind: AwardPickKind, id: string, at: number): UtState {
+export function awardPick(ut: UtState, pool: Pool, kind: AwardPickKind, id: string, at: number): UtState | null {
   if (claimed(ut, 'pick:' + id) || contentOf(ut).picks?.some((p) => p.id === id)) return ut;
+  if (picksFull(ut)) return null;
   if (kind === 'program-pick') {
     const day = easternDateKey(new Date(at));
     const promo = promosOn(day)
@@ -270,7 +274,7 @@ export function awardPick(ut: UtState, pool: Pool, kind: AwardPickKind, id: stri
   }
   const g = GOLD_PICKS[kind];
   const options = goldOptions(pool, g.floor, g.n, kind + ':' + id, g.prefer ? ownedCardIds(ut.owned) : undefined);
-  if (!options.length) return ut;
+  if (!options.length) return null;
   return addPick(ut, { id, kind, title: g.title + ' · ' + fcToDisplay(g.floor, pool.sport) + '+', options: options.map((rc) => rc.line.id), at });
 }
 

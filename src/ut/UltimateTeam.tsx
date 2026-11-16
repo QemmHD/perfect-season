@@ -125,6 +125,8 @@ import {
   contentOf,
   isLocked,
   lockedSet,
+  PICKS_FULL,
+  picksFull,
   toggleLock,
   withClaim,
 } from './content-state';
@@ -660,6 +662,8 @@ export default function UltimateTeam(props: {
     const at = Date.now();
     if (buysLeft(ut, 'scout', day, at) <= 0)
       return onToast('Three Scout’s Choice picks a week. More next week.');
+    // Claude (packs-1 fix): a 51st open pick would be dropped on the next load, coins spent
+    if (picksFull(ut)) return onToast(PICKS_FULL);
     if (profile.coins < price) {
       sfx.nope();
       return onToast(
@@ -672,7 +676,7 @@ export default function UltimateTeam(props: {
     const pick = pickFor(pool, 'scout', id, week, at);
     sfx.coin();
     update((p) =>
-      p.coins < price || buysLeft(p.ut, 'scout', day, at) <= 0
+      p.coins < price || buysLeft(p.ut, 'scout', day, at) <= 0 || picksFull(p.ut)
         ? p
         : {
             ...p,
@@ -1038,6 +1042,14 @@ export default function UltimateTeam(props: {
     )
       return startPromo(pp.kind, 0, pp.id);
     // Claude: a reward Scout's Choice / Standout pick becomes a pick sheet (its id is the pack's)
+    // Claude (packs-1 fix): not while 50 picks are open (the pack stays waiting, nothing is lost)
+    if (
+      (pp.kind.startsWith('live-pick:') ||
+        pp.kind === 'scout' ||
+        pp.kind === 'standout-pick') &&
+      picksFull(ut)
+    )
+      return onToast(PICKS_FULL);
     // Claude wave 3: a Live Calendar program pick
     if (pp.kind.startsWith('live-pick:') && pool) {
       const pick = livePick(pool, pp.kind, pp.id, day, Date.now());
@@ -1205,8 +1217,9 @@ export default function UltimateTeam(props: {
           at: Date.now(),
         }
       : null;
+    // Claude (packs-1 fix): `sbc:` names an SBC reward pack (Scout Stamps: a trade-in earns none)
     const pack = s.reward.pack
-      ? { id: newId(), kind: s.reward.pack, at: Date.now() }
+      ? { id: 'sbc:' + s.id + ':' + newId(), kind: s.reward.pack, at: Date.now() }
       : null;
     update((p) => {
       const current = new Set(p.ut.owned.map((c) => c.uid));

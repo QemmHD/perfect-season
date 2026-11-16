@@ -474,3 +474,16 @@
   cursor: default;
   transform: none;
 }
+
+/* Claude (packs-1 fix): a pending pack from a newer build (packs.ts knownPack): it says it needs an update
+   before the tap, in the theme's gold, on two centred lines inside the 78px tile */
+.ut-mine-pack.ut-mine-new {
+  border-color: rgba(245, 184, 61, 0.55);
+}
+.ut-open.ut-update {
+  color: var(--gold);
+  letter-spacing: 0.5px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+}

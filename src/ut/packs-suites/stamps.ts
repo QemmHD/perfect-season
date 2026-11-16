@@ -11,12 +11,15 @@ import { freshProfile, PROFILE_KEYS } from '../../lib/profile';
 import { OPTIONAL_KEYS, RECOVERY_KEYS, validateSaveValues } from '../../lib/recovery';
 import { pickFor, SPORT } from '../../engine/sport';
 import { legacyNormalizeContent } from '../__fixtures__/legacy-content-state';
-import { normalizeContent, withClaim } from '../content-state';
+import { addDays } from '../calendar';
+import { awardPick } from '../content-packs';
+import { normalizeContent, PICKS_MAX, picksFull, withClaim } from '../content-state';
 import { packDefs } from '../packs';
 import { packsClaimables, STAMPS_READY } from '../packs-claimables';
 import { getPool, type Pool } from '../pool';
-import { recordPull, type PullInput } from '../pull-log';
-import { claimStamps, grantStamps, NOMINAL_PRICE, pullStampsFloor, STAMP_GRANT, STAMP_SHELF, STAMPS_FROM, stampsBalance, stampsToNext } from '../scout-stamps';
+import { recordPull, sourceOfPending, type PullInput } from '../pull-log';
+import { sbcsFor } from '../sbc';
+import { claimStamps, earnsNothing, grantStamps, NOMINAL_PRICE, priceStamps, pullStampsFloor, STAMP_GRANT, STAMP_SHELF, STAMPS_FROM, stampsBalance, stampsToNext } from '../scout-stamps';
 import { redeemStamps } from '../stamp-shelf';
 import { freshUt, migrateUt, type UtState } from '../state';
 import type { RatedCard } from '../types';
@@ -89,6 +92,49 @@ export function stampsSuite(): void {
         pack('gift:1', 'admin-icon', 0, 'reward'),
       ];
       for (const p of none) expect(stampsBalance(recordPull(freshUt(), p)), p.id).toBe(0);
+    });
+
+    // Claude (packs-1 fix, review finding 1): an SBC pack is paid for with cards, never coins
+    it('earns 0 for an SBC reward pack (sbc: and stream: ids), while a MINUTES or objective Silver still earns its Store price', () => {
+      const silver = Math.floor(packDefs(SPORT).silver.price / 100);
+      expect(silver).toBe(pickFor(SPORT, { nba: 5, nfl: 3, soccer: 4 }));
+      for (const id of ['sbc:u:2026-12-01:0:0:3f2a', 'sbc:cal:s1-gold:2026-12-01:9c1d', 'stream:' + SPORT + ':gold:2']) {
+        expect(sourceOfPending(id), id).toBe('sbc');
+        expect(stampsBalance(recordPull(freshUt(), pack(id, 'silver', 0, sourceOfPending(id)))), id).toBe(0);
+      }
+      // an SBC pack the special-duplicate bonus would otherwise pay for: still 0
+      const sp = specials[0];
+      const owned = { ...freshUt(), owned: [{ uid: 'old', cardId: sp.line.id, level: 1, xp: 0, at: 1 }] };
+      expect(stampsBalance(recordPull(owned, pack('sbc:w:1:3f2a', 'premium', 0, 'sbc', AT, [sp])))).toBe(0);
+      expect(stampsBalance(recordPull(freshUt(), pack('minutes:life:1h', 'silver', 0, sourceOfPending('minutes:life:1h'))))).toBe(silver);
+      expect(stampsBalance(recordPull(freshUt(), pack('objective:x', 'silver', 0, sourceOfPending('objective:x'))))).toBe(silver);
+    });
+
+    it('pace: a full day of SBCs pays no stamps (it paid about 100-120 a day at Store prices; target 50 every 3 days)', () => {
+      let before = 0;
+      let after = 0;
+      const n = 14;
+      const seen = new Set<string>();
+      for (let d = 0; d < n; d++) {
+        const day = addDays('2026-12-01', d);
+        for (const s of sbcsFor(pool, day)) {
+          // a weekly challenge is listed every day of its week: count it once
+          if (!s.reward.pack || seen.has(s.id)) continue;
+          seen.add(s.id);
+          const times = s.left ?? 1;
+          for (let k = 0; k < times; k++) {
+            // the pending id UltimateTeam gives an SBC reward pack, and the random id it had before
+            const id = 'sbc:' + s.id + ':' + k;
+            const e = { id, k: s.reward.pack, s: sourceOfPending(id), c: 0, at: AT, cs: [[golds[0].line.id, golds[0].ovr, 'gold']] as [string, number, 'gold'][] };
+            after += priceStamps(e);
+            expect(earnsNothing(e)).toBe(true);
+            before += priceStamps({ ...e, id: 'x' + k, s: 'reward' });
+          }
+        }
+      }
+      expect(after).toBe(0);
+      // the measured problem is real on this catalogue: SBC packs alone paid more than the plan's pace
+      expect(before / n).toBeGreaterThan(50 / 3);
     });
 
     it('adds 10 for each special edition the player already had, and only then', () => {
@@ -169,6 +215,25 @@ export function stampsSuite(): void {
       expect(redeemStamps(r, pool, 'g82', 'u1', '2026-12-01', at)).toBe(r);
       expect(redeemStamps(r, pool, 'g82', 'u2', '2026-12-01', at)).toBeNull();
       expect(r.content!.claims!.slice(-1)).toEqual(['stamps:g82:50:u1']);
+    });
+  });
+
+  // Claude (packs-1 fix, review finding 5): the normalizer keeps PICKS_MAX open picks, so a 51st is refused
+  describe('Scout Stamps: a full pick list (' + SPORT + ')', () => {
+    it('with 50 picks open, redeeming spends nothing and awardPick returns null', () => {
+      const picks = Array.from({ length: PICKS_MAX }, (_, i) => ({ id: 'scout:' + i, kind: 'scout', title: 'S', options: [golds[0].line.id, golds[1].line.id, golds[2].line.id], at: 1 }));
+      const base = grantStamps(freshUt(), 50, 'other', 'full');
+      const full: UtState = { ...base, content: { ...base.content, picks } };
+      expect(picksFull(full)).toBe(true);
+      expect(redeemStamps(full, pool, 'g82', 'u1', '2026-12-01', AT)).toBeNull();
+      expect(stampsBalance(full)).toBe(50);
+      expect(awardPick(full, pool, 'front-office', 'fo', AT)).toBeNull();
+      expect(awardPick(full, pool, 'program-pick', 'pp', AT)).toBeNull();
+      // one fewer: it goes through, and the 50th pick survives the normalizer
+      const room: UtState = { ...full, content: { ...full.content, picks: picks.slice(1) } };
+      const r = redeemStamps(room, pool, 'g82', 'u1', '2026-12-01', AT)!;
+      expect(stampsBalance(r)).toBe(0);
+      expect(normalizeContent(JSON.parse(JSON.stringify(r.content)))!.picks!.map((p) => p.id)).toContain('stamps:g82:u1');
     });
   });
 
