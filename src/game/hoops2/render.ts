@@ -17,7 +17,7 @@ import type { Pose } from '../pixel/rig';
 import { AT_RIM, type Anim, animOf, dribbleArm, hangOf, lookFor, type Memo, spins360 } from '../pixel/select-nba';
 import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import { type Juice, squashStretch } from '../juice';
-import { ballPos, contestOf, JUMPER_TOP, RIM, RIM_H, shotChance, topSpeed } from './engine';
+import { ballPos, contestOf, RIM, RIM_H, shotChance, topSpeed } from './engine';
 import { catchChance } from './autopilot';
 import { type Cam3, CAM, camOf, camStart, camStep, type CamState, depthOf, facingIndex, guardOf, pitchAt, project, type SafeBox, screenToCourt, subjectOf, yawFor } from './camera';
 import { drawCourtFloor } from './floor';

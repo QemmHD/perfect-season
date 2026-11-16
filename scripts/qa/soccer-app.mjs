@@ -1,6 +1,6 @@
-// Soccer in the app, end to end in Chromium (Claude, 2026-11-01). Needs the dev server and the local
-// relay (docs/BROWSER-QA.md):
-//   PS_QA_URL=http://localhost:5193/ node scripts/qa/soccer-app.mjs [all|switch|draft|arcade|ut|widths]
+// Soccer in the app, end to end in Chromium (Claude, 2026-11-01). Needs the dev server (the local
+// relay runs in this process):
+//   PS_QA_URL=http://localhost:5193/ node scripts/qa/soccer-app.mjs [all|switch|draft|arcade|ut|quit|widths]
 // - switch: an NBA player switches to SOCCER on Home (the reload model), the other sports' saves untouched
 // - draft:  a Classic soccer draft (eight spots on the pitch) → the 38-game W-D-L season → the cup (simulated
 //           rounds with GameCast) → results (W-D-L, points)
@@ -8,14 +8,20 @@
 //           (?autoplay), to the result
 // - ut:     a fresh Ultimate Team: starter pack → squad on the pitch (formation switch) → a Squad Battles
 //           match (autoplay) → Store (no Spotlight)
-// - widths: Home, draft, UT Home/Squad/Store at 430, 390 and 320
+// - widths: Home, draft, UT Home/Squad/Store on the six soccer presets (scripts/soccer/qa-isolate.mjs)
 // Every flow fails on a page error. Screenshots go to PS_QA_ARTIFACTS (default /tmp/perfect-season-qa).
+// Studio overhaul soccer-1 (2026-11-10): every context is isolated (live hosts aborted and counted)
+// and the head-to-head relay runs in this process on 7777 (scripts/soccer/relay.mjs: it waits for a
+// busy port, never falls back to a live relay).
 import assert from 'node:assert/strict';
 import { base, fixture, launch, shot } from './browser.mjs';
+import { blockedLine, insets, isolateBrowser, PRESETS } from '../soccer/qa-isolate.mjs';
+import { startRelay } from '../soccer/relay.mjs';
 
 const which = process.argv[2] ?? 'all';
 const run = (k) => which === 'all' || which === k;
-const browser = await launch();
+const relay = await startRelay();
+const browser = isolateBrowser(await launch());
 const report = {};
 const wait = (page, ms) => page.waitForTimeout(ms);
 const noErrors = (errors, what) => assert.deepEqual(errors, [], what + ': page errors');
@@ -249,9 +255,94 @@ if (run('ut')) {
   await context.close();
 }
 
+// soccer-2 review fix: solo QUIT through the real hosts (ut contract B), never the lab's stub.
+// A UT Squad Battle and a draft 1 vs 1, both played (no ?autoplay, so the pause button shows), paused,
+// QUIT MATCH → QUIT: the match settles as a loss in the host (ut record l+1; the draft's vs.won false).
+async function quitMatch(page, tag) {
+  await page.locator('.sc2').waitFor({ timeout: 60000 });
+  await page.locator('.sc2-ctl.go').waitFor({ timeout: 30000 });
+  await page.locator('.sc2-ctl.go').click();
+  await wait(page, 2500);
+  await page.getByRole('button', { name: /pause/i }).first().click();
+  await wait(page, 600);
+  await shot(page, tag + '-paused');
+  const sheet = await page.locator('.sc2-sheet').innerText();
+  assert.match(sheet, /QUIT MATCH/);
+  assert.doesNotMatch(sheet, /FORFEIT/);
+  await page.getByRole('button', { name: 'QUIT MATCH' }).click();
+  await wait(page, 400);
+  await shot(page, tag + '-quit-confirm');
+  await page.getByRole('button', { name: 'QUIT', exact: true }).click();
+  return sheet;
+}
+if (run('quit')) {
+  const { page, errors, context } = await fixture(browser, 'soccer', 'Claude QA', 393, { viewport: { width: 393, height: 852 }, hasTouch: true, isMobile: true });
+  await insets(context, [59, 0, 34, 0]);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await wait(page, 2000);
+  // UT Squad Battles, rung 1
+  await page.getByRole('button', { name: /Ultimate Team:/ }).click();
+  await page.locator('.ut-tabs').waitFor({ timeout: 60000 });
+  await wait(page, 1200);
+  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')).ut.record ?? { w: 0, l: 0 });
+  // soccer-2 re-review: a quit pays nothing (coins, card XP, paid slot, Season XP, objective games)
+  const purse = () => page.evaluate(() => { const p = JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')); const u = p.ut; const days = u.hq?.days ?? {}; return { coins: p.coins, paid: u.paid?.n ?? 0, xp: (u.owned ?? []).reduce((s, o) => s + (o.xp ?? 0) + 1000 * (o.level ?? 0), 0), games: Object.values(days).reduce((s, d) => s + (d.games ?? 0), 0), sp: Object.values(u.hq?.seasons ?? {}).reduce((s, x) => s + (x.xp ?? 0), 0) }; });
+  const paid0 = await purse();
+  await page.locator('.ut-tabs button', { hasText: 'PLAY' }).first().click();
+  await wait(page, 800);
+  await page.locator('.play-mode').filter({ hasText: 'SQUAD BATTLES' }).first().click();
+  await wait(page, 1200);
+  await page.getByRole('button', { name: /^Rung 1:/ }).click();
+  await wait(page, 1500);
+  const go = page.getByRole('button', { name: /^PLAY/ }).last();
+  if (await go.isVisible().catch(() => false)) await go.click();
+  await page.locator('.vote-opt.play').waitFor({ timeout: 60000 });
+  await page.locator('.vote-opt.play').click();
+  await page.locator('.arc-kick button.shine').waitFor({ timeout: 60000 });
+  await page.locator('.arc-kick button.shine').click();
+  await quitMatch(page, 'soccer-quit-ut');
+  await page.getByRole('heading', { name: /WIN|LOSS/, exact: true }).waitFor({ timeout: 30000 });
+  const head = await page.getByRole('heading', { name: /WIN|LOSS/, exact: true }).innerText();
+  await wait(page, 1500);
+  await shot(page, 'soccer-quit-ut-result');
+  const after = await page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')).ut.record);
+  assert.equal(head, 'LOSS');
+  assert.equal(after.l, (before.l ?? 0) + 1);
+  assert.equal(after.w, before.w ?? 0);
+  const paid1 = await purse();
+  assert.deepEqual(paid1, paid0);
+  report.quitUt = { head, before, after, purse: [paid0, paid1] };
+  // the draft: a 1 vs 1 against the AI, played
+  await page.goto(page.url().split('#')[0], { waitUntil: 'domcontentloaded' });
+  await wait(page, 2000);
+  const back = page.getByRole('button', { name: /Back|HOME/ }).first();
+  if (!(await page.locator('.playbar').count()) && (await back.isVisible().catch(() => false))) await back.click();
+  await page.getByRole('button', { name: /Head to Head|1 vs 1/i }).first().click();
+  await page.locator('.playbar button').first().click();
+  await page.getByRole('button', { name: /PLAY THE AI NOW/ }).click({ timeout: 20000 });
+  await wait(page, 3000);
+  await draft(page, 'soccer-quit-1v1');
+  await page.locator('.arc-kick button.shine').waitFor({ timeout: 60000 });
+  await page.locator('.arc-kick button.shine').click();
+  await quitMatch(page, 'soccer-quit-1v1');
+  await page.locator('.vs-head').waitFor({ timeout: 30000 });
+  await wait(page, 1500);
+  await shot(page, 'soccer-quit-1v1-result');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('perfect-season:profile:soccer:v1')));
+  const last = saved.history[saved.history.length - 1];
+  assert.equal(last.mode, '1v1');
+  assert.equal(last.vs.won, false);
+  report.quitDraft = { won: last.vs.won, playoff: last.playoff };
+  noErrors(errors, 'quit');
+  await context.close();
+}
+
 if (run('widths')) {
-  for (const width of [430, 390, 320]) {
-    const { page, errors, context } = await fixture(browser, 'soccer', 'Claude QA', width, width === 320 ? { viewport: { width: 320, height: 568 } } : width === 430 ? { viewport: { width: 430, height: 932 } } : {});
+  for (const p of PRESETS) {
+    const width = p.tag;
+    const { page, errors, context } = await fixture(browser, 'soccer', 'Claude QA', p.w, { viewport: { width: p.w, height: p.h }, hasTouch: true, isMobile: true });
+    await insets(context, p.insets);
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await wait(page, 1500);
     await shot(page, 'soccer-w' + width + '-home');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
@@ -281,4 +372,6 @@ if (run('widths')) {
 }
 
 await browser.close();
-console.log(JSON.stringify({ base, ...report }, null, 1));
+await relay.close();
+console.log(JSON.stringify({ base, ...report, relay: relay.stats }, null, 1));
+console.log(blockedLine());

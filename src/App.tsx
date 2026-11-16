@@ -623,7 +623,7 @@ export function App() {
     season: TeamRating,
     bracket: Series[] | null,
     bot: { lineup: DraftState['botLineup']; rating: TeamRating } | null,
-    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; pens?: Pens; quit?: boolean }
+    arcade?: { us: number; them: number; how: 'played' | 'sim'; takenOver: boolean; tookMe: boolean; pens?: Pens; forfeit?: 'us' | 'them' }
   ) => {
     const draft = r.draft!;
     const p0 = profileRef.current;
@@ -633,12 +633,13 @@ export function App() {
     const oppKey = r.online?.found.opp.pubkey;
     // both phones lost each other and let the AI finish: nobody gets the result
     const noContest = !!r.online && droppedRef.current && !!opp?.tookOver;
-    const forfeit = r.online && droppedRef.current && !noContest ? ('them' as const) : undefined;
+    // soccer-2: a played match forfeited online (or quit against the AI) decides it, whatever the score
+    const forfeit = r.online && !noContest && arcade?.forfeit !== 'us' && (droppedRef.current || arcade?.forfeit === 'them') ? ('them' as const) : undefined;
     const byRating = bot ? (season.rating > bot.rating.rating ? true : season.rating < bot.rating.rating ? false : null) : null;
     // a played game: the score decides, a tie goes to the better team
     // soccer (Claude 2026-11-01): a level match was settled on penalties
-    const byGame = arcade ? (arcade.us > arcade.them ? true : arcade.us < arcade.them ? false : arcade.pens ? arcade.pens.won : byRating) : null;
-    const vsWon = noContest ? null : forfeit ? true : arcade?.quit ? false : arcade ? byGame : byRating;
+    const byGame = arcade ? (arcade.forfeit ? arcade.forfeit === 'them' : arcade.us > arcade.them ? true : arcade.us < arcade.them ? false : arcade.pens ? arcade.pens.won : byRating) : null;
+    const vsWon = noContest ? null : forfeit ? true : arcade ? byGame : byRating;
     const g = gradeFor(season.wins);
     const out = bracket ? playoffOutcome(bracket) : null;
     const rewards = rewardsFor({ wins: season.wins, seriesWon: out ? out.seriesWon : 0, title: !!po?.title, mode: r.mode, vsWon: bot ? vsWon : null, botLevel: r.botLevel, rankedDaily: r.ranked, vsName: oppName });
@@ -702,7 +703,7 @@ export function App() {
         return p.primedFrom ? { s, id: p.id, pr: p.primedFrom.cellId } : { s, id: p.id };
       }),
       vs: bot ? { won: vsWon, botWins: bot.rating.wins, botLevel: r.botLevel } : undefined,
-      online: oppName ? { opp: oppName, forfeit } : undefined,
+      online: oppName ? { opp: oppName, forfeit: arcade?.forfeit === 'us' ? ('you' as const) : forfeit } : undefined,
       draft: review
         ? {
             picks: review.picks.map((p) => (p.grade === 'good' ? 'o' : p.grade.charAt(0))).join(''),
@@ -1107,11 +1108,12 @@ export function App() {
           onTakeover={(k) => matchRef.current?.update((s) => ({ ...s, arcadeTook: k }))}
           feedback={profile.settings}
           onFeedback={(k, v) => update((p) => ({ ...p, settings: { ...p.settings, [k]: v } }))}
-          onFinish={(us, them, how, took, pens, quit) => {
+          onFinish={(us, them, how, took, pens, ff) => {
             const season = playSeason(d.lineup);
             const botRating = rateTeam(SLOTS.map((s) => d.botLineup[s]));
-            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us, pens, quit: quit === 'us' });
+            finish(r, season, null, { lineup: d.botLineup, rating: botRating }, { us: us.score, them: them.score, how, takenOver: took.them, tookMe: took.us, pens, forfeit: ff });
           }}
+          onQuit={(us, them) => finish(r, playSeason(d.lineup), null, { lineup: d.botLineup, rating: rateTeam(SLOTS.map((s) => d.botLineup[s])) }, { us: us.score, them: them.score, how: 'sim', takenOver: false, tookMe: false, forfeit: 'us' })}
         /></React.Suspense>
       </div>
     );

@@ -3,7 +3,10 @@
 // `vite` dev (main.tsx gates the import on import.meta.env.DEV), so the card data never reaches the
 // production bundle. Parameters: home=BAR&hs=2015&away=RMA&as=2017 (club codes and seasons), seed,
 // auto (autopilot), slowmo, attacks=N, scenario=corner (deal only that), pens (straight to
-// penalties), tie (the rival's score made level), def=-0.5..1 (difficulty), qa (window.__soccer).
+// penalties), tie (the rival's score made level), def=-0.5..1 (difficulty), qa (window.__soccer),
+// start=x,y (the man on the ball starts there, pitch metres: x 0-68 across, y up to the goal at 105),
+// online (the pause sheet offers FORFEIT, not QUIT). Soccer-2 (2026-11-16): QUIT and FORFEIT are
+// stubs that record what they were given on window.__quit / window.__forfeit.
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Progress } from '../progress';
 import { soccerKits } from './kits';
@@ -39,6 +42,8 @@ export default function SoccerLab() {
   const rivalScore = q.has('tie') && mine?.done ? mine.score : ai.ends.slice(0, n).filter((e) => e === 'G').length;
   const rival = { name: teams.them.abbr, score: rivalScore, drive: n, done: n >= total };
   const sc = q.get('scenario') as Scenario | null;
+  const at = (q.get('start') ?? '').split(',').map(Number);
+  const start = at.length === 2 && at.every(Number.isFinite) ? { x: at[0], y: at[1] } : undefined;
   return (
     <div className="screen" style={{ paddingTop: 0, paddingBottom: 0 }}>
       <Soccer2
@@ -54,16 +59,20 @@ export default function SoccerLab() {
         autoplayHook={q.has('auto')}
         timeScale={Number(q.get('slowmo') ?? 1)}
         forceShootout={q.has('pens')}
+        start={start}
         debug={
           q.has('qa')
-            ? (a, m, ui) => {
-                (window as unknown as { __soccer: unknown }).__soccer = { a, m, ui };
+            ? (a, m, ui, view) => {
+                (window as unknown as { __soccer: unknown }).__soccer = { a, m, ui, view };
               }
             : undefined
         }
         onProgress={setMine}
         onDone={setMine}
         onShootout={(r) => ((window as unknown as { __pens: unknown }).__pens = r)}
+        online={q.has('online')}
+        onQuit={(p) => void ((window as unknown as { __quit: unknown }).__quit = { us: p, them: ai })}
+        onForfeit={(p) => void ((window as unknown as { __forfeit: unknown }).__forfeit = p)}
       />
       <span hidden data-progress={JSON.stringify(mine)} />
     </div>

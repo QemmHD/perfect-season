@@ -96,6 +96,9 @@ export interface Body {
   /** the way he faces (unit), for the drawing and the first touch */
   fx: number;
   fy: number;
+  /** render only (the players' action contract, docs/studio-overhaul/soccer.md §5.5): what his last
+   * kick or throw was. The engine writes it and never reads it. */
+  passKind?: PassKind | 'cross' | 'throw' | 'loftedThrough';
 }
 
 export type PassKind = 'ground' | 'lofted' | 'through';
@@ -116,8 +119,9 @@ export interface Ball {
   owner: number | null;
   /** who touched it last, and how */
   last: number | null;
-  /** what it is doing in flight */
-  flight: null | { kind: PassKind | 'shot' | 'cross' | 'parry' | 'clear'; from: number; to: number | null; at: number };
+  /** what it is doing in flight; `bounces`: how often it has bounced since (a shot or parry that has
+   * bounced twice is a loose ball again: engine.ts deadShot) */
+  flight: null | { kind: PassKind | 'shot' | 'cross' | 'parry' | 'clear' | 'throw'; from: number; to: number | null; at: number; bounces?: number };
 }
 
 /** SHOOT held: the power meter. top is where the green slice sits (seconds after the press). */
@@ -191,7 +195,7 @@ export interface Attack {
   /** a shot waiting to be struck: the leg swings, the ball goes at `at` */
   strike: null | { at: number; by: number; vx: number; vy: number; vh: number; curl: number; dip: number; info: ShotInfo };
   /** a pass waiting to be struck */
-  kick: null | { at: number; by: number; to: number | null; kind: PassKind | 'cross'; vx: number; vy: number; vh: number; curl: number };
+  kick: null | { at: number; by: number; to: number | null; kind: PassKind | 'cross' | 'throw'; vx: number; vy: number; vh: number; curl: number; /** a person's lofted through ball (THRU held; render only) */ loftedThrough?: true };
   /** the free ball's predicted path (a point every 1/30 s), for runs onto it and the keeper */
   path: { t: number; x: number; y: number; h: number; v: number }[] | null;
   /** when that path starts (attack time) */
@@ -215,4 +219,8 @@ export interface Attack {
   passStick?: Pt | null;
   /** a penalty's keeper told which way to go (a person keeping in a shootout): -1 left, 0 stay, 1 right */
   guess?: number;
+  /** restarts earned in this attack (R-2: a corner off a defender or a parry, a quick throw-in), at
+   * most RESTARTS.max; and the latest one's kind (a corner's marking and headers apply after it) */
+  restarts?: number;
+  restart?: 'corner' | 'throw';
 }

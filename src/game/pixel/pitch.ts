@@ -34,7 +34,7 @@ const Y0 = -4;
 const Y1 = 116;
 
 /** Is (x, y) on a marking? Lines are drawn 0.22 m wide so they survive the distance. */
-function onLine(x: number, y: number): boolean {
+export function onLine(x: number, y: number): boolean {
   const w = 0.11;
   const near = (v: number, at: number) => Math.abs(v - at) < w;
   const inX = (a: number, b: number) => x >= a - w && x <= b + w;

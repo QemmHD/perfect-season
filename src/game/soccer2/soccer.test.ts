@@ -3,7 +3,7 @@
 import cardsText from '../../data/cards-soccer.json?raw';
 import { describe, expect, it } from 'vitest';
 import { autoplayAttack, decide, pilot } from './autopilot';
-import { CLOCK, groundSpeedFor, GX, kickOff, loftVelocity, pass, PL, pressShoot, releaseShoot, setupAttack, shotVelocity, step, stepBall, TOP, tracePath } from './engine';
+import { groundSpeedFor, GX, kickOff, loftVelocity, pass, PL, pressShoot, releaseShoot, setupAttack, shotVelocity, step, stepBall, TOP, tracePath } from './engine';
 import { autoplayMatch, dealOf, newMatch, recordAttack, totalOf } from './match';
 import { clubSquad, gkDive, gkReaction, greenHalf, passError, rateSoccerLine, rt, shotCone, soccerLines, squadFrom, tackleWin, topSpeed, type SoccerCardsFile } from './ratings';
 import { newShootout, recordKick, simShootout, score, takers } from './shootout';
@@ -201,7 +201,11 @@ describe('ratings decide attacks', () => {
       });
     const elite = goals(95);
     const poor = goals(55);
-    expect(elite).toBeGreaterThan(poor + 0.12);
+    // (studio overhaul soccer-1, R-2: the margin was +0.12; part of it was the elite finisher's
+    // on-target shots parried into the keeper's own net, the bug R-2 fixes. soccer-4 refits the SHO
+    // curve: plan S1/S6)
+    expect(elite).toBeGreaterThan(poor + 0.1);
+    expect(elite).toBeGreaterThan(poor * 2.5);
   });
   it('an elite keeper saves more of the same shots', () => {
     const saved = (v: number) =>
@@ -266,7 +270,9 @@ describe('determinism and safety', () => {
         autoplayAttack(a, (i % 4) / 3, 'q' + i);
         expect(a.end, sc + i).not.toBeNull();
         expect(finite(a), sc + i).toBe(true);
-        expect(a.t).toBeLessThan(CLOCK * 3 + 31);
+        // within its clock and a little more for set pieces and shots in the air (studio overhaul
+        // soccer-1: this allowed the 120 s hard stop, which a dead "shot" used to hang on: R-1)
+        expect(a.t, sc + i).toBeLessThan(a.clock + 15);
         seen.add(a.end!.kind);
       }
     expect([...seen].every((k) => 'GSWBLOT'.includes(k))).toBe(true);

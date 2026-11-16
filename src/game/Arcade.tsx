@@ -12,7 +12,7 @@ import type { BotLevel, Lineup, Player } from '../engine/types';
 import { sfx } from '../lib/sound';
 import { type Attrs, loadAttrs } from './attrs';
 import { aiDrives2, aiDrivesOf, Football2 } from './football2/Football2';
-import type { RivalLive } from './progress';
+import { awarded, canForfeit, forfeitedBy, type RivalLive, settleInputs, wireOf } from './progress';
 import { WaitLine } from './Wait';
 import { DRIVES } from './football2/drive';
 import { offenseOf } from './football2/squad';
@@ -34,8 +34,8 @@ const FOOTBALL = pick({ nba: false, nfl: true, soccer: false });
 const POINTS: Record<string, number> = pick<Record<string, number>>({
   nba: { '2': 2, '3': 3, A: 3, X: 0, TO: 0 },
   nfl: { TD: 7, FG: 3, MISS: 0, INT: 0, DOWNS: 0, PUNT: 0, FUM: 0, SAF: 0, TIME: 0 },
-  // soccer: a goal, or saved, wide, blocked, lost, offside, time (soccer2/match.ts)
-  soccer: { G: 1, S: 0, W: 0, B: 0, L: 0, O: 0, T: 0 },
+  // soccer: a goal, or saved, wide, blocked, lost, offside, time (soccer2/match.ts); 'FF' a forfeited attack (soccer-2)
+  soccer: { G: 1, S: 0, W: 0, B: 0, L: 0, O: 0, T: 0, FF: 0 },
 });
 /** drives, possessions or attacks each (soccer: six and one in stoppage time) */
 const TOTAL = pick({ nba: POSSESSIONS, nfl: DRIVES, soccer: 7 });
@@ -166,9 +166,9 @@ export const Arcade = forwardRef(function Arcade({
   onProgress: (p: Progress) => void;
   /** this phone let the AI finish the rival's drives from drive `k` on: tell the other phone */
   onTakeover: (k: number) => void;
-  /** `pens`: soccer, a level match settled on penalties; `forfeit`: 'us' when this phone quit (a loss) */
-  onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens, forfeit?: 'us') => void;
-  /** offline quit from the pause menu (contract C4; football so far): the host decides what leaving means */
+  /** `pens`: soccer, a level match settled on penalties; `forfeit`: who forfeited ('us': this phone quit or forfeited, a loss whatever the score) */
+  onFinish: (us: Progress, them: Progress, how: 'played' | 'sim', took: { them: boolean; us: boolean }, pens?: Pens, forfeit?: 'us' | 'them') => void;
+  /** a solo match quit from the pause sheet (ut contract B / nfl C4), with what was played and the AI's: the host decides what leaving means */
   onQuit?: (us: Progress, them: Progress) => void;
   quitText?: string;
   /** the pause menu's sound and haptics switches (football so far) */
@@ -222,7 +222,7 @@ export const Arcade = forwardRef(function Arcade({
   const aiPlay = (rival: boolean, s: string, skill: number, a: (p: Player) => Attrs | null): Progress => {
     if (SOCCER) {
       const q = squads!;
-      return rival ? sg!.aiProgress(q.them, q.us, s, skill, defenseIQ) : sg!.aiProgress(q.us, q.them, s, skill, defenseIQ);
+      return rival ? sg!.aiProgressFor(q.them, q.us, s, skill, defenseIQ, { rival, online }) : sg!.aiProgressFor(q.us, q.them, s, skill, defenseIQ, { rival, online });
     }
     if (teams) {
       const t = teams;
@@ -307,15 +307,22 @@ export const Arcade = forwardRef(function Arcade({
     return { name: rivalName, score: pointsThrough(ai, n), drive: n, done: n >= TOTAL };
   }, [online, rivalLive, takeover, ai, mine, stallAt]);
 
-  const us: Progress | null = taken ?? (mine?.done ? mine : null);
-  const them: Progress | null = online ? (takeover ?? (rivalLive?.done ? rivalLive : null)) : ai;
+  // soccer's online forfeit (soccer-2; merge: nba-7's forfeit block does the same for every sport):
+  // a side that forfeits sends its attacks padded with 'FF' and done, and the match ends on both phones
+  const [forfeit, setForfeit] = useState<'us' | 'them' | null>(null);
+  const rivalFF = SOCCER && online && forfeitedBy(rivalLive);
+  useEffect(() => {
+    if (rivalFF && !forfeit) setForfeit('them');
+  }, [rivalFF]);
   const sent = useRef(false);
   const how = useRef<'played' | 'sim'>('played');
   // soccer: a level match goes to penalties. Online, sims and taken-over games use the shootout both
   // phones work out the same way (the host's eleven kicks first); a match played against the AI has
   // its shootout played out on the pitch (Soccer2's onShootout).
   const [pens, setPens] = useState<Pens | null>(null);
-  const level = SOCCER && !!us && !!them && us.score === them.score;
+  // the forfeit is read in this render (not from the state the effect above sets a commit later), so
+  // the phone that finished first and is waiting settles a rival forfeit as one (soccer-2 re-review)
+  const { ff, us, them, level, final } = settleInputs({ mine, rivalLive, forfeit, watchFF: SOCCER && online, online, taken, takeover, ai, soccer: SOCCER, pens });
   const agreed = useMemo(() => (SOCCER && sg && squads ? sg.agreedShootout(squads.us, squads.them, seed, online ? host : true) : null), [sg, squads]);
   const onPitch = !taken && how.current === 'played';
   useEffect(() => {
@@ -324,12 +331,13 @@ export const Arcade = forwardRef(function Arcade({
     setPens({ us: agreed.us, them: agreed.them, won: agreed.winner === 'us' });
   }, [level, pens, agreed, onPitch]);
   useEffect(() => {
-    if (sent.current || !us || !them) return;
-    if (level && !pens) return;
+    if (sent.current || !final) return;
     sent.current = true;
+    // a forfeit decides the match, whatever the score (soccer-2 fix): football's rule, 3-0 to the side left standing
+    const [u, t] = final;
     // the held arena reports at the whistle (its sheet comes up over the dimmed court)
-    window.setTimeout(() => onFinish(us, them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), hold ? 0 : level ? 2600 : 1600);
-  }, [us, them, pens]);
+    window.setTimeout(() => onFinish(u, t, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined, ff ?? undefined), hold ? 0 : level ? 2600 : 1600);
+  }, [us, them, pens, ff]);
 
   useImperativeHandle(
     ref,
@@ -340,6 +348,7 @@ export const Arcade = forwardRef(function Arcade({
         how.current = 'played';
         setMine(null);
         setPens(null);
+        setForfeit(null);
         setStage('play');
         setRound((r) => ({
           n: r.n + 1,
@@ -357,17 +366,50 @@ export const Arcade = forwardRef(function Arcade({
   const progress = (p: Progress) => {
     if (taken) return;
     setMine(p);
-    onProgress(p);
+    onProgress(wireOf(p));
+  };
+  // soccer, online: FORFEIT from the pause sheet (confirmed there): what was played, padded with 'FF' to TOTAL
+  // (refused once every attack is in: nothing is left to pad, so the other phone could never see it)
+  // (true when accepted: Soccer2 ends the match on its side only then)
+  const forfeitNow = (p: Progress): boolean => {
+    if (sent.current || ff || taken || mine?.done || !canForfeit(p, TOTAL)) return false;
+    const ends = p.ends.slice(0, TOTAL);
+    while (ends.length < TOTAL) ends.push('FF');
+    setForfeit('us');
+    progress({ ...p, ends, drive: TOTAL, done: true, forfeit: true });
+    return true;
+  };
+  // soccer, solo: QUIT from the pause sheet (confirmed there): the host decides what a quit means (ut contract B)
+  // A quit is a forfeit: the AI's attacks through the ones you played, and football's 3-0 award (soccer-2 fix)
+  const quitNow = (p: Progress): boolean => {
+    if (sent.current || !ai || !onQuit) return false;
+    sent.current = true;
+    const n = Math.min(TOTAL, p.ends.length);
+    const ends = p.ends.slice(0, TOTAL);
+    while (ends.length < TOTAL) ends.push('FF');
+    const so: Progress = { ...ai, score: pointsThrough(ai, n), drive: n, done: true, ends: ai.ends.slice(0, n) };
+    const [u, t] = awarded({ ...p, ends, drive: TOTAL, done: true, forfeit: true }, so, 'us');
+    onQuit(u, t);
+    return true;
   };
 
-  // offline Quit from the pause sheet (nba-2, NBA-09): the game ends now as a loss; the possessions
-  // you didn't play score nothing
+  // offline Quit from the pause sheet (nba-2, NBA-09; football through quitPair): the game ends now as
+  // a loss; the possessions you didn't play score nothing. A quitter is never shown ahead: if what was
+  // played already beats the AI's total, the forfeit's 3-0 award applies (progress.ts awarded).
+  // Wave 1: every sport's quit goes to the host's onQuit (a quit pays nothing in UT: ut/play.ts settle
+  // `quit`), falling back to a finished loss for hosts that pass none.
+  const quitPair = (p: Progress | null, rival: Progress): [Progress, Progress] => {
+    const played = p ?? { score: 0, drive: 0, done: false, ends: [] };
+    const ends = [...played.ends.slice(0, TOTAL), ...Array(Math.max(0, TOTAL - played.ends.length)).fill('X')];
+    const u: Progress = { ...played, drive: ends.length, done: true, ends };
+    return u.score < rival.score ? [u, rival] : awarded(u, rival, 'us');
+  };
   const quit = () => {
     if (sent.current || !ai) return;
     sent.current = true;
-    const played = mine ?? { score: 0, drive: 0, done: false, ends: [] };
-    const ends = [...played.ends, ...Array(Math.max(0, TOTAL - played.ends.length)).fill('X')];
-    onFinish({ ...played, drive: ends.length, done: true, ends }, ai, 'played', { them: false, us: false }, undefined, 'us');
+    const [u, t] = quitPair(mine, ai);
+    if (onQuit) onQuit(u, t);
+    else onFinish(u, t, 'played', { them: false, us: false }, undefined, 'us');
   };
 
   // sim: the autopilot plays your drives at a middling level
@@ -547,13 +589,16 @@ export const Arcade = forwardRef(function Arcade({
         rivalName={rivalName}
         seed={seed}
         defIQ={defenseIQ}
-        rival={shown}
+        rival={shown && rivalFF ? { ...shown, forfeit: true } : shown}
         kits={k}
         autoplayHook={autoplay}
         fixedShootout={online && agreed ? { first: agreed.first, scored: agreed.scored } : undefined}
+        online={online}
         onProgress={progress}
         onDone={progress}
         onShootout={(r) => setPens({ us: r.us, them: r.them, won: r.winner === 'us' })}
+        onQuit={!online && onQuit ? quitNow : undefined}
+        onForfeit={online ? forfeitNow : undefined}
       />
     );
   }
@@ -563,5 +608,5 @@ export const Arcade = forwardRef(function Arcade({
   }
   const k = kits ?? kitsFor(null, null, 'nfl');
   return <Football2 key={round.n} lineup={lineup} rivalLineup={rivalLineup} offense={teams?.offense} rivalDefense={teams?.rivalDefense} rivalName={rivalName} seed={seed} defIQ={defenseIQ} rival={shown} ourKit={k.mine as FootballKit} theirKit={k.theirs as FootballKit} field={k.field} autoplayHook={autoplay} onProgress={progress} onDone={progress}
-    online={online} quitText={quitText} onQuit={onQuit && !online ? (p) => onQuit(p, them ?? { score: 0, drive: 0, done: false, ends: [] }) : undefined} feedback={feedback} onFeedback={onFeedback} />;
+    online={online} quitText={quitText} onQuit={onQuit && !online ? (p) => { if (sent.current || !ai) return; sent.current = true; onQuit(...quitPair(p, ai)); } : undefined} feedback={feedback} onFeedback={onFeedback} />;
 });

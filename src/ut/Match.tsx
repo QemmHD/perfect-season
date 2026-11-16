@@ -211,6 +211,7 @@ const END_LABEL: Record<string, string> = pick({
     L: 'LOST',
     O: 'OFF',
     T: '·',
+    FF: 'FF',
   },
 });
 const END_POINTS: Record<string, number> = pick({
@@ -688,7 +689,8 @@ export default function UtMatch(props: {
     them: Progress,
     how: 'played' | 'sim',
     pens?: Pens,
-    forfeit?: 'us',
+    ff?: 'us' | 'them',
+    quit?: boolean,
   ) => {
     if (done.current || !setup || !pool) return;
     done.current = true;
@@ -701,11 +703,10 @@ export default function UtMatch(props: {
       return a !== b ? a > b : !!s.online?.host;
     };
     // soccer: a level match was settled on penalties (Arcade.tsx)
-    // quit from the pause sheet: a loss, whatever the score (nba-2)
-    const d =
-      forfeit === 'us'
-        ? { won: false, tiebreak: false }
-        : pens && us.score === them.score
+    // soccer-2: a forfeit (online, or a solo quit) decides the match whatever the score
+    const d = ff
+      ? { won: ff === 'them', tiebreak: false }
+      : pens && us.score === them.score
         ? { won: pens.won, tiebreak: true }
         : decide(
             us.score,
@@ -728,6 +729,7 @@ export default function UtMatch(props: {
         day: easternDateKey(),
         how,
         opponent: s.rival.name,
+        quit,
       };
       const shownD = settleDraft(ut, dIn);
       props.update((p) => ({ ...p, ut: settleDraft(p.ut, dIn).ut }));
@@ -775,6 +777,7 @@ export default function UtMatch(props: {
       packId: newId(),
       at: Date.now(),
       pay: s.rung && s.rung.i >= 0 ? s.level?.pay : undefined,
+      quit,
     };
     const shown = settle(ut, input);
     const beforeDivision = divisionOf(rivalsOf(ut.rivals, week).points),
@@ -785,7 +788,8 @@ export default function UtMatch(props: {
     const cardIds = s.me.wire.map((w) => w[1]);
     props.update((p) => {
       const r = settle(p.ut, input);
-      const evo = recordEvoMatch(r.ut, {
+      // a quit earns no Evolution progress either (soccer-2 re-review)
+      const evo = quit ? r.ut : recordEvoMatch(r.ut, {
         matchId: input.matchId,
         won: d.won,
         played: input.played,
@@ -864,13 +868,14 @@ export default function UtMatch(props: {
           c1: '#9B7BFF',
           c2: '#5B3FD1',
         });
-        const us = sg.aiProgress(a, b, key(setup.me.wire), mine, defenseIQ);
-        const them = sg.aiProgress(
+        const us = sg.aiProgressFor(a, b, key(setup.me.wire), mine, defenseIQ, { rival: false, online: !!setup.online });
+        const them = sg.aiProgressFor(
           b,
           a,
           key(setup.rival.wire),
           theirs,
           defenseIQ,
+          { rival: true, online: !!setup.online },
         );
         const so =
           us.score === them.score
@@ -955,7 +960,8 @@ export default function UtMatch(props: {
           host={setup.online ? !!setup.online.host : true}
           onProgress={(p) => conn?.update((s) => ({ ...s, arcade: p }))}
           onTakeover={(k) => conn?.update((s) => ({ ...s, arcadeTook: k }))}
-          onFinish={(us, them, how, _took, pens, forfeit) => finish(us, them, how, pens, forfeit)}
+          onFinish={(us, them, how, _took, pens, ff) => finish(us, them, how, pens, ff)}
+          onQuit={(us, them) => finish(us, them, 'played', undefined, 'us', true)}
         />
       </div>
     );

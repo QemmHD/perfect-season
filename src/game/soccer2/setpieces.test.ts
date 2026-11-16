@@ -40,11 +40,14 @@ describe('soccer set pieces', () => {
     expect(r.all).toBeGreaterThan(0.06);
     expect(r.all).toBeLessThan(0.14);
   });
-  it('free kicks: about one direct free kick in ten goes in, 10-15% of free-kick attacks', () => {
+  it('free kicks: direct free kicks go in now and then, 6-15% of free-kick attacks', () => {
     const r = rate('freekick');
-    expect(r.all).toBeGreaterThan(0.08);
+    // (studio overhaul soccer-1, R-2: the floors were 8% of attacks and 5% of direct free kicks; about
+    // half of the direct goals were keepers parrying the kick into their own net, the bug R-2 fixes.
+    // soccer-7 refits free kicks to the plan's A12 (direct 6-11%) and restores these floors.)
+    expect(r.all).toBeGreaterThan(0.06);
     expect(r.all).toBeLessThan(0.17);
-    expect(r.fk).toBeGreaterThan(0.05);
+    expect(r.fk).toBeGreaterThan(0.02);
     expect(r.fk).toBeLessThan(0.15);
   });
   it('penalties go in about three times in four', () => {
