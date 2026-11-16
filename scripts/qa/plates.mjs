@@ -16,6 +16,11 @@
 //   pixels against the before phase's.
 // has (NBA heavy, 393): style-recalc time (CDP RecalcStyleDuration) of opening UT Club, with
 //   plates.css on and off, interleaved.
+// seams (393, standard player): the seam across the inset line (CIEDE2000 at x = 20/195/370, 1.5 pt
+//   above and below it), with every plate and with A alone, on the screens without a header (the real
+//   Draft; Playoffs, Welcome, Vote and Search as the real class over the Draft) and on the full-screen
+//   overlays drawn over a header screen (Champions, GameCast, Rivals promotion, sport switch over
+//   Home; the UT player pick over UT Home), each a synthetic element with the real class.
 // Output: <PS_QA_SHOTS>/shell-3/<phase>/plates-*.json and screenshots there.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,7 +34,7 @@ const opt = (name, fallback) => {
   return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : fallback;
 };
 const phase = opt('phase', 'ship');
-const parts = opt('parts', 'plates,h1,has').split(',');
+const parts = opt('parts', 'plates,h1,has,seams').split(',');
 const sports = opt('sports', 'nba,nfl,soccer').split(',');
 const h1Devices = opt('devices', '393,390,402,440,320').split(',');
 const runs = Math.max(1, +opt('runs', 5));
@@ -143,6 +148,90 @@ async function platesPart(browser, sport) {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.locator('.splash').waitFor({ timeout: 20000 });
     out.splash = (await platesAudit(page, dev)).status;
+  } catch (e) {
+    out.fail = e.message.split('\n')[0];
+  } finally {
+    out.errors = f.errors;
+    out.blocked = [...new Set(f.blocked)];
+    await f.context.close();
+  }
+  return out;
+}
+
+/** CIEDE2000 across the inset line at x = 20/195/370 (1.5 pt above against 1.5 pt below), and the plate's colour. */
+async function seamAt(page, t) {
+  const xs = [20, 195, 370];
+  const px = await readPixels(page, { points: xs.flatMap((x) => [[x, t - 1.5], [x, t + 1.5]]) });
+  const dE = xs.map((x, i) => r2(deltaE2000(px.points[i * 2], px.points[i * 2 + 1])));
+  const plate = await page.evaluate(() => {
+    const p = document.querySelector('.status-plate');
+    return p ? getComputedStyle(p).display + ' ' + getComputedStyle(p).backgroundColor : null;
+  });
+  return { plate, dE, max: Math.max(...dE), above: px.points[2], below: px.points[3] };
+}
+/** The seam with every plate (A + B + C) and with A alone. */
+async function seamBoth(page, t) {
+  const abc = await seamAt(page, t);
+  await platesOff(page, true);
+  await settle(page, 120);
+  const a = await seamAt(page, t);
+  await platesOff(page, false);
+  await settle(page, 300);
+  return { abc, a: { dE: a.dE, max: a.max } };
+}
+/** Append an element with these classes next to `near` (or into the stage), measure, remove it. */
+async function seamWith(page, t, cls, near) {
+  await page.evaluate(
+    ([cls, near]) => {
+      const host = (near && document.querySelector(near)?.parentElement) || document.querySelector('.stage') || document.getElementById('root');
+      const d = document.createElement('div');
+      d.className = cls;
+      d.id = '__ps-seam-probe';
+      host.append(d);
+    },
+    [cls, near]
+  );
+  await settle(page, 600);
+  const out = await seamBoth(page, t);
+  await page.evaluate(() => document.getElementById('__ps-seam-probe')?.remove());
+  await settle(page, 300);
+  return out;
+}
+
+async function seamsPart(browser, sport) {
+  const dev = '393',
+    d = DEVICES[dev],
+    t = d.insets[0];
+  const dir = path.join(OUT, 'seams-' + sport);
+  fs.mkdirSync(dir, { recursive: true });
+  const f = await fixture(browser, sport, 'Edge QA', d.w, ctxOpts, { insets: d.insets, height: d.h, standalone: true, dsf: 1, serialized: true });
+  const { page } = f;
+  const out = { sport, device: dev, headerless: {}, overlays: {} };
+  try {
+    await waitForHome(page);
+    await settle(page, 500);
+    out.home = await seamBoth(page, t);
+    // full-screen overlays over Home (a header screen)
+    for (const cls of ['champ', 'champ perfect', 'cast', 'promotion', 'sportfade nba']) out.overlays[cls] = await seamWith(page, t, cls, '.shell');
+    await page.screenshot({ path: path.join(dir, 'home.png') });
+    // the real Draft, reached with PLAY
+    await page.locator('.mode').filter({ hasText: /CLASSIC/i }).first().click();
+    await page.locator('.home .playbar button').click();
+    await page.locator('.screen.draft').waitFor({ timeout: 60000 });
+    await settle(page, 700);
+    out.headerless.draft = await seamBoth(page, t);
+    await page.screenshot({ path: path.join(dir, 'draft.png') });
+    await page.screenshot({ path: path.join(dir, 'draft-top.png'), clip: { x: 0, y: 0, width: d.w, height: 140 } });
+    // the other header-less screens: the real class laid over the Draft
+    for (const cls of ['screen playoffs', 'screen welcome', 'screen vote', 'screen search']) out.headerless[cls.split(' ')[1]] = await seamWith(page, t, cls, '.screen.draft');
+    // the UT player pick over UT Home (back Home first: the Draft has no UT entry)
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForHome(page);
+    await openUt(page);
+    await settle(page, 700);
+    await closeDialogs(page);
+    out.utHome = await seamBoth(page, t);
+    out.overlays['ut-pick-screen'] = await seamWith(page, t, 'ut-pick-screen', '.screen.ut');
   } catch (e) {
     out.fail = e.message.split('\n')[0];
   } finally {
@@ -374,6 +463,17 @@ try {
     });
     await Promise.all(workers);
     save('h1.json', all);
+  }
+  if (parts.includes('seams')) {
+    const all = [];
+    for (const s of sports) {
+      const r = await seamsPart(browser, s);
+      all.push(r);
+      failures += r.errors.length + (r.fail ? 1 : 0);
+      const row = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v.abc.max + ' (A ' + v.a.max + ')']));
+      console.log(JSON.stringify({ part: 'seams', sport: s, fail: r.fail, home: r.home && r.home.abc.max, ut: r.utHome && r.utHome.abc.max, headerless: row(r.headerless), overlays: row(r.overlays), errors: r.errors.length }));
+    }
+    save('seams.json', all);
   }
   if (parts.includes('has')) {
     const r = await hasPart(browser);

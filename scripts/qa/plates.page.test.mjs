@@ -26,6 +26,7 @@ const ruleOf = (css, selector) => {
 };
 const plates = read('src/shell/plates.css');
 const styles = read('src/styles.css');
+const voteCss = read('src/ui/vote.css');
 const nav = read('src/ut/nav.css');
 const tokens = Object.fromEntries([...plates.matchAll(/(--plate-[a-z-]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2]]));
 const rgbOf = (hex) => 'rgb(' + [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ') + ')';
@@ -52,6 +53,9 @@ ${headCss}
 ${plates}
 ${extraCss}
 </style></head><body>${plateTag}<div id="root"><div class="stage">${body}</div></div></body></html>`;
+
+// the header-less screens' and the overlays' own backgrounds, from the real CSS
+const screensCss = [ruleOf(styles, '.draft'), ruleOf(styles, '.playoffs'), ruleOf(styles, '.welcome'), ruleOf(styles, '.search'), ruleOf(voteCss, '.screen.vote'), ruleOf(styles, '.champ'), ruleOf(styles, '.cast')].join('\n');
 
 const mainShell = '<div class="shell"><div class="shell-top"><div class="topbar"><span>LEVEL 19</span></div></div><div class="shell-views"><p style="margin:0">first row</p></div></div>';
 const utScreen = (extra = '') => `<div class="screen ut"><div class="topbar ut-top"><span>CLUB</span></div><div class="ut-body" style="flex:1">body</div>${extra}</div>`;
@@ -136,9 +140,61 @@ describe.skipIf(!run)('status plate and header plates (real Chromium, static pag
     expect((await plate()).color).toBe(rgbOf(tokens['--plate-top-ut']));
   });
 
-  it('screens without a header get the app background, and the immersive screens get no plate at all', async () => {
-    await set('<div class="screen draft"></div>');
-    expect((await plate()).color).toBe('rgb(4, 18, 26)');
+  // CIEDE2000 across the inset line at x 20 / 195 / 370: y = 57 (the band) against y = 61 (the screen)
+  const seam = async () => {
+    const px = await page.screenshot({ clip: { x: 0, y: 56, width: 393, height: 6 } });
+    const cols = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = 'data:image/png;base64,' + b64;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      return [1, 5].map((y) => [20, 195, 370].map((x) => [...g.getImageData(x, y, 1, 1).data.slice(0, 3)]));
+    }, px.toString('base64'));
+    return Math.max(...[0, 1, 2].map((i) => deltaE2000(cols[0][i], cols[1][i])));
+  };
+  const setCss = async (body, css) => {
+    await page.setContent(page0(body, css));
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  };
+
+  it('screens without a header: the plate is transparent and the screen\'s own top runs through the inset line', async () => {
+    for (const cls of ['screen draft', 'screen playoffs', 'screen welcome', 'screen vote', 'screen search']) {
+      await setCss(`<div class="${cls}"></div>`, screensCss);
+      expect((await plate()).color, cls).toBe('rgba(0, 0, 0, 0)');
+      expect(await seam(), cls).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('a flat --bg plate on those screens drew a seam (the bug this guards)', async () => {
+    const old = 'html .status-plate{background-color:var(--bg)!important}';
+    for (const cls of ['screen draft', 'screen playoffs', 'screen welcome']) {
+      await setCss(`<div class="${cls}"></div>`, screensCss + old);
+      expect(await seam(), cls).toBeGreaterThan(2);
+    }
+  });
+
+  it('full-screen overlays over a header screen: the plate is transparent and the band shows the overlay', async () => {
+    for (const cls of ['champ', 'champ perfect', 'cast', 'promotion', 'sportfade nba']) {
+      await setCss(mainShell + `<div class="${cls}" style="position:absolute;inset:0;z-index:15"></div>`, screensCss);
+      expect((await plate()).color, cls).toBe('rgba(0, 0, 0, 0)');
+    }
+    await setCss(utScreen('<div class="ut-pick-screen"></div>'), '');
+    expect((await plate()).color).toBe('rgba(0, 0, 0, 0)');
+    // the real GameCast and Champions backgrounds: no seam across the inset line
+    for (const cls of ['cast', 'champ']) {
+      await setCss(mainShell + `<div class="${cls}"></div>`, screensCss);
+      expect(await seam(), cls).toBeLessThanOrEqual(2);
+    }
+    // and with no overlay the header screen keeps its opaque plate
+    await setCss(mainShell, screensCss);
+    expect((await plate()).color).toBe(rgbOf(tokens['--plate-top']));
+  });
+
+  it('the immersive screens get no plate at all', async () => {
     for (const cls of ['ut-open-screen', 'splash', 'vs-splash', 'screen reveal']) {
       await set(mainShell + `<div class="${cls}"></div>`);
       expect((await plate()).display, cls).toBe('none');
