@@ -1,5 +1,5 @@
 import { ArrowMark, DrillMark } from '../evolution/Marks';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { summarize } from '../engine/collection';
 import { BOOSTER_HELP, BOOSTER_NAMES, BOOSTER_PRICES, BOOSTER_UNLOCK_LEVEL, RESPIN_PRICE, levelInfo } from '../engine/economy';
 import { ROUNDS } from '../engine/draft';
@@ -22,6 +22,8 @@ import { FavoritesCard } from './Favorites';
 import { Crown, Football, Home as HomeIcon, Hoop, Lock, Ranks as RanksIcon, SoccerBall, Target, User } from './icons';
 import { FLOOR, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
 import { HomeMinutesChip, PlaytimePanel } from './playtime-ui';
+import { TabBadge } from './NextUpStrip';
+import './progress-links.css';
 
 // ut-3: the Minutes screen (RANKS → MINUTES) loads with its segment, never at first paint
 const MinutesView = React.lazy(() => import('./MinutesView'));
@@ -55,7 +57,9 @@ function SportSwitch({ onSport }: { onSport: (s: SportId) => void }) {
 export type Tab = 'home' | 'ranks' | 'profile';
 const TAB_ORDER: (Tab | 'ut')[] = ['home', 'ut', 'ranks', 'profile'];
 
-export function Tabs({ tab, onTab, onUltimate, utNew }: { tab: Tab; onTab: (t: Tab) => void; onUltimate?: () => void; utNew?: boolean }) {
+export function Tabs({ tab, onTab, onUltimate, utNew, utBadge }: { tab: Tab; onTab: (t: Tab) => void; onUltimate?: () => void; utNew?: boolean; utBadge?: { count: number; amber: boolean } | null }) {
+  // ut-4: the badge is UT HOME's Rewards count; the FREE tag shows only while nothing is counted
+  const badge = utBadge && utBadge.count > 0 ? utBadge : null;
   const items: [Tab | 'ut', string, React.ReactNode][] = [
     ['home', 'HOME', <HomeIcon size={22} />],
     ['ut', 'ULTIMATE TEAM', <UtMark />],
@@ -69,10 +73,15 @@ export function Tabs({ tab, onTab, onUltimate, utNew }: { tab: Tab; onTab: (t: T
         .filter(([k]) => k !== 'ut' || onUltimate)
         .map(([k, label, icon]) =>
           k === 'ut' ? (
-            <button key={k} className="tab-ut" onClick={onUltimate} aria-label={'Ultimate Team: ' + SPORT_NAME[SPORT] + ' packs, squads and challenges'}>
+            <button
+              key={k}
+              className="tab-ut"
+              onClick={onUltimate}
+              aria-label={'Ultimate Team: ' + SPORT_NAME[SPORT] + ' packs, squads and challenges' + (badge ? ', ' + badge.count + (badge.count === 1 ? ' reward' : ' rewards') + ' to claim' + (badge.amber ? ', a streak ends tonight' : '') : '')}
+            >
               {icon}
               <span>{label}</span>
-              {utNew && <i className="tab-new">FREE</i>}
+              {badge ? <TabBadge count={badge.count} amber={badge.amber} /> : utNew && <i className="tab-new">FREE</i>}
             </button>
           ) : (
             <button key={k} aria-current={tab === k ? 'page' : undefined} onClick={() => onTab(k)}>
@@ -149,6 +158,9 @@ export function HomePage(props: {
   checkpoint: {count: number; mode: string; screen: string; wins?: number; at: number} | null;
   /** ut-3: the Minutes ring chip opens RANKS → MINUTES */
   onMinutes: () => void;
+  /** ut-4: the "Next up" strip (NextUpStrip.tsx), drawn in the PLAY bar directly above PLAY. It takes
+   * the place of the one-line mode hint, so Home gains no height; Head to Head keeps its AI chips. */
+  nextUp?: React.ReactNode;
 }) {
   const [intro] = useState(() => !introPlayed);
   useEffect(() => {
@@ -157,6 +169,18 @@ export function HomePage(props: {
   const p = props.profile;
   // the rows that give way on shorter screens (styles.css "home")
   const { content } = useLayout();
+  // ut-4: with the "Next up" strip in the PLAY bar, a Home whose rows already overflow (Training Camp
+  // on a 393 x 852 iPhone) takes the snug mode tiles rather than hiding the last tiles behind the strip.
+  // Measured once per frame height; it only ever tightens, so it cannot flip back and forth.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [tight, setTight] = useState<number | null>(null);
+  const hasNext = !!props.nextUp;
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!hasNext || !el || tight === content || content < 620 || content >= 816) return;
+    if (el.scrollHeight - el.clientHeight > 1) setTight(content);
+  });
+  const snug = content < 730 || tight === content;
   const playLabel = p.mode === 'daily' ? (props.dailyDone ? 'PRACTICE DAILY' : 'PLAY DAILY #' + props.dailyNo) : p.mode === '1v1' ? (NET_ON ? 'FIND A MATCH' : 'PLAY THE BOT') : 'PLAY';
   // someone to play: another player with this sport open
   const live = props.online && props.online.here > 1;
@@ -175,8 +199,8 @@ export function HomePage(props: {
   // Claude (UI reorganisation): everything above the PLAY button scrolls when it can't fit (320x568
   // with a saved run used to push PLAY off the screen); PLAY itself never moves.
   return (
-    <div className={'page-view home' + (content < 620 ? ' short' : content < 730 ? ' snug' : '') + (content >= 816 ? ' tall' : '')}>
-      <div className="home-scroll">
+    <div className={'page-view home' + (content < 620 ? ' short' : snug ? ' snug' : '') + (content >= 816 ? ' tall' : '')}>
+      <div className="home-scroll" ref={scrollRef}>
         <h1 className={'logo' + (intro ? ' intro' : '')} aria-label="Perfect Season">
           <span className="disp l1" aria-hidden="true">
             {letters('PERFECT', 80)}
@@ -242,7 +266,7 @@ export function HomePage(props: {
             </button>
           ))}
         </div>
-        <div className="under" key={p.mode}>
+        {(p.mode === '1v1' || !props.nextUp) && <div className="under" key={p.mode}>
           {p.mode === '1v1' ? (
             <>
               <span className="eyebrow">{NET_ON ? 'AI backup' : 'AI'}</span>
@@ -259,10 +283,11 @@ export function HomePage(props: {
           ) : (
             <span>1 free team respin and 1 free decade respin every draft.</span>
           )}
-        </div>
+        </div>}
         <div className="spacer" />
       </div>
       <div className="playbar">
+        {props.nextUp}
         <button className="big shine" onClick={props.onPlay}>
           <Fit text={playLabel} />
         </button>
@@ -406,7 +431,19 @@ function BoostersSection(props: { profile: Profile; onBuy: (b: Booster) => void 
   );
 }
 
-export function ProfilePage(props: { profile: Profile; onName?: () => void; onBinder: () => void; onFavs?: () => void; onBuy: (b: Booster) => void; onUltimate?: () => void; onMinutes?: () => void }) {
+export function ProfilePage(props: {
+  profile: Profile;
+  onName?: () => void;
+  onBinder: () => void;
+  onFavs?: () => void;
+  onBuy: (b: Booster) => void;
+  onUltimate?: () => void;
+  onMinutes?: () => void;
+  /** ut-4 (audit H5): Ultimate Team's next best action; the card leads there */
+  utNext?: { line: string; done?: boolean; onGo: () => void } | null;
+  /** ut-4: a player with no drafts yet starts one from their empty history */
+  onDraft?: () => void;
+}) {
   const p = props.profile;
   const lv = levelInfo(p.xp);
   const best = bestRuns(p.history, 'all', 1)[0];
@@ -458,7 +495,7 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
           ))}
         </div>
         {props.onUltimate && (
-          <button className="profile-ut rise-in" onClick={props.onUltimate} aria-label="Open Ultimate Team">
+          <button className="profile-ut rise-in" onClick={props.utNext?.onGo ?? props.onUltimate} aria-label={'Open Ultimate Team' + (props.utNext ? ': ' + props.utNext.line : '')}>
             <span className="profile-ut-mark" aria-hidden="true">
               <UtMark />
             </span>
@@ -478,6 +515,11 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
                   <b className="num">{p.ut.packsOpened}</b> {p.ut.packsOpened === 1 ? 'pack' : 'packs'} opened
                 </span>
               </span>
+              {props.utNext && (
+                <em className="profile-ut-next" {...(props.utNext.done ? { 'data-done': '' } : {})}>
+                  {props.utNext.line}
+                </em>
+              )}
             </span>
             <i className="go" aria-hidden="true">
               ›
@@ -504,7 +546,16 @@ export function ProfilePage(props: { profile: Profile; onName?: () => void; onBi
         </button>
         <BoostersSection profile={p} onBuy={props.onBuy} />
         <span className="eyebrow">Recent drafts</span>
-        {p.history.length ? p.history.slice(0, 20).map((r, i) => <HistRow key={i} r={r} i={i} />) : <div className="empty">No drafts yet. Your history shows up here.</div>}
+        {p.history.length ? p.history.slice(0, 20).map((r, i) => <HistRow key={i} r={r} i={i} />) : props.onDraft ? (
+          <div className="empty first-draft">
+            No drafts yet. Your history shows up here.
+            <button className="btn primary" onClick={props.onDraft}>
+              PLAY YOUR FIRST DRAFT
+            </button>
+          </div>
+        ) : (
+          <div className="empty">No drafts yet. Your history shows up here.</div>
+        )}
         <p className="note">Progress is saved on this phone. The home-screen app and Safari keep separate progress.</p>
       </div>
     </div>
@@ -694,7 +745,16 @@ export function HowToSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** Claude (UI reorganisation): the Legends Gauntlet chip on Home opens this (it used to be a toast). */
-export function GauntletSheet(props: { teams: string[]; best: number; coins: number[]; clear: number; onClose: () => void }) {
+export function GauntletSheet(props: {
+  teams: string[];
+  best: number;
+  coins: number[];
+  clear: number;
+  onClose: () => void;
+  /** ut-4 (audit H5): climb now with the team from the draft just finished ("YOUR 64–18 TEAM"), or
+   * start the draft a climb needs */
+  go?: { label: string; onGo: () => void };
+}) {
   return (
     <Sheet label="Legends Gauntlet" onClose={props.onClose}>
       {(close) => (
@@ -711,8 +771,13 @@ export function GauntletSheet(props: { teams: string[]; best: number; coins: num
               </li>
             ))}
           </ol>
-          <button className="btn primary" onClick={() => close()}>
-            GOT IT
+          {props.go && (
+            <button className="btn gold gauntlet-go" onClick={() => close(props.go!.onGo)}>
+              {props.go.label}
+            </button>
+          )}
+          <button className={props.go ? 'btn' : 'btn primary'} onClick={() => close()}>
+            {props.go ? 'NOT NOW' : 'GOT IT'}
           </button>
         </div>
       )}

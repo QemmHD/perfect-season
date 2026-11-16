@@ -19,6 +19,12 @@ export interface GameEvent {
   margin?: number;
 }
 
+/**
+ * Where a mission is done (ut-4, audit H5: its GO): 'any' draft mode, a 'season' (any mode but Head to
+ * Head, whose 1 vs 1 has no season), or one mode. missionMode turns it into the mode GO starts.
+ */
+export type MissionGo = 'any' | 'season' | 'daily' | 'blind' | '1v1';
+
 export interface Mission {
   id: string;
   text: string;
@@ -27,60 +33,69 @@ export interface Mission {
   xp: number;
   /** how much a finished game moves it forward */
   step: (e: GameEvent) => number;
+  /** where it is done: the mode its GO starts */
+  go: MissionGo;
+}
+
+/** The draft mode a mission's GO starts, given the mode the player has chosen on Home. */
+export function missionMode(go: MissionGo, current: GameEvent['mode']): GameEvent['mode'] {
+  if (go === 'any') return current;
+  if (go === 'season') return current === '1v1' ? 'classic' : current;
+  return go;
 }
 
 const season = (e: GameEvent) => e.mode !== '1v1';
 
 const NBA_EASY: Mission[] = [
-  { id: 'play3', text: 'Finish 3 games', goal: 3, coins: 30, xp: 30, step: () => 1 },
-  { id: 'daily', text: 'Play today’s Daily', goal: 1, coins: 30, xp: 30, step: (e) => (e.mode === 'daily' ? 1 : 0) },
-  { id: 'h2h2', text: 'Play 2 Head to Head matches', goal: 2, coins: 30, xp: 30, step: (e) => (e.mode === '1v1' ? 1 : 0) },
-  { id: 'blind', text: 'Finish a Blind draft', goal: 1, coins: 30, xp: 30, step: (e) => (e.mode === 'blind' ? 1 : 0) },
+  { id: 'play3', text: 'Finish 3 games', goal: 3, coins: 30, xp: 30, step: () => 1, go: 'any' },
+  { id: 'daily', text: 'Play today’s Daily', goal: 1, coins: 30, xp: 30, step: (e) => (e.mode === 'daily' ? 1 : 0), go: 'daily' },
+  { id: 'h2h2', text: 'Play 2 Head to Head matches', goal: 2, coins: 30, xp: 30, step: (e) => (e.mode === '1v1' ? 1 : 0), go: '1v1' },
+  { id: 'blind', text: 'Finish a Blind draft', goal: 1, coins: 30, xp: 30, step: (e) => (e.mode === 'blind' ? 1 : 0), go: 'blind' },
 ];
 const NBA_MEDIUM: Mission[] = [
-  { id: 'playoffs2', text: 'Make the playoffs twice', goal: 2, coins: 50, xp: 50, step: (e) => (season(e) && e.wins >= 50 ? 1 : 0) },
-  { id: 'series', text: 'Win a playoff series', goal: 1, coins: 50, xp: 50, step: (e) => (e.series > 0 ? 1 : 0) },
-  { id: 'legend', text: 'Draft a Legendary player', goal: 1, coins: 50, xp: 50, step: (e) => (e.legends > 0 ? 1 : 0) },
-  { id: 'h2hwin', text: 'Win a Head to Head match', goal: 1, coins: 50, xp: 50, step: (e) => (e.vsWon === true ? 1 : 0) },
-  { id: 'balance', text: 'Finish a season with 90%+ balance', goal: 1, coins: 50, xp: 50, step: (e) => (season(e) && e.balance >= 0.9 ? 1 : 0) },
+  { id: 'playoffs2', text: 'Make the playoffs twice', goal: 2, coins: 50, xp: 50, step: (e) => (season(e) && e.wins >= 50 ? 1 : 0), go: 'season' },
+  { id: 'series', text: 'Win a playoff series', goal: 1, coins: 50, xp: 50, step: (e) => (e.series > 0 ? 1 : 0), go: 'season' },
+  { id: 'legend', text: 'Draft a Legendary player', goal: 1, coins: 50, xp: 50, step: (e) => (e.legends > 0 ? 1 : 0), go: 'any' },
+  { id: 'h2hwin', text: 'Win a Head to Head match', goal: 1, coins: 50, xp: 50, step: (e) => (e.vsWon === true ? 1 : 0), go: '1v1' },
+  { id: 'balance', text: 'Finish a season with 90%+ balance', goal: 1, coins: 50, xp: 50, step: (e) => (season(e) && e.balance >= 0.9 ? 1 : 0), go: 'season' },
 ];
 const NBA_HARD: Mission[] = [
-  { id: 'wins62', text: 'Win 62+ games in a season', goal: 1, coins: 80, xp: 80, step: (e) => (season(e) && e.wins >= 62 ? 1 : 0) },
-  { id: 'title', text: 'Win a championship', goal: 1, coins: 80, xp: 80, step: (e) => (e.title ? 1 : 0) },
-  { id: 'sweep', text: 'Sweep a playoff series 4–0', goal: 1, coins: 80, xp: 80, step: (e) => (e.sweeps > 0 ? 1 : 0) },
-  { id: 'legend2', text: 'Draft 2 Legendary players in one team', goal: 1, coins: 80, xp: 80, step: (e) => (e.legends >= 2 ? 1 : 0) },
-  { id: 'realwin', text: 'Beat a real player in Head to Head', goal: 1, coins: 80, xp: 80, step: (e) => (e.online && e.vsWon === true ? 1 : 0) },
+  { id: 'wins62', text: 'Win 62+ games in a season', goal: 1, coins: 80, xp: 80, step: (e) => (season(e) && e.wins >= 62 ? 1 : 0), go: 'season' },
+  { id: 'title', text: 'Win a championship', goal: 1, coins: 80, xp: 80, step: (e) => (e.title ? 1 : 0), go: 'season' },
+  { id: 'sweep', text: 'Sweep a playoff series 4–0', goal: 1, coins: 80, xp: 80, step: (e) => (e.sweeps > 0 ? 1 : 0), go: 'season' },
+  { id: 'legend2', text: 'Draft 2 Legendary players in one team', goal: 1, coins: 80, xp: 80, step: (e) => (e.legends >= 2 ? 1 : 0), go: 'any' },
+  { id: 'realwin', text: 'Beat a real player in Head to Head', goal: 1, coins: 80, xp: 80, step: (e) => (e.online && e.vsWon === true ? 1 : 0), go: '1v1' },
 ];
 
 // football: the same kinds of goals, on a 17-game season with one-game playoff rounds
 const NFL_MEDIUM: Mission[] = [
-  { id: 'playoffs2', text: 'Make the playoffs twice', goal: 2, coins: 50, xp: 50, step: (e) => (season(e) && e.wins >= 10 ? 1 : 0) },
-  { id: 'series', text: 'Win a playoff game', goal: 1, coins: 50, xp: 50, step: (e) => (e.series > 0 ? 1 : 0) },
-  { id: 'legend', text: 'Draft a Legendary player', goal: 1, coins: 50, xp: 50, step: (e) => (e.legends > 0 ? 1 : 0) },
-  { id: 'h2hwin', text: 'Win a Head to Head match', goal: 1, coins: 50, xp: 50, step: (e) => (e.vsWon === true ? 1 : 0) },
-  { id: 'balance', text: 'Finish a season with 90%+ balance', goal: 1, coins: 50, xp: 50, step: (e) => (season(e) && e.balance >= 0.9 ? 1 : 0) },
+  { id: 'playoffs2', text: 'Make the playoffs twice', goal: 2, coins: 50, xp: 50, step: (e) => (season(e) && e.wins >= 10 ? 1 : 0), go: 'season' },
+  { id: 'series', text: 'Win a playoff game', goal: 1, coins: 50, xp: 50, step: (e) => (e.series > 0 ? 1 : 0), go: 'season' },
+  { id: 'legend', text: 'Draft a Legendary player', goal: 1, coins: 50, xp: 50, step: (e) => (e.legends > 0 ? 1 : 0), go: 'any' },
+  { id: 'h2hwin', text: 'Win a Head to Head match', goal: 1, coins: 50, xp: 50, step: (e) => (e.vsWon === true ? 1 : 0), go: '1v1' },
+  { id: 'balance', text: 'Finish a season with 90%+ balance', goal: 1, coins: 50, xp: 50, step: (e) => (season(e) && e.balance >= 0.9 ? 1 : 0), go: 'season' },
 ];
 const NFL_HARD: Mission[] = [
-  { id: 'wins14', text: 'Win 14+ games in a season', goal: 1, coins: 80, xp: 80, step: (e) => (season(e) && e.wins >= 14 ? 1 : 0) },
-  { id: 'title', text: 'Win the Super Bowl', goal: 1, coins: 80, xp: 80, step: (e) => (e.title ? 1 : 0) },
-  { id: 'blowout', text: 'Win a playoff game by 21+', goal: 1, coins: 80, xp: 80, step: (e) => ((e.margin ?? 0) >= 21 ? 1 : 0) },
-  { id: 'legend2', text: 'Draft 2 Legendary players in one team', goal: 1, coins: 80, xp: 80, step: (e) => (e.legends >= 2 ? 1 : 0) },
-  { id: 'realwin', text: 'Beat a real player in Head to Head', goal: 1, coins: 80, xp: 80, step: (e) => (e.online && e.vsWon === true ? 1 : 0) },
+  { id: 'wins14', text: 'Win 14+ games in a season', goal: 1, coins: 80, xp: 80, step: (e) => (season(e) && e.wins >= 14 ? 1 : 0), go: 'season' },
+  { id: 'title', text: 'Win the Super Bowl', goal: 1, coins: 80, xp: 80, step: (e) => (e.title ? 1 : 0), go: 'season' },
+  { id: 'blowout', text: 'Win a playoff game by 21+', goal: 1, coins: 80, xp: 80, step: (e) => ((e.margin ?? 0) >= 21 ? 1 : 0), go: 'season' },
+  { id: 'legend2', text: 'Draft 2 Legendary players in one team', goal: 1, coins: 80, xp: 80, step: (e) => (e.legends >= 2 ? 1 : 0), go: 'any' },
+  { id: 'realwin', text: 'Beat a real player in Head to Head', goal: 1, coins: 80, xp: 80, step: (e) => (e.online && e.vsWon === true ? 1 : 0), go: '1v1' },
 ];
 // soccer (Claude 2026-11-01): a 38-game league with draws, then a one-game-a-round knockout cup
 const SOCCER_MEDIUM: Mission[] = [
-  { id: 'playoffs2', text: 'Reach the cup twice', goal: 2, coins: 50, xp: 50, step: (e) => (season(e) && e.wins >= 22 ? 1 : 0) },
-  { id: 'series', text: 'Win a cup tie', goal: 1, coins: 50, xp: 50, step: (e) => (e.series > 0 ? 1 : 0) },
-  { id: 'legend', text: 'Draft a Legendary player', goal: 1, coins: 50, xp: 50, step: (e) => (e.legends > 0 ? 1 : 0) },
-  { id: 'h2hwin', text: 'Win a Head to Head match', goal: 1, coins: 50, xp: 50, step: (e) => (e.vsWon === true ? 1 : 0) },
-  { id: 'balance', text: 'Finish a season with 90%+ balance', goal: 1, coins: 50, xp: 50, step: (e) => (season(e) && e.balance >= 0.9 ? 1 : 0) },
+  { id: 'playoffs2', text: 'Reach the cup twice', goal: 2, coins: 50, xp: 50, step: (e) => (season(e) && e.wins >= 22 ? 1 : 0), go: 'season' },
+  { id: 'series', text: 'Win a cup tie', goal: 1, coins: 50, xp: 50, step: (e) => (e.series > 0 ? 1 : 0), go: 'season' },
+  { id: 'legend', text: 'Draft a Legendary player', goal: 1, coins: 50, xp: 50, step: (e) => (e.legends > 0 ? 1 : 0), go: 'any' },
+  { id: 'h2hwin', text: 'Win a Head to Head match', goal: 1, coins: 50, xp: 50, step: (e) => (e.vsWon === true ? 1 : 0), go: '1v1' },
+  { id: 'balance', text: 'Finish a season with 90%+ balance', goal: 1, coins: 50, xp: 50, step: (e) => (season(e) && e.balance >= 0.9 ? 1 : 0), go: 'season' },
 ];
 const SOCCER_HARD: Mission[] = [
-  { id: 'wins30', text: 'Win 30+ league games', goal: 1, coins: 80, xp: 80, step: (e) => (season(e) && e.wins >= 30 ? 1 : 0) },
-  { id: 'title', text: 'Win the cup final', goal: 1, coins: 80, xp: 80, step: (e) => (e.title ? 1 : 0) },
-  { id: 'blowout', text: 'Win a cup tie by 3+ goals', goal: 1, coins: 80, xp: 80, step: (e) => ((e.margin ?? 0) >= 3 ? 1 : 0) },
-  { id: 'legend2', text: 'Draft 2 Legendary players in one team', goal: 1, coins: 80, xp: 80, step: (e) => (e.legends >= 2 ? 1 : 0) },
-  { id: 'realwin', text: 'Beat a real player in Head to Head', goal: 1, coins: 80, xp: 80, step: (e) => (e.online && e.vsWon === true ? 1 : 0) },
+  { id: 'wins30', text: 'Win 30+ league games', goal: 1, coins: 80, xp: 80, step: (e) => (season(e) && e.wins >= 30 ? 1 : 0), go: 'season' },
+  { id: 'title', text: 'Win the cup final', goal: 1, coins: 80, xp: 80, step: (e) => (e.title ? 1 : 0), go: 'season' },
+  { id: 'blowout', text: 'Win a cup tie by 3+ goals', goal: 1, coins: 80, xp: 80, step: (e) => ((e.margin ?? 0) >= 3 ? 1 : 0), go: 'season' },
+  { id: 'legend2', text: 'Draft 2 Legendary players in one team', goal: 1, coins: 80, xp: 80, step: (e) => (e.legends >= 2 ? 1 : 0), go: 'any' },
+  { id: 'realwin', text: 'Beat a real player in Head to Head', goal: 1, coins: 80, xp: 80, step: (e) => (e.online && e.vsWon === true ? 1 : 0), go: '1v1' },
 ];
 const EASY = NBA_EASY;
 const MEDIUM = pick({ nba: NBA_MEDIUM, nfl: NFL_MEDIUM, soccer: SOCCER_MEDIUM });

@@ -1,0 +1,137 @@
+/* Claude, 2026-11-16 (studio overhaul, team ut, task ut-4; audit H5/L2): GO links on the main app's
+   progress surfaces (Missions, the Legends Gauntlet sheet, draft Results, Profile). Every one leads to
+   the screen where the progress is made. Targets >= 44 design px; text >= 10 px. */
+
+/* ---------- Missions ---------- */
+.mission-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.mission-head strong {
+  min-width: 0;
+}
+/* L2: the difficulty pill was 9 px */
+.mission-head .mission-tier {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+.missions .mission .claim {
+  height: 44px;
+}
+.btn.mission-go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 84px;
+  height: 44px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(25, 227, 201, 0.55);
+  background: linear-gradient(180deg, rgba(25, 227, 201, 0.18), rgba(25, 227, 201, 0.06));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  color: var(--teal);
+  font-family: var(--display);
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 85%;
+  letter-spacing: 0.5px;
+}
+.btn.mission-go:active {
+  transform: scale(0.96);
+  background: rgba(25, 227, 201, 0.24);
+}
+
+/* ---------- the Legends Gauntlet sheet ---------- */
+.gauntlet-sheet .gauntlet-go {
+  margin-top: 4px;
+}
+.gauntlet-sheet .gauntlet-go + .btn {
+  margin-top: 8px;
+}
+
+/* ---------- draft Results: the bridge into Ultimate Team ---------- */
+.ut-bridge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(245, 184, 61, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(100deg, rgba(245, 184, 61, 0.2), rgba(12, 34, 45, 0.96) 70%),
+    var(--panel-2);
+  box-shadow: inset 0 1px rgba(255, 236, 190, 0.14);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.ut-bridge:active {
+  transform: scale(0.985);
+}
+.ut-bridge-gift {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffd978, var(--gold) 60%, var(--gold-2));
+  color: var(--gold-ink);
+  box-shadow: inset 0 -2px rgba(120, 72, 0, 0.35);
+}
+.ut-bridge-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ut-bridge-txt small {
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.3px;
+}
+.ut-bridge-txt b {
+  font-size: 14px;
+  font-weight: 800;
+}
+.ut-bridge > svg {
+  flex: none;
+  color: var(--gold);
+}
+
+/* ---------- Profile: the Ultimate Team card's next step, and the new drafter ---------- */
+.profile-ut-next {
+  display: block;
+  margin-top: 4px;
+  color: var(--gold);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-ut-next[data-done] {
+  color: var(--teal);
+}
+.empty.first-draft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.empty.first-draft .btn {
+  min-height: 44px;
+  padding: 0 22px;
+}

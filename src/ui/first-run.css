@@ -1,0 +1,104 @@
+/* Claude, 2026-11-16 (studio overhaul, team ut, task ut-4; audit M7, Game Design V2 D.15): the one
+   welcoming sheet of the first run. Two gift rows (coins, the Day 1 chest), COLLECT ALL, then the
+   starter pack. Gold for rewards; the chest keeps its wobble only while motion is allowed. */
+.first-run {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.first-run h2 {
+  margin: 0;
+  font-size: 32px;
+  color: var(--gold);
+}
+.fr-gifts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 2px 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+.fr-gifts li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(245, 184, 61, 0.45);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(110deg, rgba(245, 184, 61, 0.18), var(--panel-2) 70%);
+  box-shadow:
+    inset 0 1px rgba(255, 236, 190, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+  text-align: left;
+  transition:
+    border-color 0.18s var(--ease-out),
+    background 0.18s var(--ease-out);
+}
+.fr-gifts.done li {
+  border-color: rgba(25, 227, 201, 0.5);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(110deg, rgba(25, 227, 201, 0.14), var(--panel-2) 70%);
+}
+.fr-gifts li > svg {
+  flex: none;
+  color: var(--teal);
+}
+.fr-art {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 48px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 211, 107, 0.35), rgba(255, 211, 107, 0) 70%);
+}
+.fr-art.chest svg {
+  width: 52px;
+  height: 42px;
+}
+.fr-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fr-txt small {
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.3px;
+}
+.fr-txt b {
+  font-size: 18px;
+  font-weight: 800;
+}
+.fr-total {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.fr-total b {
+  font-size: 34px;
+  color: var(--gold);
+}
+.first-run .btn.fr-go {
+  width: 100%;
+  min-height: 52px;
+  font-size: 15px;
+}
+.fr-note {
+  max-width: 290px;
+  color: var(--sub);
+  font-size: 12px;
+  line-height: 1.35;
+}

@@ -6,6 +6,14 @@ import { sfx } from '../lib/sound';
 import { Fit } from './common';
 import { FavPicker } from './Favorites';
 import { NameField } from './Leaderboard';
+import { nextStreak, rewardFor } from '../engine/missions';
+import type { Profile } from '../lib/profile';
+import { LABEL } from '../ut/labels';
+import { Sheet } from './common';
+import { Check, Coin } from './icons';
+import { CountUp, reducedMotion } from './motion';
+import { ChestArt } from './Rewards';
+import './first-run.css';
 
 /** First launch of the web app: pick the name everyone else will see, then your NBA and NFL teams. */
 export function Welcome({ onDone }: { onDone: (name: string) => void }) {
@@ -117,6 +125,9 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
         <li>
           <b>Battle</b> real players live in Head to Head
         </li>
+        <li>
+          <b>Build</b> your {LABEL.ultimateTeam}: a free starter pack is waiting
+        </li>
       </ul>
       <div className="spacer" />
       <div className="actionbar">
@@ -125,5 +136,125 @@ export function Welcome({ onDone }: { onDone: (name: string) => void }) {
         </button>
       </div>
     </form>
+  );
+}
+
+// ---------- ut-4: the first run (audit M7, Game Design V2 D.15) ----------
+// The testers' gift and the Day 1 chest used to arrive as two sheets, one after the other. Now one
+// welcoming sheet holds both: COLLECT ALL pays them in one tap (the same receipts as before: the gift's
+// id in `gifts`, `rewardDay` and the streak), then "OPEN YOUR FREE STARTER PACK" leads to Ultimate
+// Team's Home, where the starter pack waits.
+
+export interface FirstRunGift {
+  id: string;
+  coins: number;
+}
+export interface FirstRunPlan {
+  gift: FirstRunGift;
+  /** today's chest, when not opened yet today: its streak day and what it pays */
+  chest: { day: number; coins: number; xp: number } | null;
+  /** the free starter pack waits in Ultimate Team */
+  starter: boolean;
+}
+
+/** What the first-run sheet offers, or null when the gift is already collected (the usual daily chest applies). */
+export function firstRunPlan(p: Profile, today: string, gift: FirstRunGift): FirstRunPlan | null {
+  if ((p.gifts ?? []).includes(gift.id)) return null;
+  const st = nextStreak(p.streak, today);
+  return {
+    gift,
+    chest: p.rewardDay === today ? null : { day: st.count, ...rewardFor(st.count) },
+    starter: !p.ut.starterClaimed,
+  };
+}
+
+/** Pay everything the sheet offers, once: a second call (or a stale plan) pays nothing more. */
+export function collectFirstRun(p: Profile, today: string, gift: FirstRunGift): Profile {
+  let out = p;
+  if (!(out.gifts ?? []).includes(gift.id)) out = { ...out, coins: out.coins + gift.coins, gifts: [...(out.gifts ?? []), gift.id] };
+  if (out.rewardDay !== today) {
+    const st = nextStreak(out.streak, today),
+      rw = rewardFor(st.count);
+    out = { ...out, streak: st, rewardDay: today, coins: out.coins + rw.coins, xp: out.xp + rw.xp };
+  }
+  return out;
+}
+
+/** The one welcoming sheet: the gift and today's chest, COLLECT ALL, then the starter pack. */
+export function FirstRunSheet({ plan, onCollect, onStarter, onClose }: { plan: FirstRunPlan; onCollect: () => void; onStarter: () => void; onClose: () => void }) {
+  const [done, setDone] = useState(false);
+  const total = plan.gift.coins + (plan.chest?.coins ?? 0);
+  const collect = () => {
+    if (done) return;
+    setDone(true);
+    sfx.levelUp();
+    window.setTimeout(() => sfx.coin(), 380);
+    onCollect();
+  };
+  return (
+    // closing it any other way still collects: nothing offered here is lost
+    <Sheet label="Welcome gifts" kind="center" onClose={() => (done || onCollect(), onClose())}>
+      {(close) => (
+        <div className="first-run">
+          <span className="eyebrow wide">Welcome to Perfect Season</span>
+          <h2 className="disp">{done ? 'All yours' : 'Your welcome gifts'}</h2>
+          <ul className={'fr-gifts' + (done ? ' done' : '')}>
+            <li>
+              <span className="fr-art coin" aria-hidden="true">
+                <Coin size={34} />
+              </span>
+              <span className="fr-txt">
+                <small>THANK YOU FOR TESTING</small>
+                <b className="num">{plan.gift.coins.toLocaleString('en-US')} coins</b>
+              </span>
+              {done && <Check size={20} />}
+            </li>
+            {plan.chest && (
+              <li>
+                <span className="fr-art chest" aria-hidden="true">
+                  <ChestArt />
+                </span>
+                <span className="fr-txt">
+                  <small>DAILY CHEST · DAY {Math.min(7, plan.chest.day)} OF 7</small>
+                  <b className="num">
+                    {plan.chest.coins} coins · {plan.chest.xp} XP
+                  </b>
+                </span>
+                {done && <Check size={20} />}
+              </li>
+            )}
+          </ul>
+          {done ? (
+            <>
+              <p className="fr-total" aria-live="polite">
+                <b className="disp num">
+                  +<CountUp value={total} from={0} ms={reducedMotion() ? 0 : 700} />
+                </b>
+                <Coin size={22} />
+              </p>
+              {plan.starter ? (
+                <>
+                  <button className="btn gold shine fr-go" onClick={() => close(onStarter)}>
+                    OPEN YOUR FREE STARTER PACK
+                  </button>
+                  <small className="fr-note">A full squad to start your {LABEL.ultimateTeam}, with one gold to build around.</small>
+                </>
+              ) : (
+                <button className="btn primary fr-go" onClick={() => close()}>
+                  LET’S PLAY
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="note">Come back every day: the chest grows for 7 days.</p>
+              <button className="btn gold shine fr-go" onClick={collect}>
+                COLLECT ALL
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </Sheet>
   );
 }

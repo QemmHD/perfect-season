@@ -26,6 +26,7 @@ import { NET_ON } from '../net/nostr';
 import { CardSheet, TradingCard } from './Card';
 import { Scout, teamBar } from './Scout';
 import { record } from './sportui';
+import './progress-links.css';
 
 export interface ResultInfo {
   record: RunRecord;
@@ -147,6 +148,7 @@ export function Results({
   onAgain,
   onHome,
   onToast,
+  utBridge,
 }: {
   info: ResultInfo;
   xp: number;
@@ -159,6 +161,8 @@ export function Results({
   onAgain: () => void;
   onHome: () => void;
   onToast: (t: string) => void;
+  /** ut-4 (audit H4): Ultimate Team rewards waiting in this sport, one tap away */
+  utBridge?: { count: number; onGo: () => void } | null;
 }) {
   const { record: r, rating } = info;
   const g = gradeFor(r.wins);
@@ -339,6 +343,26 @@ export function Results({
         ))}
 
         {gauntlet && onGauntlet && <GauntletCard {...gauntlet} onGo={onGauntlet} />}
+
+        {utBridge && utBridge.count > 0 && (
+          <button className="ut-bridge rise-in" style={{ animationDelay: '420ms' }} onClick={() => (sfx.click(), utBridge.onGo())}>
+            <span className="ut-bridge-gift" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round">
+                <rect x="3.5" y="9" width="17" height="11.5" rx="1.6" />
+                <path d="M2.5 9h19M12 9v11.5M12 9c-2.6 0-5-1-5-3.1C7 4.3 8.2 3.5 9.4 3.5 11.2 3.5 12 6 12 9zm0 0c2.6 0 5-1 5-3.1 0-1.6-1.2-2.4-2.4-2.4C12.8 3.5 12 6 12 9z" />
+              </svg>
+            </span>
+            <span className="ut-bridge-txt">
+              <small>ULTIMATE TEAM</small>
+              <b>
+                {utBridge.count} {utBridge.count === 1 ? 'reward' : 'rewards'} waiting
+              </b>
+            </span>
+            <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M5 2.5L9.5 7 5 11.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
 
         {vs && (
           <div className="roster">

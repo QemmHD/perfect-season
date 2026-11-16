@@ -1,0 +1,255 @@
+/* Claude, 2026-11-16 (studio overhaul, team ut, task ut-4; Game Design V2 D.5, audit H4/L1): the main
+   Home's "Next up" strip and the Ultimate Team tab badge.
+   The strip sits in the PLAY bar, directly above PLAY, so it never scrolls away and PLAY never moves.
+   It takes the height of the line it replaces (Home's one-line mode hint: 40 px, 34 px on snug and
+   short phones), and an invisible ::before lifts its touch area to 44 design px. Gold for "do this",
+   amber when a clock ends tonight, calm teal once the day is done. Reduced motion: no sheen. */
+
+.nu-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  margin: 0 0 6px 0;
+  padding: 0 5px 0 12px;
+  border: 1px solid rgba(245, 184, 61, 0.62);
+  border-radius: 13px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(100deg, rgba(245, 184, 61, 0.26), rgba(245, 184, 61, 0.08) 48%, rgba(12, 34, 45, 0.96) 100%),
+    var(--panel-2);
+  box-shadow:
+    inset 0 1px rgba(255, 236, 190, 0.18),
+    0 6px 16px -6px rgba(245, 184, 61, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    transform 0.12s var(--ease-out),
+    filter 0.12s var(--ease-out);
+}
+/* the touch area: 44 design px tall, never wider than the strip */
+.nu-strip::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  bottom: -2px;
+}
+button.nu-strip:active {
+  transform: scale(0.985);
+  filter: brightness(1.12);
+}
+/* one pass of light across the bar when a new action arrives */
+.nu-strip::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 236, 190, 0.22) 50%, transparent 70%);
+  transform: translateX(-110%);
+  animation: nu-sheen 0.9s 0.15s var(--ease-out) both;
+  pointer-events: none;
+}
+@keyframes nu-sheen {
+  to {
+    transform: translateX(110%);
+  }
+}
+.nu-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+.nu-text small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.nu-text b {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nu-cta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  padding: 0 8px 0 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffd978, var(--gold) 55%, var(--gold-2));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.55),
+    inset 0 -2px rgba(120, 72, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+  color: var(--gold-ink);
+  font-family: var(--display);
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 85%;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+/* a clock ends tonight (the Daily Drop streak, a weekly goal on Sunday): amber */
+.nu-strip[data-tone='amber'] {
+  border-color: rgba(255, 159, 28, 0.8);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(100deg, rgba(255, 140, 20, 0.3), rgba(255, 140, 20, 0.08) 48%, rgba(12, 34, 45, 0.96) 100%),
+    var(--panel-2);
+}
+.nu-strip[data-tone='amber'] .nu-text small {
+  color: #ffb648;
+}
+/* the day's goals are met: calm, never pushed */
+.nu-strip[data-tone='done'] {
+  border-color: rgba(25, 227, 201, 0.4);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(100deg, rgba(25, 227, 201, 0.14), rgba(12, 34, 45, 0.96) 60%),
+    var(--panel-2);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+}
+.nu-strip[data-tone='done']::after {
+  display: none;
+}
+.nu-strip[data-tone='done'] .nu-text small {
+  color: var(--teal);
+}
+.nu-strip[data-tone='done'] .nu-text b {
+  color: var(--soft);
+  font-weight: 700;
+}
+.nu-strip[data-tone='done'] .nu-cta {
+  background: rgba(25, 227, 201, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(25, 227, 201, 0.45);
+  color: var(--teal);
+}
+
+/* before the engine answers (one idle moment after first paint): the same box, quiet */
+.nu-strip.nu-wait {
+  border-color: rgba(245, 184, 61, 0.28);
+  box-shadow: none;
+}
+.nu-strip.nu-wait::after {
+  display: none;
+}
+.nu-ghost {
+  display: block;
+  width: 58%;
+  height: 10px;
+  margin-top: 3px;
+  border-radius: 5px;
+  background: rgba(143, 166, 178, 0.16);
+}
+
+/* snug and short phones: one line, the eyebrow as a tag in front of the text */
+.home.snug .nu-strip,
+.home.short .nu-strip {
+  height: 34px;
+  border-radius: 11px;
+}
+.home.snug .nu-strip::before,
+.home.short .nu-strip::before {
+  top: -5px;
+  bottom: -5px;
+}
+.home.snug .nu-text,
+.home.short .nu-text {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+}
+.home.snug .nu-text small,
+.home.short .nu-text small {
+  flex: none;
+}
+.home.snug .nu-text b,
+.home.short .nu-text b {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.home.snug .nu-ghost,
+.home.short .nu-ghost {
+  margin-top: 0;
+}
+.home.snug .nu-cta,
+.home.short .nu-cta {
+  height: 26px;
+  font-size: 12px;
+}
+
+/* ---------- the Ultimate Team tab's badge (L1: #c62828 under white 11 px bold, 5.6:1) ---------- */
+.tabs .tab-badge {
+  position: absolute;
+  top: 3px;
+  left: calc(50% + 7px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: #c62828;
+  box-shadow: 0 0 0 2px var(--bg-2);
+  color: #fff;
+  font-family: var(--body);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  animation: nu-pop 0.4s var(--ease-spring) both;
+}
+/* the Daily Drop streak ends tonight with its claim waiting: an amber ring and a clock */
+.tabs .tab-badge.amber {
+  box-shadow:
+    0 0 0 2px var(--bg-2),
+    0 0 0 3.5px #ff9f1c;
+}
+@keyframes nu-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nu-strip,
+  .nu-strip::after,
+  .tabs .tab-badge {
+    animation: none;
+    transition: none;
+  }
+  .nu-strip::after {
+    display: none;
+  }
+}

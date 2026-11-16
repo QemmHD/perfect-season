@@ -5,6 +5,7 @@ import { sfx } from '../lib/sound';
 import { Confetti, Sheet } from './common';
 import { Check, Coin, Flame } from './icons';
 import { CountUp, reducedMotion } from './motion';
+import './progress-links.css';
 
 /** The chest you open once a day. Coming back on consecutive days makes it bigger. */
 export function DailyReward({ streakDay, onClaim, onClose }: { streakDay: number; onClaim: () => void; onClose: () => void }) {
@@ -60,7 +61,8 @@ export function DailyReward({ streakDay, onClaim, onClose }: { streakDay: number
   );
 }
 
-function ChestArt() {
+/** The daily chest (also on the first-run sheet, Welcome.tsx). */
+export function ChestArt() {
   return (
     <svg className="chest-art" width="150" height="120" viewBox="0 0 150 120" aria-hidden="true">
       <defs>
@@ -93,7 +95,7 @@ function ChestArt() {
 }
 
 /** Today's three missions, with progress and claim buttons. */
-export function MissionsSheet({ profile, day, onClaim, onClose }: { profile: Profile; day: string; onClaim: (i: number) => void; onClose: () => void }) {
+export function MissionsSheet({ profile, day, onClaim, onGo, onClose }: { profile: Profile; day: string; onClaim: (i: number) => void; onGo?: (i: number) => void; onClose: () => void }) {
   const list = missionsFor(day);
   const st = profile.missions && profile.missions.day === day ? profile.missions : { day, progress: [0, 0, 0], claimed: [false, false, false] };
   const claimedAll = st.claimed.every(Boolean);
@@ -118,7 +120,10 @@ export function MissionsSheet({ profile, day, onClaim, onClose }: { profile: Pro
               return (
                 <div key={m.id} className={'mission rise-in' + (done ? ' done' : '') + (claimed ? ' claimed' : '')} style={{ animationDelay: i * 70 + 'ms' }}>
                   <div className="mission-main">
-                    <strong>{m.text}</strong>
+                    <span className="mission-head">
+                      <span className={'mission-tier t' + i}>{['EASY', 'MEDIUM', 'HARD'][i]}</span>
+                      <strong>{m.text}</strong>
+                    </span>
                     <span className="bar">
                       <i style={{ width: (p / m.goal) * 100 + '%' }} className={done ? 'full' : ''} />
                     </span>
@@ -134,9 +139,15 @@ export function MissionsSheet({ profile, day, onClaim, onClose }: { profile: Pro
                     <button className="btn gold claim shine" onClick={() => onClaim(i)}>
                       CLAIM
                     </button>
-                  ) : (
-                    <span className={'mission-tier t' + i}>{['EASY', 'MEDIUM', 'HARD'][i]}</span>
-                  )}
+                  ) : onGo ? (
+                    // ut-4 (audit H5): every unfinished mission leads to the draft that moves it
+                    <button className="btn mission-go" onClick={() => close(() => onGo(i))} aria-label={'Play: ' + m.text}>
+                      PLAY
+                      <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true">
+                        <path d="M5 2.5L9.5 7 5 11.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  ) : null}
                 </div>
               );
             })}

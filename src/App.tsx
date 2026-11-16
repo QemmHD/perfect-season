@@ -8,7 +8,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { DATA_SOURCE, LATEST_SEASON } from './engine/data';
 import { assignSlots, type DraftState } from './engine/draft';
 import { BOOSTER_PRICES, LEVEL_UP_COINS, levelInfo, rewardsFor, unlockedAt } from './engine/economy';
-import { ALL_MISSIONS_BONUS, advance, type GameEvent, missionsFor, nextStreak, rewardFor } from './engine/missions';
+import { ALL_MISSIONS_BONUS, advance, type GameEvent, missionMode, missionsFor, nextStreak, rewardFor } from './engine/missions';
 import { buildBracket, gameWinChance, PLAYOFF_MIN_WINS, playoffOutcome, ROUND_NAMES, type Series, seriesScore } from './engine/playoffs';
 import { rarityOf } from './engine/rarity';
 import { dailyPar, reviewDraft } from './engine/review';
@@ -52,7 +52,9 @@ import { Vote } from './ui/Vote';
 const AUTOPLAY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('autoplay');
 import { Playoffs, Reveal } from './ui/Season';
 import { Coin, Football, Hoop, SoccerBall } from './ui/icons';
-import { Welcome } from './ui/Welcome';
+import { collectFirstRun, type FirstRunPlan, FirstRunSheet, firstRunPlan, Welcome } from './ui/Welcome';
+import { record } from './ui/sportui';
+import { loadNextUp, NextUpStrip, requestUtOpen, takeUtOpen, useAppBadge, useHomeNext } from './ui/NextUpStrip';
 import type { UtMatchRequest } from './ut/play';
 
 type Screen = 'tab' | 'search' | 'draft' | 'vote' | 'arcade' | 'reveal' | 'playoffs' | 'results' | 'gauntlet' | 'ut' | 'utmatch' | 'training';
@@ -432,8 +434,17 @@ export function App() {
     const t = window.setTimeout(() => setModal('gift'), 400);
     return () => clearTimeout(t);
   }, [needsName, screen, modal, giftPending]);
-  const collectGift = () =>
-    update((p) => ((p.gifts ?? []).includes(TESTER_GIFT.id) ? p : { ...p, coins: p.coins + TESTER_GIFT.coins, gifts: [...(p.gifts ?? []), TESTER_GIFT.id] }));
+  // ut-4: what the one first-run sheet offers (the gift, today's chest if unopened, the starter pack);
+  // frozen when the sheet opens, so collecting does not change what it shows
+  const [firstRun, setFirstRun] = useState<FirstRunPlan | null>(null);
+  useEffect(() => {
+    if (modal === 'gift' && !firstRun) {
+      const plan = firstRunPlan(profileRef.current, todayKey, TESTER_GIFT);
+      if (plan) setFirstRun(plan);
+      else setModal(null);
+    }
+    if (modal !== 'gift' && firstRun) setFirstRun(null);
+  }, [modal]);
 
   // ---------- gifts from the admin (src/net/gifts.ts): each collected once, shown between games ----------
 
@@ -464,6 +475,7 @@ export function App() {
   const missionList = missionsFor(todayKey);
   const missionsDone = missionList.filter((m, i) => missionState.progress[i] >= m.goal).length;
   const missionsClaimable = missionList.some((m, i) => missionState.progress[i] >= m.goal && !missionState.claimed[i]);
+  const missionsReady = missionList.filter((m, i) => missionState.progress[i] >= m.goal && !missionState.claimed[i]).length;
 
   const claimMission = (i: number) => {
     const m = missionList[i];
@@ -494,6 +506,16 @@ export function App() {
     // a reload the browser refused leaves the game as it was
     window.setTimeout(() => setSportTo(null), wait + 6000);
   };
+
+  // ---------- ut-4: the next best action (Home's "Next up" strip, the UT tab badge, the app icon) ----------
+
+  const homeNext = useHomeNext(profile, SPORT, { missions: missionsReady, daily: { no: dailyNo, done: dailyDone } }, screen === 'tab' || screen === 'ut' || screen === 'results');
+  useAppBadge(homeNext?.total ?? null);
+  // another sport's "claim" sent us here: open its Ultimate Team where the rewards are (once)
+  useEffect(() => {
+    const view = takeUtOpen(SPORT);
+    if (view) void loadNextUp().then((m) => m.goHome({ app: 'ut', view }, SPORT, nextRoutes()));
+  }, []);
 
   // ---------- starting games ----------
 
@@ -903,6 +925,20 @@ export function App() {
     showMinutesRanks();
     goTab('ranks');
   };
+  // ut-4: where each next-best-action target is done, one tap from Home (next-up-main.ts goHome)
+  const nextRoutes = () => ({
+    openUt: () => setScreen('ut'),
+    otherSport: (to: SportId, view: Parameters<typeof requestUtOpen>[1]) => {
+      requestUtOpen(to, view);
+      goSport(to);
+    },
+    minutes: openMinutes,
+    draft: (m: Mode) => {
+      update((p) => (p.mode === m ? p : { ...p, mode: m }));
+      startRun(m);
+    },
+    missions: () => setModal('missions'),
+  });
   if (tab === 'ranks') page = <RanksPage profile={profile} update={update} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setModal('name'))} />;
   else if (tab === 'profile')
     page = (
@@ -911,6 +947,12 @@ export function App() {
         onBuy={buyBooster}
         onUltimate={openUltimate}
         onMinutes={openMinutes}
+        utNext={
+          homeNext && (homeNext.action.target.app === 'ut' || homeNext.action.target.app === 'match')
+            ? { line: homeNext.action.line, done: homeNext.action.done, onGo: () => (sfx.click(), void loadNextUp().then((m) => m.goHome(homeNext.action.target, SPORT, nextRoutes()))) }
+            : null
+        }
+        onDraft={profile.history.length ? undefined : () => startRun()}
         onName={NET_ON ? () => (sfx.click(), setModal('name')) : undefined}
         onBinder={() => (sfx.click(), setModal('binder'))}
         onFavs={() => {
@@ -959,6 +1001,15 @@ export function App() {
         onGauntlet={() => (sfx.click(), setModal('gauntlet'))}
         dailyResult={profile.daily && profile.daily.key === todayKey ? profile.daily.record : null}
         onMinutes={openMinutes}
+        nextUp={
+          <NextUpStrip
+            action={homeNext?.action ?? null}
+            onGo={(a) => {
+              sfx.click();
+              void loadNextUp().then((m) => m.goHome(a.target, SPORT, nextRoutes()));
+            }}
+          />
+        }
       />
     );
 
@@ -1164,6 +1215,7 @@ export function App() {
         onAgain={() => startRun(run.mode)}
         onHome={() => goTab('home')}
         onToast={showToast}
+        utBridge={homeNext && homeNext.count > 0 ? { count: homeNext.count, onGo: () => void loadNextUp().then((m) => m.goHome({ app: 'ut', view: 'inbox' }, SPORT, nextRoutes())) } : null}
       />
     );
   } else if (screen === 'gauntlet' && run?.result && gauntletAt?.runId === run.id) {
@@ -1211,7 +1263,7 @@ export function App() {
             {page}
           </Transition>
         </div>
-        <Tabs tab={tab} onTab={goTab} onUltimate={openUltimate} utNew={!profile.ut.starterClaimed} />
+        <Tabs tab={tab} onTab={goTab} onUltimate={openUltimate} utNew={!profile.ut.starterClaimed} utBadge={homeNext} />
       </div>
     );
   }
@@ -1289,33 +1341,50 @@ export function App() {
         />
       )}
       {modal === 'gauntlet' && (
-        <GauntletSheet teams={ladder.map((t) => t.year + ' ' + t.team)} best={gauntletBest} coins={RUNG_COINS} clear={CLEAR_COINS} onClose={() => setModal(null)} />
+        <GauntletSheet
+          teams={ladder.map((t) => t.year + ' ' + t.team)}
+          best={gauntletBest}
+          coins={RUNG_COINS}
+          clear={CLEAR_COINS}
+          onClose={() => setModal(null)}
+          go={
+            // ut-4: the team from the draft just finished climbs now; otherwise a draft starts the way up
+            run?.result
+              ? {
+                  label: 'CLIMB WITH YOUR ' + record(run.result.record.wins) + ' TEAM',
+                  onGo: () => {
+                    setModal(null);
+                    setGauntletAt({ runId: run.id, week, ladder, best: gauntletBest });
+                    setScreen('gauntlet');
+                  },
+                }
+              : { label: 'PLAY A DRAFT', onGo: () => (setModal(null), startRun()) }
+          }
+        />
       )}
-      {modal === 'missions' && <MissionsSheet profile={profile} day={todayKey} onClaim={claimMission} onClose={() => setModal(null)} />}
-      {modal === 'gift' && (
-        <Sheet label="Thank you for testing" kind="center" onClose={() => (collectGift(), setModal(null))}>
-          {(close) => (
-            <div className="gift">
-              <span className="eyebrow wide">Thank you for testing</span>
-              <h2 className="disp">{TESTER_GIFT.coins.toLocaleString('en-US')} COINS</h2>
-              <span className="gift-coin" aria-hidden="true">
-                <Coin size={44} />
-              </span>
-              <p>You’re one of the first to play Perfect Season, and it’s better for every bug you found and every idea you sent. Here’s {TESTER_GIFT.coins.toLocaleString('en-US')} coins on us: open some packs in Ultimate Team.</p>
-              <button
-                className="btn gold"
-                onClick={() => {
-                  sfx.coin();
-                  vibrate([20, 30, 20]);
-                  collectGift();
-                  close(() => setModal(null));
-                }}
-              >
-                COLLECT
-              </button>
-            </div>
-          )}
-        </Sheet>
+      {modal === 'missions' && (
+        <MissionsSheet
+          profile={profile}
+          day={todayKey}
+          onClaim={claimMission}
+          onGo={(i) => {
+            setModal(null);
+            nextRoutes().draft(missionMode(missionList[i].go, profile.mode));
+          }}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'gift' && firstRun && (
+        // ut-4 (audit M7): the testers' gift and today's chest in one sheet, then the starter pack
+        <FirstRunSheet
+          plan={firstRun}
+          onCollect={() => update((p) => collectFirstRun(p, todayKey, TESTER_GIFT))}
+          onStarter={() => {
+            setModal(null);
+            void loadNextUp().then((m) => m.goHome({ app: 'ut', view: 'hub' }, SPORT, nextRoutes()));
+          }}
+          onClose={() => setModal(null)}
+        />
       )}
       {modal === 'reward' && (
         <DailyReward
