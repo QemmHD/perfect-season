@@ -7827,10 +7827,12 @@ button.friendcard:active {
   position: fixed;
   inset: 0;
   z-index: 50;
-  --sat: env(safe-area-inset-top, 0px);
-  --sab: env(safe-area-inset-bottom, 0px);
-  --sal: env(safe-area-inset-left, 0px);
-  --sar: env(safe-area-inset-right, 0px);
+  /* Claude (studio overhaul, shell-2): the stage publishes the insets and the blurred status-bar edge on
+     <html> (screen px; window.__psInsets in QA); env() stands in until it has measured */
+  --sat: calc(var(--ps-inset-top, env(safe-area-inset-top, 0px)) + var(--ps-edge, 0px));
+  --sab: var(--ps-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --sal: var(--ps-inset-left, env(safe-area-inset-left, 0px));
+  --sar: var(--ps-inset-right, env(safe-area-inset-right, 0px));
   color: #fff;
   font-family: var(--body, inherit);
 }
@@ -11649,10 +11651,54 @@ button.friendcard:active {
 }
 .home-scroll > .spacer {
   flex: 1 0 0;
+  /* Claude (studio overhaul, shell-2): never closer to PLAY than its fade, at rest or scrolled to the end */
+  min-height: 10px;
 }
 .home .playbar {
   position: relative;
-  box-shadow: 0 -14px 18px -6px var(--bg);
+}
+/* a short fade where the column meets PLAY (it used to be a 26 px shadow over the last row) */
+.home .playbar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
+  background: linear-gradient(to top, var(--bg), transparent);
+  pointer-events: none;
+}
+/* Claude (studio overhaul, shell-2, 2026-11-16): Home's vertical budget, shell-owned (docs/studio-overhaul/
+   shell.md "Home budget"). Screens now start 22 pt lower on island phones, so the column is tightened until
+   every state without a saved run fits above PLAY on every phone. Whatever room is left goes to the hero
+   (4:1 with the spacer), not to a dead gap; the hint slot under the modes keeps its height in every mode, so
+   nothing moves when a mode is picked. A saved run adds its card and the column scrolls. */
+.page-view.home .home-scroll > .logo {
+  margin-top: 3px;
+  margin-bottom: 4px;
+}
+.page-view.home .home-scroll > .hero {
+  flex: 4 0 82px;
+  min-height: 82px;
+  margin-top: 10px;
+}
+.page-view.home .home-scroll > .evo-home-actions {
+  margin: 9px 16px 0;
+}
+/* soccer has no Training Camp: without a saved run the actions row is empty, and its margins were dead space */
+.page-view.home .home-scroll > .evo-home-actions:empty {
+  display: none;
+}
+.page-view.home .home-scroll > .modes {
+  margin-top: 10px;
+}
+.page-view.home:not(.snug):not(.short) .mode {
+  height: 64px;
+  padding: 8px 14px;
+}
+.page-view.home .home-scroll .training-entry {
+  padding-top: 9px;
+  padding-bottom: 9px;
 }
 .mode .livebadge.daily-new {
   background: var(--gold);

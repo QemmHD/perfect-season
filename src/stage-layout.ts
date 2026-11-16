@@ -6,8 +6,14 @@ export type Insets = [number, number, number, number];
 export interface Layout {
   k: number;
   h: number;
+  /** the raw top safe-area inset (status bar / Dynamic Island), frame px */
   sat: number;
   sab: number;
+  /** Claude (studio overhaul, shell-2): clearance below `sat` that iOS blurs and dims under the status bar, frame px; 0 rotated or framed */
+  edge: number;
+  /** the height between the raw insets (h - sat - sab), frame px; the size classes read this, so the edge never flips one */
+  room: number;
+  /** the height left for screens below `sat + edge` and above `sab` (room - edge), frame px */
   content: number;
   fit: Fit;
   framed: boolean;
@@ -31,6 +37,15 @@ export function visibleViewport(input:ViewportInput):ViewportBox {
   return {w:v.width,h:v.height,x:inset(v.offsetLeft),y:inset(v.offsetTop)};
  return {w,h,x:0,y:0};
 }
+/** Claude (studio overhaul, shell-2, 2026-11-16): iOS 26 blurs and dims a band below the status bar that
+ * reaches past the reported safe-area inset (audit-ut-ui C1: 22 pt on Dynamic Island phones, about 19 on a
+ * 47-pt notch, about 8 under a plain 20-pt status bar). Screens keep their content below inset + edge.
+ * Screen pt in, screen pt out. scripts/qa/edge-lib.mjs `edgeOf` mirrors this; both are tested on the same table.
+ */
+export const EDGE_MAX = 22;
+export function topEdge(insetTop:number):number {
+ return Number.isFinite(insetTop)?Math.min(EDGE_MAX,Math.round(Math.max(0,insetTop)*0.4)):0;
+}
 export function fitFor(content:number):Fit {
  return content<650?'compact':content<730?'tight':content<800?'normal':'roomy';
 }
@@ -45,15 +60,19 @@ export function portraitRotation(width:number,height:number,coarse:boolean,angle
  }
  return -90;
 }
-/** Phones always fill the visible width. Short content scrolls inside screens; it never shrinks the whole app. */
+/** Phones always fill the visible width. Short content scrolls inside screens; it never shrinks the whole app.
+ * `sat` stays the raw inset; the edge below it is reported separately (`edge`; 0 when rotated, because iOS hides
+ * the status bar in landscape, and on framed desktop/tablet layouts, which have no status bar over them).
+ */
 export function stageBox(viewport:ViewportBox,insets:Insets,rot:Rot=0):StageBox {
  const VW=positive(viewport.w,390),VH=positive(viewport.h,844),W=rot?VH:VW,H=rot?VW:VH;
  const [vt,vr,vb,vl]=insets.map(inset);
  const [top,bottom]=rot===-90?[vl,vr]:rot===90?[vr,vl]:[vt,vb];
- let k:number,h:number,x:number,y:number,sat=0,sab=0,framed=false;
+ let k:number,h:number,x:number,y:number,sat=0,sab=0,edge=0,framed=false;
  if(W<=600) {
   k=W/DESIGN_W;h=H/k;x=0;y=0;
   sat=Math.min(top,H)/k;sab=Math.min(bottom,Math.max(0,H-top))/k;
+  edge=rot?0:topEdge(top)/k;
  } else {
   const m=Math.min(24,H/10,W/10),availableW=Math.max(1,W-2*m),availableH=Math.max(1,H-2*m);
   framed=true;k=Math.min(1.2,availableW/DESIGN_W,availableH/600);h=Math.min(844,availableH/k);
@@ -61,6 +80,7 @@ export function stageBox(viewport:ViewportBox,insets:Insets,rot:Rot=0):StageBox 
  }
  const place='translate('+x+'px,'+y+'px) scale('+k+')';
  const transform=rot===-90?'translate(0px,'+VH+'px) rotate(-90deg) '+place:rot===90?'translate('+VW+'px,0px) rotate(90deg) '+place:place;
- const content=Math.max(0,h-sat-sab);
- return {k,h,sat,sab,content,fit:fitFor(content),framed,rot,transform};
+ const room=Math.max(0,h-sat-sab),content=Math.max(0,room-edge);
+ // the size class reads the room between the raw insets, so adding the edge never changes a phone's class
+ return {k,h,sat,sab,edge,room,content,fit:fitFor(room),framed,rot,transform};
 }

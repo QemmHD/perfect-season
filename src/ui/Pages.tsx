@@ -150,8 +150,9 @@ export function HomePage(props: {
     introPlayed = true;
   }, []);
   const p = props.profile;
-  // the rows that give way on shorter screens (styles.css "home")
-  const { content } = useLayout();
+  // the rows that give way on shorter screens (styles.css "home"); Claude (studio overhaul, shell-2): read from the
+  // room between the raw insets, like the stage's fit, so the status-bar edge never changes a phone's class
+  const { room } = useLayout();
   const playLabel = p.mode === 'daily' ? (props.dailyDone ? 'PRACTICE DAILY' : 'PLAY DAILY #' + props.dailyNo) : p.mode === '1v1' ? (NET_ON ? 'FIND A MATCH' : 'PLAY THE BOT') : 'PLAY';
   // someone to play: another player with this sport open
   const live = props.online && props.online.here > 1;
@@ -170,7 +171,7 @@ export function HomePage(props: {
   // Claude (UI reorganisation): everything above the PLAY button scrolls when it can't fit (320x568
   // with a saved run used to push PLAY off the screen); PLAY itself never moves.
   return (
-    <div className={'page-view home' + (content < 620 ? ' short' : content < 730 ? ' snug' : '') + (content >= 816 ? ' tall' : '')}>
+    <div className={'page-view home' + (room < 620 ? ' short' : room < 730 ? ' snug' : '') + (room >= 816 ? ' tall' : '')}>
       <div className="home-scroll">
         <h1 className={'logo' + (intro ? ' intro' : '')} aria-label="Perfect Season">
           <span className="disp l1" aria-hidden="true">
@@ -250,9 +251,7 @@ export function HomePage(props: {
             <span>{props.dailyDone ? 'Your ranked try is in. Replays are practice. New spins in ' + left + '.' : 'Everyone gets today’s same spins. Your first try is ranked.'}</span>
           ) : p.mode === 'blind' ? (
             <span>Draft from memory. Stats stay hidden until the results.</span>
-          ) : (
-            <span>1 free team respin and 1 free decade respin every draft.</span>
-          )}
+          ) : null /* Claude (studio overhaul, shell-2): Classic's respin hint lives in How to play; its slot stays so the tiles never move */}
         </div>
         <div className="spacer" />
       </div>

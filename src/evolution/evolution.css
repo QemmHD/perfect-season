@@ -368,7 +368,7 @@
 .camp-overlay {
   position: fixed;
   z-index: 10020;
-  top: calc(env(safe-area-inset-top, 0px) + 87px);
+  top: calc(var(--ps-inset-top, env(safe-area-inset-top, 0px)) + 87px);
   left: 12px;
   right: 12px;
   display: flex;
@@ -664,7 +664,8 @@
 .save-warning {
   position: fixed;
   z-index: 11000;
-  top: env(safe-area-inset-top, 0px);
+  /* below the status-bar edge iOS blurs (shell-2; the stage publishes --ps-inset-top and --ps-edge) */
+  top: calc(var(--ps-inset-top, env(safe-area-inset-top, 0px)) + var(--ps-edge, 0px));
   left: 0;
   right: 0;
   background: #4c2814;
@@ -1088,7 +1089,7 @@ button:disabled {
   .camp-overlay {
     left: max(12px, env(safe-area-inset-left));
     right: max(12px, env(safe-area-inset-right));
-    top: calc(env(safe-area-inset-top, 0px) + 53px);
+    top: calc(var(--ps-inset-top, env(safe-area-inset-top, 0px)) + 53px);
     max-width: 420px;
     margin: auto;
   }

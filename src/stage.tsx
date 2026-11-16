@@ -10,13 +10,19 @@ import type { Rot } from './stage-layout';
    The frame runs edge to edge; --sat/--sab carry the Dynamic Island / status
    bar and home-indicator insets (in frame px) so screens can keep their
    content clear of them while their backgrounds bleed underneath.
+   Claude (studio overhaul, shell-2): --sat is the top inset plus the edge iOS
+   blurs below the status bar (stage-layout topEdge); --inset-top is the raw
+   inset and --edge the clearance. <html> carries the same in screen px as
+   --ps-inset-* and --ps-edge for what lives outside the frame (the matches
+   portaled to <body>, fixed banners), so every surface reads one source:
+   the probe's env() on a phone, window.__psInsets in QA.
 
    The game is portrait only. Browsers can't lock rotation on iPhone, so when
    a phone is turned sideways the frame is turned back by 90 degrees: it stays
    upright relative to the phone, the way a portrait-locked app does, and the
    island stays at its top. */
 
-const DEFAULT: Layout = { k: 1, h: 844, sat: 0, sab: 0, content: 844, fit: 'roomy', framed: false, rot: 0 };
+const DEFAULT: Layout = { k: 1, h: 844, sat: 0, sab: 0, edge: 0, room: 844, content: 844, fit: 'roomy', framed: false, rot: 0 };
 const LayoutCtx = createContext<Layout>(DEFAULT);
 export const useLayout = () => useContext(LayoutCtx);
 
@@ -27,7 +33,7 @@ declare global {
   }
 }
 
-interface Box extends StageBox { viewport: ViewportBox; }
+interface Box extends StageBox { viewport: ViewportBox; /** raw screen-px insets [t, r, b, l] */ insets: [number, number, number, number]; }
 
 function readInsets(probe: HTMLElement | null): [number, number, number, number] {
   if (window.__psInsets) return window.__psInsets;
@@ -46,7 +52,15 @@ function measure(root: HTMLElement, probe: HTMLElement | null): Box {
   const legacy = (window as unknown as {orientation?:number}).orientation;
   const angle = typeof legacy === 'number' ? legacy : screen.orientation?.angle;
   const rot = portraitRotation(viewport.w, viewport.h, window.matchMedia?.('(pointer: coarse)').matches ?? false, angle);
-  return { ...stageBox(viewport, readInsets(probe), rot), viewport };
+  const insets = readInsets(probe);
+  return { ...stageBox(viewport, insets, rot), viewport, insets: [...insets] as Box['insets'] };
+}
+
+/** Claude (studio overhaul, shell-2): the insets and edge in screen px on <html>, for what is outside the frame. */
+function publishInsets(insets: [number, number, number, number], edge: number) {
+  const st = document.documentElement.style;
+  (['top', 'right', 'bottom', 'left'] as const).forEach((side, i) => st.setProperty('--ps-inset-' + side, insets[i] + 'px'));
+  st.setProperty('--ps-edge', edge + 'px');
 }
 
 const standaloneIOS = () => (navigator as Navigator & { standalone?: boolean }).standalone === true;
@@ -59,9 +73,10 @@ export function viewportInfo(): string {
   const app = document.getElementById('root')?.clientHeight ?? 0;
   const sc = Math.min(screen.width, screen.height) + '×' + Math.max(screen.width, screen.height);
   const [t, , b] = readInsets(document.querySelector<HTMLElement>('.inset-probe'));
+  const edge = parseFloat(document.documentElement.style.getPropertyValue('--ps-edge')) || 0;
   const visual=window.visualViewport;
   const visible=visual?' · visible '+Math.round(visual.width)+'×'+Math.round(visual.height)+' @'+visual.scale.toFixed(2)+' offset '+Math.round(visual.offsetLeft)+'/'+Math.round(visual.offsetTop):'';
-  return 'view ' + Math.round(innerWidth) + '×' + Math.round(innerHeight) + (doc !== innerHeight || app !== innerHeight ? ' (' + doc + '/' + app + ')' : '') + ' · screen ' + sc + ' · safe ' + Math.round(t) + '/' + Math.round(b) + visible + (standaloneIOS() ? ' · home screen' : '');
+  return 'view ' + Math.round(innerWidth) + '×' + Math.round(innerHeight) + (doc !== innerHeight || app !== innerHeight ? ' (' + doc + '/' + app + ')' : '') + ' · screen ' + sc + ' · safe ' + Math.round(t) + '/' + Math.round(b) + ' · edge ' + Math.round(edge) + visible + (standaloneIOS() ? ' · home screen' : '');
 }
 
 /** An element's box in frame px, whatever the frame's scale and rotation. */
@@ -103,7 +118,7 @@ export function Stage({ children }: { children: React.ReactNode }) {
     const timers=new Set<number>();
     const apply=()=>{
       const next=measure(root,probeRef.current);
-      setBox(old=>old&&old.transform===next.transform&&old.h===next.h&&old.sat===next.sat&&old.sab===next.sab&&old.viewport.w===next.viewport.w&&old.viewport.h===next.viewport.h&&old.viewport.x===next.viewport.x&&old.viewport.y===next.viewport.y?old:next);
+      setBox(old=>old&&old.transform===next.transform&&old.h===next.h&&old.sat===next.sat&&old.sab===next.sab&&old.edge===next.edge&&old.insets.every((v,i)=>v===next.insets[i])&&old.viewport.w===next.viewport.w&&old.viewport.h===next.viewport.h&&old.viewport.x===next.viewport.x&&old.viewport.y===next.viewport.y?old:next);
     };
     const update=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(apply);};
     const later=(ms:number)=>{const id=window.setTimeout(()=>{timers.delete(id);update();},ms);timers.add(id);};
@@ -135,6 +150,11 @@ export function Stage({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Claude (studio overhaul, shell-2): the same insets and edge, in screen px, for surfaces outside the frame
+  useLayoutEffect(() => {
+    if (box) publishInsets(box.insets, Math.round(box.edge * box.k * 1000) / 1000);
+  }, [box]);
+
   // after the phone turns, the frame fades back in instead of snapping into place
   useLayoutEffect(() => {
     if (!box) return;
@@ -148,8 +168,11 @@ export function Stage({ children }: { children: React.ReactNode }) {
         width: DESIGN_W,
         height: box.h,
         transform: box.transform,
-        '--sat': box.sat + 'px',
+        // Claude (studio overhaul, shell-2): every screen keeps its content below the blurred band
+        '--sat': box.sat + box.edge + 'px',
         '--sab': box.sab + 'px',
+        '--inset-top': box.sat + 'px',
+        '--edge': box.edge + 'px',
       } as React.CSSProperties)
     : undefined;
 

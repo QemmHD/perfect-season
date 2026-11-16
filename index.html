@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Perfect Season</title>
-    <meta name="description" content="Spin a random NBA or NFL team and decade, draft a lineup of legends, and go for a perfect season: 82–0 and 16–0, or 17–0 and the Super Bowl." />
+    <meta name="description" content="Spin a random NBA, NFL or soccer team and decade, draft a lineup of legends, and go for a perfect season." />
     <meta name="theme-color" content="#04121a" />
     <meta name="color-scheme" content="dark" />
     <!-- installed to the home screen: full screen, light status bar text over the game -->
@@ -37,8 +37,9 @@
         background: #04121a;
       }
       /* iOS 26 home-screen apps get a viewport one status bar short while the page is shorter than
-         the screen (WebKit bug 301108); a page as tall as the screen gets the full viewport. Here so it
-         applies from the first frame; the same rule is in styles.css */
+         the screen (WebKit bug 301108); a page as tall as the screen gets the full viewport. This is the
+         only copy of the rule, inline so it applies from the first frame. CDP cannot emulate display-mode,
+         so browser QA injects it without the media query (scripts/qa/edge-lib.mjs forceStandaloneRule). */
       @media (display-mode: standalone) {
         html {
           min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px)));

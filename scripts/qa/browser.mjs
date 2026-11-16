@@ -133,7 +133,8 @@ export async function dismissPack(page) {
     if (await done.isVisible().catch(() => false)) await done.click();
     else {
       const skip = page.getByRole('button', { name: 'SKIP', exact: true });
-      if (await skip.isVisible().catch(() => false)) await skip.click();
+      // SKIP rides the pack cinema's animation and can be replaced mid-tap; a forced tap is still a real click
+      if (await skip.isVisible().catch(() => false)) await skip.click({ timeout: 4000 }).catch(() => skip.click({ force: true, timeout: 4000 }).catch(() => {}));
       else await page.locator('.ut-open-screen').click({ position: { x: 10, y: 60 } });
     }
     await page.waitForTimeout(220);

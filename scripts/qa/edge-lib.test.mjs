@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEVICE_IDS, DEVICES, edgeOf, expectedLayout, fitFor, homeClassFor, textClearOf, TEXT_CLEAR } from './edge-lib.mjs';
 import { edgeOf as snippetEdgeOf } from './edge-snippet.mjs';
-import { fitFor as appFitFor, stageBox } from '../../src/stage-layout';
+import { fitFor as appFitFor, stageBox, topEdge } from '../../src/stage-layout';
 
 describe('edge-lib devices and edge', () => {
   it('lists the nine phones of the shell plan with their insets', () => {
@@ -26,6 +26,7 @@ describe('edge-lib devices and edge', () => {
     const table = { 0: 0, 20: 8, 47: 19, 50: 20, 59: 22, 62: 22, 68: 22, 100: 22, '-5': 0 };
     for (const [t, e] of Object.entries(table)) {
       expect(edgeOf(+t)).toBe(e);
+      expect(topEdge(+t)).toBe(e);
       expect(snippetEdgeOf(+t)).toBe(e);
     }
   });
@@ -47,7 +48,10 @@ describe('expectedLayout mirrors the stage', () => {
       const d = DEVICES[id];
       const box = stageBox({ w: d.w, h: d.h, x: 0, y: 0 }, d.insets, 0);
       const e = expectedLayout(id);
-      expect(e.room).toBeCloseTo(box.content, 0);
+      // shell-2 split the stage's height into room (between the raw insets) and content (room − edge)
+      expect(e.room).toBeCloseTo(box.room, 0);
+      expect(e.roomAfterEdge).toBeCloseTo(box.content, 0);
+      expect(e.edge).toBeCloseTo(box.edge, 0);
       expect(e.fit).toBe(box.fit);
       expect(e.sat * e.k).toBeCloseTo(d.insets[0], 0);
     }
