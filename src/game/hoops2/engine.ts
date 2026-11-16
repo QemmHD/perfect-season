@@ -960,7 +960,8 @@ export function spin(p: Possession, dir: number) {
 export function driving(p: Possession): boolean {
   if (p.handler === null) return false;
   const h = p.bodies[p.handler];
-  const speed = Math.hypot(h.vx, h.vz);
+  // sqrt (correctly rounded everywhere), not hypot: the sim math stays bit-identical on every engine
+  const speed = Math.sqrt(h.vx * h.vx + h.vz * h.vz);
   const d = dist(h, RIM);
   if (speed < 5 || d > 24) return false;
   return (h.vx * (RIM.cx - h.cx) + h.vz * (RIM.cz - h.cz)) / (speed * Math.max(d, 0.01)) > 0.45;

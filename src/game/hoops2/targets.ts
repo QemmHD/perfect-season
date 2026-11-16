@@ -1,6 +1,7 @@
 // The studio overhaul's NBA targets as data (Claude 2026-11-10): every row of the team plan's §3
 // (docs/studio-overhaul/nba-plan.md), with the real value where there is one, the accepted band,
-// the audit's baseline where it measured one, where the number comes from and the task that
+// the baseline where one was measured (the audit's, or nba-1's for the V2 rows: §3.8 geometry,
+// §3.9 performance, §3.10 flow), where the number comes from and the task that
 // proves it. Test-only: the harnesses print their measurements against these rows, and nba-10's
 // fit asserts them (NBA_CAL_ASSERT=1). The app never imports this file.
 
@@ -15,7 +16,11 @@ export interface Target {
   lo: number;
   hi: number;
   source: string;
-  /** what the audit (2026-11-09) measured, when it did */
+  /**
+   * Today's value before any overhaul change, when one was measured: the audit's (2026-11-09), or
+   * nba-1's (2026-11-16; the V2 rows: §3.8 geometry and camera, §3.9 perf, §3.10 flow). Rows whose
+   * thing doesn't exist yet (the pause button, the Heat bar, the gold ring, haptics, grades) have none.
+   */
   baseline?: number;
   /** the band applies to (this metric − the metric named here), for era rows */
   relTo?: string;
@@ -322,13 +327,89 @@ export const GEO: Record<'393' | '320', GeoSize> = {
     toast: { bottom: 404, h: 24 }, safe: { y0: 76, y1: 368 },
   },
 };
+/**
+ * nba-1's measurement of today's controls on these rows (`nba-geo.mjs`, 2026-11-16, before nba-2):
+ * A = SHOOT, B = PASS, C = the SCREEN/CUT/SPACE strip, D = the CROSS/STEP BACK/SPIN row, the stick =
+ * the fixed stick (its zone is the ring only), the toast = the hint line. The pause button and the
+ * Heat bar didn't exist (no row); the safe box is new.
+ */
+export const GEO_BASELINE: Record<string, number> = {
+  // 393
+  'geo.393.A.d': 100,
+  'geo.393.A.cx': 329,
+  'geo.393.A.cy': 756,
+  'geo.393.B.d': 70,
+  'geo.393.B.cx': 246,
+  'geo.393.B.cy': 685,
+  'geo.393.C.d': 44,
+  'geo.393.C.cx': 121.5,
+  'geo.393.C.cy': 190,
+  'geo.393.D.d': 44,
+  'geo.393.D.cx': 195.4,
+  'geo.393.D.cy': 612,
+  'geo.393.stick.d': 128,
+  'geo.393.stick.cx': 78,
+  'geo.393.stick.cy': 742,
+  'geo.393.zone.x0': 14,
+  'geo.393.zone.x1': 142,
+  'geo.393.zone.y0': 678,
+  'geo.393.zone.y1': 806,
+  'geo.393.bug.x': 56.3,
+  'geo.393.bug.y': 67,
+  'geo.393.bug.w': 280.5,
+  'geo.393.bug.h': 34,
+  'geo.393.toast.bottom': 258,
+  'geo.393.toast.h': 38,
+  'geo.393.gap.AB': 24.2,
+  'geo.393.gap.AC': 530.8,
+  'geo.393.gap.AD': 124.4,
+  'geo.393.minTarget': 44,
+  'geo.393.rightTargets': 6,
+  'geo.393.highestTarget': 0.197,
+  'geo.393.overlaps': 0,
+  // 320
+  'geo.320.A.d': 100,
+  'geo.320.A.cx': 256,
+  'geo.320.A.cy': 506,
+  'geo.320.B.d': 70,
+  'geo.320.B.cx': 173,
+  'geo.320.B.cy': 435,
+  'geo.320.C.d': 44,
+  'geo.320.C.cx': 91.9,
+  'geo.320.C.cy': 151,
+  'geo.320.D.d': 44,
+  'geo.320.D.cx': 122.4,
+  'geo.320.D.cy': 362,
+  'geo.320.stick.d': 114.2,
+  'geo.320.stick.cx': 71.1,
+  'geo.320.stick.cy': 492,
+  'geo.320.zone.x0': 14,
+  'geo.320.zone.x1': 128.2,
+  'geo.320.zone.y0': 428,
+  'geo.320.zone.y1': 556,
+  'geo.320.bug.x': 46,
+  'geo.320.bug.y': 28,
+  'geo.320.bug.w': 228,
+  'geo.320.bug.h': 29,
+  'geo.320.toast.bottom': 231,
+  'geo.320.toast.h': 50,
+  'geo.320.gap.AB': 24.2,
+  'geo.320.gap.AC': 319.1,
+  'geo.320.gap.AD': 124.4,
+  'geo.320.minTarget': 44,
+  'geo.320.rightTargets': 6,
+  'geo.320.highestTarget': 0.227,
+  'geo.320.overlaps': 0,
+};
+
 /** plan §3.8: the gap between two buttons' edges (A-B, A-C, A-D), at 393 / 320 */
 export const GEO_GAPS = { AB: [16, 10], AC: [15, 14], AD: [18, 12] } as const;
 export const GEO_TOL = 2;
 const GEO_SRC = 'plan §3.8 (V2 A.5)';
 const geoRows = (): Target[] => {
-  const rows: [string, string, number | null, number, number, string][] = [];
-  const px = (k: string, label: string, v: number) => rows.push([k, label, v, v - GEO_TOL, v + GEO_TOL, GEO_SRC]);
+  const rows: [string, string, number | null, number, number, string, Partial<Target>?][] = [];
+  const base = (k: string): Partial<Target> | undefined => (k in GEO_BASELINE ? { baseline: GEO_BASELINE[k] } : undefined);
+  const px = (k: string, label: string, v: number) => rows.push([k, label, v, v - GEO_TOL, v + GEO_TOL, GEO_SRC, base(k)]);
   for (const [size, g] of Object.entries(GEO)) {
     const at = `${g.w}×${g.h}`;
     for (const el of ['A', 'B', 'C', 'D', 'stick'] as const) {
@@ -344,11 +425,11 @@ const geoRows = (): Target[] => {
     px(`geo.${size}.safe.y0`, `${at}: action-safe box top (px)`, g.safe.y0);
     px(`geo.${size}.safe.y1`, `${at}: action-safe box bottom (px)`, g.safe.y1);
     const i = size === '393' ? 0 : 1;
-    for (const [pair, v] of Object.entries(GEO_GAPS)) rows.push([`geo.${size}.gap.${pair}`, `${at}: ${pair[0]}-${pair[1]} edge gap (px)`, v[i], 10, 18, GEO_SRC]);
-    rows.push([`geo.${size}.minTarget`, `${at}: smallest tap target (px)`, null, 44, INF, GEO_SRC]);
-    rows.push([`geo.${size}.rightTargets`, `${at}: right-thumb targets, at most`, null, 0, 4, GEO_SRC]);
-    rows.push([`geo.${size}.highestTarget`, `${at}: highest right-thumb target top, as a share of the height (none above 2/3 up)`, null, 1 / 3, 1, GEO_SRC]);
-    rows.push([`geo.${size}.overlaps`, `${at}: overlapping controls`, null, 0, 0, GEO_SRC]);
+    for (const [pair, v] of Object.entries(GEO_GAPS)) rows.push([`geo.${size}.gap.${pair}`, `${at}: ${pair[0]}-${pair[1]} edge gap (px)`, v[i], 10, 18, GEO_SRC, base(`geo.${size}.gap.${pair}`)]);
+    rows.push([`geo.${size}.minTarget`, `${at}: smallest tap target (px)`, null, 44, INF, GEO_SRC, base(`geo.${size}.minTarget`)]);
+    rows.push([`geo.${size}.rightTargets`, `${at}: right-thumb targets, at most`, null, 0, 4, GEO_SRC, base(`geo.${size}.rightTargets`)]);
+    rows.push([`geo.${size}.highestTarget`, `${at}: highest right-thumb target top, as a share of the height (none above 2/3 up)`, null, 1 / 3, 1, GEO_SRC, base(`geo.${size}.highestTarget`)]);
+    rows.push([`geo.${size}.overlaps`, `${at}: overlapping controls`, null, 0, 0, GEO_SRC, base(`geo.${size}.overlaps`)]);
   }
   return t('3.8', 'nba-2', rows);
 };
@@ -357,52 +438,55 @@ const HUD = [
   ...t('3.8', 'nba-3', [
     ['geo.otherSizes.overlaps', '430×932 and 375×667: overlaps, targets under 44 px, controls under the insets', null, 0, 0, GEO_SRC, { task: 'nba-2' }],
     ['geo.landscape.overlaps', 'Landscape (852×393, 932×430, 667×375, 568×320): overlaps or controls outside --sal/--sar', null, 0, 0, GEO_SRC, { task: 'nba-2' }],
-    ['safe.handlerRim', 'Handler and rim inside the safe box, share of 300 offense frames (every size)', null, 0.98, 1, GEO_SRC],
+    ['safe.handlerRim', 'Handler and rim inside the safe box, share of 300 offense frames (every size)', null, 0.98, 1, GEO_SRC, { baseline: 0.406 }],
     ['safe.defense', 'Your defender and the AI handler inside the safe box, share of defense frames', null, 0.98, 1, GEO_SRC, { task: 'nba-6' }],
-    ['cam.rimY', 'Camera: rim centre, share of the viewport height', null, 0.2, 0.24, 'plan §3.8 (V2 B.1.3)'],
-    ['cam.handlerY', "Camera: handler's feet (median), share of the height", null, 0.5, 0.55, 'plan §3.8 (V2 B.1.3)'],
-    ['cam.overlap', 'On-ball defender overlap ≤ 35%, share of releases', null, 0.9, 1, 'plan §3.8 (V2 B.1.3)'],
-    ['cam.zoomVar', 'Zoom variation with the ball within 15 ft of the rim, at most', null, 0, 0.02, 'plan §3.8 (V2 B.1.3)'],
+    ['cam.rimY', 'Camera: rim centre, share of the viewport height', null, 0.2, 0.24, 'plan §3.8 (V2 B.1.3)', { baseline: 0.364 }],
+    ['cam.handlerY', "Camera: handler's feet (median), share of the height", null, 0.5, 0.55, 'plan §3.8 (V2 B.1.3)', { baseline: 0.657 }],
+    ['cam.overlap', 'On-ball defender overlap ≤ 35%, share of releases', null, 0.9, 1, 'plan §3.8 (V2 B.1.3)', { baseline: 0.5 }],
+    ['cam.zoomVar', 'Zoom variation with the ball within 15 ft of the rim, at most', null, 0, 0.02, 'plan §3.8 (V2 B.1.3)', { baseline: 0.127 }],
     ['gesture.misclass', 'Gesture misclassification (200 jittered per class: tap, hold, four swipes)', null, 0, 0.02, 'plan §3.8', { task: 'nba-2' }],
     ['gesture.accidentalPass', 'Accidental passes from stick touches', null, 0, 0, 'plan §3.8', { task: 'nba-2' }],
     ['gesture.twoPointers', 'Stick + A held together: both tracked', null, 1, 1, 'plan §3.8', { task: 'nba-2' }],
-    ['stick.responseFrames', 'Stick response after pointerdown (frames)', null, 0, 1, 'plan §3.8', { task: 'nba-2' }],
+    ['stick.responseFrames', 'Stick response after pointerdown (frames)', null, 0, 1, 'plan §3.8', { task: 'nba-2', baseline: 3 }],
     ['stick.preheldFt', 'Thumb resting 300 ms before the whistle: handler moved within 300 ms of it (ft)', null, 1.5, INF, 'plan §3.8 (NBA-12)', { task: 'nba-2', baseline: 0 }],
-    ['stick.deadZone', 'Stick dead zone (× ring radius)', null, 0.12, 0.12, 'plan §4.2', { task: 'nba-2' }],
-    ['stick.sprintAt', 'Sprint past (× ring radius)', null, 1.15, 1.15, 'plan §3.8', { task: 'nba-2' }],
+    ['stick.deadZone', 'Stick dead zone (× ring radius)', null, 0.12, 0.12, 'plan §4.2', { task: 'nba-2', baseline: 0 }],
+    ['stick.sprintAt', 'Sprint past (× ring radius)', null, 1.15, 1.15, 'plan §3.8', { task: 'nba-2', baseline: 0.92 }],
     ['stick.followAt', 'Ring follows the thumb beyond (× ring radius)', null, 1.6, 1.6, 'plan §3.8', { task: 'nba-2' }],
-    ['text.minPx', 'Every DOM text at 320 wide (px)', null, 10, INF, 'BUILD-RULES', { task: 'every task' }],
-    ['tags.duplicates', 'Duplicate on-court tags over 1,000 random UT squads', null, 0, 0, 'plan §3.8'],
-    ['font.glyphMisses', 'Name-chip glyph misses over every name in cards-nba.json', null, 0, 0, 'plan §3.8'],
+    ['text.minPx', 'Every DOM text at 320 wide (px)', null, 10, INF, 'BUILD-RULES', { task: 'every task', baseline: 10 }],
+    ['tags.duplicates', 'Duplicate on-court tags over 1,000 random UT squads (courts with one, of 500)', null, 0, 0, 'plan §3.8', { baseline: 76 }],
+    ['font.glyphMisses', 'Name-chip glyph misses over every name in cards-nba.json (names with a hole)', null, 0, 0, 'plan §3.8', { baseline: 122 }],
   ]),
 ];
 
 // §3.9: performance, bundle and test time
 const PERF = t('3.9', 'nba-10', [
-  ['perf.4x.medianFps', '4× CPU: median fps', null, 55, INF, 'plan §3.9'],
-  ['perf.4x.over20', '4× CPU: share of frames over 20 ms', null, 0, 0.05, 'plan §3.9'],
-  ['perf.1x.p99Ms', '1×: rAF callback p99 (ms)', null, 0, 10, 'plan §3.9', { baseline: 8.9 }],
+  // baselines: nba-1's nba-perf.mjs, the worst of 430×932 / 320×568 / 852×393 (each size's is in nba.md)
+  ['perf.4x.medianFps', '4× CPU: median fps', null, 55, INF, 'plan §3.9', { baseline: 59.9 }],
+  ['perf.4x.over20', '4× CPU: share of frames over 20 ms', null, 0, 0.05, 'plan §3.9', { baseline: 0.482 }],
+  ['perf.1x.p99Ms', '1×: rAF callback p99 (ms; 430 / 320 / 852 wide: 13.0 / 9.8 / 9.9)', null, 0, 10, 'plan §3.9', { baseline: 13.0 }],
   ['bundle.gameKb', 'Game chunk growth, shared stick/ring/heat/HUD included (KB gzip)', null, -INF, 18, 'plan §3.9'],
   ['bundle.mainKb', 'Main / first-paint chunk growth (KB gzip)', null, -INF, 0, 'plan §3.9'],
   ['bundle.utKb', 'UT chunk growth (KB gzip; hud/grade.ts and hoops2/usage.ts only)', null, -INF, 2, 'plan §3.9'],
   ['tests.addedS', 'Always-on test time added to the NBA run (s)', null, 0, 60, 'plan §2'],
 ]);
 
-// §3.10: flow, pause and the held arena (V2 D.1)
+// §3.10: flow, pause and the held arena (V2 D.1). Baselines: nba-rematch.mjs after the review fix (no
+// captures inside a timed span), on the pre-overhaul code at 393×852: the median of 3 pre-game runs
+// (6.24 / 6.45 / 6.97 s on a shared machine), one 2-game loop. Pause rows: nothing paused (no row).
 const FLOW_SRC = 'plan §3.10 (V2 D.1)';
 const FLOW = t('3.10', 'nba-3', [
-  ['flow.pregameTaps', 'PLAY tap to the first controllable possession (taps)', null, 0, 2, FLOW_SRC, { task: 'nba-9' }],
-  ['flow.pregameS', 'PLAY tap to the first controllable possession (s)', null, 0, 3.5, FLOW_SRC, { task: 'nba-9' }],
+  ['flow.pregameTaps', 'PLAY tap to the first controllable possession (taps)', null, 0, 2, FLOW_SRC, { task: 'nba-9', baseline: 3 }],
+  ['flow.pregameS', 'PLAY tap to the first controllable possession (s)', null, 0, 3.5, FLOW_SRC, { task: 'nba-9', baseline: 6.45 }],
   ['flow.skipCurtainS', 'Skipping the curtain (s)', null, 0, 0.3, FLOW_SRC, { task: 'nba-9' }],
   ['pause.steps', 'Engine steps during a 10 s pause', null, 0, 0, FLOW_SRC, { task: 'nba-2' }],
   ['pause.timers', 'Timer callbacks during a 10 s pause', null, 0, 0, FLOW_SRC, { task: 'nba-2' }],
   ['pause.markDiff', 'Marks differing from the same scripted game unpaused', null, 0, 0, FLOW_SRC, { task: 'nba-2' }],
-  ['pause.autoOnHide', 'Auto-pause on visibilitychange / pagehide', null, 1, 1, FLOW_SRC, { task: 'nba-2' }],
-  ['hold.whistleToFinishS', 'Held arena: final whistle to onFinish (s)', null, 0, 0.3, FLOW_SRC],
-  ['hold.rematchToPlayS', 'rematch() to the first controllable frame, 4× CPU, curtain included (s)', null, 0, 1.5, FLOW_SRC],
-  ['hold.newCanvases', 'New canvases or renderers made by a rematch', null, 0, 0, FLOW_SRC],
-  ['hold.heapGrowth', 'JS heap after the 5th rematch vs after the 1st (×)', null, 0, 1.1, FLOW_SRC],
-  ['hold.loopS', 'Whole loop: whistle to the next tip-off, with ut\'s 5 s slam/tally (s)', null, 0, 10, FLOW_SRC],
+  ['pause.autoOnHide', 'Auto-pause on visibilitychange / pagehide', null, 1, 1, FLOW_SRC, { task: 'nba-2', baseline: 0 }],
+  ['hold.whistleToFinishS', 'Held arena: final whistle to onFinish (s)', null, 0, 0.3, FLOW_SRC, { baseline: 1.6 }],
+  ['hold.rematchToPlayS', 'rematch() to the first controllable frame, 4× CPU, curtain included (s)', null, 0, 1.5, FLOW_SRC, { baseline: 2.54 }],
+  ['hold.newCanvases', 'New canvases or renderers made by a rematch', null, 0, 0, FLOW_SRC, { baseline: 1 }],
+  ['hold.heapGrowth', 'JS heap after the 5th rematch vs after the 1st (×; baseline: game 2 vs 1)', null, 0, 1.1, FLOW_SRC, { baseline: 1.028 }],
+  ['hold.loopS', 'Whole loop: whistle to the next tip-off, with ut\'s 5 s slam/tally (s)', null, 0, 10, FLOW_SRC, { baseline: 13.05 }],
 ]);
 
 // §3.11: practice drills and Moments

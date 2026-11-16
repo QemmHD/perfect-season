@@ -3,7 +3,9 @@
 //  - the dev server is the team's own, http://localhost:5215, with ?ns=inspect and the team's own
 //    relay ws://localhost:7795 (scripts/audit/nba-relay.mjs; never the shared 7777 or a real relay)
 //  - every request and WebSocket to a host other than localhost/127.0.0.1 is aborted (fonts from
-//    fonts.googleapis.com / fonts.gstatic.com excepted) and recorded in `blocked`
+//    fonts.googleapis.com / fonts.gstatic.com excepted) and recorded in `blocked`, by nba-guard.mjs:
+//    a context route plus a guard on the Route itself, so a page-level route's continue() or fetch()
+//    can't get past it either
 //  - the 8 plan sizes carry their safe-area insets, injected where the app reads them: the stage's
 //    window.__psInsets hook and the game's own .arcade-full variables (which read env())
 //  - both reduced-motion modes; touch through CDP
@@ -11,13 +13,15 @@
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ALLOWED, blocked, guardNode, guardPlaywright, isolate } from './nba-guard.mjs';
+
+export { ALLOWED, blocked, isolate };
 
 export const require = createRequire(new URL('../../package.json', import.meta.url));
 export const PORT = 5215;
 export const RELAY_PORT = 7795;
 export const BASE = `http://localhost:${PORT}/`;
 export const RELAY = `ws://localhost:${RELAY_PORT}`;
-export const ALLOWED = ['localhost', '127.0.0.1', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 /** where captures and JSON land (NBA_SHOTS to change it; never inside the repo) */
 export const SHOTS = process.env.NBA_SHOTS || '/tmp/ps-nba-shots';
 fs.mkdirSync(SHOTS, { recursive: true });
@@ -39,12 +43,10 @@ export const SIZES = {
 };
 export const PORTRAIT = ['393', '320', '430', '375'];
 
-export const blocked = [];
-const allowed = (u) => u.protocol === 'data:' || u.protocol === 'blob:' || ALLOWED.includes(u.hostname);
-
 export async function launch() {
   process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = '1';
-  const { chromium } = require('playwright');
+  guardNode();
+  const { chromium } = guardPlaywright(require('playwright'));
   return chromium.launch({ headless: true, args: ['--no-sandbox'] });
 }
 
@@ -65,23 +67,6 @@ export function url(params = {}) {
   for (const [k, v] of Object.entries(params)) q.set(k, v);
   u.search = q.toString().replace(/=(&|$)/g, '$1');
   return u.href;
-}
-
-/** Abort every request and socket that would leave the machine. */
-export async function isolate(context) {
-  await context.route('**/*', (route) => {
-    const u = new URL(route.request().url());
-    if (allowed(u)) return route.continue();
-    blocked.push(u.hostname);
-    return route.abort();
-  });
-  if (context.routeWebSocket)
-    await context.routeWebSocket(/.*/, (ws) => {
-      const u = new URL(ws.url());
-      if (ALLOWED.includes(u.hostname)) return ws.connectToServer();
-      blocked.push('ws:' + u.hostname);
-      return ws.close();
-    });
 }
 
 /**

@@ -1,58 +1,49 @@
-// Loaded by nba-qa-run.mjs into a shared QA script (node --import): before the script runs, every
-// playwright browser it launches is isolated the nba-lib way (Claude 2026-11-16):
-//  - each new context aborts requests and WebSockets to any host but localhost/127.0.0.1 (fonts
-//    excepted), so a shared script can't reach live Supabase, relays or boards
+// Loaded by nba-qa-run.mjs into a shared QA script (node --import): before the script runs, the
+// playwright it will load is guarded the nba-lib way (Claude 2026-11-16; route guard after review):
+//  - nba-guard.mjs: every context a launched browser makes aborts requests and WebSockets to any
+//    host but localhost/127.0.0.1 (fonts excepted), and the guard sits on the Route itself, so a
+//    script's own page.route(...).continue() / fetch() to such a host is aborted too (scripts/qa
+//    content.mjs and pack-cinema.mjs continue() card-registry requests); APIRequestContext, CDP
+//    interception, service workers, persistent profiles, outside browsers and node's own
+//    fetch/WebSocket/http(s) are covered as nba-guard.mjs describes
 //  - page.goto moves the shared relay (ws://localhost:7777) to the team's own 7795, unless the runner
 //    holds the 7777 lock for online.mjs (NBA_QA_KEEP_RELAY=1)
-//  - persistent profiles and connecting to an outside browser are refused
 // If anything here fails, the child stops before the script's first line.
-import { blocked, isolate, RELAY, require } from './nba-lib.mjs';
+import { blocked, guardNode, guardPlaywright } from './nba-guard.mjs';
+import { RELAY, require } from './nba-lib.mjs';
 
 const keepRelay = process.env.NBA_QA_KEEP_RELAY === '1';
-const pw = require('playwright');
+const pw = guardPlaywright(require('playwright'));
+guardNode();
 
-function patchPage(page) {
-  const goto = page.goto.bind(page);
-  page.goto = (u, opts) => goto(keepRelay ? u : String(u).replace(/relay=ws(%3A|:)(%2F%2F|\/\/)localhost(%3A|:)7777/g, 'relay=' + encodeURIComponent(RELAY)), opts);
-  return page;
-}
-
-function patchContext(ctx) {
-  const newPage = ctx.newPage.bind(ctx);
-  ctx.newPage = async () => patchPage(await newPage());
-  return ctx;
-}
-
-function patchBrowser(browser) {
-  const newContext = browser.newContext.bind(browser);
-  browser.newContext = async (opts = {}) => {
-    const ctx = await newContext(opts);
-    await isolate(ctx);
-    return patchContext(ctx);
+if (!keepRelay) {
+  // the relay move, on every page however it was made (newPage, browser.newPage, popups)
+  const seen = new WeakSet();
+  const moveRelay = (page) => {
+    const P = Object.getPrototypeOf(page);
+    if (seen.has(P)) return;
+    seen.add(P);
+    const goto = P.goto;
+    P.goto = function (u, opts) {
+      return goto.call(this, String(u).replace(/relay=ws(%3A|:)(%2F%2F|\/\/)localhost(%3A|:)7777/g, 'relay=' + encodeURIComponent(RELAY)), opts);
+    };
   };
-  browser.newPage = async (opts = {}) => {
-    const ctx = await browser.newContext(opts);
-    const page = await ctx.newPage();
-    page.once('close', () => ctx.close().catch(() => {}));
-    return page;
-  };
-  return browser;
+  for (const type of ['chromium', 'webkit', 'firefox'].map((n) => pw[n]).filter(Boolean)) {
+    const launch = type.launch.bind(type);
+    type.launch = async (opts) => {
+      const browser = await launch(opts);
+      const newContext = browser.newContext.bind(browser);
+      browser.newContext = async (o) => {
+        const ctx = await newContext(o);
+        ctx.on('page', moveRelay);
+        return ctx;
+      };
+      return browser;
+    };
+    type.launch.nbaGuarded = true;
+  }
 }
-
-for (const name of ['chromium', 'webkit', 'firefox']) {
-  const type = pw[name];
-  if (!type) continue;
-  const launch = type.launch.bind(type);
-  type.launch = async (opts) => patchBrowser(await launch(opts));
-  type.launch.nbaIsolated = true;
-  type.launchPersistentContext = async () => {
-    throw Error('nba-qa-run: a persistent browser profile is refused (QA never loads a real profile)');
-  };
-  type.connect = type.connectOverCDP = async () => {
-    throw Error('nba-qa-run: connecting to an outside browser is refused');
-  };
-}
-if (!pw.chromium?.launch?.nbaIsolated) throw Error('nba-qa-run: could not isolate playwright; refusing to run');
+if (!pw.chromium?.launch?.nbaGuarded) throw Error('nba-qa-run: could not guard playwright; refusing to run');
 
 process.on('exit', () => {
   const hosts = [...new Set(blocked)];

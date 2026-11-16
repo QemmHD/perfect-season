@@ -4,7 +4,7 @@
 //    plain loop, an app-like loop of uneven frames, the render-only juice holding steps back, and
 //    the box tracker watching;
 //  - a person's inputs, recorded by step, replay to the same game (over uneven frames too);
-//  - the simulation code adds no transcendental math (exp/pow/log and friends are not guaranteed
+//  - the simulation code adds no transcendental math (exp/pow/log, trig, hypot and friends are not guaranteed
 //    bit-identical between the iPhone's engine and V8; new sim math uses + - × ÷, sqrt, min, max
 //    and tables) and never reads the clock or Math.random.
 /// <reference types="vite/client" />
@@ -147,19 +147,43 @@ function personGame(script: { ops: Op[]; sticks: (Pt | null)[] } | null, unevenS
 
 // ---------- the source scan ----------
 
-/** This folder's sources (tests left out), read as text. */
-const SOURCES = import.meta.glob<string>(['./*.ts', '!./*.test.ts'], { query: '?raw', import: 'default', eager: true });
+/**
+ * This folder's sources (tests left out), read as text, plus the shared outcome functions the plan
+ * puts in src/game (heat.ts, perfect.ts: scanned as soon as they land; a missing file matches nothing).
+ */
+const SOURCES = import.meta.glob<string>(['./*.ts', '!./*.test.ts', '../heat.ts', '../perfect.ts'], { query: '?raw', import: 'default', eager: true });
 /** Drawing and test support: free to use any math (they never decide an outcome). */
 const NOT_SIM = new Set(['render.ts', 'hud-draw.ts', 'harness.ts', 'targets.ts']);
-const TRANSCENDENTAL = /\bMath\.(exp|expm1|pow|log|log1p|log2|log10|cbrt|sinh|cosh|tanh|asinh|acosh|atanh)\b|\*\*/g;
+/** exp/pow/log, the hyperbolics, ** and the trig family (incl. hypot): none is bit-identical between JSC and V8 */
+const TRANSCENDENTAL = /\bMath\.(exp|expm1|pow|log|log1p|log2|log10|cbrt|sinh|cosh|tanh|asinh|acosh|atanh|sin|cos|tan|asin|acos|atan|atan2|hypot)\b|\*\*/g;
 const CLOCKS = /\bMath\.random\b|\bDate\.now\b|\bperformance\.now\b|\bnew Date\b/g;
 /**
- * The transcendental calls the simulation already had on 2026-11-10, by file and top-level
- * declaration. They stay (changing them changes every match), but nothing new may join them.
+ * The transcendental calls the simulation already had at the base 78a1c86 (trig and hypot counted
+ * since 2026-11-16), by file and top-level declaration. They stay (changing them changes every
+ * match: golden.test.ts pins those games), but nothing new may join them.
  */
 const GRANDFATHERED: Record<string, Record<string, number>> = {
-  'engine.ts': { greenWindow: 2, releaseProbability: 2, normTail: 1, finishNow: 1 },
-  'autopilot.ts': { attackValue: 1 },
+  'engine.ts': {
+    dist: 1,
+    isThree: 2,
+    unit: 1,
+    steer: 1,
+    closest: 1,
+    greenWindow: 3,
+    releaseProbability: 2,
+    shotChance: 1,
+    normTail: 1,
+    pressShoot: 1,
+    finishNow: 1,
+    pass: 1,
+    aimPass: 1,
+    plantedScreen: 1,
+    step: 7,
+    offBall: 4,
+    defend: 2,
+    loose: 2,
+  },
+  'autopilot.ts': { attackValue: 1, decide: 3, towards: 1 },
   'ratings.ts': { overallFromRank: 1, hooper: 8 },
 };
 
@@ -235,14 +259,15 @@ describe('hoops2 determinism', () => {
   }, 60_000);
 
   it('the simulation adds no transcendental math and never reads the clock or Math.random', () => {
+    // './engine.ts' → 'engine.ts'; the src/game files keep their '../' prefix
     const files = Object.keys(SOURCES)
-      .map((k) => k.replace('./', ''))
+      .map((k) => k.replace(/^\.\//, ''))
       .filter((f) => !NOT_SIM.has(f));
     expect(files).toContain('engine.ts');
     expect(files).toContain('box.ts');
     const found: string[] = [];
     for (const f of files) {
-      const src = SOURCES['./' + f];
+      const src = SOURCES[f.startsWith('../') ? f : './' + f];
       const clocks = code(src).match(CLOCKS);
       if (clocks) found.push(`${f}: ${clocks.join(', ')}`);
       const allowed = GRANDFATHERED[f] ?? {};
@@ -259,7 +284,7 @@ describe('hoops2 determinism', () => {
       "// Math.pow(2, 3) in a comment doesn't count",
       "const label = 'Math.exp(x)';",
       'export function fresh(x: number): number {',
-      '  return Math.pow(x, 1.5) + x ** 2;',
+      '  return Math.pow(x, 1.5) + x ** 2 + Math.atan2(x, 1) + Math.hypot(x, 1);',
       '}',
       'function clean(x: number) {',
       '  return Math.sqrt(x) * Math.min(1, x);',
@@ -269,7 +294,7 @@ describe('hoops2 determinism', () => {
     const n = (name: string) => ds.find((d) => d.name === name)?.body.match(TRANSCENDENTAL)?.length ?? 0;
     expect(ds.map((d) => d.name)).toEqual(['label', 'fresh', 'clean']);
     expect(n('label')).toBe(0);
-    expect(n('fresh')).toBe(2);
+    expect(n('fresh')).toBe(4);
     expect(n('clean')).toBe(0);
   });
 });

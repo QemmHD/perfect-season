@@ -1,12 +1,15 @@
 // V2 baseline probe for plan §3.10 (Claude 2026-11-16): today's match flow through the UT Squad
 // Battles fixture at 393×852 (local profile, isolated), printing a value for every §3.10 row.
 //  1. Pre-game: from the rung tap to the first controllable possession (the clock shows a number
-//     and SHOOT is live): taps and seconds, and whether a tap skips the VS card.
+//     and SHOOT is live): taps and seconds, timed in a pass that only polls and taps (no screenshots,
+//     no probe taps on the VS card: those used to sit inside the timed span and inflate it); then a
+//     second, untimed pass takes the captures and asks whether a tap skips the VS card.
 //  2. Pause: today's game has no pause; what 10 s away does (engine steps and possessions played),
 //     and whether a hidden page pauses it.
 //  3. The loop, with ?autoplay so a full game plays itself: the final whistle to onFinish (the
 //     result screen), then ut's 5 s result sheet stubbed by a 5 s wait, NEXT RUNG, and the next
 //     tip-off at 4× CPU; whether the canvas and renderer were rebuilt; the JS heap after each game.
+//     Captures are taken outside every timed span; the loop is the sum of its timed parts.
 //     Autoplay shortens the VS card to 0.4 s and skips the vote, so the whole loop is also given
 //     with step 1's measured pre-game added back.
 //   node scripts/audit/nba-rematch.mjs [games]      (games: autoplay games to play, default 3)
@@ -40,39 +43,39 @@ await needServer();
 const browser = await launch();
 const out = {};
 try {
-  // ---- 1. pre-game, and the VS card ----
-  {
-    const { ctx, page, errors } = await context(browser, '393');
-    await utFixture(page);
-    await toBattles(page);
+  // ---- 1. pre-game, timed: only polls and the taps a person makes ----
+  /** walk from the rung to the first controllable possession; `capture` takes the screenshots (untimed pass) */
+  async function pregame(page, capture) {
     let taps = 1;
     const t0 = Date.now();
     await page.locator('.utb-rung.next').click();
-    await page.locator('.utm-vs').waitFor({ timeout: 10000 });
-    await shot(page, 'rematch-vs');
-    // does a tap skip the VS card? (V2: the curtain skips in ≤ 0.3 s)
-    const tTap = Date.now();
-    await page.locator('.utm-vs').click({ force: true }).catch(() => {});
-    const gone = await until(page, async () => (await page.locator('.utm-vs').count()) === 0, 4000);
-    // a skip answers the tap at once; a card that leaves later just ran its own 2.8 s
-    const skipS = gone !== null && gone <= 0.5 ? gone : null;
-    const vsS = (Date.now() - t0) / 1000;
     let stage = '';
     let firstS = null;
-    for (let i = 0; i < 400 && firstS === null; i++) {
+    let vsSeen = false;
+    for (let i = 0; i < 2000 && firstS === null; i++) {
       if (await controllable(page)) firstS = (Date.now() - t0) / 1000;
-      else if (stage !== 'vote' && (await page.locator('.vote-opt').filter({ hasText: 'PLAY' }).count())) {
+      else if (!vsSeen && (await page.locator('.utm-vs').count())) {
+        vsSeen = true;
+        if (capture) await capture('vs');
+      } else if (stage !== 'vote' && (await page.locator('.vote-opt').filter({ hasText: 'PLAY' }).count())) {
         stage = 'vote';
-        await shot(page, 'rematch-vote');
+        if (capture) await capture('vote');
         await page.locator('.vote-opt').filter({ hasText: 'PLAY' }).click();
         taps++;
       } else if (stage !== 'how' && (await page.locator('button.big').filter({ hasText: /^PLAY$/ }).count())) {
         stage = 'how';
-        await shot(page, 'rematch-how');
+        if (capture) await capture('how');
         await page.locator('button.big').filter({ hasText: /^PLAY$/ }).click();
         taps++;
-      } else await wait(25);
+      } else await wait(20);
     }
+    return { taps, firstS };
+  }
+  {
+    const { ctx, page, errors } = await context(browser, '393');
+    await utFixture(page);
+    await toBattles(page);
+    const { taps, firstS } = await pregame(page, null);
     await shot(page, 'rematch-first-possession');
     // ---- 2. no pause: 10 s away ----
     const before = await page.evaluate(() => ({ t: window.__hg2?.possession()?.t ?? 0, done: window.__hg2?.game()?.done ?? 0 }));
@@ -86,14 +89,38 @@ try {
     const after = await page.evaluate(() => ({ t: window.__hg2?.possession()?.t ?? 0, done: window.__hg2?.game()?.done ?? 0 }));
     out.pregame = {
       taps,
-      tapsNote: 'the rung, the vote PLAY and the Arcade PLAY (the probe also tapped the VS card once, which did nothing)',
-      seconds: firstS,
-      vsSkippedByTapS: skipS,
-      vsCardS: +vsS.toFixed(2),
-      pauseControl: 'absent',
+      tapsNote: 'the rung, the vote PLAY and the Arcade PLAY, as a person meets them (timed with no captures)',
+      seconds: firstS === null ? null : +firstS.toFixed(2),
       hidden10s: { possessionsPlayed: after.done - before.done, simSecondsAdvanced: +(after.done === before.done ? after.t - before.t : NaN).toFixed(2) },
       errors,
     };
+    await ctx.close();
+  }
+  // ---- 1b. untimed: the captures, and does a tap skip the VS card? (V2: the curtain skips in ≤ 0.3 s) ----
+  {
+    const { ctx, page, errors } = await context(browser, '393');
+    await utFixture(page);
+    await toBattles(page);
+    let skipS = null;
+    let vsS = null;
+    const tRung = Date.now();
+    let captureS = 0;
+    const timedShot = async (name) => {
+      const t = Date.now();
+      await shot(page, name);
+      captureS += (Date.now() - t) / 1000;
+    };
+    const walk = await pregame(page, async (stage) => {
+      if (stage !== 'vs') return void (await timedShot('rematch-' + stage));
+      await timedShot('rematch-vs');
+      await page.locator('.utm-vs').click({ force: true }).catch(() => {});
+      const gone = await until(page, async () => (await page.locator('.utm-vs').count()) === 0, 4000);
+      // a skip answers the tap at once; a card that leaves later just ran its own timer
+      skipS = gone !== null && gone <= 0.5 ? gone : null;
+      vsS = +((Date.now() - tRung) / 1000).toFixed(2);
+    });
+    // what the old single pass reported: this walk, with the captures and the VS tap inside its span
+    Object.assign(out.pregame, { vsSkippedByTapS: skipS, vsCardS: vsS, withCapturesS: walk.firstS === null ? null : +walk.firstS.toFixed(2), capturesS: +captureS.toFixed(2), captureErrors: errors });
     console.log('pre-game', JSON.stringify(out.pregame));
     await ctx.close();
   }
@@ -124,8 +151,7 @@ try {
         return { id: c?.dataset.qaId ?? null, made: window.__canvases };
       });
       const gameS = await until(page, () => page.evaluate(() => !!document.querySelector('.hg2-final')), 400000, 50);
-      const tWhistle = Date.now();
-      await shot(page, `rematch-whistle-${gi + 1}`);
+      // timed first, captured after: a screenshot inside the span would count as the app's time
       const toFinish = await until(page, async () => (await page.getByRole('button', { name: 'NEXT RUNG', exact: true }).count()) > 0, 20000);
       await shot(page, `rematch-result-${gi + 1}`);
       const g = { heapMB, canvas, gameS, whistleToFinishS: toFinish };
@@ -137,7 +163,8 @@ try {
         const tip = await until(page, () => tippedOff(page), 30000);
         await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
         g.nextRungToTipoffS4x = tip === null ? null : +((Date.now() - tTap) / 1000).toFixed(2);
-        g.loopS = +((Date.now() - tWhistle) / 1000).toFixed(2);
+        // the loop is its timed parts: whistle → result, the stub sheet, NEXT RUNG → tip-off
+        g.loopS = toFinish === null || tip === null ? null : +(toFinish + STUB_SHEET_S + g.nextRungToTipoffS4x).toFixed(2);
       }
       games.push(g);
       console.log('game', gi + 1, JSON.stringify(g));

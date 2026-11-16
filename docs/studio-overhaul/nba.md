@@ -43,7 +43,8 @@ Nothing a player sees. nba-1 builds the measuring tools every later task proves 
 
 | Test | When | What it proves | Time |
 |---|---|---|---|
-| `determinism.test.ts` | always | 3 seeded games identical across a plain loop, uneven 8-34 ms frames, the juice's hit-stop and the box tracker; a recorded person's inputs replay to the same marks, scores, final `p.t` and shot chances, frame batching aside; the sim adds no `Math.exp/pow/log` and never reads a clock or `Math.random` | 4.0 s |
+| `determinism.test.ts` | always | 3 seeded games identical across a plain loop, uneven 8-34 ms frames, the juice's hit-stop and the box tracker; a recorded person's inputs replay to the same marks, scores, final `p.t` and shot chances, frame batching aside; the sim adds no `Math.exp/pow/log`, **trig or `hypot`** (since the review fix; today's per-declaration counts grandfathered) and never reads a clock or `Math.random`; the scan also covers `src/game/heat.ts` and `perfect.ts` once they land | 4.0 s |
+| `golden.test.ts` (review fix) | always | 6 seeded AI games (`aiPossessionsOf`'s exact body, 4 skills × 4 defensive IQs, with a bench) score and mark exactly as **recorded from the base `78a1c86`**, and the same autoplay loop ends every possession with the same kind, points, scorer, text and final clock (to 1 µs); and `aiPossessionsOf` in `Hoops2.tsx` still is exactly that body | 3.3 s |
 | `box.test.ts` | always (20 games; `NBA_BOX=1`: 200 with real squads) | Σ PTS = the score; made FG, threes, and-ones, turnovers and possessions = the marks; attempts, free throws, blocks, steals and defensive rebounds = the events counted independently; every line consistent (PERFECT ≤ FGA, PERFECT3 ≤ PERFECT and ≤ 3PA); pass → catch → make credits exactly one assist, and a hold past 2.5 s none | 7.6 s |
 | `calibration-smoke.test.ts` (new) | always | 20 AI-v-AI games at the audit's even 78, Pro: the box agrees with the score every game, and 11 numbers per side sit inside wide bands that hold for today's engine and for §3.1's targets (PPP 0.95-1.40, TOV 3-20%, FTA/FGA 0-.40 until nba-5 raises the floor to .12, …) | 15.1 s |
 | `calibration.test.ts` | `NBA_CAL=1` | the full §3.1 / §3.1b / §3.5 tables against targets.ts (`NBA_CAL_GAMES`, `NBA_CAL_CONFIGS`, `NBA_ERA`, `NBA_CAL_ASSERT` for nba-10) | 116 s at 150 games × 3 configs |
@@ -59,7 +60,8 @@ The standard set is green (see Verification).
 - **`nba-lib.mjs`**: every probe's harness.
   - Port 5215 and relay 7795; `?ns=inspect&relay=ws://localhost:7795` on every URL.
   - Every request and WebSocket to a host other than localhost / 127.0.0.1 is aborted (Google Fonts excepted) and
-    reported at the end of each run. The lab runs reported none; the UT-fixture runs reported the app's own call to the
+    reported at the end of each run. Since the review fix this is `nba-guard.mjs` (below): a context route **plus** a
+    guard on Playwright's Route itself, so no page-level route can `continue()` past it. The lab runs reported none; the UT-fixture runs reported the app's own call to the
     live Supabase host, which was aborted.
   - The 8 plan sizes with their insets (393×852 59/34, 320×568 20/0, 430×932, 375×667 and the four landscape sizes),
     injected both where the stage reads them (`window.__psInsets`) and where the game reads them (`.arcade-full`'s
@@ -71,7 +73,8 @@ The standard set is green (see Verification).
   launches isolated the same way, and the shared relay moved to 7795. `online.mjs` keeps 7777 and runs only under
   `flock /tmp/ps-qa-relay-7777.lock`.
   - It refuses (exit 2): scripts outside `scripts/qa` / `scripts/audit`, `admin-registry` and `cloud-backend`, any
-    script naming a remote host, no dev server, or a dry run in which playwright is not isolated.
+    script naming a remote host **in its own source or any local module it imports, followed transitively**, no dev
+    server, or a failing guard self-test (`nba-qa-selftest.mjs`, run under the same preload before every script).
   - Checked: `admin-registry.mjs` refused; `cloud.mjs` ran against 5215 and its request to the live Supabase host was
     aborted (the script itself then timed out on a stale `DEVELOPMENT` selector, unrelated).
 - **Ported from the audit:** `nba-shots`, `nba-clock`, `nba-deadstick`, `nba-perf`, `nba-final`, `nba-se` (`.mjs`, on
@@ -206,18 +209,19 @@ BACK/SPIN buttons, the stick = today's fixed stick, the toast = the hint line.
   JOHNSON, BROWN, …; V2: 0).
 - **The shot clock froze** for 7.2 s at "8" with nobody touching anything (`nba-clock.mjs`, NBA-08 reproduced).
 
-**§3.10 flow today** (`nba-rematch.mjs`, the UT Squad Battles fixture at 393×852, local profile, isolated):
+**§3.10 flow today** (`nba-rematch.mjs`, the UT Squad Battles fixture at 393×852, local profile, isolated; re-measured
+after the review fix with no capture inside a timed span, on the pre-overhaul code; the first figures in brackets):
 
 | Row | V2 | Today |
 |---|---|---|
-| Rung tap to the first controllable possession | ≤ 2 taps, ≤ 3.5 s | **3 taps** (the rung, the vote's PLAY, the Arcade's PLAY), **6.6 s** |
+| Rung tap to the first controllable possession | ≤ 2 taps, ≤ 3.5 s | **3 taps** (the rung, the vote's PLAY, the Arcade's PLAY), **6.45 s** (median of 3 runs: 6.24 / 6.45 / 6.97; first figure 6.6) |
 | Skipping the curtain | ≤ 0.3 s | not skippable: the VS card runs its 2.8 s (3.2 s measured) |
 | Pause | 0 steps and 0 timers in 10 s; auto-pause on hide | no pause control; a hidden page plays on (10 s of sim in 10 s) |
-| Final whistle → onFinish | ≤ 0.3 s | **1.53 s** (the 1.6 s timeout) |
-| Rematch → first live frame, 4× CPU | ≤ 1.5 s | **2.77 s** (autoplay's 0.4 s VS card, no vote) |
+| Final whistle → onFinish | ≤ 0.3 s | **1.60 s** (the 1.6 s timeout; first figure 1.53) |
+| Rematch → first live frame, 4× CPU | ≤ 1.5 s | **2.54 s** (autoplay's 0.4 s VS card, no vote; first figure 2.77) |
 | New canvases / renderers per rematch | 0 | a new game canvas and renderer every match; ~13,800 offscreen sprite canvases made per game |
-| JS heap, game 3 vs game 1 | ≤ 1.10 | 1.02 (71.4 → 72.9 MB after GC) |
-| Whistle → next tip-off, with a 5 s result sheet | ≤ 10 s | **13.2 s** (1.5 + 5 + the 6.6 s pre-game a person meets) |
+| JS heap, game 3 vs game 1 | ≤ 1.10 | 1.02 (71.4 → 72.9 MB after GC); 1.028 game 2 vs 1 in the re-measure |
+| Whistle → next tip-off, with a 5 s result sheet | ≤ 10 s | **13.05 s** (1.60 + 5 + the 6.45 s pre-game a person meets; first figure 13.2) |
 
 **§3.9 performance today** (`nba-perf.mjs`, autoplay lab game, 8 s per sample):
 
@@ -251,6 +255,64 @@ SPACE strip at the top of the screen, and the landscape hint sitting on the hand
   reduced motion), `nba-perf` and `nba-final` against the team's dev server on 5215, each reporting the hosts it
   aborted: none, except the app's own call to the live Supabase host during the UT fixture runs, which was aborted.
 - `nba-qa-run.mjs`: refuses `admin-registry.mjs` (exit 2); the preload's dry run reports playwright isolated.
+
+### Review fixes (2026-11-16)
+
+An independent review of nba-1 (`78a1c86..0e788b1`) found one high and five low issues. All are fixed on top of nba-2.
+
+- **High: a shared QA script could reach live hosts past the isolation.** The isolation was a context route only. In
+  Playwright a page route runs first, and its `route.continue()` goes straight to the network, so `scripts/qa/content.mjs`
+  (which aborts the first card-registry POST and `continue()`s the retry) would have sent a pack registration to the live
+  registry through `nba-qa-run`. Fixed with **`scripts/audit/nba-guard.mjs`**, which both `nba-lib.mjs` and the preload now
+  install:
+  - every route handler on any page or context is wrapped, and the first route patches Playwright's Route class once:
+    `continue()` and `fetch()` to a host that isn't allowed abort instead (fetch then throws), whatever `url` override
+    they carry; the HAR redirect too. `fallback()` ends at the context's abort-everything route.
+  - a page-level `routeWebSocket` handler's `connectToServer()` to such a host closes the socket.
+  - `APIRequestContext` (`page.request`, `context.request`, `playwright.request.newContext`, `route.fetch`) refuses such
+    hosts before sending.
+  - `unroute` / `unrouteAll` can't remove the guard route (it goes straight back).
+  - every context blocks service workers (their requests never pass through routes), and a remote `baseURL` is refused.
+  - the CDP Fetch domain and request interception, browser-level CDP sessions, persistent profiles, `launchServer` and
+    connecting to an outside browser are refused.
+  - in node: `fetch`, `WebSocket` and `http(s).request/get` to such a host throw.
+- **`scripts/audit/nba-qa-selftest.mjs`** proves it, and `nba-qa-run` runs it under the same preload before every script and
+  refuses the run if it fails. Two local servers stand in for the two kinds of host (127.0.0.1 allowed, 127.0.0.2 not):
+  every probe must reach 127.0.0.1 (so it really fires) and never 127.0.0.2. **With the guard: 19/19 hold. Against the
+  nba-1 isolation (`0e788b1`): 15 of 19 fail**, including the reviewer's case, `page.route + continue()` on a
+  `/functions/v1/card-registry` POST, which reached 127.0.0.2.
+- **End to end:** `node scripts/audit/nba-qa-run.mjs scripts/qa/content.mjs` against 5215: self-test passed, and the
+  script's `continue()`d registry retry was aborted (the only host recorded is the live Supabase host; the script then
+  timed out waiting for the pack it couldn't register, as expected for a run that may not register anything).
+- **`nba-qa-run`'s static gate now follows local imports transitively** (relative `import`, `import()`, `require`) and
+  refuses a remote host or a refused script anywhere in that tree, and a file outside the worktree. Checked with a
+  throwaway script importing a helper that names a remote host: refused, naming the helper. It also clears
+  `PS_QA_PROXY` for the child.
+- **Low: no golden pinned the engine's outcomes.** New **`golden.test.ts`** (always on, 3.3 s): 6 seeded AI games
+  (`aiPossessionsOf`'s exact body) and the same autoplay loop with every possession's end and final clock, recorded on
+  the base `78a1c86` (`NBA_GOLDEN_RECORD=1`). Today's engine, nba-2 included, matches byte for byte. The Protocol section
+  now cites it.
+- **Low: the transcendental scan missed trig and `hypot`.** `determinism.test.ts` now counts `sin/cos/tan/asin/acos/atan/
+  atan2/hypot` too, with the base's per-declaration counts grandfathered (engine.ts 18 declarations, autopilot.ts 3,
+  ratings.ts 2), and also scans `src/game/heat.ts` and `perfect.ts` once they land. It found one new call from nba-2:
+  `driving()` used `Math.hypot` for the handler's speed; it now uses `Math.sqrt(vx² + vz²)` (correctly rounded on every
+  engine). `driving()` only picks a person's euro-step, never the AI (the golden is unchanged), and nba-2's protocol line
+  already covers a person's moves.
+- **Low: targets.ts lacked nba-1's baselines.** The new rows now carry them: every §3.8 geometry row from `nba-geo.json`
+  (`GEO_BASELINE`, both sizes), the camera, safe-box, stick, text, tag and glyph rows, §3.9 perf (`perf.1x.p99Ms` 8.9 →
+  **13.0**, the worst of 13.0 / 9.8 / 9.9 ms; the 4× rows) and §3.10 flow. Rows for things that don't exist yet (pause
+  button, Heat bar, gold ring, haptics, grades) have none, which the `baseline` doc comment now says.
+- **Low: `nba-rematch.mjs` timed its own screenshots.** The pre-game is now timed in a pass that only polls and taps; a
+  second, untimed pass takes the captures and the VS-tap check, and also reports the old single-pass number for
+  comparison. Whistle → result is timed before its capture, and the loop is the sum of its timed parts. Measured on the
+  pre-overhaul code, the inflation was within run-to-run noise: the capture pass took 0.67 s of screenshots yet came out
+  at 6.10 s against 6.45 s for the clean pass, because the captures overlap the VS card's and the vote's own timers. The
+  §3.10 table above has the re-measured figures (pre-game 6.45 s, loop 13.05 s).
+
+Verification: `bash O/heavy.sh npm run typecheck` clean; `npx vitest run src/game/hoops2 src/game/stick.test.ts
+src/game/hud src/engine/sport-branches.test.ts`: 13 files passed, 5 skipped (opt-in), 80 tests passed; the guard
+self-test 19/19 (and 15 failures against `0e788b1`, the negative control); `nba-rematch.mjs` against the pre-overhaul
+code; `nba-qa-run` on `content.mjs` and on `admin-registry.mjs` (refused).
 
 ---
 
@@ -707,7 +769,9 @@ grades), ISO's clear-out and feed, the euro-step, PASS held for a lob, the gathe
 the floating stick's own sprint ring in place of the 0.92 edge. The AI's possessions are byte-identical
 (`controls.test.ts`), so the AI race and `aiPossessionsOf` are unchanged. **nba-1 adds nothing to it:** its engine events
 (`fga`, `drb`, `stl`, `int`, `foul`) are pushed beside the existing ones and never change state or the order of
-`p.rand` draws; `determinism.test.ts` proves seeded games come out identical with and without them.
+`p.rand` draws. `golden.test.ts` pins it: 6 seeded AI games (score, marks, and every possession's end and final clock)
+recorded on the base `78a1c86` come out byte-identical on today's engine, nba-2 included. Any later task that moves
+them is an outcome change (re-record from that commit and add it here).
 
 ---
 
