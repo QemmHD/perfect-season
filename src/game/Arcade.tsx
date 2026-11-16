@@ -353,7 +353,10 @@ export const Arcade = forwardRef(function Arcade({
     sent.current = true;
     const played = mine ?? { score: 0, drive: 0, done: false, ends: [] };
     const ends = [...played.ends, ...Array(Math.max(0, TOTAL - played.ends.length)).fill('X')];
-    onFinish({ ...played, drive: ends.length, done: true, ends }, ai, 'played', { them: false, us: false }, undefined, 'us');
+    // the score says what the result does: a quit never reads as a loss with more points than them
+    // (a Cup or Club Season settlement rejects that pair and would record nothing)
+    const them = { ...ai, score: Math.max(ai.score, played.score + 1) };
+    onFinish({ ...played, drive: ends.length, done: true, ends }, them, 'played', { them: false, us: false }, undefined, 'us');
   };
 
   // sim: the autopilot plays your drives at a middling level

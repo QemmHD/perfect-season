@@ -256,7 +256,9 @@
   overflow: visible;
 }
 .ps-ctl-hints text {
-  font: 800 10px var(--display, inherit);
+  /* user units: the 160-unit viewBox is drawn at A + 64 px (148 px at 320, 156 at 393), so 11.5
+   * units reads 10.6-11.2 px, never under the 10 px floor */
+  font: 800 11.5px var(--display, inherit);
   letter-spacing: 0.8px;
   fill: rgba(255, 255, 255, 0.82);
   text-anchor: middle;
@@ -266,6 +268,9 @@
 }
 .ps-ctl-hints text.side {
   text-anchor: end;
+}
+.ps-ctl-hints text.down {
+  text-anchor: start;
 }
 .ps-ctl-hints path {
   fill: var(--ps-gold);

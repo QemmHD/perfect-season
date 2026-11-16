@@ -10,8 +10,9 @@
 // D is hidden in NBA. A teammate on the court is a pass target (tap him).
 import React from 'react';
 import { Cluster, type ClusterInput, Radial, type Slot, type SlotSpec } from '../hud/Cluster';
-import { Stick } from '../Stick';
+import { Stick } from '../StickPad';
 import type { StickOut } from '../stick';
+import { PUMP_EVERY, pumpFake, unrise } from './engine';
 import type { Possession } from './types';
 
 export type HoopsCtx = 'offense' | 'board' | 'dead';
@@ -89,6 +90,24 @@ export function slotsFor(ctx: HoopsCtx): Record<Slot, SlotSpec> {
  * old buttons kept the state of their last React render). A: nobody to shoot or jump for; B: no ball
  * in hand to pass; C: no ball in hand, or the call still recharging.
  */
+/**
+ * SHOOT lifted (nba-2 fix): the gesture decides, never the engine's clock. A tap is a pump fake while
+ * he hasn't left the floor, and still one when the gather rose at most UNRISE_S before the lift got
+ * here (the lift arrives a frame or three after the finger left the glass): that rise is taken back.
+ * Anything else lets the shot go; the caller times it from the lift's own timestamp.
+ *   'pump' a fake went up · 'wait' a tap, but too soon after the last fake · 'release' shoot · 'none'
+ */
+export function liftShoot(p: Possession, tap: boolean): 'pump' | 'wait' | 'release' | 'none' {
+  const gathering = !!p.meter?.gather || (!!p.finish && p.t < p.finish.tUp && !p.ball);
+  if (tap && (gathering || unrise(p))) {
+    const h = p.handler !== null ? p.bodies[p.handler] : null;
+    const tooSoon = !!h && p.t - (h.pumpAt ?? -9) < PUMP_EVERY;
+    if (pumpFake(p)) return 'pump';
+    return tooSoon ? 'wait' : 'none';
+  }
+  return p.meter && p.meter.off === undefined ? 'release' : 'none';
+}
+
 export function offOf(p: Possession | null, replaying: boolean): string {
   const dead = !p || !!p.end || replaying;
   const out: string[] = [];
@@ -128,7 +147,7 @@ export function HoopsControls({
     <div className="hg2-controls" ref={rootRef}>
       <div className="ps-scrim" aria-hidden="true" />
       <Stick onChange={onStick} onSprintEdge={onSprintEdge} onOtherTap={(x, y) => onCourtTap(x, y)} />
-      <Cluster slots={slotsFor(ctx)} onInput={onInput} buttonsOnly={buttonsOnly} arc={ctx === 'offense' ? MOVE_ARC : undefined} onArc={onArc} />
+      <Cluster slots={slotsFor(ctx)} onInput={onInput} buttonsOnly={buttonsOnly} arc={ctx === 'offense' ? MOVE_ARC : undefined} arcOff={callOpen} onArc={onArc} />
       <Radial items={CALLS} at="C" open={callOpen && ctx === 'offense'} onPick={onCall} onClose={onCallClose} />
     </div>
   );

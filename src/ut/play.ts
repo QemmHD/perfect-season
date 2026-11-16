@@ -124,10 +124,14 @@ export function settle(
     clubOvr?: number;
     opponent?: string;
     how?: 'played' | 'sim';
+    /** (nba-2 fix) this phone quit the game: a loss that pays nothing (no coins, card XP or season
+     * points, and no paid game used); the record and the cup/league/circuit state still advance */
+    forfeit?: boolean;
   },
 ): Settled {
   const activeCircuit = r.circuit ? hqOf(ut).circuit.active : undefined;
   if (
+    (r.forfeit && r.won) ||
     (r.cup &&
       (r.online ||
         r.rung ||
@@ -179,9 +183,10 @@ export function settle(
   ut = ut.hq ? ut : { ...ut, hq: hqOf(ut) };
   const today = ut.paid.day === r.day ? ut.paid.n : 0;
   const capped = today >= PAID_GAMES_A_DAY;
-  const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
+  const { coins, xp } =
+    capped || r.forfeit ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
   const x = awardXp(
-    { ...ut, paid: { day: r.day, n: today + (capped ? 0 : 1) } },
+    { ...ut, paid: { day: r.day, n: today + (capped || r.forfeit ? 0 : 1) } },
     r.played,
     xp,
   );
@@ -247,7 +252,7 @@ export function settle(
         matchId: r.matchId!,
       })
     : seasonUt;
-  const progression = recordMatchProgress(cupUt, {
+  const progression = r.forfeit ? { ut: cupUt, sp: 0 } : recordMatchProgress(cupUt, {
     id: r.matchId ?? 'legacy:' + r.packId,
     at: r.at,
     mode: r.cup

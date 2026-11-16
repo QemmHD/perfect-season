@@ -34,7 +34,7 @@ function SwipeHints({ hints }: { hints: NonNullable<SlotSpec['hints']> }) {
       {hints.up && (
         <g>
           {tri(0, -66, 0)}
-          <text x="0" y="-52">{hints.up}</text>
+          <text x="0" y="-53">{hints.up}</text>
         </g>
       )}
       {hints.side && (
@@ -44,9 +44,13 @@ function SwipeHints({ hints }: { hints: NonNullable<SlotSpec['hints']> }) {
         </g>
       )}
       {hints.down && (
+        // arrow and word side by side in the band just under A: with no bottom inset (320×568) the
+        // screen edge is only ~17 units below A's rim, so a word stacked over the arrow ran off it
         <g>
-          <text x="0" y="60">{hints.down}</text>
-          {tri(0, 70, 180)}
+          {tri(-24, 54, 180)}
+          <text x="-16" y="58" className="down">
+            {hints.down}
+          </text>
         </g>
       )}
     </svg>
@@ -58,6 +62,7 @@ export function Cluster({
   onInput,
   buttonsOnly = false,
   arc,
+  arcOff = false,
   onArc
 }: {
   slots: Record<Slot, SlotSpec>;
@@ -65,6 +70,8 @@ export function Cluster({
   buttonsOnly?: boolean;
   /** Buttons-only mode: the swipes as small buttons in an arc above A, firing on down */
   arc?: { id: string; label: string }[];
+  /** hide the arc for now (NBA: while the CALL radial is open, it fans out over the arc's spot) */
+  arcOff?: boolean;
   onArc?: (id: string, t: number) => void;
 }) {
   const props = useRef({ slots, onInput, buttonsOnly });
@@ -160,7 +167,7 @@ export function Cluster({
           <SwipeHints hints={slots.A.hints} />
         </div>
       )}
-      {buttonsOnly && arc && !slots.A.hidden && (
+      {buttonsOnly && arc && !arcOff && !slots.A.hidden && (
         <div className="ps-ctl-arc">
           {arc.map((m, i) => (
             <button

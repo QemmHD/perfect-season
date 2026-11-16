@@ -9,7 +9,7 @@ change is logged in [`nba.md`](nba.md) under "Contract changes".
 |---|---|
 | `src/game/controls-geometry.css` | The A.5 geometry as CSS tokens on `.ps-geo` (no width media queries; `.ps-geo.land` for sideways) |
 | `src/game/stick.ts` | The floating stick's rules, pure: dead zone 12%, sprint at 1.15 R, follow at 1.6 R, home band, fixed mode |
-| `src/game/Stick.tsx` | The stick on screen: ghost ring, spawn under the thumb, pre-held thumb adoption, one report per frame |
+| `src/game/StickPad.tsx` (was `Stick.tsx`, renamed 2026-11-16: it differed from `stick.ts` only in case) | The stick on screen: ghost ring, spawn under the thumb, pre-held thumb adoption, one report per frame |
 | `src/game/hud/gestures.ts` | `classify` (tap / hold / swipe) and `ClusterTracker`, the pure pointer bookkeeping |
 | `src/game/hud/Cluster.tsx` | The A/B/C/D buttons, the SVG swipe labels, the Buttons-only arc, and `Radial` (the CALL menu) |
 | `src/game/hud/ToastLine.tsx` | `ToastProvider`, `useToast`, `ToastLine`: the one line of text above the controls |
@@ -71,7 +71,7 @@ corners and moves the toast under the score bug.
 
 ```tsx
 import { Cluster, PauseButton, PauseSheet, PausableTimers, ToastLine, ToastProvider, haptic, type ClusterInput } from '../hud';
-import { Stick } from '../Stick';
+import { Stick } from '../StickPad'; // or from '../hud' (the barrel re-exports it)
 
 function MyMatch({ online, onQuit }: { online: boolean; onQuit?: () => void }) {
   const toast = useRef<{ show(t: Toast): void; clear(): void } | null>(null);

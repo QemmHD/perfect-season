@@ -9,6 +9,7 @@ export function PauseSheet({
   onResume,
   onQuit,
   onForfeit,
+  quitNote = 'It counts as a loss. The rest of the game scores nothing.',
   children
 }: {
   open: boolean;
@@ -18,6 +19,9 @@ export function PauseSheet({
   onQuit?: () => void;
   /** online: confirm, then a forfeit */
   onForfeit?: () => void;
+  /** the confirm's line, in the sport's own words (NBA: possessions, NFL: drives, soccer: attacks);
+   * defaults to sport-neutral wording */
+  quitNote?: string;
   /** sport items: controls help, calibrate, Auto-defend, sound */
   children?: ReactNode;
 }) {
@@ -59,7 +63,7 @@ export function PauseSheet({
           <>
             <span className="ps-hud-sheet-eyebrow">{online ? 'Forfeit' : 'Quit'}</span>
             <h2 id="ps-pause-title">{online ? 'FORFEIT THIS MATCH?' : 'QUIT THIS GAME?'}</h2>
-            <p className="ps-hud-sheet-note">It counts as a loss. Possessions you haven’t played score nothing.</p>
+            <p className="ps-hud-sheet-note">{quitNote}</p>
             <button type="button" className="ps-hud-sheet-btn danger solid" onClick={leave}>
               {online ? 'FORFEIT · TAKE THE LOSS' : 'QUIT · TAKE THE LOSS'}
             </button>

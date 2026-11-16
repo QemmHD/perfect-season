@@ -500,6 +500,7 @@ export function pressShoot(p: Possession, opts: { at?: number; provisional?: boo
   if (opts.provisional) {
     // he gathers; he leaves the floor at GATHER_S unless a tap or a swipe takes it back first
     p.meter.gather = true;
+    p.meter.gatherAt = p.t;
     return;
   }
   rise(p, b);
@@ -510,7 +511,10 @@ export const GATHER_S = 0.125;
 
 /** The jumper goes up: the jump, and the nearest defender closing out with him. */
 function rise(p: Possession, b: Body) {
-  if (p.meter?.gather) delete p.meter.gather;
+  const m = p.meter;
+  const provisional = !!m?.gather;
+  if (m?.gather) delete m.gather;
+  const before = { at: p.t, vx: b.vx, vz: b.vz, act: b.act, actAt: b.actAt };
   act(b, 'shoot', p.t);
   b.vh = 12.5;
   b.h = 0.01;
@@ -519,11 +523,47 @@ function rise(p: Possession, b: Body) {
   p.events.push('rise');
   // the nearest defender closes out and goes up with him
   const { d: cd, r } = closest(p, b);
-  if (r < 8 && p.t >= cd.stunUntil) {
+  const goes = r < 8 && p.t >= cd.stunUntil;
+  // a person's gather: remember what the rise changed, so a tap heard a few frames late is still a pump fake
+  if (provisional && m) m.rose = { ...before, def: goes ? cd.idx : null, dh: cd.h, dvh: cd.vh, dAct: cd.act, dActAt: cd.actAt };
+  if (goes) {
     act(cd, 'contest', p.t);
     cd.vh = lerp(10, 13.5, rate(cd.p.vrt));
     cd.h = 0.01;
   }
+}
+
+/** How long after a provisional gather rose a tap's lift can still take it back (three 60 Hz frames). */
+export const UNRISE_S = 0.06;
+
+/**
+ * Take back a provisional gather's rise (nba-2 fix): the gesture says the touch was a tap, but its lift
+ * reached the game a frame or three after the gather's rise. He comes back down as if he never went
+ * up, and so does the man who closed out with him; the caller then plays the pump fake. Only while
+ * nothing has happened since: the ball not released, no finish, at most UNRISE_S after the rise.
+ */
+export function unrise(p: Possession, within = UNRISE_S): boolean {
+  const m = p.meter;
+  if (!m?.rose || m.gather || m.off !== undefined || p.handler === null || p.ball || p.finish || p.end) return false;
+  if (p.t - m.rose.at > within + 1e-9) return false;
+  const b = p.bodies[p.handler];
+  const r = m.rose;
+  b.h = 0;
+  b.vh = 0;
+  b.vx = r.vx;
+  b.vz = r.vz;
+  b.act = r.act;
+  b.actAt = r.actAt;
+  if (r.def !== null) {
+    const d = p.bodies[r.def];
+    d.h = r.dh;
+    d.vh = r.dvh;
+    d.act = r.dAct;
+    d.actAt = r.dActAt;
+  }
+  p.meter = null;
+  p.events.push('unrise');
+  return true;
 }
 
 /** The top of a jump shot's meter (seconds after SHOOT): the green, and where the drawing puts
@@ -1118,7 +1158,7 @@ export function step(p: Possession, dt: number, stick: Pt | null, sprintHeld?: b
   if (p.scheme === 'switch' && Math.floor(t * 4) !== Math.floor((t - dt) * 4)) switchMarks(p);
 
   // a person's provisional gather leaves the floor once the tap / swipe window has passed
-  if (p.meter?.gather && handler && t - p.meter.t0 >= GATHER_S) rise(p, handler);
+  if (p.meter?.gather && handler && t - (p.meter.gatherAt ?? p.meter.t0) >= GATHER_S) rise(p, handler);
 
   // ISO: the ball goes to the star on the strong wing once he's there or open (or after 1.1 s)
   const iso = p.playCall?.kind === 'iso' && p.playCall.feed ? p.playCall : null;

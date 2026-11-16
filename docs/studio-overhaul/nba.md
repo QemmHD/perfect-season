@@ -465,6 +465,38 @@ the 0.92 edge. The AI's possessions are unchanged (the golden test).
 
 ---
 
+### Review fixes (nba-2, 2026-11-16)
+
+An independent review of `0e788b1..98cb6ed` found 11 issues; all are fixed except the bundle-size one, which is
+measured in nba-10's build (below). Probe: `scripts/audit/nba-controls-fix.mjs` (CDP touch, isolated), JSON and
+captures in `O/shots/nba/nba-2-fix/`.
+
+| # | Severity | Issue | Fix | Measured after |
+|---|---|---|---|---|
+| 1 | high | A tap on SHOOT could come out as a **shot**: the jumper rose on the meter's backdated clock (touch time + 125 ms), often before the lift's handler ran, so a 90-121 ms tap found him in the air | The **gesture decides**, not the engine's clock. `HoopsControls.liftShoot(p, tap)`: a tap is a pump fake while he's on the floor, and still one if the gather rose ≤ `UNRISE_S` (60 ms, three frames) before the lift was heard; the new `unrise()` takes that rise back (the shooter and the man who closed out with him come back down exactly as they were). And the rise now waits `GATHER_S` on the **handler's** clock (`Meter.gatherAt`, the game time the down was heard); only the meter's `t0` stays backdated, so release timing is unchanged | Browser: **24 / 24** taps of 89-119 ms (event timestamps), lift heard 21-67 ms late, are pump fakes, 0 shots (review: 6 / 6 shots). Unit: 84 tap / lag / late-frame combinations (90-115 ms, 0-60 ms lag, 0-3 frames late) all pump fakes |
+| 2 | medium | An offline **Quit paid the full loss reward** (+30 coins, card XP, +80 season points): a 3-second loop where SIM isn't offered | `settle()` takes `forfeit` (ut's `play.ts`, small additive hunk): **no coins, no card XP, no season points, no paid game used**; the loss is recorded once and Cup / Club Season / Circuit advance. `settleDraft` too (no season points). `Match.tsx` passes it, skips Evolution progress, and the result screen says "You quit this game: it counts as a loss and pays no coins, XP or season points." | `src/ut/forfeit.test.ts` (3): Squad Battles, a forfeit-win rejected, a Cup round. Browser (`nba-controls.mjs --only=quit`): Squad Battles quit → "LOSS 0 – 8 … You quit this game: it counts as a loss and pays no coins, XP or season points", no reward lines |
+| 3 | low | A quit could report **us > them** with a loss; Cup and Club Season settlement reject that pair and recorded nothing | `Arcade.quit()` reports the rival at `max(their score, ours + 1)` | the Cup forfeit test settles |
+| 4 | medium | LAST PLAY (then top-left) sat under the **Moments / Training Camp** Leave button | nba-3 moved LAST PLAY to the top-right beside the bug; the probe then found its opened card under Camp's **Restart** button. LAST PLAY is now **hidden in practice** (Camp and Moments report each attempt in their own overlay) | Camp and Moments at 393 and 320, overlays placed at a real phone's `env(sat)`: **0 overlaps** with the pause button |
+| 5 | medium | Buttons-only: the open **CALL radial landed on CROSS / STEP / SPIN** (5 overlaps per size) | `Cluster` takes `arcOff`; NBA hides the move arc while the radial is open (it comes back when the radial closes) | radial open: **0 overlaps** in Gestures and Buttons-only at 393 and 320; arc back after close |
+| 6 | low | A near-instant tap on CALL picked a radial item (ISO) from under the finger while the menu was still opening | `onC` up reads the item under the finger only after a real slide (≥ `TAP_PX`) or a non-tap | quick tap: radial **open, nothing picked** (both sizes, both modes) |
+| 7 | low | Swipe labels rendered at 9.25-9.75 px; STEP ran off the bottom at 320×568 / 375×667 | labels 11.5 user units (**10.64 px at 320, 11.07 at 375, 11.21 at 393**); the down hint is arrow-and-word side by side in the band under A | all labels and arrows inside the screen at 320 / 375 / 393 |
+| 8 | low | The toast line covered the handler at tip-off | re-checked with nba-3's camera | **0 of 53** sampled frames with a toast had the handler under it (393 and 320) |
+| 9 | low | `PauseSheet` had basketball copy | `quitNote` prop, neutral default ("The rest of the game scores nothing."); NBA passes its possessions line | — |
+| 10 | low | `Stick.tsx` and `stick.ts` differed only in case (misresolves on macOS / Windows) | renamed to **`StickPad.tsx`** (the component is still `Stick`; `src/game/hud` re-exports it) | contract log below |
+| 11 | low | Moments imports Hoops2 statically, so the HUD kit loads with UT (plan §3.9's +2 KB UT budget) | not changed: needs a build to measure, and full builds are for final QA. **nba-10 measures it**; if it's over, the Moments game is lazy-loaded like Training | — |
+
+Verification: `heavy.sh npm run typecheck` clean; `heavy.sh npx vitest run src/game/hoops2 src/game/hud
+src/game/stick.test.ts src/ut/{forfeit,cup-settlement,match,league,overhaul,cup}.test.ts
+src/engine/sport-branches.test.ts`: 22 files passed (5 opt-in skipped), 152 tests, golden and determinism green.
+Browser: `nba-controls-fix.mjs` (all sections) and `nba-controls.mjs --only=quit`, 0 page errors; the only
+aborted outside request is the UT fixture's Supabase call (as in nba-1).
+
+Tests added: `controls.test.ts` +3 (late-heard taps, the handler-clock rise, hold / late lift / released shot never
+taken back; the existing gather test now times the rise from `gatherAt`), `src/ut/forfeit.test.ts` (3).
+
+**Protocol:** no new bump. The provisional gather is a person's input only (the AI never uses it; the golden
+autopilot test is unchanged), and it's already inside nba-2's "Protocol bump needed: NBA draft + UT".
+
 ## nba-3 · The frame: three-quarter camera, action-safe box, score bug and Heat bar, live clock, readable text, held arena (2026-11-16)
 
 ### What changed
@@ -707,7 +739,7 @@ The files are listed in landing order.
 | File | Lands in | Consumers |
 |---|---|---|
 | `src/game/controls-geometry.css` | nba-2 | nba, nfl, soccer, ut (the One-More bar sits at A's position) |
-| `src/game/stick.ts` (pure) + `src/game/Stick.tsx` | nba-2 | all three sports |
+| `src/game/stick.ts` (pure) + `src/game/StickPad.tsx` (was `Stick.tsx`) | nba-2 | all three sports |
 | `src/game/hud/gestures.ts`, `Cluster.tsx`, `ToastLine.tsx`, `PauseButton.tsx`, `PauseSheet.tsx`, `prefs.ts`, `feel.ts`, `hud.css`, `index.ts` | nba-2 | all three |
 | `src/game/hud/ScoreBug.tsx`, `HeatBar.tsx`, `geometry.ts` | nba-3 | all three |
 | `Arcade.tsx` held-arena props and `ArcadeHandle` | nba-3 | ut hosts; nfl and soccer adopt them for their branches |
@@ -747,7 +779,7 @@ Colour tokens (V2 C.3) are also declared here: `--ps-gold #f6b93b`, `--ps-teal #
 The class `.ps-geo.land` switches to the landscape rule (the 393 sizes, corner-anchored). The host sets the class from
 JS; there are no media queries.
 
-### 4.2 `stick.ts` (pure) and `Stick.tsx`
+### 4.2 `stick.ts` (pure) and `StickPad.tsx` (was `Stick.tsx`)
 
 ```ts
 // src/game/stick.ts — no DOM, no timers; unit-tested
@@ -766,7 +798,7 @@ export function sprintEdge(prev: StickOut, next: StickOut): boolean;  // true on
 export function geomFrom(el: Element): StickGeom;  // reads the §4.1 tokens; DOM helper, not called by the pure functions
 ```
 
-`Stick.tsx` is `<Stick geom? disabled? onChange={(o: StickOut) => void} onSprintEdge?={() => void} />`. It provides:
+`StickPad.tsx` (was `Stick.tsx`; the component is still `Stick`) is `<Stick geom? disabled? onChange={(o: StickOut) => void} onSprintEdge?={() => void} />`. It provides:
 - non-passive listeners, `touch-action: none` and `setPointerCapture`
 - the ghost ring at rest
 - a pre-held thumb: a pointer already down when the component enables (at the whistle) is adopted at once, and its
@@ -924,6 +956,9 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
 | 2026-11-16 | §4.3 `BugProps` (nba-3) | optional `sub` (a second line under the period), `clockRef` (the host writes the clock every frame), `youColor` / `rivalColor`, `aside` (an icon beside the bug) | the live clock without re-renders; LAST PLAY in the bug |
 | 2026-11-16 | §4.3 `readGeometry` (nba-3) | also returns `hudBottom` (the Heat bar's bottom; sideways the toast line's); `intersects()` exported | the rim keeps 40 px under the HUD |
 | 2026-11-16 | §4.8 `ArcadeHandle.rematch` (nba-3) | `next?: { seed?: string; rival?: string /* name */; them?: { lineup?: Lineup; teams?: ArcadeTeams } }`: the plan's `Rival` and `Squad` types don't exist, so these are the shapes Arcade already takes. `Arcade` is a `forwardRef`; `hold` is offline only | the stub host and ut's One-More bar |
+| 2026-11-16 | §4.2 `Stick.tsx` (nba-2 review) | renamed **`src/game/StickPad.tsx`**; the export is still `Stick`, and `src/game/hud` re-exports it. Import `{ Stick } from '../StickPad'` or from `'../hud'` | `Stick.tsx` and `stick.ts` differed only in case: on macOS / Windows `'../Stick'` resolved to `stick.ts` |
+| 2026-11-16 | §4.3 `Cluster` / `PauseSheet` (nba-2 review) | `Cluster` takes optional `arcOff` (hide the Buttons-only arc); `PauseSheet` takes optional `quitNote` (the confirm's line in the sport's words; neutral default) | the radial over the arc; sport-neutral copy |
+| 2026-11-16 | §4.8 forfeit (nba-2 review) | a quit's `them` score is at least `us + 1`; UT `settle()` / `settleDraft()` take `forfeit` and pay nothing for it | Cup / Club Season reject a loss with more points; a quit is not a reward loop |
 | 2026-11-16 | `controls-geometry.css` (nba-3) | sideways `--safe-t` 64 → 100 px | the toast line sits under the bug sideways (to --sat + 94) |
 
 ---
@@ -1018,7 +1053,11 @@ golden and the AI-race golden byte-identical, and the rematch's AI side is prove
   - `src/App.tsx` (shared): the draft host passes `quit` into `finish`, and `vsWon` is false for a quit
     (2 lines).
   - `src/ut/Match.tsx` (shared): `finish` takes `forfeit`; a quit settles as `{ won: false }` (4 lines).
-    ut decides whether a quit should still pay the loss reward (see Left undone).
+  - **Review fixes:** `src/ut/play.ts` (ut): `settle()` takes an optional `forfeit` (rejected with a win; pays
+    no coins / XP / season points and uses no paid game). `src/ut/draft-mode.ts` (ut): `settleDraft` takes
+    `forfeit` (no season points). `src/ut/Match.tsx`: passes `forfeit`, skips `recordEvoMatch` for a quit, and
+    a result-screen note. `src/game/Arcade.tsx`: a quit reports the rival at `max(them, us + 1)`. New test
+    `src/ut/forfeit.test.ts`. ut: please keep the flag when you rework settlement.
   - `src/game/play-readout.css` (shared with nfl): removed the dead `.hg2-skills` rules (NBA's old
     move buttons).
   - `src/game/hoops2/render.ts`, players section: two fallback poses, `pump` and `euro` (players' own
@@ -1058,7 +1097,8 @@ golden and the AI-race golden byte-identical, and the rematch's AI side is prove
 - The sprint ring: does pushing past it feel deliberate, and is the haptic tick felt (iOS plays one tick,
   only inside a touch; the sprint edge comes from a move, so iOS may play it on the next touch)?
 - Gestures on SHOOT under a real thumb: taps that should be pump fakes, swipes that should be moves
-  (thresholds 120 ms / 12 px / 36 px in 250 ms).
+  (thresholds 120 ms / 12 px / 36 px in 250 ms). After the review fix a quick tap should never brick a
+  shot: try fast taps on a busy moment (a crowded paint, right after a pass).
 - Auto-pause when a call comes in or the app is switched away, and Resume.
 - The Dynamic Island: re-measure the pause button and the bug once shell's `--sat` fix merges.
 
@@ -1085,12 +1125,14 @@ ring's feel, haptics, defense, the rematch loop and accented names.
 - **The 393 live handler median** is 0.494 in one 900-frame lab slice (0.536 over 6 simulated games).
 
 **nba-2:**
-- **A quit still pays the ordinary loss reward** in UT (30 coins, XP, season points) and the debrief
-  coaches the empty possessions. That is ut's call (rewards and debrief are theirs); a quit at tip-off
-  is no faster than a SIM where SIM is offered, but Circuit, Club Season and Cups don't offer SIM.
+- ~~A quit still pays the ordinary loss reward~~: fixed in the review fixes (a quit pays nothing). The
+  debrief still coaches the empty possessions (ut's).
 - The euro-step and the pump fake use fallback poses until players' `euro` and `pump` land.
 - The radial's open animation and the euro-step were on the cut line; both shipped.
 - The online forfeit (the sheet's Forfeit) is nba-9's, as planned.
+- **The UT chunk's size** with the HUD kit (Moments imports Hoops2 statically): estimated by the review at about
+  +7 KB gzip JS and +4 KB CSS against plan §3.9's +2 KB. nba-10's build measures it; over budget, the Moments
+  game gets lazy-loaded like Training.
 
 - Nothing from nba-1's Must list. The probes measure only what today's game has; rows for controls that don't exist yet
   (pause, Heat bar, sprint ring, gestures on A) print "absent", and the tasks that build them add their measurements.

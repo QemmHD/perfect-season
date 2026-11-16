@@ -26,7 +26,7 @@ import { PausableTimers } from '../hud/timers';
 import { ToastLine, ToastProvider, type Toast } from '../hud/ToastLine';
 import '../hud';
 import type { StickOut } from '../stick';
-import { HoopsControls, type HoopsCtx, offOf } from './HoopsControls';
+import { HoopsControls, type HoopsCtx, liftShoot, offOf } from './HoopsControls';
 import './match.css';
 import { Juice } from '../juice';
 import { BADGE_LABEL, tierLabel } from './badges';
@@ -41,7 +41,7 @@ import type { Progress, RivalLive } from '../progress';
 import { frameAt, Recorder, type Replay, REPLAY_AFTER, REPLAY_BEFORE, REPLAY_SPEED, replayTime, REPLAYS_IN_AUTOPLAY } from '../replay';
 import { WaitLine } from '../Wait';
 import { autoplay, decide, pilot } from './autopilot';
-import { aimPass, callPlay, cancelGather, cancelShoot, crossover, driving, euroStep, jumpRebound, pass, PUMP_EVERY, pressShoot, pumpFake, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
+import { aimPass, callPlay, cancelGather, cancelShoot, crossover, driving, euroStep, jumpRebound, pass, pressShoot, releaseShoot, RIM, RIM_H, spin, step, stepback } from './engine';
 import { afterPossession, CLUTCH, half, type HoopsGame, type Mark, newHoopsGame, POSSESSIONS, practiceStart, startPossession } from './game';
 import { hooper, lineOf, SPOTS } from './ratings';
 import { type Fx, HoopsRenderer, type Kit } from './render';
@@ -931,16 +931,14 @@ export function Hoops2({
       cancelShoot(p);
       return;
     }
-    // up: a tap before he left the floor is a pump fake; otherwise the shot goes
-    const gathering = p.meter?.gather || (p.finish && p.t < p.finish.tUp && !p.ball);
-    if (e.gesture?.kind === 'tap' && gathering) {
-      const h = p.handler !== null ? p.bodies[p.handler] : null;
-      const tooSoon = h && p.t - (h.pumpAt ?? -9) < PUMP_EVERY;
-      if (!pumpFake(p) && tooSoon) say('ONE FAKE AT A TIME', 'plain', 600);
+    // up: the gesture decides (a tap is a pump fake, even when its lift got here a frame or three
+    // after the gather rose); otherwise the shot goes, timed from the lift
+    const out = liftShoot(p, e.gesture?.kind === 'tap');
+    if (out === 'release') release(p, e.t);
+    else {
+      if (out === 'wait') say('ONE FAKE AT A TIME', 'plain', 600);
       handleEvents(p);
-      return;
     }
-    if (p.meter && p.meter.off === undefined) release(p, e.t);
   };
   const onB = (e: ClusterInput, p: Possession | null) => {
     if (e.phase === 'down') {
@@ -966,8 +964,9 @@ export function Hoops2({
   };
   const onC = (e: ClusterInput) => {
     if (e.phase === 'down') setCallOpen((o) => !o);
-    else if (e.phase === 'up' && e.x !== undefined && e.y !== undefined) {
-      // slid from CALL onto an item and lifted there
+    else if (e.phase === 'up' && e.x !== undefined && e.y !== undefined && ((e.dist ?? 0) >= TAP_PX || e.gesture?.kind !== 'tap')) {
+      // slid from CALL onto an item and lifted there (a plain tap on CALL only opens the menu: its items
+      // still sit on CALL while they fan out, and a quick tap's lift would land on one)
       const id = radialAt(e.x, e.y);
       if (id) pickCall(id);
     }
@@ -1078,6 +1077,9 @@ export function Hoops2({
         )}
         {g && (
           <>
+            {/* LAST PLAY stays out of practice (Training Camp, Moments): their own overlays sit right under
+                the bug with Leave and Restart buttons the opened card would cover, and they report each
+                attempt themselves */}
             <ScoreBug
               you={g.score}
               rival={rival?.score ?? 0}
@@ -1090,7 +1092,7 @@ export function Hoops2({
               phase={qaPhase ?? (!g.over && g.done >= g.total - CLUTCH ? 'clutch' : 'normal')}
               youColor={teamColor(ourKit)}
               rivalColor={teamColor(theirKit)}
-              aside={!autoplayHook && <PlayReadout readout={lastReadout} live={!between && !g.over} resetKey={g.done} icon />}
+              aside={!autoplayHook && !practice && <PlayReadout readout={lastReadout} live={!between && !g.over} resetKey={g.done} icon />}
             />
             {/* fed zeros until heat.ts lands (nba-4) */}
             <HeatBar you={{ v: 0, stage: 'cold' }} />
@@ -1121,7 +1123,7 @@ export function Hoops2({
         )}
         <ToastLine />
         {g && !g.over && <PauseButton onPause={pause} label={online ? 'Match menu' : 'Pause'} />}
-        <PauseSheet open={sheet} online={online} onResume={resume} onQuit={!online && onQuit ? quit : undefined}>
+        <PauseSheet open={sheet} online={online} onResume={resume} onQuit={!online && onQuit ? quit : undefined} quitNote="It counts as a loss. Possessions you haven’t played score nothing.">
           <SheetToggle
             label="Controls"
             value={prefs.controls ?? 'gestures'}
