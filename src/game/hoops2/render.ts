@@ -6,7 +6,7 @@
 import { drawBody, type Look, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
 import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
-import { drawGate } from '../pixel/ready';
+import { wantPixels } from '../pixel/ready';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
@@ -362,8 +362,9 @@ export class HoopsRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, p: Possession, real: number, fx: Fx) {
-    // the first frame waits for the clips and looks (players-3, pixel/ready.ts)
-    if (!drawGate('nba')) return;
+    // keep the clips and looks coming (players-3, pixel/ready.ts); the frame always draws: the screen
+    // holds game time while the first load is on its way (holdPlay)
+    wantPixels('nba');
     ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     this.budget = 4;
     ctx.imageSmoothingEnabled = false;

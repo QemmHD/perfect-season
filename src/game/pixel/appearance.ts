@@ -325,6 +325,9 @@ export interface AppearanceFile {
   players: Record<string, string>;
   /** soccer: pids whose preferred foot is left, both, or not recorded (everyone else: right) */
   feet?: { L: string[]; B: string[]; U: string[] };
+  /** a curated player with eras: his own seasons in each draft cell (`CELL:pid` → [from, to]), so a
+   * draft id alone resolves the era that covers him (refOf) */
+  cells?: Record<string, number[]>;
 }
 
 // ---------- seeded defaults ----------
@@ -480,7 +483,8 @@ export interface Ref {
  * (and every edition: promo, legend, goat, spotlight, landmark, `standout:<week>`, live
  * `nba:live:<promo>[.f]:…`), the variants `holo~<id>` and `evo~<a+b>~<id>`, soccer `108830:2019:BAR`.
  * Stand-ins (`reserve:PG`, `depth:WR:…`, `squad-3`) have no one to look like: null. `ctx.from`/`to`
- * are a draft player's own seasons inside the cell.
+ * are a draft player's own seasons inside the cell; without them a cell id takes them from the built
+ * data (`cells`, every curated player with eras), so `CHI-1980:jordami01` draws his 1985-89 look.
  */
 export function refOf(sport: Sport, id: string, ctx?: { from?: number; to?: number }): Ref | null {
   if (id.startsWith('holo~')) return refOf(sport, id.slice(5), ctx);
@@ -496,10 +500,13 @@ export function refOf(sport: Sport, id: string, ctx?: { from?: number; to?: numb
   }
   const cell = /^[A-Z0-9]+-(\d{4}):(.+)$/.exec(id);
   if (cell) {
+    // his own seasons in the cell: the caller's, else the built data's (every curated player with
+    // eras), else unknown: the middle of the decade picks the defaults and no span is claimed, so an
+    // era applies only if it covers that season (never the whole decade, which no era covers)
+    const known = ctx?.from !== undefined && ctx?.to !== undefined ? ([ctx.from, ctx.to] as [number, number]) : data[sport]?.cells.get(id);
+    if (known) return { pid: cell[2], season: Math.round((known[0] + known[1]) / 2), span: known };
     const decade = Number(cell[1]);
-    const from = ctx?.from ?? decade;
-    const to = ctx?.to ?? decade + 9;
-    return { pid: cell[2], season: Math.round((from + to) / 2), span: [from, to] };
+    return { pid: cell[2], season: Math.round((decade + decade + 9) / 2) };
   }
   const soc = /^(\d+):(\d{4}):[^:]+$/.exec(id);
   if (soc) return { pid: soc[1], season: Number(soc[2]) };
@@ -508,15 +515,19 @@ export function refOf(sport: Sport, id: string, ctx?: { from?: number; to?: numb
 
 // ---------- data and lookup ----------
 
-const FILES: Record<string, () => Promise<{ default: AppearanceFile }>> = {
-  ...import.meta.glob<{ default: AppearanceFile }>(['../../data/appearance/nba.json', '../../data/appearance/nfl.json']),
+// one chunk per sport, named looks-<sport> (the wrapper modules), so the readiness probe can tell it
+// from the draft dataset's <sport>-<hash>.js
+const FILES: Partial<Record<Sport, () => Promise<{ default: AppearanceFile }>>> = {
+  nba: () => import('../../data/appearance/looks-nba'),
+  nfl: () => import('../../data/appearance/looks-nfl'),
   // the single-file artifact build plays NBA and NFL only: it leaves soccer's data out
-  ...(__SOCCER__ ? import.meta.glob<{ default: AppearanceFile }>('../../data/appearance/soccer.json') : {}),
+  ...(__SOCCER__ ? { soccer: () => import('../../data/appearance/looks-soccer') } : {}),
 };
 
 interface Loaded {
   players: Map<string, { base: Partial<LookFields>; eras: LookEra[] }>;
   feet: Map<string, 'L' | 'B' | null>;
+  cells: Map<string, [number, number]>;
 }
 const data: Partial<Record<Sport, Loaded>> = {};
 const loading: Partial<Record<Sport, Promise<boolean>>> = {};
@@ -531,14 +542,15 @@ export function useAppearanceFile(f: AppearanceFile): void {
   for (const pid of f.feet?.L ?? []) feet.set(pid, 'L');
   for (const pid of f.feet?.B ?? []) feet.set(pid, 'B');
   for (const pid of f.feet?.U ?? []) feet.set(pid, null);
-  data[f.sport] = { players, feet };
+  const cells = new Map(Object.entries(f.cells ?? {}).map(([k, [from, to]]) => [k, [from, to] as [number, number]] as const));
+  data[f.sport] = { players, feet, cells };
   for (const k of [...memo.keys()]) if (k.startsWith(f.sport + '|')) memo.delete(k);
 }
 
 /** Load a sport's looks (one small chunk); resolves false if it can't (the defaults carry on). */
 export function loadAppearance(sport: Sport): Promise<boolean> {
   if (data[sport]) return Promise.resolve(true);
-  const file = FILES['../../data/appearance/' + sport + '.json'];
+  const file = FILES[sport];
   if (!file) return Promise.resolve(false);
   const p = (loading[sport] ??= file().then(
     (m) => {
@@ -577,7 +589,9 @@ export function appearanceFor(sport: Sport, pid: string, season?: number, ctx?: 
   const d = data[sport];
   const out = defaultAppearance(sport, pid, s, ctx?.pos);
   const row = d?.players.get(pid);
-  if (row) {
+  // a row with nothing curated yet (a player listed for review whose fields are all still uncertain)
+  // draws and reports as the defaults: Tier A is a look someone checked, not a name on a list
+  if (row && (Object.keys(row.base).length || row.eras.length)) {
     Object.assign(out, row.base);
     let helmet = row.base.helmetHair;
     if (season !== undefined)

@@ -6,7 +6,7 @@
 import { drawBody, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
 import { drawField, type FieldCam, fieldAt, fieldCam, fieldFacing, type FieldTheme } from '../pixel/field';
 import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
-import { drawGate } from '../pixel/ready';
+import { wantPixels } from '../pixel/ready';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
 import { drawGroundMark } from '../pixel/ground';
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
@@ -421,8 +421,9 @@ export class FootballRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, p: Play, ballOn: number, o: FbOverlay) {
-    // the first frame waits for the clips and looks (players-3, pixel/ready.ts)
-    if (!drawGate('nfl')) return;
+    // keep the clips and looks coming (players-3, pixel/ready.ts); the frame always draws: the screen
+    // holds game time while the first load is on its way (holdPlay)
+    wantPixels('nfl');
     ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     ctx.imageSmoothingEnabled = false;
     this.aiming = !!o.aim;

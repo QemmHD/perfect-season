@@ -11,7 +11,7 @@
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-soccer.ts.
 import { drawBody, freeCanvas, type Look, SpriteCache, CanvasOut } from '../pixel/body';
 import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
-import { drawGate } from '../pixel/ready';
+import { wantPixels } from '../pixel/ready';
 import { drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { pitchTexture, type PitchTheme } from '../pixel/pitch';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
@@ -584,8 +584,9 @@ export class SoccerRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, a: Attack, o: SoccerOverlay, kitOf: (b: Body) => 'us' | 'them') {
-    // the first frame waits for the clips and looks (players-3, pixel/ready.ts)
-    if (!drawGate('soccer')) return;
+    // keep the clips and looks coming (players-3, pixel/ready.ts); the frame always draws: the screen
+    // holds game time while the first load is on its way (holdPlay)
+    wantPixels('soccer');
     ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
     ctx.imageSmoothingEnabled = false;
     // a corner pulls out wide enough for the taker and the whole box; a replay pushes in

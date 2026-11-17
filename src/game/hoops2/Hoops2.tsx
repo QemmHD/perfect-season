@@ -28,6 +28,7 @@ import type { Body, Hooper, Possession, Pt, Scheme } from './types';
 import './coach-controls.css';
 import { useInputInterrupt } from '../useInputInterrupt';
 import { artScale } from '../pixel/art-scale';
+import { holdPlay } from '../pixel/ready';
 
 const DT = 1 / 60;
 /** what a phone's screen and touch add between what you saw and the release it hears (seconds) */
@@ -508,6 +509,8 @@ export function Hoops2({
       const J = fx.juice!;
       J.update(elapsed);
       acc += J.gameTime(now, now < slowUntil.current ? elapsed * 0.35 : elapsed);
+      // players-3: no game time passes while the first frame's clips and looks are on their way (≤1.5 s)
+      if (holdPlay('nba', now)) acc = 0;
       // a play can end between the steps too: a crossover, a spin or a step-back stripped as you
       // swipe it ends the possession in the swipe itself, and unbooked the game would wait on it
       // forever (the court still drawn, the clock stopped)

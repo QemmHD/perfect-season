@@ -50,6 +50,7 @@ import './playbook.css';
 import { PlaybookDialog } from './PlaybookDialog';
 import { useInputInterrupt } from '../useInputInterrupt';
 import { artScale } from '../pixel/art-scale';
+import { holdPlay } from '../pixel/ready';
 
 type Ui = 'loading' | 'pre' | 'fourth' | 'live' | 'after' | 'kick' | 'final';
 
@@ -686,6 +687,8 @@ export function Football2({
       // slow motion and hit-stop only hold back real time: the same fixed steps run, a beat later
       fx.juice.update(elapsed);
       acc += fx.juice.gameTime(now, now < slowUntil.current ? elapsed * 0.4 : elapsed);
+      // players-3: no game time passes while the first frame's clips and looks are on their way (≤1.5 s)
+      if (holdPlay('nfl', now)) acc = 0;
       if (p && p.end) {
         // after the whistle: the hit lands, the tackled man slides, the pile settles
         const vis = fx.juice.gameTime(now, now < slowUntil.current ? elapsed * 0.4 : elapsed);

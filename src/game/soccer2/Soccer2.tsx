@@ -29,6 +29,7 @@ import { kickAttack, newShootout, nextKick, recordKick, score as soScore, type S
 import type { Attack, AttackEnd, Body, Pt, Scenario, Squad } from './types';
 import './soccer2.css';
 import { artScale } from '../pixel/art-scale';
+import { holdPlay } from '../pixel/ready';
 
 type Ui = 'loading' | 'intro' | 'live' | 'after' | 'so-intro' | 'so-kick' | 'so-after' | 'final';
 type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green';
@@ -667,9 +668,12 @@ export function Soccer2({
       const elapsed = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
       const slow = now < slowUntil.current ? 0.35 : 1;
+      const held = holdPlay('soccer', now);
       const u = uiRef.current;
       if (a && (u === 'live' || u === 'so-kick') && !a.end && !replayRef.current) {
         acc += elapsed * slow;
+        // players-3: no game time passes while the first frame's clips and looks are on their way (≤1.5 s)
+        if (held) acc = 0;
         while (acc >= DT) {
           acc -= DT;
           const ai = autoplayHook || (u === 'so-kick' && !usKicking.current);

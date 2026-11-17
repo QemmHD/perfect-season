@@ -60,9 +60,12 @@ function readinessHooks() {
 }
 
 // dev: /src/data/mocap/run.json?import ; production: /assets/run-<hash>.js (clip names as in mocap.ts) or,
-// from players-3, the per-sport bundle /assets/clips-<sport>-<hash>.js
-const CLIP = /\/data\/mocap\/(?!index)[\w-]+\.json|\/assets\/clips-(?:nba|nfl|soccer)-[\w-]{6,}\.js$|\/assets\/(?:ready|jog|run|sprint|walk|jumpshot|layup|throw|catch|catch_run|dive|block|kick|backpedal|shuffle|celebrate|fall_back|fall_forward|stumble|slip|getup|getup_front|dribble|crossover|cut|stiff_arm|jump)-[\w-]{6,}\.js$/;
-const LOOKS = /\/data\/appearance\/|\/assets\/(?:appearance|looks)[\w-]*\.(?:js|json)$/;
+// from players-3, the per-sport bundle /assets/clips-<sport>-<hash>.js plus /assets/clips-shared-<hash>.js
+// (the clips two or more sports play; measured on a build: two clip requests per sport)
+const CLIP = /\/data\/mocap\/(?!index)[\w-]+\.json|\/assets\/clips-(?:nba|nfl|soccer|shared)-[\w-]{6,}\.js$|\/assets\/(?:ready|jog|run|sprint|walk|jumpshot|layup|throw|catch|catch_run|dive|block|kick|backpedal|shuffle|celebrate|fall_back|fall_forward|stumble|slip|getup|getup_front|dribble|crossover|cut|stiff_arm|jump)-[\w-]{6,}\.js$/;
+// dev: /src/data/appearance/looks-<sport>.ts and <sport>.json ; production: /assets/looks-<sport>-<hash>.js
+// (the looks-<sport>.ts wrapper names the chunk; the draft dataset's chunk is the bare <sport>-<hash>.js)
+const LOOKS = /\/data\/appearance\/|\/assets\/looks-(?:nba|nfl|soccer)-[\w-]{6,}\.js$/;
 const GAME = /(Hoops2|Football2|Soccer2|SoccerLab|Lab|render|arcade)[\w.-]*\.(?:tsx?|js)(\?|$)/;
 
 await needServer();
