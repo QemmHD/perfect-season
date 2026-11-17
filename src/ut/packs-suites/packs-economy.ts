@@ -42,6 +42,22 @@ function legacyUpgrades(day: string): Sbc[] {
   ];
   return t.map((x, i) => ({ ...x, id: 'u:' + day + ':' + i + ':0', kind: 'upgrade' as const, ...(i < 3 ? { left: 2 } : {}) }));
 }
+/**
+ * Claude (packs-6, D5): the four weekly Hot Season challenges as they were before HOT_SEASON_TUNE (team 70 /
+ * 78, five to eight cards), rebuilt from today's sheet with the same key order, so the fixture test proves
+ * nothing else in the weekly catalogue moved.
+ */
+function legacyWeekly(x: Sbc): Sbc {
+  if (x.kind !== 'weekly' || x.reward.card?.tier !== 'promo') return x;
+  const sc = (v: number) => onScale(v, SPORT);
+  const fr = x.reqs.filter((r): r is Extract<Sbc['reqs'][number], { k: 'fr' }> => r.k === 'fr');
+  const tail = { reward: x.reward, id: x.id, kind: x.kind };
+  if (x.title.startsWith('Dynasty: ')) return { title: x.title, blurb: 'Five from one franchise. A Hot Season card comes back.', size: 5, reqs: [{ ...fr[0], n: 5 }, { k: 'teamOvr', ovr: sc(70) }], ...tail };
+  if (x.title === 'Hall of Fame Class') return { title: x.title, blurb: 'Eight golds, and good ones.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(78) }], ...tail };
+  if (x.title === 'Rival Dynasties') return { title: x.title, blurb: 'Three ' + fr[0].name + ', three ' + fr[1].name + '. A Hot Season card comes back.', size: 6, reqs: [{ ...fr[0], n: 3 }, { ...fr[1], n: 3 }, { k: 'teamOvr', ovr: sc(70) }], ...tail };
+  if (x.title === 'Hot Season Hunt') return { title: x.title, blurb: 'Six cards: five golds, three teammates.', size: 6, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'sameFr', n: 3 }], ...tail };
+  return x;
+}
 const FIXTURES = import.meta.glob<PacksSnapshot>('../__fixtures__/packs-before/*.json', { import: 'default' });
 const fixture = () => FIXTURES['../__fixtures__/packs-before/' + SPORT + '.json']();
 const MINT: CardMint = { serial: 7, totalAtPull: 7, requestId: 'packs-test', namespace: 'inspect' };
@@ -251,7 +267,8 @@ export function packsEconomySuite(): void {
       const now = takeSnapshot(pool);
       // Claude (packs-3): the six upgrades are retuned by the SBC value rules (sbc.ts UPGRADE_TUNE); with the
       // upgrades as they were, every day's catalogue (dailies, weeklies, ids and order) is the fixture's
-      const legacy = Object.fromEntries(sbcDays().map((day) => [day, digest(JSON.stringify([...sbcsFor(pool, day).filter((x) => x.kind !== 'upgrade'), ...legacyUpgrades(day)]))]));
+      // Claude (packs-6): and the four Hot Season weeklies as they were before HOT_SEASON_TUNE (legacyWeekly)
+      const legacy = Object.fromEntries(sbcDays().map((day) => [day, digest(JSON.stringify([...sbcsFor(pool, day).filter((x) => x.kind !== 'upgrade').map(legacyWeekly), ...legacyUpgrades(day)]))]));
       if (SPORT === 'soccer') expect(Object.keys(now.sbcs)).toEqual(Object.keys(before.sbcs));
       else expect(legacy).toEqual(before.sbcs);
       expect(now.started).toEqual(before.started);

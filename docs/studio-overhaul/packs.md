@@ -16,7 +16,8 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 | packs-3 review fixes (the plan's Club Collection floor, Club Collection limits shown, Scout's Choice by route cost, snapshot kind, flash pick price, NFL Silver Upgrade, first-paint split) | done | see `git log` (subject "packs-3 review fixes") |
 | packs-5: ratings truth (Hot Season/Legend re-rate, GOAT/Spotlight shape, OVR diff) | done | see `git log` (subject "packs-5") |
 | packs-4 review fixes (fast calendar pick sheet, NFL Scout's Choice by player, confirm rows, certain rows, sheet dates, blurb numbers, pick/reward speed tests) | done | see `git log` (subject "packs-4 review fixes") |
-| packs-6 … packs-10 | not started | |
+| packs-6: pity, the stamp shelf page, rankOf, the ladder levers and the V2 ladder model | done | see `git log` (subject "packs-6") |
+| packs-7 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
 
@@ -1122,12 +1123,118 @@ Fixed on top of packs-5 (`349e342`). No storage key, card or copy id, claim id, 
 
 - packs-10: re-measure tap to sheet on the production build, as planned.
 
+## packs-6: pity, the stamp shelf page and the tier ladder (with MINUTES and every D.16 income row)
+
+### What changed and why
+
+- **Pity (D6, D7), `live-packs.ts`.** `pityLength(p) = max(13, ceil(3.9 / p))` on the pack's unboosted program rate, `effectiveProgramRate(p, L) = p / (1 − (1 − p)^L)`, and `pityState(sport, log, kind, day)`: the trailing run of this promo's `live:` packs (any source) since its latest wave began without a program card, recomputed from the Pack Tracker's recent packs. Nothing is stored. Any program card resets it, a new wave resets it, other kinds in between are skipped. `pack-actions.ts` `openOpts(kind)` adds `forceProgram` when `misses ≥ L − 1`, and `openLivePack` then makes the program slot certain (UltimateTeam passes the kind: one line). The odds sheet of a program pack publishes `effectiveProgram` and `pityLength` ("Program card guaranteed within N packs", N from the player's own log when the Store opens it), a note with the rule, and its footer no longer says "independent" without the exception.
+- **Honors (D5).** A program whose band reaches 96 and that starts on or after the cutoff (`HONORS_FROM = 2026-12-04`, packs-plan §1) is Honors-class (`isHonors`): its pack is at most 8% a program card (with pity: L = 49 at 8%, 65 at 6%) and its guarantee costs at least 40,000 (NFL 24,000, soccer 32,000), one a week. That is January Honors and the late-year 96+ programs (s7 Dream Teams, s8 Ring Night, s9 Summer Heat, s11 Rivalry, s12 Anniversary). None has started.
+- **`rankOf` (D1), `pool.ts`.** Program 3.0, Hot Season 3.2, Honors program cards 4.3, Finale 4.6, everything else its `TIER_RANK`. `byValue` and `revealOrder` use it. Display order only.
+- **The stamp shelf page.** `StampShelf.tsx` + `stamp-shelf.css`, lazy, at the new UT view `stamps` (title "Scout Stamps", under the Store tab). A glass hero with a gold ring toward the next pick, the four rungs with foil art, their own progress, an ODDS chip and REDEEM (first tap arms, second spends; 92×48 design px), and "Where stamps come from". The Store gets a STAMPS tile under the Daily Drop (358×56). Redeeming spends exactly once and opens the ordinary pick sheet.
+- **All four rungs open (`stamp-shelf.ts`).** 300: 1 of 3 of this week's Standouts (soccer: Matchday Standouts). 600: a Program Pick of the program live now, in basketball and football only; with none live, or in soccer, the tile is LOCKED with the reason, no stamps move, and its sheet is not published (it is never an 82+ stand-in).
+- **The gold rungs' floors are per sport (a correction to packs-1/packs-2).** Valued by the game's own pick price (Scout's Choice costs a quarter of the cheapest pack route to a gold that good), an 85+ pick for 120 stamps was worth 62% of the 12,000 coins its stamps stand for, and stamps would have become the main source of 85+ golds. `SHELF_FLOOR`: NBA 80+ / 82+, NFL 82+ / 84+, soccer 82+ / 83+ (basketball's scale; each sport shows its own). New award kinds `pick-80` and `pick-83`; a `pick-85` already waiting keeps its kind. `STAMP_SHELF` labels lose their number ("Player Pick", "Stamp Scout"), so ut's near-miss line reads "12 to your Player Pick".
+- **Ladder levers (D5).**
+  - Legend: Elite Gold's last slot is a Legend 5% (NFL 6%, soccer 5%), from 1%. NBA Elite 2,600 → 2,700, because the Black Friday sale's 25% off went to 0.755 of its price (now 0.73; full price 0.55).
+  - Hot Season: the four weekly Hot Season challenges ask a team of 83+ (`HOT_SEASON_TUNE`; NFL sheets 8/11/8/8 cards because its golds cost a third). Ids, order and rewards unchanged.
+  - Program: NBA program pack 3,300 → 3,250, so its guarantee is 7,200 and the 600-stamp Program Pick stays at 12% (program packs still return 0.52-0.56).
+  - Spotlight: price = 0.20 × 1.5 × max(Legend, Finale), up to 1,000: NBA 3,500 → **30,000**, NFL 3,500 → **17,000**; one a week from the Store (`LIMITS.spotlight`, counted when its registry pack lands; earned Spotlight packs don't count); a reservation keeps the price it was made at (`pendingPromo.price`, the pull-tracker test). `SPOTLIGHT_RATES` and the server are untouched; nothing deployed. (The plan writes "rung ÷ 0.20": the rung is the price ÷ 0.20, so the price is 0.20 × the rung.)
+- **Fixes made while finishing the task (after the restart):** a Store Spotlight receipt that lands in a later week (an offline retry) no longer rewrites the limit counters with its old reservation day (that dropped today's Elite/Jumbo counters); the odds-sheet stamp line waits for `STAMPS_FROM`; the shelf's and the ladder model's sport branches use `pickFor`; a redemption refused for a reason other than the balance says so.
+- **The ladder model: `scripts/packs/ladder.ts`.** Rungs by cheapest coin route from the real definitions (Store packs at full price, the program pack with pity, guarantees, the Hot Season challenges' cheapest fodder at D10 acquisition cost, the Spotlight contract odds; Finale = a Legend + six program cards, D5's lower bound). Days for the casual, regular, engaged and maximum player, today, after the planned ut overhaul and with every V2 row: `V2_INCOME` (D.16/E.4 base, E.5 MINUTES, E.6 league, Scout Drops 2-3, Hot Hand, Daily Play), MINUTES from `src/ut/minutes.ts` when it is on the branch (an `import.meta.glob`), else `MINUTES_FALLBACK` (a copy of E.5 that equals ut's `LADDERS` on `origin/claude/studio-ut` today). MINUTES packs are valued at their exact quick-sell EV on the realistic curve and earn stamps at their Store price. ut's earned special routes (Circuit 6-0, Season Pass level 25) are modelled as the code has them (`current`) and as packs-1 asked (`requested`: Program Picks). `PS_SPORT=<s> npx vite-node scripts/packs/ladder.ts` prints the tables below (copies in `O/packs-out/after-packs-6/`).
+
+### Ladder in coins (cheapest coin route; before = f9fd2c1)
+
+| Rung | NBA before → after | NFL after | Soccer after | D5 band (NBA; others × Standout price ratio 0.6 / 0.8) |
+|---|---|---|---|---|
+| Standout | 3,000 → 3,000 | 1,800 | 2,400 | 3,000-3,600 |
+| Program | 7,300 → 7,200 (guarantee) | 4,400 | — | 6,600-10,000 |
+| Hot Season | ≈ 640 (Hall of Fame Class net of its Premium; Dynasty ≈ 1,100) → 18,419 | 9,920 | 12,246 | 15,000-26,000 |
+| Legend | 175,000 (Spotlight pack) → 54,000 (Elite Gold) | 30,000 | 38,000 | 40,000-55,000 |
+| Honors | 55,000 (pack at 6%, no pity) → 45,631 (pack with pity) | 28,081 | — | ≥ 40,000 |
+| Finale (lower bound) | 218,800 → 97,200 | 56,400 | — | > Legend |
+| Spotlight | 17,500 → 150,000 | 85,000 | — | ≥ 1.5 × max(Legend, Finale) |
+| GOAT | 7,000,000 → 60,000,000 | 34,000,000 | — | ≥ 1,000,000 |
+
+Adjacent rungs (Standout → Program → Hot Season → Legend → Spotlight → GOAT): NBA 2.4×, 2.6×, 2.9×, 2.8×; NFL 2.4×, 2.3×, 3.0×, 2.8×; soccer 5.1×, 3.1×. Before: Hot Season sat under a Standout and a Spotlight cost a tenth of a Legend.
+
+### Ladder in days (NBA; planned income → with V2; today's income in brackets)
+
+ut routes **requested** (the Circuit 6-0 and Season Pass level-25 Spotlight packs become Program Picks):
+
+| Player | Income today / planned / V2 | Standout | Program | Hot Season | Legend | Honors | Finale | Spotlight |
+|---|---|---|---|---|---|---|---|---|
+| casual | 1,030 / 1,260 / 1,509 | 2.4 → 2.0 (2.9) | 5.7 → 4.8 (7.0) | 15 → 12 (18) | 43 → 36 (52) | 36 → 30 (44) | 77 → 64 (94) | 119 → 99 (146) |
+| regular | 1,250 / 1,500 / 1,931 | 2.0 → 1.6 (2.4) | 4.3 → 3.4 (5.1) | 12 → 9.5 (15) | 36 → 28 (43) | 30 → 24 (37) | 65 → 50 (78) | 100 → 78 (120) |
+| engaged | 1,470 / 1,860 / 2,754 | 1.6 → 1.1 (2.0) | 3.2 → 2.3 (3.9) | 9.9 → 6.7 (13) | 29 → **20** (37) | 25 → 17 (31) | 52 → 35 (66) | 81 → 54 (102) |
+| max | 1,470 / 1,860 / 3,088 | 1.6 → 1.0 (2.0) | 3.1 → 2.0 (3.7) | 9.9 → 6.0 (13) | 29 → 17 (37) | 25 → 15 (31) | 52 → 31 (66) | 81 → 49 (102) |
+
+ut routes **current** (engaged): Program 3.9 → 2.6, Hot Season 8.6 → 6.1, Legend 28 → 19, Finale 52 → 35, **Spotlight 43 → 34**: the free Spotlight packs make a Spotlight (34 days) arrive before the Finale (35) for an engaged player, so Spotlight vs Finale is 0.97× in days, not 1.5×. Re-pricing cannot fix it at a sane price (the free packs alone give one every ≈ 90 days; the Store pack would need ≈ 70,000 coins). It needs ut's answer to the packs-1 request (Requests below; follow-up).
+
+NFL engaged (requested): Standout 0.7, Program 1.5, Hot Season 3.7, Legend 11, Finale 21, Spotlight 32 days with V2 (football's prices are 0.6 of basketball's, so every rung is about 0.6 as many days; "a Legend in about 20 days" is basketball's E.5 figure). Soccer engaged: Standout 0.9, Hot Season 4.5, Legend 14.
+
+V2 against the planned income, engaged: +48% (NBA 1,860 → 2,754: MINUTES 641, league 30, Scout Drops 88, Hot Hand 60, Daily Play 75). MINUTES here is 641, not E.5's 514, because its Silver/Gold/Premium are valued at their exact quick-sell EV on the realistic curve (NBA Silver ≈ 290, not 200). Program ≈ 28% sooner (3.2 → 2.3 days), Legend 20 days (V2 E.5: "about 20% sooner" and "about 20 days").
+
+**For ut (ut-7 coin-flow table):** the rows of `V2_INCOME` and the per-player income above are the packs-side numbers (base = ut's own coin-flow figures). Per-player assumptions not in D.16: league 14 / 15 / 30 / 64 a day, Scout Drops 1 / 2 / 2 / 2, Hot Hand 20 / 40 / 60 / 96, Circuit entries 0 / 1 / 3 / 3 at win rates 0.50 / 0.55 / 0.60 / 0.65, Season Pass level 25 reached 0 / 0.5 / 1 / 1 of seasons.
+
+### The stamp shelf and the stamp pace
+
+| Item (stamps) | NBA | NFL | Soccer |
+|---|---|---|---|
+| Player Pick (50) | 80+, 477 coins, 9.5% | 82+, 360, 7.2% | 82+, 457, 9.1% |
+| Stamp Scout (120) | 82+, 602, 5.0% | 84+, 1,143, 9.5% | 83+, 986, 8.2% |
+| Standout Pick (300) | 3,000, 10.0% | 1,800, 6.0% | 2,400, 8.0% |
+| Program Pick (600) | 7,200, 12.0% | 4,400, 7.3% | none (LOCKED) |
+
+Value = the Store's own price for the same thing (gold picks: a quarter of the route cost of the floor; Standout and program cards: their rung); % = value ÷ (stamps × 100 coins).
+
+Stamp pace (a player who opens packs with every coin; day the balance first reaches it): NBA casual 50 on day 4, regular day 2, engaged **day 2** (300 on day 8, 600 day 15), max day 1-2; NFL and soccer engaged day 2, 300 on day 8. Engaged ≈ 39-41 stamps a day, casual 14. Before this task the page didn't exist and only the 50/120 rungs could be redeemed (by code).
+
+### Tests
+
+- New suite `ladder` (`packs-suites/ladder.ts`; `ladder.test.ts` NBA/NFL, `soccer-ladder.test.ts` soccer), 16 tests: L for 30/20/8/7/6%; 200k packs at p = 0.30: pity 1.38% ± 0.15 of program cards, 0.42% ± 0.05 of packs, max misses 12, rate = effective ± 1 pt; p = 0.07 and 0.20 at 1.4-1.9%; **2,000 real opens** through `openPack` with `pityState` from the growing log never exceed L − 1 misses, the sheet's effective rate and stamps; resets (program card, new wave, other kinds skipped, guarantees have none); Honors packs ≤ 8% and guarantees ≥ 40,000 (scaled); `rankOf`, `byValue`, `revealOrder`; every shelf item 5-12% in every sport, none sold; stamp pace; every rung in its D5 band; adjacent ≥ 1.5× in coins, Spotlight price = the D5 rule; adjacent ≥ 1.5× in engaged days with V2 (requested routes) and the day ladder monotone for all four players; Program ≈ 20% sooner ± 3 days, NBA Legend 20 ± 3 days, V2 between +30% and +60%; `MINUTES_FALLBACK` equals `minutes.ts` when present; the Store Spotlight pack counts toward its week when its receipt lands, an earned one doesn't, and a receipt landing a week late counts nothing and keeps today's other counters.
+- `stamps` suite: every rung redeems (gold floors and three different golds, Standouts, Program Pick live / locked, soccer locked); labels updated.
+- Changed old tests (their old behaviour is what this task deliberately changes): `pack-curve` (the 120 rung's floor is the sport's), `odds` (shelf picks by sport; no shelf Program sheet with no program live), `exploits` (an Honors-class guarantee is priced by the ladder, ≥ 40,000, instead of returning a fifth of its price), `packs-economy` fixture (the four Hot Season weeklies are compared in their pre-packs-6 shape, so nothing else in the weekly catalogue may move), `economy` (adds Elite Gold's Legend cadence).
+
+### Browser QA (`scripts/packs/qa-stamps.mjs`, dev server 5213, `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted; touch, `deviceScaleFactor: 1`, reduced motion)
+
+Shots in `O/shots/packs/packs-6/`. Blocked hosts: only the Supabase registry. No page errors.
+- **NBA 393** (insets 59/34): Store STAMPS tile (`nba-393-store-tile.png`, 358×56); the First Tip program pack's sheet with ten logged misses reads "Program card guaranteed within 3 packs · With the guarantee, 30% of these packs hold a program card", footer "Each pack is independent, except the program-card guarantee." (`nba-393-program-odds.png`; the "Buying it adds N Scout Stamps (1 for every 100 coins paid)" line shows only from `STAMPS_FROM`, the release, because no pack earns stamps before it; an earlier QA run with that line is superseded); the shelf (`nba-393-shelf.png`, `-shelf-bottom.png`): 650 stamps, four tiles REDEEM 92×48; Standout Pick odds, armed CONFIRM, the pick sheet, kept Zach LaVine 83 Standout; after: 350 stamps, claim `stamps:standouts:300:<uuid>`, card `pick:stamps:standouts:<uuid>` in the club, no pick left open.
+- **Soccer 320**: the shelf (`soccer-320-shelf.png`): Player Pick 82+, Stamp Scout 83+, Matchday Standout Pick, Program Pick LOCKED "No programs in soccer yet"; redeemed the 50 rung end to end (`soccer-320-g82-*.png`: odds, CONFIRM, pick, Gündoğan 82 kept); after: 600 stamps, one claim `stamps:g82:50:<uuid>`; the Store tile at 320 (`soccer-320-store-tile.png`).
+- **NBA 320, full motion**: redeemed the 600 rung (`nba-320-program-*.png`): the First Tip Program Pick, kept Mark Jackson 84 Program; after: 50 stamps, claim `stamps:program:600:<uuid>`.
+
+### Saved state and older builds
+
+No new saved field. Pity is recomputed from the Pack Tracker log; the Spotlight's weekly counter is an ordinary `buys` key (`spotlight:<week>`); stamp redemptions use packs-1 B's pinned claims. New pick kinds `pick-80` / `pick-83` are ordinary `PickState`s: an older build keeps and opens them (its Store labels them "Scout's Choice"). No storage key, card id, copy id, claim id or receipt changes.
+
+### Protocol
+
+None. Odds, prices, limits, stamps and SBC requirements are economy; `rankOf` changes display order only; `CONTENT_PRINT` is unchanged.
+
+### Touched outside my lane (packs-6)
+
+- `src/ut/UltimateTeam.tsx` (ut): the `stamps` view (lazy `StampShelf` in `Suspense`), `redeemShelf`, `onStamps` on the Store, `pa.openOpts(kind)`, the Store Spotlight's one-a-week check; 32 lines added, 4 changed.
+- `src/ut/nav.ts` (ut): the `stamps` view (title, tab, parent), 2 lines. ut's doc says packs adds its reserved views with their screens.
+
+### Owner device checks (packs-6)
+
+- The shelf on the phone: the two-tap REDEEM → CONFIRM reads clearly and never spends by accident.
+- The program sheet's "guaranteed within N packs" box is readable at a glance.
+- A 30,000-coin Spotlight pack (NBA) feels like a weekly chase, not a wall; the Store shows "1 of 1 left this week".
+
+### Left for later (packs-6)
+
+- **ut:** convert the Circuit 6-0 and Season Pass level-25 Spotlight packs to Program Picks (packs-1 request). Until then the engaged day ladder has Spotlight ≈ Finale (34 vs 35 days).
+- **ut:** the near-miss line uses `stampsToNext().item`, now "Player Pick" / "Stamp Scout" without a number.
+- `STAMP_VALUE` (drop-tables, 11 coins a stamp) stays: the shelf's NBA Player Pick is 9.5 coins a stamp, close enough for the drop sheet's "about" line.
+- Pity counts only packs in the Pack Tracker's newest 300; a player who opens more than 300 other packs between two program packs can lose part of a run (never gains).
+- **Lead (shelf floors):** the brief says "82+ picks". Valued by the game's own pick price, a 50-stamp 82+ pick in basketball would pay back more than 12% of the coins its stamps stand for, so basketball's 50 rung is 80+ (football and soccer keep 82+). If the lead prefers the brief's wording to the 5-12% band, the alternative is an 82+ pick at 60-70 stamps, which changes the V2.4 `STAMP_SHELF` contract (`cost: 50 | 120 | 300 | 600`).
+- Still open from earlier tasks (lead decisions, not changed here): the Program Guarantee's 0.23 return, how D10 values NFL golds under 83, whether Captains/Dynasty stay chase items, and whether Hot Seasons under 80 leave the NBA/NFL pack buckets.
+
 ## Requests (answers are recorded here as they arrive)
 
 - **Lead:** assign `src/ut/ut-scale.ts` (its promo/legend knots), `scripts/fit_ut_scale.ts` and `scripts/fit_ut_balance.ts` to packs for packs-5. OWNERSHIP gives them to nobody; without the assignment packs-5 uses the rate.ts-only fallback. *Answer: pending; packs-5 shipped the fallback (`rate.ts` no longer calls `editionDisplay`; the knots are stale, see packs-5 "Left for later").*
 - **Lead:** `STAMPS_FROM` (scout-stamps.ts) is the release instant, midnight Eastern on 2026-11-27, the planned `SHIP_DATE`. If the ship date moves, move it with `SHIP_DATE` (packs-7's release check covers both). *Answer: pending.*
 - **ut:**
-  - the Circuit 6-0 Spotlight pack (`circuit.ts:11`) and the Season Pass level-25 Spotlight pack (`progression.ts:183`) become Program Picks (`awardPick(…, 'program-pick', <claim id>, at)`), as research §8.7/§8.9 specify. packs-6 prices the Spotlight only after this answer. *Answer: pending.*
+  - the Circuit 6-0 Spotlight pack (`circuit.ts:11`) and the Season Pass level-25 Spotlight pack (`progression.ts:183`) become Program Picks (`awardPick(…, 'program-pick', <claim id>, at)`), as research §8.7/§8.9 specify. packs-6 prices the Spotlight only after this answer. *Answer: pending. packs-6 priced it by the coin rule (NBA 30,000, NFL 17,000) on the workflow's instruction; with today's free Spotlight packs the engaged day ladder has Spotlight ≈ Finale (packs-6 section).*
   - new UT state goes under `ut.hq`, or ask us to add it to `ContentState` (one normalizer, nothing silently dropped);
   - the D12 modal order for the later promo takeover (your `ut-modal-queue.ts` slot 2 matches);
   - wire `storeBadge(pool, ut, at).n` onto the Store tab and `setAppBadge`;

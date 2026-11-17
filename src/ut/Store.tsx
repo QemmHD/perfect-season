@@ -26,7 +26,9 @@ import './store.css';
 import { UtCard } from './CardArt';
 import { SectionHead, Segmented } from './ui';
 import type { CalPack } from './calendar';
-import { livePackDef, liveBuysLeft, livePacksOn } from './live-packs';
+import { livePackDef, liveBuysLeft, livePacksOn, pityState } from './live-packs';
+import { stampsBalance, stampsToNext } from './scout-stamps';
+import './stamp-shelf.css';
 import type { Pool } from './pool';
 import type { ClubCard } from './UltimateTeam';
 
@@ -272,6 +274,37 @@ function BuyConfirm({ pool, sport, coins, ask, prefs, onOdds, onPrefs, onClose }
   );
 }
 
+/** Claude (packs-6): the stamp mark: a perforated stamp with a star (SVG, never a glyph). */
+export function StampIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg className="ps-stamp-ic" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <path
+        d="M4 3h16v2.2a1.3 1.3 0 0 0 0 2.6v2.4a1.3 1.3 0 0 0 0 2.6v2.4a1.3 1.3 0 0 0 0 2.6V21H4v-2.2a1.3 1.3 0 0 0 0-2.6v-2.4a1.3 1.3 0 0 0 0-2.6V8.8a1.3 1.3 0 0 0 0-2.6Z"
+        fill="currentColor"
+        opacity="0.92"
+      />
+      <path d="m12 7.2 1.45 2.95 3.25.47-2.35 2.3.55 3.24L12 14.63l-2.9 1.53.55-3.24-2.35-2.3 3.25-.47Z" fill="#0a1f2a" />
+    </svg>
+  );
+}
+
+/** Claude (packs-6): the Store's STAMPS tile: the balance and the next pick in reach, into the stamp shelf. */
+function StampsTile({ ut, onOpen }: { ut: UtState; onOpen: () => void }) {
+  const have = stampsBalance(ut);
+  const next = stampsToNext(ut);
+  const ready = have >= 50;
+  return (
+    <button className={'ps-stamps-tile' + (ready ? ' ready' : '')} onClick={onOpen} aria-label={'Scout Stamps: ' + have + '. Open the stamp shelf'}>
+      <StampIcon size={30} />
+      <span>
+        <b>Scout Stamps · {have.toLocaleString('en-US')}</b>
+        <small>{next ? next.need.toLocaleString('en-US') + ' to your ' + next.item : 'Every pick on the shelf is in reach'}</small>
+      </span>
+      <i>{ready ? 'REDEEM' : 'STAMPS'}</i>
+    </button>
+  );
+}
+
 export function Store(props: {
   sport: UtSport;
   coins: number;
@@ -300,6 +333,8 @@ export function Store(props: {
   onFlash?: (key: string) => void;
   /** Claude (packs-4): save Store preferences (the buy confirm's "Don't ask again") */
   onPrefs?: (prefs: { skipBuyConfirm?: boolean }) => void;
+  /** Claude (packs-6): open the stamp shelf (UT view `stamps`) */
+  onStamps?: () => void;
 }) {
   const { open: setOdds, host: oddsHost } = useOddsHost(props.pool, props.sport);
   const [ask, setAsk] = useState<Ask | null>(null);
@@ -455,6 +490,7 @@ export function Store(props: {
             </>
           )}
           <DailyDrop ut={props.ut} day={props.day} sport={props.sport} pool={props.pool} onClaim={() => props.onBuy('daily', 0)} onOdds={() => setOdds({ type: 'pack', kind: 'daily' })} />
+          {props.onStamps && <StampsTile ut={props.ut} onOpen={props.onStamps} />}
           {props.onFlash && (
             <FlashSale
               sport={props.sport}
@@ -493,7 +529,7 @@ export function Store(props: {
                             </small>
                           )}
                           <small className="ut-limit">{(left ? left + ' left ' : 'Limit reached ') + (p.tpl === 'guarantee' ? 'this week' : 'today') + ' · until ' + p.end.slice(5).replace('-', '/')}</small>
-                          <button className="ut-oddsbtn" onClick={() => setOdds({ type: 'pack', kind: p.id })} aria-label={d.name + ' odds'}>
+                          <button className="ut-oddsbtn" onClick={() => setOdds({ type: 'pack', kind: p.id, within: pityState(props.sport, contentOf(props.ut).pulls, p.id, props.day)?.within })} aria-label={d.name + ' odds'}>
                             <IconInfo size={13} /> Odds
                           </button>
                         </div>
@@ -534,7 +570,7 @@ export function Store(props: {
           <div className="ut-shop">
             {BY_PRICE.filter((k) => k !== 'spotlight' || props.sport !== 'soccer') /* soccer has no Spotlight (no registered serials) */
               .sort((a, b) => props.defs[a].price - props.defs[b].price)
-              .map((k) => item(k, k === 'spotlight' ? 'Every card gets a registered serial' : undefined))}
+              .map((k) => (k === 'spotlight' ? item(k, 'Every card gets a registered serial · ' + limitNote('spotlight'), left('spotlight') ? undefined : 'limit') : item(k)))}
           </div>
           <p className="note">Coins only, never real money. Matches, objectives, SBCs and the daily chest all pay coins.</p>
         </>

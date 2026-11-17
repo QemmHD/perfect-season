@@ -14,7 +14,7 @@ import { curveOdds, curveStepMass, drawGold, fill, FLOORS, type FloorKind, GOLD_
 import { getPool, type Pool } from '../pool';
 import { rewardCard } from '../sbc';
 import { grantStamps } from '../scout-stamps';
-import { redeemStamps } from '../stamp-shelf';
+import { redeemStamps, SHELF_FLOOR, shelfPickKind } from '../stamp-shelf';
 import { positionMix } from '../squad';
 import { standoutProgram } from '../standouts';
 import { freshUt, type UtState } from '../state';
@@ -317,13 +317,15 @@ export function packCurveSuite(): void {
       }
     });
 
-    it('the stamp shelf’s 120 rung opens a Stamp Scout: 1 of 3 golds 85+', () => {
+    // Claude (packs-6): the 120 rung's floor is the sport's (stamp-shelf.ts SHELF_FLOOR: 85+ paid back 62% of the
+    // coins its stamps stand for); it was 85+ in packs-2
+    it('the stamp shelf’s 120 rung opens a Stamp Scout: 1 of 3 golds at the sport’s floor', () => {
       const t = Date.UTC(2026, 11, 1, 17);
       const rich = grantStamps(grantStamps(grantStamps(freshUt(), 50, 'other', 'a'), 50, 'other', 'b'), 30, 'other', 'c');
       const r = redeemStamps(rich, pool, 'scout85', 'u1', '2026-12-01', t)!;
       const pick = r.content!.picks![0];
-      expect(pick.kind).toBe('pick-85');
-      expect(pick.options.every((id) => pool.base.get(id)!.tier === 'gold' && pool.base.get(id)!.ovr >= at(85))).toBe(true);
+      expect(pick.kind).toBe(shelfPickKind('scout85', SPORT));
+      expect(pick.options.every((id) => pool.base.get(id)!.tier === 'gold' && pool.base.get(id)!.ovr >= at(SHELF_FLOOR[SPORT].scout85))).toBe(true);
       expect(redeemStamps(r, pool, 'scout85', 'u1', '2026-12-01', t)).toBe(r);
     });
   });

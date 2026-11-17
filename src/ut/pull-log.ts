@@ -41,7 +41,7 @@ export function ovrBucket(ovr: number, sport: UtSport): number {
 
 /** Picks: one card kept from a sheet (they never counted in `packsOpened`). */
 // (packs-2: the reward picks of content-packs.ts awardPick too; a Scout Drop's pack is its pack kind)
-const PICK_GROUPS = new Set(['scout', 'standout-pick', 'swap', 'new-era', 'calendar', 'live-pick', 'front-office', 'pick-82', 'pick-84', 'pick-85', 'program-pick']);
+const PICK_GROUPS = new Set(['scout', 'standout-pick', 'swap', 'new-era', 'calendar', 'live-pick', 'front-office', 'pick-80', 'pick-82', 'pick-83', 'pick-84', 'pick-85', 'program-pick']);
 export const isPickGroup = (g: string) => PICK_GROUPS.has(g);
 
 /** The pack type a pack's totals go under: unit/position packs together, a Preview Pack apart from
@@ -63,7 +63,9 @@ export function groupName(group: string, name: string, sport: UtSport): string {
     'live-pick': 'Program Pick',
     'program-pick': 'Program Pick',
     'front-office': 'Front Office Pick',
+    'pick-80': 'Player Pick 80+',
     'pick-82': 'Player Pick 82+',
+    'pick-83': 'Stamp Scout 83+',
     'pick-84': 'Player Pick 84+',
     'pick-85': 'Stamp Scout 85+',
     scout: "Scout's Choice",

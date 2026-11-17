@@ -318,10 +318,27 @@ const HARD: Template[] = [
     }),
 ];
 
+/**
+ * Claude (packs-6, plan D5 "Hot Season"): the four weekly challenges that pay a Hot Season card ask for a
+ * team of 83+ (displayed, each sport's own scale), so the cheapest coin route to a Hot Season card costs
+ * what its rung says: NBA 15,000-26,000 coins of cards at acquisition cost (value.ts cheapestFodder: an
+ * 83+ gold at its pack-route cost), NFL 9,000-15,600, soccer 12,000-20,800. Before, a team of 70 (a few
+ * silvers, about 1,000 coins) turned into a Hot Season card, cheaper than a Weekly Standout. Football's
+ * golds cost a third as much, so its sheets are larger. Ids, list order and rewards are unchanged; a sheet
+ * of this week not done yet asks the new numbers (claims are by id). scripts/packs/ladder.ts measures it.
+ */
+export const HOT_SEASON_TUNE: Record<UtSport, { team: number; dynasty: number; hof: number; rival: number; hunt: number }> = {
+  nba: { team: 83, dynasty: 5, hof: 8, rival: 6, hunt: 6 },
+  nfl: { team: 83, dynasty: 8, hof: 11, rival: 8, hunt: 8 },
+  soccer: { team: 83, dynasty: 5, hof: 8, rival: 6, hunt: 6 },
+};
+const hst = (c: Ctx) => HOT_SEASON_TUNE[c.pool.sport];
+
 const WEEKLY: Template[] = [
   (c) => {
     const f = pickOne(c.frs, c.rand);
-    return { title: 'Dynasty: ' + f.name, blurb: 'Five from one franchise. A Hot Season card comes back.', size: 5, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: 5 }, { k: 'teamOvr', ovr: sc(c, 70) }], reward: { card: { tier: 'promo', fr: f.fr } } };
+    const t = hst(c);
+    return { title: 'Dynasty: ' + f.name, blurb: upper(WORDS[t.dynasty]) + ' from one franchise, team ' + t.team + '+. A Hot Season card comes back.', size: t.dynasty, reqs: [{ k: 'fr', fr: f.fr, name: f.name, n: t.dynasty }, { k: 'teamOvr', ovr: t.team }], reward: { card: { tier: 'promo', fr: f.fr } } };
   },
   (c) => {
     const d = pickOne(c.decades, c.rand);
@@ -334,16 +351,24 @@ const WEEKLY: Template[] = [
       soccer: { title: 'Gold Spine', blurb: 'A gold keeper, centre-back, holder and striker.', size: 4, reqs: [{ k: 'positions', pos: ['GK', 'CB', 'DM', 'ST'] }, { k: 'tier', tier: 'gold', n: 4 }], reward: { pack: 'premium', card: { tier: 'gold', minOvr: sc(c, 82) } } },
     }),
   (c) => ({ title: 'Team Builders', blurb: 'Eight cards, one era, real chemistry.', size: 8, reqs: [{ k: 'sameDecade', n: 6 }, { k: 'sameFr', n: 3 }, { k: 'teamOvr', ovr: sc(c, 70) }], reward: { pack: 'premium' } }),
-  (c) => ({ title: 'Hall of Fame Class', blurb: 'Eight golds, and good ones.', size: 8, reqs: [{ k: 'tier', tier: 'gold', n: 8 }, { k: 'teamOvr', ovr: sc(c, 78) }], reward: { pack: 'premium', card: { tier: 'promo' } } }),
+  (c) => {
+    const t = hst(c);
+    return { title: 'Hall of Fame Class', blurb: upper(WORDS[t.hof]) + ' golds, team ' + t.team + '+.', size: t.hof, reqs: [{ k: 'tier', tier: 'gold', n: t.hof }, { k: 'teamOvr', ovr: t.team }], reward: { pack: 'premium', card: { tier: 'promo' } } };
+  },
   (c) => {
     const [a, b] = shuffle(c.frs, c.rand);
-    return { title: 'Rival Dynasties', blurb: 'Three ' + a.name + ', three ' + b.name + '. A Hot Season card comes back.', size: 6, reqs: [{ k: 'fr', fr: a.fr, name: a.name, n: 3 }, { k: 'fr', fr: b.fr, name: b.name, n: 3 }, { k: 'teamOvr', ovr: sc(c, 70) }], reward: { card: { tier: 'promo' } } };
+    const t = hst(c);
+    const half = t.rival / 2;
+    return { title: 'Rival Dynasties', blurb: upper(WORDS[half]) + ' ' + a.name + ', ' + WORDS[half] + ' ' + b.name + ', team ' + t.team + '+. A Hot Season card comes back.', size: t.rival, reqs: [{ k: 'fr', fr: a.fr, name: a.name, n: half }, { k: 'fr', fr: b.fr, name: b.name, n: half }, { k: 'teamOvr', ovr: t.team }], reward: { card: { tier: 'promo' } } };
   },
   (c) => {
     const d = pickOne(c.decades, c.rand);
     return { title: 'Champions of the ' + d + 's', blurb: 'Five from the ' + d + 's, built to win.', size: 5, reqs: [{ k: 'decade', decade: d, n: 5 }, { k: 'teamOvr', ovr: sc(c, 74) }], reward: { card: { tier: 'gold', minOvr: sc(c, 85) } } };
   },
-  () => ({ title: 'Hot Season Hunt', blurb: 'Six cards: five golds, three teammates.', size: 6, reqs: [{ k: 'tier', tier: 'gold', n: 5 }, { k: 'sameFr', n: 3 }], reward: { card: { tier: 'promo' } } }),
+  (c) => {
+    const t = hst(c);
+    return { title: 'Hot Season Hunt', blurb: upper(WORDS[t.hunt]) + ' cards: ' + WORDS[t.hunt - 1] + ' golds, three teammates, team ' + t.team + '+.', size: t.hunt, reqs: [{ k: 'tier', tier: 'gold', n: t.hunt - 1 }, { k: 'sameFr', n: 3 }, { k: 'teamOvr', ovr: t.team }], reward: { card: { tier: 'promo' } } };
+  },
 ];
 
 /** Upgrades (cards in for a better pack: twice a day each) and repeatables (cards in for a better card:

@@ -10,7 +10,7 @@ import type { CardLine, OwnedCard, RatedCard, Tier, UtSport } from './types';
 import { deriveEditionLine, parseEditionId } from './editions';
 import { deriveVariantLine, isVariantId } from './variants';
 import { deriveLiveLine, parseLiveId } from './live-cards';
-import { loadSchedule, schedule } from './calendar';
+import { loadSchedule, promoById, schedule } from './calendar';
 import { rareInfo } from './rare';
 
 /**
@@ -179,7 +179,33 @@ export function shortSeason(line: Pick<CardLine, 'season'>): string {
 
 export const TIER_RANK: Record<Tier, number> = { bronze: 0, silver: 1, gold: 2, standout: 2.5, program: 3, promo: 3, landmark: 3.5, legend: 4, spotlight: 5, goat: 6 };
 
-/** Best first: tier, then overall. */
+/** Claude (packs-6, D1): a program whose band reaches this displayed overall ranks as Honors. */
+const HONORS_RANK_TOP = 96;
+
+/**
+ * Claude (packs-6, plan D1): a card's place in the value order. TIER_RANK stays canonical (quick-sell and
+ * the SBC tier rules read it); rankOf only breaks its ties and places the time-limited program kinds by
+ * what they are: a program card 3.0, a Hot Season 3.2, an Honors program card (its program's band reaches
+ * 96: January Honors and the late-year 96+ programs) 4.3, a Finale card 4.6. The reveal order (packs.ts
+ * revealOrder), byValue and the ladder (scripts/packs/ladder.ts) use it. Display order only: no rating moves.
+ */
+export function rankOf(rc: { tier: Tier; line: Pick<CardLine, 'program' | 'programKind'> }): number {
+  if (rc.tier === 'promo') return 3.2;
+  if (rc.tier !== 'program') return TIER_RANK[rc.tier] ?? 0;
+  const kind = rc.line.programKind;
+  if (kind === 'finale') return 4.6;
+  if (kind === 'honors' || (rc.line.program && honorsBand(rc.line.program))) return 4.3;
+  return 3;
+}
+const honorsBands = new Map<string, boolean>();
+/** Whether a program's band reaches HONORS_RANK_TOP (memoised: sorting a club calls it per comparison). */
+function honorsBand(promoId: string): boolean {
+  let v = honorsBands.get(promoId);
+  if (v === undefined) honorsBands.set(promoId, (v = (promoById(promoId)?.ovrBand[1] ?? 0) >= HONORS_RANK_TOP));
+  return v;
+}
+
+/** Best first: rank (rankOf), then overall. */
 export function byValue(a: RatedCard, b: RatedCard): number {
-  return TIER_RANK[b.tier] - TIER_RANK[a.tier] || b.ovr - a.ovr;
+  return rankOf(b) - rankOf(a) || b.ovr - a.ovr;
 }

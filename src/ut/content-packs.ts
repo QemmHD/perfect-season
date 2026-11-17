@@ -21,7 +21,7 @@ import type { OwnedCard, RatedCard, UtSport } from './types';
 
 // ---------- purchase limits ----------
 
-export type LimitedKind = 'elite' | 'jumbo' | 'scout' | 'standout' | 'lightning' | 'swap' | 'roster' | 'captains' | 'dynasty';
+export type LimitedKind = 'elite' | 'jumbo' | 'scout' | 'standout' | 'lightning' | 'swap' | 'roster' | 'captains' | 'dynasty' | 'spotlight';
 /** Claude (packs-2): the Store packs bought under a limit (Scout's Choice and the Swap Desk are picks).
  * Claude (packs-3, audit H2): the Club Collection packs too (roster 2 a day, captains 1 a day, dynasty 1 a week). */
 export const LIMITED_PACKS = ['elite', 'jumbo', 'standout', 'lightning', 'roster', 'captains', 'dynasty'] as const satisfies readonly LimitedKind[];
@@ -38,6 +38,9 @@ export const LIMITS: Record<LimitedKind, { per: 'day' | 'week' | 'window'; n: nu
   roster: { per: 'day', n: 2 },
   captains: { per: 'day', n: 1 },
   dynasty: { per: 'week', n: 1 },
+  // Claude (packs-6, D5): one Spotlight pack a week from the Store (counted when its registry pack lands,
+  // promo.ts; earned Spotlight packs from rewards are not counted)
+  spotlight: { per: 'week', n: 1 },
 };
 
 /**
@@ -200,7 +203,7 @@ export function pickFor(pool: Pool, kind: 'scout' | 'standout-pick' | 'swap', id
  * 25-hour MINUTES milestone and Rookie Week's day-7 pick). packs-2 adds 'pick-85', the Stamp Scout (the
  * stamp shelf's 120 rung: 1 of 3 golds 85+). Every gold pick draws on the per-overall gold curve.
  */
-export type AwardPickKind = 'front-office' | 'pick-82' | 'pick-84' | 'pick-85' | 'program-pick';
+export type AwardPickKind = 'front-office' | 'pick-80' | 'pick-82' | 'pick-83' | 'pick-84' | 'pick-85' | 'program-pick';
 
 /**
  * Gold picks: how many options, from which overall (basketball's scale, shown on the sport's own), and
@@ -208,7 +211,10 @@ export type AwardPickKind = 'front-office' | 'pick-82' | 'pick-84' | 'pick-85' |
  */
 export const GOLD_PICKS: Record<Exclude<AwardPickKind, 'program-pick'>, { n: number; floor: number; title: string; prefer?: true }> = {
   'front-office': { n: 5, floor: 80, title: 'Front Office Pick' },
+  // Claude (packs-6): the stamp shelf's gold rungs per sport (stamp-shelf.ts SHELF_FLOOR)
+  'pick-80': { n: 3, floor: 80, title: 'Player Pick', prefer: true },
   'pick-82': { n: 3, floor: 82, title: 'Player Pick' },
+  'pick-83': { n: 3, floor: 83, title: 'Stamp Scout', prefer: true },
   'pick-84': { n: 3, floor: 84, title: 'Player Pick', prefer: true },
   'pick-85': { n: 3, floor: 85, title: 'Stamp Scout', prefer: true },
 };

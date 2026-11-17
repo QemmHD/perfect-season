@@ -9,7 +9,8 @@
 //   live-pick:<promo>:n pick 1 of n program cards (rewards only, never sold)
 // The Finale is SBC-only: it never fills a pack slot.
 import { hashString, type Rand, rng, shuffle } from '../engine/rng';
-import { packsOn, per, promoById, schedule, type CalPack } from './calendar';
+import { easternDateKey } from '../engine/season';
+import { packsOn, per, promoById, schedule, wavesOf, type CalPack } from './calendar';
 import { contentOf, type PickState } from './content-state';
 import { FINALE_KIND, promoCards } from './live-cards';
 import { fill, type Odds, type PackDef } from './packs';
@@ -20,6 +21,7 @@ import { boosted, boostOf } from './boost';
 import { weekOf } from './sbc';
 import type { UtState } from './state';
 import type { RatedCard, UtSport } from './types';
+import type { PullEntry } from './pull-log-state';
 
 // Claude (packs-2, research §8.2): a program pack's golds are any gold and golds 80+ (its old rare golds);
 // a guarantee's are golds 82+.
@@ -44,12 +46,32 @@ export const PRICE_FACTOR: Record<UtSport, Record<string, number>> = { nba: { gu
  * keeps it under 0.60, and a named flash sale's 25% off keeps it at or under 0.75. Soccer has no Live
  * Calendar yet; its price follows its Premium (the same ratio as basketball's) for when it has one.
  */
-export const LIVE_PROGRAM_PRICE: Record<UtSport, number> = { nba: 3300, nfl: 2000, soccer: 2800 };
+export const LIVE_PROGRAM_PRICE: Record<UtSport, number> = { nba: 3250, nfl: 2000, soccer: 2800 };
+// Claude (packs-6, D5): NBA 3,300 → 3,250, so its Program Guarantee (2.2 × the pack, 7,300 → 7,200) and the
+// stamp shelf's Program Pick (600 stamps, 60,000 coins of packs) stay inside the shelf's 5-12% band. Every
+// scheduled program pack still returns 0.52-0.56 of its price (the exploits suite holds the EV band).
 /** A Program Guarantee costs at least this many program packs (audit H3: 3,200 against a 3,000 pack before). */
 export const GUARANTEE_OVER = 2.2;
 const ceil100 = (x: number) => Math.ceil(x / 100) * 100;
 /** A program pack's golds 80+ (`rare`, the old rare golds) and any golds, and a guarantee's golds 82+, per sport. Soccer has no calendar yet: kept for when it does. */
 const LIVE_SHAPE: Record<UtSport, { rare: number; gold: number; guarantee: number }> = { nba: { rare: 3, gold: 4, guarantee: 5 }, nfl: { rare: 6, gold: 9, guarantee: 11 }, soccer: { rare: 4, gold: 5, guarantee: 7 } };
+
+/**
+ * Claude (packs-6, D5 "Honors"): a program whose band reaches this displayed overall (January Honors and
+ * any later 96+ program) is an Honors-class program: its pack's program slot is at most HONORS_ODDS (with
+ * pity, below), and its Program Guarantee costs at least HONORS_GUARANTEE (one a week, one per wave). Only
+ * programs that start on or after HONORS_FROM (packs-plan §1 "Cutoffs": PROMO_EDIT_FROM) change, so a
+ * program already on sale never moves.
+ */
+export const HONORS_TOP = 96;
+export const HONORS_ODDS = 0.08;
+export const HONORS_GUARANTEE: Record<UtSport, number> = { nba: 40000, nfl: 24000, soccer: 32000 };
+export const HONORS_FROM = '2026-12-04';
+/** Whether a promo is Honors-class (band top 96+, starting on or after the cutoff). */
+export function isHonors(promoId: string): boolean {
+  const p = promoById(promoId);
+  return !!p && p.ovrBand[1] >= HONORS_TOP && p.start >= HONORS_FROM;
+}
 
 /** The pack's promo id (`live:s4-honors-y2` → `s4-honors-y2`). */
 export const promoOfPack = (kind: string) => kind.replace(/^live(-plus|-pick)?:/, '').split(':')[0];
@@ -62,7 +84,9 @@ export const promoOfPack = (kind: string) => kind.replace(/^live(-plus|-pick)?:/
 export function livePackDef(sport: UtSport, pack: Pick<CalPack, 'id' | 'tpl' | 'name' | 'price' | 'programOdds' | 'extraOdds'>, at?: number): PackDef & { odds: number; extra: [string, number][]; boost: { until: number } | null } {
   const tpl = schedule()?.defaults.packTemplates[pack.tpl] ?? {};
   const guarantee = pack.tpl === 'guarantee';
-  const base = guarantee ? 1 : (pack.programOdds ?? tpl.programOdds ?? 0.3);
+  const honors = isHonors(promoOfPack(pack.id));
+  const base0 = guarantee ? 1 : (pack.programOdds ?? tpl.programOdds ?? 0.3);
+  const base = honors && !guarantee ? Math.min(HONORS_ODDS, base0) : base0;
   // the Finale never fills a pack slot (owner decision: SBC-only)
   const extra0 = Object.entries(pack.extraOdds ?? {}).filter(([id]) => promoById(id)?.kind !== FINALE_KIND && promoById(id)?.kind !== 'season-finale');
   const extraP0 = extra0.reduce((a, [, p]) => a + p, 0);
@@ -78,7 +102,7 @@ export function livePackDef(sport: UtSport, pack: Pick<CalPack, 'id' | 'tpl' | '
   const slots = guarantee ? [...rep(ls.guarantee, G82), slot] : [...rep(ls.gold, G75), ...rep(ls.rare, G80), slot];
   const name = per(pack.name, sport) ?? pack.id;
   const program = LIVE_PROGRAM_PRICE[sport];
-  const price = guarantee ? Math.max(Math.round(((pack.price ?? tpl.price ?? GUARANTEE_PRICE) * (PRICE_FACTOR[sport].guarantee ?? 1)) / 100) * 100, ceil100(GUARANTEE_OVER * program)) : program;
+  const price = guarantee ? Math.max(Math.round(((pack.price ?? tpl.price ?? GUARANTEE_PRICE) * (PRICE_FACTOR[sport].guarantee ?? 1)) / 100) * 100, ceil100(GUARANTEE_OVER * program), honors ? HONORS_GUARANTEE[sport] : 0) : program;
   return {
     kind: pack.id as PackDef['kind'],
     name,
@@ -109,11 +133,13 @@ export function livePackName(sport: UtSport, kind: string): string {
 }
 
 /** Open a program pack: its slots, the program slot drawn from the released cards of its promos (boosted when `at` is in a boost). */
-export function openLivePack(pool: Pool, kind: string, rand: Rand, day: string, week = weekOf(day), owned?: ReadonlySet<string>, at?: number): RatedCard[] {
+export function openLivePack(pool: Pool, kind: string, rand: Rand, day: string, week = weekOf(day), owned?: ReadonlySet<string>, at?: number, forceProgram = false): RatedCard[] {
   const p = packOfKind(kind);
   if (!p) return [];
   // (packs-3: opened at `at`, inside a Friday boost the program slot is the boosted one)
-  const def = livePackDef(pool.sport, p, at);
+  const def0 = livePackDef(pool.sport, p, at);
+  // Claude (packs-6, D6): the pity pack's program slot is a program card for certain
+  const def = forceProgram && p.tpl !== 'guarantee' ? { ...def0, slots: [...def0.slots.slice(0, -1), { program: 1 }] } : def0;
   const promo = promoOfPack(kind);
   const draw = (r: Rand, have?: ReadonlySet<string>): RatedCard | null => {
     // which promo this slot is (the pack's own, or one of its extras), in proportion to their odds
@@ -134,6 +160,77 @@ export function openLivePack(pool: Pool, kind: string, rand: Rand, day: string, 
     return list.length ? list[Math.floor(r() * list.length)] : null;
   };
   return fill(pool, def.slots, rand, undefined, week, draw, { owned });
+}
+
+// ---------- pity (Claude, packs-6; packs-plan D6 and D7) ----------
+
+/**
+ * D6: how many program packs in a row can open before one is a program card for certain, for a pack whose
+ * unboosted program rate is `p`: L = max(13, ceil(3.9 / p)). 30% → 13, 20% → 20, 8% → 49, 6% → 65. The
+ * pity so fires on about 1.4-1.9% of program cards whatever the pack, and a low-odds pack stays rare.
+ */
+export function pityLength(p: number): number {
+  if (!(p > 0)) return Infinity;
+  if (p >= 1) return 1;
+  return Math.max(13, Math.ceil(3.9 / p - 1e-9));
+}
+
+/** D6: the share of program packs that hold a program card with pity: p ÷ (1 − (1 − p)^L). */
+export function effectiveProgramRate(p: number, L = pityLength(p)): number {
+  if (!(p > 0)) return 0;
+  if (p >= 1 || !Number.isFinite(L)) return Math.min(1, p);
+  return p / (1 - Math.pow(1 - p, L));
+}
+
+/** A program pack's unboosted program rate (its own promo and its extras): what pity's length follows. */
+export function baseProgramRate(sport: UtSport, kind: string): number | null {
+  const p = packOfKind(kind);
+  if (!p || p.tpl === 'guarantee' || !kind.startsWith('live:')) return null;
+  const def = livePackDef(sport, p);
+  return def.odds + def.extra.reduce((a, [, x]) => a + x, 0);
+}
+
+/** The Eastern day a wave of this promo last started on or before `day` (its start, then each wave). */
+function waveStart(promoId: string, sport: UtSport, day: string): string {
+  const pr = promoById(promoId);
+  if (!pr) return '';
+  return [pr.start, ...wavesOf(pr, sport).map((w) => w.d)].filter((d) => d <= day).sort().pop() ?? pr.start;
+}
+
+export interface PityState {
+  /** L: the pack that opens a program card for certain is at most this many packs after the last one */
+  length: number;
+  /** this promo's program packs opened in a row this wave without a program card */
+  misses: number;
+  /** the next program card arrives within this many packs (1: the next pack is guaranteed one) */
+  within: number;
+  /** the next pack's program slot is certain */
+  force: boolean;
+}
+
+/**
+ * D7: pity is never stored. It is recomputed from the Pack Tracker's recent packs: the trailing run of this
+ * promo's program packs (`live:<promo>`, from any source) opened since its latest wave began, none of which
+ * held a program card. Any program card resets it, and so does a new wave. Null for a guarantee or a kind
+ * that is not a program pack.
+ */
+export function pityState(sport: UtSport, log: { r: readonly PullEntry[] } | undefined, kind: string, day: string): PityState | null {
+  const p = baseProgramRate(sport, kind);
+  if (p === null) return null;
+  const length = pityLength(p);
+  const promo = promoOfPack(kind);
+  const from = waveStart(promo, sport, day);
+  let misses = 0;
+  const r = log?.r ?? [];
+  for (let i = r.length - 1; i >= 0; i--) {
+    const e = r[i];
+    if (!e.k.startsWith('live:') || promoOfPack(e.k) !== promo) continue;
+    if (easternDateKey(new Date(e.at)) < from) break;
+    if (e.cs.some((c) => c[2] === 'program')) break;
+    misses++;
+  }
+  const within = Math.max(1, length - misses);
+  return { length, misses, within, force: misses >= length - 1 };
 }
 
 /** Program packs on sale on a day (the Store's This Season row). */

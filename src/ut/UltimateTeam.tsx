@@ -198,7 +198,11 @@ import {
 } from './live-packs';
 import { programReward } from './live-cards';
 import { recordPull, sourceOfPending } from './pull-log';
-import { flashDeal, flashLeft, recordFlash, usePackActions } from './pack-actions';
+import { flashDeal, flashLeft, recordFlash, spotlightLeft, usePackActions } from './pack-actions';
+// Claude (packs-6): the stamp shelf page (lazy) and its redemption
+import { redeemStamps } from './stamp-shelf';
+import { type ShelfItem, STAMP_SHELF, stampsBalance } from './scout-stamps';
+const StampShelf = React.lazy(() => import('./StampShelf'));
 import { PullTracker } from './PullTracker';
 import type { PickState } from './content-state';
 // Claude (UI reorganisation): last, so the shell and shared pieces win over older rules
@@ -239,7 +243,8 @@ export type UtView =
   | 'daily'
   | 'evolutions'
   | 'inbox'
-  | 'tracker';
+  | 'tracker'
+  | 'stamps';
 
 /** the view to come back to after a match (the screen unmounts while it's played) */
 
@@ -530,7 +535,7 @@ export default function UltimateTeam(props: {
     // Claude: a Preview Pack opens exactly the cards it showed
     let cards: RatedCard[];
     try {
-      cards = preset ?? openPack(pool, kind, undefined, undefined, pa.openOpts());
+      cards = preset ?? openPack(pool, kind, undefined, undefined, pa.openOpts(kind));
     } catch (e) {
       // Claude (packs-1, D9): a pack this build can't open stays pending (nothing below runs)
       onToast(e instanceof Error ? e.message : String(e));
@@ -687,6 +692,19 @@ export default function UltimateTeam(props: {
           },
     );
     setPickOpen(id);
+  };
+
+  /** Claude (packs-6): spend Scout Stamps on a shelf item, exactly once, and open its pick sheet. */
+  const redeemShelf = (item: ShelfItem) => {
+    if (!pool) return;
+    if (picksFull(ut)) return onToast(PICKS_FULL);
+    const at = Date.now();
+    const uuid = newId();
+    const shown = redeemStamps(latest.current.ut, pool, item, uuid, day, at);
+    if (!shown) return onToast(stampsBalance(latest.current.ut) < (STAMP_SHELF.find((s) => s.item === item)?.cost ?? 0) ? 'Not enough Scout Stamps for that yet.' : 'That pick can’t be redeemed right now.');
+    update((p) => ({ ...p, ut: redeemStamps(p.ut, pool, item, uuid, day, at) ?? p.ut }));
+    sfx.coin();
+    setPickOpen('stamps:' + item + ':' + uuid);
   };
 
   const keep = (id: string, index: number) => {
@@ -1019,8 +1037,11 @@ export default function UltimateTeam(props: {
       price = packDefs(SPORT)[kind].price;
       kind = snapshotPack(SPORT, kind);
     }
-    if (kind === 'spotlight')
+    if (kind === 'spotlight') {
+      // Claude (packs-6, D5): one Spotlight pack a week from the Store
+      if (!spotlightLeft(ut, day, Date.now())) return onToast('One Spotlight pack a week. The next one opens Monday.');
       return startPromo(kind, packDefs(SPORT).spotlight.price);
+    }
     if (kind === 'daily') return claimDailyDrop();
     if (kind === 'scout') return buyScout(packDefs(SPORT).scout.price);
     const limited = pa.limitOf(kind);
@@ -1747,6 +1768,12 @@ export default function UltimateTeam(props: {
         }}
       />
     );
+  else if (view === 'stamps')
+    body = (
+      <React.Suspense fallback={<div className="page" />}>
+        <StampShelf pool={pool} ut={ut} sport={SPORT} day={day} onRedeem={redeemShelf} />
+      </React.Suspense>
+    );
   else if (view === 'tracker')
     body = (
       <PullTracker
@@ -1846,6 +1873,7 @@ export default function UltimateTeam(props: {
           onSwap={swap}
           onStandouts={() => go('standouts')}
           onTracker={() => go('tracker')}
+          onStamps={() => go('stamps')}
           onLive={buyLive}
           onFlash={buyFlash}
           onPrefs={(prefs) => setUt((u) => withPrefs(u, prefs))}

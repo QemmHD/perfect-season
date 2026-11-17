@@ -23,6 +23,7 @@ import { livePick, livePacksOn as packsOnDay, packOfKind } from '../live-packs';
 import { ALWAYS_CONFIRM_FROM, CONFIRM_FROM, confirmFor, dropSheet, fmtPct, hasPickOdds, headline, ODDS_UPDATED, oddsFor, oddsTable, oneIn, pickTable, pickTableNow, premiumChanceAtLeast, rewardOdds, routeCost, type OddsTable } from '../odds';
 import { FLOORS, goldDist, isFloorKind, LEGEND_PREMIUM, openPack, packDefs, positionChoices, registeredPack } from '../packs';
 import { getPool, type Pool } from '../pool';
+import { shelfPickKind } from '../stamp-shelf';
 import { expectedFor } from '../pull-log';
 import { rewardCard, sbcsFor, weekOf, type Reward } from '../sbc';
 import { drawStandout } from '../standouts';
@@ -198,9 +199,12 @@ export function oddsSuite(): void {
           kind,
         );
       }
-      expect(pickTable(pool, 'shelf:g82', AT)!.bands).toEqual(pickTable(pool, 'pick-82', AT)!.bands);
-      expect(pickTable(pool, 'shelf:scout85', AT)!.bands).toEqual(pickTable(pool, 'pick-85', AT)!.bands);
+      // Claude (packs-6): the shelf's gold rungs open the sport's floor (stamp-shelf.ts SHELF_FLOOR)
+      expect(pickTable(pool, 'shelf:g82', AT)!.bands).toEqual(pickTable(pool, shelfPickKind('g82', SPORT), AT)!.bands);
+      expect(pickTable(pool, 'shelf:scout85', AT)!.bands).toEqual(pickTable(pool, shelfPickKind('scout85', SPORT), AT)!.bands);
       expect(pickTable(pool, 'shelf:standouts', AT)!.bands).toEqual(pickTable(pool, 'standout-pick', AT)!.bands);
+      // with no program live the shelf's Program Pick has no sheet (it can't be redeemed: never an 82+ stand-in)
+      if (!programPickSource(pool, DAY)) expect(pickTable(pool, 'shelf:program', AT)).toBeNull();
     });
 
     it("Scout's Choice and the Swap Desk (40,000 draws, ±0.8 points: NFL's repeated players are modelled)", () => {
@@ -418,6 +422,8 @@ export function oddsSuite(): void {
         if (promo) rewards.push(['program', { program: promo.id.replace(/^live:/, '').replace(/-y\d+$/, '') }]);
       }
       // warm-up: the pool's own caches (gold curves, the week's Standouts) and the JIT, as after a Store visit
+      // (packs-6: the shelf's Program Pick has a sheet only while a program is live)
+      if (!programPickSource(pool, DAY)) kinds.splice(kinds.indexOf('shelf:program'), 1);
       for (const k of kinds) pickTableNow(pool, k, DAY, W);
       for (const [, w] of rewards) rewardOdds(pool, w, AT);
       // the best of three runs: the computation's own cost, not a busy machine's scheduling

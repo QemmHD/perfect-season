@@ -9,6 +9,8 @@ import { organizeStorage } from './storage';
 import type { OwnedCard } from './types';
 import type { Opening } from './UltimateTeam';
 import { recordPull, sourceOfPending } from './pull-log';
+import { recordBuy } from './content-packs';
+import { weekOf } from './sbc';
 
 export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryReceipt): { profile: Profile; opening: Opening | null } {
   if (p.ut.registeredOpenings?.includes(receipt.id)) {
@@ -51,7 +53,13 @@ export function registeredOpening(pool: Pool, p: Profile, receipt: RegistryRecei
   // Claude: the Pack Tracker logs the pack once, on the state before its cards land (pull-log.ts)
   const title = pending.kind==='admin-goat' ? 'GOAT Pack' : pending.kind.startsWith('event-') ? 'Spotlight Reward' : 'Spotlight Pack';
   const logged = recordPull(p.ut, { id: receipt.id, kind: receipt.kind, name: title, price: pending.price, source: pending.packId ? sourceOfPending(pending.packId) : 'store', at: pending.at, uid: 'registered:' + receipt.id + ':', cards });
-  const ut = organizeStorage(recordActivity(logged, 'pack:' + receipt.id, easternDateKey(), { packs: 1 }), owned);
+  // Claude (packs-6, D5): a Spotlight pack bought in the Store counts toward its one a week. It counts in the
+  // week it was reserved; a receipt that lands in a later week (an offline retry) counts nothing, because
+  // that week is over (and recordBuy, given today, keeps today's other counters).
+  const today = easternDateKey();
+  const store = pending.kind === 'spotlight' && !pending.packId && pending.price > 0;
+  const bought = store && weekOf(easternDateKey(new Date(pending.at))) === weekOf(today) ? recordBuy(logged, 'spotlight', today, Date.now()) : logged;
+  const ut = organizeStorage(recordActivity(bought, 'pack:' + receipt.id, easternDateKey(), { packs: 1 }), owned);
   const stored = new Set(ut.duplicateStorage);
   return {
     profile: {

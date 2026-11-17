@@ -18,9 +18,11 @@ import { packDefs } from '../packs';
 import { packsClaimables, STAMPS_READY } from '../packs-claimables';
 import { getPool, type Pool } from '../pool';
 import { recordPull, sourceOfPending, type PullInput } from '../pull-log';
-import { sbcsFor } from '../sbc';
+import { sbcsFor, weekOf } from '../sbc';
 import { claimStamps, earnsNothing, grantStamps, NOMINAL_PRICE, priceStamps, pullStampsFloor, STAMP_GRANT, STAMP_SHELF, STAMPS_FROM, stampsBalance, stampsToNext } from '../scout-stamps';
-import { redeemStamps } from '../stamp-shelf';
+import { redeemStamps, SHELF_FLOOR, shelfPickKind, shelfStatus } from '../stamp-shelf';
+import { fcToDisplay } from '../fc-scale';
+import { standoutProgram } from '../standouts';
 import { freshUt, migrateUt, type UtState } from '../state';
 import type { RatedCard } from '../types';
 
@@ -183,9 +185,9 @@ export function stampsSuite(): void {
     });
 
     it('stampsToNext names the next shelf item it can’t afford yet', () => {
-      expect(stampsToNext(freshUt())).toEqual({ have: 0, need: 50, item: '82+ Player Pick' });
+      expect(stampsToNext(freshUt())).toEqual({ have: 0, need: 50, item: 'Player Pick' });
       const ut = grantStamps(grantStamps(freshUt(), 33, 'other', 'a'), 5, 'minutes', 'b');
-      expect(stampsToNext(ut)).toEqual({ have: 38, need: 12, item: '82+ Player Pick' });
+      expect(stampsToNext(ut)).toEqual({ have: 38, need: 12, item: 'Player Pick' });
       let rich: UtState = freshUt();
       for (let i = 0; i < 12; i++) rich = grantStamps(rich, 50, 'other', 'r' + i);
       expect(stampsToNext(rich)).toBeNull();
@@ -215,6 +217,60 @@ export function stampsSuite(): void {
       expect(redeemStamps(r, pool, 'g82', 'u1', '2026-12-01', at)).toBe(r);
       expect(redeemStamps(r, pool, 'g82', 'u2', '2026-12-01', at)).toBeNull();
       expect(r.content!.claims!.slice(-1)).toEqual(['stamps:g82:50:u1']);
+    });
+  });
+
+  // Claude (packs-6): every rung of the shelf redeems (120 the higher gold floor, 300 a Standout pick, 600 a
+  // Program pick while a program is live in basketball and football; none in soccer)
+  describe('Scout Stamps: every shelf rung (' + SPORT + ')', () => {
+    const rich = () => {
+      let ut: UtState = freshUt();
+      for (let i = 0; i < 12; i++) ut = grantStamps(ut, 50, 'other', 'rich' + i);
+      return ut;
+    };
+    const day = '2026-12-05';
+    const at = Date.parse(day + 'T17:00:00Z');
+    it('the gold rungs offer three different golds at the sport floor, never a special', () => {
+      for (const item of ['g82', 'scout85'] as const) {
+        const r = redeemStamps(rich(), pool, item, 'g-' + item, day, at)!;
+        const pick = r.content!.picks!.find((p) => p.id === 'stamps:' + item + ':g-' + item)!;
+        const floor = fcToDisplay(SHELF_FLOOR[SPORT][item], SPORT);
+        expect(pick.kind).toBe(shelfPickKind(item, SPORT));
+        expect(pick.options).toHaveLength(3);
+        expect(new Set(pick.options.map((id) => pool.base.get(id)!.line.pid)).size).toBe(3);
+        for (const id of pick.options) {
+          expect(pool.base.get(id)!.tier).toBe('gold');
+          expect(pool.base.get(id)!.ovr).toBeGreaterThanOrEqual(floor);
+        }
+        expect(stampsBalance(r)).toBe(600 - STAMP_SHELF.find((s) => s.item === item)!.cost);
+      }
+    });
+    it('300 stamps: three of this week’s Standouts, spent once', () => {
+      const r = redeemStamps(rich(), pool, 'standouts', 's1', day, at)!;
+      const pick = r.content!.picks!.find((p) => p.id === 'stamps:standouts:s1')!;
+      expect(pick.kind).toBe('standout-pick');
+      expect(pick.options.length).toBeGreaterThanOrEqual(Math.min(3, standoutProgram(pool, weekOf(day)).cards.length));
+      expect(pick.options.every((id) => pool.base.get(id)!.tier === 'standout')).toBe(true);
+      expect(stampsBalance(r)).toBe(300);
+      expect(r.content!.claims!.slice(-1)).toEqual(['stamps:standouts:300:s1']);
+      expect(redeemStamps(r, pool, 'standouts', 's1', day, at)).toBe(r);
+    });
+    it('600 stamps: a Program pick of the live program; with none live (or in soccer) nothing is spent', () => {
+      const live = shelfStatus(pool, 'program', day);
+      const r = redeemStamps(rich(), pool, 'program', 'p1', day, at);
+      if (SPORT === 'soccer') {
+        expect(live.open).toBe(false);
+        expect(r).toBeNull();
+        return;
+      }
+      expect(live.open).toBe(true);
+      const pick = r!.content!.picks!.find((p) => p.id === 'stamps:program:p1')!;
+      expect(pick.kind).toBe('program-pick');
+      expect(pick.options.every((id) => pool.base.get(id)!.tier === 'program')).toBe(true);
+      expect(stampsBalance(r!)).toBe(0);
+      // a day with no program live: the tile is closed and no stamps move
+      const quiet = '2026-11-25';
+      if (!shelfStatus(pool, 'program', quiet).open) expect(redeemStamps(rich(), pool, 'program', 'p2', quiet, Date.parse(quiet + 'T17:00:00Z'))).toBeNull();
     });
   });
 

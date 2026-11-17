@@ -59,6 +59,8 @@ const V: Record<UtView, ViewInfo> = {
   standouts: { title: 'Weekly Standouts', tab: 'sbc', parent: 'sbc' },
 
   store: { title: 'Store', tab: 'store' },
+  // Claude (packs-6): the stamp shelf, from the Store's STAMPS tile
+  stamps: { title: 'Scout Stamps', tab: 'store', parent: 'store' },
 };
 
 export const viewInfo = (v: UtView): ViewInfo => V[v] ?? V.hub;

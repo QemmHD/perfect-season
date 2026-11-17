@@ -4,7 +4,7 @@
 // everything the squad can't use; a keeper keeps his silvers and spare golds (for the bench,
 // challenges, chemistry) and only sells bronze. See the math at the top of packs.ts.
 import { SPORT } from '../engine/sport';
-import { LEGEND_PREMIUM, openPack, packDefs, positionChoices, quickSellValue } from './packs';
+import { LEGEND_ELITE_BY_SPORT, LEGEND_PREMIUM, openPack, packDefs, positionChoices, quickSellValue } from './packs';
 import { getPool, type Pool } from './pool';
 import { positionMix } from './squad';
 import type { RatedCard } from './types';
@@ -92,5 +92,15 @@ describe('the economy (' + SPORT + ')', () => {
     expect(Math.abs(legends - want)).toBeLessThan(4 * Math.sqrt(want));
     expect(N / legends).toBeGreaterThan(110);
     expect(N / legends).toBeLessThan(210);
+  });
+
+  // Claude (packs-6, D5): Elite Gold's last slot is the Legend lever (NBA 5%, NFL 6%: 1 in 20 / 1 in 17)
+  it('pulls a legend from Elite Gold at its published rate', async () => {
+    const pool = await getPool();
+    const N = 4000;
+    let legends = 0;
+    for (let i = 0; i < N; i++) if (openPack(pool, 'elite', 'eleg:' + i).some((c) => c.tier === 'legend')) legends++;
+    const want = N * LEGEND_ELITE_BY_SPORT[pool.sport];
+    expect(Math.abs(legends - want)).toBeLessThan(4 * Math.sqrt(want));
   });
 });

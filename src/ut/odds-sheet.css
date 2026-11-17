@@ -226,6 +226,26 @@
   letter-spacing: 0.8px;
 }
 
+/* Claude (packs-6, D6): the program-card guarantee, above the chances (violet = the program tier chip) */
+.ps-odds-pity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--violet, #a78bfa) 45%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--violet, #a78bfa) 22%, #0a1f2a), #0d2230);
+  box-shadow: inset 0 1px 0 #ffffff14;
+}
+.ps-odds-pity b {
+  font: 900 13px/1.25 var(--body);
+  color: #ede6ff;
+}
+.ps-odds-pity span {
+  font-size: 12px;
+  color: var(--sub, #8fa6b2);
+}
+
 .ps-odds-notes {
   margin: 0;
   padding: 0 0 0 16px;

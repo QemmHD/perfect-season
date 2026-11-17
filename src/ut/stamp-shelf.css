@@ -1,0 +1,323 @@
+/* Claude (packs-6): the stamp shelf page (StampShelf.tsx) and the Store's STAMPS tile (Store.tsx).
+   Tokens follow Game Design V2 C.3 with the existing palette as fallbacks. Depth: glass panels with a
+   bevel and layered shadows; a ready rung glows gold. Text is 10 design px or more and every control is
+   44 design px tall or more (the 390 frame). Motion stops under prefers-reduced-motion. */
+
+.ut-stamps {
+  gap: 12px;
+}
+
+/* ---------- the balance ---------- */
+.ps-stamps-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px 14px 12px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--gold, #f6b93b) 45%, transparent);
+  background:
+    radial-gradient(90% 120% at 0% 50%, color-mix(in srgb, var(--gold, #f6b93b) 26%, transparent), transparent 62%),
+    radial-gradient(70% 90% at 100% 0%, color-mix(in srgb, var(--teal, #19e3c9) 14%, transparent), transparent 60%),
+    linear-gradient(165deg, #1d1a0c 0%, var(--panel, #0a1f2a) 70%);
+  box-shadow:
+    inset 0 1px 0 #ffffff26,
+    inset 0 -2px 0 #00000055,
+    0 14px 30px #00000066,
+    0 0 26px color-mix(in srgb, var(--gold, #f6b93b) 16%, transparent);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ps-stamps-hero::after {
+  /* a slow sheen across the glass */
+  content: '';
+  position: absolute;
+  inset: -40% auto -40% -30%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, #ffffff14, transparent);
+  transform: skewX(-18deg);
+  animation: ps-stamps-sheen 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ps-stamps-sheen {
+  0%,
+  55% {
+    left: -40%;
+  }
+  100% {
+    left: 130%;
+  }
+}
+.ps-stamps-ring {
+  position: relative;
+  flex: 0 0 104px;
+  width: 104px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 4px 10px #00000080);
+}
+.ps-stamps-ring svg {
+  position: absolute;
+  inset: 0;
+}
+.ps-stamps-ring circle:last-of-type {
+  transition: stroke-dashoffset 0.6s ease;
+}
+.ps-stamps-ring b {
+  position: relative;
+  margin-top: -8px;
+  font-size: 30px;
+  line-height: 1;
+  color: #fff3c4;
+  text-shadow: 0 2px 0 #00000080, 0 0 14px #f6b93b66;
+}
+.ps-stamps-ring small {
+  position: absolute;
+  bottom: 30px;
+  font: 800 10px/1 var(--body);
+  letter-spacing: 1.2px;
+  color: var(--gold, #f6b93b);
+}
+.ps-stamps-hero-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ps-stamps-hero-txt .eyebrow {
+  color: var(--gold, #f6b93b);
+}
+.ps-stamps-hero-txt b {
+  font-size: 20px;
+  line-height: 1.12;
+  color: var(--text, #eef6f9);
+}
+.ps-stamps-hero-txt small {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--sub, #8fa6b2);
+}
+
+/* ---------- the shelf ---------- */
+.ps-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.ps-shelf-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--stroke, #ffffff1f);
+  background: linear-gradient(180deg, #ffffff0d, #00000026), var(--panel, #0a1f2a);
+  box-shadow:
+    inset 0 1px 0 #ffffff17,
+    0 8px 18px #00000059;
+}
+.ps-shelf-tile.ready {
+  border-color: color-mix(in srgb, var(--gold, #f6b93b) 70%, transparent);
+  background:
+    radial-gradient(80% 140% at 0% 50%, color-mix(in srgb, var(--gold, #f6b93b) 18%, transparent), transparent 62%),
+    linear-gradient(180deg, #ffffff10, #00000026),
+    var(--panel, #0a1f2a);
+  box-shadow:
+    inset 0 1px 0 #ffffff26,
+    0 10px 22px #00000066,
+    0 0 20px color-mix(in srgb, var(--gold, #f6b93b) 26%, transparent);
+}
+.ps-shelf-tile.closed {
+  opacity: 0.78;
+}
+.ps-shelf-tile.i-program.ready {
+  border-color: color-mix(in srgb, var(--violet, #a78bfa) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0 #ffffff26,
+    0 10px 22px #00000066,
+    0 0 20px color-mix(in srgb, var(--violet, #a78bfa) 30%, transparent);
+}
+.ps-shelf-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ps-shelf-txt strong {
+  font: 800 15px/1.2 var(--body);
+  color: var(--text, #eef6f9);
+}
+.ps-shelf-txt small {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--sub, #8fa6b2);
+}
+.ps-shelf-bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: #00000066;
+  box-shadow: inset 0 1px 2px #000000a0;
+  overflow: hidden;
+}
+.ps-shelf-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c27c0e, var(--gold, #f6b93b) 60%, #ffe58c);
+  box-shadow: 0 0 8px #f6b93b88;
+  transition: width 0.5s ease;
+}
+.i-program .ps-shelf-bar i {
+  background: linear-gradient(90deg, #6d4fd6, var(--violet, #a78bfa) 60%, #e3d8ff);
+  box-shadow: 0 0 8px #a78bfa88;
+}
+.ps-shelf-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+}
+.ps-shelf-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  background: #00000055;
+  border: 1px solid color-mix(in srgb, var(--gold, #f6b93b) 40%, transparent);
+  color: var(--gold, #f6b93b);
+  font-size: 12px;
+}
+.ps-shelf-why {
+  font-style: normal;
+  font: 700 11px/1.2 var(--body);
+  color: var(--sub, #8fa6b2);
+}
+.ps-shelf-btn {
+  flex: 0 0 auto;
+  min-width: 92px;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 13px;
+  letter-spacing: 0.4px;
+}
+.ps-shelf-btn.short {
+  color: var(--sub, #8fa6b2);
+  background: #ffffff0d;
+  border: 1px solid var(--stroke, #ffffff1f);
+  box-shadow: none;
+}
+.ps-shelf-btn.armed {
+  background: linear-gradient(180deg, #ffe58c, var(--gold, #f6b93b));
+  color: #1a1100;
+  box-shadow:
+    0 0 0 2px #ffe58c66,
+    0 0 18px #f6b93b99;
+  animation: ps-stamps-arm 0.9s ease-in-out infinite alternate;
+}
+@keyframes ps-stamps-arm {
+  to {
+    box-shadow:
+      0 0 0 4px #ffe58c33,
+      0 0 24px #f6b93bcc;
+  }
+}
+
+/* ---------- where stamps come from ---------- */
+.ps-stamps-src {
+  margin: 0;
+  padding: 4px 12px;
+  list-style: none;
+  border-radius: 14px;
+  border: 1px solid var(--stroke, #ffffff1f);
+  background: linear-gradient(180deg, #ffffff08, #00000022), var(--panel, #0a1f2a);
+  flex-shrink: 0;
+}
+.ps-stamps-src li {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 8px;
+  padding: 9px 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--sub, #8fa6b2);
+}
+.ps-stamps-src li + li {
+  border-top: 1px solid #ffffff10;
+}
+.ps-stamps-src b {
+  font-weight: 800;
+  color: var(--text, #eef6f9);
+}
+
+.ps-stamp-ic {
+  flex: 0 0 auto;
+}
+
+/* ---------- the Store's STAMPS tile ---------- */
+.ps-stamps-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--gold, #f6b93b) 45%, transparent);
+  background:
+    radial-gradient(70% 160% at 0% 50%, color-mix(in srgb, var(--gold, #f6b93b) 20%, transparent), transparent 60%),
+    linear-gradient(180deg, #ffffff0c, #00000024),
+    var(--panel, #0a1f2a);
+  box-shadow:
+    inset 0 1px 0 #ffffff1f,
+    0 8px 18px #00000055;
+  color: var(--text, #eef6f9);
+  text-align: left;
+  flex-shrink: 0;
+}
+.ps-stamps-tile > .ps-stamp-ic {
+  color: var(--gold, #f6b93b);
+  filter: drop-shadow(0 2px 4px #00000080);
+}
+.ps-stamps-tile span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ps-stamps-tile b {
+  font: 800 14px/1.2 var(--body);
+}
+.ps-stamps-tile small {
+  font-size: 11.5px;
+  color: var(--sub, #8fa6b2);
+}
+.ps-stamps-tile i {
+  font-style: normal;
+  font: 900 12px/1 var(--body);
+  letter-spacing: 0.6px;
+  color: var(--gold, #f6b93b);
+}
+.ps-stamps-tile.ready i {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--gold, #f6b93b);
+  color: #1a1100;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-stamps-hero::after,
+  .ps-shelf-btn.armed {
+    animation: none;
+  }
+  .ps-stamps-ring circle:last-of-type,
+  .ps-shelf-bar i {
+    transition: none;
+  }
+}

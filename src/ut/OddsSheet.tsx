@@ -14,10 +14,16 @@ import { dropSheet, type DropSheet, fmtPct, oddsFor, type OddsRow, type OddsTabl
 import './odds-sheet.css';
 import type { Pool } from './pool';
 import type { Reward } from './sbc';
+import { STAMPS_FROM } from './scout-stamps';
 import type { UtSport } from './types';
 
 /** What a sheet shows: a pack by its kind, a pick by its kind, a random reward, or a Scout Drop. */
-export type OddsSource = { type: 'pack'; kind: string } | { type: 'pick'; kind: string } | { type: 'reward'; reward: Reward } | { type: 'drop'; index: DropIndex };
+export type OddsSource =
+  /** `within` (packs-6): this player's program card is guaranteed within that many packs (live-packs pityState) */
+  | { type: 'pack'; kind: string; within?: number }
+  | { type: 'pick'; kind: string }
+  | { type: 'reward'; reward: Reward }
+  | { type: 'drop'; index: DropIndex };
 
 export interface OddsSheetProps {
   /** the card pool (not needed for a Scout Drop) */
@@ -81,7 +87,7 @@ function Group({ title, rows, tone }: { title: string; rows: OddsRow[]; tone?: (
 /** The tier rows' colour (the tier chip palette). */
 const toneOf = (r: OddsRow) => (r.key.startsWith('t-') ? 'tone-' + r.key.slice(2) : r.key === 'holo' ? 'tone-holo' : r.key === 'featured' ? 'tone-featured' : undefined);
 
-function TableView({ t, at }: { t: OddsTable; at: number }) {
+function TableView({ t, at, within }: { t: OddsTable; at: number; within?: number }) {
   const [perCard, setPerCard] = useState(false);
   const what = t.kind === 'pick' ? 'among the ' + t.cards + ' options' : t.kind === 'reward' ? 'in this reward' : 'in a pack';
   const editions: OddsRow[] = [...t.tiers];
@@ -98,6 +104,14 @@ function TableView({ t, at }: { t: OddsTable; at: number }) {
         <p className="ps-odds-boost">
           <b>BOOSTED</b> program card {fmtPct(t.boosted.now)} (normally {fmtPct(t.boosted.base)}) for {left(t.boosted.until - at)}
         </p>
+      )}
+      {t.effectiveProgram !== null && t.pityLength && (
+        <div className="ps-odds-pity" role="note">
+          <b>Program card guaranteed within {within ?? t.pityLength} {(within ?? t.pityLength) === 1 ? 'pack' : 'packs'}</b>
+          <span>
+            With the guarantee, {fmtPct(t.effectiveProgram)} of these packs hold a program card.
+          </span>
+        </div>
       )}
       <h3 className="ps-odds-h">Chance of at least one {what}</h3>
       <Group title="By overall" rows={t.bands} />
@@ -204,13 +218,14 @@ export default function OddsSheet({ pool, sport, source, at, onClose }: OddsShee
           {view.drop ? (
             <DropView d={view.drop} />
           ) : view.table ? (
-            <TableView t={view.table} at={when} />
+            <TableView t={view.table} at={when} within={source.type === 'pack' ? source.within : undefined} />
           ) : (
             <p className="ps-odds-none">This item has no random draw to publish: what it holds is fixed.</p>
           )}
           <footer className="ps-odds-foot">
             <small>
-              {independent}
+              {view.table?.pityLength ? 'Each pack is independent, except the program-card guarantee.' : independent}
+              {view.table?.stamps && when >= STAMPS_FROM ? ' Buying it adds ' + view.table.stamps + ' Scout Stamps (1 for every 100 coins paid).' : ''}
               {updated ? ' Updated ' + dateText(updated) + '.' : ''}
             </small>
             <button className="btn" onClick={() => close()}>

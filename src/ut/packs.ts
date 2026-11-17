@@ -37,7 +37,7 @@ import { catalogOf, readPackSnapshot, studioKind, snapshotPack, STUDIO_PACKS, ST
 // 6% of Premium packs, 2% of Gold packs.
 import { SPOTLIGHT_RATES } from '../../supabase/functions/card-registry/contract';
 import { hashString, rng, type Rand, trueRand } from '../engine/rng';
-import { type Pool, TIER_RANK } from './pool';
+import { type Pool, rankOf, TIER_RANK } from './pool';
 import { TIER_CUTS } from './rate';
 import { UT_SCALE } from './ut-scale';
 import { fcToDisplay } from './fc-scale';
@@ -97,13 +97,32 @@ export const PROMO_GOLD = 0.005;
 /** Of any Standout pulled, the week's Featured Standout. */
 export const FEATURED_STANDOUT = 0.1;
 export const STANDOUT_ELITE = 0.1;
-export const LEGEND_ELITE = 0.01;
+/**
+ * Claude (packs-6, D5 "Legend"): Elite Gold's last slot is a Legend this often (it was 1% everywhere), the
+ * only Store lever left for the Legend rung (Headliners and Franchise Vault are cut). Elite Gold is the
+ * cheapest coin route to a Legend, so the rung is its price ÷ this: NBA 2,700 ÷ 5% = 54,000 (D5 band
+ * 40,000-55,000), NFL 1,800 ÷ 6% = 30,000 (24,000-33,000), soccer 1,900 ÷ 5% = 38,000 (32,000-44,000).
+ * scripts/packs/ladder.ts measures it; the ladder suite holds every rung to its band.
+ */
+export const LEGEND_ELITE_BY_SPORT: Record<UtSport, number> = { nba: 0.05, nfl: 0.06, soccer: 0.05 };
+/** Basketball's Elite Gold Legend chance (the other sports: LEGEND_ELITE_BY_SPORT). */
+export const LEGEND_ELITE = LEGEND_ELITE_BY_SPORT.nba;
+/**
+ * Claude (packs-6, D5 "Spotlight"): the Spotlight pack's price (it was 3,500 in every sport, so a 100+ card
+ * cost 17,500 coins, a tenth of a Legend's). The registry's contract odds stay (SPOTLIGHT_RATES, 20% a
+ * Spotlight), so the rung is the price ÷ 0.20, and the price is set so that rung is at least 1.5 times the
+ * dearer of the Legend and Finale rungs: 0.20 × 1.5 × max(Legend, Finale), rounded up to 1,000.
+ * scripts/packs/ladder.ts measures both rungs and the ladder suite checks this price against them. One a
+ * week (LIMITS.spotlight); a reservation already made keeps the price it was made at (pendingPromo.price).
+ * Soccer has no Spotlight pack (no registered serials).
+ */
+export const SPOTLIGHT_PRICE: Record<UtSport, number> = { nba: 30000, nfl: 17000, soccer: 12000 };
 export const STANDOUT_DAILY = 0.02;
 
 /** the slot that can turn into something special (Claude, packs-2: a gold 78+ otherwise, research §8.2) */
 const goldPlus: Odds = { g78: 1 - STANDOUT_GOLD - PROMO_GOLD - LEGEND_GOLD, standout: STANDOUT_GOLD, promo: PROMO_GOLD, legend: LEGEND_GOLD };
 const premiumPlus: Odds = { g78: 1 - STANDOUT_PREMIUM - PROMO_PREMIUM - LEGEND_PREMIUM, standout: STANDOUT_PREMIUM, promo: PROMO_PREMIUM, legend: LEGEND_PREMIUM };
-const elitePlus: Odds = { g84: 1 - STANDOUT_ELITE - LEGEND_ELITE, standout: STANDOUT_ELITE, legend: LEGEND_ELITE };
+const elitePlus = (sport: UtSport): Odds => ({ g84: 1 - STANDOUT_ELITE - LEGEND_ELITE_BY_SPORT[sport], standout: STANDOUT_ELITE, legend: LEGEND_ELITE_BY_SPORT[sport] });
 const dailyLast: Odds = { silver: 0.6, g75: 1 - 0.6 - STANDOUT_DAILY, standout: STANDOUT_DAILY };
 
 /** Claude: the new packs' prices. Football's 16-card Standout pack holds golds that sell for a third
@@ -123,7 +142,10 @@ export const CONTENT_PRICES: Record<UtSport, { scout: number; elite: number; jum
   // routeCost(84) for: NBA 13,022, NFL 4,570, soccer 8,413. At 650 / 250 / 500 it was the cheapest 84+ in
   // the game (a Market 84 costs at least a quarter of its route cost). It now costs a quarter of
   // routeCost(84) or more, also at a flash sale's 20% off (to 50 coins): 3,300 / 1,200 / 2,150 (exploits).
-  nba: { scout: 3300, elite: 2600, jumbo: 4200, standout: 3000, lightning: 2250 },
+  // Claude (packs-6, D5): NBA Elite Gold 2,600 → 2,700. Its Legend slot is 5% now (LEGEND_ELITE_BY_SPORT), which
+  // lifted its quick-sell return, and the Black Friday sale's 25% off went over 0.75; at 2,700 it returns 0.55
+  // (0.73 on sale) and the Legend rung is 2,700 ÷ 5% = 54,000.
+  nba: { scout: 3300, elite: 2700, jumbo: 4200, standout: 3000, lightning: 2250 },
   nfl: { scout: 1200, elite: 1800, jumbo: 3000, standout: 1800, lightning: 1350 },
   // soccer (Claude 2026-11-01): eleven starters, about 1.4 times basketball's cards a pack, each worth 0.7 as much sold
   // (packs-3: soccer's Standout Guarantee 2,600 → 2,400 returned 48%; Lightning keeps 25% off, 1,800)
@@ -222,7 +244,7 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
     spotlight: {
       kind: 'spotlight',
       name: 'Spotlight Pack',
-      price: 3500,
+      price: SPOTLIGHT_PRICE[sport],
       // (soccer has no Spotlight editions: the Store leaves this pack out, storeOrder)
       blurb: SPOTLIGHT_COMMON[sport] + 1 + ' gold-or-better cards. 20% Spotlight, 0.05% GOAT. Online.',
       // Claude (packs-2): its golds are rebuilt from the registry's receipt by the pre-curve draw
@@ -255,8 +277,8 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       kind: 'elite',
       name: 'Elite Gold',
       price: CONTENT_PRICES[sport].elite,
-      blurb: c.elite.g82 + c.elite.g84 + ' golds ' + fcToDisplay(82, sport) + '+, ' + c.elite.g84 + ' of them ' + fcToDisplay(84, sport) + '+; the last is a Standout ' + fmtPct(STANDOUT_ELITE) + ' or a Legend ' + fmtPct(LEGEND_ELITE),
-      slots: [...rep(c.elite.g82, G82), ...rep(c.elite.g84 - 1, { g84: 1 }), elitePlus],
+      blurb: c.elite.g82 + c.elite.g84 + ' golds ' + fcToDisplay(82, sport) + '+, ' + c.elite.g84 + ' of them ' + fcToDisplay(84, sport) + '+; the last is a Standout ' + fmtPct(STANDOUT_ELITE) + ' or a Legend ' + fmtPct(LEGEND_ELITE_BY_SPORT[sport]),
+      slots: [...rep(c.elite.g82, G82), ...rep(c.elite.g84 - 1, { g84: 1 }), elitePlus(sport)],
       prefer: true,
     },
     jumbo: {
@@ -287,6 +309,7 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
   }
   return defs;
 }
+
 
 /** Claude: chance that one Scout's Choice option is a Weekly Standout. */
 export const SCOUT_STANDOUT = 0.03;
@@ -689,6 +712,8 @@ export interface OpenOpts {
   owned?: ReadonlySet<string>;
   /** Claude (packs-3): when it opens (ms; default now): a program pack inside its Friday boost opens boosted */
   at?: number;
+  /** Claude (packs-6, D6): a program pack opens with its program slot certain (the pity pack; live-packs pityState) */
+  forceProgram?: boolean;
 }
 
 /** A Weekly Standout; one the player owns is redrawn among the week's he doesn't (chase protection). */
@@ -865,7 +890,7 @@ export function openPack(pool: Pool, kind: string, seed?: string, week = current
   // Claude: Scout's Choice is a pick of three, not a pack (content-packs.ts pickOptions)
   if (kind === 'scout' || kind === 'standout-pick' || kind.startsWith('live-pick:')) throw new Error('This is a pick, not a pack.');
   // Claude wave 3: Live Calendar program packs (live-packs.ts)
-  if (kind.startsWith('live:') || kind.startsWith('live-plus:')) return openLivePack(pool, kind, rand, easternDateKey(opts.at === undefined ? undefined : new Date(opts.at)), week, opts.owned, opts.at ?? Date.now());
+  if (kind.startsWith('live:') || kind.startsWith('live-plus:')) return openLivePack(pool, kind, rand, easternDateKey(opts.at === undefined ? undefined : new Date(opts.at)), week, opts.owned, opts.at ?? Date.now(), !!opts.forceProgram);
   // The rare slot is rolled and numbered by the shared registry, never by this local RNG.
   if (kind === 'spotlight' || kind.startsWith('event-spotlight:')) throw new Error('This pack needs the shared card registry.');
   if (kind === 'admin-goat') throw new Error('This pack needs an admin award and the card registry.');
@@ -992,7 +1017,8 @@ export function quickSell(tier: Tier, o: number, sport: UtSport): number {
 
 /** Best last: the order a pack reveals in. */
 export function revealOrder(cards: RatedCard[]): RatedCard[] {
-  return cards.slice().sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier] || a.ovr - b.ovr);
+  // Claude (packs-6, D1): by rankOf, so an Honors or Finale card comes after a Hot Season one
+  return cards.slice().sort((a, b) => rankOf(a) - rankOf(b) || a.ovr - b.ovr);
 }
 
 /**

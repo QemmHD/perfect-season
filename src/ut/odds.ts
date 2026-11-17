@@ -30,7 +30,7 @@ import { fcToDisplay } from './fc-scale';
 import { fmtPct, oneIn } from './odds-fmt';
 import { weekMonday } from './flash';
 import { promoCards } from './live-cards';
-import { livePackDef, packOfKind, promoOfPack } from './live-packs';
+import { effectiveProgramRate, livePackDef, packOfKind, pityLength, promoOfPack } from './live-packs';
 import {
   curveDist,
   curveOdds,
@@ -56,7 +56,8 @@ import {
 import type { Pool } from './pool';
 import { TIER_CUTS, TIER_NAMES } from './rate';
 import { rewardText, type Reward, weekOf } from './sbc';
-import type { ShelfItem } from './scout-stamps';
+import { type ShelfItem, STAMP_SHELF } from './scout-stamps';
+import { shelfPickKind } from './stamp-shelf';
 import { positionMix } from './squad';
 import { standoutProgram } from './standouts';
 import type { RatedCard, Tier, UtSport } from './types';
@@ -335,8 +336,12 @@ export interface OddsTable {
   perSlot: { n: number; label: string; chips: OddsRow[] }[];
   /** a program pack inside its Friday boost: the boosted and normal program chance, and until when */
   boosted: { until: number; now: number; base: number } | null;
-  /** the effective program rate with pity (packs-6 fills it) */
+  /** the effective program rate with pity (packs-6, D6): the share of these packs that hold a program card */
   effectiveProgram: number | null;
+  /** Claude (packs-6, D6): a program card is certain within this many packs of the last one (pity), or null */
+  pityLength?: number | null;
+  /** Claude (packs-6): the Scout Stamps buying it adds (1 per 100 coins of its price), or 0 */
+  stamps?: number;
   notes: string[];
   /** the date these numbers last changed (YYYY-MM-DD) */
   updated: string;
@@ -637,8 +642,28 @@ function liveTable(pool: Pool, kind: string, at: number, day: string, week: stri
     const base = livePackDef(pool.sport, p);
     boosted = { until: def.boost.until, now: def.slots[def.slots.length - 1].program ?? 0, base: base.slots[base.slots.length - 1].program ?? 0 };
   }
-  return oddsTable(pool, { ...def, kind }, { week, day, program, featured }, { boosted, featuredName, updated: released });
+  const t = oddsTable(pool, { ...def, kind }, { week, day, program, featured }, { boosted, featuredName, updated: released });
+  if (p.tpl === 'guarantee') return t;
+  // Claude (packs-6, D6): the pity. Its length follows the unboosted rate; inside a boost the effective rate
+  // is the boosted one with the same length.
+  const base = livePackDef(pool.sport, p);
+  const pBase = base.odds + base.extra.reduce((a, [, x]) => a + x, 0);
+  const pNow = def.odds + def.extra.reduce((a, [, x]) => a + x, 0);
+  const L = pityLength(pBase);
+  const eff = effectiveProgramRate(pNow, L);
+  return {
+    ...t,
+    effectiveProgram: eff,
+    pityLength: L,
+    notes: [
+      'Bad-luck protection: if ' + (L - 1) + ' of these packs in a row hold no ' + name + ' card, the next one holds one for certain. Any ' + name + ' card resets the count, and so does each new wave. With it, ' + fmtPct(eff) + ' of these packs hold a program card (' + fmtPct(pNow) + ' without it).',
+      ...t.notes,
+    ],
+  };
 }
+
+/** Claude (packs-6): Scout Stamps a bought pack adds (scout-stamps.ts: 1 per 100 coins of the price). */
+const stampsOf = (price: number | undefined) => (price && price > 0 ? Math.floor(price / 100) : 0);
 
 /**
  * The odds sheet of a pack by its kind, at `at` (default now): a Store kind, `position` (a random
@@ -648,6 +673,16 @@ function liveTable(pool: Pool, kind: string, at: number, day: string, week: stri
  * admin awards, an event Spotlight reward).
  */
 export function oddsFor(pool: Pool, kind: string, at = Date.now()): OddsTable | null {
+  const t = oddsForKind(pool, kind, at);
+  if (!t || t.stamps !== undefined) return t;
+  // Claude (packs-6): what buying it adds in Scout Stamps (memoised with the table: the price is fixed per key)
+  const live = kind.startsWith('live:') || kind.startsWith('live-plus:') ? packOfKind(kind) : null;
+  const price = live ? livePackDef(pool.sport, live, at).price : (packDefs(pool.sport) as Record<string, PackDef>)[kind === 'preview' ? 'premium' : kind.startsWith('position') ? 'position' : kind]?.price;
+  t.stamps = stampsOf(price);
+  return t;
+}
+
+function oddsForKind(pool: Pool, kind: string, at: number): OddsTable | null {
   const { day, week } = dayWeek(at);
   const sport = pool.sport;
   if (kind.startsWith('live:') || kind.startsWith('live-plus:')) {
@@ -684,7 +719,7 @@ export function oddsFor(pool: Pool, kind: string, at = Date.now()): OddsTable | 
     }
     if (kind === 'position') {
       // a random choice's pack: the mean of every choice's chances (a mixture), and how far they spread
-      const tables = positionChoices(sport).map((c) => oddsFor(pool, 'position:' + c.key, at)!);
+      const tables = positionChoices(sport).map((c) => oddsForKind(pool, 'position:' + c.key, at)!);
       const mean = (f: (t: OddsTable) => number) => tables.reduce((a, t) => a + f(t), 0) / tables.length;
       const first = tables[0];
       const BI = BANDS.map((_, i) => i);
@@ -957,24 +992,23 @@ function optionPick(pool: Pool, title: string, n: number, cases: [Dist[] | Rows,
   };
 }
 
-/** The stamp shelf's items as the picks they open (stamp-shelf.ts; Standout and Program open with packs-6). */
-const SHELF_PICK: Record<ShelfItem, string> = { g82: 'pick-82', scout85: 'pick-85', standouts: 'standout-pick', program: 'program-pick' };
 
 /** The saved pick kinds (PickState.kind) with a published table: every pick but the one-time Icon pick. */
-const PICK_KINDS: ReadonlySet<string> = new Set(['scout', 'swap', 'standout-pick', 'front-office', 'pick-82', 'pick-84', 'pick-85', 'program-pick', 'calendar']);
+const PICK_KINDS: ReadonlySet<string> = new Set(['scout', 'swap', 'standout-pick', 'front-office', 'pick-80', 'pick-82', 'pick-83', 'pick-84', 'pick-85', 'program-pick', 'calendar']);
 /** Whether pickTable publishes this pick (by its saved kind, or a `live-pick:` / `shelf:` kind). */
 export const hasPickOdds = (kind: string): boolean => PICK_KINDS.has(kind) || kind.startsWith('live-pick:') || kind.startsWith('shelf:');
 
 /**
  * A pick's sheet: the chance that at least one of its options is each band and tier. Kinds: `scout` and
- * `swap` (Scout's Choice), `front-office`, `pick-82`, `pick-84`, `pick-85`, `program-pick`,
+ * `swap` (Scout's Choice), `front-office`, `pick-80`, `pick-82`, `pick-83`, `pick-84`, `pick-85`, `program-pick`,
  * `standout-pick`, `live-pick:<promo>:<n>`, `calendar`, and the stamp shelf's items as `shelf:<item>`.
  * Null for a pick with no published draw (a one-time Icon pick).
  */
 export function pickTable(pool: Pool, kind: string, at = Date.now()): OddsTable | null {
   const { day, week } = dayWeek(at);
   // what the table depends on: nothing (the gold and calendar picks), the Standout week, or the day
-  const base = kind.startsWith('shelf:') ? (SHELF_PICK[kind.slice(6) as ShelfItem] ?? kind) : kind;
+  // (packs-6: a shelf item opens its sport's pick, stamp-shelf.ts shelfPickKind)
+  const base = kind.startsWith('shelf:') ? shelfPickKind(kind.slice(6) as ShelfItem, pool.sport) : kind;
   const when = GOLD_PICKS[base as keyof typeof GOLD_PICKS] || base === 'calendar' ? '' : base === 'scout' || base === 'swap' || base === 'standout-pick' ? week : day;
   return memoised(pool, 'pick|' + kind + '|' + when, () => pickTableNow(pool, kind, day, week));
 }
@@ -986,8 +1020,11 @@ const calendarGolds = new WeakMap<Pool, RatedCard[]>();
 export function pickTableNow(pool: Pool, kind: string, day: string, week: string): OddsTable | null {
   const sport = pool.sport;
   if (kind.startsWith('shelf:')) {
-    const k = SHELF_PICK[kind.slice(6) as ShelfItem];
-    return k ? pickTableNow(pool, k, day, week) : null;
+    const item = kind.slice(6) as ShelfItem;
+    if (!STAMP_SHELF.some((x) => x.item === item)) return null;
+    // a Program Pick bought with stamps is never an 82+ stand-in: with no program live the shelf sells none
+    if (item === 'program' && !programPickSource(pool, day)) return null;
+    return pickTableNow(pool, shelfPickKind(item, sport), day, week);
   }
   const g = GOLD_PICKS[kind as keyof typeof GOLD_PICKS];
   if (g) {

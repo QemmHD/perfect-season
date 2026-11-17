@@ -9,34 +9,49 @@
 //                  weekly limit)
 // Claude (packs-3): the named flash sales' deals (flashDeals, flashDeal) and their one-per-player limit
 // (flashLeft, recordFlash), shared by the Store and UltimateTeam's buy flow.
+//   openOpts(kind) Claude (packs-6, D6/D7): a program pack whose pity is due opens with its program slot
+//                  certain (live-packs pityState, recomputed from the Pack Tracker's recent packs)
+//   spotlightLeft  Claude (packs-6, D5): the Store's Spotlight pack is one a week
 import { useMemo } from 'react';
 import { readPackSnapshot } from '../admin/catalog';
-import { contentOf, withContent } from './content-state';
-import { isLimitedPack, type LimitedPack } from './content-packs';
+import { easternDateKey } from '../engine/season';
+import { SPORT } from '../engine/sport';
+import { contentOf, type ContentState, withContent } from './content-state';
+import { buysLeft, isLimitedPack, type LimitedPack } from './content-packs';
 import { flashPrice, flashSalesAt } from './flash';
-import { livePackDef, packOfKind } from './live-packs';
+import { livePackDef, packOfKind, pityState } from './live-packs';
 import { ownedCardIds, type OpenOpts, packDefs } from './packs';
 import type { UtState } from './state';
 import type { OwnedCard, UtSport } from './types';
 
 export interface PackActions {
-  openOpts: () => OpenOpts;
+  /** what an opening of `kind` knows: the owned ids, and (a program pack) whether its pity is due */
+  openOpts: (kind?: string) => OpenOpts;
   limitOf: (kind: string) => LimitedPack | null;
 }
 
-/** The pack actions for the club `ut` (only its owned copies are read). */
-export function usePackActions(ut: { owned: readonly OwnedCard[] }): PackActions {
+/** The pack actions for the club `ut` (its owned copies and its Pack Tracker log are read). */
+export function usePackActions(ut: { owned: readonly OwnedCard[]; content?: Pick<ContentState, 'pulls'> }): PackActions {
   const owned = useMemo(() => ownedCardIds(ut.owned), [ut.owned]);
+  const pulls = ut.content?.pulls;
   return useMemo(
     () => ({
-      openOpts: () => ({ owned }),
+      openOpts: (kind?: string) => {
+        const pity = kind?.startsWith('live:') ? pityState(SPORT, pulls, kind, easternDateKey()) : null;
+        return pity?.force ? { owned, forceProgram: true } : { owned };
+      },
       limitOf: (kind: string) => {
         const base = readPackSnapshot(kind)?.base ?? kind;
         return isLimitedPack(base) ? base : null;
       },
     }),
-    [owned],
+    [owned, pulls],
   );
+}
+
+/** Claude (packs-6, D5): whether this week's Store Spotlight pack is still to buy (one a week). */
+export function spotlightLeft(ut: UtState, day: string, at: number): boolean {
+  return buysLeft(ut, 'spotlight', day, at) > 0;
 }
 
 /** A flash sale's offer as the Store sells it. */
