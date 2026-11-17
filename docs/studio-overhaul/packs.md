@@ -15,6 +15,7 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 | packs-4: odds engine and disclosure (sheets everywhere, BuyConfirm, picks, rewards, Scout Drops, tracker, RARE) | done | see `git log` (subject "packs-4") |
 | packs-3 review fixes (the plan's Club Collection floor, Club Collection limits shown, Scout's Choice by route cost, snapshot kind, flash pick price, NFL Silver Upgrade, first-paint split) | done | see `git log` (subject "packs-3 review fixes") |
 | packs-5: ratings truth (Hot Season/Legend re-rate, GOAT/Spotlight shape, OVR diff) | done | see `git log` (subject "packs-5") |
+| packs-4 review fixes (fast calendar pick sheet, NFL Scout's Choice by player, confirm rows, certain rows, sheet dates, blurb numbers, pick/reward speed tests) | done | see `git log` (subject "packs-4 review fixes") |
 | packs-6 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
@@ -1063,6 +1064,63 @@ There is no new saved state. Ids, owned copies, uids, levels, XP and serials are
 - **The scale top (lead/players).** A 92–95 Hot Season or Legend prints faces up to 91. Either extend the displayed curve above 99 for editions, or hold editions to 91 (`ut-scale.ts`, unassigned).
 - **packs-6 (the ladder):** NBA/NFL Hot Seasons now run 62–95 (NBA 22 and NFL 121 under 80). The ladder should decide whether those leave the pack buckets as soccer's do, or stay in the Hot Season slot as a smaller hit. `sbc.ts:447` still values a Hot Season reward at the old promo knot (94).
 - **Lead:** remove `editionDisplay` and the promo/legend knots of `UT_SCALE` once the scale question is settled. The quick-sell lines still read `scale.legend[0][1]`.
+
+## packs-4 review fixes (after the independent review of 651b0cc..705ce31)
+
+Fixed on top of packs-5 (`349e342`). No storage key, card or copy id, claim id, receipt, saved field or draw changes: `odds.ts` still only reads definitions. Protocol: none (sheets, the confirm, blurbs and the Store's idle queue only; `CONTENT_PRINT` and `pool.print` unchanged).
+
+### What changed and why
+
+- **The login calendar pick's sheet is fast (finding 1, medium).** `uniformPick` called `thresholds()` (8 `fcToDisplay` calls, each allocating) for every card in every band, plus 10 more full filters: 52–142 ms for the first `pickTable('calendar')`. It now counts every band, tier, the featured card and specials in **one pass** (`cardEvents`, thresholds once), the calendar's card list is built once per pool, and the pick memo is keyed by what each pick depends on (nothing for the gold and calendar picks, the Standout week for Scout's Choice, the Swap Desk and the Standout Pick, the day for the rest), so a new day never recomputes them. Its header reads "2 different players face down from 4,780 season golds" (was "4780 season gold 78+s"). The Store's idle queue now also computes Scout's Choice and every waiting pick's table after the pack sheets.
+  - While there: the calendar pick is **exact over players** now. `calendarPickOptions` takes the first card of a shuffle, then the first card of another player, so the second option is any card of a different player; the old hypergeometric over cards was within 0.5 pt, now it is the draw's own rule (`distinctPlayers`, k ≤ 2). Its header says "2 different players".
+- **Speed tests for picks and rewards (finding 1).** The suite times `pickTableNow` (the table without the memo, exported for this) for `calendar`, `standout-pick`, `program-pick`, `scout`, `swap`, `front-office`, `pick-82`, `pick-84`, `pick-85` and the four `shelf:` kinds, and `rewardOdds` for a gold 82+, a Weekly Standout, a Premium pack and (NBA, NFL) a program reward: each ≤ 20 ms at 1×, best of three runs after warm-up (the computation, not the shared machine's scheduling: the first soccer run measured 22.7 ms on a single run at load 6).
+- **Premium before Daily (finding 2, low).** The Daily Drop's chance line used to compute `oddsFor('daily')` in the first task after paint, ahead of the Store's idle queue, so the first Premium tap could land on a cold Premium computation. The Daily Drop now computes Premium first, then its own sheet, each in a task of its own. Rendering the sheet's header before its rows was not needed (tap to sheet below).
+- **NFL Scout's Choice modelled by player (finding 3, low).** NFL's three options share one position group and `scoutOptions` draws again while a player repeats (up to 24 times), so in thin groups the later options lean to other players. `scoutGroupRows` computes "no option hits" exactly over players (each option a Weekly Standout `SCOUT_STANDOUT` while an eligible one isn't offered yet, else a gold on the group's curve renormalised over the players not yet offered; a gold branch with nobody left gives no option). NBA and soccer keep independent options: their options take different positions when they can, so a player rarely repeats (residual gap measured ≤ 0.17 pt at 40,000 draws).
+
+  | NFL Scout's Choice vs 40,000 real draws | 85+ | 86+ | 88+ |
+  |---|---|---|---|
+  | W46, before (sheet / real) | 81.81 / 82.61 | 58.84 / 59.58 | 20.60 / 20.71 |
+  | W46, after | **82.68** / 82.61 | **59.60** / 59.58 | **20.84** / 20.71 |
+  | W47, before | 80.91 / 81.79 | 56.55 / 57.52 | 18.79 / 19.04 |
+  | W47, after | **81.87** / 81.79 | **57.43** / 57.52 | **19.12** / 19.04 |
+
+  The suite now checks Scout's Choice against **40,000** draws at **±0.8 pt** (was 10,000 at ±1.5), which the old NFL model (up to 0.96 pt off) would fail.
+- **The buy confirm's rows (finding 4, low).** `headline` keeps the best band hit 1 time in 20; the second row is now a band **above** it hit 1 in 200; when the first is already the top band (88+), it is a Hot Season or Standout row, then the featured card, then 83+; then the rarest special; the rows are sorted common to rare, and a filler never adds a band below the first. Jumbo now reads NBA "86+ 9.9%, 88+ 4.8%, Legend 0.7%", NFL and soccer "88+ 7.1% / 6.0%, Hot Season 2.0%, Legend 0.7%" (was "88+ 5.7%, 86+ 10%, Legend").
+- **Scout's Choice and Swap Desk dates (finding 5, low).** `optionPick` takes the week: their "Updated" is the later of 16 Nov 2026 and the Weekly Standout week's Monday, like pack sheets with Standout slots. Gold picks keep 16 Nov.
+- **Certain rows (finding 6, low).** `visible()` lists only the highest band that is certain (≥ 99.5%). Player Pick 84+ and Scout's Choice now start at "84+ 100%", then 85+, 86+, 88+; the Premium Gold sheet keeps "80+ 100%" only. The Position/Unit pack's mean is computed from every band (`OddsTable.raw`, new, not saved) so a band hidden on one choice's sheet still counts in the mean.
+- **One number, one way (finding 7, low).** `fmtPct` and `oneIn` moved to a tiny `odds-fmt.ts` (re-exported by `odds.ts`, so no import changes) and the blurbs that carry chances write them with it: Premium "6.0% a Standout or Hot Season, 0.7% a Legend" (was "6% … 0.66% a Legend"), Elite "a Standout 10% or a Legend 1.0%", program packs "30% a program card, 0.5% a Legend". `odds.ts` stays out of the first-paint bundle (`odds-fmt.ts` has no imports).
+- **No arrow glyph (finding 8, low).** The Scout Drop step rows read "Common to Rare" (words, like the rest of the sheet).
+- **Test strength and time (finding 9, low).** The calendar pick is checked against **10,000** draws at **±1.5 pt** (was 4,000 at ±2.4): the test builds the sorted card list once and replays `calendarPickOptions`' own draw (checked identical to it for 100 ids). Suite time per sport with the extra checks: NBA 33–44 s, soccer 20–30 s, **NFL 49–61 s** (was 79 s; inside the 60 s budget on all but one loaded run, so sharing openings with the exploits suite was not needed).
+- **Found in browser QA, fixed: a waiting calendar pick was labelled "Scout's Choice".** `pickLabel` (Store) fell back to "Scout's Choice" for kind `calendar` (its tile and its ODDS chip); it now reads "Calendar Gold Pick".
+
+### Tests (suite `odds`, now 20 per sport)
+
+- New: every pick and random reward table ≤ 20 ms; every sheet lists at most one certain band, Pick 84+ leads with 84+ and then only uncertain rows, the Premium header writes its Legend chance as the table does; the buy confirm's rows for every sold pack (common to rare, the 1-in-20 band present, no band below it except the 83+ stand-in, no duplicates); Scout's Choice and the Swap Desk dated by the Standout week, Pick 84+ not.
+- Changed: Scout's Choice 10,000 → 40,000 draws at ±0.8; the calendar pick 4,000 at ±2.4 → 10,000 at ±1.5; the Position mean reads `raw` bands.
+- Typecheck clean. NBA `vitest run src/ut src/admin src/engine/sport-branches.test.ts` 381 passed (16 skipped); NFL 379 passed (17 skipped); soccer `vitest run soccer sport-branches` 183 passed (an earlier run failed only the new speed test on a single timed run, see above, before it took the best of three).
+
+### Browser QA (packs-4 review fixes)
+
+`scripts/packs/qa-odds-sheets.mjs` (dev server 5213, `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted: the only host blocked was the Supabase registry; touch, `deviceScaleFactor: 1`; clock 2026-11-27 18:30 Eastern). It now also puts a waiting login calendar pick in the fixture and times its sheet's first open at 4× CPU. Runs: NBA 393 (reduced) and 320 (full), NFL 320 (reduced), soccer 393 (full) and 320 (full). Shots: `O/shots/packs/packs-4-fixes/<sport>-<width>-*.png` (new: `*-calendar-sheet.png`).
+- Tap to visible sheet at 4× (ms): Premium 52–114, Jumbo 24–78, Elite 30–89, Gold 38–122, **calendar pick 34–54** (the Store's idle queue now computes it after the pack sheets; the table itself is about 3 ms at 1× in node once its card list exists). Every sample under 150; the machine's load average was about 6 on 4 CPUs.
+- Pick 84+ (all sports): "84+ 100%, 85+ 81%, 86+ 57%, 88+ 23%" with the notes and PER OPTION above the fold at 320×568 (`nba-320-pick-screen-sheet.png`).
+- Calendar pick: bands only (no edition rows). The first run showed GOAT / Spotlight / Legend rows reading "less than 0.1%, 1 in 346,430,740,567,000": rounding error in the exact player formula for a tier no card has. Fixed (a tier no card has is exactly 0, a sheet never lists a chance under 10⁻¹²) and tested; the re-run lists none.
+- Buy confirm (Jumbo): NBA "86+ 9.9%, 88+ 4.8%, Legend 0.7%"; NFL "88+ 7.1%, Hot Season 2.0%, Legend 0.7%"; soccer "88+ 6.0%, Hot Season 2.0%, Legend 0.7%" (`*-buy-confirm.png`).
+- Every sheet and the confirm: 0 controls under 44 design px, 0 texts under 10, no overflow, the footer on screen, 0 page errors.
+- The Scout Drop sheet has no screen on this branch yet (ut's Scout Drop screen renders it); its step label change is text only.
+
+### Touched outside my lane (packs-4 review fixes)
+
+- None. (`scripts/packs/qa-odds-sheets.mjs` gained a waiting calendar pick, its timed first open, a shot and the Pick 84+ rows in its log.)
+
+### Owner device checks (packs-4 review fixes)
+
+- The pick sheets now start at the certain row ("84+ 100%") with the rows that matter right under it, also on a small phone.
+- The buy confirm's three rows read naturally from common to rare.
+
+### Left for later (packs-4 review fixes)
+
+- packs-10: re-measure tap to sheet on the production build, as planned.
 
 ## Requests (answers are recorded here as they arrive)
 

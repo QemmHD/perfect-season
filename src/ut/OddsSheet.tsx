@@ -146,7 +146,7 @@ function DropView({ d }: { d: DropSheet }) {
       <h3 className="ps-odds-h">Each tap</h3>
       <div className="ps-odds-group" role="table" aria-label="Each tap">
         {d.steps.map((s) => (
-          <Row key={s.from} r={{ key: s.from, label: cap(s.from) + ' → ' + cap(s.to), p: s.p }} tone={'tone-drop-' + s.to} />
+          <Row key={s.from} r={{ key: s.from, label: cap(s.from) + ' to ' + cap(s.to), p: s.p }} tone={'tone-drop-' + s.to} />
         ))}
       </div>
       <h3 className="ps-odds-h">Where it ends</h3>

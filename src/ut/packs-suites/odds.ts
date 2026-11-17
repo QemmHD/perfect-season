@@ -18,10 +18,10 @@ import { legacyNormalizeContent } from '../__fixtures__/legacy-content-state';
 import { calendarPickOptions } from '../daily-hub';
 import { DROP_TIERS, dropOdds, dropTable } from '../drop-tables';
 import { fcToDisplay } from '../fc-scale';
-import { boostWindows, easternAt, easternParts } from '../flash';
+import { boostWindows, easternAt, easternParts, weekMonday } from '../flash';
 import { livePick, livePacksOn as packsOnDay, packOfKind } from '../live-packs';
-import { ALWAYS_CONFIRM_FROM, CONFIRM_FROM, confirmFor, dropSheet, fmtPct, headline, oddsFor, oddsTable, oneIn, pickTable, premiumChanceAtLeast, rewardOdds, routeCost, type OddsTable } from '../odds';
-import { FLOORS, goldDist, isFloorKind, openPack, packDefs, positionChoices, registeredPack } from '../packs';
+import { ALWAYS_CONFIRM_FROM, CONFIRM_FROM, confirmFor, dropSheet, fmtPct, hasPickOdds, headline, ODDS_UPDATED, oddsFor, oddsTable, oneIn, pickTable, pickTableNow, premiumChanceAtLeast, rewardOdds, routeCost, type OddsTable } from '../odds';
+import { FLOORS, goldDist, isFloorKind, LEGEND_PREMIUM, openPack, packDefs, positionChoices, registeredPack } from '../packs';
 import { getPool, type Pool } from '../pool';
 import { expectedFor } from '../pull-log';
 import { rewardCard, sbcsFor, weekOf, type Reward } from '../sbc';
@@ -113,8 +113,10 @@ export function oddsSuite(): void {
       const tables = positionChoices(SPORT).map((c) => oddsFor(pool, 'position:' + c.key, AT)!);
       positionChoices(SPORT).forEach((c, i) => agrees(tables[i], opens(pool, 'position:' + c.key, AT), c.key));
       const all = oddsFor(pool, 'position', AT)!;
+      // (from every computed band, also ones a choice's own sheet hides because they are certain there)
       for (const b of all.bands) {
-        const mean = tables.reduce((a, t) => a + (t.bands.find((x) => x.key === b.key)?.p ?? 0), 0) / tables.length;
+        const i = [80, 82, 83, 84, 85, 86, 88].indexOf(Number(b.key.slice(1)));
+        const mean = tables.reduce((a, t) => a + t.raw.bands[i], 0) / tables.length;
         expect(b.p).toBeCloseTo(mean, 9);
       }
       expect(all.notes[0]).toMatch(/differ from these by at most \d+\.\d points/);
@@ -201,15 +203,21 @@ export function oddsSuite(): void {
       expect(pickTable(pool, 'shelf:standouts', AT)!.bands).toEqual(pickTable(pool, 'standout-pick', AT)!.bands);
     });
 
-    it("Scout's Choice and the Swap Desk", () => {
+    it("Scout's Choice and the Swap Desk (40,000 draws, ±0.8 points: NFL's repeated players are modelled)", () => {
       const t = pickTable(pool, 'scout', AT)!;
-      check(
+      agrees(
         t,
         (function* () {
-          for (let i = 0; i < N; i++) yield scoutOptions(pool, 'odds-scout:' + i, W).options;
+          for (let i = 0; i < 4 * N; i++) yield scoutOptions(pool, 'odds-scout:' + i, W).options;
         })(),
         'scout',
+        0.008,
       );
+      // the Standout share follows the Weekly Standout week, and so does the sheet's date
+      const later = easternAt('2026-11-26', 12);
+      expect(pickTable(pool, 'scout', later)!.updated).toBe(weekMonday(weekOf('2026-11-26')));
+      expect(pickTable(pool, 'swap', later)!.updated).toBe(weekMonday(weekOf('2026-11-26')));
+      expect(pickTable(pool, 'pick-84', later)!.updated).toBe(ODDS_UPDATED);
       expect(t.slotsText).toMatch(/Weekly Standout/);
       expect(pickTable(pool, 'swap', AT)!.bands).toEqual(t.bands);
     });
@@ -228,15 +236,36 @@ export function oddsSuite(): void {
 
     it('Program, program (live) and calendar picks', () => {
       const ids = (xs: string[]) => xs.map((id) => pool.base.get(id)!);
-      // (the login calendar's pick sorts every gold per draw, so 4,000 draws: 3σ ≈ 2.4 points)
+      // the login calendar's pick sorts every gold per draw: the same draw with the sorted list built once
+      // (checked against calendarPickOptions itself), so 10,000 draws fit
+      const floor = fcToDisplay(78, SPORT);
+      const sorted = Object.values(pool.buckets.gold)
+        .flat()
+        .filter((rc) => rc.line.kind === 'season' && rc.ovr >= floor)
+        .sort((a, b) => (a.line.id < b.line.id ? -1 : 1));
+      const calDraw = (id: string): RatedCard[] => {
+        const out: RatedCard[] = [];
+        const pids = new Set<string>();
+        for (const rc of shuffle(sorted, rng(hashString('calendar:' + id)))) {
+          if (pids.has(rc.line.pid)) continue;
+          pids.add(rc.line.pid);
+          out.push(rc);
+          if (out.length === 2) break;
+        }
+        return out;
+      };
+      for (let i = 0; i < 100; i++) expect(calDraw('odds-cal:' + i).map((rc) => rc.line.id)).toEqual(calendarPickOptions(pool, 'odds-cal:' + i));
       const cal = pickTable(pool, 'calendar', AT)!;
+      expect(cal.cards).toBe(2);
+      // season golds only: no special edition row, not even a rounding error's "1 in 10^14"
+      expect(cal.tiers.filter((x) => x.key !== 't-gold'), 'calendar tiers').toEqual([]);
+      expect(cal.special).toBe(0);
       agrees(
         cal,
         (function* () {
-          for (let i = 0; i < 4000; i++) yield ids(calendarPickOptions(pool, 'odds-cal:' + i));
+          for (let i = 0; i < N; i++) yield calDraw('odds-cal:' + i);
         })(),
         'calendar',
-        0.024,
       );
       if (SPORT === 'soccer' || !schedule()) return;
       // a day a program is live
@@ -373,6 +402,51 @@ export function oddsSuite(): void {
       }
     });
 
+    it('every pick and random reward table is computed in 20 ms or less (after warm-up)', () => {
+      // every saved pick kind with a table, the stamp shelf's, and a program's own pick
+      const kinds = ['calendar', 'standout-pick', 'program-pick', 'scout', 'swap', 'front-office', 'pick-82', 'pick-84', 'pick-85', 'shelf:g82', 'shelf:scout85', 'shelf:standouts', 'shelf:program'];
+      for (const k of kinds) expect(hasPickOdds(k), k).toBe(true);
+      const rewards: [string, Reward][] = [
+        ['gold', { card: { tier: 'gold', minOvr: fcToDisplay(82, SPORT) } }],
+        ['standout', { standout: true }],
+        ['pack', { pack: 'premium' }],
+      ];
+      if (SPORT !== 'soccer' && schedule()) {
+        let day = DAY;
+        for (let k = 0; k < 200 && !programPickSource(pool, day); k++) day = addDays(day, 1);
+        const promo = packsOnDay(day).find((p) => p.tpl === 'program');
+        if (promo) rewards.push(['program', { program: promo.id.replace(/^live:/, '').replace(/-y\d+$/, '') }]);
+      }
+      // warm-up: the pool's own caches (gold curves, the week's Standouts) and the JIT, as after a Store visit
+      for (const k of kinds) pickTableNow(pool, k, DAY, W);
+      for (const [, w] of rewards) rewardOdds(pool, w, AT);
+      // the best of three runs: the computation's own cost, not a busy machine's scheduling
+      const best = (f: () => unknown) => {
+        let ms = Infinity;
+        for (let i = 0; i < 3; i++) {
+          const t0 = performance.now();
+          expect(f()).toBeTruthy();
+          ms = Math.min(ms, performance.now() - t0);
+        }
+        return ms;
+      };
+      for (const k of kinds) expect(best(() => pickTableNow(pool, k, DAY, W)), k).toBeLessThanOrEqual(20);
+      for (const [k, w] of rewards) expect(best(() => rewardOdds(pool, w, AT)), 'reward ' + k).toBeLessThanOrEqual(20);
+    });
+
+    it('sheets list one certain band at most, and the Premium header writes its Legend chance like the table', () => {
+      const tables = [...SOLD.map((k) => oddsFor(pool, k, AT)!), ...['pick-84', 'pick-85', 'scout', 'calendar', 'standout-pick'].map((k) => pickTable(pool, k, AT)!)];
+      for (const t of tables) expect(t.bands.filter((b) => b.p >= 0.995).length, t.title).toBeLessThanOrEqual(1);
+      // a Player Pick 84+ leads with its one certain row, then the rows that matter
+      const p84 = pickTable(pool, 'pick-84', AT)!;
+      expect(p84.bands[0].key).toBe('b84');
+      expect(p84.bands.slice(1).every((b) => b.p < 0.995)).toBe(true);
+      const prem = oddsFor(pool, 'premium', AT)!;
+      const legend = prem.tiers.find((x) => x.key === 't-legend')!;
+      expect(legend.p).toBeCloseTo(LEGEND_PREMIUM, 12);
+      expect(prem.slotsText).toContain(fmtPct(legend.p) + ' a Legend');
+    });
+
     it('the buy confirm: from 1,500 coins; "Don’t ask again" never at 10,000 or more', () => {
       expect(confirmFor(CONFIRM_FROM - 1).ask).toBe(false);
       expect(confirmFor(CONFIRM_FROM).ask).toBe(true);
@@ -385,6 +459,18 @@ export function oddsSuite(): void {
       const rows = headline(oddsFor(pool, 'jumbo', AT)!);
       expect(rows.length).toBe(3);
       for (const r of rows) expect(r.p).toBeGreaterThan(0);
+      // for every pack: common to rare, led by the best band hit 1 time in 20, and no band row below it
+      for (const kind of SOLD) {
+        const t = oddsFor(pool, kind, AT)!;
+        const h = headline(t);
+        for (let i = 1; i < h.length; i++) expect(h[i].p, kind).toBeLessThanOrEqual(h[i - 1].p);
+        const a = [...t.bands].reverse().find((b) => b.p >= 0.05 && b.p < 0.995);
+        // every band row is that band or a rarer one; 83+ only as the stand-in when nothing rarer is left
+        const band = (key: string) => Number(key.slice(1));
+        if (a) for (const r of h.filter((x) => x.key.startsWith('b') && x.key !== 'b83')) expect(band(r.key), kind + ' ' + r.label).toBeGreaterThanOrEqual(band(a.key));
+        if (a) expect(h.some((r) => r.key === a.key), kind).toBe(true);
+        expect(new Set(h.map((r) => r.key)).size, kind).toBe(h.length);
+      }
     });
 
     it('old saves: no prefs asks first; the field survives today and an older build drops only it', () => {

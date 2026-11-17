@@ -41,6 +41,7 @@ import { type Pool, TIER_RANK } from './pool';
 import { TIER_CUTS } from './rate';
 import { UT_SCALE } from './ut-scale';
 import { fcToDisplay } from './fc-scale';
+import { fmtPct } from './odds-fmt';
 import { slotsFor, canPlay, positionMix } from './squad';
 import type { RatedCard, Tier, UtSport } from './types';
 import { easternDateKey } from '../engine/season';
@@ -215,7 +216,7 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       kind: 'premium',
       name: 'Premium Gold',
       price: k.price.premium,
-      blurb: ps + pg + pr + ' cards, ' + (pg + pr) + ' golds (' + k.rare.premium + ' of them 78+), 6% a Standout or Hot Season, 0.66% a Legend',
+      blurb: ps + pg + pr + ' cards, ' + (pg + pr) + ' golds (' + k.rare.premium + ' of them 78+), ' + fmtPct(STANDOUT_PREMIUM + PROMO_PREMIUM) + ' a Standout or Hot Season, ' + fmtPct(LEGEND_PREMIUM) + ' a Legend',
       slots: [...rep(ps, S), ...rep(goldRest(pg + pr, k.rare.premium), G75), ...rep(k.rare.premium - pr, G78), ...rep(pr, premiumPlus)],
     },
     spotlight: {
@@ -254,7 +255,7 @@ export function packDefs(sport: UtSport): Record<Exclude<PackKind, 'starter'>, P
       kind: 'elite',
       name: 'Elite Gold',
       price: CONTENT_PRICES[sport].elite,
-      blurb: c.elite.g82 + c.elite.g84 + ' golds ' + fcToDisplay(82, sport) + '+, ' + c.elite.g84 + ' of them ' + fcToDisplay(84, sport) + '+; the last is a Standout 10% or a Legend 1%',
+      blurb: c.elite.g82 + c.elite.g84 + ' golds ' + fcToDisplay(82, sport) + '+, ' + c.elite.g84 + ' of them ' + fcToDisplay(84, sport) + '+; the last is a Standout ' + fmtPct(STANDOUT_ELITE) + ' or a Legend ' + fmtPct(LEGEND_ELITE),
       slots: [...rep(c.elite.g82, G82), ...rep(c.elite.g84 - 1, { g84: 1 }), elitePlus],
       prefer: true,
     },

@@ -15,6 +15,7 @@ import { FINALE_KIND, promoCards } from './live-cards';
 import { fill, type Odds, type PackDef } from './packs';
 import type { Pool } from './pool';
 import { fcToDisplay } from './fc-scale';
+import { fmtPct } from './odds-fmt';
 import { boosted, boostOf } from './boost';
 import { weekOf } from './sbc';
 import type { UtState } from './state';
@@ -84,7 +85,7 @@ export function livePackDef(sport: UtSport, pack: Pick<CalPack, 'id' | 'tpl' | '
     price,
     blurb: guarantee
       ? slots.length + ' cards: ' + (slots.length - 1) + ' golds ' + fcToDisplay(82, sport) + '+ and one program card guaranteed'
-      : slots.length + ' cards: ' + (ls.rare + ls.gold) + ' golds (' + ls.rare + ' of them ' + fcToDisplay(80, sport) + '+) and a program slot (' + Math.round((odds + extraP) * 100) + '% a program card' + (boost ? ', boosted' : '') + ', ' + Math.round(legend * 1000) / 10 + '% a Legend, otherwise a Weekly Standout)',
+      : slots.length + ' cards: ' + (ls.rare + ls.gold) + ' golds (' + ls.rare + ' of them ' + fcToDisplay(80, sport) + '+) and a program slot (' + fmtPct(odds + extraP) + ' a program card' + (boost ? ', boosted' : '') + ', ' + fmtPct(legend) + ' a Legend, otherwise a Weekly Standout)',
     slots,
     odds,
     extra,

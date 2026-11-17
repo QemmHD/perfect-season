@@ -62,6 +62,11 @@ const fixture = await page.evaluate(async (sport) => {
   // a waiting Premium and a waiting Player Pick 84+ (reward-style ids)
   ut = { ...ut, packs: [{ id: 'objective:qa-premium', kind: 'premium', at: Date.now() }] };
   ut = awardPick(ut, pool, 'pick-84', 'minutes:life:25h', Date.now()) ?? ut;
+  // (packs-4 review fixes) a waiting login calendar gold pick: its sheet's first open is timed at 4x
+  const { addPick } = await import('/src/ut/content-packs.ts');
+  const { calendarPickOptions } = await import('/src/ut/daily-hub.ts');
+  const calId = 'calendar:' + sport + ':' + day;
+  ut = addPick(ut, { id: calId, kind: 'calendar', title: 'Login Calendar · Gold Pick', options: calendarPickOptions(pool, calId), at: Date.now() });
   // two logged Gold packs, so the Pack Tracker has a summary
   for (const i of [0, 1]) {
     const got = openPack(pool, 'gold', 'qa-log-' + i);
@@ -173,8 +178,22 @@ for (const name of ['Premium Gold', 'Jumbo Premium', 'Elite Gold', 'Gold Pack'])
   await settle(300);
   await close();
 }
+let calendarText = '';
+// the waiting login calendar pick (its table is computed on this first tap: nothing precomputes it)
+{
+  const cal = page.locator('.ut-mine').getByRole('button', { name: 'Calendar Gold Pick odds', exact: true }).first();
+  if (await cal.count()) {
+    times['Calendar pick (first open)'] = Math.round(await timedOpen(cal));
+    await settle(300);
+    calendarText = (await page.locator('.ps-odds-body').innerText()).replace(/\s+/g, ' ').slice(0, 300);
+    await shot('calendar-sheet');
+    await audit('.ps-odds', 'calendar pick sheet');
+    await close();
+  } else issues.push('no waiting calendar pick chip');
+}
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 console.log('tap → sheet at 4x (ms):', JSON.stringify(times));
+console.log('calendar:', calendarText);
 
 // the Premium sheet with PER CARD open
 await page.getByRole('button', { name: 'Premium Gold odds', exact: true }).first().click();
@@ -211,6 +230,7 @@ for (const label of ['Player Pick 84+ odds', 'Premium Gold odds']) {
   await page.locator('.ps-odds-body').waitFor();
   await settle(400);
   await shot(label.startsWith('Player') ? 'pick84-sheet' : 'waiting-premium-sheet');
+  if (label.startsWith('Player')) console.log('pick84:', (await page.locator('.ps-odds-body').innerText()).replace(/\s+/g, ' ').slice(0, 200));
   await audit('.ps-odds', label);
   await close();
 }

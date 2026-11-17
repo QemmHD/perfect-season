@@ -58,6 +58,8 @@ function pickLabel(p: PickState, sport: UtSport): string {
   if (p.kind === 'standout-pick') return 'Standout Pick';
   if (p.kind === 'new-era') return 'Icon Pick';
   if (p.kind === 'program-pick' || p.kind === 'live-pick') return 'Program Pick';
+  // (review fixes) the login calendar's gold pick read "Scout's Choice" under Your packs
+  if (p.kind === 'calendar') return 'Calendar Gold Pick';
   const g = GOLD_PICKS[p.kind as keyof typeof GOLD_PICKS];
   return g ? g.title + ' ' + fcToDisplay(g.floor, sport) + '+' : 'Scout’s Choice';
 }
@@ -118,9 +120,14 @@ function DailyDrop({ ut, day, sport, pool, onClaim, onOdds }: { ut: UtState; day
   // Claude (packs-4, audit L2): the drop's own chances, from its odds sheet (computed after the first paint)
   const [chance, setChance] = useState<{ gold: number; standout: number } | null>(null);
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      const o = oddsFor(pool, 'daily');
-      if (o) setChance({ gold: o.tiers.find((r) => r.key === 't-gold')?.p ?? 0, standout: o.tiers.find((r) => r.key === 't-standout')?.p ?? 0 });
+    // the Premium Gold sheet first (the most opened; memoised, so the Store's idle queue then finds it
+    // ready), then the drop's own, each in a task of its own so a tap in between is never held up
+    let t = window.setTimeout(() => {
+      oddsFor(pool, 'premium');
+      t = window.setTimeout(() => {
+        const o = oddsFor(pool, 'daily');
+        if (o) setChance({ gold: o.tiers.find((r) => r.key === 't-gold')?.p ?? 0, standout: o.tiers.find((r) => r.key === 't-standout')?.p ?? 0 });
+      }, 0);
     }, 0);
     return () => clearTimeout(t);
   }, [pool, day]);
@@ -301,16 +308,20 @@ export function Store(props: {
   // odds.ts), so a tap only has to draw the sheet
   useEffect(() => {
     const kinds = ['premium', 'gold', 'jumbo', 'elite', 'standout', 'silver', 'bronze', 'daily', 'position', ...livePacksOn(props.day).map((p) => p.id)];
+    // (review fixes) then the picks: Scout's Choice and every waiting pick with a table (a calendar pick too)
+    const picks = [...new Set(['scout', ...(contentOf(props.ut).picks ?? []).map((p) => p.kind).filter(hasPickOdds)])];
     const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
     let id = 0;
     let i = 0;
     const next = () => {
-      if (i >= kinds.length) return;
-      oddsFor(props.pool, kinds[i++]);
+      if (i >= kinds.length + picks.length) return;
+      if (i < kinds.length) oddsFor(props.pool, kinds[i++]);
+      else pickTable(props.pool, picks[i++ - kinds.length]);
       id = w.requestIdleCallback ? w.requestIdleCallback(next, { timeout: 3000 }) : window.setTimeout(next, 50);
     };
     id = w.requestIdleCallback ? w.requestIdleCallback(next, { timeout: 3000 }) : window.setTimeout(next, 300);
     return () => (w.cancelIdleCallback ? w.cancelIdleCallback(id) : clearTimeout(id));
+    // (the waiting picks are read once per pool and day: a pick added later is computed when it is tapped)
   }, [props.pool, props.day]);
   /**
    * Claude (packs-4): a purchase of CONFIRM_FROM coins or more asks first (BuyConfirm), unless the player

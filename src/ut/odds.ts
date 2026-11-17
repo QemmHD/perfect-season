@@ -27,6 +27,7 @@ import { per, promoById, wavesOf } from './calendar';
 import { GOLD_PICKS, NFL_GROUPS, programPickSource } from './content-packs';
 import { DROP_TIERS, dropEv, dropOdds, dropTable, type DropIndex, type DropReward, type DropTier } from './drop-tables';
 import { fcToDisplay } from './fc-scale';
+import { fmtPct, oneIn } from './odds-fmt';
 import { weekMonday } from './flash';
 import { promoCards } from './live-cards';
 import { livePackDef, packOfKind, promoOfPack } from './live-packs';
@@ -77,25 +78,7 @@ const TIER_ROWS: Tier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program',
 
 // ---------- how a chance is written ----------
 
-/**
- * A chance as the sheets write it: under 0.1% reads "less than 0.1%", 99.5% and up "100%", one decimal
- * below 10% and whole numbers above. A chance of exactly 0 reads "0%".
- */
-export function fmtPct(p: number): string {
-  if (!(p > 0)) return '0%';
-  if (p < 0.001) return 'less than 0.1%';
-  if (p >= 0.995) return '100%';
-  const x = Math.round(p * 1000) / 10;
-  return x < 10 ? x.toFixed(1) + '%' : Math.round(p * 100) + '%';
-}
-
-/** "1 in 2,000" for a chance under 1% (null above, where the percentage says enough). */
-export function oneIn(p: number): string | null {
-  if (!(p > 0) || p >= 0.01) return null;
-  const n = 1 / p;
-  const r = n >= 1000 ? Math.round(n / 100) * 100 : n >= 100 ? Math.round(n / 10) * 10 : Math.round(n);
-  return '1 in ' + r.toLocaleString('en-US');
-}
+export { fmtPct, oneIn } from './odds-fmt';
 
 // ---------- one card's distribution ----------
 
@@ -361,6 +344,8 @@ export interface OddsTable {
   r86: number;
   r90: number;
   special: number;
+  /** every computed "at least one" before visible() hides rows: by BAND_ALL, and by tier */
+  raw: { bands: number[]; tiers: Partial<Record<Tier, number>> };
 }
 
 const SLOT_ORDER: SlotTier[] = ['goat', 'spotlight', 'legend', 'landmark', 'program', 'promo', 'standout', 'g88', 'g86', 'g84', 'g82', 'g80', 'g78', 'rare', 'g75', 'gold', 'silver', 'bronze'];
@@ -460,10 +445,21 @@ function rowsOf(dists: Dist[], sport: UtSport, groups: NoneFactor[] = []) {
 
 type Rows = ReturnType<typeof rowsOf>;
 
-/** The visible rows: every band with a chance, special tiers with a chance, base tiers when uncertain. */
+/** Below this a computed chance is rounding error, not a chance: a sheet never lists it. */
+const DUST = 1e-12;
+
+const rawOf = (r: Rows): OddsTable['raw'] => ({ bands: [...r.bands], tiers: Object.fromEntries(r.tiers) });
+
+/**
+ * The visible rows: every band with a chance, special tiers with a chance, base tiers when uncertain. Of
+ * the bands that are certain (every pick option is 84+, say), only the highest is listed, so the rows that
+ * matter come first on a small phone.
+ */
 function visible(r: Rows): { bands: OddsRow[]; tiers: OddsRow[] } {
-  const bands = BANDS.map((b, i) => ({ key: 'b' + b, label: fcToDisplay(b, r.sport) + '+ overall', p: r.bands[i] })).filter((x) => x.p > 0);
-  const tiers = TIER_ROWS.map((t) => ({ key: 't-' + t, label: TIER_NAMES[t], p: r.tiers.get(t) ?? 0 })).filter((x) => x.p > 0 && (!BASE_TIERS.has(x.key.slice(2) as Tier) || x.p < 0.995));
+  const all = BANDS.map((b, i) => ({ key: 'b' + b, label: fcToDisplay(b, r.sport) + '+ overall', p: r.bands[i] })).filter((x) => x.p > DUST);
+  const sure = all.filter((x) => x.p >= 0.995).pop();
+  const bands = all.filter((x) => x.p < 0.995 || x === sure);
+  const tiers = TIER_ROWS.map((t) => ({ key: 't-' + t, label: TIER_NAMES[t], p: r.tiers.get(t) ?? 0 })).filter((x) => x.p > DUST && (!BASE_TIERS.has(x.key.slice(2) as Tier) || x.p < 0.995));
   return { bands, tiers };
 }
 
@@ -591,6 +587,7 @@ export function oddsTable(pool: Pool, def: SheetDef, ctx: OddsCtx, extra: { boos
     r86: r.bands[I86],
     r90: r.bands[I90],
     special: r.special,
+    raw: rawOf(r),
   };
 }
 
@@ -690,19 +687,26 @@ export function oddsFor(pool: Pool, kind: string, at = Date.now()): OddsTable | 
       const tables = positionChoices(sport).map((c) => oddsFor(pool, 'position:' + c.key, at)!);
       const mean = (f: (t: OddsTable) => number) => tables.reduce((a, t) => a + f(t), 0) / tables.length;
       const first = tables[0];
-      const spread = Math.max(
-        0,
-        ...first.bands.map((b) => Math.max(...tables.map((t) => t.bands.find((x) => x.key === b.key)?.p ?? 0)) - Math.min(...tables.map((t) => t.bands.find((x) => x.key === b.key)?.p ?? 0))),
-      );
+      const BI = BANDS.map((_, i) => i);
+      const spread = Math.max(0, ...BI.map((i) => Math.max(...tables.map((t) => t.raw.bands[i])) - Math.min(...tables.map((t) => t.raw.bands[i]))));
       const unit = pickFor(sport, { nba: 'position', nfl: 'unit', soccer: 'line' });
+      const r: Rows = {
+        bands: BAND_ALL.map((_, i) => mean((t) => t.raw.bands[i])),
+        tiers: new Map(TIER_ROWS.map((x) => [x, mean((t) => t.raw.tiers[x] ?? 0)])),
+        holo: mean((t) => t.holo),
+        featured: 0,
+        special: mean((t) => t.special),
+        sport,
+      };
       return {
         ...first,
         title: pickFor(sport, { nba: defs.position.name, nfl: 'Unit Pack', soccer: defs.position.name }),
-        bands: first.bands.map((b) => ({ ...b, p: mean((t) => t.bands.find((x) => x.key === b.key)?.p ?? 0) })),
-        tiers: first.tiers.map((b) => ({ ...b, p: mean((t) => t.tiers.find((x) => x.key === b.key)?.p ?? 0) })),
-        r86: mean((t) => t.r86),
-        r90: mean((t) => t.r90),
-        special: mean((t) => t.special),
+        ...visible(r),
+        holo: r.holo,
+        r86: r.bands[I86],
+        r90: r.bands[I90],
+        special: r.special,
+        raw: rawOf(r),
         notes: ['Shown for a ' + unit + ' picked at random. Each ' + unit + '’s own chances differ from these by at most ' + (Math.round(spread * 1000) / 10).toFixed(1) + ' points.', ...first.notes],
       };
     }
@@ -736,7 +740,30 @@ export function hyperAtLeast(N: number, m: number, k: number): number {
   return 1 - none;
 }
 
-/** k different cards of `list`, all equally likely (Standout, Program, program and calendar picks). */
+/**
+ * The events a pick table counts, card by card, in one pass: each band (BAND_ALL), each tier (TIER_ROWS),
+ * the featured card and any special edition. `hit(card)` fills `out` with 1 for every event the card is.
+ */
+const EV_TIER = BAND_ALL.length;
+const EV_FEAT = EV_TIER + TIER_ROWS.length;
+const EV_SPECIAL = EV_FEAT + 1;
+const EV_N = EV_SPECIAL + 1;
+const TIER_EV = new Map<Tier, number>(TIER_ROWS.map((t, i) => [t, EV_TIER + i]));
+function cardEvents(rc: RatedCard, th: readonly number[], featured: ReadonlySet<string> | undefined, out: Uint8Array): void {
+  out.fill(0);
+  for (let i = 0; i < th.length; i++) if (rc.ovr >= th[i]) out[i] = 1;
+  const t = TIER_EV.get(rc.tier);
+  if (t !== undefined) out[t] = 1;
+  if (featured?.has(rc.line.id)) out[EV_FEAT] = 1;
+  if (!BASE_TIERS.has(rc.tier)) out[EV_SPECIAL] = 1;
+}
+
+/**
+ * k different cards of `list`, all equally likely (Standout, Program, program and calendar picks). With
+ * `distinctPlayers` (the login calendar's pick: the first card of a shuffle, then the first card of another
+ * player), exact over players for k ≤ 2: the second option is any card of a different player, equally
+ * likely. Counted in one pass over `list` (thresholds once), so a 4,800-card calendar pick stays fast.
+ */
 function uniformPick(
   pool: Pool,
   title: string,
@@ -746,20 +773,58 @@ function uniformPick(
   notes: string[],
   featured?: { ids: ReadonlySet<string>; name: string },
   updated?: string,
+  distinctPlayers = false,
 ): OddsTable {
   const sport = pool.sport;
   const n = list.length;
-  const kk = Math.min(k, n);
-  const bands = BAND_ALL.map((_, i) => hyperAtLeast(n, list.filter((rc) => rc.ovr >= thresholds(sport)[i]).length, kk));
-  const tiers = new Map<Tier, number>(TIER_ROWS.map((t) => [t, hyperAtLeast(n, list.filter((rc) => rc.tier === t).length, kk)]));
-  const fm = featured ? list.filter((rc) => featured.ids.has(rc.line.id)).length : 0;
-  const r: Rows = { bands, tiers, holo: 0, featured: hyperAtLeast(n, fm, kk), special: hyperAtLeast(n, list.filter((rc) => !BASE_TIERS.has(rc.tier)).length, kk), sport };
+  const th = thresholds(sport);
+  const cnt = new Float64Array(EV_N);
+  const ev = new Uint8Array(EV_N);
+  // per player: how many cards, and how many of them miss each event
+  const pidIdx = new Map<string, number>();
+  const pidTot: number[] = [];
+  const pidMiss: number[][] = [];
+  for (const rc of list) {
+    cardEvents(rc, th, featured?.ids, ev);
+    for (let e = 0; e < EV_N; e++) cnt[e] += ev[e];
+    if (!distinctPlayers) continue;
+    let j = pidIdx.get(rc.line.pid);
+    if (j === undefined) {
+      pidIdx.set(rc.line.pid, (j = pidTot.length));
+      pidTot.push(0);
+      pidMiss.push(new Array<number>(EV_N).fill(0));
+    }
+    pidTot[j]++;
+    const miss = pidMiss[j];
+    for (let e = 0; e < EV_N; e++) miss[e] += 1 - ev[e];
+  }
+  const exact = distinctPlayers && k <= 2;
+  const kk = Math.min(k, exact ? pidTot.length : n);
+  const atLeast = (e: number): number => {
+    // no card is a hit, or every card is: exactly 0 or 1 (never a rounding error shown as "1 in 10^14")
+    if (!cnt[e]) return 0;
+    if (cnt[e] === n) return 1;
+    if (!exact || kk < 2) return hyperAtLeast(n, cnt[e], kk);
+    // P(no hit) = Σ over the first card's player q: (q's misses / n) × (the other players' misses / their cards)
+    const missAll = n - cnt[e];
+    let none = 0;
+    for (let j = 0; j < pidTot.length; j++) {
+      const m = pidMiss[j][e];
+      if (m) none += (m / n) * ((missAll - m) / (n - pidTot[j]));
+    }
+    return Math.min(1, Math.max(0, 1 - none));
+  };
+  const bands = BAND_ALL.map((_, i) => atLeast(i));
+  const tiers = new Map<Tier, number>(TIER_ROWS.map((t, i) => [t, atLeast(EV_TIER + i)]));
+  const fm = featured ? cnt[EV_FEAT] : 0;
+  const r: Rows = { bands, tiers, holo: 0, featured: fm ? atLeast(EV_FEAT) : 0, special: atLeast(EV_SPECIAL), sport };
   const v = visible(r);
   return {
     kind: 'pick',
     title,
     cards: kk,
-    slotsText: (kk === 1 ? 'One option' : kk + ' different options') + ' face down from ' + n + ' ' + chip + (n === 1 ? '' : 's') + ', all equally likely. Keep one.',
+    slotsText:
+      (kk === 1 ? 'One option' : kk + (distinctPlayers ? ' different players' : ' different options')) + ' face down from ' + n.toLocaleString('en-US') + ' ' + chip + (n === 1 ? '' : 's') + ', all equally likely. Keep one.',
     ...v,
     holo: 0,
     featured: featured && fm ? { name: featured.name, p: r.featured, ids: [...featured.ids] } : null,
@@ -771,13 +836,98 @@ function uniformPick(
     r86: bands[I86],
     r90: bands[I90],
     special: r.special,
+    raw: rawOf(r),
+  };
+}
+
+/**
+ * Scout's Choice in one position group whose options may share a position (NFL), exact over players: `n`
+ * options one after another, each a Weekly Standout (`s`, while one of the group's eligible Standouts is not
+ * an option yet, uniformly among those) or else a gold on the curve (`gold`, per card), and a player already
+ * offered is drawn again (scoutOptions draws up to 24 times; a gold branch with no player left gives no more
+ * options). In a thin group (quarterbacks) those redraws push the later options toward other players, which
+ * independent options miss by about a point at 85+.
+ */
+function scoutGroupRows(pool: Pool, gold: Map<RatedCard, number>, eligible: readonly RatedCard[], s: number, n: number): Rows {
+  const sport = pool.sport;
+  const th = thresholds(sport);
+  const pidIdx = new Map<string, number>();
+  const ix = (pid: string) => {
+    let j = pidIdx.get(pid);
+    if (j === undefined) pidIdx.set(pid, (j = pidIdx.size));
+    return j;
+  };
+  // per card: its player, its events and its chance on each branch
+  const ev = new Uint8Array(EV_N);
+  const gCards: [number, Uint8Array, number][] = [];
+  const sCards: [number, Uint8Array][] = [];
+  for (const [rc, p] of gold) {
+    cardEvents(rc, th, undefined, ev);
+    gCards.push([ix(rc.line.pid), ev.slice(), p]);
+  }
+  for (const rc of eligible) {
+    cardEvents(rc, th, undefined, ev);
+    sCards.push([ix(rc.line.pid), ev.slice()]);
+  }
+  const P = pidIdx.size;
+  const g = new Float64Array(P);
+  const c = new Float64Array(P);
+  for (const [j, , p] of gCards) g[j] += p;
+  for (const [j] of sCards) c[j]++;
+  const gAll = g.reduce((a, x) => a + x, 0);
+  const E = eligible.length;
+  const EPS = 1e-12;
+  const none = (e: number): number => {
+    // each player's chance mass of a card that misses event e, on each branch
+    const gm = new Float64Array(P);
+    const cm = new Float64Array(P);
+    for (const [j, v, p] of gCards) if (!v[e]) gm[j] += p;
+    for (const [j, v] of sCards) if (!v[e]) cm[j]++;
+    const GM = gm.reduce((a, x) => a + x, 0);
+    const CM = cm.reduce((a, x) => a + x, 0);
+    if (GM + CM === 0) return 0;
+    // every card misses: no option can hit
+    if (Math.abs(GM - gAll) <= EPS && CM === E) return 1;
+    const live: number[] = [];
+    for (let j = 0; j < P; j++) if (gm[j] > 0 || cm[j] > 0) live.push(j);
+    const taken = new Uint8Array(P);
+    // no hit from option `depth` on, given the players already offered (their sums gT, cT, gmT, cmT)
+    const step = (gT: number, cT: number, gmT: number, cmT: number, depth: number): number => {
+      const soN = E - cT;
+      const pSo = soN > 0 ? s : 0;
+      const gLeft = gAll - gT;
+      const goldDead = gLeft <= EPS;
+      // a gold branch with every player taken gives no more options: nothing more can hit
+      const stop = goldDead ? 1 - pSo : 0;
+      if (depth === n - 1) return stop + (pSo ? (pSo * (CM - cmT)) / soN : 0) + (goldDead ? 0 : ((1 - pSo) * (GM - gmT)) / gLeft);
+      let out = stop;
+      for (const j of live) {
+        if (taken[j]) continue;
+        const m = (pSo ? (pSo * cm[j]) / soN : 0) + (goldDead ? 0 : ((1 - pSo) * gm[j]) / gLeft);
+        if (!(m > 0)) continue;
+        taken[j] = 1;
+        out += m * step(gT + g[j], cT + c[j], gmT + gm[j], cmT + cm[j], depth + 1);
+        taken[j] = 0;
+      }
+      return out;
+    };
+    return step(0, 0, 0, 0, 0);
+  };
+  const hit = (e: number) => Math.min(1, Math.max(0, 1 - none(e)));
+  return {
+    bands: BAND_ALL.map((_, i) => hit(i)),
+    tiers: new Map(TIER_ROWS.map((t, i) => [t, hit(EV_TIER + i)])),
+    holo: 0,
+    featured: 0,
+    special: hit(EV_SPECIAL),
+    sport,
   };
 }
 
 /** Options each drawn independently from per-option distributions (gold and Scout's Choice picks), as a mixture of cases. */
-function optionPick(pool: Pool, title: string, n: number, cases: [Dist[], number][], perOption: OddsRow[], slotsText: string, notes: string[]): OddsTable {
+function optionPick(pool: Pool, title: string, n: number, cases: [Dist[] | Rows, number][], perOption: OddsRow[], slotsText: string, notes: string[], updated?: string): OddsTable {
   const sport = pool.sport;
-  const rows = cases.map(([ds, w]) => [rowsOf(ds, sport), w] as const);
+  const rows = cases.map(([ds, w]) => [Array.isArray(ds) ? rowsOf(ds, sport) : ds, w] as const);
   const avg = (f: (r: Rows) => number) => rows.reduce((a, [r, w]) => a + w * f(r), 0);
   const r: Rows = {
     bands: BAND_ALL.map((_, i) => avg((x) => x.bands[i])),
@@ -799,10 +949,11 @@ function optionPick(pool: Pool, title: string, n: number, cases: [Dist[], number
     boosted: null,
     effectiveProgram: null,
     notes: [...notes, 'You keep exactly one option. The others never join your club. Picks earn no holo.'],
-    updated: ODDS_UPDATED,
+    updated: later(ODDS_UPDATED, updated ?? ''),
     r86: r.bands[I86],
     r90: r.bands[I90],
     special: r.special,
+    raw: rawOf(r),
   };
 }
 
@@ -822,10 +973,17 @@ export const hasPickOdds = (kind: string): boolean => PICK_KINDS.has(kind) || ki
  */
 export function pickTable(pool: Pool, kind: string, at = Date.now()): OddsTable | null {
   const { day, week } = dayWeek(at);
-  return memoised(pool, 'pick|' + kind + '|' + day, () => pickTableNow(pool, kind, day, week));
+  // what the table depends on: nothing (the gold and calendar picks), the Standout week, or the day
+  const base = kind.startsWith('shelf:') ? (SHELF_PICK[kind.slice(6) as ShelfItem] ?? kind) : kind;
+  const when = GOLD_PICKS[base as keyof typeof GOLD_PICKS] || base === 'calendar' ? '' : base === 'scout' || base === 'swap' || base === 'standout-pick' ? week : day;
+  return memoised(pool, 'pick|' + kind + '|' + when, () => pickTableNow(pool, kind, day, week));
 }
 
-function pickTableNow(pool: Pool, kind: string, day: string, week: string): OddsTable | null {
+/** The login calendar pick's cards (daily-hub calendarPickOptions: every season gold 78+), once per pool. */
+const calendarGolds = new WeakMap<Pool, RatedCard[]>();
+
+/** pickTable without the memo (the odds suite times it). */
+export function pickTableNow(pool: Pool, kind: string, day: string, week: string): OddsTable | null {
   const sport = pool.sport;
   if (kind.startsWith('shelf:')) {
     const k = SHELF_PICK[kind.slice(6) as ShelfItem];
@@ -850,12 +1008,17 @@ function pickTableNow(pool: Pool, kind: string, day: string, week: string): Odds
     const so = standoutProgram(pool, week).cards;
     const groups: [string[], number][] = pickFor<[string[], number][]>(sport, { nba: [[Object.keys(positionMix(sport)), 1]], nfl: NFL_GROUPS.map(([, ps]) => [ps, 1 / NFL_GROUPS.length]), soccer: [[Object.keys(positionMix(sport)), 1]] });
     const need = positionMix(sport);
+    // NBA and soccer offer different positions when they can (so a player rarely repeats); NFL does not
+    const repeatPositions = pickFor(sport, { nba: false, nfl: true, soccer: false });
     let soShare = 0;
-    const cases = groups.map(([ps, w]): [Dist[], number] => {
+    const cases = groups.map(([ps, w]): [Dist[] | Rows, number] => {
       const inGroup = new Set(ps);
       const eligible = so.filter((rc) => inGroup.has(rc.line.pos[0]) && rc.ovr >= floor);
       const s = eligible.length ? SCOUT_STANDOUT : 0;
       soShare += w * s;
+      const mix = ps.map((p): [string, number] => [p, need[p] ?? 1]);
+      // NFL: the three options share one group, so a player already offered is drawn again; exact over players
+      if (repeatPositions) return [scoutGroupRows(pool, goldCardDist(pool, 84, mix), eligible, s, 3), w];
       const d = mixDist([
         [
           fromOvr(
@@ -894,6 +1057,8 @@ function pickTableNow(pool: Pool, kind: string, day: string, week: string): Odds
       soShare < SCOUT_STANDOUT
         ? ['This week ' + (soShare ? 'only some position groups have' : 'has no') + ' Weekly Standout rated ' + floor + '+, so the Standout chance is ' + fmtPct(soShare) + '.']
         : [],
+      // the Standout share and its note follow the Weekly Standout week
+      weekMonday(week),
     );
   }
   if (kind === 'standout-pick') {
@@ -928,10 +1093,15 @@ function pickTableNow(pool: Pool, kind: string, day: string, week: string): Odds
   }
   if (kind === 'calendar') {
     const floor = fcToDisplay(78, sport);
-    const golds = Object.values(pool.buckets.gold)
-      .flat()
-      .filter((rc) => rc.line.kind === 'season' && rc.ovr >= floor);
-    return uniformPick(pool, 'Login Calendar · Gold Pick', golds, 2, 'season gold ' + floor + '+', []);
+    let golds = calendarGolds.get(pool);
+    if (!golds)
+      calendarGolds.set(
+        pool,
+        (golds = Object.values(pool.buckets.gold)
+          .flat()
+          .filter((rc) => rc.line.kind === 'season' && rc.ovr >= floor)),
+      );
+    return uniformPick(pool, 'Login Calendar · Gold Pick', golds, 2, 'season gold', ['Every option is a season gold rated ' + floor + ' or higher (no special editions); the second is always a different player.'], undefined, undefined, true);
   }
   return null;
 }
@@ -1013,6 +1183,7 @@ export function rewardOdds(pool: Pool, w: Reward, at = Date.now()): OddsTable | 
     r86: r.bands[I86],
     r90: r.bands[I90],
     special: r.special,
+    raw: rawOf(r),
   };
 }
 
@@ -1138,20 +1309,33 @@ export function confirmFor(price: number, prefs?: { skipBuyConfirm?: boolean }):
 }
 
 /**
- * The three most telling rows of a sheet for the buy confirm: the best band a pack hits at least 1 time
- * in 20, the best band it hits at least 1 in 200, and the rarest special tier (or the featured card).
+ * The three most telling rows of a sheet for the buy confirm, from the most common to the rarest: the best
+ * band a pack hits at least 1 time in 20; a better band it hits at least 1 in 200 (when the first is already
+ * the top band: a Hot Season or Standout row, or 83+); and the rarest special tier (or the featured card).
  */
 export function headline(t: OddsTable, n = 3): OddsRow[] {
   const out: OddsRow[] = [];
+  const add = (x: OddsRow | undefined) => {
+    if (x && !out.some((y) => y.key === x.key)) out.push(x);
+  };
   const bands = t.bands.filter((b) => b.p < 0.995);
   const a = [...bands].reverse().find((b) => b.p >= 0.05);
-  if (a) out.push(a);
-  const b = [...bands].reverse().find((x) => x.p >= 0.005 && x !== a);
-  if (b) out.push(b);
-  const special = t.tiers.filter((x) => !['t-gold', 't-silver', 't-bronze'].includes(x.key) && x.p < 0.995 && x.p > 0);
+  add(a);
+  const above = a ? bands.slice(bands.indexOf(a) + 1) : bands;
+  const b = [...above].reverse().find((x) => x.p >= 0.005);
+  const featured: OddsRow | undefined = t.featured && t.featured.p < 0.995 ? { key: 'featured', label: t.featured.name, p: t.featured.p } : undefined;
+  if (b) add(b);
+  else
+    add(
+      ['t-promo', 't-standout'].map((k) => t.tiers.find((x) => x.key === k && x.p >= 0.005 && x.p < 0.995)).find(Boolean) ??
+        (featured && featured.p >= 0.005 ? featured : undefined) ??
+        bands.find((x) => x.key === 'b83'),
+    );
+  const special = t.tiers.filter((x) => !['t-gold', 't-silver', 't-bronze'].includes(x.key) && x.p < 0.995 && x.p > 0 && !out.some((y) => y.key === x.key));
   const rare = special.find((x) => x.p >= 0.0001) ?? special[0];
-  if (rare) out.push(rare);
-  else if (t.featured) out.push({ key: 'featured', label: t.featured.name, p: t.featured.p });
-  for (const x of [...t.tiers, ...t.bands]) if (out.length < n && x.p < 0.995 && x.p > 0 && !out.includes(x)) out.push(x);
-  return out.slice(0, n);
+  if (rare) add(rare);
+  else add(featured);
+  // anything left: other tiers, then rarer bands (never a band below the first)
+  for (const x of [...t.tiers, ...[...above].reverse()]) if (out.length < n && x.p < 0.995 && x.p > 0) add(x);
+  return out.slice(0, n).sort((x, y) => y.p - x.p);
 }
