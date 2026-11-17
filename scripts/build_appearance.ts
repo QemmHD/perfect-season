@@ -78,8 +78,40 @@ export function compile(src: SourceFile): AppearanceFile {
     fields: FIELDS.map(([k]) => k),
     players: Object.fromEntries(Object.entries(players).sort(([a], [b]) => (a < b ? -1 : 1))),
   };
+  const spans = cellSpans(src.sport, new Set(src.players.filter((r) => r.eras?.length).map((r) => r.pid)));
+  if (Object.keys(spans).length) out.cells = spans;
   if (src.feet) out.feet = { L: [...src.feet.L].sort(), B: [...src.feet.B].sort(), U: [...src.feet.U].sort() };
   return out;
+}
+
+/** Where a draft row keeps its seasons and pid (engine/data.ts reads the same columns). */
+const DRAFT_COLS: Record<Sport, { from: number; to: number; pid: number }> = {
+  nba: { from: 9, to: 10, pid: 13 },
+  nfl: { from: 4, to: 5, pid: 7 },
+  soccer: { from: 4, to: 5, pid: 8 },
+};
+const draftCache = new Map<Sport, { teams: { id: string; players: unknown[][] }[] }>();
+
+/**
+ * A curated player's own seasons in each draft cell he is in (`CELL:pid` → [from, to]), for the players
+ * with era overrides only: a match draws a draft player from his cell id alone, and the decade alone
+ * can't say which era covers him (Jordan's CHI-1980 seasons are 1985-89, Shaq's ORL-1990 1993-96).
+ */
+export function cellSpans(sport: Sport, pids: Set<string>): Record<string, [number, number]> {
+  if (!pids.size) return {};
+  let d = draftCache.get(sport);
+  if (!d) {
+    d = JSON.parse(readFileSync(join(ROOT, 'src/data', sport + '.json'), 'utf8')) as { teams: { id: string; players: unknown[][] }[] };
+    draftCache.set(sport, d);
+  }
+  const c = DRAFT_COLS[sport];
+  const out: [string, [number, number]][] = [];
+  for (const t of d.teams)
+    for (const p of t.players) {
+      const pid = String(p[c.pid]);
+      if (pids.has(pid)) out.push([t.id + ':' + pid, [Number(p[c.from]), Number(p[c.to])]]);
+    }
+  return Object.fromEntries(out.sort(([a], [b]) => (a < b ? -1 : 1)));
 }
 
 export const compactText = (f: AppearanceFile) => JSON.stringify(f) + '\n';

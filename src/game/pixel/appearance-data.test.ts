@@ -18,7 +18,7 @@ interface Row {
   src: string;
   skinSrc?: string;
   reviewed: string;
-  look: { skin?: number };
+  look: { skin?: number; hair?: string; hairTone?: string; facial?: string };
   eras?: { from: number; to: number; skin?: number }[];
 }
 interface Script {
@@ -34,6 +34,21 @@ beforeAll(async () => {
 });
 
 const SPORTS: Sport[] = ['nba', 'nfl', 'soccer'];
+
+/** The Tier A minimum a first-run row must carry (a bald or buzzed head needs no hair colour). */
+const missing = (look: Row['look']): string[] => {
+  const out: string[] = [];
+  if (!look.hair) out.push('hair');
+  if (!look.hairTone && look.hair !== 'bald') out.push('hairTone');
+  if (!look.facial) out.push('facial');
+  return out;
+};
+/**
+ * First-run rows still short of the minimum, with the reason (the team doc lists them too). Derek
+ * Stingley: every public photo found (Wikidata's and a Commons search) shows him helmeted, so his hair
+ * and facial hair stay unknown; his row is empty and reports as the defaults, not as curated.
+ */
+const SHORTFALL: Record<Sport, string[]> = { nba: [], nfl: ['00-0037237'], soccer: [] };
 const BUILT: Record<Sport, AppearanceFile> = { nba: NBA as AppearanceFile, nfl: NFL as AppearanceFile, soccer: SOCCER as AppearanceFile };
 const BUILT_TEXT = (s: Sport) => JSON.stringify(BUILT[s]) + '\n';
 
@@ -78,13 +93,17 @@ describe.each(SPORTS)('%s appearance data', (sport) => {
     for (const pid of (FIRST_RUN as Record<Sport, string[]>)[sport]) expect(seasons.has(pid), pid).toBe(true);
   }, 120000);
 
-  it('curates 100% of the first-run players (at least 12)', () => {
+  it('curates every first-run player to the Tier A minimum (hair, hair colour, facial hair), and reports the shortfall', () => {
     const list = (FIRST_RUN as Record<Sport, string[]>)[sport];
     expect(list.length).toBeGreaterThanOrEqual(12);
-    const curated = new Set(src().players.map((p) => p.pid));
-    expect(list.filter((p) => !curated.has(p))).toEqual([]);
+    const rows = new Map(src().players.map((p) => [p.pid, p]));
+    expect(list.filter((p) => !rows.has(p))).toEqual([]);
+    // the shortfall is exactly the listed rows, each named in the team doc with the reason; no more
+    const short = list.filter((p) => missing(rows.get(p)!.look).length);
+    expect(short, short.map((p) => `${p}: ${missing(rows.get(p)!.look).join(', ')}`).join('; ')).toEqual(SHORTFALL[sport]);
+    expect(short.length / list.length).toBeLessThanOrEqual(1 / 12);
     useAppearanceFile(BUILT[sport]);
-    for (const pid of list) expect(appearanceFor(sport, pid, 2025).src).toBe('curated');
+    for (const pid of list) expect(appearanceFor(sport, pid, 2025).src, pid).toBe(rows.get(pid)!.look && Object.keys(rows.get(pid)!.look).length ? 'curated' : 'default');
   });
 });
 
@@ -100,6 +119,20 @@ describe('the seeds', () => {
     has('nfl', ['00-0019596', '00-0033873', '00-0032764']);
     // Haaland, Mbappé; Messi, Ronaldinho
     has('soccer', ['418560', '342229', '28003', '3373']);
+  });
+
+  it('give the mockup archetypes their hair (and its colour) and facial hair', () => {
+    const rows = (s: Sport) => new Map(S.readSource(s).players.map((p) => [p.pid, p]));
+    const check = (s: Sport, pids: string[], allow: string[] = []) => {
+      const r = rows(s);
+      for (const pid of pids) expect(missing(r.get(pid)!.look).filter((m) => !allow.includes(m)), pid).toEqual([]);
+    };
+    // Curry, LeBron, Jokić; Mahomes, Henry; Messi; Ronaldinho, whose facial hair varied by season (left
+    // to the default rather than guessed)
+    check('nba', ['curryst01', 'jamesle01', 'jokicni01']);
+    check('nfl', ['00-0033873', '00-0032764']);
+    check('soccer', ['28003']);
+    check('soccer', ['3373'], ['facial']);
   });
 
   it('get the owner-named looks right', () => {

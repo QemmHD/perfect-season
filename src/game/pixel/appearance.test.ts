@@ -204,7 +204,9 @@ describe('the compact code', () => {
 
 describe('ids', () => {
   it('reads every id form', () => {
-    expect(refOf('nba', 'CHI-1990:jordami01')).toEqual({ pid: 'jordami01', season: 1995, span: [1990, 1999] });
+    // a draft cell without his seasons, of a player the data has no cell spans for: the middle of the
+    // decade, and no span (a whole-decade span would let no era ever cover him)
+    expect(refOf('nba', 'CHI-1990:nobody99')).toEqual({ pid: 'nobody99', season: 1995 });
     expect(refOf('nba', 'CHI-1990:jordami01', { from: 1991, to: 1993 })).toEqual({ pid: 'jordami01', season: 1992, span: [1991, 1993] });
     expect(refOf('nfl', 'ARI-1970:00-0000335')).toMatchObject({ pid: '00-0000335' });
     expect(refOf('nba', 'nba:season:1996:jordami01:CHI')).toEqual({ pid: 'jordami01', season: 1996 });
@@ -228,6 +230,29 @@ describe('curated looks and eras', () => {
   beforeAll(() => {
     useAppearanceFile(NBA as AppearanceFile);
     useAppearanceFile(NFL as AppearanceFile);
+  });
+
+  it('resolves a draft cell id without his seasons from the built cell spans (the match passes no ctx)', () => {
+    const look = (sport: 'nba' | 'nfl', id: string) => {
+      const r = refOf(sport, id)!;
+      return appearanceFor(sport, r.pid, r.season, { span: r.span });
+    };
+    expect(refOf('nba', 'CHI-1980:jordami01')).toEqual({ pid: 'jordami01', season: 1987, span: [1985, 1989] });
+    // Jordan's hair in his first Chicago years, bald from 1990
+    expect(look('nba', 'CHI-1980:jordami01')).toMatchObject({ hair: 'short', hairTone: 'black' });
+    expect(look('nba', 'CHI-1990:jordami01').hair).toBe('bald');
+    // Shaq's Orlando fade, bald with the Lakers
+    expect(look('nba', 'ORL-1990:onealsh01')).toMatchObject({ hair: 'fade', facial: 'none' });
+    expect(look('nba', 'LAL-1990:onealsh01').hair).toBe('bald');
+    // Iverson short-haired, no headband or sleeve in his first Philadelphia seasons; cornrows later
+    expect(look('nba', 'PHI-1990:iversal01')).toMatchObject({ hair: 'short', head: 'none', armR: 'none' });
+    expect(look('nba', 'PHI-2000:iversal01')).toMatchObject({ hair: 'cornrows', head: 'band' });
+    // Rodman from the id alone
+    expect(look('nba', 'SAS-1990:rodmade01').hairTone).toBe('platinum');
+    expect(look('nba', 'CHI-1990:rodmade01').hairTone).toBe('red');
+    expect(look('nba', 'DET-1990:rodmade01').hairTone).toBe('black');
+    // the caller's own seasons still win
+    expect(refOf('nba', 'CHI-1980:jordami01', { from: 1985, to: 1986 })).toEqual({ pid: 'jordami01', season: 1986, span: [1985, 1986] });
   });
 
   it('resolves Rodman per draft cell: natural in Detroit, dyed in San Antonio and Chicago', () => {
