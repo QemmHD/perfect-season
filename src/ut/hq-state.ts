@@ -22,6 +22,8 @@ export interface ClubMatch {
   opponent: string;
   coins: number;
   xp: number;
+  /** Claude ut-5: a level score settled as a draw (the dormant soccer three-way branch, play.ts) */
+  draw?: boolean;
 }
 export interface ClubPreset {
   id: number;
@@ -266,6 +268,7 @@ export function normalizeHQ(raw: unknown, owned: OwnedCard[]): ClubHQ {
                 : 'Opponent',
             coins: nat(h.coins),
             xp: nat(h.xp),
+            ...(h.draw === true ? { draw: true } : {}),
           },
         ];
       })

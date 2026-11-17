@@ -12,6 +12,8 @@ import { rivalsMatch } from './rivals';
 // arcade game, then settles the result here: coins, card XP, the record and the ladder.
 import { battlesThisWeek, RUNGS } from './battles';
 import { awardXp, type UtState } from './state';
+import { LEVEL_UP_COINS, levelInfo, unlockedAt } from '../engine/economy';
+import type { Booster } from '../engine/types';
 
 export interface UtMatchRequest {
   /** unique per match started */
@@ -26,6 +28,11 @@ export interface UtMatchRequest {
   cup?: CupRequest;
   /** Claude: a UT Draft game (draft-mode.ts) */
   draft?: { runId: string; game: number };
+  /**
+   * Claude ut-5: started from the One-More bar at the end of the last match. The stake was on the
+   * bar, so the match starts straight away: a short curtain with the opponent, no vote, no kickoff.
+   */
+  quick?: boolean;
 }
 
 export interface UtMatchResult {
@@ -34,6 +41,8 @@ export interface UtMatchResult {
   them: number;
   /** the uids of the cards that played (the whole squad) */
   played: string[];
+  /** Claude ut-5: a level score settled as a draw (soccer's three-way branch; dormant until soccer settles draws) */
+  draw?: true;
 }
 
 export type PlaySquad = (req: UtMatchRequest) => void;
@@ -44,6 +53,13 @@ export const XP_FOR_WIN = 20;
 /** A UT game pays like a draft's grade, so the economy (packs.ts) holds: about 50 a game. */
 export const COINS_WIN = 60;
 export const COINS_LOSS = 30;
+/**
+ * Claude ut-5, the dormant soccer three-way branch (plan contract G): a draw pays between the two,
+ * and its cards earn half a win's bonus XP. Nothing settles a draw today: soccer settles a level UT
+ * match on penalties; if soccer ever settles draws, that is soccer's UT protocol bump.
+ */
+export const COINS_DRAW = 45;
+export const XP_FOR_DRAW = 10;
 
 /**
  * Games a day that pay coins and XP (Squad Battles and head to head together): enough for a good
@@ -54,13 +70,55 @@ export const PAID_GAMES_A_DAY = 8;
 
 /** What a game pays: coins (times the Squad Battles difficulty's `pay`) and XP for every card. */
 export function matchRewards(
-  r: Pick<UtMatchResult, 'won'>,
+  r: Pick<UtMatchResult, 'won'> & { draw?: boolean },
   pay = 1,
 ): { coins: number; xp: number } {
+  const draw = !r.won && !!r.draw;
   return {
-    coins: Math.round((r.won ? COINS_WIN : COINS_LOSS) * pay),
-    xp: XP_PER_GAME + (r.won ? XP_FOR_WIN : 0),
+    coins: Math.round((r.won ? COINS_WIN : draw ? COINS_DRAW : COINS_LOSS) * pay),
+    xp: XP_PER_GAME + (r.won ? XP_FOR_WIN : draw ? XP_FOR_DRAW : 0),
   };
+}
+
+/**
+ * Claude ut-5 (V2 D.1): what a paid UT match adds to the shared Career level (`profile.xp`, the
+ * draft's level): played +20, +10 more for a win (+5 for a draw), a sim +5. A match past the day's
+ * paid games, or one that was already settled, adds nothing (the caller passes `paid`: the match
+ * paid its card XP).
+ */
+export const CAREER_XP = { played: 20, win: 10, draw: 5, sim: 5 } as const;
+export function careerXp(r: { how: 'played' | 'sim'; won: boolean; draw?: boolean; paid: boolean }): number {
+  if (!r.paid) return 0;
+  if (r.how === 'sim') return CAREER_XP.sim;
+  return CAREER_XP.played + (r.won ? CAREER_XP.win : r.draw ? CAREER_XP.draw : 0);
+}
+
+export interface CareerGain {
+  xp: number;
+  /** levels reached by this gain, in order */
+  levelUps: number[];
+  /** LEVEL_UP_COINS for each of them */
+  coins: number;
+  /** boosters those levels unlock (as the draft's level-ups do) */
+  boosters: Booster[];
+}
+/**
+ * Career XP on the profile's shared fields: each level crossed pays LEVEL_UP_COINS and unlocks its
+ * boosters, exactly as a draft run's level-up does. `xp` only rises, so a level pays once ever.
+ */
+export function addCareerXp<P extends { xp: number; coins: number; inventory: Record<Booster, number> }>(p: P, xp: number): { profile: P; gain: CareerGain } {
+  const gain: CareerGain = { xp: Math.max(0, Math.floor(xp)), levelUps: [], coins: 0, boosters: [] };
+  if (!gain.xp) return { profile: p, gain };
+  const from = levelInfo(p.xp).level,
+    to = levelInfo(p.xp + gain.xp).level;
+  for (let l = from + 1; l <= to; l++) {
+    gain.levelUps.push(l);
+    gain.boosters.push(...unlockedAt(l));
+  }
+  gain.coins = LEVEL_UP_COINS * gain.levelUps.length;
+  const inventory = { ...p.inventory };
+  for (const b of gain.boosters) inventory[b] = (inventory[b] ?? 0) + 1;
+  return { profile: { ...p, xp: p.xp + gain.xp, coins: p.coins + gain.coins, inventory }, gain };
 }
 
 /**
@@ -78,6 +136,14 @@ export function decide(
   if (Math.abs(mine - theirs) > 1e-9)
     return { won: mine > theirs, tiebreak: true };
   return { won: coin(), tiebreak: true };
+}
+
+/**
+ * A draw stands only for a level score that did not win, against the AI, outside a Cup (knockout:
+ * penalties decide it) and a Club Season (its tables have no draws).
+ */
+export function isDraw(r: { draw?: boolean; won: boolean; us: number; them: number; online: boolean; cup?: unknown; league?: unknown }): boolean {
+  return !!r.draw && !r.won && r.us === r.them && !r.online && !r.cup && !r.league;
 }
 
 export interface Settled {
@@ -124,6 +190,8 @@ export function settle(
     clubOvr?: number;
     opponent?: string;
     how?: 'played' | 'sim';
+    /** Claude ut-5: a level score settled as a draw (the dormant soccer branch; never in a Cup, a Club Season or online) */
+    draw?: boolean;
   },
 ): Settled {
   const activeCircuit = r.circuit ? hqOf(ut).circuit.active : undefined;
@@ -177,9 +245,10 @@ export function settle(
       circuitPrizes: [],
     };
   ut = ut.hq ? ut : { ...ut, hq: hqOf(ut) };
+  const draw = isDraw(r);
   const today = ut.paid.day === r.day ? ut.paid.n : 0;
   const capped = today >= PAID_GAMES_A_DAY;
-  const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards(r, r.pay);
+  const { coins, xp } = capped ? { coins: 0, xp: 0 } : matchRewards({ won: r.won, draw }, r.pay);
   const x = awardXp(
     { ...ut, paid: { day: r.day, n: today + (capped ? 0 : 1) } },
     r.played,
@@ -194,7 +263,9 @@ export function settle(
         h2hW: rec.h2hW + (r.won ? 1 : 0),
         h2hL: rec.h2hL + (r.won ? 0 : 1),
       }
-    : { ...rec, w: rec.w + (r.won ? 1 : 0), l: rec.l + (r.won ? 0 : 1) };
+    : draw
+      ? { ...rec, d: (rec.d ?? 0) + 1 }
+      : { ...rec, w: rec.w + (r.won ? 1 : 0), l: rec.l + (r.won ? 0 : 1) };
   let battles = battlesThisWeek(x.ut.battles, r.week);
   const climbed =
     !!r.rung && r.rung.i >= 0 && r.won && r.rung.i === battles.cleared;
@@ -270,6 +341,7 @@ export function settle(
     day: r.day,
     how: r.how ?? 'played',
     played: r.played,
+    ...(draw ? { draw: true } : {}),
   });
   return {
     ut: progression.ut,

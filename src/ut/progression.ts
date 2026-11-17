@@ -94,6 +94,8 @@ export function recordMatchProgress(
     (h.days[r.day]?.games ?? 0) < 16
       ? (r.how === 'played' ? 80 : 30) +
         (r.won ? (r.how === 'played' ? 30 : 10) : 0) +
+        // Claude ut-5: the dormant soccer draw branch (play.ts): played 80 + 15
+        (r.draw ? (r.how === 'played' ? 15 : 5) : 0) +
         (r.mode === 'online' ? 10 : 0)
       : 0;
   let next = recordActivity(

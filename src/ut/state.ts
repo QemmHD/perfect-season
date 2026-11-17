@@ -57,7 +57,8 @@ export interface UtState {
    * it is (the next one comes up after clearing one), and the difficulty */
   battles: { week: string; cleared: number; best: number; round?: number; level?: Level };
   /** results of played matches: vs the AI and online head to head */
-  record: { w: number; l: number; h2hW: number; h2hL: number };
+  /** Claude ut-5: `d`, draws (the dormant soccer three-way branch in play.ts; optional, stats only) */
+  record: { w: number; l: number; h2hW: number; h2hL: number; d?: number };
   /** games that paid coins and XP today (`day`, Eastern): a day's paid games are limited (play.ts) */
   paid: { day: string; n: number };
 }
@@ -127,7 +128,7 @@ export function migrateUt(raw: unknown): UtState {
     : [];
   const sold = r.sold as { cards?: unknown; coins?: unknown } | undefined;
   const bt = r.battles as { week?: unknown; cleared?: unknown; best?: unknown; round?: unknown; level?: unknown } | undefined;
-  const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL', unknown>> | undefined;
+  const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL' | 'd', unknown>> | undefined;
   const paid = r.paid as { day?: unknown; n?: unknown } | undefined;
   const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
   const league = normalizeLeague(r.league);
@@ -168,7 +169,7 @@ export function migrateUt(raw: unknown): UtState {
       ...(count(bt?.round) ? { round: count(bt?.round) } : {}),
       ...(bt?.level ? { level: levelOf(bt.level) } : {}),
     },
-    record: { w: count(rec?.w), l: count(rec?.l), h2hW: count(rec?.h2hW), h2hL: count(rec?.h2hL) },
+    record: { w: count(rec?.w), l: count(rec?.l), h2hW: count(rec?.h2hW), h2hL: count(rec?.h2hL), ...(count(rec?.d) ? { d: count(rec?.d) } : {}) },
     paid: { day: typeof paid?.day === 'string' ? paid.day : '', n: count(paid?.n) },
   });
 }
