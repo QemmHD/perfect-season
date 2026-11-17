@@ -3,7 +3,7 @@
 // AI, so it changes no outcome.
 //
 // The curve is real football's, from our own analysis of the StatsBomb Open Data shot set (65,931
-// open-play shots; docs/CREDITS.md, CC BY-SA 4.0; research-soccer §6.2): conversion by distance for
+// open-play shots; docs/CREDITS.md, the StatsBomb Public Data User Agreement; research-soccer §6.2): conversion by distance for
 // feet and heads, a central/wide factor at the same range, and the set-piece rates (penalties 0.76,
 // direct free kicks 0.064). It is the real-world chance of the shot, not this game's (which runs about
 // 1.6× real per attack); the match screen shows it as "xG".

@@ -35,7 +35,7 @@ export { haptic, HAPTIC_PATTERN, hapticCount, heartbeat } from './haptics';
 /** ut's `src/lib/playtime.ts`. */
 export { playtimeState, usePlaytime } from './playtime';
 /** nba's gold ring (`src/game/perfect.ts` + `hud/ring-draw.ts`; soccer-4). */
-export { DEFAULT_LAG_MS, deviceLagMs, drawRing, FIRE_MULT, GOLD_ARC_MIN_PX, GOLD_FLOOR_MS, GOOD_SPAN, goldArcPx, judge, RING_COLORS, ringMap, ringWindow, setDeviceLag, WINDOW_CAP, type WindowPart, windowScale, wordFor } from './perfect';
+export { DEFAULT_LAG_MS, deviceLagMs, drawRing, FIRE_MULT, GOLD_ARC_MIN_PX, GOLD_FLOOR_MS, GOOD_SPAN, goldArcPx, judge, RING_COLORS, RING_FILL, ringMap, ringWindow, setDeviceLag, WINDOW_CAP, type WindowPart, windowScale, wordFor } from './perfect';
 
 /* ---------- written by other teams: the interfaces soccer relies on (§5.0.2) ---------- */
 

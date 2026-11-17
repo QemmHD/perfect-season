@@ -215,6 +215,10 @@ describe('ratings decide attacks', () => {
     expect(elite).toBeGreaterThan(poor + 0.04);
     expect(elite).toBeGreaterThan(poor * 1.6);
   });
+  // Tracking (soccer-4 review fix): soccer-4 loosened these to fit the narrowed keeper and real
+  // conversion; soccer-7's whole-match fit owns bringing them back (or recording why not)
+  it.todo('soccer-7: the elite finisher margin from 21-24 m back to +0.10 and 2.5x (soccer-4 left +0.04 and 1.6x)');
+  it.todo('soccer-7: the keeper reach gap DIV 92 vs 55 back to > 0.5 m, or the narrowing recorded as final (soccer-4 left > 0.1 m)');
   it('an elite keeper saves more of the same shots', () => {
     const saved = (v: number) =>
       rate(160, (i) => {

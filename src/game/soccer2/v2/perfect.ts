@@ -115,11 +115,19 @@ export function goldArcPx(r: number, sweep: number, goldFrom: number, goldTo: nu
   return (m(goldTo) - m(goldFrom)) * r * sweep;
 }
 
-export const RING_COLORS: Record<RingState, { band: string; fill: string; rim: string }> = {
-  gold: { band: '#f6b93b', fill: '#ffe08a', rim: '#fff3c4' },
-  amber: { band: '#c9852c', fill: '#ffb04a', rim: '#ffd6a0' },
-  red: { band: '#a3343a', fill: '#ff5d5d', rim: '#ffb3b3' },
+/**
+ * The ring's colours. `band` is the window, saturated; `lit` is the window while the fill is inside it
+ * (release now); `rim` its edge ticks. The fill is never the band's colour (soccer-4 review fix: a
+ * yellow fill heading into a yellow band hid where gold starts and ends): it is the neutral `RING_FILL`
+ * on every ring.
+ */
+export const RING_COLORS: Record<RingState, { band: string; lit: string; rim: string }> = {
+  gold: { band: '#f2a516', lit: '#ffe066', rim: '#fff6cf' },
+  amber: { band: '#c9852c', lit: '#ffb04a', rim: '#ffe2b8' },
+  red: { band: '#b0343c', lit: '#ff5d5d', rim: '#ffc2c2' },
 };
+/** The fill heading to the window: a pale teal-white, the same on gold, amber and red rings. */
+export const RING_FILL = 'rgba(206,238,244,0.72)';
 
 /**
  * Draw the ring: a dark track, the band (gold, or amber/red when the ring can't be gold), the fill up
@@ -151,11 +159,25 @@ export function drawRing(ctx: CanvasRenderingContext2D, o: RingDraw & { start?: 
   ctx.lineCap = 'butt';
   arc(0, 1, w + 4, 'rgba(5,7,13,0.82)');
   arc(0, 1, w, '#1a2235');
-  arc(o.goldFrom, o.goldTo, w, col.band);
-  arc(o.goldFrom, o.goldTo, 2, col.rim);
   const p = Math.max(0, Math.min(1, o.progress));
+  // the fill first, neutral; the window over it in its own saturated colour (lit while the fill is in
+  // it: release now), so the band always reads as the band
+  if (p > 0) arc(0, p, Math.max(2, w - 2), RING_FILL);
+  const inside = p >= o.goldFrom && p <= o.goldTo;
+  arc(o.goldFrom, o.goldTo, w, inside ? col.lit : col.band);
+  // bright edge ticks where the window starts and ends: 2 px along the ring, taller than the track
+  const tick = (t: number) => {
+    const at = start + map(t) * sweep;
+    const da = 2 / Math.max(4, o.r);
+    ctx.strokeStyle = col.rim;
+    ctx.lineWidth = w + 5;
+    ctx.beginPath();
+    ctx.ellipse(o.x, o.y, o.r, ry, 0, at - da / 2, at + da / 2);
+    ctx.stroke();
+  };
+  tick(o.goldFrom);
+  tick(o.goldTo);
   if (p > 0) {
-    arc(0, p, Math.max(2, w - 2), col.fill);
     const head = start + map(p) * sweep;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = w + 3;

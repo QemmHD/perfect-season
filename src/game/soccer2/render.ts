@@ -24,7 +24,7 @@ import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
 import { reducedMotion } from '../../ui/motion';
 import { artOf, ballR, type Box, camStep, type CamState, heightK, newCamState, SPRITE_TILT, spriteScale, WALL_Y } from './camera';
-import { aimPoint, CONE_SCALE, coneMult, GH, GHALF, GX, PL, PW, ctrlOf, releaseWord, type PassPlan } from './engine';
+import { aimPoint, CONE_SCALE, coneMult, RED_CONE_SCALE, GH, GHALF, GX, PL, PW, ctrlOf, releaseWord, type PassPlan } from './engine';
 import { nearestWithin, TAP_PLAYER_PX } from './controls';
 import { shotCone, topSpeed } from './ratings';
 import type { Attack, Body, Pt, RingWhy } from './types';
@@ -471,7 +471,7 @@ export class SoccerRenderer {
   arrows: { id: number; x: number; y: number; ang: number }[] = [];
   /** draws, sprites asked for, stale sprites reused, floor redraws; the man's and the ball's size on screen */
   /** goldArc: the gold band's drawn length (px) on the ring this frame, the smaller of the arc over his head and the ring at his feet (plan G1) */
-  stats = { draws: 0, sprites: 0, stale: 0, floors: 0, ctrlPx: 0, ballPx: 0, goldArc: 0 };
+  stats = { draws: 0, sprites: 0, stale: 0, floors: 0, ctrlPx: 0, ballPx: 0, goldArc: 0, sparks: 0 };
   /** set once the first frame with the pitch and the players has been drawn (shell's ps:arena-ready) */
   firstFrame = false;
   private lastDraw = 0;
@@ -838,8 +838,19 @@ export class SoccerRenderer {
 
   /** Turf kicked up by a tackle or a dive, or confetti for a goal in the scorer's kit (J-3, Claude
    * 2026-11-10: it was always your colours, the rival's goals included). No confetti with reduced motion. */
-  private burst(x: number, y: number, n: number, kind: 'turf' | 'confetti', kit: SoccerKit = this.kits.us) {
-    if (kind === 'confetti' && reducedMotion()) return;
+  private burst(x: number, y: number, n: number, kind: 'turf' | 'confetti' | 'gold', kit: SoccerKit = this.kits.us) {
+    if ((kind === 'confetti' || kind === 'gold') && reducedMotion()) return;
+    if (kind === 'gold') {
+      // PERFECT (soccer-4 review fix, V2 "particles for PERFECT"): a short spray of gold sparks off the boot
+      const gold = ['#ffe066', '#fff6cf', '#f2a516', '#ffffff'];
+      for (let i = 0; i < n; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const sp = 1.5 + Math.random() * 3;
+        this.bits.push({ x, y, h: 0.2 + Math.random() * 0.6, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, vh: 3 + Math.random() * 4, life: 0.45 + Math.random() * 0.3, color: gold[Math.floor(Math.random() * 4)], size: 0.16 });
+      }
+      if (this.bits.length > 400) this.bits.splice(0, this.bits.length - 400);
+      return;
+    }
     const turf = ['#3c7a2c', '#58993c', '#6b4a2a', '#8a6a3c'];
     const conf = [kit.jersey, kit.trim, '#ffffff', '#ffd23a'];
     for (let i = 0; i < n; i++) {
@@ -848,6 +859,15 @@ export class SoccerRenderer {
       this.bits.push({ x, y, h: kind === 'turf' ? 0.1 : 2 + Math.random() * 2, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, vh: kind === 'turf' ? 2 + Math.random() * 3 : 4 + Math.random() * 6, life: kind === 'turf' ? 0.5 : 1.6 + Math.random() * 0.8, color: (kind === 'turf' ? turf : conf)[Math.floor(Math.random() * 4)], size: kind === 'turf' ? 0.14 : 0.24 });
     }
     if (this.bits.length > 400) this.bits.splice(0, this.bits.length - 400);
+  }
+
+  /** A gold release (PERFECT): sparks at the shooter's feet (none under reduced motion). Render only. */
+  perfectBurst(a: Attack) {
+    const c = a.bodies[a.ctrl];
+    const before = this.bits.length;
+    if (c) this.burst(c.x, c.y, 26, 'gold');
+    // (QA reads how many sparks the last PERFECT threw: 0 under reduced motion)
+    this.stats.sparks = this.bits.length - before;
   }
 
   private particles(ctx: CanvasRenderingContext2D, a: Attack, kitOf: (b: Body) => 'us' | 'them') {
@@ -934,7 +954,7 @@ export class SoccerRenderer {
     const off = a.t - m.t0 - m.top;
     if (m.ring === 'gold' && Math.abs(off) <= m.green) return 0;
     const cm = coneMult(off, m.green);
-    return shotCone(c.p) * CONE_SCALE * (m.ring === 'red' ? Math.max(1, cm) : cm);
+    return shotCone(c.p) * (m.ring === 'red' ? RED_CONE_SCALE * Math.max(1, cm) : CONE_SCALE * cm);
   }
 
   /** A small goal over the meter: the keeper, and where the shot is going (a dot, AUTO when it's the assist). */

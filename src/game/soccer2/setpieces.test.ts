@@ -54,6 +54,11 @@ describe('soccer set pieces', () => {
     expect(r.fk).toBeGreaterThan(0.01);
     expect(r.fk).toBeLessThan(0.15);
   });
+  // Tracking (soccer-4 review fix): soccer-4 loosened these floors to fit its numbers; soccer-7's set-piece
+  // fit owns restoring them. These todos show in every soccer run until soccer-7 turns them into the
+  // real floors (the lead's integration checklist reads them).
+  it.todo('soccer-7: restore the corner floor to 6% of corner attacks (soccer-4 left it at 3%)');
+  it.todo('soccer-7: restore the direct free-kick floor to 2% of direct free kicks (soccer-4 left it at 1%)');
   it('penalties go in about three times in four', () => {
     const r = rate('penalty');
     expect(r.all).toBeGreaterThan(0.7);

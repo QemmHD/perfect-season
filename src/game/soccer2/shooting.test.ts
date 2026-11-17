@@ -170,7 +170,8 @@ describe('timing: the closer to the green, the truer', () => {
         }
       }
       miss.push(m / Math.max(1, n));
-      goals.push(rate(120, (i) => shot(oneOnOne(squad(75), squad(75), 'tg' + i, i), (i % 2 ? 1 : -1) * u * g, true).end?.kind === 'G'));
+      // (240: at 120 a seed's luck could reverse two neighbouring levels; soccer-4 review fix)
+      goals.push(rate(240, (i) => shot(oneOnOne(squad(75), squad(75), 'tg' + i, i), (i % 2 ? 1 : -1) * u * g, true).end?.kind === 'G'));
     }
     for (let k = 1; k < levels.length; k++) {
       expect(miss[k], 'miss ' + miss.map((x) => x.toFixed(2))).toBeGreaterThan(miss[k - 1]);

@@ -192,7 +192,6 @@ export function soccerFeedback(a: Attack): PlayFeedback {
             { label: 'Ring', value: ring },
             { label: 'Release', value: releaseText(s.off * 1000, s.greened) },
             { label: 'Aim', value: s.assisted ? 'Assisted' : 'Manual' },
-            ...(s.xg !== undefined ? [{ label: 'xG', value: s.xg.toFixed(2) }] : []),
           ]
         : []),
       ...(tk ? [{ label: 'Won off you', value: tk.poke ? 'Between touches · ' + tk.gap.toFixed(1) + ' m out' : 'At your feet' }] : []),

@@ -862,6 +862,211 @@ Agreement green.
 - `*-touch-yellow.png`: "YELLOW CARD · ADVANTAGE PLAYED". The event is staged on the live attack because a breakaway foul is seeded luck; the rule is `balance.test.ts` P8.
 
 
+## soccer-4 review fixes (2026-11-17)
+
+An independent review of soccer-4 (`3762287..c15e435`) found two high, two medium and five low issues. Fixed on the current HEAD (`46cf692`, after soccer-5), so every "before" below is HEAD measured in a detached copy of it, same seeds; the reviewer's numbers were on `c15e435`, before soccer-5. Engine, AI and ratings change: this rides the soccer protocol bump (Protocol, below).
+
+### 1 (high) · Whole-match scoring and the rating gradient
+
+**What was wrong.** At `c15e435` a match had 1.15 goals, 32.5% 0–0, and the side 8+ OVR better won 43.6%. soccer-5 lifted that to 1.50 goals and 52.1%, still far from the plan's A1–A4 and from "better cards are better" (B-2). The cause is soccer-4's real per-shot conversion (about 10–14%) at the game's 5.3 shots a side, against real football's 12; and soccer-4's narrowed keepers took away some of the rating gradient.
+
+**What changed (interim, until soccer-7 raises shot volume).**
+- `CONE_SCALE` 2.1 → **0.85** (`engine.ts`). A red ring keeps its own **`RED_CONE_SCALE` 2.4**. The free kick's and the corner header's cones are written as an absolute over `CONE_SCALE` (3.0 and 3.4), and the penalty's as `(0.95 × 2.1) / CONE_SCALE`, so set pieces stay where soccer-4 left them (they are soccer-7's fit).
+- **`RANGE_CONE` steeper beyond 20 m:** 3.2 → 4.6 at 25 m, 4.3 → 7.0 at 30 m, then 0.4 a metre, so long shots stay rare with the smaller scale (P2).
+- **SHO's cone** `shotCone` 5.5° → 1.6° became **6.5° → 1.4°** (`ratings.ts`). This puts the rating gradient on the finisher. The keeper's REF spread stays as soccer-4 narrowed it (restoring it broke S5: GK 93 conceded 0.49× a 75).
+- **The keeper's range read off:** `KEEPER.farReach` 0.15 → 0 and `farReact` 0.85 → 1. With them, the save rate was 74.5%.
+- **Blocks:** `BLOCK` body 0.35 → 0.42 m, react 0.08 → 0.05 s, speed 6 → 7 m/s, lunge 1.2 → 2.0 m; `blockChance` 0.42–0.80 → 0.50–0.85.
+- **The assist** aims at 90% of the finest spot (`ASSIST.share` 0.8 → 0.9). It needs this now that the corner is held inside `aimReach`.
+- **A stride contact:** a shot struck on the stride as he catches a sprint touch (`why: 'stride'`) gets `CONTEXT.stride` ×2.2, a poor contact.
+
+`sim.ts 400 pro` (real club-season elevens, AI vs AI):
+
+| Measure | c15e435 (review) | HEAD 46cf692 | **After** | Target |
+|---|---|---|---|---|
+| Goals/match; draws; 0–0 | 1.15; 43.3; 32.5% | 1.50; 38.0; 21.3% | **2.04; 29.8; 11.0%** | soccer-7: 2.4–2.7; 22–29; 4–10% |
+| Better side ΔOVR ≥ 8: W/D/L | 43.6 / 40.7 / 15.7 | 52.1 / 35.0 / 12.9 | **61.4 / 26.4 / 12.1** | A4 60–72 / 18–28 / 7–15 ✓ |
+| Better side ΔOVR ≥ 4: W/D/L | 41.6 / — / — | 47.2 / 38.0 / 14.8 | **54.4 / 28.8 / 16.8** | — |
+| Shots/side; on target; goals/shot | 5.54; 40.7; 10.4% | 5.20; 47.7; 14.4% | 5.34; **58.1; 19.1%** | 9–13; 32–40; 9–14 (soccer-7) |
+| Save%; blocked; woodwork | 74.5; 12.4; 1.7% | 69.8; 9.1; 2.3% | **67.2 ✓; 12.6; 2.2% ✓** | 64–72; ≥ 18 (interim); 2–4 |
+| Earned corners per side per match | 0.03 | 0.05 | 0.07 | soccer-7: 1.0–2.5 |
+| S1 open play 0–6 / 6–11 / 11–16.5 / 16.5–22 / 22–30 / 30+ m | 34.1 / 23.6 / 13.5 / 5.8 / 0.9 / 0.0 | 34.9 / 29.7 / 19.8 / 6.7 / 1.5 / 0.0 | 43.2 / 36.1 / 23.1 / 12.4 / 4.7 / 0.0 | 35–55 / 18–32 / 8–15 / 4–8 / 1.5–4 / ≤ 1.5 |
+| S2 keeper, goals per on-target shot by yards | 50 / 51 / 30 / 18 / 3 | 56 / 52 / 41 / 15 / 3 | 58 / 51 / 37 / 22 / 5 | 70–80 / 45–55 / 30–40 / 18–25 / 8–12 |
+| Attack ends G/S/W/B/L/O/T | 8.2/10.0/31.8/9.9/36.9/3.0/0.3 | 10.7/10.7/26.7/6.7/43.3/1.5/0.4 | 14.6/12.2/19.0/9.6/42.8/1.5/0.3 | — |
+
+- **The trade, on purpose.** The match's goals, draws, 0–0 and the rating gradient come back. Save% and woodwork are in band. A4 is met at ΔOVR ≥ 8.
+- **The price:** per-shot conversion runs above real football (on target 58%; S1's middle bands 6–16 points over), because the game still has 5.3 shots a side.
+- **soccer-7 must take `CONE_SCALE` back up (toward 2.1) as it brings shot volume to 9–13 a side.** It has the knobs in one place.
+- **Blocked is 12.6%, not the interim ≥ 18%.**
+  - A longer lunge and a 0.85 block chance moved it from 9.1%. The rest is geometry: since soccer-5 the autopilot waits for a clear look, so few shots go through bodies.
+  - Making each block likelier only removes goals. The real quarter needs more shots in traffic, which is soccer-7's volume.
+  - 22–30 m shots are blocked 28% of the time, 16.5–22 m 20%.
+
+**The guard (new `rating-gradient.test.ts`).**
+- 60 seeded Pro matches between real elevens at least 8 OVR apart, played the way the Arcade and the UT sims play them (`aiAttacksOf`).
+- The better side must win ≥ 52% and at least 3× as often as it loses.
+- Now: 35 wins and 9 losses (58%). HEAD 46cf692: 23 and 8 (38%), which fails. The harness band (60–72%) is the tight number above.
+
+### 2 (high) · Gold into the corner beat every keeper
+
+**What was wrong.** A gold release placed the ball 0.56 m inside the post, beyond any keeper's reach from 12–16 m. A practised finisher (the stick let go so the ball is at his feet, dragged to the open corner, timing sd 0.06 s) scored 72.5% at HEAD; with perfect timing 100%, at every gold. GK 93 against GK 75 barely mattered (67.5 vs 70.0%). A press at 30 m could also turn gold by running on into range during the wind-up.
+
+**What changed.**
+- **`aimReach(p, d)`** (`ratings.ts`, `AIM_REACH`): how far into the corner he can place it, in open play. 0.68 of `AIM_X` at SHO 40, 0.80 at 75 and 0.88 at 99, from 16 m or nearer; 1.2% less a metre beyond that.
+  - `aimPoint` holds the aim inside it, so the reticle shows the real spot and a gold release still lands exactly on it (G2a).
+  - Set pieces are exempt: penalties and free kicks are soccer-7's fit.
+- **The set keeper's full stretch** (`engine.ts` `STRETCH`, `ratings.ts` `gkStretch`/`GK_STRETCH`). A keeper who is set as the shot is struck can get fingertips (or a leg, spread) to a shot passing up to 0.95 m beyond his reach on the side he read. Set means moving under 2.5 m/s, diving or spread, and the shot struck within 12 m of him.
+  - The chance is `gkStretch` (0.42 at 40, 0.67 at 75, 0.80 at 93, by DIV and REF) × how far inside the stretch it passes × the shot's pace (×0.75 at 30 m/s).
+  - A save is always a parry, round the post from near it.
+  - The engine reads this from `gkPlan.set`, written from geometry; `keeperSet` stays render only (`render-fields.test.ts`).
+- **The red lock** (`Meter.lockRed`): pressed beyond `maxRange`, the ring stays red for that wind-up whatever happens in it.
+- **A pending shot is struck within 1.3 s** (`TOUCH.pendingShot`). This is SHOOT wound up with the ball knocked out ahead (soccer-5).
+  - Before, it waited up to 3 s. A press at 30 m was struck 20 m later, from 5 m.
+  - Now, if he hasn't reached the ball by then, he strikes it at full stretch if it's within 0.8 m more (never gold, a stride contact). Otherwise the chance is gone: `shot-dropped`, and the toast says TOO FAR AHEAD · catch the ball first.
+
+`scripts/audit_soccer_shots.ts 200` (75 v 75). The audit's drill was broken by soccer-5's rolling ball (every row read 0%); it now holds the ball at the shooter's feet, as the tests do. A new `aim` thumb is the practised finisher (stick let go until the ball is back at his feet, dragged to the open corner). `SOCCER_THUMB=aim` runs the SHO, keeper and timing rows with it.
+
+| Row (aim thumb, sd 0.06 unless said) | HEAD 46cf692 | **After** | Target (S6) |
+|---|---|---|---|
+| 1v1 12–16 m, 75 v 75 | 71.0% (gold → goal 100%) | **44.5%** (48.6%) | 35–45 ✓ |
+| SHO 95 vs GK 75 | 91.5% | **57.5%** | 50–58 ✓ |
+| SHO 75 vs GK 93 | 67.5% | **32.0%** | 25–32 ✓ |
+| SHO 55 / 75 / 95 vs GK 75 | 48.5 / 68.5 / 91.5 | 29.5 / 46.5 / 57.5 | monotone ✓ |
+| GK 52 / 75 / 93 vs SHO 75 | 72.5 / 70.0 / 67.5 | 62.0 / 41.5 / 32.0 | GK 93 ≈ 0.7–0.85× GK 75 ✓ (0.77) |
+| Timing sd 0 / 0.03 / 0.06 / 0.1 / 0.15 | 100 / 90 / 71 / 53.5 / 42 | 49.5 / 47.5 / 44.5 / 43.5 / 32 | gold places, never guarantees ✓ |
+| Edge 18–21 m: aim / drag on the run | 6.0 / 17.0% | 11.0 / 33.5% | 12–18% (aim ✓; on the run over, as S1's 16.5–22 m band: the interim conversion) |
+
+`human.ts 200` (defIQ 0):
+- **P2** (beeline, SHOOT pressed at 30 m; build / counter / wide):
+  - c15e435: 7.5 / 13.0 / 7.5%;
+  - HEAD: 1.0 / 2.5 / 3.0%;
+  - after: **1.0 / 3.5 / 3.5%** against ≤ 2%.
+  - Inside 1.5 points of HEAD, with the cone halved for everything else. The counter and wide rows are strong shooters (`maxRange` ≥ 30 m) pressing in range: not red, amber on the stride. Not met, by 1.5 points.
+- **S8** (beeline at 20 m: gold drag to the corner vs the assist; build / counter / wide):
+  - 17.0 vs 13.5, 23.0 vs 21.0, 20.0 vs 14.5.
+  - Gold ahead by +3.5 / +2.0 / +5.5: the G guard (+2) holds in all three, the H target (+5) only in wide.
+  - The assist reaches 79 / 91 / 73% of gold: H ≥ 70% ✓ (it was 41–61% at c15e435).
+- **P1** (worst no-skill row vs the Pro autopilot): 2.12× / 1.73× / 1.48× → 1.41× / 1.77× / 1.24× at defIQ 0, and 3.00× → 2.47× at the defIQ 1 counter. The autopilot gains more from the smaller cone than the beelines do. Still over 1.3× (soccer-5's followup).
+- **`skilled`** 10.5 / 22.5 / 24.0 → 7.0 / 24.0 / 28.0. P4 is still short in build (soccer-5's followup).
+- **Pens:** low corner / high corner / centre / autopilot 73.0 / 60.5 / 39.0 / 72.5 → 72.5 / 59.5 / 40.5 / 72.0. Unchanged, as intended (soccer-7's S12).
+- **FK:** BEND / no bend / near low / autopilot 10.0 / 15.5 / 1.0 / 8.0 → 10.5 / 18.0 / 1.0 / 11.0 (soccer-7's S11).
+
+### 3 (medium) · G2b at the strike
+
+**What was wrong.** A first-time release kept the gold it was judged on when SHOOT was let go, through the ball's flight, even if a defender closed or the ball was deflected across him. A strike played as he got back to a ball that was out (soccer-5's pending shot) did the same.
+
+**What changed.** `strikeShot` re-reads the ring where the ball actually is as it's struck, before anything else: `shotRing(a, c, first, { from, vin, strike: true })`, with the real contact point and the way the ball came.
+- If the ring is no longer gold (pressure, across the body > 90°, a header from beyond 8 m, out of range), the release becomes that amber or red ring and goes through the cone.
+- `a.release.gold` turns false, `a.perfects` drops by one, and the event `gold-lost` makes the match screen replace PERFECT with the word and the reason (only for the person's own release).
+- The stride rule is skipped at the strike itself: by then he is on the ball.
+
+Measured over 150 Pro matches between real elevens (`g2b` probe: every gold strike checked at the frame it's struck):
+- HEAD: 215 gold strikes, 13 breaking G2b. 9 were clear (5 under pressure, 2 out of range, 2 across the body); 4 were at the edge.
+- **After: 204 gold strikes, none clear.** The 4 left are boundary cases: a defender who stepped from 2.0 to 1.85–2.0 m in the frame of the strike, and a 91° turn measured against the aim rather than the goal's centre.
+
+**Tests** (`perfect-soccer.test.ts`):
+- A first-time release on gold, then a defender put at 1.5 m before the contact: amber PRESSURE, no gold, no exact solve, `release.gold` false, the PERFECT taken back.
+- The same with the ball deflected to come at him from the goal side: no gold.
+- The control case keeps its gold.
+- A press 1.2 m beyond `maxRange` that sprints into range during the wind-up stays red.
+- The autopilot test now also checks every gold strike's pressure, range, header distance and turn as it is struck.
+
+### 4 (medium) · The ring's colours and PERFECT's particles
+
+**What was wrong.** The fill heading into the gold window was gold too (`#ffe08a` on `#f6b93b`), so the window was hard to pick out. PERFECT had only a toast plate and the arc's word.
+
+**What changed** (`v2/perfect.ts` `drawRing`, `RING_COLORS`, `RING_FILL`; `render.ts`):
+- The fill is a neutral pale teal-white (`rgba(206,238,244,0.72)`) on every ring.
+- The window is drawn over it in its own saturated colour (gold `#f2a516`, amber, red), and in a lit colour while the fill is inside it (release now).
+- Bright 2 px edge ticks in the rim colour, taller than the track, mark where the window starts and ends.
+- On a person's gold release, 26 gold sparks burst from the shooter's boots (`perfectBurst`, render-only randomness), in the same handler as the word, chime and haptic. None under reduced motion.
+- The gold band is still drawn ≥ 8 px (`goldArc` 8.0 at both widths).
+
+**Browser** (dev server 5217, `scripts/qa/soccer-lab.mjs ring`; touch through CDP; isolated: 0 requests to live hosts, 0 page errors). Screenshots in `O/shots/soccer/soccer-4-fix/`, all looked at:
+- `*-ring-near.png`: the fill right up against the window. The pale fill, the gold band and its two bright ticks read apart at 393 (sat 59) and 320. `crop-393x852-sat59-ring-near.png` is the zoom.
+- `*-ring-gold.png`, `*-ring-amber.png` (PRESSURE), `*-ring-red.png` (TOO FAR): amber and red bands over the same neutral fill.
+- `*-ring-perfect.png`: PERFECT over the arc, the gold toast plate and the sparks on the shooter (`crop-393x852-sat59-ring-perfect.png`). The QA reads `stats.sparks` = 26 at both widths.
+- **Reduced motion:** a gold release throws 0 sparks (a new step in the QA part).
+- **G6:** the mark, the toast, the haptic and the chime are in the same frame (frame 45 at 393, 47 at 320).
+- **G5:** the engine's offset equals the touches' own (+27.6 ms at 393, −8.0 ms at 320, both gold).
+
+### 5 (low) · The hold on the game clock
+
+**What was wrong.** A release was judged on real time (`holdOf`) while the ring moves on game time. During a 0.4× slow-motion beat, a hit-stop or a clamped long frame, a gold-looking release was judged hundreds of ms late.
+
+**What changed.**
+- `controls.ts` `GameClock`: the loop ticks it each frame with the game seconds that frame advanced (0 while paused, held, between attacks or in a replay).
+- `holdOnClock(clock, press, release, lag, rate)` maps both touch timestamps onto it. It interpolates between the frames around each one, and runs on at the current rate past the newest.
+- `Soccer2.shootUp` passes that hold. At a steady 1× it equals `holdOf` to 1e-9.
+
+**Test** (`perfect-soccer.test.ts` G5):
+- A clock with a 0.4× beat and a 66 ms hit-stop: 200 random press/release pairs are judged within 1 ms of the integrated game time.
+- 600 real ms inside the slow motion is 0.24 s of hold (`holdOf` would have said 0.6).
+- At 1× it matches `holdOf`.
+
+### 6 (low) · Loosened floors: tracked
+
+- `it.todo` entries name soccer-7 for each floor soccer-4 loosened. They show in every soccer run, and the lead's integration checklist reads them:
+  - in `setpieces.test.ts`: the corner floor back to 6% (from 3%) and the direct free-kick floor to 2% (from 1%);
+  - in `soccer.test.ts`: the finisher margin back to +0.10 and 2.5× (from +0.04 and 1.6×), and the keeper reach gap back to 0.5 m (from 0.1 m), or the narrowing recorded as final.
+- The suite shows "4 todo".
+
+### 7 (low) · xG in the read-out
+
+The xG fact is gone from `soccerFeedback` (plan §0.3 cuts it to P2). `lastShot.xg` is still filled for the box data. `play-feedback-soccer.test.ts` now checks that xG is never a fact.
+
+### 8 (low) · The StatsBomb credit
+
+`docs/CREDITS.md` (and `xg.ts`'s header) now credit StatsBomb Open Data (github.com/statsbomb/open-data), used under the StatsBomb Public Data User Agreement, with attribution. The mirror's CC BY-SA 4.0 is named as the mirror's own label, and the relicensing sentence is gone. **For the lead:** confirm the wording.
+
+### 9 (low) · Suite wall time
+
+- G2a runs 300 seeded gold releases in the suite. `SOCCER_G2A=1000` runs the full 1,000: run once, 100% within 0.25 m.
+- `agreement.test.ts` was the suite's longest file (68 s). Its agreed-shootout half moved to `agreement-pens.test.ts`, so the two run side by side. Coverage is unchanged.
+
+### Tests changed, and why
+
+- `keeper.test.ts` S3: the lost-rush guard. The autopilot set up 3 races in 240 attacks; one lost race read as 33% and failed the 28% guard on a sample of three. It now allows one loss below four races (`lost ≤ max(1, ⌊0.28 × rushes⌋)`) and requires at least one race.
+- `rules.test.ts` R-2 restarts: 60 → 120 attacks a scenario. An earned restart comes about once in a hundred, so 300 attacks held one or none by luck of the seeds (HEAD: 1).
+- `shooting.test.ts` timing monotone: 120 → 240 shots a level. At 120, two neighbouring levels swapped by seed luck. At 480 the curve is monotone.
+
+**Golden re-based** (REBASES #5):
+- attacks `1d7cdc7e039995` → `1036510f99d886`;
+- matches `1708a325e6679d` → `1d3f3996736321`;
+- shootouts `1f1b284a6ae4a2` → `14b5217178220b` (the penalty's cone and the corner header's).
+
+Agreement green, both files.
+
+### Also measured
+
+`probe.ts 3000` (HEAD → after):
+- frozen balls 0 → 0;
+- attacks over clock + 15 s 0 → 0;
+- goals straight from a parry 0 of 294 → **0 of 374**;
+- goals after a rebound 27.9 → 28.3%;
+- a dead loose ball for 5 s+ 3 → 5 (0.17%, all inside the clock);
+- step cost 32.8 → 31.7 µs.
+
+### Suite and checks
+
+- `npm run typecheck`: clean.
+- `PS_SPORT=soccer npx vitest run soccer sport-branches` (through `heavy.sh`): **30 files, 224 passed, 4 todo**.
+  - Duration 100.5 s at a machine load of about 3; 130.5 s on the final run at a load of 6–7.5. The box is shared, and the total test CPU is about 310 s over 4 workers.
+  - Under 120 s when the box isn't saturated, over it when it is. The longest file is now `agreement.test.ts`'s takeover half (about 45 s).
+- Default sport (`play-feedback`, `golden`, the three agreement files, `juice`, `sport-branches`, `sound`): 10 files, 60/60.
+
+### Not met here, with numbers (followups)
+
+- **Per-shot realism is interim.**
+  - On target 58%, goals/shot 19%.
+  - S1's 6–11 / 11–16.5 / 16.5–22 / 22–30 m bands sit 4–8 points over.
+  - S2 point-blank is 58% against 70–80.
+  - Blocked is 12.6% against ≥ 18%.
+  - soccer-7 restores these with shot volume and takes `CONE_SCALE` back up.
+- A1–A3 (2.4–2.7 goals, 22–29% draws, 4–10% 0–0) are close but not in: 2.04, 29.8, 11.0. soccer-7.
+- P2 counter and wide are 3.5% (≤ 2%); P1 is up to 1.77× (2.47× at defIQ 1); P4 build is short. The last two are soccer-5's followups.
+- S8's +5 holds only in wide (+3.5 build, +2.0 counter).
+
+
 ## Contracts (plan §5): what soccer publishes and what it adopts
 
 Published in soccer-1 so ut, nba, nfl, players and shell can rely on them from now on. Branches merge only at integration: where another team's piece isn't in our base, soccer writes against the interface below, and the lead keeps one copy at merge. Where another team publishes different names first, theirs win and only `src/game/soccer2/v2/` changes.
@@ -997,10 +1202,11 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 | `src/lib/sound.ts` | soccer owns the soccer crowd wiring; V2 F.1 gives soccer the PERFECT chime | `sfx.perfect`, `sfx.ringTick`, `sfx.post` and their constants (`PERFECT_ROOT`, `PERFECT_MAX_STEP`, `perfectStep`, `RING_TICK`): additive, about 40 lines, nothing existing changed. Tested in the new `src/lib/sound-perfect.test.ts` (default suite). | soccer-1 |
 | `src/game/pixel/pitch.ts` | players | `onLine` is now exported (one word) so soccer's `pitchTex` draws the same markings; `pitchTexture` there is no longer used by soccer (players may adopt `PITCH`/`pitchTex` or delete it). | soccer-3 |
 | `src/game/play-feedback.ts` (`soccerFeedback` only) | nfl/soccer shared | soccer-4: the ring's next-step lines (TOO FAR, PRESSURE, BLOCKED, FIRST TIME ACROSS YOUR BODY, KEEPER CLAIM, PARRIED WIDE), the Ring and xG facts (`SOCCER_RING` map + the function body; the NBA and NFL functions untouched). | soccer-4 |
-| `docs/CREDITS.md` | shared | soccer-4: one section crediting StatsBomb Open Data (CC BY-SA 4.0) for `xg.ts` and the conversion targets. | soccer-4 |
+| `docs/CREDITS.md` | shared | soccer-4: one section crediting StatsBomb Open Data for `xg.ts` and the conversion targets (review fix: under the StatsBomb Public Data User Agreement; the mirror's CC BY-SA label named as the mirror's own; lead to confirm the wording). | soccer-4 |
 | `src/game/soccer2/render.ts` players section (`sprite()`) | players (shared file) | Two hooks: the sprite's look-down angle comes from `tiltAt(y)` (≤ `SPRITE_TILT` 0.6, the camera's) instead of `min(0.9, pitchAt)`, and two counters (`stats.sprites`, `stats.stale`) for the stale-draw budget. The size passed in is the camera's (`spriteScale`). | soccer-3 |
 | `src/game/soccer2/render.ts` players section (`sprite()`, the draw call) | players (shared file) | soccer-3 review fix: a `far` flag (a man > 15 m from the ball: 8 facings, every third clip frame, sizes in 4 px steps), and the new-sprite budget 5 always (12 before the whistle), no longer 3 after a long frame (~6 lines). Players may fold this into their LOD. | soccer-3 fix |
 | `src/game/soccer2/render.ts` players section (`animOf`, `sprite()`) | players (shared file) | soccer-5 stand-in, marked merge: act `'poke'` plays the start of the kick clip; a `'jockey'`/`'poke'` defender's facing comes from `Body.look` (the ball) instead of his run (~6 lines). Players' routing (§5.5) replaces it. | soccer-5 |
+| `src/game/play-feedback.ts` (`soccerFeedback` only) | nfl/soccer shared | soccer-4 review fix: the xG fact removed (one line; plan §0.3). | soccer-4 fix |
 | `src/game/play-feedback.ts` (`soccerFeedback` only) | nfl/soccer shared | soccer-5: TACKLED BETWEEN TOUCHES, TACKLED, HEAVY TOUCH, YELLOW, SHIELDED and ON THE RUN lines; the "Won off you" and "Cards" facts; `SOCCER_RING.stride`. | soccer-5 |
 
 ## Protocol
@@ -1018,6 +1224,17 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 **Protocol bump needed: soccer draft 2 → 3, UT 2 → 3, because** soccer-4 changes shot windows (the wind-up by distance, gold by SHO and openness, gold placing the ball exactly, amber and red), the shot, keeper and pass model (the cone by range and context, first-time shots and passes, blocks, the keeper's ratings, reads, races, claims and spread, the assist) and the AI's simulations (the autopilot's range and release against the wind-up). Golden re-based (REBASES #3); agreement green, so both phones of a new client still agree; old and new clients would not. The same single soccer bump covers it. **Do not release soccer online with soccer-4 alone:** the whole-match scoring is soccer-7's fit (below).
 
 **Protocol bump needed: soccer draft 2 → 3, UT 2 → 3, because** soccer-5 changes every open-play attack the AI simulations play: touch dribbling (the ball knocked ahead and rolling between touches, the pending pass and shot, the turning circle, the first touch), the defending (contain, pokes only at an exposed ball, the knock that runs into a defender, the last-ditch challenge), tackleWin's curve, the foul formula and yellows, the amber ring off a sprint touch, the lofted error and the autopilot's reads. Golden re-based (REBASES #4); agreement green. Shielding and close control are a person's inputs, but the engine applies them to any carrier. The same single soccer bump covers it.
+
+**Protocol bump needed: soccer draft 2 → 3, UT 2 → 3, because** the soccer-4 review fix changes shot outcomes and the AI simulations: the cone scale, the red ring's cone, the range cone, SHO's cone, the aim's reach into the corner, the set keeper's full stretch, the keeper's range read, blocks, the assist, the stride contact, gold re-read at the strike, the red lock and the pending shot's 1.3 s. Golden re-based (REBASES #5); agreement green (all three files). The same single soccer bump covers it.
+
+## Shipping notes (owner decision 2026-11-16: ship in waves)
+
+- **The soccer wave is blocked until soccer-7.**
+  - After the soccer-4 review fix, whole matches are back in a playable range: 2.04 goals, 29.8% draws, 11.0% 0–0, the better side (8+ OVR) winning 61%. `rating-gradient.test.ts` guards that last number.
+  - But per-shot conversion is held high on purpose (on target 58%) to make up for 5.3 shots a side. The fit is interim by design.
+  - soccer-7 (the V2 deal, shot volume, set pieces and the whole-match fit) is the plan's one calibration point.
+- **Don't ship soccer offline or online from any commit before soccer-7's**, and never online without the soccer protocol bump.
+- If a soccer wave must go out before soccer-7, ship it from this commit or later, not from `c15e435` (1.15 goals, 32.5% 0–0, the better side winning 44%) and not from `46cf692` (1.50 goals, 21.3% 0–0, 52%). Name the interim per-shot numbers in the release note.
 
 ## Hand-offs
 
@@ -1049,6 +1266,13 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 - **players:** a quick throw-in's thrower carries `passKind: 'throw'` and act `'catch'` (arms up) while he holds the ball; route it to a throw clip if you add one (§5.5).
 
 ## Owner device checks
+
+- soccer-4 review fix:
+  - **The ring on the phone in daylight:** the pale fill against the gold band and its edge ticks, at arm's length.
+  - **The PERFECT sparks:** do they read without hiding the shooter?
+  - **A corner placed on gold from 12–16 m:** does a set keeper's fingertip save feel fair, or like the game took a sure goal away?
+  - **A shot on a rebound during the slow-motion beat:** is a release on the gold now PERFECT?
+  - **SHOOT pressed at a sprint with the ball knocked well ahead:** "TOO FAR AHEAD" when the chance is gone.
 
 - soccer-5: the dribble's feel under a real thumb:
   - the knock-on at a sprint (3–5 m: too loose?) against a jog (0.6–1.0 m);

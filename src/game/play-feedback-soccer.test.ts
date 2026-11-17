@@ -1,6 +1,7 @@
 // The soccer read-out between attacks (Claude 2026-11-16, studio overhaul soccer-4): the gold ring's
 // reasons and the new lines (TOO FAR, PRESSURE, BLOCKED, FIRST TIME ACROSS YOUR BODY, KEEPER CLAIM,
-// PARRIED WIDE), the ring and the xG in the facts.
+// PARRIED WIDE) and the ring in the facts. The xG stays box data only (plan §0.3 cuts it from the
+// read-out to P2; soccer-4 review fix).
 import { describe, expect, it } from 'vitest';
 import { soccerFeedback } from './play-feedback';
 import type { Attack, ShotInfo } from './soccer2/types';
@@ -28,9 +29,8 @@ describe('soccerFeedback (soccer-4)', () => {
     expect(soccerFeedback(atk({ kind: 'S', text: 'SAVED' }, shot({ greened: true, ring: 'gold' }))).next).toMatch(/exactly where you aim/);
     expect(soccerFeedback(atk({ kind: 'W', text: 'WIDE' }, shot({ ring: 'gold' }))).next).toMatch(/^Release on the gold/);
   });
-  it('the xG shows when the match screen has filled it in', () => {
-    expect(fact(atk({ kind: 'S', text: 'SAVED' }, shot({ xg: 0.137 })), 'xG')).toBe('0.14');
-    expect(fact(atk({ kind: 'S', text: 'SAVED' }, shot({})), 'xG')).toBeUndefined();
+  it('the xG is box data only: never a fact in the read-out (plan §0.3)', () => {
+    expect(fact(atk({ kind: 'S', text: 'SAVED' }, shot({ xg: 0.137 })), 'xG')).toBeUndefined();
   });
 });
 

@@ -379,6 +379,29 @@ in `docs/studio-overhaul/soccer.md` (soccer-4); in short:
   `contact`, `diveHeight`, `keeperSet`, `slide`. `xg.ts` is display data (StatsBomb Open Data, see
   `docs/CREDITS.md`).
 
+**Review fixes (Claude, 2026-11-17; full record and numbers in `docs/studio-overhaul/soccer.md`,
+"soccer-4 review fixes").** These supersede the values above where they differ.
+- **Gold is re-read at the strike** (`strikeShot` calls `shotRing(…, { from, vin, strike: true })`).
+  This covers a first-time hit let go early and a shot played as he gets back to the ball. A defender
+  who closed in, a ball that came across him or range turns it amber or red (event `gold-lost`).
+- **Red locks for the whole wind-up** when SHOOT is pressed out of range (`Meter.lockRed`).
+- **A pending shot** is struck within 1.3 s, at full stretch, or is dropped (`TOUCH.pendingShot`,
+  event `shot-dropped`).
+- **The aim's reach into the corner** is held inside `aimReach(SHO, d)` in open play (0.68 / 0.80 /
+  0.88 of `AIM_X` at SHO 40 / 75 / 99).
+- **A set keeper gets a full-stretch save** on a shot struck within 12 m of him that passes up to
+  0.95 m beyond his reach on the side he read (`STRETCH`, `gkStretch`).
+- **The interim whole-match fit,** until soccer-7 brings shot volume:
+  - `CONE_SCALE` 0.85, and a red ring's `RED_CONE_SCALE` 2.4;
+  - `RANGE_CONE` 4.6 at 25 m and 7.0 at 30 m;
+  - `shotCone` 6.5° → 1.4°;
+  - no range read for the keeper;
+  - `BLOCK` 0.42 m / 0.05 s / 7 m/s / 2.0 m, and `blockChance` 0.50 → 0.85;
+  - `ASSIST.share` 0.9;
+  - the stride contact ×2.2.
+- **Timing** is judged on the match's game clock (`controls.ts GameClock`, `holdOnClock`), so slow
+  motion and hit-stops inside a hold count the way the ring moved.
+
 ### Studio overhaul soccer-5: touch dribbling, shielding and defenders who contain (Claude, 2026-11-16)
 
 The numbers and the tests are in `docs/studio-overhaul/soccer.md` (soccer-5). In short:

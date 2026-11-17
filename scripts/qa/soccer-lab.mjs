@@ -512,7 +512,7 @@ for (const p of [preset('393x852-sat59'), preset('320x568')]) {
       await touch(cdp, 'touchEnd', []);
       await page.waitForTimeout(80);
       await page.screenshot({ path: `${out}/${tag}-ring-perfect.png` });
-      const rel = await page.evaluate(() => { const a = window.__soccer.a; return { release: a.release ?? null, mark: performance.getEntriesByName('sc2-perfect').map((e) => e.startTime), ring: window.__ring }; });
+      const rel = await page.evaluate(() => { const a = window.__soccer.a; return { release: a.release ?? null, mark: performance.getEntriesByName('sc2-perfect').map((e) => e.startTime), ring: window.__ring, sparks: window.__soccer.view.stats.sparks }; });
       await page.waitForTimeout(500);
       await page.screenshot({ path: `${out}/${tag}-ring-after.png` });
       // G5: the engine's offset against the touches' own timestamps (the device lag is the 30 ms default)
@@ -528,7 +528,45 @@ for (const p of [preset('393x852-sat59'), preset('320x568')]) {
       const vib = rel.ring.vib.find((x) => Array.isArray(x.p));
       const osc = rel.ring.osc.find((x) => at !== undefined && x >= at - 1);
       const g6 = at === undefined ? null : { frame: frameOf(at), toast: toast ? frameOf(toast.at) : null, haptic: vib ? frameOf(vib.at) : null, chime: osc !== undefined ? frameOf(osc) : null, toastText: toast?.text ?? null };
-      report.push({ tag, step: 'ring-gold', meterAtShot: m, goldArcPx: view, release: rel.release, judgedOffMs: judgedMs, engineOffMs: rel.release ? rel.release.off * 1000 : null, g6, errors });
+      report.push({ tag, step: 'ring-gold', meterAtShot: m, goldArcPx: view, release: rel.release, judgedOffMs: judgedMs, engineOffMs: rel.release ? rel.release.off * 1000 : null, g6, sparks: rel.sparks, errors });
+      if (rel.release?.gold && !(rel.sparks > 0)) errorsAll.push(tag + ': a PERFECT threw no sparks');
+      errorsAll.push(...errors);
+      await context.close();
+    }
+    // (soccer-4 review fix) the fill right up against the window: the neutral fill and the gold band with
+    // its edge ticks must still read apart (its own run: the screenshot takes longer than the window)
+    {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-ring', scenario: 'build', start: '30,87', sho: '92' });
+      await page.locator('.sc2-ctl.go').tap({ force: true });
+      await page.waitForSelector('.sc2-ctl[data-act="shoot"]');
+      await clearOf(page, 0);
+      await page.waitForTimeout(150);
+      const shoot = await center(page, '.sc2-ctl[data-act="shoot"]');
+      await touch(cdp, 'touchStart', [{ ...shoot, id: 5 }]);
+      let m = await meter(page);
+      for (let k = 0; k < 200; k++) { m = await meter(page); if (!m || m.held >= m.top - m.green - 0.03) break; await page.waitForTimeout(4); }
+      await page.screenshot({ path: `${out}/${tag}-ring-near.png` });
+      await touch(cdp, 'touchEnd', []);
+      report.push({ tag, step: 'ring-near', meter: m, errors });
+      errorsAll.push(...errors);
+      await context.close();
+    }
+    // reduced motion: the PERFECT keeps its word, chime and colour but throws no sparks
+    {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-ring', scenario: 'build', start: '30,87', sho: '92' }, { reducedMotion: 'reduce' });
+      await page.locator('.sc2-ctl.go').tap({ force: true });
+      await page.waitForSelector('.sc2-ctl[data-act="shoot"]');
+      await clearOf(page, 0);
+      await page.waitForTimeout(150);
+      const shoot = await center(page, '.sc2-ctl[data-act="shoot"]');
+      await touch(cdp, 'touchStart', [{ ...shoot, id: 5 }]);
+      let m = await meter(page);
+      for (let k = 0; k < 200; k++) { m = await meter(page); if (!m || m.held >= m.top - 0.012) break; await page.waitForTimeout(4); }
+      await touch(cdp, 'touchEnd', []);
+      await page.waitForTimeout(80);
+      const r = await page.evaluate(() => ({ gold: window.__soccer.a.release?.gold ?? null, sparks: window.__soccer.view.stats.sparks }));
+      report.push({ tag, step: 'ring-reduced', ...r, errors });
+      if (r.sparks !== 0) errorsAll.push(tag + ': sparks under reduced motion ' + JSON.stringify(r));
       errorsAll.push(...errors);
       await context.close();
     }

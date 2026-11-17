@@ -434,8 +434,10 @@ describe('R-2: the restarts', () => {
     const weak = withHan(B, 45);
     let restarted = 0;
     let corners = 0;
+    // (soccer-4 review fix: 120 a scenario, not 60: an earned restart comes about once in a hundred
+    // attacks, so 300 of them held one or none, by luck of the seeds)
     for (const sc of SC)
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 120; i++) {
         const a = autoplayAttack(setupAttack(sc, A, weak, 'restarts:' + sc + i, { side: i % 2 ? 1 : -1 }), 0.55 + (i % 4) * 0.12, 'restarts-pilot' + i);
         expect(a.restarts ?? 0, sc + i).toBeLessThanOrEqual(RESTARTS.max);
         if (a.restarts) restarted++;

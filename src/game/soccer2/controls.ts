@@ -111,3 +111,50 @@ export function nearestWithin<T extends { x: number; y: number }>(pts: readonly 
 export function holdOf(pressTs: number, releaseTs: number, lagMs: number, timeScale = 1): number {
   return (Math.max(0, releaseTs - pressTs - lagMs) / 1000) * timeScale;
 }
+
+/**
+ * The match's game clock against real time (soccer-4 review fix). The ring the player watches moves on
+ * game time (slow motion after a near miss or the woodwork, hit-stops, a long frame clamped to 0.1 s),
+ * while touches carry real timestamps; `holdOf` alone assumes the two run together, so a shot on a
+ * rebound inside a 0.4× slow-motion beat was judged hundreds of ms late while the ring showed gold. The
+ * loop calls `tick` each frame with the real time and the game seconds it advanced; `at` maps a real
+ * timestamp to game seconds, interpolated between the frames around it, and past the newest frame at
+ * `rate` (game s per real s now: 0 in a hit-stop, 0.4 in slow motion).
+ */
+export class GameClock {
+  private s: { real: number; game: number }[] = [];
+  game = 0;
+  tick(realMs: number, dGame: number) {
+    this.game += Math.max(0, dGame);
+    const last = this.s[this.s.length - 1];
+    if (last && realMs <= last.real) last.game = this.game;
+    else this.s.push({ real: realMs, game: this.game });
+    if (this.s.length > 600) this.s.splice(0, this.s.length - 600);
+  }
+  at(tsMs: number, rate = 1): number {
+    const s = this.s;
+    if (!s.length) return (tsMs / 1000) * rate;
+    const last = s[s.length - 1];
+    if (tsMs >= last.real) return last.game + ((tsMs - last.real) / 1000) * rate;
+    if (tsMs <= s[0].real) return s[0].game - ((s[0].real - tsMs) / 1000) * rate;
+    let lo = 0;
+    let hi = s.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (s[mid].real <= tsMs) lo = mid;
+      else hi = mid;
+    }
+    const a = s[lo];
+    const b = s[hi];
+    return a.game + ((tsMs - a.real) / Math.max(1e-9, b.real - a.real)) * (b.game - a.game);
+  }
+}
+
+/**
+ * A SHOOT hold in game seconds on the match's clock (soccer-4 review fix): the release less the
+ * device's display lag (the ring the player saw was that much behind), minus the press. At a steady
+ * time scale it equals `holdOf`.
+ */
+export function holdOnClock(clock: GameClock, pressTs: number, releaseTs: number, lagMs: number, rate: number): number {
+  return Math.max(0, clock.at(releaseTs - lagMs, rate) - clock.at(pressTs, rate));
+}

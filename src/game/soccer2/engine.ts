@@ -12,6 +12,7 @@
 import { hashString, rng } from '../../engine/rng';
 import {
   accelOf,
+  aimReach,
   blockChance,
   contactPace,
   DRIBBLE_JOG,
@@ -25,6 +26,7 @@ import {
   gkPositionError,
   gkReaction,
   gkSmother,
+  gkStretch,
   greenHalf,
   headerSpeed,
   interceptChance,
@@ -760,14 +762,16 @@ export interface RingRead {
   turn: number;
 }
 
-export function shotRing(a: Attack, c: Body, first: boolean): RingRead {
+export function shotRing(a: Attack, c: Body, first: boolean, at?: { from?: Pt & { h: number }; vin?: Pt; strike?: boolean }): RingRead {
   const sp = a.setPiece;
   let from = { x: a.ball.x, y: a.ball.y, h: a.ball.h };
   let turn = 0;
   if (first) {
-    const m = meetPoint(a, c, jumpReach(c.p));
+    // `at` (soccer-4 fix, G2b at the strike): the real contact (where the ball is as it's met, and the
+    // way it came), not the meet point predicted while SHOOT was held
+    const m = at?.from ?? meetPoint(a, c, jumpReach(c.p));
     if (m) from = { x: m.x, y: m.y, h: m.h };
-    const v = norm(a.ball.vx, a.ball.vy);
+    const v = at?.vin ? norm(at.vin.x, at.vin.y) : norm(a.ball.vx, a.ball.vy);
     const to = norm(GX - from.x, PL - from.y);
     turn = (Math.acos(clamp(v.x * to.x + v.y * to.y, -1, 1)) * 180) / Math.PI;
   }
@@ -789,7 +793,8 @@ export function shotRing(a: Attack, c: Body, first: boolean): RingRead {
   else if (!sp && d < RING.wideIn && Math.abs(Math.atan2(from.x - GX, Math.max(0.3, PL - from.y))) > RING.wideAng) [why, amber] = ['angle', 'RANGE'];
   // soccer-5: at a sprint with the ball knocked out ahead, he strikes it on the stride as he gets to it:
   // no gold off a sprint touch (gold needs the ball at his feet)
-  else if (!sp && !first && a.ball.owner === c.id && dist(a.ball, c) > TOUCH.reach && Math.hypot(c.vx, c.vy) > topSpeed(c.p) * dribblePace(c.p) * RING.stride) [why, amber] = ['stride', 'TIMING'];
+  // (not at the strike itself: by then he has got to the ball, `at.strike`)
+  else if (!sp && !first && !at?.strike && a.ball.owner === c.id && dist(a.ball, c) > TOUCH.reach && Math.hypot(c.vx, c.vy) > topSpeed(c.p) * dribblePace(c.p) * RING.stride) [why, amber] = ['stride', 'TIMING'];
   const w = ringWindow({ baseHalfMs: greenHalf(c.p) * 1000, rating01: rt(c.p.a.SHO), contested, inRange, fire: false, amber, parts });
   if (w.state === 'red') why = 'range';
   else if (w.state === 'amber' && contested) why = 'pressure';
@@ -808,6 +813,9 @@ export function pressShoot(a: Attack): boolean {
   if (!own && !taking && !incoming) return false;
   const r = shotRing(a, c, !!incoming);
   a.meter = { t0: a.t, top: windup(r.d), green: r.green, ring: r.state, why: r.why, dial: r.dial, first: !!incoming, assist: assistAim(a, c) };
+  // pressed out of range: red for the whole wind-up (soccer-4 fix, P2: a press at 30 m that sprints on
+  // into range during the swing used to turn gold)
+  if (r.state === 'red') a.meter.lockRed = true;
   // the keeper sees the backlift: his split step lands now (render: well before the strike)
   keeperOf(a).keeperSet = a.t;
   a.events.push('meter');
@@ -817,6 +825,7 @@ export function pressShoot(a: Attack): boolean {
 /** The ring follows the play while SHOOT is held (a defender closing turns it amber; one who's beaten
  * gives it back): the state only, the window and the wind-up stay as they were at the press. */
 function refreshRing(a: Attack, m: Meter) {
+  if (m.lockRed) return;
   const r = shotRing(a, ctrlOf(a), m.first && a.ball.owner !== a.ctrl);
   m.ring = r.state;
   m.why = r.why;
@@ -890,8 +899,10 @@ export const bendCurl = (k: number): number => (k === 0 ? 0 : -k * 0.75);
 export const AIM_X = 3.1;
 /** Aim assist's height (aim space: low); how far across it goes depends on the range and his SHO.
  * `share` (B-4, soccer-4): it aims at this share of the way out to the finest spot his accuracy allows,
- * so a person's deliberate corner on a gold release beats it, and the assist stays a safe default. */
-export const ASSIST = { y: -0.75, share: 0.8 };
+ * so a person's deliberate corner on a gold release beats it, and the assist stays a safe default
+ * (0.8 → 0.9 in the soccer-4 review fix: with the corner held inside aimReach and SHO's steeper cone,
+ * 0.8 left the assist at 30% one on one, under the "fair shot" floor). */
+export const ASSIST = { y: -0.75, share: 0.9 };
 
 /**
  * Aim assist (no drag): the side of the goal the keeper leaves open, with a little preference for
@@ -941,31 +952,45 @@ export function snapAim(v: Pt): Pt {
 /** Where in the goal an aim points (x across, h up). null: the assist. */
 export function aimPoint(a: Attack, shooter: Body, aim: Pt | null): { x: number; h: number } {
   const v = aim ?? a.meter?.assist ?? assistAim(a, shooter);
-  return { x: GX + clamp(v.x, -1, 1) * AIM_X, h: 0.3 + clamp((v.y + 1) / 2, 0, 1) * 1.75 };
+  // how far into the corner he can place it in open play: his SHO and the range (soccer-4 review fix;
+  // the reticle shows this point, so a gold release still lands exactly on it). A set piece's dead ball
+  // is placed anywhere (penalties and free kicks are soccer-7's fit)
+  const k = a.setPiece ? 1 : aimReach(shooter.p, Math.hypot(GX - a.ball.x, PL - a.ball.y));
+  return { x: GX + clamp(v.x, -k, k) * AIM_X, h: 0.3 + clamp((v.y + 1) / 2, 0, 1) * 1.75 };
 }
 
 /** Range makes a shot harder to place (soccer-4, fitted to real conversion by distance): ×1 at 11 m
- * or nearer, 1.6 at 16.5 m, 2.4 at 20 m, 3.2 at 25 m, 4.3 at 30 m, then 0.22 a metre. */
+ * or nearer, 1.6 at 16.5 m, 2.4 at 20 m, 4.6 at 25 m, 7.0 at 30 m, then 0.4 a metre (the soccer-4 review
+ * fix steepened it beyond 20 m, 3.2 and 4.3 before, as CONE_SCALE came down: plan P2, a person shooting
+ * from 30 m scores ≤ 2%). */
 export const RANGE_CONE: readonly (readonly [number, number])[] = [
   [11, 1],
   [16.5, 1.6],
   [20, 2.4],
-  [25, 3.2],
-  [30, 4.3],
+  [25, 4.6],
+  [30, 7.0],
 ];
 export function rangeCone(d: number): number {
   const t = RANGE_CONE;
   if (d <= t[0][0]) return t[0][1];
   for (let i = 1; i < t.length; i++) if (d <= t[i][0]) return lerp(t[i - 1][1], t[i][1], (d - t[i - 1][0]) / (t[i][0] - t[i - 1][0]));
-  return t[t.length - 1][1] + (d - t[t.length - 1][0]) * 0.22;
+  return t[t.length - 1][1] + (d - t[t.length - 1][0]) * 0.4;
 }
 
 /** The cone's context multipliers (soccer-4; each is also an amber cause on the ring): a defender
- * within 2 m, a tight angle inside 12 m, a header from beyond 8 m (inside it `headerNear`), a volley. */
-export const CONTEXT = { pressure: 1.35, wide: 1.5, headerFar: 2, headerNear: 1.4, volley: 1.3 };
+ * within 2 m, a tight angle inside 12 m, a header from beyond 8 m (inside it `headerNear`), a volley;
+ * and (soccer-4 review fix) a shot wound up at a sprint with the ball knocked out ahead, struck on the
+ * stride as he catches it (`stride`: a poor contact; the sprint beeline's long shot, plan P2). */
+export const CONTEXT = { pressure: 1.35, wide: 1.5, headerFar: 2, headerNear: 1.4, volley: 1.3, stride: 2.2 };
 /** Every release that isn't gold has its cone scaled by this (soccer-4): before the ring, nearly every
- * shot was on target (53%, real 34.5%); now gold is where the precision lives. */
-export const CONE_SCALE = 2.1;
+ * shot was on target (53%, real 34.5%); now gold is where the precision lives. Soccer-4 review fix
+ * (interim, until soccer-7 raises shot volume to the real 9-13 a side): 2.1 → 0.85. At 5.3 shots a side,
+ * 2.1 left 1.15-1.5 goals a match, a third of them 0-0, and the better side (8+ OVR) winning under half
+ * its matches; soccer-7 takes it back toward 2 once there are real shot numbers (team doc). */
+export const CONE_SCALE = 0.85;
+/** A red ring's release (pressed out of range: TOO FAR) keeps the soccer-4 scale whatever CONE_SCALE is,
+ * so a shot from 30 m stays the long shot it is (plan P2: a person shooting from 30 m scores ≤ 2%). */
+export const RED_CONE_SCALE = 2.4;
 
 /** A first-time hit (a shot, or a pass played straight off a touch) is harder to keep true the more it
  * turns the ball: ×1 straight on, ×1.2 at 90°, ×1.6 at 135° or more (plan S9). */
@@ -1090,6 +1115,22 @@ export function exactShot(from: Pt & { h: number }, tx: number, th: number, v: n
  */
 function strikeShot(a: Attack, c: Body, r: ShotRelease, header = false, assisted = false, incoming: Pt | null = null) {
   const sp = a.setPiece;
+  // G2b at the strike (soccer-4 fix): a release judged earlier (a first-time hit let go before the
+  // ball arrived, or one struck as he got back to a ball that was out) keeps its gold only if the ring
+  // would still be gold here and now: a defender who closed in, a ball that came across him or dropped
+  // into a header from range, or a strike from out of range turn it amber or red, and it goes through
+  // the cone like any other amber or red release
+  if (!sp && r.inWin && r.ring === 'gold') {
+    const now = shotRing(a, c, !!incoming, { from: incoming ? { x: a.ball.x, y: a.ball.y, h: a.ball.h } : undefined, vin: incoming ?? undefined, strike: true });
+    if (now.state !== 'gold') {
+      r = { ...r, ring: now.state, why: now.why };
+      if (a.release?.gold) {
+        a.release = { ...a.release, gold: false, ring: now.state, why: now.why };
+        a.perfects = Math.max(0, (a.perfects ?? 0) - 1);
+      }
+      a.events.push('gold-lost');
+    }
+  }
   const kind: ShotInfo['kind'] = header ? 'header' : sp?.kind === 'penalty' ? 'pen' : sp?.kind === 'freekick' ? 'fk' : a.ball.h > 0.4 ? 'volley' : 'shot';
   const gold = r.inWin && r.ring === 'gold';
   const aim = r.aim;
@@ -1120,10 +1161,11 @@ function strikeShot(a: Attack, c: Body, r: ShotRelease, header = false, assisted
   let cone = 0;
   if (!gold) {
     const cm = coneMult(off, green);
-    cone = shotCone(c.p) * CONE_SCALE * (r.ring === 'red' ? Math.max(1, cm) : cm);
+    cone = shotCone(c.p) * (r.ring === 'red' ? RED_CONE_SCALE * Math.max(1, cm) : CONE_SCALE * cm);
     if (!sp && nearestDefender(a, c).d < RING.pressure) cone *= CONTEXT.pressure;
     if (kind === 'header') cone *= d > RING.headerFar ? CONTEXT.headerFar : CONTEXT.headerNear;
     if (kind === 'volley') cone *= CONTEXT.volley;
+    if (r.why === 'stride') cone *= CONTEXT.stride;
     if (kind === 'pen') cone *= SP_TUNE.penCone;
     if (kind === 'fk') cone *= SP_TUNE.fkCone;
     // a header from a corner: under a crowd of bodies, a worse contact than an open-play cross
@@ -1183,16 +1225,17 @@ function strikeShot(a: Attack, c: Body, r: ShotRelease, header = false, assisted
  */
 export const SP_TUNE = {
   penGreen: 0.8,
-  // soccer-4: the free kick's and the corner header's cones divided by CONE_SCALE (2.1), which every
-  // release that isn't gold now carries, so their misses are what they were (their own fit is
-  // soccer-7's); the penalty keeps its cone and a narrower gold (a gold penalty is exact)
-  penCone: 0.95,
+  // soccer-4: the free kick's and the corner header's cones divided by CONE_SCALE, which every release
+  // that isn't gold now carries, so their misses are what they were before the ring (3.0 and 3.8; their
+  // own fit is soccer-7's); the penalty keeps the cone soccer-4 gave it (0.95 × the 2.1 scale then) and
+  // a narrower gold (a gold penalty is exact)
+  penCone: (0.95 * 2.1) / CONE_SCALE,
   penRead: 0.07,
   fkGreen: 0.7,
-  fkCone: 1.43,
+  fkCone: 3.0 / CONE_SCALE,
   fkReact: 0.55,
   fkRead: 0.4,
-  cornerHeaderCone: 1.8,
+  cornerHeaderCone: 3.4 / CONE_SCALE,
   cornerDuel: 0.8,
   /** how close a marker has to be to go up with the header (open-play crosses 1.5 m) */
   cornerMark: 3.2,
@@ -1207,13 +1250,26 @@ export const KEEP = { tightDepth: 1.3, shuffle: 3.2, narrow: 0.3, setSlow: 0.8, 
 
 /**
  * The keeper against range and in a race (soccer-4). From `farFrom` m or more he has time to read it:
- * his reach is `farReach` m bigger and his reaction ×`farReact`. He comes off his line for a one-on-one
+ * his reach is `farReach` m bigger and his reaction ×`farReact` (soccer-4 review fix: 0 and ×1 for now;
+ * 0.15 m and ×0.85 had lifted the save rate to 74.5%, against the real 64-72%). He comes off his line for a one-on-one
  * only when he gets to the ball's next touch (where it will be `look` s on) first, allowing `reach` m
  * of stretch; otherwise he holds the angle. On a ball played into the box he sets for the man it's for
  * (where he'll meet it), not for the ball in the air, so he isn't pulled to the near post first. A
  * cross he calls for he takes through the crowd within `claimReach` m, up to `claimH` m.
  */
-export const KEEPER = { farFrom: 18, farReach: 0.15, farReact: 0.85, claimReach: 1.6, claimH: 2.75, look: 0.4, reach: 1.0, setFor: 25 };
+export const KEEPER = { farFrom: 18, farReach: 0, farReact: 1, claimReach: 1.6, claimH: 2.75, look: 0.4, reach: 1.0, setFor: 25 };
+/**
+ * Full stretch (soccer-4 review fix, plan S5/S6). A keeper who is set as the shot is struck (moving
+ * slower than `setSpeed` m/s: not caught rushing out or shuffling across), diving or spread, who read
+ * the side it goes, can get fingertips (or a leg) to a shot passing up to `reach` m beyond his hands:
+ * gkStretch (DIV, REF) × how far inside that it passes × the shot's pace (×`fast` at `fastV` m/s or
+ * more, ×1 at `slowV` or less), for a shot struck within `within` m of him (from further out his dive
+ * already has the time to get there, and the error cone does the rest). It is always a parry, round
+ * the post from near it. Before, a gold
+ * release into the corner from 12-16 m beat every keeper alike (99.5% at perfect timing; GK 93 vs 75
+ * barely mattered).
+ */
+export const STRETCH = { setSpeed: 2.5, reach: 0.95, slowV: 18, fastV: 30, fast: 0.75, within: 12 };
 
 /** Where the keeper stands: on the bisector of the angle the posts make from the ball, off his line by how far away it is. */
 export function keeperSpot(a: Attack, _gk: Body, err: number): Pt {
@@ -1278,6 +1334,7 @@ function planKeeper(a: Attack) {
   const e = gauss(a.rand) * mis;
   a.gkPlan = {
     far,
+    set: Math.hypot(gk.vx, gk.vy) < STRETCH.setSpeed,
     // a direct free kick: the keeper is set and sees it struck (he reacts a little sooner); from range
     // he has longer to read it
     react: a.t + gkReaction(gk.p) * (1 - 0.15 * a.defIQ) * (a.lastShot?.kind === 'fk' ? SP_TUNE.fkReact : 1) * (far ? KEEPER.farReact : 1) + a.rand() * 0.04,
@@ -1357,12 +1414,22 @@ function keeperSave(a: Attack, gk: Body, prev: Pt & { h: number }) {
   // he had no time to move at all: only what comes at him
   const dx = (Math.sign(bx - gk.x) || 1) * Math.hypot(bx - gk.x, by - gk.y);
   const q = Math.sqrt((dx / ax) ** 2 + ((bh - cy) / ay) ** 2);
-  if (q > 1) return false;
-  const margin = 1 - q;
   const speed = Math.hypot(b.vx, b.vy, b.vh);
-  if (margin < 0.12 && a.rand() > 0.45 + margin * 4) return false;
+  // full stretch (STRETCH): a set keeper diving the right way, the ball just past his hands
+  let tip = false;
+  if (q > 1) {
+    const past = (q - 1) * ax;
+    const way = plan ? Math.sign(plan.tx - plan.x0) : 0;
+    if ((!diving && !spread) || !plan?.set || !o || Math.hypot(o.x - gk.x, o.y - gk.y) > STRETCH.within || Math.abs(bx - GX) > GHALF || bh > GH || past > STRETCH.reach || way === 0 || way !== Math.sign(bx - plan.x0) || a.lastShot?.kind === 'pen') return false;
+    const pace = lerp(1, STRETCH.fast, clamp((speed - STRETCH.slowV) / (STRETCH.fastV - STRETCH.slowV), 0, 1));
+    if (a.rand() >= gkStretch(gk.p) * (1 - past / STRETCH.reach) * pace) return false;
+    tip = true;
+    a.events.push('fingertips');
+  }
+  const margin = 1 - q;
+  if (!tip && margin < 0.12 && a.rand() > 0.45 + margin * 4) return false;
   const stretch = Math.min(1, Math.abs(dx) / (ax + 0.01));
-  const held = margin >= 0.12 && a.rand() < gkCatch(gk.p, speed, stretch, bh > 1.8);
+  const held = !tip && margin >= 0.12 && a.rand() < gkCatch(gk.p, speed, stretch, bh > 1.8);
   b.curl = 0;
   if (a.lastShot) a.lastShot.cross = null;
   if (held) {
@@ -1398,7 +1465,7 @@ function keeperSave(a: Attack, gk: Body, prev: Pt & { h: number }) {
   const wide = Math.sign(bx - GX) || body;
   const han = gk.p.a.HAN;
   const away = Number.isFinite(han) && han < PARRY.fumbleHan ? body : wide;
-  const out = a.rand() < clamp(lerp(PARRY.outLo, PARRY.outHi, rt(han)), PARRY.outLo, PARRY.outHi);
+  const out = tip || a.rand() < clamp(lerp(PARRY.outLo, PARRY.outHi, rt(han)), PARRY.outLo, PARRY.outHi);
   const sp = speed * lerp(0.25, 0.45, a.rand());
   const roundPost = out && Math.abs(bx - GX) > GHALF - PARRY.postIn;
   const dir = !out ? norm(away * (0.3 + a.rand() * 0.8), -1) : roundPost ? norm(wide * 0.9, 0.45) : norm(away * 0.9, -0.35);
@@ -1807,9 +1874,11 @@ function duringFlight(a: Attack, prev: Pt & { h: number }) {
 /**
  * Blocks (soccer-4): an outfielder's body is `body` m either side of him (plus the ball); `react` s
  * after the strike he lunges toward it at `speed` m/s, at most `lunge` m further, below `lungeH` m,
- * and a block at full stretch is `stretch` less likely to hold.
+ * and a block at full stretch is `stretch` less likely to hold. (Soccer-4 review fix: 0.35 m, 0.08 s,
+ * 6 m/s and 1.2 m before; blocked shots 9 → 12.5%. The real quarter needs more shots in traffic, which
+ * is soccer-7's shot volume: the autopilot now waits for a clear look, soccer-5.)
  */
-export const BLOCK = { body: 0.35, react: 0.08, speed: 6, lunge: 1.2, lungeH: 0.95, stretch: 0.35 };
+export const BLOCK = { body: 0.42, react: 0.05, speed: 7, lunge: 2.0, lungeH: 0.95, stretch: 0.35 };
 
 /**
  * When a shot or a parry has died (R-1, Claude 2026-11-10, studio overhaul soccer-1): rolling slower
@@ -2028,6 +2097,9 @@ function contact(a: Attack) {
 export const TOUCH = {
   foot: 0.35,
   reach: 0.8,
+  /** a shot asked for with the ball out: struck within this (s), at full stretch within `stretch` m */
+  pendingShot: 1.3,
+  stretch: 0.8,
   exposed: 0.6,
   turn: 35,
   turnExposed: 60,
@@ -2178,7 +2250,16 @@ function dribbleBall(a: Attack, c: Body, dt: number) {
   const d = dist(ball, c);
   if (a.pending) {
     if (d <= TOUCH.reach + 0.15) playPending(a, c);
-    else if (t - a.pending.at > TOUCH.pending || d > tc.out + TOUCH.foot + TOUCH.lost + 2) loseIt(a, c);
+    // a shot can't be wound up and held for ever (soccer-4 review fix, P2: a press at 30 m used to fire
+    // up to 3 s and 20 m later): not reached within pendingShot s, he strikes it at full stretch if it's
+    // within `stretch` m (no gold, a stride contact), else the chance is gone
+    else if (a.pending.kind === 'shot' && t - a.pending.at > TOUCH.pendingShot) {
+      if (d <= TOUCH.reach + TOUCH.stretch) playPending(a, c, true);
+      else {
+        a.pending = null;
+        a.events.push('shot-dropped');
+      }
+    } else if (t - a.pending.at > TOUCH.pending || d > tc.out + TOUCH.foot + TOUCH.lost + 2) loseIt(a, c);
     return;
   }
   const w = tc.want;
@@ -2262,12 +2343,20 @@ function loseIt(a: Attack, c: Body) {
   a.events.push('heavy-touch', 'lost-touch');
 }
 
-/** He's back on the ball: the pass or shot he asked for while it was out goes now. */
-function playPending(a: Attack, c: Body) {
+/** He's back on the ball: the pass or shot he asked for while it was out goes now (`stretched`: he
+ * reaches for it at full stretch: never gold, a stride contact). */
+function playPending(a: Attack, c: Body, stretched = false) {
   const p = a.pending!;
   a.pending = null;
   if (p.kind === 'pass') pass(a, p.how, p.dir, p.free, p.to);
-  else strikeShot(a, c, p.r, false, p.assisted);
+  else if (stretched) {
+    if (a.release?.gold) {
+      a.release = { ...a.release, gold: false, ring: 'amber', why: 'stride' };
+      a.perfects = Math.max(0, (a.perfects ?? 0) - 1);
+      a.events.push('gold-lost');
+    }
+    strikeShot(a, c, { ...p.r, ring: p.r.ring === 'red' ? 'red' : 'amber', why: p.r.ring === 'red' ? p.r.why : 'stride' }, false, p.assisted);
+  } else strikeShot(a, c, p.r, false, p.assisted);
 }
 
 function human(a: Attack, b: Body, stick: Pt, sprint: boolean, dt: number) {

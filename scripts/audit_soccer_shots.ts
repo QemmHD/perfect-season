@@ -24,7 +24,7 @@ function player(pos: SoccerPos, v = 75, over: Record<string, number> = {}): Socc
   const id = 'p' + uid++;
   return { id, name: id, tag: id.toUpperCase(), num: null, ht: 182, pos, pos2: [pos], ovr: v, a, keeper };
 }
-function squad(v = 75, over: Partial<Record<'gk' | 'def' | 'mid' | 'fwd', Record<string, number>>> = {}): Squad {
+export function squad(v = 75, over: Partial<Record<'gk' | 'def' | 'mid' | 'fwd', Record<string, number>>> = {}): Squad {
   return {
     name: 'T',
     abbr: 'T',
@@ -76,6 +76,10 @@ export function drill(att: Squad, def: Squad, seed: string, sit: Situation): Att
     c.x = pin.x;
     c.y = pin.y;
     c.vx = c.vy = 0;
+    // (soccer-5: the ball is no longer glued to his feet, so the drill holds it at them with him)
+    a.ball.x = holder.x;
+    a.ball.y = holder.y + 0.35;
+    a.ball.vx = a.ball.vy = 0;
   }
   if (sit === '1v1') {
     const want = Math.hypot(GX - spot.x, PL - spot.y);
@@ -110,8 +114,13 @@ export function drill(att: Squad, def: Squad, seed: string, sit: Situation): Att
  * aims). run: keeps running at goal, no drag (aim assist); still: lets go of the stick, no drag;
  * drag: keeps running and drags to the open side's low corner; bad: drags at the keeper's side.
  */
-export type Thumb = 'run' | 'still' | 'drag' | 'bad';
-const RUN: Record<Thumb, Pt> = { run: { x: 0, y: 1 }, still: { x: 0, y: 0 }, drag: { x: 0, y: 1 }, bad: { x: 0, y: 1 } };
+export type Thumb = 'run' | 'still' | 'drag' | 'bad' | 'aim';
+/** aim (soccer-4 fix): the practised finisher: lets go of the stick (the ball at his feet, so the ring
+ * can be gold) and drags to the open side's low corner. */
+const RUN: Record<Thumb, Pt> = { run: { x: 0, y: 1 }, still: { x: 0, y: 0 }, drag: { x: 0, y: 1 }, bad: { x: 0, y: 1 }, aim: { x: 0, y: 0 } };
+const DRAGS = (t: Thumb) => t === 'drag' || t === 'aim';
+/** the thumb the SHO / keeper / timing rows use (SOCCER_THUMB=aim for the practised finisher) */
+const ROW_THUMB = (process.env.SOCCER_THUMB as Thumb | undefined) ?? 'drag';
 
 /** One shot by a simulated person: timing spread `sd` (s), the thumbs, a release lag like the app's. */
 export function humanShot(a: Attack, sd: number, thumb: Thumb, r: () => number): Attack {
@@ -126,15 +135,18 @@ export function humanShot(a: Attack, sd: number, thumb: Thumb, r: () => number):
     }
     if (a.ball.flight?.to !== c.id) return a;
   }
+  // the practised finisher gathers it first (the stick let go until the ball is back at his feet)
+  if (thumb === 'aim' && !a.ball.flight)
+    for (let i = 0; i < 40 && !a.end && a.ball.owner === c.id && Math.hypot(a.ball.x - c.x, a.ball.y - c.y) > 0.8; i++) step(a, 1 / 60, { x: 0, y: 0 });
   if (!pressShoot(a)) return a;
   // the drag goes on as SHOOT is pressed (it counts for a first-time hit still held at contact)
   const pre = openSide(a, c).side;
-  if (thumb === 'drag' || thumb === 'bad') setAim(a, snapAim({ x: (thumb === 'drag' ? pre : -pre) * 0.95, y: -0.85 }));
+  if (DRAGS(thumb) || thumb === 'bad') setAim(a, snapAim({ x: (DRAGS(thumb) ? pre : -pre) * 0.95, y: -0.85 }));
   const hold = Math.max(1, Math.round((a.meter!.top + off) * 60));
   for (let i = 0; i < hold && !a.end && a.meter; i++) step(a, 1 / 60, a.ball.flight ? null : RUN[thumb]);
   // the person looks at the keeper as he lets go
   const side = openSide(a, c).side;
-  const aim = thumb === 'drag' ? snapAim({ x: side * 0.95, y: -0.85 }) : thumb === 'bad' ? snapAim({ x: -side * 0.95, y: -0.85 }) : null;
+  const aim = DRAGS(thumb) ? snapAim({ x: side * 0.95, y: -0.85 }) : thumb === 'bad' ? snapAim({ x: -side * 0.95, y: -0.85 }) : null;
   if (a.meter) releaseShoot(a, aim);
   for (let i = 0; i < 60 * 60 && !a.end; i++) step(a, 1 / 60, a.ball.owner === c.id ? RUN[thumb] : { x: 0, y: 0 });
   return a;
@@ -150,35 +162,36 @@ function tally(f: (i: number) => Attack | null): Tally {
     const k = a.end?.kind ?? 'T';
     t[k] = (t[k] ?? 0) + 1;
     if (a.lastShot?.greened) t.green = (t.green ?? 0) + 1;
+    if (a.lastShot?.greened && k === 'G') t.goldG = (t.goldG ?? 0) + 1;
     if (a.end?.text.includes('HELD') || a.end?.text.includes('COLLECTS')) t.atGk = (t.atGk ?? 0) + 1;
   }
   return t;
 }
 const pct = (t: Tally, k: string) => (((t[k] ?? 0) / Math.max(1, t.n)) * 100).toFixed(1) + '%';
-const row = (label: string, t: Tally) => console.log(label.padEnd(36), 'goal', pct(t, 'G').padStart(6), ' saved', pct(t, 'S').padStart(6), ' held', pct(t, 'atGk').padStart(6), ' wide', pct(t, 'W').padStart(6), ' blk', pct(t, 'B').padStart(6), ' lost', pct(t, 'L').padStart(6), ' green', pct(t, 'green').padStart(6));
+const row = (label: string, t: Tally) => console.log(label.padEnd(36), 'goal', pct(t, 'G').padStart(6), ' saved', pct(t, 'S').padStart(6), ' held', pct(t, 'atGk').padStart(6), ' wide', pct(t, 'W').padStart(6), ' blk', pct(t, 'B').padStart(6), ' lost', pct(t, 'L').padStart(6), ' green', pct(t, 'green').padStart(6), ' gold→goal', ((100 * (t.goldG ?? 0)) / Math.max(1, t.green ?? 0)).toFixed(1).padStart(5) + '%');
 
 if (ONLY === 'all' || ONLY === 'shots') {
 console.log('== by situation and thumb (75 team, 75 keeper, timing sd 0.06 s) ==');
 for (const sit of ['1v1', 'edge', 'wide', 'volley'] as Situation[])
-  for (const thumb of (sit === 'volley' ? ['still', 'drag'] : ['run', 'still', 'drag', 'bad']) as Thumb[]) {
+  for (const thumb of (sit === 'volley' ? ['still', 'drag'] : ['run', 'still', 'drag', 'bad', 'aim']) as Thumb[]) {
     const t = tally((i) => humanShot(drill(squad(75), squad(75), sit + i, sit), 0.06, thumb, rng(hashString('h' + sit + i))));
     row(sit + ' / ' + thumb, t);
   }
-console.log('== 1v1 and edge by SHO (thumb: drag), timing sd 0.06 ==');
+console.log('== 1v1 and edge by SHO (thumb: ' + ROW_THUMB + '), timing sd 0.06 ==');
 for (const sho of [55, 75, 95])
   for (const sit of ['1v1', 'edge'] as Situation[]) {
-    const t = tally((i) => humanShot(drill(squad(75, { fwd: { SHO: sho }, mid: { SHO: sho } }), squad(75), sit + 's' + i, sit), 0.06, 'drag', rng(hashString('hs' + sit + i))));
+    const t = tally((i) => humanShot(drill(squad(75, { fwd: { SHO: sho }, mid: { SHO: sho } }), squad(75), sit + 's' + i, sit), 0.06, ROW_THUMB, rng(hashString('hs' + sit + i))));
     row(sit + ' SHO ' + sho, t);
   }
-console.log('== 1v1 and edge by keeper (SHO 75, drag) ==');
+console.log('== 1v1 and edge by keeper (SHO 75, ' + ROW_THUMB + ') ==');
 for (const gk of [52, 75, 93])
   for (const sit of ['1v1', 'edge'] as Situation[]) {
-    const t = tally((i) => humanShot(drill(squad(75), squad(75, { gk: { DIV: gk, HAN: gk, REF: gk, POS: gk, SPD: gk } }), sit + 'g' + i, sit), 0.06, 'drag', rng(hashString('hg' + sit + i))));
+    const t = tally((i) => humanShot(drill(squad(75), squad(75, { gk: { DIV: gk, HAN: gk, REF: gk, POS: gk, SPD: gk } }), sit + 'g' + i, sit), 0.06, ROW_THUMB, rng(hashString('hg' + sit + i))));
     row(sit + ' GK ' + gk, t);
   }
-console.log('== 1v1 by timing spread (drag) ==');
+console.log('== 1v1 by timing spread (' + ROW_THUMB + ') ==');
 for (const sd of [0, 0.03, 0.06, 0.1, 0.15]) {
-  const t = tally((i) => humanShot(drill(squad(75), squad(75), '1v1t' + i, '1v1'), sd, 'drag', rng(hashString('ht' + i))));
+  const t = tally((i) => humanShot(drill(squad(75), squad(75), '1v1t' + i, '1v1'), sd, ROW_THUMB, rng(hashString('ht' + i))));
   row('1v1 timing sd ' + sd, t);
 }
 

@@ -198,6 +198,9 @@ export interface Meter {
   assist?: Pt;
   /** the person's aim while SHOOT is held (the drag on SHOOT; null: assist) */
   aim?: Pt | null;
+  /** pressed beyond maxRange: the ring stays red for this wind-up (soccer-4 fix: running on into
+   * range during the swing doesn't turn it gold) */
+  lockRed?: boolean;
 }
 
 /** The last shot, for the HUD and the replay. */
@@ -283,7 +286,7 @@ export interface Attack {
   /** attackers in an offside position when the last pass was played */
   offIds: number[];
   /** the keeper's read of a shot: when he goes, from where, to where */
-  gkPlan: null | { react: number; x0: number; tx: number; th: number; at: number; y0?: number; ty?: number; far?: boolean };
+  gkPlan: null | { react: number; x0: number; tx: number; th: number; at: number; y0?: number; ty?: number; far?: boolean; set?: boolean };
   /** a first-time hit let go before the ball arrived */
   first: null | ShotRelease;
   /** the set-piece taker */

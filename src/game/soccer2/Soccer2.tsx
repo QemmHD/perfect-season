@@ -22,7 +22,7 @@ import { soccerFeedback, type PlayFeedback } from '../play-feedback';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { crowd, loadSamples, sfx, vibrate } from '../../lib/sound';
-import { holdOf, LOFT_HOLD, nextBend, type ControlPhase, type Slot, type SlotId, slotsFor, type Slots, targetsOf } from './controls';
+import { GameClock, holdOnClock, LOFT_HOLD, nextBend, type ControlPhase, type Slot, type SlotId, slotsFor, type Slots, targetsOf } from './controls';
 import { PauseSheet } from './PauseSheet';
 import { PausableTimers } from './timers';
 import { deviceLagMs, haptic, heartbeat, PauseButton, ScoreBug, Stick, type StickOut, ToastLine, usePlaytime } from './v2';
@@ -212,6 +212,8 @@ export function Soccer2({
   const [aimDot, setAimDot] = useState<Pt | null>(null);
   /** SHOOT's touch-down: its own timestamp (PointerEvent.timeStamp, or the key's), for the release's judging */
   const shotPress = useRef<number | null>(null);
+  /** the match's game clock against real time, so a hold is judged on the clock the ring moves on */
+  const gameClock = useMemo(() => new GameClock(), []);
   /** consecutive PERFECT releases (the chime climbs a semitone each, to +4) */
   const perfectStreak = useRef(0);
   /** the closing ring's ticks played for this hold, and the release last given its word */
@@ -283,6 +285,7 @@ export function Soccer2({
       sfx.perfect(perfectStreak.current);
       haptic('double');
       performance.mark?.('sc2-perfect');
+      renderer.perfectBurst(a);
       setReleaseToast({ id, text: 'PERFECT' + (perfectStreak.current > 1 ? ' · ' + perfectStreak.current + ' IN A ROW' : ' · on the gold'), kind: 'perfect' });
     } else {
       perfectStreak.current = 0;
@@ -432,6 +435,13 @@ export function Soccer2({
         if (ls && ls.d !== undefined) ls.xg = xgOf({ d: ls.d, ang: ls.ang ?? 0, kind: ls.kind });
         sfx.kick();
         swell(0.5);
+      } else if (e === 'shot-dropped') {
+        // a shot wound up with the ball knocked too far ahead to catch in time (soccer-4 review fix)
+        if (!autoplayHook) say('TOO FAR AHEAD', 'plain', 1000, 'catch the ball first');
+      } else if (e === 'gold-lost') {
+        // a first-time hit let go on gold lost it at the strike (a defender closed, the ball came across
+        // him, or he met it out of range: G2b at the contact): the toast says why
+        if (lastFed.current && a.release && lastFed.current.at === a.release.at) feedRelease(a);
       } else if (e === 'release-green' || e === 'release') {
         // a person's first-time hit still held as the ball arrived is judged by the engine (the word
         // and the chime here; the haptic needs the touch's own handler, so it plays only on a release)
@@ -842,7 +852,9 @@ export function Soccer2({
     const t0 = shotPress.current;
     shotPress.current = null;
     // the aim is already on the meter (the drag, the stick at a set piece, the keys); none: assist
-    if (a && !a.end && t0 !== null && releaseShoot(a, null, 0, holdOf(t0, ts, deviceLagMs(), timeScale))) feedRelease(a);
+    // (on the game clock: slow motion, hit-stops and clamped frames inside the hold count as the ring did)
+    const rate = pausedRef.current ? 0 : juice.gameTime(ts, timeScale);
+    if (a && !a.end && t0 !== null && releaseShoot(a, null, 0, holdOnClock(gameClock, t0, ts, deviceLagMs(), rate))) feedRelease(a);
   };
   const shootCancel = () => {
     shotPointer.current = null;
@@ -1029,8 +1041,10 @@ export function Soccer2({
       const gameDt = juice.gameTime(now, elapsed);
       const u = uiRef.current;
       // paused: nothing moves (the accumulator is dropped, so resuming never catches up); the frame stays drawn
+      const running = !pausedRef.current && !!a && (u === 'live' || u === 'so-kick') && !a.end && !replayRef.current;
+      gameClock.tick(now, running ? gameDt : 0);
       if (pausedRef.current) acc = 0;
-      else if (a && (u === 'live' || u === 'so-kick') && !a.end && !replayRef.current) {
+      else if (running && a) {
         acc += gameDt;
         while (acc >= DT) {
           acc -= DT;

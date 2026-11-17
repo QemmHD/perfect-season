@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { hashString, rng } from '../../engine/rng';
 import { decide, pilot } from './autopilot';
-import { holdOf } from './controls';
+import { GameClock, holdOf, holdOnClock } from './controls';
 import { GX, kickOff, lineCross, nearestDefender, PL, pressShoot, releaseShoot, RING, setAim, setCurl, setupAttack, shotRing, step, tracePath, windup } from './engine';
 import { greenHalf, maxRange } from './ratings';
 import { squadFor } from './squads.test-util';
@@ -136,12 +136,14 @@ describe('G1 and G3: the window', () => {
 });
 
 describe('G2: gold never lies', () => {
-  it('(a) 1,000 seeded gold releases with nobody to stop them cross the line within 0.25 m of the reticle', () => {
+  // (soccer-4 review fix, wall time: 300 seeded releases here; SOCCER_G2A=1000 runs the full harness)
+  const G2A = Number((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.SOCCER_G2A ?? 300);
+  it(`(a) ${G2A} seeded gold releases with nobody to stop them cross the line within 0.25 m of the reticle`, () => {
     const r = rng(hashString('gold-1000'));
     let gold = 0;
     let worst = 0;
     let i = 0;
-    while (gold < 1000) {
+    while (gold < G2A) {
       i++;
       const kind = i % 10;
       const fk = kind === 0;
@@ -248,14 +250,27 @@ describe('G2: gold never lies', () => {
     }
   });
 
-  it('(b) and over 120 autopilot attacks, a gold ring never shows with a man within 2 m or out of range', () => {
+  it('(b) and over 120 autopilot attacks, a gold ring never shows, and no gold strike is struck, with a man within 2 m or out of range', () => {
     let golds = 0;
+    let goldStrikes = 0;
     for (let i = 0; i < 120; i++) {
       const a = setupAttack((['build', 'counter', 'wide'] as const)[i % 3], A, B, 'gauto' + i, {});
       const pl = pilot(0.68, 'gauto' + i);
       kickOff(a);
+      let lastStrike: Attack['strike'] = null;
       for (let n = 0; n < 60 * 40 && !a.end; n++) {
         step(a, DT, decide(a, pl));
+        // (soccer-4 review fix) G2b at the strike itself, first-time hits and headers included
+        const s = a.strike;
+        if (s && s !== lastStrike && s.info.greened && !a.setPiece) {
+          goldStrikes++;
+          const by = a.bodies[s.by];
+          expect(nearestDefender(a, a.ball).d, 'gold strike under pressure, attack ' + i).toBeGreaterThanOrEqual(RING.pressure);
+          expect(Math.hypot(a.ball.x - GX, PL - a.ball.y), 'gold strike out of range, attack ' + i).toBeLessThanOrEqual(maxRange(by.p) + 1e-9);
+          if (s.info.kind === 'header') expect(s.info.d).toBeLessThanOrEqual(RING.headerFar);
+          if (s.info.turn !== undefined && s.info.kind !== 'header') expect(s.info.turn).toBeLessThanOrEqual(RING.firstAcross);
+        }
+        lastStrike = s;
         const m = a.meter;
         if (!m || m.ring !== 'gold' || a.setPiece || m.first) continue;
         golds++;
@@ -265,6 +280,7 @@ describe('G2: gold never lies', () => {
       }
     }
     expect(golds).toBeGreaterThan(50);
+    expect(goldStrikes).toBeGreaterThan(5);
   }, 60_000);
 
   it('On Fire turns only an uncontested amber gold, never pressure or red', () => {
@@ -275,7 +291,136 @@ describe('G2: gold never lies', () => {
   });
 });
 
+describe('G2b at the strike (soccer-4 review fix)', () => {
+  /** A ball played straight up to him from 16 m further out; SHOOT pressed for a first-time hit and let
+   * go on the gold before it arrives. */
+  const firstTime = (seed: string) => {
+    const a = alone(seed, GX, PL - 14);
+    const c = a.bodies[a.ctrl];
+    a.ball.owner = null;
+    [a.ball.x, a.ball.y, a.ball.h] = [GX, PL - 30, 0];
+    [a.ball.vx, a.ball.vy, a.ball.vh] = [0, 17, 0];
+    a.ball.flight = { kind: 'ground', from: 0, to: c.id, at: a.t } as Attack['ball']['flight'];
+    a.path = tracePath(a.ball, 4);
+    a.pathAt = a.t;
+    expect(pressShoot(a)).toBe(true);
+    expect(a.meter!.first).toBe(true);
+    expect(a.meter!.ring).toBe('gold');
+    const steps = Math.round(a.meter!.top * 60) - 1;
+    for (let k = 0; k < steps; k++) step(a, DT, null);
+    releaseShoot(a, null, 0, a.meter!.top);
+    expect(a.first).toBeTruthy();
+    expect(a.release!.gold).toBe(true);
+    return { a, c };
+  };
+  const strikeOf = (a: Attack, before?: (a: Attack) => void) => {
+    let moved = false;
+    for (let k = 0; k < 120 && !a.strike && !a.lastShot && !a.end; k++) {
+      if (!moved && before && Math.hypot(a.ball.x - a.bodies[a.ctrl].x, a.ball.y - a.bodies[a.ctrl].y) < 3) {
+        before(a);
+        moved = true;
+      }
+      step(a, DT, null);
+    }
+    return a.strike;
+  };
+  it('a first-time release on gold keeps it when nothing changes before the contact', () => {
+    const { a } = firstTime('g2b-ok');
+    const s = strikeOf(a);
+    expect(s).toBeTruthy();
+    expect(s!.info.greened).toBe(true);
+    expect(s!.exact).toBeTruthy();
+    expect(a.release!.gold).toBe(true);
+  });
+  it('a defender closing to 1.5 m before the ball arrives turns it amber at the contact: no gold, no exact placement', () => {
+    const { a, c } = firstTime('g2b-press');
+    const perfects = a.perfects;
+    const s = strikeOf(a, (q) => {
+      const def = q.bodies.find((b) => b.side === 'D' && b.role !== 'gk')!;
+      // beside the spot he meets it (the ball comes up to him from behind: it's met just short of him)
+      [def.x, def.y] = [c.x + 1.5, c.y - 0.5];
+    });
+    expect(s).toBeTruthy();
+    expect(s!.info.greened).toBe(false);
+    expect(s!.info.ring).toBe('amber');
+    expect(s!.info.why).toBe('pressure');
+    expect(s!.exact).toBeUndefined();
+    expect(a.release!.gold).toBe(false);
+    expect(a.perfects).toBe((perfects ?? 1) - 1);
+    expect(a.events.includes('gold-lost') || s!.info.cone > 0).toBe(true);
+  });
+  it('a deflection that brings the ball across him (more than 90°) turns it amber at the contact', () => {
+    const { a, c } = firstTime('g2b-deflect');
+    const s = strikeOf(a, (q) => {
+      // knocked off its line: now coming back at him from the goal side (it turns more than 90° to goal)
+      const from = { x: c.x + 1.0, y: c.y + 2.4 };
+      [q.ball.x, q.ball.y] = [from.x, from.y];
+      const L = Math.hypot(c.x - from.x, c.y - from.y);
+      [q.ball.vx, q.ball.vy] = [((c.x - from.x) / L) * 9, ((c.y - from.y) / L) * 9];
+      q.path = tracePath(q.ball, 4);
+      q.pathAt = q.t;
+    });
+    expect(s, 'ends ' + a.end?.text + ' ball ' + [a.ball.x - c.x, a.ball.y - c.y, a.ball.owner].join(',')).toBeTruthy();
+    expect(s!.info.greened).toBe(false);
+    expect(s!.exact).toBeUndefined();
+    expect(a.release!.gold).toBe(false);
+  });
+  it('pressed out of range, the ring stays red through the wind-up even when he runs on into range', () => {
+    const a = alone('red-lock', GX, PL - 10);
+    const c = a.bodies[a.ctrl];
+    withSho(c, 70);
+    const far = maxRange(c.p) + 1.2;
+    [c.y, a.ball.y] = [PL - far - 0.35, PL - far];
+    expect(pressShoot(a)).toBe(true);
+    expect(a.meter!.ring).toBe('red');
+    a.sprinting = true;
+    const steps = Math.round(a.meter!.top * 60);
+    for (let k = 0; k < steps && a.meter; k++) step(a, DT, { x: 0, y: 1 });
+    expect(Math.hypot(a.ball.x - GX, PL - a.ball.y)).toBeLessThan(maxRange(c.p));
+    expect(a.meter!.ring).toBe('red');
+    releaseShoot(a, null, 0, a.meter!.top);
+    expect(a.release!.ring).toBe('red');
+    expect(a.release!.gold).toBe(false);
+  });
+});
+
 describe('G5: timing from the touch', () => {
+  it('a hold is judged on the game clock: slow motion and a hit-stop inside it count as the ring moved (soccer-4 review fix)', () => {
+    const clock = new GameClock();
+    // 60 fps frames; 300-900 ms: a 0.4× slow-motion beat; 1000-1066 ms: a hit-stop (no game time)
+    let real = 0;
+    const rateAt = (t: number) => (t >= 1000 && t < 1066 ? 0 : t >= 300 && t < 900 ? 0.4 : 1);
+    clock.tick(0, 0);
+    while (real < 2000) {
+      const next = real + 1000 / 60;
+      clock.tick(next, ((next - real) / 1000) * rateAt(real));
+      real = next;
+    }
+    const gameAt = (t: number) => {
+      // the exact game time at real t, integrating the rate frame by frame as the loop does
+      let g = 0;
+      for (let r = 0; r < t; r += 1000 / 60) g += (Math.min(1000 / 60, t - r) / 1000) * rateAt(r);
+      return g;
+    };
+    const r = rng(hashString('g5-clock'));
+    for (let i = 0; i < 200; i++) {
+      const press = 100 + r() * 800;
+      const release = press + 300 + r() * 600;
+      const lag = r() * 40;
+      const held = holdOnClock(clock, press, release, lag, 1);
+      expect(Math.abs(held - (gameAt(release - lag) - gameAt(press))) * 1000).toBeLessThan(1);
+    }
+    // a hold of 600 real ms entirely inside the slow-motion beat is 240 ms of game time (the ring's), where
+    // the real-time judge would have called it 360 ms late
+    expect(Math.abs(holdOnClock(clock, 300, 900, 0, 1) - 0.24)).toBeLessThan(0.012);
+    expect(holdOf(300, 900, 0, 1)).toBeCloseTo(0.6, 9);
+    // past the newest frame it runs on at the rate now; at a steady 1× it is holdOf
+    const steady = new GameClock();
+    for (let k = 0; k <= 120; k++) steady.tick(k * (1000 / 60), k ? 1 / 60 : 0);
+    expect(holdOnClock(steady, 500.3, 1890.9, 27, 1)).toBeCloseTo(holdOf(500.3, 1890.9, 27, 1), 9);
+    expect(holdOnClock(steady, 1500, 2100, 0, 1)).toBeCloseTo(0.6, 9);
+    expect(holdOnClock(steady, 1500, 2100, 0, 0.4)).toBeCloseTo(0.5 + 0.1 * 0.4, 9);
+  });
   it('a press/release pair across frame boundaries is judged to ±1 ms of its true offset', () => {
     const r = rng(hashString('g5'));
     for (let i = 0; i < 400; i++) {

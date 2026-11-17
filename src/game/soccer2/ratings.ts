@@ -87,9 +87,11 @@ export function accelOf(p: SoccerPlayer): number {
 export function passError(p: SoccerPlayer): number {
   return Math.max(0.5, lin(7, 1.5, rt(p.keeper ? p.a.KIC : p.a.PAS)));
 }
-/** A shot's error cone, degrees (1 sd) on a green release: SHO 40 → 5.5°, SHO 99 → 1.6°. */
+/** A shot's error cone, degrees (1 sd) on a green release: SHO 40 → 6.5°, SHO 99 → 1.4° (5.5 → 1.6
+ * before the soccer-4 review fix: a steeper SHO curve keeps better finishers better while the keeper
+ * ratings stay narrowed, plan A4 and S5). */
 export function shotCone(p: SoccerPlayer): number {
-  return Math.max(0.4, lin(5.5, 1.6, rt(p.keeper ? 40 : p.a.SHO)));
+  return Math.max(0.4, lin(6.5, 1.4, rt(p.keeper ? 40 : p.a.SHO)));
 }
 /**
  * The gold window's base half-width on SHOOT (seconds), before openness and the rest (engine.ts
@@ -100,6 +102,29 @@ export function shotCone(p: SoccerPlayer): number {
  */
 export function greenHalf(p: SoccerPlayer): number {
   return lin(0.018, 0.066, Math.pow(Math.min(1, rt(p.keeper ? 40 : p.a.SHO)), 1.25) + Math.max(0, rt(p.a.SHO) - 1) * 0.5);
+}
+/**
+ * How far into the corner he can place it (aim space, the share of AIM_X = 3.1 m from the centre):
+ * SHO 40 → 0.68 (2.1 m), SHO 75 → 0.80 (2.5 m), SHO 99 → 0.88 (2.7 m) from 16 m or nearer, 1.2% less a
+ * metre beyond that (never under 0.82 of it). The aim (and the reticle that shows it) is held inside
+ * this, so a gold release from an average finisher lands where a set keeper at full stretch can still
+ * reach it, and a fine finisher gets it nearer the post (soccer-4 review fix, plan S6: gold places the
+ * ball exactly, it does not guarantee a goal). Fitted with scripts/audit_soccer_shots.ts (aim thumb).
+ */
+export const AIM_REACH = { lo: 0.68, hi: 0.88, from: 16, perM: 0.012, floor: 0.82 };
+export function aimReach(p: SoccerPlayer, d: number): number {
+  const k = lin(AIM_REACH.lo, AIM_REACH.hi, Math.min(1, rt(p.keeper ? 40 : p.a.SHO)));
+  return k * (d <= AIM_REACH.from ? 1 : Math.max(AIM_REACH.floor, 1 - AIM_REACH.perM * (d - AIM_REACH.from)));
+}
+/**
+ * A set keeper at full stretch (soccer-4 review fix, plan S5/S6): his chance to get fingertips (or a
+ * leg, spread) to a placed shot that passes just beyond his reach on the side he read, by DIV and REF:
+ * 0.42 at 40, 0.67 at 75, 0.80 at 93 (engine.ts STRETCH scales it down with how far past him it goes
+ * and how hard it was hit).
+ */
+export const GK_STRETCH = { lo: 0.42, hi: 0.84, max: 0.9 };
+export function gkStretch(p: SoccerPlayer): number {
+  return clamp(lin(GK_STRETCH.lo, GK_STRETCH.hi, rt(p.a.DIV) * 0.5 + rt(p.a.REF) * 0.5), 0.05, GK_STRETCH.max);
 }
 /** The range gate (V2 B.3.5): beyond this the ring is red (TOO FAR). SHO 40 → 24 m, SHO 99 → 34 m. */
 export function maxRange(p: SoccerPlayer): number {
@@ -218,9 +243,10 @@ export function interceptChance(p: SoccerPlayer, speed: number, defIQ: number): 
   return clamp(0.25 + 0.42 * rt(p.a.DEF) + 0.18 * (1 - speed / 22) + 0.06 * defIQ, 0.1, 0.9);
 }
 /** A defender's chance to block a shot passing within his body's reach (soccer-4: 0.25 → 0.62 before;
- * a ball struck straight at a body is mostly stopped, and real open play has a quarter of shots blocked). */
+ * a ball struck straight at a body is mostly stopped, and real open play has a quarter of shots blocked;
+ * the soccer-4 review fix 0.42 → 0.80 to 0.50 → 0.85, with a longer, earlier lunge, engine.ts BLOCK). */
 export function blockChance(p: SoccerPlayer, wall: boolean): number {
-  return wall ? 0.92 : clamp(lin(0.42, 0.8, rt(p.a.DEF)), 0.3, 0.85);
+  return wall ? 0.92 : clamp(lin(0.5, 0.85, rt(p.a.DEF)), 0.3, 0.9);
 }
 
 /* Keepers. Soccer-4 (Claude 2026-11-16) narrowed the spread of these around a 75 keeper (whose

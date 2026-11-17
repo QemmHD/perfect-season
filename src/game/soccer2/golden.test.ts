@@ -37,11 +37,19 @@ import type { Attack, Scenario, Squad } from './types';
  *     sprint and under pressure, and the autopilot (close control, sprinting only into space, the pass
  *     read at his feet and to the man it was read for, through balls into space, switching play, waiting
  *     for a clear look). The shootouts are unchanged.
+ *  5. soccer-4 review fix (2026-11-17): gold re-read at the strike (G2b: a first-time or pending
+ *     strike loses its gold to a defender who closed, a ball that came across him, or range), the
+ *     ring locked red when pressed out of range, a pending shot struck within 1.3 s (at full stretch,
+ *     or dropped), the stride contact, the aim's reach into the corner by SHO and range, the set keeper's
+ *     full stretch, the interim whole-match fit (CONE_SCALE 2.1 → 0.85, the red ring's own 2.4, the
+ *     range cone steeper beyond 20 m, SHO's cone 6.5° → 1.4°, no range read for the keeper, block
+ *     lunges and blockChance, the assist at 90%, the corner header's cone) and the penalty's cone kept
+ *     as soccer-4 set it (the shootouts).
  */
 const GOLDEN = {
-  attacks: '1d7cdc7e039995',
-  matches: '1708a325e6679d',
-  shootouts: '1f1b284a6ae4a2',
+  attacks: '1036510f99d886',
+  matches: '1d3f3996736321',
+  shootouts: '14b5217178220b',
 };
 
 /** cyrb53: a 53-bit string hash, as hex */
