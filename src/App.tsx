@@ -29,6 +29,9 @@ import { NET_ON } from './net/nostr';
 import { Sheet, Toast, TopBar } from './ui/common';
 import { Transition } from './ui/motion';
 import { RecoveryBoundary } from './shell/Recovery';
+import { ArenaCurtain, ArenaCurtainHost } from './shell/ArenaCurtain';
+import type { ArenaInfo } from './shell/curtain';
+import { UtSkeleton } from './shell/UtSkeleton';
 import { Draft, type OnlineProps } from './ui/Draft';
 import { type LbStatus, NameSheet, openBoardNext, openOnlineNext } from './ui/Leaderboard';
 import { type Gift, watchGifts } from './net/gifts';
@@ -955,6 +958,7 @@ export function App() {
   let body: React.ReactNode;
   let viewId = 'shell';
   let enter = 'fade';
+  let arenaInfo: ArenaInfo | null = null; // shell-6: the arena curtain's matchup (draft matches)
   if (needsName) {
     viewId = 'welcome';
     body = (
@@ -973,7 +977,7 @@ export function App() {
     viewId = 'ut';
     enter = 'up';
     body = (
-      <React.Suspense fallback={<ScreenLoading label="Preparing your club…" />}>
+      <React.Suspense fallback={<UtSkeleton coins={profile.coins} onExit={() => goTab('home')} />}>
         <UltimateTeam
           profile={profile}
           update={update}
@@ -1069,10 +1073,11 @@ export function App() {
     const mine = favoriteFor(SPORT);
     const kits = kitsFor(mine, r.online ? (opp?.fav ?? null) : aiFavorite(seed, SPORT, mine), SPORT);
     viewId = 'arcade:' + run.id;
+    arenaInfo = { us: { name: 'You', abbr: 'YOU', c1: kits.mine.jersey, c2: kits.mine.trim }, them: { name: r.online ? r.online.found.opp.name : 'AI ' + r.botLevel.toUpperCase(), c1: kits.theirs.jersey, c2: kits.theirs.trim }, mode: r.online ? 'Head to Head · online' : 'Head to Head' };
     enter = 'zoom';
     body = (
       <div className="screen arcade">
-        <React.Suspense fallback={<ScreenLoading label="Preparing the game…" />}><Arcade
+        <React.Suspense fallback={<ArenaCurtain standalone info={arenaInfo} />}><Arcade
           lineup={d.lineup}
           rivalLineup={d.botLineup}
           rivalName={r.online ? r.online.found.opp.name : 'AI ' + r.botLevel.toUpperCase()}
@@ -1192,6 +1197,7 @@ export function App() {
 
   return (
     <>
+      <ArenaCurtainHost info={arenaInfo} seed={viewId} />
       <Transition id={viewId} enter={enter} exitMs={260}>
         <RecoveryBoundary where="view" resetKey={viewId} onHome={recoveryHome} homeLabel={screen === 'utmatch' ? 'BACK TO ULTIMATE TEAM' : undefined} online={!!run?.online && inDraftMatch && !opp?.left && !opp?.gone && !droppedRef.current}>{body}</RecoveryBoundary>
       </Transition>

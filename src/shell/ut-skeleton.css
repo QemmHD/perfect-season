@@ -1,0 +1,287 @@
+/* Claude (studio overhaul, shell-6, 2026-11-16): Ultimate Team's loading screen (src/shell/UtSkeleton.tsx).
+   The top bar and tab bar are UT's own (styles.css has their base rules). nav.css arrives with UT's
+   code, so the few nav.css rules the chrome needs are repeated here for `.ut-skel` only, with the same
+   values: nothing moves when UT takes over. Placeholders shimmer; under reduced motion they are still. */
+
+/* ---------- chrome rules from nav.css, for the screen drawn before UT's code is in ---------- */
+.ut-skel .ut-top {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+.ut-skel .ut-top.no-back {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.ut-skel .ut-top.no-back .ut-title {
+  text-align: left;
+  padding-left: 2px;
+}
+.ut-skel .ut-top .ut-back {
+  height: 44px;
+  min-width: 44px;
+  padding: 0 12px 0 9px;
+  gap: 4px;
+  font-size: 11.5px;
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+}
+.ut-skel .ut-top .ut-back.icon-only {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.ut-skel.ut-sub .ut-title {
+  font-size: 21px;
+}
+.ut-skel.ut-v-circuit .ut-title,
+.ut-skel.ut-v-standouts .ut-title {
+  font-size: 19px;
+}
+.ut-skel .ut-tabs button {
+  font-stretch: 78%;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  min-height: 48px;
+}
+.ut-skel .ut-tabs button > span {
+  max-width: 100%;
+  white-space: nowrap;
+}
+.ut-skel .ut-segbar {
+  flex-shrink: 0;
+  padding: 0 16px 8px;
+}
+.ut-skel .ut-segs {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  padding: 3px;
+  border-radius: 13px;
+  background: #061820;
+  border: 1px solid var(--line);
+}
+.ut-skel .ut-segs-ind {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--n));
+  transform: translateX(calc(var(--i) * 100%));
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1c4a55, #123540);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.ut-skel-seg {
+  position: relative;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sub);
+  font: 800 11px/1.1 var(--body);
+  font-stretch: 80%;
+  letter-spacing: 0.6px;
+}
+.ut-skel-seg > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ut-skel-seg[data-on] {
+  color: var(--text);
+}
+/* the back pill is drawn but not live until UT is in */
+.ut-skel-off {
+  pointer-events: none;
+}
+.ut-skel .ut-tabs button {
+  pointer-events: none;
+}
+
+/* ---------- the content placeholders ---------- */
+.ut-skel-body,
+.ut-loading.ut-skel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  color: inherit;
+  padding: 6px 16px 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.ut-skel-shapes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+.ut-skel-shapes .sk {
+  display: block;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(31, 66, 80, 0.55), rgba(13, 38, 49, 0.55));
+  border: 1px solid rgba(143, 166, 178, 0.14);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.05),
+    0 8px 18px -12px rgba(0, 0, 0, 0.7);
+}
+.ut-skel-shapes .sk::after {
+  /* the shimmer: one band of light sweeping across, all shapes in step */
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.07) 50%, transparent 80%);
+  animation: sk-sweep 1.4s ease-in-out infinite;
+}
+@keyframes sk-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+.ut-skel-shapes .sk-hero {
+  background:
+    radial-gradient(80% 90% at 85% 10%, rgba(245, 184, 61, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(36, 74, 88, 0.6), rgba(13, 38, 49, 0.6));
+  border-color: rgba(245, 184, 61, 0.2);
+}
+.ut-skel-shapes .sk-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.ut-skel-shapes .sk-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ut-skel-shapes .sk-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.ut-skel-shapes .sk-card {
+  background:
+    linear-gradient(160deg, rgba(245, 184, 61, 0.12), transparent 50%),
+    linear-gradient(180deg, rgba(36, 70, 84, 0.6), rgba(13, 38, 49, 0.6));
+}
+.ut-skel-shapes .sk-court {
+  position: relative;
+  height: 330px;
+  flex-shrink: 0;
+  border-radius: 18px;
+  background:
+    radial-gradient(60% 40% at 50% 100%, rgba(255, 255, 255, 0.05), transparent 70%),
+    linear-gradient(180deg, rgba(31, 66, 80, 0.35), rgba(13, 38, 49, 0.35));
+  border: 1px solid rgba(143, 166, 178, 0.12);
+}
+.ut-skel-shapes .sk-court .sk {
+  position: absolute;
+}
+.sk-c0 {
+  left: 36.5%;
+  top: 16px;
+}
+.sk-c1 {
+  left: 6%;
+  top: 92px;
+}
+.sk-c2 {
+  right: 6%;
+  top: 92px;
+}
+.sk-c3 {
+  left: 18%;
+  top: 214px;
+}
+.sk-c4 {
+  right: 18%;
+  top: 214px;
+}
+
+/* ---------- the label and its track ---------- */
+.ut-skel-label {
+  margin: 12px 0 8px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.ut-skel-label .num {
+  color: var(--gold);
+}
+.ut-skel-track {
+  display: block;
+  align-self: center;
+  width: 58%;
+  height: 4px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.ut-skel-track i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #c98a1d, var(--gold), #ffe7a8);
+  box-shadow: 0 0 8px rgba(245, 184, 61, 0.6);
+  transition: width 0.25s ease-out;
+}
+
+/* ---------- the load error ---------- */
+.ut-load-error {
+  padding: 24px;
+  text-align: center;
+}
+.ut-load-error h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text);
+}
+.ut-load-error p {
+  margin: 0;
+  max-width: 300px;
+  line-height: 1.4;
+}
+.ut-load-error .btn {
+  min-height: 48px;
+  min-width: 160px;
+}
+.ut-load-mark {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  color: var(--gold);
+  background: linear-gradient(180deg, #17404f, #08202b);
+  border: 1px solid rgba(245, 184, 61, 0.35);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.15),
+    0 10px 22px -10px rgba(0, 0, 0, 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ut-skel-shapes .sk::after {
+    animation: none;
+    display: none;
+  }
+  .ut-skel-track i {
+    transition: none;
+  }
+}

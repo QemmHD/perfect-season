@@ -47,7 +47,7 @@ import './clubhouse.css';
 // card pool loads when the screen opens. App.tsx only routes here (screen 'ut').
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { easternDateKey } from '../engine/season';
-import { SPORT, SPORT_NAME } from '../engine/sport';
+import { SPORT } from '../engine/sport';
 import { newId, saveProfile, type Profile } from '../lib/profile';
 import { reloadForMissingFiles } from '../lib/update';
 import { sfx, vibrate } from '../lib/sound';
@@ -198,6 +198,7 @@ import { PullTracker } from './PullTracker';
 import type { PickState } from './content-state';
 // Claude (UI reorganisation): last, so the shell and shared pieces win over older rules
 import './nav.css';
+import { UtLoadError, UtSkeletonBody } from '../shell/UtSkeleton';
 
 /** An owned card with its rating and where it plays (if it's in the squad). */
 export interface ClubCard {
@@ -1268,22 +1269,9 @@ export default function UltimateTeam(props: {
   const detailCard = detail ? (byUid.get(detail) ?? null) : null;
 
   let body: React.ReactNode;
-  if (failed)
-    body = (
-      <div className="ut-loading">
-        <p>The cards didn’t load.</p>
-        <button className="btn primary" onClick={load}>
-          TRY AGAIN
-        </button>
-      </div>
-    );
-  else if (!pool)
-    body = (
-      <div className="ut-loading" role="status">
-        <span className="ut-spinner" aria-hidden="true" />
-        <p>Loading {SPORT_NAME[SPORT]} cards…</p>
-      </div>
-    );
+  // shell-6: the chrome above and below is UT's own while the pool loads; the body is the loading screen's
+  if (failed) body = <UtLoadError onRetry={load} />;
+  else if (!pool) body = <UtSkeletonBody view={view} />;
   else if (view === 'squad')
     body = (
       <SquadView

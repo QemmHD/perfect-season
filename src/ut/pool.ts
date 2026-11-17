@@ -12,6 +12,7 @@ import { deriveVariantLine, isVariantId } from './variants';
 import { deriveLiveLine, parseLiveId } from './live-cards';
 import { loadSchedule, schedule } from './calendar';
 import { rareInfo } from './rare';
+import { poolLoadStarted, reportPool } from '../shell/pool-progress';
 
 /**
  * Claude: content version mixed into the pool fingerprint. This build can field Weekly Standout and
@@ -115,9 +116,12 @@ function poolBuilder(sport: UtSport, lines: CardLine[], byId?: Map<string, CardL
 async function buildPoolInSlices(sport: UtSport, lines: CardLine[], byId?: Map<string, CardLine>): Promise<Pool> {
   const b = poolBuilder(sport, lines, byId);
   let t0 = performance.now();
+  let n = 0;
   for (const l of lines) {
     b.add(l);
+    n++;
     if (performance.now() - t0 > 12) {
+      reportPool('rate', n, lines.length);
       await new Promise((r) => setTimeout(r, 0));
       t0 = performance.now();
     }
@@ -125,16 +129,23 @@ async function buildPoolInSlices(sport: UtSport, lines: CardLine[], byId?: Map<s
   return b.done();
 }
 
+// Claude (studio overhaul, shell-6, 2026-11-16): loading progress for Ultimate Team's loading screen
+// (src/shell/pool-progress.ts holds it; src/shell/UtSkeleton.tsx shows it). Loading path only: the
+// pool that is built is unchanged. Phases: fetch (the card file arrives and expands), rate (counted),
+// done, failed.
+export { onPoolProgress, poolProgress, type PoolProgress } from '../shell/pool-progress';
+
 let cache: Promise<Pool> | null = null;
 
 /** This page's sport's pool (cached). */
 export function getPool(): Promise<Pool> {
+  if (!cache) poolLoadStarted('pool');
   // Claude wave 3: the Live Calendar schedule loads with the cards (program cards resolve from it)
   cache ??= Promise.all([loadCards(SPORT), loadSchedule()])
-    .then(([s]) => buildPoolInSlices(SPORT, s.lines, s.byId))
-    .then((p) => (rareInfo(p), p));
+    .then(([s]) => (reportPool('rate', 0, s.lines.length), buildPoolInSlices(SPORT, s.lines, s.byId)))
+    .then((p) => (rareInfo(p), reportPool('done', p.lines.length, p.lines.length), p));
   // a failed load can be tried again
-  cache.catch(() => (cache = null));
+  cache.catch(() => ((cache = null), reportPool('failed')));
   return cache;
 }
 
