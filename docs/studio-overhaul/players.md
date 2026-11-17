@@ -426,6 +426,64 @@ The harness's L4 reads 7 of 7 correct on the records.
 
 ---
 
+### players-5 · Near-first sprite budget (A-1), locomotion without skating (A-5), HUD and rematch anchors (done; NBA 4× within the paired base's spread, see "Left undone")
+
+Base `c66413e` (the players-4 doc commit). The machine restarted during an earlier attempt at this task; its uncommitted work (sprite-budget.ts, locomotion.ts, anchors.ts, the walk clip, the three renderers' sprite sections, the tests and the classifier rewrite) was reviewed, measured, fixed and finished here. Render-only: **Protocol bump needed: none.** No storage key, save field, card/edition/copy id or engine number changed; the simulation imports none of this code, and `render-only.test.ts` now runs the budget, locomotion and every touch in its per-step engine hash (unchanged).
+
+**What changed**
+- **`src/game/pixel/sprite-budget.ts` (new).** Each renderer plans every body's sprite first (`SpritePlan`: key, how to draw it, the next stride frame), resolves them in budget order (`resolveSprites`) into a map, then draws in its existing depth order.
+  - **Must set, always fresh:** the handler/carrier (NFL: the QB until the throw), the pass target, his nearest defender, the NBA rebounder in a race, the body the player controls in any phase (`renderer.controlled`, set by the screen when it isn't the ball body: the default solo defense), and any body `pin()`ned. Then `px + 24 × frames stale`; a body of 32 art px or more stale 2 frames is forced.
+  - **Count:** an EWMA (0.15) of per-draw cost from each frame's total time over its draws (robust to iOS's 1 ms timer clamp), `clamp(floor(budgetMs / cost), 3, 14)`, `budgetMs` 5 (3 after a frame over 20 ms).
+  - **Starts** (snap, kickoff, inbound, replay jump, rematch / `resetMotion`): the first frame may draw 14, the next 30 spend 10 ms, and up to 2 leftover draws a frame pre-draw the next stride frames of the 6 nearest bodies. A new state object counts as a start only if its clock starts (<0.25 s) or jumps, so replays, which hand over a new snapshot each frame, don't (an earlier cut warmed every replay frame).
+  - **`tight`** (the 5 ms buys fewer than 3 drawings, or a slow frame outside a start): no start budget, the must set at 15 fps and inside the count, big bodies forced after 4 stale frames, and fewer variants per frame (no side lean, head lead or plant dip; forward lean in 0.1 rad steps).
+  - **Area:** every match `SpriteCache` shares `MATCH_AREA`, a 6 Mpx art-px account (module-level, so it outlives a rematch); over the cap the oldest drawings not on screen go first. `Steady` holds a body's size and pitch through the camera's small moves (6% / 0.1).
+- **`src/game/pixel/locomotion.ts` (new), used by `select-{nba,nfl,soccer}.ts` `motionOf`.**
+  - `pickGait`: the nearest recorded stride at 0.8–1.25×, shorter steps (10% steps, floor 25%, the slide 15%) below the slowest; a stride already showing stays while within 8%. Forward walk/jog/run/sprint (+ the NFL block step for blockers), back the backpedal then walk/jog played backward, sideways the shuffle. `openHips` turns a defender to run when he moves back or sideways faster than any stride that way.
+  - **Walk clip:** CMU 035_01, 1.14 s, footfalls from `build_mocap.py` (new `step_lift`/`step_dwell` for a walk's low swing), in all three bundles.
+  - **Dead bands gone:** NBA `run` under 2.5 ft/s showing `ready`, the static `defend` pose at 1–3 ft/s, soccer `ready` while drifting 0.15–1 m/s, the backpedal rate caps; NFL `stance`/`run`/`backpedal` showing the stance or `ready` under 0.6–1 yd/s.
+  - **Planted foot (R4):** in a contact beat (first 40% of each step after `stepL`/`stepR`) the drawn body moves with the feet; between contacts it leads back through a damper of at most half the stride's own travel a frame; airborne it decays; capped at 5% of his height. The NBA ground mark, dribble floor and hand anchor, the soccer ball at his feet, and the NFL ball arm take the same offset.
+  - **Rates:** step 1 (30 fps) for the must set, step 2 (15 fps) for everyone else including far NFL/soccer bodies (they were step ≥3); a must-set stride under rate 1 at half frames, rasterised fresh from the joints between two recorded frames (never two drawings blended).
+  - **Turns (R5):** 90° per 100 ms; under 45° glide, 45–120° plant (a 1 art px dip for 0.1 s), over 120° two-thirds-speed steps then the plant; the head leads by one frame; spins, falls, dives and the 360 dunk are exempt.
+  - **Facing:** NBA the engine's facing; NFL the QB faces downfield from the snap (a 6-frame catch of the snap, then a rate-matched back stride while he drops: never the idle clip while he moves), backpedalling defenders watch the QB until they open their hips, any defender retreating from the ball faces it; soccer defenders getting back (<4.5 m/s) face the ball.
+  - **Lean (R6):** up to 12° forward into a burst (with the sprint lean, capped at 12° total), 8° into turns, a 6° brake lean-back for 5 frames; head bob −1, −1, +2 art px per stride at 34 art px.
+  - **Game-time clock:** every memo runs on `t`; Δt < 0, Δt > 0.25 s or `resetMotion()` restarts the turn, the planted foot, the lean and the stride; a frozen clock (pause, hit-stop) holds the frame.
+- **HUD anchors** (§4.3), on each renderer, keyed by body index (NBA) or body id (NFL, soccer): `drawnOffset`, `headTop`, `feetAt`, `groundEllipse`, `handAnchor`, `pin`, `resetMotion`, plus the `controlled` field (`src/game/pixel/anchors.ts`).
+
+**Before → after** (393×852, dev server 5214, `players-sprites.mjs`, 18 s autoplay; before = players-1's baseline on the base tree; after = `--tag final-p5`, `O/shots/players/players-5/`):
+
+| Row | Target | Before | After |
+|---|---|---|---|
+| NFL stale | ≥48 px <2%, 32–47 <5%, overall <10% | 82.5% / 57.5% / 41.4% | **0% / 0.1% / 0.7%** (320: 0 / 0 / 0.7%) |
+| NBA stale | ≥48 px <2%, first 10 frames <5% | 5% (72+ 9.9%) / 26.8% | **0.4% / 0%** (320: 0.1% / 0%; ≥48 px 0.3–1.2% and first 10 frames 0–1.8% across the 393 and 320 runs after the last `tight` fix; one 393 run of an earlier `tight` threshold read 10.8%, and one 320 run made while the vitest suites ran (56.8 fps) read 11.5%) |
+| Soccer stale | ≤1% | 1.9% | **0–0.4%** |
+| Pre-warm, ≥32 px, first 30 frames | ≤1% | NBA 17.7%, NFL 3%, soccer 0% | **NBA 0%, NFL 0%, soccer 0%**; after 3 `resetMotion()` rematches (`players-rematch.mjs`): NBA 1.0%, NFL 0.7%, soccer 0% |
+| Must-set rate (handler/carrier, defender, target) in a stride or stance | ≥28 fps | NBA ball body –, NFL 2.8, soccer 12.3 | pooled **NBA 38.1, NFL 42.2, soccer 38.1**; median body 34.1 / 38.7 / 39.6; lowest body 30.1 / 38.3 / 21.9 |
+| Every other body | ≥12 fps, none <10 | NBA min 5.7, NFL 0.7, soccer 10.9 | **min 14.2 / 17.3 / 18.1**, 0 under 12 |
+| Foot sliding (`players-slide-*.ts`, `motionOf`) | NBA ≤8%, soccer ≤4%, NFL ≤5% + 0 idle QB frames | 29.1%, 13.7%, 40.4% + 20,418 | **3.9%** (3 games), **2.6%** (120 attacks), **3.8%** + **0** (24 games, 408 dropbacks, 0 yd skated) |
+| Planted-foot drift in a contact beat (art px at 34) | ≤1 | — | p99 0.56 / 0.13 / 0; max 1.36 / 1.93 / 1.03 (NBA/NFL/soccer) |
+| Sprite area | ≤6 Mpx, across rematches | peak 6.61 (NBA 430) | NBA 6.00 (the cap) at 393/430, NFL 2.4–2.6, soccer 3.7; 3 rematches: peak 6.0 / 2.51 / 3.69, never over; NFL 22 bodies at 4× for 60 s: peak 1.94 |
+| Heap over 40 s and 3 rematches | within +10% | — | **+5.7% / +3.2% / +4.7%** |
+
+**Frame rate** (`players-matchperf.mjs`, DPR 3, 10 s windows, `O/shots/players/players-5/perf/`). 1× at the five viewports, `--tag after2-p5`: 59.7–60.0 in every run (NFL 393 58.1 in one earlier run while other teams' builds ran). 4×, **paired** with the base tree (`c66413e` exported to the scratchpad, served on the same port, alternated twice per round, `pair.sh`):
+
+| 4× fps | NBA 393 | NBA 430 | NBA 375 | NFL (five vps) | Soccer (five vps) |
+|---|---|---|---|---|---|
+| base | 53.4, 53.5, 52.5, 49.0, 49.3 | 50.8, 51.0, 46.7, 49.2, 47.3 | 53.2, 53.2, 53.4, 50.2, 52.2 | 53.6–57.8 | 56.8–59.2 |
+| first cut | 49.6, 48.9 | 47.3, 47.4 | 53.3, 49.7 | 51.9–57.0 | 55.4–57.8 |
+| with `tight` (final) | 48.5, 48.7, 48.9, 47.4 | 47.8, 47.0, 48.4, 44.8 | 54.0, 54.4, 50.4, 51.5 | 51.7–56.1 | 56.4–58.6 |
+
+The base's own spread at NBA 393 is 4.5 fps. Taking the rounds where both trees ran back to back on a quiet machine, NBA is 0.6–2.5 fps under the base at 393/430 and 2 over at 375; NFL and soccer within 0.5–3. The first cut was 4–8 fps under at NBA 375/393 (its 14-draw start frames and 30 fps must set at 4× CPU), which `tight` fixed. The remaining NBA cost is the freshness itself: the base left 4.4% of NBA draws stale; now 0.3–0.7%.
+
+**Why the plan's numbers moved (recorded deviations):** the budget is 5 ms, not 3 (with 3 ms NBA ≥48 px stayed at 5.3% stale: 10 large bodies, each a new drawing every few frames as the camera drifts); the start window spends 10 ms for 30 frames instead of only 2 leftover draws (measured: after an NBA replay the zoom eases from 1.35 to 1 and every body changes size each frame, so leftover-only pre-warm left 26.8% stale); "every sprite ≥34 art px at 30 fps" was dropped (it doubled an NBA frame's new drawings past the budget and froze the near players it was meant to help).
+
+**Tests added:** `sprite-budget.test.ts` (7: the must set and pins always fresh and no ≥32 px body stale over 2 frames under a 4-draw budget across 400 frames of 22 bodies; near-first order; the EWMA within ±20% in 30 frames through a 1 ms clock, count in [3, 14], the slow-frame budget; pre-warm ≤2 a frame for 30 frames; the start window; `tight`; the area cap never exceeded across 3 rematches), `locomotion.test.ts` (12: 0.8–1.25× and ≤15% off from a drift to a sprint; walk below the jog; planted toe ≤1 art px at 34 through each contact beat; ≤5% of height; airborne decay; footfalls; turn classes, 80–120 ms per 90° and ≤1 of 16 facings a frame; the one-frame head lead; 6° brake for 4–6 frames, ≤12° burst; bob −1, −1, +2; the clock), `time.test.ts` (6: rewind, SIM jump, inbound and rematch start exactly like a body seen for the first time; pause and hit-stop hold the frame and resume within 20% of his height). `render-only.helpers.ts` runs `motionOf`, the touches and a `SpriteBudget` in the per-step hash. **Changed:** `select-golden.test.ts` and `select-golden-soccer.test.ts` re-pinned (NBA `0fb1e2aa`/`eee73918`, NFL `f83f9e62`/`4ea8a66d`, soccer `c99b29e8`/`30da6afa`), because locomotion changes the selection on purpose and the runner now hashes the whole `motionOf` frame; the players-2/4 values stay in git history as the move's proof.
+
+**Harness:** the three slide classifiers now run `motionOf` (they carried their own copy of the old branches); the sprite probe resets the budget's dev counters (`window.__pixelDebug`, written only while a harness sets it), reports the must set's rate (`animFps.priority`) and matches soccer keys; `players-rematch.mjs` (new); verify row A4 now gates the must set (pooled and median ≥28) and everyone ≥12.
+
+**Verification:** `bash O/heavy.sh npm run typecheck` pass. `npx vitest run src/game/pixel scripts/qa/players-lib.test.ts src/engine/sport-branches.test.ts src/game/hoops2 src/game/juice.test.ts`: 254 pass, 11 skipped. `PS_SPORT=nfl npx vitest run src/game/pixel src/game/football2`: 275 pass, 12 skipped. `PS_SPORT=soccer npx vitest run soccer sport-branches src/game/pixel`: 285 pass, 9 skipped. Browser runs (dev server 5214, Playwright, touch, isolated, 0 external requests in every report): `players-sprites.mjs --vp 393,320`, `players-matchperf.mjs` (5 viewports, 1× and 4×) and the paired runs, `players-rematch.mjs`, `players-burst.mjs`, and `vite-node scripts/qa/players-slide-{nba,nfl,soccer}.ts`.
+
+**Looked at:** `after-p5-ingame-{nba,nfl,soccer}-{393,320}-{0..5}.png`, `after-p5-burst-{nba,nfl,soccer}-sheet.png` (0.25×: poses change every capture, no frozen near player, no figure off its shadow), `perf/after-p5-perf-match-*.png`.
+
 ## 2. Baselines (base commit `1d14201` = source of `acdf3e2`, dev server, players-1, 2026-11-16)
 
 Unless noted: 393×852 with insets 59/34, `deviceScaleFactor` 1, the autoplay benches (`?arcade&auto`, `?soccer-lab&auto&qa`), `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted. **The machine was shared with six other teams** (load average 5–6 on 4 CPUs) throughout, which matters for the 4× CPU rows (see "Against the audit").
@@ -672,6 +730,8 @@ Published in players-1 (plan section 6). Other teams can rely on these names and
 
 Hit tests and HUD placement use these, never `b.p.ht`, because the drawn height is exaggerated ×1.15 (render-only). Sprite caches survive a rematch with the arena mounted; the 6 Mpx art-px area cap holds across rematches.
 
+**As built (players-5):** `who` is the body index on `HoopsRenderer` (`b.idx`) and the body id on `FootballRenderer` and `SoccerRenderer` (`b.id`). Points are the renderer's canvas px (before the screen's own CSS scale); each anchor is where the body was drawn on the last frame drawn, `null` before his first. `pin(who)` forces the next frame's sprite. `resetMotion()` keeps the drawings and the area account and pre-draws the next 30 frames. A screen whose player controls a body that isn't the ball's (the default solo defense) sets `renderer.controlled = <who>` (null otherwise) so that body is always drawn fresh at 30 fps. Pauses of 0.25 s or less need nothing: the game-time clock holds the frame.
+
 ### 4.4 Ground marks and the art pixel (players-2)
 
 **Re-published in the players-1 fix (V2 revised 13:09; v1.1).**
@@ -764,12 +824,19 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 | players-4 | same three | top imports | `staleLook` from `../pixel/looks`, `drawVignette` from `../pixel/venue` |
 | players-4 | same three | `let look = this.looks.get(who)` in the sprite method | `if (!look \|\| staleLook(look))`: a look made before the appearance data arrived is rebuilt, and the drawings let go (`this.sprites.dispose(this.last.values())`) |
 | players-4 | same three | the floor blit (`ctx.drawImage(fl.canvas, …)`; NFL also its early-return field blit) | `drawVignette(ctx, this.W, this.H)` right after it: one cached canvas, colour only |
+| players-5 | `hoops2/render.ts`, `football2/render.ts`, `soccer2/render.ts` | top imports | `locomotion`, `sprite-budget`, `anchors` imports; `motionOf` (was `animOf`), `groundEllipse`, `clipMeta`/`mocapJointsAtFrame` |
+| players-5 | same three | renderer fields after `sprites`/`last` | `SpriteCache(…, MATCH_AREA)`; `budget = new SpriteBudget()`, `steady`, `frameAt`, `lastT`, the last state, `anchors`, `pinned`, `controlled` (soccer also `ballShift`) |
+| players-5 | same three | `private sprite(` (now `private plan(`) | returns a `SpritePlan` (key, make, next stride frame) built from `motionOf`; the old inline budget/`CanvasOut` block moved to `resolveSprites`; then `mustSet`, the anchor methods and `resetMotion` |
+| players-5 | same three | `draw(` where `this.budget = 4` (NBA, NFL) or `5` (soccer) was | the start detection and `this.budget.begin(…)`; every body planned and `resolveSprites` run before the shadows; shadows, sprites and anchors at the drawn spot (engine spot + planted-foot offset) |
+| players-5 | `hoops2/render.ts` | the ball block (`// the ball: in a flight, on the dribble`) | the dribble floor (two lines) reads the handler's drawn feet (`this.anchors`) |
+| players-5 | `soccer2/render.ts` | the ball drawing (`const b = a.ball`) | the owned ball rides with its owner's planted-foot offset (`ballShift`) |
 | players-4 | `pixel/persp.ts` `standsWall`, `courtTexture`; `pixel/court.ts` `drawCourt`/`drawCrowd`; `pixel/field.ts` `drawField`; `pixel/pitch.ts` `pitchTexture` | the colour picks inside the per-texel loops | colours from `venue.ts`/`crowd.ts` (tokens, `lit`, `teamPaint`, `crowdAt`); no geometry, line, stand or camera position changed |
 
 ## 7. Touched outside my lane
 
 - **players-2, announced backing hunk** (plan §2, request 2 in section 5): `src/game/hoops2/Hoops2.tsx`, `src/game/football2/Football2.tsx`, `src/game/soccer2/Soccer2.tsx`, the resize code in the draw loop: one import of `artScale` plus 4 lines (`renderer.art = artScale(canvas, W, H)`; the backing size `bw`/`bh`; the size check and `canvas.width/height` use it). With the adopted option C the backing is 1, so the canvas is exactly as before; `?artpx=A` turns on the device-resolution backing.
 - players-1 changed only `scripts/qa/players-*` and this doc.
+- **players-5:** only the players sections of the three `render.ts` files (section 6), plus three small hunks next to the sport teams' code: the budget's start detection and `begin()` at the top of each `draw()` (where `this.budget = 4` or `5` was), the NBA dribble-floor lines and the soccer owned-ball offset in the ball drawing (two lines each), and the anchor methods appended to each renderer class. `scripts/build_mocap.py` (players-owned per the plan) gained the walk clip and the walk's footfall thresholds. No screen file (`Hoops2.tsx`, `Football2.tsx`, `Soccer2.tsx`) was touched: wiring `renderer.controlled`, `resetMotion()` on rematch and the HUD's use of the anchors is the sport teams'.
 - **players-4:** `src/game/soccer2/kits.ts` (soccer's), two lines in `soccerKits`: the rival changes whenever the first colours are within CIEDE2000 ΔE 25, to the first of the away set and three change kits that reads (`clearOf`, `CHANGE_COLORS` from `uniforms.ts`); before, he changed only when the away set was "further" by the redmean distance. The `drawVignette` line and the look-rebuild line in each sport's `render.ts` (section 6) sit next to the sport teams' floor and sprite code.
 - **players-3 review fix:** one announced line plus an import in each sport screen's game loop (`Hoops2.tsx`, `Football2.tsx`, `Soccer2.tsx`): `if (holdPlay('<sport>', now)) acc = 0;`, right after the `acc +=` line (soccer: `const held = holdPlay('soccer', now)` beside `slow`, and `if (held) acc = 0;` in the live branch). It holds game time, never inputs or results, while the first load is on its way (section 6).
 - **players-3:** `docs/CREDITS.md`, a new "Player appearance" section (Monk Skin Tone CC BY 4.0, transfermarkt-datasets CC0, Commons photos as references only). The one-line `drawGate` hunks in the three `render.ts` `draw()` methods (section 6) sit at the top of a method the sport teams also edit.
@@ -777,6 +844,8 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 ## 8. Deviations from STREAM, recorded
 
 - **A-5 "interpolating 15 fps clips".** Research R2 says never interpolate between cached frames (pixel joints shimmer). We sample clips natively at 30 fps for the near, large and ball bodies instead, and blend only *between clips*. V2 B.1.6's rates (handler and defender 30 fps, others 15) agree.
+- **players-5 sprite budget:** 5 ms (not 3) and a 10 ms start window for 30 frames (not 2 leftover draws) at 1×; on a slow phone (`tight`) it falls back below the plan's numbers. "Every sprite ≥34 art px at 30 fps" was dropped: only the must set runs at 30. Measured reasons in section 1, players-5.
+- **players-5 NFL drop:** the 3/5/7-step footwork comes from the stride rate-matched to the engine's drop speed (the steps the engine's movement implies), not from a keyed 3/5/7-step table; the engine has no `dropSteps` field yet (§4.1 reserves it).
 - **players-4's crowd is three dark bands with flecks** (the task's spec), not yet V2 13:09's head-and-shirt crowd; that, and the shimmer and flashes, land with players-9 on the same `crowd.ts`.
 - **"Venue ≥30% darker than the players" is not met** (NBA −2.6%, NFL −15.4%, soccer −40% at 320): the spec's own plank and grass tokens set the surface lightness. V2 13:09 made the row reported only; section 5 request 8 asks the lead.
 - **STREAM's skin-palette crowd recolour** is replaced by V2 C.2's head-and-shirt crowd (revised 13:09: shirt colours by team share and six skin tones), so the crowd is still not one tone.
@@ -795,6 +864,7 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 10. The first match frame never pops from stand-in poses to recorded motion, and no curated star changes look mid-match (players-3 readiness), on a cold start over mobile data.
 12. players-4: open `?pixel=looks` on the phone and check the owner's seven (Shaq bald, Iverson cornrows + headband + sleeve, Kareem goggles, Rodman's dyed hair, Haaland long blond, Mbappé short and clean-shaven, Brady), then a match per sport: can you tell the stars apart, do numbers read from about 28 px, and is the calmer floor and three-band crowd still "a lit arena" rather than dull?
 13. Kits: two teams with close colours (Lakers vs Kings, Bulls vs Heat, Liverpool vs Arsenal) get a change kit that reads at a glance.
+14. players-5: in a match per sport, do the near players ever freeze or slide? Watch the NBA inbound after a replay, the NFL snap and drop (the QB faces downfield and steps back, never gliding), soccer defenders backing off facing the ball, and slow drifts (a walk, never a frozen stance). On an older iPhone, does the frame rate hold at the start of a possession?
 11. Black kits (Nets, Spurs, Raiders, Saints, Steelers, Juventus) on the phone: they now draw as charcoal (`#3b3b3b` base) inside the `#14121c` outline so the silhouette and the shaded side show; check they still read as black kits in a match, and that white kits read white.
 
 ## 10. Left undone, and why
@@ -813,4 +883,10 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
     - wiring `crowd.excite` (the sport teams);
     - the ledger-only C.2 items the sport teams own: layers, beams, haze, drift.
   - The venue screen row: soccer's 393 run caught 0 venue frames (its 320 run is reported). The screen harness's crowd top-3 share counts the ribbons and facades inside its detected stands band; the palette itself is proved in `venue.test.ts`.
+- **players-5:**
+  - **NBA at 4× CPU** stays 0.6–2.5 fps under the paired base at 393 and 430 (inside the base's own 4.5 fps run-to-run spread, and 2 fps over it at 375); NFL and soccer within 0.5–3. The extra cost is the freshness (stale NBA draws 4.4% → 0.3%). players-10 repeats the pairing on `vite preview`; if the phone needs it, the next lever is fewer touch variants per frame at 1× too.
+  - **The must set's lowest body** reads 21.9 fps in soccer (pooled 38–39, median body 39–41) and 29–30 in NBA: the harness's must set (the ball's body, the target, his nearest opponent) is a stand-in for the renderer's (which also holds the controlled man and the soccer pass target), and one soccer body the harness counts was not always in the renderer's set. Not yet traced to the frame.
+  - **`renderer.controlled`, `resetMotion()` on the One-More rematch, and the HUD reading `headTop`/`feetAt`** are the sport teams' hunks in their screens; until they land, the controlled defender in solo defense is fresh only through the ≥32 px force rule, and a rematch re-mount starts cold (the caches go with the old renderer).
+  - **16 facings from 18 art px** "when the area cap allows" was not done: NBA already runs at the 6 Mpx cap at 393/430, so far bodies keep 8 facings under 26 (NBA) / 22 (NFL, soccer) art px.
+  - The `?pixeldebug` counter is the harness-set `window.__pixelDebug` (frames, draws, forced, limit, cost, drawing time); stand-in poses, default looks and blend draws are counted by the existing readiness probe and land with players-6's blends.
 - **Nothing else from players-1 is left.** Every later row in section 3 belongs to the task named in its row.
