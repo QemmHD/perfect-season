@@ -1,0 +1,76 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "smoke",
+  "sat": 59,
+  "wantSat": 59,
+  "probe": {
+   "fetched": "blocked",
+   "socket": "blocked"
+  },
+  "blockedHere": 2,
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat81",
+  "step": "smoke",
+  "sat": 81,
+  "wantSat": 81,
+  "probe": {
+   "fetched": "blocked",
+   "socket": "blocked"
+  },
+  "blockedHere": 2,
+  "errors": []
+ },
+ {
+  "tag": "390x844",
+  "step": "smoke",
+  "sat": 47,
+  "wantSat": 47,
+  "probe": {
+   "fetched": "blocked",
+   "socket": "blocked"
+  },
+  "blockedHere": 2,
+  "errors": []
+ },
+ {
+  "tag": "430x932",
+  "step": "smoke",
+  "sat": 59,
+  "wantSat": 59,
+  "probe": {
+   "fetched": "blocked",
+   "socket": "blocked"
+  },
+  "blockedHere": 2,
+  "errors": []
+ },
+ {
+  "tag": "375x667",
+  "step": "smoke",
+  "sat": 20,
+  "wantSat": 20,
+  "probe": {
+   "fetched": "blocked",
+   "socket": "blocked"
+  },
+  "blockedHere": 2,
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "smoke",
+  "sat": 0,
+  "wantSat": 0,
+  "probe": {
+   "fetched": "blocked",
+   "socket": "blocked"
+  },
+  "blockedHere": 2,
+  "errors": []
+ }
+]
+QA isolation: blocked 12 request(s) to live hosts {"example.com":12}
+errors 0 []

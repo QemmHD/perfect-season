@@ -1,0 +1,867 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "layout",
+  "c5": {
+   "whistleAt": 6273.800000000745,
+   "movedMs": 88
+  },
+  "c2": {
+   "n": 50,
+   "p50": 45,
+   "p95": 69
+  },
+  "dom": {
+   "a": {
+    "x": 277,
+    "y": 692,
+    "w": 92,
+    "h": 92,
+    "cx": 323,
+    "cy": 738
+   },
+   "b": {
+    "x": 206,
+    "y": 746,
+    "w": 64,
+    "h": 64,
+    "cx": 238,
+    "cy": 778
+   },
+   "c": {
+    "x": 226,
+    "y": 670,
+    "w": 48,
+    "h": 48,
+    "cx": 250,
+    "cy": 694
+   },
+   "zone": {
+    "x": 0,
+    "y": 383,
+    "w": 189,
+    "h": 435,
+    "cx": 94,
+    "cy": 601
+   },
+   "bug": {
+    "x": 81,
+    "y": 65,
+    "w": 232,
+    "h": 40,
+    "cx": 197,
+    "cy": 85
+   },
+   "heat": true,
+   "pause": {
+    "x": 12,
+    "y": 63,
+    "w": 44,
+    "h": 44,
+    "cx": 34,
+    "cy": 85
+   },
+   "toast": {
+    "x": 12,
+    "y": 590,
+    "w": 369,
+    "h": 28,
+    "cx": 197,
+    "cy": 604
+   }
+  },
+  "gaps": {
+   "ab": 15.9,
+   "ac": 15.2
+  },
+  "text": {
+   "bad": [],
+   "spill": [],
+   "scrollX": 0
+  },
+  "toastGoal": {
+   "n": 120,
+   "hit": 0
+  },
+  "pause": {
+   "t0": 0.35,
+   "t1": 0.35,
+   "t2": 1.1500000000000008
+  },
+  "sheetFits": true,
+  "quit": {
+   "us": [
+    "L"
+   ],
+   "them": 7
+  },
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat59",
+  "step": "c4",
+  "c4": {
+   "sprint": 8.69,
+   "underShoot": 7.32,
+   "rawRatio": 0.842,
+   "ratio": 0.85,
+   "before": {
+    "v": 8.69354387865556,
+    "stamina": 0.776666666666669,
+    "sprinting": true,
+    "owner": true,
+    "meter": false,
+    "end": false
+   },
+   "during": {
+    "v": 7.319656652456194,
+    "stamina": 0.7000000000000031,
+    "sprinting": true,
+    "owner": true,
+    "meter": true,
+    "end": false
+   }
+  },
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat59",
+  "step": "layout-fk",
+  "d": {
+   "w": 48,
+   "cx": 340,
+   "cy": 652
+  },
+  "gad": 17.7,
+  "targets": 4,
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat59",
+  "step": "forfeit-sheet",
+  "ff": {
+   "score": 0,
+   "drive": 0,
+   "done": false,
+   "ends": [],
+   "plays": 0
+  },
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat59",
+  "step": "reduced-motion",
+  "breathe": "none",
+  "slide": "none",
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat81",
+  "step": "layout",
+  "c5": {
+   "whistleAt": 5249.9000000003725,
+   "movedMs": 87
+  },
+  "c2": {
+   "n": 50,
+   "p50": 34,
+   "p95": 49
+  },
+  "dom": {
+   "a": {
+    "x": 277,
+    "y": 692,
+    "w": 92,
+    "h": 92,
+    "cx": 323,
+    "cy": 738
+   },
+   "b": {
+    "x": 206,
+    "y": 746,
+    "w": 64,
+    "h": 64,
+    "cx": 238,
+    "cy": 778
+   },
+   "c": {
+    "x": 226,
+    "y": 670,
+    "w": 48,
+    "h": 48,
+    "cx": 250,
+    "cy": 694
+   },
+   "zone": {
+    "x": 0,
+    "y": 383,
+    "w": 189,
+    "h": 435,
+    "cx": 94,
+    "cy": 601
+   },
+   "bug": {
+    "x": 81,
+    "y": 87,
+    "w": 232,
+    "h": 40,
+    "cx": 197,
+    "cy": 107
+   },
+   "heat": true,
+   "pause": {
+    "x": 12,
+    "y": 85,
+    "w": 44,
+    "h": 44,
+    "cx": 34,
+    "cy": 107
+   },
+   "toast": {
+    "x": 12,
+    "y": 590,
+    "w": 369,
+    "h": 28,
+    "cx": 197,
+    "cy": 604
+   }
+  },
+  "gaps": {
+   "ab": 15.9,
+   "ac": 15.2
+  },
+  "text": {
+   "bad": [],
+   "spill": [],
+   "scrollX": 0
+  },
+  "toastGoal": {
+   "n": 121,
+   "hit": 0
+  },
+  "pause": {
+   "t0": 0.3333333333333333,
+   "t1": 0.3333333333333333,
+   "t2": 1.1333333333333342
+  },
+  "sheetFits": true,
+  "quit": {
+   "us": [
+    "L"
+   ],
+   "them": 7
+  },
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat81",
+  "step": "c4",
+  "c4": {
+   "sprint": 8.7,
+   "underShoot": 7.33,
+   "rawRatio": 0.843,
+   "ratio": 0.85,
+   "before": {
+    "v": 8.700690236139044,
+    "stamina": 0.7833333333333355,
+    "sprinting": true,
+    "owner": true,
+    "meter": false,
+    "end": false
+   },
+   "during": {
+    "v": 7.334842662108591,
+    "stamina": 0.7166666666666696,
+    "sprinting": true,
+    "owner": true,
+    "meter": true,
+    "end": false
+   }
+  },
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat81",
+  "step": "layout-fk",
+  "d": {
+   "w": 48,
+   "cx": 340,
+   "cy": 652
+  },
+  "gad": 17.7,
+  "targets": 4,
+  "errors": []
+ },
+ {
+  "tag": "390x844",
+  "step": "layout",
+  "c5": {
+   "whistleAt": 4277.5,
+   "movedMs": 89
+  },
+  "c2": {
+   "n": 50,
+   "p50": 48,
+   "p95": 54
+  },
+  "dom": {
+   "a": {
+    "x": 275,
+    "y": 685,
+    "w": 92,
+    "h": 92,
+    "cx": 321,
+    "cy": 731
+   },
+   "b": {
+    "x": 204,
+    "y": 739,
+    "w": 64,
+    "h": 64,
+    "cx": 236,
+    "cy": 770
+   },
+   "c": {
+    "x": 224,
+    "y": 663,
+    "w": 48,
+    "h": 48,
+    "cx": 248,
+    "cy": 687
+   },
+   "zone": {
+    "x": 0,
+    "y": 380,
+    "w": 187,
+    "h": 430,
+    "cx": 94,
+    "cy": 595
+   },
+   "bug": {
+    "x": 80,
+    "y": 53,
+    "w": 231,
+    "h": 40,
+    "cx": 195,
+    "cy": 73
+   },
+   "heat": true,
+   "pause": {
+    "x": 12,
+    "y": 51,
+    "w": 44,
+    "h": 44,
+    "cx": 34,
+    "cy": 73
+   },
+   "toast": {
+    "x": 12,
+    "y": 585,
+    "w": 366,
+    "h": 28,
+    "cx": 195,
+    "cy": 599
+   }
+  },
+  "gaps": {
+   "ab": 15.7,
+   "ac": 15.2
+  },
+  "text": {
+   "bad": [],
+   "spill": [],
+   "scrollX": 0
+  },
+  "toastGoal": {
+   "n": 121,
+   "hit": 0
+  },
+  "pause": {
+   "t0": 0.3333333333333333,
+   "t1": 0.3333333333333333,
+   "t2": 1.1166666666666676
+  },
+  "sheetFits": true,
+  "quit": {
+   "us": [
+    "L"
+   ],
+   "them": 7
+  },
+  "errors": []
+ },
+ {
+  "tag": "390x844",
+  "step": "c4",
+  "c4": {
+   "sprint": 8.69,
+   "underShoot": 7.32,
+   "rawRatio": 0.842,
+   "ratio": 0.85,
+   "before": {
+    "v": 8.69354387865556,
+    "stamina": 0.776666666666669,
+    "sprinting": true,
+    "owner": true,
+    "meter": false,
+    "end": false
+   },
+   "during": {
+    "v": 7.322693854386672,
+    "stamina": 0.7033333333333364,
+    "sprinting": true,
+    "owner": true,
+    "meter": true,
+    "end": false
+   }
+  },
+  "errors": []
+ },
+ {
+  "tag": "390x844",
+  "step": "layout-fk",
+  "d": {
+   "w": 48,
+   "cx": 338,
+   "cy": 645
+  },
+  "gad": 17.4,
+  "targets": 4,
+  "errors": []
+ },
+ {
+  "tag": "430x932",
+  "step": "layout",
+  "c5": {
+   "whistleAt": 4424.300000000745,
+   "movedMs": 83
+  },
+  "c2": {
+   "n": 50,
+   "p50": 45,
+   "p95": 52
+  },
+  "dom": {
+   "a": {
+    "x": 314,
+    "y": 772,
+    "w": 92,
+    "h": 92,
+    "cx": 360,
+    "cy": 818
+   },
+   "b": {
+    "x": 243,
+    "y": 826,
+    "w": 64,
+    "h": 64,
+    "cx": 275,
+    "cy": 858
+   },
+   "c": {
+    "x": 263,
+    "y": 750,
+    "w": 48,
+    "h": 48,
+    "cx": 287,
+    "cy": 774
+   },
+   "zone": {
+    "x": 0,
+    "y": 419,
+    "w": 206,
+    "h": 479,
+    "cx": 103,
+    "cy": 659
+   },
+   "bug": {
+    "x": 99,
+    "y": 65,
+    "w": 232,
+    "h": 40,
+    "cx": 215,
+    "cy": 85
+   },
+   "heat": true,
+   "pause": {
+    "x": 12,
+    "y": 63,
+    "w": 44,
+    "h": 44,
+    "cx": 34,
+    "cy": 85
+   },
+   "toast": {
+    "x": 12,
+    "y": 670,
+    "w": 406,
+    "h": 28,
+    "cx": 215,
+    "cy": 684
+   }
+  },
+  "gaps": {
+   "ab": 15.9,
+   "ac": 15.2
+  },
+  "text": {
+   "bad": [],
+   "spill": [],
+   "scrollX": 0
+  },
+  "toastGoal": {
+   "n": 121,
+   "hit": 0
+  },
+  "pause": {
+   "t0": 0.36666666666666664,
+   "t1": 0.36666666666666664,
+   "t2": 1.1500000000000008
+  },
+  "sheetFits": true,
+  "quit": {
+   "us": [
+    "L"
+   ],
+   "them": 7
+  },
+  "errors": []
+ },
+ {
+  "tag": "430x932",
+  "step": "c4",
+  "c4": {
+   "sprint": 8.7,
+   "underShoot": 7.33,
+   "rawRatio": 0.843,
+   "ratio": 0.85,
+   "before": {
+    "v": 8.700690236139044,
+    "stamina": 0.7833333333333355,
+    "sprinting": true,
+    "owner": true,
+    "meter": false,
+    "end": false
+   },
+   "during": {
+    "v": 7.334842662108591,
+    "stamina": 0.7166666666666696,
+    "sprinting": true,
+    "owner": true,
+    "meter": true,
+    "end": false
+   }
+  },
+  "errors": []
+ },
+ {
+  "tag": "430x932",
+  "step": "layout-fk",
+  "d": {
+   "w": 48,
+   "cx": 377,
+   "cy": 732
+  },
+  "gad": 17.7,
+  "targets": 4,
+  "errors": []
+ },
+ {
+  "tag": "375x667",
+  "step": "layout",
+  "c5": {
+   "whistleAt": 4025.7000000011176,
+   "movedMs": 63
+  },
+  "c2": {
+   "n": 50,
+   "p50": 48,
+   "p95": 51
+  },
+  "dom": {
+   "a": {
+    "x": 264,
+    "y": 547,
+    "w": 90,
+    "h": 90,
+    "cx": 309,
+    "cy": 592
+   },
+   "b": {
+    "x": 195,
+    "y": 598,
+    "w": 62,
+    "h": 62,
+    "cx": 226,
+    "cy": 629
+   },
+   "c": {
+    "x": 214,
+    "y": 525,
+    "w": 47,
+    "h": 47,
+    "cx": 238,
+    "cy": 549
+   },
+   "zone": {
+    "x": 0,
+    "y": 300,
+    "w": 180,
+    "h": 367,
+    "cx": 90,
+    "cy": 484
+   },
+   "bug": {
+    "x": 75,
+    "y": 26,
+    "w": 224,
+    "h": 39,
+    "cx": 188,
+    "cy": 45
+   },
+   "heat": true,
+   "pause": {
+    "x": 11,
+    "y": 23,
+    "w": 44,
+    "h": 44,
+    "cx": 33,
+    "cy": 45
+   },
+   "toast": {
+    "x": 12,
+    "y": 423,
+    "w": 351,
+    "h": 27,
+    "cx": 188,
+    "cy": 437
+   }
+  },
+  "gaps": {
+   "ab": 14.5,
+   "ac": 15
+  },
+  "text": {
+   "bad": [],
+   "spill": [],
+   "scrollX": 0
+  },
+  "toastGoal": {
+   "n": 121,
+   "hit": 0
+  },
+  "pause": {
+   "t0": 0.35,
+   "t1": 0.35,
+   "t2": 1.1500000000000008
+  },
+  "sheetFits": true,
+  "quit": {
+   "us": [
+    "L"
+   ],
+   "them": 7
+  },
+  "errors": []
+ },
+ {
+  "tag": "375x667",
+  "step": "c4",
+  "c4": {
+   "sprint": 8.69,
+   "underShoot": 7.33,
+   "rawRatio": 0.843,
+   "ratio": 0.85,
+   "before": {
+    "v": 8.69354387865556,
+    "stamina": 0.776666666666669,
+    "sprinting": true,
+    "owner": true,
+    "meter": false,
+    "end": false
+   },
+   "during": {
+    "v": 7.328768258247633,
+    "stamina": 0.710000000000003,
+    "sprinting": true,
+    "owner": true,
+    "meter": true,
+    "end": false
+   }
+  },
+  "errors": []
+ },
+ {
+  "tag": "375x667",
+  "step": "layout-fk",
+  "d": {
+   "w": 47,
+   "cx": 326,
+   "cy": 509
+  },
+  "gad": 16.2,
+  "targets": 4,
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "layout",
+  "c5": {
+   "whistleAt": 4577.60000000149,
+   "movedMs": 85
+  },
+  "c2": {
+   "n": 50,
+   "p50": 47,
+   "p95": 53
+  },
+  "dom": {
+   "a": {
+    "x": 224,
+    "y": 468,
+    "w": 84,
+    "h": 84,
+    "cx": 266,
+    "cy": 510
+   },
+   "b": {
+    "x": 162,
+    "y": 508,
+    "w": 56,
+    "h": 56,
+    "cx": 190,
+    "cy": 536
+   },
+   "c": {
+    "x": 178,
+    "y": 446,
+    "w": 44,
+    "h": 44,
+    "cx": 200,
+    "cy": 468
+   },
+   "zone": {
+    "x": 0,
+    "y": 256,
+    "w": 154,
+    "h": 312,
+    "cx": 77,
+    "cy": 412
+   },
+   "bug": {
+    "x": 60,
+    "y": 4,
+    "w": 200,
+    "h": 34,
+    "cx": 160,
+    "cy": 21
+   },
+   "heat": true,
+   "pause": {
+    "x": 6,
+    "y": 0,
+    "w": 44,
+    "h": 44,
+    "cx": 28,
+    "cy": 22
+   },
+   "toast": {
+    "x": 12,
+    "y": 380,
+    "w": 296,
+    "h": 24,
+    "cx": 160,
+    "cy": 392
+   }
+  },
+  "gaps": {
+   "ab": 10.3,
+   "ac": 14.2
+  },
+  "text": {
+   "bad": [],
+   "spill": [],
+   "scrollX": 0
+  },
+  "toastGoal": {
+   "n": 121,
+   "hit": 0
+  },
+  "pause": {
+   "t0": 0.31666666666666665,
+   "t1": 0.31666666666666665,
+   "t2": 1.1166666666666676
+  },
+  "sheetFits": true,
+  "quit": {
+   "us": [
+    "L"
+   ],
+   "them": 7
+  },
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "c4",
+  "c4": {
+   "sprint": 8.7,
+   "underShoot": 7.33,
+   "rawRatio": 0.843,
+   "ratio": 0.85,
+   "before": {
+    "v": 8.700690236139044,
+    "stamina": 0.7833333333333355,
+    "sprinting": true,
+    "owner": true,
+    "meter": false,
+    "end": false
+   },
+   "during": {
+    "v": 7.331805460178113,
+    "stamina": 0.7133333333333363,
+    "sprinting": true,
+    "owner": true,
+    "meter": true,
+    "end": false
+   }
+  },
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "layout-fk",
+  "d": {
+   "w": 44,
+   "cx": 282,
+   "cy": 436
+  },
+  "gad": 11.7,
+  "targets": 4,
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "forfeit-sheet",
+  "ff": {
+   "score": 0,
+   "drive": 0,
+   "done": false,
+   "ends": [],
+   "plays": 0
+  },
+  "errors": []
+ },
+ {
+  "tag": "393x852-sat59",
+  "step": "rival-taker",
+  "shot": true,
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "rival-taker",
+  "shot": true,
+  "errors": []
+ }
+]

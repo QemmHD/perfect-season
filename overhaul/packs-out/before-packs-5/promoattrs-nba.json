@@ -1,0 +1,651 @@
+{
+ "sport": "nba",
+ "promo@1": {
+  "n": 518,
+  "shown": [
+   94,
+   97
+  ],
+  "overSeasonMean": 11.26,
+  "overSeason": {
+   "6": 2,
+   "7": 29,
+   "8": 26,
+   "9": 47,
+   "10": 162,
+   "11": 63,
+   "12": 61,
+   "13": 28,
+   "14": 45,
+   "15": 11,
+   "16": 16,
+   "17": 6,
+   "18": 6,
+   "19": 9,
+   "20": 4,
+   "21": 2,
+   "22": 1
+  },
+  "rawUnder85": 35,
+  "faceOverPlayedMax": 21,
+  "faceOverPlayedOver1": 518,
+  "meanGapMax": 21,
+  "meanGapOver1": 518,
+  "meanGapHist": {
+   "7": 2,
+   "8": 41,
+   "9": 86,
+   "10": 153,
+   "11": 91,
+   "12": 40,
+   "13": 32,
+   "14": 30,
+   "15": 14,
+   "16": 5,
+   "17": 13,
+   "18": 2,
+   "19": 2,
+   "20": 5,
+   "21": 2
+  },
+  "worst": [
+   {
+    "id": "nba:promo:1983:richami01:GSW",
+    "name": "Michael Ray Richardson 1983",
+    "shown": 94,
+    "season": 73,
+    "raw": 78,
+    "faceGap": 21,
+    "meanGap": 21,
+    "face": "OUT75 INS77 PLY99 ATH96 DEF99 REB60",
+    "played": "54 56 87 75 80 39"
+   },
+   {
+    "id": "nba:promo:1963:rodgegu01:GSW",
+    "name": "Guy Rodgers 1963",
+    "shown": 94,
+    "season": 74,
+    "raw": 78,
+    "faceGap": 21,
+    "meanGap": 21,
+    "face": "OUT87 INS78 PLY99 ATH89 DEF73 REB47",
+    "played": "66 57 89 68 52 26"
+   },
+   {
+    "id": "nba:promo:1978:leero01:PHX",
+    "name": "Ron Lee 1978",
+    "shown": 94,
+    "season": 73,
+    "raw": 77,
+    "faceGap": 20,
+    "meanGap": 20,
+    "face": "OUT88 INS75 PLY99 ATH95 DEF99 REB59",
+    "played": "68 55 82 75 80 39"
+   },
+   {
+    "id": "nba:promo:1976:wattssl01:OKC",
+    "name": "Slick Watts 1976",
+    "shown": 94,
+    "season": 74,
+    "raw": 81,
+    "faceGap": 20,
+    "meanGap": 20,
+    "face": "OUT68 INS78 PLY99 ATH99 DEF99 REB59",
+    "played": "48 58 91 79 80 39"
+   },
+   {
+    "id": "nba:promo:1960:shuege01:DET",
+    "name": "Gene Shue 1960",
+    "shown": 94,
+    "season": 74,
+    "raw": 79,
+    "faceGap": 20,
+    "meanGap": 20,
+    "face": "OUT99 INS83 PLY98 ATH92 DEF74 REB46",
+    "played": "82 63 78 72 54 26"
+   }
+  ]
+ },
+ "promo@5": {
+  "n": 518,
+  "shown": [
+   96,
+   99
+  ],
+  "overSeasonMean": 13.26,
+  "overSeason": {
+   "6": 2,
+   "7": 29,
+   "8": 26,
+   "9": 47,
+   "10": 162,
+   "11": 63,
+   "12": 61,
+   "13": 28,
+   "14": 45,
+   "15": 11,
+   "16": 16,
+   "17": 6,
+   "18": 6,
+   "19": 9,
+   "20": 4,
+   "21": 2,
+   "22": 1
+  },
+  "rawUnder85": 24,
+  "faceOverPlayedMax": 21,
+  "faceOverPlayedOver1": 518,
+  "meanGapMax": 21,
+  "meanGapOver1": 518,
+  "meanGapHist": {
+   "9": 6,
+   "10": 60,
+   "11": 139,
+   "12": 160,
+   "13": 46,
+   "14": 41,
+   "15": 30,
+   "16": 11,
+   "17": 9,
+   "18": 5,
+   "19": 6,
+   "20": 2,
+   "21": 3
+  },
+  "worst": [
+   {
+    "id": "nba:promo:1983:richami01:GSW",
+    "name": "Michael Ray Richardson 1983",
+    "shown": 96,
+    "season": 73,
+    "raw": 80,
+    "faceGap": 21,
+    "meanGap": 21,
+    "face": "OUT76 INS81 PLY99 ATH97 DEF99 REB60",
+    "played": "55 60 89 76 80 39"
+   },
+   {
+    "id": "nba:promo:1963:rodgegu01:GSW",
+    "name": "Guy Rodgers 1963",
+    "shown": 96,
+    "season": 74,
+    "raw": 80,
+    "faceGap": 21,
+    "meanGap": 20,
+    "face": "OUT89 INS81 PLY99 ATH93 DEF77 REB47",
+    "played": "68 60 91 72 56 26"
+   },
+   {
+    "id": "nba:promo:1978:leero01:PHX",
+    "name": "Ron Lee 1978",
+    "shown": 96,
+    "season": 73,
+    "raw": 79,
+    "faceGap": 20,
+    "meanGap": 21,
+    "face": "OUT90 INS78 PLY99 ATH96 DEF99 REB59",
+    "played": "70 58 84 76 80 39"
+   },
+   {
+    "id": "nba:promo:1976:wattssl01:OKC",
+    "name": "Slick Watts 1976",
+    "shown": 96,
+    "season": 74,
+    "raw": 83,
+    "faceGap": 20,
+    "meanGap": 21,
+    "face": "OUT69 INS82 PLY99 ATH99 DEF99 REB59",
+    "played": "49 62 91 79 80 39"
+   },
+   {
+    "id": "nba:promo:1960:shuege01:DET",
+    "name": "Gene Shue 1960",
+    "shown": 96,
+    "season": 74,
+    "raw": 81,
+    "faceGap": 20,
+    "meanGap": 19,
+    "face": "OUT99 INS88 PLY99 ATH94 DEF76 REB46",
+    "played": "83 68 80 74 56 26"
+   }
+  ]
+ },
+ "legend@1": {
+  "n": 120,
+  "shown": [
+   88,
+   94
+  ],
+  "overSeasonMean": 6.51,
+  "overSeason": {
+   "4": 8,
+   "5": 24,
+   "6": 37,
+   "7": 28,
+   "8": 4,
+   "9": 16,
+   "10": 1,
+   "12": 1,
+   "13": 1
+  },
+  "rawUnder85": 1,
+  "faceOverPlayedMax": 11,
+  "faceOverPlayedOver1": 120,
+  "meanGapMax": 11,
+  "meanGapOver1": 120,
+  "meanGapHist": {
+   "3": 2,
+   "4": 4,
+   "5": 18,
+   "6": 30,
+   "7": 29,
+   "8": 19,
+   "9": 8,
+   "10": 8,
+   "11": 2
+  },
+  "worst": [
+   {
+    "id": "nba:legend:1988:roberal01:SAS",
+    "name": "Alvin Robertson 1988",
+    "shown": 89,
+    "season": 80,
+    "raw": 86,
+    "faceGap": 11,
+    "meanGap": 11,
+    "face": "OUT85 INS77 PLY94 ATH89 DEF94 REB62",
+    "played": "74 66 83 78 83 51"
+   },
+   {
+    "id": "nba:legend:1980:richami01:NYK",
+    "name": "Michael Ray Richardson 1980",
+    "shown": 89,
+    "season": 80,
+    "raw": 87,
+    "faceGap": 11,
+    "meanGap": 11,
+    "face": "OUT74 INS83 PLY99 ATH87 DEF92 REB62",
+    "played": "63 72 89 76 81 51"
+   },
+   {
+    "id": "nba:legend:1971:vanlino01:SAC",
+    "name": "Norm Van Lier 1971",
+    "shown": 89,
+    "season": 80,
+    "raw": 87,
+    "faceGap": 10,
+    "meanGap": 10,
+    "face": "OUT87 INS78 PLY89 ATH89 DEF94 REB57",
+    "played": "77 68 79 79 84 47"
+   },
+   {
+    "id": "nba:legend:1989:mullich01:GSW",
+    "name": "Chris Mullin 1989",
+    "shown": 90,
+    "season": 83,
+    "raw": 93,
+    "faceGap": 10,
+    "meanGap": 10,
+    "face": "OUT93 INS93 PLY87 ATH88 DEF89 REB62",
+    "played": "83 83 77 78 79 52"
+   },
+   {
+    "id": "nba:legend:2008:artesro01:SAC",
+    "name": "Metta World Peace 2008",
+    "shown": 88,
+    "season": 79,
+    "raw": 86,
+    "faceGap": 10,
+    "meanGap": 10,
+    "face": "OUT90 INS78 PLY82 ATH87 DEF92 REB57",
+    "played": "80 68 72 77 82 47"
+   }
+  ]
+ },
+ "legend@5": {
+  "n": 120,
+  "shown": [
+   90,
+   96
+  ],
+  "overSeasonMean": 8.51,
+  "overSeason": {
+   "4": 8,
+   "5": 24,
+   "6": 37,
+   "7": 28,
+   "8": 4,
+   "9": 16,
+   "10": 1,
+   "12": 1,
+   "13": 1
+  },
+  "rawUnder85": 0,
+  "faceOverPlayedMax": 11,
+  "faceOverPlayedOver1": 120,
+  "meanGapMax": 11,
+  "meanGapOver1": 120,
+  "meanGapHist": {
+   "5": 5,
+   "6": 18,
+   "7": 27,
+   "8": 30,
+   "9": 22,
+   "10": 10,
+   "11": 8
+  },
+  "worst": [
+   {
+    "id": "nba:legend:1988:roberal01:SAS",
+    "name": "Alvin Robertson 1988",
+    "shown": 91,
+    "season": 80,
+    "raw": 88,
+    "faceGap": 11,
+    "meanGap": 11,
+    "face": "OUT88 INS81 PLY95 ATH90 DEF94 REB62",
+    "played": "77 70 84 79 83 51"
+   },
+   {
+    "id": "nba:legend:1980:richami01:NYK",
+    "name": "Michael Ray Richardson 1980",
+    "shown": 91,
+    "season": 80,
+    "raw": 89,
+    "faceGap": 11,
+    "meanGap": 10,
+    "face": "OUT81 INS86 PLY99 ATH88 DEF92 REB62",
+    "played": "70 75 91 77 81 51"
+   },
+   {
+    "id": "nba:legend:1971:vanlino01:SAC",
+    "name": "Norm Van Lier 1971",
+    "shown": 91,
+    "season": 80,
+    "raw": 89,
+    "faceGap": 10,
+    "meanGap": 11,
+    "face": "OUT87 INS82 PLY90 ATH90 DEF94 REB57",
+    "played": "77 72 80 80 84 47"
+   },
+   {
+    "id": "nba:legend:1989:mullich01:GSW",
+    "name": "Chris Mullin 1989",
+    "shown": 92,
+    "season": 83,
+    "raw": 95,
+    "faceGap": 10,
+    "meanGap": 11,
+    "face": "OUT93 INS93 PLY87 ATH89 DEF91 REB67",
+    "played": "83 83 77 79 81 57"
+   },
+   {
+    "id": "nba:legend:2008:artesro01:SAC",
+    "name": "Metta World Peace 2008",
+    "shown": 90,
+    "season": 79,
+    "raw": 88,
+    "faceGap": 10,
+    "meanGap": 11,
+    "face": "OUT92 INS78 PLY82 ATH89 DEF93 REB61",
+    "played": "82 68 72 79 83 51"
+   }
+  ]
+ },
+ "spotlight@1": {
+  "n": 120,
+  "ovr": [
+   100,
+   105
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 81,
+   "1": 38,
+   "2": 1
+  },
+  "faceAtCapMean": 0.33,
+  "distinctMin": 4,
+  "tauMin": 0.643,
+  "tauUnder08": 4,
+  "examples": [
+   {
+    "id": "nba:spotlight:1989:jordami01:CHI",
+    "name": "Michael Jordan 1989",
+    "ovr": 104,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 32,
+    "face": "OUT90 INS103 PLY98 ATH91 DEF95 REB71"
+   },
+   {
+    "id": "nba:spotlight:1976:abdulka01:LAL",
+    "name": "Kareem Abdul-Jabbar 1976",
+    "ovr": 104,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 45,
+    "face": "OUT76 INS103 PLY60 ATH83 DEF95 REB105"
+   },
+   {
+    "id": "nba:spotlight:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "ovr": 104,
+    "atCap": 2,
+    "distinct": 5,
+    "tau": 1,
+    "spread": 59,
+    "face": "OUT46 INS105 PLY72 ATH84 DEF95 REB105"
+   },
+   {
+    "id": "nba:spotlight:2015:jordade01:LAC",
+    "name": "DeAndre Jordan 2015",
+    "ovr": 100,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 72,
+    "face": "OUT46 INS92 PLY31 ATH78 DEF88 REB103"
+   },
+   {
+    "id": "nba:spotlight:2016:curryst01:GSW",
+    "name": "Stephen Curry 2016",
+    "ovr": 100,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 51,
+    "face": "OUT104 INS91 PLY105 ATH82 DEF77 REB54"
+   }
+  ]
+ },
+ "spotlight@5": {
+  "n": 120,
+  "ovr": [
+   102,
+   105
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 52,
+   "1": 66,
+   "2": 2
+  },
+  "faceAtCapMean": 0.58,
+  "distinctMin": 4,
+  "tauMin": 0.5,
+  "tauUnder08": 10,
+  "examples": [
+   {
+    "id": "nba:spotlight:1989:jordami01:CHI",
+    "name": "Michael Jordan 1989",
+    "ovr": 105,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 32,
+    "face": "OUT94 INS103 PLY100 ATH92 DEF95 REB71"
+   },
+   {
+    "id": "nba:spotlight:1976:abdulka01:LAL",
+    "name": "Kareem Abdul-Jabbar 1976",
+    "ovr": 105,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 45,
+    "face": "OUT76 INS103 PLY60 ATH83 DEF95 REB105"
+   },
+   {
+    "id": "nba:spotlight:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "ovr": 105,
+    "atCap": 2,
+    "distinct": 5,
+    "tau": 1,
+    "spread": 59,
+    "face": "OUT46 INS105 PLY72 ATH84 DEF95 REB105"
+   },
+   {
+    "id": "nba:spotlight:2015:jordade01:LAC",
+    "name": "DeAndre Jordan 2015",
+    "ovr": 102,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 74,
+    "face": "OUT46 INS95 PLY31 ATH79 DEF90 REB105"
+   },
+   {
+    "id": "nba:spotlight:2016:curryst01:GSW",
+    "name": "Stephen Curry 2016",
+    "ovr": 102,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 51,
+    "face": "OUT104 INS93 PLY105 ATH83 DEF79 REB54"
+   }
+  ]
+ },
+ "goat@1": {
+  "n": 20,
+  "ovr": [
+   106,
+   110
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 9,
+   "1": 9,
+   "2": 2
+  },
+  "faceAtCapMean": 0.65,
+  "distinctMin": 5,
+  "tauMin": 0.733,
+  "tauUnder08": 1,
+  "examples": [
+   {
+    "id": "nba:goat:1989:jordami01:CHI",
+    "name": "Michael Jordan 1989",
+    "ovr": 109,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 34,
+    "face": "OUT94 INS108 PLY104 ATH93 DEF100 REB74"
+   },
+   {
+    "id": "nba:goat:1976:abdulka01:LAL",
+    "name": "Kareem Abdul-Jabbar 1976",
+    "ovr": 109,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 49,
+    "face": "OUT80 INS109 PLY61 ATH85 DEF100 REB110"
+   },
+   {
+    "id": "nba:goat:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "ovr": 109,
+    "atCap": 2,
+    "distinct": 5,
+    "tau": 1,
+    "spread": 63,
+    "face": "OUT47 INS110 PLY75 ATH87 DEF100 REB110"
+   },
+   {
+    "id": "nba:goat:2016:curryst01:GSW",
+    "name": "Stephen Curry 2016",
+    "ovr": 106,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 55,
+    "face": "OUT109 INS96 PLY110 ATH84 DEF81 REB55"
+   }
+  ]
+ },
+ "goat@5": {
+  "n": 20,
+  "ovr": [
+   108,
+   110
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 6,
+   "1": 12,
+   "2": 2
+  },
+  "faceAtCapMean": 0.8,
+  "distinctMin": 4,
+  "tauMin": 0.733,
+  "tauUnder08": 3,
+  "examples": [
+   {
+    "id": "nba:goat:1989:jordami01:CHI",
+    "name": "Michael Jordan 1989",
+    "ovr": 110,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 34,
+    "face": "OUT98 INS108 PLY106 ATH95 DEF100 REB74"
+   },
+   {
+    "id": "nba:goat:1976:abdulka01:LAL",
+    "name": "Kareem Abdul-Jabbar 1976",
+    "ovr": 110,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 49,
+    "face": "OUT80 INS109 PLY61 ATH86 DEF100 REB110"
+   },
+   {
+    "id": "nba:goat:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "ovr": 110,
+    "atCap": 2,
+    "distinct": 5,
+    "tau": 1,
+    "spread": 63,
+    "face": "OUT47 INS110 PLY75 ATH87 DEF100 REB110"
+   },
+   {
+    "id": "nba:goat:2016:curryst01:GSW",
+    "name": "Stephen Curry 2016",
+    "ovr": 108,
+    "atCap": 1,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 55,
+    "face": "OUT109 INS97 PLY110 ATH86 DEF84 REB55"
+   }
+  ]
+ }
+}

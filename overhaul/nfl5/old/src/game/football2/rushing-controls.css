@@ -1,0 +1,16 @@
+/* The football controls' shared motion. Codex's fixed stick, BURST, move buttons and pass panel
+   (2026-10-30) were replaced by the V2 control grammar in nfl-2: the floating stick and the A/B/C/D
+   cluster now live in pass-controls.css, positioned by the C15 geometry variables.
+   Claude (nfl-1): the HOLD TO RUN ghost's pulse, used by the floating stick's ghost ring while the
+   ball is in the air (reduced motion: the label only, no pulse). */
+@keyframes fb2-ghost-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}

@@ -1,0 +1,91 @@
+{
+ "sport": "nba",
+ "club": {
+  "spotlight": "Michael Jordan 104 qs 30",
+  "goat": "Michael Jordan 109 qs 30"
+ },
+ "day": "2026-11-09",
+ "sbcsTakingSpecialsOnDay": 8,
+ "onDay": [
+  {
+   "sbc": "Pairs",
+   "cards": [
+    "Michael Jordan spotlight 104"
+   ],
+   "reward": {
+    "pack": "silver"
+   }
+  },
+  {
+   "sbc": "Silver Squad",
+   "cards": [
+    "Michael Jordan spotlight 104"
+   ],
+   "reward": {
+    "pack": "gold"
+   }
+  },
+  {
+   "sbc": "Golden Pair",
+   "cards": [
+    "Michael Jordan spotlight 104"
+   ],
+   "reward": {
+    "pack": "gold"
+   }
+  },
+  {
+   "sbc": "Hot Season Hunt",
+   "cards": [
+    "Michael Jordan spotlight 104"
+   ],
+   "reward": {
+    "card": {
+     "tier": "promo"
+    }
+   }
+  },
+  {
+   "sbc": "Bronze Upgrade",
+   "cards": [
+    "Michael Jordan spotlight 104"
+   ],
+   "reward": {
+    "pack": "silver"
+   }
+  },
+  {
+   "sbc": "Silver Upgrade",
+   "cards": [
+    "Michael Jordan spotlight 104"
+   ],
+   "reward": {
+    "pack": "gold"
+   }
+  },
+  {
+   "sbc": "Gold Upgrade",
+   "cards": [
+    "Michael Jordan spotlight 104"
+   ],
+   "reward": {
+    "pack": "premium"
+   }
+  },
+  {
+   "sbc": "Silver to Gold",
+   "cards": [
+    "Michael Jordan spotlight 104"
+   ],
+   "reward": {
+    "card": {
+     "tier": "gold"
+    }
+   }
+  }
+ ],
+ "sbcsTakingSpecialsIn28Days": 220,
+ "specialUidsIn28Days": [
+  "u0"
+ ]
+}

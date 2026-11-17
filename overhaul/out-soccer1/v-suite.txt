@@ -1,0 +1,96 @@
+
+ RUN  v2.1.4 /home/user/ps-s-soccer
+
+ ✓ src/game/soccer2/shooting.test.ts  (10 tests) 14630ms
+   ✓ timing: the closer to the green, the truer > miss distance and goal rate are monotone in |release − green| 6487ms
+   ✓ ratings still decide > a better finisher scores more one on one; aim assist too 4456ms
+   ✓ ratings still decide > a better keeper concedes fewer of the same chances 3206ms
+ ✓ src/data/soccer-data.test.ts  (9 tests) 143ms
+ ✓ src/game/soccer2/rules.test.ts  (17 tests) 15527ms
+   ✓ R-1: a dead shot is a loose ball > a shot that dies short stops being a shot within 1 s, and the attack ends within 15 s 1459ms
+   ✓ R-1: a dead shot is a loose ball > autopilot attacks all finish within the clock + 15 s 4403ms
+   ✓ C-4: BEND bends the way its arrow points (x across the pitch: + right on screen) > over 40 kicks each: Bend left ends 1.5 m+ left of the aim, Bend right 1.5 m+ right, straight within 0.5 m 1206ms
+   ✓ J-1: the bounce is a sound, not a rule > bounces are reported, and taking them out of the events changes no attack 1326ms
+   ✓ R-2: a parry goes away from goal > leaves his hands going away from the goal line, unless pushed round the post from outside ±(GHALF − 0.3) 1476ms
+   ✓ R-2: a parry goes away from goal > from a keeper with sound hands (HAN 55+) it goes to the side it came, never back across his goal 739ms
+   ✓ R-2: the restarts > across seeded autopilot attacks: never more than two restarts, every wide end a goal kick, all inside the clock + 15 s 4774ms
+ ❯ src/game/soccer2/soccer.test.ts  (20 tests | 1 failed) 20047ms
+   ✓ ratings > every card line rates to finite, bounded players; elevens build from real clubs 301ms
+   × ratings decide attacks > a good finisher scores more from the same chances (wider green, tighter cone) 8626ms
+     → expected 0.1625 to be greater than 0.16375
+   ✓ ratings decide attacks > an elite keeper saves more of the same shots 7046ms
+   ✓ ratings decide attacks > better teams score more over seeded matches 1574ms
+   ✓ determinism and safety > every scenario ends, every value finite, no endless attacks 1654ms
+ ✓ src/engine/soccer-draft.test.ts  (7 tests) 1453ms
+   ✓ soccer draft > loads forty clubs by decade, every player at his spots 744ms
+   ✓ soccer draft > keeps the draft difficulty where it was tuned 460ms
+ ✓ src/lib/soccer-saves.test.ts  (6 tests) 28ms
+ ✓ src/game/soccer2/golden.test.ts  (3 tests) 7575ms
+   ✓ soccer golden hash > 60 seeded autopilot attacks: the whistle and 3 s after it 3047ms
+   ✓ soccer golden hash > 20 aiProgress matches 2927ms
+   ✓ soccer golden hash > 50 agreed shootouts 1600ms
+ ✓ src/ut/soccer-ut.test.ts  (6 tests) 15868ms
+   ✓ Ultimate Team soccer > rates every card from its own overall and face, FC-style tiers 4783ms
+ ✓ src/engine/sport-branches.test.ts  (2 tests) 97ms
+ ❯ src/game/soccer2/setpieces.test.ts  (3 tests | 1 failed) 6348ms
+   ✓ soccer set pieces > corners score about one in ten 4181ms
+   × soccer set pieces > free kicks: about one direct free kick in ten goes in, 10-15% of free-kick attacks 1800ms
+     → expected 0.07333333333333333 to be greater than 0.08
+   ✓ soccer set pieces > penalties go in about three times in four 366ms
+ ✓ src/ut/soccer-pull-tracker.test.ts  (11 tests) 3919ms
+   ✓ pack tracker log (soccer) > keeps totals uncapped while the recent list holds its pack and card caps 924ms
+ ✓ src/game/soccer2/agreement-ut.test.ts  (6 tests) 47876ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 1-99 13088ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 101-199 8788ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 201-299 8908ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 301-399 8550ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 401-499 7443ms
+   ✓ online agreement: simBoth from both seats > has teeth: a difficulty that leaked into online play would be caught 1098ms
+ ✓ src/game/soccer2/agreement.test.ts  (11 tests) 73389ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 0-98 12514ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 100-198 8016ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 200-298 9791ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 300-398 8190ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 400-498 8289ms
+   ✓ online agreement: takeover and taken > has teeth: a difficulty that leaked into online play would be caught 994ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 0-199 6055ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 200-399 5081ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 400-599 5170ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 600-799 4802ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 800-999 4485ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/game/soccer2/setpieces.test.ts > soccer set pieces > free kicks: about one direct free kick in ten goes in, 10-15% of free-kick attacks
+AssertionError: expected 0.07333333333333333 to be greater than 0.08
+ ❯ src/game/soccer2/setpieces.test.ts:45:19
+     43|   it('free kicks: about one direct free kick in ten goes in, 10-15% of…
+     44|     const r = rate('freekick');
+     45|     expect(r.all).toBeGreaterThan(0.08);
+       |                   ^
+     46|     expect(r.all).toBeLessThan(0.17);
+     47|     expect(r.fk).toBeGreaterThan(0.05);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/game/soccer2/soccer.test.ts > ratings decide attacks > a good finisher scores more from the same chances (wider green, tighter cone)
+AssertionError: expected 0.1625 to be greater than 0.16375
+ ❯ src/game/soccer2/soccer.test.ts:204:19
+    202|     const elite = goals(95);
+    203|     const poor = goals(55);
+    204|     expect(elite).toBeGreaterThan(poor + 0.12);
+       |                   ^
+    205|   });
+    206|   it('an elite keeper saves more of the same shots', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  2 failed | 11 passed (13)
+      Tests  2 failed | 109 passed (111)
+   Start at  14:15:30
+   Duration  111.52s (transform 19.71s, setup 0ms, collect 34.70s, tests 206.90s, environment 2ms, prepare 1.47s)
+
+
+real	1m52.430s
+user	2m49.878s
+sys	0m12.345s

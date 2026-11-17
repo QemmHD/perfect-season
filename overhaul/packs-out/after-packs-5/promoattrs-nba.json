@@ -1,0 +1,606 @@
+{
+ "sport": "nba",
+ "promo@1": {
+  "n": 518,
+  "shown": [
+   75,
+   95
+  ],
+  "overSeasonMean": 4.56,
+  "overSeason": {
+   "3": 114,
+   "4": 61,
+   "5": 284,
+   "6": 59
+  },
+  "rawUnder85": 40,
+  "faceOverPlayedMax": 0,
+  "faceOverPlayedOver1": 0,
+  "meanGapMax": 8,
+  "meanGapOver1": 411,
+  "meanGapHist": {
+   "0": 20,
+   "1": 76,
+   "2": 75,
+   "3": 109,
+   "4": 104,
+   "5": 49,
+   "6": 43,
+   "7": 22,
+   "8": 5,
+   "-1": 11,
+   "-2": 4
+  },
+  "worst": [
+   {
+    "id": "nba:promo:2001:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2001",
+    "shown": 95,
+    "season": 91,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 8,
+    "face": "OUT37 INS91 PLY68 ATH79 DEF83 REB91",
+    "played": "37 91 68 79 83 91"
+   },
+   {
+    "id": "nba:promo:1971:abdulka01:MIL",
+    "name": "Kareem Abdul-Jabbar 1971",
+    "shown": 93,
+    "season": 87,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 8,
+    "face": "OUT77 INS87 PLY52 ATH68 DEF80 REB91",
+    "played": "77 87 52 68 80 91"
+   },
+   {
+    "id": "nba:promo:2005:duncati01:SAS",
+    "name": "Tim Duncan 2005",
+    "shown": 95,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 8,
+    "face": "OUT79 INS87 PLY64 ATH79 DEF84 REB91",
+    "played": "79 87 64 79 84 91"
+   },
+   {
+    "id": "nba:promo:2003:duncati01:SAS",
+    "name": "Tim Duncan 2003",
+    "shown": 95,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 8,
+    "face": "OUT80 INS87 PLY66 ATH79 DEF84 REB91",
+    "played": "80 87 66 79 84 91"
+   },
+   {
+    "id": "nba:promo:1988:jordami01:CHI",
+    "name": "Michael Jordan 1988",
+    "shown": 95,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 8,
+    "face": "OUT82 INS89 PLY91 ATH84 DEF85 REB63",
+    "played": "82 89 91 84 85 63"
+   }
+  ]
+ },
+ "promo@5": {
+  "n": 518,
+  "shown": [
+   77,
+   97
+  ],
+  "overSeasonMean": 6.56,
+  "overSeason": {
+   "3": 114,
+   "4": 61,
+   "5": 284,
+   "6": 59
+  },
+  "rawUnder85": 26,
+  "faceOverPlayedMax": 0,
+  "faceOverPlayedOver1": 0,
+  "meanGapMax": 10,
+  "meanGapOver1": 476,
+  "meanGapHist": {
+   "0": 10,
+   "1": 27,
+   "2": 44,
+   "3": 61,
+   "4": 81,
+   "5": 95,
+   "6": 91,
+   "7": 40,
+   "8": 40,
+   "9": 16,
+   "10": 5,
+   "-1": 5,
+   "-2": 1,
+   "-3": 2
+  },
+  "worst": [
+   {
+    "id": "nba:promo:2001:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2001",
+    "shown": 97,
+    "season": 91,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 10,
+    "face": "OUT37 INS91 PLY68 ATH79 DEF83 REB91",
+    "played": "37 91 68 79 83 91"
+   },
+   {
+    "id": "nba:promo:1971:abdulka01:MIL",
+    "name": "Kareem Abdul-Jabbar 1971",
+    "shown": 95,
+    "season": 87,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 10,
+    "face": "OUT77 INS87 PLY52 ATH68 DEF80 REB91",
+    "played": "77 87 52 68 80 91"
+   },
+   {
+    "id": "nba:promo:2005:duncati01:SAS",
+    "name": "Tim Duncan 2005",
+    "shown": 97,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 10,
+    "face": "OUT80 INS87 PLY64 ATH79 DEF84 REB91",
+    "played": "80 87 64 79 84 91"
+   },
+   {
+    "id": "nba:promo:2003:duncati01:SAS",
+    "name": "Tim Duncan 2003",
+    "shown": 97,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 10,
+    "face": "OUT80 INS87 PLY66 ATH79 DEF84 REB91",
+    "played": "80 87 66 79 84 91"
+   },
+   {
+    "id": "nba:promo:1988:jordami01:CHI",
+    "name": "Michael Jordan 1988",
+    "shown": 97,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 10,
+    "face": "OUT82 INS89 PLY91 ATH85 DEF85 REB63",
+    "played": "82 89 91 85 85 63"
+   }
+  ]
+ },
+ "legend@1": {
+  "n": 120,
+  "shown": [
+   81,
+   93
+  ],
+  "overSeasonMean": 3.33,
+  "overSeason": {
+   "3": 103,
+   "4": 4,
+   "5": 4,
+   "6": 9
+  },
+  "rawUnder85": 3,
+  "faceOverPlayedMax": 0,
+  "faceOverPlayedOver1": 0,
+  "meanGapMax": 6,
+  "meanGapOver1": 77,
+  "meanGapHist": {
+   "0": 3,
+   "1": 37,
+   "2": 27,
+   "3": 29,
+   "4": 12,
+   "5": 7,
+   "6": 2,
+   "-1": 3
+  },
+  "worst": [
+   {
+    "id": "nba:legend:1971:havlijo01:BOS",
+    "name": "John Havlicek 1971",
+    "shown": 89,
+    "season": 86,
+    "raw": 98,
+    "faceGap": 0,
+    "meanGap": 6,
+    "face": "OUT84 INS84 PLY82 ATH81 DEF84 REB79",
+    "played": "84 84 82 81 84 79"
+   },
+   {
+    "id": "nba:legend:2003:duncati01:SAS",
+    "name": "Tim Duncan 2003",
+    "shown": 93,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 6,
+    "face": "OUT79 INS86 PLY62 ATH78 DEF84 REB91",
+    "played": "79 86 62 78 84 91"
+   },
+   {
+    "id": "nba:legend:1990:olajuha01:HOU",
+    "name": "Hakeem Olajuwon 1990",
+    "shown": 91,
+    "season": 88,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 5,
+    "face": "OUT77 INS87 PLY60 ATH64 DEF83 REB91",
+    "played": "77 87 60 64 83 91"
+   },
+   {
+    "id": "nba:legend:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "shown": 93,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 5,
+    "face": "OUT36 INS91 PLY66 ATH79 DEF84 REB91",
+    "played": "36 91 66 79 84 91"
+   },
+   {
+    "id": "nba:legend:2008:mingya01:HOU",
+    "name": "Yao Ming 2008",
+    "shown": 88,
+    "season": 85,
+    "raw": 97,
+    "faceGap": 0,
+    "meanGap": 5,
+    "face": "OUT79 INS82 PLY49 ATH41 DEF79 REB91",
+    "played": "79 82 49 41 79 91"
+   }
+  ]
+ },
+ "legend@5": {
+  "n": 120,
+  "shown": [
+   83,
+   95
+  ],
+  "overSeasonMean": 5.33,
+  "overSeason": {
+   "3": 103,
+   "4": 4,
+   "5": 4,
+   "6": 9
+  },
+  "rawUnder85": 0,
+  "faceOverPlayedMax": 0,
+  "faceOverPlayedOver1": 0,
+  "meanGapMax": 8,
+  "meanGapOver1": 111,
+  "meanGapHist": {
+   "0": 2,
+   "1": 7,
+   "2": 25,
+   "3": 21,
+   "4": 31,
+   "5": 19,
+   "6": 9,
+   "7": 5,
+   "8": 1
+  },
+  "worst": [
+   {
+    "id": "nba:legend:2003:duncati01:SAS",
+    "name": "Tim Duncan 2003",
+    "shown": 95,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 8,
+    "face": "OUT80 INS86 PLY62 ATH78 DEF84 REB91",
+    "played": "80 86 62 78 84 91"
+   },
+   {
+    "id": "nba:legend:1990:olajuha01:HOU",
+    "name": "Hakeem Olajuwon 1990",
+    "shown": 93,
+    "season": 88,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 7,
+    "face": "OUT77 INS87 PLY60 ATH66 DEF83 REB91",
+    "played": "77 87 60 66 83 91"
+   },
+   {
+    "id": "nba:legend:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "shown": 95,
+    "season": 90,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 7,
+    "face": "OUT36 INS91 PLY66 ATH79 DEF84 REB91",
+    "played": "36 91 66 79 84 91"
+   },
+   {
+    "id": "nba:legend:2008:mingya01:HOU",
+    "name": "Yao Ming 2008",
+    "shown": 90,
+    "season": 85,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 7,
+    "face": "OUT79 INS82 PLY49 ATH42 DEF79 REB91",
+    "played": "79 82 49 42 79 91"
+   },
+   {
+    "id": "nba:legend:1985:birdla01:BOS",
+    "name": "Larry Bird 1985",
+    "shown": 91,
+    "season": 86,
+    "raw": 99,
+    "faceGap": 0,
+    "meanGap": 7,
+    "face": "OUT91 INS82 PLY84 ATH72 DEF82 REB84",
+    "played": "91 82 84 72 82 84"
+   }
+  ]
+ },
+ "spotlight@1": {
+  "n": 120,
+  "ovr": [
+   100,
+   105
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 120
+  },
+  "faceAtCapMean": 0,
+  "distinctMin": 4,
+  "tauMin": 0.867,
+  "tauUnder08": 0,
+  "examples": [
+   {
+    "id": "nba:spotlight:1989:jordami01:CHI",
+    "name": "Michael Jordan 1989",
+    "ovr": 104,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 26,
+    "face": "OUT86 INS97 PLY93 ATH89 DEF91 REB71"
+   },
+   {
+    "id": "nba:spotlight:1976:abdulka01:LAL",
+    "name": "Kareem Abdul-Jabbar 1976",
+    "ovr": 104,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 40,
+    "face": "OUT73 INS98 PLY60 ATH81 DEF90 REB100"
+   },
+   {
+    "id": "nba:spotlight:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "ovr": 104,
+    "atCap": 0,
+    "distinct": 5,
+    "tau": 1,
+    "spread": 54,
+    "face": "OUT46 INS100 PLY72 ATH82 DEF91 REB100"
+   },
+   {
+    "id": "nba:spotlight:2015:jordade01:LAC",
+    "name": "DeAndre Jordan 2015",
+    "ovr": 100,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 66,
+    "face": "OUT46 INS87 PLY31 ATH77 DEF84 REB97"
+   },
+   {
+    "id": "nba:spotlight:2016:curryst01:GSW",
+    "name": "Stephen Curry 2016",
+    "ovr": 100,
+    "atCap": 0,
+    "distinct": 5,
+    "tau": 0.966,
+    "spread": 45,
+    "face": "OUT99 INS86 PLY99 ATH82 DEF74 REB54"
+   }
+  ]
+ },
+ "spotlight@5": {
+  "n": 120,
+  "ovr": [
+   102,
+   105
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 119,
+   "1": 1
+  },
+  "faceAtCapMean": 0.01,
+  "distinctMin": 4,
+  "tauMin": 0.296,
+  "tauUnder08": 9,
+  "examples": [
+   {
+    "id": "nba:spotlight:1989:jordami01:CHI",
+    "name": "Michael Jordan 1989",
+    "ovr": 105,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 28,
+    "face": "OUT90 INS99 PLY95 ATH91 DEF93 REB71"
+   },
+   {
+    "id": "nba:spotlight:1976:abdulka01:LAL",
+    "name": "Kareem Abdul-Jabbar 1976",
+    "ovr": 105,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 44,
+    "face": "OUT73 INS100 PLY60 ATH81 DEF93 REB104"
+   },
+   {
+    "id": "nba:spotlight:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "ovr": 105,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 0.966,
+    "spread": 58,
+    "face": "OUT46 INS103 PLY72 ATH83 DEF94 REB104"
+   },
+   {
+    "id": "nba:spotlight:2015:jordade01:LAC",
+    "name": "DeAndre Jordan 2015",
+    "ovr": 102,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 70,
+    "face": "OUT46 INS90 PLY31 ATH77 DEF87 REB101"
+   },
+   {
+    "id": "nba:spotlight:2016:curryst01:GSW",
+    "name": "Stephen Curry 2016",
+    "ovr": 102,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 49,
+    "face": "OUT102 INS89 PLY103 ATH83 DEF77 REB54"
+   }
+  ]
+ },
+ "goat@1": {
+  "n": 20,
+  "ovr": [
+   106,
+   110
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 20
+  },
+  "faceAtCapMean": 0,
+  "distinctMin": 5,
+  "tauMin": 0.867,
+  "tauUnder08": 0,
+  "examples": [
+   {
+    "id": "nba:goat:1989:jordami01:CHI",
+    "name": "Michael Jordan 1989",
+    "ovr": 109,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 27,
+    "face": "OUT90 INS101 PLY97 ATH91 DEF95 REB74"
+   },
+   {
+    "id": "nba:goat:1976:abdulka01:LAL",
+    "name": "Kareem Abdul-Jabbar 1976",
+    "ovr": 109,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 42,
+    "face": "OUT76 INS100 PLY61 ATH83 DEF92 REB103"
+   },
+   {
+    "id": "nba:goat:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "ovr": 109,
+    "atCap": 0,
+    "distinct": 5,
+    "tau": 1,
+    "spread": 55,
+    "face": "OUT47 INS102 PLY75 ATH84 DEF93 REB102"
+   },
+   {
+    "id": "nba:goat:2016:curryst01:GSW",
+    "name": "Stephen Curry 2016",
+    "ovr": 106,
+    "atCap": 0,
+    "distinct": 5,
+    "tau": 0.966,
+    "spread": 46,
+    "face": "OUT101 INS88 PLY101 ATH84 DEF77 REB55"
+   }
+  ]
+ },
+ "goat@5": {
+  "n": 20,
+  "ovr": [
+   108,
+   110
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 20
+  },
+  "faceAtCapMean": 0,
+  "distinctMin": 4,
+  "tauMin": 0.733,
+  "tauUnder08": 2,
+  "examples": [
+   {
+    "id": "nba:goat:1989:jordami01:CHI",
+    "name": "Michael Jordan 1989",
+    "ovr": 110,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 30,
+    "face": "OUT94 INS104 PLY100 ATH93 DEF98 REB74"
+   },
+   {
+    "id": "nba:goat:1976:abdulka01:LAL",
+    "name": "Kareem Abdul-Jabbar 1976",
+    "ovr": 110,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 1,
+    "spread": 46,
+    "face": "OUT76 INS103 PLY61 ATH84 DEF95 REB107"
+   },
+   {
+    "id": "nba:goat:2000:onealsh01:LAL",
+    "name": "Shaquille O'Neal 2000",
+    "ovr": 110,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 0.966,
+    "spread": 59,
+    "face": "OUT47 INS105 PLY75 ATH85 DEF96 REB106"
+   },
+   {
+    "id": "nba:goat:2016:curryst01:GSW",
+    "name": "Stephen Curry 2016",
+    "ovr": 108,
+    "atCap": 0,
+    "distinct": 6,
+    "tau": 0.867,
+    "spread": 50,
+    "face": "OUT104 INS91 PLY105 ATH85 DEF80 REB55"
+   }
+  ]
+ }
+}

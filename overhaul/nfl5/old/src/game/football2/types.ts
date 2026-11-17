@@ -1,0 +1,244 @@
+// Football v2: the players and a play's state. Field yards: x across (0 to 53.3, the sidelines),
+// y up the field from your own goal line (the far end zone is 100 to 110). Your offense goes up.
+
+/** A player rated Madden-style: attributes 0-99 keyed by their short names (SPD, THP, CTH, MCV...). */
+export interface FbPlayer {
+  id: string;
+  name: string;
+  tag: string;
+  num: number | null;
+  ht: number;
+  wt: number;
+  /** QB RB WR TE OT OG C DE DT LB CB S K */
+  pos: string;
+  ovr: number;
+  a: Record<string, number>;
+  abil: string[];
+}
+
+/** Eleven on offense (and a kicker), eleven on defense. */
+export interface Offense {
+  qb: FbPlayer;
+  rb: FbPlayer;
+  /** X (wide left), Z (wide right), slot */
+  wr: [FbPlayer, FbPlayer, FbPlayer];
+  te: FbPlayer;
+  /** LT LG C RG RT */
+  ol: [FbPlayer, FbPlayer, FbPlayer, FbPlayer, FbPlayer];
+  k: FbPlayer;
+}
+
+export interface Defense {
+  /** LE, LDT, RDT, RE */
+  dl: [FbPlayer, FbPlayer, FbPlayer, FbPlayer];
+  /** WLB, MLB, SLB */
+  lb: [FbPlayer, FbPlayer, FbPlayer];
+  cb: [FbPlayer, FbPlayer];
+  /** free (deep), strong */
+  s: [FbPlayer, FbPlayer];
+}
+
+export interface Pt {
+  x: number;
+  y: number;
+}
+
+/**
+ * Human input is a normalized field vector (a touched, centred stick is {0,0} and brakes). A number
+ * is the AI's lane. `null` is "nobody is steering": a designed run follows its lane, and any other
+ * carrier (a receiver, a scrambling quarterback) carries his momentum and turns upfield. The screen
+ * sends it for a carrier the player hasn't touched the stick for since he got the ball (nfl-1).
+ */
+export type RunInput = Pt | number | null;
+
+export type Job = 'block' | 'route' | 'rush' | 'man' | 'zone' | 'spy' | 'carry' | 'pursue' | 'qb' | 'idle' | 'track' | 'handoff';
+
+/** what a body is doing, for the animation */
+export type Act = 'stance' | 'run' | 'block' | 'throw' | 'catch' | 'carry' | 'juke' | 'spin' | 'stiff' | 'truck' | 'windup' | 'tackle' | 'down' | 'rush' | 'backpedal' | 'celebrate' | 'kick';
+
+export type Move = 'juke' | 'spin' | 'stiff' | 'truck';
+
+export interface Body {
+  id: number;
+  side: 'O' | 'D';
+  p: FbPlayer;
+  /** the slot he lines up in (X, Z, SL, TE, RB, QB, LT..., LE..., WLB..., CB1, FS...) */
+  slot: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  job: Job;
+  act: Act;
+  actAt: number;
+  route: Pt[];
+  sit: boolean;
+  mark: number | null;
+  /** zone landmark for zone coverage */
+  zone: Pt | null;
+  /** locked up with a blocker until then */
+  heldUntil: number;
+  blocker?: number;
+  /** a linebacker reading the run (his keys) until then, and whether he bit the wrong way */
+  readUntil: number;
+  misread: boolean;
+  stunUntil: number;
+  breakAt: number;
+  /** a pass rusher beats his man then */
+  winAt: number;
+  /** a tackler gathering to dive at the runner since then (Infinity when he isn't), when his last
+   * dive left the ground, and the dive in flight (committed: where he aimed it) */
+  windAt: number;
+  diveAt: number;
+  dive: { vx: number; vy: number; until: number } | null;
+  trail: Pt[];
+  /** his abilities in the zone this play (a seeded roll at the snap) */
+  on?: string[];
+  /** a man defender beaten on a route break: reacting late and slower until then */
+  brokenUntil?: number;
+  /** nfl-4: the moment a tackler's wind-up commits him to his dive (the middle of the JUKE/SPIN
+   * ring's window), kept through the dive; and whether that ring has been counted as a chance */
+  ringAt?: number;
+  ringSeen?: boolean;
+}
+
+export type Call = 'pass' | 'run';
+export type Concept = 'verts' | 'slants' | 'smash' | 'flood' | 'dagger' | 'mesh' | 'curls' | 'posts';
+export type RunPlay = 'inside' | 'outside' | 'power';
+export type PassType = 'bullet' | 'touch' | 'lob';
+
+export interface Ball {
+  from: Pt;
+  to: Pt;
+  t0: number;
+  t1: number;
+  peak: number;
+  type?: PassType;
+  /** Each defender gets one physical play on this pass, rather than a fresh lottery every frame. */
+  tried?: number[];
+  /** thrown away out of bounds (nfl-2): nobody plays it, and it's never intercepted */
+  away?: boolean;
+  /** nfl-4: a PERFECT sling on a gold ring: this receiver (a body id) catches it in stride, with no
+   * play on it in the lane, no drop and no interception ("gold never lies") */
+  sure?: number;
+}
+
+export type EndKind = 'tackle' | 'incomplete' | 'td' | 'int' | 'sack' | 'out' | 'fumble';
+
+/**
+ * A flag on the play (Claude 2026-11-01). The offense's holding costs ten yards and the down is
+ * played again; the defense's holding or illegal contact is five yards and a first down; offside is
+ * five yards and the down again; pass interference puts the ball at the spot with a first down.
+ * The side that didn't foul takes the play's result instead when that's better for it.
+ */
+export interface Flag {
+  by: 'O' | 'D';
+  kind: 'holding' | 'def-holding' | 'offside' | 'dpi';
+  /** who it's on (his tag), for the banner */
+  tag: string;
+  /** pass interference: the spot of the foul (yard line) */
+  spot?: number;
+}
+
+export interface PlayEnd {
+  kind: EndKind;
+  /** a flag thrown on the play (the drive decides whether it's accepted) */
+  flag?: Flag;
+  x: number;
+  y: number;
+  gain: number;
+  text: string;
+  /** a completed pass (the On Fire streak counts these) */
+  caught: boolean;
+  /** how long the play ran (seconds, for the two-minute clock) */
+  secs: number;
+  /** nfl-4: the players (FbPlayer ids) who made a PERFECT moment on the play, one entry each, and
+   * the gold rings the offense was offered on it (Heat and the match grade count them) */
+  perfects?: string[];
+  chances?: number;
+}
+
+/** nfl-4: the dial a ring's toast names when it isn't a PERFECT (V2 §B.0.1). */
+export type Dial = 'TIMING' | 'PRESSURE' | 'RANGE';
+/** nfl-4: the last ring judged on a play: what it was for, how it was judged, and its state. */
+export interface RingNote {
+  kind: 'sling' | 'juke' | 'spin';
+  judge: 'perfect' | 'good' | 'early' | 'late';
+  state: 'gold' | 'amber' | 'red';
+  dial: Dial | null;
+}
+
+export interface Play {
+  t: number;
+  call: Call;
+  concept: Concept;
+  run: RunPlay;
+  coverage: 'man' | 'zone';
+  los: number;
+  bx: number;
+  bodies: Body[];
+  qb: Body;
+  rb: Body;
+  carrier: Body | null;
+  ball: Ball | null;
+  phase: 'pre' | 'drop' | 'air' | 'run' | 'dead';
+  end: PlayEnd | null;
+  rand: () => number;
+  /** a move under way (juke, spin, stiff arm, truck): when it started, how well it works (by the
+   * runner's stamina and how often he's used it), where he was and how he was heading as it began */
+  move: { kind: Move; at: number; until: number; dir: number; eff: number; x: number; y: number; vx: number; vy: number; perfect?: boolean } | null;
+  moveReady: number;
+  /** the runner's stamina (0-1): moves drain it, it comes back as he runs */
+  stamina: number;
+  /** Held by the player; transient, never saved to a profile. */
+  bursting?: boolean;
+  passType?: PassType;
+  /** the moves he's made this play (the same one again works less) */
+  used: Partial<Record<Move, number>>;
+  /** across the field, the hole a run is blocked for */
+  hole: number;
+  /** Formation handedness; a pre-snap flip mirrors assignments and run landmarks together. */
+  direction?: 1 | -1;
+  /**
+   * How well the defense plays, beyond its ratings (Squad Battles' difficulty): 0 the standard, up
+   * to 1 (reads and breaks on the ball sooner, covers tighter, gets home faster, misreads runs less),
+   * below 0 looser.
+   */
+  defIQ: number;
+  slowUntil: number;
+  /** pressure on the quarterback right now (0-1), for the HUD and the throw */
+  pressure: number;
+  events: string[];
+  catcher: Body | null;
+  caughtAt: Pt | null;
+  /** when the ball last changed hands (a handoff, a catch, a scramble), for the momentum carry */
+  carrierAt?: number;
+  /** where the throw lands (the slingshot's aim), for the HUD */
+  aim: Pt | null;
+  /** the offense is ON FIRE (Heat, nfl-4): every gold window is 1.25x wide and an uncontested amber
+   * sling is gold; the ball burns. (It used to be three completions in a row, and let the
+   * quarterback see the whole arc and throw quicker; Heat's wider gold replaces that.) */
+  fire: boolean;
+  /** nfl-4: PERFECT moments this play (FbPlayer ids), gold rings offered, and the last ring judged */
+  pf?: string[];
+  chances?: number;
+  ring?: RingNote;
+  /** ability pops already reported this play */
+  fired?: string[];
+  /** the coverage defender who blew his assignment this play (a seeded roll at the snap), if any */
+  bust?: number;
+  /** how the ball was caught (for the drawing only): how far he reached, a high ball, in traffic */
+  catchInfo?: { ro: number; high: boolean; contested: boolean };
+  /**
+   * The pocket (nfl-2). `spot` is where the quarterback settles: his drop until the stick has moved
+   * him, then wherever the stick left him. `roll` is how hard the stick is moving him this step (0-1;
+   * 0 or absent on a scripted drop), which costs his sight of the arc and adds throw error.
+   */
+  spot?: Pt;
+  roll?: number;
+  /** the carrier is giving himself up (nfl-2): a quarterback's slide or a dive for the line; the
+   * play ends in a tackle at `until`, or at the first contact, with no fumble */
+  down?: { kind: 'slide' | 'dive'; at: number; until: number };
+  /** the carrier covers the ball up with both arms (nfl-2): he holds on through a hit, a step slower, no moves */
+  covered?: boolean;
+}

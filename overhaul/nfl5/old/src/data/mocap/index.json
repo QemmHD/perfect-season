@@ -1,0 +1,723 @@
+{
+ "credit": "The data used in this project was obtained from mocap.cs.cmu.edu. The database was created with funding from NSF EIA-0196217.",
+ "units": "lengths in the subject's leg lengths (hip to ankle); times in seconds",
+ "bones": [
+  "hipAxis",
+  "thighL",
+  "shinL",
+  "footL",
+  "thighR",
+  "shinR",
+  "footR",
+  "spine",
+  "neck",
+  "shAxis",
+  "upperL",
+  "foreL",
+  "handL",
+  "upperR",
+  "foreR",
+  "handR"
+ ],
+ "clips": {
+  "jumpshot": {
+   "src": "124_05",
+   "desc": "jump shot: step in, dip, ball up past the forehead, release at the top, land",
+   "frames": 43,
+   "fps": 30.0,
+   "duration": 1.4,
+   "loop": false,
+   "yaw": "smooth",
+   "events": {
+    "gather": 0.1,
+    "dip": 0.292,
+    "set": 0.375,
+    "takeoff": 0.467,
+    "apex": 0.692,
+    "release": 0.7,
+    "land": 0.917
+   },
+   "root": {
+    "dx": 0.452,
+    "dz": 0.859,
+    "turn": -1.366,
+    "speed": 0.906,
+    "peak": 0.316
+   },
+   "tags": [
+    "nba"
+   ]
+  },
+  "layup": {
+   "src": "124_06",
+   "desc": "layup off one foot: last two steps, plant, right hand lays it in at full stretch (also the driving jump for a dunk)",
+   "frames": 47,
+   "fps": 30.0,
+   "duration": 1.5333,
+   "loop": false,
+   "yaw": "smooth",
+   "events": {
+    "takeoff": 0.65,
+    "apex": 0.983,
+    "release": 0.992,
+    "land": 1.317
+   },
+   "root": {
+    "dx": 2.161,
+    "dz": 1.737,
+    "turn": -2.563,
+    "speed": 2.414,
+    "peak": 0.68
+   },
+   "tags": [
+    "nba"
+   ]
+  },
+  "jump": {
+   "src": "016_03",
+   "desc": "two-foot vertical jump from a deep load (dunks from a standstill, rebounds, blocks)",
+   "frames": 55,
+   "fps": 30.0,
+   "duration": 1.8,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "dip": 0.483,
+    "takeoff": 0.742,
+    "apex": 1.0,
+    "land": 1.275
+   },
+   "root": {
+    "dx": -0.103,
+    "dz": 0.049,
+    "turn": 0.0,
+    "speed": 0.358,
+    "peak": 0.507
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "dribble": {
+   "src": "006_13",
+   "desc": "dribbling on the move, right hand (walking pace: speed it up for a jog)",
+   "frames": 35,
+   "fps": 30.2158,
+   "duration": 1.1583,
+   "loop": true,
+   "yaw": "smooth",
+   "events": {},
+   "beats": {
+    "bounce": [
+     0.6,
+     1.138
+    ],
+    "stepL": [
+     0.367,
+     0.733
+    ],
+    "stepR": [
+     0.308,
+     0.992
+    ]
+   },
+   "root": {
+    "dx": 1.331,
+    "dz": -0.472,
+    "turn": -0.235,
+    "speed": 1.234,
+    "peak": 0.06
+   },
+   "cycle": {
+    "dx": 1.369,
+    "dz": -0.476,
+    "turn": -0.249
+   },
+   "tags": [
+    "nba"
+   ]
+  },
+  "crossover": {
+   "src": "006_12",
+   "desc": "crossover: right-hand dribble, ball across to the left hand (the mirror goes left to right)",
+   "frames": 31,
+   "fps": 30.0,
+   "duration": 1.0,
+   "loop": false,
+   "yaw": "smooth",
+   "events": {
+    "cross": 0.4
+   },
+   "root": {
+    "dx": 1.375,
+    "dz": -0.144,
+    "turn": 0.092,
+    "speed": 1.391,
+    "peak": 0.018
+   },
+   "mirror": "crossover_l",
+   "tags": [
+    "nba"
+   ]
+  },
+  "shuffle": {
+   "src": "102_27",
+   "desc": "defensive slide to his right: low, wide, hands out (the mirror slides left)",
+   "frames": 28,
+   "fps": 30.2703,
+   "duration": 0.925,
+   "loop": true,
+   "yaw": "fixed",
+   "events": {},
+   "beats": {
+    "stepL": [
+     0.242,
+     0.708
+    ],
+    "stepR": [
+     0.783
+    ]
+   },
+   "root": {
+    "dx": 0.481,
+    "dz": 3.01,
+    "turn": 0.0,
+    "speed": 3.303,
+    "peak": 0.055
+   },
+   "cycle": {
+    "dx": 0.494,
+    "dz": 3.146,
+    "turn": 0.0
+   },
+   "mirror": "shuffle_l",
+   "tags": [
+    "nba"
+   ]
+  },
+  "ready": {
+   "src": "140_06",
+   "desc": "ready stance: knees bent, hands up, weight shifting (also a two-point stance)",
+   "frames": 81,
+   "fps": 30.0,
+   "duration": 2.7,
+   "loop": true,
+   "yaw": "fixed",
+   "events": {},
+   "root": {
+    "dx": 0.062,
+    "dz": 0.1,
+    "turn": 0.0,
+    "speed": 0.154,
+    "peak": 0.001
+   },
+   "cycle": {
+    "dx": 0.061,
+    "dz": 0.103,
+    "turn": 0.0
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "jog": {
+   "src": "016_35",
+   "desc": "jog",
+   "frames": 24,
+   "fps": 30.0,
+   "duration": 0.8,
+   "loop": true,
+   "yaw": "smooth",
+   "events": {},
+   "beats": {
+    "stepL": [
+     0.633
+    ],
+    "stepR": [
+     0.233
+    ]
+   },
+   "root": {
+    "dx": 2.588,
+    "dz": -0.026,
+    "turn": 0.047,
+    "speed": 3.239,
+    "peak": 0.067
+   },
+   "cycle": {
+    "dx": 2.693,
+    "dz": -0.03,
+    "turn": 0.05
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "run": {
+   "src": "102_10",
+   "desc": "run (a basketball player, no ball)",
+   "frames": 20,
+   "fps": 30.7692,
+   "duration": 0.65,
+   "loop": true,
+   "yaw": "smooth",
+   "events": {},
+   "beats": {
+    "stepL": [
+     0.008
+    ],
+    "stepR": [
+     0.325
+    ]
+   },
+   "root": {
+    "dx": 3.581,
+    "dz": -0.137,
+    "turn": -0.55,
+    "speed": 5.584,
+    "peak": 0.144
+   },
+   "cycle": {
+    "dx": 3.769,
+    "dz": -0.115,
+    "turn": -0.553
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "sprint": {
+   "src": "143_01",
+   "desc": "sprint",
+   "frames": 22,
+   "fps": 30.6977,
+   "duration": 0.7167,
+   "loop": true,
+   "yaw": "smooth",
+   "events": {},
+   "beats": {
+    "stepL": [
+     0.325,
+     0.675
+    ],
+    "stepR": [
+     0.117,
+     0.492
+    ]
+   },
+   "root": {
+    "dx": 5.469,
+    "dz": -0.115,
+    "turn": -0.599,
+    "speed": 7.744,
+    "peak": 0.081
+   },
+   "cycle": {
+    "dx": 5.684,
+    "dz": -0.1,
+    "turn": -0.604
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "cut": {
+   "src": "102_18",
+   "desc": "jab step left, plant and cut hard right (the mirror cuts left)",
+   "frames": 31,
+   "fps": 30.0,
+   "duration": 1.0,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "plant": 0.55
+   },
+   "beats": {
+    "stepL": [
+     0.65
+    ],
+    "stepR": [
+     0.267,
+     0.95
+    ]
+   },
+   "root": {
+    "dx": 3.033,
+    "dz": 0.024,
+    "turn": 0.0,
+    "speed": 3.116,
+    "peak": 0.052
+   },
+   "mirror": "cut_l",
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "backpedal": {
+   "src": "136_11",
+   "desc": "backpedal: crouched, stepping backward (play faster for a quick drop)",
+   "frames": 51,
+   "fps": 30.0,
+   "duration": 1.7,
+   "loop": true,
+   "yaw": "smooth",
+   "events": {},
+   "beats": {
+    "stepL": [
+     0.3
+    ],
+    "stepR": [
+     1.108
+    ]
+   },
+   "root": {
+    "dx": -1.22,
+    "dz": 0.017,
+    "turn": 0.017,
+    "speed": 0.734,
+    "peak": 0.027
+   },
+   "cycle": {
+    "dx": -1.242,
+    "dz": 0.017,
+    "turn": 0.017
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "celebrate": {
+   "src": "079_69",
+   "desc": "celebration: both arms thrown up and out, held, then down",
+   "frames": 73,
+   "fps": 30.0,
+   "duration": 2.4,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {},
+   "root": {
+    "dx": -0.143,
+    "dz": 0.034,
+    "turn": 0.0,
+    "speed": 0.098,
+    "peak": 0.015
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "stumble": {
+   "src": "104_13",
+   "desc": "stumble: lurches forward, arms flung out, catches himself",
+   "frames": 33,
+   "fps": 30.0,
+   "duration": 1.0667,
+   "loop": false,
+   "yaw": "smooth",
+   "events": {},
+   "root": {
+    "dx": 1.831,
+    "dz": -0.292,
+    "turn": -0.37,
+    "speed": 1.804,
+    "peak": 0.068
+   },
+   "mirror": "stumble_m",
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "fall_back": {
+   "src": "090_18",
+   "desc": "knocked down backward: feet go, falls flat on his back (posterized, run over)",
+   "frames": 56,
+   "fps": 30.0,
+   "duration": 1.8333,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "impact": 0.5,
+    "ground": 0.942
+   },
+   "root": {
+    "dx": 0.073,
+    "dz": -0.009,
+    "turn": 0.0,
+    "speed": 0.215,
+    "peak": 0.123
+   },
+   "mirror": "fall_back_m",
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "slip": {
+   "src": "090_17",
+   "desc": "feet fly out from under him, lands on his back legs up (ankle breaker)",
+   "frames": 61,
+   "fps": 30.0,
+   "duration": 2.0,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "impact": 1.292,
+    "ground": 1.992
+   },
+   "root": {
+    "dx": 1.614,
+    "dz": -0.135,
+    "turn": 0.0,
+    "speed": 1.001,
+    "peak": 1.462
+   },
+   "mirror": "slip_m",
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "fall_forward": {
+   "src": "090_16",
+   "desc": "pitched forward through the air, lands flat on his front (starts airborne)",
+   "frames": 46,
+   "fps": 30.0,
+   "duration": 1.5,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "impact": 0.675,
+    "ground": 1.067
+   },
+   "root": {
+    "dx": 0.137,
+    "dz": 0.215,
+    "turn": 0.0,
+    "speed": 0.357,
+    "peak": 1.366
+   },
+   "mirror": "fall_forward_m",
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "getup": {
+   "src": "140_08",
+   "desc": "gets up from lying on his back",
+   "frames": 124,
+   "fps": 30.0,
+   "duration": 4.1,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {},
+   "root": {
+    "dx": 0.839,
+    "dz": -0.105,
+    "turn": 0.0,
+    "speed": 0.293,
+    "peak": 0.094
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "getup_front": {
+   "src": "140_01",
+   "desc": "gets up from lying on his front",
+   "frames": 91,
+   "fps": 30.0,
+   "duration": 3.0,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {},
+   "root": {
+    "dx": -1.039,
+    "dz": -0.111,
+    "turn": 0.0,
+    "speed": 0.502,
+    "peak": 0.075
+   },
+   "tags": [
+    "nba",
+    "nfl"
+   ]
+  },
+  "throw": {
+   "src": "079_91",
+   "desc": "quarterback pass: ball up by the ear, stride, overhand release, follow-through",
+   "frames": 82,
+   "fps": 30.0,
+   "duration": 2.7,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "release": 1.85
+   },
+   "root": {
+    "dx": -0.023,
+    "dz": 0.081,
+    "turn": 0.0,
+    "speed": 0.124,
+    "peak": 0.011
+   },
+   "tags": [
+    "nfl"
+   ]
+  },
+  "catch": {
+   "src": "033_01",
+   "desc": "catch at the chest, both hands",
+   "frames": 28,
+   "fps": 30.0,
+   "duration": 0.9,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "catch": 0.358
+   },
+   "root": {
+    "dx": -0.043,
+    "dz": -0.143,
+    "turn": 0.0,
+    "speed": 0.637,
+    "peak": 0.001
+   },
+   "tags": [
+    "nfl"
+   ]
+  },
+  "catch_run": {
+   "src": "143_22",
+   "desc": "reaches out low for the ball, then turns upfield",
+   "frames": 37,
+   "fps": 30.0,
+   "duration": 1.2,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "catch": 0.392
+   },
+   "root": {
+    "dx": 1.987,
+    "dz": -0.126,
+    "turn": 0.0,
+    "speed": 2.814,
+    "peak": 0.049
+   },
+   "tags": [
+    "nfl"
+   ]
+  },
+  "block": {
+   "src": "082_06",
+   "desc": "drive block: low, both hands into the man, short driving steps",
+   "frames": 44,
+   "fps": 30.1714,
+   "duration": 1.4583,
+   "loop": true,
+   "yaw": "fixed",
+   "events": {},
+   "beats": {
+    "stepL": [],
+    "stepR": [
+     0.55
+    ]
+   },
+   "root": {
+    "dx": 0.855,
+    "dz": -0.089,
+    "turn": 0.0,
+    "speed": 0.594,
+    "peak": 0.011
+   },
+   "cycle": {
+    "dx": 0.872,
+    "dz": -0.095,
+    "turn": 0.0
+   },
+   "tags": [
+    "nfl"
+   ]
+  },
+  "stiff_arm": {
+   "src": "143_23",
+   "desc": "stiff arm: right arm punched straight out (hold the extend frame)",
+   "frames": 17,
+   "fps": 30.0,
+   "duration": 0.5333,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "extend": 0.225
+   },
+   "root": {
+    "dx": -0.002,
+    "dz": -0.019,
+    "turn": 0.0,
+    "speed": 0.164,
+    "peak": 0.0
+   },
+   "tags": [
+    "nfl"
+   ]
+  },
+  "kick": {
+   "src": "010_01",
+   "desc": "kick: approach, plant, right leg swings through the ball",
+   "frames": 49,
+   "fps": 30.0,
+   "duration": 1.6,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "plant": 0.75,
+    "contact": 0.975
+   },
+   "root": {
+    "dx": 1.534,
+    "dz": 0.077,
+    "turn": 0.0,
+    "speed": 1.038,
+    "peak": 0.056
+   },
+   "tags": [
+    "nfl"
+   ]
+  },
+  "dive": {
+   "src": "090_16",
+   "desc": "dive: gathers, launches forward, lands flat on his front (diving tackle or catch)",
+   "frames": 65,
+   "fps": 30.0,
+   "duration": 2.1333,
+   "loop": false,
+   "yaw": "fixed",
+   "events": {
+    "takeoff": 0.458,
+    "impact": 1.325,
+    "ground": 1.717
+   },
+   "root": {
+    "dx": 0.372,
+    "dz": 0.206,
+    "turn": 0.0,
+    "speed": 0.444,
+    "peak": 1.367
+   },
+   "tags": [
+    "nfl"
+   ]
+  }
+ }
+}

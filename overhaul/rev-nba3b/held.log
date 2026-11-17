@@ -1,0 +1,137 @@
+{"game":0,"whistleToFinishS":0.009,"boxPtsAtWhistle":2,"scoreAtWhistle":2,"loopWhistleToTipS":6.24,"loopWaitS":6.079,"boxPtsAtTip":{"box":0,"score":0,"done":0},"sameRenderer":true,"heapMB":25.24}
+{"game":1,"whistleToFinishS":0.004,"boxPtsAtWhistle":0,"scoreAtWhistle":0,"skipCurtainToLiveS":0.036,"boxPtsAtTip":{"box":0,"score":0,"done":0},"sameRenderer":true,"heapMB":25.63}
+{"game":2,"whistleToFinishS":0.007,"boxPtsAtWhistle":0,"scoreAtWhistle":0,"rematchToTip4xS":1.221,"rematchToLive4xS":1.319,"boxPtsAtTip":{"box":0,"score":0,"done":0},"sameRenderer":true,"heapMB":26.56}
+{"game":3,"whistleToFinishS":0.005,"boxPtsAtWhistle":0,"scoreAtWhistle":0,"rematchToTip4xS":1.227,"rematchToLive4xS":1.313,"boxPtsAtTip":{"box":0,"score":0,"done":0},"sameRenderer":true,"heapMB":26.34}
+{"game":4,"whistleToFinishS":0.004,"boxPtsAtWhistle":2,"scoreAtWhistle":2,"rematchToTip4xS":1.206,"rematchToLive4xS":1.297,"boxPtsAtTip":{"box":0,"score":0,"done":1},"sameRenderer":true,"heapMB":26.1}
+{"game":5,"whistleToFinishS":0.006,"boxPtsAtWhistle":3,"scoreAtWhistle":3,"rematchToTip4xS":1.21,"rematchToLive4xS":1.273,"boxPtsAtTip":{"box":0,"score":0,"done":0},"sameRenderer":true,"heapMB":26.01}
+{"game":6,"whistleToFinishS":0.004,"boxPtsAtWhistle":0,"scoreAtWhistle":0,"rematchToTip4xS":1.209,"rematchToLive4xS":1.286,"boxPtsAtTip":{"box":0,"score":0,"done":0},"sameRenderer":true,"heapMB":26.08}
+{
+ "rematches": [
+  {
+   "game": 0,
+   "whistleToFinishS": 0.009,
+   "boxPtsAtWhistle": 2,
+   "scoreAtWhistle": 2,
+   "loopWhistleToTipS": 6.24,
+   "loopWaitS": 6.079,
+   "boxPtsAtTip": {
+    "box": 0,
+    "score": 0,
+    "done": 0
+   },
+   "sameRenderer": true,
+   "heapMB": 25.24
+  },
+  {
+   "game": 1,
+   "whistleToFinishS": 0.004,
+   "boxPtsAtWhistle": 0,
+   "scoreAtWhistle": 0,
+   "skipCurtainToLiveS": 0.036,
+   "boxPtsAtTip": {
+    "box": 0,
+    "score": 0,
+    "done": 0
+   },
+   "sameRenderer": true,
+   "heapMB": 25.63
+  },
+  {
+   "game": 2,
+   "whistleToFinishS": 0.007,
+   "boxPtsAtWhistle": 0,
+   "scoreAtWhistle": 0,
+   "rematchToTip4xS": 1.221,
+   "rematchToLive4xS": 1.319,
+   "boxPtsAtTip": {
+    "box": 0,
+    "score": 0,
+    "done": 0
+   },
+   "sameRenderer": true,
+   "heapMB": 26.56
+  },
+  {
+   "game": 3,
+   "whistleToFinishS": 0.005,
+   "boxPtsAtWhistle": 0,
+   "scoreAtWhistle": 0,
+   "rematchToTip4xS": 1.227,
+   "rematchToLive4xS": 1.313,
+   "boxPtsAtTip": {
+    "box": 0,
+    "score": 0,
+    "done": 0
+   },
+   "sameRenderer": true,
+   "heapMB": 26.34
+  },
+  {
+   "game": 4,
+   "whistleToFinishS": 0.004,
+   "boxPtsAtWhistle": 2,
+   "scoreAtWhistle": 2,
+   "rematchToTip4xS": 1.206,
+   "rematchToLive4xS": 1.297,
+   "boxPtsAtTip": {
+    "box": 0,
+    "score": 0,
+    "done": 1
+   },
+   "sameRenderer": true,
+   "heapMB": 26.1
+  },
+  {
+   "game": 5,
+   "whistleToFinishS": 0.006,
+   "boxPtsAtWhistle": 3,
+   "scoreAtWhistle": 3,
+   "rematchToTip4xS": 1.21,
+   "rematchToLive4xS": 1.273,
+   "boxPtsAtTip": {
+    "box": 0,
+    "score": 0,
+    "done": 0
+   },
+   "sameRenderer": true,
+   "heapMB": 26.01
+  },
+  {
+   "game": 6,
+   "whistleToFinishS": 0.004,
+   "boxPtsAtWhistle": 0,
+   "scoreAtWhistle": 0,
+   "rematchToTip4xS": 1.209,
+   "rematchToLive4xS": 1.286,
+   "boxPtsAtTip": {
+    "box": 0,
+    "score": 0,
+    "done": 0
+   },
+   "sameRenderer": true,
+   "heapMB": 26.08
+  },
+  {
+   "game": 7,
+   "whistleToFinishS": 0.004,
+   "boxPtsAtWhistle": 2,
+   "scoreAtWhistle": 2
+  }
+ ],
+ "summary": {
+  "whistleToFinishMaxS": 0.009,
+  "rematchToTip4xMaxS": 1.227,
+  "rematchToLive4xMaxS": 1.319,
+  "rematches4x": 5,
+  "skipCurtainToLiveS": 0.036,
+  "loopWhistleToTipS": 6.24,
+  "rendererKept": true,
+  "boxIsThisGame": true,
+  "heapAfter1stMB": 25.24,
+  "heapAfterLastMB": 26.08,
+  "heapGrowth": 1.033
+ },
+ "errors": []
+}
+
+nba-held: JSON /tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/rev-nba3b/shots/nba-held.json; requests to other hosts aborted: none

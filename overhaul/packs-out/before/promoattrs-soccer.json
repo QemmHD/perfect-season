@@ -1,0 +1,155 @@
+{
+ "sport": "soccer",
+ "promo": {
+  "n": 277,
+  "shownMinusRawMean": 0,
+  "rawUnder85": 70,
+  "rawUnder80": 16,
+  "builtOnBronzeOrSilver": 10,
+  "faceOverPlayedMax": 0,
+  "faceOverPlayedOver1": 0,
+  "lowestRaw": [
+   {
+    "name": "Édouard Duplan 2016",
+    "tier": "promo",
+    "shown": 73,
+    "raw": 73,
+    "boost": 3,
+    "face": "PAC78 SHO62 PAS77 DRI76 DEF37 PHY64",
+    "played": "PAC78 SHO62 PAS77 DRI76 DEF37 PHY64",
+    "baseShown": 70,
+    "baseRaw": 70,
+    "attrGain": 2.7,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Cyriel Dessers 2020",
+    "tier": "promo",
+    "shown": 74,
+    "raw": 74,
+    "boost": 3,
+    "face": "PAC77 SHO75 PAS63 DRI73 DEF36 PHY76",
+    "played": "PAC77 SHO75 PAS63 DRI73 DEF36 PHY76",
+    "baseShown": 71,
+    "baseRaw": 71,
+    "attrGain": 2.8,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Anastasios Douvikas 2023",
+    "tier": "promo",
+    "shown": 74,
+    "raw": 74,
+    "boost": 3,
+    "face": "PAC77 SHO77 PAS61 DRI72 DEF35 PHY72",
+    "played": "PAC77 SHO77 PAS61 DRI72 DEF35 PHY72",
+    "baseShown": 71,
+    "baseRaw": 71,
+    "attrGain": 2.8,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Alan 2014",
+    "tier": "promo",
+    "shown": 75,
+    "raw": 75,
+    "boost": 3,
+    "face": "PAC77 SHO67 PAS80 DRI77 DEF37 PHY63",
+    "played": "PAC77 SHO67 PAS80 DRI77 DEF37 PHY63",
+    "baseShown": 72,
+    "baseRaw": 72,
+    "attrGain": 2.8,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Georgios Giakoumakis 2021",
+    "tier": "promo",
+    "shown": 76,
+    "raw": 76,
+    "boost": 3,
+    "face": "PAC79 SHO79 PAS60 DRI74 DEF37 PHY78",
+    "played": "PAC79 SHO79 PAS60 DRI74 DEF37 PHY78",
+    "baseShown": 73,
+    "baseRaw": 73,
+    "attrGain": 2.8,
+    "faceOverPlayed": 0
+   }
+  ]
+ },
+ "legend": {
+  "n": 132,
+  "shownMinusRawMean": 0,
+  "rawUnder85": 0,
+  "rawUnder80": 0,
+  "builtOnBronzeOrSilver": 0,
+  "faceOverPlayedMax": 0,
+  "faceOverPlayedOver1": 0,
+  "lowestRaw": [
+   {
+    "name": "Emilio Butragueño 1987",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 88,
+    "boost": 4,
+    "face": "PAC91 SHO90 PAS78 DRI87 DEF44 PHY86",
+    "played": "PAC91 SHO90 PAS78 DRI87 DEF44 PHY86",
+    "baseShown": 84,
+    "baseRaw": 84,
+    "attrGain": 3.8,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "David Villa 2009",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 88,
+    "boost": 4,
+    "face": "PAC91 SHO90 PAS78 DRI87 DEF44 PHY86",
+    "played": "PAC91 SHO90 PAS78 DRI87 DEF44 PHY86",
+    "baseShown": 84,
+    "baseRaw": 84,
+    "attrGain": 3.8,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Fernando Torres 2008",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 88,
+    "boost": 4,
+    "face": "PAC94 SHO90 PAS78 DRI87 DEF43 PHY86",
+    "played": "PAC94 SHO90 PAS78 DRI87 DEF43 PHY86",
+    "baseShown": 84,
+    "baseRaw": 84,
+    "attrGain": 3.7,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Gary Lineker 1986",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 88,
+    "boost": 4,
+    "face": "PAC91 SHO90 PAS78 DRI87 DEF44 PHY86",
+    "played": "PAC91 SHO90 PAS78 DRI87 DEF44 PHY86",
+    "baseShown": 84,
+    "baseRaw": 84,
+    "attrGain": 3.8,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Ian Rush 1984",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 88,
+    "boost": 4,
+    "face": "PAC92 SHO90 PAS78 DRI87 DEF44 PHY86",
+    "played": "PAC92 SHO90 PAS78 DRI87 DEF44 PHY86",
+    "baseShown": 84,
+    "baseRaw": 84,
+    "attrGain": 3.8,
+    "faceOverPlayed": 0
+   }
+  ]
+ }
+}

@@ -1,0 +1,48 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "buttons",
+  "before": "XAVI",
+  "afterPass": {
+   "ctrl": "MESSI",
+   "owner": 5,
+   "end": null
+  },
+  "thru": {
+   "ctrl": "XAVI",
+   "end": null
+  },
+  "shot": {
+   "end": {
+    "kind": "L",
+    "text": "CLEARED BY MCCARTHY",
+    "x": 49.823324986992816,
+    "y": 39.70393323082498,
+    "t": 6.349999999999983
+   },
+   "ends": [
+    "L"
+   ]
+  },
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "buttons",
+  "before": "XAVI",
+  "afterPass": {
+   "ctrl": "MESSI",
+   "owner": 5,
+   "end": null
+  },
+  "thru": {
+   "ctrl": "XAVI",
+   "end": null
+  },
+  "shot": {
+   "end": null,
+   "ends": []
+  },
+  "errors": []
+ }
+]

@@ -84,3 +84,6 @@ Flat, plain or placeholder-looking UI fails review.
   - UI with bevels, layered shadows, glass panels, and 3D card tilt and flips
 
   Flat top-down scenes and flat UI fail review.
+
+## OWNER DECISION (2026-11-16 20:00): SHIP IN WAVES
+The owner said the overhaul is taking too long and chose to ship in waves instead of one release. Finished, reviewed and verified work ships in batches as it is ready. Everything else in this brief still applies.

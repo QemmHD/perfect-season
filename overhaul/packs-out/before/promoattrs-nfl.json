@@ -1,0 +1,183 @@
+{
+ "sport": "nfl",
+ "promo": {
+  "n": 1106,
+  "shownMinusRawMean": 0.3,
+  "rawUnder85": 61,
+  "rawUnder80": 10,
+  "builtOnBronzeOrSilver": 115,
+  "faceOverPlayedMax": 25,
+  "faceOverPlayedOver1": 617,
+  "lowestRaw": [
+   {
+    "name": "Joe Ferguson 1977",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 72,
+    "boost": 3,
+    "face": "THP99 SAC90 MAC88 DAC92 TUP97 SPD99",
+    "played": "THP79 SAC65 MAC63 DAC67 TUP73 SPD87",
+    "baseShown": 59,
+    "baseRaw": 69,
+    "attrGain": 3,
+    "faceOverPlayed": 25
+   },
+   {
+    "name": "William Henderson 2004",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 74,
+    "boost": 4,
+    "face": "SPD89 ACC90 BTK99 JKM91 CAR99 BCV86",
+    "played": "SPD66 ACC67 BTK77 JKM69 CAR83 BCV63",
+    "baseShown": 59,
+    "baseRaw": 70,
+    "attrGain": 4,
+    "faceOverPlayed": 23
+   },
+   {
+    "name": "Lorenzo Neal 2007",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 74,
+    "boost": 4,
+    "face": "SPD92 ACC83 BTK99 JKM59 CAR99 BCV99",
+    "played": "SPD69 ACC59 BTK89 JKM34 CAR77 BCV80",
+    "baseShown": 60,
+    "baseRaw": 70,
+    "attrGain": 3.3,
+    "faceOverPlayed": 25
+   },
+   {
+    "name": "Patrick Ricard 2024",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 74,
+    "boost": 4,
+    "face": "SPD98 ACC99 BTK86 JKM91 CAR98 BCV92",
+    "played": "SPD75 ACC79 BTK62 JKM67 CAR75 BCV69",
+    "baseShown": 59,
+    "baseRaw": 70,
+    "attrGain": 4,
+    "faceOverPlayed": 24
+   },
+   {
+    "name": "Lorenzo Neal 2006",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 75,
+    "boost": 4,
+    "face": "SPD92 ACC83 BTK99 JKM59 CAR99 BCV99",
+    "played": "SPD69 ACC59 BTK91 JKM34 CAR77 BCV80",
+    "baseShown": 60,
+    "baseRaw": 71,
+    "attrGain": 3.3,
+    "faceOverPlayed": 25
+   }
+  ]
+ },
+ "legend": {
+  "n": 130,
+  "shownMinusRawMean": -5.2,
+  "rawUnder85": 4,
+  "rawUnder80": 0,
+  "builtOnBronzeOrSilver": 4,
+  "faceOverPlayedMax": 12,
+  "faceOverPlayedOver1": 19,
+  "lowestRaw": [
+   {
+    "name": "Alan Page 1971",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 81,
+    "boost": 2,
+    "face": "PMV85 FMV85 BSH84 STR95 SPD95 TAK98",
+    "played": "PMV76 FMV76 BSH75 STR83 SPD83 TAK87",
+    "baseShown": 69,
+    "baseRaw": 79,
+    "attrGain": 1.9,
+    "faceOverPlayed": 12
+   },
+   {
+    "name": "Randy White 1978",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 81,
+    "boost": 2,
+    "face": "PMV87 FMV84 BSH86 STR95 SPD89 TAK96",
+    "played": "PMV78 FMV76 BSH77 STR85 SPD79 TAK86",
+    "baseShown": 70,
+    "baseRaw": 79,
+    "attrGain": 2,
+    "faceOverPlayed": 10
+   },
+   {
+    "name": "Jack Youngblood 1974",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 83,
+    "boost": 2,
+    "face": "PMV82 FMV96 BSH81 STR92 SPD96 TAK94",
+    "played": "PMV76 FMV89 BSH75 STR83 SPD89 TAK86",
+    "baseShown": 73,
+    "baseRaw": 81,
+    "attrGain": 2,
+    "faceOverPlayed": 9
+   },
+   {
+    "name": "Morten Andersen 1986",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 83,
+    "boost": 2,
+    "face": "KPW83 KAC92 AWR94 STR50 SPD68 AGI68",
+    "played": "KPW80 KAC91 AWR93 STR47 SPD66 AGI66",
+    "baseShown": 73,
+    "baseRaw": 81,
+    "attrGain": 1.9,
+    "faceOverPlayed": 3
+   },
+   {
+    "name": "DeMarcus Ware 2008",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 85,
+    "boost": 2,
+    "face": "TAK90 PUR89 PRC93 ZCV70 SPD91 BSH90",
+    "played": "TAK86 PUR84 PRC91 ZCV67 SPD88 BSH86",
+    "baseShown": 75,
+    "baseRaw": 83,
+    "attrGain": 2,
+    "faceOverPlayed": 5
+   }
+  ]
+ },
+ "spotlight": {
+  "n": 131,
+  "faceAtCapMean": 1.67,
+  "faceAtCapMax": 5,
+  "example": {
+   "name": "Tom Brady 2007",
+   "tier": "spotlight",
+   "shown": 105,
+   "raw": 105,
+   "boost": 8,
+   "face": "THP105 SAC105 MAC105 DAC105 TUP105 SPD65",
+   "played": "THP105 SAC105 MAC105 DAC105 TUP105 SPD65"
+  }
+ },
+ "goat": {
+  "n": 20,
+  "faceAtCapMean": 2.65,
+  "faceAtCapMax": 5,
+  "example": {
+   "name": "Tom Brady 2007",
+   "tier": "goat",
+   "shown": 110,
+   "raw": 110,
+   "boost": 14,
+   "face": "THP110 SAC110 MAC110 DAC110 TUP110 SPD66",
+   "played": "THP110 SAC110 MAC110 DAC110 TUP110 SPD66"
+  }
+ }
+}

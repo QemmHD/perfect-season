@@ -1,0 +1,29 @@
+{
+ "sport": "nba",
+ "counts": {
+  "promo": {
+   "0": 518
+  },
+  "legend": {
+   "0": 120
+  },
+  "spotlight": {
+   "0": 120
+  },
+  "goat": {
+   "0": 20
+  },
+  "landmark": {
+   "0": 252
+  },
+  "standout": {
+   "0": 48
+  },
+  "program": {
+   "0": 340
+  }
+ },
+ "changed": [],
+ "missing": 0,
+ "added": 0
+}

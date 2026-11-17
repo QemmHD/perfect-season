@@ -1,0 +1,21 @@
+
+== AI pro gold v gold, 60 games x 11 drives (3198 plays)
+pass share by down 46.9% (n 1510) / 58.6% (n 1104) / 77.0% (n 527) / 61.4% (n 57)
+time to throw 2.42 s; scrambles 2.3%; 4th-down tries / game 0.95
+cmp 71.7 INT 1.6 sack 0.0 YPC 4.65 pts/drive 4.89
+calls 3198 snaps, 11 distinct: c0 4.6, c1 16.7, c1r 7.9, c2 12.2, t2 7.1, c3 20.0, c4 11.6, fire 8.8, sim 8.3, goal 2.6, prevent 0.2
+rotated 13.7%; 3rd & 7+: two-high or blitz 69.6%; red zone man/C0/C1/GL 52.0%
+sacks blitz 0.0 base 0.0 (xNaN); 20+ blitz 18.9 base 19.5 (x0.97)
+FREE RUSHER shows on 51.7% of unblocked blitzes (n 120); truly free when shown 0.0% (n 62)
+
+== AI legend gold v gold, 60 games x 11 drives (3055 plays)
+pass share by down 48.3% (n 1383) / 61.3% (n 1050) / 77.2% (n 565) / 63.2% (n 57)
+time to throw 2.49 s; scrambles 3.3%; 4th-down tries / game 0.95
+cmp 69.7 INT 2.1 sack 0.0 YPC 3.91 pts/drive 4.36
+calls 3055 snaps, 11 distinct: c0 5.2, c1 15.7, c1r 6.8, c2 13.9, t2 6.3, c3 24.7, c4 11.3, fire 7.4, sim 6.1, goal 2.5, prevent 0.1
+rotated 29.8%; 3rd & 7+: two-high or blitz 64.7%; red zone man/C0/C1/GL 51.3%
+sacks blitz 0.0 base 0.0 (xNaN); 20+ blitz 13.8 base 19.9 (x0.70)
+FREE RUSHER shows on 28.8% of unblocked blitzes (n 104); truly free when shown 0.0% (n 30)
+
+done in 46s -> docs/studio-overhaul/nfl-calibration/nfl5-scratch-games.json
+EXIT 0

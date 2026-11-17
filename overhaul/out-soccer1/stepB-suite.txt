@@ -1,0 +1,67 @@
+
+ RUN  v2.1.4 /home/user/ps-s-soccer
+
+ ✓ src/data/soccer-data.test.ts  (9 tests) 355ms
+ ✓ src/game/soccer2/rules.test.ts  (9 tests) 7320ms
+   ✓ R-1: a dead shot is a loose ball > a shot that dies short stops being a shot within 1 s, and the attack ends within 15 s 1293ms
+   ✓ R-1: a dead shot is a loose ball > autopilot attacks all finish within the clock + 15 s 3277ms
+   ✓ C-4: BEND bends the way its arrow points (x across the pitch: + right on screen) > over 40 kicks each: Bend left ends 1.5 m+ left of the aim, Bend right 1.5 m+ right, straight within 0.5 m 997ms
+   ✓ J-1: the bounce is a sound, not a rule > bounces are reported, and taking them out of the events changes no attack 1671ms
+ ✓ src/game/soccer2/shooting.test.ts  (10 tests) 14992ms
+   ✓ timing: the closer to the green, the truer > miss distance and goal rate are monotone in |release − green| 6934ms
+   ✓ ratings still decide > a better finisher scores more one on one; aim assist too 3693ms
+   ✓ ratings still decide > a better keeper concedes fewer of the same chances 3807ms
+   ✓ free passing > a receiver whose stick is still held the way of the pass runs onto it 364ms
+ ✓ src/game/soccer2/soccer.test.ts  (20 tests) 16716ms
+   ✓ ratings decide attacks > a good finisher scores more from the same chances (wider green, tighter cone) 5097ms
+   ✓ ratings decide attacks > an elite keeper saves more of the same shots 4279ms
+   ✓ ratings decide attacks > better teams score more over seeded matches 2772ms
+   ✓ determinism and safety > every scenario ends, every value finite, no endless attacks 2878ms
+   ✓ penalties > simulated shootouts always finish with a winner, deterministically 474ms
+ ✓ src/engine/soccer-draft.test.ts  (7 tests) 1867ms
+   ✓ soccer draft > loads forty clubs by decade, every player at his spots 864ms
+   ✓ soccer draft > keeps the draft difficulty where it was tuned 615ms
+   ✓ soccer draft > a knockout cup of one-game rounds; level after 90 minutes goes to penalties 303ms
+ ✓ src/lib/soccer-saves.test.ts  (6 tests) 32ms
+ ✓ src/game/soccer2/golden.test.ts  (3 tests) 6930ms
+   ✓ soccer golden hash > 60 seeded autopilot attacks: the whistle and 3 s after it 2605ms
+   ✓ soccer golden hash > 20 aiProgress matches 3155ms
+   ✓ soccer golden hash > 50 agreed shootouts 1168ms
+ ✓ src/engine/sport-branches.test.ts  (2 tests) 75ms
+ ✓ src/ut/soccer-ut.test.ts  (6 tests) 14980ms
+   ✓ Ultimate Team soccer > rates every card from its own overall and face, FC-style tiers 4164ms
+ ✓ src/game/soccer2/setpieces.test.ts  (3 tests) 7094ms
+   ✓ soccer set pieces > corners score about one in ten 4138ms
+   ✓ soccer set pieces > free kicks: about one direct free kick in ten goes in, 10-15% of free-kick attacks 2527ms
+   ✓ soccer set pieces > penalties go in about three times in four 427ms
+ ✓ src/ut/soccer-pull-tracker.test.ts  (11 tests) 6102ms
+   ✓ pack tracker log (soccer) > keeps totals uncapped while the recent list holds its pack and card caps 1765ms
+ ✓ src/game/soccer2/agreement-ut.test.ts  (6 tests) 62990ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 1-99 17103ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 101-199 8729ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 201-299 10655ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 301-399 14257ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 401-499 11199ms
+   ✓ online agreement: simBoth from both seats > has teeth: a difficulty that leaked into online play would be caught 1045ms
+ ✓ src/game/soccer2/agreement.test.ts  (11 tests) 88893ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 0-98 12255ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 100-198 10593ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 200-298 8455ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 300-398 11811ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 400-498 12430ms
+   ✓ online agreement: takeover and taken > has teeth: a difficulty that leaked into online play would be caught 1476ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 0-199 9269ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 200-399 6433ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 400-599 5565ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 600-799 5320ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 800-999 5285ms
+
+ Test Files  13 passed (13)
+      Tests  103 passed (103)
+   Start at  12:59:15
+   Duration  124.58s (transform 20.37s, setup 0ms, collect 38.91s, tests 228.35s, environment 9ms, prepare 3.34s)
+
+
+real	2m6.340s
+user	3m2.180s
+sys	0m13.321s

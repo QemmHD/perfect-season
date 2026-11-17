@@ -1,0 +1,64 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "restarts",
+  "corner": {
+   "setPiece": {
+    "kind": "corner",
+    "spot": {
+     "x": 67.5,
+     "y": 104.5
+    },
+    "side": -1
+   },
+   "restarts": 1,
+   "end": null,
+   "clockLeft": 29.5,
+   "taker": "MILNER",
+   "ctrlIsTaker": true
+  },
+  "afterCorner": {
+   "end": {
+    "kind": "L",
+    "text": "WON IN THE AIR BY FERNANDINHO",
+    "x": 40.69308343617222,
+    "y": 94.3652137868797,
+    "t": 3.183333333333327
+   },
+   "setPiece": null
+  },
+  "thrown": null,
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "restarts",
+  "corner": {
+   "setPiece": {
+    "kind": "corner",
+    "spot": {
+     "x": 67.5,
+     "y": 104.5
+    },
+    "side": -1
+   },
+   "restarts": 1,
+   "end": null,
+   "clockLeft": 29.5,
+   "taker": "MILNER",
+   "ctrlIsTaker": true
+  },
+  "afterCorner": {
+   "end": {
+    "kind": "L",
+    "text": "WON IN THE AIR BY FERNANDINHO",
+    "x": 40.69308343617222,
+    "y": 94.3652137868797,
+    "t": 3.183333333333327
+   },
+   "setPiece": null
+  },
+  "thrown": null,
+  "errors": []
+ }
+]

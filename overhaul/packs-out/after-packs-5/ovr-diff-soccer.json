@@ -1,0 +1,17 @@
+{
+ "sport": "soccer",
+ "counts": {
+  "promo": {
+   "0": 261
+  },
+  "legend": {
+   "0": 132
+  },
+  "standout": {
+   "0": 66
+  }
+ },
+ "changed": [],
+ "missing": 0,
+ "added": 0
+}

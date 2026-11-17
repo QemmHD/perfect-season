@@ -1,0 +1,3 @@
+BEND Bend left (left arrow)      curl  0.75  mean (crossing x − aimed x)  -2.54 m over 40 kicks (+ = right)
+BEND STRAIGHT                    curl  0.00  mean (crossing x − aimed x)  -0.07 m over 40 kicks (+ = right)
+BEND Bend right (right arrow)    curl -0.75  mean (crossing x − aimed x)   2.50 m over 40 kicks (+ = right)

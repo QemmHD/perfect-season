@@ -1,0 +1,12 @@
+{
+ "sport": "soccer",
+ "club": {
+  "spotlight": null,
+  "goat": null
+ },
+ "day": "2026-11-09",
+ "sbcsTakingSpecialsOnDay": 0,
+ "onDay": [],
+ "sbcsTakingSpecialsIn28Days": 0,
+ "specialUidsIn28Days": []
+}

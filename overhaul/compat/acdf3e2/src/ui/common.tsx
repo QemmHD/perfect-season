@@ -1,0 +1,433 @@
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { levelInfo } from '../engine/economy';
+import type { Player } from '../engine/types';
+import { useLayout } from '../stage';
+import { Coin, Gear, Help } from './icons';
+import { CountUp, reducedMotion, usePulse } from './motion';
+
+/** The name without the "(1988–92)" label that tells namesakes apart. */
+export function baseName(name: string): string {
+  return name.replace(/\s*\([^)]*\)\s*$/, '');
+}
+
+export function initials(name: string): string {
+  const parts = baseName(name).replace(/\./g, '').split(/[\s-]+/).filter(Boolean);
+  const first = parts[0]?.charAt(0) ?? '';
+  const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+  return (first + last).toUpperCase();
+}
+
+export { lastName } from '../lib/share';
+
+export function shortEra(era: string): string {
+  return '’' + era.slice(2);
+}
+
+export { seasonLabel } from './sportui';
+
+/** Coin balance. Counts to the new value and bumps whenever it changes. */
+export function CoinChip({ coins, from, delay = 450 }: { coins: number; from?: number; delay?: number }) {
+  const bump = usePulse(coins, 520);
+  return (
+    <div className={'coins num' + (bump ? ' bump' : '')} aria-label={coins + ' coins'}>
+      <Coin />
+      <span>
+        <CountUp value={coins} from={from} ms={from !== undefined ? 900 : 500} delay={from !== undefined ? delay : 0} />
+      </span>
+    </div>
+  );
+}
+
+export function TopBar({ xp, coins, onProfile, onSettings, onHelp }: { xp: number; coins: number; onProfile: () => void; onSettings?: () => void; onHelp?: () => void }) {
+  const lv = levelInfo(xp);
+  return (
+    <div className="topbar">
+      <button className="level" onClick={onProfile} aria-label={'Level ' + lv.level + ', ' + lv.into + ' of ' + lv.need + ' XP'}>
+        <span className="level-ring" style={{ '--p': lv.into / lv.need } as React.CSSProperties}>
+          <span>LV</span>
+          <b>{lv.level}</b>
+        </span>
+        <span className="level-text">
+          <span className="eyebrow">Level {lv.level}</span>
+          <span className="bar">
+            <i style={{ width: Math.round((lv.into / lv.need) * 100) + '%' }} />
+          </span>
+          <span className="xp num">
+            {lv.into}/{lv.need} XP
+          </span>
+        </span>
+      </button>
+      <div className="topbar-right">
+        <CoinChip coins={coins} />
+        {onHelp && (
+          <button className="icon-btn round" onClick={onHelp} aria-label="How to play">
+            <Help size={18} />
+          </button>
+        )}
+        {onSettings && (
+          <button className="icon-btn round" onClick={onSettings} aria-label="Settings">
+            <Gear size={18} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function TeamChips({ players, stagger, lit = -1, on = 99 }: { players: (Player | null)[]; stagger?: boolean; lit?: number; on?: number }) {
+  return (
+    <div className={'teamchips' + (players.length > 6 ? ' many' : '')}>
+      {players.filter(Boolean).map((p, i) => (
+        <span key={p!.id} className={'teamchip' + (stagger ? ' rise-in' : '') + (i === lit ? ' lit' : '') + (i >= on ? ' unlit' : '')} style={{ background: p!.c1, borderColor: p!.c2, animationDelay: i * 70 + 'ms' }}>
+          {initials(p!.name)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Modal sheet. `bottom` slides up from the bottom edge like an iOS sheet;
+ * `center` pops in like an alert. Both animate out before `onClose` runs.
+ */
+export function Sheet({
+  label,
+  kind = 'bottom',
+  onClose,
+  children
+}: {
+  label: string;
+  kind?: 'bottom' | 'center' | 'top';
+  onClose: () => void;
+  children: (close: (after?: () => void) => void) => React.ReactNode;
+}) {
+  const [closing, setClosing] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const swiped = useRef(false);
+  const done = useRef(false);
+  const close = (after?: () => void) => {
+    if (done.current) return;
+    done.current = true;
+    setClosing(true);
+    window.setTimeout(() => (after ? after() : onClose()), reducedMotion() ? 0 : 200);
+  };
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  // A sheet that was dragged and let back keeps `animation: none` inline (so its opening slide
+  // doesn't replay); clear it as the closing class lands so X/scrim/Escape still slide it away.
+  useLayoutEffect(() => {
+    const sheet = sheetRef.current;
+    if (closing && sheet && !swiped.current) sheet.style.animation = '';
+  }, [closing]);
+  // Claude: the grab bar on bottom sheets now works. Pull the sheet down (from anywhere on it,
+  // once its content is scrolled to the top) and let go past ~a quarter of its height, or flick
+  // it, to close; otherwise it springs back. Horizontal drags, form controls, tiltable cards and
+  // elements that own their touches (touch-action: none) are left alone.
+  useEffect(() => {
+    const sheet = sheetRef.current,
+      scrim = dialogRef.current;
+    if (kind !== 'bottom' || !sheet || !scrim) return;
+    let start: { x: number; y: number } | null = null,
+      dragging = false,
+      dy = 0,
+      speed = 0,
+      last = { y: 0, at: 0 };
+    const ownsTouch = (target: EventTarget | null) => {
+      for (let el = target instanceof Element ? target : null; el && el !== sheet; el = el.parentElement) {
+        if (el.matches('input,textarea,select,[data-tilt],[data-sheet-noswipe]')) return true;
+        if (el.scrollTop > 0) return true;
+        if (getComputedStyle(el).touchAction === 'none') return true;
+      }
+      return sheet.scrollTop > 0;
+    };
+    const settle = (shut: boolean) => {
+      const quick = reducedMotion();
+      sheet.style.transition = quick ? 'none' : 'transform ' + (shut ? 0.2 : 0.26) + 's cubic-bezier(0.2, 0.8, 0.3, 1)';
+      scrim.style.transition = quick ? 'none' : 'background-color 0.2s ease';
+      if (shut) {
+        swiped.current = true;
+        sheet.style.transform = 'translateY(100%)';
+        closeRef.current();
+        return;
+      }
+      sheet.style.transform = '';
+      scrim.style.backgroundColor = '';
+      window.setTimeout(() => {
+        if (dragging) return;
+        sheet.style.transition = '';
+        sheet.style.willChange = '';
+        scrim.style.transition = '';
+      }, 300);
+    };
+    const begin = (e: TouchEvent) => {
+      start = null;
+      if (e.touches.length !== 1 || done.current || ownsTouch(e.target)) return;
+      const p = e.touches[0];
+      start = { x: p.clientX, y: p.clientY };
+      dragging = false;
+      dy = 0;
+      speed = 0;
+      last = { y: p.clientY, at: e.timeStamp };
+    };
+    const move = (e: TouchEvent) => {
+      if (!start) return;
+      if (e.touches.length !== 1) {
+        start = null;
+        if (dragging) {
+          dragging = false;
+          settle(false);
+        }
+        return;
+      }
+      const p = e.touches[0],
+        dx = p.clientX - start.x,
+        down = p.clientY - start.y;
+      if (!dragging) {
+        if (Math.abs(dx) + Math.abs(down) < 6) return;
+        // an upward or sideways start is a scroll or a carousel, not a dismiss
+        if (down <= 0 || Math.abs(dx) > down) {
+          start = null;
+          return;
+        }
+        dragging = true;
+        sheet.style.animation = 'none';
+        sheet.style.transition = 'none';
+        sheet.style.willChange = 'transform';
+        scrim.style.transition = 'none';
+      }
+      if (e.cancelable) e.preventDefault();
+      dy = Math.max(0, down);
+      const dt = e.timeStamp - last.at;
+      if (dt > 0) speed = speed * 0.4 + ((p.clientY - last.y) / dt) * 0.6;
+      last = { y: p.clientY, at: e.timeStamp };
+      sheet.style.transform = 'translateY(' + dy + 'px)';
+      const h = sheet.getBoundingClientRect().height || 1;
+      scrim.style.backgroundColor = 'rgba(2, 8, 12, ' + (0.78 * (1 - Math.min(1, dy / h) * 0.7)).toFixed(3) + ')';
+    };
+    const end = (e: TouchEvent) => {
+      if (!start) return;
+      start = null;
+      if (!dragging) return;
+      dragging = false;
+      // a lift after a drag is not a tap on whatever sits under the finger
+      const swallow = (ev: Event) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      sheet.addEventListener('click', swallow, true);
+      window.setTimeout(() => sheet.removeEventListener('click', swallow, true), 400);
+      const h = sheet.getBoundingClientRect().height,
+        // a finger that stopped before lifting isn't flicking
+        flick = e.timeStamp - last.at < 90 && speed > 0.45 && dy > 40;
+      settle(e.type === 'touchend' && (dy > Math.min(140, h * 0.25) || flick));
+    };
+    sheet.addEventListener('touchstart', begin, { passive: true });
+    sheet.addEventListener('touchmove', move, { passive: false });
+    sheet.addEventListener('touchend', end);
+    sheet.addEventListener('touchcancel', end);
+    return () => {
+      sheet.removeEventListener('touchstart', begin);
+      sheet.removeEventListener('touchmove', move);
+      sheet.removeEventListener('touchend', end);
+      sheet.removeEventListener('touchcancel', end);
+    };
+  }, [kind]);
+  useEffect(() => {
+    const root = dialogRef.current;
+    if (!root) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const top = () => {
+      const dialogs = Array.from(document.querySelectorAll('[aria-modal="true"]')).filter((el) => el.getClientRects().length);
+      return dialogs[dialogs.length - 1] === root;
+    };
+    const focusable = () =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])')
+      ).filter((el) => el.getClientRects().length && !el.closest('[inert]'));
+    // Focus the dialog, not an input: opening a sheet must not summon the phone keyboard.
+    root.focus({ preventScroll: true });
+    const keys = (event: KeyboardEvent) => {
+      if (!top() || event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const list = focusable(),
+        first = list[0],
+        last = list[list.length - 1];
+      if (!first) {
+        event.preventDefault();
+        root.focus({ preventScroll: true });
+      } else if (event.shiftKey && (document.activeElement === first || document.activeElement === root)) {
+        event.preventDefault();
+        last!.focus({ preventScroll: true });
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === root)) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    };
+    const focus = (event: FocusEvent) => {
+      if (top() && event.target instanceof Node && !root.contains(event.target)) root.focus({ preventScroll: true });
+    };
+    document.addEventListener('keydown', keys);
+    document.addEventListener('focusin', focus);
+    return () => {
+      document.removeEventListener('keydown', keys);
+      document.removeEventListener('focusin', focus);
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
+  return (
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      className={'scrim ' + kind + (closing ? ' closing' : '')}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      onClick={(e) => e.target === e.currentTarget && close()}
+    >
+      <div ref={sheetRef} className={'sheet ' + kind}>
+        {kind === 'bottom' && <span className="grip" aria-hidden="true" />}
+        {children(close)}
+      </div>
+    </div>
+  );
+}
+
+export function Confirm(props: { title: string; body: string; yes: string; no: string; onYes: () => void; onNo: () => void; tone?: 'gold' | 'primary' }) {
+  return (
+    <Sheet label={props.title} kind="center" onClose={props.onNo}>
+      {(close) => (
+        <>
+          <h2 className="disp">{props.title}</h2>
+          <p>{props.body}</p>
+          <div className="btnrow">
+            <button className="btn" onClick={() => close()}>
+              {props.no}
+            </button>
+            <button className={'btn ' + (props.tone ?? 'primary')} onClick={() => close(props.onYes)}>
+              {props.yes}
+            </button>
+          </div>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+const CONFETTI_COLORS = ['#19E3C9', '#F5B83D', '#FFFFFF', '#6CB4FF', '#FFD36B', '#45F5DD'];
+
+/** Paper confetti fired from both bottom corners, plus a shower from the top for big moments. */
+export function Confetti({ density = 1, colors = CONFETTI_COLORS }: { density?: number; colors?: string[] }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const { h, k } = useLayout();
+  useEffect(() => {
+    const c = ref.current;
+    if (!c || reducedMotion()) return;
+    const g = c.getContext('2d');
+    if (!g) return;
+    const W = 390;
+    const H = h;
+    const scale = Math.min(3, (window.devicePixelRatio || 1) * k);
+    c.width = Math.round(W * scale);
+    c.height = Math.round(H * scale);
+    g.scale(scale, scale);
+    type P = { x: number; y: number; vx: number; vy: number; r: number; vr: number; w: number; h: number; c: string; ph: number; vph: number; life: number };
+    const parts: P[] = [];
+    const add = (x: number, y: number, vx: number, vy: number, delay: number) =>
+      parts.push({ x, y, vx, vy, r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.25, w: 6 + Math.random() * 6, h: 4 + Math.random() * 5, c: colors[Math.floor(Math.random() * colors.length)], ph: Math.random() * Math.PI * 2, vph: 0.12 + Math.random() * 0.18, life: -delay });
+    const n = Math.round(70 * density);
+    for (let i = 0; i < n; i++) {
+      const left = i % 2 === 0;
+      const a = 0.18 + Math.random() * 0.42;
+      const sp = 13 + Math.random() * 9;
+      add(left ? -6 : W + 6, H * 0.82, (left ? 1 : -1) * Math.sin(a) * sp, -Math.cos(a) * sp, Math.floor(Math.random() * 8));
+    }
+    if (density >= 1.8) for (let i = 0; i < n * 0.6; i++) add(Math.random() * W, -20 - Math.random() * 120, (Math.random() - 0.5) * 2, 1 + Math.random() * 2, 20 + Math.floor(Math.random() * 50));
+    let raf = 0;
+    let frame = 0;
+    const END = 220;
+    const tick = () => {
+      frame++;
+      g.clearRect(0, 0, W, H);
+      for (const p of parts) {
+        p.life++;
+        if (p.life < 0) continue;
+        p.vy += 0.32;
+        p.vx *= 0.985;
+        p.vy *= 0.985;
+        if (p.vy > 3.2) p.vy = 3.2 + (p.vy - 3.2) * 0.8; // paper flutters down instead of falling
+        p.ph += p.vph;
+        p.x += p.vx + Math.sin(p.ph) * 0.6;
+        p.y += p.vy;
+        p.r += p.vr;
+        const flip = Math.cos(p.ph);
+        g.save();
+        g.translate(p.x, p.y);
+        g.rotate(p.r);
+        g.scale(1, Math.max(0.12, Math.abs(flip)));
+        g.globalAlpha = Math.max(0, Math.min(1, (END - frame) / 40));
+        g.fillStyle = p.c;
+        g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        if (flip < 0) {
+          g.fillStyle = 'rgba(0,0,0,0.25)';
+          g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        }
+        g.restore();
+      }
+      if (frame < END) raf = requestAnimationFrame(tick);
+      else g.clearRect(0, 0, W, H);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [density]);
+  return <canvas ref={ref} className="confetti" style={{ height: h }} aria-hidden="true" />;
+}
+
+export function Toast({ text, out }: { text: string; out: boolean }) {
+  return (
+    <div className={'toast' + (out ? ' out' : '')} role="status">
+      {text}
+    </div>
+  );
+}
+
+/** Keeps a value on screen for `ms` after it turns falsy, so it can animate out. */
+export function useLinger<T>(value: T | null, ms = 220): [T | null, boolean] {
+  const [kept, setKept] = useState<T | null>(value);
+  useEffect(() => {
+    if (value) {
+      setKept(value);
+      return;
+    }
+    const t = window.setTimeout(() => setKept(null), ms);
+    return () => clearTimeout(t);
+  }, [value]);
+  return [value ?? kept, !value && !!kept];
+}
+
+/** Button label that shrinks its font just enough to fit on one line. */
+export function Fit({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [fit, setFit] = useState(1);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const box = el?.parentElement;
+    if (!el || !box) return;
+    el.style.fontSize = '';
+    const cs = getComputedStyle(box);
+    const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const need = el.scrollWidth;
+    setFit(need > avail && need > 0 ? Math.max(0.6, Math.floor((avail / need) * 100) / 100) : 1);
+  }, [text]);
+  return (
+    <span ref={ref} style={fit < 1 ? { fontSize: fit + 'em' } : undefined}>
+      {text}
+    </span>
+  );
+}

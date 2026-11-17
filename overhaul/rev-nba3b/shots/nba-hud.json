@@ -1,0 +1,133 @@
+{
+ "320": {
+  "errors": [],
+  "rects": {
+   "bug": {
+    "x": 60,
+    "y": 24,
+    "w": 200,
+    "h": 34,
+    "cx": 160,
+    "cy": 41
+   },
+   "pause": {
+    "x": 6,
+    "y": 20,
+    "w": 44,
+    "h": 44,
+    "cx": 28,
+    "cy": 42
+   },
+   "heat": {
+    "x": 60,
+    "y": 60,
+    "w": 200,
+    "h": 5,
+    "cx": 160,
+    "cy": 62.5
+   },
+   "lastPlay": {
+    "x": 314,
+    "y": 20,
+    "w": 0,
+    "h": 0,
+    "cx": 314,
+    "cy": 20
+   }
+  },
+  "v2": {
+   "bug": true,
+   "pause": true,
+   "heat": true,
+   "safeBox": true
+  },
+  "safeBox": {
+   "safeTop": 76,
+   "safeBottom": 368,
+   "land": false,
+   "hudBottom": 65
+  },
+  "camera": {
+   "frames": 10800,
+   "framesHeldOut": 1420,
+   "rimRow": 0.213,
+   "handlerRow": 0.538,
+   "safeHandlerRim": 0.999,
+   "zoomVarNearRim": 0.005,
+   "releases": 39,
+   "overlapOkAll": 0.718,
+   "jumpReleases": 4,
+   "overlapOk": 1,
+   "domOnRimFrames": 7,
+   "domOnRim": [
+    "ps-heat"
+   ]
+  },
+  "portrait": true
+ },
+ "393": {
+  "errors": [],
+  "rects": {
+   "bug": {
+    "x": 80.5,
+    "y": 65,
+    "w": 232,
+    "h": 40,
+    "cx": 196.5,
+    "cy": 85
+   },
+   "pause": {
+    "x": 12,
+    "y": 63,
+    "w": 44,
+    "h": 44,
+    "cx": 34,
+    "cy": 85
+   },
+   "heat": {
+    "x": 80.5,
+    "y": 108,
+    "w": 232,
+    "h": 6,
+    "cx": 196.5,
+    "cy": 111
+   },
+   "lastPlay": {
+    "x": 381,
+    "y": 63,
+    "w": 0,
+    "h": 0,
+    "cx": 381,
+    "cy": 63
+   }
+  },
+  "v2": {
+   "bug": true,
+   "pause": true,
+   "heat": true,
+   "safeBox": true
+  },
+  "safeBox": {
+   "safeTop": 115,
+   "safeBottom": 568,
+   "land": false,
+   "hudBottom": 114
+  },
+  "camera": {
+   "frames": 10800,
+   "framesHeldOut": 1240,
+   "rimRow": 0.226,
+   "handlerRow": 0.536,
+   "safeHandlerRim": 1,
+   "zoomVarNearRim": 0.005,
+   "releases": 31,
+   "overlapOkAll": 0.645,
+   "jumpReleases": 6,
+   "overlapOk": 1,
+   "domOnRimFrames": 0,
+   "domOnRim": []
+  },
+  "portrait": true
+ },
+ "blockedHosts": []
+}

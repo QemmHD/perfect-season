@@ -1,0 +1,7 @@
+attacks 3000  mean step cost 34.8 us (autopilot + engine)
+attack length (game s) p50/p90/p99/max 5.2 / 10.4 / 14.4 / 24.0  clock 30
+frozen balls: on the 120 s hard stop 0 0.00%  | a dead loose ball for 5 s+ 0 0.00%
+attacks over clock + 15 s of game time: 0 0.00% {}
+dead shots played on as loose balls (R-1): 225 {"shot bounced, 8+ m/s":35,"shot slow":52,"parry bounced, 3-8 m/s":54,"shot bounced, 3-8 m/s":38,"parry bounced, 8+ m/s":12,"parry slow":34}  attacks that still ended in a goal after one: 29
+restarts earned (R-2): corners 30 (30 from a parry)  quick throw-ins 0  most in one attack 1
+goals 404  straight from a keeper parry (into his own net): 0 0.00%  after a rebound (parry, woodwork, block): 85 21.04%  parries 478

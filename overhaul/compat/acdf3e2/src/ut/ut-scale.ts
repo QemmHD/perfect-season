@@ -1,0 +1,95 @@
+// Claude ratings rework (2026-11-01): the ONE place the Ultimate Team overall scale is configured.
+//
+// Ratings are built on a "rating scale" (2K/Madden-like: attributes, raw overall, face categories);
+// gameplay always reads the rating-scale attributes. What a card DISPLAYS — its overall, its six face
+// numbers, its tier — goes through the per-sport curve below, and every UT threshold (tiers, onScale
+// challenge/SBC targets, Squad Battles ladders, pack walkouts, Hot Season/Legend ranges) follows.
+// Re-targeting the UT scale means editing UT_SCALE only (then re-running scripts/fit_ut_scale.ts and
+// scripts/fit_ut_balance.ts if the pool changes).
+//
+// Current setting: the EA FC 27-style scale (see docs/RATINGS-AUDIT.md, "UT display scale"):
+//  - Bronze 40–64, Silver 65–74, Gold 75–99 in both sports (≈35% / 35% / 30% of season cards)
+//  - base season golds: common 75–82, good 83–86, elite 87–90, only a dozen or so per sport at 90+,
+//    the greatest seasons 91; each overall above 83 several times rarer than the one below
+//  - Legends 88–95 (a handful at 94–95), Hot Season promos 94–97 (Team-of-the-Year analog, no 99s),
+//    room left for weekly promos at 80–92; Spotlight 100–105 and GOAT 106–110 stay above, unchanged.
+import type { UtSport } from './types';
+
+export interface UtScale {
+  /** rating-scale overall → displayed overall, piecewise-linear, increasing (fitted to the pool's
+   * season-card quantiles by scripts/fit_ut_scale.ts) */
+  curve: [number, number][];
+  /** displayed tier cuts for season cards */
+  cuts: { silver: number; gold: number };
+  /** displayed overall from which a pack reveal walks out */
+  walkout: number;
+  /** the season card's displayed overall → the edition's displayed overall */
+  promo: [number, number][];
+  legend: [number, number][];
+}
+
+export const UT_SCALE: Record<UtSport, UtScale> = {
+  nba: {
+    curve: [[49.002,39.5],[70.154,64.5],[75.262,74.5],[83.646,79.5],[89.349,82.5],[91.622,83.5],[93.396,84.5],[95.087,85.5],[96.352,86.5],[97.187,87.5],[97.873,88.5],[98.068,89.5],[98.281,90.5],[99,91]],
+    cuts: { silver: 65, gold: 75 },
+    walkout: 86,
+    promo: [[78, 94], [84, 95], [88, 96], [91, 97]],
+    legend: [[78, 88], [84, 90], [88, 92], [90, 94], [91, 95]],
+  },
+  nfl: {
+    curve: [[48.386,39.5],[75.531,64.5],[82.139,74.5],[90.115,79.5],[94.322,82.5],[95.531,83.5],[96.141,84.5],[96.8,85.5],[97.4,86.5],[98.1,87.5],[98.6,88.5],[98.8,89.5],[99,90.5],[99,91]],
+    cuts: { silver: 65, gold: 75 },
+    walkout: 86,
+    promo: [[78, 94], [84, 95], [88, 96], [91, 97]],
+    legend: [[76, 88], [82, 90], [86, 92], [90, 93], [91, 95]],
+  },
+  // Claude 2026-11-01: soccer cards are built on this scale already (scripts/build_soccer_cards.py:
+  // Bronze <65, Silver 65–74, Gold 75+, season cards to 93, promos to 97, legends 88–97), each
+  // edition with its own overall in the card file, so the curve is the identity
+  soccer: {
+    curve: [[40, 40], [99, 99]],
+    cuts: { silver: 65, gold: 75 },
+    walkout: 86,
+    promo: [[75, 80], [99, 99]],
+    legend: [[75, 88], [99, 99]],
+  },
+};
+
+/** Tier cuts on the displayed scale (Bronze < silver ≤ Silver < gold ≤ Gold). */
+export const TIER_CUTS: Record<UtSport, { silver: number; gold: number }> = {
+  nba: UT_SCALE.nba.cuts,
+  nfl: UT_SCALE.nfl.cuts,
+  soccer: UT_SCALE.soccer.cuts,
+};
+
+/** Piecewise-linear through increasing knots; flat beyond the ends' slope of 1. */
+export function along(x: number, knots: [number, number][]): number {
+  if (x <= knots[0][0]) return knots[0][1] + (x - knots[0][0]);
+  for (let i = 1; i < knots.length; i++)
+    if (x <= knots[i][0]) {
+      const [x0, y0] = knots[i - 1],
+        [x1, y1] = knots[i];
+      return x1 === x0 ? y1 : y0 + ((x - x0) * (y1 - y0)) / (x1 - x0);
+    }
+  const [xn, yn] = knots[knots.length - 1];
+  return yn + (x - xn);
+}
+
+/** A rating-scale value (overall or face category, ≤99) as displayed, unrounded. */
+export function toDisplay(sport: UtSport, x: number): number {
+  const top = UT_SCALE[sport].curve[UT_SCALE[sport].curve.length - 1];
+  return x >= top[0] ? top[1] : along(x, UT_SCALE[sport].curve);
+}
+
+/** The inverse: a displayed value back on the rating scale (for scale-independent thresholds). */
+export function fromDisplay(sport: UtSport, y: number): number {
+  return along(y, UT_SCALE[sport].curve.map(([a, b]) => [b, a] as [number, number]));
+}
+
+/** A Hot Season or Legend edition's displayed overall, from its season card's displayed overall. */
+export function editionDisplay(sport: UtSport, kind: 'promo' | 'legend', seasonShown: number): number {
+  const knots = UT_SCALE[sport][kind];
+  const lo = knots[0][1],
+    hi = knots[knots.length - 1][1];
+  return Math.round(Math.max(lo, Math.min(hi, along(Math.max(knots[0][0], seasonShown), knots))));
+}

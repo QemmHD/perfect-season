@@ -1,0 +1,588 @@
+{
+ "sport": "nfl",
+ "promo@1": {
+  "n": 1106,
+  "shown": [
+   94,
+   97
+  ],
+  "overSeasonMean": 14.06,
+  "overSeason": {
+   "6": 5,
+   "7": 38,
+   "8": 18,
+   "9": 50,
+   "10": 173,
+   "11": 87,
+   "12": 109,
+   "13": 78,
+   "14": 151,
+   "15": 41,
+   "16": 44,
+   "17": 59,
+   "18": 112,
+   "19": 26,
+   "20": 8,
+   "21": 40,
+   "22": 9,
+   "23": 7,
+   "24": 11,
+   "25": 27,
+   "26": 1,
+   "28": 1,
+   "29": 3,
+   "30": 2,
+   "33": 1,
+   "34": 2,
+   "35": 3
+  },
+  "rawUnder85": 61,
+  "faceOverPlayedMax": 35,
+  "faceOverPlayedOver1": 1106,
+  "meanGapMax": 35,
+  "meanGapOver1": 1106,
+  "meanGapHist": {
+   "5": 15,
+   "6": 39,
+   "7": 85,
+   "8": 117,
+   "9": 121,
+   "10": 84,
+   "11": 110,
+   "12": 81,
+   "13": 74,
+   "14": 44,
+   "15": 41,
+   "16": 52,
+   "17": 101,
+   "18": 31,
+   "19": 11,
+   "20": 13,
+   "21": 34,
+   "22": 15,
+   "23": 7,
+   "24": 22,
+   "28": 1,
+   "29": 1,
+   "30": 1,
+   "32": 1,
+   "33": 1,
+   "34": 3,
+   "35": 1
+  },
+  "worst": [
+   {
+    "id": "nfl:promo:1977:FER184572:BUF",
+    "name": "Joe Ferguson 1977",
+    "shown": 94,
+    "season": 59,
+    "raw": 72,
+    "faceGap": 35,
+    "meanGap": 35,
+    "face": "THP99 SAC90 MAC88 DAC92 TUP97 SPD99",
+    "played": "70 55 53 57 62 78"
+   },
+   {
+    "id": "nfl:promo:2006:00-0011958:LAC",
+    "name": "Lorenzo Neal 2006",
+    "shown": 94,
+    "season": 60,
+    "raw": 75,
+    "faceGap": 34,
+    "meanGap": 34,
+    "face": "SPD92 ACC83 BTK99 JKM59 CAR99 BCV99",
+    "played": "58 49 80 25 67 71"
+   },
+   {
+    "id": "nfl:promo:2007:00-0011958:LAC",
+    "name": "Lorenzo Neal 2007",
+    "shown": 94,
+    "season": 60,
+    "raw": 74,
+    "faceGap": 34,
+    "meanGap": 34,
+    "face": "SPD92 ACC83 BTK99 JKM59 CAR99 BCV99",
+    "played": "58 49 79 25 67 71"
+   },
+   {
+    "id": "nfl:promo:2024:00-0033376:BAL",
+    "name": "Patrick Ricard 2024",
+    "shown": 94,
+    "season": 59,
+    "raw": 74,
+    "faceGap": 34,
+    "meanGap": 34,
+    "face": "SPD98 ACC99 BTK86 JKM91 CAR98 BCV92",
+    "played": "64 70 52 57 64 58"
+   },
+   {
+    "id": "nfl:promo:2004:00-0007254:GB",
+    "name": "William Henderson 2004",
+    "shown": 94,
+    "season": 59,
+    "raw": 74,
+    "faceGap": 33,
+    "meanGap": 33,
+    "face": "SPD89 ACC90 BTK99 JKM91 CAR99 BCV86",
+    "played": "56 57 67 58 75 53"
+   }
+  ]
+ },
+ "promo@5": {
+  "n": 1106,
+  "shown": [
+   96,
+   99
+  ],
+  "overSeasonMean": 16.06,
+  "overSeason": {
+   "6": 5,
+   "7": 38,
+   "8": 18,
+   "9": 50,
+   "10": 173,
+   "11": 87,
+   "12": 109,
+   "13": 78,
+   "14": 151,
+   "15": 41,
+   "16": 44,
+   "17": 59,
+   "18": 112,
+   "19": 26,
+   "20": 8,
+   "21": 40,
+   "22": 9,
+   "23": 7,
+   "24": 11,
+   "25": 27,
+   "26": 1,
+   "28": 1,
+   "29": 3,
+   "30": 2,
+   "33": 1,
+   "34": 2,
+   "35": 3
+  },
+  "rawUnder85": 31,
+  "faceOverPlayedMax": 35,
+  "faceOverPlayedOver1": 1106,
+  "meanGapMax": 33,
+  "meanGapOver1": 1106,
+  "meanGapHist": {
+   "6": 21,
+   "7": 101,
+   "8": 178,
+   "9": 140,
+   "10": 123,
+   "11": 103,
+   "12": 71,
+   "13": 52,
+   "14": 58,
+   "15": 86,
+   "16": 56,
+   "17": 13,
+   "18": 39,
+   "19": 11,
+   "20": 18,
+   "21": 25,
+   "22": 2,
+   "26": 1,
+   "27": 1,
+   "28": 1,
+   "30": 1,
+   "31": 4,
+   "33": 1
+  },
+  "worst": [
+   {
+    "id": "nfl:promo:1977:FER184572:BUF",
+    "name": "Joe Ferguson 1977",
+    "shown": 96,
+    "season": 59,
+    "raw": 74,
+    "faceGap": 35,
+    "meanGap": 33,
+    "face": "THP99 SAC93 MAC92 DAC95 TUP99 SPD99",
+    "played": "75 58 57 60 67 80"
+   },
+   {
+    "id": "nfl:promo:2006:00-0011958:LAC",
+    "name": "Lorenzo Neal 2006",
+    "shown": 96,
+    "season": 60,
+    "raw": 77,
+    "faceGap": 34,
+    "meanGap": 31,
+    "face": "SPD96 ACC87 BTK99 JKM63 CAR99 BCV99",
+    "played": "62 53 83 29 73 76"
+   },
+   {
+    "id": "nfl:promo:2007:00-0011958:LAC",
+    "name": "Lorenzo Neal 2007",
+    "shown": 96,
+    "season": 60,
+    "raw": 76,
+    "faceGap": 34,
+    "meanGap": 31,
+    "face": "SPD96 ACC87 BTK99 JKM63 CAR99 BCV99",
+    "played": "62 53 82 29 73 76"
+   },
+   {
+    "id": "nfl:promo:2024:00-0033376:BAL",
+    "name": "Patrick Ricard 2024",
+    "shown": 96,
+    "season": 59,
+    "raw": 76,
+    "faceGap": 34,
+    "meanGap": 31,
+    "face": "SPD99 ACC99 BTK90 JKM94 CAR99 BCV96",
+    "played": "70 75 56 60 70 62"
+   },
+   {
+    "id": "nfl:promo:2004:00-0007254:GB",
+    "name": "William Henderson 2004",
+    "shown": 96,
+    "season": 59,
+    "raw": 76,
+    "faceGap": 33,
+    "meanGap": 31,
+    "face": "SPD92 ACC93 BTK99 JKM95 CAR99 BCV90",
+    "played": "59 60 73 62 78 57"
+   }
+  ]
+ },
+ "legend@1": {
+  "n": 130,
+  "shown": [
+   88,
+   95
+  ],
+  "overSeasonMean": 7.32,
+  "overSeason": {
+   "3": 6,
+   "4": 6,
+   "5": 21,
+   "6": 16,
+   "7": 28,
+   "8": 25,
+   "9": 10,
+   "10": 3,
+   "11": 8,
+   "12": 2,
+   "13": 1,
+   "15": 2,
+   "18": 1,
+   "19": 1
+  },
+  "rawUnder85": 4,
+  "faceOverPlayedMax": 20,
+  "faceOverPlayedOver1": 130,
+  "meanGapMax": 20,
+  "meanGapOver1": 130,
+  "meanGapHist": {
+   "2": 3,
+   "3": 4,
+   "4": 12,
+   "5": 16,
+   "6": 23,
+   "7": 31,
+   "8": 13,
+   "9": 6,
+   "10": 5,
+   "11": 3,
+   "12": 7,
+   "13": 4,
+   "17": 1,
+   "19": 1,
+   "20": 1
+  },
+  "worst": [
+   {
+    "id": "nfl:legend:1971:PAG332232:MIN",
+    "name": "Alan Page 1971",
+    "shown": 88,
+    "season": 69,
+    "raw": 81,
+    "faceGap": 20,
+    "meanGap": 20,
+    "face": "PMV85 FMV85 BSH84 STR95 SPD95 TAK98",
+    "played": "65 65 64 75 75 78"
+   },
+   {
+    "id": "nfl:legend:1978:WHI401276:DAL",
+    "name": "Randy White 1978",
+    "shown": 88,
+    "season": 70,
+    "raw": 81,
+    "faceGap": 19,
+    "meanGap": 19,
+    "face": "PMV87 FMV84 BSH86 STR95 SPD89 TAK96",
+    "played": "68 65 67 76 70 77"
+   },
+   {
+    "id": "nfl:legend:1974:YOU728550:LAR",
+    "name": "Jack Youngblood 1974",
+    "shown": 88,
+    "season": 73,
+    "raw": 83,
+    "faceGap": 17,
+    "meanGap": 17,
+    "face": "PMV82 FMV96 BSH81 STR92 SPD96 TAK94",
+    "played": "65 79 64 75 79 77"
+   },
+   {
+    "id": "nfl:legend:1985:00-0014988:CHI",
+    "name": "Mike Singletary 1985",
+    "shown": 88,
+    "season": 77,
+    "raw": 88,
+    "faceGap": 13,
+    "meanGap": 13,
+    "face": "TAK92 PUR93 PRC95 ZCV68 SPD91 BSH81",
+    "played": "79 80 82 55 78 68"
+   },
+   {
+    "id": "nfl:legend:2008:00-0023445:DAL",
+    "name": "DeMarcus Ware 2008",
+    "shown": 88,
+    "season": 75,
+    "raw": 85,
+    "faceGap": 13,
+    "meanGap": 13,
+    "face": "TAK90 PUR89 PRC93 ZCV70 SPD91 BSH90",
+    "played": "77 76 80 57 78 77"
+   }
+  ]
+ },
+ "legend@5": {
+  "n": 130,
+  "shown": [
+   90,
+   97
+  ],
+  "overSeasonMean": 9.32,
+  "overSeason": {
+   "3": 6,
+   "4": 6,
+   "5": 21,
+   "6": 16,
+   "7": 28,
+   "8": 25,
+   "9": 10,
+   "10": 3,
+   "11": 8,
+   "12": 2,
+   "13": 1,
+   "15": 2,
+   "18": 1,
+   "19": 1
+  },
+  "rawUnder85": 2,
+  "faceOverPlayedMax": 20,
+  "faceOverPlayedOver1": 130,
+  "meanGapMax": 17,
+  "meanGapOver1": 129,
+  "meanGapHist": {
+   "1": 1,
+   "2": 1,
+   "3": 4,
+   "4": 14,
+   "5": 36,
+   "6": 26,
+   "7": 21,
+   "8": 10,
+   "9": 1,
+   "10": 5,
+   "11": 4,
+   "12": 2,
+   "13": 2,
+   "14": 1,
+   "16": 1,
+   "17": 1
+  },
+  "worst": [
+   {
+    "id": "nfl:legend:1971:PAG332232:MIN",
+    "name": "Alan Page 1971",
+    "shown": 90,
+    "season": 69,
+    "raw": 83,
+    "faceGap": 20,
+    "meanGap": 17,
+    "face": "PMV91 FMV91 BSH90 STR98 SPD98 TAK99",
+    "played": "71 71 70 78 78 80"
+   },
+   {
+    "id": "nfl:legend:1978:WHI401276:DAL",
+    "name": "Randy White 1978",
+    "shown": 90,
+    "season": 70,
+    "raw": 83,
+    "faceGap": 19,
+    "meanGap": 16,
+    "face": "PMV93 FMV90 BSH92 STR98 SPD94 TAK98",
+    "played": "74 71 73 79 75 79"
+   },
+   {
+    "id": "nfl:legend:1974:YOU728550:LAR",
+    "name": "Jack Youngblood 1974",
+    "shown": 90,
+    "season": 73,
+    "raw": 85,
+    "faceGap": 17,
+    "meanGap": 14,
+    "face": "PMV88 FMV99 BSH87 STR95 SPD99 TAK96",
+    "played": "71 82 70 78 82 79"
+   },
+   {
+    "id": "nfl:legend:2008:00-0023445:DAL",
+    "name": "DeMarcus Ware 2008",
+    "shown": 90,
+    "season": 75,
+    "raw": 87,
+    "faceGap": 13,
+    "meanGap": 13,
+    "face": "TAK92 PUR91 PRC96 ZCV73 SPD94 BSH92",
+    "played": "79 78 83 60 81 79"
+   },
+   {
+    "id": "nfl:legend:2009:00-0014724:NO",
+    "name": "Darren Sharper 2009",
+    "shown": 91,
+    "season": 78,
+    "raw": 92,
+    "faceGap": 13,
+    "meanGap": 13,
+    "face": "SPD94 ZCV99 MCV86 TAK71 HIT75 PRC99",
+    "played": "81 91 73 58 62 91"
+   }
+  ]
+ },
+ "spotlight@1": {
+  "n": 131,
+  "ovr": [
+   100,
+   105
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 33,
+   "1": 26,
+   "2": 37,
+   "3": 24,
+   "4": 8,
+   "5": 3
+  },
+  "faceAtCapMean": 1.67,
+  "distinctMin": 2,
+  "tauMin": 0.4,
+  "tauUnder08": 18,
+  "examples": [
+   {
+    "id": "nfl:spotlight:2007:00-0019596:NE",
+    "name": "Tom Brady 2007",
+    "ovr": 105,
+    "atCap": 5,
+    "distinct": 2,
+    "tau": 0.745,
+    "spread": 40,
+    "face": "THP105 SAC105 MAC105 DAC105 TUP105 SPD65"
+   }
+  ]
+ },
+ "spotlight@5": {
+  "n": 131,
+  "ovr": [
+   102,
+   105
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 14,
+   "1": 4,
+   "2": 34,
+   "3": 39,
+   "4": 21,
+   "5": 19
+  },
+  "faceAtCapMean": 2.81,
+  "distinctMin": 2,
+  "tauMin": 0.387,
+  "tauUnder08": 46,
+  "examples": [
+   {
+    "id": "nfl:spotlight:2007:00-0019596:NE",
+    "name": "Tom Brady 2007",
+    "ovr": 105,
+    "atCap": 5,
+    "distinct": 2,
+    "tau": 0.745,
+    "spread": 36,
+    "face": "THP105 SAC105 MAC105 DAC105 TUP105 SPD69"
+   }
+  ]
+ },
+ "goat@1": {
+  "n": 20,
+  "ovr": [
+   106,
+   110
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "0": 1,
+   "1": 2,
+   "2": 5,
+   "3": 8,
+   "4": 3,
+   "5": 1
+  },
+  "faceAtCapMean": 2.65,
+  "distinctMin": 2,
+  "tauMin": 0.481,
+  "tauUnder08": 4,
+  "examples": [
+   {
+    "id": "nfl:goat:2007:00-0019596:NE",
+    "name": "Tom Brady 2007",
+    "ovr": 110,
+    "atCap": 5,
+    "distinct": 2,
+    "tau": 0.745,
+    "spread": 44,
+    "face": "THP110 SAC110 MAC110 DAC110 TUP110 SPD66"
+   }
+  ]
+ },
+ "goat@5": {
+  "n": 20,
+  "ovr": [
+   108,
+   110
+  ],
+  "underFloor": 0,
+  "atCapHist": {
+   "2": 2,
+   "3": 10,
+   "4": 1,
+   "5": 7
+  },
+  "faceAtCapMean": 3.65,
+  "distinctMin": 2,
+  "tauMin": 0.463,
+  "tauUnder08": 12,
+  "examples": [
+   {
+    "id": "nfl:goat:2007:00-0019596:NE",
+    "name": "Tom Brady 2007",
+    "ovr": 110,
+    "atCap": 5,
+    "distinct": 2,
+    "tau": 0.745,
+    "spread": 40,
+    "face": "THP110 SAC110 MAC110 DAC110 TUP110 SPD70"
+   }
+  ]
+ }
+}

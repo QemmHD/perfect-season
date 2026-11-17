@@ -1,0 +1,70 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "restarts",
+  "corner": {
+   "setPiece": {
+    "kind": "corner",
+    "spot": {
+     "x": 67.5,
+     "y": 104.5
+    },
+    "side": -1
+   },
+   "restarts": 1,
+   "end": null,
+   "clockLeft": 29.5,
+   "taker": "MILNER",
+   "ctrlIsTaker": true
+  },
+  "afterCorner": {
+   "end": null,
+   "setPiece": null
+  },
+  "thrown": {
+   "kick": {
+    "kind": "throw",
+    "to": 2
+   },
+   "restarts": 2,
+   "end": null,
+   "ballH": 2.05
+  },
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "restarts",
+  "corner": {
+   "setPiece": {
+    "kind": "corner",
+    "spot": {
+     "x": 67.5,
+     "y": 104.5
+    },
+    "side": -1
+   },
+   "restarts": 1,
+   "end": null,
+   "clockLeft": 29.5,
+   "taker": "MILNER",
+   "ctrlIsTaker": true
+  },
+  "afterCorner": {
+   "end": null,
+   "setPiece": null
+  },
+  "thrown": {
+   "kick": {
+    "kind": "throw",
+    "to": 2
+   },
+   "restarts": 2,
+   "end": null,
+   "ballH": 2.05
+  },
+  "errors": []
+ }
+]
+QA isolation: blocked 0 request(s) to live hosts {}
+errors 0 []

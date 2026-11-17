@@ -1,0 +1,486 @@
+/* Claude (studio overhaul nfl-3): the football HUD kit (C19's local version, shared-v2.ts): one
+   score bug with its drive pips and the Heat bar directly under it, and one toast line. Sizes and
+   places come from the C15 variables (--bug-w, --bug-h, --bug-top, --heat-h, --toast-bottom),
+   never from width media queries. Broadcast materials (V2 §C.3): team-coloured skewed blocks with a
+   top highlight and a dark foot, a glossy dark centre, an inset Heat track; no backdrop-filter in a
+   match (it would recompose the whole screen every frame). */
+
+/* ---------- the score bug ---------- */
+.fb2 .v2-bug {
+  position: absolute;
+  z-index: 6;
+  top: var(--bug-top, calc(var(--sat) + 6px));
+  /* centred, but never under the pause button where the screen is narrow for both */
+  left: max(50%, calc(var(--pause-left, 12px) + 52px + var(--bug-w, 232px) / 2));
+  width: var(--bug-w, 232px);
+  height: var(--bug-h, 40px);
+  margin-left: calc(var(--bug-w, 232px) / -2);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr calc(var(--bug-w, 232px) * 0.38) 1fr;
+  border-radius: 9px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1b2440 0%, #0c1122 58%, #060912 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 2px 0 rgba(0, 0, 0, 0.55),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+  font-family: var(--display);
+  color: #f3f6ff;
+  pointer-events: none;
+}
+.fb2 .v2-bug-team {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 5px 3px 6px;
+  min-width: 0;
+}
+.fb2 .v2-bug-team.us {
+  background: linear-gradient(180deg, #4ff3dd 0%, #13bda6 48%, #0a7466 100%);
+  color: #04221d;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+}
+.fb2 .v2-bug-team.them {
+  background: linear-gradient(180deg, #c6b4ff 0%, #8b6ef0 48%, #4d34ad 100%);
+  color: #120a2c;
+  clip-path: polygon(7px 0, 100% 0, 100% 100%, 0 100%);
+}
+.fb2 .v2-bug-team i {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fb2 .v2-bug-team b {
+  font-style: italic;
+  font-weight: 900;
+  font-size: calc(var(--bug-h, 40px) * 0.5);
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.fb2 .v2-bug-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 4px 3px;
+  min-width: 0;
+  text-align: center;
+}
+.fb2 .v2-bug-mid i {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  color: #a9b8d8;
+  white-space: nowrap;
+}
+.fb2 .v2-bug-mid b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  color: #ffd56a;
+}
+.fb2 .v2-bug-clock {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #24304e;
+  color: #ffe08a;
+  box-shadow: 0 0 6px rgba(255, 210, 90, 0.35);
+}
+.fb2 .v2-bug-clock.low {
+  background: #5a1420;
+  color: #ff9a9a;
+}
+/* the 3 px drive line along the bug's foot: one pip a drive, the live one filling with field position */
+.fb2 .v2-bug-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  display: flex;
+  gap: 2px;
+  background: #04060c;
+}
+.fb2 .v2-bug-line .pip {
+  flex: 1;
+  background: #27314a;
+}
+.fb2 .v2-bug-line .pip.td {
+  background: linear-gradient(90deg, #fff3c4, #f6b93b);
+}
+.fb2 .v2-bug-line .pip.fg {
+  background: #4fe3c1;
+}
+.fb2 .v2-bug-line .pip.lost {
+  background: #ff5d5d;
+}
+.fb2 .v2-bug-line .pip.none {
+  background: #56607a;
+}
+.fb2 .v2-bug-line .pip.open[style] {
+  background: linear-gradient(90deg, #f6b93b var(--fill, 0%), #27314a var(--fill, 0%));
+}
+/* Clutch (nfl-9 sets it): the bug turns gold */
+.fb2 .v2-bug.clutch {
+  border-color: #f6b93b;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 243, 196, 0.5),
+    0 0 14px rgba(246, 185, 59, 0.55),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- the Heat bars, directly under the bug (nfl-4: yours under YOU, theirs under the rival) ---------- */
+.fb2 .v2-heat {
+  position: absolute;
+  z-index: 6;
+  top: calc(var(--bug-top, 65px) + var(--bug-h, 40px) + 3px);
+  left: max(50%, calc(var(--pause-left, 12px) + 52px + var(--bug-w, 232px) / 2));
+  width: var(--bug-w, 232px);
+  height: var(--heat-h, 6px);
+  margin-left: calc(var(--bug-w, 232px) / -2);
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+}
+.fb2 .v2-heat-bar {
+  position: relative;
+  flex: 1 1 0;
+  box-sizing: border-box;
+  border-radius: 99px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #05070d, #141a2a);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.fb2 .v2-heat-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.22) 0 4px, transparent 4px 9px), linear-gradient(90deg, #f6b93b, #ff7a1a 70%, #ff4a2a);
+  transition: width 0.25s ease-out;
+}
+.fb2 .v2-heat-bar.them i {
+  background: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.18) 0 4px, transparent 4px 9px), linear-gradient(90deg, #b9a4ff, #ff8a5a 70%, #ff4a2a);
+}
+/* the HEATING UP mark at 66 */
+.fb2 .v2-heat-mark {
+  position: absolute;
+  left: 66%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 243, 196, 0.75);
+}
+.fb2 .v2-heat-bar.heating {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 186, 90, 0.55),
+    0 0 6px rgba(255, 140, 40, 0.55);
+}
+.fb2 .v2-heat-bar.fire {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 220, 140, 0.8),
+    0 0 10px rgba(255, 120, 40, 0.85);
+}
+.fb2 .v2-heat-bar.fire i {
+  animation: v2-heat-run 0.6s linear infinite;
+  background-size:
+    18px 100%,
+    100% 100%;
+}
+@keyframes v2-heat-run {
+  to {
+    background-position:
+      18px 0,
+      0 0;
+  }
+}
+/* ON FIRE on the bug: a still flame in the block's top corner (clear of the name) and a hot rim */
+.fb2 .v2-bug-flame {
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  color: #ff5a1f;
+  filter: drop-shadow(0 0 2px rgba(255, 210, 120, 0.9));
+}
+.fb2 .v2-bug-team.them .v2-bug-flame {
+  left: auto;
+  right: 4px;
+}
+.fb2 .v2-bug-team.fire {
+  box-shadow: inset 0 0 0 2px rgba(255, 150, 40, 0.9);
+}
+
+/* ---------- the toast line ---------- */
+.fb2 .v2-toast {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  bottom: var(--toast-bottom, calc(var(--sab) + 200px));
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  height: 28px;
+  max-width: calc(100% - 24px - var(--sal, 0px) - var(--sar, 0px));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(40, 56, 110, 0.82), rgba(10, 16, 38, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 6px 16px rgba(0, 0, 0, 0.45);
+  font-family: var(--display);
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+  animation: v2-toast-in 0.16s ease-out both;
+}
+.fb2 .v2-toast-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8fa2c8;
+  box-shadow: 0 0 6px currentColor;
+}
+.fb2 .v2-toast b {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  color: #f3f6ff;
+}
+.fb2 .v2-toast span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  color: #c8d4ee;
+}
+.fb2 .v2-toast span::before {
+  content: '·';
+  margin-right: 6px;
+  color: #8fa2c8;
+}
+.fb2 .v2-toast.good b,
+.fb2 .v2-toast.green b {
+  color: #5eead4;
+}
+.fb2 .v2-toast.good .v2-toast-dot,
+.fb2 .v2-toast.green .v2-toast-dot {
+  background: #5eead4;
+  color: #5eead4;
+}
+.fb2 .v2-toast.bad b {
+  color: #ff7a7a;
+}
+.fb2 .v2-toast.bad .v2-toast-dot {
+  background: #ff5d5d;
+  color: #ff5d5d;
+}
+.fb2 .v2-toast.big {
+  border-color: rgba(251, 191, 36, 0.7);
+  background: linear-gradient(180deg, rgba(92, 64, 12, 0.9), rgba(28, 18, 4, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 243, 196, 0.35),
+    0 0 16px rgba(251, 191, 36, 0.45),
+    0 6px 16px rgba(0, 0, 0, 0.45);
+}
+.fb2 .v2-toast.big b {
+  font-size: 15px;
+  background: linear-gradient(180deg, #fff7d6 0%, #ffd56a 45%, #f59e0b 70%, #fff3c4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 #5a3a04);
+}
+.fb2 .v2-toast.big .v2-toast-dot {
+  background: #fbbf24;
+  color: #fbbf24;
+}
+/* nfl-4: PERFECT, in gold, scaling 1.0 -> 1.25 -> 1.0 over 220 ms (still under reduced motion) */
+.fb2 .v2-toast.perfect {
+  border-color: rgba(255, 210, 58, 0.9);
+  background: linear-gradient(180deg, rgba(110, 78, 8, 0.94), rgba(36, 24, 2, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 243, 196, 0.45),
+    0 0 18px rgba(255, 210, 58, 0.6),
+    0 6px 16px rgba(0, 0, 0, 0.45);
+}
+.fb2 .v2-toast.perfect b {
+  display: inline-block;
+  font-size: 16px;
+  letter-spacing: 1.2px;
+  background: linear-gradient(180deg, #ffffff 0%, #ffe680 40%, #ffbf1f 70%, #fff6c8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 #6b4500);
+  animation: v2-perfect-pop 0.22s ease-out both;
+}
+.fb2 .v2-toast.perfect .v2-toast-dot {
+  background: #ffd23a;
+  color: #ffd23a;
+}
+@keyframes v2-perfect-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* a ring that wasn't PERFECT names its dial: TIMING, PRESSURE or RANGE, in amber */
+.fb2 .v2-toast.dial b {
+  color: #ffb547;
+  letter-spacing: 0.8px;
+}
+.fb2 .v2-toast.dial .v2-toast-dot {
+  background: #ff9a2a;
+  color: #ff9a2a;
+}
+/* HEATING UP */
+.fb2 .v2-toast.heat {
+  border-color: rgba(255, 140, 40, 0.7);
+}
+.fb2 .v2-toast.heat b {
+  color: #ffa04a;
+}
+.fb2 .v2-toast.heat .v2-toast-dot {
+  background: #ff7a1a;
+  color: #ff7a1a;
+}
+
+/* nfl-4: the match grade on the final card (C22) */
+.fb2 .fb2-grade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
+  margin-top: 8px;
+}
+.fb2 .fb2-grade-letter {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font: 900 italic 22px/1 var(--display);
+  color: #10121a;
+  background: linear-gradient(180deg, #e4ecff, #9fb2d8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.25),
+    0 3px 10px rgba(0, 0, 0, 0.45);
+}
+.fb2 .fb2-grade-letter.g-S {
+  background: linear-gradient(180deg, #fff6c8, #ffd23a 50%, #c98a00);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 0 14px rgba(255, 210, 58, 0.7),
+    0 3px 10px rgba(0, 0, 0, 0.45);
+}
+.fb2 .fb2-grade-letter.g-A {
+  background: linear-gradient(180deg, #c8fff3, #3fe9d4 50%, #0a8a78);
+}
+.fb2 .fb2-grade > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.fb2 .fb2-grade i {
+  font: 800 normal 10px/1 var(--display);
+  letter-spacing: 0.8px;
+  color: #b8c4dc;
+}
+.fb2 .fb2-grade em {
+  font: 900 italic 15px/1 var(--display);
+  color: #f3f6ff;
+}
+.fb2 .fb2-grade .lit em {
+  color: #ff8a3a;
+}
+.fb2 .fb2-grade .flawless {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font: 900 italic 11px/1 var(--display);
+  letter-spacing: 1px;
+  color: #04221d;
+  background: linear-gradient(180deg, #b7fff4, #3fe9d4 55%, #10bfa8);
+}
+
+/* the ability pop: the card's ability on its own line, gold edge */
+.fb2 .v2-toast.ability {
+  border-color: rgba(251, 191, 36, 0.55);
+}
+.fb2 .v2-toast.ability b {
+  color: #ffd56a;
+}
+.fb2 .v2-toast.ability .v2-toast-dot {
+  background: #fbbf24;
+  color: #fbbf24;
+}
+@keyframes v2-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+/* landscape: the toast sits under the Heat bar (the tray and the cluster own the bottom right) */
+.fb2.wide .v2-toast {
+  bottom: auto;
+  top: calc(var(--bug-top, 6px) + var(--bug-h, 34px) + var(--heat-h, 5px) + 10px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fb2 .v2-toast {
+    animation: none;
+  }
+  .fb2 .v2-heat-bar i {
+    transition: none;
+  }
+  .fb2 .v2-heat-bar.fire i {
+    animation: none;
+  }
+  .fb2 .v2-toast.perfect b {
+    animation: none;
+  }
+}

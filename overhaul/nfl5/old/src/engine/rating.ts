@@ -1,0 +1,262 @@
+import { pick } from './sport';
+import type { Line, Player } from './types';
+
+// ---------- basketball ----------
+
+/** Stat weights per game, measured from 82-0 (see research/82-0/README.md §2.5). */
+const NBA_W: Line = { pts: 0.33, reb: 0.67, ast: 0.64, stl: 1.2, blk: 1.13 };
+
+/**
+ * Team totals of a "near-perfect" lineup (era-rated), used for the balance check and the
+ * breakdown bars: about the 97th percentile of skilled drafts in each category.
+ */
+const NBA_BENCHMARK = { pts: 125, reb: 51, ast: 31, def: 16 };
+
+/**
+ * Win curve as [rating, wins] anchors, linear in between. Each anchor is a quantile of
+ * simulated drafts (src/engine/sim.test.ts), so the curve says how good a team is compared
+ * with how people actually draft: random picks have a median of 30 wins, picking the best
+ * available player has 10th/50th/90th percentiles of 52/57/64 wins, the top 1% of
+ * skilled drafts win 75+, and the top ~0.15% go 82-0.
+ */
+const NBA_CURVE: [number, number][] = [
+  [0, 0],
+  [23.5, 18],
+  [33.6, 30],
+  [46.5, 36],
+  [81.8, 52],
+  [89.1, 57],
+  [97.1, 64],
+  [104.7, 75],
+  [109.1, 82],
+];
+
+// ---------- football ----------
+
+/**
+ * Football values are already in one currency (see scripts/build_nfl_data.py): each part counts
+ * once. Defense is the three defenders' values together (DL, LB and DB).
+ */
+const NFL_W: Line = { pass: 1, rush: 1, recv: 1, def: 1 };
+
+/**
+ * About the 97th percentile of skilled drafts in passing, rushing, receiving and defense, and in
+ * rushing plus receiving together (src/engine/sim.test.ts, CALIB=1).
+ */
+const NFL_BENCHMARK = { pass: 23.2, rush: 39.6, recv: 72.3, def: 68.6, skill: 92.5 };
+
+/**
+ * Win curve for a 17-game season, from simulated drafts like basketball's: random picks have
+ * 10th/50th/90th percentiles of 4/6/8 wins, picking the best available player 11/12/13, the
+ * top 1% of skilled drafts win 16, and only the top ~0.15% go 17-0.
+ */
+const NFL_CURVE: [number, number][] = [
+  [0, 0],
+  [70.8, 4],
+  [85.2, 6],
+  [99.9, 8],
+  [143.5, 11],
+  [153.8, 12],
+  [164.8, 13],
+  [174.4, 16],
+  [179.4, 16.5],
+  // 16.5 rounds up, so 179.4 is already 17-0; a real 17-win team is rated where 17-0 starts
+  [179.5, 17],
+];
+
+// ---------- soccer (Claude 2026-11-01) ----------
+
+/**
+ * A soccer line's value: its overall on a convex scale (a 90 is worth twice an 80), split into
+ * attack, midfield, defense and goalkeeping by the position he played. A keeper is all goalkeeping.
+ */
+const SOCCER_ROLE: Record<string, [number, number, number, number]> = {
+  GK: [0, 0, 0, 1],
+  CB: [0.05, 0.15, 0.8, 0],
+  FB: [0.2, 0.3, 0.5, 0],
+  DM: [0.1, 0.4, 0.5, 0],
+  CM: [0.25, 0.5, 0.25, 0],
+  AM: [0.45, 0.5, 0.05, 0],
+  W: [0.6, 0.35, 0.05, 0],
+  ST: [0.8, 0.15, 0.05, 0],
+};
+
+export function soccerValue(ovr: number): number {
+  const x = Math.max(0, ovr - 55) / 10;
+  return 3 * x * x;
+}
+
+export function soccerParts(role: string, ovr: number): Line {
+  const [a, m, d, g] = SOCCER_ROLE[role] ?? SOCCER_ROLE.CM;
+  const v = soccerValue(ovr);
+  return { att: a * v, mid: m * v, def: d * v, gk: g * v };
+}
+
+const SOCCER_W: Line = { att: 1, mid: 1, def: 1, gk: 1 };
+
+/** About the 97th percentile of skilled drafts in each part (src/engine/sim.test.ts, CALIB=1). */
+const SOCCER_BENCHMARK = { att: 108, mid: 78, def: 71, gk: 35 };
+
+/**
+ * Win curve for a 38-game league season, from simulated drafts like the others: random picks have
+ * a median of about 14 wins, picking the best available player 10th/50th/90th percentiles of about
+ * 24/26/29, the top 1% of skilled drafts win 35+, and only the top ~0.15% go 38-0. The rest of the
+ * games are draws and defeats (soccerDraws).
+ */
+const SOCCER_CURVE: [number, number][] = [
+  [0, 0],
+  [60, 6],
+  [80.5, 11],
+  [102, 14],
+  [127.4, 17],
+  [167.2, 24],
+  [195.1, 26],
+  [223.4, 29.5],
+  [254.6, 35],
+  // 37.5 rounds up, so 269.4 is already 38-0
+  [269.4, 37.5],
+  [269.5, 38],
+];
+
+export const W: Line = pick({ nba: NBA_W, nfl: NFL_W, soccer: SOCCER_W });
+export const BENCHMARK: Record<string, number> = pick<Record<string, number>>({ nba: NBA_BENCHMARK, nfl: NFL_BENCHMARK, soccer: SOCCER_BENCHMARK });
+export const WIN_CURVE: [number, number][] = pick({ nba: NBA_CURVE, nfl: NFL_CURVE, soccer: SOCCER_CURVE });
+/** Games in a regular season. */
+export const GAMES = pick({ nba: 82, nfl: 17, soccer: 38 });
+
+export const CATEGORY_LABELS = pick({ nba: ['Scoring', 'Rebounding', 'Playmaking', 'Defense'], nfl: ['Passing', 'Rushing', 'Receiving', 'Defense'], soccer: ['Attack', 'Midfield', 'Defense', 'Goalkeeping'] });
+
+/**
+ * Soccer: the draws in a season of `wins` wins. About half the games a side doesn't win are draws,
+ * fewer for the very worst (who lose more), never more than 12. Defeats are the rest.
+ */
+export function soccerDraws(wins: number): number {
+  const rest = Math.max(0, GAMES - wins);
+  return Math.min(rest, Math.min(12, Math.round(rest * 0.5)));
+}
+
+/** League points: 3 a win, 1 a draw. */
+export function soccerPoints(wins: number, draws: number): number {
+  return 3 * wins + draws;
+}
+export const BALANCE_FLOOR = 0.85;
+
+export function lineValue(l: Line): number {
+  let v = 0;
+  for (const k in W) v += (l[k] ?? 0) * W[k];
+  return v;
+}
+
+export interface TeamRating {
+  totals: Line;
+  base: number;
+  /** the four categories vs the benchmark (1 = benchmark) */
+  ratios: [number, number, number, number];
+  balance: number;
+  rating: number;
+  wins: number;
+}
+
+function interpolate(x: number, from: 0 | 1): number {
+  const to = from === 0 ? 1 : 0;
+  const pts = WIN_CURVE;
+  if (x <= pts[0][from]) return pts[0][to];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    if (x <= b[from]) return a[to] + ((x - a[from]) / (b[from] - a[from])) * (b[to] - a[to]);
+  }
+  return pts[pts.length - 1][to];
+}
+
+export function winsFromRating(rating: number): number {
+  return Math.max(0, Math.min(GAMES, Math.round(interpolate(rating, 0))));
+}
+
+export function ratingForWins(wins: number): number {
+  return interpolate(Math.min(GAMES, Math.max(0, wins)), 1);
+}
+
+function ratiosOf(t: Line): [number, number, number, number] {
+  return pick<() => [number, number, number, number]>({
+    nfl: () => [t.pass / BENCHMARK.pass, t.rush / BENCHMARK.rush, t.recv / BENCHMARK.recv, t.def / BENCHMARK.def],
+    nba: () => [t.pts / BENCHMARK.pts, t.reb / BENCHMARK.reb, t.ast / BENCHMARK.ast, (t.stl * W.stl + t.blk * W.blk) / BENCHMARK.def],
+    soccer: () => [t.att / BENCHMARK.att, t.mid / BENCHMARK.mid, t.def / BENCHMARK.def, t.gk / BENCHMARK.gk],
+  })();
+}
+
+/**
+ * What the balance check compares. Basketball: the four categories. Football: passing, the run
+ * and catch game together, and defense, so the FLEX can be a back or a receiver at no cost
+ * (the bars still show rushing and receiving apart).
+ */
+function balanceParts(t: Line, ratios: [number, number, number, number]): number[] {
+  return pick({ nfl: () => [ratios[0], (t.rush + t.recv) / BENCHMARK.skill, ratios[3]], nba: () => ratios, soccer: () => ratios })();
+}
+
+/** Scores a lineup from its players' rated lines (era-adjusted, see Player.r). */
+export function rateTeam(players: (Player | null | undefined)[]): TeamRating {
+  const totals: Line = {};
+  for (const k in W) totals[k] = 0;
+  for (const p of players) {
+    if (!p) continue;
+    for (const k in W) totals[k] += p.r[k] ?? 0;
+  }
+  return rateTotals(totals);
+}
+
+/** Scores a lineup from its rated lines added up, as rateTeam does (the result keeps `totals`). */
+export function rateTotals(totals: Line): TeamRating {
+  const base = lineValue(totals);
+  const ratios = ratiosOf(totals);
+  const capped = balanceParts(totals, ratios).map((r) => Math.min(r, 1.25));
+  const mean = capped.reduce((a, b) => a + b, 0) / capped.length;
+  const balance = mean > 0 ? Math.min(...capped) / mean : 1;
+  const rating = base * (BALANCE_FLOOR + (1 - BALANCE_FLOOR) * balance);
+  return { totals, base, ratios, balance, rating, wins: winsFromRating(rating) };
+}
+
+export interface Grade {
+  min: number;
+  letter: string;
+  tier: string;
+  color: string;
+  coins: number;
+}
+
+export const GRADES: Grade[] = pick({
+  soccer: [
+    { min: 38, letter: 'S+', tier: 'Perfect', color: '#F5B83D', coins: 100 },
+    { min: 34, letter: 'S', tier: 'Legendary', color: '#F5B83D', coins: 60 },
+    { min: 31, letter: 'A+', tier: 'Invincible', color: '#19E3C9', coins: 55 },
+    { min: 28, letter: 'A', tier: 'Juggernaut', color: '#4FD8C6', coins: 50 },
+    { min: 25, letter: 'B', tier: 'Title Race', color: '#6CB4FF', coins: 40 },
+    { min: 22, letter: 'C', tier: 'Cup Places', color: '#F2A33A', coins: 30 },
+    { min: 15, letter: 'D', tier: 'Mid-Table', color: '#A3B1BC', coins: 25 },
+    { min: 0, letter: 'F', tier: 'Relegation Battle', color: '#FF7A7A', coins: 20 },
+  ],
+  nfl: [
+      { min: 17, letter: 'S+', tier: 'Perfect', color: '#F5B83D', coins: 100 },
+      { min: 16, letter: 'S', tier: 'Legendary', color: '#F5B83D', coins: 60 },
+      { min: 15, letter: 'A+', tier: 'Dynasty', color: '#19E3C9', coins: 55 },
+      { min: 14, letter: 'A', tier: 'Juggernaut', color: '#4FD8C6', coins: 50 },
+      { min: 12, letter: 'B', tier: 'Contender', color: '#6CB4FF', coins: 40 },
+      { min: 10, letter: 'C', tier: 'Playoff Team', color: '#F2A33A', coins: 30 },
+      { min: 7, letter: 'D', tier: 'Bubble Team', color: '#A3B1BC', coins: 25 },
+      { min: 0, letter: 'F', tier: 'Rebuilding', color: '#FF7A7A', coins: 20 },
+    ],
+  nba: [
+      { min: 82, letter: 'S+', tier: 'Perfect', color: '#F5B83D', coins: 100 },
+      { min: 75, letter: 'S', tier: 'Legendary', color: '#F5B83D', coins: 60 },
+      { min: 69, letter: 'A+', tier: 'Dynasty', color: '#19E3C9', coins: 55 },
+      { min: 63, letter: 'A', tier: 'Juggernaut', color: '#4FD8C6', coins: 50 },
+      { min: 57, letter: 'B', tier: 'Contender', color: '#6CB4FF', coins: 40 },
+      { min: 50, letter: 'C', tier: 'Playoff Team', color: '#F2A33A', coins: 30 },
+      { min: 38, letter: 'D', tier: 'Lottery Bound', color: '#A3B1BC', coins: 25 },
+      { min: 0, letter: 'F', tier: 'Rebuilding', color: '#FF7A7A', coins: 20 },
+    ],
+});
+
+export function gradeFor(wins: number): Grade {
+  return GRADES.find((g) => wins >= g.min) ?? GRADES[GRADES.length - 1];
+}

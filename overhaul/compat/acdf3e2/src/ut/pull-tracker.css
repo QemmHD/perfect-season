@@ -1,0 +1,425 @@
+/* Claude, 2026-11-01 — the Pack Tracker (docs/PULL-TRACKER.md). Existing Archivo / teal / gold
+   materials; no width media queries (the app scales a 390px frame); every tap target ≥44 design px
+   (compact chips get an invisible ::before hit area); children of the scrolling .page never shrink. */
+
+.ut-tracker > * {
+  flex-shrink: 0;
+}
+.ut-tracker-link {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 52px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ut-tracker-link > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ut-tracker-link svg {
+  flex-shrink: 0;
+  color: var(--teal);
+}
+
+/* ---------- hero ---------- */
+.ut-trk-hero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.ut-trk-hero > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 11px 4px 10px;
+  border-radius: 14px;
+  border: 1px solid #f5b83d33;
+  background: linear-gradient(160deg, #1d1c12, #0a1a20 75%);
+  min-width: 0;
+}
+.ut-trk-hero b {
+  font-family: var(--display);
+  font-size: 23px;
+  line-height: 0.95;
+  color: var(--text);
+  white-space: nowrap;
+}
+.ut-trk-hero > span:last-child b {
+  color: var(--gold);
+}
+.ut-trk-hero > span.dim b {
+  color: var(--sub);
+}
+.ut-trk-hero small {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: var(--sub);
+  white-space: nowrap;
+}
+.ut-trk-since {
+  margin: -2px 2px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sub);
+}
+.ut-trk-seg {
+  margin: 2px 0;
+}
+
+/* ---------- empty ---------- */
+.ut-trk-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ut-trk-empty .ut-empty {
+  padding: 30px 18px 26px;
+}
+.ut-trk-empty .btn {
+  min-height: 48px;
+}
+
+/* ---------- by pack ---------- */
+.ut-trk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ut-trk-list > * {
+  flex-shrink: 0;
+}
+.ut-trk-pack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: linear-gradient(170deg, var(--panel-2), var(--bg-2) 80%);
+}
+.ut-trk-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.ut-trk-head .ut-pack.small {
+  margin: 0;
+  width: 42px;
+  height: 59px;
+  font-size: 3.5px;
+}
+.ut-trk-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ut-trk-name b {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ut-trk-name small {
+  font-size: 11.5px;
+  color: var(--sub);
+}
+.ut-trk-best {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.ut-trk-best i {
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+.ut-trk-table {
+  display: flex;
+  flex-direction: column;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.ut-trk-table > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 76px;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+.ut-trk-table > div + div {
+  border-top: 1px solid var(--line);
+}
+.ut-trk-table.solo > div {
+  grid-template-columns: minmax(0, 1fr) 76px;
+}
+.ut-trk-table > div > :nth-child(n + 2) {
+  text-align: right;
+}
+.ut-trk-table > div > span:first-child {
+  color: var(--soft);
+}
+.ut-trk-table > div > b {
+  color: var(--teal);
+  font-size: 14px;
+}
+.ut-trk-table > div > span:last-child {
+  color: var(--sub);
+  font-size: 13px;
+}
+.ut-trk-table .ut-trk-th {
+  min-height: 24px;
+  background: #061820;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.ut-trk-table .ut-trk-th > span {
+  color: var(--sub) !important;
+  font-size: 9.5px !important;
+}
+.ut-trk-ovr {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+.ut-trk-ovr > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0 5px;
+  border-radius: 9px;
+  background: #061820;
+  border: 1px solid var(--line);
+}
+.ut-trk-ovr b {
+  font-size: 14px;
+  line-height: 1;
+}
+.ut-trk-ovr small {
+  font-size: 9px;
+  color: var(--sub);
+  white-space: nowrap;
+}
+.ut-trk-ovr > span.zero b {
+  color: var(--sub);
+  opacity: 0.6;
+}
+.ut-trk-ovr > .b4:not(.zero) {
+  border-color: #19e3c966;
+}
+.ut-trk-ovr > .b4:not(.zero) b {
+  color: var(--teal);
+}
+.ut-trk-ovr > .b5:not(.zero) {
+  border-color: #f5b83d88;
+  background: linear-gradient(170deg, #2a2210, #061820);
+}
+.ut-trk-ovr > .b5:not(.zero) b {
+  color: var(--gold);
+}
+.ut-trk-foot {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--sub);
+}
+
+/* ---------- filters ---------- */
+.ut-trk-chips .chip {
+  position: relative;
+  height: 32px;
+}
+.ut-trk-chips .chip::before {
+  content: '';
+  position: absolute;
+  inset: -6px -3px;
+}
+.ut-trk-chips {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  margin-top: -6px;
+  margin-bottom: -6px;
+}
+
+/* ---------- recent ---------- */
+.ut-trk-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ut-trk-feed > * {
+  flex-shrink: 0;
+}
+.ut-trk-pull {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 11px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.ut-trk-pull-head {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.ut-trk-pull-head b {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ut-trk-pull-head > span {
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.ut-trk-src {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--teal);
+  background: rgba(25, 227, 201, 0.1);
+  border: 1px solid rgba(25, 227, 201, 0.3);
+  white-space: nowrap;
+}
+.ut-trk-src.s-store,
+.ut-trk-src.s-preview {
+  color: var(--gold);
+  background: rgba(245, 184, 61, 0.1);
+  border-color: rgba(245, 184, 61, 0.35);
+}
+.ut-trk-when {
+  font-size: 11px;
+  color: var(--sub);
+}
+.ut-trk-cards {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+}
+.ut-trk-mini {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.ut-trk-mini.gone {
+  opacity: 0.5;
+}
+.ut-trk-more {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 44px;
+  padding: 0 6px;
+  border-radius: 10px;
+  border: 1px dashed var(--line-2);
+  color: var(--soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+.ut-trk-missing {
+  display: block;
+  border-radius: 6px;
+  border: 1px dashed var(--line-2);
+  background: #061820;
+}
+.ut-trk-show {
+  min-height: 46px;
+}
+
+/* ---------- all cards ---------- */
+.ut-trk-count {
+  margin: 0 2px;
+  font-size: 12px;
+  color: var(--sub);
+}
+.ut-trk-count b {
+  color: var(--text);
+}
+.ut-trk-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 6px;
+}
+.ut-trk-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.ut-trk-item.gone .utc {
+  opacity: 0.45;
+}
+.ut-trk-from,
+.ut-trk-date {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ut-trk-from {
+  margin-top: 3px;
+  color: var(--soft);
+  font-weight: 700;
+}
+.ut-trk-item.pre .ut-trk-from {
+  color: var(--sub);
+  font-style: italic;
+  font-weight: 600;
+}
+.ut-trk-date {
+  color: var(--sub);
+}
+.ut-trk-status {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #061820;
+  border: 1px solid var(--line-2);
+  color: var(--soft);
+  white-space: nowrap;
+}
+.ut-trk-status.st-sold,
+.ut-trk-status.st-sbc,
+.ut-trk-status.st-gone {
+  color: var(--red);
+  border-color: var(--red-dim);
+}

@@ -1,0 +1,70 @@
+393 {"v2":{"bug":true,"pause":true,"heat":true,"safeBox":true},"safeBox":{"safeTop":115,"safeBottom":568,"land":false,"hudBottom":114},"camera":{"frames":16200,"framesHeldOut":2087,"rimRow":0.22,"handlerRow":0.547,"safeHandlerRim":0.999,"zoomVarNearRim":0.015,"releases":63,"overlapOkAll":0.73,"jumpReleases":6,"overlapOk":1,"domOnRimFrames":0,"domOnRim":[]}}
+{
+ "393": {
+  "errors": [],
+  "rects": {
+   "bug": {
+    "x": 80.5,
+    "y": 65,
+    "w": 232,
+    "h": 40,
+    "cx": 196.5,
+    "cy": 85
+   },
+   "pause": {
+    "x": 12,
+    "y": 63,
+    "w": 44,
+    "h": 44,
+    "cx": 34,
+    "cy": 85
+   },
+   "heat": {
+    "x": 80.5,
+    "y": 108,
+    "w": 232,
+    "h": 6,
+    "cx": 196.5,
+    "cy": 111
+   },
+   "lastPlay": {
+    "x": 381,
+    "y": 63,
+    "w": 0,
+    "h": 0,
+    "cx": 381,
+    "cy": 63
+   }
+  },
+  "v2": {
+   "bug": true,
+   "pause": true,
+   "heat": true,
+   "safeBox": true
+  },
+  "safeBox": {
+   "safeTop": 115,
+   "safeBottom": 568,
+   "land": false,
+   "hudBottom": 114
+  },
+  "camera": {
+   "frames": 16200,
+   "framesHeldOut": 2087,
+   "rimRow": 0.22,
+   "handlerRow": 0.547,
+   "safeHandlerRim": 0.999,
+   "zoomVarNearRim": 0.015,
+   "releases": 63,
+   "overlapOkAll": 0.73,
+   "jumpReleases": 6,
+   "overlapOk": 1,
+   "domOnRimFrames": 0,
+   "domOnRim": []
+  },
+  "portrait": true
+ }
+}
+
+nba-hud: JSON /tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/rev-nba3b/shots2/nba-hud.json; requests to other hosts aborted: none
+exit 0

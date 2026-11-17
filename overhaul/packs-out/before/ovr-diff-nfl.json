@@ -1,0 +1,29 @@
+{
+ "sport": "nfl",
+ "counts": {
+  "promo": {
+   "0": 1106
+  },
+  "legend": {
+   "0": 130
+  },
+  "spotlight": {
+   "0": 131
+  },
+  "goat": {
+   "0": 20
+  },
+  "landmark": {
+   "0": 354
+  },
+  "standout": {
+   "0": 90
+  },
+  "program": {
+   "0": 542
+  }
+ },
+ "changed": [],
+ "missing": 0,
+ "added": 0
+}

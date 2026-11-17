@@ -1,0 +1,134 @@
+
+ RUN  v2.1.4 /home/user/ps-s-nfl
+
+ ❯ src/game/football2/rushing.test.ts  (30 tests | 1 failed) 4212ms
+   ✓ the momentum carry after a catch > never sends a receiver back-left after a pocket drift: upfield at +0.3 s in 20 of 20 seeded catches 358ms
+   × the momentum carry after a catch > steers a receiver at once with a thumb that landed while the ball was in the air (held right through the catch) 475ms
+     → expected 1.232508495489161 to be greater than 1.5
+   ✓ the momentum carry after a catch > leaves the AI unchanged: the autopilot never gives the engine null for a ball carrier 2944ms
+ ✓ src/game/football2/gameplay.test.ts  (25 tests) 15981ms
+   ✓ the pocket (nfl-2) > refuses a throwaway inside the box, and outside it the ball is never intercepted (500 seeds) 3254ms
+   ✓ the pocket (nfl-2) > always ends a slide (and a dive) in a tackle with no fumble (500 seeds) 906ms
+   ✓ the pocket (nfl-2) > plays the same inputs to the same end, stick, throwaway and all 835ms
+   ✓ the pocket (nfl-2) > never reads a body's act: 500 seeded plays come out the same with every act swapped for a dummy (C9) 8105ms
+   ✓ the pocket (nfl-2) > spends identical stamina whether burst comes from the ring or from the D button (200 seeds) 1900ms
+ ✓ src/game/football2/heat.test.ts  (14 tests) 6101ms
+   ✓ Heat in the drive (drive.ts) > identical inputs give identical Heat: two seeded whole games, the same bar and counts 6081ms
+ ✓ src/game/football2/gestures.test.ts  (16 tests) 16ms
+ ❯ src/game/football2/ratings-matter.test.ts  (9 tests | 1 failed) 436ms
+   × NFL abilities: all sixteen work, in the zone about half the time > every ability has an effect when it is on 15ms
+     → expected 2.579172487684432 to be close to 2.70292508358038, received difference is 0.12375259589594778, but expected 0.0000049999999999999996
+ ✓ src/game/football2/camera.test.ts  (10 tests) 4611ms
+   ✓ render-only (the camera and the overlays never touch a play) > gives identical seeded plays with the camera and every overlay running each step 4162ms
+ ✓ src/game/football2/controls.test.ts  (18 tests) 6ms
+ ✓ src/game/football2/calibration.test.ts  (7 tests | 2 skipped) 12157ms
+   ✓ calibration kit > plays the same game from the same seed, and a different one from another 2045ms
+   ✓ calibration kit > summarizes 40 synthetic games into sane bands, each with its sample size and interval 10109ms
+ ❯ src/game/football2/variance.test.ts  (11 tests | 1 failed) 2125ms
+   ✓ blown coverages > happen on a few percent of passes, more for a green secondary, less for a smart one or a hard defense 2058ms
+   × the AI on fourth down > kicks in range and otherwise goes for it (a punt is worth nothing in this format) 7ms
+     → expected 'punt' to be 'go' // Object.is equality
+ ↓ src/game/football2/human.test.ts  (1 test | 1 skipped)
+ ↓ src/game/football2/tune.test.ts  (1 test | 1 skipped)
+ ✓ src/game/football2/ring.test.ts  (8 tests) 39149ms
+   ✓ gold windows > stay between 30 ms a side and 110 ms across before On Fire, over ratings 40-110, every difficulty and On Fire on or off 405ms
+   ✓ gold never lies > slings: 1,000 seeded releases on the centre of a gold ring are all caught, none dropped or picked 15473ms
+   ✓ gold never lies > jukes and spins: 1,000 seeded moves on the centre of a gold ring leave that tackler on the turf for the stumble 19969ms
+   ✓ gold never lies > never offers gold in an amber or red state: pressure, a tight man, off his path or past the arm 3258ms
+ ✓ src/game/football2/shared-v2.test.ts  (6 tests) 5ms
+ ✓ src/game/football2/prefs.test.ts  (5 tests) 14ms
+ ↓ src/game/football/tune.test.ts  (1 test | 1 skipped)
+ ✓ src/game/football2/hud.test.ts  (11 tests) 26852ms
+   ✓ the one-pop rule (V-4) > over 2,000+ plays: the seeded roll still fires on 45-55% of eligible chances, and at most one pop shows a play 26813ms
+ ✓ src/game/football2/imports.test.ts  (3 tests) 21ms
+ ✓ src/engine/sport-branches.test.ts  (2 tests) 140ms
+ ✓ src/game/football2/clock.test.ts  (4 tests) 11ms
+ ✓ src/game/football2/drive.test.ts  (4 tests) 4ms
+ ✓ src/game/football2/feel.test.ts  (3 tests) 24ms
+ ✓ src/game/football2/receiver-icons.test.ts  (3 tests) 73ms
+ ❯ src/game/football2/determinism.test.ts  (3 tests | 2 failed) 6685ms
+   × the AI side is unchanged (determinism pin) > plays 200 seeded AI plays, at three levels and three squad strengths, to the pinned hash 3841ms
+     → expected 'e563e48b' to be '9d4f17f7' // Object.is equality
+   × the AI side is unchanged (determinism pin) > gives the same aiDrivesOf results and online takeovers 2843ms
+     → expected 'b6ef633c' to be 'd7536bc8' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/game/football2/determinism.test.ts > the AI side is unchanged (determinism pin) > plays 200 seeded AI plays, at three levels and three squad strengths, to the pinned hash
+AssertionError: expected 'e563e48b' to be '9d4f17f7' // Object.is equality
+
+Expected: "9d4f17f7"
+Received: "e563e48b"
+
+ ❯ src/game/football2/determinism.test.ts:94:21
+     92|     }
+     93|     expect(plays).toBe(200);
+     94|     expect(h.value).toBe(PIN.plays);
+       |                     ^
+     95|   });
+     96| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/game/football2/determinism.test.ts > the AI side is unchanged (determinism pin) > gives the same aiDrivesOf results and online takeovers
+AssertionError: expected 'b6ef633c' to be 'd7536bc8' // Object.is equality
+
+Expected: "d7536bc8"
+Received: "b6ef633c"
+
+ ❯ src/game/football2/determinism.test.ts:108:21
+    106|       }
+    107|     }
+    108|     expect(h.value).toBe(PIN.drives);
+       |                     ^
+    109|   });
+    110| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/game/football2/ratings-matter.test.ts > NFL abilities: all sixteen work, in the zone about half the time > every ability has an effect when it is on
+AssertionError: expected 2.579172487684432 to be close to 2.70292508358038, received difference is 0.12375259589594778, but expected 0.0000049999999999999996
+ ❯ src/game/football2/ratings-matter.test.ts:129:28
+    127|     // (the rolls come after the rush is drawn, so the same seed witho…
+    128|     const base = lineUp(offense(), defense(), 'pass', 'verts', 'inside…
+    129|     expect(le(wall).winAt).toBeCloseTo(le(base).winAt + 0.35, 5);
+       |                            ^
+    130|     const edge = forced(offense(), defense(fb('DE', 'e', {}, ['edge-th…
+    131|     const base2 = lineUp(offense(), defense(fb('DE', 'e', {}, [], 280)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/game/football2/rushing.test.ts > the momentum carry after a catch > steers a receiver at once with a thumb that landed while the ball was in the air (held right through the catch)
+AssertionError: expected 1.232508495489161 to be greater than 1.5
+ ❯ src/game/football2/rushing.test.ts:277:33
+    275|       // moving right by +0.25 s even from a hard leftward catch (a 0.…
+    276|       expect(held[1]).toBeGreaterThan(held[0]);
+    277|       expect(held[6] - held[0]).toBeGreaterThan(1.5);
+       |                                 ^
+    278|       expect(held[6]).toBeGreaterThan(free[6] + 1);
+    279|       expect(held[15]).toBeGreaterThan(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/game/football2/variance.test.ts > the AI on fourth down > kicks in range and otherwise goes for it (a punt is worth nothing in this format)
+AssertionError: expected 'punt' to be 'go' // Object.is equality
+
+Expected: "go"
+Received: "punt"
+
+ ❯ src/game/football2/variance.test.ts:141:27
+    139|     g.toGo = 9;
+    140|     g.ballOn = 20;
+    141|     expect(fourthDown(g)).toBe('go');
+       |                           ^
+    142|     g.ballOn = 75;
+    143|     expect(fourthDown(g)).toBe('kick');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+ Test Files  4 failed | 16 passed | 3 skipped (23)
+      Tests  5 failed | 185 passed | 5 skipped (195)
+   Start at  02:56:52
+   Duration  51.31s (transform 9.43s, setup 0ms, collect 24.73s, tests 118.62s, environment 3ms, prepare 2.92s)
+
+EXIT 1

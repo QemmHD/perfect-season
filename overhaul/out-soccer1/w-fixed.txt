@@ -1,0 +1,33 @@
+
+ RUN  v2.1.4 /home/user/ps-s-soccer
+
+ ❯ src/game/soccer2/setpieces.test.ts  (3 tests | 1 failed) 5652ms
+   ✓ soccer set pieces > corners score about one in ten 3671ms
+   × soccer set pieces > free kicks: about one direct free kick in ten goes in, 6-15% of free-kick attacks 1659ms
+     → expected 0.03007518796992481 to be greater than 0.05
+   ✓ soccer set pieces > penalties go in about three times in four 321ms
+ ✓ src/game/soccer2/soccer.test.ts  (20 tests) 13521ms
+   ✓ ratings decide attacks > a good finisher scores more from the same chances (wider green, tighter cone) 5326ms
+   ✓ ratings decide attacks > an elite keeper saves more of the same shots 4494ms
+   ✓ ratings decide attacks > better teams score more over seeded matches 1308ms
+   ✓ determinism and safety > every scenario ends, every value finite, no endless attacks 1352ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/game/soccer2/setpieces.test.ts > soccer set pieces > free kicks: about one direct free kick in ten goes in, 6-15% of free-kick attacks
+AssertionError: expected 0.03007518796992481 to be greater than 0.05
+ ❯ src/game/soccer2/setpieces.test.ts:49:18
+     47|     expect(r.all).toBeGreaterThan(0.06);
+     48|     expect(r.all).toBeLessThan(0.17);
+     49|     expect(r.fk).toBeGreaterThan(0.05);
+       |                  ^
+     50|     expect(r.fk).toBeLessThan(0.15);
+     51|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 22 passed (23)
+   Start at  14:41:11
+   Duration  21.39s (transform 8.66s, setup 0ms, collect 16.52s, tests 19.17s, environment 0ms, prepare 228ms)
+

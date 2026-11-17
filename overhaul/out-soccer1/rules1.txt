@@ -1,0 +1,18 @@
+
+ RUN  v2.1.4 /home/user/ps-s-soccer
+
+ ✓ src/game/soccer2/rules.test.ts  (17 tests) 10299ms
+   ✓ R-1: a dead shot is a loose ball > a shot that dies short stops being a shot within 1 s, and the attack ends within 15 s 934ms
+   ✓ R-1: a dead shot is a loose ball > autopilot attacks all finish within the clock + 15 s 2868ms
+   ✓ C-4: BEND bends the way its arrow points (x across the pitch: + right on screen) > over 40 kicks each: Bend left ends 1.5 m+ left of the aim, Bend right 1.5 m+ right, straight within 0.5 m 511ms
+   ✓ J-1: the bounce is a sound, not a rule > bounces are reported, and taking them out of the events changes no attack 990ms
+   ✓ R-2: a parry goes away from goal > leaves his hands going away from the goal line, unless pushed round the post from outside ±(GHALF − 0.3) 1284ms
+   ✓ R-2: a parry goes away from goal > from a keeper with sound hands (HAN 55+) it goes to the side it came, never back across his goal 543ms
+   ✓ R-2: the restarts > across seeded autopilot attacks: never more than two restarts, every wide end a goal kick, all inside the clock + 15 s 3066ms
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  13:31:07
+   Duration  12.47s (transform 1.41s, setup 0ms, collect 1.80s, tests 10.30s, environment 0ms, prepare 64ms)
+
+done

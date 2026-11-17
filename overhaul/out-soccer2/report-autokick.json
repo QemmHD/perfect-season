@@ -1,0 +1,32 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "autokick",
+  "countdown": [
+   "BEND · swipe the pitch, then SHOOT",
+   "AUTO KICK · in 5",
+   "AUTO KICK · in 4",
+   "AUTO KICK · in 3",
+   "AUTO KICK · in 2",
+   "AUTO KICK · in 1",
+   "FREE KICK · swipe to BEND · then SHOOT"
+  ],
+  "takenAt": 12.133333333333516,
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "autokick",
+  "countdown": [
+   "BEND · swipe the pitch, then SHOOT",
+   "AUTO KICK · in 5",
+   "AUTO KICK · in 4",
+   "AUTO KICK · in 3",
+   "AUTO KICK · in 2",
+   "AUTO KICK · in 1",
+   "FREE KICK · swipe to BEND · then SHOOT"
+  ],
+  "takenAt": 12.016666666666843,
+  "errors": []
+ }
+]

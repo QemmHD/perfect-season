@@ -1,0 +1,33 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "autokick",
+  "countdown": [
+   "AUTO KICK IN 5",
+   "AUTO KICK IN 4",
+   "AUTO KICK IN 3",
+   "AUTO KICK IN 2",
+   "AUTO KICK IN 1"
+  ],
+  "takenAt": null,
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "autokick",
+  "countdown": [
+   "AUTO KICK IN 5",
+   "AUTO KICK IN 4",
+   "AUTO KICK IN 3",
+   "AUTO KICK IN 2",
+   "AUTO KICK IN 1"
+  ],
+  "takenAt": null,
+  "errors": []
+ }
+]
+QA isolation: blocked 0 request(s) to live hosts {}
+errors 2 [
+  '393x852-sat59: the free kick was not taken for the person at 12-15 s (null)',
+  '320x568: the free kick was not taken for the person at 12-15 s (null)'
+]

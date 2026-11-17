@@ -1,0 +1,26 @@
+
+== concept x call, completion per dropback, 30 snaps a cell (AI passer at Pro, gold v gold)
+concept       c0     c1    c1r     c2     t2     c3     c4   fire    sim   goalprevent    avg
+verts         47     57     67     97     50     23     47     37     40     67     60    53.6
+slants         0     93     63     50     73     43     53     57     70     93     67    60.3
+smash          0     27     43     53     67     53     57     13     53     27     30    38.5
+flood         53     50     57     80     87     43     57     47     43     27     33    52.4
+dagger        30     33     47     93     73     53     73     73     57     43     50    57.0
+mesh           7     97     90     97     97     90     97     93     90    100     93    86.4
+curls          0     33     27     57     60     67     67     27     67     30     67    45.5
+posts         37     50     47     70     67     37     43     30     40     70     53    49.4
+avg           22     55     55     75     72     51     62     47     57     57     57
+sacks % / yards per dropback
+verts      13/35   7/18   0/32   0/56   0/34   0/35   0/38   0/36   3/31   10/7   0/11
+slants     47/-6   0/31   0/21   0/22   0/31   0/19   0/23   3/15   0/18   0/22   0/16
+smash      40/-5    3/9   0/18   0/14   3/10   0/23   3/12  60/-4   0/27   7/11   0/31
+flood        0/9    0/9    0/8   0/14    0/9   0/30   0/27   0/29   0/31    0/8   0/36
+dagger     17/15  13/13   0/32   0/58   0/33   0/35   0/27   0/16   0/32  10/16   0/26
+mesh       53/-5   0/14    0/9   0/12    0/8    0/8   0/10    0/9   0/10   0/18    0/9
+curls      47/-5   0/17   7/11   0/22   3/14   3/13   0/23   40/1   0/14   7/12   0/18
+posts       13/6   10/3    7/2   7/32   0/28   0/29  10/18   0/31   0/28    7/2   0/32
+each call's best concept (pts over the call's average): c0 flood +32, c1 mesh +42, c1r mesh +35, c2 verts +22, t2 mesh +25, c3 mesh +39, c4 mesh +35, fire mesh +46, sim mesh +33, goal mesh +43, prevent mesh +37
+each concept's best call (pts under the concept's average): verts c3 -30, slants c0 -60, smash c0 -38, flood goal -26, dagger c0 -27, mesh c0 -80, curls c0 -45, posts fire -19
+sacks blitz 14.0 base 1.8 ; 20+ blitz 36.8 base 36.9
+
+done in 25s -> docs/studio-overhaul/nfl-calibration/nfl5-scratch.json

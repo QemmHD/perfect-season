@@ -1,0 +1,86 @@
+{
+ "sport": "nfl",
+ "club": {
+  "spotlight": "Peyton Manning 104 qs 10",
+  "goat": "Peyton Manning 109 qs 10"
+ },
+ "day": "2026-11-09",
+ "sbcsTakingSpecialsOnDay": 7,
+ "onDay": [
+  {
+   "sbc": "Golden Pair",
+   "cards": [
+    "Peyton Manning spotlight 104"
+   ],
+   "reward": {
+    "pack": "gold"
+   }
+  },
+  {
+   "sbc": "Hall of Fame Class",
+   "cards": [
+    "Peyton Manning spotlight 104"
+   ],
+   "reward": {
+    "pack": "premium",
+    "card": {
+     "tier": "promo"
+    }
+   }
+  },
+  {
+   "sbc": "Bronze Upgrade",
+   "cards": [
+    "Peyton Manning spotlight 104"
+   ],
+   "reward": {
+    "pack": "silver"
+   }
+  },
+  {
+   "sbc": "Silver Upgrade",
+   "cards": [
+    "Peyton Manning spotlight 104"
+   ],
+   "reward": {
+    "pack": "gold"
+   }
+  },
+  {
+   "sbc": "Gold Upgrade",
+   "cards": [
+    "Peyton Manning spotlight 104"
+   ],
+   "reward": {
+    "pack": "premium"
+   }
+  },
+  {
+   "sbc": "Silver to Gold",
+   "cards": [
+    "Peyton Manning spotlight 104"
+   ],
+   "reward": {
+    "card": {
+     "tier": "gold"
+    }
+   }
+  },
+  {
+   "sbc": "Golden Hour",
+   "cards": [
+    "Peyton Manning spotlight 104"
+   ],
+   "reward": {
+    "card": {
+     "tier": "gold",
+     "minOvr": 81
+    }
+   }
+  }
+ ],
+ "sbcsTakingSpecialsIn28Days": 211,
+ "specialUidsIn28Days": [
+  "u0"
+ ]
+}

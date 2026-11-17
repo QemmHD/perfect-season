@@ -1,0 +1,219 @@
+import React, { useEffect, useRef } from 'react';
+import { pick } from '../engine/sport';
+
+/** Claude 2026-11-01: football's field and soccer's pitch are both grass */
+const GRASS = pick({ nba: false, nfl: true, soccer: true });
+import { useLayout } from '../stage';
+import { reducedMotion } from './motion';
+
+/** The arena behind the home screen's scoreboard: sweeping spotlights,
+    a crowd with camera flashes, and the court (or the football field) in perspective. Drawn on canvas. */
+export function ArenaHero({ children }: { children: React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLCanvasElement>(null);
+  const { k } = useLayout();
+  useEffect(() => {
+    const c = ref.current;
+    const el = box.current;
+    if (!c || !el) return;
+    const g = c.getContext('2d');
+    if (!g) return;
+    let W = 0;
+    let H = 0;
+    let scale = 1;
+    // the floor, the crowd and the vignette don't move: draw them once into layers
+    const base = document.createElement('canvas');
+    const top = document.createElement('canvas');
+    let seats: { x: number; y: number; r: number }[] = [];
+    const flashes: { x: number; y: number; r: number; f: number }[] = [];
+    const size = () => {
+      W = el.clientWidth;
+      H = el.clientHeight;
+      if (!W || !H) return;
+      scale = Math.min(3, (window.devicePixelRatio || 1) * k);
+      for (const cv of [c, base, top]) {
+        cv.width = Math.round(W * scale);
+        cv.height = Math.round(H * scale);
+      }
+      g.setTransform(scale, 0, 0, scale, 0, 0);
+      const b = base.getContext('2d')!;
+      b.setTransform(scale, 0, 0, scale, 0, 0);
+      const bg = b.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#0d3240');
+      bg.addColorStop(0.6, '#081f29');
+      bg.addColorStop(1, '#05141b');
+      b.fillStyle = bg;
+      b.fillRect(0, 0, W, H);
+      // court floor (or football field) in perspective
+      b.beginPath();
+      b.moveTo(W * 0.3, H * 0.74);
+      b.lineTo(W * 0.7, H * 0.74);
+      b.lineTo(W * 0.98, H + 2);
+      b.lineTo(W * 0.02, H + 2);
+      b.closePath();
+      const fl = b.createLinearGradient(0, H * 0.74, 0, H);
+      fl.addColorStop(0, GRASS ? 'rgba(46,204,113,0.13)' : 'rgba(25,227,201,0.10)');
+      fl.addColorStop(1, GRASS ? 'rgba(46,204,113,0.03)' : 'rgba(25,227,201,0.02)');
+      b.fillStyle = fl;
+      b.fill();
+      b.strokeStyle = GRASS ? 'rgba(242,246,247,0.32)' : 'rgba(25,227,201,0.30)';
+      b.lineWidth = 1.2;
+      b.stroke();
+      if (pick({ nba: false, nfl: false, soccer: true })) {
+        // the far penalty box, its arc and the goal
+        const y0 = H * 0.74;
+        const bh = H * 0.06;
+        b.beginPath();
+        b.moveTo(W / 2 - W * 0.16, y0);
+        b.lineTo(W / 2 - W * 0.17, y0 + bh);
+        b.lineTo(W / 2 + W * 0.17, y0 + bh);
+        b.lineTo(W / 2 + W * 0.16, y0);
+        b.stroke();
+        b.beginPath();
+        b.ellipse(W / 2, y0 + bh, W * 0.06, H * 0.018, 0, 0, Math.PI);
+        b.stroke();
+        b.beginPath();
+        b.moveTo(W * 0.08, H * 0.95);
+        b.lineTo(W * 0.92, H * 0.95);
+        b.stroke();
+        b.beginPath();
+        b.ellipse(W / 2, H * 0.95, W * 0.09, H * 0.03, 0, Math.PI, Math.PI * 2);
+        b.stroke();
+        b.strokeStyle = 'rgba(242,246,247,0.7)';
+        b.lineWidth = 2;
+        b.beginPath();
+        b.moveTo(W / 2 - W * 0.05, y0);
+        b.lineTo(W / 2 - W * 0.05, y0 - H * 0.045);
+        b.lineTo(W / 2 + W * 0.05, y0 - H * 0.045);
+        b.lineTo(W / 2 + W * 0.05, y0);
+        b.stroke();
+        b.lineWidth = 1.2;
+      } else if (pick({ nba: false, nfl: true, soccer: false })) {
+        // yard lines, closer together toward the far end zone, and the goalposts
+        for (let i = 1; i < 6; i++) {
+          const f = Math.pow(i / 6, 1.6);
+          const y = H * 0.74 + f * (H * 0.26);
+          const half = W * (0.2 + f * 0.48);
+          b.beginPath();
+          b.moveTo(W / 2 - half, y);
+          b.lineTo(W / 2 + half, y);
+          b.strokeStyle = 'rgba(242,246,247,' + (0.12 + f * 0.16) + ')';
+          b.stroke();
+        }
+        b.strokeStyle = 'rgba(245,184,61,0.6)';
+        b.lineWidth = 2;
+        b.beginPath();
+        b.moveTo(W / 2, H * 0.74);
+        b.lineTo(W / 2, H * 0.68);
+        b.moveTo(W / 2 - W * 0.05, H * 0.68);
+        b.lineTo(W / 2 + W * 0.05, H * 0.68);
+        b.moveTo(W / 2 - W * 0.05, H * 0.68);
+        b.lineTo(W / 2 - W * 0.05, H * 0.56);
+        b.moveTo(W / 2 + W * 0.05, H * 0.68);
+        b.lineTo(W / 2 + W * 0.05, H * 0.56);
+        b.stroke();
+        b.lineWidth = 1.2;
+      } else {
+        b.beginPath();
+        b.ellipse(W / 2, H * 0.88, W * 0.11, H * 0.05, 0, 0, Math.PI * 2);
+        b.stroke();
+      }
+      // tiers of seats curving around the floor
+      seats = [];
+      for (let row = 0; row < 7; row++) {
+        const y = H - 16 - row * 7.5;
+        const spread = W * (0.62 + row * 0.07);
+        const n = 26 + row * 6;
+        for (let i = 0; i < n; i++) {
+          const t = i / (n - 1) - 0.5;
+          const lift = Math.pow(Math.abs(t) * 2, 2) * 18;
+          const p = { x: W / 2 + t * spread * 1.15 + (Math.random() - 0.5) * 3, y: y - lift + (Math.random() - 0.5) * 2, r: 1.1 + row * 0.12 + Math.random() * 0.5 };
+          seats.push(p);
+          b.fillStyle = 'rgba(143,166,178,' + (0.12 + Math.random() * 0.22) + ')';
+          b.beginPath();
+          b.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          b.fill();
+        }
+      }
+      const v = top.getContext('2d')!;
+      v.setTransform(scale, 0, 0, scale, 0, 0);
+      const vg = v.createRadialGradient(W / 2, H * 0.45, H * 0.2, W / 2, H * 0.45, W * 0.75);
+      vg.addColorStop(0, 'rgba(4,18,26,0)');
+      vg.addColorStop(1, 'rgba(4,18,26,0.55)');
+      v.fillStyle = vg;
+      v.fillRect(0, 0, W, H);
+    };
+    size();
+    const ro = new ResizeObserver(size);
+    ro.observe(el);
+    let raf = 0;
+    const still = reducedMotion();
+    const beam = (t: number, ox: number, base0: number, speed: number, phase: number, rgb: string) => {
+      const a = base0 + Math.sin(t * speed + phase) * 0.22;
+      const len = H * 1.6;
+      const gr = g.createLinearGradient(ox, -10, ox + Math.sin(a) * len, Math.cos(a) * len);
+      gr.addColorStop(0, 'rgba(' + rgb + ',0.30)');
+      gr.addColorStop(0.55, 'rgba(' + rgb + ',0.08)');
+      gr.addColorStop(1, 'rgba(' + rgb + ',0)');
+      g.fillStyle = gr;
+      const wdt = 0.13;
+      g.beginPath();
+      g.moveTo(ox, -10);
+      g.lineTo(ox + Math.sin(a - wdt) * len, Math.cos(a - wdt) * len);
+      g.lineTo(ox + Math.sin(a + wdt) * len, Math.cos(a + wdt) * len);
+      g.closePath();
+      g.fill();
+    };
+    const draw = (now: number) => {
+      const t = now / 1000;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalCompositeOperation = 'source-over';
+      g.drawImage(base, 0, 0);
+      g.setTransform(scale, 0, 0, scale, 0, 0);
+      // the odd camera flash in the crowd
+      if (!still && seats.length && Math.random() < 0.35) {
+        const p = seats[Math.floor(Math.random() * seats.length)];
+        if (Math.random() < 0.5) flashes.push({ ...p, f: 1 });
+      }
+      for (let i = flashes.length - 1; i >= 0; i--) {
+        const p = flashes[i];
+        g.fillStyle = 'rgba(255,255,255,' + p.f + ')';
+        g.beginPath();
+        g.arc(p.x, p.y, p.r + p.f * 1.2, 0, Math.PI * 2);
+        g.fill();
+        p.f -= 0.09;
+        if (p.f <= 0) flashes.splice(i, 1);
+      }
+      // two spotlights sweeping across the floor
+      g.globalCompositeOperation = 'lighter';
+      beam(t, W * 0.08, 0.55, 0.5, 0, '25,227,201');
+      beam(t, W * 0.92, -0.55, 0.43, 2.1, '245,184,61');
+      g.globalCompositeOperation = 'source-over';
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.drawImage(top, 0, 0);
+      if (!still) raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    const vis = () => {
+      cancelAnimationFrame(raf);
+      if (!document.hidden) raf = requestAnimationFrame(draw);
+    };
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      document.removeEventListener('visibilitychange', vis);
+      // its layers' memory back now (iOS counts a dropped canvas until it's collected)
+      for (const cv of [base, top]) {
+        cv.width = 0;
+        cv.height = 0;
+      }
+    };
+  }, [k]);
+  return (
+    <div className="hero" ref={box}>
+      <canvas ref={ref} aria-hidden="true" />
+      {children}
+    </div>
+  );
+}

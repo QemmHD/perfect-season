@@ -1,0 +1,646 @@
+// A playoff game told as it happens: the scoring, who did it, the clock and the win probability.
+// Pure presentation. The engine has already decided who won (and, in football, the final score);
+// this only writes a game that agrees with it, seeded so the same game always tells the same way.
+import { type Rand, hashString, rng } from './rng';
+import type { TeamRating } from './rating';
+import { DRAW, expectedGoals, expectedScores, gameScore, soccerScore } from './season';
+import { pick as bySport } from './sport';
+import type { Lineup, OppPlayer, Player, PlayoffTeam } from './types';
+import { DEF_SLOTS, SLOTS } from './types';
+
+export type Side = 'us' | 'them';
+
+export interface CastEvent {
+  /** game time, 0 (kickoff, tip-off) to 1 (the final whistle) */
+  t: number;
+  /** 1-4 */
+  period: number;
+  /** time left in the period, "8:42" */
+  clock: string;
+  side: Side | null;
+  pts: number;
+  /** the score after this play */
+  us: number;
+  them: number;
+  text: string;
+  /** a play worth a headline: a touchdown, a three, a dunk, a pick */
+  big: boolean;
+  /** a play that put a side ahead for good, late */
+  clutch?: boolean;
+  /** our win probability after the play, 0-1 */
+  wp: number;
+}
+
+export interface StarLine {
+  side: Side;
+  name: string;
+  line: string;
+}
+
+export interface GameCast {
+  us: number;
+  them: number;
+  won: boolean;
+  /** points per period, ours then theirs */
+  periods: [number, number][];
+  /** every scoring play (basketball: every basket), in order; `big` ones make the play-by-play */
+  events: CastEvent[];
+  /** the win probability through the game, for the chart: [t, wp] */
+  wp: [number, number][];
+  /** player of the game, and the other side's best */
+  stars: StarLine[];
+  /** soccer: level after 90 minutes, the shootout's score (ours first) */
+  pens?: [number, number];
+}
+
+/** Claude 2026-11-01: soccer is told in two halves of goals, with scorers and assists. */
+const SOCCER = bySport({ nba: false, nfl: false, soccer: true });
+const FOOTBALL = bySport({ nba: false, nfl: true, soccer: false });
+const PERIOD_MIN = bySport({ nba: 12, nfl: 15, soccer: 45 });
+/** periods in a game: quarters, or soccer's halves */
+const PERIODS = bySport({ nba: 4, nfl: 4, soccer: 2 });
+/** spread of a game's final margin around what was expected, in points (Stern's model); soccer in goals */
+const SIGMA = bySport({ nba: 11.5, nfl: 13.45, soccer: 1.7 });
+
+// ---------- small maths ----------
+
+function erf(x: number): number {
+  // Abramowitz-Stegun 7.1.26
+  const s = Math.sign(x);
+  const a = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * a);
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-a * a);
+  return s * y;
+}
+const phi = (x: number) => 0.5 * (1 + erf(x / Math.SQRT2));
+function phiInv(p: number): number {
+  // bisection is plenty here
+  let lo = -8;
+  let hi = 8;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (phi(mid) < p) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * Our chance to win with `lead` points at game time t, for a game we were expected to win with
+ * probability `pre` (the margin is a random walk: what's left of it is spread like the rest of
+ * the game).
+ */
+export function winProb(lead: number, t: number, pre: number): number {
+  const rem = Math.max(0, 1 - t);
+  if (rem < 1e-4) return lead > 0 ? 1 : lead < 0 ? 0 : 0.5;
+  const mu = phiInv(Math.min(0.995, Math.max(0.005, pre))) * SIGMA;
+  return phi((lead + mu * rem) / (SIGMA * Math.sqrt(rem)));
+}
+
+function pick<T>(xs: T[], rand: Rand): T {
+  return xs[Math.floor(rand() * xs.length)];
+}
+
+function weighted<T>(xs: T[], w: (x: T) => number, rand: Rand): T {
+  const ws = xs.map((x) => Math.max(0, w(x)));
+  const total = ws.reduce((a, b) => a + b, 0);
+  if (total <= 0) return pick(xs, rand);
+  let r = rand() * total;
+  for (let i = 0; i < xs.length; i++) {
+    r -= ws[i];
+    if (r <= 0) return xs[i];
+  }
+  return xs[xs.length - 1];
+}
+
+function clockOf(t: number): { period: number; clock: string } {
+  if (SOCCER) {
+    // the minute played, as a soccer scoreboard counts up ("67'"); stoppage time at the end of each half
+    const min = Math.min(90, Math.floor(t * 90) + 1);
+    const period = min > 45 ? 2 : 1;
+    return { period, clock: (t > 0.985 ? "90+" + (1 + Math.floor((t - 0.985) * 300)) : String(min)) + "'" };
+  }
+  const period = Math.min(4, Math.floor(t * 4) + 1);
+  const left = Math.max(0, (period - t * 4) * PERIOD_MIN);
+  const m = Math.floor(left);
+  const s = Math.min(59, Math.round((left - m) * 60));
+  return { period, clock: m + ':' + String(s).padStart(2, '0') };
+}
+
+/** A last name for the play-by-play: "Rice", "St. Brown". */
+function short(name: string): string {
+  const parts = name.replace(/\s*\([^)]*\)\s*$/, '').split(' ');
+  let i = parts.length - 1;
+  if (/^(Jr\.?|Sr\.?|II|III|IV)$/.test(parts[i]) && i > 1) i--;
+  const before = parts[i - 1];
+  return i > 1 && /^(St\.|Van|van|De|Del|La|Le|Du|Da|Di|Mac)$/.test(before) ? before + ' ' + parts[i] : parts[i];
+}
+
+// ---------- the score, split into plays ----------
+
+/** Football points as scoring plays: mostly touchdowns (7) and field goals (3). */
+export function footballPlays(points: number): number[] {
+  // fewest plays, touchdowns first; 6 (missed extra point), 8 (two-point try) and 2 (safety) when needed
+  const cost: Record<number, number> = { 7: 1, 3: 1.15, 6: 1.7, 8: 1.7, 2: 3 };
+  const best: (number[] | null)[] = [[]];
+  for (let p = 1; p <= points; p++) {
+    let choice: number[] | null = null;
+    let c = Infinity;
+    for (const v of [7, 3, 6, 8, 2]) {
+      const prev = p - v >= 0 ? best[p - v] : null;
+      if (!prev) continue;
+      const pc = prev.reduce((a, x) => a + cost[x], 0) + cost[v];
+      if (pc < c) {
+        c = pc;
+        choice = prev.concat([v]);
+      }
+    }
+    best.push(choice);
+  }
+  return best[points] ?? [];
+}
+
+/** Basketball points as baskets: twos, threes and free throws. */
+function basketballPlays(points: number, rand: Rand): number[] {
+  const out: number[] = [];
+  let left = points;
+  while (left > 0) {
+    if (left <= 3) {
+      out.push(left);
+      break;
+    }
+    const r = rand();
+    const v = r < 0.6 ? 2 : r < 0.85 ? 3 : 1;
+    out.push(v);
+    left -= v;
+  }
+  return out;
+}
+
+/** A basketball game's score that agrees with its result. */
+export function basketballScore(won: boolean, pre: number, rand: Rand): [number, number] {
+  const total = Math.round(206 + (rand() - 0.5) * 34);
+  const expected = phiInv(Math.min(0.99, Math.max(0.01, pre))) * SIGMA;
+  // how much a winner wins by: around the expectation, never zero
+  let margin = Math.abs(Math.round(expected * (won ? 1 : -1) * 0.6 + (rand() - 0.5) * 2 * 14));
+  if (margin < 1) margin = 1 + Math.floor(rand() * 4);
+  margin = Math.min(margin, 38);
+  const hi = Math.round((total + margin) / 2);
+  const lo = hi - margin;
+  return won ? [hi, lo] : [lo, hi];
+}
+
+// ---------- who did it ----------
+
+interface Cast {
+  /** football */
+  qb?: string;
+  backs: { name: string; w: number }[];
+  catchers: { name: string; w: number }[];
+  /** football: the defenders (DL, LB, DB), weighted by how good they are */
+  defenders: { name: string; pos: string; w: number }[];
+  /** basketball: everyone, weighted by scoring, with their position */
+  scorers: { name: string; w: number; pos: string; three: number }[];
+}
+
+/** The lineup's players in a fixed order (by id), whatever spots they sit in: two phones seat a team differently. */
+function playersOf(lineup: Lineup): Player[] {
+  return (SLOTS.map((k) => lineup[k]).filter(Boolean) as Player[]).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+const isDefender = (pos: string) => DEF_SLOTS.includes(pos);
+
+/** Soccer: a side's goals and assists, weighted by the scorer's season (a keeper never scores). */
+function soccerCast(ps: { name: string; pos: string; s: Record<string, number> }[]): Cast {
+  const goalW: Record<string, number> = { ST: 14, W: 8, AM: 7, CM: 4, DM: 2, FB: 1.5, CB: 2, GK: 0 };
+  const assistW: Record<string, number> = { ST: 5, W: 7, AM: 8, CM: 6, DM: 3, FB: 4, CB: 1, GK: 0.2 };
+  const v = (x: number | undefined, dflt: number) => (typeof x === 'number' && x >= 0 ? x : dflt);
+  return {
+    backs: [],
+    catchers: ps.map((p) => ({ name: p.name, w: v(p.s.a, assistW[p.pos] ?? 3) + 0.3 })),
+    defenders: ps.filter((p) => p.pos === 'GK').map((p) => ({ name: p.name, pos: 'GK', w: 1 })),
+    scorers: ps.filter((p) => p.pos !== 'GK').map((p) => ({ name: p.name, w: v(p.s.g, goalW[p.pos] ?? 3) + 0.4, pos: p.pos, three: 0 })),
+  };
+}
+
+function ourCast(lineup: Lineup): Cast {
+  const ps = playersOf(lineup);
+  if (SOCCER) return soccerCast(ps.map((p) => ({ name: p.name, pos: p.role ?? 'CM', s: p.s })));
+  if (!FOOTBALL) return { backs: [], catchers: [], defenders: [], scorers: ps.map((p) => ({ name: p.name, w: p.s.pts ?? 10, pos: p.pos[0], three: /G/.test(p.pos[0]) ? 0.45 : p.pos[0] === 'SF' ? 0.35 : 0.15 })) };
+  const qb = ps.find((p) => p.pos[0] === 'QB');
+  const skill = ps.filter((p) => p.pos[0] !== 'QB' && !isDefender(p.pos[0]));
+  return {
+    qb: qb?.name,
+    defenders: ps.filter((p) => isDefender(p.pos[0])).map((p) => ({ name: p.name, pos: p.pos[0], w: Math.max(1, p.val) })),
+    backs: [...(qb ? [{ name: qb.name, w: (qb.s.rushTd ?? 0) + 0.02 }] : []), ...skill.map((p) => ({ name: p.name, w: (p.s.rushTd ?? 0) + (p.pos[0] === 'RB' ? 0.1 : 0) }))],
+    catchers: skill.map((p) => ({ name: p.name, w: (p.s.recTd ?? 0) + (p.s.recYds ?? 0) / 400 })),
+    scorers: [],
+  };
+}
+
+function theirCast(opp: PlayoffTeam): Cast {
+  const five: OppPlayer[] = opp.five;
+  if (SOCCER) return soccerCast(five.map((p) => ({ name: p.name, pos: p.pos.split('/')[0], s: p.s })));
+  if (!FOOTBALL) return { backs: [], catchers: [], defenders: [], scorers: five.map((p) => ({ name: p.name, w: p.s.pts ?? 10, pos: p.pos, three: /G/.test(p.pos) ? 0.45 : p.pos === 'SF' ? 0.35 : 0.15 })) };
+  const qb = five.find((p) => p.pos === 'QB');
+  const rest = five.filter((p) => p.pos !== 'QB');
+  return {
+    qb: qb?.name,
+    // an honoree makes the big plays more often
+    defenders: (opp.def ?? []).map((p) => ({ name: p.name, pos: p.pos, w: 10 + 5 * (p.s.hon ?? 0) })),
+    backs: [...(qb ? [{ name: qb.name, w: (qb.s.rushTd ?? 0) + 0.02 }] : []), ...rest.map((p) => ({ name: p.name, w: (p.s.rushTd ?? 0) + (p.pos === 'RB' ? 0.1 : 0) }))],
+    catchers: rest.map((p) => ({ name: p.name, w: (p.s.recTd ?? 0) + (p.s.recYds ?? 0) / 400 })),
+    scorers: [],
+  };
+}
+
+/** A play's yards: short ones are common, long ones rare. */
+function yards(rand: Rand, max = 80): number {
+  return Math.max(1, Math.min(max, Math.round(1 + Math.pow(rand(), 2.2) * max)));
+}
+
+interface Credit {
+  name: string;
+  side: Side;
+  td: number;
+  yds: number;
+  passTd: number;
+  /** football defenders */
+  sacks: number;
+  ints: number;
+}
+
+type Crediter = (name: string, f: Partial<Credit>) => void;
+
+/** A defender for a play: the pass rush (DL, LB), the cover men (DB, LB), or anyone. */
+function defenderFor(d: Cast, kind: 'rush' | 'cover' | 'any', rand: Rand): { name: string; pos: string } | null {
+  const fit = d.defenders.filter((x) => kind === 'any' || (kind === 'rush' ? x.pos !== 'DB' : x.pos !== 'DL'));
+  return fit.length ? weighted(fit, (x) => x.w * (kind === 'rush' && x.pos === 'DL' ? 1.4 : kind === 'cover' && x.pos === 'DB' ? 1.6 : 1), rand) : null;
+}
+
+/**
+ * One football scoring play, told: `c` is the side that scored (its offense, or its defense
+ * coming up with the ball), `other` the other side, whose defenders stop drives at field goals.
+ */
+function footballText(side: Side, v: number, c: Cast, other: Cast, rand: Rand, credit: Crediter, creditD: Crediter, label: string | null): { text: string; big: boolean } {
+  if (v === 3) {
+    const yd = 22 + Math.floor(rand() * 32);
+    const fg = (label ? label + ' field goal' : 'Field goal') + ' from ' + yd + ' yards';
+    // the other defense stopped the drive short of the end zone, now and then by name
+    const stop = rand() < 0.45 ? defenderFor(other, 'any', rand) : null;
+    if (!stop) return { text: fg, big: false };
+    if (stop.pos === 'DB') return { text: short(stop.name) + ' breaks up third down. ' + fg, big: false };
+    creditD(stop.name, { sacks: 1 });
+    return { text: short(stop.name) + ' sack stalls the drive. ' + fg, big: false };
+  }
+  if (v === 2) {
+    const by = defenderFor(c, 'rush', rand);
+    if (!by) return { text: 'Safety', big: true };
+    credit(by.name, { sacks: 1 });
+    return { text: short(by.name) + ' sacks ' + (other.qb ? short(other.qb) : 'the quarterback') + ' in the end zone: safety', big: true };
+  }
+  const tail = v === 8 ? ', and the two-point try is good' : v === 6 ? ' (the extra point is no good)' : '';
+  // the defense scores now and then: a pick-six, or a fumble taken back
+  const takeaway = c.defenders.length && rand() < 0.08 ? defenderFor(c, 'any', rand) : null;
+  if (takeaway) {
+    const yd = yards(rand, 90);
+    const pick = takeaway.pos === 'DB' || (takeaway.pos === 'LB' && rand() < 0.5);
+    credit(takeaway.name, { td: 1, ints: pick ? 1 : 0 });
+    const n = short(takeaway.name);
+    if (pick) return { text: n + ' pick-six: ' + yd + ' yards the other way' + tail, big: true };
+    if (takeaway.pos === 'DL' && rand() < 0.5) return { text: n + ' strips ' + (other.qb ? short(other.qb) : 'the quarterback') + ' and falls on it in the end zone: touchdown' + tail, big: true };
+    return { text: n + ' scoops up the fumble and takes it ' + yd + ' yards to the house' + tail, big: true };
+  }
+  const passing = c.qb && c.catchers.length && rand() < 0.62;
+  if (passing) {
+    const to = weighted(c.catchers, (x) => x.w, rand);
+    const d = yards(rand, 75);
+    credit(to.name, { td: 1, yds: d });
+    credit(c.qb!, { passTd: 1, yds: d });
+    const t = rand() < 0.5 ? short(c.qb!) + ' finds ' + short(to.name) + ' for a ' + d + '-yard touchdown' : short(to.name) + ' hauls in a ' + d + '-yard TD from ' + short(c.qb!);
+    return { text: t + tail, big: true };
+  }
+  const back = c.backs.length ? weighted(c.backs, (x) => x.w, rand) : null;
+  const d = yards(rand, 60);
+  if (back) credit(back.name, { td: 1, yds: d });
+  const who = back ? short(back.name) : (label ?? (side === 'us' ? 'Your offense' : 'They'));
+  const t = d >= 20 ? who + ' breaks loose: ' + d + '-yard touchdown run' : who + ' punches it in from ' + d + (d === 1 ? ' yard' : ' yards');
+  return { text: t + tail, big: true };
+}
+
+const DUNK = ['throws it down', 'with the slam', 'hammers home the dunk', 'finishes at the rim'];
+const TWO = ['pull-up jumper', 'drives for two', 'scores in the post', 'hits the baseline jumper', 'floater drops'];
+const THREE = ['buries a three', 'from way downtown', 'drains the corner three', 'hits the step-back three'];
+
+function basketballText(v: number, c: Cast, rand: Rand, credit: (name: string, pts: number) => void): { text: string; big: boolean } {
+  const shooter = weighted(c.scorers, (x) => x.w * (v === 3 ? x.three * 2 : 1), rand);
+  credit(shooter.name, v);
+  const n = short(shooter.name);
+  if (v === 3) return { text: n + ' ' + pick(THREE, rand), big: true };
+  if (v === 1) return { text: n + ' at the line', big: false };
+  if (/C|PF/.test(shooter.pos) && rand() < 0.4) return { text: n + ' ' + pick(DUNK, rand), big: true };
+  return { text: n + ' ' + pick(TWO, rand), big: rand() < 0.25 };
+}
+
+const FINISH = ['slots it past the keeper', 'curls one into the top corner', 'fires in from the edge of the box', 'taps in at the far post', 'rifles it into the roof of the net', 'chips the keeper', 'scores on the rebound'];
+const HEADER = ['heads home', 'powers in a header', 'glances a header inside the post'];
+
+/** One soccer goal, told: the scorer, and the pass or cross that made it. */
+function soccerText(c: Cast, rand: Rand, credit: Crediter): { text: string; big: boolean } {
+  if (!c.scorers.length) return { text: 'Goal', big: true };
+  const by = weighted(c.scorers, (x) => x.w, rand);
+  credit(by.name, { td: 1 });
+  const n = short(by.name);
+  const r = rand();
+  if (r < 0.1) return { text: n + ' from the spot: sends the keeper the wrong way', big: true };
+  if (r < 0.16) return { text: n + ' bends the free kick over the wall', big: true };
+  const helpers = c.catchers.filter((x) => x.name !== by.name);
+  const from = helpers.length && rand() < 0.75 ? weighted(helpers, (x) => x.w, rand) : null;
+  if (from) credit(from.name, { passTd: 1 });
+  const head = r < 0.34 && /CB|ST/.test(by.pos);
+  const verb = head ? pick(HEADER, rand) : pick(FINISH, rand);
+  if (!from) return { text: n + ' ' + verb, big: true };
+  const f = short(from.name);
+  return { text: head ? n + ' ' + verb + ' from ' + f + '’s cross' : rand() < 0.5 ? n + ' ' + verb + ', ' + f + ' with the assist' : f + ' finds ' + n + ', who ' + verb, big: true };
+}
+
+// ---------- the game ----------
+
+/**
+ * Tell one game. `us` and `them` are the final score (football: the engine's; basketball: pass
+ * null and one is made up from the result). `pre` is our pregame chance to win.
+ */
+export function castGame(input: { lineup: Lineup; opp: PlayoffTeam; won: boolean; score?: [number, number] | null; pre: number; seed: string; ourTeam?: string; pens?: [number, number] }): GameCast {
+  const rand = rng(hashString('cast:' + input.seed));
+  const [us, them] = input.score ?? basketballScore(input.won, input.pre, rand);
+  const ours = ourCast(input.lineup);
+  const theirs = theirCast(input.opp);
+  const credits = new Map<string, Credit>();
+  const credit = (side: Side) => (name: string, f: Partial<Credit>) => {
+    const key = side + ':' + name;
+    const c = credits.get(key) ?? { name, side, td: 0, yds: 0, passTd: 0, sacks: 0, ints: 0 };
+    c.td += f.td ?? 0;
+    c.yds += f.yds ?? 0;
+    c.passTd += f.passTd ?? 0;
+    c.sacks += f.sacks ?? 0;
+    c.ints += f.ints ?? 0;
+    credits.set(key, c);
+  };
+
+  // each side's plays, at random moments
+  const plays: { side: Side; v: number; t: number }[] = [];
+  for (const side of ['us', 'them'] as Side[]) {
+    const pts = side === 'us' ? us : them;
+    const vs = bySport({ nba: () => basketballPlays(pts, rand), nfl: () => footballPlays(pts), soccer: () => Array.from({ length: pts }, () => 1) })();
+    for (const v of vs) plays.push({ side, v, t: 0.004 + rand() * 0.988 });
+  }
+  plays.sort((a, b) => a.t - b.t);
+
+  // a close game is decided late: the winner's last score comes at the end, from behind
+  const margin = Math.abs(us - them);
+  const winner: Side = us > them ? 'us' : 'them';
+  const closeEnough = margin > 0 && margin <= bySport({ nba: 3, nfl: 8, soccer: 1 });
+  let clutchAt = -1;
+  if (closeEnough) {
+    const idx = plays.map((p, i) => ({ p, i })).filter(({ p }) => p.side === winner && p.v >= margin);
+    if (idx.length) {
+      const chosen = idx[Math.floor(rand() * idx.length)].i;
+      const [moved] = plays.splice(chosen, 1);
+      const lastT = plays.reduce((m, p) => Math.max(m, p.t), 0);
+      moved.t = Math.min(0.999, Math.max(lastT + 0.002, bySport({ nba: 0.992 + rand() * 0.006, nfl: 0.975 + rand() * 0.02, soccer: 0.9 + rand() * 0.09 })));
+      plays.push(moved);
+      plays.sort((a, b) => a.t - b.t);
+      clutchAt = plays.indexOf(moved);
+    }
+  }
+
+  const events: CastEvent[] = [];
+  const periods: [number, number][] = Array.from({ length: PERIODS }, () => [0, 0] as [number, number]);
+  let a = 0;
+  let b = 0;
+  const wp: [number, number][] = [[0, input.pre]];
+  plays.forEach((p, i) => {
+    if (p.side === 'us') a += p.v;
+    else b += p.v;
+    const { period, clock } = clockOf(p.t);
+    periods[period - 1][p.side === 'us' ? 0 : 1] += p.v;
+    const c = p.side === 'us' ? ours : theirs;
+    const other: Side = p.side === 'us' ? 'them' : 'us';
+    // who a side is, for plays without a player: your field goals stay yours, theirs get their name
+    const label = p.side === 'us' ? (input.ourTeam ?? null) : input.opp.abbr;
+    const said = bySport({
+      nba: () => basketballText(p.v, c, rand, (name, pts) => credit(p.side)(name, { td: pts })),
+      nfl: () => footballText(p.side, p.v, c, p.side === 'us' ? theirs : ours, rand, credit(p.side), credit(other), label),
+      soccer: () => soccerText(c, rand, credit(p.side)),
+    })();
+    const w = winProb(a - b, p.t, input.pre);
+    events.push({ t: p.t, period, clock, side: p.side, pts: p.v, us: a, them: b, text: said.text, big: said.big || i === clutchAt, clutch: i === clutchAt || undefined, wp: w });
+    wp.push([p.t, w]);
+  });
+  // soccer: level after 90 minutes, penalties settle it
+  const won = input.pens ? input.pens[0] > input.pens[1] : us > them;
+  if (input.pens) {
+    const [pa, pb] = input.pens;
+    events.push({ t: 1, period: PERIODS, clock: 'PENS', side: won ? 'us' : 'them', pts: 0, us, them, text: (won ? (input.ourTeam ?? 'You') + ' win' : input.opp.abbr + ' win') + ' the shootout ' + Math.max(pa, pb) + '–' + Math.min(pa, pb), big: true, clutch: true, wp: won ? 1 : 0 });
+  }
+  wp.push([1, won ? 1 : 0]);
+
+  // basketball runs: a side scoring 9+ unanswered gets a line in the play-by-play
+  if (bySport({ nba: true, nfl: false, soccer: false })) {
+    let run: Side | null = null;
+    let runPts = 0;
+    let told = false;
+    for (const e of events) {
+      if (e.side === run) runPts += e.pts;
+      else {
+        run = e.side;
+        runPts = e.pts;
+        told = false;
+      }
+      if (runPts >= 9 && !told && !e.clutch) {
+        e.big = true;
+        // a historic team goes by its nickname ("Bulls"); a head-to-head rival by its whole name
+        const them = input.opp.year ? input.opp.team.split(' ').pop() : input.opp.team;
+        e.text = (e.side === 'us' ? (input.ourTeam ?? 'Your team') : them) + ' on a ' + runPts + '-0 run. ' + e.text;
+        told = true;
+      }
+    }
+  }
+
+  return { us, them, won, periods, events, wp, stars: stars(input, us, them, credits, rand), ...(input.pens ? { pens: input.pens } : {}) };
+}
+
+function stars(input: { lineup: Lineup; opp: PlayoffTeam }, us: number, them: number, credits: Map<string, Credit>, rand: Rand): StarLine[] {
+  const out: StarLine[] = [];
+  for (const side of ['us', 'them'] as Side[]) {
+    const mine = [...credits.values()].filter((c) => c.side === side);
+    if (SOCCER) {
+      // most goals, then assists; a goalless side's best is its keeper
+      const best = mine.sort((x, y) => y.td - x.td || y.passTd - x.passTd)[0];
+      if (best) {
+        const parts = [best.td ? best.td + (best.td > 1 ? ' goals' : ' goal') : '', best.passTd ? best.passTd + (best.passTd > 1 ? ' assists' : ' assist') : ''];
+        out.push({ side, name: best.name, line: parts.filter(Boolean).join(', ') });
+      } else {
+        const keeper = side === 'us' ? SLOTS.map((k) => input.lineup[k]).find((q) => q?.role === 'GK') : input.opp.five.find((q) => q.pos === 'GK');
+        const conceded = side === 'us' ? them : us;
+        if (keeper) out.push({ side, name: keeper.name, line: 2 + Math.floor(rand() * 5) + ' saves' + (conceded === 0 ? ', clean sheet' : '') });
+      }
+      continue;
+    }
+    if (FOOTBALL) {
+      // most touchdowns, then most yards, then most sacks
+      const best = mine.sort((x, y) => y.td + y.passTd - (x.td + x.passTd) || y.yds - x.yds || y.sacks - x.sacks)[0];
+      if (!best) continue;
+      const p = side === 'us' ? (SLOTS.map((k) => input.lineup[k]).find((q) => q?.name === best.name) ?? null) : null;
+      const o = side === 'them' ? (input.opp.five.find((q) => q.name === best.name) ?? input.opp.def?.find((q) => q.name === best.name)) : null;
+      const s = p?.s ?? o?.s ?? {};
+      const f = 0.85 + rand() * 0.6;
+      let line: string;
+      if (isDefender(p?.pos[0] ?? o?.pos ?? '')) {
+        const parts = [best.sacks ? best.sacks + (best.sacks > 1 ? ' sacks' : ' sack') : '', best.ints ? best.ints + ' INT' : '', best.td ? best.td + ' TD' : ''];
+        line = parts.filter(Boolean).join(', ') || 'a stop';
+      } else if (best.passTd > 0 && (s.passYds ?? 0) > 0) line = Math.round((s.passYds ?? 0) * f + best.yds * 0.3) + ' pass yds, ' + best.passTd + ' TD' + (best.td ? ', ' + best.td + ' rush TD' : '');
+      else if ((s.recYds ?? 0) >= (s.rushYds ?? 0)) line = Math.max(1, Math.round((s.rec ?? 3) * f)) + ' rec, ' + Math.round((s.recYds ?? 40) * f + best.yds * 0.5) + ' yds, ' + best.td + ' TD';
+      else line = Math.round((s.rushYds ?? 50) * f + best.yds * 0.4) + ' rush yds, ' + best.td + ' TD';
+      out.push({ side, name: best.name, line });
+    } else {
+      const total = side === 'us' ? us : them;
+      const best = mine.sort((x, y) => y.td - x.td)[0];
+      if (!best) continue;
+      const o = side === 'them' ? input.opp.five.find((q) => q.name === best.name) : null;
+      const p = side === 'us' ? SLOTS.map((k) => input.lineup[k]).find((q) => q?.name === best.name) : null;
+      const s = p?.s ?? o?.s ?? {};
+      const pts = Math.min(Math.round(total * 0.55), best.td);
+      const reb = Math.max(0, Math.round((s.reb ?? 4) * (0.7 + rand() * 0.7)));
+      const ast = Math.max(0, Math.round((s.ast ?? 3) * (0.7 + rand() * 0.7)));
+      out.push({ side, name: best.name, line: pts + ' pts, ' + reb + ' reb, ' + ast + ' ast' });
+    }
+  }
+  // the winner's star first
+  return us > them || (us === them && out[0]?.side === 'us') ? out : out.reverse();
+}
+
+/** The same game from the other bench: what a head-to-head guest sees of the host's telling. */
+export function mirrorCast(g: GameCast): GameCast {
+  const flip = (s: Side | null): Side | null => (s === 'us' ? 'them' : s === 'them' ? 'us' : null);
+  return {
+    us: g.them,
+    them: g.us,
+    won: !g.won,
+    periods: g.periods.map(([a, b]) => [b, a]),
+    events: g.events.map((e) => ({ ...e, side: flip(e.side), us: e.them, them: e.us, wp: 1 - e.wp })),
+    wp: g.wp.map(([t, w]) => [t, 1 - w]),
+    stars: g.stars.map((s) => ({ ...s, side: flip(s.side) as Side })),
+    ...(g.pens ? { pens: [g.pens[1], g.pens[0]] as [number, number] } : {}),
+  };
+}
+
+/** A drafted lineup as the other side of a game: its players, the way a playoff team's are kept. */
+export function asOpponent(lineup: Lineup, name: string, abbr: string, colors: [string, string]): PlayoffTeam {
+  const ps = playersOf(lineup);
+  return {
+    year: '',
+    team: name,
+    abbr,
+    w: 0,
+    l: 0,
+    t: 0,
+    wFull: 0,
+    c1: colors[0],
+    c2: colors[1],
+    star: '',
+    five: ps.filter((p) => !isDefender(p.pos[0])).map((p) => ({ name: p.name, pos: p.role && SOCCER ? p.role : p.pos[0], g: p.g, s: p.s, est: p.est })),
+    // DL, LB, DB: a defender only plays his own spot, so this order is the same on both phones
+    ...(FOOTBALL
+      ? {
+          def: DEF_SLOTS.map((k) => ps.find((p) => p.pos[0] === k))
+            .filter((p): p is Player => !!p)
+            .map((p) => ({ name: p.name, pos: p.pos[0], g: p.g, s: { ...p.s, hon: p.s.ap ? 2 : p.s.pb ? 1 : 0 }, est: p.est })),
+        }
+      : {}),
+  };
+}
+
+// ---------- the regular season's headlines ----------
+
+export interface Headline {
+  /** the game (0-based) it belongs to */
+  i: number;
+  text: string;
+}
+
+/**
+ * A few games of the season worth a headline, credited to your players: football's routs,
+ * thrillers, shutouts, defensive days and snapped streaks; basketball's big scoring nights and
+ * long streaks. Seeded by the season, spaced out so each gets its moment.
+ */
+export function seasonHeadlines(lineup: Lineup, seq: number[], scores: { us: number; them: number; opp: string; home: boolean }[] | undefined, seed: string): Headline[] {
+  const rand = rng(hashString('headlines:' + seed));
+  const ps = SLOTS.map((k) => lineup[k]).filter(Boolean) as Player[];
+  const scorers = ps.filter((p) => !isDefender(p.pos[0]));
+  const defenders = ps.filter((p) => isDefender(p.pos[0]));
+  if (!scorers.length) return [];
+  const who = () => short(weighted(scorers, (p) => p.val * p.val, rand).name);
+  const stopper = () => weighted(defenders, (p) => p.val * p.val, rand);
+  const cands: Headline[] = [];
+  let streak = 0;
+  seq.forEach((x, i) => {
+    const g = scores?.[i];
+    const at = g ? (g.home ? 'vs ' : 'at ') + g.opp : '';
+    if (x === 1) {
+      streak++;
+      if (SOCCER && g) {
+        const m = g.us - g.them;
+        const score = g.us + '–' + g.them + ' ';
+        const keeper = ps.find((p) => p.role === 'GK');
+        if (m >= 3 && rand() < 0.5) cands.push({ i, text: who() + ' hat-trick in a ' + score + 'rout ' + at });
+        else if (m >= 3) cands.push({ i, text: who() + ' and co. run riot: ' + score + at });
+        else if (g.them === 0 && keeper && rand() < 0.5) cands.push({ i, text: short(keeper.name) + ' keeps a clean sheet, ' + score + at });
+        else if (m === 1 && rand() < 0.4) cands.push({ i, text: who() + ' with a late winner, ' + score + at });
+      } else if (FOOTBALL && g) {
+        const m = g.us - g.them;
+        const score = g.us + '–' + g.them + ' ';
+        if (g.them === 0 && defenders.length) cands.push({ i, text: short(stopper().name) + ' and the defense pitch a shutout, ' + score + at });
+        else if (m >= 21) cands.push({ i, text: who() + ' runs wild in a ' + score + 'rout ' + at });
+        else if (m <= 3) cands.push({ i, text: who() + ' seals a ' + score + 'thriller ' + at });
+        else if (g.them <= 10 && defenders.length && rand() < 0.6) {
+          // a day for the defense: the pass rush, or the man in coverage
+          const d = stopper();
+          const n = 2 + Math.floor(rand() * 2);
+          const play = d.pos[0] === 'DB' ? ' picks off ' + (n === 2 ? 'two' : 'three') + ' passes' : ' sacks the quarterback ' + (n === 2 ? 'twice' : 'three times');
+          cands.push({ i, text: short(d.name) + play + ' in a ' + score + 'win ' + at });
+        }
+      } else if (bySport({ nba: true, nfl: false, soccer: false })) {
+        if (streak === 10 || streak === 20 || streak === 30) cands.push({ i, text: streak + ' straight wins: ' + who() + ' leads the way' });
+        else if (rand() < 0.1) {
+          const p = weighted(scorers, (q) => (q.s.pts ?? 10) ** 2, rand);
+          const big = (p.s.ast ?? 0) >= 6 || (p.s.reb ?? 0) >= 9;
+          if (big && rand() < 0.4)
+            cands.push({ i, text: short(p.name) + ' triple-double: ' + Math.max(10, Math.round((p.s.pts ?? 12) * 1.15)) + '-' + Math.max(10, Math.round((p.s.reb ?? 6) * 1.4)) + '-' + Math.max(10, Math.round((p.s.ast ?? 5) * 1.5)) });
+          else cands.push({ i, text: short(p.name) + ' drops ' + Math.round((p.s.pts ?? 12) * (1.55 + rand() * 0.55)) + ' in a win' });
+        }
+      }
+    } else {
+      if (streak >= bySport({ nba: 12, nfl: 5, soccer: 6 })) cands.push({ i, text: streak + '-game winning run ' + (x === DRAW ? 'ends in a draw' : 'snapped') + (at ? ' ' + at : '') });
+      streak = 0;
+    }
+  });
+  // spaced out, a handful a season
+  // basketball's ticker runs fast: a headline needs a quarter of the season to itself
+  const gap = bySport({ nba: 22, nfl: 3, soccer: 6 });
+  const out: Headline[] = [];
+  for (const c of cands) if (!out.length || c.i - out[out.length - 1].i >= gap) out.push(c);
+  return out.slice(0, bySport({ nba: 4, nfl: 5, soccer: 5 }));
+}
+
+/** A head-to-head game's football score: each side's scoring against the other's defense. */
+export function matchScore(won: boolean, a: TeamRating, b: TeamRating, seed: string): [number, number] {
+  if (SOCCER) {
+    const ea = expectedGoals(a);
+    const eb = expectedGoals(b);
+    return soccerScore(won ? 1 : 0, (ea.pf + eb.pa) / 2, (eb.pf + ea.pa) / 2, rng(hashString('score:' + seed)));
+  }
+  const ea = expectedScores(a);
+  const eb = expectedScores(b);
+  return gameScore(won, (ea.pf + eb.pa) / 2, (eb.pf + ea.pa) / 2, rng(hashString('score:' + seed)));
+}

@@ -1,0 +1,204 @@
+import { normalizeCup, type CupState } from './cup-state';
+import type { AdminPackVoucher } from '../../supabase/functions/card-registry/admin-packs';
+import { normalizeLeague, type LeagueState } from './league-state';
+import { rivalsOf, type RivalsState } from './rivals';
+// Ultimate Team: what the profile keeps, per sport (the basketball and football profiles each have
+// their own `ut`). Small and free of card data on purpose: the profile loads it on every launch,
+// while the cards themselves load only when the mode opens. See docs/ULTIMATE-TEAM.md.
+import { type Level, levelOf } from './battles';
+import type { OwnedCard, CardRetirement } from './types';
+import { organizeStorage } from './storage';
+import { normalizeHQ, type ClubHQ } from './hq-state';
+import { normalizeContent, type ContentState } from './content-state';
+
+/** A pack waiting to be opened (a challenge reward, the starter). */
+export interface PendingPack {
+  voucher?: AdminPackVoucher;
+  /** unique, and the seed its contents come from */
+  id: string;
+  kind: string;
+  at: number;
+}
+
+export interface UtState {
+  v: 1;
+  hq?: ClubHQ;
+  /** Claude 2026-11-01: UT content drop 2 (content-state.ts), optional and additive */
+  content?: ContentState;
+  league?: LeagueState;
+  /** Codex: additive, persistent own-club knockout Cups. */
+  cup?: CupState;
+  rivals?: RivalsState;
+  collected?: string[];
+  collectionClaims?: string[];
+  events?: Record<string, number>;
+  registeredOpenings?: string[];
+  pendingPromo?: { id: string; kind: string; price: number; packId?: string; at: number; voucher?: AdminPackVoucher };
+  /** Persisted before removal; safe to retry until the server acknowledges retirement. */
+  retirements?: CardRetirement[];
+  settled?: string[];
+  owned: OwnedCard[];
+  /** UIDs of spare exact-edition copies. All cards remain in `owned` for original-build restores. */
+  duplicateStorage?: string[];
+  /** the squad: slot id (PG, B1, QB, WR2, ...) to an owned card's uid */
+  squad: Record<string, string>;
+  /** Claude 2026-11-01, soccer only, optional: the squad's formation (squad.ts FORMATIONS; 4-3-3 when absent) */
+  formation?: string;
+  packsOpened: number;
+  /** the free starter pack (once per sport) has been opened */
+  starterClaimed: boolean;
+  /** squad building challenges: challenge id to when it was done (ms) */
+  sbc: { done: Record<string, number> };
+  /** packs earned and not opened yet */
+  packs: PendingPack[];
+  /** what was quick-sold, for the hub */
+  sold: { cards: number; coins: number };
+  /** Squad Battles this week: rungs cleared on the ladder, the best ever, which ladder of the week
+   * it is (the next one comes up after clearing one), and the difficulty */
+  battles: { week: string; cleared: number; best: number; round?: number; level?: Level };
+  /** results of played matches: vs the AI and online head to head */
+  record: { w: number; l: number; h2hW: number; h2hL: number };
+  /** games that paid coins and XP today (`day`, Eastern): a day's paid games are limited (play.ts) */
+  paid: { day: string; n: number };
+}
+
+export function freshUt(): UtState {
+  return {
+    v: 1,
+    owned: [],
+    duplicateStorage: [],
+    squad: {},
+    packsOpened: 0,
+    starterClaimed: false,
+    sbc: { done: {} },
+    packs: [],
+    sold: { cards: 0, coins: 0 },
+    battles: { week: '', cleared: 0, best: 0 },
+    record: { w: 0, l: 0, h2hW: 0, h2hL: 0 },
+    paid: { day: '', n: 0 },
+  };
+}
+
+const num = (x: unknown, d: number): number => (typeof x === 'number' && Number.isFinite(x) ? x : d);
+
+/**
+ * Any saved `ut` (none at all in profiles from before the mode, or one from an older build) as a
+ * valid current state: unknown fields go, bad entries are dropped, and the squad only points at
+ * cards that are still owned.
+ */
+export function migrateUt(raw: unknown): UtState {
+  const base = freshUt();
+  if (!raw || typeof raw !== 'object') return base;
+  const r = raw as Partial<Record<keyof UtState, unknown>>;
+  const owned: OwnedCard[] = [];
+  const seen = new Set<string>();
+  if (Array.isArray(r.owned))
+    for (const c of r.owned as Partial<OwnedCard>[]) {
+      if (!c || typeof c.uid !== 'string' || typeof c.cardId !== 'string' || seen.has(c.uid)) continue;
+      seen.add(c.uid);
+      owned.push({
+        uid: c.uid,
+        cardId: c.cardId,
+        level: Math.max(1, Math.min(5, Math.round(num(c.level, 1)))),
+        xp: Math.max(0, num(c.xp, 0)),
+        at: num(c.at, 0),
+        ...(c.mint && Number.isSafeInteger(c.mint.serial) && c.mint.serial > 0 && typeof c.mint.requestId === 'string' && typeof c.mint.namespace === 'string'
+          ? {
+              mint: {
+                serial: c.mint.serial,
+                totalAtPull: Math.max(c.mint.serial, num(c.mint.totalAtPull, c.mint.serial)),
+                ...(Number.isSafeInteger(c.mint.activeAtPull) && c.mint.activeAtPull! >= 0 ? { activeAtPull: c.mint.activeAtPull } : {}),
+                requestId: c.mint.requestId,
+                namespace: c.mint.namespace,
+              },
+            }
+          : {}),
+      });
+    }
+  const squad: Record<string, string> = {};
+  if (r.squad && typeof r.squad === 'object')
+    for (const [slot, uid] of Object.entries(r.squad as Record<string, unknown>))
+      if (typeof uid === 'string' && seen.has(uid) && !Object.values(squad).includes(uid)) squad[slot] = uid;
+  const done: Record<string, number> = {};
+  const sbc = r.sbc as { done?: unknown } | undefined;
+  if (sbc && sbc.done && typeof sbc.done === 'object') for (const [k, v] of Object.entries(sbc.done as Record<string, unknown>)) if (typeof v === 'number') done[k] = v;
+  const packs: PendingPack[] = Array.isArray(r.packs)
+    ? (r.packs as PendingPack[]).filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string').map((p) => ({ id: p.id, kind: p.kind, at: num(p.at, 0), ...(p.voucher && typeof p.voucher.event?.id==='string' && Number.isInteger(p.voucher.index) ? {voucher:p.voucher} : {}) }))
+    : [];
+  const sold = r.sold as { cards?: unknown; coins?: unknown } | undefined;
+  const bt = r.battles as { week?: unknown; cleared?: unknown; best?: unknown; round?: unknown; level?: unknown } | undefined;
+  const rec = r.record as Partial<Record<'w' | 'l' | 'h2hW' | 'h2hL', unknown>> | undefined;
+  const paid = r.paid as { day?: unknown; n?: unknown } | undefined;
+  const count = (x: unknown) => Math.max(0, Math.round(num(x, 0)));
+  const league = normalizeLeague(r.league);
+  const content = normalizeContent(r.content);
+  const cup = normalizeCup(r.cup);
+  return organizeStorage({
+    v: 1,
+    ...(typeof r.formation === 'string' && r.formation.length <= 8 ? { formation: r.formation } : {}),
+    ...(content ? { content } : {}),
+    ...(league ? { league } : {}),
+    ...(cup ? { cup } : {}),
+    ...(r.hq && typeof r.hq === 'object' ? { hq: normalizeHQ(r.hq, owned) } : {}),
+    ...(r.rivals && typeof r.rivals === 'object' ? { rivals: rivalsOf(r.rivals as RivalsState, (r.rivals as RivalsState).week) } : {}),
+    ...(Array.isArray(r.settled) ? { settled: r.settled.filter((x) => typeof x === 'string').slice(-1000) } : {}),
+    owned,
+    ...(Array.isArray(r.retirements) ? { retirements: (r.retirements as CardRetirement[]).filter(c => c && typeof c.uid === 'string' && typeof c.cardId === 'string' && Number.isInteger(c.level) && c.level >= 1 && c.level <= 5 && ['sold','sbc'].includes(c.reason)) } : {}),
+    ...(Array.isArray(r.collected) ? { collected: [...new Set([...r.collected.filter((id): id is string => typeof id === 'string'), ...owned.map((c) => c.cardId)])] } : {}),
+    ...(Array.isArray(r.collectionClaims) ? { collectionClaims: [...new Set(r.collectionClaims.filter((id): id is string => typeof id === 'string'))] } : {}),
+    ...(Array.isArray(r.registeredOpenings) ? { registeredOpenings: [...new Set(r.registeredOpenings.filter((id): id is string => typeof id === 'string'))] } : {}),
+    ...(r.events && typeof r.events === 'object' ? { events: Object.fromEntries(Object.entries(r.events).map(([id, n]) => [id, Math.min(3, count(n))])) } : {}),
+    ...(r.pendingPromo &&
+    typeof r.pendingPromo === 'object' &&
+    typeof (r.pendingPromo as UtState['pendingPromo'])?.id === 'string' &&
+    typeof (r.pendingPromo as UtState['pendingPromo'])?.kind === 'string'
+      ? { pendingPromo: { ...(r.pendingPromo as NonNullable<UtState['pendingPromo']>), price: count((r.pendingPromo as NonNullable<UtState['pendingPromo']>).price) } }
+      : {}),
+    duplicateStorage: Array.isArray(r.duplicateStorage) ? r.duplicateStorage.filter((uid): uid is string => typeof uid === 'string' && seen.has(uid)) : [],
+    squad,
+    packsOpened: Math.max(0, Math.round(num(r.packsOpened, 0))),
+    starterClaimed: r.starterClaimed === true,
+    sbc: { done },
+    packs,
+    sold: { cards: num(sold?.cards, 0), coins: num(sold?.coins, 0) },
+    battles: {
+      week: typeof bt?.week === 'string' ? bt.week : '',
+      cleared: Math.min(8, count(bt?.cleared)),
+      best: Math.min(8, count(bt?.best)),
+      ...(count(bt?.round) ? { round: count(bt?.round) } : {}),
+      ...(bt?.level ? { level: levelOf(bt.level) } : {}),
+    },
+    record: { w: count(rec?.w), l: count(rec?.l), h2hW: count(rec?.h2hW), h2hL: count(rec?.h2hL) },
+    paid: { day: typeof paid?.day === 'string' ? paid.day : '', n: count(paid?.n) },
+  });
+}
+
+// ---------- upgrades ----------
+
+export const MAX_LEVEL = 5;
+/** XP from one level to the next: 1→2 100, 2→3 150, 3→4 200, 4→5 250 (700 in all, ~15-20 games). */
+export function xpToNext(level: number): number {
+  return level >= MAX_LEVEL ? 0 : 50 + 50 * level;
+}
+
+/**
+ * Cards that played earn XP (the match code calls this through `awardXp` with the squad's uids).
+ * `xp` is the progress into the current level; a card levels up as many times as it fills.
+ */
+export function awardXp(ut: UtState, uids: string[], n: number): { ut: UtState; ups: { uid: string; level: number }[] } {
+  const want = new Set(uids);
+  const ups: { uid: string; level: number }[] = [];
+  const owned = ut.owned.map((c) => {
+    if (!want.has(c.uid) || c.level >= MAX_LEVEL || n <= 0) return c;
+    let level = c.level;
+    let xp = c.xp + n;
+    while (level < MAX_LEVEL && xp >= xpToNext(level)) {
+      xp -= xpToNext(level);
+      level++;
+    }
+    if (level >= MAX_LEVEL) xp = 0;
+    if (level > c.level) ups.push({ uid: c.uid, level });
+    return { ...c, level, xp };
+  });
+  return { ut: { ...ut, owned }, ups };
+}

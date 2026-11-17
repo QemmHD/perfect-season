@@ -1,0 +1,25 @@
+/* Implemented by Codex. Spotlight uses the same foil/crimp structure as existing store packs. */
+.ut-pack.p-spotlight {
+  --pk1: #7654aa;
+  --pk2: #112332;
+  --pkink: #faf0ff;
+  background: none;
+  border: 0;
+}
+.p-spotlight .ut-pack-body {
+  background:
+    linear-gradient(112deg, transparent 20%, #b6f6e540 43%, transparent 57%), repeating-linear-gradient(132deg, transparent 0 1.1em, #d4bcff17 1.1em 1.18em),
+    radial-gradient(90% 75% at 50% 38%, #72529b, #152a35 80%);
+  box-shadow:
+    inset 0 0 0 0.2em #d2b8f378,
+    inset 0 0 3em #080d244d;
+}
+.p-spotlight .ut-pack-body b {
+  color: #f5dc9d;
+  text-shadow: 0 0.05em #422653;
+  filter: drop-shadow(0 0 0.4em #f9e8bf22);
+}
+.p-spotlight .ut-pack-label {
+  background: #090f224d;
+  color: #d0fbee;
+}

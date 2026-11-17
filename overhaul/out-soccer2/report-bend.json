@@ -1,0 +1,48 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "bend",
+  "sizes": [
+   {
+    "w": 48,
+    "h": 48,
+    "label": "Bend: straight. Tap to change"
+   }
+  ],
+  "pressed": "true",
+  "curl": 0.75,
+  "kick": {
+   "aimX": 31.94,
+   "crossX": null
+  },
+  "path": {
+   "ballX": 26.42112677684497,
+   "ballY": 101.62783006638657,
+   "end": null
+  },
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "bend",
+  "sizes": [
+   {
+    "w": 44,
+    "h": 44,
+    "label": "Bend: straight. Tap to change"
+   }
+  ],
+  "pressed": "true",
+  "curl": 0.75,
+  "kick": {
+   "aimX": 31.94,
+   "crossX": null
+  },
+  "path": {
+   "ballX": 25.920162992961234,
+   "ballY": 99.72314081126923,
+   "end": null
+  },
+  "errors": []
+ }
+]

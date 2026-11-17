@@ -1,0 +1,193 @@
+// Squad Building Challenges: requirement checks, the day's and week's set, rewards and auto-fill.
+import { SPORT } from '../engine/sport';
+import { fakeCard } from './fake.test-util';
+import { getPool, type Pool } from './pool';
+import { autoFill, checkReq, checkSbc, type Req, rewardCard, rewardText, type Sbc, sbcsFor, teamNeed, weekOf } from './sbc';
+
+const bulls96 = (n: number, ovr = 80) => Array.from({ length: n }, (_, i) => fakeCard({ pos: ['PG', 'SG', 'SF', 'PF', 'C'][i % 5], ovr, fr: 'CHI', season: 1996 }));
+
+describe('requirements', () => {
+  it('checks every kind, with progress', () => {
+    const cards = [fakeCard({ pos: 'PG', ovr: 81, fr: 'CHI', season: 1996 }), fakeCard({ pos: 'SG', ovr: 72, fr: 'CHI', season: 1991 }), fakeCard({ pos: 'C', ovr: 64, fr: 'NYK', season: 1994 })];
+    const t = (r: Req) => checkReq(r, cards);
+    expect(t({ k: 'minOvr', ovr: 64 })).toEqual({ ok: true, have: 'all 64+' });
+    expect(t({ k: 'minOvr', ovr: 65 })).toEqual({ ok: false, have: '1 under' });
+    expect(t({ k: 'teamOvr', ovr: 72 })).toEqual({ ok: true, have: '72' });
+    expect(t({ k: 'teamOvr', ovr: 73 }).ok).toBe(false);
+    expect(t({ k: 'tier', tier: 'silver', n: 2 })).toEqual({ ok: true, have: '2/2' });
+    expect(t({ k: 'tier', tier: 'gold', n: 2 })).toEqual({ ok: false, have: '1/2' });
+    expect(t({ k: 'sameFr', n: 2 }).ok).toBe(true);
+    expect(t({ k: 'sameFr', n: 3 })).toEqual({ ok: false, have: '2/3' });
+    expect(t({ k: 'fr', fr: 'NYK', name: 'Knicks', n: 1 }).ok).toBe(true);
+    expect(t({ k: 'decade', decade: 1990, n: 3 }).ok).toBe(true);
+    expect(t({ k: 'decade', decade: 1980, n: 1 }).ok).toBe(false);
+    expect(t({ k: 'sameDecade', n: 3 }).ok).toBe(true);
+    expect(t({ k: 'positions', pos: ['PG', 'SG', 'C'] })).toEqual({ ok: true, have: '3/3' });
+    expect(t({ k: 'positions', pos: ['PG', 'PG'] })).toEqual({ ok: false, have: '1/2' });
+  });
+
+  it('matches positions to different cards (a PG/SG can only fill one)', () => {
+    const combo = fakeCard({ pos: ['PG', 'SG'], ovr: 70 });
+    expect(checkReq({ k: 'positions', pos: ['PG', 'SG'] }, [combo]).ok).toBe(false);
+    expect(checkReq({ k: 'positions', pos: ['PG', 'SG'] }, [combo, fakeCard({ pos: 'SG', ovr: 70 })]).ok).toBe(true);
+    // the scarce position goes first, so the flexible card covers the other
+    expect(checkReq({ k: 'positions', pos: ['SG', 'PG'] }, [combo, fakeCard({ pos: 'SG', ovr: 70 })]).ok).toBe(true);
+  });
+
+  it('finds the full five among two-position cards whatever order they came in', () => {
+    const five = [['SF', 'PF'], ['PF', 'SG'], ['PG', 'PF'], ['C', 'SF'], ['SF']].map((pos) => fakeCard({ pos, ovr: 70 }));
+    const all = ['PG', 'SG', 'SF', 'PF', 'C'];
+    for (let k = 0; k < five.length; k++) {
+      const order = five.slice(k).concat(five.slice(0, k));
+      expect(checkReq({ k: 'positions', pos: all }, order)).toEqual({ ok: true, have: '5/5' });
+      expect(checkReq({ k: 'positions', pos: all }, order.slice().reverse())).toEqual({ ok: true, have: '5/5' });
+    }
+  });
+
+  it('needs exactly the right number of different players', () => {
+    const s: Sbc = { id: 't', kind: 'daily', title: 'T', blurb: '', size: 3, reqs: [{ k: 'sameFr', n: 3 }], reward: { coins: 100 } };
+    expect(checkSbc(s, bulls96(3)).ok).toBe(true);
+    expect(checkSbc(s, bulls96(2)).ok).toBe(false);
+    expect(checkSbc(s, bulls96(4)).full).toBe(false);
+    const twice = bulls96(2);
+    const same = { ...twice[0], line: { ...twice[0].line, id: 'other-season' } };
+    expect(checkSbc(s, [...twice, same]).ok).toBe(false);
+  });
+});
+
+describe('the day’s challenges (' + SPORT + ')', () => {
+  let pool: Pool;
+  beforeAll(async () => {
+    pool = await getPool();
+  }, 60000);
+
+  it('are six daily, four weekly, and the upgrades and repeatables, the same for everyone on a day', () => {
+    const a = sbcsFor(pool, '2026-10-27');
+    expect(a.filter((s) => s.kind === 'daily')).toHaveLength(6);
+    expect(a.filter((s) => s.kind === 'weekly')).toHaveLength(4);
+    expect(a.filter((s) => s.kind === 'upgrade')).toHaveLength(6);
+    expect(sbcsFor(pool, '2026-10-27')).toEqual(a);
+    expect(new Set(a.map((s) => s.id)).size).toBe(16);
+    // no challenge twice in a day's or a week's list
+    expect(new Set(a.filter((s) => s.kind === 'daily').map((s) => s.title)).size).toBe(6);
+    expect(new Set(a.filter((s) => s.kind === 'weekly').map((s) => s.title)).size).toBe(4);
+    // the weekly ones hold all week; the daily ones change
+    const b = sbcsFor(pool, '2026-10-28');
+    expect(b.filter((s) => s.kind === 'weekly')).toEqual(a.filter((s) => s.kind === 'weekly'));
+    const days = ['2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31'].map((d) => sbcsFor(pool, d).filter((s) => s.kind === 'daily').map((s) => s.title).join('|'));
+    expect(new Set(days).size).toBeGreaterThan(1);
+    expect(weekOf('2026-10-27')).toBe('2026-W44');
+    expect(weekOf('2026-11-02')).toBe('2026-W45');
+  });
+
+  it('an upgrade can be done twice a day, then shows as done', () => {
+    const day = '2026-10-27';
+    const up = (done: Record<string, number>) => sbcsFor(pool, day, done).filter((s) => s.kind === 'upgrade')[0];
+    const first = up({});
+    expect(first.left).toBe(2);
+    const second = up({ [first.id]: 1 });
+    expect(second.id).not.toBe(first.id);
+    expect(second.left).toBe(1);
+    // both done: the second one, done
+    const after = up({ [first.id]: 1, [second.id]: 1 });
+    expect(after.id).toBe(second.id);
+    // a new day starts over
+    expect(sbcsFor(pool, '2026-10-28', { [first.id]: 1, [second.id]: 1 }).filter((s) => s.kind === 'upgrade')[0].left).toBe(2);
+  });
+
+  it('a repeatable takes eight golds for a better gold, as often as you like', () => {
+    const day = '2026-10-27';
+    const gh = (done: Record<string, number>) => sbcsFor(pool, day, done).find((s) => s.title === 'Golden Hour')!;
+    let s = gh({});
+    expect(s.size).toBe(8);
+    expect(s.reqs).toContainEqual({ k: 'tier', tier: 'gold', n: 8 });
+    // the better the card it pays, the more it asks
+    const ep = sbcsFor(pool, day).find((x) => x.title === 'Elite Pull')!;
+    const team = (x: typeof s) => (x.reqs.find((r) => r.k === 'teamOvr') as { ovr: number }).ovr;
+    expect(ep.reward.card!.minOvr!).toBeGreaterThan(s.reward.card!.minOvr!);
+    expect(team(ep)).toBeGreaterThan(team(s));
+    expect(s.left).toBeUndefined();
+    const done: Record<string, number> = {};
+    const ids = new Set<string>();
+    for (let i = 0; i < 12; i++) {
+      ids.add(s.id);
+      done[s.id] = 1;
+      s = gh(done);
+      expect(done[s.id]).toBeUndefined();
+    }
+    expect(ids.size).toBe(12);
+    expect(rewardText(s.reward, SPORT, () => 'Pack')).toMatch(/Gold card/);
+    expect(rewardText({ card: { tier: 'gold' } }, SPORT, () => 'Pack')).toBe('a Gold card');
+  });
+
+  it('says what the empty spots need to average for the team overall', () => {
+    expect(teamNeed([], 8, 83)).toEqual({ now: 0, need: 83 });
+    // 412 in five: three 83s make 661 (82.6, rounds to 83); three 82s only 658 (82.25)
+    expect(teamNeed([85, 85, 80, 80, 82], 8, 83)).toEqual({ now: 82, need: 83 });
+    expect(teamNeed([60, 60, 60, 60, 60, 60, 60], 8, 83).need).toBeGreaterThan(99);
+    expect(teamNeed([83, 83, 83, 83, 83, 83, 83, 83], 8, 83)).toEqual({ now: 83, need: null });
+  });
+
+  it('pays packs and cards, not coins', () => {
+    for (let d = 1; d <= 28; d++) for (const x of sbcsFor(pool, '2026-11-' + String(d).padStart(2, '0'))) expect(x.reward.coins).toBeUndefined();
+  });
+
+  it('every challenge can be met by some cards in the pool, and pays something', () => {
+    const all = Array.from(pool.base.values());
+    const club = all.filter((_, i) => i % 3 === 0).map((rc, i) => ({ uid: 'u' + i, rc, slot: null }));
+    let filled = 0;
+    let n = 0;
+    for (let d = 1; d <= 28; d++) {
+      const day = '2026-11-' + String(d).padStart(2, '0');
+      for (const s of sbcsFor(pool, day)) {
+        n++;
+        expect(rewardText(s.reward, SPORT, () => 'Pack').length).toBeGreaterThan(0);
+        const got = autoFill(s, club);
+        if (got) {
+          filled++;
+          const cards = got.map((u) => club.find((c) => c.uid === u)!.rc);
+          expect(checkSbc(s, cards).ok).toBe(true);
+        }
+      }
+    }
+    // a big club meets nearly all of them
+    expect(filled / n).toBeGreaterThan(0.95);
+  });
+
+  it('auto-fills with the cheapest cards and leaves the squad alone when it can', () => {
+    const s: Sbc = { id: 'x', kind: 'daily', title: 'X', blurb: '', size: 3, reqs: [{ k: 'sameFr', n: 3 }], reward: { coins: 1 } };
+    const club = [...bulls96(3, 90).map((rc, i) => ({ uid: 'star' + i, rc, slot: 'S' + i })), ...bulls96(4, 60).map((rc, i) => ({ uid: 'bench' + i, rc, slot: null }))];
+    const got = autoFill(s, club)!;
+    expect(got).toHaveLength(3);
+    expect(got.every((u) => u.startsWith('bench'))).toBe(true);
+    expect(autoFill({ ...s, reqs: [{ k: 'sameFr', n: 3 }, { k: 'minOvr', ovr: 95 }] }, club)).toBeNull();
+  });
+
+  it('pays a random card that fits the reward (the same one for a seed, in tests)', () => {
+    const want = { tier: 'gold' as const, minOvr: 80 };
+    const a = rewardCard(pool, want, 'd:2026-10-27:2');
+    expect(a).not.toBeNull();
+    expect(a!.ovr).toBeGreaterThanOrEqual(80);
+    expect(rewardCard(pool, want, 'd:2026-10-27:2')!.line.id).toBe(a!.line.id);
+    const promo = rewardCard(pool, { tier: 'promo' }, 'w');
+    expect(promo?.tier).toBe('promo');
+    // claimed for real (no seed): a fresh draw each time, always one that fits
+    const ids = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      const c = rewardCard(pool, want)!;
+      expect(c.ovr).toBeGreaterThanOrEqual(80);
+      ids.add(c.line.id);
+    }
+    expect(ids.size).toBeGreaterThan(5);
+  });
+
+  it('prefers equally valued storage copies without sacrificing a valuable spare for a cheap challenge', () => {
+    const s: Sbc = { id: 'storage', kind: 'daily', title: 'Storage', blurb: '', size: 3, reqs: [], reward: { coins: 1 } };
+    const cards = bulls96(3, 65);
+    const club = cards.map((rc, i) => ({ uid: 'club' + i, rc, slot: null }));
+    const spares = cards.map((rc, i) => ({ uid: 'spare' + i, rc, slot: null, storage: true }));
+    expect(autoFill(s, [...club, ...spares])?.every(id => id.startsWith('spare'))).toBe(true);
+    const expensive = { uid: 'rare', rc: fakeCard({ pos: 'PG', ovr: 99 }), slot: null, storage: true };
+    expect(autoFill(s, [expensive, ...club])).not.toContain('rare');
+  });
+});

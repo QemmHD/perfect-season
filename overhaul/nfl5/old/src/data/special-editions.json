@@ -1,0 +1,1457 @@
+[
+  {
+    "id": "nba:spotlight:1989:jordami01:CHI",
+    "seasonId": "nba:season:1989:jordami01:CHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1989:jordami01:CHI",
+    "seasonId": "nba:season:1989:jordami01:CHI",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1976:abdulka01:LAL",
+    "seasonId": "nba:season:1976:abdulka01:LAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1976:abdulka01:LAL",
+    "seasonId": "nba:season:1976:abdulka01:LAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1962:chambwi01:GSW",
+    "seasonId": "nba:season:1962:chambwi01:GSW",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1962:chambwi01:GSW",
+    "seasonId": "nba:season:1962:chambwi01:GSW",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2010:jamesle01:CLE",
+    "seasonId": "nba:season:2010:jamesle01:CLE",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2010:jamesle01:CLE",
+    "seasonId": "nba:season:2010:jamesle01:CLE",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2003:duncati01:SAS",
+    "seasonId": "nba:season:2003:duncati01:SAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2003:duncati01:SAS",
+    "seasonId": "nba:season:2003:duncati01:SAS",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2003:bryanko01:LAL",
+    "seasonId": "nba:season:2003:bryanko01:LAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2003:bryanko01:LAL",
+    "seasonId": "nba:season:2003:bryanko01:LAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1981:johnsma02:LAL",
+    "seasonId": "nba:season:1981:johnsma02:LAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1981:johnsma02:LAL",
+    "seasonId": "nba:season:1981:johnsma02:LAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1990:olajuha01:HOU",
+    "seasonId": "nba:season:1990:olajuha01:HOU",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1990:olajuha01:HOU",
+    "seasonId": "nba:season:1990:olajuha01:HOU",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1994:malonka01:UTA",
+    "seasonId": "nba:season:1994:malonka01:UTA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2009:paulch01:NOP",
+    "seasonId": "nba:season:2009:paulch01:NOP",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1964:roberos01:SAC",
+    "seasonId": "nba:season:1964:roberos01:SAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1964:roberos01:SAC",
+    "seasonId": "nba:season:1964:roberos01:SAC",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1982:malonmo01:HOU",
+    "seasonId": "nba:season:1982:malonmo01:HOU",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1985:birdla01:BOS",
+    "seasonId": "nba:season:1985:birdla01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1985:birdla01:BOS",
+    "seasonId": "nba:season:1985:birdla01:BOS",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2004:garneke01:MIN",
+    "seasonId": "nba:season:2004:garneke01:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2004:garneke01:MIN",
+    "seasonId": "nba:season:2004:garneke01:MIN",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1964:russebi01:BOS",
+    "seasonId": "nba:season:1964:russebi01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1964:russebi01:BOS",
+    "seasonId": "nba:season:1964:russebi01:BOS",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2020:antetgi01:MIL",
+    "seasonId": "nba:season:2020:antetgi01:MIL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2020:antetgi01:MIL",
+    "seasonId": "nba:season:2020:antetgi01:MIL",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2016:curryst01:GSW",
+    "seasonId": "nba:season:2016:curryst01:GSW",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2016:curryst01:GSW",
+    "seasonId": "nba:season:2016:curryst01:GSW",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2011:howardw01:ORL",
+    "seasonId": "nba:season:2011:howardw01:ORL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2000:onealsh01:LAL",
+    "seasonId": "nba:season:2000:onealsh01:LAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2000:onealsh01:LAL",
+    "seasonId": "nba:season:2000:onealsh01:LAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1991:stockjo01:UTA",
+    "seasonId": "nba:season:1991:stockjo01:UTA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1971:westje01:LAL",
+    "seasonId": "nba:season:1971:westje01:LAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1971:westje01:LAL",
+    "seasonId": "nba:season:1971:westje01:LAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1994:robinda01:SAS",
+    "seasonId": "nba:season:1994:robinda01:SAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2014:duranke01:OKC",
+    "seasonId": "nba:season:2014:duranke01:OKC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2014:duranke01:OKC",
+    "seasonId": "nba:season:2014:duranke01:OKC",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2025:jokicni01:DEN",
+    "seasonId": "nba:season:2025:jokicni01:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2006:nashst01:PHX",
+    "seasonId": "nba:season:2006:nashst01:PHX",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2017:hardeja01:HOU",
+    "seasonId": "nba:season:2017:hardeja01:HOU",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2005:iversal01:PHI",
+    "seasonId": "nba:season:2005:iversal01:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1999:kiddja01:PHX",
+    "seasonId": "nba:season:1999:kiddja01:PHX",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1987:barklch01:PHI",
+    "seasonId": "nba:season:1987:barklch01:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1971:havlijo01:BOS",
+    "seasonId": "nba:season:1971:havlijo01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2000:paytoga01:OKC",
+    "seasonId": "nba:season:2000:paytoga01:OKC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2017:westbru01:OKC",
+    "seasonId": "nba:season:2017:westbru01:OKC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2005:nowitdi01:DAL",
+    "seasonId": "nba:season:2005:nowitdi01:DAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2005:nowitdi01:DAL",
+    "seasonId": "nba:season:2005:nowitdi01:DAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:2003:wallabe01:DET",
+    "seasonId": "nba:season:2003:wallabe01:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1992:rodmade01:DET",
+    "seasonId": "nba:season:1992:rodmade01:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1993:mutomdi01:DEN",
+    "seasonId": "nba:season:1993:mutomdi01:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2022:goberru01:UTA",
+    "seasonId": "nba:season:2022:goberru01:UTA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1995:pippesc01:CHI",
+    "seasonId": "nba:season:1995:pippesc01:CHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:1995:pippesc01:CHI",
+    "seasonId": "nba:season:1995:pippesc01:CHI",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1962:bayloel01:LAL",
+    "seasonId": "nba:season:1962:bayloel01:LAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2020:leonaka01:LAC",
+    "seasonId": "nba:season:2020:leonaka01:LAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1980:gervige01:SAS",
+    "seasonId": "nba:season:1980:gervige01:SAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1980:ervinju01:PHI",
+    "seasonId": "nba:season:1980:ervinju01:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2018:davisan02:NOP",
+    "seasonId": "nba:season:2018:davisan02:NOP",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1975:fraziwa01:NYK",
+    "seasonId": "nba:season:1975:fraziwa01:NYK",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1975:barryri01:GSW",
+    "seasonId": "nba:season:1975:barryri01:GSW",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2024:embiijo01:PHI",
+    "seasonId": "nba:season:2024:embiijo01:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1974:hayesel01:WAS",
+    "seasonId": "nba:season:1974:hayesel01:WAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1982:moncrsi01:MIL",
+    "seasonId": "nba:season:1982:moncrsi01:MIL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2024:doncilu01:DAL",
+    "seasonId": "nba:season:2024:doncilu01:DAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2009:wadedw01:MIA",
+    "seasonId": "nba:season:2009:wadedw01:MIA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:goat:2009:wadedw01:MIA",
+    "seasonId": "nba:season:2009:wadedw01:MIA",
+    "kind": "goat"
+  },
+  {
+    "id": "nba:spotlight:1985:eatonma01:UTA",
+    "seasonId": "nba:season:1985:eatonma01:UTA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1969:reedwi01:NYK",
+    "seasonId": "nba:season:1969:reedwi01:NYK",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2003:mcgratr01:ORL",
+    "seasonId": "nba:season:2003:mcgratr01:ORL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2025:gilgesh01:OKC",
+    "seasonId": "nba:season:2025:gilgesh01:OKC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1974:mcadobo01:LAC",
+    "seasonId": "nba:season:1974:mcadobo01:LAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1962:pettibo01:ATL",
+    "seasonId": "nba:season:1962:pettibo01:ATL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1977:waltobi01:POR",
+    "seasonId": "nba:season:1977:waltobi01:POR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1973:architi01:SAC",
+    "seasonId": "nba:season:1973:architi01:SAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1990:ewingpa01:NYK",
+    "seasonId": "nba:season:1990:ewingpa01:NYK",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2016:greendr01:GSW",
+    "seasonId": "nba:season:2016:greendr01:GSW",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1999:mournal01:MIA",
+    "seasonId": "nba:season:1999:mournal01:MIA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1988:roberal01:SAS",
+    "seasonId": "nba:season:1988:roberal01:SAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1985:thomais01:DET",
+    "seasonId": "nba:season:1985:thomais01:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1973:cowenda01:BOS",
+    "seasonId": "nba:season:1973:cowenda01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2019:georgpa01:OKC",
+    "seasonId": "nba:season:2019:georgpa01:OKC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1991:wilkido01:ATL",
+    "seasonId": "nba:season:1991:wilkido01:ATL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1982:johnsde01:PHX",
+    "seasonId": "nba:season:1982:johnsde01:PHX",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2006:cambyma01:DEN",
+    "seasonId": "nba:season:2006:cambyma01:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2023:lillada01:POR",
+    "seasonId": "nba:season:2023:lillada01:POR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1969:lucasje01:SAC",
+    "seasonId": "nba:season:1969:lucasje01:SAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2023:tatumja01:BOS",
+    "seasonId": "nba:season:2023:tatumja01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1960:cousybo01:BOS",
+    "seasonId": "nba:season:1960:cousybo01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1964:greerha01:PHI",
+    "seasonId": "nba:season:1964:greerha01:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2013:rondora01:BOS",
+    "seasonId": "nba:season:2013:rondora01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2001:webbech01:SAC",
+    "seasonId": "nba:season:2001:webbech01:SAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2021:butleji01:MIA",
+    "seasonId": "nba:season:2021:butleji01:MIA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2015:jordade01:LAC",
+    "seasonId": "nba:season:2015:jordade01:LAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1977:maravpe01:UTA",
+    "seasonId": "nba:season:1977:maravpe01:UTA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1972:unselwe01:WAS",
+    "seasonId": "nba:season:1972:unselwe01:WAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1972:cunnibi01:PHI",
+    "seasonId": "nba:season:1972:cunnibi01:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1997:hillgr01:DET",
+    "seasonId": "nba:season:1997:hillgr01:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1985:kingbe01:NYK",
+    "seasonId": "nba:season:1985:kingbe01:NYK",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2005:stoudam01:PHX",
+    "seasonId": "nba:season:2005:stoudam01:PHX",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1976:westppa01:PHX",
+    "seasonId": "nba:season:1976:westppa01:PHX",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2014:anthoca01:NYK",
+    "seasonId": "nba:season:2014:anthoca01:NYK",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1969:bingda01:DET",
+    "seasonId": "nba:season:1969:bingda01:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1981:coopemi01:LAL",
+    "seasonId": "nba:season:1981:coopemi01:LAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1977:jonesbo01:DEN",
+    "seasonId": "nba:season:1977:jonesbo01:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1971:vanlino01:SAC",
+    "seasonId": "nba:season:1971:vanlino01:SAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1977:busedo01:IND",
+    "seasonId": "nba:season:1977:busedo01:IND",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1991:dumarjo01:DET",
+    "seasonId": "nba:season:1991:dumarjo01:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1991:hardati01:GSW",
+    "seasonId": "nba:season:1991:hardati01:GSW",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1973:haywosp01:OKC",
+    "seasonId": "nba:season:1973:haywosp01:OKC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1971:johnsgu01:WAS",
+    "seasonId": "nba:season:1971:johnsgu01:WAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1980:richami01:NYK",
+    "seasonId": "nba:season:1980:richami01:NYK",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2011:rosede01:CHI",
+    "seasonId": "nba:season:2011:rosede01:CHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1974:debusda01:NYK",
+    "seasonId": "nba:season:1974:debusda01:NYK",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1989:drexlcl01:POR",
+    "seasonId": "nba:season:1989:drexlcl01:POR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1994:blaylmo01:ATL",
+    "seasonId": "nba:season:1994:blaylmo01:ATL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2020:drumman01:DET",
+    "seasonId": "nba:season:2020:drumman01:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2011:griffbl01:LAC",
+    "seasonId": "nba:season:2011:griffbl01:LAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1989:johnske02:PHX",
+    "seasonId": "nba:season:1989:johnske02:PHX",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1987:mchalke01:BOS",
+    "seasonId": "nba:season:1987:mchalke01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2014:noahjo01:CHI",
+    "seasonId": "nba:season:2014:noahjo01:CHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1979:porteke01:DET",
+    "seasonId": "nba:season:1979:porteke01:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1997:richmmi01:SAC",
+    "seasonId": "nba:season:1997:richmmi01:SAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2006:bowenbr01:SAS",
+    "seasonId": "nba:season:2006:bowenbr01:SAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1978:dantlad01:IND",
+    "seasonId": "nba:season:1978:dantlad01:IND",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2012:gasolma01:MEM",
+    "seasonId": "nba:season:2012:gasolma01:MEM",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1989:mullich01:GSW",
+    "seasonId": "nba:season:1989:mullich01:GSW",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2024:sabondo01:SAC",
+    "seasonId": "nba:season:2024:sabondo01:SAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2014:aldrila01:POR",
+    "seasonId": "nba:season:2014:aldrila01:POR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2008:artesro01:SAC",
+    "seasonId": "nba:season:2008:artesro01:SAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1983:englial01:DEN",
+    "seasonId": "nba:season:1983:englial01:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1996:hardaan01:ORL",
+    "seasonId": "nba:season:1996:hardaan01:ORL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:1960:heinsto01:BOS",
+    "seasonId": "nba:season:1960:heinsto01:BOS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2014:ibakase01:OKC",
+    "seasonId": "nba:season:2014:ibakase01:OKC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2023:jacksja02:MEM",
+    "seasonId": "nba:season:2023:jacksja02:MEM",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2008:mingya01:HOU",
+    "seasonId": "nba:season:2008:mingya01:HOU",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nba:spotlight:2025:wembavi01:SAS",
+    "seasonId": "nba:season:2025:wembavi01:SAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2013:00-0010346:DEN",
+    "seasonId": "nfl:season:2013:00-0010346:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2013:00-0010346:DEN",
+    "seasonId": "nfl:season:2013:00-0010346:DEN",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1993:00-0013639:SF",
+    "seasonId": "nfl:season:1993:00-0013639:SF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1993:00-0013639:SF",
+    "seasonId": "nfl:season:1993:00-0013639:SF",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2007:00-0019596:NE",
+    "seasonId": "nfl:season:2007:00-0019596:NE",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2007:00-0019596:NE",
+    "seasonId": "nfl:season:2007:00-0019596:NE",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1997:00-0014313:DET",
+    "seasonId": "nfl:season:1997:00-0014313:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1997:00-0014313:DET",
+    "seasonId": "nfl:season:1997:00-0014313:DET",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1986:00-0016128:NYG",
+    "seasonId": "nfl:season:1986:00-0016128:NYG",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1986:00-0016128:NYG",
+    "seasonId": "nfl:season:1986:00-0016128:NYG",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1995:00-0005106:GB",
+    "seasonId": "nfl:season:1995:00-0005106:GB",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1987:00-0017567:PHI",
+    "seasonId": "nfl:season:1987:00-0017567:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1987:00-0017567:PHI",
+    "seasonId": "nfl:season:1987:00-0017567:PHI",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2011:00-0023459:GB",
+    "seasonId": "nfl:season:2011:00-0023459:GB",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2018:00-0031388:LAR",
+    "seasonId": "nfl:season:2018:00-0031388:LAR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2018:00-0031388:LAR",
+    "seasonId": "nfl:season:2018:00-0031388:LAR",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1990:00-0015111:BUF",
+    "seasonId": "nfl:season:1990:00-0015111:BUF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1990:00-0015111:BUF",
+    "seasonId": "nfl:season:1990:00-0015111:BUF",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2000:00-0009889:BAL",
+    "seasonId": "nfl:season:2000:00-0009889:BAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2000:00-0009889:BAL",
+    "seasonId": "nfl:season:2000:00-0009889:BAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1984:00-0010379:MIA",
+    "seasonId": "nfl:season:1984:00-0010379:MIA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2011:00-0020531:NO",
+    "seasonId": "nfl:season:2011:00-0020531:NO",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2011:00-0020531:NO",
+    "seasonId": "nfl:season:2011:00-0020531:NO",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1981:00-0011825:CIN",
+    "seasonId": "nfl:season:1981:00-0011825:CIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1973:SIM593235:BUF",
+    "seasonId": "nfl:season:1973:SIM593235:BUF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1985:00-0014988:CHI",
+    "seasonId": "nfl:season:1985:00-0014988:CHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2012:00-0025394:MIN",
+    "seasonId": "nfl:season:2012:00-0025394:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1979:CAM251095:TEN",
+    "seasonId": "nfl:season:1979:CAM251095:TEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1977:PAY738296:CHI",
+    "seasonId": "nfl:season:1977:PAY738296:CHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1977:PAY738296:CHI",
+    "seasonId": "nfl:season:1977:PAY738296:CHI",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2000:00-0005092:LAR",
+    "seasonId": "nfl:season:2000:00-0005092:LAR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1988:00-0010550:TEN",
+    "seasonId": "nfl:season:1988:00-0010550:TEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2004:00-0021377:BAL",
+    "seasonId": "nfl:season:2004:00-0021377:BAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2004:00-0021377:BAL",
+    "seasonId": "nfl:season:2004:00-0021377:BAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1993:00-0015165:DAL",
+    "seasonId": "nfl:season:1993:00-0015165:DAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1993:00-0015165:DAL",
+    "seasonId": "nfl:season:1993:00-0015165:DAL",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1992:00-0018441:SF",
+    "seasonId": "nfl:season:1992:00-0018441:SF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2015:00-0027949:HOU",
+    "seasonId": "nfl:season:2015:00-0027949:HOU",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1989:00-0011493:SF",
+    "seasonId": "nfl:season:1989:00-0011493:SF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1989:00-0011493:SF",
+    "seasonId": "nfl:season:1989:00-0011493:SF",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2025:00-0033868:CLE",
+    "seasonId": "nfl:season:2025:00-0033868:CLE",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2008:00-0006101:KC",
+    "seasonId": "nfl:season:2008:00-0006101:KC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2008:00-0006101:KC",
+    "seasonId": "nfl:season:2008:00-0006101:KC",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:1971:PAG332232:MIN",
+    "seasonId": "nfl:season:1971:PAG332232:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2002:00-0001833:TB",
+    "seasonId": "nfl:season:2002:00-0001833:TB",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1990:00-0010790:MIN",
+    "seasonId": "nfl:season:1990:00-0010790:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2006:00-0020536:LAC",
+    "seasonId": "nfl:season:2006:00-0020536:LAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2016:00-0029255:SEA",
+    "seasonId": "nfl:season:2016:00-0029255:SEA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1976:HAN295312:NE",
+    "seasonId": "nfl:season:1976:HAN295312:NE",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1993:00-0018229:PIT",
+    "seasonId": "nfl:season:1993:00-0018229:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2022:00-0031402:DAL",
+    "seasonId": "nfl:season:2022:00-0031402:DAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1996:00-0014619:LAC",
+    "seasonId": "nfl:season:1996:00-0014619:LAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2018:00-0033873:KC",
+    "seasonId": "nfl:season:2018:00-0033873:KC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2018:00-0033873:KC",
+    "seasonId": "nfl:season:2018:00-0033873:KC",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2021:00-0033886:PIT",
+    "seasonId": "nfl:season:2021:00-0033886:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1976:LAM488570:PIT",
+    "seasonId": "nfl:season:1976:LAM488570:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2001:00-0015795:NYG",
+    "seasonId": "nfl:season:2001:00-0015795:NYG",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1974:GRE420024:PIT",
+    "seasonId": "nfl:season:1974:GRE420024:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1978:WHI401276:DAL",
+    "seasonId": "nfl:season:1978:WHI401276:DAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1986:00-0004266:LAR",
+    "seasonId": "nfl:season:1986:00-0004266:LAR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1994:00-0014324:SF",
+    "seasonId": "nfl:season:1994:00-0014324:SF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1994:00-0014324:SF",
+    "seasonId": "nfl:season:1994:00-0014324:SF",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2009:00-0018227:GB",
+    "seasonId": "nfl:season:2009:00-0018227:GB",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1982:FOU692150:LAC",
+    "seasonId": "nfl:season:1982:FOU692150:LAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2001:00-0000217:DAL",
+    "seasonId": "nfl:season:2001:00-0000217:DAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1998:00-0004054:DEN",
+    "seasonId": "nfl:season:1998:00-0004054:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2015:00-0025390:CLE",
+    "seasonId": "nfl:season:2015:00-0025390:CLE",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2006:00-0005058:PIT",
+    "seasonId": "nfl:season:2006:00-0005058:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1989:00-0010088:SF",
+    "seasonId": "nfl:season:1989:00-0010088:SF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:1989:00-0010088:SF",
+    "seasonId": "nfl:season:1989:00-0010088:SF",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2013:00-0029248:CAR",
+    "seasonId": "nfl:season:2013:00-0029248:CAR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2002:00-0007024:IND",
+    "seasonId": "nfl:season:2002:00-0007024:IND",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2008:00-0023445:DAL",
+    "seasonId": "nfl:season:2008:00-0023445:DAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2003:00-0013791:KC",
+    "seasonId": "nfl:season:2003:00-0013791:KC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2023:00-0034796:BAL",
+    "seasonId": "nfl:season:2023:00-0034796:BAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1974:HAM025169:PIT",
+    "seasonId": "nfl:season:1974:HAM025169:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1971:YAR726754:MIN",
+    "seasonId": "nfl:season:1971:YAR726754:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2002:00-0012322:BAL",
+    "seasonId": "nfl:season:2002:00-0012322:BAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1999:00-0014358:TB",
+    "seasonId": "nfl:season:1999:00-0014358:TB",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2010:00-0022119:PIT",
+    "seasonId": "nfl:season:2010:00-0022119:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2021:00-0029597:BAL",
+    "seasonId": "nfl:season:2021:00-0029597:BAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1993:00-0004085:PIT",
+    "seasonId": "nfl:season:1993:00-0004085:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1997:00-0013405:MIN",
+    "seasonId": "nfl:season:1997:00-0013405:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1991:00-0016331:BUF",
+    "seasonId": "nfl:season:1991:00-0016331:BUF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2003:00-0016344:MIA",
+    "seasonId": "nfl:season:2003:00-0016344:MIA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2001:00-0017200:LAR",
+    "seasonId": "nfl:season:2001:00-0017200:LAR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2021:00-0028129:PHI",
+    "seasonId": "nfl:season:2021:00-0028129:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2020:00-0030506:KC",
+    "seasonId": "nfl:season:2020:00-0030506:KC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1985:00-0000220:LV",
+    "seasonId": "nfl:season:1985:00-0000220:LV",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2006:00-0000585:DEN",
+    "seasonId": "nfl:season:2006:00-0000585:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2005:00-0019456:CHI",
+    "seasonId": "nfl:season:2005:00-0019456:CHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2005:00-0020466:SEA",
+    "seasonId": "nfl:season:2005:00-0020466:SEA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1978:WEB755060:PIT",
+    "seasonId": "nfl:season:1978:WEB755060:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1974:YOU728550:LAR",
+    "seasonId": "nfl:season:1974:YOU728550:LAR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2009:00-0025398:SF",
+    "seasonId": "nfl:season:2009:00-0025398:SF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2017:00-0027793:PIT",
+    "seasonId": "nfl:season:2017:00-0027793:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1971:LIT593270:MIA",
+    "seasonId": "nfl:season:1971:LIT593270:MIA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1981:AND324128:CIN",
+    "seasonId": "nfl:season:1981:AND324128:CIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2005:00-0008894:SEA",
+    "seasonId": "nfl:season:2005:00-0008894:SEA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2006:00-0016112:MIA",
+    "seasonId": "nfl:season:2006:00-0016112:MIA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2016:00-0031040:LV",
+    "seasonId": "nfl:season:2016:00-0031040:LV",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1971:HEN313420:IND",
+    "seasonId": "nfl:season:1971:HEN313420:IND",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1992:00-0009148:SEA",
+    "seasonId": "nfl:season:1992:00-0009148:SEA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1987:00-0011819:TEN",
+    "seasonId": "nfl:season:1987:00-0011819:TEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2000:00-0012478:SF",
+    "seasonId": "nfl:season:2000:00-0012478:SF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2005:00-0019647:SEA",
+    "seasonId": "nfl:season:2005:00-0019647:SEA",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2011:00-0022740:MIN",
+    "seasonId": "nfl:season:2011:00-0022740:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2012:00-0025389:DET",
+    "seasonId": "nfl:season:2012:00-0025389:DET",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2021:00-0027857:SF",
+    "seasonId": "nfl:season:2021:00-0027857:SF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2012:00-0027940:DEN",
+    "seasonId": "nfl:season:2012:00-0027940:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2017:00-0027969:PIT",
+    "seasonId": "nfl:season:2017:00-0027969:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1972:BRO544942:WAS",
+    "seasonId": "nfl:season:1972:BRO544942:WAS",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1984:HAY692125:LV",
+    "seasonId": "nfl:season:1984:HAY692125:LV",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2008:00-0010577:TEN",
+    "seasonId": "nfl:season:2008:00-0010577:TEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1993:00-0014722:DEN",
+    "seasonId": "nfl:season:1993:00-0014722:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2002:00-0014811:KC",
+    "seasonId": "nfl:season:2002:00-0014811:KC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1991:00-0018129:LV",
+    "seasonId": "nfl:season:1991:00-0018129:LV",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2004:00-0022073:MIN",
+    "seasonId": "nfl:season:2004:00-0022073:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2006:00-0004073:PHI",
+    "seasonId": "nfl:season:2006:00-0004073:PHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2002:00-0007661:KC",
+    "seasonId": "nfl:season:2002:00-0007661:KC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2009:00-0014724:NO",
+    "seasonId": "nfl:season:2009:00-0014724:NO",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2004:00-0021140:CAR",
+    "seasonId": "nfl:season:2004:00-0021140:CAR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2015:00-0027944:ATL",
+    "seasonId": "nfl:season:2015:00-0027944:ATL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2020:00-0034342:IND",
+    "seasonId": "nfl:season:2020:00-0034342:IND",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1975:DEL063890:BUF",
+    "seasonId": "nfl:season:1975:DEL063890:BUF",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1978:GRA066822:DEN",
+    "seasonId": "nfl:season:1978:GRA066822:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1975:TAR369148:MIN",
+    "seasonId": "nfl:season:1975:TAR369148:MIN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1974:UPS276861:LV",
+    "seasonId": "nfl:season:1974:UPS276861:LV",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1987:00-0004884:DEN",
+    "seasonId": "nfl:season:1987:00-0004884:DEN",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2007:00-0011754:NE",
+    "seasonId": "nfl:season:2007:00-0011754:NE",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2007:00-0011754:NE",
+    "seasonId": "nfl:season:2007:00-0011754:NE",
+    "kind": "goat"
+  },
+  {
+    "id": "nfl:spotlight:2009:00-0024323:NO",
+    "seasonId": "nfl:season:2009:00-0024323:NO",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2015:00-0025473:BAL",
+    "seasonId": "nfl:season:2015:00-0025473:BAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2022:00-0032762:KC",
+    "seasonId": "nfl:season:2022:00-0032762:KC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2001:00-0000741:TB",
+    "seasonId": "nfl:season:2001:00-0000741:TB",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2002:00-0005741:LV",
+    "seasonId": "nfl:season:2002:00-0005741:LV",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1992:00-0014723:GB",
+    "seasonId": "nfl:season:1992:00-0014723:GB",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1997:00-0017710:ARI",
+    "seasonId": "nfl:season:1997:00-0017710:ARI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2004:00-0021146:IND",
+    "seasonId": "nfl:season:2004:00-0021146:IND",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1975:BLO664464:PIT",
+    "seasonId": "nfl:season:1975:BLO664464:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1986:00-0000282:NO",
+    "seasonId": "nfl:season:1986:00-0000282:NO",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1981:WIN521505:LAC",
+    "seasonId": "nfl:season:1981:WIN521505:LAC",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2002:00-0016919:NE",
+    "seasonId": "nfl:season:2002:00-0016919:NE",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1978:BRA301078:PIT",
+    "seasonId": "nfl:season:1978:BRA301078:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1977:HAR387270:PIT",
+    "seasonId": "nfl:season:1977:HAR387270:PIT",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1983:00-0015035:LAR",
+    "seasonId": "nfl:season:1983:00-0015035:LAR",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1970:pfr-ButkDi00:CHI",
+    "seasonId": "nfl:season:1970:pfr-ButkDi00:CHI",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1970:OTT553720:LV",
+    "seasonId": "nfl:season:1970:OTT553720:LV",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:1978:STA762496:DAL",
+    "seasonId": "nfl:season:1978:STA762496:DAL",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:spotlight:2011:00-0027656:NE",
+    "seasonId": "nfl:season:2011:00-0027656:NE",
+    "kind": "spotlight"
+  },
+  {
+    "id": "nfl:goat:2011:00-0027656:NE",
+    "seasonId": "nfl:season:2011:00-0027656:NE",
+    "kind": "goat"
+  }
+]

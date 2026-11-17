@@ -1,0 +1,42 @@
+
+ RUN  v2.1.4 /home/user/ps-s-soccer
+
+ ✓ src/lib/sound-perfect.test.ts  (7 tests) 34ms
+ ✓ src/lib/sound.test.ts  (16 tests) 91ms
+ ✓ src/game/soccer2/golden.test.ts  (3 tests) 7771ms
+   ✓ soccer golden hash > 60 seeded autopilot attacks: the whistle and 3 s after it 3748ms
+   ✓ soccer golden hash > 20 aiProgress matches 3159ms
+   ✓ soccer golden hash > 50 agreed shootouts 860ms
+ ✓ src/game/soccer2/rules.test.ts  (17 tests) 14797ms
+   ✓ R-1: a dead shot is a loose ball > a shot that dies short stops being a shot within 1 s, and the attack ends within 15 s 1988ms
+   ✓ R-1: a dead shot is a loose ball > autopilot attacks all finish within the clock + 15 s 4680ms
+   ✓ C-4: BEND bends the way its arrow points (x across the pitch: + right on screen) > over 40 kicks each: Bend left ends 1.5 m+ left of the aim, Bend right 1.5 m+ right, straight within 0.5 m 519ms
+   ✓ J-1: the bounce is a sound, not a rule > bounces are reported, and taking them out of the events changes no attack 673ms
+   ✓ R-2: a parry goes away from goal > leaves his hands going away from the goal line, unless pushed round the post from outside ±(GHALF − 0.3) 1080ms
+   ✓ R-2: a parry goes away from goal > from a keeper with sound hands (HAN 55+) it goes to the side it came, never back across his goal 890ms
+   ✓ R-2: the restarts > across seeded autopilot attacks: never more than two restarts, every wide end a goal kick, all inside the clock + 15 s 4858ms
+ ✓ src/game/soccer2/agreement-ut.test.ts  (6 tests) 43775ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 1-99 11810ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 101-199 8107ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 201-299 7316ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 301-399 7150ms
+   ✓ online agreement: simBoth from both seats > both phones, odd seeds 401-499 8383ms
+   ✓ online agreement: simBoth from both seats > has teeth: a difficulty that leaked into online play would be caught 1006ms
+ ✓ src/game/soccer2/agreement.test.ts  (11 tests) 68980ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 0-98 14373ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 100-198 8423ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 200-298 7295ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 300-398 6803ms
+   ✓ online agreement: takeover and taken > both phones, even seeds 400-498 6625ms
+   ✓ online agreement: takeover and taken > has teeth: a difficulty that leaked into online play would be caught 1068ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 0-199 5571ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 200-399 5134ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 400-599 4526ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 600-799 4618ms
+   ✓ online agreement: the agreed shootout, host and guest > mirrored, seeds 800-999 4540ms
+
+ Test Files  6 passed (6)
+      Tests  60 passed (60)
+   Start at  14:17:22
+   Duration  71.35s (transform 1.89s, setup 0ms, collect 4.01s, tests 135.45s, environment 1ms, prepare 799ms)
+

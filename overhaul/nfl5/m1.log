@@ -1,0 +1,45 @@
+
+== AI pro gold v gold, 40 games x 11 drives (2073 plays)
+pass share by down 47.4% (n 981) / 59.3% (n 713) / 76.8% (n 354) / 52.0% (n 25)
+time to throw 2.44 s; scrambles 2.5%; 4th-down tries / game 0.63
+cmp 72.3 INT 1.7 sack 0.0 YPC 4.81 pts/drive 4.93
+calls 2073 snaps, 11 distinct: c0 4.0, c1 16.8, c1r 8.0, c2 12.1, t2 8.1, c3 19.7, c4 11.9, fire 8.3, sim 8.6, goal 2.4, prevent 0.2
+rotated 13.2%; 3rd & 7+: two-high or blitz 70.5%; red zone man/C0/C1/GL 53.0%
+sacks blitz 0.0 base 0.0 (xNaN); 20+ blitz 20.6 base 19.9 (x1.03)
+FREE RUSHER shows on 53.8% of unblocked blitzes (n 65); truly free when shown 0.0% (n 35)
+
+== AI legend gold v gold, 40 games x 11 drives (1989 plays)
+pass share by down 50.1% (n 914) / 61.4% (n 678) / 74.9% (n 362) / 60.0% (n 35)
+time to throw 2.50 s; scrambles 3.3%; 4th-down tries / game 0.88
+cmp 70.1 INT 1.8 sack 0.0 YPC 3.95 pts/drive 4.49
+calls 1989 snaps, 11 distinct: c0 4.4, c1 16.2, c1r 5.9, c2 15.0, t2 6.1, c3 24.4, c4 11.6, fire 7.7, sim 6.2, goal 2.2, prevent 0.3
+rotated 30.2%; 3rd & 7+: two-high or blitz 65.8%; red zone man/C0/C1/GL 51.0%
+sacks blitz 0.0 base 0.0 (xNaN); 20+ blitz 16.5 base 20.4 (x0.81)
+FREE RUSHER shows on 28.8% of unblocked blitzes (n 66); truly free when shown 0.0% (n 19)
+
+== concept x call, completion per dropback, 60 snaps a cell (AI passer at Pro, gold v gold)
+concept       c0     c1    c1r     c2     t2     c3     c4   fire    sim   goalprevent    avg
+verts         58     63     92     98     93     97     88     98     93     72     62    83.2
+slants         0     85     63     55     73     58     50     60     70     90     63    60.8
+smash          0     25     42     50     55     53     53     45     68     38     40    42.7
+flood         53     48     57     88     92     68     95     63     70     32     33    63.6
+dagger        48     42     88     95     88     97     88     82     93     52     62    75.9
+mesh           8     95     93     93     98     87     98     93     95     97     95    86.7
+curls          0     32     38     78     70     73     67     45     75     30     70    52.6
+posts         50     55     55     75     82     75     67     75     70     58     40    63.8
+avg           27     56     66     79     81     76     76     70     79     59     58
+sacks % / yards per dropback
+verts       0/40   0/23   0/49   0/64   0/52   0/61   0/55   0/59   0/53   0/13   0/13
+slants      0/-3   0/27   0/20   0/23   0/30   0/17   0/21   0/15   0/16   0/23   0/15
+smash       0/-3    0/8   0/19   0/13    0/9   0/23   0/10    0/6   0/30   0/11   0/32
+flood        0/9    0/8    0/8   0/13   0/10   0/25   0/11   0/25   0/28    0/8   0/35
+dagger      0/17   0/17   0/55   0/60   0/30   0/55   0/41   0/17   0/52   0/18   0/22
+mesh        0/-1   0/12   0/10   0/10    0/8    0/9   0/11   0/10    0/8   0/19    0/9
+curls       0/-3   0/17   0/16   0/27   0/14   0/18   0/20    0/6   0/18   0/13   0/18
+posts        0/7    0/5    0/3   0/43   0/42   0/24   0/11   0/29   0/29    0/3   0/30
+each call's best concept (pts over the call's average): c0 verts +31, c1 mesh +39, c1r mesh +27, c2 verts +19, t2 mesh +17, c3 verts +21, c4 mesh +22, fire verts +28, sim mesh +16, goal mesh +38, prevent mesh +37
+each concept's best call (pts under the concept's average): verts c0 -25, slants c0 -61, smash c0 -43, flood goal -32, dagger c1 -34, mesh c0 -78, curls c0 -53, posts prevent -24
+sacks blitz 0.0 base 0.0 ; 20+ blitz 31.4 base 34.5
+
+done in 84s -> docs/studio-overhaul/nfl-calibration/nfl5-scratch.json
+EXIT 0

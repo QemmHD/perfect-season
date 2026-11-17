@@ -1,0 +1,70 @@
+[
+ {
+  "tag": "393x852-sat59",
+  "step": "bend",
+  "sizes": [
+   {
+    "w": 46,
+    "h": 44,
+    "label": "Bend left"
+   },
+   {
+    "w": 88,
+    "h": 44,
+    "label": "No bend"
+   },
+   {
+    "w": 46,
+    "h": 44,
+    "label": "Bend right"
+   }
+  ],
+  "pressed": "true",
+  "curl": 0.75,
+  "kick": {
+   "aimX": 31.94,
+   "crossX": null
+  },
+  "path": {
+   "ballX": 25.92016299296124,
+   "ballY": 99.72314081126923,
+   "end": null
+  },
+  "errors": []
+ },
+ {
+  "tag": "320x568",
+  "step": "bend",
+  "sizes": [
+   {
+    "w": 46,
+    "h": 44,
+    "label": "Bend left"
+   },
+   {
+    "w": 88,
+    "h": 44,
+    "label": "No bend"
+   },
+   {
+    "w": 46,
+    "h": 44,
+    "label": "Bend right"
+   }
+  ],
+  "pressed": "true",
+  "curl": 0.75,
+  "kick": {
+   "aimX": 31.94,
+   "crossX": null
+  },
+  "path": {
+   "ballX": 25.86202357703451,
+   "ballY": 99.06973706065848,
+   "end": null
+  },
+  "errors": []
+ }
+]
+QA isolation: blocked 0 request(s) to live hosts {}
+errors 0 []

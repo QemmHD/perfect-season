@@ -1,0 +1,74 @@
+
+ RUN  v2.1.4 /home/user/ps-r-nba-t3b
+
+ ✓ src/game/hoops2/ring.test.ts  (20 tests) 13796ms
+   ✓ NBA gold ring: gold never lies (plan §4.4) > 10,000 seeded gold releases (jumpers and finishes) are 10,000 makes and 0 blocks 13283ms
+   ✓ NBA gold ring: the release is timed from the touch > a press and a release between two 60 Hz steps land within 1 ms of where they were 304ms
+ ↓ src/game/hoops2/human.test.ts  (2 tests | 2 skipped)
+ ↓ src/game/hoops2/calibration.test.ts  (1 test | 1 skipped)
+ ✓ src/game/hoops2/zzrev-cam.test.ts  (10 tests | 2 skipped) 17226ms
+   ✓ the broadcast camera (V2 B.1.3) > frames the rim at 20-24% and the handler at 50-55% (median), both in the safe box, zoom fixed near the rim, at 393 and 320 11949ms
+   ✓ the broadcast camera (V2 B.1.3) > keeps the handler and the rim in the safe box at the other sizes, sideways included 5188ms
+ ✓ src/game/hoops2/gameplay.test.ts  (15 tests) 104ms
+ ✓ src/game/hoops2/camera.test.ts  (10 tests | 2 skipped) 17903ms
+   ✓ the broadcast camera (V2 B.1.3) > frames the rim at 20-24% and the handler at 50-55% (median), both in the safe box, zoom fixed near the rim, at 393 and 320 12222ms
+   ✓ the broadcast camera (V2 B.1.3) > keeps the handler and the rim in the safe box at the other sizes, sideways included 5583ms
+ ✓ src/game/hoops2/controls.test.ts  (16 tests) 10114ms
+   ✓ moves, the lob and ISO > ISO gets the ball to the top-usage card within 2 s, and the other four clear out 496ms
+   ✓ the AI's race is untouched > autopilot games come out exactly as before nba-2 (18 seeded games) 9230ms
+ ✓ src/game/hoops2/determinism.test.ts  (4 tests) 5099ms
+   ✓ hoops2 determinism > seeded autopilot games are identical across loops, uneven frames, juice and the box tracker 4053ms
+   ✓ hoops2 determinism > a recorded person replays to the same game, frame batching aside 1006ms
+ ↓ src/game/hoops2/curve.test.ts  (1 test | 1 skipped)
+ ✓ src/game/hoops2/golden.test.ts  (3 tests) 8256ms
+   ✓ hoops2 golden AI games (base 78a1c86) > seeded AI games score and end exactly as on the base engine 5193ms
+   ✓ hoops2 golden AI games (base 78a1c86) > the autoplay loop ends every possession at the same clock as on the base engine 3057ms
+ ✓ src/game/perfect.test.ts  (10 tests) 6ms
+ ✓ src/game/juice.test.ts  (3 tests) 3297ms
+   ✓ juice is render only > a seeded basketball game is identical with and without hit-stop/shake/particles 2005ms
+   ✓ juice is render only > a seeded football game is identical with and without hit-stop/shake/particles 1284ms
+ ✓ src/game/hud/gestures.test.ts  (6 tests) 140ms
+ ✓ src/game/hoops2/box.test.ts  (3 tests) 10015ms
+   ✓ box score > player lines add up to the marks and the score (20 games, both teams) 10001ms
+ ✓ src/game/stick.test.ts  (9 tests) 5ms
+ ✓ src/game/heat.test.ts  (8 tests) 1833ms
+   ✓ heat.ts > integer only: every value it can reach over 20,000 random events is an integer in 0..100 1827ms
+ ✓ src/game/hoops2/labels.test.ts  (7 tests) 302ms
+ ↓ src/game/hoops2/moments.test.ts  (1 test | 1 skipped)
+ ✓ src/game/play-feedback.test.ts  (7 tests) 8ms
+ ✓ src/game/hud/ring-draw.test.ts  (5 tests) 9ms
+ ✓ src/game/hud/grade.test.ts  (6 tests) 10ms
+ ↓ src/game/hoops2/tune.test.ts  (1 test | 1 skipped)
+ ✓ src/engine/sport-branches.test.ts  (2 tests) 37ms
+ ✓ src/game/hud/prefs.test.ts  (5 tests) 11ms
+ ✓ src/game/hoops2/held.test.ts  (3 tests) 5606ms
+   ✓ the held arena: the rematch AI game > a possession per task gives exactly aiPossessionsOf 4152ms
+   ✓ the held arena: the rematch AI game > autoplaySteps drained is autoplay 1402ms
+ ✓ src/ut/forfeit.test.ts  (3 tests) 5ms
+ ✓ src/game/hud/pause.test.ts  (3 tests) 5ms
+ ✓ src/game/hoops2/finish.test.ts  (1 test) 2107ms
+   ✓ a shot near the rim > is a finish when he runs at the rim from 10.5 feet, a jumper when he stands there 2106ms
+ ✓ src/game/hoops2/feel-events.test.ts  (5 tests) 13ms
+ ✓ src/game/hoops2/calibrator.test.ts  (3 tests) 3ms
+ ✓ src/ut/match-debrief.test.ts  (4 tests) 4ms
+stdout | src/game/hoops2/zzrev-steal.test.ts > early steals
+RV poss 480 steals 49 early<0.5s 4 first ts 0.00,0.00,0.35,0.40,0.55,0.58,0.67,0.90,0.97,0.98
+
+ ✓ src/game/hoops2/zzrev-steal.test.ts  (1 test) 11014ms
+   ✓ early steals 11014ms
+ ✓ src/game/hoops2/calibration-smoke.test.ts  (1 test) 25870ms
+   ✓ NBA calibration smoke > 20 AI v AI games at even 78 Pro land inside the wide bands 25869ms
+ ✓ src/game/difficulty.test.ts  (1 test) 20ms
+ ✓ src/game/hoops2/ratings-matter.test.ts  (14 tests) 208634ms
+   ✓ NBA: better offensive ratings never score less > elite shooters score more than average ones, and average more than poor (the autopilot stall) 43830ms
+   ✓ NBA: better offensive ratings never score less > is monotone across the other offensive attributes (90 never clearly below 75) 77582ms
+   ✓ NBA: better defensive ratings never concede more > raising any defensive attribute to 90 never raises the opponent’s PPP 71369ms
+   ✓ NBA shot selection (the AI attacks the rim with finishers, shoots with shooters) > even teams take a real mix (not ~85% contested threes) and score 1.0-1.15 a trip 4418ms
+   ✓ NBA shot selection (the AI attacks the rim with finishers, shoots with shooters) > elite slashers attack the rim more and score more; elite shooters shoot more threes 11418ms
+
+ Test Files  30 passed | 5 skipped (35)
+      Tests  184 passed | 10 skipped (194)
+   Start at  02:55:34
+   Duration  232.75s (transform 18.09s, setup 0ms, collect 33.73s, tests 341.45s, environment 8ms, prepare 4.70s)
+
+vitest exit 0

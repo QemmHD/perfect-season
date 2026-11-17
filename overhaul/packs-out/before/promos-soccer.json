@@ -1,0 +1,120 @@
+{
+ "sport": "soccer",
+ "promos": [],
+ "standoutsYear": {
+  "weeks": 52,
+  "featuredHist": {
+   "91": 24,
+   "92": 4,
+   "93": 24
+  },
+  "allHist": {
+   "80": 116,
+   "81": 109,
+   "82": 69,
+   "83": 41,
+   "84": 44,
+   "85": 38,
+   "86": 31,
+   "87": 20,
+   "88": 23,
+   "89": 16,
+   "90": 7,
+   "91": 28,
+   "92": 6,
+   "93": 24
+  },
+  "decades": {
+   "2010": 25,
+   "2020": 27
+  }
+ },
+ "landmarks": {
+  "n": 0,
+  "uplift": {},
+  "ovr": {}
+ },
+ "fodderQs": {
+  "goldMin": 70,
+  "goldP25": 70,
+  "silverMin": 30,
+  "silverP50": 45,
+  "bronzeMin": 10
+ },
+ "sbcCatalogue": {
+  "daily:Then and Now -> {\"pack\":\"silver\"}": 9,
+  "daily:Decade Night -> {\"pack\":\"silver\"}": 6,
+  "daily:Decade Draft -> {\"pack\":\"gold\"}": 10,
+  "daily:Pass Catchers -> {\"pack\":\"gold\"}": 8,
+  "daily:Skill Set -> {\"pack\":\"premium\"}": 10,
+  "daily:Golden Era -> {\"card\":{\"tier\":\"gold\",\"minOvr\":83}}": 17,
+  "weekly:Champions of the decade -> {\"card\":{\"tier\":\"gold\",\"minOvr\":84}}": 28,
+  "weekly:Hall of Fame Class -> {\"pack\":\"premium\",\"card\":{\"tier\":\"promo\"}}": 22,
+  "weekly:Dynasty -> {\"card\":{\"tier\":\"promo\",\"fr\":\"HVR\"}}": 1,
+  "weekly:Decade All-Stars -> {\"pack\":\"premium\"}": 7,
+  "daily:Three of a Kind -> {\"pack\":\"silver\"}": 7,
+  "daily:Pairs -> {\"pack\":\"silver\"}": 10,
+  "daily:Golden Pair -> {\"pack\":\"gold\"}": 7,
+  "daily:Deep Bench -> {\"pack\":\"premium\"}": 8,
+  "weekly:Team Builders -> {\"pack\":\"premium\"}": 7,
+  "weekly:Gold Front Seven -> {\"pack\":\"premium\",\"card\":{\"tier\":\"gold\",\"minOvr\":83}}": 14,
+  "daily:Silver Lining -> {\"pack\":\"silver\"}": 9,
+  "daily:Silver Squad -> {\"pack\":\"gold\"}": 8,
+  "daily:Bronze Age -> {\"pack\":\"silver\"}": 6,
+  "daily:No Fly Zone -> {\"pack\":\"premium\"}": 12,
+  "daily:Scrimmage -> {\"pack\":\"silver\"}": 5,
+  "daily:Franchise Night -> {\"pack\":\"gold\"}": 8,
+  "daily:Rivalry Week -> {\"pack\":\"gold\"}": 7,
+  "daily:Borussia Dortmund Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"BVB\"}}": 1,
+  "weekly:Rival Dynasties -> {\"card\":{\"tier\":\"promo\"}}": 13,
+  "weekly:Dynasty -> {\"card\":{\"tier\":\"promo\",\"fr\":\"BOA\"}}": 7,
+  "daily:Nantes Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"FCN\"}}": 1,
+  "daily:Same Era -> {\"pack\":\"gold\"}": 8,
+  "daily:Getafe Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"GET\"}}": 1,
+  "daily:Cagliari Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"CAG\"}}": 1,
+  "weekly:Dynasty -> {\"card\":{\"tier\":\"promo\",\"fr\":\"LIL\"}}": 7,
+  "daily:West Ham United Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"WHU\"}}": 1,
+  "daily:Silver Service -> {\"pack\":\"silver\"}": 4,
+  "daily:Burnley Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"BUR\"}}": 1,
+  "daily:FC Porto Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"FCP\"}}": 1,
+  "weekly:Dynasty -> {\"card\":{\"tier\":\"promo\",\"fr\":\"OM\"}}": 6,
+  "daily:VfL Wolfsburg Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"WOB\"}}": 1,
+  "daily:PEC Zwolle Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81,\"fr\":\"PEC\"}}": 1
+ },
+ "rewardCards": {
+  "promo": {
+   "ovr": 87.9,
+   "qs": 684.6
+  },
+  "gold84": {
+   "ovr": 86,
+   "qs": 136.3
+  },
+  "gold88": {
+   "ovr": 89.4,
+   "qs": 169.1
+  },
+  "goldAny": {
+   "ovr": 79.2,
+   "qs": 89.5
+  }
+ },
+ "packGoldMeanOvr": 77.7,
+ "prices": {
+  "bronze": 220,
+  "silver": 380,
+  "gold": 900,
+  "premium": 1600,
+  "spotlight": 3500,
+  "position": 650,
+  "daily": 0,
+  "scout": 500,
+  "elite": 1900,
+  "jumbo": 3200,
+  "standout": 2600,
+  "lightning": 1950,
+  "roster": 1000,
+  "captains": 2300,
+  "dynasty": 4300
+ }
+}

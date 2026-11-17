@@ -1,0 +1,183 @@
+{
+ "sport": "nba",
+ "promo": {
+  "n": 518,
+  "shownMinusRawMean": 0.1,
+  "rawUnder85": 35,
+  "rawUnder80": 11,
+  "builtOnBronzeOrSilver": 7,
+  "faceOverPlayedMax": 17,
+  "faceOverPlayedOver1": 260,
+  "lowestRaw": [
+   {
+    "name": "Ron Lee 1978",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 77,
+    "boost": 3,
+    "face": "OUT88 INS75 PLY99 ATH95 DEF99 REB59",
+    "played": "OUT? INS? PLY? ATH? DEF? REB49",
+    "baseShown": 73,
+    "baseRaw": 74,
+    "attrGain": 2.2,
+    "faceOverPlayed": 10
+   },
+   {
+    "name": "George Johnson 1982",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 77,
+    "boost": 3,
+    "face": "OUT71 INS85 PLY48 ATH76 DEF96 REB99",
+    "played": "OUT? INS? PLY? ATH? DEF? REB85",
+    "baseShown": 72,
+    "baseRaw": 74,
+    "attrGain": 2.2,
+    "faceOverPlayed": 14
+   },
+   {
+    "name": "Nate McMillan 1994",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 78,
+    "boost": 3,
+    "face": "OUT94 INS74 PLY98 ATH94 DEF99 REB67",
+    "played": "OUT? INS? PLY? ATH? DEF? REB58",
+    "baseShown": 75,
+    "baseRaw": 75,
+    "attrGain": 2.7,
+    "faceOverPlayed": 9
+   },
+   {
+    "name": "Michael Ray Richardson 1983",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 78,
+    "boost": 3,
+    "face": "OUT75 INS77 PLY99 ATH96 DEF99 REB60",
+    "played": "OUT? INS? PLY? ATH? DEF? REB49",
+    "baseShown": 73,
+    "baseRaw": 75,
+    "attrGain": 2.1,
+    "faceOverPlayed": 11
+   },
+   {
+    "name": "Guy Rodgers 1963",
+    "tier": "promo",
+    "shown": 94,
+    "raw": 78,
+    "boost": 3,
+    "face": "OUT87 INS78 PLY99 ATH89 DEF73 REB47",
+    "played": "OUT? INS? PLY? ATH? DEF? REB36",
+    "baseShown": 74,
+    "baseRaw": 75,
+    "attrGain": 2.1,
+    "faceOverPlayed": 11
+   }
+  ]
+ },
+ "legend": {
+  "n": 120,
+  "shownMinusRawMean": -3.9,
+  "rawUnder85": 1,
+  "rawUnder80": 0,
+  "builtOnBronzeOrSilver": 0,
+  "faceOverPlayedMax": 8,
+  "faceOverPlayedOver1": 33,
+  "lowestRaw": [
+   {
+    "name": "Kevin Porter 1979",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 83,
+    "boost": 2,
+    "face": "OUT76 INS73 PLY99 ATH86 DEF80 REB36",
+    "played": "OUT? INS? PLY? ATH? DEF? REB36",
+    "baseShown": 78,
+    "baseRaw": 81,
+    "attrGain": 1.6,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Marc Gasol 2012",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 85,
+    "boost": 2,
+    "face": "OUT85 INS91 PLY67 ATH70 DEF88 REB89",
+    "played": "OUT? INS? PLY? ATH? DEF? REB85",
+    "baseShown": 79,
+    "baseRaw": 83,
+    "attrGain": 1.8,
+    "faceOverPlayed": 4
+   },
+   {
+    "name": "Bruce Bowen 2006",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 85,
+    "boost": 8,
+    "face": "OUT92 INS79 PLY86 ATH88 DEF90 REB46",
+    "played": "OUT? INS? PLY? ATH? DEF? REB49",
+    "baseShown": 75,
+    "baseRaw": 77,
+    "attrGain": 6.8,
+    "faceOverPlayed": 0
+   },
+   {
+    "name": "Bobby Jones 1977",
+    "tier": "legend",
+    "shown": 88,
+    "raw": 85,
+    "boost": 2,
+    "face": "OUT74 INS92 PLY66 ATH87 DEF99 REB76",
+    "played": "OUT? INS? PLY? ATH? DEF? REB71",
+    "baseShown": 79,
+    "baseRaw": 83,
+    "attrGain": 1.8,
+    "faceOverPlayed": 5
+   },
+   {
+    "name": "Alvin Robertson 1988",
+    "tier": "legend",
+    "shown": 89,
+    "raw": 86,
+    "boost": 2,
+    "face": "OUT85 INS77 PLY94 ATH89 DEF94 REB62",
+    "played": "OUT? INS? PLY? ATH? DEF? REB59",
+    "baseShown": 80,
+    "baseRaw": 84,
+    "attrGain": 1.6,
+    "faceOverPlayed": 3
+   }
+  ]
+ },
+ "spotlight": {
+  "n": 120,
+  "faceAtCapMean": 0.33,
+  "faceAtCapMax": 2,
+  "example": {
+   "name": "Larry Bird 1985",
+   "tier": "spotlight",
+   "shown": 105,
+   "raw": 105,
+   "boost": 8,
+   "face": "OUT104 INS92 PLY96 ATH74 DEF87 REB91",
+   "played": "OUT? INS? PLY? ATH? DEF? REB91"
+  }
+ },
+ "goat": {
+  "n": 20,
+  "faceAtCapMean": 0.65,
+  "faceAtCapMax": 2,
+  "example": {
+   "name": "Larry Bird 1985",
+   "tier": "goat",
+   "shown": 110,
+   "raw": 110,
+   "boost": 14,
+   "face": "OUT109 INS96 PLY101 ATH77 DEF93 REB97",
+   "played": "OUT? INS? PLY? ATH? DEF? REB97"
+  }
+ }
+}

@@ -1,0 +1,49 @@
+
+ RUN  v2.1.4 /home/user/ps-s-soccer
+
+ ❯ src/game/soccer2/golden.test.ts  (3 tests | 2 failed) 5265ms
+   × soccer golden hash > 60 seeded autopilot attacks: the whistle and 3 s after it 1649ms
+     → expected '0dde30cbc63300' to be '0f8f55a4585cb3' // Object.is equality
+   × soccer golden hash > 20 aiProgress matches 2385ms
+     → expected '07f3dde0f40f62' to be '0b2cfdb283c412' // Object.is equality
+   ✓ soccer golden hash > 50 agreed shootouts 1230ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/game/soccer2/golden.test.ts > soccer golden hash > 60 seeded autopilot attacks: the whistle and 3 s after it
+AssertionError: expected '0dde30cbc63300' to be '0f8f55a4585cb3' // Object.is equality
+
+Expected: "0f8f55a4585cb3"
+Received: "0dde30cbc63300"
+
+ ❯ src/game/soccer2/golden.test.ts:69:37
+     67|     for (const sc of SCENARIOS) for (const side of [1, -1]) for (let s…
+     68|     expect(prints).toHaveLength(60);
+     69|     expect(hash(prints.join('\n'))).toBe(GOLDEN.attacks);
+       |                                     ^
+     70|   });
+     71|   it('20 aiProgress matches', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/game/soccer2/golden.test.ts > soccer golden hash > 20 aiProgress matches
+AssertionError: expected '07f3dde0f40f62' to be '0b2cfdb283c412' // Object.is equality
+
+Expected: "0b2cfdb283c412"
+Received: "07f3dde0f40f62"
+
+ ❯ src/game/soccer2/golden.test.ts:77:37
+     75|       prints.push([p.score, p.drive, p.done, p.plays, p.ends.join('')]…
+     76|     }
+     77|     expect(hash(prints.join('\n'))).toBe(GOLDEN.matches);
+       |                                     ^
+     78|   });
+     79|   it('50 agreed shootouts', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  13:56:11
+   Duration  7.67s (transform 1.40s, setup 0ms, collect 1.74s, tests 5.26s, environment 24ms, prepare 226ms)
+

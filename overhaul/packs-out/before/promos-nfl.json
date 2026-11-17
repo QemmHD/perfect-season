@@ -1,0 +1,1199 @@
+{
+ "sport": "nfl",
+ "promos": [
+  {
+   "id": "s1-first-tip",
+   "kind": "program",
+   "name": "Rookie Breakouts",
+   "start": "2026-11-13",
+   "end": "2026-11-26",
+   "band": [
+    84,
+    89
+   ],
+   "delta": 4,
+   "n": 15,
+   "ovrMin": 84,
+   "ovrMax": 89,
+   "meanUplift": 4.4,
+   "minUplift": 2,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Kevin Byard '17 79→84",
+    "Wyatt Teller '20 78→84",
+    "Jason Babin '10 80→84",
+    "Shane Conlan '87 83→87"
+   ]
+  },
+  {
+   "id": "s1-landmark",
+   "kind": "landmark",
+   "name": "Air Raid",
+   "start": "2026-11-06",
+   "end": "2026-11-22",
+   "band": [
+    86,
+    92
+   ],
+   "delta": 5,
+   "n": 6,
+   "ovrMin": 92,
+   "ovrMax": 92,
+   "meanUplift": 2.5,
+   "minUplift": 1,
+   "maxUplift": 3,
+   "belowBase": 0,
+   "sample": [
+    "Tom Brady '07 91→92",
+    "Michael Thomas '19 90→92",
+    "DeAndre Hopkins '18 89→92",
+    "Davante Adams '21 89→92"
+   ]
+  },
+  {
+   "id": "s2-feast-week",
+   "kind": "program",
+   "name": "Feast Week",
+   "start": "2026-11-27",
+   "end": "2026-12-10",
+   "band": [
+    86,
+    91
+   ],
+   "delta": 4,
+   "n": 16,
+   "ovrMin": 86,
+   "ovrMax": 91,
+   "meanUplift": 4.13,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Kent Hull '91 84→88",
+    "LeRoy Butler '93 84→88",
+    "Terrell Owens '04 83→87",
+    "Eric Moulds '98 83→87"
+   ]
+  },
+  {
+   "id": "s2-cup-crown",
+   "kind": "program",
+   "name": "Snow Globe",
+   "start": "2026-12-04",
+   "end": "2026-12-17",
+   "band": [
+    87,
+    92
+   ],
+   "delta": 4,
+   "n": 15,
+   "ovrMin": 87,
+   "ovrMax": 92,
+   "meanUplift": 4.73,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Steve Atwater '92 84→88",
+    "Antonio Brown '17 88→92",
+    "Joe Thomas '14 83→87",
+    "Riley Odoms '74 81→87"
+   ]
+  },
+  {
+   "id": "s2-landmark",
+   "kind": "landmark",
+   "name": "Sack Masters",
+   "start": "2026-12-11",
+   "end": "2026-12-20",
+   "band": [
+    86,
+    92
+   ],
+   "delta": 5,
+   "n": 6,
+   "ovrMin": 90,
+   "ovrMax": 92,
+   "meanUplift": 4,
+   "minUplift": 2,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "J.J. Watt '15 90→92",
+    "Aaron Donald '18 89→92",
+    "Myles Garrett '21 88→92",
+    "Warren Sapp '00 86→91"
+   ]
+  },
+  {
+   "id": "s2-marquee",
+   "kind": "marquee",
+   "name": "November Marquee",
+   "start": "2026-12-07",
+   "end": "2026-12-20",
+   "band": [
+    90,
+    90
+   ],
+   "delta": 4,
+   "n": 1,
+   "ovrMin": 90,
+   "ovrMax": 90,
+   "meanUplift": 1,
+   "minUplift": 1,
+   "maxUplift": 1,
+   "belowBase": 0,
+   "sample": [
+    "Matthew Stafford '25 89→90"
+   ]
+  },
+  {
+   "id": "s3-holiday-hoops",
+   "kind": "program",
+   "name": "Christmas Slate",
+   "start": "2026-12-25",
+   "end": "2027-01-07",
+   "band": [
+    88,
+    92
+   ],
+   "delta": 4,
+   "n": 16,
+   "ovrMin": 88,
+   "ovrMax": 92,
+   "meanUplift": 4.44,
+   "minUplift": 3,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Gary Zimmerman '96 84→88",
+    "Terrell Owens '04 83→88",
+    "David Bakhtiari '18 86→90",
+    "Bobby Wagner '18 89→92"
+   ]
+  },
+  {
+   "id": "s3-landmark",
+   "kind": "landmark",
+   "name": "Ground Game",
+   "start": "2027-01-01",
+   "end": "2027-01-10",
+   "band": [
+    86,
+    92
+   ],
+   "delta": 5,
+   "n": 5,
+   "ovrMin": 92,
+   "ovrMax": 92,
+   "meanUplift": 2.8,
+   "minUplift": 2,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "LaDainian Tomlinson '06 90→92",
+    "Chris Johnson '09 90→92",
+    "Adrian Peterson '12 90→92",
+    "Saquon Barkley '24 89→92"
+   ]
+  },
+  {
+   "id": "s4-honors",
+   "kind": "honors",
+   "name": "Hot Season Honors",
+   "start": "2027-01-15",
+   "end": "2027-01-29",
+   "band": [
+    94,
+    97
+   ],
+   "delta": 6,
+   "n": 24,
+   "ovrMin": 94,
+   "ovrMax": 97,
+   "meanUplift": 6.21,
+   "minUplift": 6,
+   "maxUplift": 8,
+   "belowBase": 0,
+   "sample": [
+    "Champ Bailey '05 90→96",
+    "J.J. Watt '15 90→96",
+    "Stephon Gilmore '19 90→96",
+    "Brian Urlacher '06 89→95"
+   ]
+  },
+  {
+   "id": "s4-honors-legends",
+   "kind": "legends",
+   "name": "Hot Season Legends",
+   "start": "2027-01-22",
+   "end": "2027-02-05",
+   "band": [
+    92,
+    96
+   ],
+   "delta": 3,
+   "n": 6,
+   "ovrMin": 92,
+   "ovrMax": 94,
+   "meanUplift": 4.5,
+   "minUplift": 3,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "Zack Martin '22 87→92",
+    "Peyton Manning '13 88→92",
+    "Larry Allen '01 91→94",
+    "Joe Montana '89 87→92"
+   ]
+  },
+  {
+   "id": "s4-landmark",
+   "kind": "landmark",
+   "name": "Ballhawks",
+   "start": "2027-02-05",
+   "end": "2027-02-14",
+   "band": [
+    87,
+    93
+   ],
+   "delta": 5,
+   "n": 5,
+   "ovrMin": 90,
+   "ovrMax": 93,
+   "meanUplift": 4.6,
+   "minUplift": 3,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "Champ Bailey '06 90→93",
+    "Mel Blount '75 87→92",
+    "Eric Turner '94 86→91",
+    "Charles Woodson '09 86→91"
+   ]
+  },
+  {
+   "id": "s4-deadline",
+   "kind": "program",
+   "name": "Honor Roll Week",
+   "start": "2027-02-08",
+   "end": "2027-02-14",
+   "band": [
+    85,
+    90
+   ],
+   "delta": 5,
+   "n": 15,
+   "ovrMin": 85,
+   "ovrMax": 90,
+   "meanUplift": 5.2,
+   "minUplift": 1,
+   "maxUplift": 7,
+   "belowBase": 0,
+   "sample": [
+    "Cameron Heyward '21 82→87",
+    "George Pickens '25 78→85",
+    "Davante Adams '20 89→90",
+    "Mike Evans '16 78→85"
+   ]
+  },
+  {
+   "id": "s4-pairs",
+   "kind": "program",
+   "name": "Perfect Pairs",
+   "start": "2027-02-12",
+   "end": "2027-02-25",
+   "band": [
+    88,
+    92
+   ],
+   "delta": 4,
+   "n": 8,
+   "ovrMin": 88,
+   "ovrMax": 90,
+   "meanUplift": 4.38,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Harold Carmichael '73 85→89",
+    "Jerry Rice '90 86→90",
+    "Brett Favre '96 83→88",
+    "Steve McNair '03 84→88"
+   ]
+  },
+  {
+   "id": "s5-next-up",
+   "kind": "program",
+   "name": "Next Up",
+   "start": "2027-02-16",
+   "end": "2027-03-01",
+   "band": [
+    86,
+    91
+   ],
+   "delta": 5,
+   "n": 15,
+   "ovrMin": 86,
+   "ovrMax": 88,
+   "meanUplift": 5.73,
+   "minUplift": 5,
+   "maxUplift": 7,
+   "belowBase": 0,
+   "sample": [
+    "Patrick Willis '08 83→88",
+    "Joe Cribbs '81 80→86",
+    "Shane Conlan '88 83→88",
+    "Brock Marion '00 80→86"
+   ]
+  },
+  {
+   "id": "s5-desert-stars",
+   "kind": "program",
+   "name": "Franchise Tag",
+   "start": "2027-02-19",
+   "end": "2027-03-04",
+   "band": [
+    89,
+    93
+   ],
+   "delta": 4,
+   "n": 15,
+   "ovrMin": 89,
+   "ovrMax": 93,
+   "meanUplift": 4.4,
+   "minUplift": 2,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Derrick Henry '20 84→89",
+    "Myles Garrett '21 88→92",
+    "Jalen Ramsey '17 86→90",
+    "David DeCastro '17 83→89"
+   ]
+  },
+  {
+   "id": "s5-combine",
+   "kind": "program",
+   "name": "Combine Kings",
+   "start": "2027-02-26",
+   "end": "2027-03-11",
+   "band": [
+    86,
+    91
+   ],
+   "delta": 5,
+   "n": 15,
+   "ovrMin": 86,
+   "ovrMax": 91,
+   "meanUplift": 5.2,
+   "minUplift": 5,
+   "maxUplift": 7,
+   "belowBase": 0,
+   "sample": [
+    "George Rogers '81 83→88",
+    "Ndamukong Suh '10 80→86",
+    "Saquon Barkley '18 79→86",
+    "Patrick Mahomes '18 86→91"
+   ]
+  },
+  {
+   "id": "s5-landmark",
+   "kind": "landmark",
+   "name": "Forty Club",
+   "start": "2027-03-05",
+   "end": "2027-03-21",
+   "band": [
+    87,
+    93
+   ],
+   "delta": 5,
+   "n": 4,
+   "ovrMin": 93,
+   "ovrMax": 93,
+   "meanUplift": 2,
+   "minUplift": 2,
+   "maxUplift": 2,
+   "belowBase": 0,
+   "sample": [
+    "Peyton Manning '04 91→93",
+    "Tom Brady '07 91→93",
+    "Aaron Rodgers '11 91→93",
+    "Lamar Jackson '24 91→93"
+   ]
+  },
+  {
+   "id": "s5-frenzy",
+   "kind": "program",
+   "name": "Free Agent Frenzy",
+   "start": "2027-03-12",
+   "end": "2027-03-25",
+   "band": [
+    88,
+    92
+   ],
+   "delta": 4,
+   "n": 15,
+   "ovrMin": 88,
+   "ovrMax": 88,
+   "meanUplift": 5.4,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Jared Allen '09 83→88",
+    "Andre Rison '92 82→88",
+    "Rod Woodson '02 83→88",
+    "Jalen Ramsey '18 83→88"
+   ]
+  },
+  {
+   "id": "s6-farewell",
+   "kind": "program",
+   "name": "Farewell Tour",
+   "start": "2027-03-26",
+   "end": "2027-04-08",
+   "band": [
+    87,
+    92
+   ],
+   "delta": 8,
+   "n": 15,
+   "ovrMin": 87,
+   "ovrMax": 92,
+   "meanUplift": 7.8,
+   "minUplift": 4,
+   "maxUplift": 10,
+   "belowBase": 0,
+   "sample": [
+    "Brian Waters '11 79→87",
+    "Zach Thomas '06 86→92",
+    "Willie Roaf '05 86→92",
+    "Steve Young '98 84→92"
+   ]
+  },
+  {
+   "id": "s6-landmark",
+   "kind": "landmark",
+   "name": "Scramble Drill",
+   "start": "2027-04-02",
+   "end": "2027-04-18",
+   "band": [
+    87,
+    93
+   ],
+   "delta": 5,
+   "n": 4,
+   "ovrMin": 87,
+   "ovrMax": 93,
+   "meanUplift": 7.25,
+   "minUplift": 2,
+   "maxUplift": 9,
+   "belowBase": 0,
+   "sample": [
+    "Lamar Jackson '24 91→93",
+    "Randall Cunningham '90 78→87",
+    "Mike Vick '04 78→87",
+    "Robert Griffin III '12 78→87"
+   ]
+  },
+  {
+   "id": "s6-underdogs",
+   "kind": "program",
+   "name": "Day One Starters",
+   "start": "2027-04-09",
+   "end": "2027-04-22",
+   "band": [
+    86,
+    91
+   ],
+   "delta": 7,
+   "n": 15,
+   "ovrMin": 86,
+   "ovrMax": 91,
+   "meanUplift": 7.6,
+   "minUplift": 5,
+   "maxUplift": 9,
+   "belowBase": 0,
+   "sample": [
+    "Ronnie Lott '81 86→91",
+    "Marcus Stroud '02 77→86",
+    "Roy Williams '02 79→86",
+    "Khalil Mack '14 78→86"
+   ]
+  },
+  {
+   "id": "s6-primetime",
+   "kind": "program",
+   "name": "Postseason Primetime",
+   "start": "2027-04-16",
+   "end": "2027-04-29",
+   "band": [
+    90,
+    94
+   ],
+   "delta": 4,
+   "n": 12,
+   "ovrMin": 90,
+   "ovrMax": 93,
+   "meanUplift": 4.25,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Rob Gronkowski '15 87→91",
+    "Julio Jones '16 87→91",
+    "Aaron Rodgers '20 85→90",
+    "Todd Gurley '18 86→90"
+   ]
+  },
+  {
+   "id": "s7-draft-night",
+   "kind": "program",
+   "name": "Draft Night",
+   "start": "2027-04-29",
+   "end": "2027-05-12",
+   "band": [
+    87,
+    92
+   ],
+   "delta": 5,
+   "n": 15,
+   "ovrMin": 87,
+   "ovrMax": 92,
+   "meanUplift": 5.2,
+   "minUplift": 3,
+   "maxUplift": 7,
+   "belowBase": 0,
+   "sample": [
+    "Ahmad Gardner '22 83→88",
+    "Keith Jackson '88 83→88",
+    "James Lofton '78 82→87",
+    "Bobby Butler '81 83→88"
+   ]
+  },
+  {
+   "id": "s7-capital",
+   "kind": "program",
+   "name": "Capital Classics",
+   "start": "2027-04-30",
+   "end": "2027-05-13",
+   "band": [
+    88,
+    91
+   ],
+   "delta": 3,
+   "n": 3,
+   "ovrMin": 88,
+   "ovrMax": 88,
+   "meanUplift": 3,
+   "minUplift": 3,
+   "maxUplift": 3,
+   "belowBase": 0,
+   "sample": [
+    "Larry Brown '70 85→88",
+    "Art Monk '84 85→88",
+    "Gary Clark '87 85→88"
+   ]
+  },
+  {
+   "id": "s7-landmark",
+   "kind": "landmark",
+   "name": "Tight End Factory",
+   "start": "2027-05-07",
+   "end": "2027-05-23",
+   "band": [
+    87,
+    93
+   ],
+   "delta": 5,
+   "n": 4,
+   "ovrMin": 88,
+   "ovrMax": 91,
+   "meanUplift": 5,
+   "minUplift": 5,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "Kellen Winslow '80 86→91",
+    "Todd Christensen '83 83→88",
+    "Rob Gronkowski '11 83→88",
+    "Trey McBride '25 83→88"
+   ]
+  },
+  {
+   "id": "s7-dream-teams",
+   "kind": "season-finale",
+   "name": "Decade Dream Teams",
+   "start": "2027-05-14",
+   "end": "2027-06-17",
+   "band": [
+    90,
+    96
+   ],
+   "delta": 4,
+   "n": 75,
+   "ovrMin": 90,
+   "ovrMax": 97,
+   "meanUplift": 4.33,
+   "minUplift": 4,
+   "maxUplift": 10,
+   "belowBase": 0,
+   "sample": [
+    "Gene Washington '70 87→97",
+    "Cliff Branch '74 87→91",
+    "Mel Blount '75 87→91",
+    "Walter Payton '77 87→91"
+   ]
+  },
+  {
+   "id": "s8-ring-night",
+   "kind": "program",
+   "name": "Ring Night",
+   "start": "2027-06-04",
+   "end": "2027-06-17",
+   "band": [
+    93,
+    96
+   ],
+   "delta": 5,
+   "n": 8,
+   "ovrMin": 93,
+   "ovrMax": 96,
+   "meanUplift": 5.25,
+   "minUplift": 5,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Peyton Manning '04 91→96",
+    "Tom Brady '07 91→96",
+    "Aaron Rodgers '11 91→96",
+    "Adrian Peterson '12 90→95"
+   ]
+  },
+  {
+   "id": "s8-finale",
+   "kind": "finale",
+   "name": "Perfect Season Finale",
+   "start": "2027-06-18",
+   "end": "2027-07-01",
+   "band": [
+    98,
+    99
+   ],
+   "delta": 9,
+   "n": 8,
+   "ovrMin": 98,
+   "ovrMax": 99,
+   "meanUplift": 9.13,
+   "minUplift": 8,
+   "maxUplift": 11,
+   "belowBase": 0,
+   "sample": [
+    "Peyton Manning '04 91→99",
+    "LaDainian Tomlinson '06 90→99",
+    "J.J. Watt '15 90→99",
+    "Stephon Gilmore '19 90→99"
+   ]
+  },
+  {
+   "id": "s8-lottery",
+   "kind": "program",
+   "name": "Minicamp Standouts",
+   "start": "2027-06-22",
+   "end": "2027-07-04",
+   "band": [
+    88,
+    93
+   ],
+   "delta": 5,
+   "n": 15,
+   "ovrMin": 88,
+   "ovrMax": 90,
+   "meanUplift": 5.93,
+   "minUplift": 5,
+   "maxUplift": 7,
+   "belowBase": 0,
+   "sample": [
+    "A.J. Green '12 82→88",
+    "Keith Bulluck '03 81→88",
+    "Kevin Williams '04 82→88",
+    "Jake Scott '71 84→89"
+   ]
+  },
+  {
+   "id": "s9-summer-run",
+   "kind": "program",
+   "name": "Rookie Camp",
+   "start": "2027-07-09",
+   "end": "2027-07-22",
+   "band": [
+    88,
+    93
+   ],
+   "delta": 5,
+   "n": 15,
+   "ovrMin": 88,
+   "ovrMax": 89,
+   "meanUplift": 5.13,
+   "minUplift": 5,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Curt Warner '83 82→88",
+    "Rob Gronkowski '11 83→88",
+    "Tony Hill '78 83→88",
+    "Lynn Swann '75 83→88"
+   ]
+  },
+  {
+   "id": "s9-summer-heat",
+   "kind": "program",
+   "name": "Summer Heat",
+   "start": "2027-07-16",
+   "end": "2027-08-12",
+   "band": [
+    92,
+    96
+   ],
+   "delta": 4,
+   "n": 40,
+   "ovrMin": 92,
+   "ovrMax": 97,
+   "meanUplift": 5.17,
+   "minUplift": 4,
+   "maxUplift": 7,
+   "belowBase": 0,
+   "sample": [
+    "LaDainian Tomlinson '07 89→93",
+    "Ryan Clady '09 88→92",
+    "Jake Long '10 86→92",
+    "Steve Young '94 87→92"
+   ]
+  },
+  {
+   "id": "s9-landmark",
+   "kind": "landmark",
+   "name": "Rushing Crown",
+   "start": "2027-07-23",
+   "end": "2027-08-08",
+   "band": [
+    89,
+    94
+   ],
+   "delta": 5,
+   "n": 5,
+   "ovrMin": 94,
+   "ovrMax": 94,
+   "meanUplift": 4.4,
+   "minUplift": 4,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "LaDainian Tomlinson '06 90→94",
+    "Chris Johnson '09 90→94",
+    "Adrian Peterson '12 90→94",
+    "Christian McCaffrey '23 89→94"
+   ]
+  },
+  {
+   "id": "s9-canton",
+   "kind": "legends",
+   "name": "Canton Class",
+   "start": "2027-08-05",
+   "end": "2027-08-19",
+   "band": [
+    92,
+    96
+   ],
+   "delta": 3,
+   "n": 6,
+   "ovrMin": 92,
+   "ovrMax": 92,
+   "meanUplift": 4.5,
+   "minUplift": 4,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "Steve Hutchinson '05 88→92",
+    "Antonio Brown '17 88→92",
+    "Steve Young '92 87→92",
+    "Trent Williams '21 88→92"
+   ]
+  },
+  {
+   "id": "s10-camp-battles",
+   "kind": "program",
+   "name": "Camp Battles",
+   "start": "2027-08-13",
+   "end": "2027-09-09",
+   "band": [
+    90,
+    94
+   ],
+   "delta": 5,
+   "n": 16,
+   "ovrMin": 90,
+   "ovrMax": 94,
+   "meanUplift": 6,
+   "minUplift": 5,
+   "maxUplift": 7,
+   "belowBase": 0,
+   "sample": [
+    "Drew Brees '10 83→90",
+    "Peyton Manning '00 85→90",
+    "Josh Allen '24 89→94",
+    "Eli Manning '11 85→90"
+   ]
+  },
+  {
+   "id": "s10-springfield",
+   "kind": "legends",
+   "name": "Gold Jackets II",
+   "start": "2027-09-03",
+   "end": "2027-09-16",
+   "band": [
+    92,
+    96
+   ],
+   "delta": 3,
+   "n": 3,
+   "ovrMin": 92,
+   "ovrMax": 93,
+   "meanUplift": 3.33,
+   "minUplift": 3,
+   "maxUplift": 4,
+   "belowBase": 0,
+   "sample": [
+    "Myles Garrett '25 88→92",
+    "LaDainian Tomlinson '06 90→93",
+    "J.J. Watt '15 90→93"
+   ]
+  },
+  {
+   "id": "s10-landmark",
+   "kind": "landmark",
+   "name": "Receiving Crown",
+   "start": "2027-08-20",
+   "end": "2027-09-05",
+   "band": [
+    90,
+    95
+   ],
+   "delta": 5,
+   "n": 5,
+   "ovrMin": 93,
+   "ovrMax": 95,
+   "meanUplift": 5,
+   "minUplift": 5,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "Michael Thomas '19 90→95",
+    "Tyreek Hill '23 89→94",
+    "Ja'Marr Chase '24 89→94",
+    "Calvin Johnson '11 88→93"
+   ]
+  },
+  {
+   "id": "s10-kickoff",
+   "kind": "program",
+   "name": "Kickoff Countdown",
+   "start": "2027-09-10",
+   "end": "2027-09-23",
+   "band": [
+    91,
+    95
+   ],
+   "delta": 4,
+   "n": 15,
+   "ovrMin": 91,
+   "ovrMax": 92,
+   "meanUplift": 6.6,
+   "minUplift": 4,
+   "maxUplift": 8,
+   "belowBase": 0,
+   "sample": [
+    "Puka Nacua '25 87→91",
+    "Myles Garrett '25 88→92",
+    "Maxx Crosby '25 84→91",
+    "Trent Williams '25 84→91"
+   ]
+  },
+  {
+   "id": "s11-primetime-lights",
+   "kind": "program",
+   "name": "Primetime Lights",
+   "start": "2027-09-17",
+   "end": "2027-09-30",
+   "band": [
+    91,
+    95
+   ],
+   "delta": 4,
+   "n": 15,
+   "ovrMin": 91,
+   "ovrMax": 94,
+   "meanUplift": 4.93,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Antonio Brown '17 88→92",
+    "Khalil Mack '16 86→91",
+    "Patrick Mahomes '22 88→92",
+    "David Bakhtiari '20 85→91"
+   ]
+  },
+  {
+   "id": "s11-landmark",
+   "kind": "landmark",
+   "name": "Sack Crown",
+   "start": "2027-09-24",
+   "end": "2027-10-10",
+   "band": [
+    90,
+    95
+   ],
+   "delta": 5,
+   "n": 5,
+   "ovrMin": 90,
+   "ovrMax": 95,
+   "meanUplift": 5,
+   "minUplift": 5,
+   "maxUplift": 5,
+   "belowBase": 0,
+   "sample": [
+    "J.J. Watt '15 90→95",
+    "Aaron Donald '18 89→94",
+    "Myles Garrett '25 88→93",
+    "Nick Bosa '22 86→91"
+   ]
+  },
+  {
+   "id": "s11-rivalry",
+   "kind": "program",
+   "name": "Rivalry Week",
+   "start": "2027-10-01",
+   "end": "2027-10-14",
+   "band": [
+    92,
+    96
+   ],
+   "delta": 4,
+   "n": 16,
+   "ovrMin": 92,
+   "ovrMax": 95,
+   "meanUplift": 5.25,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Priest Holmes '02 86→92",
+    "Drew Pearson '74 86→92",
+    "Emmitt Smith '93 87→92",
+    "Mel Blount '75 87→92"
+   ]
+  },
+  {
+   "id": "s12-anniversary",
+   "kind": "program",
+   "name": "Anniversary Club",
+   "start": "2027-10-22",
+   "end": "2027-11-04",
+   "band": [
+    93,
+    96
+   ],
+   "delta": 4,
+   "n": 10,
+   "ovrMin": 93,
+   "ovrMax": 93,
+   "meanUplift": 5.3,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Wesley Walker '78 87→93",
+    "Shaun Alexander '05 87→93",
+    "Saquon Barkley '24 89→93",
+    "Myles Garrett '24 89→93"
+   ]
+  },
+  {
+   "id": "s12-first-tip",
+   "kind": "program",
+   "name": "Rookie Breakouts II",
+   "start": "2027-11-05",
+   "end": "2027-11-18",
+   "band": [
+    90,
+    94
+   ],
+   "delta": 4,
+   "n": 15,
+   "ovrMin": 90,
+   "ovrMax": 91,
+   "meanUplift": 5.07,
+   "minUplift": 4,
+   "maxUplift": 6,
+   "belowBase": 0,
+   "sample": [
+    "Larry Brown '70 85→90",
+    "Patrick Mahomes '18 86→90",
+    "Larry Johnson '05 84→90",
+    "Ottis Anderson '79 84→90"
+   ]
+  }
+ ],
+ "standoutsYear": {
+  "weeks": 52,
+  "featuredHist": {
+   "91": 25,
+   "92": 16,
+   "93": 11
+  },
+  "allHist": {
+   "80": 154,
+   "81": 131,
+   "82": 103,
+   "83": 80,
+   "84": 62,
+   "85": 56,
+   "86": 57,
+   "87": 23,
+   "88": 25,
+   "89": 20,
+   "90": 9,
+   "91": 28,
+   "92": 21,
+   "93": 11
+  },
+  "decades": {
+   "1970": 12,
+   "1980": 5,
+   "1990": 8,
+   "2000": 8,
+   "2010": 10,
+   "2020": 9
+  }
+ },
+ "landmarks": {
+  "n": 354,
+  "uplift": {
+   "2": 5,
+   "3": 7,
+   "4": 242,
+   "5": 23,
+   "6": 11,
+   "7": 16,
+   "8": 13,
+   "9": 9,
+   "10": 12,
+   "11": 2,
+   "12": 5,
+   "13": 2,
+   "14": 3,
+   "18": 1,
+   "19": 1,
+   "20": 2
+  },
+  "ovr": {
+   "85": 131,
+   "86": 33,
+   "87": 41,
+   "88": 41,
+   "89": 37,
+   "90": 24,
+   "91": 16,
+   "92": 9,
+   "93": 22
+  }
+ },
+ "fodderQs": {
+  "goldMin": 35,
+  "goldP25": 35,
+  "silverMin": 15,
+  "silverP50": 20,
+  "bronzeMin": 5
+ },
+ "sbcCatalogue": {
+  "daily:Pairs -> {\"pack\":\"silver\"}": 5,
+  "daily:Then and Now -> {\"pack\":\"silver\"}": 9,
+  "daily:Franchise Night -> {\"pack\":\"gold\"}": 7,
+  "daily:Golden Pair -> {\"pack\":\"gold\"}": 10,
+  "daily:Dallas Cowboys Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"DAL\"}}": 1,
+  "daily:No Fly Zone -> {\"pack\":\"premium\"}": 9,
+  "weekly:Rival Dynasties -> {\"card\":{\"tier\":\"promo\"}}": 14,
+  "weekly:Dynasty -> {\"card\":{\"tier\":\"promo\",\"fr\":\"TB\"}}": 1,
+  "weekly:Champions of the decade -> {\"card\":{\"tier\":\"gold\",\"minOvr\":82}}": 21,
+  "weekly:Gold Front Seven -> {\"pack\":\"premium\",\"card\":{\"tier\":\"gold\",\"minOvr\":81}}": 21,
+  "daily:Bronze Age -> {\"pack\":\"silver\"}": 4,
+  "daily:Silver Service -> {\"pack\":\"silver\"}": 6,
+  "daily:Skill Set -> {\"pack\":\"premium\"}": 12,
+  "daily:Golden Era -> {\"card\":{\"tier\":\"gold\",\"minOvr\":81}}": 16,
+  "weekly:Dynasty -> {\"card\":{\"tier\":\"promo\",\"fr\":\"GB\"}}": 7,
+  "weekly:Hall of Fame Class -> {\"pack\":\"premium\",\"card\":{\"tier\":\"promo\"}}": 14,
+  "daily:Silver Lining -> {\"pack\":\"silver\"}": 9,
+  "daily:Decade Night -> {\"pack\":\"silver\"}": 7,
+  "daily:Silver Squad -> {\"pack\":\"gold\"}": 8,
+  "daily:Same Era -> {\"pack\":\"gold\"}": 8,
+  "daily:Deep Bench -> {\"pack\":\"premium\"}": 8,
+  "daily:Scrimmage -> {\"pack\":\"silver\"}": 8,
+  "daily:Pass Catchers -> {\"pack\":\"gold\"}": 8,
+  "daily:New England Patriots Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"NE\"}}": 1,
+  "daily:Three of a Kind -> {\"pack\":\"silver\"}": 8,
+  "daily:Rivalry Week -> {\"pack\":\"gold\"}": 7,
+  "daily:Decade Draft -> {\"pack\":\"gold\"}": 8,
+  "daily:Cincinnati Bengals Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"CIN\"}}": 1,
+  "daily:New York Jets Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"NYJ\"}}": 1,
+  "daily:Baltimore Ravens Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"BAL\"}}": 1,
+  "weekly:Dynasty -> {\"card\":{\"tier\":\"promo\",\"fr\":\"LV\"}}": 7,
+  "daily:Buffalo Bills Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"BUF\"}}": 1,
+  "daily:Las Vegas Raiders Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"LV\"}}": 1,
+  "weekly:Decade All-Stars -> {\"pack\":\"premium\"}": 7,
+  "weekly:Dynasty -> {\"card\":{\"tier\":\"promo\",\"fr\":\"ATL\"}}": 7,
+  "weekly:Hot Season Hunt -> {\"card\":{\"tier\":\"promo\"}}": 13,
+  "daily:Kansas City Chiefs Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"KC\"}}": 1,
+  "daily:Denver Broncos Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"DEN\"}}": 1,
+  "daily:Pittsburgh Steelers Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"PIT\"}}": 1,
+  "daily:Chicago Bears Legacy -> {\"card\":{\"tier\":\"gold\",\"minOvr\":80,\"fr\":\"CHI\"}}": 1
+ },
+ "rewardCards": {
+  "promo": {
+   "ovr": 94.8,
+   "qs": 241.6
+  },
+  "gold84": {
+   "ovr": 85.6,
+   "qs": 91.7
+  },
+  "gold88": {
+   "ovr": 88.8,
+   "qs": 118.3
+  },
+  "goldAny": {
+   "ovr": 78.3,
+   "qs": 48.6
+  }
+ },
+ "packGoldMeanOvr": 76.9,
+ "prices": {
+  "bronze": 175,
+  "silver": 320,
+  "gold": 900,
+  "premium": 1400,
+  "spotlight": 3500,
+  "position": 500,
+  "daily": 0,
+  "scout": 250,
+  "elite": 1500,
+  "jumbo": 2700,
+  "standout": 1800,
+  "lightning": 1350,
+  "roster": 900,
+  "captains": 1000,
+  "dynasty": 1900
+ }
+}

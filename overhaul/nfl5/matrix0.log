@@ -1,0 +1,18 @@
+
+== concept x call, completion per dropback, 80 snaps a cell (AI passer at Pro, gold v gold)
+concept       c0     c1    c1r     c2     t2     c3     c4   fire    sim   goalprevent    avg
+verts         63     66     91     98     94     98     91     99     95     71     64    84.4
+slants         0     88     64     53     73     61     46     64     70     91     65    61.2
+smash          0     28     46     50     50     60     56     49     60     41     41    43.7
+flood         50     46     51     88     91     68     94     70     70     38     30    63.2
+dagger        51     46     89     93     90     98     85     79     96     51     66    76.7
+mesh           8     96     95     95     98     90     99     95     96     98     96    87.7
+curls          0     34     34     75     73     73     68     46     76     30     73    52.7
+posts         53     57     51     81     81     75     68     75     71     54     38    64.0
+avg           28     58     65     79     81     78     76     72     79     59     59
+each call's best concept (pts over the call's average): c0 verts +35, c1 mesh +39, c1r mesh +30, c2 verts +19, t2 mesh +16, c3 verts +20, c4 mesh +23, fire verts +27, sim dagger +17, goal mesh +38, prevent mesh +37
+each concept's best call (pts under the concept's average): verts c0 -22, slants c0 -61, smash c0 -44, flood prevent -33, dagger c1 -30, mesh c0 -80, curls c0 -53, posts prevent -26
+sacks blitz 0.0 base 0.0 ; 20+ blitz 31.0 base 34.9
+
+done in 72s -> docs/studio-overhaul/nfl-calibration/nfl5-scratch-matrix.json
+EXIT 0
