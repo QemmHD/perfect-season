@@ -5,7 +5,7 @@ Branch `claude/studio-nba`, worktree `/home/user/ps-s-nba`, dev server port **52
 [`nba-plan.md`](nba-plan.md) (revision 3, Game Design V2). This doc records what each task changed, the before and
 after numbers, the tests, the protocol line, the contracts other teams build against, and what's left.
 
-**Contents:** nba-1 (harness, baseline, QA isolation) · nba-2 (the shared controls) · nba-3 (the frame: camera, HUD, clock, text, held arena) · Contracts for nfl / soccer / ut (plan §4, verbatim) · Contract
+**Contents:** nba-1 (harness, baseline, QA isolation) · nba-2 (the shared controls) · nba-3 (the frame: camera, HUD, clock, text, held arena) · nba-3 review fixes · nba-4 (the gold ring, PERFECT, Heat, the grade) · Contracts for nfl / soccer / ut (plan §4, verbatim) · Contract
 changes · Requests to other teams · Escalations · Protocol · Touched outside my lane · Owner device checks · Left
 undone.
 
@@ -724,6 +724,203 @@ golden in `controls.test.ts` are byte-identical, and the rematch's AI side is pr
 
 ---
 
+## nba-3 review fixes (2026-11-17)
+
+An independent review of nba-3 (`143eee7..4645b91`) found 2 high, 4 medium and 4 low issues. All are fixed on
+today's HEAD (after nba-4). The frame-budget row stays open as an integration blocker, with a committed profile.
+Nothing here changes how a match plays or ends: no protocol line.
+
+### What changed
+
+- **High: the camera cut on a pass or a loose ball** (`camera.ts` `camStep`). A new subject's bounds were
+  hard-clamped in one frame.
+  - **The follow is eased back inside the bounds:** `CAM.kClamp` is 14 per second.
+  - **It never moves faster than `CAM.vmax`:** 1.3 safe-box heights a second, about 9.8 px a frame at 393×852 at
+    60 fps.
+  - **The cap is measured on the rim itself:** the step starts from the pan that holds the rim exactly where it was
+    under this frame's zoom and tilt. A zoom easing home is a push-in about the rim, never a jolt.
+  - **Hard bounds are the last resort:** the man with the ball, and the rim, inside the screen. A pass's catcher or
+    a loose ball's man is panned to, never snapped to.
+  - **A new possession is a cut:** every man is re-placed, so the camera is framed afresh and the yaw's sign is
+    chosen again (`render.ts` follow and the test rig). A pan across a teleport would read worse.
+  - `camFollow` (camera.ts) is now the one function `render.ts` and `camera.test.ts` both drive. The test films
+    exactly what the game shows.
+- **High: the court swayed** (`yawStep`, camera.ts). The yaw keeps its sign and its hysteresis in the camera state.
+  - It changes only when the guard has been clearly on the other side on **both** axes (over 1.5 ft ahead or
+    behind, and over 1 ft to the side) for 0.45 s.
+  - It waits at least 1.5 s after the last change, and never changes while the ball is in the air (a shot, a pass,
+    a loose ball).
+  - `kYaw` went from 4 to 5, so a turn settles in 0.6 s.
+  - **The stick is latched:** it keeps the camera's yaw from the moment the thumb went down until it lifts
+    (`Hoops2` `stickYaw`, `renderer.stickToCourt(x, y, yaw)`). A turn never rotates the court under a held thumb.
+- **Medium: the scorer plate added up across rematches.** The rematch block makes a new `BoxTracker`. The dev probe
+  gained `boxPoints()`, and `nba-held.mjs` checks that the box never runs ahead of its own game.
+- **Medium: rematch → controllable frame.**
+  - **Found:** the "third rematch" outlier was not GC or timers. Seed `held:r5`'s first possession ends in a reach-in
+    steal on its very first step (deterministic, engine behaviour). The probe waited for a live possession, so it
+    timed the second one: +1.27 s.
+  - **Found too, and worse:** every 4× rematch spent a 540-670 ms long task on its first frame, so the first frame
+    on screen came at 1.85-2.16 s. `renderer.reset` compared the court and kits by identity, and hosts rebuild them on
+    every render. So each rematch rebuilt the court texture and cleared every player's look. They are now compared
+    by value.
+  - The curtain is 1.2 s (was 1.4).
+  - **The AI side is time-sliced:** `autoplaySteps(…, chunk)` also yields every 20 steps, and
+    `aiPossessionsLater(…, { now, budgetMs: 3 })` ends each task at the first chunk past 3 ms. Arcade passes
+    `performance.now`. The clock never enters the engine: the scan is unchanged, and the result is proven equal to
+    `aiPossessionsOf`.
+  - **The probe** times the first tip-off (watched, because a later possession's tip overwrites `tipAt`) and the first
+    frame on screen after the game has stepped. It runs 5 rematches at 4×.
+- **Medium: the handler's row.**
+  - **A fixed bias couldn't do it.** The median is as much about where the AI holds the ball as about the camera.
+    Since nba-4, the live lab game (real lineups) holds it further out than the test's synthetic squads. With the rim
+    pinned, the old framing measured 0.559 live against 0.501 / 0.487 in the test.
+  - **So the rim floats in a band now:** `CAM.handPull` and `rimBandLo/Hi` give 20-24% of the height at 393 and
+    320. It drifts toward the frame that puts the man with the ball on `handRow` (51-53%): a man at the top of the
+    key lifts the picture a little, a man in the paint lowers it.
+  - **Within 16-20 ft of the rim** (`handNear`) the rim settles at the band's bottom, so the zoom near the rim stays
+    fixed.
+  - `axisRow` went 0.5 → 0.48 (it splits a release's pair a little more).
+  - **Live** (6 lab games a size, 16,200 frames of play): **0.548 at 393, 0.527 at 320.** **Test** (6 games):
+    0.524 / 0.510. The test floor nba-4 lowered to 0.47 is back at 0.50. `nba-hud.mjs` now samples several games per size (`NBA_HUD_SEEDS`, `NBA_HUD_FRAMES`) and
+  reports every release as well as jump shots. Since nba-4 it also pre-sets the calibration, because the calibrator
+  offer held the played page's tip-off and the probe timed out.
+- **Medium: the frame budget.**
+  - **Cut:** the Heat bar's stripes run only at HEATING UP and ON FIRE. A cold bar's running background repainted every
+    frame.
+  - **Committed:** `scripts/audit/nba-profile.mjs`, a per-part breakdown (below).
+  - **Still open:** the row, as an integration blocker.
+- **Low:**
+  - **The box tracker:** the pump fake and the play call feed it before `handleEvents` clears the events.
+  - **`onFinish` with `hold`:** it is immediate only offline (`hold && !online`).
+  - **`HeldLab`:** it is lazy and dev-only (`import.meta.env.DEV`), so the stub sheet is not in the production bundle.
+  - **The rim edge:** when the subject and the rim can't both keep their margins, the subject keeps his and the
+    whole backboard stays on screen (`CAM.board`, 3 ft). The rim gives up its margin first, never the board. Before,
+    the two split the difference and the board was cut.
+  - **Chip plates:** they stay 4 px in from the screen's sides (`labels.ts`).
+
+### Before → after
+
+**Camera** (`camera.test.ts`; HEAD = 4645b91+nba-4 before the fix, the same harness and seeds, 6 games at 393 / 320):
+
+| Row | Before 393 / 320 | After 393 / 320 |
+|---|---|---|
+| Rim motion in one frame, max (≤ 12 px) | **193 / 104 px** | **9.8 / 6.3 px** |
+| Frames over 12 px | 102 / 94 | **0 / 0** |
+| Yaw sign changes per possession (≤ 1) | **5.4** (95% of possessions; max 16) | **0.87** (51%; max 4) |
+| Frames mid-swing (≤ 10%) | **55.8%** | **8.2%** |
+| Handler's median row (0.50-0.55) | 0.495 / 0.482 | **0.524 / 0.510** |
+| Rim row (0.20-0.24), median | 0.220 / 0.216 | 0.234 / 0.230 (it floats in the band) |
+| Handler and rim in the safe box (≥ 0.98) | 0.998 / 0.997 | 0.999 / 1.000 |
+| Zoom near the rim, the live definition (the man with the ball within 15 ft; ≤ 2%) | — | **0.5% / 0.5%** |
+| … counting a shot's flight from deep too | 1.5% | 5.4% / 5.1% (gated ≤ 6% over 12 games) |
+| Jump-shot releases, defender hides ≤ 35% (≥ 0.90) | 0.933 | **0.967** |
+| All releases | 0.871 | 0.882 |
+
+- **The other sizes, after:**
+  - Rim motion max 4.2-11.5 px; 0.69-1.08 yaw changes per possession; 6.7-9.5% of frames mid-swing.
+  - The zoom row at most 0.7% (live definition).
+  - The handler median at 430 is 0.537. At 375 it is 0.478: its box is the shortest of the portrait sizes, and V2's
+    row is defined at 393 / 320.
+- **568 sideways:** the safe box goes 0.891 → **0.929**.
+
+**Live, in the browser** (`NBA_HUD_SEEDS=6 NBA_HUD_FRAMES=2700 nba-hud.mjs 393 320`: 6 autoplay lab games a size,
+45 s each, only frames where the game clock moved, Clutch's deliberate 6% left out of the zoom row):
+
+| | 393 | 320 |
+|---|---|---|
+| Bug, pause, Heat bar, safe box against V2 (±2 px) | ✓ ✓ ✓ ✓ | ✓ ✓ ✓ ✓ |
+| Rim row (0.20-0.24) | 0.220 | 0.221 |
+| Handler's median row (0.50-0.55) | **0.548** (review: 0.495) | **0.527** |
+| Handler and rim in the safe box | 0.998 | 1.000 |
+| Zoom near the rim | 1.5% | 0.7% |
+| Releases (all kinds); a defender hides ≤ 35% | 64; 0.72 | 62; 0.61 |
+| Jump-shot releases; ≤ 35% | 6; 1.00 | 6; 1.00 |
+| Frames with a DOM element within 40 px of the rim | 0 | 0 |
+
+- **The live sample:** 16,200 frames a size, against the review's 900, and more than 30 releases a size.
+- **Few jump shots:** the lab AI takes few jumpers since nba-4 (its contest-mix follow-up), so the jump-shot row live
+  rests on 6 a size. The test's 12 games carry it (56 jump shots, 0.964).
+- **Most all-release misses are finishes:** a defender trailing straight behind a layup, which no 12° yaw can split.
+- **The rim row:** the live rim sits higher than in the test because the lab's handlers stand further out, so the rim
+  floats up its band.
+- **The flight-inclusive zoom row rose,** for two reasons:
+  - The rim is held still on screen while the zoom eases home after a deep release, rather than jumping.
+  - The rim now floats in its band.
+
+  So the row is asserted on the live probe's definition (≤ 2%), and the flight-inclusive number is capped at 6% so
+  it can't drift.
+
+**Held arena** (`nba-held.mjs 7`, 393×852, isolated; 5 rematches at 4×):
+
+| Row | Review (before) | After |
+|---|---|---|
+| rematch() → tip-off at 4× | 1.40-1.42 s, one 2.66 s | **1.208-1.231 s** |
+| rematch() → first frame on screen after the game stepped, at 4× (≤ 1.5 s) | not measured (1.85-2.16 s in the trace) | **1.268-1.291 s** (max of 5) |
+| A tap on the curtain → live | 0.25 s | **0.028 s** |
+| The long task on the tip-off frame at 4× | 540-670 ms | gone (the court and the drawings are kept) |
+| Renderer and canvas kept; heap after the 5th vs the 1st | ✓; 1.035 | ✓; **1.036** |
+| Whistle → onFinish | 0.009-0.013 s | 0.004-0.029 s |
+| Whistle → next tip-off with the 5 s sheet | 6.55 s | 6.25 s |
+
+**Frame budget** (`nba-perf.mjs` and `nba-profile.mjs`, autoplay, 8 s per sample, the dev server):
+
+| Size | 1×: frames > 20 ms, callback p99 | 4×: frames > 20 ms, callback p99 |
+|---|---|---|
+| 430×932 | 1.9%, 14.4 ms | **31.6%** (review: 34.5%), 43.0 ms |
+| 320×568 | 0.2%, 8.0 ms | **4.0%**, 25.0 ms |
+| 852×393 | 0%, 6.7 ms | **7.4%** (review: 9.2%), 27.4 ms |
+
+Where a frame goes, in ms per frame (`nba-profile.mjs`):
+
+| Part | 430 1× | 430 4× | 320 4× | 852L 4× | Whose |
+|---|---|---|---|---|---|
+| The players' drawings (`sprite`: look-up and build) | 2.56 | **8.78** | 4.63 | 4.09 | players |
+| The floor cast (`drawFloorNow` + board) | 0.81 | **3.86** | 1.84 | 3.02 | nba |
+| Rest of the draw (sprite blits, shadows, chips) | 0.25 | 0.84 | 0.82 | 0.89 | shared |
+| Sim + React (callback outside the draw) | 0.31 | 0.71 | 0.75 | 0.68 | nba |
+| Camera, rim and ball, HUD on the canvas | 0.16 | 0.48 | 0.51 | 0.56 | nba |
+| Outside the callback: compositing | 1.29 | 5.45 | 3.06 | 3.53 | browser |
+| Outside the callback: paint, style, layout, GC | 0.33 | 1.26 | 0.84 | 0.90 | — |
+
+- **The players' sprite builds are 60% of the callback** at 430 4×.
+- **The floor is nba's next lever:** it is recast whenever the camera moves over half a pixel, which is most frames
+  while the play moves. A reuse by translation for sub-pixel pans goes to nba-10's perf pass.
+- **Compositing:** the canvas is the size of the screen at 430, and the cost scales with it.
+- **The row stays open (integration blocker)**, with players' near-first sprite budget as the dependency. See
+  "Requests to other teams".
+
+### Tests
+
+| Test | What it proves |
+|---|---|
+| `camera.test.ts` (8 + 2 opt-in) | new rows at 393/320 over 12 games: rim motion ≤ 12 px in every frame (cuts at a new possession aside), ≤ 1 yaw change per possession, ≤ 10% mid-swing, handler 0.50-0.55, zoom ≤ 2% (live definition) and ≤ 6% with flights (≤ 7% at the other sizes); the yaw's hysteresis (under 1 ft, a short excursion, the ball in the air, the hold after a change; a fresh camera picks at once); the whole backboard on screen with a man in either corner at both sizes. `NBA_CAMQ=1` prints the rows (`NBA_CAMQ_VARS` tries CAM variants, `NBA_CAMDBG` the outliers) |
+| `held.test.ts` (3) | the time-sliced AI side (3 ms budget) equals `aiPossessionsOf` on 3 seeds with 90% of tasks under 8 ms; `autoplaySteps` in 20-step chunks is `autoplay` |
+| `labels.test.ts`, `determinism.test.ts` | unchanged and green (the chip edge; the scan sees no clock: the slice's clock is the host's) |
+
+### Verification (nba-3 review fixes)
+
+- **Typecheck:** `bash O/heavy.sh npm run typecheck` is clean.
+- **The standard set:** `bash O/heavy.sh npx vitest run src/game/hoops2 src/game/hud src/game/stick.test.ts
+  src/game/juice.test.ts src/game/play-feedback.test.ts src/game/difficulty.test.ts src/game/heat.test.ts
+  src/game/perfect.test.ts src/ut/match-debrief.test.ts src/ut/forfeit.test.ts src/engine/sport-branches.test.ts`.
+  - **Result:** 28 files passed, 5 skipped (opt-in), 175 tests passed (8 skipped), 238 s.
+  - **After that run,** the camera's last two constants changed (`handNear`, `rimBandLo` / `handRow`), so
+    `camera.test.ts` was re-run alone: 9 passed (1 opt-in skipped). No other file reads them.
+  - **An earlier run** had one failure: the first version of the held test asserted wall-clock task times on the
+    loaded machine. It now counts the clock's reads, so it is exact.
+  - `golden.test.ts`, `controls.test.ts` (the AI race) and `determinism.test.ts` pass unchanged.
+- **Browser** (5215, every other host aborted, none tried):
+  - `nba-held.mjs 7`: the table above, no errors.
+  - `nba-perf.mjs`, `nba-profile.mjs`
+  - `NBA_HUD_SEEDS=6 NBA_HUD_FRAMES=2700 nba-hud.mjs 393 320`: the live table above, no errors.
+  - `nba-held.mjs 7` after the box fix: each rematch's box is 0 at the tip (`boxIsThisGame`), and 5 rematches at 4× came
+    in at 1.262-1.282 s.
+- **Captures** in `O/shots/nba/nba-3-fix/`, all looked at:
+  - `fix-393-pass-0/1/2`: a pass, 0.12 s and 0.28 s later, panned rather than cut.
+  - `fix-393-corner`: a man out wide at the baseline, with the backboard whole on screen.
+  - `fix-320-play`, `hud-393-auto` / `hud-320-auto` (the scorer plate), `hud-*-play`.
+  - `held-393-sheet`, `held-393-curtain`.
+
 ## nba-4 · The gold ring, PERFECT feedback, Heat and the match grade (2026-11-16)
 
 ### What changed
@@ -1205,6 +1402,10 @@ Every change to a signature above is logged here with its date, so nfl, soccer a
 - **To players:** the poses and kits listed in plan §4.6. Every act falls back to an existing pose until they land.
   Also a number for their sprite cache: an NBA game makes about 13,800 offscreen canvases (`nba-rematch.mjs`), and at
   4× CPU 21-48% of frames run over 20 ms (`nba-perf.mjs`). Worth a look alongside the near-first sprite budget.
+  **Updated after the nba-3 review (2026-11-17):** `nba-profile.mjs` puts `sprite()` (look-up and build) at 8.8 of
+  14.7 ms per frame at 430×932 4× (60%), and 4.1-4.6 ms at 320 and sideways. §3.9's row (≤ 5% of frames over 20 ms
+  at 4×) can't close without the near-first budget. **The ask: a date for it, so the lead can schedule the
+  row's re-measure at integration.**
 - **To packs (open since 2026-11-10):** the UT card rating puts THR_avg at 80, the draft engine at 73 (see "THR_avg"
   above). The §3.3 windows key off the engine value. If UT cards carry +7 on the three-point rating, every UT shooter gets
   a wider gold window than the same player in a draft. Packs either align `ut/rate.ts`'s 3PT with the engine scale, or
@@ -1306,6 +1507,11 @@ touch. Both goldens were re-recorded at nba-4.
     cache change.
   - `src/game/PlayReadout.tsx` and `play-readout.css` (shared with nfl): an optional `icon` mode (a 44 px
     button). nfl's pill is unchanged.
+- **nba-3 review fixes:**
+  - `src/game/Arcade.tsx`: `onFinish` is immediate only for `hold && !online`. The NBA rematch's AI side is
+    passed the host clock (`{ now: performance.now, budgetMs: 3 }`). Both are one line.
+  - `src/game/Lab.tsx`: `HeldLab` is a lazy import behind `import.meta.env.DEV`.
+  - `src/game/hud/bug.css` (nba's HUD kit): the Heat bar's stripes run only at HEATING UP and ON FIRE.
 - **nba-4:**
   - `src/game/progress.ts` (shared): two optional type lines, `box?: BoxData` and `grade?: MatchGrade` (type-only
     import).
@@ -1337,8 +1543,12 @@ touch. Both goldens were re-recorded at nba-4.
   and the steeper view read as a broadcast? Is the tip-off zoom-back noticeable?
 - The shot clock's tick under 4 s and the red pulse at 5 s.
 - Accented names on the chips (Jokić → JOKIC) and the J.JOHNSON-style tags.
-- The rematch loop once ut's sheet is wired: the curtain's 1.4 s, a tap to skip, and the dimmed arena behind
-  the sheet.
+- The rematch loop once ut's sheet is wired: the curtain's 1.2 s (review fixes), a tap to skip, and the dimmed
+  arena behind the sheet.
+- **The camera after the review fixes:**
+  - Does a pass now read as a quick pan, never a cut?
+  - Is the court steady, turning at most about once a possession?
+  - With the stick held through a turn, does the man keep going where your thumb points on the court?
 - The Dynamic Island: re-measure the bug, LAST PLAY and the safe box once shell's `--sat` fix merges.
 
 **nba-2:**
@@ -1381,15 +1591,19 @@ ring's feel, haptics, defense, the rematch loop and accented names.
   `camera.ts` and tested. Wiring the flag to the defensive possessions is nba-6's (there are none to show
   yet), including the backboard and rim drawn from behind.
 - **The OT phase** of the bug is drawn and captured (forced through the dev probe). nba-6's overtime sets it.
-- **Frame budget at 430×932 and sideways** misses §3.9: 4×, 34.5% and 9.2% of frames over 20 ms; 1× p99 at 430
-  is 12.2 ms. What's left is the players' sprite drawing, so the near-first budget (players-2) is the fix.
-  Flagged to players with these numbers.
+- **Frame budget at 430×932 and sideways (open, integration blocker)** misses §3.9. After the review fixes: at 4×,
+  31.6% and 7.4% of frames over 20 ms; the 1× callback p99 at 430 is 14.4 ms. The committed breakdown
+  (`nba-profile.mjs`, see the review fixes) puts 60% of the callback in the players' sprite builds and 26% in nba's
+  floor cast. Players' near-first budget is the dependency, and the floor's reuse-by-translation goes to nba-10.
 - **The 568×320 sideways safe box** (196 px under the bug and the toast) keeps the handler in only 89% of
   frames. A man walking up from half court dips under it. Every other size is ≥ 98%.
 - **Finishes with a trailing defender:** at 11.8% of all releases at 393, he hides more than 35% of the
   finisher. Jump shots: 0%.
-- **One 4× rematch in three** tipped off at 2.7 s, not 1.4 s; the cause isn't found yet.
-- **The 393 live handler median** is 0.494 in one 900-frame lab slice (0.536 over 6 simulated games).
+- ~~One 4× rematch in three tipped off at 2.7 s~~: explained and fixed in the review fixes. The probe timed a
+  possession that ended on its first step. The real cost was a 0.6 s court and look rebuild on every tip-off frame.
+- ~~The 393 live handler median~~: re-framed in the review fixes (see the live rows there).
+- **A reach-in steal on a possession's very first step** happens (seed `held:r5`, autoplay). It's engine behaviour
+  and an outcome: a grace period after the inbound belongs to nba-6/7's defense work, with a protocol line.
 
 **nba-2:**
 - ~~A quit still pays the ordinary loss reward~~: fixed in the review fixes (a quit pays nothing). The
