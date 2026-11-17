@@ -14,7 +14,8 @@ Team **packs** (pack economy, odds, promos, pack opening, the Store and SBC scre
 | packs-2 review fixes (protection never lowers a published chance; acceptance wording; holo doc) | done | see `git log` (subject "packs-2 review fixes") |
 | packs-4: odds engine and disclosure (sheets everywhere, BuyConfirm, picks, rewards, Scout Drops, tracker, RARE) | done | see `git log` (subject "packs-4") |
 | packs-3 review fixes (the plan's Club Collection floor, Club Collection limits shown, Scout's Choice by route cost, snapshot kind, flash pick price, NFL Silver Upgrade, first-paint split) | done | see `git log` (subject "packs-3 review fixes") |
-| packs-5 … packs-10 | not started | |
+| packs-5: ratings truth (Hot Season/Legend re-rate, GOAT/Spotlight shape, OVR diff) | done | see `git log` (subject "packs-5") |
+| packs-6 … packs-10 | not started | |
 
 ## packs-1 commit A: baselines, contracts and the critical fixes
 
@@ -861,9 +862,211 @@ Fixed on top of packs-4. No storage key, card or copy id, claim id, receipt or s
 - packs-6: the Program Guarantee's 0.23 (above); how D10 values NFL golds under 83 (the NFL upgrades are value-correct but card-count heavy); whether Captains/Dynasty stay chase items.
 - packs-8: add the FLASH SALE block's small PackArt labels (5 instances, 5.5 design px) to the label-legibility checklist.
 
+## packs-5: ratings truth (owner decision 5)
+
+### What changed and why
+
+- **Hot Season and Legends show what they play (D3, `rate.ts`).** An edition displays `min(95, season + d)`, with no floor. For a Hot Season, `d` comes from the season's honors (`hotSeasonDelta`): MVP or OPOY 6; first-team All-League or DPOY 5; another All-League team 4; anything else 3. A Legend uses its own edition boost held to 3..6 (`editionDelta`). The played attributes gain the same delta (`editionAttributes(…, d, 99, false, sport)`), where a displayed-scale point is worth more than a rating point in the flat 80s, so each face number rises by about the delta too. Weak attributes (under 55) still gain at most 2. Measured speed (NBA SPD/ACC, NFL SPD/ACC/AGI) gains half the delta, because an honored season isn't a faster one. The face prints those played attributes on the displayed scale, so `faceLift` is gone. When the weighted face still reads more than 1 under the overall, the role's main skills (never measured ones) rise by 1 at most twice (`liftFace`). Tier, frame and ability are unchanged.
+- **GOAT and Spotlight keep the player's shape (D4, `rating-quality.ts`).** On strengths (80+) a numbered edition's gain now scales with headroom: `boost × (cap − v)/(cap − 60)`. `shapeEdition` replaces Codex's `supportEdition`. It lifts proven strengths in proportion to `(v − 60)^1.5` until the profile carries the target overall, with these rules:
+  - at most 2 attributes at the cap (overflow spills to the next strength);
+  - no face value passes one that stood above it;
+  - the tier floor (Spotlight 100, GOAT 106) always holds.
+  - A levelled copy keeps at most 2 attributes at the cap (`holdCap`).
+- **Quick-sell for Hot Season** is the D2 line: `650 + 50·max(0, ovr − 80)` (× the sport's factor). The D1 monotone test still passes in all three sports.
+- **Soccer (L4, `pool.ts`).** A Hot Season under 80 (`SOCCER_PROMO_MIN`) leaves the pack buckets. It stays in `base`/`byId`, so owned copies still resolve, sell and play. Soccer's own editions are not re-rated.
+- **`CONTENT_PRINT` → `ut-content-5`**, so `pool.print` changes in all three sports.
+- **Fallback, not the lead path.** The lead's answer on `ut-scale.ts` is still pending, so `rate.ts` no longer calls `editionDisplay`. The promo/legend knots in `UT_SCALE` are now read only by the quick-sell lines (`scale.legend[0][1]`) and the SBC reward value (`sbc.ts:447`, `UT_SCALE.promo[0][1]`). `editionDisplay` has no caller left. `fit_ut_scale.ts` and `fit_ut_balance.ts` fit season cards only, which didn't move. Report-only runs on the base and on this tree (`O/packs-out/fit/`, NBA and NFL) print identical knots and balance tables, so nothing needs pasting.
+- **Numbered catalog: never regenerated.** The committed `numbered-*.json` and `card-registry/numbered.json` are untouched (committed digests `2cpo:1cnt20s1t242wi` NBA and `5vxi:2olz7i1hbiq0s` NFL, the same before and after). A copy that drops below 90 keeps its serial.
+
+### Before → after (`O/packs-out/before-packs-5/` → `O/packs-out/after-packs-5/`, `scripts/packs/promoattrs.ts`, levels 1 and 5)
+
+| | NBA before | NBA after | NFL before | NFL after |
+|---|---|---|---|---|
+| Hot Season shown (L1) | 94–97 (season +6 … +22) | 75–95 (season +3: 114, +4: 61, +5: 284, +6: 59) | 94–97 (season +6 … +35) | 62–95 (+3: 51, +4: 42, +5: 939, +6: 74) |
+| Hot Season, worst \|face − played\| (L1 / L5) | 21 / 21 (all 518 over 1) | **0 / 0** | 35 / 35 (all 1,106 over 1) | **0 / 0** |
+| Legend shown (L1) | 88–94 | 81–93 (+3 … +6) | 88–95 | 72–94 |
+| Legend, worst \|face − played\| | 11 (all 120 over 1) | **0** | 20 (all 130) | **0** |
+| Spotlight: face values at the cap, L1 (cards with 0/1/2/3+) | 81/38/1/0 | 120/0/0/0 | 33/26/37/35 | 131/0/0/0 |
+| Spotlight: Kendall τ min (L1), cards under 0.8 | 0.643, 4 | 0.867, 0 | 0.400, 18 | 0.866, 0 |
+| GOAT: face values at the cap, L1 (0/1/2/3+) | 9/9/2/0 | 20/0/0/0 | 1/2/5/12 | 20/0/0/0 |
+| GOAT: τ min (L1), under 0.8 | 0.733, 1 | 0.867, 0 | 0.481, 4 | 0.957, 0 |
+| Distinct face values, min (Spotlight / GOAT) | 4 / 5 | 4 / 5 | 2 / 2 | 3 / 3 |
+| Under the tier floor | 0 | 0 | 0 | 0 |
+
+- **Ferguson '77 Hot Season** (NFL): before 94 with a face of THP 99 / SAC 90 / SPD 99, while the match played 70 / 55 / 78 on the displayed scale. After: **62**, face THP 70 / SAC 57 / MAC 55 / DAC 58 / TUP 64 / SPD 77, the same as it plays.
+- **Nate McMillan '94 Hot Season** (NBA): 94 with DEF 99 (played 82) → **78**, DEF 82.
+- **Michael Cooper '81 Legend:** 88 → **82** (season 79 + 3).
+- **Brady 2007 GOAT:** before, 5 of 6 face values at 110. After: 110, with THP 102 / SAC 102 / MAC 102 / DAC 102 / TUP 101 / SPD 66. None is at the cap, and he is still a pocket passer. His season card already rates all five passing skills at the rating-scale top, so they stay level with each other (τ 1).
+- **Kareem 1976 GOAT:** INS 109 / REB 110 → INS 100 / REB 103 / DEF 92 / ATH 83 / OUT 76 / PLY 61. The skyhook shape is kept and the spread is 42.
+- **Feasibility run (`promoattrs --feasibility`):** 0 conflicts in both sports, on the base and after (NBA 140 cards, NFL 151). The feasibility list (`FEASIBILITY` in the suite) is empty: no card needed a third value at the cap.
+- **A known limit, for the lead and players.** The displayed scale (`ut-scale.ts`, not ours) tops out at 91, which is a 99 attribute. A 92–95 Hot Season or Legend therefore prints faces up to 91 under a higher overall. Its face is exactly its played attributes, but the weighted face mean sits about 5 under the number (NBA Hot Season 91+: median gap 4.98; NFL 2.97). At 90 and below the gap matches season cards (NBA Hot Season median 2.22 vs gold 1.80; NFL 1.19 vs 1.62). There are two fixes, both outside this lane: extend the displayed curve above 99 for editions, or hold editions to 91. Listed under Left for later.
+- **Pool build time** (`getPool`, vite-node, two runs each on the shared machine): NBA 6.97 / 5.30 s before vs 6.12 / 5.71 s after; NFL 8.43 / 8.41 s vs 6.82 / 8.12 s. That is within noise; `shapeEdition` adds nothing measurable.
+
+### Every changed overall (`docs/studio-overhaul/packs-ovr-diff.md`)
+
+`scripts/packs/ovr-diff.ts` against the packs-1 fixture lists every changed id at levels 1–5. Counts by kind and level-1 Δ:
+
+| Sport | Kind | Δ L1 → count |
+|---|---|---|
+| NBA | Hot Season (518, all changed) | −19: 1, −18: 2, −17: 3, −16: 9, −15: 7, −14: 6, −13: 15, −12: 12, −11: 31, −10: 16, −9: 22, −8: 26, −7: 55, −6: 74, −5: 114, −4: 58, −3: 23, −2: 42, −1: 2 |
+| NBA | Legend (119 of 120) | −7: 2, −6: 14, −5: 3, −4: 21, −3: 39, −2: 28, −1: 12, 0: 1 |
+| NFL | Hot Season (1,106, all) | −32 … −1 (median −9; 121 now under 80, 41 under 75) |
+| NFL | Legend (124 of 130) | −16: 1, −15: 1, −12: 2, −10: 1, −9: 2, −8: 7, −7: 3, −6: 10, −5: 26, −4: 28, −3: 16, −2: 20, −1: 6, 0: 6, +1: 1 |
+| both | Spotlight, GOAT, Landmark, Standout, program | 0 (overall unchanged; Spotlight/GOAT attributes reshaped) |
+| Soccer | all | 0 (its 16 Hot Seasons under 80 left the buckets only: 277 → 261 bucket rows) |
+
+- **Share of owned-possible editions affected:** NBA 637 of 1,418 snapshot rows (45%; 637 of the 778 re-rated-kind ids). NFL 1,230 of 2,373 (52%; 1,230 of 1,387). Soccer 0 of 475.
+- **Max |face − played|** at levels 1 and 5: Hot Season 0, Legend 0 (both sports). Spotlight and GOAT print their played attributes by construction.
+- **Crossing 90 (numbered eligibility, for the lead):** NBA 368 ids, NFL 915 ids, all Hot Season or Legend. They are the rows marked "crosses" in `packs-ovr-diff.md`. Proof: the catalog `build_numbered_catalog.ts` would generate changed between the base and now on exactly these 368 + 915 ids (the generated sets compared directly), and the suite checks the same thing against the fixture. `--check` reports DIFFERS on the base too: the committed files were frozen from an older rating model. Its committed digests are identical before and after.
+- **SBC `teamOvr`** uses the new numbers, so a squad built for a requirement may need re-checking. Cup and Club Season entries keep their saved snapshot (tested).
+
+### Played-attribute change per position (for nba and nfl: Squad Battles balance, owner decision 3)
+
+Level 1, every edition in the buckets, the same ids before and after (`scripts/packs/attr-delta.ts`). "Face skills": NBA, every played attribute but stamina; NFL, the six face keys of the card's position.
+
+| NBA | Pos | Cards | Mean Δ, every attribute | Mean Δ, face skills | Largest Δ (attribute) | Mean Δ displayed OVR |
+|---|---|---|---|---|---|---|
+| Hot Season | C | 144 | +1.3 | +1.3 | +9.0 (LAY) | -7.1 |
+| Hot Season | PF | 89 | +2.1 | +2.2 | +9.0 (REB) | -5.7 |
+| Hot Season | PG | 139 | +1.4 | +1.4 | +9.0 (MID) | -7.4 |
+| Hot Season | SF | 74 | +2.1 | +2.2 | +8.0 (DNK) | -6.0 |
+| Hot Season | SG | 72 | +1.3 | +1.3 | +8.0 (3PT) | -6.6 |
+| Legend | C | 31 | +1.6 | +1.7 | +6.0 (DNK) | -3.3 |
+| Legend | PF | 23 | +2.0 | +2.1 | +6.0 (LAY) | -3.3 |
+| Legend | PG | 28 | +1.5 | +1.6 | +7.0 (CLS) | -2.9 |
+| Legend | SF | 21 | +2.0 | +2.1 | +6.0 (DNK) | -3.1 |
+| Legend | SG | 17 | +1.3 | +1.4 | +6.0 (HND) | -3.2 |
+| Spotlight | C | 31 | -2.4 | -2.2 | -7.0 (SDK) | 0.0 |
+| Spotlight | PF | 23 | -2.1 | -1.9 | -7.0 (STA) | 0.0 |
+| Spotlight | PG | 28 | -2.3 | -2.1 | -7.0 (PAS) | 0.0 |
+| Spotlight | SF | 21 | -2.2 | -2.0 | -7.0 (STA) | 0.0 |
+| Spotlight | SG | 17 | -2.1 | -1.9 | -7.0 (PAS) | 0.0 |
+| GOAT | C | 5 | -4.2 | -3.9 | -10.0 (LAY) | 0.0 |
+| GOAT | PF | 4 | -3.9 | -3.7 | -10.0 (DNK) | 0.0 |
+| GOAT | PG | 3 | -3.6 | -3.3 | -10.0 (HND) | 0.0 |
+| GOAT | SF | 4 | -3.4 | -3.1 | -10.0 (STR) | 0.0 |
+| GOAT | SG | 4 | -3.7 | -3.4 | -10.0 (CLS) | 0.0 |
+| NFL | Pos | Cards | Mean Δ, every attribute | Mean Δ, face skills | Largest Δ (attribute) | Mean Δ displayed OVR |
+|---|---|---|---|---|---|---|
+| Hot Season | CB | 136 | +1.0 | +1.5 | +6.0 (MCV) | -10.5 |
+| Hot Season | DL | 224 | +1.0 | +1.5 | +6.0 (BSH) | -10.6 |
+| Hot Season | K | 1 | -0.7 | -0.5 | -2.0 (SPD) | -14.0 |
+| Hot Season | LB | 207 | +1.1 | +1.5 | +6.0 (PUR) | -9.6 |
+| Hot Season | QB | 99 | +0.2 | +0.7 | +6.0 (MAC) | -7.8 |
+| Hot Season | RB | 129 | +0.7 | +0.5 | +7.0 (BTK) | -8.1 |
+| Hot Season | S | 124 | +1.3 | +1.9 | +6.0 (ZCV) | -10.0 |
+| Hot Season | TE | 55 | +1.3 | +1.6 | +6.0 (RTE) | -8.9 |
+| Hot Season | WR | 131 | +0.5 | +0.7 | +6.0 (REL) | -5.8 |
+| Legend | CB | 8 | +1.1 | +1.4 | +5.0 (MCV) | -4.3 |
+| Legend | DL | 21 | +1.0 | +1.3 | +5.0 (FMV) | -5.6 |
+| Legend | K | 3 | +0.4 | +0.5 | +2.0 (AWR) | -6.0 |
+| Legend | LB | 18 | +1.1 | +1.3 | +5.0 (TAK) | -5.5 |
+| Legend | OL | 29 | +0.9 | +1.2 | +4.0 (PBK) | -3.9 |
+| Legend | QB | 18 | +0.7 | +1.1 | +5.0 (TUP) | -3.2 |
+| Legend | RB | 16 | +0.9 | +0.8 | +5.0 (BTK) | -2.8 |
+| Legend | S | 5 | +1.3 | +1.5 | +5.0 (TAK) | -5.0 |
+| Legend | TE | 4 | +1.4 | +1.7 | +5.0 (RTE) | -5.3 |
+| Legend | WR | 8 | +0.7 | +0.8 | +4.0 (REL) | -3.3 |
+| Spotlight | CB | 8 | -3.2 | -4.3 | -7.0 (MCV) | 0.0 |
+| Spotlight | DL | 21 | -3.5 | -3.8 | -7.0 (STR) | 0.0 |
+| Spotlight | K | 3 | -1.8 | -2.1 | -7.0 (KAC) | 0.0 |
+| Spotlight | LB | 18 | -2.5 | -3.3 | -7.0 (AWR) | 0.0 |
+| Spotlight | OL | 29 | -3.4 | -4.5 | -7.0 (PBK) | 0.0 |
+| Spotlight | QB | 18 | -3.3 | -4.4 | -7.0 (AWR) | 0.0 |
+| Spotlight | RB | 16 | -3.3 | -4.0 | -7.0 (TRK) | 0.0 |
+| Spotlight | S | 5 | -2.9 | -3.7 | -7.0 (PRC) | 0.0 |
+| Spotlight | TE | 5 | -2.6 | -3.0 | -6.0 (AWR) | 0.0 |
+| Spotlight | WR | 8 | -3.4 | -5.0 | -7.0 (AWR) | 0.0 |
+| GOAT | CB | 1 | -4.9 | -7.0 | -10.0 (AWR) | 0.0 |
+| GOAT | DL | 3 | -6.4 | -7.3 | -10.0 (AWR) | 0.0 |
+| GOAT | LB | 2 | -4.4 | -6.3 | -10.0 (AWR) | 0.0 |
+| GOAT | QB | 5 | -5.1 | -6.9 | -10.0 (AWR) | 0.0 |
+| GOAT | RB | 3 | -4.8 | -5.8 | -10.0 (AWR) | 0.0 |
+| GOAT | S | 2 | -5.2 | -6.3 | -10.0 (AWR) | 0.0 |
+| GOAT | TE | 2 | -3.5 | -4.3 | -10.0 (AWR) | 0.0 |
+| GOAT | WR | 2 | -4.7 | -7.6 | -10.0 (AWR) | 0.0 |
+
+Reading the tables:
+- **Hot Season and Legend** play slightly stronger than before: about +1 to +2 a face skill, up to +9. The old boost lifted the face, not the played profile, and their displayed overall falls by 3–11 on average.
+- **Spotlight and GOAT** play weaker at the very top: about −2 to −7 a face skill, at most −10, mostly AWR and the attributes that sat at 105/110. Their displayed overall is unchanged.
+- **Squad Battles opponents** built from these editions change by the same amounts.
+
+### Tests
+
+New suite `ratings-truth` (`src/ut/packs-suites/ratings-truth.ts`, measures in `truth-measure.ts`). `ratings-truth.test.ts` runs it for NBA and NFL (14 tests each) and `soccer-ratings-truth.test.ts` for soccer (6 tests):
+- the deltas from honors and boosts; `CONTENT_PRINT` is `ut-content-5`.
+- **Hot Season and Legend, every edition at levels 1 and 5:** displayed `= min(95, season + d)` plus the level bonus, the tier is kept, and every face key is within 1 of the played attribute (measured: 0).
+- Measured speed rises by at most half the delta.
+- Up to 90, an edition reads as close to its face as its season card does: 95% within 2 more points, none more than 5. (The two at 5 are Jerry Lucas '65/'68. His REB and CLS/IND are already at the top of the scale.)
+- Hot Season quick-sell is on the D2 line.
+- **GOAT and Spotlight at levels 1 and 5:**
+  - at most 2 face values and 2 attributes at the cap (the feasibility list allows 3, and it is empty);
+  - at least 3 distinct face values;
+  - the floors 100 / 106 (displayed and raw);
+  - Kendall τ ≥ 0.8 against the season card at level 1;
+  - when the season face spread is ≥ 10, the weakest value is ≤ the strongest − 8;
+  - Brady GOAT stays a pocket passer (SPD < 70, SAC > 99, at most 2 at 110), and Kareem's CLS stays far above his 3PT.
+- **Numbered catalog:** the committed catalogs equal the fixture's, and the editions whose first 90+ level moved are exactly the OVR diff's crossing list.
+- **Nothing else moved:** every edition outside promo, legend, spotlight and goat equals the packs-1 fixture at levels 1–5 (gated on `FOREIGN_FINGERPRINT`), and so do the receipts and the numbered catalogs.
+- **Soccer:** the buckets hold no Hot Season under 80. The 16 that left still resolve owned at levels 1 and 5. The remaining rows and all Legends equal the fixture.
+- **Entry snapshots:**
+  - a Cup sets opponents from the anchor saved at entry, not today's re-rated squad;
+  - a Silver Cup judges cards at their entry level;
+  - Club Season keeps its start overall (a drop moves its AI by at most 4).
+
+Changed old tests (each old expectation was the behaviour owner decision 5 replaces):
+- `rate.test.ts` "applies a promo's boost once": 94–97 becomes `min(95, season + d)` for Hot Season and Legend.
+- `ratings-audit.test.ts`:
+  - "keeps Hot Season promos in 94–97, Legends in 88–95" is now "season plus 3..6, at most 95".
+  - "prints a face whose position-weighted mean matches the overall" skips 92–95 Hot Season and Legend cards. Their face is held to the played numbers in the suite, and the scale tops out at 91.
+- `packs-economy`:
+  - the quick-sell fixture test now expects Hot Season and the NBA/NFL Legend values to move;
+  - the fixture self-check allows the four re-rated kinds' ratings and the promo and legend quick-sell. Everything else must still be identical.
+
+### Browser QA (packs-5)
+
+`scripts/packs/qa-ratings.mjs` ran against a dev server on 5213: first a copy of the base `c99de81` for the before shots, then this tree. The page used `?ns=inspect&relay=ws://localhost:7777` with every non-localhost request aborted; the only host blocked was the Supabase registry, so nothing reached a live service and no 90+ copy was registered. Touch, `deviceScaleFactor: 1`, reduced motion, 393×852 (insets 59/34) and 320×568. It owns one copy of each card, opens Club → Players → the card, and prints the face next to the played attributes. No page errors. Shots are in `O/shots/packs/packs-5/` (`<sport>-<width>-<before|after>-<kind>-<name>.png`):
+
+| Card | Before (393) | After (393 and 320) |
+|---|---|---|
+| Nate McMillan '94 Hot Season | 94: OUT 94 INS 74 PLY 98 ATH 94 DEF 99 REB 67 (plays 77/57/81/77/82/50) | **78**: OUT 77 INS 57 PLY 83 ATH 76 DEF 82 REB 50 (plays the same) |
+| Michael Cooper '81 Legend | 88: 86/87/85/86/91/48 (plays 79/80/78/79/84/41) | **82**: 80/82/79/78/84/41 (the same) |
+| Kareem 1976 GOAT | 109: OUT 80 INS 109 PLY 61 ATH 85 DEF 100 REB 110 | 109: 76/100/61/83/92/103 |
+| Joe Ferguson '77 Hot Season | 94: THP 99 SAC 90 MAC 88 DAC 92 TUP 97 SPD 99 (plays 70/55/53/57/62/78) | **62**: 70/57/55/58/64/77 (the same) |
+| Tom Brady 2007 GOAT | 110: five at 110, SPD 66 | 110: 102/102/102/102/101, SPD 66 |
+
+At 320 the detail sheet's six face tiles, the action row and the SELL value stay inside the frame (checked by eye on every after shot). The card face art is players' (CardArt), unchanged.
+
+### Saved state and older builds
+
+There is no new saved state. Ids, owned copies, uids, levels, XP and serials are untouched; displayed overalls move by id, as owner decision 5 says. Old saves load unchanged: the old-save round trips in the `stamps` and `packs-economy` suites still pass. A registered Spotlight/GOAT receipt rebuilds its common slots with the legacy draw from `pool.buckets.gold`, and gold membership did not move (the fixture's 20 receipts are equal).
+
+### Protocol
+
+- **Protocol bump needed: NBA UT**, because Hot Season, Legend, Spotlight and GOAT played attributes change (the table above) and `CONTENT_PRINT` → `ut-content-5` changes `pool.print`.
+- **Protocol bump needed: NFL UT**, for the same reasons.
+- **Protocol bump needed: soccer UT**, because `CONTENT_PRINT` and the promo-bucket filter change `pool.print`. Soccer ratings are unchanged. The lead bumps once per sport; soccer's rides on the soccer team's own UT bump.
+- No draft protocol change (draft ratings don't read UT editions).
+
+### Touched outside my lane (packs-5)
+
+- `src/ut/rate.test.ts` and `src/ut/ratings-audit.test.ts`: the old 94–97 / 88–95 expectations are replaced by D3 (listed above), and the Brady identity test is unchanged and passes. These test our `rate.ts`; no app code outside our files changed.
+- `src/ut/ut-scale.ts` was **not** edited. `editionDisplay` and the promo/legend knots are stale for the lead (see Requests).
+
+### Owner device checks (packs-5)
+
+- Card detail on the phone for a re-rated Hot Season (McMillan 78) and a GOAT (Kareem 109, Brady 110): the numbers read as the player, and the drop of an owned Hot Season reads as fair.
+- One Squad Battles game with a Hot Season-heavy squad, to feel that the cards play like their faces.
+
+### Left for later (packs-5)
+
+- **The scale top (lead/players).** A 92–95 Hot Season or Legend prints faces up to 91. Either extend the displayed curve above 99 for editions, or hold editions to 91 (`ut-scale.ts`, unassigned).
+- **packs-6 (the ladder):** NBA/NFL Hot Seasons now run 62–95 (NBA 22 and NFL 121 under 80). The ladder should decide whether those leave the pack buckets as soccer's do, or stay in the Hot Season slot as a smaller hit. `sbc.ts:447` still values a Hot Season reward at the old promo knot (94).
+- **Lead:** remove `editionDisplay` and the promo/legend knots of `UT_SCALE` once the scale question is settled. The quick-sell lines still read `scale.legend[0][1]`.
+
 ## Requests (answers are recorded here as they arrive)
 
-- **Lead:** assign `src/ut/ut-scale.ts` (its promo/legend knots), `scripts/fit_ut_scale.ts` and `scripts/fit_ut_balance.ts` to packs for packs-5. OWNERSHIP gives them to nobody; without the assignment packs-5 uses the rate.ts-only fallback. *Answer: pending.*
+- **Lead:** assign `src/ut/ut-scale.ts` (its promo/legend knots), `scripts/fit_ut_scale.ts` and `scripts/fit_ut_balance.ts` to packs for packs-5. OWNERSHIP gives them to nobody; without the assignment packs-5 uses the rate.ts-only fallback. *Answer: pending; packs-5 shipped the fallback (`rate.ts` no longer calls `editionDisplay`; the knots are stale, see packs-5 "Left for later").*
 - **Lead:** `STAMPS_FROM` (scout-stamps.ts) is the release instant, midnight Eastern on 2026-11-27, the planned `SHIP_DATE`. If the ship date moves, move it with `SHIP_DATE` (packs-7's release check covers both). *Answer: pending.*
 - **ut:**
   - the Circuit 6-0 Spotlight pack (`circuit.ts:11`) and the Season Pass level-25 Spotlight pack (`progression.ts:183`) become Program Picks (`awardPick(…, 'program-pick', <claim id>, at)`), as research §8.7/§8.9 specify. packs-6 prices the Spotlight only after this answer. *Answer: pending.*
@@ -877,7 +1080,7 @@ Fixed on top of packs-4. No storage key, card or copy id, claim id, receipt or s
   - **[V2]** `packsClaimables` body: commit B ships it in `src/ut/packs-claimables.ts` with your published shape. Keep the shape and the file at merge; your stub and ours are identical in signature.
 - **shell:** define `--ut-sticky-top` from the header height (our sticky chips use it). SKIP's target size stays yours; TAP TO CONTINUE, QUICK SELL DUPES and every new pack-screen button are ours, so no rule is duplicated.
 - **players:** an edit to `supportOverall` in `card-face.ts` changes attributes matches use, so it means "Protocol bump needed". **[V2]** Please confirm the D15 walkout slot props `{ rc, size, maxMs: 2000, onDone, reduced }`, no text inside the figure, at most 3 a pack. *Answer: pending.*
-- **nba / nfl:** packs-5 changes Hot Season, Legend, Spotlight and GOAT played attributes. The exact per-position deltas will follow here.
+- **nba / nfl:** packs-5 changes Hot Season, Legend, Spotlight and GOAT played attributes. The per-position deltas are in packs-5, "Played-attribute change per position".
 - **All teams:** the stricter `sport-branches` regex flags any `nba(x) ? a : b` helper ternary at merge.
 
 ## Tests

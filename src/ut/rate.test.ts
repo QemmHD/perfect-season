@@ -1,7 +1,7 @@
 // Rating cards: the same code the games use, tiers from overall, and what promos and levels add.
 import { SPORT } from '../engine/sport';
 import { getPool } from './pool';
-import { levelBonus, NBA_ATTRS, NBA_KEYS, onScale, rateCard, tierOf, toHooper } from './rate';
+import { editionDelta, EDITION_TOP, hotSeasonDelta, levelBonus, NBA_ATTRS, NBA_KEYS, onScale, rateCard, tierOf, toHooper } from './rate';
 import type { CardLine } from './types';
 
 describe('rating cards (' + SPORT + ')', () => {
@@ -45,15 +45,16 @@ describe('rating cards (' + SPORT + ')', () => {
     const promo = lines.find((x) => x.kind === 'promo' && (x.boost ?? 0) > 0)!;
     const plain = rateCard({ ...promo, kind: 'season', boost: undefined });
     const rc = rateCard(promo);
-    // Hot Season (Team-of-the-Year analog) shows 94–97, always above its season card
+    // Hot Season shows its season plus 3..6 from the season's honors, at most 95 (packs-5, plan D3: owner
+    // decision 5 replaced the old 94–97 range, which showed numbers the match didn't play)
     expect(rc.ovr).toBeGreaterThan(plain.ovr);
-    expect(rc.ovr).toBeGreaterThanOrEqual(94);
-    expect(rc.ovr).toBeLessThanOrEqual(97);
+    expect(rc.ovr).toBe(Math.min(EDITION_TOP, plain.ovr + hotSeasonDelta(promo)));
     expect(rc.tier).toBe('promo');
     expect(rc.abil).toContain('heat-check');
     const legend = lines.find((x) => x.kind === 'legend')!;
+    const legendSeason = rateCard({ ...legend, kind: 'season', boost: undefined });
     expect(rateCard(legend).tier).toBe('legend');
-    expect(rateCard(legend).ovr).toBeGreaterThanOrEqual(88);
+    expect(rateCard(legend).ovr).toBe(Math.min(EDITION_TOP, legendSeason.ovr + editionDelta(legend)));
   });
 
   if (SPORT === 'nba')

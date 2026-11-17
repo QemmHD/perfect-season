@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { SPORT } from "../engine/sport";
 import { getPool, type Pool } from "./pool";
-import { rateCard, TIER_CUTS } from "./rate";
+import { editionDelta, EDITION_TOP, rateCard, TIER_CUTS } from "./rate";
 import { faceWeights } from "./card-face";
 import type { CardLine } from "./types";
 let pool: Pool;
@@ -151,19 +151,17 @@ describe("Ultimate Team ratings rework (" + SPORT + ")", () => {
     const at = (a: number, b: number) => all.filter((c) => c.ovr >= a && c.ovr <= b).length;
     for (let o = 83; o <= 87; o += 2) expect(at(o + 2, o + 3), String(o)).toBeLessThan(at(o, o + 1));
   });
-  it("keeps Hot Season promos in 94–97, Legends in 88–95 (a few at 94+), specials above 99", () => {
+  it("rates Hot Season and Legends at their season plus 3..6 (at most 95), specials above 99", () => {
+    // packs-5 (plan D3, owner decision 5) replaced the fixed 94–97 / 88–95 ranges: an edition shows its
+    // season card plus its delta, with no floor, so the number is what the attributes play
     const of = (t: string) => [...pool.base.values()].filter((c) => c.tier === t);
-    for (const c of of("promo")) {
-      expect(c.ovr).toBeGreaterThanOrEqual(94);
-      expect(c.ovr).toBeLessThanOrEqual(97);
-      expect(c.ovr).toBeGreaterThan(pool.base.get(c.line.seasonId!)!.ovr);
-    }
-    const legends = of("legend");
-    for (const c of legends) {
-      expect(c.ovr).toBeGreaterThanOrEqual(88);
-      expect(c.ovr).toBeLessThanOrEqual(95);
-    }
-    expect(legends.filter((c) => c.ovr >= 94).length).toBeLessThanOrEqual(6);
+    for (const t of ["promo", "legend"])
+      for (const c of of(t)) {
+        const season = pool.base.get(c.line.seasonId!)!.ovr;
+        expect(c.ovr).toBe(Math.min(EDITION_TOP, season + editionDelta(c.line)));
+        expect(c.ovr).toBeGreaterThan(Math.min(season, EDITION_TOP - 1));
+      }
+    expect(of("legend").filter((c) => c.ovr >= 94).length).toBeLessThanOrEqual(6);
     for (const c of of("spotlight")) expect(c.ovr).toBeGreaterThanOrEqual(100);
     for (const c of of("goat")) expect(c.ovr).toBeGreaterThanOrEqual(106);
   });
@@ -195,7 +193,9 @@ describe("Ultimate Team ratings rework (" + SPORT + ")", () => {
   it("prints a face whose position-weighted mean matches the overall", () => {
     for (const tier of ["silver", "gold", "promo", "legend"]) {
       const gaps = [...pool.base.values()]
-        .filter((c) => c.tier === tier)
+        // a 92–95 Hot Season or Legend (packs-5) prints the played attributes, and the displayed scale tops
+        // out at 91 (a 99 attribute), so its face is held to the played numbers instead (ratings-truth suite)
+        .filter((c) => c.tier === tier && (c.ovr <= 91 || (tier !== "promo" && tier !== "legend")))
         .map((c) => {
           const w = faceWeights(SPORT, SPORT === "nba" ? c.line.pos[0] : c.pos, c.attrs);
           let n = 0, t = 0;

@@ -26,6 +26,7 @@ import { standoutProgram } from '../standouts';
 import { freshUt, migrateUt, type UtState } from '../state';
 import type { CardMint, RatedCard, Tier } from '../types';
 import { diffSnapshot, digest, type PacksSnapshot, sbcDays, snapshotEditions, takeSnapshot } from './snapshot';
+import { RERATED } from './truth-measure';
 import { onScale } from '../rate';
 
 /** The six upgrades exactly as they were before packs-3 (for the catalogue fixture). */
@@ -103,11 +104,14 @@ export function packsEconomySuite(): void {
       expect(quickSell('legend', 99, SPORT)).toBeLessThanOrEqual(quickSell('spotlight', 100, SPORT));
     });
 
-    it('changes only the Spotlight, GOAT and Standout values against the before fixture', async () => {
+    it('changes only the Spotlight, GOAT, Standout, Hot Season and re-rated Legend values against the before fixture', async () => {
+      // packs-1 moved Spotlight, GOAT and Standout; packs-5 put Hot Season on the D2 line (every sport) and
+      // re-rated the basketball and football Legends (plan D3), whose quick-sell follows their overall
       const before = (await fixture()).qs;
       const now = takeSnapshot(pool).qs;
+      const moved: Tier[] = ['spotlight', 'goat', 'standout', 'promo', ...pickFor(SPORT, { nba: ['legend'] as Tier[], nfl: ['legend'] as Tier[], soccer: [] as Tier[] })];
       for (const t of Object.keys(before) as Tier[]) {
-        if (t === 'spotlight' || t === 'goat' || t === 'standout') expect(now[t], t).not.toEqual(before[t]);
+        if (moved.includes(t)) expect(now[t], t).not.toEqual(before[t]);
         else expect(now[t], t).toEqual(before[t]);
       }
     });
@@ -228,9 +232,15 @@ export function packsEconomySuite(): void {
       // a rating module another team owns moved: the fixture can't tell our changes from theirs
       if (now.foreignFingerprint !== before.foreignFingerprint) throw new Error('foreign rating modules changed: run scripts/packs/rebaseline.ts, review the OVR diff, accept (' + JSON.stringify(diffSnapshot(before, now).foreign) + ')');
       const diff = diffSnapshot(before, now);
-      // quick-sell: Spotlight, GOAT and Standout (packs-1); soccer's SBC catalogue: the five templates (packs-1);
-      // every day's upgrades (packs-3 value rules: the next test proves nothing else in the catalogue moved)
-      const allowed: Record<string, (path: string) => boolean> = { qs: (p) => ['spotlight', 'goat', 'standout'].includes(p), sbcs: () => true };
+      // quick-sell: Spotlight, GOAT and Standout (packs-1), Hot Season and Legend (packs-5); soccer's SBC
+      // catalogue: the five templates (packs-1); every day's upgrades (packs-3 value rules: the next test
+      // proves nothing else in the catalogue moved); the re-rated kinds' ratings (packs-5: the ratings-truth
+      // suite proves each of them and that every other kind still equals the fixture)
+      const allowed: Record<string, (path: string) => boolean> = {
+        qs: (p) => ['spotlight', 'goat', 'standout', 'promo', 'legend'].includes(p),
+        sbcs: () => true,
+        ratings: (p) => (RERATED as readonly string[]).includes(p.split('.')[0]),
+      };
       const unexpected = Object.entries(diff).flatMap(([sec, paths]) => paths.filter((p) => !allowed[sec]?.(p)).map((p) => sec + '.' + p));
       expect(unexpected).toEqual([]);
       expect(diff.qs?.length).toBeGreaterThan(0);

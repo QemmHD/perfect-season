@@ -5,9 +5,9 @@ import { rateVariant } from './variants';
 import { rateLive } from './live-cards';
 import { calibrateNflReference, RATING_CONTEXT } from './season-reference';
 import { careerOf } from './cards';
-import { editionAttributes, profileQuality, supportEdition } from './rating-quality';
-import { TIER_CUTS, editionDisplay, fromDisplay, toDisplay } from './ut-scale';
-import { shownFaceMean, faceOf, levelAttrBonus, levelOvrBonus, nflFaceKeys, SOCCER_GK_FACE, SOCCER_OUT_FACE, soccerFaceKeys, supportOverall } from './card-face';
+import { editionAttributes, holdCap, profileQuality, shapeEdition } from './rating-quality';
+import { TIER_CUTS, fromDisplay, toDisplay } from './ut-scale';
+import { shownFaceMean, faceOf, faceWeights, levelAttrBonus, levelOvrBonus, NBA_FACE, nflFaceKeys, SOCCER_GK_FACE, SOCCER_OUT_FACE, soccerFaceKeys, supportOverall } from './card-face';
 // Ultimate Team ratings: a card line becomes a rated card with the same code the played games use,
 // so a card shows exactly what it plays like. Basketball goes through hoops2's `hooper()` (fed the
 // season's own ranks), football through football2's `rateNflLine()`. On top of the base rating:
@@ -245,6 +245,51 @@ function balanced(line: CardLine, pos: string, ovr: number): number {
   return ovr + shift * taper;
 }
 
+/** Claude (packs-5, plan D3): the highest overall a Hot Season or Legend edition displays (before levels). */
+export const EDITION_TOP = 95;
+
+/**
+ * Claude (packs-5, plan D3, owner decision 5): what a Hot Season edition adds to its season, from the
+ * season's honors. MVP or Player of the Year 6; first-team All-League or Defensive Player of the Year
+ * 5; any other All-League team 4; stat titles, records, Pro Bowls and the rest 3.
+ */
+export function hotSeasonDelta(line: Pick<CardLine, 'honors'>): number {
+  const h = line.honors ?? [];
+  if (h.some((x) => x === 'MVP' || x === 'OPOY')) return 6;
+  if (h.some((x) => x === 'ALLNBA1' || x === 'ALLPRO1' || x === 'DPOY')) return 5;
+  if (h.some((x) => /^ALL(NBA|PRO)[23]$/.test(x))) return 4;
+  return 3;
+}
+
+/** A Hot Season's honors delta, or a Legend's own edition boost held to 3..6 (plan D3). */
+export function editionDelta(line: Pick<CardLine, 'kind' | 'honors' | 'boost'>): number {
+  return line.kind === 'legend' ? Math.max(3, Math.min(6, Math.round(line.boost ?? 0))) : hotSeasonDelta(line);
+}
+
+/** Measured or observed attributes a Hot Season or Legend face is never lifted through (as card-face.ts). */
+const MEASURED: Record<UtSport, string[]> = { nba: ['FT', 'SPD', 'ACC'], nfl: ['SPD', 'ACC', 'AGI', 'STR', 'THP'], soccer: [] };
+
+/**
+ * Claude (packs-5, plan D3): when a Hot Season or Legend face (the played attributes on the displayed
+ * scale) still reads more than one under its displayed overall, the role's main skills rise by one, at
+ * most twice. Faces stop at the top of the displayed curve, so the very best editions can stay short.
+ */
+function liftFace(sport: UtSport, pos: string, attrs: Record<string, number>, shown: number): Record<string, number> {
+  let out = attrs;
+  for (let step = 0; step < 2 && Math.round(shownFaceMean(sport, pos, out)) < shown - 1; step++) {
+    const w = faceWeights(sport, pos, out);
+    const main = pickFor(sport, {
+      nba: () => NBA_FACE.filter((c) => (w[c.code] ?? 0) >= 0.15).flatMap((c) => Object.keys(c.parts)),
+      nfl: () => Object.keys(w).filter((c) => w[c] >= 0.15),
+      soccer: () => [] as string[],
+    })().filter((c) => c in out && !MEASURED[sport].includes(c) && out[c] < 99);
+    if (!main.length) break;
+    out = { ...out };
+    for (const c of main) out[c] = Math.min(99, out[c] + 1);
+  }
+  return out;
+}
+
 /**
  * A card, rated: overall, tier, its attributes (0-99 by card code), the six it shows, abilities.
  * `pos` rates it at another of its positions (basketball's overall doesn't move; football's may).
@@ -312,11 +357,15 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   const fit = RATING_CONTEXT.support ? supportOverall(line.sport, facePos, attrs, base, { referenced: Object.keys(line.ratingReference?.attrs ?? {}), signature: (line.games ?? 0) >= 10 }) : { attrs, ovr: base };
   attrs = fit.attrs;
   if (special) {
-    // Spotlight/GOAT: unchanged Codex model (signature skills raised to support 100–110).
+    // Spotlight/GOAT (Codex model, reshaped by Claude in packs-5, plan D4): strengths gain with their
+    // headroom, then rise in proportion to their size until the profile carries the edition's overall,
+    // with at most two at the cap; the tier floor (Spotlight 100, GOAT 106) always holds.
+    const floor = goat ? 106 : 100;
+    const target = bounded(Math.max(floor, base + (goat ? 11 : 6)));
     attrs = editionAttributes(attrs, boost, limit, true);
-    attrs = supportEdition(line.sport, at, attrs, limit, goat ? 106 : 100);
+    attrs = shapeEdition(line.sport, at, attrs, limit, target, floor, (a) => faceOf(line.sport, facePos, a, limit).map(([, , v]) => v));
     const support = Math.round(profileQuality(line.sport, at, attrs) + 8);
-    baseOvr = bounded(Math.min(support, Math.max(goat ? 106 : 100, base + (goat ? 11 : 6))));
+    baseOvr = bounded(Math.max(floor, Math.min(support, target)));
     exact = baseOvr;
   } else {
     exact = Math.max(40, Math.min(99, fit.ovr));
@@ -324,19 +373,25 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   }
   // What the card shows: its overall and face on the displayed UT scale (ut-scale.ts); levels add on top.
   let shownBase = special ? baseOvr : Math.max(40, cap(toDisplay(line.sport, exact)));
-  let faceLift = 0;
   if (line.kind === 'promo' || line.kind === 'legend') {
-    // Hot Season (Team-of-the-Year analog) / Legend: the displayed overall comes from the edition's own
-    // range (UT_SCALE), ordered by the season it celebrates; the playable profile gains the edition's
-    // boost once (weaknesses kept), and the face shows the season face raised to the edition's number.
-    const seasonShown = shownBase;
-    shownBase = Math.max(seasonShown + (line.kind === 'promo' ? 1 : 0), editionDisplay(line.sport, line.kind, seasonShown));
-    attrs = editionAttributes(attrs, boost, 99, false);
-    baseOvr = cap(baseOvr + boost);
-    faceLift = Math.max(0, shownBase - Math.round(shownFaceMean(line.sport, facePos, attrs)));
+    // Claude (packs-5, plan D3, owner decision 5): a Hot Season or Legend edition displays its season
+    // plus the edition's delta (3..6, from the season's honors or the legend's boost), at most 95 and
+    // with no floor. The played profile gains the same delta, on the displayed scale as well
+    // (weaknesses kept), and the face prints those played attributes: what the card shows is what the
+    // match uses.
+    const d = editionDelta(line);
+    shownBase = Math.min(EDITION_TOP, shownBase + d);
+    attrs = liftFace(line.sport, facePos, editionAttributes(attrs, d, 99, false, line.sport), shownBase);
+    baseOvr = cap(baseOvr + d);
   }
   const lv = levelAttrBonus(Math.min(MAX_LEVEL, level));
-  if (lv) for (const [code] of keys) attrs[code] = bounded((attrs[code] ?? baseOvr) + lv);
+  if (lv) {
+    const before = attrs;
+    attrs = { ...attrs };
+    for (const [code] of keys) attrs[code] = bounded((attrs[code] ?? baseOvr) + lv);
+    // a levelled Spotlight or GOAT keeps at most two attributes at its cap (plan D4)
+    if (special) attrs = holdCap(attrs, before, limit);
+  }
   if (line.sport === 'nba') {
     const h = hooper(nbaLineOf(line), at, line.num);
     for (const [code, field] of NBA_ATTRS) (h as unknown as Record<string, unknown>)[field] = attrs[code];
@@ -346,7 +401,7 @@ export function rateCard(line: CardLine, level = 1, pos?: string): RatedCard {
   if (line.kind === 'promo') abil.push(PROMO_ABILITY);
   if (line.kind === 'legend' || goat) abil.unshift(LEGEND_ABILITY);
   const ovr = bounded(shownBase + levelBonus(level));
-  const face = faceOf(line.sport, facePos, attrs, limit).map(([c, n, v]) => [c, n, special ? v : bounded(toDisplay(line.sport, v) + faceLift)] as [string, string, number]);
+  const face = faceOf(line.sport, facePos, attrs, limit).map(([c, n, v]) => [c, n, special ? v : bounded(toDisplay(line.sport, v))] as [string, string, number]);
   // a season card's tier is its unlevelled overall's, so levelling never turns bronze into silver
   const tier: Tier =
     line.kind === 'goat' ? 'goat' : line.kind === 'spotlight' ? 'spotlight' : line.kind === 'promo' ? 'promo' : line.kind === 'legend' ? 'legend' : tierOf(shownBase, line.sport);

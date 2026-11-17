@@ -976,7 +976,8 @@ export function quickSell(tier: Tier, o: number, sport: UtSport): number {
   // Claude content editions, on the same displayed scale: Landmark ~85–93, programs
   else if (tier === 'landmark') v = 1200 + 60 * Math.max(0, o - (scale.legend[0][1] - 3));
   else if (tier === 'program') v = 700 + 60 * Math.max(0, o - (scale.legend[0][1] - 4));
-  else if (tier === 'promo') v = 500 + 40 * Math.max(0, o - (scale.promo[0][1] - 4));
+  // Claude (packs-5, plan D2): Hot Season on one absolute line after the re-rate (season + 3..6, at most 95)
+  else if (tier === 'promo') v = 650 + 50 * Math.max(0, o - 80);
   // Claude (packs-1): Standouts (80–93) on one absolute line, under every Hot Season. The old line
   // (400 + 40 per point from the Hot Season knot - 14) sold a 93 Standout above a 97 Hot Season, and in
   // soccer (knot 80) every Standout above every Hot Season.

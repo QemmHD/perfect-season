@@ -16,9 +16,16 @@ import { rareInfo } from './rare';
 /**
  * Claude: content version mixed into the pool fingerprint. This build can field Weekly Standout and
  * Landmark Season editions that older builds can't resolve, so its online queue must not pair with
- * them (`queueOf` in Match.tsx uses the fingerprint).
+ * them (`queueOf` in Match.tsx uses the fingerprint). 5 (packs-5): the Hot Season, Legend, Spotlight
+ * and GOAT re-rate and soccer's promo buckets.
  */
-export const CONTENT_PRINT = 'ut-content-4';
+export const CONTENT_PRINT = 'ut-content-5';
+
+/**
+ * Claude (packs-5, plan D3/L4): a soccer Hot Season under this overall is not a Hot Season worth a pack
+ * slot. It stays a card (owned copies resolve through `base` and `byId`) but leaves the pack buckets.
+ */
+export const SOCCER_PROMO_MIN = 80;
 
 /**
  * Card lines by id that also resolve the derived editions (editions.ts) on demand: a Standout from
@@ -98,7 +105,7 @@ function poolBuilder(sport: UtSport, lines: CardLine[], byId?: Map<string, CardL
     add(l: CardLine) {
       const rc = rateCard(l);
       base.set(l.id, rc);
-      (buckets[rc.tier][l.pos[0]] ??= []).push(rc);
+      if (!(sport === 'soccer' && rc.tier === 'promo' && rc.ovr < SOCCER_PROMO_MIN)) (buckets[rc.tier][l.pos[0]] ??= []).push(rc);
       h = Math.imul(h ^ hashString(l.id + ':' + rc.ovr + ':' + rc.tier + ':' + JSON.stringify(rc.attrs) + ':' + rc.abil.join(',')), 16777619) >>> 0;
     },
     done: (): Pool => {

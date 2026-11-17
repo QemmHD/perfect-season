@@ -1,6 +1,7 @@
 import { pickFor } from '../engine/sport';
 // Implemented by Codex. Overall must be supported by the attributes used in the actual match.
 import type { UtSport } from "./types";
+import { fromDisplay, toDisplay } from "./ut-scale";
 const NBA: Record<string, Record<string, number>> = {
   PG: {
     HND: 0.19,
@@ -143,53 +144,133 @@ export function profileQuality(
     ? Math.max(quality, profileQuality("nba", "SF", attrs))
     : quality;
 }
-/** Higher editions improve signature strengths; a pocket passer or non-shooter retains that identity. */
+/** Measured speed: a Hot Season or Legend raises it by half its delta (editionAttributes). */
+const ATHLETIC: Record<UtSport, string[]> = { nba: ["SPD", "ACC"], nfl: ["SPD", "ACC", "AGI"], soccer: [] };
+/**
+ * Higher editions improve signature strengths; a pocket passer or non-shooter retains that identity.
+ * Claude (packs-5, plan D4): a numbered edition's gain on a strength (80+) scales with its headroom,
+ * `amount × (cap − v) / (cap − 60)`, so a 99 gains less than an 85 and the top of the profile keeps its
+ * order instead of piling up at the cap (the old full gain put Brady's GOAT at 110 in five of six).
+ * Given `sport`, a Hot Season or Legend gain (packs-5, plan D3) is at least `amount` on the displayed
+ * scale too (ut-scale.ts), so every face number rises by the edition's delta like its overall does,
+ * where the displayed curve is flat (most of the 80s) and `amount` rating points would show as two.
+ * Measured speed (ATHLETIC) is the exception: an honored season doesn't make a player faster, so there
+ * a Hot Season or Legend adds half its delta (a 44-year-old Brady stays a pocket passer).
+ */
 export function editionAttributes(
   base: Record<string, number>,
   amount: number,
   cap: number,
   special: boolean,
+  sport?: UtSport,
 ): Record<string, number> {
   return Object.fromEntries(
     Object.entries(base).map(([code, value]) => {
       let gain = amount;
       if (special) {
-        gain *= value < 65 ? 0.12 : value < 80 ? 0.5 : 1;
+        gain *= value < 65 ? 0.12 : value < 80 ? 0.5 : Math.max(0, cap - value) / (cap - 60);
         if (["SPD", "ACC", "AGI", "VRT"].includes(code))
           gain = Math.min(amount >= 14 ? 6 : 4, gain);
         if (code === "FT") gain = Math.min(4, gain);
       } else if (value < 55) gain = Math.min(2, amount * 0.3);
+      else if (sport && ATHLETIC[sport].includes(code)) gain = Math.ceil(amount / 2);
+      else if (sport) gain = Math.max(amount, fromDisplay(sport, toDisplay(sport, value) + amount) - value);
       return [code, Math.max(1, Math.min(cap, Math.round(value + gain)))];
     }),
   );
 }
 
-/** Numbered editions raise proven signature skills enough to earn their tier, never every weak attribute. */
-export function supportEdition(
+/** Measured or observed athleticism (and free throws, stamina): a numbered edition never lifts them. */
+const UNLIFTED = ["SPD", "ACC", "AGI", "VRT", "FT", "STA"];
+/** Claude (packs-5, plan D4): how many attributes of a numbered edition may sit at its cap. */
+export const SPECIAL_AT_CAP = 2;
+
+/**
+ * Hold a numbered edition to at most `n` attributes at its cap: the ones already there stay, then the
+ * highest of `ref` (the profile before the last raise, so ties keep their order); every other
+ * attribute stops one under the cap.
+ */
+export function holdCap(
+  attrs: Record<string, number>,
+  ref: Record<string, number>,
+  cap: number,
+  n = SPECIAL_AT_CAP,
+): Record<string, number> {
+  const out = { ...attrs };
+  const want = Object.keys(out).filter((k) => out[k] >= cap);
+  if (want.length <= n) return out;
+  const keep = new Set(want.filter((k) => (ref[k] ?? 0) >= cap));
+  for (const k of want.slice().sort((a, b) => (ref[b] ?? 0) - (ref[a] ?? 0) || (a < b ? -1 : 1)))
+    if (keep.size < n) keep.add(k);
+  for (const k of want) if (!keep.has(k)) out[k] = cap - 1;
+  return out;
+}
+
+/**
+ * Claude (packs-5, plan D4; replaces Codex's supportEdition): lift a numbered edition's proven
+ * strengths until its overall reaches `target`, keeping the player's shape. The strengths (role skills
+ * of 75+, never measured athleticism, free throws or stamina) rise a point at a time in proportion to
+ * (v − 60)^1.5, so the best skills rise most, and:
+ *  1. at most SPECIAL_AT_CAP attributes reach the cap (what can't go higher spills to the next strength);
+ *  2. no face value (`face`: the six numbers the card prints) reaches one that stood above it, so the
+ *     face keeps its order;
+ *  3. the tier `floor` holds.
+ * When the target can't be met that way the edition settles on the best whole overall it can carry, as
+ * long as that is the floor. Only a card that could not otherwise reach its floor gives way: first on
+ * the face order, then with a third attribute at the cap (the feasibility list,
+ * `scripts/packs/promoattrs.ts --feasibility`).
+ */
+export function shapeEdition(
   sport: UtSport,
   pos: string,
   attrs: Record<string, number>,
   cap: number,
-  minimum: number,
+  target: number,
+  floor: number,
+  face: (attrs: Record<string, number>) => number[] = (a) => Object.values(a),
 ): Record<string, number> {
-  const out = { ...attrs },
-    weights = roleWeights(sport, pos);
-  const strong = Object.keys(out).filter(
-    (k) =>
-      (weights[k] ?? 0) >= 0.075 &&
-      out[k] >= 75 &&
-      !["SPD", "ACC", "AGI", "VRT", "FT", "STA"].includes(k),
+  const weights = roleWeights(sport, pos);
+  const strong = Object.keys(attrs).filter(
+    (k) => (weights[k] ?? 0) >= 0.075 && attrs[k] >= 75 && !UNLIFTED.includes(k),
   );
-  for (
-    let step = 0;
-    step < 400 && profileQuality(sport, pos, out) + 8 < minimum - 0.49;
-    step++
-  ) {
-    const eligible = strong
-      .filter((k) => out[k] < cap)
-      .sort((a, b) => (weights[b] ?? 0) - (weights[a] ?? 0) || out[b] - out[a]);
-    if (!eligible.length) break;
-    out[eligible[step % eligible.length]]++;
-  }
-  return out;
+  const carries = (a: Record<string, number>, want: number) => profileQuality(sport, pos, a) + 8 >= want - 0.49;
+  if (!strong.length || carries(attrs, target)) return { ...attrs };
+  const pull = strong.map((k) => Math.pow(attrs[k] - 60, 1.5));
+  const ref = face(attrs);
+  // [higher, lower] face positions: the lower stays under the higher (never ties it, never passes it)
+  const pairs: [number, number][] = [];
+  ref.forEach((x, i) => ref.forEach((y, j) => x > y && pairs.push([i, j])));
+  const run = (n: number, keepOrder: boolean, want: number) => {
+    const out = { ...attrs };
+    const lift = strong.map(() => 0);
+    let atCap = Object.values(out).filter((v) => v >= cap).length;
+    while (!carries(out, want)) {
+      let moved = false;
+      for (const i of strong.map((_, i) => i).sort((a, b) => lift[a] / pull[a] - lift[b] / pull[b] || b - a)) {
+        const k = strong[i];
+        if (out[k] >= cap || (out[k] + 1 >= cap && atCap >= n)) continue;
+        out[k]++;
+        if (keepOrder) {
+          const f = face(out);
+          if (pairs.some(([hi, lo]) => f[lo] >= f[hi])) {
+            out[k]--;
+            continue;
+          }
+        }
+        if (out[k] >= cap) atCap++;
+        lift[i]++;
+        moved = true;
+        break;
+      }
+      if (!moved) break;
+    }
+    return out;
+  };
+  const kept = run(SPECIAL_AT_CAP, true, target);
+  if (carries(kept, target)) return kept;
+  // the best whole overall the shape can carry, reached with the least lift
+  const most = Math.min(target, Math.floor(profileQuality(sport, pos, kept) + 8 + 0.49));
+  if (most >= floor) return run(SPECIAL_AT_CAP, true, most);
+  const loose = run(SPECIAL_AT_CAP, false, floor);
+  return carries(loose, floor) ? loose : run(SPECIAL_AT_CAP + 1, false, floor);
 }
