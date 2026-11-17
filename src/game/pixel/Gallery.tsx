@@ -1,9 +1,12 @@
 // A test sheet for the pixel art (?pixel): players of different sizes in every move, from several
 // angles, at game scale. Not reachable from the app's menus. ?pixel=mocap opens the motion-capture
-// bench (MocapGallery.tsx) instead.
-import React, { useEffect, useRef } from 'react';
+// bench (MocapGallery.tsx) instead, ?pixel=looks the looks gallery (LooksGallery.tsx).
+import React, { Suspense, useEffect, useRef } from 'react';
 import { DEFAULT_HAIR, DEFAULT_SKIN, drawBody, type Look } from './body';
 import MocapGallery from './MocapGallery';
+
+// ?pixel=looks: every appearance trait, kits and the venue palette (players-4), in its own chunk
+const LooksGallery = React.lazy(() => import('./LooksGallery'));
 import { celebrate, contest, defend, dribble, dunk, idle, jumpShot, layup, pass, run } from './poses';
 import type { Pose } from './rig';
 
@@ -43,7 +46,14 @@ const nfl = (ht: number, wt: number, num: number, jersey: string, trim: string, 
 });
 
 export default function Gallery() {
-  return new URLSearchParams(location.search).get('pixel') === 'mocap' ? <MocapGallery /> : <Sheet />;
+  const which = new URLSearchParams(location.search).get('pixel');
+  if (which === 'looks')
+    return (
+      <Suspense fallback={null}>
+        <LooksGallery />
+      </Suspense>
+    );
+  return which === 'mocap' ? <MocapGallery /> : <Sheet />;
 }
 
 function Sheet() {

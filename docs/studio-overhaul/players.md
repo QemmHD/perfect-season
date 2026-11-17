@@ -176,6 +176,198 @@ PLAY-to-first-frame is at or under the base everywhere (target ≤ +100 ms; the 
 
 ---
 
+### players-4 · Looks drawn in all three engines, C.1.6 kits, calmer C.2 venues (done)
+
+Base `4dc58d0` (the last commit before this task: the players-2 review-fix doc). The machine restarted during an earlier attempt at this task; its uncommitted work in this worktree was reviewed, kept and finished here. Render-only: **Protocol bump needed: none.** No storage key, save field, card/edition/copy id or engine number changed. The simulation imports none of this code (`render-only.test.ts` import graph), and a seeded game in each sport hashes the same engine state after every step with and without the whole drawing pipeline, which now includes `matchLook` with the appearance data loaded and the crowd hook.
+
+**What changed**
+
+1. **`src/game/pixel/head.ts` (new): the head.** The skull, the face and every head trait, painted into the body's pixel grid with the same depth test.
+   - **18 hair recipes** (V2 C.1.4): bald, buzz, short, fade, high top (a flat block on the crown), afro and big afro (rings round the skull), cornrows (alternating rows), short and long locs and braids (hanging strands), ponytail and bun (knots), mohawk (a ridge with faded sides), curly top (a bumpy crop), long flow, receding, headband-bound.
+   - **Each style changes the head's outline by at least one art pixel on two sides** against bald (C.5 rule 2), at 24, 34 and 60 art px, in three facings. On a big head (a radius of 4.5 art px or more) a crop stands a pixel higher over the crown than at the sides, so the box with hair keeps V2's 12×13 shape.
+   - **LOD:** below 24 art px the 18 collapse to four silhouettes (none, cap, tall, long). Facial hair goes below 20, except a full beard.
+   - **Faces:** 8 facial masks (goatee, full, long, moustache, stubble, chinstrap, short, none). Eyes and brows come in two sizes (small and big heads).
+   - **Gear:** headband, wrap and skullcap in the record's colour; goggles (lens and frame); a mouthguard from 24 art px.
+   - **NFL helmet:**
+     - a shell in the helmet colour with the centre stripe and blank sides (no logos);
+     - the facemask, and a clear, dark or tinted visor;
+     - the face showing through a clear visor;
+     - locs, a flow or curls out of the back of the helmet, readable at 23 art px.
+     The helmet now always covers the shoulder pads, the way the head covers the torso; before, the pads swallowed the helmet in low views.
+   - `sec` (hair lag) is in the signature for players-7's secondary motion.
+2. **`body.ts`: gear and numbers.**
+   - **Gear:**
+     - arm gear from the record: full sleeve, shooting sleeve, elbow sleeve, long sleeves, and wristbands and tape from 34 art px;
+     - leg gear: knee pad, knee sleeve, brace, tights, calf sleeve;
+     - sock height (low, crew, high, over the knee) per sport;
+     - an NFL towel from 24 art px.
+   - **Colours:** gear colours resolve against the kit (`looks.ts`). Close-cropped dyed hair keeps its colour (Rodman's red shows through the skin far less than natural hair does).
+   - The palette slots moved to `slots.ts`, so `head.ts` and `body.ts` paint the same materials.
+   - **Numbers (L-5):** a 3×5 font below 34 art px, 4×7 from 34 to 59 and 6×10 from 60.
+     - The glyphs are exact or the number is hidden, never scrambled.
+     - A turned chest closes the gap between digits, never a glyph's columns.
+     - The number is hidden when `squeeze < 0.6`, or where it doesn't fit whole on the jersey (an arm across it). The back number is kept.
+     - The trim border goes on only where the chest has room: the shirt must still show twice as much shirt as number. Otherwise a 4×7 number on a 34 px chest took every mid-tone pixel off the jersey (C.7 #8).
+   - **Kit trim:** a collar in the trim colour, so the kit reads as base + trim + number.
+3. **Wiring.**
+   - **Match:** `select-{nba,nfl,soccer}.ts` `lookFor` is now `matchLook(sport, refOf(sport, id), kit, {...})`:
+     - NFL: pads by position;
+     - soccer: `buildOf`'s weight by position, and the keeper's kit and gloves.
+     The renderers no longer call `hairFor`/`beardFor`; the galleries still use them.
+   - **Late data:** a look made before the sport's appearance data arrived (the first-frame gate gave up on a slow network) is marked `withData: false`. The renderer rebuilds it once the data is in (`staleLook`) and lets its drawings go through the sprite budget.
+   - **Cards:** `ut/CardArt.tsx` `lookOf` is now `looks.ts` `cardLook(line)`, so today's card figures show the real looks before players-8.
+     - The UT chunk starts loading this page's sport's looks.
+     - A portrait drawn before they are in is not cached, and `usePortrait` redraws it once they arrive.
+4. **Kits, `src/game/uniforms.ts` (V2 C.1.6).**
+   - **Clash rule:** two kits clash when their primaries are within **CIEDE2000 ΔE 25**. `deltaE2000` is in `color.ts` and checked against Sharma, Wu and Dalal's published test pairs.
+   - **Away swap:** a clash always sends the rival to his away set; if that also clashes, to a change kit in his second colour, white or charcoal (`clearOf`, `CHANGE_COLORS`).
+   - **Soccer:** `soccer2/kits.ts` uses the same rule, a 2-line hunk (section 7).
+   - **Ramps:** the 3-tone ramps come from the body raster.
+   - **Ring colours:** no kit primary of any NBA, NFL or soccer team is one of the four ground-ring colours.
+5. **Calmer venues (`venue.ts`, `crowd.ts`; colour only, through the V2 grant).**
+   - **Tokens:**
+     - NBA planks `#c98f52`/`#bf8548` every 6 texels, lines `#f4ead8`;
+     - NFL mow stripes `#2f8f46`/`#2a8240` every 5 yards, lines `#eaf5ea`, yard numbers at 60% ink;
+     - soccer mow stripes `#2e9a4a`/`#288a41` every 5.5 m, lines `#f2fff2` at 85%.
+   - **Team colour:** team paint (the key, the centre circle, the end zones) at 85% saturation; the apron and boards in the team's dark.
+   - **Light, baked into each texture once:** four soft light pools, a +8% pool under the rim, and the far end 6% darker.
+   - **Vignette:** one cached canvas darkens the screen's corners by 18%. It is drawn over the venue and under the players, one blit a frame.
+   - **The crowd** (`crowdPalette`, `crowdAt`): three dark value bands (`#4a426e`, `#342d52`, `#221d36`, nearest the lightest, each leaning 10% toward the home colour), flecked with the home colour (5%, at most 6%) and white (1.5%, at most 2%) in 2×2 blocks.
+     - It is the same in the far stands (`persp.ts` `standsWall`), the courtside and touchline seats (`persp.ts`, `pitch.ts`) and the side-on stands (`court.ts`, `field.ts`).
+     - Line, stand, horizon and camera positions are untouched.
+   - `crowd.excite(kind, t)` is a safe no-op for the sport teams to wire now; players-9 animates it.
+6. **The looks gallery, `?pixel=looks`** (`LooksGallery.tsx`).
+   - **How it loads:** its own lazy chunk inside the pixel gallery's, unlinked, storage-free (0 items in local and session storage after a visit).
+   - **What it shows:**
+     - the owner's seven examples in the seasons that show their looks, at 60/34/24 art px, with the record each one drew;
+     - all 18 hair styles × 16/20/24/34/60 art px × 4 facings, plus a light kit;
+     - facial hair, head gear, goggles, the mouthguard, arm and leg gear and socks;
+     - the football helmet, visors, hair out of the helmet and the towel;
+     - 10 skin tones × 8 kits;
+     - each sport's 12 lineup stars in their own colours and in one shared kit at 60/34/24;
+     - the venue tokens, crowd strips, the three textures and the vignette.
+   - **QA:** `scripts/qa/players-looks.mjs` saves it at 393×852 (insets 59/34) and 320×568 and reads every sheet straight off its canvas.
+7. **Data.**
+   - **Lineup stars:** five NFL lineup stars gained a skin tone picked from a cited Commons photo (Ray Lewis, Aaron Donald, Barry Sanders, Tyreek Hill, Justin Tucker).
+   - **Henry:** Derrick Henry's long locs, out of the back of the helmet.
+   - **Brady:** curated with no visor. The seeded default (25% of skill players from 2005) had given him a clear one, and he never wore one.
+   - The rebuilt data is `nfl.json`, 790 bytes.
+
+**Before → after**
+
+**Identity.** `likeness.test.ts` and `players-lineup.mjs --tag after-p4` measure the 12 lineup stars in one shared kit, all drawn at the same height.
+
+| Measure | NBA | NFL | Soccer |
+|---|---|---|---|
+| Pairs ≥8% different at 24 art px | 94% → **100%** (target ≥80%) | 95% → **100%** (≥75%) | 86% → **100%** (≥75%) |
+| Smallest pair at 34 art px | 6.9% → **16.5%** (≥12%) | 4.4% → **15.0%** | 1.7% → **12.8%** |
+| Smallest pair at 60 art px | 2.4% → **19.2%** (100% ≥8%) | 5.6% → **17.2%** | 2.4% → **11.5%** |
+| Distinct skin tones / hair colours among the stars | 1/1 → 5/3 | 1/1 → 6/4 | 1/1 → 6/5 |
+| Closest pairs | LeBron/Giannis | Rice/Moss | Pelé/Maradona |
+
+**Build at 34 art px, real height and weight through `cardLook`.**
+
+| Method | Shaq | Bol | Difference | Other pairs |
+|---|---|---|---|---|
+| Torso, arms raised (`body-build.test.ts`) | 13 | 9 | **4** (≥3) | Haaland 11 vs Messi 8 (≥2) |
+| Audit chest band (harness) | 20 | 17 | **3** | was 18 vs 17 at the base |
+
+**Numbers** (`numbers.test.ts`): 23, 80, 88, 99, 7 and 12 are exact in the 3×5 font at 28 px front-on in all three sports. At 34, 56 and 80 art px and facings 0.6–0.9 they are exact or hidden, never scrambled, and shown in more than half the cases. The 4×7 font from 34 and the 6×10 from 60.
+
+**Venue (`players-screen.mjs --secs 12 --tag after-p4`, 393; soccer at 320, because its 393 run caught 0 venue frames).**
+
+| Row | NBA | NFL | Soccer | Target |
+|---|---|---|---|---|
+| Surface grain | 14.2% → **2.4%** | 3.0% → **0.9%** | 2.6% → **0.9%** | ≤4% |
+| Venue mean L* vs sprites' (negative = venue lighter) | −24.6% → −2.6% | −29.7% → −15.4% | −47.7% → −40.0% | ≥30% darker: **not met** (below) |
+| Crowd: pixels equal to their right neighbour (2 px blocks) | 0.83 → 0.93 | 0.70 → 0.92 | 0.83 → 0.91 | 2 px blocks |
+| Crowd: top-3 colours' share in the detected stands band | 0.22 → 0.36 | 0.12 → 0.32 | 0.19 → 0.33 | three bands plus flecks (below) |
+| Stands vs sprites, neighbour contrast | 1.30 vs 14.0 | 1.33 vs 19.5 | 1.16 vs 17.3 | softer than the play |
+| Corner tiles vs centre (L*) | −26% → −41% | −43% → −52% | −42% → −49% | vignette layer −18% (below) |
+
+- **Grain, the crowd's palette, 2 px blocks and the vignette layer are met exactly** in `venue.test.ts`, which reads the textures and the vignette canvas:
+  - every crowd pixel of the far stands is one of the three bands, the home fleck or the white fleck;
+  - home 2–6%, white ≤2%, every fleck a whole 2×2 block;
+  - the courtside and touchline fans are drawn in the same palette;
+  - the vignette gradient ends at exactly 18%.
+- **Why the screen numbers read differently:**
+  - The screen harness's "stands band" also takes in the LED ribbon, facades, roof lamps and boards (the sport teams' geometry), and the perspective resampling of the stands. That is why its top-3 share is 0.32–0.36, and not ≥0.9.
+  - Its "corner vs centre" measures the whole frame (dark stands and HUD in the top corners), not the vignette layer.
+- **Venue ≥30% darker than the players is not met, and conflicts with the spec's own tokens.**
+  - NBA planks at `#c98f52` (L* ≈ 64) can't sit 30% under sprites whose mean L* is 42. The NFL and soccer grass tokens are mid-greens.
+  - V2's 13:09 revision dropped this row: it is reported, not gated; the plan's §3.2 ledger records this. Players pop through the outline, rim and contrast instead: stands neighbour contrast 1.2–1.3 against the sprites' 14–19.
+  - If the lead still wants it, the lever is the tokens themselves. That is a lead call, recorded in section 5.
+
+**Engine render** (393, dev server, the machine shared with six teams).
+
+| Measure | NBA | NFL | Soccer | Notes |
+|---|---|---|---|---|
+| Stale body draws (`players-sprites.mjs`), players-2 → now | 2.9% → 2.9% | 40.6% → 40.5% | 1.4% → 2.1% | NFL 48–71 px 80.9% (A-1 is players-5) |
+| fps 1×/4× at DPR 3, paired with the players-2/3 tree `4dc58d0` on the same port (`players-matchperf.mjs --vp 393 --cpu 1,4 --dpr 3 --window 10`, `O/shots/players/players-4/perf-paired/`) | base 59.9/50.7, 60.0/43.7, 58.4/44.6 → players-4 59.8/41.1, 59.7/46.0 (4× draw p50 11.2–11.4 → 11.7–12.7 ms) | base 60.0/56.7, 59.8/56.6, 59.1/50.7 → 59.5/53.7, 59.9/53.5 | base 60.0/58.6, 60.0/58.5, 58.8/54.8 → 59.9/53.5, 59.9/56.8 | runs alternate base, base, players-4, base, players-4 |
+
+- **1×** holds 59.5–60.0 in every sport.
+- **4× sits inside the base tree's own run-to-run spread** in NBA (43.7–50.7 base, 41.1–46.0 here) and soccer. NFL runs 1–3 fps under the base's two best runs.
+- **Raster cost.** A sprite build costs more: hair shells, gear, and the number's font search. On the node bench (`vite-node`, 540 rasters), the cost per raster went:
+  - from 0.37 to 0.40 ms at 34 art px;
+  - from 0.47 to 0.51 ms at 64;
+  - from 0.63 to 0.86 ms at 90.
+
+  That is after cutting the collar scan to the rows round the shoulder line, and removing the per-pixel allocations in it and in the number border, which first measured 0.48 / 0.86 / 1.48 ms. The browser NBA 4× draw p50 is about 0.5–1 ms higher.
+- **Followup:** players-5's near-first sprite budget re-checks this.
+- **Stale draws:** soccer's 2.1% sits within players-1's spread (1.7–1.9% over 18 s windows).
+- **The first paired attempt was invalid:** a stale server kept the port, and its "players-4" rows were the base tree. It is kept under `perf-paired/bad/` and not used.
+
+The keep-list (`players-keep.mjs --tag after-p4`) passes all 13 items, with 0 page errors.
+
+**The owner's seven examples, checked by eye in the gallery** (`O/shots/players/players-4/after-p4-gallery-01-the-owner-s-seven-examples.png`):
+
+| Player and season | What the gallery shows |
+|---|---|
+| Shaq, 2000 | bald with a goatee, the heaviest build |
+| Iverson, 2001 | cornrows, a white headband, a right-arm shooting sleeve |
+| Kareem, 1985 | goggles over a receding hairline |
+| Rodman, 1997 | a red buzz |
+| Haaland, 2023 | long blond hair, falling to the shoulders from behind |
+| Mbappé, 2023 | a black buzz, clean-shaven |
+| Brady, 2007 | the helmet with its stripe and facemask, no visor, light-brown hair in the record |
+
+The harness's L4 reads 7 of 7 correct on the records.
+
+**Tests added:**
+- `head.test.ts`: each of the 18 silhouettes changes the outline on ≥2 sides at 24/34/60 in 3 facings; the collapse to 4 below 24 art px; facial hair from 20 (full below); NFL hair out of the helmet at 23 art px; the stripe and the three visor tints.
+- `numbers.test.ts` (above).
+- `likeness.test.ts` with `likeness.helpers.ts`: the identity row in each sport under its own `PS_SPORT`.
+- `body-build.test.ts`: Shaq − Bol ≥3; Haaland − Messi ≥2.
+- `kits.test.ts`: CIEDE2000 against the published pairs; every NBA, NFL and soccer pair within ΔE 25 swaps to a kit that doesn't clash; the soccer keepers read against both outfield sets; 0 primaries on the ring colours.
+- `venue.test.ts`: grain on all three textures, the crowd palette and 2 px blocks, the band order, courtside and touchline fans, team paint at 85%, depth −6% and pools, the vignette at 18%.
+
+**Tests changed, and why:**
+- `select-golden*.test.ts`: `lookFor` changes the look half of every sample on purpose. Run with the three `lookFor`s as they stood before (`LEGACY_LOOK` in the helper), the modules still hash to players-2's digests (NBA `556ad50a`, NFL `ed52d518`, soccer `326e398f`). That proves clip, pose and gait selection are untouched. The new digests are pinned beside them, with the data loaded.
+- `raster.test.ts`: the head, gear, collar and numbers redraw the pinned sprites; the hash is re-pinned to `88fb19d9`.
+- `proportions.test.ts`: on a big head, buzz and the high top now show a pixel of hair past the skull's sides, so the "no hair at the sides" width check accepts V2's box as well as the box less the hair.
+- `render-only.helpers.ts`: the drawn run loads the appearance data and calls `crowd.excite`.
+
+**Verification:**
+- **Typecheck:** `bash O/heavy.sh npm run typecheck` passes.
+- **Tests:**
+  - NBA (default sport): `npx vitest run src/game/pixel src/game/kits.test.ts src/game/uniforms.test.ts scripts/qa/players-lib.test.ts src/engine/sport-branches.test.ts`: 202 pass, 9 skipped by sport.
+  - NFL: `PS_SPORT=nfl npx vitest run src/game/pixel src/game/kits.test.ts`: 184 pass, 10 skipped.
+  - Soccer: `PS_SPORT=soccer npx vitest run soccer sport-branches src/game/pixel src/game/kits.test.ts`: 259 pass, 9 skipped.
+- **Browser runs:** dev server 5214, Playwright with touch, isolated: 0 external requests in every report. Each was run as `node scripts/qa/<script> --out O/shots/players/players-4`:
+  - `players-looks.mjs`: 10 sections at 393×852 (insets 59/34) and at 320×568; no horizontal scroll, 0 page errors, 0 storage items.
+  - `players-screen.mjs --secs 12`;
+  - `players-sprites.mjs`;
+  - `players-lineup.mjs`;
+  - `players-keep.mjs`: 13 of 13 PASS;
+  - `players-matchperf.mjs`, paired (above).
+- **Looked at:**
+  - the 10 gallery sheets;
+  - `after-p4-lineup-{nba,nfl,soccer}.png`;
+  - `after-p4-screen-{sport}-{393,320}-*.png` beside players-1's `before-screen-*`;
+  - `after-p4-perf-match-*.png`.
+
+---
+
 ## 2. Baselines (base commit `1d14201` = source of `acdf3e2`, dev server, players-1, 2026-11-16)
 
 Unless noted: 393×852 with insets 59/34, `deviceScaleFactor` 1, the autoplay benches (`?arcade&auto`, `?soccer-lab&auto&qa`), `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted. **The machine was shared with six other teams** (load average 5–6 on 4 CPUs) throughout, which matters for the 4× CPU rows (see "Against the audit").
@@ -428,7 +620,7 @@ Hit tests and HUD placement use these, never `b.p.ht`, because the drawn height 
 
 - `drawGroundMark(ctx, { x, y, shoulderPx, mark?: 'you'|'target'|'pressure'|'rival', color? })` in `src/game/pixel/ground.ts`: today the soft shadow (`rgba(0,0,0,0.32)`, 70% of shoulder width). From players-4 the same call draws V2 C.1.3's cast shadow (the sprite's silhouette sheared away from the lights at 34–42% alpha, anchored at the ground) plus a small occlusion ellipse; the signature does not change. When asked, it draws the 2 px ring in gold `#f6b93b`, teal `#4fe3c1`, red arc `#ff5d5d` or violet `#8b7cf6`. Nothing else on the field uses those four colours. `color` is the hook for ut's cosmetic ring colour (the Minutes 500/1,000-hour reward).
 - `artScale(canvas) → { backing, devPerArt, artPxFor(cssHeight) }` in `src/game/pixel/art-scale.ts`. **To the sport teams:** your cameras set the on-screen heights. V2 C.1.2 (revised) makes its table a **floor**: controlled ≥51 design px (NBA) / ≥34 (NFL, soccer), far ≥36 / ≥22.5; the camera guides at 393 are NBA handler ≈95, NFL QB ≈70, soccer carrier ≈75 (far ≈60 / 45 / 55). Bigger than the floor is right; nobody needs to shrink. `players-screen.mjs` measures them and `players-verify.mjs` row S6 reports them. Today 1 art px = 1 canvas px = about 1 design px (section 2); whether V2 still wants a fixed 1.5 design px art pixel is request 7. If players-2 picks backing A or B, the resize code sets `canvas.width = W × backing` and draws through one `setTransform(backing)`; everything else keeps CSS px. That hunk is announced here before it lands.
-- **Venue palette tokens** (players-4, V2 C.2 as revised 13:09; the three-band crowd of v1 is withdrawn): the surface grain at ≤4% contrast with baked light pools; the stands softer and foggier than the play, each tier dimmer than the one below; the crowd as head + shirt blocks of 2 px (top tier), 3 px (middle) and 5–6 px (courtside), shirts 40% home, 22% second colour, 12% white, 12% third colour, the rest dark neutrals, six skin tones, a quarter with arms up; 25–60 shimmering pixels a frame and 8–26 flashes (off under reduced motion); a corner vignette. **Stands height** is the sport teams' (C.5 rule 4: about 30–40% of the screen above the far boundary in gameplay; row L7). Colour-only hunks through `src/game/pixel/venue.ts`, one line each, ledgered below. `crowd.excite('score'|'onfire'|'clutch')` is a no-op-safe call from players-4; reactions land in players-9.
+- **Venue palette tokens (v1.2, as built in players-4).** `src/game/pixel/venue.ts` holds the surface tokens (`VENUE`: NBA planks `#c98f52`/`#bf8548`, lines `#f4ead8`; NFL mow `#2f8f46`/`#2a8240` every 5 yd, lines `#eaf5ea`, numbers at 60%; soccer mow `#2e9a4a`/`#288a41` every 5.5 m, lines `#f2fff2` at 85%), `teamPaint` (85% saturation), `teamDark`, `lit(c, x, y, pools, along)` (light pools and the far end 6% darker, baked into textures), `drawVignette(ctx, W, H)` (corners −18%, one cached canvas). `src/game/pixel/crowd.ts` holds the crowd: `crowdPalette(home)`, `crowdAt(palette, x, y, band, seed)`: three dark bands, nearest lightest, flecked with the home colour (≤6%) and white (≤2%) in 2 px blocks. **The task spec for players-4 asked for this three-band crowd** (the earlier C.2 text); V2 13:09's head-and-shirt crowd with shirt shares, six skin tones, arms up, shimmer and flashes is the living-venue work of players-9, which builds on `crowd.ts`. `crowd.excite('score'|'onfire'|'clutch', t)` exists now and does nothing yet; wire it on a score, ON FIRE and Clutch. **Stands height** stays the sport teams' (C.5 rule 4; row L7).
 
 ### 4.5 PlayerPortrait and WalkoutFigure (players-7, players-8)
 
@@ -484,6 +676,7 @@ The Collection screen is ut's. Players gives it `PlayerPortrait` with `variant="
 5. **On-screen heights and the stands share are the sport teams'.** Rows S6 (V2 C.1.2 floors: controlled ≥51 / ≥34 design px, with the ≈95 / 70 / 75 camera guides beside them) and L7 (C.5 rule 4: stands about 30–40% of the screen above the far boundary) report them (section 3); the numbers today are in section 2. Nothing asks a camera to shrink. Please re-run `players-screen.mjs` after a camera change.
 6. **Post-merge:** run `bash O/heavy.sh node scripts/qa/players-verify.mjs --run all --port <port>` on the merged tree (players-10 step 8), with `PS_QA_FONT_DIR=O/qa-fonts` so the card-text rows are measured in Archivo.
 7. **Art-pixel ruling (new, V2 13:09).** V2 now contradicts itself: C.6 says perspective scaling "replaces the flat '1.5 px per art pixel' rule in C.1.2: size is whatever the camera says", while C.5 rule 3 and lead decision 3 still say one art pixel = 1.5 design px. players-2 adopted today's grain (option C, about 1 design px per art px, whole device pixels) on measured 4× fps. Please rule `camera` (no fixed art-pixel size; S6's floors apply) or `flat-1.5`; row S1 gates only whole device pixels until then (`S1_RULING` in `players-verify.mjs`).
+8. **Venue darkness (players-4).** The players-4 spec asks for both the plank/grass tokens (NBA `#c98f52`, L* ≈ 64) and a venue mean lightness ≥30% below the sprites' (≈42 L* on the NBA court). Both can't hold on a wood floor; the tokens are built and the darkness row is reported (NBA −2.6%, NFL −15.4%, soccer −40% at 320), as V2 13:09's revision already treats it. If the lead wants the 30%, the lever is darker tokens (and a sport-team look check); please rule.
 
 ---
 
@@ -503,16 +696,23 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 | players-3 | same three | top imports | `loadClips` and `CLIPS` imports dropped; `import { drawGate } from '../pixel/ready'` |
 | players-3 | same three | `constructor(` | the `loadClips(CLIPS)` call removed (the body is now `{}`): `select-*.ts` starts the sport's bundle as the game chunk loads |
 | players-3 | same three | `draw(ctx…` first line | `if (!drawGate('<sport>')) return;` (one line and a comment) |
+| players-4 | same three | top imports | `staleLook` from `../pixel/looks`, `drawVignette` from `../pixel/venue` |
+| players-4 | same three | `let look = this.looks.get(who)` in the sprite method | `if (!look \|\| staleLook(look))`: a look made before the appearance data arrived is rebuilt, and the drawings let go (`this.sprites.dispose(this.last.values())`) |
+| players-4 | same three | the floor blit (`ctx.drawImage(fl.canvas, …)`; NFL also its early-return field blit) | `drawVignette(ctx, this.W, this.H)` right after it: one cached canvas, colour only |
+| players-4 | `pixel/persp.ts` `standsWall`, `courtTexture`; `pixel/court.ts` `drawCourt`/`drawCrowd`; `pixel/field.ts` `drawField`; `pixel/pitch.ts` `pitchTexture` | the colour picks inside the per-texel loops | colours from `venue.ts`/`crowd.ts` (tokens, `lit`, `teamPaint`, `crowdAt`); no geometry, line, stand or camera position changed |
 
 ## 7. Touched outside my lane
 
 - **players-2, announced backing hunk** (plan §2, request 2 in section 5): `src/game/hoops2/Hoops2.tsx`, `src/game/football2/Football2.tsx`, `src/game/soccer2/Soccer2.tsx`, the resize code in the draw loop: one import of `artScale` plus 4 lines (`renderer.art = artScale(canvas, W, H)`; the backing size `bw`/`bh`; the size check and `canvas.width/height` use it). With the adopted option C the backing is 1, so the canvas is exactly as before; `?artpx=A` turns on the device-resolution backing.
 - players-1 changed only `scripts/qa/players-*` and this doc.
+- **players-4:** `src/game/soccer2/kits.ts` (soccer's), two lines in `soccerKits`: the rival changes whenever the first colours are within CIEDE2000 ΔE 25, to the first of the away set and three change kits that reads (`clearOf`, `CHANGE_COLORS` from `uniforms.ts`); before, he changed only when the away set was "further" by the redmean distance. The `drawVignette` line and the look-rebuild line in each sport's `render.ts` (section 6) sit next to the sport teams' floor and sprite code.
 - **players-3:** `docs/CREDITS.md`, a new "Player appearance" section (Monk Skin Tone CC BY 4.0, transfermarkt-datasets CC0, Commons photos as references only). The one-line `drawGate` hunks in the three `render.ts` `draw()` methods (section 6) sit at the top of a method the sport teams also edit.
 
 ## 8. Deviations from STREAM, recorded
 
 - **A-5 "interpolating 15 fps clips".** Research R2 says never interpolate between cached frames (pixel joints shimmer). We sample clips natively at 30 fps for the near, large and ball bodies instead, and blend only *between clips*. V2 B.1.6's rates (handler and defender 30 fps, others 15) agree.
+- **players-4's crowd is three dark bands with flecks** (the task's spec), not yet V2 13:09's head-and-shirt crowd; that, and the shimmer and flashes, land with players-9 on the same `crowd.ts`.
+- **"Venue ≥30% darker than the players" is not met** (NBA −2.6%, NFL −15.4%, soccer −40% at 320): the spec's own plank and grass tokens set the surface lightness. V2 13:09 made the row reported only; section 5 request 8 asks the lead.
 - **STREAM's skin-palette crowd recolour** is replaced by V2 C.2's head-and-shirt crowd (revised 13:09: shirt colours by team share and six skin tones), so the crowd is still not one tone.
 
 ## 9. Owner device checks
@@ -527,6 +727,8 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 8. After a full match and two rematches, background the PWA and return: it must still be alive.
 9. Skin tones of curated stars look right (players-3 picked 57 by eye from Commons photos; they show on cards and in matches from players-4).
 10. The first match frame never pops from stand-in poses to recorded motion, and no curated star changes look mid-match (players-3 readiness), on a cold start over mobile data.
+12. players-4: open `?pixel=looks` on the phone and check the owner's seven (Shaq bald, Iverson cornrows + headband + sleeve, Kareem goggles, Rodman's dyed hair, Haaland long blond, Mbappé short and clean-shaven, Brady), then a match per sport: can you tell the stars apart, do numbers read from about 28 px, and is the calmer floor and three-band crowd still "a lit arena" rather than dull?
+13. Kits: two teams with close colours (Lakers vs Kings, Bulls vs Heat, Liverpool vs Arsenal) get a change kit that reads at a glance.
 11. Black kits (Nets, Spurs, Raiders, Saints, Steelers, Juventus) on the phone: they now draw as charcoal (`#3b3b3b` base) inside the `#14121c` outline so the silhouette and the shaded side show; check they still read as black kits in a match, and that white kits read white.
 
 ## 10. Left undone, and why
@@ -537,4 +739,12 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 - **The 4× CPU numbers are not comparable with the audit's** (dev server on a machine shared by seven teams vs the audit's production build on a quiet machine). players-10 repeats `players-matchperf.mjs` on `vite preview`; the relative rows (A5) compare like with like in the meantime. Row A5 also fails at 1× today for the same reason (55.4–59.0 fps in 10 of 15 runs while other teams ran builds and Playwright), not because of the game.
 - **Crowd detection is approximate.** `players-screen.mjs` finds the stands as the band of textured rows above the surface; the screenshots it saves beside the numbers are the check by eye. The numbers agree with the screenshots looked at (NFL 393: stands ≈ y 120–270 of 852, measured 16.9%).
 - **players-3:** the looks are loaded and ready but not drawn yet: `matchLook`/`cardLook` replace `lookFor`/`lookOf` in players-4 (step 3), with the raster for the 18 silhouettes, facial hair and gear. A look that arrives after the gate gave up is not yet re-drawn (the renderers cache `Look` per body); players-4 marks such looks stale when it wires `matchLook` (the gate makes that case rare: 0 in every run). The second, independent review of the 73 rows is players-9/10's; Tier A beyond the seeds (GOAT, Legend, top 60) is players-9. Sixteen rows keep the neutral skin until a usable photo is found. ut and packs still need to draw the first-run showcase and the starter's featured gold from `first-run.json` (§4.8). In production the appearance chunk is named after its JSON (`nba-<hash>.js`), which `players-readiness.mjs`'s `LOOKS` pattern does not match; players-10 adds the production names when it runs readiness on `vite preview`. The NFL browser golden sequence (below) was not re-run.
+- **players-4:**
+  - The plan listed V2 13:09's five-tone shading (`shading.test.ts`) and cast-shadow silhouettes (`cast-shadow.test.ts`) under players-4, but this task's spec does not include them. Sprites keep three tones with the outline (C.7 #8's three tones are met for the jersey, skin and shorts in `outline.test.ts`). The harness's lineup row still reads `tonesMin 2` for one NBA star's minor material at 34 art px, and the rim light is lit on 58–72% of the qualifying pixels, against V2's "every". Both are carried as followups.
+  - Also from the plan, not built here, to a later task:
+    - the head-and-shirt crowd, shimmer and flashes (players-9);
+    - the soccer captain's armband and soccer kit patterns (L-6, stretch);
+    - wiring `crowd.excite` (the sport teams);
+    - the ledger-only C.2 items the sport teams own: layers, beams, haze, drift.
+  - The venue screen row: soccer's 393 run caught 0 venue frames (its 320 run is reported). The screen harness's crowd top-3 share counts the ribbons and facades inside its detected stands band; the palette itself is proved in `venue.test.ts`.
 - **Nothing else from players-1 is left.** Every later row in section 3 belongs to the task named in its row.
