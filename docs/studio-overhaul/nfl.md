@@ -10,6 +10,7 @@ Worktree `/home/user/ps-s-nfl`, branch `claude/studio-nfl`, cut from `claude/stu
 
 | Task | Reason |
 |---|---|
+| nfl-4 | The gold ring: a PERFECT sling is caught in stride with no error, drop or interception; early or late throws carry 1.3× the error; a PERFECT JUKE/SPIN puts that tackler on the turf for 0.8 s (the AI's own moves meet the same ring). Touch-timestamp timing. Heat replaces the three-completion On Fire (no more quicker ball or whole arc); ON FIRE widens every gold window 1.25× and turns a rush-only amber gold. The determinism pins moved (`9d4f17f7` / `d7536bc8`), so AI drives, sims and takeovers come out differently too. |
 | nfl-2 | The pocket: the stick moves the quarterback (sight and throw error follow), the automatic scramble when he crosses the line, `throwAway` (outside the tackle box only, never intercepted), `giveUp` slide and dive (a tackle, no fumble roll), `coverBall` (a covered ball comes loose 0.3 as often; no moves), the TOUCH/BULLET/LOB chip resetting to TOUCH each snap, and burst read from the stick's ring. Human-played drives come out differently. The AI's drives, sims and takeovers are unchanged (the determinism pins hold): its quarterback never moves on the stick and keeps its old sideline bail throw. |
 | nfl-1 | Input semantics after a carrier change: a stick the player has not touched since the catch, handoff or scramble now reaches the engine as `null` (the carrier keeps his momentum) instead of `{0,0}` (a hard brake); the engine's `null` carry for receivers and scrambling QBs keeps the heading for 0.35 s. Human-played drives come out differently, so an old and a new client must not share a queue. AI drives, sims and takeovers are unchanged (the autopilot never sends `null` to a carrier; the determinism test proves it). |
 
@@ -236,8 +237,11 @@ interface MatchGrade {
   heatBest: number;     // 0–100
   lit: number;          // times On Fire
   flawless: boolean;    // won with 0 turnovers
+  turnovers: number;    // nfl-4: what flawless reads, settled once the rival's score is final
 }
 ```
+
+- **nfl-4 amendment:** `turnovers` is carried so `flawless` can be settled when the result is known. The game screen sends its grade in `onDone` before the rival may have finished, and `Arcade` sets `flawless` with `gradeResult(us, them)` as it calls `onFinish` (`src/game/progress.ts`). Consumers read `flawless`, never the count.
 
 - One optional field in `src/game/progress.ts`, next to `box`, attached to **finished** `Progress` only, never on the wire (test).
 - **The letter** comes from your points per drive against `PAR[level]`: S ≥ par + 1.5, A ≥ par + 0.5, B ≥ par − 0.5, else C. `PAR` is a constants table nfl-10 fits.
@@ -494,6 +498,9 @@ An independent review of `b0277ad..7ac837c` found one medium and four low issues
 
 ## Touched outside my lane
 
+- **nfl-4** `src/game/progress.ts` (shared by all three sports, additive): optional `Progress.grade` (`MatchGrade`, C22), `wireProgress` and `gradeResult`, and optional `RivalLive.ends`. nba's C22 lands the same field; the lead keeps one copy.
+- **nfl-4** `src/game/Arcade.tsx` (shared; about 8 lines, every sport, harmless for the others): `onProgress(wireProgress(p))` so a grade never reaches the wire, `onFinish(gradeResult(us, them), …)` to settle FLAWLESS, and the rival's `ends` passed in `shown` (online, from their progress; solo, the AI's ends so far).
+
 - **nfl-3** `src/game/Arcade.tsx` (shared with nba; NFL lines only): the NFL kickoff copy (P-4) and one line that skips `loadAttrs()` for an NFL UT match (`FOOTBALL && teams…`).
 - **nfl-3** `src/evolution/Training.tsx`: the NFL drill tips (strings only).
 - **nfl-3** `src/game/play-feedback.ts` and its test (shared nba/nfl; NFL strings only): the next-step copy (P-4).
@@ -631,6 +638,53 @@ The far players (the two deepest defenders) draw 11–12 px at A: the plan's "ab
 
 **Protocol:** none (render and UI only; the determinism pins and the render-only test hold). **Saves:** none.
 
+### nfl-4: the gold ring, Heat and the match grade (slice #5) — done 2026-11-17
+
+**What changed and why.**
+- **Timing from the touch (C17).** Every timed input (the sling's release, JUKE, SPIN, a swipe off A) is turned into engine time once, from the event's own `timeStamp`, by `touchTime(e, anchor, calibrationLag())`. The anchor pairs `performance.now()` with the engine's time (the play clock plus what is waiting in the fixed-step accumulator) and is refreshed every frame. The input waits in one slot (`timed`) and is applied at the first step its time has reached, and the engine judges it at that exact time, so a late frame never moves the judgement. A JUKE press that turns into a swipe is timed by the press. On a tackler's live gold ring the press cuts away from him at once instead of waiting for the lift: the browser QA found a tap's ~100 ms between press and lift could put a perfectly timed JUKE after the hit (it failed at 320 px on seeds where the dive lands 60–80 ms after the commit).
+- **The sling ring (`engine.ts` `slingWindow`, drawn on the reticle).** The window is centred on the release that has the ball arrive as the receiver gets there (`slingTarget`: the closest pass of his route to the spot, or his arrival at a curl's settle). Its half-width is `windowHalf(22 ms + 33 ms × accuracy at that distance, 1, On Fire)`, ×0.7 for 20+ air yards, floored at 30 ms. It is **gold only when the outcome can be promised**: the spot within his 1.2 yd catch radius and in bounds, in arm range, his separation halo green (2.4 yd; 3.4 yd for a 20+ yard ball, which hangs), and the rush under 0.5 (under 0.25 deep). It is **amber** under pressure or tight coverage (PRESSURE) or off his path (TIMING), and **red** past the arm (RANGE, the whole ring, no timing). **Gold + PERFECT** = no placement error, nobody plays the ball in the lane, no drop and no interception (`ball.sure`). Early or late = 1.3× the throw error. Amber or red can never be PERFECT. A tap on a name chip, and every AI throw, take the `good` path (today's accuracy), so a tap never beats a PERFECT sling.
+- **The separation halo** on each name chip (`ReceiverIcons`): green when he is open where a throw now would meet him, amber when tight. It uses the same `separation()` value the autopilot reads to choose its man.
+- **PERFECT JUKE and SPIN.** A tackler's wind-up (`windupOf`) is now the gold ring around him (`jukeWindow`), centred on the moment he commits. Its half-width is `windowHalf(22 + 33 × his moves and agility)`. It is gold while the carrier has a move ready, amber while he does not. **PERFECT:** that tackler grabs at air and is on the turf for 0.8 s (`stumble:<id>`), and the carrier keeps 90% of his speed. **Early:** the cut is 25% weaker. **Late or good:** as before (the dive's own timing decides; nfl-7 adds the contest). The AI's own moves meet the same rings at its step.
+- **Heat (C18) replaces the three-completion On Fire.** It is integer `Game` state (`drive.ts heatEvent`, the pure maths in `shared-v2 addHeat/spendFire`):
+  - +12 for each PERFECT, +25 for a touchdown, +15 for a stop or takeaway by your defense (solo: the rival's drive ends in a punt, downs, a missed kick, a turnover or a safety), +5 for a clean first down (a set of downs moved on with no sack or flag), −20 for a turnover, −10 when the rival scores (solo).
+  - HEATING UP at 66 (the ball's trail warms and lengthens, the crowd lifts, the bar glows). ON FIRE at 100 for your next 3 snaps (4 with a Heat Check card, which used to light the old fire a completion sooner): every gold window 1.25× wide, an amber that is only the rush's turns gold short of 20 air yards, the ball burns (flame particles; under reduced motion the bug's still flame says it), and the first score while On Fire gets the slow-motion replay. The bar empties after drive 2.
+  - The quarterback's old On Fire (the whole arc shown, a 12% quicker ball) is gone; ON FIRE's wider gold covers it. The defensive On Fire of revision 2 is cut.
+  - **The rival's bar** is worked out from their wire `ends` alone (`heatFromEnds`: TD +25, turnover −20, empty after their drive 2), online and solo. `RivalLive.ends` carries them from `Arcade`. Online, your Heat is your offense's alone.
+  - The score bug shows two bars (yours under YOU, theirs under the rival), each with the 66 mark, and a still flame in the block of whoever is ON FIRE.
+- **Words, sound and feel (V2 §B.0.5).** PERFECT on the toast line in gold ("PERFECT · IN STRIDE / JUKE / SPIN"), scaling 1.0 → 1.25 → 1.0 over 220 ms (no scale under reduced motion). `perfectChime(streak)` (two notes a fourth apart, a semitone higher for each PERFECT in a row up to five; the shared `sfx.perfect` when the merge brings it) and `haptic('double')`. A non-gold release names its dial: TIMING (EARLY / LATE / NOT IN STRIDE), PRESSURE (RUSHED / TIGHT COVERAGE) or RANGE (PAST HIS ARM). HEATING UP and ON FIRE are toasts too, also when a stop by your defense lights it. A PERFECT move gets a 50 ms hit-stop. Every NFL hit-stop now goes through `feel.ts impact()`: 33–120 ms each, 30 ms under reduced motion, never more than 150 ms in any second.
+- **The match grade (C22).** `Game` counts PERFECTs (and each player's, for nfl-9's `pf` box key), gold chances, turnovers, best Heat and times lit. `gradeOf` gives the letter from points a drive against a provisional `PAR` (Rookie 4.0, Pro 3.4, Legend 2.1; nfl-10 fits it). The grade rides only on the finished `Progress` from `onDone`. `Arcade` strips it from everything it sends (`wireProgress`) and settles FLAWLESS (a win with 0 turnovers) once the rival's score is final (`gradeResult`). The final card shows the letter, PERFECT n/m, best HEAT, ON FIRE ×n and FLAWLESS.
+- **The human proxy (`sim-kit.ts`).** Release error σ = 50 ms around each ring's centre, judged at that instant (the same model as nba-4). On a sling he drags onto where his man will be, with the pilot's own aim error. The ring corrects him up to twice: if its moment has already passed, he leads further; if it is amber TIMING, he slides halfway back onto the path. He goes for 70% of the gold JUKE/SPIN rings he is shown, on any tackler closing on him, once his move is ready. His solo rival's drive ends (the AI pilot at the difficulty) land after each of his drives, as `Arcade` shows them. The AI side is unchanged by the proxy.
+
+**Before → after.** Calibration: `MODE=fast CASES=ai,human,stick npx vite-node scripts/nfl_calibrate.ts`, 100 games a case, gold fixtures v gold. "Before" is the pre-task tree `3c4c2e6` (`nfl-calibration/nfl4-before.*`; its AI rows are `baseline-fast`). "After" is `nfl-calibration/nfl4-fast.*`.
+
+| Measure | Before | After | Acceptance |
+|---|---|---|---|
+| Human proxy, Pro gold: PERFECT share of gold chances | — (no ring) | **39.7%** [36.7–42.7] (slings 41.8%, moves 39.1%; 10.3 chances a game) | 25–45% |
+| … completion | 66.7% | **72.8%** [70.3–75.3] | 55–75% |
+| … games reaching HEATING UP | — | **69%** [59–77] | ≥ 50% |
+| … games ON FIRE | — | **24%** [17–33] | 20–45% (starting band) |
+| … points a drive | 3.66 | 3.91 | — |
+| … deep (20+) completion | 59.3% | **72.2%** | ≤ 50% (fitted in nfl-6: see "Left undone") |
+| … yards a carry | 3.94 | **3.31** | (fitted in nfl-7) |
+| Human Rookie / Legend: PERFECT, HEATING UP, ON FIRE | — | 40% / 78% / 29%; 38% / 48% / 14% | — |
+| AI Pro gold: points a drive, completion, yards a carry | 3.50, 68.9%, 4.01 | 3.62, 69.8%, 3.84 | the AI's own play unchanged within noise |
+| Gold window, ratings 40–110 × every difficulty × On Fire | — | half ≥ 30 ms, full ≤ 110 ms before ×1.25; 3+ steps at any 60 Hz phase | ✓ |
+| Gold segment on screen (24 px sling ring, 22 px tackler ring) | — | **≥ 8 px** at 70 for every throw and wind-up; **95 vs 70 ≥ 1.4×** on every throw short of 20 air yards and every wind-up | ✓ |
+| Gold never lies, 10,000 seeded centre releases each (`NFL_LONG=1`) | — | slings 10,000/10,000 caught, 0 INT; jukes/spins 10,000/10,000 tacklers on the turf for 0.8 s | 100% |
+
+**Live (`scripts/qa/nfl-ring.mjs`, isolated, touch, A = 393×852 with insets 59/34, C = 320×568, both motion settings).** Touches go in through CDP with their own timestamps. The checks: the sling's gold ring on the reticle and a release on its centre judged PERFECT, with the PERFECT toast and the chime called exactly once; PERFECT pops (`v2-perfect-pop`) with motion and holds still under reduced motion; Heat 90 + PERFECT lights ON FIRE (the bug's flame, the hot bar, the next play's `fire`); amber off the man's path, red past the arm with RANGE on the toast; with every frame delayed 30 ms (one frame every ~47 ms), three releases near the centre judged as their touch timestamps say; a JUKE on a tackler's gold ring judged PERFECT, the chime called once and that tackler down and stunned; HEATING UP at 60 + 12; the final card shows the grade, and only the finished Progress carries it; no page errors and no non-local requests. Screenshots are in `O/shots/nfl/nfl-4/`.
+
+**Tests added or changed.**
+- `ring.test.ts` (new): the window property test (ratings 40–110, Rookie/Pro/Legend, On Fire on/off, 7 lengths, short and deep: ≥ 30 ms a side, ≤ 110 ms across before ×1.25; On Fire exactly ×1.25; deep narrower); judging at the touch's own time, with every window spanning 3+ steps at any 60 Hz phase, and the same touch through two anchors a delayed frame apart giving the same engine time; the on-screen segment (≥ 8 px at 70, ≥ 1.4× for 95 vs 70); **gold never lies** for slings and for jukes/spins (1,000 each in the ordinary suite, 10,000 with `NFL_LONG=1`), where every gold ring also re-checks every promise (catch radius, halo, arm, rush); gold is never offered amber or red (random spots, a forced rush, past the arm; red is RANGE and never PERFECT); a tap takes the good path; 95 vs 70 windows.
+- `heat.test.ts` (new): every NFL value; HEATING UP at 66 and ON FIRE at 100; full while lit, put out by a loss; 3 snaps (4 with Heat Check) spent on the plays they line up; the bar empties after drive 2 (a kick, a punt; not in a one-drive drill); clean first downs per series; solo rival ends (−10 conceded; +15 for a punt, downs, a miss, a takeaway or a safety; nothing for the clock; a stop can light ON FIRE); the rival's bar from ends alone; identical Heat from identical seeded games, with the AI's own chances counted; the grade's letter against par and its determinism; FLAWLESS iff a win with 0 turnovers; the grade never on the wire, and `Football2` only ever sends `progress(g)` through `onProgress` (a source check), with the grade added in `onDone` alone.
+- `feel.test.ts` (new): the 50 ms juke stop, every kind inside 33–120 ms, the 150 ms-a-second budget (cut to fit or skipped), 30 ms under reduced motion.
+- `drive.test.ts`: the old three-completion On Fire test is removed. That behaviour is gone on purpose; Heat replaces it and `heat.test.ts` covers it. `ratings-matter.test.ts`: Heat Check now gives a fourth ON FIRE snap. `determinism.test.ts`: re-pinned, because the AI's own JUKE/SPIN meet the gold ring and its On Fire is Heat's (`9d4f17f7` / `d7536bc8`; before `f3099ed1` / `ade7aadc`).
+- `sim-kit.ts` summary adds `perfectRate`, `perfectBy`, `ringsJudged`, `slingByDepth`, `chancesPerGame`, `heatingGames` and `fireGames`.
+
+**Protocol bump needed: NFL draft 10→11, UT 11→12** (one row in the table at the top).
+
+**Saves:** none. Heat, the grade's counts and the touch anchor live in the match only; `Progress.grade` is optional and never stored or sent.
+
 ## For the lead (found in nfl-1)
 
 - **Integration checklist (nfl-2 review):** (1) wire `onQuit`/`quitText` (C4) in App's draft `<Arcade>` and ut's `Match.tsx` before ship: today QUIT exists only in the `?arcade` lab, so D-5 quit is not yet reachable by players; (2) the AI quarterback's 0.8 yd step-up (nfl-5), the online takeover deadline on the pause menu (nfl-9) and the controls diagram stay deferred (see "Deferred and rejected").
@@ -638,6 +692,11 @@ The far players (the two deepest defenders) draw 11–12 px at A: the plan's "ab
 - **QA isolation:** under `?ns=inspect` the app and the shared `scripts/qa/browser.mjs` fixture still call the live `player-save` and `card-registry` functions (aborted here by `nfl-guard.cjs`). Every team's legacy QA should run behind a route-abort, and `ns=inspect` should probably disable cloud saves and registry writes in the app itself (`src/lib/cloud-save.ts`, `src/ut/registry.ts`: lead-only paths).
 
 ## Owner device checks
+
+- **nfl-4** The gold ring on the reticle while dragging: whether 24 px reads at arm's length, the closing outer ring, and letting go on gold for PERFECT · IN STRIDE.
+- **nfl-4** The tackler's gold ring and a PERFECT JUKE: the 50 ms beat, the double buzz and the climbing chime (iOS Safari gives no web haptics; the double pattern only plays where `navigator.vibrate` exists).
+- **nfl-4** Heat on the bug (both bars), HEATING UP and ON FIRE with the burning ball, and the grade line on the final card.
+- **nfl-4** Touch timing on the device: a release on the ring's centre should feel exact. The device's own input lag comes in with nba's one-time calibration (`calibrationLag`, 0 until it lands).
 
 - **nfl-3** The new camera on the owner's phone: the formation above the tray before the snap, the players' size (35 px quarterback), the pull-back on a deep throw and the push-in on contact.
 - **nfl-3** The 124 px tray: three cards and a swipe into the book, the fourth-down [play] [FIELD GOAL] [PUNT] with A saying GO / KICK / PUNT, LAST PLAY in the header, and dragging the field to look around.
@@ -659,6 +718,11 @@ The far players (the two deepest defenders) draw 11–12 px at A: the plan's "ab
 Copied from the plan (§9), each with its reason; cut-line items land here with the task that dropped them.
 
 **Deferred**
+- **nfl-4: deep completions.** The human proxy completes 72% of 20+ yard throws (59% before). Gold deep balls are rarer (×0.7 window, a 3.4 yd halo, no gold under any real rush), but the ring's information and its PERFECT catches lift the rest too. The plan fits deep completion to ≤ 50% in nfl-6, and that is where it belongs: the accuracy model by depth.
+- **nfl-4: the human proxy's yards a carry** fell from 3.94 to 3.31. The proxy now spends its moves on the tacklers' rings (70% of the gold ones it's shown, pursuers included); the AI's carries are unchanged within noise. nfl-7 fits the run game and the move economy.
+- **nfl-4: the AI's Heat in solo** scales nothing on defense yet. "Its On Fire scales its defenders' tackle-ring and pick odds ×1.25" needs the defensive rings of nfl-8. The AI already earns Heat by the same rules on its own drives (its PERFECTs come from its own move timing, not separate rolls), and its bar is shown from its ends.
+- **nfl-4: hit-stop and real time.** The touch anchor maps real time to engine time 1:1, so a touch made during a hit-stop (≤ 90 ms) or slow motion is judged up to that much late. Rings never sit inside a stop in practice (a stop follows a PERFECT or a hit); nba's shared C17 can carry the time scale if it ever matters.
+- **nfl-4: PAR** for the grade letter is provisional (Rookie 4.0, Pro 3.4, Legend 2.1), and so are the clean-first-down reading and the 25–45% band; nfl-10 fits them.
 - **nfl-3: the far players' size.** The deepest defenders draw 11–12 px at 393 (the plan hoped for about 22). A flatter camera would shrink the near players below 34 or push the wideouts off the screen; players' LOD sprites (C14) and nfl-10's final camera fit can revisit it.
 - **nfl-3: the kickoff copy's tie line.** "A tie goes to the better team" is still true; nfl-9 replaces it with the C2 overtime line when overtime lands.
 - **nfl-3: the crowd-swell audio cues** (the plan's cut line) move to nfl-10's polish list.
