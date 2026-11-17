@@ -16,7 +16,7 @@ import type { Profile } from '../lib/profile';
 import { claimMinutes, lifeBadge, minutesChip, shortReward, LADDERS } from '../ut/minutes';
 import { MINUTES_DONE_LINE, nextUp } from '../ut/next-action';
 import MinutesView from './MinutesView';
-import { HomeMinutesChip, minText, PlaytimePanel } from './playtime-ui';
+import { compactCount, HomeMinutesChip, minText, PlaytimePanel } from './playtime-ui';
 
 const fs = (await import(/* @vite-ignore */ 'node:' + 'fs')) as { readFileSync(p: URL | string, enc: 'utf8'): string; readdirSync(p: URL): string[] };
 
@@ -60,7 +60,9 @@ describe('the Minutes chip in every state (V2 E.9.1)', () => {
     ['0 min', ledger({ min: 0, lifeMin: 360, life: [0, 1] }), { state: 'next', minutes: 0, target: 5, reward: '25 coins next' }],
     ['27 min', ledger({ min: 27, day: [0, 1], lifeMin: 360, life: [0, 1] }), { state: 'next', minutes: 27, target: 30, reward: '75 coins + stamp next' }],
     ['58 min', ledger({ min: 58, day: [0, 1, 2], lifeMin: 360, life: [0, 1] }), { state: 'next', minutes: 58, target: 60, reward: 'Silver Pack next' }],
-    ['60 min, ready', ledger({ min: 60, day: [0, 1, 2], week: [0], lifeMin: 360, life: [0, 1] }), { state: 'ready', minutes: 60, target: 60, reward: 'Silver Pack ready', ready: 1 }],
+    ['60 min, ready', ledger({ min: 60, day: [0, 1, 2], week: [0], lifeMin: 360, life: [0, 1] }), { state: 'ready', minutes: 60, target: 90, reward: 'Silver Pack ready', ready: 1 }],
+    // review fix: today's real minutes toward the next unreached rung, never clamped to the first ready one
+    ['75 min, the 30 and 60 waiting', ledger({ min: 75, day: [0, 1], week: [0], lifeMin: 360, life: [0, 1] }), { state: 'ready', minutes: 75, target: 90, reward: '2 rewards ready', ready: 2 }],
     ['89 min', ledger({ min: 89, day: [0, 1, 2, 3], week: [0], lifeMin: 360, life: [0, 1] }), { state: 'next', minutes: 89, target: 90, reward: '50 coins next' }],
     ['90 min, all claimed', ledger({ min: 90, day: [0, 1, 2, 3, 4], week: [0], lifeMin: 360, life: [0, 1] }), { state: 'done', minutes: 90, target: 90, reward: 'Great session.' }],
     ['90 min, the 90 rung waiting', ledger({ min: 90, day: [0, 1, 2, 3], week: [0], lifeMin: 360, life: [0, 1] }), { state: 'ready', target: 90, reward: '50 coins ready' }],
@@ -77,7 +79,7 @@ describe('the Minutes chip in every state (V2 E.9.1)', () => {
     expect(minutesChip(undefined, NOW, false)).toMatchObject({ state: 'next', minutes: 0, target: 5 });
   });
   it('several rewards waiting say how many', () => {
-    expect(minutesChip(ledger({ min: 31 }), NOW)).toMatchObject({ state: 'ready', ready: 3, target: 5, reward: '3 rewards ready' });
+    expect(minutesChip(ledger({ min: 31 }), NOW)).toMatchObject({ state: 'ready', ready: 3, minutes: 31, target: 60, reward: '3 rewards ready' });
   });
   it('the short reward text names a pack, coins and the stamp', () => {
     expect(LADDERS.daily.map((r) => shortReward(r.reward))).toEqual(['25 coins', '50 coins', '75 coins + stamp', 'Silver Pack', '50 coins']);
@@ -113,7 +115,8 @@ describe('the Minutes screen', () => {
     expect(t).toContain('THIS WEEK · 27 min');
     expect(t).toContain('SILVER PACK AT 150');
     expect(t).toContain('CAREER · 6 H');
-    expect(t).toContain('Leagues start next week');
+    expect(t).toContain('Leagues are coming');
+    expect(t).not.toMatch(/next week/i);
     expect(t).toContain('Active play only · up to 90 a day · resets midnight ET');
     expect(view(ledger({ min: 27, day: [0, 1] }))).toContain('aria-label="How Minutes work"');
   });
@@ -122,6 +125,23 @@ describe('the Minutes screen', () => {
     expect(h.match(/data-state="next"/g)?.length).toBeGreaterThanOrEqual(1);
     expect(h).toMatch(/data-state="next"[^]*?width="40"/);
     expect(h).not.toContain('ut-k-claim');
+  });
+  it('the 90-minute "done" chest is a plain locked chest until it is reached (review fix)', () => {
+    const CHECK = 'M15 27.5l3.4 3.4 6.4-6.6';
+    const node90 = (h: string) => h.match(/<li[^>]*aria-label="90: [^"]*"[^]*?<\/li>/)?.[0] ?? '';
+    for (const min of [27, 60]) {
+      const n = node90(view(ledger({ min, day: [0, 1, 2], week: [0], lifeMin: 360, life: [0, 1] })));
+      expect(n).toMatch(/data-state="(locked|next)"/);
+      expect(n).not.toContain(CHECK);
+      expect(text(n)).toContain('FINISH');
+      expect(text(n)).not.toContain('DONE');
+    }
+    const ready = node90(view(ledger({ min: 90, day: [0, 1, 2, 3], week: [0], lifeMin: 360, life: [0, 1] })));
+    expect(ready).toContain('data-state="ready"');
+    expect(ready).toContain(CHECK);
+    const claimed = node90(view(ledger({ min: 90, day: [0, 1, 2, 3, 4], week: [0], lifeMin: 360, life: [0, 1] })));
+    expect(claimed).toContain('data-state="claimed"');
+    expect(text(claimed)).toContain('DONE');
   });
   it('60 ready: CLAIM, and the hero names the reward', () => {
     const h = view(ledger({ min: 60, day: [0, 1, 2], week: [0], lifeMin: 360, life: [0, 1] }));
@@ -236,12 +256,27 @@ describe('the Profile panel (V2 E.9.5)', () => {
   });
 });
 
+describe('compactCount for the online chip (review fix: the strip stays in the gutters)', () => {
+  it('3 digits as they are, then k and m, rounded down', () => {
+    expect([0, 7, 99, 999].map(compactCount)).toEqual(['0', '7', '99', '999']);
+    expect([1000, 1234, 1999, 9999, 12345, 999999].map(compactCount)).toEqual(['1k', '1.2k', '1.9k', '9.9k', '12k', '999k']);
+    expect([1_000_000, 1_250_000, 12_500_000].map(compactCount)).toEqual(['1m', '1.2m', '12m']);
+    for (const n of [0, 5, 999, 1234, 54321, 999999, 3_000_001]) expect(compactCount(n).length).toBeLessThanOrEqual(4);
+  });
+});
+
 describe('playtimeLine for the sports’ pause sheets', () => {
   it('adds the seconds of the match in progress', () => {
     const p = { playtime: ledger({ min: 27 }) };
     expect(playtimeLine(p, NOW, 0)).toBe('Today 27 min · next reward at 30');
     expect(playtimeLine(p, NOW, 4 * 60)).toBe('Today 31 min · next reward at 60');
     expect(playtimeLine({ playtime: ledger({ min: 88 }) }, NOW, 600)).toBe('Today 90 min · done for today');
+  });
+  it('applies the week cap to the match in progress (review fix: never above what it will bank)', () => {
+    // Monday with 625 minutes already this week (a tampered or carried-over week): 5 minutes of room
+    const p = { playtime: ledger({ min: 0, extra: { weekDays: [0, 0, 0, 0, 0, 0, 625 * 60] } }) };
+    expect(playtimeLine(p, NOW, 20 * 60)).toBe('Today 5 min · next reward at 15');
+    expect(playtimeLine(p, NOW, 20 * 60)).toBe(playtimeLine({ playtime: credit(p.playtime, { sec: 20 * 60, menu: 0, raw: 0, sport: 'nba', act: 0 }, NOW) }, NOW, 0));
   });
 });
 

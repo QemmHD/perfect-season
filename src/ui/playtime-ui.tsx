@@ -17,6 +17,17 @@ export function minText(min: number): string {
   return h ? h + ' h' + (m ? ' ' + m + ' min' : '') : m + ' min';
 }
 
+/**
+ * A count short enough for Home's five-chip stat strip: 999, then 1.2k, 12k, 1.2m. Rounded down, so
+ * it never says more than are there. (Review fix: a 4-digit online count pushed the strip past the
+ * 16 px gutters.)
+ */
+export function compactCount(n: number): string {
+  n = Math.max(0, Math.floor(n));
+  const short = (v: number, unit: string) => (v < 10 ? Math.floor(v * 10) / 10 : Math.floor(v)) + unit;
+  return n < 1000 ? String(n) : n < 1e6 ? short(n / 1000, 'k') : short(n / 1e6, 'm');
+}
+
 /** A 20 px ring with a clock (or a check when the day is done) inside. */
 function MiniRing({ share, state }: { share: number; state: 'next' | 'ready' | 'done' }) {
   const r = 8.5,

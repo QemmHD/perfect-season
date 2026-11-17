@@ -214,15 +214,27 @@
 }
 
 /* Home's stat strip holds five chips with the Minutes ring: a little less padding and gap, so the
-   row stays inside the 16 px gutters (even at 100+ online) and Home gains no height */
+   row stays inside the 16 px gutters and Home gains no height. Review fix: measured with the widest
+   strip the app draws (a 2-digit streak, "1.2k online" from compactCount, "58/60", 3/3, 8/8) it
+   spanned x 10-380; at 4 px gaps and 8 px padding it fits, and the online chip's word can still
+   shrink with an ellipsis as a last resort (the number never does; the chip's label says it all) */
 .home .statstrip {
-  gap: 5px;
+  gap: 4px;
 }
 .home .statstrip > .statchip {
-  padding: 0 9px;
+  padding: 0 8px;
 }
 .home .statstrip > .statchip.mins-chip {
-  padding: 0 9px 0 4px;
+  padding: 0 8px 0 4px;
+}
+.home .statstrip > .statchip.online {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.home .statstrip > .statchip.online > .lc-word {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* RANKS gained a third segment (MINUTES): when the sport's title and the three no longer fit on one

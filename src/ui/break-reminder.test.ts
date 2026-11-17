@@ -25,10 +25,12 @@ function fakePage() {
       for (const fn of listeners.get(type) ?? []) fn({ type, ...e });
     },
     lock: null as object | null,
+    slept: 0,
   };
   vi.stubGlobal('document', page);
   vi.stubGlobal('addEventListener', (type: string, fn: Fn) => page.addEventListener(type, fn));
-  vi.stubGlobal('performance', { now: () => Date.now() });
+  // the ticker's clock: Date's, less the time the phone slept (iOS's performance.now stands still then)
+  vi.stubGlobal('performance', { now: () => Date.now() - page.slept });
   vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) });
   vi.stubGlobal('navigator', {
     locks: {
@@ -135,6 +137,26 @@ describe('the break reminder on the real ticker (70-minute fake-clock runs)', ()
     a.match('ut:b', 40 * 60);
     expect(a.shown).toHaveLength(0);
     a.match('ut:c', 25 * 60);
+    expect(a.shown).toHaveLength(1);
+  });
+  it('a 15-minute phone lock starts the hour again, though performance.now stood still (iOS uptime clock)', async () => {
+    const a = await app();
+    a.match('ut:a', 55 * 60);
+    expect(a.shown).toHaveLength(0);
+    // locked: the page hides, no timer runs, Date moves 15 minutes and performance.now does not
+    page.visibilityState = 'hidden';
+    vi.advanceTimersByTime(1000);
+    const t0 = performance.now();
+    vi.setSystemTime(Date.now() + 15 * 60_000);
+    page.slept += 15 * 60_000;
+    expect(performance.now() - t0).toBe(0);
+    page.visibilityState = 'visible';
+    page.fire('visibilitychange');
+    for (let i = 0; i < 3; i++) await Promise.resolve();
+    // 10 more minutes: 65 active since the start, but only 10 since the break
+    a.match('ut:b', 10 * 60);
+    expect(a.shown).toHaveLength(0);
+    a.match('ut:c', 51 * 60);
     expect(a.shown).toHaveLength(1);
   });
   it('idle menus do not count toward the hour', async () => {

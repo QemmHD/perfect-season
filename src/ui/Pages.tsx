@@ -21,7 +21,7 @@ import { StreakChip } from './Rewards';
 import { FavoritesCard } from './Favorites';
 import { Crown, Football, Home as HomeIcon, Hoop, Lock, Ranks as RanksIcon, SoccerBall, Target, User } from './icons';
 import { FLOOR, PERFECT_PLAYOFFS, PERFECT_RECORD, record } from './sportui';
-import { HomeMinutesChip, PlaytimePanel } from './playtime-ui';
+import { compactCount, HomeMinutesChip, PlaytimePanel } from './playtime-ui';
 import { TabBadge } from './NextUpStrip';
 import './progress-links.css';
 
@@ -116,7 +116,8 @@ function LiveCount({ online, queue, onClick }: { online: number; queue: number; 
   return (
     <button className="statchip online" onClick={onClick} aria-label={online + ' players online, ' + queue + ' in the head-to-head queue: see who'}>
       <i className="livedot" aria-hidden="true" />
-      <b className={'num' + (a ? ' tick' : '')}>{online}</b> online
+      <b className={'num' + (a ? ' tick' : '')}>{compactCount(online)}</b>
+      <span className="lc-word">online</span>
     </button>
   );
 }

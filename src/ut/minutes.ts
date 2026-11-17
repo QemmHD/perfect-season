@@ -197,11 +197,13 @@ export function minutesChip(pt: Playtime | undefined, now: number, fresh = false
     min = v.day.min,
     one = v.ready.find((r) => r.track === 'day') ?? v.ready[0],
     base = { minutes: min, ready: v.ready.length, frozen: v.frozen, rested: v.rested };
+  // ready: today's real minutes toward the next rung not reached yet (75 with the 30 and 60 waiting
+  // reads "75 / 90", not a ring clamped to "30 / 30"); the gold dot and the line say what waits
   if (one)
     return {
       ...base,
       state: 'ready',
-      target: one.track === 'day' ? one.at : (v.day.next?.at ?? DAY_RUNGS[DAY_RUNGS.length - 1]),
+      target: v.day.next?.at ?? DAY_RUNGS[DAY_RUNGS.length - 1],
       reward: v.ready.length === 1 ? shortReward(one.reward) + ' ready' : v.ready.length + ' rewards ready',
     };
   const next = v.day.capped ? null : v.day.next;

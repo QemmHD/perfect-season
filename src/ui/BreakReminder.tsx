@@ -6,6 +6,9 @@
 // hour again. The Session reminder setting turns it off (the count still resets at each stoppage,
 // so turning it back on never fires a backlog). It reads the ticker (src/lib/playtime.ts) once a
 // second and writes nothing.
+// Review fix (ut-3): the ten-minute gap is measured on the wall clock (Date.now), not the ticker's
+// performance.now(): on iOS that is an uptime clock that stands still while the phone sleeps, so a
+// 30-minute lock read as a few seconds and never started the hour again.
 import React, { useEffect, useRef, useState } from 'react';
 import { type PlayCtx, watchPlaytime } from '../lib/playtime';
 import { Sheet } from './common';
@@ -22,11 +25,11 @@ export const BREAK_LINE = 'Good time for a stretch. Your progress is saved.';
 export interface BreakState {
   /** active seconds since the last reminder or break */
   active: number;
-  /** when a second last counted (performance time, ms) */
+  /** when a second last counted (wall-clock time, ms: Date.now, which keeps running while the phone sleeps) */
   lastAt: number;
 }
 
-/** One ticker second: the new state, and whether the reminder is due on this screen now. */
+/** One ticker second at wall-clock time `t` (ms): the new state, and whether the reminder is due on this screen now. */
 export function breakStep(s: BreakState, sec: number, ctx: PlayCtx | undefined, t: number): { s: BreakState; due: boolean } {
   let active = t - s.lastAt > BREAK_GAP ? 0 : s.active,
     lastAt = s.lastAt;
@@ -46,11 +49,14 @@ export function holdBreak(who: string, on: boolean): void {
   else held.delete(who);
 }
 
-/** A ticker watcher that calls `onDue` once per reminder (for watchPlaytime). */
-export function breakWatcher(onDue: () => void): (sec: number, ctx: PlayCtx | undefined, t: number) => void {
+/**
+ * A ticker watcher that calls `onDue` once per reminder (for watchPlaytime). The ticker's own time
+ * (performance.now) is ignored: the break gap is wall-clock time.
+ */
+export function breakWatcher(onDue: () => void, wall: () => number = () => Date.now()): (sec: number, ctx: PlayCtx | undefined, t: number) => void {
   let s: BreakState = { active: 0, lastAt: -Infinity };
-  return (sec, ctx, t) => {
-    const r = breakStep(s, sec, held.size ? undefined : ctx, t);
+  return (sec, ctx) => {
+    const r = breakStep(s, sec, held.size ? undefined : ctx, wall());
     s = r.s;
     if (r.due) onDue();
   };

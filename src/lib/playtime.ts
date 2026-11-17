@@ -181,15 +181,17 @@ export function playtimeView(p: Pick<Profile, 'playtime'>, now = Date.now()): Pl
 }
 
 /**
- * One line for a pause sheet: "Today 27 min · next reward at 30". It adds the seconds this phone has
- * counted but not banked yet (`unbanked`, by default the match in progress), so a pause mid-match
- * reads the real total.
+ * One line for a pause sheet: "Today 27 min · next reward at 30". It adds the play seconds this phone
+ * has counted but not banked yet (`unbanked`, by default the match in progress), so a pause mid-match
+ * reads the real total. They go through `credit`, so the day and week caps apply; the menu buffer is
+ * left out (the 25% rule may not count it), so the line never reads above what the match banks when
+ * it completes. (A forfeit under 120 s banks nothing: the line is the match's expected total.)
  */
 export function playtimeLine(p: Pick<Profile, 'playtime'>, now = Date.now(), unbanked = pendingSec()): string {
   const v = playtimeView(p, now);
   if (v.today.frozen) return 'Minutes paused: the date changed';
-  const pt = p.playtime,
-    min = Math.min(DAY_CAP, (pt && pt.day === etDay(now) ? pt.daySec : 0) + unbanked) / 60 | 0,
+  const q = credit(p.playtime, { sec: Math.max(0, Math.floor(unbanked)), menu: 0, raw: 0, sport: SPORT, act: 0 }, now),
+    min = (q.day === etDay(now) ? q.daySec : 0) / 60 | 0,
     next = DAY_RUNGS.find((r) => r > min);
   return 'Today ' + min + ' min · ' + (next ? 'next reward at ' + next : 'done for today');
 }
@@ -543,9 +545,12 @@ export function bankActivity(id: string, how: 'complete' | 'forfeit'): void {
   else if (had) park();
 }
 
-/** Counted seconds not in the profile yet: the activity on screen and the menu/play buffers. */
+/**
+ * Counted play seconds not in the profile yet: the activity on screen and the play buffer. The menu
+ * buffer is left out: the 25% menu rule decides at the bank how much of it counts.
+ */
 export function pendingSec(): number {
-  return Math.floor((cur?.sec ?? 0) + play + menu);
+  return Math.floor((cur?.sec ?? 0) + play);
 }
 
 /** The break reminder (src/ui/BreakReminder.tsx): told every second this tab ticks. One watcher. */

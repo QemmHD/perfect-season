@@ -1168,6 +1168,48 @@ async function minutesCase(a) {
               ringAnimation: await page.evaluate(() => getComputedStyle(document.querySelector('.home .mins-mini .fill')).animationName),
             };
             await page.screenshot({ path: path.join(a.out, tag + '-home.png') });
+            // review fix: the widest strip the app can draw. A 4-digit online count reads "1.2k"
+            // (compactCount, unit-tested: 1234 -> "1.2k", 12345 -> "12k"), with a 2-digit streak and
+            // "58/60" in the Minutes chip; every chip must stay inside the gutters. The numbers are
+            // set in place for the measurement and put back at once.
+            r.home.worst = await page.evaluate(() => {
+              const st = document.querySelector('.stage'),
+                k = st.getBoundingClientRect().width / st.offsetWidth || 1,
+                x0 = st.getBoundingClientRect().left,
+                set = [
+                  ['.home .statchip.streak b.num', '12'],
+                  ['.home .statchip.online b.num', '1.2k'],
+                  ['.home .mins-chip b.num', '58/60'],
+                  ['.home .statchip.quests b.num', '3/3'],
+                  ['.home .statchip.gauntlet-chip b.num', '8/8'],
+                ].map(([sel, t]) => {
+                  const e = document.querySelector(sel);
+                  if (!e) return null;
+                  const was = e.textContent;
+                  e.textContent = t;
+                  return [e, was];
+                }),
+                boxes = [...document.querySelectorAll('.home .statstrip > *')].map((c) => {
+                  const b = c.getBoundingClientRect();
+                  return [Math.round((b.left - x0) / k), Math.round((b.right - x0) / k)];
+                }),
+                strip = document.querySelector('.home .statstrip').getBoundingClientRect(),
+                h = Math.round(strip.height / k),
+                word = document.querySelector('.home .statchip.online .lc-word'),
+                wordCut = !!word && word.scrollWidth > word.clientWidth,
+                chip = document.querySelector('.home .statchip.online'),
+                chipCut = !!chip && chip.scrollWidth > chip.clientWidth + 1;
+              for (const x of set) if (x) x[0].textContent = x[1];
+              return {
+                chips: boxes.length,
+                online: !!set[1],
+                x: [Math.min(...boxes.map((b) => b[0])), Math.max(...boxes.map((b) => b[1]))],
+                h,
+                wordCut,
+                chipCut,
+                inGutters: boxes.every(([l, rr]) => l >= 15.5 && rr <= 374.5),
+              };
+            });
             // the Minutes screen
             const since = await page.evaluate(() => performance.now());
             await page.locator('.home .mins-chip').click();
@@ -1267,6 +1309,9 @@ async function minutesCase(a) {
             !r.fail &&
             !r.pageErrors.length &&
             r.home?.inGutters &&
+            r.home?.worst?.inGutters &&
+            r.home?.worst?.h <= 30 &&
+            !r.home?.worst?.chipCut &&
             r.minutes?.nextRung?.visible &&
             r.minutes.segsInside &&
             !r.minutes.small.length &&
@@ -1277,7 +1322,7 @@ async function minutesCase(a) {
             !r.profile?.small.length &&
             !r.profile?.tiny.length;
           report.runs.push(r);
-          console.log(tag, r.ok ? 'ok' : 'FAILED', JSON.stringify({ home: r.home && { chip: r.home.chipText, scroll: r.home.scroll, playTop: r.home.playTop, inGutters: r.home.inGutters }, minutes: r.minutes && { hero: r.minutes.hero, next: r.minutes.nextRung, small: r.minutes.small.length, tiny: r.minutes.tiny.length, lowc: r.minutes.lowContrast }, claim: r.claim, ut: r.utHome?.text, fail: r.fail }));
+          console.log(tag, r.ok ? 'ok' : 'FAILED', JSON.stringify({ home: r.home && { chip: r.home.chipText, scroll: r.home.scroll, playTop: r.home.playTop, inGutters: r.home.inGutters, worst: r.home.worst }, minutes: r.minutes && { hero: r.minutes.hero, next: r.minutes.nextRung, small: r.minutes.small.length, tiny: r.minutes.tiny.length, lowc: r.minutes.lowContrast }, claim: r.claim, ut: r.utHome?.text, fail: r.fail }));
         }
   } finally {
     await browser.close();

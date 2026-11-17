@@ -114,6 +114,14 @@ export function Hub(props: {
 }) {
   const { ut, rating, lineup, pool, sport, profile } = props;
   const size = slotsFor(sport).length;
+  // the Rewards tile never says "All caught up" while the Minutes ring above it has rungs waiting
+  // (review fix: the two tiles contradicted each other); Minutes rungs are claimed on their own screen
+  const minutesReady = props.minutes?.ready ?? 0,
+    rewardsLine = props.inboxReady
+      ? props.inboxReady + (props.inboxReady === 1 ? ' reward' : ' rewards') + ' ready to claim'
+      : minutesReady
+        ? 'Inbox clear · Minutes ' + (minutesReady === 1 ? 'reward' : 'rewards') + ' ready above'
+        : 'All caught up · packs and picks wait in the Store';
   // every derivation of the hub in one pass, timed for QA (`ps-hub-derive`, perfNote)
   const d = useMemo(() => {
     const t0 = performance.now(),
@@ -345,11 +353,11 @@ export function Hub(props: {
           ))}
         </span>
       </button>
-      <button className="uh-form uh-rewards rise-in" style={stagger(i++)} onClick={() => props.onGo('inbox')} aria-label={props.inboxReady ? LABEL.rewards + ': ' + props.inboxReady + ' ready to claim' : LABEL.rewards + ': all caught up'}>
+      <button className="uh-form uh-rewards rise-in" style={stagger(i++)} onClick={() => props.onGo('inbox')} aria-label={LABEL.rewards + ': ' + rewardsLine}>
         <IconGift size={20} />
         <span className="uh-form-txt">
           <b>{LABEL.rewards}</b>
-          <small>{props.inboxReady ? props.inboxReady + (props.inboxReady === 1 ? ' reward' : ' rewards') + ' ready to claim' : 'All caught up · packs and picks wait in the Store'}</small>
+          <small>{rewardsLine}</small>
         </span>
         <HQArrow />
       </button>

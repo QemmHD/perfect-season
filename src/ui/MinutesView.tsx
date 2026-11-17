@@ -6,8 +6,9 @@
 //   reward", the rewards ready to CLAIM, or the calm "Done for today" state at 90.
 // - Today, This week and Career rails: chests per rung (opened when claimed, glowing when ready, the
 //   next one enlarged, the rest locked), the fill between them, and what each pays.
-// - The league tile with the six tier shields and the board tabs, which say "Leagues start next week"
-//   until the leagues land (ut-8).
+// - The league tile with the six tier shields and the board tabs, which say "Leagues are coming"
+//   until the leagues land (ut-8). (Review fix: undated, so a wave that ships before ut-8 never
+//   promises "next week" for weeks.)
 // - The explainer sheet in V2 E.9.6's words.
 // Claiming is `claimMinutes` (src/ut/minutes.ts): pure and idempotent, so a second tap grants nothing.
 import React, { useEffect, useState } from 'react';
@@ -45,8 +46,12 @@ const CHEST: Record<ChestKind, [string, string, string]> = {
   done: ['#7af0d4', '#1c8f78', '#e8fffa'],
 };
 
-/** A reward chest in SVG: closed, glowing or opened (lid raised, a check inside). */
-function Chest({ kind, open, size = 34 }: { kind: ChestKind; open: boolean; size?: number }) {
+/**
+ * A reward chest in SVG: closed, glowing or opened (lid raised, a check inside). The 90-minute
+ * "done" chest wears its check only once it is reached (`reached`): locked, it is a plain chest, so
+ * it never reads as already completed next to the claimed ones.
+ */
+function Chest({ kind, open, reached = false, size = 34 }: { kind: ChestKind; open: boolean; reached?: boolean; size?: number }) {
   const [a, b, band] = CHEST[kind];
   const id = 'mvc-' + kind;
   return (
@@ -71,16 +76,19 @@ function Chest({ kind, open, size = 34 }: { kind: ChestKind; open: boolean; size
           <path d="M5 18 Q5 9 20 8 Q35 9 35 18" fill="none" stroke="rgba(255,255,255,.35)" />
           <rect x="17" y="8.5" width="6" height="26.5" fill={band} opacity=".9" />
           <rect x="15.5" y="16" width="9" height="7" rx="1.5" fill={band} stroke="rgba(0,0,0,.35)" />
-          {kind === 'done' && <path d="M15 27.5l3.4 3.4 6.4-6.6" fill="none" stroke="#063a30" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />}
+          {kind === 'done' && reached && <path d="M15 27.5l3.4 3.4 6.4-6.6" fill="none" stroke="#063a30" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />}
         </>
       )}
     </svg>
   );
 }
 
-/** The short label under a chest: "25", "75 + STAMP", "SILVER", "DONE"; a status-only career rung names its badge. */
-function nodeLabel(r: MinutesReward, badge?: string): string {
-  if (r.done) return 'DONE';
+/**
+ * The short label under a chest: "25", "75 + STAMP", "SILVER", "FINISH" (the 90-minute rung, "DONE"
+ * once it is claimed); a status-only career rung names its badge.
+ */
+function nodeLabel(r: MinutesReward, badge?: string, claimed = false): string {
+  if (r.done) return claimed ? 'DONE' : 'FINISH';
   const head = r.pack ? r.pack.toUpperCase() : r.pick ? 'PLAYER PICK' : r.coins ? r.coins.toLocaleString('en-US') : (badge ?? r.flair ?? '').toUpperCase();
   return head + (r.stamp ? ' + STAMP' : '');
 }
@@ -123,9 +131,9 @@ function Rail(props: { title: string; value: string; aside: string; track: Track
               <li key={r.i} className="mv-node" data-state={state} aria-label={(props.atText ?? String)(r.at) + ': ' + rewardText(r.reward) + ' · ' + (state === 'claimed' ? 'claimed' : state === 'ready' ? 'ready to claim' : r.minutesLeft + ' min to go')}>
                 <small className="num">{(props.atText ?? String)(r.at)}</small>
                 <span className="mv-chest">
-                  <Chest kind={chestOf(r.reward)} open={state === 'claimed'} size={state === 'next' ? 40 : 34} />
+                  <Chest kind={chestOf(r.reward)} open={state === 'claimed'} reached={r.reached} size={state === 'next' ? 40 : 34} />
                 </span>
-                <b>{state === 'ready' ? 'READY' : nodeLabel(r.reward, r.track === 'life' ? LIFE_BADGES[r.i] : undefined)}</b>
+                <b>{state === 'ready' ? 'READY' : nodeLabel(r.reward, r.track === 'life' ? LIFE_BADGES[r.i] : undefined, state === 'claimed')}</b>
               </li>
             );
           })}
@@ -202,7 +210,7 @@ function LeagueTile({ profile, weekMin }: { profile: Profile; weekMin: number })
         ))}
       </div>
       <h3 id="mv-league-title" className="disp">
-        Leagues start next week
+        Leagues are coming
       </h3>
       <span className="seg mv-boards" role="group" aria-label="Minutes boards">
         {(Object.keys(BOARD_LABEL) as Board[]).map((b) => (
