@@ -483,7 +483,7 @@ export function ScoreBug(props: ScoreBugProps & ScoreBugExtra) {
   // block's top corner so the name keeps its width on a 320 px phone
   const flame = (on: boolean) =>
     on
-      ? h('svg', { className: 'v2-bug-flame', viewBox: '0 0 12 14', width: 10, height: 12, 'aria-hidden': true }, h('path', { d: 'M6 0C7 3 10 4.5 10 8.5 10 11.5 8.2 14 6 14S2 11.5 2 8.5C2 6.5 3 5.5 4 4.5 4 6 4.8 7 5.6 7 5.6 4.5 4.6 2.5 6 0Z', fill: 'currentColor' }))
+      ? h('svg', { className: 'v2-bug-flame', viewBox: '0 0 12 14', width: 8, height: 10, 'aria-hidden': true }, h('path', { d: 'M6 0C7 3 10 4.5 10 8.5 10 11.5 8.2 14 6 14S2 11.5 2 8.5C2 6.5 3 5.5 4 4.5 4 6 4.8 7 5.6 7 5.6 4.5 4.6 2.5 6 0Z', fill: 'currentColor' }))
       : null;
   return h(
     React.Fragment,

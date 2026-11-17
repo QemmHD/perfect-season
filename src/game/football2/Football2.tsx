@@ -54,7 +54,7 @@ import {
   startChoice,
   startPlay
 } from './drive';
-import { CONCEPTS, coverBall, dist, FIELD_W, flipPlay, giveUp, haloNeed, isLine, maxThrow, moveEdge, moveWithBall, outsideBox, receiverLead, scramble, separation, setBurst, slingWindow, snap, step, throwAway, throwTo, throwToReceiver } from './engine';
+import { CONCEPTS, coverBall, dist, FIELD_W, flipPlay, giveUp, haloNeed, isLine, jukeWindow, maxThrow, moveEdge, moveWithBall, outsideBox, receiverLead, scramble, separation, setBurst, slingWindow, snap, step, throwAway, throwTo, throwToReceiver } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, PassType, Play, Pt, RunInput } from './types';
@@ -372,7 +372,7 @@ export function Football2({
       sfx.levelUp();
       crowd.swell(0.9);
       haptic('long');
-      post({ text: 'ON FIRE', sub: fireSnapsFor(game) + ' SNAPS · GOLD +25%', tone: 'big', prio: PRIO.momentum, ms: 1800, scope: 'time' });
+      post({ text: 'ON FIRE', sub: fireSnapsFor(game) + ' SNAPS', tone: 'big', prio: PRIO.momentum, ms: 1800, scope: 'time' });
       tip('fire', 'ON FIRE · the gold is 25% wider, and the rush no longer turns it amber', true);
     } else if (heating) {
       crowd.swell(0.6);
@@ -1613,9 +1613,13 @@ export function Football2({
               'a',
               'JUKE',
               (e) => {
-                // toward the stick's side; with the stick centred, a swipe off A picks the side (or he cuts away on lift)
+                // toward the stick's side; with the stick centred, a swipe off A picks the side (or he cuts away on lift).
+                // On a tackler's live gold ring it cuts away from him at the press: waiting for the
+                // lift (a tap is ~100 ms) could put the move after the hit it was timed against
                 const side = stickSide();
-                if (side || !('pointerId' in e)) juke(side, e.timeStamp);
+                const live = playRef.current;
+                const onRing = !!live && live.phase === 'run' && live.bodies.some((b) => b.side === 'D' && jukeWindow(live, b)?.state === 'gold');
+                if (side || onRing || !('pointerId' in e)) juke(side, e.timeStamp);
                 else {
                   // (the press is the timing: the swipe that follows only picks the side)
                   aDownAt.current = e.timeStamp;
