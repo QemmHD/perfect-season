@@ -471,6 +471,8 @@ export async function installProbe(page, sport, { golden = false, goldenCap = 40
         goldenCap,
         t0: performance.now(),
         reset() {
+          // the renderer's sprite-budget counters (pixel/sprite-budget.ts writes them while this exists)
+          window.__pixelDebug = {};
           this.frames = 0;
           this.drawMs = [];
           this.byPx = {};
@@ -486,6 +488,7 @@ export async function installProbe(page, sport, { golden = false, goldenCap = 40
           this.t0 = performance.now();
         },
       });
+      window.__pixelDebug = {};
       const P = body.SpriteCache.prototype;
       const g0 = P.get,
         s0 = P.set;
@@ -514,6 +517,42 @@ export async function installProbe(page, sport, { golden = false, goldenCap = 40
         const o = st.ball && st.ball.owner;
         if (o === null || o === undefined) return null;
         return whoOf(st.bodies.find((b) => b.id === o) ?? st.bodies[o]);
+      };
+      // the bodies the renderer must keep at 30 fps (players-5's must set as the harness can see it in
+      // autoplay): the ball's body, the pass target, and the ball body's nearest opponent
+      // (in a cycling clip: a stride or the ready stance; an action clip holds its key frames on purpose)
+      const CYCLES = new Set(['walk', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'ready', 'block']);
+      const prioWho = (st) => {
+        const out = new Set();
+        const bodies = st.bodies ?? [];
+        const posOf = (b) => (sport === 'nba' ? { x: b.cx, y: b.cz } : { x: b.x, y: b.y });
+        let ball = null;
+        if (sport === 'nfl') {
+          ball = st.carrier ?? st.qb;
+          if (st.catcher) out.add(whoOf(st.catcher));
+        } else if (sport === 'nba') {
+          ball = st.handler === null || st.handler === undefined ? null : bodies[st.handler];
+          if (st.target !== null && st.target !== undefined && bodies[st.target]) out.add(whoOf(bodies[st.target]));
+        } else {
+          const o = st.ball && st.ball.owner;
+          ball = o === null || o === undefined ? bodies[st.ctrl] : bodies.find((b) => b.id === o) ?? bodies[o];
+        }
+        if (!ball) return out;
+        out.add(whoOf(ball));
+        const bp = posOf(ball);
+        let best = null;
+        let bd = Infinity;
+        for (const b of bodies) {
+          if (b.side === ball.side) continue;
+          const q = posOf(b);
+          const d = Math.hypot(q.x - bp.x, q.y - bp.y);
+          if (d < bd) {
+            bd = d;
+            best = b;
+          }
+        }
+        if (best) out.add(whoOf(best));
+        return out;
       };
       const area = () => {
         const seen = new Set();
@@ -546,6 +585,7 @@ export async function installProbe(page, sport, { golden = false, goldenCap = 40
         const since = S.startFrame < 0 ? -1 : S.frames - S.startFrame;
         const sb = since < 0 ? 'unknown' : since < 10 ? '0-9' : since < 30 ? '10-29' : since < 120 ? '30-119' : '120+';
         const bw = ballWho(st);
+        const prio = prioWho(st);
         const line = [];
         const pxs = [];
         let ballPx = -1;
@@ -576,8 +616,15 @@ export async function installProbe(page, sport, { golden = false, goldenCap = 40
               if (st2 === 'stale') bs.stale++;
             }
           let b = S.bodies.get(who);
-          if (!b) S.bodies.set(who, (b = { frames: 0, px: [], reqAnim: null, shownAnim: null, reqChanges: 0, shownChanges: 0, stale: 0, staleRun: 0, maxStaleRun: 0, ball: 0 }));
+          if (!b) S.bodies.set(who, (b = { frames: 0, px: [], reqAnim: null, shownAnim: null, reqChanges: 0, shownChanges: 0, stale: 0, staleRun: 0, maxStaleRun: 0, ball: 0, prioFrames: 0, prioReq: 0, prioShown: 0 }));
           b.frames++;
+          // a priority body in a recorded clip: its frames, and the poses it asked for and was shown
+          const inPrio = prio.has(who) && CYCLES.has(q.e.clip);
+          if (inPrio) {
+            b.prioFrames++;
+            if (q.e.anim !== b.reqAnim && b.reqAnim !== null) b.prioReq++;
+            if (st2 !== 'stale' && q.e.anim !== b.shownAnim && b.shownAnim !== null) b.prioShown++;
+          }
           if (b.px.length < 4000) b.px.push(q.e.px);
           if (q.e.anim !== b.reqAnim) {
             if (b.reqAnim !== null) b.reqChanges++;
@@ -652,7 +699,7 @@ export const readProbe = (page) =>
       const s = [...a].sort((x, y) => x - y);
       return s[Math.floor((s.length - 1) / 2)];
     };
-    const bodies = [...S.bodies.entries()].map(([who, b]) => ({ who, frames: b.frames, px: med(b.px), reqChanges: b.reqChanges, shownChanges: b.shownChanges, stale: b.stale, maxStaleRun: b.maxStaleRun, ball: b.ball }));
+    const bodies = [...S.bodies.entries()].map(([who, b]) => ({ who, frames: b.frames, px: med(b.px), reqChanges: b.reqChanges, shownChanges: b.shownChanges, stale: b.stale, maxStaleRun: b.maxStaleRun, ball: b.ball, prioFrames: b.prioFrames, prioReq: b.prioReq, prioShown: b.prioShown }));
     return { frames: S.frames, secs, drawMs: S.drawMs, byPx: S.byPx, pxHist: S.pxHist, heavyKeys: S.heavyKeys, leanKeys: S.leanKeys, bySince: S.bySince, bodies, starts: S.starts, areaNow: S.area(), areaPeak: Math.max(S.areaPeak, S.area()), areaSamples: S.areaSamples, perFrame: S.perFrame, cacheEntries: [...S.caches].reduce((n, c) => n + (c.map ? c.map.size : 0), 0), pixelDebug: window.__pixelDebug ?? null };
   });
 
@@ -672,6 +719,18 @@ export function frameArtPx(perFrame) {
  * 32 px and up), and per-body effective animation rates (distinct poses SHOWN per second, against
  * the poses the renderer ASKED for), for every body, the large ones (40 px and up) and the ball's.
  */
+/** The priority bodies' rate (players-5: the ball's body, the pass target and his nearest opponent at
+ * 30 fps): poses shown a second over the frames each spent in the must set in a recorded clip, for the
+ * bodies with at least a second of them; and the same over everyone else's frames. */
+function prioRate(bodies, fps) {
+  const list = bodies.filter((b) => (b.prioFrames ?? 0) >= fps);
+  const xs = list.map((b) => (b.prioShown * fps) / b.prioFrames);
+  const frames = list.reduce((n, b) => n + b.prioFrames, 0);
+  const shown = list.reduce((n, b) => n + b.prioShown, 0);
+  const req = list.reduce((n, b) => n + b.prioReq, 0);
+  return { bodies: list.length, frames, min: round(quantile(xs, 0)), p50: round(quantile(xs, 0.5)), pooled: round((shown * fps) / Math.max(1, frames)), reqPooled: round((req * fps) / Math.max(1, frames)) };
+}
+
 export function summariseProbe(r) {
   const tot = { lookups: 0, hit: 0, made: 0, stale: 0 };
   const byPx = {};
@@ -717,7 +776,7 @@ export function summariseProbe(r) {
     drawMsP99: round(quantile(r.drawMs, 0.99), 2),
     maxStaleRun: Math.max(0, ...r.bodies.map((b) => b.maxStaleRun)),
     maxStaleRun32: Math.max(0, ...r.bodies.filter((b) => b.px >= 32).map((b) => b.maxStaleRun)),
-    animFps: { all: dist(live), large40: dist(large), ball: dist(ball), nearest6: dist(near) },
+    animFps: { all: dist(live), large40: dist(large), ball: dist(ball), nearest6: dist(near), priority: prioRate(r.bodies, fps) },
     frameArtPx: frameArtPx(r.perFrame),
     spriteAreaMpx: round(r.areaNow / 1e6, 2),
     spriteAreaPeakMpx: round(r.areaPeak / 1e6, 2),
