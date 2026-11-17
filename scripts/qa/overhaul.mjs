@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, fixture, shot, artifacts } from './browser.mjs';
+
+/** Career level from profile XP (src/engine/economy.ts levelInfo): ut-5 pays UT matches Career XP */
+const levelOf = (xp) => {
+  const steps = [70, 110, 140, 170];
+  let level = 1, acc = 0, i = 0, need = steps[0];
+  while (xp >= acc + need) (acc += need), level++, i++, (need = i < steps.length ? steps[i] : need + 30);
+  return level;
+};
 const browser = await launch(),
   report = [];
 try {
@@ -104,7 +112,7 @@ try {
     await page
       .getByRole('button', { name: 'PLAY QUARTERFINAL', exact: true })
       .click();
-    await page.locator('.utm-result').waitFor({ timeout: 180000 });
+    await page.locator('.mr').waitFor({ timeout: 180000 });
     await shot(page, 'overhaul-' + sport + '-real-result');
     console.log(
       JSON.stringify({
@@ -114,15 +122,19 @@ try {
       }),
     );
     assert.ok(await page.evaluate(() => window.__cupRuntime > 0));
+    // ut-5: the breakdown sits in the end-of-match recap's BOX SCORE sheet
+    await page.locator('.mr-sec button').filter({ hasText: 'BOX SCORE' }).click();
     await page.getByRole('region', { name: 'Match breakdown' }).waitFor();
+    await page.keyboard.press('Escape');
     assert.equal(await page.getByRole('button', { name: /^SIM/ }).count(), 0);
     await shot(page, 'overhaul-' + sport + '-real-result');
-    const won = (await page.locator('.utm-verdict').innerText()) === 'WIN',
+    const won = (await page.locator('.mr-word').innerText()) === 'WIN',
       afterMatch = await current();
     assert.equal(afterMatch.ut.cup.active.results.length, 1);
     assert.equal(afterMatch.ut.cup.active.round, 1);
     assert.equal(afterMatch.ut.cup.active.results[0].won, won);
-    assert.equal(afterMatch.coins, original.coins + (won ? 60 : 30));
+    // ut-5: a paid match also adds Career XP; a level it crosses pays its 50 coins
+    assert.equal(afterMatch.coins, original.coins + (won ? 60 : 30) + 50 * (levelOf(afterMatch.xp) - levelOf(original.xp)));
     for (const before of original.ut.owned) {
       const after = afterMatch.ut.owned.find((x) => x.uid === before.uid);
       assert.ok(after);
@@ -259,21 +271,20 @@ try {
       });
       const beforeBattle = await current();
       await page.locator('.utb-rung.next').click();
-      await page.locator('.utm-result').waitFor({ timeout: 180000 });
+      await page.locator('.mr').waitFor({ timeout: 180000 });
       for (
         let attempt = 0;
         attempt < 2 &&
-        (await page.locator('.utm-verdict').innerText()) !== 'WIN';
+        (await page.locator('.mr-word').innerText()) !== 'WIN';
         attempt++
       ) {
-        await page
-          .getByRole('button', { name: 'TRY AGAIN', exact: true })
-          .click();
-        await page.locator('.utm-result').waitFor({ state: 'hidden' });
-        await page.locator('.utm-result').waitFor({ timeout: 180000 });
+        // ut-5: the One-More bar (REMATCH, the same rung, or the next) starts the next match
+        await page.locator('.mr-onemore [data-primary]').click({ timeout: 15000 });
+        await page.locator('.mr').waitFor({ state: 'hidden' });
+        await page.locator('.mr').waitFor({ timeout: 180000 });
       }
       await page
-        .getByRole('button', { name: 'VIEW REWARD PACKS', exact: true })
+        .getByRole('button', { name: 'OPEN IN STORE', exact: true })
         .waitFor();
       await shot(page, 'overhaul-nba-earned-pack-result');
       const withReward = await current();
@@ -282,7 +293,7 @@ try {
         beforeBattle.ut.packs.length + 1,
       );
       await page
-        .getByRole('button', { name: 'VIEW REWARD PACKS', exact: true })
+        .getByRole('button', { name: 'OPEN IN STORE', exact: true })
         .click();
       await page
         .getByRole('button', { name: 'Open your Bronze Pack', exact: true })

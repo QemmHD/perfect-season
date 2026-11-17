@@ -23,6 +23,12 @@
 //               contrast) with the next rung visible without scrolling; CLAIM feedback time, coins and
 //               packs paid once, a second tap a no-op; reduced motion (--rm) draws the rings and rail
 //               fills with no animation; the Profile panel; UT Home's ring (first fixture only)
+//   recap       the 5-second end of match (ut-5): a Squad Battles SIM to the result; the One-More bar's
+//               time from mount (<= 5.0 s; --rm <= 100 ms), tally fps and long tasks (--cpu 4: >= 55),
+//               vibrations outside input (0), the bar's tap area over V2 A.5's A centre, >= 64 px and
+//               the only data-primary, layout metrics; the BOX SCORE sheet; --skip taps at 0.7 s
+//               (final state <= 100 ms, the tap presses nothing); --onemore taps the bar and times the
+//               next match's first game frame (<= 3.0 s)
 //   kit         the visual kit (src/ut/kit.tsx) rendered inside UT: sizes, data-primary, press and
 //               claim burst, its CSS gzip size (<= 5 KB); with --rm, burst, sheen and ring fill must
 //               compute animation none
@@ -716,6 +722,8 @@ function args(argv) {
     else if (k === '--out') a.out = argv[++i];
     else if (k === '--dead') a.dead = argv[++i];
     else if (k === '--screen') (a.screen ??= []).push(argv[++i]);
+    else if (k === '--skip') a.skip = true;
+    else if (k === '--onemore') a.onemore = true;
     else a._.push(k);
   }
   if (!a.sport.length) a.sport = [...SPORTS];
@@ -1335,11 +1343,181 @@ async function minutesCase(a) {
   return report;
 }
 
+
+// ---------------------------------------------------------------- recap (ut-5)
+
+/** UT → PLAY → Squad Battles → the next rung; the vote's SIM (or PLAY with --played) to the result. */
+async function toResult(page) {
+  await enterUt(page);
+  await utTab(page, 'PLAY');
+  await closeDialogs(page);
+  await page.locator('button').filter({ hasText: /^PLAY SQUAD BATTLES$/ }).click();
+  await settle(page, 500);
+  await page.locator('.utb-rung').first().click();
+  await page.locator('.vote-opt.sim').waitFor({ timeout: 60000 });
+  await page.locator('.vote-opt.sim').click();
+}
+
+/** In-page probes, before the result mounts: when it mounts, when the bar shows, frame times, vibrations. */
+const recapProbes = () => {
+  const w = window;
+  w.__rc = { mount: null, bar: null, done: null, frames: [], vib: [] };
+  const v = navigator.vibrate?.bind(navigator);
+  navigator.vibrate = (p) => {
+    w.__rc.vib.push({ t: performance.now(), ev: window.event?.type ?? null, trusted: window.event?.isTrusted ?? null });
+    return v ? v(p) : true;
+  };
+  new MutationObserver(() => {
+    const r = w.__rc;
+    if (!r.mount && document.querySelector('.mr')) {
+      r.mount = performance.now();
+      let last = r.mount;
+      const loop = (t) => {
+        r.frames.push([t - r.mount, t - last]);
+        last = t;
+        if (t - r.mount < 6000) requestAnimationFrame(loop);
+      };
+      requestAnimationFrame(loop);
+    }
+    if (r.mount && !r.bar && document.querySelector('.mr-onemore [data-primary]')) r.bar = performance.now();
+    if (r.mount && !r.done && document.querySelector('.mr[data-phase=done]')) r.done = performance.now();
+  }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-phase'] });
+};
+
+/** The bar's tap area in screen px, and whether it covers V2 A.5's A-button centre. */
+const A_CENTRE = { 393: [323, 738], 375: [305, 587], 320: [266, 510] };
+const barGeometry = (page, size) =>
+  page.evaluate((a) => {
+    const stage = document.querySelector('.stage');
+    const k = stage.getBoundingClientRect().width / stage.offsetWidth || 1;
+    const b = document.querySelector('.mr-onemore [data-primary]')?.getBoundingClientRect();
+    if (!b) return null;
+    return {
+      rect: [b.left, b.top, b.width, b.height].map(Math.round),
+      heightDesign: Math.round(b.height / k),
+      coversA: a[0] >= b.left && a[0] <= b.right && a[1] >= b.top && a[1] <= b.bottom,
+      primaries: document.querySelectorAll('[data-primary]').length,
+      verdict: document.querySelector('.mr-word')?.textContent,
+      score: document.querySelector('.mr-score')?.textContent,
+      title: document.querySelector('.mr-onemore .ut-k-gold-text b')?.textContent,
+      stake: document.querySelector('.mr-onemore .ut-k-gold-text em')?.textContent ?? null,
+    };
+  }, A_CENTRE[size]);
+
+async function recapCase(a) {
+  const browser = await launch();
+  const report = { case: 'recap', at: new Date().toISOString(), flags: flagsOf(a), runs: [] };
+  try {
+    for (const sport of a.sport)
+      for (const size of a.size) {
+        const tag = sport + '-' + size + (a.rm ? '-rm' : '') + (a.cpu > 1 ? '-cpu' + a.cpu : '');
+        const r = { sport, size, rm: a.rm, cpu: a.cpu, fail: [] };
+        const { context, page, errors, edge } = await openPhone(browser, { sport, size, fixture: a.fixture, rm: a.rm, cpu: a.cpu, edge: a.edge, clock: a.clock });
+        try {
+          await context.addInitScript(recapProbes);
+          await page.evaluate(recapProbes);
+          await waitHome(page);
+          await toResult(page);
+          await page.locator('.mr').waitFor({ timeout: 60000 });
+          if (a.skip) {
+            await page.waitForTimeout(700);
+            const t = await page.evaluate(() => performance.now());
+            await page.touchscreen.tap(195 * (size / 390), 300 * (size / 390));
+            await page.waitForFunction(() => window.__rc.done, null, { timeout: 5000 });
+            r.skipMs = Math.round((await page.evaluate(() => window.__rc.done)) - t);
+            await page.waitForTimeout(400);
+            r.stillOnResult = (await page.locator('.mr').count()) > 0;
+            if (!(r.skipMs <= 100)) r.fail.push('skip ' + r.skipMs + ' ms');
+            if (!r.stillOnResult) r.fail.push('the skip tap pressed something');
+          }
+          await page.locator('.mr-onemore [data-primary]').waitFor({ timeout: 15000 });
+          const rc = await page.evaluate(() => window.__rc);
+          r.barMs = Math.round(rc.bar - rc.mount);
+          const tally = rc.frames.filter(([t]) => t >= 2400 && t <= 5000);
+          if (tally.length > 1) {
+            const span = tally[tally.length - 1][0] - tally[0][0];
+            r.tallyFps = Math.round(((tally.length - 1) / span) * 1000 * 10) / 10;
+            r.worstFrameMs = Math.round(Math.max(...tally.map(([, d]) => d)));
+          }
+          const lt = await page.evaluate((m) => (window.__lt ?? []).filter(([t]) => t >= m && t <= m + 5200).map(([, d]) => Math.round(d)), rc.mount);
+          r.longTasks = lt;
+          r.vibrations = rc.vib;
+          r.timerVibrations = rc.vib.filter((x) => !/pointer|click|touch|key/.test(x.ev ?? '')).length;
+          await settle(page, 300);
+          r.geometry = await barGeometry(page, size);
+          const m = await captureScreen(page, { file: path.join(a.out, 'recap-' + tag + '.png'), edge, since: 0, errors, errorsBefore: 0, probe: false });
+          r.metrics = { hOverflow: m.hOverflow, offscreen: m.offscreen, clipped: m.clipped, truncated: m.truncated, small: m.small, tiny: m.tiny, lowContrast: m.lowContrast, primaries: m.primaries };
+          const limit = a.rm ? 100 : 5000;
+          if (!(r.barMs <= limit)) r.fail.push('bar at ' + r.barMs + ' ms');
+          if (!r.geometry?.coversA) r.fail.push('bar misses the A centre');
+          if (!(r.geometry?.heightDesign >= 64)) r.fail.push('bar ' + r.geometry?.heightDesign + ' px tall');
+          if (r.geometry?.primaries !== 1) r.fail.push(r.geometry?.primaries + ' primaries');
+          if (r.timerVibrations) r.fail.push(r.timerVibrations + ' vibrations outside input');
+          if (m.hOverflow > 0 || m.offscreen.length || m.clipped.length || m.small.length || m.tiny.length) r.fail.push('layout');
+          if (!a.rm && a.cpu >= 4 && !(r.tallyFps >= 55)) r.fail.push('tally ' + r.tallyFps + ' fps');
+          // the box score sheet, then the bar: tap → the next match's first game frame
+          await page.locator('.mr-sec button').filter({ hasText: 'BOX SCORE' }).click();
+          await page.locator('.mr-box').waitFor({ timeout: 5000 });
+          await settle(page, 400);
+          await page.screenshot({ path: path.join(a.out, 'recap-' + tag + '-box.png') });
+          await page.keyboard.press('Escape');
+          await page.locator('.mr-box').waitFor({ state: 'detached', timeout: 5000 });
+          if (a.onemore) {
+            const t0 = await page.evaluate(() => performance.now());
+            const b = r.geometry.rect;
+            await page.touchscreen.tap(b[0] + b[2] / 2, b[1] + b[3] / 2);
+            // the first game frame: the game's canvas up and its loading line gone (the attributes are
+            // in, so the engine has drawn the court, field or pitch; the recap has no canvas)
+            // and the picture really drawn: at least 6 colours across a 5 x 5 grid of samples
+            await page.waitForFunction(
+              () =>
+                !document.querySelector('.fg-loading') &&
+                [...document.querySelectorAll('canvas')].some((c) => {
+                  if (!(c.width > 0 && c.getBoundingClientRect().height > 100)) return false;
+                  const g = c.getContext('2d');
+                  if (!g) return false;
+                  const seen = new Set();
+                  for (let i = 1; i <= 5; i++)
+                    for (let j = 1; j <= 5; j++) seen.add(g.getImageData(Math.floor((c.width * i) / 6), Math.floor((c.height * j) / 6), 1, 1).data.join(','));
+                  return seen.size >= 6;
+                }),
+              null,
+              { timeout: 15000, polling: 'raf' },
+            );
+            const t1 = await page.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame((t) => res(t)))));
+            r.oneMoreToFrameMs = Math.round(t1 - t0);
+            if (!(r.oneMoreToFrameMs <= 3000)) r.fail.push('One-More to first frame ' + r.oneMoreToFrameMs + ' ms');
+            await page.screenshot({ path: path.join(a.out, 'recap-' + tag + '-next.png') });
+            await page.waitForTimeout(1500);
+            await page.screenshot({ path: path.join(a.out, 'recap-' + tag + '-next-1500.png') });
+          }
+          r.pageErrors = errors;
+          if (errors.length) r.fail.push('page errors');
+        } catch (e) {
+          r.fail.push('error: ' + e.message.split('\n')[0]);
+          await page.screenshot({ path: path.join(a.out, 'recap-' + tag + '-error.png') }).catch(() => {});
+        }
+        r.ok = !r.fail.length;
+        report.runs.push(r);
+        console.log(tag, r.ok ? 'ok' : 'FAILED', JSON.stringify({ barMs: r.barMs, skipMs: r.skipMs, fps: r.tallyFps, worst: r.worstFrameMs, lt: r.longTasks, vib: r.vibrations?.length, timerVib: r.timerVibrations, geo: r.geometry, next: r.oneMoreToFrameMs, layout: r.metrics && { small: r.metrics.small, tiny: r.metrics.tiny, clipped: r.metrics.clipped, off: r.metrics.offscreen, trunc: r.metrics.truncated, lowc: r.metrics.lowContrast }, fail: r.fail }));
+        await context.close();
+      }
+  } finally {
+    await browser.close();
+  }
+  report.sockets = socketReport();
+  report.blocked = [...blocked];
+  report.ok = report.sockets.ok && report.runs.every((r) => r.ok);
+  fs.writeFileSync(path.join(a.out, 'recap-report' + (a.rm ? '-rm' : '') + (a.cpu > 1 ? '-cpu' + a.cpu : '') + '.json'), JSON.stringify(report, null, 1));
+  console.log('recap:', report.runs.filter((r) => r.ok).length + '/' + report.runs.length, 'ok; sockets', JSON.stringify(report.sockets), report.ok ? 'ok' : 'FAILED');
+  return report;
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const a = args(process.argv.slice(2));
-  const run = { selfcheck, fixtures: fixturesCase, deadtaps: deadtapsCase, kit: kitCase, minutes: minutesCase }[a._[0]];
+  const run = { selfcheck, fixtures: fixturesCase, deadtaps: deadtapsCase, kit: kitCase, minutes: minutesCase, recap: recapCase }[a._[0]];
   if (!run) {
-    console.log('usage: node scripts/qa/ut-studio.mjs selfcheck|fixtures|deadtaps|kit|minutes [--sport s] [--size 393|375|320] [--fixture name] [--no-edge] [--cpu n] [--rm] [--clock t] [--out dir] [--dead 393|all|none]');
+    console.log('usage: node scripts/qa/ut-studio.mjs selfcheck|fixtures|deadtaps|kit|minutes|recap [--skip] [--onemore] [--sport s] [--size 393|375|320] [--fixture name] [--no-edge] [--cpu n] [--rm] [--clock t] [--out dir] [--dead 393|all|none]');
     process.exit(1);
   }
   const r = await run(a);

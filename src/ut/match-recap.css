@@ -1,0 +1,734 @@
+/* Claude, 2026-11-17 (studio overhaul, team ut, task ut-5): the 5-second end of match (MatchRecap.tsx).
+   A lit stadium wash behind a metal verdict, glass tiles for the grade, a glass tally that counts up,
+   and the One-More bar in the A button's place (V2 A.5: its tap area covers (323, 738) at 393x852 and
+   (266, 510) at 320x568). Count-ups are driven from JS (transform/text only); every CSS movement here
+   is off under reduced motion, which shows the final state at once. Tokens: ut-system.css (--ps-*). */
+
+.screen.ut.mr-screen {
+  overflow: hidden;
+  background: #050c18;
+}
+.mr {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  isolation: isolate;
+  color: var(--ps-text);
+}
+
+/* ---------- the stadium behind it: colour washes, two light beams, a crowd band ---------- */
+.mr-bg {
+  position: absolute;
+  inset: calc(-1 * var(--sat, 0px)) 0 calc(-1 * var(--sab, 0px));
+  z-index: -1;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(79, 227, 193, 0.22), transparent 60%),
+    radial-gradient(90% 50% at 0% 40%, rgba(139, 124, 246, 0.2), transparent 70%),
+    radial-gradient(90% 50% at 100% 55%, rgba(246, 185, 59, 0.12), transparent 70%),
+    linear-gradient(180deg, #0b1a33 0%, #071226 45%, #050c18 100%);
+  pointer-events: none;
+}
+.mr[data-tone='loss'] .mr-bg {
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(143, 162, 200, 0.18), transparent 60%),
+    radial-gradient(90% 50% at 0% 40%, rgba(139, 124, 246, 0.16), transparent 70%),
+    linear-gradient(180deg, #0c1529 0%, #081022 45%, #050c18 100%);
+}
+.mr-crowd {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 46%;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.07) 0 1.5px, transparent 2px) 0 0 / 11px 9px,
+    radial-gradient(circle at 70% 60%, rgba(246, 185, 59, 0.08) 0 1.5px, transparent 2px) 0 0 / 13px 10px,
+    radial-gradient(circle at 40% 80%, rgba(79, 227, 193, 0.07) 0 1.5px, transparent 2px) 0 0 / 9px 12px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent);
+}
+.mr-beam {
+  position: absolute;
+  top: -10%;
+  width: 46%;
+  height: 80%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), transparent 75%);
+  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+  opacity: 0.7;
+}
+.mr-beam.a {
+  left: -6%;
+  transform: rotate(-16deg);
+}
+.mr-beam.b {
+  right: -6%;
+  transform: rotate(16deg);
+}
+
+/* ---------- the scrolling column ---------- */
+.mr-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px 16px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* rows that scroll under the dock fade out instead of being cut */
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 18px), transparent);
+}
+.mr-scroll > * {
+  flex-shrink: 0;
+}
+.mr-eyebrow {
+  align-self: center;
+  max-width: 100%;
+  padding: 5px 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: #c8d6ea;
+  font: 800 11px var(--body);
+  letter-spacing: 1.6px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ---------- the slam ---------- */
+.mr-slam {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+.mr-word {
+  margin: 0;
+  padding: 0 0.1em;
+  background: linear-gradient(180deg, #f2fffb 0%, #9ff5e0 38%, #2fd3ad 62%, #0f8f74 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font: italic 900 84px/0.95 var(--display);
+  font-stretch: 62%;
+  letter-spacing: 1px;
+  filter: drop-shadow(0 4px 0 #063a30) drop-shadow(0 0 22px rgba(79, 227, 193, 0.45));
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.35);
+}
+.mr[data-tone='loss'] .mr-word {
+  background-image: linear-gradient(180deg, #ffffff 0%, #c9d4e8 40%, #8fa2c8 64%, #56688f 100%);
+  filter: drop-shadow(0 4px 0 #1b2440) drop-shadow(0 0 16px rgba(143, 162, 200, 0.3));
+}
+.mr[data-tone='draw'] .mr-word {
+  background-image: linear-gradient(180deg, #fff8e1 0%, #ffe39a 38%, #f6b93b 64%, #b8730f 100%);
+  filter: drop-shadow(0 4px 0 #4a2c05) drop-shadow(0 0 20px rgba(246, 185, 59, 0.4));
+}
+.mr-tag {
+  position: absolute;
+  top: 6px;
+  right: 12%;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffe39a, var(--ps-gold));
+  color: #2b1a00;
+  font: italic 900 15px var(--display);
+  font-stretch: 68%;
+  letter-spacing: 0.6px;
+  transform: rotate(-6deg);
+}
+.mr-score {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+.mr-score b {
+  font: italic 900 42px/1 var(--display);
+  font-stretch: 68%;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+.mr-score b.them {
+  color: #b9c6f2;
+}
+.mr-score > i {
+  color: var(--ps-dim);
+  font: italic 900 30px var(--display);
+}
+/* a long club name takes two lines rather than an ellipsis ("'20S MAVERICKS") */
+.mr-name {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: #c8d6ea;
+  font: 800 12px/1.2 var(--body);
+  letter-spacing: 1px;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+.mr-name.me {
+  text-align: right;
+}
+.mr-note {
+  margin: 4px 0 0;
+  color: #d9e3f2;
+  font: 700 13px var(--body);
+  text-align: center;
+}
+.mr[data-tone='win'] .mr-note {
+  color: #9ff5e0;
+}
+
+/* ---------- grade, PERFECTS, BEST HEAT, FLAWLESS ---------- */
+.mr-tiles {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mr-tile,
+.mr-motm,
+.mr-row,
+.mr-mile {
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(40, 56, 110, 0.55), rgba(12, 18, 44, 0.72));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 10px 22px rgba(0, 0, 0, 0.35);
+}
+.mr-tile {
+  display: grid;
+  min-width: 92px;
+  padding: 7px 12px;
+}
+.mr-tile small,
+.mr-motm small {
+  color: #a9b9d6;
+  font: 800 10px var(--body);
+  letter-spacing: 1.4px;
+}
+.mr-tile b {
+  font: italic 900 26px/1 var(--display);
+  font-stretch: 68%;
+}
+.mr-tile em {
+  color: var(--ps-dim);
+  font-size: 16px;
+  font-style: normal;
+}
+.mr-heat b {
+  color: #ffd27a;
+  font-size: 22px;
+}
+.mr-heat[data-fire] b {
+  background: linear-gradient(180deg, #fff1a8, #ff9a3c 55%, #ff4d2e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.mr-grade {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #3a2a08, #140d02 70%);
+  box-shadow:
+    inset 0 0 0 4px var(--ps-gold),
+    inset 0 0 0 7px rgba(0, 0, 0, 0.45),
+    0 0 20px rgba(246, 185, 59, 0.5);
+}
+.mr-grade b {
+  margin-top: -6px;
+  background: linear-gradient(180deg, #fff3c4, #fbbf24 55%, #d97706);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font: italic 900 34px/1 var(--display);
+  font-stretch: 68%;
+}
+.mr-grade small {
+  position: absolute;
+  bottom: 9px;
+  color: var(--ps-gold);
+  font: 900 10px var(--body);
+  letter-spacing: 1px;
+}
+.mr-flawless {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #d6fff6, #4fe3c1 60%, #0f9f88);
+  color: #04261f;
+  font: italic 900 16px var(--display);
+  font-stretch: 68%;
+  letter-spacing: 0.8px;
+}
+
+/* ---------- man of the match ---------- */
+.mr-motm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+}
+.mr-motm-rate {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffe39a, var(--ps-gold) 55%, #d98d16);
+  color: #2b1a00;
+  font: italic 900 24px var(--display);
+  font-stretch: 68%;
+}
+.mr-motm[data-side='them'] .mr-motm-rate {
+  background: linear-gradient(180deg, #d9d2ff, var(--ps-violet));
+  color: #170f3a;
+}
+.mr-motm-text {
+  display: grid;
+  min-width: 0;
+}
+.mr-motm-text :is(b, em) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mr-motm-text b {
+  font: italic 900 20px var(--display);
+  font-stretch: 68%;
+  text-transform: uppercase;
+}
+.mr-motm-text em {
+  color: #c8d6ea;
+  font: 700 12px var(--body);
+}
+
+/* ---------- the tally ---------- */
+.mr-tally {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 4px 12px;
+}
+.mr-row-min {
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1.5px rgba(246, 185, 59, 0.7),
+    0 0 18px rgba(246, 185, 59, 0.18);
+}
+.mr-ico,
+.mr-lv {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: var(--ps-teal);
+  font: 900 13px var(--body);
+}
+.mr-ico-coin,
+.mr-ico-min {
+  color: var(--ps-gold);
+}
+.mr-ico-sp {
+  color: #c5b8ff;
+}
+.mr-ico-rp b {
+  font: italic 900 13px var(--display);
+}
+.mr-ico-done {
+  background: var(--ps-teal);
+  color: #04261f;
+}
+.mr-lv {
+  position: relative;
+  box-shadow: inset 0 0 0 3px var(--ps-teal);
+}
+.mr-lv b {
+  margin-top: -3px;
+  font: italic 900 16px/1 var(--display);
+  font-stretch: 68%;
+}
+.mr-lv small {
+  position: absolute;
+  bottom: 3px;
+  color: #a9b9d6;
+  font-size: 10px;
+  line-height: 1;
+}
+.mr-row-text {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+.mr-row-text > b {
+  overflow: hidden;
+  font: 800 14px var(--body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mr-row-text > small {
+  overflow: hidden;
+  color: #a9b9d6;
+  font: 600 11px var(--body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mr-bar {
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.mr-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2fd3ad, #9ff5e0);
+  transform-origin: 0 50%;
+  will-change: transform;
+}
+.mr-row[data-kind='sp'] .mr-bar > i {
+  background: linear-gradient(90deg, #8b7cf6, #c5b8ff);
+}
+.mr-row-min .mr-bar > i,
+.mr-row[data-kind='coins'] .mr-bar > i {
+  background: linear-gradient(90deg, #f6b93b, #ffe39a);
+}
+.mr-val {
+  flex-shrink: 0;
+  min-width: 64px;
+  color: var(--ps-gold);
+  font: italic 900 18px var(--display);
+  font-stretch: 68%;
+  text-align: right;
+}
+.mr-row[data-kind='objective'] .mr-val {
+  color: #c8d6ea;
+  font-size: 15px;
+}
+.mr-row[data-pop] .mr-val,
+.mr-row[data-kind='objective'][data-pop] .mr-val {
+  color: var(--ps-teal);
+}
+
+/* ---------- milestones and the claim ---------- */
+.mr-miles {
+  display: grid;
+  gap: 8px;
+}
+.mr-mile {
+  display: grid;
+  padding: 8px 12px;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1.5px rgba(79, 227, 193, 0.55);
+}
+.mr-mile b {
+  color: var(--ps-teal);
+  font: italic 900 17px var(--display);
+  font-stretch: 68%;
+  letter-spacing: 0.4px;
+}
+.mr-mile small {
+  color: #c8d6ea;
+  font: 600 12px var(--body);
+}
+.mr-claims {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mr-claims .ut-k-claim {
+  flex: 1;
+  min-height: 48px;
+}
+.mr-link,
+.mr-sec button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #a9b9d6;
+  font: 900 13px var(--body);
+  letter-spacing: 2px;
+}
+.mr-claims .mr-link {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  color: var(--ps-text);
+}
+
+/* ---------- the dock: the One-More bar in the A button's place, then BOX SCORE and HOME ---------- */
+.mr-dock {
+  position: relative;
+  flex-shrink: 0;
+  padding: 8px 16px 6px;
+  background: linear-gradient(180deg, transparent, rgba(5, 12, 24, 0.92) 30%);
+}
+.mr-onemore {
+  min-height: 76px;
+}
+.mr-onemore .ut-k-gold {
+  min-height: 76px;
+  padding: 10px 12px 10px 14px;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 2px rgba(255, 255, 255, 0.55),
+    inset 0 -3px rgba(146, 80, 10, 0.55),
+    0 6px 0 #92500a,
+    0 12px 26px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(251, 191, 36, 0.35);
+  animation: mr-bar-in 220ms var(--ease-out, ease-out) both;
+}
+.mr-onemore .ut-k-gold-text b {
+  font-size: 20px;
+}
+.mr-onemore .ut-k-gold-text em {
+  font-size: 12px;
+}
+.mr-onemore[data-calm] .ut-k-gold {
+  background: linear-gradient(180deg, #2a3d63, #18264a 60%, #101a36);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.2),
+    inset 0 0 0 1.5px rgba(246, 185, 59, 0.6),
+    0 10px 22px rgba(0, 0, 0, 0.45);
+  color: var(--ps-text);
+}
+.mr-onemore[data-calm] .ut-k-gold::before {
+  animation: none;
+}
+.mr-onemore[data-calm] .ut-k-gold-art {
+  color: var(--ps-gold);
+}
+.mr-sec {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 6px;
+}
+
+/* ---------- the box score sheet ---------- */
+.mr-box {
+  display: grid;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+.mr-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mr-box-head h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.mr-ends {
+  display: grid;
+  gap: 6px;
+}
+.mr-ends > span {
+  display: grid;
+  gap: 4px;
+}
+.mr-ends small {
+  overflow: hidden;
+  color: #a9b9d6;
+  font: 800 11px var(--body);
+  letter-spacing: 1.2px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mr-ends > span > span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.mr-ends i {
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c8d6ea;
+  font: 800 11px var(--body);
+  font-style: normal;
+}
+.mr-ends i.pts {
+  background: rgba(79, 227, 193, 0.2);
+  color: var(--ps-teal);
+}
+.mr-ends .them i.pts {
+  background: rgba(139, 124, 246, 0.22);
+  color: #c5b8ff;
+}
+.mr-ratings {
+  display: grid;
+  gap: 4px;
+}
+.mr-rating-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  min-height: 40px;
+}
+.mr-rating-row b {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(246, 185, 59, 0.18);
+  color: var(--ps-gold);
+  font: italic 900 17px var(--display);
+}
+.mr-rating-row span {
+  overflow: hidden;
+  font: 800 14px var(--body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mr-rating-row small {
+  color: #a9b9d6;
+  font: 600 11px var(--body);
+}
+
+/* ---------- the sequence (normal motion only) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .mr[data-phase='slam'] .mr-word {
+    animation: mr-slam 520ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  }
+  .mr[data-phase='slam'] .mr-tag {
+    animation: mr-pop 300ms 420ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  }
+  .mr[data-phase='slam'] .mr-score,
+  .mr[data-phase='slam'] .mr-note {
+    animation: mr-rise 260ms 160ms ease-out both;
+  }
+  .mr[data-phase='slam'] .mr-tiles > * {
+    animation: mr-pop 280ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  }
+  .mr[data-phase='slam'] .mr-tiles > :nth-child(1) {
+    animation-delay: 600ms;
+  }
+  .mr[data-phase='slam'] .mr-tiles > :nth-child(2) {
+    animation-delay: 760ms;
+  }
+  .mr[data-phase='slam'] .mr-tiles > :nth-child(3) {
+    animation-delay: 920ms;
+  }
+  .mr[data-phase='slam'] .mr-tiles > :nth-child(4) {
+    animation-delay: 1080ms;
+  }
+  .mr[data-phase='slam'] .mr-motm {
+    animation: mr-rise 300ms 1250ms ease-out both;
+  }
+  /* the tally waits for its beat, then every row arrives together */
+  .mr[data-phase='slam'] :is(.mr-tally, .mr-miles, .mr-claims) {
+    opacity: 0;
+  }
+  .mr[data-phase='tally'] .mr-row {
+    animation: mr-rise 200ms ease-out both;
+  }
+  .mr[data-phase='done'] .mr-row[data-pop] .mr-val,
+  .mr[data-phase='done'] .mr-row[data-pop] .mr-ico-done {
+    animation: mr-pop 300ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  }
+  .mr[data-phase='tally'] :is(.mr-miles, .mr-claims) {
+    animation: mr-rise 220ms 1500ms ease-out both;
+  }
+  .mr-beam {
+    animation: mr-sweep 6s ease-in-out infinite alternate;
+  }
+  .mr-beam.b {
+    animation-delay: -3s;
+  }
+}
+@keyframes mr-slam {
+  0% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes mr-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes mr-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mr-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mr-sweep {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0.8;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mr-onemore .ut-k-gold {
+    animation: none;
+  }
+}

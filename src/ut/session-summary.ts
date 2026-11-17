@@ -25,6 +25,24 @@ export function markSession(p: Profile, now: number): SessionMark {
   return { at: now, day, coins: p.coins, packs: p.ut.packs.length, opened: p.ut.packsOpened, sec: daySec(p, day) };
 }
 
+/**
+ * Claude ut-5: a visit outlives a match. Ultimate Team unmounts while a UT match plays and mounts again
+ * after its result, so the mark taken at the visit's start is held across that round trip (and any other
+ * short step outside UT) and picked up again on return; EXIT ends the visit and drops it.
+ */
+let held: SessionMark | null = null;
+/** How long a held visit waits for the player to come back to UT. */
+export const HOLD_MS = 30 * 60000;
+export function holdSession(m: SessionMark | null) {
+  held = m;
+}
+/** The visit's mark: the one held for this day (within HOLD_MS), or a new one. Takes the held mark. */
+export function resumeSession(p: Profile, now: number): SessionMark {
+  const h = held;
+  held = null;
+  return h && h.day === easternClock(now).day && now - h.at >= 0 && now - h.at < HOLD_MS ? h : markSession(p, now);
+}
+
 /** A visit shorter than this that earned nothing says nothing. */
 export const QUIET_MS = 30000;
 

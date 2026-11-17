@@ -1,11 +1,25 @@
 import { cupOpponent, CUP_ROUNDS, cupOf, type CupRequest } from './cup';
-import { MatchDebrief } from './MatchDebrief';
+import { MatchRecap } from './MatchRecap';
+import { boxOf, gradeOf, stripLocal } from './match-box';
+import { rateBox } from './match-ratings';
+import {
+  afterCtxOf,
+  bankedLedger,
+  buildRecap,
+  milestonesOf,
+  type MatchKind,
+  oneMoreStart,
+  type Recap,
+  verdictOf,
+} from './match-recap';
+import { nextCtxOf, nextUp, type NextAction } from './next-action';
+import { claimMinutes, minutesExtras, minutesView } from './minutes';
+import { claimAll, inboxCount } from './inbox';
+import { elsewhereOf, readDevice } from '../ui/next-up-main';
 import { rememberUtReturn } from './return-view';
 import { leagueOpponent, type LeagueRequest } from './league';
 import { applyLeagueTeams } from './league-match';
 import { withLeagueForm } from './league-form';
-import { Promotion } from './Rivals';
-import { divisionOf, rivalsOf } from './rivals';
 import { publishRivals } from './rivals-net';
 import { LABEL } from './labels';
 // Ultimate Team's played matches: Squad Battles against this week's AI ladder, and online head to
@@ -15,7 +29,7 @@ import { LABEL } from './labels';
 // takeover and tiebreak rules. The result pays coins and card XP and climbs the ladder (play.ts).
 // Online, the squads cross over the match channel (src/net/match.ts) in a queue of their own.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { bankActivity, usePlaytime } from '../lib/playtime';
+import { bankActivity, pendingSec, usePlaytime } from '../lib/playtime';
 import { holdBreak } from '../ui/BreakReminder';
 import { levelInfo } from '../engine/economy';
 import { hashString } from '../engine/rng';
@@ -35,7 +49,7 @@ import { aiPossessionsOf } from '../game/hoops2/Hoops2';
 import { kitsFor } from '../game/uniforms';
 import { favoriteFor } from '../lib/favorites';
 import { newId, type Profile } from '../lib/profile';
-import { sfx, vibrate } from '../lib/sound';
+import { sfx } from '../lib/sound';
 import {
   type ArcadeState,
   type Found,
@@ -48,7 +62,7 @@ import {
 import { NET_ON } from '../net/nostr';
 import { NO_VOTE, type VoteWire, voteWireOf } from '../net/vote';
 import { CoinChip, initials } from '../ui/common';
-import { Back, Coin } from '../ui/icons';
+import { Back } from '../ui/icons';
 import { Sparks } from '../ui/motion';
 import { Vote } from '../ui/Vote';
 import {
@@ -64,11 +78,9 @@ import {
   weekLadder,
 } from './battles';
 import { UtCard } from './CardArt';
-import { packName } from './packs';
 import { eventRung } from './events';
 import { circuitRung } from './circuit';
-import { hqOf } from './progression';
-import { decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
+import { addCareerXp, careerXp, type CareerGain, decide, PAID_GAMES_A_DAY, settle, type UtMatchRequest } from './play';
 import { byValue, getPool, type Pool } from './pool';
 import { weekOf } from './sbc';
 import {
@@ -119,6 +131,8 @@ const CONNECT_MS = 15000;
 /** how long the found splash and the VS screen stay up */
 const FOUND_MS = 2300;
 const VS_MS = 2800;
+/** Claude ut-5: a match started from the One-More bar shows its opponent this long, then kicks off (V2 D.1) */
+const QUICK_VS_MS = 1500;
 
 interface Side {
   form?: Record<string, number>;
@@ -179,53 +193,15 @@ interface Outcome {
   refreshed: boolean;
   /** Claude: a draft game: the run's wins after it, and whether the run is over */
   draft?: { wins: number; done: boolean };
+  /** Claude ut-5: the 5-second end of match, and the One-More bar's next match */
+  recap: Recap;
+  next: NextAction;
+  kind: MatchKind & { event?: { id: string; node: number } };
+  paidToday: number;
 }
 
 type Stage =
   'load' | 'search' | 'found' | 'vs' | 'vote' | 'play' | 'result' | 'error';
-
-/** how each drive or possession ended, on the result screen */
-// Claude, final QA 2026-11-01: soccer's attacks end in one-letter codes (soccer2/match.ts END_TEXT), which
-// showed as a row of bare letters with goals not highlighted; they get short words and goals score
-const HOOPS_FOOTBALL_LABEL: Record<string, string> = {
-  A: '2+1',
-  X: '·',
-  TO: 'TO',
-  MISS: 'FG✕',
-  DOWNS: 'DWN',
-};
-const HOOPS_FOOTBALL_POINTS: Record<string, number> = {
-  TD: 7,
-  FG: 3,
-  '2': 2,
-  '3': 3,
-  A: 3,
-};
-const END_LABEL: Record<string, string> = pick({
-  nba: HOOPS_FOOTBALL_LABEL,
-  nfl: HOOPS_FOOTBALL_LABEL,
-  soccer: {
-    G: 'GOAL',
-    S: 'SAVE',
-    W: 'WIDE',
-    B: 'BLK',
-    L: 'LOST',
-    O: 'OFF',
-    T: '·',
-  },
-});
-const END_POINTS: Record<string, number> = pick({
-  nba: HOOPS_FOOTBALL_POINTS,
-  nfl: HOOPS_FOOTBALL_POINTS,
-  soccer: { G: 1 },
-});
-/** read aloud: soccer's words (its letters mean nothing alone), the other sports' codes as before */
-const endSpoken = (e: string) =>
-  pick({
-    nba: e,
-    nfl: e,
-    soccer: END_LABEL[e] === '·' ? 'time' : (END_LABEL[e] ?? e).toLowerCase(),
-  });
 
 const clock = (s: number) =>
   Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
@@ -302,7 +278,6 @@ export default function UtMatch(props: {
   const [found, setFound] = useState<Found | null>(null);
   const [opp, setOpp] = useState<OppView | null>(null);
   const [out, setOut] = useState<Outcome | null>(null);
-  const [promotion, setPromotion] = useState<number | null>(null);
   const [week] = useState(() => weekOf(easternDateKey()));
   const connRef = useRef<MatchConn | null>(null);
   const oppRef = useRef(opp);
@@ -677,11 +652,11 @@ export default function UtMatch(props: {
     const t = window.setTimeout(
       () =>
         setStage(
-          props.autoplay || setup?.circuit || setup?.league || setup?.cup
+          props.autoplay || setup?.circuit || setup?.league || setup?.cup || req.quick
             ? 'play'
             : 'vote',
         ),
-      props.autoplay ? 400 : VS_MS,
+      props.autoplay ? 400 : req.quick ? QUICK_VS_MS : VS_MS,
     );
     return () => clearTimeout(t);
   }, [stage]);
@@ -694,8 +669,13 @@ export default function UtMatch(props: {
   ) => {
     if (done.current || !setup || !pool) return;
     done.current = true;
+    // Claude ut-5: this match's counted seconds, before they bank (the recap's "+N min")
+    const minutesSec = pendingSec();
     bankActivity('ut:' + req.id, 'complete');
     const s = setup;
+    const before = profileRef.current;
+    const now = Date.now(),
+      day = easternDateKey();
     // two squads exactly as good: a coin both phones read the same way off the match
     const coin = () => {
       const a = hashString(s.seed + JSON.stringify(s.me.wire));
@@ -713,7 +693,72 @@ export default function UtMatch(props: {
             s.rival.rating.raw,
             s.online ? coin : () => true,
           );
-    const ut = profileRef.current.ut;
+    // Claude ut-5: what this phone's game reported at the whistle (C1 grade, C2 box), read without
+    // trusting it; neither ever reached the wire (stripLocal on every update)
+    const local = us as Progress & { grade?: unknown; box?: unknown; ot?: unknown };
+    const grade = gradeOf(local.grade, d.won),
+      box = rateBox(SPORT, boxOf(local.box)),
+      verdict = verdictOf(
+        {
+          us: us.score,
+          them: them.score,
+          won: d.won,
+          tiebreak: d.tiebreak,
+          ...(pens && us.score === them.score ? { pens } : {}),
+          ...(typeof local.ot === 'number' ? { ot: local.ot } : {}),
+          ends: [us.ends, them.ends],
+        },
+        SPORT,
+      );
+    const ut = before.ut;
+    const bt = battlesThisWeek(ut.battles, week);
+    const kind: Outcome['kind'] = {
+      online: req.mode === 'online',
+      cup: s.cup,
+      circuit: s.circuit,
+      league: s.league,
+      draft: s.draft,
+      event: s.event ? { id: s.event.id, node: s.event.node } : undefined,
+      rung: s.rung && s.rung.i >= 0 && !s.event && !s.cup && !s.circuit && !s.league && !s.draft ? s.rung.i : undefined,
+      level: levelOf(bt.level),
+    };
+    /** the One-More bar: the best next match, from the save as this match settled it */
+    const oneMore = (after: Profile): NextAction => {
+      const ledger = bankedLedger(after.playtime, minutesSec, now, SPORT);
+      const ctx = nextCtxOf(after.ut, SPORT, now, {
+        ...minutesExtras(ledger, now),
+        after: afterCtxOf(after.ut, kind, { won: d.won, us: us.score, them: them.score, flawless: grade?.flawless }),
+      });
+      return nextUp({ ...ctx, elsewhere: elsewhereOf(readDevice(), SPORT, ctx.day) });
+    };
+    const result = (after: Profile, o: Omit<Outcome, 'recap' | 'next' | 'kind' | 'paidToday' | keyof typeof d | 'us' | 'them' | 'how' | 'ends'>, extra: { career: CareerGain | null; milestones: Parameters<typeof milestonesOf>[0] }): Outcome => ({
+      ...o,
+      ...d,
+      us: us.score,
+      them: them.score,
+      how,
+      ends: [us.ends, them.ends],
+      kind,
+      paidToday: after.ut.paid.day === day ? after.ut.paid.n : 0,
+      next: oneMore(after),
+      recap: buildRecap({
+        sport: SPORT,
+        day,
+        week,
+        now,
+        before,
+        after,
+        verdict,
+        cards: { xp: o.xp, ups: o.ups },
+        capped: o.capped,
+        career: extra.career,
+        online: !!s.online,
+        minutesSec,
+        milestones: milestonesOf(extra.milestones),
+        grade,
+        box,
+      }),
+    });
     if (s.draft) {
       // Claude: a draft game settles on the run only (exactly once: active run, its game, a new match id)
       const dIn = {
@@ -723,35 +768,28 @@ export default function UtMatch(props: {
         us: us.score,
         them: them.score,
         matchId: 'ut-ai:' + req.id,
-        at: Date.now(),
-        day: easternDateKey(),
+        at: now,
+        day,
         how,
         opponent: s.rival.name,
       };
+      const applyD = (p: Profile): Profile => ({ ...p, ut: settleDraft(p.ut, dIn).ut });
       const shownD = settleDraft(ut, dIn);
-      props.update((p) => ({ ...p, ut: settleDraft(p.ut, dIn).ut }));
+      const after = applyD(before);
+      props.update(applyD);
       const run = draftOf(shownD.ut);
-      setOut({
-        ...d,
-        us: us.score,
-        them: them.score,
-        how,
-        ends: [us.ends, them.ends],
-        coins: 0,
-        xp: 0,
-        ups: [],
-        climbed: false,
-        pack: null,
-        capped: false,
-        refreshed: false,
-        seasonXP: shownD.sp,
-        draft: { wins: run?.wins ?? 0, done: !!run?.done },
-      });
+      const draft = { wins: run?.wins ?? 0, done: !!run?.done };
+      setOut(
+        result(
+          after,
+          { coins: 0, xp: 0, ups: [], climbed: false, pack: null, capped: false, refreshed: false, seasonXP: shownD.sp, draft },
+          { career: null, milestones: { sport: SPORT, draft: { ...draft, games: DRAFT_GAMES } } },
+        ),
+      );
       setStage('result');
-      if (d.won) {
-        sfx.seriesWin();
-        vibrate([30, 60, 30]);
-      } else sfx.nope();
+      // sound only: this runs from the game's timer, and iOS replays a timed vibration on the next tap
+      if (d.won) sfx.seriesWin();
+      else sfx.nope();
       return;
     }
     const input = {
@@ -770,26 +808,22 @@ export default function UtMatch(props: {
       rung: s.rung && s.rung.i >= 0 ? { i: s.rung.i, pack: s.rung.pack } : null,
       played: Object.values(ut.squad),
       week,
-      day: easternDateKey(),
+      day,
       packId: newId(),
-      at: Date.now(),
+      at: now,
       pay: s.rung && s.rung.i >= 0 ? s.level?.pay : undefined,
     };
-    const shown = settle(ut, input);
-    const beforeDivision = divisionOf(rivalsOf(ut.rivals, week).points),
-      afterDivision = divisionOf(rivalsOf(shown.ut.rivals, week).points);
-    if (s.online && afterDivision > beforeDivision) setPromotion(afterDivision);
-    if (s.online)
-      void publishRivals({ ...profileRef.current, ut: shown.ut }, week);
     const cardIds = s.me.wire.map((w) => w[1]);
-    props.update((p) => {
+    // one pure step for the save: settlement, Evolutions, the Standout objective and Career XP (a
+    // match that paid nothing, capped or already settled, adds no Career XP)
+    const apply = (p: Profile): { profile: Profile; gain: CareerGain } => {
       const r = settle(p.ut, input);
       const evo = recordEvoMatch(r.ut, {
         matchId: input.matchId,
         won: d.won,
         played: input.played,
       });
-      return {
+      const next: Profile = {
         ...p,
         coins: p.coins + r.coins,
         ut: s.online
@@ -801,7 +835,13 @@ export default function UtMatch(props: {
               cardIds,
             }),
       };
-    });
+      return addCareerXp(next, careerXp({ how, won: d.won, paid: r.xp > 0 }));
+    };
+    const shown = settle(ut, input);
+    const applied = apply(before);
+    if (s.online)
+      void publishRivals({ ...before, ut: shown.ut }, week);
+    props.update((p) => apply(p).profile);
     // our final state lingers a while, for a phone still finishing
     connRef.current?.close(false, 30000);
     connRef.current = null;
@@ -811,32 +851,44 @@ export default function UtMatch(props: {
       name: pool.byId.get(cardOf.get(u.uid) ?? '')?.name ?? 'A card',
       level: u.level,
     }));
-    setOut({
-      cupDone: !!s.cup && !!cupOf(shown.ut).active?.done,
-      seasonXP: shown.seasonXP,
-      circuitPrizes: shown.circuitPrizes,
-      eventCleared:
-        !!s.event &&
-        (shown.ut.events?.[s.event.id] ?? 0) > (ut.events?.[s.event.id] ?? 0),
-      ...d,
-      us: us.score,
-      them: them.score,
-      how,
-      ends: [us.ends, them.ends],
-      coins: shown.coins,
-      xp: shown.xp,
-      ups,
-      climbed: shown.climbed,
-      pack: shown.pack,
-      capped: shown.capped,
-      refreshed: shown.refreshed,
-    });
+    const eventCleared =
+      !!s.event &&
+      (shown.ut.events?.[s.event.id] ?? 0) > (ut.events?.[s.event.id] ?? 0);
+    const cupDone = !!s.cup && !!cupOf(shown.ut).active?.done;
+    setOut(
+      result(
+        applied.profile,
+        {
+          cupDone,
+          seasonXP: shown.seasonXP,
+          circuitPrizes: shown.circuitPrizes,
+          eventCleared,
+          coins: shown.coins,
+          xp: shown.xp,
+          ups,
+          climbed: shown.climbed,
+          pack: shown.pack,
+          capped: shown.capped,
+          refreshed: shown.refreshed,
+        },
+        {
+          career: applied.gain,
+          milestones: {
+            sport: SPORT,
+            career: applied.gain,
+            climbed: shown.climbed && s.rung ? { rung: s.rung.i, rungs: RUNGS, pack: shown.pack, level: s.level?.name } : undefined,
+            refreshed: shown.refreshed,
+            event: s.event ? { title: s.event.title, won: d.won, cleared: eventCleared, final: s.event.node === 2 } : undefined,
+            circuitPrizes: shown.circuitPrizes,
+            cupDone,
+          },
+        },
+      ),
+    );
     setStage('result');
-    if (d.won) {
-      sfx.seriesWin();
-      vibrate([30, 60, 30]);
-    } else sfx.nope();
-    if (shown.ups.length) window.setTimeout(() => sfx.levelUp(), 900);
+    // sound only: this runs from the game's timer, and iOS replays a timed vibration on the next tap
+    if (d.won) sfx.seriesWin();
+    else sfx.nope();
   };
 
   /** The vote went to the sim: both sides' drives by the autopilot, the same on both phones. */
@@ -948,11 +1000,11 @@ export default function UtMatch(props: {
           rivalGone={!!setup.online && (!!opp?.gone || !!opp?.left)}
           tookMe={setup.online ? (opp?.arcadeTook ?? null) : null}
           autoplay={props.autoplay}
-          manualOnly={!!setup.circuit || !!setup.league || !!setup.cup}
+          manualOnly={!!setup.circuit || !!setup.league || !!setup.cup || !!req.quick}
           kits={kits}
           soccerFavs={{ mine: setup.me.fav, theirs: setup.rival.fav }}
           host={setup.online ? !!setup.online.host : true}
-          onProgress={(p) => conn?.update((s) => ({ ...s, arcade: p }))}
+          onProgress={(p) => conn?.update((s) => ({ ...s, arcade: stripLocal(p) }))}
           onTakeover={(k) => conn?.update((s) => ({ ...s, arcadeTook: k }))}
           onFinish={(us, them, how, _took, pens) => finish(us, them, how, pens)}
         />
@@ -1018,84 +1070,43 @@ export default function UtMatch(props: {
       />
     );
   else if (stage === 'vs' && setup) body = <VsView setup={setup} />;
-  else if (stage === 'result' && setup && out)
-    body = (
-      <ResultView
-        setup={setup}
-        out={out}
-        onDone={leave}
-        onStore={() => {
-          rememberUtReturn('store');
-          leave();
-        }}
-        onPractice={SOCCER ? undefined : props.onPractice}
-        onAgain={() => {
-          sfx.click();
-          const r = setup.rung;
-          if (setup.cup) {
-            const a = cupOf(profileRef.current.ut).active;
-            if (a && !a.done)
-              props.onAgain({
-                id: Date.now(),
-                mode: 'ai',
-                cup: { runId: a.id, round: a.round },
-              });
-            else leave();
-            return;
-          }
-          if (setup.league) {
+  if (stage === 'result' && setup && out)
+    return (
+      <div className="screen ut utm mr-screen">
+        <ResultRecap
+          setup={setup}
+          out={out}
+          pool={pool}
+          profile={profile}
+          week={week}
+          onHome={leave}
+          onStore={() => {
+            rememberUtReturn('store');
             leave();
-            return;
-          }
-          if (setup.draft) {
-            const run = draftOf(profileRef.current.ut);
-            if (run && run.id === setup.draft.runId && !run.done)
-              props.onAgain({
-                id: Date.now(),
-                mode: 'ai',
-                draft: { runId: run.id, game: run.games },
-              });
-            else leave();
-            return;
-          }
-          if (setup.circuit) {
-            const active = hqOf(profileRef.current.ut).circuit.active;
-            if (active)
-              props.onAgain({
-                id: Date.now(),
-                mode: 'ai',
-                circuit: { runId: active.id, round: active.games },
-              });
-            else leave();
-            return;
-          }
-          if (setup.event) {
-            props.onAgain({
-              id: Date.now(),
-              mode: 'ai',
-              event: {
-                id: setup.event.id,
-                node: out.won
-                  ? Math.min(2, setup.event.node + 1)
-                  : setup.event.node,
-              },
-            });
-            return;
-          }
-          if (setup.online || !r || r.i < 0)
-            props.onAgain({ id: Date.now(), mode: req.mode });
-          else
-            props.onAgain({
-              id: Date.now(),
-              mode: 'ai',
-              rung: out.refreshed ? 0 : out.climbed ? r.i + 1 : r.i,
-            });
-        }}
-      />
+          }}
+          onPractice={SOCCER ? undefined : props.onPractice}
+          onToast={props.onToast}
+          update={props.update}
+          onOneMore={() => {
+            const st = oneMoreStart(out.next, profileRef.current.ut, out.kind, Date.now(), out.won);
+            if (st.kind === 'view') {
+              rememberUtReturn(st.view);
+              props.onExit();
+              return;
+            }
+            // a different difficulty starts its ladder at rung 1, exactly as picking it in Squad Battles does
+            const level = st.level;
+            if (level)
+              props.update((p) => ({
+                ...p,
+                ut: { ...p.ut, battles: { ...battlesThisWeek(p.ut.battles, week), level, cleared: 0 } },
+              }));
+            props.onAgain(st.req);
+          }}
+        />
+      </div>
     );
 
-  if (promotion !== null && stage === 'result')
-    return <Promotion division={promotion} onDone={() => setPromotion(null)} />;
   const canLeave = stage === 'search' || stage === 'error' || stage === 'load';
   const title = req.cup
     ? LABEL.clubCups
@@ -1344,249 +1355,115 @@ function VsView({ setup }: { setup: Setup }) {
   );
 }
 
-function ResultView({
-  setup,
-  out,
-  onDone,
-  onAgain,
-  onStore,
-  onPractice,
-}: {
+/** "PLAY '86 BOSTON" and its stake line: what the One-More bar says about the match it starts. */
+function oneMoreText(a: NextAction, setup: Setup, pool: Pool | null, ut: UtState, week: string): { title: string; line: string } {
+  const strip = (l: string) => l.replace(new RegExp('^' + LABEL.doneForToday + ' · '), '');
+  const t = a.target;
+  if (t.app !== 'match') return { title: t.app === 'ut' && t.view === 'moments' ? LABEL.moments + ' DRILL' : a.cta, line: strip(a.line) };
+  const m = t.setup;
+  if (m.mode === 'battles') {
+    const level = m.level ?? levelOf(battlesThisWeek(ut.battles, week).level);
+    const bt = battlesThisWeek(ut.battles, week);
+    const rung = pool ? weekLadder(pool, week, bt.round ?? 0, level)[m.rung ?? 0] : undefined;
+    const name = m.rematch ? setup.rival.name : rung ? shortName(rung) : LABEL.squadBattles;
+    const where = LEVEL_NAME[level] + ' · rung ' + ((m.rung ?? 0) + 1) + ' of ' + RUNGS;
+    return {
+      title: (m.rematch ? 'REMATCH ' : 'PLAY ') + name,
+      line: (a.id.endsWith('after:harder') ? 'FLAWLESS · step up · ' : a.id.endsWith('after:easier') ? 'Reset the rhythm · ' : '') + where + (a.stake ? ' · 1 win to a ' + a.stake : ''),
+    };
+  }
+  const title: Record<typeof m.mode, string> = {
+    cup: 'NEXT CUP ROUND',
+    circuit: 'NEXT CIRCUIT MATCH',
+    league: 'NEXT SEASON GAME',
+    draft: 'NEXT DRAFT GAME',
+    rivals: 'PLAY ONLINE AGAIN',
+    events: 'NEXT EVENT MATCH',
+    moments: LABEL.moments,
+  };
+  if (m.rematch && m.mode !== 'rivals') return { title: 'REMATCH ' + setup.rival.name, line: strip(a.line) };
+  return { title: title[m.mode], line: m.mode === 'rivals' ? 'Back into the ' + LABEL.rivals + ' queue' : strip(a.line) };
+}
+
+/** The result: the 5-second recap (MatchRecap.tsx), its CLAIM ALL and the One-More bar's words. */
+function ResultRecap(props: {
   setup: Setup;
   out: Outcome;
-  onDone: () => void;
-  onAgain: () => void;
+  pool: Pool | null;
+  profile: Profile;
+  week: string;
+  onHome: () => void;
   onStore: () => void;
   onPractice?: () => void;
+  onOneMore: () => void;
+  onToast: (t: string) => void;
+  update: (fn: (p: Profile) => Profile) => void;
 }) {
+  const { setup, out, pool, profile, week } = props;
   const r = setup.rung;
-  const ladder = !!r && r.i >= 0;
-  const top = ladder && out.climbed && r!.i + 1 >= RUNGS;
-  const again = setup.cup
-    ? out.cupDone
-      ? 'VIEW CUP RESULT'
-      : 'NEXT CUP ROUND'
+  const [claimable, setClaimable] = useState(0);
+  // what waits to claim (the Rewards inbox and Minutes rungs): counted after the first frames, and
+  // again whenever the save changes (the match's minutes bank a moment after the whistle)
+  useEffect(() => {
+    if (!pool) return;
+    const t = window.setTimeout(() => {
+      const day = easternDateKey();
+      setClaimable(inboxCount(pool, profile, day, week) + minutesView(profile.playtime, Date.now()).ready.length);
+    }, 60);
+    return () => clearTimeout(t);
+  }, [pool, profile, week]);
+  const claim = () => {
+    if (!pool) return;
+    const at = Date.now(),
+      day = easternDateKey();
+    const all = (p: Profile) => {
+      const a = claimAll(pool, p, day, week, at);
+      const m = claimMinutes(a.profile, at, SPORT);
+      return { profile: m.profile, n: a.claimed + m.granted.length, coins: m.profile.coins - p.coins };
+    };
+    const shown = all(profile);
+    if (!shown.n) return;
+    props.update((p) => all(p).profile);
+    sfx.levelUp();
+    props.onToast(
+      'Claimed ' + shown.n + (shown.n === 1 ? ' reward' : ' rewards') + (shown.coins ? ' · +' + shown.coins.toLocaleString('en-US') + ' coins' : '') + '. Packs and picks are in your Store.',
+    );
+  };
+  const eyebrow = setup.cup
+    ? LABEL.clubCups + ' · ' + CUP_ROUNDS[setup.cup.round]
     : setup.draft
-      ? out.draft && !out.draft.done
-        ? 'NEXT DRAFT GAME'
-        : 'DRAFT REWARDS'
+      ? LABEL.utDraft + ' · Game ' + (setup.draft.game + 1) + ' / ' + DRAFT_GAMES
       : setup.league
-        ? 'SEASON HUB'
+        ? LABEL.clubSeason + ' · ' + (setup.level?.name ?? '')
         : setup.circuit
-          ? setup.circuit.round < 5
-            ? 'NEXT CIRCUIT MATCH'
-            : 'BACK TO CLUB'
+          ? LABEL.championsCircuit + ' · Match ' + (setup.circuit.round + 1) + ' / 6'
           : setup.event
-            ? out.won && setup.event.node < 2
-              ? 'NEXT EVENT MATCH'
-              : 'PLAY AGAIN'
-            : setup.online || (r && r.i < 0)
-              ? 'PLAY AGAIN'
-              : out.refreshed
-                ? 'NEW LADDER'
-                : out.climbed && !top
-                  ? 'NEXT RUNG'
-                  : out.won
-                    ? 'PLAY IT AGAIN'
-                    : 'TRY AGAIN';
+            ? setup.event.title
+            : r && r.i >= 0
+              ? LABEL.squadBattles + ' · ' + (setup.level ? setup.level.name + ' · ' : '') + 'rung ' + (r.i + 1)
+              : setup.online
+                ? LABEL.headToHead
+                : 'Vs an AI squad';
+  const next = useMemo(() => ({ action: out.next, ...oneMoreText(out.next, setup, pool, profile.ut, week) }), [out.next]);
   return (
-    <div className="page utm-result">
-      <span className="eyebrow wide">
-        {setup.cup
-          ? LABEL.clubCups + ' · ' + CUP_ROUNDS[setup.cup.round]
-          : setup.draft
-            ? LABEL.utDraft + ' · Game ' + (setup.draft.game + 1) + ' / ' + DRAFT_GAMES
-            : setup.league
-              ? LABEL.clubSeason + ' · league results and standings updated'
-              : setup.circuit
-                ? 'Solo ' + LABEL.championsCircuit + ' · Match ' +
-                  (setup.circuit.round + 1) +
-                  ' / 6'
-                : setup.event
-                  ? setup.event.title
-                  : ladder
-                    ? LABEL.squadBattles + ' · rung ' + (r!.i + 1)
-                    : setup.online
-                      ? LABEL.headToHead
-                      : 'Vs an AI squad'}
-      </span>
-      <h1 className={'disp utm-verdict ' + (out.won ? 'win' : 'loss')}>
-        {out.won ? 'WIN' : 'LOSS'}
-      </h1>
-      <div
-        className="utm-score"
-        aria-label={'You ' + out.us + ', ' + setup.rival.name + ' ' + out.them}
-      >
-        <span>
-          <b className="disp num">{out.us}</b>
-          <small>{setup.me.name}</small>
-        </span>
-        <i>–</i>
-        <span>
-          <b className="disp num">{out.them}</b>
-          <small>{setup.rival.name}</small>
-        </span>
-      </div>
-      <div
-        className="utm-ends"
-        aria-label={
-          pick({ nba: 'Possessions', nfl: 'Drives', soccer: 'Attacks' }) +
-          ': yours ' +
-          out.ends[0].map(endSpoken).join(', ') +
-          '; theirs ' +
-          out.ends[1].map(endSpoken).join(', ')
-        }
-      >
-        {out.ends.map((ends, k) => (
-          <span
-            key={k}
-            className={(k ? 'them' : 'us') + (ends.length > 8 ? ' many' : '')}
-          >
-            {ends.map((e, i) => (
-              <i key={i} className={'e-' + (END_POINTS[e] ? 'pts' : 'none')}>
-                {END_LABEL[e] ?? e}
-              </i>
-            ))}
-          </span>
-        ))}
-      </div>
-      {(out.tiebreak || out.how === 'sim') && (
-        <p className="utm-note">
-          {out.how === 'sim' ? 'Simmed. ' : ''}
-          {out.tiebreak
-            ? 'A tie goes to the better squad: ' +
-              (out.won ? 'yours.' : 'theirs.')
-            : ''}
-        </p>
-      )}
-      {setup.event && out.won && (
-        <div className="utm-climb rise-in">
-          <b className="disp">
-            {out.eventCleared
-              ? setup.event.node === 2
-                ? 'SERIES COMPLETE'
-                : 'EVENT MATCH WON'
-              : 'REPLAY COMPLETE'}
-          </b>
-          <small>
-            {out.eventCleared
-              ? 'Your first-clear reward is waiting in the Store.'
-              : 'This stage’s first-clear reward has already been earned.'}
-          </small>
-        </div>
-      )}
-      {out.climbed && (
-        <div className="utm-climb rise-in">
-          <b className="disp">
-            {top ? 'LADDER CLEARED!' : 'RUNG ' + (r!.i + 1) + ' CLEARED'}
-          </b>
-          {out.pack ? (
-            <small>
-              Your {packName(SPORT, out.pack)} is waiting in the Store.
-            </small>
-          ) : (
-            !top && <small>Next up: rung {r!.i + 2}.</small>
-          )}
-          {out.refreshed && (
-            <small>
-              A new ladder of {RUNGS} squads is up
-              {setup.level ? ' on ' + setup.level.name : ''}.
-            </small>
-          )}
-        </div>
-      )}
-      {out.draft && (
-        <div className="utm-climb rise-in">
-          <b className="disp">
-            {out.draft.done
-              ? out.draft.wins >= DRAFT_GAMES
-                ? 'PERFECT DRAFT!'
-                : 'RUN OVER · ' +
-                  out.draft.wins +
-                  (out.draft.wins === 1 ? ' WIN' : ' WINS')
-              : out.draft.wins + ' / ' + DRAFT_GAMES + ' WINS'}
-          </b>
-          <small>
-            {out.draft.done
-              ? 'Claim your rewards in Play → UT Draft.'
-              : 'Win the next game to raise your reward.'}
-          </small>
-        </div>
-      )}
-      {out.draft ? null : out.capped ? (
-        <p className="utm-note">
-          Today’s {PAID_GAMES_A_DAY} paid games are played: games pay coins and
-          XP again tomorrow.
-        </p>
-      ) : (
-        <div className="utm-rewards">
-          <span>
-            <Coin size={16} /> <b className="num">+{out.coins}</b> coins
-          </span>
-          <span>
-            <b className="num">+{out.xp}</b> XP for every card in your squad
-          </span>
-        </div>
-      )}
-      {!!out.seasonXP && (
-        <div className="utm-climb rise-in">
-          <b className="disp">+{out.seasonXP} SEASON POINTS</b>
-          <small>
-            Your free reward track moves forward. Claim unlocked tiers in
-            Challenges → Season Pass.
-          </small>
-        </div>
-      )}
-      {!!out.circuitPrizes?.length && (
-        <div className="utm-climb rise-in">
-          <b className="disp">CIRCUIT REWARD UNLOCKED</b>
-          {out.circuitPrizes.map((p) => (
-            <small key={p}>{p} · waiting in your Store</small>
-          ))}
-        </div>
-      )}
-      {out.ups.length > 0 && (
-        <div className="utm-ups">
-          <span className="eyebrow">
-            {out.ups.length === 1 ? 'Level up' : out.ups.length + ' level-ups'}
-          </span>
-          {out.ups.slice(0, out.ups.length > 4 ? 3 : 4).map((u, i) => (
-            <span
-              key={i}
-              className="utm-up rise-in"
-              style={{ animationDelay: 300 + i * 120 + 'ms' }}
-            >
-              <b>{u.name}</b> <i className="num">LV {u.level}</i>
-            </span>
-          ))}
-          {out.ups.length > 4 && (
-            <span className="utm-up utm-more">
-              and {out.ups.length - 3} more: every card plays at its new level
-              from your next game
-            </span>
-          )}
-        </div>
-      )}
-      {(out.pack || out.eventCleared || !!out.circuitPrizes?.length) && (
-        <button className="btn gold" onClick={onStore}>
-          VIEW REWARD PACKS
-        </button>
-      )}
-      <MatchDebrief
-        sport={SPORT}
-        ends={out.ends[0]}
-        simulated={out.how === 'sim'}
-        onPractice={onPractice}
-      />
-      <div className="spacer" />
-      <div className="btnrow utm-btns">
-        <button className="btn" onClick={onDone}>
-          DONE
-        </button>
-        <button className="btn primary" onClick={onAgain}>
-          {again}
-        </button>
-      </div>
-    </div>
+    <MatchRecap
+      sport={SPORT}
+      eyebrow={eyebrow}
+      me={setup.me.name}
+      rival={setup.rival.name}
+      us={out.us}
+      them={out.them}
+      ends={out.ends}
+      simulated={out.how === 'sim'}
+      recap={out.recap}
+      next={next}
+      paidToday={{ n: out.paidToday, of: PAID_GAMES_A_DAY }}
+      claimable={claimable}
+      onClaimAll={claim}
+      onOneMore={props.onOneMore}
+      onHome={props.onHome}
+      onStore={props.onStore}
+      onPractice={props.onPractice}
+    />
   );
 }

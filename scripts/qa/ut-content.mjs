@@ -31,7 +31,7 @@ async function finishOpening(page) {
   }
 }
 async function closeOpening(page) {
-  await page.getByRole('button', { name: 'DONE', exact: true }).click();
+  await page.locator('.mr-sec button').filter({ hasText: 'HOME' }).click();
   await page.locator('.ut-open-screen').waitFor({ state: 'detached', timeout: 8000 });
 }
 const tab = (page, label) => page.locator('.ut-tabs button').filter({ hasText: new RegExp('^' + label + '[0-9]*$') }).click();
@@ -333,13 +333,13 @@ async function run(sport, width, opts = {}) {
   assert.equal(dBefore.ut.owned.length, ownedBeforeDraft, 'drafting never touches the club');
   await page.locator('.ut-draft-next .btn').click();
   await page.locator('.vote-opt.sim').click({ timeout: 30000 });
-  await page.locator('.utm-result').waitFor({ timeout: 90000 });
+  await page.locator('.mr').waitFor({ timeout: 90000 });
   await page.waitForTimeout(400);
   await shot(page, 'utc-' + tag + '-draft-result');
   const dAfter = await current();
   assert.equal(dAfter.ut.content.draft.active.games, 1, 'one game settled');
   assert.equal(dAfter.coins, dBefore.coins, 'draft games pay at the end');
-  await page.getByRole('button', { name: 'DONE', exact: true }).click();
+  await page.locator('.mr-sec button').filter({ hasText: 'HOME' }).click();
   await page.getByRole('button', { name: /CLAIM REWARDS|END RUN NOW/ }).first().waitFor({ timeout: 30000 });
   const retire = page.getByRole('button', { name: /END RUN NOW/ });
   if (await retire.isVisible().catch(() => false)) await retire.click();

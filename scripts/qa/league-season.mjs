@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, fixture, shot, artifacts } from './browser.mjs';
+
+/** Career level from profile XP (src/engine/economy.ts levelInfo): ut-5 pays UT matches Career XP */
+const levelOf = (xp) => {
+  const steps = [70, 110, 140, 170];
+  let level = 1, acc = 0, i = 0, need = steps[0];
+  while (xp >= acc + need) (acc += need), level++, i++, (need = i < steps.length ? steps[i] : need + 30);
+  return level;
+};
 const browser = await launch(),
   report = [];
 try {
@@ -156,9 +164,9 @@ try {
     await page
       .getByRole('button', { name: 'PLAY GAME 1', exact: true })
       .click();
-    await page.locator('.utm-result').waitFor({ timeout: 150000 });
+    await page.locator('.mr').waitFor({ timeout: 150000 });
     assert.ok(await page.evaluate(() => window.__leagueRuntime.frames > 0));
-    const won = await page.locator('.utm-verdict').innerText();
+    const won = await page.locator('.mr-word').innerText();
     await shot(page, 'league-' + sport + '-result');
     const afterMatch = await current(),
       s = afterMatch.ut.league.active;
@@ -166,7 +174,8 @@ try {
     assert.equal(s.results.length, sport === 'nba' ? 15 : 16);
     assert.ok(s.teams.every((t) => t.w + t.l === 1));
     assert.equal(s.teams[0].w, won === 'WIN' ? 1 : 0);
-    assert.equal(afterMatch.coins, original.coins + (won === 'WIN' ? 60 : 30));
+    // ut-5: a paid match also adds Career XP; a level it crosses pays its 50 coins
+    assert.equal(afterMatch.coins, original.coins + (won === 'WIN' ? 60 : 30) + 50 * (levelOf(afterMatch.xp) - levelOf(original.xp)));
     await page.getByRole('button', { name: 'SEASON HUB', exact: true }).click();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await enter();

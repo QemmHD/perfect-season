@@ -1,8 +1,5 @@
 /* Ultimate Team's played matches (Match.tsx) and the Squad Battles ladder (Battles.tsx). */
 
-.utm-climb,
-.utm-rewards,
-.utm-btns,
 .utb-head,
 .utb-warn,
 .utb-rung {
@@ -175,132 +172,6 @@
   font-size: 13px;
   line-height: 1.4;
   color: var(--soft);
-}
-
-/* ---------- the result ---------- */
-.utm-result {
-  align-items: center;
-  text-align: center;
-  gap: 10px;
-  padding-bottom: calc(var(--sab) + 12px);
-}
-.utm-verdict {
-  margin: 4px 0 0 0;
-  font-size: 76px;
-  line-height: 0.9;
-  animation: pop-in 0.5s var(--ease-spring) both;
-}
-.utm-verdict.win {
-  color: var(--gold);
-  text-shadow: 0 0 30px rgba(245, 184, 61, 0.55);
-}
-.utm-verdict.loss {
-  color: var(--soft);
-}
-.utm-score {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  width: 100%;
-}
-.utm-score span {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.utm-score b {
-  font-size: 52px;
-  line-height: 1;
-}
-.utm-score span:first-child b {
-  color: var(--teal);
-}
-.utm-score small {
-  max-width: 100%;
-  font-size: 12px;
-  color: var(--sub);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.utm-score > i {
-  font-style: normal;
-  font-size: 30px;
-  color: var(--sub);
-}
-.utm-note {
-  margin: 0;
-  font-size: 13px;
-  color: var(--soft);
-}
-.utm-climb {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background:
-    radial-gradient(120% 140% at 50% 0%, rgba(245, 184, 61, 0.24) 0%, rgba(245, 184, 61, 0) 70%),
-    var(--panel);
-  border: 1.5px solid rgba(245, 184, 61, 0.6);
-}
-.utm-climb b {
-  font-size: 24px;
-  color: var(--gold);
-}
-.utm-climb small {
-  font-size: 12.5px;
-  color: var(--soft);
-}
-.utm-rewards {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  font-size: 13px;
-  color: var(--soft);
-}
-.utm-rewards span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-.utm-rewards b {
-  color: var(--text);
-  font-weight: 800;
-}
-.utm-ups {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-}
-.utm-up {
-  font-size: 13px;
-}
-.utm-up i {
-  font-style: normal;
-  font-weight: 800;
-  color: var(--teal);
-  margin-left: 4px;
-}
-.utm-btns {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  flex-shrink: 0;
 }
 
 /* ---------- the Squad Battles ladder ---------- */
@@ -499,51 +370,6 @@
   line-height: 1.4;
   color: var(--sub);
   text-align: center;
-}
-.utm-more {
-  max-width: 300px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--sub);
-}
-.utm-ends {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-.utm-ends span {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 2px;
-}
-.utm-ends i {
-  min-width: 18px;
-  padding: 2px 3px;
-  border-radius: 5px;
-  font-style: normal;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  background: var(--panel-2);
-  color: var(--sub);
-}
-.utm-ends .us i.e-pts {
-  background: rgba(25, 227, 201, 0.18);
-  color: var(--teal);
-}
-.utm-ends .them i.e-pts {
-  background: rgba(245, 184, 61, 0.18);
-  color: var(--gold);
-}
-.utm-ends span.many {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 3px;
-  max-width: 300px;
-  margin: 0 auto;
-  width: 100%;
 }
 
 /* the difficulty: four levels, what each pays */

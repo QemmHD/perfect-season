@@ -249,7 +249,7 @@ try {
       .filter((e) => e.name === 'FunctionCall' && e.args?.data?.functionName === 'tick' && /\/src\/lib\/playtime\.ts/.test(e.args?.data?.url ?? ''))
       .map((e) => (e.tdur ?? e.dur ?? 0) / 1000)
       .sort((a, b) => a - b);
-    await page.locator('.utm-result').waitFor({ timeout: 900000 });
+    await page.locator('.mr').waitFor({ timeout: 900000 });
     const r = await page.evaluate(() => {
       clearInterval(window.__tapper);
       return { now: performance.now(), writes: window.__writes.slice(), long: window.__long.slice(), taps: window.__tap };

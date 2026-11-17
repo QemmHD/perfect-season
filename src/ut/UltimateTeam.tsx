@@ -169,7 +169,7 @@ import { DraftView } from './DraftView';
 import './content-ui.css';
 import { claimNewEra, NEW_ERA_COINS, newEraPickId, newEraReady } from './new-era';
 import { markSeen } from './seen';
-import { markSession, sessionSummary, summaryText } from './session-summary';
+import { holdSession, resumeSession, type SessionMark, sessionSummary, summaryText } from './session-summary';
 import { useUtModalQueue } from './ut-modal-queue';
 import type { Target } from './next-action';
 import { cancelEvo, claimEvo, playId, startEvo } from './evolutions';
@@ -301,7 +301,11 @@ export default function UltimateTeam(props: {
   const latest = useRef(profile);
   latest.current = profile;
   // ut-4: what this visit started with, for the two-line summary on EXIT (session-summary.ts)
-  const session = useRef(markSession(profile, Date.now()));
+  const session = useRef<SessionMark | null>(null);
+  session.current ??= resumeSession(profile, Date.now());
+  // ut-5: a match (or any step outside UT) keeps the visit going; EXIT ends it
+  const exited = useRef(false);
+  useEffect(() => () => holdSession(exited.current ? null : session.current), []);
   const [day, setDay] = useState(() => easternDateKey());
   useEffect(() => {
     const refresh = () => setDay(easternDateKey());
@@ -2015,7 +2019,8 @@ export default function UltimateTeam(props: {
               sfx.click();
               rememberUtReturn('hub');
               // ut-4: what this visit earned and what waits tomorrow, once Home is on screen
-              const sum = sessionSummary(session.current, latest.current, Date.now());
+              const sum = sessionSummary(session.current!, latest.current, Date.now());
+              exited.current = true;
               props.onExit();
               if (sum) window.setTimeout(() => onToast(summaryText(sum)), 450);
             }}

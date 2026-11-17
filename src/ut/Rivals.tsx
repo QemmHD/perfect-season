@@ -254,31 +254,3 @@ export function Rivals({
     </div>
   );
 }
-export function Promotion({
-  division,
-  onDone,
-}: {
-  division: number;
-  onDone: () => void;
-}) {
-  useEffect(() => {
-    sfx.title();
-  }, []);
-  return (
-    <div
-      className="promotion"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Division promotion"
-    >
-      <span className="eyebrow">YOU EARNED THIS</span>
-      <DivisionBadge division={division} large />
-      <h1 className="disp">PROMOTED.</h1>
-      <p>WELCOME TO {DIVISIONS[division].name.toUpperCase()}</p>
-      <button className="big gold" onClick={onDone}>
-        LET’S KEEP CLIMBING <ArrowMark />
-      </button>
-      <Confetti />
-    </div>
-  );
-}
