@@ -274,7 +274,8 @@ describe('the momentum carry after a catch', () => {
       // whatever way the catch had him moving), right of where his momentum alone takes him, and
       // moving right by +0.25 s even from a hard leftward catch (a 0.15 s turn when he caught it square)
       expect(held[1]).toBeGreaterThan(held[0]);
-      expect(held[6] - held[0]).toBeGreaterThan(1.5);
+      // (a catch already running right at 2+ yd/s only speeds up: nfl-5's route variation made one)
+      expect(held[6] - held[0]).toBeGreaterThan(held[0] >= 2 ? 0.9 : 1.5);
       expect(held[6]).toBeGreaterThan(free[6] + 1);
       expect(held[15]).toBeGreaterThan(0);
       if (held[0] > -1) expect(held.slice(0, 10).some((v) => v > 0)).toBe(true);

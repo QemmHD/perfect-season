@@ -10,7 +10,8 @@ import { hashString, rng } from '../../engine/rng';
 import { autoplay, chooseCall, decide, fourthDown, pilot, pocketThumb } from './autopilot';
 import { afterPlay, DRIVES, fgDistance, kick, newGame, punt, rivalDriveEnd, startPlay } from './drive';
 import { CarryGate } from './controls';
-import { dist, FIELD_W, flightTime, projectRoute, slingWindow, snap, step, throwAway, throwTo } from './engine';
+import { dist, FIELD_W, flightTime, projectRoute, slingWindow, snap, speedOf, step, throwAway, throwTo } from './engine';
+import { CALL_IDS, CALLS } from './calls';
 import { HEATING } from './shared-v2';
 import * as pacing from './pacing';
 import { REPLAY_AFTER, REPLAY_SPEED } from '../replay';
@@ -217,6 +218,56 @@ function rivalDrives(teams: Teams, mode: PilotMode, seed: string, drives: number
   return autoplay(g, level.skill, 'cal-rival:' + seed).ends;
 }
 
+/**
+ * nfl-5: count the defense's call on a lined-up snap (the call mix, its situational shares, a blitz
+ * against the base calls, the FREE RUSHER flame and how often it shows), and return a per-step
+ * watcher for the flame's rusher: he's "truly unblocked" when nobody is assigned to him, nobody ever
+ * holds him, and over his first second (or until the ball is out) he closes on the quarterback at
+ * 60% of his top speed or more.
+ */
+function callStats(p: Play, down: number, toGo: number, ballOn: number, add: (k: string, n?: number) => void): ((p: Play) => void) | null {
+  const dc = p.dcall;
+  if (!dc) return null;
+  const call = CALLS[dc.id];
+  add('dcsnaps');
+  add('dc:' + dc.id);
+  if (dc.rotated) add('dc:rotated');
+  if (dc.shown !== 'one' || dc.shell !== 'one') add('dc:not-one');
+  if (down >= 3 && toGo >= 7) {
+    add('dc:3rdlong');
+    if (dc.shell === 'two' || call.family === 'BLITZ') add('dc:3rdlong:hit');
+  }
+  if (ballOn >= 80) {
+    add('dc:rz');
+    if (call.coverage === 'man' || dc.id === 'goal') add('dc:rz:hit');
+  }
+  if (p.call !== 'pass') return null;
+  if (call.family === 'BLITZ') add('bz:drop');
+  else add('base:drop');
+  if (dc.free.length) {
+    add('free:snaps');
+    if (call.family === 'BLITZ') add('free:blitz');
+    if (dc.flame !== null && call.family === 'BLITZ') add('free:blitz:flame');
+  }
+  if (dc.flame === null) return null;
+  add('flame');
+  const f = p.bodies[dc.flame];
+  const top = speedOf(f.p);
+  const d0 = dist(f, p.qb);
+  let held = f.mark !== null || !!f.blocker;
+  let done = false;
+  return (q: Play) => {
+    if (done) return;
+    if (f.heldUntil > q.t) held = true;
+    const out = q.phase !== 'drop' || q.carrier !== q.qb || !!q.end;
+    if (q.t >= 1 || out) {
+      done = true;
+      const closing = (d0 - dist(f, q.qb)) / Math.max(0.2, q.t);
+      if (!held && (closing >= 0.6 * top || dist(f, q.qb) < 1.2)) add('flame:free');
+    }
+  };
+}
+
 /** Play one whole game (`drives` drives) of `teams.off` against `teams.def`, counting into `acc`. */
 export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc, drives = DRIVES): GameResult {
   const g = newGame(teams.off, teams.def, 'cal:' + seed, drives, mode.defIQ);
@@ -309,6 +360,7 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
     const down = g.down;
     const toGo = g.toGo;
     const p = startPlay(g, chooseCall(g, pl));
+    const watch = callStats(p, down, toGo, g.ballOn, add);
     snap(p);
     pl.readAt = human ? 1.5 + pl.rand() * 1.4 : 0;
     const stick = withStick ? humanStick(mode) : null;
@@ -335,6 +387,7 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
         else lane = th.steer;
       }
       step(p, DT, stick ? stick(p, lane) : lane);
+      watch?.(p);
       for (const e of p.events) {
         if (e === 'throwaway') add('throwaway');
         if (e === 'throw' || e === 'throw-pressure') {
@@ -358,6 +411,14 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
     }
     const e = p.end!;
     add('plays');
+    if (p.dcall) {
+      const fam = p.dcall.family === 'BLITZ' ? 'bz' : 'base';
+      add(fam + ':plays');
+      if (e.gain >= 20) add(fam + ':20');
+      if (p.call === 'pass' && e.kind === 'sack') add(fam + ':sack');
+    }
+    add('down:' + down);
+    if (p.call === 'pass') add('down:' + down + ':pass');
     drivePlays++;
     if (e.flag) add('flag');
     if (p.call === 'pass') {
@@ -564,6 +625,22 @@ export function summarize(acc: Acc) {
     fireGames: share('fireGames', acc.games),
     fieldGoals: { all: share('fgm', n('fga')), ...Object.fromEntries(FG_BINS.map(([b]) => [b, share('fgm:' + b, n('fga:' + b))])), fifty: wilson(n('fga:50-59') + n('fga:60+'), n('fga')) },
     fourthDownTries: { v: round(n('4th-go') / Math.max(1, acc.games), 2), n: acc.games },
+    // nfl-5: the AI's play calling and the defense's calls
+    passShareByDown: Object.fromEntries([1, 2, 3, 4].map((d) => [d, share('down:' + d + ':pass', n('down:' + d))])),
+    calls: {
+      snaps: n('dcsnaps'),
+      mix: Object.fromEntries(CALL_IDS.map((id) => [id, share('dc:' + id, n('dcsnaps'))])),
+      distinct: CALL_IDS.filter((id) => n('dc:' + id) > 0).length,
+      rotated: share('dc:rotated', n('dcsnaps')),
+      thirdLongTwoHighOrBlitz: share('dc:3rdlong:hit', n('dc:3rdlong')),
+      redZoneManOrGoal: share('dc:rz:hit', n('dc:rz')),
+      blitzSack: share('bz:sack', n('bz:drop')),
+      baseSack: share('base:sack', n('base:drop')),
+      blitz20: share('bz:20', n('bz:plays')),
+      base20: share('base:20', n('base:plays')),
+      flameOnFreeBlitz: share('free:blitz:flame', n('free:blitz')),
+      flameTrulyFree: share('flame:free', n('flame'))
+    },
     scores: {
       hist: Object.fromEntries([...new Set(acc.scores)].sort((a, b) => a - b).map((s) => [s, acc.scores.filter((x) => x === s).length])),
       tie: jackknifeBand(acc.scores, tieOdds),

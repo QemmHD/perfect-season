@@ -2,7 +2,7 @@
 // defense, on its own phone, at the same time. Your progress goes to the other phone over the
 // match channel; theirs comes back the same way (against the AI, its drives are played by the
 // autopilot and shown as you finish yours). The higher score wins; a tie goes to the better team.
-import { defenseDifficulty } from './difficulty';
+import { defenseDifficulty, rivalOffenseFaces } from './difficulty';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { pick } from '../engine/sport';
 import { loadSoccerGame, type SoccerGame } from '../soccer-lazy';
@@ -196,13 +196,15 @@ export function Arcade({
       const q = squads!;
       return rival ? sg!.aiProgress(q.them, q.us, s, skill, defenseIQ) : sg!.aiProgress(q.us, q.them, s, skill, defenseIQ);
     }
+    // (football, nfl-5 / C5: the AI's offense faces your defense at rivalOffenseFaces, not the AI defense's difficulty)
+    const facesIQ = rival ? rivalOffenseFaces(online, botLevel) : defenseIQ;
     if (teams) {
       const t = teams;
-      if (FOOTBALL) return rival ? aiDrivesOf(t.rivalOffense!, t.defense!, s, skill, DRIVES, defenseIQ) : aiDrivesOf(t.offense!, t.rivalDefense!, s, skill, DRIVES, defenseIQ);
+      if (FOOTBALL) return rival ? aiDrivesOf(t.rivalOffense!, t.defense!, s, skill, DRIVES, facesIQ) : aiDrivesOf(t.offense!, t.rivalDefense!, s, skill, DRIVES, defenseIQ);
       return rival ? aiPossessionsOf(t.rivalFive!, t.five!, s, skill, POSSESSIONS, t.rivalBench, defenseIQ) : aiPossessionsOf(t.five!, t.rivalFive!, s, skill, POSSESSIONS, t.bench, defenseIQ);
     }
     const [off, def] = rival ? [rivalLineup!, lineup!] : [lineup!, rivalLineup!];
-    return FOOTBALL ? aiDrives2(off, def, s, skill, a, DRIVES, defenseIQ) : aiPossessions2(off, def, s, skill, a, POSSESSIONS, defenseIQ);
+    return FOOTBALL ? aiDrives2(off, def, s, skill, a, DRIVES, facesIQ) : aiPossessions2(off, def, s, skill, a, POSSESSIONS, defenseIQ);
   };
   const ai = useMemo(() => (!online && attrs ? aiPlay(true, seed, aiSkill ?? AI_SKILL[botLevel], attrs) : null), [attrs]);
 

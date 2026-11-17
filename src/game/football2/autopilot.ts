@@ -2,9 +2,11 @@
 // tests. It reads who's open and throws him the ball in stride, picks the lane with room on a run,
 // uses the runner's best move against a tackler, kicks in range and punts when it must.
 import { hashString, rng } from '../../engine/rng';
-import { BOX_HALF, DROP_TIME, dist, FIELD_W, flightTime, isLine, maxThrow, moveEdge, moveReady, moveWithBall, outsideBox, projectRoute, rt, separation, sight, snap, step, throwAway, throwTo, windupOf } from './engine';
-import { afterPlay, fgDistance, fgInRange, type Game, kick, kickWindow, punt, startPlay } from './drive';
-import type { Body, Move, Play, Pt } from './types';
+import { BOX_HALF, DROP_TIME, dist, FIELD_W, flightTime, isLine, maxThrow, moveEdge, moveReady, moveWithBall, on, outsideBox, projectRoute, rt, scramble, separation, sight, snap, step, throwAway, throwTo, windupOf } from './engine';
+import { afterPlay, fgDistance, fgInRange, type Game, kick, kickWindow, punt, situation, snapSeed, startPlay } from './drive';
+import { dealConcepts, dealRuns, passShare } from './coach';
+import type { Level } from './calls';
+import type { Body, Concept, Move, Play, Pt } from './types';
 
 export interface Pilot {
   skill: number;
@@ -34,6 +36,66 @@ export interface Pilot {
   ringSigma?: number;
   /** how often he goes for a gold JUKE/SPIN ring he's shown (0-1); unset, the AI's old reaction */
   ringTry?: number;
+  /** nfl-5: the AI quarterback's progression on the play he's on (aiPass) */
+  reads?: Reads | null;
+}
+
+/**
+ * nfl-5: how the AI quarterback works a pass play (aiPass). He reads his progression in order,
+ * timed from his set: the first read 0.15-0.45 s after it (by awareness), then one every
+ * lerp(0.55, 0.32, awareness) s, and never before that man's route has made its break. He sees as
+ * many reads as his level allows (Rookie 1-2, Pro 2-3, Legend 2-4 by awareness), then the
+ * checkdown; past that he holds it until the rush makes him throw it away, find a man late or run.
+ * A throw takes a 0.35-0.45 s wind-up, through which he can be hit and the coverage can close.
+ */
+export interface Reads {
+  play: Play;
+  order: { b: Body; ready: number }[];
+  check: Body | null;
+  i: number;
+  next: number;
+  gap: number;
+  cap: number;
+  /** Rookie: he's locked onto his first read whatever the coverage */
+  lock: boolean;
+  wind: number;
+  /** he'll pull it down and run when the pocket breaks with a lane (decided once a play) */
+  runner: boolean;
+  stage: 'reads' | 'check' | 'hold';
+  release: { at: number; b: Body } | null;
+  /** how much pressure he feels before he hurries it (an aware passer sooner; over 1, a hit he
+   * never sees coming: the blind side) */
+  feel: number;
+}
+
+/** The AI's level from its skill (Arcade AI_SKILL: Rookie 0.45, Pro 0.68, Legend 0.88). */
+export const levelOfSkill = (skill: number): Level => (skill < 0.56 ? 'rookie' : skill < 0.78 ? 'pro' : 'legend');
+
+/**
+ * Each concept's progression (nfl-5): the reads in order, each with the moment (s after the snap)
+ * his route has made its break, and the checkdown last. Routes by slot: CONCEPT_ROUTES in engine.ts.
+ */
+export const READS: Record<Concept, { reads: [string, number][]; check: string }> = {
+  verts: { reads: [['SL', 1.9], ['TE', 1.9], ['X', 2.2], ['Z', 2.2]], check: 'RB' },
+  slants: { reads: [['X', 0.9], ['SL', 0.9], ['Z', 1.0], ['TE', 1.6]], check: 'RB' },
+  smash: { reads: [['SL', 2.0], ['X', 1.6], ['TE', 1.7], ['Z', 1.6]], check: 'RB' },
+  flood: { reads: [['Z', 2.0], ['SL', 1.7], ['TE', 1.2], ['X', 2.3]], check: 'RB' },
+  dagger: { reads: [['SL', 1.8], ['X', 2.1], ['Z', 1.6]], check: 'RB' },
+  mesh: { reads: [['X', 1.3], ['SL', 1.3], ['Z', 2.0], ['TE', 1.6]], check: 'RB' },
+  curls: { reads: [['X', 1.6], ['Z', 1.6], ['TE', 2.0], ['SL', 1.1]], check: 'RB' },
+  posts: { reads: [['X', 2.0], ['Z', 2.0], ['SL', 1.6], ['TE', 1.4]], check: 'RB' }
+};
+
+/** a hurried throw's wind-up (s): a flick to get rid of it before the hit */
+export const HURRIED_WIND = 0.18;
+/** the AI passer's clock in his head (s after the snap, a little less for a better one) */
+export const CLOCK_IN_HEAD = 3.3;
+
+/** How many reads he gets through before the checkdown, by level (Legend by awareness). */
+export function readCap(level: Level, awr01: number, u: number): number {
+  if (level === 'rookie') return u < 0.5 ? 1 : 2;
+  if (level === 'pro') return u < 0.5 ? 2 : 3;
+  return 2 + Math.round(2 * awr01);
 }
 
 export function pilot(skill: number, seed: string): Pilot {
@@ -41,24 +103,39 @@ export function pilot(skill: number, seed: string): Pilot {
 }
 
 const gauss = (r: () => number) => (r() + r() + r() + r() - 2) * 1.732;
+const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.max(0, Math.min(1, t));
 
+/**
+ * The AI's play call (nfl-5): run or pass by the down and distance (coach.ts passShare: about 47% on
+ * first down, 59% on second, 74% on third), and the concept and the run that fit it, dealt from the
+ * snap's seed as the tray deals a person's cards.
+ */
 export function chooseCall(g: Game, pl: Pilot): 'pass' | 'run' {
-  const short = g.toGo <= 2;
-  return pl.rand() < (short ? 0.55 : 0.3) ? 'run' : 'pass';
+  const s = situation(g);
+  g.concept = dealConcepts(snapSeed(g), s, 1)[0];
+  g.run = dealRuns(snapSeed(g), s, 1)[0];
+  return pl.rand() < passShare(s) ? 'pass' : 'run';
 }
 
 /**
- * Fourth down: 'kick' in range, otherwise 'go'. In this format a punt is worth nothing: the drive
- * ends with no points either way and the other side's drives start from their own kickoff, so a
- * turnover on downs costs exactly what a punt does (Claude 2026-11-01; the AI used to punt from its
- * own half on fourth and long, which threw away the weaker side's last chance on ~40% of drives).
- * ('punt' stays in the type for the player's button.)
+ * Fourth down (nfl-5, the AI's chart): the last kick when the clock's run out; go for it on a yard
+ * or two from midfield on (or anywhere near the goal), and on fourth and a few deep in their end or
+ * out of kicking range; kick when it's in range; punt the rest. (Before nfl-5 it never punted, as a
+ * punt and a stop on downs end the drive the same way in this format; it went for it 3.3 times a
+ * game, which no football team does. A punt also earns the other side's defense nothing it
+ * wouldn't get for a stop.)
  */
 export function fourthDown(g: Game): 'kick' | 'go' | 'punt' {
   // the clock ran out in range: the last kick
   if (g.clock === 0) return 'kick';
-  if (fgInRange(g) && (g.toGo > 1.5 || fgDistance(g) <= 30)) return 'kick';
-  return 'go';
+  const inRange = fgInRange(g);
+  // the two-minute drill: a kick if it's there, else it's now or never
+  if (g.clock !== null) return inRange ? 'kick' : 'go';
+  if (g.toGo <= 1.5 && g.ballOn >= 38) return 'go';
+  if (g.toGo <= 3 && (g.ballOn >= 55 || (inRange && fgDistance(g) <= 25))) return 'go';
+  if (inRange) return 'kick';
+  if (g.ballOn >= 55 && g.toGo <= 6) return 'go';
+  return 'punt';
 }
 
 /** Where to throw to hit a receiver in stride, and how open he'll be when it gets there. */
@@ -73,6 +150,131 @@ function lead(p: Play, b: Body): { at: Pt; open: number } {
   return { at, open: separation(p, b, at) };
 }
 
+/** Where he aims a throw meant for `at`: a little off by his skill, and a guess along the line where he can't see the arc land. */
+function aimOf(p: Play, pl: Pilot, at: Pt): Pt {
+  const len = Math.max(1, dist(p.qb, at));
+  const hidden = (1 - sight(p, len)) * len;
+  // (its own aim is a little off by skill; the passer's ratings throw the real error in throwTo)
+  const along = gauss(pl.rand) * ((1 - pl.skill) * 1.6 + hidden * (0.2 - 0.12 * pl.skill));
+  const across = gauss(pl.rand) * ((1 - pl.skill) * 1.0 + hidden * 0.03);
+  const ux = (at.x - p.qb.x) / len;
+  const uy = (at.y - p.qb.y) / len;
+  return { x: at.x + ux * along - uy * across, y: at.y + uy * along + ux * across };
+}
+
+/** How open a man has to be for him to pull the trigger: tighter for a better passer, more room for a deep ball. */
+const roomFor = (p: Play, pl: Pilot, at: Pt) => 2.9 - pl.skill * 0.5 + Math.max(0, dist(p.qb, at) - 20) * 0.03;
+
+/** A man he can throw to (in range, not behind him): where to hit him in stride and how open he'll be. */
+function option(p: Play, b: Body): { b: Body; at: Pt; open: number } | null {
+  if (b.job === 'block' || isLine(b) || b === p.qb) return null;
+  const o = lead(p, b);
+  return dist(p.qb, o.at) <= maxThrow(p) && o.at.y > p.los - 3 ? { b, ...o } : null;
+}
+
+/** A lane to run: nobody within 1.8 yd of the five yards straight up, or up and to either side. */
+export function scrambleLane(p: Play): boolean {
+  const qb = p.qb;
+  const defenders = p.bodies.filter((b) => b.side === 'D' && p.t >= b.stunUntil);
+  return [-0.7, 0, 0.7].some((ang) => {
+    const dx = Math.sin(ang),
+      dy = Math.cos(ang);
+    return defenders.every((d) => {
+      const k = Math.max(0, Math.min(5, (d.x - qb.x) * dx + (d.y - qb.y) * dy));
+      return Math.hypot(qb.x + dx * k - d.x, qb.y + dy * k - d.y) > 1.8;
+    });
+  });
+}
+
+/** The AI quarterback's pass play (nfl-5): reads, checkdown, wind-up, throwaway, scramble. */
+function aiPass(p: Play, pl: Pilot) {
+  const qb = p.qb;
+  const awr = rt(qb.p.a.AWR, 45, 99);
+  if (!pl.reads || pl.reads.play !== p) {
+    const level = levelOfSkill(pl.skill);
+    const plan = READS[p.concept];
+    const at = (slot: string) => p.bodies.find((b) => b.side === 'O' && b.slot === slot) ?? null;
+    const order = plan.reads.map(([slot, ready]) => ({ b: at(slot)!, ready })).filter((o) => o.b && o.b.job !== 'block');
+    const check = [at(plan.check), at('TE')].find((b) => b && b.job !== 'block') ?? null;
+    pl.reads = {
+      play: p,
+      order,
+      check,
+      i: 0,
+      next: DROP_TIME + lerp(0.45, 0.15, awr) + pl.rand() * 0.06,
+      gap: lerp(0.55, 0.32, awr),
+      cap: Math.min(order.length, readCap(level, awr, pl.rand())),
+      lock: level === 'rookie' && pl.rand() < 0.25,
+      wind: lerp(0.45, 0.35, 0.5 * awr + 0.5 * pl.skill),
+      runner: pl.rand() < lerp(0.35, 0.85, rt(qb.p.a.SPD, 50, 95)) * (on(qb, 'scrambler') ? 1.3 : 1),
+      stage: 'reads',
+      release: null,
+      feel: 0.5 + pl.rand() * 0.3 + (1 - awr) * 0.25
+    };
+  }
+  const r = pl.reads;
+  // the wind-up: the ball leaves when it's done, to where the man is going now
+  if (r.release) {
+    // (a rusher in his face, a step and a half away: it comes out now, hurried)
+    if (p.t >= r.release.at || p.pressure > 0.92) {
+      const o = option(p, r.release.b);
+      throwTo(p, aimOf(p, pl, o ? o.at : lead(p, r.release.b).at));
+      r.release = null;
+      r.stage = 'hold';
+    }
+    return;
+  }
+  // (hurried, he gets rid of it with a flick)
+  const throwIt = (b: Body, quick = false) => {
+    r.release = { at: p.t + (quick ? HURRIED_WIND : r.wind), b };
+  };
+  if (p.pressure > r.feel && pl.felt === Infinity) pl.felt = p.t;
+  // (and his clock in his head: past it he's getting rid of it, rush or no rush)
+  const hurried = p.t - pl.felt >= 0.3 - 0.2 * pl.skill || p.t >= CLOCK_IN_HEAD - 0.4 * pl.skill;
+  // the pocket's breaking down and there's a lane: he takes off
+  if (r.runner && p.pressure > 0.6 && p.t > DROP_TIME && scrambleLane(p) && scramble(p)) return;
+  if (hurried) {
+    // about to be hit: the best man open enough now; else away (only from outside the tackle box,
+    // the rule a person plays under: inside it that's grounding), else a lane to run; else, with
+    // the hit right on him, a tight one to the most open man, or he eats it
+    const all = p.bodies.map((b) => option(p, b)).filter((o): o is NonNullable<typeof o> => !!o).sort((a, b) => b.open - a.open);
+    if (all[0] && all[0].open >= 1.4) throwIt(all[0].b, true);
+    else if (outsideBox(p) && throwAway(p)) r.stage = 'hold';
+    else if (r.runner && p.t > DROP_TIME && scrambleLane(p) && scramble(p)) return;
+    else if (p.pressure > 0.9 && all[0] && all[0].open >= 0.8) throwIt(all[0].b, true);
+    return;
+  }
+  if (p.t < r.next || r.stage === 'hold') return;
+  if (r.stage === 'reads') {
+    const read = r.order[r.i];
+    if (!read || r.i >= r.cap) {
+      r.stage = 'check';
+      return;
+    }
+    if (p.t < read.ready) return;
+    const o = option(p, read.b);
+    if (o && (o.open >= roomFor(p, pl, o.at) || (r.lock && r.i === 0))) {
+      throwIt(read.b);
+      return;
+    }
+    r.i++;
+    r.next = p.t + r.gap * (0.8 + 0.4 * pl.rand());
+    return;
+  }
+  // the checkdown, open a step is enough; else he holds it and looks for a man coming open late
+  const c = r.check ? option(p, r.check) : null;
+  if (c && c.open >= 1.3) {
+    throwIt(c.b);
+    return;
+  }
+  const late = r.order
+    .slice(0, r.cap)
+    .map((o) => option(p, o.b))
+    .filter((o): o is NonNullable<typeof o> => !!o && o.open >= roomFor(p, pl, o.at) + 0.4)[0];
+  if (late) throwIt(late.b);
+  else r.next = p.t + r.gap;
+}
+
 /** One step of decisions. Returns where the runner steers, if anyone's running. */
 export function decide(p: Play, g: Game, pl: Pilot): number | null {
   if (pl.play !== p) {
@@ -83,6 +285,10 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
     pl.seen.clear();
     pl.plan = null;
     pl.laneAt = -1;
+  }
+  if (p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb && !pl.throwAt) {
+    aiPass(p, pl);
+    return null;
   }
   if (p.phase === 'drop' && p.call === 'pass' && p.carrier === p.qb) {
     if (p.pressure > pl.feel && pl.felt === Infinity) pl.felt = p.t;

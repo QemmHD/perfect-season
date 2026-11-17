@@ -11,6 +11,8 @@
 // (4 with a Heat Check card), when every gold window is 1.25x wide and an uncontested amber sling
 // is gold. The bar empties after drive 2. It replaced the quarterback's three-completion On Fire.
 import { hashString, rng } from '../../engine/rng';
+import { callFor, levelOfIQ, NO_TENDENCY, noteTendency, type Situation, type Tendency } from './calls';
+import { coachPick, dealConcepts, dealRuns, passCards } from './coach';
 import { CONCEPTS, lineUp, rt } from './engine';
 import { addHeat, COLD, FIRE_UNITS, type Heat, type HeatEv, spendFire } from './shared-v2';
 import type { MatchGrade } from '../progress';
@@ -59,7 +61,14 @@ export interface Game {
   pf: Record<string, number>;
   /** the two-minute clock on the last drive (seconds left; null before it) */
   clock: number | null;
+  /** nfl-5: the offense's habits this game as the defense sees them (Legend's counters), and the
+   * call lined up last (the snapped one: startPlay sets it, settle counts it) */
+  tend: Tendency;
+  snapCall?: { call: Call; down: number };
 }
+
+/** The down, distance, spot and clock a call is made for (nfl-5). */
+export const situation = (g: Pick<Game, 'down' | 'toGo' | 'ballOn' | 'clock'>): Situation => ({ down: g.down, toGo: g.toGo, ballOn: g.ballOn, clock: g.clock });
 
 /** ON FIRE's snaps: three, and four with a Heat Check card in the offense (it used to light the
  * old On Fire a completion sooner) */
@@ -202,7 +211,8 @@ export function newGame(off: Offense, def: Defense, seed: string, drives = DRIVE
     turnovers: 0,
     pf: {},
     clock: drives <= 1 ? CLOCK : null,
-    defIQ
+    defIQ,
+    tend: NO_TENDENCY
   };
   g.ballOn = startSpot(g, 0);
   g.concept = conceptFor(g, 0);
@@ -233,17 +243,27 @@ export interface PlayChoice {
   run: RunPlay;
 }
 
-/** The three plays offered before a snap: two different pass plays and the down's run play. */
-export function choices(g: Game): PlayChoice[] {
-  const a = conceptFor(g, 0);
-  let b = a;
-  for (let i = 1; i < 10 && b === a; i++) b = conceptFor(g, i);
-  if (b === a) b = CONCEPTS[(CONCEPTS.indexOf(a) + 3) % CONCEPTS.length];
+/** The seed of the snap about to be called (the deal and the AI's call draw from it). */
+export const snapSeed = (g: Pick<Game, 'seed' | 'drive' | 'playNo'>) => g.seed + ':' + g.drive + ':' + g.playNo;
+
+/**
+ * The tray's three cards (nfl-5, coach.ts): as many passes as the down and distance call for (the
+ * AI's own run/pass table: three on third and long, one on third and short), the concepts that fit
+ * the distance and the runs after them, all from the snap's seed. `only` deals a drill's kind alone.
+ */
+export function choices(g: Game, only?: Call): PlayChoice[] {
+  const s = situation(g);
+  // (a run or throw drill deals three of its own kind)
+  const passes = only === 'run' ? 0 : only === 'pass' ? 3 : passCards(s);
   return [
-    { call: 'pass', concept: a, run: g.run },
-    { call: 'pass', concept: b, run: g.run },
-    { call: 'run', concept: a, run: g.run },
+    ...dealConcepts(snapSeed(g), s, passes).map((concept) => ({ call: 'pass' as const, concept, run: g.run })),
+    ...dealRuns(snapSeed(g), s, 3 - passes).map((run) => ({ call: 'run' as const, concept: g.concept, run }))
   ];
+}
+
+/** Coach Pick among the cards for this snap (nfl-5): from the situation and the shell the defense shows, never its real call. */
+export function coachFor(g: Game, cards: readonly PlayChoice[]) {
+  return coachPick(cards, situation(g), defenseCall(g).shown);
 }
 
 /** Line up one of the offered plays. */
@@ -257,9 +277,20 @@ export function startPlay(g: Game, call: Call): Play {
   const r = rng(hashString('play:' + g.seed + ':' + g.drive + ':' + g.playNo));
   const last = g.drive === g.drives - 1;
   const sides = last ? clutchSides(g.off, g.def) : { off: g.off, def: g.def };
-  const p = lineUp(sides.off, sides.def, call, g.concept, g.run, g.ballOn, g.ballX, r, g.defIQ);
+  const p = lineUp(sides.off, sides.def, call, g.concept, g.run, g.ballOn, g.ballX, r, g.defIQ, defenseCall(g));
   p.fire = onFire(g);
+  g.snapCall = { call, down: g.down };
   return p;
+}
+
+/**
+ * The defense's call for this snap (nfl-5, calls.ts): from its own seeded stream, so whatever the
+ * offense lines up (another card, an AUDIBLE, a flip) the defense keeps its call. Its sheet is its
+ * difficulty's (Rookie, Pro or Legend by defIQ).
+ */
+export function defenseCall(g: Game) {
+  const r = rng(hashString('dcall:' + g.seed + ':' + g.drive + ':' + g.playNo));
+  return callFor(situation(g), levelOfIQ(g.defIQ), r, g.tend);
 }
 
 export function fgDistance(g: Game) {
@@ -409,6 +440,9 @@ function settle(g: Game, end: PlayEnd): After {
     heatEvent(g, 'perfect', news);
   }
   g.chances += end.chances ?? 0;
+  // the defense remembers what the offense called (Legend's counters), flags and all
+  if (g.snapCall) g.tend = noteTendency(g.tend, g.snapCall.down, g.snapCall.call, end.caught && end.gain >= 15);
+  g.snapCall = undefined;
   const fl = flagged(g, end);
   if (fl) return { ...fl, fire: fireOf(news), heating: news.heating };
   const a = settlePlay(g, end, news);

@@ -120,24 +120,28 @@ describe('practice drills keep to their call', () => {
     expect([callAllowed(undefined, 'run'), callAllowed(null, 'pass')]).toEqual([true, true]);
   });
   it('never lets AUDIBLE turn a run drill into a pass (or a throw drill into a run), whatever the cards', () => {
-    const run = { call: 'run' as const },
-      pass = { call: 'pass' as const };
+    const run = { call: 'run' as const, concept: 'verts' as const, run: 'inside' as const },
+      pass = { call: 'pass' as const, concept: 'mesh' as const, run: 'inside' as const };
     for (const cards of [[run, run, run], [pass, pass, run], [run], [pass, run, pass]]) {
       for (const cur of cards) {
         const r = audibleTo(cur, cards, 'run');
         if (r?.kind === 'card') expect(cards[r.index].call).toBe('run');
-        if (r?.kind === 'book') expect(r.call).toBe('run');
+        if (r?.kind === 'book') expect(r.card.call).toBe('run');
         const t = audibleTo(cur, cards, 'throw');
         if (t?.kind === 'card') expect(cards[t.index].call).toBe('pass');
-        if (t?.kind === 'book') expect(t.call).toBe('pass');
+        if (t?.kind === 'book') expect(t.card.call).toBe('pass');
       }
     }
     // a run drill's cards are all runs: AUDIBLE does nothing at all
     expect(audibleTo(run, [run, run, run], 'run')).toBeNull();
     expect(audibleTo(pass, [pass, pass, pass], 'throw')).toBeNull();
-    // in a game it flips, to a card when one has the other call, else from the book
-    expect(audibleTo(pass, [pass, pass, run], undefined)).toEqual({ kind: 'card', index: 2 });
-    expect(audibleTo(run, [run, run, run], undefined)).toEqual({ kind: 'book', call: 'pass' });
+    // in a game it flips the picked card to its mirror (nfl-5): to the card when it's on the tray,
+    // else from the book; and back again
+    const slants = { call: 'pass' as const, concept: 'slants' as const, run: 'outside' as const };
+    const inside = { call: 'run' as const, concept: 'verts' as const, run: 'inside' as const };
+    expect(audibleTo(slants, [slants, pass, inside], undefined)).toEqual({ kind: 'card', index: 2 });
+    expect(audibleTo(slants, [slants, pass, run], undefined)).toEqual({ kind: 'book', card: { call: 'run', concept: 'slants', run: 'inside' } });
+    expect(audibleTo(inside, [inside, run, run], undefined)).toEqual({ kind: 'book', card: { call: 'pass', concept: 'slants', run: 'inside' } });
   });
   it('a run drill lined up from the real choices offers only runs (the tray never shows a pass)', () => {
     const man = (pos: string): FbPlayer => ({ id: pos, name: pos, tag: pos, num: null, ht: 74, wt: 220, pos, ovr: 75, a: {}, abil: [] });
@@ -146,7 +150,7 @@ describe('practice drills keep to their call', () => {
     const g = newGame(off, def, 'drill', 4);
     for (let down = 1; down <= 4; down++) {
       g.down = down;
-      const cs = choices(g).filter((c) => callAllowed('run', c.call));
+      const cs = choices(g, 'run').filter((c) => callAllowed('run', c.call));
       expect(cs.length).toBeGreaterThan(0);
       expect(cs.every((c) => c.call === 'run')).toBe(true);
     }

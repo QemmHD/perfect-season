@@ -10,7 +10,9 @@
 // bullet/touch/lob trajectory drives the real flight, lane defense, receiver lead and aim preview.
 // On a run the line drives its men away from the play's hole. A tackler winds up before he dives
 // (the runner can see it coming), and a juke as he leaves his feet fakes him out.
+import { rng } from '../../engine/rng';
 import { GOLD_AT, type Judgement, judge, type Ring, type RingWindow, windowHalf } from './shared-v2';
+import { alignment, type Called, CALLS, type DefSlot, landmark, type OffSlot, rotated, type Spots } from './calls';
 import type { Act, Body, Call, Concept, Defense, Dial, FbPlayer, Flag, Job, Move, Offense, PassType, Play, PlayEnd, Pt, RunInput, RunPlay } from './types';
 
 export const FIELD_W = 53.33;
@@ -202,9 +204,10 @@ function act(b: Body, a: Act, t: number) {
 
 /**
  * Line up a play at the line of scrimmage `los`, the ball at `x` (back to the near hash after a
- * play ends wide). The defense calls man (Cover 1) or zone (Cover 3).
+ * play ends wide). The defense plays `called` (calls.ts: one of eleven calls, the shell it shows
+ * and whether it tips a free rusher); without one, Cover 1 or Cover 3 as before nfl-5.
  */
-export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept, run: RunPlay, los: number, x: number, rand: () => number, defIQ = 0): Play {
+export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept, run: RunPlay, los: number, x: number, rand: () => number, defIQ = 0, called?: Called): Play {
   const bx = clamp(x, HASH_L, HASH_R);
   const bodies: Body[] = [];
   let id = 0;
@@ -224,54 +227,56 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
   const SL = add('O', off.wr[2], 'SL', bx - 7.5, los - 0.9, 'route');
   const Z = add('O', off.wr[1], 'Z', Math.min(FIELD_W - 4, bx + 13), los - 0.5, 'route');
   const TE = add('O', off.te, 'TE', bx + 4.2, los - 0.8, 'route');
-  // defense
-  const zone = rand() < 0.4;
-  const dl = [
-    add('D', def.dl[0], 'LE', bx - 3.9, los + 1, 'rush'),
-    add('D', def.dl[1], 'LDT', bx - 0.9, los + 1, 'rush'),
-    add('D', def.dl[2], 'RDT', bx + 0.9, los + 1, 'rush'),
-    add('D', def.dl[3], 'RE', bx + 4.6, los + 1, 'rush')
+  // defense: the call (nfl-5, calls.ts), drawn by the drive from the defense's own seeded stream.
+  // A bare lineUp (tests) keeps the old mix: Cover 1, or Cover 3 four times in ten.
+  const dc: Called = called ?? { call: CALLS[rand() < 0.4 ? 'c3' : 'c1'], shown: 'one', tell: false };
+  const zone = dc.call.coverage === 'zone';
+  const spots: Spots = { bx, los, X, Z, SL, TE, RB: rb };
+  // press: a corner presses more often the better he is at it (no cliff at a rating)
+  const press = (cb: FbPlayer) => (rand() < rt(cb.a.PRS, 60, 99) ? 1.5 : lerp(7.5, 5, rt(cb.a.MCV)));
+  const spot = alignment(dc.call, dc.shown, spots, (slot) => press(slot === 'CB1' ? def.cb[0] : def.cb[1]));
+  const offBy: Record<OffSlot, Body> = { X, Z, SL, TE, RB: rb };
+  const lineup: [DefSlot, FbPlayer][] = [
+    ['LE', def.dl[0]],
+    ['LDT', def.dl[1]],
+    ['RDT', def.dl[2]],
+    ['RE', def.dl[3]],
+    ['WLB', def.lb[0]],
+    ['MLB', def.lb[1]],
+    ['SLB', def.lb[2]],
+    ['CB1', def.cb[0]],
+    ['CB2', def.cb[1]],
+    ['FS', def.s[0]],
+    ['SS', def.s[1]]
   ];
-  const lbW = add('D', def.lb[0], 'WLB', bx - 4.2, los + 4.8, zone ? 'zone' : 'man');
-  const lbM = add('D', def.lb[1], 'MLB', bx + 0.3, los + 5.2, 'spy');
-  const lbS = add('D', def.lb[2], 'SLB', bx + 4.6, los + 4.6, zone ? 'zone' : 'man');
-  // press man: a corner presses more often the better he is at it (no cliff at a rating)
-  const press = (cb: FbPlayer) => (!zone && rand() < rt(cb.a.PRS, 60, 99) ? 1.5 : lerp(7.5, 5, rt(cb.a.MCV)));
-  const cb1 = add('D', def.cb[0], 'CB1', X.x, los + press(def.cb[0]), zone ? 'zone' : 'man');
-  const cb2 = add('D', def.cb[1], 'CB2', Z.x, los + press(def.cb[1]), zone ? 'zone' : 'man');
-  const fs = add('D', def.s[0], 'FS', bx, los + 14, 'zone');
-  const ss = add('D', def.s[1], 'SS', SL.x + 1, los + 8, zone ? 'zone' : 'man');
-  // who covers whom (man), or the zones (Cover 3: corners and the free safety deep thirds, the rest under)
-  if (zone) {
-    cb1.zone = { x: Math.max(6, X.x - 1), y: los + 18 };
-    cb2.zone = { x: Math.min(FIELD_W - 6, Z.x + 1), y: los + 18 };
-    fs.zone = { x: FIELD_W / 2, y: los + 20 };
-    lbW.zone = { x: bx - 9, y: los + 8 };
-    lbS.zone = { x: bx + 9, y: los + 8 };
-    ss.zone = { x: SL.x, y: los + 10 };
-  } else {
-    cb1.mark = X.id;
-    cb2.mark = Z.id;
-    ss.mark = SL.id;
-    lbS.mark = TE.id;
-    lbW.mark = rb.id;
-    fs.zone = { x: FIELD_W / 2, y: los + 18 };
+  const D = {} as Record<DefSlot, Body>;
+  for (const [slot, pl] of lineup) {
+    const j = dc.call.jobs[slot];
+    const b = add('D', pl, slot, spot[slot].x, spot[slot].y, j.kind);
+    if (j.kind === 'man') b.mark = offBy[j.on].id;
+    else if (j.kind === 'zone') {
+      // (each drop lands a little differently: a yard and a half either way, seeded)
+      const z = landmark(j.at, spots);
+      b.zone = { x: clamp(z.x + (rand() * 2 - 1) * 1.5, 2, FIELD_W - 2), y: Math.min(108, z.y + (rand() * 2 - 1) * 1.5) };
+    }
+    else if (j.kind === 'spy') b.mark = rb.id;
+    D[slot] = b;
   }
-  lbM.mark = rb.id;
-  // the rush: each lineman against his blocker; when he beats him depends on his moves against the pass block
+  const dl = [D.LE, D.LDT, D.RDT, D.RE];
+  const [lbW, lbM, lbS] = [D.WLB, D.MLB, D.SLB];
+  const [cb1, cb2, fs, ss] = [D.CB1, D.CB2, D.FS, D.SS];
+  // the run fit: each down lineman against the blocker across from him
   const blockerOf = [ol[0], ol[1], ol[3], ol[4]];
   dl.forEach((d, i) => {
-    const blk = blockerOf[i];
-    d.mark = blk.id;
-    d.blocker = blk.id;
-    d.winAt = rushWinAt(d.p, blk.p, rand, i === 1 || i === 2);
+    d.mark = blockerOf[i].id;
+    d.blocker = blockerOf[i].id;
   });
   const play: Play = {
     t: 0,
     call,
     concept,
     run,
-    coverage: zone ? 'zone' : 'man',
+    coverage: dc.call.coverage,
     los,
     bx,
     bodies,
@@ -296,20 +301,21 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     hole: bx + HOLE[run],
     defIQ
   };
+  // the rush's own stream, drawn before the ability rolls, so whether a man's ability is on never
+  // changes when the rush beats its blocks (the protection is worked out once the routes are given)
+  const rushRand = rng(Math.floor(rand() * 4294967296));
   // abilities in the zone this play
   for (const b of bodies) if (b.p.abil.length) b.on = b.p.abil.filter(() => rand() < ABILITY_ON);
-  // pass protection / edge rushers: the win comes later against a wall, sooner for an edge threat
-  dl.forEach((d, i) => {
-    const blk = blockerOf[i];
-    if (on(blk, 'pocket-wall')) d.winAt += 0.35;
-    if (on(d, 'edge-threat')) d.winAt = Math.max(1.6, d.winAt - 0.35);
-  });
   // routes (drawn before the snap so the player can read the play)
   const routes = CONCEPT_ROUTES[concept];
+  // (nfl-5: no route is run the same way twice: the stem a yard or so deeper or shorter and the
+  // break a little wider or flatter, seeded, so a concept against a call is a matchup, not a script)
   const give = (b: Body, kind: string) => {
     const s = b.x > bx ? 1 : -1;
     const r = routeOf(kind, s, -s);
-    b.route = r.pts.map((p) => ({ x: clamp(b.x + p.x, 1.5, FIELD_W - 1.5), y: b.y + p.y }));
+    const deep = 0.9 + 0.2 * rand();
+    const wide = 0.85 + 0.3 * rand();
+    b.route = r.pts.map((p) => ({ x: clamp(b.x + p.x * wide, 1.5, FIELD_W - 1.5), y: b.y + p.y * deep }));
     b.sit = !!r.sit;
   };
   give(X, routes[0]);
@@ -317,6 +323,19 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
   give(Z, routes[2]);
   give(TE, routes[3]);
   give(rb, routes[4]);
+  // the protection (nfl-5): who blocks whom, and who comes free
+  const free = call === 'pass' ? protect(play, ol, routes, rushRand) : [];
+  play.dcall = {
+    id: dc.call.id,
+    name: dc.call.name,
+    family: dc.call.family,
+    shell: dc.call.shell,
+    shown: dc.shown,
+    rotated: rotated(dc.call, dc.shown),
+    free,
+    flame: dc.tell && free.length ? free[0] : null,
+    tell: dc.tell
+  };
   if (call === 'run') {
     for (const b of [X, SL, Z, TE]) {
       b.route = [{ x: b.x, y: b.y + 4 }];
@@ -351,10 +370,10 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     // secondaries (AWR, PRC) bust less, and so does a harder defense, but never not at all: it's a
     // real source of big plays for any offense (the weaker one included), and the pilot or the
     // player still has to see it and hit it.
-    const cover = zone ? [cb1, cb2, fs] : [cb1, cb2, ss, lbS, lbW];
+    const cover = bodies.filter((b) => b.side === 'D' && (zone ? b.job === 'zone' && !!b.zone && b.zone.y - los >= 15 : b.job === 'man'));
     const smarts = (b: Body) => 0.5 * rt(b.p.a.AWR, 45, 99) + 0.5 * rt(b.p.a.PRC, 45, 99);
     const iq = cover.reduce((n, b) => n + smarts(b), 0) / cover.length;
-    if (rand() < clamp(lerp(0.075, 0.025, iq) * (1 - 0.4 * defIQ), 0.012, 0.1)) {
+    if (cover.length && rand() < clamp(lerp(0.075, 0.025, iq) * (1 - 0.4 * defIQ), 0.012, 0.1)) {
       // the weakest reader is the likeliest to bust
       const w = cover.map((b) => 1.25 - smarts(b));
       let u = rand() * w.reduce((n, x) => n + x, 0);
@@ -367,6 +386,68 @@ export function lineUp(off: Offense, def: Defense, call: Call, concept: Concept,
     }
   }
   return play;
+}
+
+/** how far from the ball (yards across) a rusher can line up and still be picked up by a lineman */
+export const OL_REACH = 5.6;
+
+/**
+ * The pass protection for a lined-up play (nfl-5): who blocks whom, and who comes free. Each down
+ * lineman rushing gets the blocker across from him; an extra rusher inside the tackles gets the
+ * nearest lineman with nobody to block (the center first, or a tackle whose end dropped). Then a
+ * back or tight end on a check release stays in for the next one, and the tight end takes one off
+ * his own edge (both give up their routes). Anyone left over is free from the snap. When a man wins
+ * depends on his moves against his blocker (rushWinAt), plus the run up to the line from where he
+ * stood. Returns the free rushers' ids.
+ */
+function protect(p: Play, ol: Body[], routes: readonly string[], rand: () => number): number[] {
+  const rushers = p.bodies.filter((b) => b.side === 'D' && b.job === 'rush');
+  const taken = new Set<number>();
+  const home: Record<string, string> = { LE: 'LT', LDT: 'LG', RDT: 'RG', RE: 'RT' };
+  const assign = (d: Body, blk: Body) => {
+    taken.add(blk.id);
+    d.mark = blk.id;
+    d.blocker = blk.id;
+    const approach = Math.max(0, d.y - p.los - 1) / speedOf(d.p);
+    d.winAt = rushWinAt(d.p, blk.p, rand, Math.abs(d.x - p.bx) < 2) + approach;
+    if (on(blk, 'pocket-wall')) d.winAt += 0.35;
+    if (on(d, 'edge-threat')) d.winAt = Math.max(1.6, d.winAt - 0.35);
+  };
+  const left: Body[] = [];
+  for (const d of rushers) {
+    const blk = ol.find((o) => o.slot === home[d.slot]);
+    if (blk) assign(d, blk);
+    else left.push(d);
+  }
+  const extra: Body[] = [];
+  for (const d of left) {
+    const open = Math.abs(d.x - p.bx) <= OL_REACH ? ol.filter((o) => !taken.has(o.id) && Math.abs(o.x - d.x) <= 4.5).sort((a, b) => Math.abs(a.x - d.x) - Math.abs(b.x - d.x))[0] : undefined;
+    if (open) assign(d, open);
+    else extra.push(d);
+  }
+  const rb = p.rb;
+  const te = p.bodies.find((b) => b.slot === 'TE')!;
+  const stayIn = (b: Body) => {
+    b.job = 'block';
+    b.route = [];
+    b.sit = true;
+  };
+  const free: number[] = [];
+  for (const d of extra) {
+    const checker = [rb, te].find((b, i) => routes[i === 0 ? 4 : 3] === 'check' && !taken.has(b.id));
+    const edge = !taken.has(te.id) && Math.sign(d.x - p.bx) === Math.sign(te.x - p.bx) && Math.abs(d.x - te.x) <= 6 ? te : undefined;
+    const blk = checker ?? edge;
+    if (blk) {
+      assign(d, blk);
+      stayIn(blk);
+      continue;
+    }
+    d.mark = null;
+    d.blocker = undefined;
+    d.winAt = 0;
+    free.push(d.id);
+  }
+  return free;
 }
 
 /** Mirror a complete formation before the snap, retaining players, assignments and ratings. */
@@ -1262,9 +1343,13 @@ function offense(p: Play, b: Body, dt: number, pull: Pt | null) {
     const assigned = p.call === 'run' && isLine(b) && !climbTo ? p.bodies.find((d) => d.side === 'D' && d.mark === b.id && t < d.heldUntil) : undefined;
     const target = assigned ?? climb ?? p.bodies.filter((d) => d.side === 'D' && t >= d.stunUntil && d.y > b.y - 2.5).sort((a1, a2) => dist(a1, b) - dist(a2, b))[0];
     const line = isLine(b);
+    const passPro = p.call === 'pass' && p.phase !== 'run';
+    // in pass protection a lineman (or a back or tight end kept in, nfl-5) gives ground to his man,
+    // staying between him and the quarterback
+    const man = passPro ? p.bodies.find((d) => d.mark === b.id && d.job === 'rush' && t < d.winAt) : undefined;
     if (target) {
       const d = dist(target, b);
-      if (d < 1.3 && target.heldUntil < t && b.heldUntil < t && (p.call === 'run' || p.phase === 'run' || !line)) {
+      if (!man && d < 1.3 && target.heldUntil < t && b.heldUntil < t && (p.call === 'run' || p.phase === 'run' || !line)) {
         // engaged: held a while by his run blocking (a lineman far longer than a receiver)
         const blk = line || b.slot === 'TE' ? rt(b.p.a.RBK) : 0.15;
         const stopper = on(target, 'run-stopper');
@@ -1282,10 +1367,7 @@ function offense(p: Play, b: Body, dt: number, pull: Pt | null) {
           p.events.push('pancake');
         }
       }
-      const passPro = p.call === 'pass' && p.phase !== 'run';
-      // in pass protection he gives ground to his man, staying between him and the quarterback
-      const man = passPro && line ? p.bodies.find((d) => d.mark === b.id && d.job === 'rush' && t < d.winAt) : undefined;
-      if (man) steerTo(b, man.x + clamp(qb.x - man.x, -0.3, 0.3), man.y - 0.95, 2.4, dt);
+      if (man) steerTo(b, man.x + clamp(qb.x - man.x, -0.3, 0.3), man.y - 0.95, line || dist(b, man) < 1.6 ? 2.4 : speedOf(b.p) * 0.8, dt);
       else if (passPro && line) steerTo(b, b.x + clamp(target.x - b.x, -0.4, 0.4), Math.max(p.los - 2.8, b.y - 0.02), 1.5, dt);
       else steerTo(b, target.x, target.y - 0.6, speedOf(b.p) * 0.8, dt);
     } else steerTo(b, b.x, b.y + 1, 3, dt);
@@ -1460,7 +1542,11 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
     const ty = p.carrier === qb ? qb.y : b.y;
     const free = p.call === 'pass' ? t >= b.winAt : !held;
     if (free) steerTo(b, tx, ty, speedOf(b.p), dt);
-    else if (p.call === 'pass' && p.carrier === qb) steerTo(b, b.x + clamp(tx - b.x, -0.3, 0.3), lerp(p.los + 0.6, qb.y + POCKET, clamp(t / b.winAt, 0, 1)), 1.8, dt);
+    else if (p.call === 'pass' && p.carrier === qb) {
+      // (a blitzer from the second level runs up to the line before he's walking anyone back)
+      const ty = lerp(p.los + 0.6, qb.y + POCKET, clamp(t / b.winAt, 0, 1));
+      steerTo(b, b.x + clamp(tx - b.x, -0.3, 0.3), ty, b.y > ty + 1 ? speedOf(b.p) * 0.9 : 1.8, dt);
+    }
     else steerTo(b, b.x + clamp(tx - b.x, -0.3, 0.3), Math.max(p.los - 1.4, b.y - 0.4), 0.7, dt);
     act(b, free ? 'rush' : 'block', t);
     move(b, dt);
@@ -1504,7 +1590,9 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
     const threat = deep ? mine.sort((a1, a2) => a2.y - a1.y)[0] : mine.sort((a1, a2) => dist(a1, z) - dist(a2, z))[0];
     if (threat && t > 0.6) {
       const at = seen(threat, b);
-      if (deep) steerTo(b, lerp(z.x, at.x, 0.55 + 0.3 * read), Math.max(at.y + lerp(2.4, 1.6, read), z.y - 2), sp, dt);
+      // (a deep zone stays over the top of where the threat is going, not where he is: half a
+      // second of his speed up the field ahead of him, less for a sharper reader, nfl-5)
+      if (deep) steerTo(b, lerp(z.x, at.x, 0.55 + 0.3 * read), Math.max(at.y + Math.max(0, seenVel(threat, b).y) * lerp(0.6, 0.45, read) + lerp(2.4, 1.6, read), z.y - 2), sp, dt);
       else steerTo(b, (at.x + z.x) / 2 + (at.x - z.x) * (0.1 + read * 0.25), Math.max(at.y + lerp(2.3, 1.5, read), p.los + 1), sp, dt);
     } else steerTo(b, z.x, z.y, sp * 0.85, dt);
     act(b, 'backpedal', t);

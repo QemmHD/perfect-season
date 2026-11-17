@@ -1,5 +1,6 @@
 // Football v2: the players and a play's state. Field yards: x across (0 to 53.3, the sidelines),
 // y up the field from your own goal line (the far end zone is 100 to 110). Your offense goes up.
+import type { DefCallId, Family, Shell } from './calls';
 
 /** A player rated Madden-style: attributes 0-99 keyed by their short names (SPD, THP, CTH, MCV...). */
 export interface FbPlayer {
@@ -168,12 +169,31 @@ export interface RingNote {
   dial: Dial | null;
 }
 
+/** nfl-5: the defense's call on a play (calls.ts), as the screen, the coach and the feedback see it. */
+export interface DefView {
+  id: DefCallId;
+  name: string;
+  family: Family;
+  /** the shell it plays, and the shell it showed before the snap (a rotation when they differ) */
+  shell: Shell;
+  shown: Shell;
+  rotated: boolean;
+  /** rushers (body ids) nobody in the protection is assigned to: they come free */
+  free: number[];
+  /** the free rusher the FREE RUSHER flame is over before the snap, if the defense tipped it */
+  flame: number | null;
+  /** the defense tips a free rusher on this snap (whichever play the offense lines up) */
+  tell: boolean;
+}
+
 export interface Play {
   t: number;
   call: Call;
   concept: Concept;
   run: RunPlay;
   coverage: 'man' | 'zone';
+  /** nfl-5: the defense's call (always set by lineUp) */
+  dcall?: DefView;
   los: number;
   bx: number;
   bodies: Body[];

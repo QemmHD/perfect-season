@@ -1,5 +1,6 @@
 // Codex: screen-relative, full two-axis movement. Field y increases toward the far end zone.
 import type { Pt } from './types';
+import { type Card, cardKey, mirrorOf } from './coach';
 
 /** Radial dead zone removes thumb jitter; full deflection retains the full speed budget. */
 export function screenRunInput(x: number, y: number, view: 'end' | 'side'): Pt {
@@ -83,11 +84,15 @@ export function callAllowed(drill: string | null | undefined, call: 'run' | 'pas
   return false;
 }
 
-/** What AUDIBLE does: line up the picked card's opposite call, if the drill allows it. */
-export type Audible = { kind: 'card'; index: number } | { kind: 'book'; call: 'run' | 'pass' } | null;
-export function audibleTo(cur: { call: 'run' | 'pass' }, cards: readonly { call: 'run' | 'pass' }[], drill: string | null | undefined): Audible {
-  const call = cur.call === 'pass' ? 'run' : 'pass';
-  if (!callAllowed(drill, call)) return null;
-  const index = cards.findIndex((c) => c.call === call);
-  return index >= 0 ? { kind: 'card', index } : { kind: 'book', call };
+/**
+ * What AUDIBLE does (nfl-5): line up the picked card's run/pass mirror out of the same formation
+ * (coach.ts MIRROR), if the drill allows its call: the card on the tray when it's there, else from
+ * the book.
+ */
+export type Audible = { kind: 'card'; index: number } | { kind: 'book'; card: Card } | null;
+export function audibleTo(cur: Card, cards: readonly Card[], drill: string | null | undefined): Audible {
+  const to = mirrorOf(cur);
+  if (!callAllowed(drill, to.call)) return null;
+  const index = cards.findIndex((c) => cardKey(c) === cardKey(to) && c.call === to.call);
+  return index >= 0 ? { kind: 'card', index } : { kind: 'book', card: to };
 }
