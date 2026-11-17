@@ -378,3 +378,24 @@ in `docs/studio-overhaul/soccer.md` (soccer-4); in short:
 - **Render-only fields** (§5.5): `kickFoot`, `passKind` (shot, header, pen, fk), `shotKind`, `power`,
   `contact`, `diveHeight`, `keeperSet`, `slide`. `xg.ts` is display data (StatsBomb Open Data, see
   `docs/CREDITS.md`).
+
+### Studio overhaul soccer-5: touch dribbling, shielding and defenders who contain (Claude, 2026-11-16)
+
+The numbers and the tests are in `docs/studio-overhaul/soccer.md` (soccer-5). In short:
+- **The ball rolls between touches** (`engine.ts` `TOUCH`, `dribbleBall`, `takeTouch`; `ratings.ts` `touchOf`):
+  - the dribbler knocks it out along his run on each touch beat (every 2 strides and 0.6–1.0 m ahead at a jog; every 5–6 and 3–5 m at a sprint; shortest with close control, the stick part-way);
+  - DRI shortens the touch;
+  - between touches he runs onto it;
+  - a pass or shot asked for with it out is played as he gets back to it (`Attack.pending`);
+  - he turns no sharper than `turnRate` lets him;
+  - a defender's body slows him by PHY;
+  - with the stick back toward his own goal and a man on him he shields (`'shield'`, `shieldBreak`).
+- **Defenders contain and poke** (`TACKLE`, `tackles`, `resolvePoke`):
+  - the first man jockeys goal-side, facing the ball; the second covers the shooting lane inside 22 m;
+  - nobody tackles a ball tight at the feet. A tackle comes only at a ball exposed between touches, a sharp turn, a shield or a last-ditch breakaway, after the read and a 0.25 s wind-up;
+  - the chance is tackleWin (scale 20, 0.15–0.85) × angle × exposure;
+  - fouls are R-3's formula, and a breakaway foul from behind is a yellow.
+- **A sprint touch can't be gold:** shooting onto a ball knocked out at a sprint is amber `'stride'`.
+- **The autopilot** keeps the ball at close control near men, sprints only into space, reads passes at its feet (to the man it chose), plays through balls into space, switches play and waits for a clear look.
+- **`skillStars(p)`** is the single source for skill stars.
+- **Deferred to soccer-6:** the acceleration archetypes.

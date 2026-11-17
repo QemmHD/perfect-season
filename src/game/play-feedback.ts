@@ -133,14 +133,29 @@ export function footballFeedback(
   };
 }
 /** What kept a soccer ring from gold, in the read-out (soccer-4). */
-const SOCCER_RING: Record<string, string> = { pressure: 'Pressure', first: 'Across the body', header: 'Header too far out', angle: 'Tight angle', range: 'Too far' };
+const SOCCER_RING: Record<string, string> = { pressure: 'Pressure', first: 'Across the body', header: 'Header too far out', angle: 'Tight angle', range: 'Too far', stride: 'On the run' };
 /** Claude 2026-11-16 (studio overhaul soccer-4): the gold ring's reasons, blocks, claims and parries. */
 export function soccerFeedback(a: Attack): PlayFeedback {
   const s = a.lastShot,
     e = a.end;
   const text = e?.text ?? '';
-  const next =
-    e?.kind === 'O'
+  // soccer-5: how the ball was won off you (between touches, a heavy touch), a shield, a yellow card
+  const tk = a.tackled;
+  const lostTouch = !!a.lostTouch;
+  const dribble =
+    e?.kind === 'L' && tk && tk.poke
+      ? 'TACKLED BETWEEN TOUCHES. He poked it while the ball was off your feet. Near a defender, ease the stick part-way for close control, or pass.'
+      : e?.kind === 'L' && tk
+        ? 'TACKLED. He read the touch. Take it away from his side, or shield it: stick back toward your own goal.'
+        : e?.kind === 'L' && lostTouch
+          ? 'HEAVY TOUCH. At a sprint the ball runs metres ahead. Jog near defenders and sprint only into space.'
+          : a.yellows?.length
+            ? 'YELLOW. Their defender fouled you from behind on a breakaway. Running at the last man pays.'
+            : a.shielded
+              ? 'SHIELDED. Your back to him kept the ball. Hold it until help arrives, then lay it off.'
+              : null;
+  const next = dribble ??
+    (e?.kind === 'O'
       ? 'Release the pass before your runner crosses the last defender, or use a runner starting deeper.'
       : e?.kind === 'T'
         ? 'Move the ball forward earlier. A quick pass can beat a defender without spending sprint energy.'
@@ -150,7 +165,9 @@ export function soccerFeedback(a: Attack): PlayFeedback {
             ? 'TOO FAR. Past his range the ring is red and can never be gold. Carry it closer before you shoot.'
             : s && !s.greened && s.why === 'pressure'
               ? 'PRESSURE. With a defender within 2 m the ring can’t be gold. Take a touch away from him or pass first.'
-              : s && !s.greened && s.why === 'first'
+              : s && !s.greened && s.why === 'stride'
+                ? 'ON THE RUN. A sprint knocks the ball metres ahead, and a shot struck onto it can’t be gold. Ease off and get it to your feet first.'
+                : s && !s.greened && s.why === 'first'
                 ? 'FIRST TIME ACROSS YOUR BODY. Turning the ball over 90° first time can’t be gold. Meet it facing goal, or take a touch.'
                 : text.startsWith('KEEPER CLAIMS')
                   ? 'KEEPER CLAIM. He reached the cross first. Play it away from him, behind the defence or to the far post.'
@@ -162,7 +179,7 @@ export function soccerFeedback(a: Attack): PlayFeedback {
                         ? 'Keep creating that angle. Watch the keeper before repeating the same finish.'
                         : s
                           ? 'A gold release goes exactly where you aim. Pick the side the keeper leaves open, not the one he stands on.'
-                          : 'Use PASS to move away from pressure, or THRU for a runner moving into the space behind the defense.';
+                          : 'Use PASS to move away from pressure, or THRU for a runner moving into the space behind the defense.');
   const ring = s ? (s.greened ? 'Gold' : s.ring === 'red' ? 'Red · Too far' : s.why ? 'Amber · ' + (SOCCER_RING[s.why] ?? s.why) : s.ring === 'gold' ? 'Gold · missed the window' : 'Amber') : '';
   return {
     title: 'Last attack',
@@ -178,6 +195,8 @@ export function soccerFeedback(a: Attack): PlayFeedback {
             ...(s.xg !== undefined ? [{ label: 'xG', value: s.xg.toFixed(2) }] : []),
           ]
         : []),
+      ...(tk ? [{ label: 'Won off you', value: tk.poke ? 'Between touches · ' + tk.gap.toFixed(1) + ' m out' : 'At your feet' }] : []),
+      ...(a.yellows?.length ? [{ label: 'Cards', value: a.yellows.length + ' yellow' }] : []),
       { label: 'Sprint energy', value: Math.round(a.stamina * 100) + '%' },
     ],
     next,

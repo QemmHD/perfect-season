@@ -119,13 +119,96 @@ export function jumpReach(p: SoccerPlayer, htCm = p.ht): number {
 
 /**
  * A tackle's chance to win the ball: DEF (and a little PHY) against DRI (and a little PHY), a
- * logistic around even, bounded to 10-90%. Sprinting with the ball costs the dribbler 6 points of
- * control; the defense's difficulty is worth up to 5.
+ * logistic around even, bounded to 15-85%. Sprinting with the ball costs the dribbler 6 points of
+ * control; the defense's difficulty is worth up to 5. B-2 (Claude 2026-11-16, studio overhaul
+ * soccer-5): the logistic's scale went from 11 to 20 points and the bounds from 10-90% to 15-85%, so a
+ * 10-point gap is worth about 0.70 (it was 0.83) and a 30-point one about 0.85: better cards win more
+ * often, never always (plan P7: 0.55-0.75 at a 10-point gap). The engine multiplies it by the angle
+ * and by how exposed the ball is between touches (engine.ts TACKLE).
  */
+export const TACKLE_SCALE = 20;
 export function tackleWin(def: SoccerPlayer, att: SoccerPlayer, sprinting: boolean, defIQ: number): number {
   const d = 100 * rt(def.a.DEF) + 18 * (rt(def.a.PHY) - 0.5) + 5 * defIQ;
   const c = 100 * rt(att.a.DRI) + 12 * (rt(att.a.PHY) - 0.5) - (sprinting ? 6 : 0);
-  return clamp(1 / (1 + Math.exp(-(d - c) / 11)), 0.1, 0.9);
+  return clamp(1 / (1 + Math.exp(-(d - c) / TACKLE_SCALE)), 0.15, 0.85);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   The man on the ball (Claude 2026-11-16, studio overhaul soccer-5; V2 B.3.4, audit B-1). The ball is
+   knocked ahead on touch beats and rolls between them (engine.ts TOUCH), so these say how far and how
+   often. */
+
+/** Off the sprint, a man on the ball runs at this share of his top speed (soccer-5; JOG off the ball). */
+export const DRIBBLE_JOG = 0.75;
+/** One running step (m) at a speed (m/s): about 1.6 m at a jog, 2.1 m at a sprint. Stride rate is
+ * speed / this (3.3 steps a second at a jog, 4.3 at a sprint). */
+export function strideLen(speed: number): number {
+  return clamp(0.9 + 0.13 * speed, 0.95, 2.2);
+}
+/**
+ * A dribble touch: how many strides until the next one, and how far (m) the ball runs out beyond the
+ * foot it left (the most it gets ahead of him before he catches it). By pace: a touch every 2 strides
+ * and 0.45 m out at a jog (the ball 0.6-1.0 m ahead), every 3-4 and about 1.4 m at a run, every 5-6 and
+ * 3.4 m at a sprint (3-5 m ahead); close control (the stick part-way, 0.5-0.85) every 1.5 strides and
+ * 0.2 m. DRI shortens it: a DRI 95 touch goes about 0.74x as far as a DRI 60 one (plan G7). `ratio` is
+ * his speed as a share of top speed.
+ */
+export const TOUCH_PACE = { jog: { strides: 2, out: 0.45 }, run: { strides: 3.5, out: 1.4 }, sprint: { strides: 5.5, out: 3.4 }, close: { strides: 1.5, out: 0.2 } };
+export function touchScale(p: SoccerPlayer): number {
+  return lin(1.2, 0.75, Math.min(1.1, rt(p.a.DRI)));
+}
+export function touchOf(p: SoccerPlayer, ratio: number, close: boolean): { strides: number; out: number } {
+  const k = touchScale(p);
+  if (close) return { strides: TOUCH_PACE.close.strides, out: TOUCH_PACE.close.out * k };
+  const { jog, run, sprint } = TOUCH_PACE;
+  // jog up to 0.78 of top speed, a run at 0.87, a sprint from 0.95
+  const u = ratio <= 0.78 ? 0 : ratio >= 0.95 ? 2 : ratio < 0.87 ? (ratio - 0.78) / 0.09 : 1 + (ratio - 0.87) / 0.08;
+  const lo = u < 1 ? jog : run;
+  const hi = u < 1 ? run : sprint;
+  const f = u < 1 ? u : u - 1;
+  // a better dribbler touches it a little more often too (fewer strides between touches)
+  return { strides: lin(lo.strides, hi.strides, f) * Math.sqrt(k), out: lin(lo.out, hi.out, f) * k };
+}
+/**
+ * How fast he can turn with the ball (rad/s) at a speed: the sideways grip a = lerp(8, 12) m/s² by
+ * DRI and PAC, over the speed (a 9 m/s sprinter turns about 1 rad/s, a 5 m/s jogger 2), never slower
+ * than 0.8 and free below 2 m/s. A turn of more than 120° at a sprint needs a brake first (engine.ts).
+ */
+export function turnRate(p: SoccerPlayer, speed: number): number {
+  if (speed < 2) return 12;
+  const grip = lin(8, 12, Math.min(1, rt(p.a.DRI) * 0.7 + rt(p.a.PAC) * 0.3));
+  return Math.max(0.8, grip / speed);
+}
+/** Body contact while he dribbles: he keeps this share of his pace, by the PHY difference (0.60-0.85). */
+export function contactPace(self: SoccerPlayer, other: SoccerPlayer): number {
+  return clamp(0.725 + 0.0075 * ((self.a.PHY ?? 60) - (other.a.PHY ?? 60)), 0.6, 0.85);
+}
+/** A shield (his back to the defender, the ball on the far foot): the defender's chance that one try
+ * through him wins it, by the PHY difference and a little DEF (plan G9: a shield holds 2 s in ≥ 60% of
+ * tries at PHY +10 and ≤ 35% at PHY −10). */
+export function shieldBreak(def: SoccerPlayer, att: SoccerPlayer): number {
+  const diff = (att.a.PHY ?? 60) - (def.a.PHY ?? 60) - 0.15 * ((def.a.DEF ?? 60) - 70);
+  return clamp(0.78 / (1 + Math.exp(diff / 6.5)), 0.05, 0.75);
+}
+/**
+ * A foul from a mistimed tackle (R-3, soccer-5; it was up to 40%): 2% plus 11% for a poor tackler, 10%
+ * from behind, 4% against a good dribbler, less for a sharper defence, bounded 1.5-20%.
+ */
+export function foulChance(def: SoccerPlayer, att: SoccerPlayer, behind: boolean, defIQ: number): number {
+  return clamp(0.02 + 0.11 * (1 - Math.min(1, rt(def.a.DEF))) + (behind ? 0.1 : 0) + 0.04 * rt(att.a.DRI) - 0.05 * defIQ, 0.015, 0.2);
+}
+/**
+ * Skill stars (1-5, plan §5.10; the single source the card faces and TRICK read): DRI 88+ → 5, 80-87 →
+ * 4, 70-79 → 3, 60-69 → 2, else 1, for wingers, attacking midfielders and strikers; full-backs and
+ * midfielders top out at 4, centre-backs and keepers at 2.
+ */
+export function skillStars(p: SoccerPlayer): number {
+  if (p.keeper) return 1;
+  const d = p.a.DRI ?? 0;
+  const s = d >= 88 ? 5 : d >= 80 ? 4 : d >= 70 ? 3 : d >= 60 ? 2 : 1;
+  const att = p.pos2.some((x) => x === 'W' || x === 'AM' || x === 'ST');
+  if (att) return s;
+  return Math.min(s, p.pos === 'CB' ? 2 : 4);
 }
 /** How far a defender reaches for a passing ball (m), and his chance to cut it out at a speed. */
 export function interceptReach(p: SoccerPlayer): number {

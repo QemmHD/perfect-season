@@ -379,6 +379,9 @@ function animOf(b: Body, t: number, look: Look, m: Memo): Anim {
     case 'tackle':
       if (since < 0.9) return clip('dive', DIVE(since));
       break;
+    // merge (players-5/8 routing; soccer-5 stand-in): a poke's wind-up as the start of a kick
+    case 'poke':
+      return clip('kick', KICK(Math.min(0.2, since)), 1);
     case 'dive':
       return clip('dive', DIVE(since));
     case 'down':
@@ -540,6 +543,8 @@ export class SoccerRenderer {
     const grounded = b.act === 'tackle' || b.act === 'down' || b.act === 'dive';
     let dir = { x: b.fx, y: b.fy };
     if (b.role === 'gk' && b.act === 'dive') dir = { x: Math.sign(b.vx) || 1, y: 0 };
+    // merge (players-5 routing; soccer-5 stand-in): a jockeying defender faces the ball, not his run
+    else if ((b.act === 'jockey' || b.act === 'poke') && b.look && Math.hypot(b.look.x - b.x, b.look.y - b.y) > 0.3) dir = { x: (b.look.x - b.x) / Math.hypot(b.look.x - b.x, b.look.y - b.y), y: (b.look.y - b.y) / Math.hypot(b.look.x - b.x, b.look.y - b.y) };
     if (!grounded || b.role === 'gk') {
       const target = Math.atan2(dir.y, dir.x);
       const old = Math.atan2(memo.face.y, memo.face.x);
@@ -1370,7 +1375,7 @@ export function placeArrows(mates: readonly { id: number; x: number; y: number }
 }
 
 /** The ring's word over the arc when it can't be gold (soccer-4). */
-const RING_TAG: Record<RingWhy, string> = { range: 'TOO FAR', pressure: 'PRESSURE', first: 'ACROSS BODY', header: 'TOO FAR OUT', angle: 'TIGHT ANGLE' };
+const RING_TAG: Record<RingWhy, string> = { range: 'TOO FAR', pressure: 'PRESSURE', first: 'ACROSS BODY', header: 'TOO FAR OUT', angle: 'TIGHT ANGLE', stride: 'ON THE RUN' };
 
 /** The ground rings' colours (V2 C.1.3): you, the pass's man, the defender on the ball, the rival's taker. */
 export const RING = { gold: '#f6b93b', teal: '#4fe3c1', red: '#ff5d5d', rival: '#a78bfa' } as const;

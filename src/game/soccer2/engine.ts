@@ -13,7 +13,10 @@ import { hashString, rng } from '../../engine/rng';
 import {
   accelOf,
   blockChance,
+  contactPace,
+  DRIBBLE_JOG,
   dribblePace,
+  foulChance,
   gkArm,
   gkCatch,
   gkDive,
@@ -32,9 +35,13 @@ import {
   passError,
   rt,
   shotCone,
+  shieldBreak,
   shotSpeed,
+  strideLen,
   tackleWin,
   topSpeed,
+  touchOf,
+  turnRate,
 } from './ratings';
 import type { Act, Attack, AttackEnd, Ball, Body, Meter, PassKind, Pt, RingWhy, Scenario, ShotInfo, ShotRelease, SoccerPlayer, Squad } from './types';
 // The gold ring's window maths (pure: v2/perfect.ts, nba's perfect.ts at merge). It is the one V2
@@ -632,12 +639,17 @@ export function passPlan(a: Attack, kind: PassKind, dir: Pt | null): PassPlan | 
  * from a corner); through: into the space ahead of a runner. `free` (a person's pass, Claude
  * 2026-11-02): it goes the stick's way with a gentle assist (passPlan) instead of to the teammate
  * nearest that way; the autopilot and a corner's "stick picks the man" keep the teammate pick. */
-export function pass(a: Attack, how: PassKind | 'loftedThrough', dir: Pt | null, free = false): boolean {
-  if (a.end || a.phase !== 'live' || a.strike || a.kick || a.meter) return false;
+export function pass(a: Attack, how: PassKind | 'loftedThrough', dir: Pt | null, free = false, toId?: number): boolean {
+  if (a.end || a.phase !== 'live' || a.strike || a.kick || a.meter || a.pending) return false;
   const sp = a.setPiece;
   const c = ownerOf(a) ?? (sp && a.taker !== null ? a.bodies[a.taker] : null);
   if (!c || (sp && sp.kind === 'penalty')) return false;
   if (sp && dist(c, sp.spot) > 1.8) return false;
+  // the ball's out between touches (soccer-5): he plays it as he gets back to it
+  if (!sp && a.ball.owner === c.id && c.role !== 'gk' && dist(a.ball, c) > TOUCH.reach) {
+    a.pending = { kind: 'pass', how, dir: dir ? { x: dir.x, y: dir.y } : null, free, at: a.t, to: toId };
+    return true;
+  }
   // the lofted through ball (THRU held; Claude 2026-11-16, soccer-2, a person's pass only: the
   // autopilot never plays it, so no AI simulation changes): a through ball's runner and space, in the air
   const loftThru = how === 'loftedThrough';
@@ -646,7 +658,9 @@ export function pass(a: Attack, how: PassKind | 'loftedThrough', dir: Pt | null,
   const from = { x: a.ball.x, y: a.ball.y };
   const corner = sp?.kind === 'corner';
   const plan = free && !corner ? passPlan(a, kind, dir) : null;
-  const to = plan ? plan.to : passTarget(a, dir, kind);
+  // (the autopilot names the man it read the pass for: soccer-5, AI-1; else the man nearest that way)
+  const named = toId !== undefined && !corner ? a.bodies[toId] : undefined;
+  const to = plan ? plan.to : named && named.side === 'A' && named !== c ? named : passTarget(a, dir, kind);
   if (!plan && !to) return false;
   const lofted = kind === 'lofted' || (corner && kind !== 'ground') || loftThru;
   const spot = plan ? plan.spot : passSpot(a, from, to!, kind);
@@ -659,7 +673,10 @@ export function pass(a: Attack, how: PassKind | 'loftedThrough', dir: Pt | null,
   const rv = a.recv && a.recv.by === c.id && a.t - a.recv.at < FIRST_TIME.window ? a.recv : null;
   const pd = norm(spot.x - from.x, spot.y - from.y);
   const ft = rv ? firstTimeMult((Math.acos(clamp(rv.dx * pd.x + rv.dy * pd.y, -1, 1)) * 180) / Math.PI) : 1;
-  const err = (passError(p) * (pressed ? 1.35 : 1) * (a.sprinting ? 1.15 : 1) * ft * Math.PI) / 180;
+  // (soccer-5: a lofted ball or a cross is ×1.2 off at full sprint and ×1.3 under pressure; a ground
+  // pass ×1.15 and ×1.35 as before)
+  const loftErr = kind === 'lofted' || loftThru || (corner && kind !== 'ground');
+  const err = (passError(p) * (pressed ? (loftErr ? 1.3 : 1.35) : 1) * (a.sprinting ? (loftErr ? 1.2 : 1.15) : 1) * ft * Math.PI) / 180;
   const ang = gauss(a.rand) * err;
   const d = dist(from, spot);
   const dirv = norm(spot.x - from.x, spot.y - from.y);
@@ -700,7 +717,8 @@ export function pass(a: Attack, how: PassKind | 'loftedThrough', dir: Pt | null,
  * clamped (0.35 s at 11 m or nearer, 0.62 s at 25 m or further). Amber (no guarantee: timing only
  * narrows the cone): a defender within `pressure` m; a first-time hit that turns the ball more than
  * `firstAcross`° across the body; a header from beyond `headerFar` m; inside `wideIn` m from wider than
- * `wideAng` rad off the goal's centre line. Red (TOO FAR): beyond maxRange(SHO) (ratings.ts, 24–34 m).
+ * `wideAng` rad off the goal's centre line; (soccer-5) at more than `stride` of his dribbling top speed
+ * with the ball knocked out of his reach (struck on the stride). Red (TOO FAR): beyond maxRange(SHO) (ratings.ts, 24–34 m).
  * The window's parts: openness (`openLo` at `pressure` m to `openHi` from `openAt` m clear), on the
  * sprint `sprint`, a first-time hit `first`, the defence's sharpness `defIQ` a point, and the set-piece
  * factors; v2/perfect.ts caps the product and floors it at ±30 ms.
@@ -719,6 +737,7 @@ export const RING = {
   openHi: 1.1,
   openAt: 7,
   sprint: 0.88,
+  stride: 0.85,
   first: 0.9,
   defIQ: 0.12,
 };
@@ -768,6 +787,9 @@ export function shotRing(a: Attack, c: Body, first: boolean): RingRead {
   if (first && !header && turn > RING.firstAcross) [why, amber] = ['first', 'TIMING'];
   else if (header && d > RING.headerFar) [why, amber] = ['header', 'RANGE'];
   else if (!sp && d < RING.wideIn && Math.abs(Math.atan2(from.x - GX, Math.max(0.3, PL - from.y))) > RING.wideAng) [why, amber] = ['angle', 'RANGE'];
+  // soccer-5: at a sprint with the ball knocked out ahead, he strikes it on the stride as he gets to it:
+  // no gold off a sprint touch (gold needs the ball at his feet)
+  else if (!sp && !first && a.ball.owner === c.id && dist(a.ball, c) > TOUCH.reach && Math.hypot(c.vx, c.vy) > topSpeed(c.p) * dribblePace(c.p) * RING.stride) [why, amber] = ['stride', 'TIMING'];
   const w = ringWindow({ baseHalfMs: greenHalf(c.p) * 1000, rating01: rt(c.p.a.SHO), contested, inRange, fire: false, amber, parts });
   if (w.state === 'red') why = 'range';
   else if (w.state === 'amber' && contested) why = 'pressure';
@@ -777,7 +799,7 @@ export function shotRing(a: Attack, c: Body, first: boolean): RingRead {
 
 /** Press SHOOT: the ring starts winding up (on the ball, at a set piece, or for a first-time hit). */
 export function pressShoot(a: Attack): boolean {
-  if (a.end || a.phase !== 'live' || a.meter || a.strike || a.kick) return false;
+  if (a.end || a.phase !== 'live' || a.meter || a.strike || a.kick || a.pending) return false;
   const c = ctrlOf(a);
   const sp = a.setPiece;
   const own = a.ball.owner === c.id;
@@ -831,7 +853,9 @@ export function releaseShoot(a: Attack, aim: Pt | null, lag = 0, held?: number):
     a.events.push(gold ? 'release-green' : 'release');
     return true;
   }
-  strikeShot(a, c, { ...r, aim: aim ?? m.assist ?? null }, false, !aim);
+  // the ball's out between touches (soccer-5): struck as he gets back to it (judged now, on this ring)
+  if (a.ball.owner === c.id && c.role !== 'gk' && dist(a.ball, c) > TOUCH.reach) a.pending = { kind: 'shot', r: { ...r, aim: aim ?? m.assist ?? null }, assisted: !aim, at: a.t };
+  else strikeShot(a, c, { ...r, aim: aim ?? m.assist ?? null }, false, !aim);
   a.events.push(gold ? 'release-green' : 'release');
   return true;
 }
@@ -1493,7 +1517,7 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
       b.y += b.vy * dt;
       continue;
     }
-    if (b.act === 'tackle' || b.act === 'down' || b.act === 'dive') act(b, 'idle', t);
+    if (b.act === 'tackle' || b.act === 'down' || b.act === 'dive' || (b.act === 'shield' && ball.owner !== b.id)) act(b, 'idle', t);
     if (b.role === 'gk') keeper(a, b, dt);
     else if (b.side === 'D') defend(a, b, dt);
     else if (b.id === a.ctrl && stick && !receiving(a, b, stick)) human(a, b, stick, sprint, dt);
@@ -1512,17 +1536,19 @@ export function step(a: Attack, dt: number, stick: Pt | null) {
 
   // the ball at his feet, or free
   const prev = { x: ball.x, y: ball.y, h: ball.h };
-  if (owner && ball.owner === owner.id) {
+  if (owner && ball.owner === owner.id && owner.role === 'gk') {
+    // in the keeper's hands
     const f = facingOf(owner);
-    const v = Math.hypot(owner.vx, owner.vy);
-    const touch = 0.32 + Math.min(0.35, v * 0.035) * (a.sprinting && owner.id === a.ctrl ? 1.4 : 1);
-    ball.x = owner.x + f.x * touch;
-    ball.y = owner.y + f.y * touch;
-    ball.h = owner.role === 'gk' ? 0.9 : 0;
+    ball.x = owner.x + f.x * 0.32;
+    ball.y = owner.y + f.y * 0.32;
+    ball.h = 0.9;
     ball.vx = owner.vx;
     ball.vy = owner.vy;
     ball.vh = 0;
-    if (owner.side === 'A') tackles(a, owner);
+  } else if (owner && ball.owner === owner.id) {
+    // at a dribbler's feet: knocked ahead on the touch beats, rolling between them (soccer-5)
+    dribbleBall(a, owner, dt);
+    if (owner.side === 'A' && ball.owner === owner.id) tackles(a, owner);
   } else if (ball.owner === null && a.kick?.kind === 'throw') {
     // a quick throw-in: the thrower holds it over his head until it goes
     const th = a.bodies[a.kick.by];
@@ -1579,6 +1605,8 @@ function receiving(a: Attack, b: Body, stick: Pt): boolean {
 function launchPass(a: Attack) {
   const k = a.kick!;
   a.kick = null;
+  a.touch = null;
+  a.pending = null;
   const b = a.ball;
   const by = a.bodies[k.by];
   b.owner = null;
@@ -1637,6 +1665,8 @@ function launchPass(a: Attack) {
 function launchShot(a: Attack) {
   const s = a.strike!;
   a.strike = null;
+  a.touch = null;
+  a.pending = null;
   const b = a.ball;
   b.owner = null;
   b.last = s.by;
@@ -1955,31 +1985,313 @@ function contact(a: Attack) {
     a.ctrl = q.id;
     q.run = null;
     a.events.push(air ? 'chest' : 'control');
+    // the first touch (soccer-5): on the run he takes it on his way, heavier for a hard pass or one
+    // from behind him, lighter for a good dribbler (ratings.ts touchOf); standing, he traps it (a set
+    // piece's taker leaves it on the spot)
+    if (!a.setPiece) {
+      const head = headingOf(q);
+      const tc = touchFor(a, q);
+      tc.at = a.t - 1;
+      const behind = speed > 2 && (b.vx * head.x + b.vy * head.y) / speed > 0.5;
+      const heavy = 1 + Math.max(0, speed - 10) / 14 + (behind ? 0.5 : 0);
+      if (Math.hypot(q.vx, q.vy) > 1.5) {
+        tc.want = { x: head.x, y: head.y, mag: 1, sprint: false };
+        tc.close = false;
+        takeTouch(a, q, head, 0, heavy);
+      } else takeTouch(a, q, null, 0);
+      if (heavy > 1.45) a.events.push('heavy-first');
+    }
     return;
   }
 }
 
 /* ---------- the man on the ball ---------- */
 
+/**
+ * Touch dribbling (Claude 2026-11-16, studio overhaul soccer-5; V2 B.3.4, audit B-1). The ball isn't
+ * glued to his feet: on each touch beat he knocks it ahead along the run he wants, and between touches
+ * it rolls on its own, slowing so that he catches it on the next beat (ratings.ts touchOf: every 2
+ * strides and 0.6-1.0 m ahead at a jog, every 5-6 and 3-5 m ahead at a sprint, shorter for a good
+ * dribbler, shortest with close control). While it's out a defender who gets to it can poke it away
+ * (TACKLE), and a pass or a shot waits until he's back on it. The ball still "belongs" to him
+ * (ball.owner) for everything else: the HUD, the AI's reads, the keeper.
+ *  - foot: a touch leaves the ball this far ahead of his body (m); reach: he can touch, pass or shoot
+ *    it within this of his body; exposed: beyond this, between touches, it can be poked away.
+ *  - turn: the stick this far (degrees) off the ball's way takes an early touch to turn it (once it's in
+ *    reach, at most every minGap s); a touch that turns it more than turnExposed° leaves it exposed for
+ *    turnWindow s.
+ *  - lost: more than out + foot + lost m from him and it's a loose ball (a heavy touch).
+ *  - pending: a pass or shot asked for while it's out waits at most this long (s) for him to get to it.
+ *  - close: the stick's part-way band for close control, at closePace of his jog; brake: a turn of more
+ *    than brakeDeg at more than brakeAt of top speed brakes to brakeTo first (2-3 steps).
+ */
+export const TOUCH = {
+  foot: 0.35,
+  reach: 0.8,
+  exposed: 0.6,
+  turn: 35,
+  turnExposed: 60,
+  turnWindow: 0.35,
+  minGap: 0.18,
+  lost: 4,
+  pending: 3,
+  maxT: 1.6,
+  close: [0.5, 0.85] as readonly [number, number],
+  closePace: 0.9,
+  brakeDeg: 120,
+  brakeAt: 0.7,
+  brakeTo: 0.45,
+};
+/** Shielding (V2 B.3.4, plan G9): the stick back toward his own goal with a defender within `on` m
+ * (kept until `off` m): his back to the man, the ball on the far foot `foot` m out, walking at `pace`. */
+export const SHIELD = { on: 1.5, off: 2.2, foot: 0.45, pace: 1.6, back: 0.5 };
+/** Body contact: a defender within `d` m of the man on the ball slows him (ratings.ts contactPace). */
+export const CONTACT = { d: 0.85 };
+
+/** The way he's going (his run when he's moving, else the way he faces). */
+const headingOf = (b: Body): Pt => (Math.hypot(b.vx, b.vy) > 0.6 ? norm(b.vx, b.vy) : facingOf(b));
+
+/** The man on the ball runs: speed by sprint, jog or close control, turns no sharper than his speed lets
+ * him (a brake first for a turn of more than 120° at a sprint), slowed by a defender's body on him. */
+function dribbleRun(a: Attack, b: Body, stick: Pt, sprint: boolean, dt: number) {
+  const t = a.t;
+  const mag = Math.min(1, Math.hypot(stick.x, stick.y));
+  const dir = mag > 0.01 ? { x: stick.x / Math.max(mag, 1e-9), y: stick.y / Math.max(mag, 1e-9) } : { x: 0, y: 0 };
+  const tc = touchFor(a, b);
+  const ball = a.ball;
+  const top0 = topSpeed(b.p) * dribblePace(b.p) * lerp(0.88, 1, a.stamina);
+  // a pass or shot waiting on the ball, or SHOOT wound up with the ball out of reach: he runs onto it
+  if (a.pending || (a.meter && dist(ball, b) > TOUCH.reach)) {
+    const lead = 0.12;
+    steer(b, ball.x + ball.vx * lead, ball.y + ball.vy * lead, top0, dt, false);
+    tc.want = { x: dir.x, y: dir.y, mag, sprint };
+    return;
+  }
+  // shielding: the stick back toward his own goal with a man on him
+  const near = nearestDefender(a, b);
+  const back = mag > 0.3 && -dir.y > SHIELD.back;
+  const shielding = back && !a.meter && !a.kick && !a.strike && near.b !== null && near.d < (b.act === 'shield' ? SHIELD.off : SHIELD.on);
+  if (shielding) {
+    act(b, 'shield', t);
+    accelTo(b, dir.x * SHIELD.pace, dir.y * SHIELD.pace, dt);
+    tc.want = { x: dir.x, y: dir.y, mag, sprint: false };
+    return;
+  }
+  if (b.act === 'shield') act(b, 'dribble', t);
+  const kicking = b.act === 'kick' && t - b.actAt < 0.3;
+  const close = !sprint && mag > 0.01 && mag <= TOUCH.close[1];
+  let top = top0 * (sprint ? 1 : DRIBBLE_JOG);
+  // close control (the stick part-way): 90% of his jog; less than half-way, slower still
+  if (close) top *= TOUCH.closePace * Math.min(1, mag / TOUCH.close[0]);
+  // winding up a shot slows him a little (see human)
+  if (a.meter) top *= 0.87;
+  if (kicking) top *= 0.4;
+  // a defender's body on him: he loses pace by the PHY difference
+  if (near.b && near.d < CONTACT.d) top *= contactPace(b.p, near.b.p);
+  tc.want = { x: dir.x, y: dir.y, mag, sprint };
+  tc.close = close;
+  // between touches he runs onto the ball (it was knocked his way); the stick's new way is taken at the
+  // next touch, once he's back on it
+  const d = dist(ball, b);
+  if (d > TOUCH.reach && mag > 0.15) {
+    const to = norm(ball.x + ball.vx * 0.15 - b.x, ball.y + ball.vy * 0.15 - b.y);
+    carry(b, to.x * top, to.y * top, dt);
+    return;
+  }
+  carry(b, dir.x * top, dir.y * top, dt);
+}
+
+/** accelTo for the man on the ball, with his turning circle: the way he runs turns no faster than
+ * turnRate (ratings.ts) at his speed, and a turn of more than TOUCH.brakeDeg at a sprint brakes first. */
+function carry(b: Body, wx: number, wy: number, dt: number) {
+  const v = Math.hypot(b.vx, b.vy);
+  const ws = Math.hypot(wx, wy);
+  if (v < 2 || ws < 0.3) {
+    accelTo(b, wx, wy, dt);
+    return;
+  }
+  const cur = Math.atan2(b.vy, b.vx);
+  const da = Math.atan2(Math.sin(Math.atan2(wy, wx) - cur), Math.cos(Math.atan2(wy, wx) - cur));
+  const top = topSpeed(b.p);
+  if (Math.abs(da) > (TOUCH.brakeDeg * Math.PI) / 180 && v > top * TOUCH.brakeAt) {
+    // too sharp to turn at this speed: plant and brake (the way he was going) until he can
+    const k = (top * TOUCH.brakeTo) / v;
+    accelTo(b, b.vx * k, b.vy * k, dt, 1.2);
+    return;
+  }
+  const maxT = turnRate(b.p, v) * dt;
+  const h = cur + clamp(da, -maxT, maxT);
+  // round a turn he can't make at once he slows into it (half pace for a right angle, nearly a stop to
+  // turn back), so below 2 m/s he turns freely
+  const sp = Math.abs(da) > maxT ? ws * clamp(0.5 + 0.5 * Math.cos(da), 0.1, 1) : ws;
+  accelTo(b, Math.cos(h) * sp, Math.sin(h) * sp, dt);
+}
+
+/** The attack's touch state for the man on the ball (a new one when the ball has changed feet). */
+function touchFor(a: Attack, c: Body) {
+  if (!a.touch || a.touch.by !== c.id) a.touch = { by: c.id, at: a.t - 1, next: a.t, out: 0, k: 0 };
+  return a.touch;
+}
+
+/**
+ * The ball at a dribbler's feet, each step: it rolls (slowing at the touch's own rate), a touch when
+ * he's caught up with it on the beat (or to turn it, or to stop it), a pass or shot he asked for as he
+ * gets to it, and a loose ball if he's left it behind.
+ */
+function dribbleBall(a: Attack, c: Body, dt: number) {
+  const ball = a.ball;
+  const t = a.t;
+  const tc = touchFor(a, c);
+  ball.h = 0;
+  ball.vh = 0;
+  // the pass or the strike is on its way: his foot is on the ball
+  if ((a.kick && a.kick.by === c.id) || (a.strike && a.strike.by === c.id)) {
+    ball.x += c.vx * dt;
+    ball.y += c.vy * dt;
+    ball.vx = c.vx;
+    ball.vy = c.vy;
+    return;
+  }
+  if (c.act === 'shield') {
+    // the ball on the far foot from the man on him
+    const nd = nearestDefender(a, c).b;
+    const away = nd ? norm(c.x - nd.x, c.y - nd.y) : headingOf(c);
+    ball.x = c.x + away.x * SHIELD.foot;
+    ball.y = c.y + away.y * SHIELD.foot;
+    ball.vx = c.vx;
+    ball.vy = c.vy;
+    tc.at = t;
+    tc.next = t + 0.25;
+    tc.out = 0;
+    tc.k = 0;
+    return;
+  }
+  // it rolls on, slowing at the knock's own rate (solved so he catches it on the beat)
+  const sp = Math.hypot(ball.vx, ball.vy);
+  if (sp > 1e-6) {
+    const ns = Math.max(0, sp - Math.max(tc.k, ROLL) * dt);
+    ball.vx *= ns / sp;
+    ball.vy *= ns / sp;
+  }
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+  const d = dist(ball, c);
+  if (a.pending) {
+    if (d <= TOUCH.reach + 0.15) playPending(a, c);
+    else if (t - a.pending.at > TOUCH.pending || d > tc.out + TOUCH.foot + TOUCH.lost + 2) loseIt(a, c);
+    return;
+  }
+  const w = tc.want;
+  const wd = w && w.mag > 0.15 ? { x: w.x, y: w.y } : null;
+  const head = headingOf(c);
+  const along = (ball.x - c.x) * head.x + (ball.y - c.y) * head.y;
+  const free = t - tc.at >= TOUCH.minGap;
+  if (d <= TOUCH.reach && free) {
+    const bv = sp > 0.6 ? norm(ball.vx, ball.vy) : head;
+    const turn = wd ? (Math.acos(clamp(wd.x * bv.x + wd.y * bv.y, -1, 1)) * 180) / Math.PI : 0;
+    const caught = t >= tc.next || along <= TOUCH.foot * 0.8;
+    // he's stopped (the stick centred) with the ball still rolling: he traps it
+    const stop = !wd && sp > 0.4 && Math.hypot(c.vx, c.vy) < 1.5;
+    if ((wd && (caught || turn > TOUCH.turn)) || stop) takeTouch(a, c, wd, turn);
+    return;
+  }
+  if (d > tc.out + TOUCH.foot + TOUCH.lost) loseIt(a, c);
+}
+
+/** A touch: knock the ball out along `wd` (null: trap it at his feet) for the carrier to catch on the
+ * next beat. `turn`: how far it turns the ball's way (degrees). */
+function takeTouch(a: Attack, c: Body, wd: Pt | null, turn: number, heavy = 1) {
+  const tc = a.touch!;
+  const ball = a.ball;
+  const t = a.t;
+  c.touchAt = t;
+  tc.at = t;
+  if (!wd) {
+    // trapped: at his feet, still
+    const f = headingOf(c);
+    ball.vx = c.vx;
+    ball.vy = c.vy;
+    tc.next = t + 0.3;
+    tc.out = 0;
+    tc.k = 3;
+    if (dist(ball, c) > TOUCH.foot + 0.15) {
+      ball.x = c.x + f.x * TOUCH.foot;
+      ball.y = c.y + f.y * TOUCH.foot;
+    }
+    return;
+  }
+  const want = tc.want;
+  const top = topSpeed(c.p) * dribblePace(c.p) * lerp(0.88, 1, a.stamina);
+  const target = top * (want?.sprint ? 1 : DRIBBLE_JOG * (tc.close ? TOUCH.closePace * Math.min(1, (want?.mag ?? 1) / TOUCH.close[0]) : 1));
+  // his speed along the new way, and the pace he's heading for: the knock is planned on the mean (a
+  // cut, turning it more than TOUCH.turn, on his speed that way now: a soft touch he can turn onto)
+  const vRun = Math.max(0.5, c.vx * wd.x + c.vy * wd.y);
+  const vPlan = turn > TOUCH.turn ? vRun : clamp((vRun + target) / 2, 0.5, Math.max(vRun, target));
+  // (his pace as a share of his fresh top speed: a tired sprint is a run's touch)
+  const tp = touchOf(c.p, vPlan / (topSpeed(c.p) * dribblePace(c.p)), !!tc.close);
+  const T = Math.min(TOUCH.maxT, (tp.strides * strideLen(vPlan)) / Math.max(vPlan, 1));
+  // a touch that turns it is a shorter one
+  const out = tp.out * lerp(1, 0.5, turn / 120) * heavy;
+  // from where the ball is now (relative to the foot spot along the new way, and off it sideways):
+  // solve the knock so it gets `out` beyond the foot at most and he meets it again after T
+  const rx = ball.x - c.x;
+  const ry = ball.y - c.y;
+  const o = rx * wd.x + ry * wd.y - TOUCH.foot;
+  const lat = -rx * wd.y + ry * wd.x;
+  const q = Math.max(0, out - o);
+  const dv = (2 * q + 2 * Math.sqrt(q * Math.max(out, o))) / T;
+  tc.k = Math.max(0.5, (2 * (o + dv * T)) / (T * T));
+  tc.out = Math.max(out, o);
+  tc.next = t + T;
+  if (turn > TOUCH.turnExposed) tc.turnAt = t;
+  const back = lat / Math.max(0.25, T * 0.6);
+  ball.vx = wd.x * (vPlan + dv) + wd.y * back;
+  ball.vy = wd.y * (vPlan + dv) - wd.x * back;
+}
+
+/** He's left the ball behind (a heavy touch, a turn he couldn't make): it's anyone's. */
+function loseIt(a: Attack, c: Body) {
+  const ball = a.ball;
+  ball.owner = null;
+  ball.last = c.id;
+  ball.flight = { kind: 'clear', from: c.id, to: null, at: a.t };
+  a.touch = null;
+  a.pending = null;
+  setPath(a, tracePath(ball));
+  a.lostTouch = true;
+  a.events.push('heavy-touch', 'lost-touch');
+}
+
+/** He's back on the ball: the pass or shot he asked for while it was out goes now. */
+function playPending(a: Attack, c: Body) {
+  const p = a.pending!;
+  a.pending = null;
+  if (p.kind === 'pass') pass(a, p.how, p.dir, p.free, p.to);
+  else strikeShot(a, c, p.r, false, p.assisted);
+}
+
 function human(a: Attack, b: Body, stick: Pt, sprint: boolean, dt: number) {
   const mag = Math.min(1, Math.hypot(stick.x, stick.y));
-  const owner = a.ball.owner === b.id;
   if (a.setPiece && a.taker === b.id) {
     // over the ball: the stick aims, he doesn't wander off it
     b.vx = 0;
     b.vy = 0;
     return;
   }
+  if (a.ball.owner === b.id && b.role !== 'gk') {
+    dribbleRun(a, b, stick, sprint, dt);
+    return;
+  }
+  // (off the ball from here: a dribbler is dribbleRun's, and a keeper with the ball is never the stick's)
   const kicking = b.act === 'kick' && a.t - b.actAt < 0.3;
   let top = topSpeed(b.p) * (sprint ? 1 : JOG) * lerp(0.88, 1, a.stamina);
-  if (owner) top *= dribblePace(b.p);
   // winding up a shot slows him a little (0.75 until 2026-11-02, when the stick still aimed; 0.85 until
   // the soccer-2 re-review, which left C4 no margin once stamina drains: 0.87 keeps the raw ratio over
   // 0.85). The autopilot's stick is still while a meter is up, so its matches (golden) don't move.
   if (a.meter) top *= 0.87;
   if (kicking) top *= 0.4;
   const dir = mag > 0.01 ? { x: stick.x / Math.max(1, mag), y: stick.y / Math.max(1, mag) } : { x: 0, y: 0 };
-  accelTo(b, dir.x * top, dir.y * top, dt, owner ? 1 : 1.1);
+  accelTo(b, dir.x * top, dir.y * top, dt, 1.1);
 }
 
 /** An attacker the stick isn't on: onto a pass, after a loose ball, or into his lane and his runs. */
@@ -2084,10 +2396,79 @@ function attackOffBall(a: Attack, b: Body, dt: number, sprint: boolean) {
   steer(b, clamp(tx, 2, PW - 2), clamp(ty, 35, PL - 2), top * (sprint ? 1 : JOG), dt);
 }
 
-/** Tackles on the man with the ball: a defender inside 1.2 m gathers, then goes in. */
+/**
+ * Defending the man on the ball (Claude 2026-11-16, studio overhaul soccer-5; V2 B.3.4, audit AI-2,
+ * B-1, R-3). Nobody tackles a dribbler just for coming close: a defender goes in only when the ball is
+ * exposed between touches (more than TOUCH.exposed from the carrier's body), or the carrier has just
+ * turned it sharply, or through a shield, or as the last man chasing a breakaway. He reads it first
+ * (his read delay, sharper by DEF), then the visible `windup` s poke ('poke'); where the ball is when
+ * it lands decides it: in his reach (interceptReach + `reach`), the chance is tackleWin × the angle
+ * (`behind`, `side`) × how exposed it is (`minExposure` tight to 1 at `exposure` m beyond the foot;
+ * `nearer` when it was knocked at him, `turned` just after a sharp turn). A knock that runs into him
+ * (`knock` m out, nearer him than its owner) is his to take at once, one go a touch. A miss leaves him
+ * beaten (`stun` s; `whiff` when the ball was never in reach) and, if he caught the man (within `body`
+ * m), maybe a foul (ratings.ts foulChance, × `onBall` when he went for a ball in reach; a frontal one in
+ * the box half as often; from behind on a breakaway a yellow).
+ *  - contain: the first defender holds goal-side at lerp(contain[0], contain[1], DEF) m, facing the
+ *    ball ('jockey'); he goes in only when he rates his chance at least `odds` (`engage` inside `danger`
+ *    m of goal), a poor tackler over-rating it by up to `rash`×; `lastDitch`: inside this of goal, the
+ *    last man chasing goes in whatever his chance; `shieldTry`: how close he gets to try a shield.
+ */
+export const TACKLE = {
+  reach: 0.45,
+  windup: 0.25,
+  ready: 1.3,
+  stun: 0.95,
+  whiff: 0.45,
+  body: 0.85,
+  onBall: 0.5,
+  behind: 0.75,
+  side: 0.9,
+  exposure: 2.2,
+  minExposure: 0.2,
+  nearer: 0.5,
+  turned: 0.6,
+  knock: 1.1,
+  contain: [2.5, 1.5] as readonly [number, number],
+  odds: 0.4,
+  engage: 0.24,
+  rash: 1.7,
+  lastDitch: 30,
+  danger: 20,
+  shieldTry: 1.2,
+};
+/** How far a defender's poke gets to (m from his body). */
+const pokeReach = (d: Body) => interceptReach(d.p) + TACKLE.reach;
+/** How exposed the ball at the carrier's feet is (0.25 tight .. 1 well out). */
+function exposureOf(a: Attack, c: Pt, ball: Pt, d: Pt): number {
+  const gap = dist(ball, c);
+  let e = clamp(TACKLE.minExposure + (gap - TOUCH.foot) / TACKLE.exposure, TACKLE.minExposure, 1);
+  // out between touches and nearer the defender than the man on it (knocked at him), or just turned sharply
+  if (gap > TOUCH.exposed && dist(ball, d) < gap) e = Math.max(e, TACKLE.nearer);
+  if (turnedNow(a)) e = Math.max(e, TACKLE.turned);
+  return e;
+}
+/** The man on the ball has just turned it more than TOUCH.turnExposed° (it's off his line for a moment). */
+const turnedNow = (a: Attack) => a.touch?.turnAt !== undefined && a.t - a.touch.turnAt < TOUCH.turnWindow;
+/** The angle a defender comes from: behind the carrier (the way he's going), from the side, or in front. */
+function angleOf(c: Body, d: Pt): { behind: boolean; chasing: boolean; mult: number } {
+  const f = headingOf(c);
+  const along = (d.x - c.x) * f.x + (d.y - c.y) * f.y;
+  const behind = along < -0.3;
+  // chasing: behind him or level with his hip (not in front of him): a breakaway's last-ditch challenge
+  return { behind, chasing: along < 0.2, mult: behind ? TACKLE.behind : along < 0.4 ? TACKLE.side : 1 };
+}
+/** No other defender between the man and the goal: a breakaway (a foul from behind on it is a yellow). */
+function breakaway(a: Attack, c: Body, fouler: Body): boolean {
+  const g = norm(GX - c.x, PL - c.y);
+  return !a.bodies.some((d) => d.role === 'def' && d !== fouler && a.t >= d.stunUntil && (d.x - c.x) * g.x + (d.y - c.y) * g.y > 0.5);
+}
+
 function tackles(a: Attack, c: Body) {
   const t = a.t;
   if (c.act === 'kick' && t - c.actAt < 0.15) return;
+  const ball = a.ball;
+  const shielding = c.act === 'shield';
   for (const d of a.bodies) {
     if (d.side !== 'D' || t < d.stunUntil || d.act === 'wall') continue;
     if (d.role === 'gk') {
@@ -2097,6 +2478,8 @@ function tackles(a: Attack, c: Body) {
         if (a.rand() < gkSmother(d.p, c.p) * (1 + 0.1 * a.defIQ)) {
           a.ball.owner = d.id;
           a.ball.last = d.id;
+          a.touch = null;
+          a.pending = null;
           act(d, 'dive', t);
           a.events.push('smother');
           endAttack(a, 'S', 'SMOTHERED BY ' + d.p.tag);
@@ -2108,62 +2491,153 @@ function tackles(a: Attack, c: Body) {
       }
       continue;
     }
-    const e = dist(d, c);
-    if (e > 1.2) {
-      d.commit = Infinity;
+    // a poke on its way: it lands now
+    if (d.act === 'poke') {
+      if (t < d.commit) continue;
+      if (resolvePoke(a, c, d)) return;
       continue;
     }
-    if (t < d.tackleReady) continue;
-    if (d.commit === Infinity) {
-      d.commit = t + lerp(0.45, 0.16, rt(d.p.a.DEF)) * (1 - 0.25 * a.defIQ) + a.rand() * 0.2;
+    if (t < d.tackleReady) {
+      d.readAt = Infinity;
       continue;
     }
-    if (t < d.commit) continue;
-    d.commit = Infinity;
-    d.tackleReady = t + 1.6;
-    const sprinting = a.sprinting && c.id === a.ctrl;
-    // a tackle from behind (the defender chasing) is harder to time cleanly
-    const behind = (d.x - c.x) * c.fx + (d.y - c.y) * c.fy < -0.3;
-    const p = tackleWin(d.p, c.p, sprinting, a.defIQ) * (behind ? 0.8 : 1);
-    act(d, 'tackle', t);
-    if (a.rand() < p) {
-      const away = norm(c.x - d.x + (a.rand() - 0.5), -1.2);
-      a.ball.owner = null;
-      a.ball.last = d.id;
-      a.ball.vx = away.x * 6;
-      a.ball.vy = away.y * 6;
-      a.ball.flight = { kind: 'clear', from: d.id, to: null, at: t };
-      c.stunUntil = t + 0.8;
-      act(c, 'down', t);
-      a.events.push('tackle');
-      endAttack(a, 'L', 'TACKLED BY ' + d.p.tag);
-      return;
-    }
-    d.stunUntil = t + 0.95;
-    d.vx *= 0.5;
-    d.vy *= 0.5;
-    a.events.push('beat');
-    // a mistimed tackle can be a foul: in the box a penalty, near the box a free kick
-    const pf = clamp(0.04 + 0.22 * (1 - Math.min(1, rt(d.p.a.DEF))) + (behind ? 0.14 : 0) + 0.08 * rt(c.p.a.DRI) - 0.05 * a.defIQ, 0.03, 0.4);
-    if (a.rand() < pf) {
-      a.fouls++;
-      act(c, 'down', t);
-      c.stunUntil = t + 0.7;
-      if (inBox(c)) {
-        a.events.push('foul', 'penalty');
-        a.penaltyFrom = d.p.tag;
-        setPieceAfterFoul(a, 'penalty', { x: GX, y: SPOT_Y });
-      } else if (c.y > 70) {
-        a.events.push('foul', 'freekick');
-        setPieceAfterFoul(a, 'freekick', { x: c.x, y: c.y });
-      } else {
-        // advantage: play on
-        a.events.push('foul', 'advantage');
-        c.stunUntil = t + 0.25;
+    // the knock ran into him: a ball out between touches that reaches his feet first is his to take
+    // (one go a touch, no wind-up)
+    const tc = a.touch;
+    if (!shielding && tc && tc.at !== d.blockAt && dist(ball, c) > TACKLE.knock && dist(d, ball) < interceptReach(d.p) && dist(d, ball) < dist(c, ball)) {
+      d.blockAt = tc.at;
+      const p = tackleWin(d.p, c.p, a.sprinting && c.id === a.ctrl, a.defIQ) * exposureOf(a, c, ball, d);
+      if (a.rand() < p) {
+        winBall(a, c, d);
+        return;
       }
     }
-    return;
+    // where things will be when a poke started now would land
+    const W = TACKLE.windup;
+    const pb = ballAhead(a, W);
+    const pd = { x: d.x + d.vx * W, y: d.y + d.vy * W };
+    let go: boolean;
+    if (shielding) go = dist(d, c) < TACKLE.shieldTry;
+    else {
+      const pc = { x: c.x + c.vx * W, y: c.y + c.vy * W };
+      // beaten, chasing a man through on goal: the last-ditch challenge (at the ball if he can get to it,
+      // through the man if not), whatever his chance
+      const desperate = angleOf(c, d).chasing && dist(c, goalC) < TACKLE.lastDitch && dist(pd, pc) < TACKLE.body + 0.3 && breakaway(a, c, d);
+      if (dist(pd, pb) > pokeReach(d) + 0.3 && !desperate) {
+        d.readAt = Infinity;
+        continue;
+      }
+      // no tackle on a ball tight at his feet: only one out between touches, or just turned
+      if (!desperate && dist(pb, pc) <= TOUCH.exposed && dist(ball, c) <= TOUCH.exposed && !turnedNow(a)) {
+        d.readAt = Infinity;
+        continue;
+      }
+      const odds = tackleWin(d.p, c.p, a.sprinting && c.id === a.ctrl, a.defIQ) * angleOf(c, pd).mult * exposureOf(a, pc, pb, pd);
+      // (a poor defender over-rates his chance: he dives in more, and fouls more)
+      const read = lerp(TACKLE.rash, 1, rt(d.p.a.DEF));
+      const inDanger = dist(c, goalC) < TACKLE.danger;
+      go = desperate || odds * read >= (inDanger ? TACKLE.engage : TACKLE.odds) - 0.06 * a.defIQ;
+    }
+    if (!go) continue;
+    // his read: he has to see it for his read delay first (sharper defenders sooner)
+    if (d.readAt === undefined || d.readAt === Infinity) {
+      d.readAt = t + lerp(0.36, 0.1, rt(d.p.a.DEF)) * (1 - 0.25 * a.defIQ) + a.rand() * 0.12;
+      continue;
+    }
+    if (t < d.readAt) continue;
+    d.readAt = Infinity;
+    // the visible wind-up
+    act(d, 'poke', t);
+    d.commit = t + W;
+    a.events.push('poke');
   }
+}
+
+/** Where the dribbled ball will be in `w` s (it slows at the touch's rate). */
+function ballAhead(a: Attack, w: number): Pt {
+  const b = a.ball;
+  const sp = Math.hypot(b.vx, b.vy);
+  if (sp < 1e-6) return { x: b.x, y: b.y };
+  const k = Math.max(a.touch?.k ?? ROLL, ROLL);
+  const s = sp > k * w ? sp * w - 0.5 * k * w * w : (sp * sp) / (2 * k);
+  return { x: b.x + (b.vx / sp) * s, y: b.y + (b.vy / sp) * s };
+}
+
+/** The ball won off the man on it: it squirts away, the attack's over. */
+function winBall(a: Attack, c: Body, d: Body) {
+  const t = a.t;
+  const ball = a.ball;
+  const gap = dist(ball, c);
+  const away = norm(c.x - d.x + (a.rand() - 0.5), -1.2);
+  a.tackled = { by: d.id, gap, poke: gap > TOUCH.exposed };
+  ball.owner = null;
+  ball.last = d.id;
+  ball.vx = away.x * 6;
+  ball.vy = away.y * 6;
+  ball.flight = { kind: 'clear', from: d.id, to: null, at: t };
+  a.touch = null;
+  a.pending = null;
+  act(d, 'tackle', t);
+  c.stunUntil = t + 0.8;
+  act(c, 'down', t);
+  a.events.push('tackle');
+  endAttack(a, 'L', 'TACKLED BY ' + d.p.tag);
+}
+
+/** A poke lands: won (the attack's over), or missed (he's beaten, and maybe it's a foul). True when the
+ * attack ended or stopped for a set piece. */
+function resolvePoke(a: Attack, c: Body, d: Body): boolean {
+  const t = a.t;
+  const ball = a.ball;
+  d.commit = Infinity;
+  d.tackleReady = t + TACKLE.ready;
+  const shielding = c.act === 'shield';
+  const ang = angleOf(c, d);
+  act(d, 'tackle', t);
+  const inReach = dist(d, ball) <= pokeReach(d) || (shielding && dist(d, c) < TACKLE.shieldTry + 0.2);
+  const p = !inReach ? 0 : shielding ? shieldBreak(d.p, c.p) : tackleWin(d.p, c.p, a.sprinting && c.id === a.ctrl, a.defIQ) * ang.mult * exposureOf(a, c, ball, d);
+  if (inReach && a.rand() < p) {
+    winBall(a, c, d);
+    return true;
+  }
+  // a miss: beaten (a whiff at a ball that was never in reach costs him less)
+  d.stunUntil = t + (inReach ? TACKLE.stun : TACKLE.whiff);
+  d.vx *= 0.5;
+  d.vy *= 0.5;
+  a.events.push('beat');
+  if (shielding) {
+    a.shielded = (a.shielded ?? 0) + 1;
+    a.events.push('shielded');
+  }
+  // a mistimed tackle that caught the man can be a foul (one that went for a ball in reach, less often):
+  // in the box a penalty, near the box a free kick
+  if (dist(d, c) > TACKLE.body) return false;
+  let pf = foulChance(d.p, c.p, ang.behind, a.defIQ) * (inReach ? TACKLE.onBall : 1);
+  if (inBox(c) && !ang.behind) pf *= 0.5;
+  if (a.rand() >= pf) return false;
+  a.fouls++;
+  act(c, 'down', t);
+  c.stunUntil = t + 0.7;
+  // a foul from behind (or level, chasing) on a breakaway is a yellow card
+  if (ang.chasing && breakaway(a, c, d)) {
+    (a.yellows ??= []).push(d.p.id);
+    a.events.push('yellow');
+  }
+  if (inBox(c)) {
+    a.events.push('foul', 'penalty');
+    a.penaltyFrom = d.p.tag;
+    setPieceAfterFoul(a, 'penalty', { x: GX, y: SPOT_Y });
+    return true;
+  }
+  if (c.y > 70) {
+    a.events.push('foul', 'freekick');
+    setPieceAfterFoul(a, 'freekick', { x: c.x, y: c.y });
+    return true;
+  }
+  // advantage: play on
+  a.events.push('foul', 'advantage');
+  c.stunUntil = t + 0.25;
+  return false;
 }
 
 /** A foul given: everyone lines up for the free kick or the penalty (the clock waits). */
@@ -2178,6 +2652,8 @@ function setPieceAfterFoul(a: Attack, kind: 'freekick' | 'penalty', at: Pt) {
   a.ctrl = taker.id;
   a.meter = null;
   a.first = null;
+  a.touch = null;
+  a.pending = null;
   const ball = a.ball;
   ball.owner = null;
   ball.flight = null;
@@ -2274,6 +2750,8 @@ function setPieceAfterOut(a: Attack, kind: 'corner' | 'throw', side: number) {
   a.first = null;
   a.strike = null;
   a.kick = null;
+  a.touch = null;
+  a.pending = null;
   a.path = null;
   a.gkPlan = null;
   a.offIds = [];
@@ -2360,12 +2838,25 @@ function setPieceAfterOut(a: Attack, kind: 'corner' | 'throw', side: number) {
 /* ---------- defenders ---------- */
 
 function defend(a: Attack, d: Body, dt: number) {
+  // containing the man on the ball goal-side, facing it (render: 'jockey' and `look`)
+  if (defendMove(a, d, dt)) act(d, 'jockey', a.t);
+  else if (d.act === 'jockey') act(d, 'idle', a.t);
+}
+
+/** Where a defender goes this step. True when he's the first man containing the dribbler. */
+function defendMove(a: Attack, d: Body, dt: number): boolean {
   const ball = a.ball;
   const owner = ownerOf(a);
   const top = topSpeed(d.p);
+  if (d.act === 'poke') {
+    // the poke's lunge: at where the ball will be when it lands
+    const at = a.touch ? ballAhead(a, Math.max(0, d.commit - a.t)) : ball;
+    steer(d, at.x, at.y, top, dt, false);
+    return false;
+  }
   if (d.act === 'wall' && a.setPiece) {
     d.vx = d.vy = 0;
-    return;
+    return false;
   }
   if (a.setPiece) {
     // set pieces: hold the zone, mark the man nearest it
@@ -2373,7 +2864,7 @@ function defend(a: Attack, d: Body, dt: number) {
     const tx = m ? m.x + (GX - m.x) * 0.1 : d.home.x;
     const ty = m ? m.y + 0.9 : d.home.y;
     steer(d, (tx + d.home.x) / 2, (ty + d.home.y) / 2, 3, dt);
-    return;
+    return false;
   }
   const bx = owner ? owner.x : ball.x;
   const by = owner ? owner.y : ball.y;
@@ -2393,33 +2884,46 @@ function defend(a: Attack, d: Body, dt: number) {
       const m = meetPoint(a, d, f.kind === 'ground' || f.kind === 'through' ? 0.9 : 2.4);
       if (m) {
         steer(d, m.x, m.y, top, dt);
-        return;
+        return false;
       }
     }
   }
   if (ball.owner === null && (!f || f.kind === 'clear' || f.kind === 'parry')) {
     if (order[0] === d || order[1] === d) {
       steer(d, ball.x, ball.y, top, dt);
-      return;
+      return false;
     }
   }
   if (owner && owner.side === 'A') {
     if (order[0] === d) {
       const g = norm(GX - seen.x, PL - seen.y);
-      // chasing from behind: flat out at where he's going, no slowing to jockey
-      if ((d.x - owner.x) * g.x + (d.y - owner.y) * g.y < 0) {
-        steer(d, owner.x + owner.vx * 0.25, owner.y + owner.vy * 0.25, top, dt, false);
-        return;
+      // a shield: tight to his back, trying to get round or through him (tackles)
+      if (owner.act === 'shield') {
+        steer(d, owner.x + g.x * 0.8, owner.y + g.y * 0.8, top * 0.9, dt);
+        d.look = { x: ball.x, y: ball.y };
+        return true;
       }
-      // goal-side: jockey, then close in to tackle
-      const close = dist(d, owner) < 3 ? 0.9 : 1.6;
-      steer(d, seen.x + g.x * close, seen.y + g.y * close, top * (dist(d, owner) > 6 ? 1 : 0.92), dt);
-      return;
+      // chasing from behind: flat out at the ball (out ahead of him between touches), no jockeying
+      if ((d.x - owner.x) * g.x + (d.y - owner.y) * g.y < 0) {
+        steer(d, ball.x + ball.vx * 0.25, ball.y + ball.vy * 0.25, top, dt, false);
+        return false;
+      }
+      // goal-side (AI-2, soccer-5): contain at his distance (nearer for a better defender), square to
+      // the ball, and wait for it to come off the man's feet (tackles)
+      const cd = lerp(TACKLE.contain[0], TACKLE.contain[1], rt(d.p.a.DEF));
+      const far = dist(d, owner);
+      steer(d, seen.x + g.x * cd, seen.y + g.y * cd, top * (far > 6 ? 1 : 0.92), dt);
+      if (far > 6) return false;
+      d.look = { x: ball.x, y: ball.y };
+      return true;
     }
     if (order[1] === d) {
+      // the cover: inside 22 m of goal on the shooting lane, close enough to block; further out, the
+      // space behind the first man
       const g = norm(GX - seen.x, PL - seen.y);
-      steer(d, seen.x + g.x * 4.5, seen.y + g.y * 4.5, top * 0.95, dt);
-      return;
+      const k = dist(seen, goalC) < 22 ? 3.2 : 4.5;
+      steer(d, seen.x + g.x * k, seen.y + g.y * k, top * 0.95, dt);
+      return false;
     }
   }
   // zonal: his slot across the line, shifted toward the ball; mark the man in his zone, goal-side
@@ -2442,6 +2946,7 @@ function defend(a: Attack, d: Body, dt: number) {
     }
   }
   steer(d, tx, Math.min(ty, PL - 1), speed, dt);
+  return false;
 }
 
 function nearestAttacker(a: Attack, q: Pt, within: number): Body | null {

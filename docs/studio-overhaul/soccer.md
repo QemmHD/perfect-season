@@ -711,6 +711,157 @@ S2, the keeper's goals per on-target shot by yards (< 6 / 6–12 / 12–18 / 18�
 - S8 partly (gold beats the assist by +6.5 and +14.5 points in build and counter, +1 in wide; the assist reaches 41–61% of gold, not 70%).
 - Save% 74.5% (64–72), blocked 12.4% (≥ 18%), woodwork 1.7% (2–4%), S2 point-blank 50% (70–80) and beyond 25 yd 2.8% (8–12, mostly free kicks).
 
+## soccer-5 · Touch dribbling, shielding and defenders who contain (B-1, B-2, R-3)
+
+**What changed** (V2 B.3.4; audit B-1, B-2, R-3, AI-1, AI-2; plan soccer-5 and Appendix A's first half). Engine, AI and ratings change, so this rides the soccer protocol bump (below).
+
+- **The rolling ball (`engine.ts` `TOUCH`, `dribbleBall`, `takeTouch`; `ratings.ts` `touchOf`, `strideLen`, `touchScale`).** The ball is no longer glued to the dribbler's feet. On each touch beat he knocks it out along the run he wants, solved so it gets `out` m beyond the foot at most and he catches it on the next beat; between touches it rolls on its own. `Attack.touch` holds the beat (`at`, `next`, `out`, the roll's slowing `k`, a sharp turn's time); `Body.touchAt` marks every touch for the players' clips.
+  - Cadence (G7): a touch every 2 strides with the ball 0.6–1.0 m ahead at a jog (75% of top speed, `DRIBBLE_JOG`); 3–4 at a run (a tired sprint); 5–6 with it 3–5 m ahead at a sprint. Close control (the stick part-way, 0.5–0.85) is every 1.5 strides, 0.2 m out, at 90% of the jog. DRI shortens every touch (DRI 95 travels 0.74× DRI 60).
+  - Between touches he runs onto the ball. The stick's new direction is taken at the next touch, or at once with an early turn touch once the ball is back in reach. A turn of more than 60° leaves the ball exposed for 0.35 s.
+  - A pass or shot asked for while the ball is out (more than 0.8 m away) is `Attack.pending`: he runs onto it and plays it as he gets there. SHOOT wound up with the ball out does the same.
+  - A ball he leaves 4 m behind its planned run is loose (`lost-touch`, HEAVY TOUCH).
+- **Movement:** the turning circle by speed (`turnRate`: lateral grip 8–12 m/s² by DRI/PAC, so about 1 rad/s at a sprint, 2 at a jog); a turn of more than 120° above 70% of top speed brakes first. A defender's body within 0.85 m slows the dribbler to 0.60–0.85 of his pace, set by the PHY difference (`contactPace`).
+- **First touch:** a controlled pass is taken on the receiver's run. It is heavier for a hard pass (+1/14 per m/s over 10) or one arriving from behind him (+0.5), and shorter for a good dribbler. A man standing still traps it. A set-piece taker leaves the ball on the spot.
+- **Shielding (G9):** with the stick back toward his own goal and a defender within 1.5 m (kept until 2.2 m), the dribbler takes act `'shield'`: his back to the defender, the ball on his far foot, walking pace. The defender gets tight and tries to go through him. Each try wins the ball with `shieldBreak` (PHY difference and a little DEF).
+- **Defenders who contain (AI-2; `TACKLE`, `tackles`, `resolvePoke`, `defendMove`):**
+  - The first defender holds goal-side at lerp(2.5, 1.5, DEF) m, as act `'jockey'`, with `Body.look` on the ball (render only). Inside 22 m the second covers the shooting lane at 3.2 m.
+  - **No auto-tackles.** A defender goes in only when the ball is exposed between touches (more than 0.6 m from the carrier's body), just after a sharp turn, through a shield, or as the last man chasing a breakaway inside 30 m.
+  - Before going in he waits his read delay (0.36 → 0.10 s by DEF), then a visible 0.25 s `'poke'` wind-up. He goes in only when he rates his chance at 0.40 or better (0.24 inside 20 m). A poor tackler over-rates his chance by up to 1.7×.
+  - Where the ball is when the poke lands decides it: tackleWin × the angle (from behind 0.75, from the side 0.9) × how exposed the ball is.
+  - A knock that runs into him (more than 1.1 m out, and nearer him than its owner) is his to take at once, one try per touch.
+  - A miss leaves him beaten for 0.95 s (0.45 s if the ball was never in reach).
+  - The pursuer chases the ball between touches, not the man.
+- **Fouls (R-3):** `foulChance` = clamp(0.02 + 0.11·(1 − DEF) + 0.10 from behind + 0.04·DRI − 0.05·defIQ, 0.015, 0.20) (up to 0.40 before), ×0.5 when he went for a ball in reach and ×0.5 for a frontal foul in the box. A foul only counts if he caught the man (within 0.85 m). A foul from behind or level, on a breakaway, is a **yellow** (`Attack.yellows`, event `yellow`, the toast's sub-line YELLOW CARD).
+- **B-2:** tackleWin's logistic scale goes from 11 to 20 points (`TACKLE_SCALE`), bounded 0.15–0.85, so a 10-point gap is worth about 0.70 (0.83 before).
+- **No gold off a sprint touch:** at more than 85% of his dribbling top speed with the ball knocked out of reach, the ring is amber, `why: 'stride'`, shown as "ON THE RUN · ball at your feet for gold". Lofted balls and crosses go ×1.2 off at a sprint and ×1.3 under pressure (ground passes keep ×1.15 and ×1.35).
+- **AI-1 (`autopilot.ts`):**
+  - The pilot carries the ball at close control within 5 m of a man and sprints only into 12 m of space.
+  - It reads a pass only with the ball at its feet, and the pass goes to the man it was read for (`pass(…, toId)`; before, it went to whoever was nearest that way).
+  - Through balls into space go to a forward level with the line, run or no run (`THRU`).
+  - It switches play when 4 or more defenders are within 12 m of the ball and a teammate more than 20 m across has 6 m of room (`SWITCH`).
+  - A sharp pilot waits for a clear look (no man within 2.2 m) before shooting from beyond 11 m.
+- **`skillStars(p)`** (`ratings.ts`, plan §5.10, the single source): DRI 88+ → 5, 80–87 → 4, 70–79 → 3, 60–69 → 2, else 1. Wingers, attacking midfielders and strikers get the full scale; full-backs and midfielders top out at 4; centre-backs and keepers at 2 (§5.10 doesn't say what FB/DM/CM get: 4 is our reading).
+- **The `skilled` proxy** (`scripts/soccer/lib.ts`, in `human.ts`):
+  - In space it sprints. Within 5 m of a man it carries the ball at close control and angles away from him and off the touchline.
+  - Pressed, it passes to the most open man further on, or shields.
+  - It shoots from 13 m, or from 18 m when nobody is within 2.1 m.
+- **The read-out (`soccerFeedback`):** TACKLED BETWEEN TOUCHES, TACKLED, HEAVY TOUCH, YELLOW, SHIELDED, ON THE RUN; facts "Won off you" (between touches · gap) and "Cards".
+- **The match screen:** HEAVY TOUCH and SHIELDED toasts; YELLOW CARD as the free kick's, penalty's or advantage's sub-line.
+- **Render stand-in** (players section, marked merge): a `'poke'` plays the start of the kick clip, and a jockeying or poking defender faces the ball (`look`).
+- **Deferred to soccer-6 (lead decision 6, plan risk 20):** the acceleration archetypes (Explosive, Lengthy, Controlled). Touch dribbling was the must-ship part.
+
+**Before → after** (same seeds; before = HEAD `921f637`, measured in a detached copy of it; after = this commit's tree).
+
+`human.ts 200` (defIQ 0; per attack goal %):
+
+| Row | Build | Counter | Wide |
+|---|---|---|---|
+| Beeline sprint, SHOOT at 12 m | 19.0 → 18.0 | 36.5 → 19.0 | 25.5 → 13.5 |
+| Beeline sprint, 16 m | 11.5 → 13.0 | 27.5 → 12.5 | 25.5 → 14.5 |
+| Beeline sprint, 20 m | 4.5 → 10.0 | 23.0 → 11.5 | 15.0 → 12.5 |
+| Beeline sprint, 20 m drag | 11.0 → 9.5 | 37.5 → 17.5 | 16.0 → 12.5 |
+| Beeline jog, 16 m | 5.0 → 9.5 | 7.5 → 8.0 | 16.0 → 17.0 |
+| Weave sprint, 16 m | 8.5 → 0.5 | 16.5 → 1.0 | 20.0 → 1.0 |
+| **`skilled`** (new) | 10.5 | 22.5 | 24.5 |
+| Autopilot 0.68 (Pro) | 10.0 → 8.5 | 5.0 → 11.0 | 11.5 → 11.5 |
+| Autopilot 0.88 (Legend) | 12.0 → 10.5 | 10.5 → 11.0 | 12.0 → 16.0 |
+| Penalties won by a beeline row (most) | 9.0 → 1.0 | 9.0 → 2.5 | 12.0 → 1.5 |
+| Free kicks won by a beeline row (most) | 28.0 → 2.5 | 9.0 → 1.0 | 25.5 → 2.0 |
+
+- **P1** (every no-skill row ≤ 1.3× the Pro autopilot): the worst row went from **7.5×** (counter, drag; 2.9× in the audit) to **2.1×** (build, 12 m: 18.0 vs 8.5). Counter is now 1.7× and wide 1.5×. **Not met.**
+- **P3** (pens ≤ 3%, FKs ≤ 8%): **met.** The most is 2.5% / 2.5% at defIQ 0, and 3.0% / 5.5% at defIQ 1.
+- **P4** (`skilled` ≥ the best no-skill row + 5):
+  - wide: +7.5, **met**;
+  - counter: +3.5, **short by 1.5**;
+  - build: −7.5, **not met** (the beeline's 12 m sprint is still the strongest build row).
+
+`ratings-human.ts 300` (beeline at 16 m vs a 78 defence; attackers 60 / 70 / 80 / 90 / 99):
+
+| Row | Before | After | Target |
+|---|---|---|---|
+| Counter, all stats | 0.3 / 0.3 / 16.7 / 65.0 / 93.3 | 0.0 / 0.7 / 5.0 / 34.7 / 80.7 | P5 3–12 / 8–20 / 15–30 / 22–40 / 30–55, no step > ×2.5 |
+| Build, all stats | 0.0 / 0.3 / 8.7 / 49.3 / 66.7 | 0.0 / 1.3 / 18.3 / 42.0 / 68.0 | |
+| Wide, all stats | 3.3 / 4.3 / 16.0 / 45.3 / 69.0 | 1.3 / 2.0 / 5.0 / 49.0 / 76.7 | |
+| Counter, PAC only | 1.7 / 3.3 / 13.0 / 31.3 / 40.7 | 0.7 / 0.3 / 10.7 / 10.0 / 16.0 | P6 monotone, no step > ×2.5 |
+| Autopilot, counter / build (60 / 80 / 99) | 2.3 / 7.0 / 26.3; 4.0 / 6.7 / 17.3 | 2.3 / 14.0 / 22.0; 5.3 / 14.0 / 25.7 | 60 → 99 gap ≥ 15 ✓ (build 20.4) |
+
+- **P5** is not met. The bottom of the curve is still a cliff for a no-skill run at 60–70, and 99 reaches 68–81%.
+- **P6** is not met. PAC alone now matters much less: counter 0.7 → 16%. The curve is not monotone at 60/70 and 80/90; the samples are small.
+- These are the remaining "B-2 cliff" work (followup).
+
+`sim.ts 400 pro` (AI vs AI, real elevens):
+
+| Measure | Before | After | Target |
+|---|---|---|---|
+| Goals/match; draws; 0–0 | 1.15; 43.3%; 32.5% | **1.50; 38.0%; 21.3%** | soccer-7: 2.4–2.7; 22–29%; 4–10% |
+| Better side (ΔOVR ≥ 8) W/D/L | 43.6 / 40.7 / 15.7 | 52.1 / 35.0 / 12.9 | 60–72 / 18–28 / 7–15 (soccer-7) |
+| Shots/side; on target; goals/shot; save% | 5.54; 40.7; 10.4; 74.5% | 5.21; 47.7; 14.4; 69.8% | 9–13; 32–40; 9–14; 64–72 (soccer-7) |
+| Blocked; woodwork | 12.4; 1.7% | 9.1; 2.3% | ≥ 18; 2–4 |
+| Attack ends G/S/W/B/L/O/T | 8.2/10.0/31.8/9.9/36.9/3.0/0.3 | 10.7/10.7/26.7/6.7/43.3/1.5/0.4 | A10: L ≤ 30, O 2–5, T ≤ 1 |
+| Tackled; intercepted | 4.6; 14.6% | **9.2%**; 15.8% | A10 tackled + poked ≥ 8 ✓; intercepted ≤ 15 (+0.8) |
+| Penalties awarded (400 matches) | 18 | 1 | A12 0.2–0.3 per team per match (soccer-7) |
+| S1 open play 0–6 / 6–11 / 11–16.5 / 16.5–22 / 22–30 / 30+ m | 34.1 / 23.6 / 13.5 / 5.8 / 0.9 / 0.0 | 34.9 / 29.7 / **19.7** / 6.7 / 1.5 / 0.0 | 35–55 / 18–32 / 8–15 / 4–8 / 1.5–4 / ≤ 1.5 |
+
+- **A10:** lost is 43.3%, not met (≤ 30). Tackles and pokes doubled (met). The rest of "lost" is interceptions 15.8, won in the air 8.8, throw-ins 5.2, headed clear 3.5.
+- **soccer-4's S1:** the 11–16.5 m band rose to 19.7%, over its 8–15%, because the autopilot now waits for a clear look before shooting. The other bands hold and stay monotone. On target 47.7% is over the interim 32–42%.
+- The whole-match fit is soccer-7's (it is the plan's one calibration point after the last outcome change).
+- Rings at the AI's open-play releases: gold 1,239, amber (pressure) 1,324, header 584, angle 97, **stride 69**, first 40, red 7.
+
+`probe.ts 3000`:
+- Frozen balls 0.
+- Attacks over the clock + 15 s 0.
+- Goals straight from a parry 0 of 294.
+- After a rebound 27.9%.
+- Attack p50 / p90 / p99 4.8 / 10.1 / 16.2 s (5.5 / 9.9 / 14.3 before).
+- **Step cost 33.2 → 40.6 µs** (engine + autopilot; the poke reads and the touch solve).
+
+**G7–G9 and the rest:**
+- **G7:** cadence probe on a lone carrier, DRI 60 / 75 / 95:
+  - jog: 2.08 / 1.94 / 1.79 strides between touches, the ball 0.79 / 0.74 / 0.67 m ahead at most;
+  - sprint: 5.6 / 5.3 / 4.9 strides, 3.9 / 3.5 / 3.0 m ahead;
+  - close control: 1.5 strides, at most 0.54 m;
+  - a run (pure `touchOf` at 0.87 of top speed): 3.4 strides;
+  - DRI 95's touch travels 0.74× DRI 60's (pure and on the pitch).
+- **G8:** the AI's tackles that won the ball came with it more than 0.6 m off the feet in 94% of cases (n = 120 attacks per scenario; build 82%, counter and wide 100%). The guard in `balance.test.ts` is ≥ 70%.
+- **G9:** a shield holds 2 s in 80.7% of tries at PHY +10, 57.7% even and **31.0%** at PHY −10 (n = 300; targets ≥ 60% / ≤ 35%).
+- **P7:** tackleWin at a 10-point gap is about 0.70 at 60, 70 and 80 (target 0.55–0.75; the guard checks all three), and no 5-point step moves it by 0.15 or more.
+- **P8:** in a breakaway with one poor tackler chasing, every foul was a yellow (21 of 21 in 60 tries; the guard is ≥ 85%).
+- **Switch play:** in the crafted overloads the autopilot plays the lofted switch to the free man on the far side. The guard is ≥ 60% of 40 overloads; in the first four looked at by hand, all four switched. Before, the pass went to the nearer midfielder on the same line.
+
+**Tests**
+- New `touch.test.ts` (5):
+  - G7 cadence and ball distance at a jog, a sprint and close control;
+  - the run's cadence and DRI's 0.75× (pure and on the pitch);
+  - a pass asked for with the ball out waits until he's on it;
+  - G9 (60 tries each way);
+  - the shield's act and the far-foot ball.
+- New `balance.test.ts` (4): P7; P1 pooled guard (≤ 2× the Pro autopilot), P3 and G8 over 180 attacks; P8; switch play.
+- `render-fields.test.ts`: `touchAt` and `look` added to the scribbled fields; 72 attacks (half with a careless pilot); a staged block lunge, because the AI shoots past a man less often now.
+- `play-feedback-soccer.test.ts`: the soccer-5 lines and facts.
+
+**Old tests changed, and why:**
+- `soccer.test.ts` `shootingDrill` and `shooting.test.ts` `oneOnOne` teleport the carrier. They now put the ball at his feet with him: the old glue did that, and the ball no longer follows him. The drill uses the glue's old 0.32 m.
+- `shooting.test.ts` "a better keeper concedes fewer": margins +0.08 → +0.04. The run-in is now on touches, so some shots are struck on the stride and are not gold. `keeper.test.ts` S5 still guards the ratio.
+- `perfect-soccer.test.ts` G2a: a release with the ball out is struck as he gets to it, so the test steps until the strike.
+- `rules.test.ts` R-1 idle dead ball: the clock is required to run until a set piece is won or someone plays the ball and ends the attack. With soccer-5's defending, a defender now clears it at 0.78 s on this seed.
+
+**Golden re-based** (REBASES #4):
+- attacks `1ef39a4bceedfe` → `1d7cdc7e039995`;
+- matches `14489f6955b10b` → `1708a325e6679d`;
+- shootouts unchanged.
+
+Agreement green.
+
+**Suite:** `PS_SPORT=soccer npx vitest run soccer sport-branches` (through `heavy.sh`): **28 files, 218/218, Duration 157.1 s**. That is over the 120 s cap, with the shared box at a load of 6–9; the new files add about 20 s. The default sport (play-feedback, golden, agreement, juice): 6 files, 35/35. `npm run typecheck` is clean.
+
+**Browser QA** (dev server 5217; `scripts/qa/soccer-lab.mjs touch`; real CDP touch on the stick, isolated: 0 requests to live hosts, 0 page errors; screenshots in `O/shots/soccer/soccer-5/`, all looked at; 393×852 at sat 59 and 320×568):
+- `*-touch-jog.png` / `*-touch-sprint.png`: through a real thumb, the ball got at most 0.66 m ahead at a jog (5 touches in 2.2 s) and 2.7–2.9 m at a sprint (3 touches). At the sprint the ball is small at this zoom: the 34 m camera shows it as a few pixels.
+- `*-touch-jockey.png`: the first defender goal-side, square to the ball.
+- `*-touch-poke.png`: the poke on Xavi, between touches at a sprint.
+- `*-touch-shield.png`: the stick back toward goal with a man on him, the ball on the far foot.
+- `*-touch-yellow.png`: "YELLOW CARD · ADVANTAGE PLAYED". The event is staged on the live attack because a breakaway foul is seeded luck; the rule is `balance.test.ts` P8.
+
+
 ## Contracts (plan §5): what soccer publishes and what it adopts
 
 Published in soccer-1 so ut, nba, nfl, players and shell can rely on them from now on. Branches merge only at integration: where another team's piece isn't in our base, soccer writes against the interface below, and the lead keeps one copy at merge. Where another team publishes different names first, theirs win and only `src/game/soccer2/v2/` changes.
@@ -778,12 +929,12 @@ Optional, render-only `Body` fields. The engine writes them from deterministic g
 | `shotKind`, `power: 0..1` | placed / power / finesse / chip / low; backlift 4–10 frames | 4, 6 |
 | `contact: 'foot'\|'head'\|'volley'` | header and volley poses | 4 |
 | `diveHeight: 'low'\|'mid'\|'high'`, `keeperSet` | the keeper's dive; split step ≥ 4 frames before every strike | 4 |
-| `touchAt` | the last dribble touch | 5 |
+| `touchAt` | the last dribble touch (**live, soccer-5**: a real knock-on) | 5 |
 | `trick: { kind; at }` | feint / stepover / roulette / dragback / ballroll | 6 |
 | `slide: { at; dx; dy }` | block lunges and slide tackles | 4, 8 |
-| `look: { x; y }` | facing the ball while jockeying | 5 |
+| `look: { x; y }` | facing the ball while jockeying (**live, soccer-5**) | 5 |
 
-Acts `'jockey'|'poke'|'block'|'getup'|'slide'|'shield'|'trick'`; routing is players' (`'jockey'` → `shuffle`/`shuffle_l`, drifting → walk, `'getup'` → `getup_front`, dives by `diveHeight`, kicks by `kickFoot`, unknown acts fall back safely). **Today:** a quick throw-in's thrower holds the ball overhead with act `'catch'` (the existing arms-up clip) and `passKind: 'throw'`; players may route that to a throw clip.
+Acts `'jockey'|'poke'|'block'|'getup'|'slide'|'shield'|'trick'`; routing is players' (`'jockey'` → `shuffle`/`shuffle_l`, drifting → walk, `'getup'` → `getup_front`, dives by `diveHeight`, kicks by `kickFoot`, unknown acts fall back safely). **Live since soccer-5:** `'jockey'`, `'poke'` (0.25 s wind-up, then `'tackle'`) and `'shield'`. **Today:** a quick throw-in's thrower holds the ball overhead with act `'catch'` (the existing arms-up clip) and `passKind: 'throw'`; players may route that to a throw clip.
 
 ### 5.6 players: impact and celebrations (soccer-3)
 
@@ -822,7 +973,7 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 
 ### 5.10 Single sources
 
-`skillStars(p)` in `soccer2/ratings.ts` (soccer-5); `xgOf` (soccer-4, display and box only); `gradeOf` (soccer-9); `dailyPlayFor` (soccer-10); `cornerLayout(side)` / `CORNER` in `engine.ts` (soccer-1: a dealt corner and an earned one line up from it).
+`skillStars(p)` in `soccer2/ratings.ts` (**live, soccer-5**: W/AM/ST full scale, FB/DM/CM capped at 4, CB/GK at 2); `xgOf` (soccer-4, display and box only); `gradeOf` (soccer-9); `dailyPlayFor` (soccer-10); `cornerLayout(side)` / `CORNER` in `engine.ts` (soccer-1: a dealt corner and an earned one line up from it).
 
 ## Touched outside my lane
 
@@ -849,6 +1000,8 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 | `docs/CREDITS.md` | shared | soccer-4: one section crediting StatsBomb Open Data (CC BY-SA 4.0) for `xg.ts` and the conversion targets. | soccer-4 |
 | `src/game/soccer2/render.ts` players section (`sprite()`) | players (shared file) | Two hooks: the sprite's look-down angle comes from `tiltAt(y)` (≤ `SPRITE_TILT` 0.6, the camera's) instead of `min(0.9, pitchAt)`, and two counters (`stats.sprites`, `stats.stale`) for the stale-draw budget. The size passed in is the camera's (`spriteScale`). | soccer-3 |
 | `src/game/soccer2/render.ts` players section (`sprite()`, the draw call) | players (shared file) | soccer-3 review fix: a `far` flag (a man > 15 m from the ball: 8 facings, every third clip frame, sizes in 4 px steps), and the new-sprite budget 5 always (12 before the whistle), no longer 3 after a long frame (~6 lines). Players may fold this into their LOD. | soccer-3 fix |
+| `src/game/soccer2/render.ts` players section (`animOf`, `sprite()`) | players (shared file) | soccer-5 stand-in, marked merge: act `'poke'` plays the start of the kick clip; a `'jockey'`/`'poke'` defender's facing comes from `Body.look` (the ball) instead of his run (~6 lines). Players' routing (§5.5) replaces it. | soccer-5 |
+| `src/game/play-feedback.ts` (`soccerFeedback` only) | nfl/soccer shared | soccer-5: TACKLED BETWEEN TOUCHES, TACKLED, HEAVY TOUCH, YELLOW, SHIELDED and ON THE RUN lines; the "Won off you" and "Cards" facts; `SOCCER_RING.stride`. | soccer-5 |
 
 ## Protocol
 
@@ -864,10 +1017,21 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 
 **Protocol bump needed: soccer draft 2 → 3, UT 2 → 3, because** soccer-4 changes shot windows (the wind-up by distance, gold by SHO and openness, gold placing the ball exactly, amber and red), the shot, keeper and pass model (the cone by range and context, first-time shots and passes, blocks, the keeper's ratings, reads, races, claims and spread, the assist) and the AI's simulations (the autopilot's range and release against the wind-up). Golden re-based (REBASES #3); agreement green, so both phones of a new client still agree; old and new clients would not. The same single soccer bump covers it. **Do not release soccer online with soccer-4 alone:** the whole-match scoring is soccer-7's fit (below).
 
+**Protocol bump needed: soccer draft 2 → 3, UT 2 → 3, because** soccer-5 changes every open-play attack the AI simulations play: touch dribbling (the ball knocked ahead and rolling between touches, the pending pass and shot, the turning circle, the first touch), the defending (contain, pokes only at an exposed ball, the knock that runs into a defender, the last-ditch challenge), tackleWin's curve, the foul formula and yellows, the amber ring off a sprint touch, the lofted error and the autopilot's reads. Golden re-based (REBASES #4); agreement green. Shielding and close control are a person's inputs, but the engine applies them to any carrier. The same single soccer bump covers it.
+
 ## Hand-offs
 
 - **nba (soccer-4):** soccer's `v2/perfect.ts` follows your `perfect.ts` names (`GOLD_FLOOR_MS`, `WINDOW_CAP`, `windowScale(baseMs, parts)`, `FIRE_MULT`) and adds `ringWindow({ …, amber?, parts? })`, `judge(pressTs, releaseTs, targetMs, win, lagMs)`, `wordFor`, `deviceLagMs`/`setDeviceLag`, `ringMap`/`goldArcPx`/`drawRing`. Soccer's engine imports `ringWindow` and `windowScale` directly (pure), so at merge keep those pure and dependency-free, or soccer keeps its copy for the engine. Your calibrator should call `setDeviceLag(ms)` (or soccer reads yours through `v2/index.ts`).
 - **players (soccer-4):** the §5.5 fields now written: `kickFoot` (shots and passes), `passKind` also `shot`/`header`/`pen`/`fk`, `shotKind` + `power` (backlift 4–10 frames), `contact` (`head`/`volley`/`foot`), `diveHeight` (low < 0.6 m, mid < 1.4 m, high), `keeperSet` (the split step, ≥ 4 frames before every strike) and `slide` (a block lunge: `{ at, dx: ±1, dy: 0 }`). Route them when your clips are in.
+- **players (soccer-5):** route the new acts and fields: `'jockey'` (shuffle facing `look`), `'poke'` (a 0.25 s wind-up then the stab: act `'tackle'` when it lands), `'shield'` (back to the defender, the ball on the far foot), and `touchAt` (a dribble touch: sync the touch foot with the knock; the ball is now genuinely 0.6–1.0 m ahead at a jog and 3–5 m at a sprint). Soccer's 6-line stand-in in `render.ts` is marked merge.
+- **soccer-6 (from soccer-5):** the acceleration archetypes (Explosive / Lengthy / Controlled from PAC/DRI/PHY and height; P6) were deferred under lead decision 6. `skillStars` is ready for TRICK. Also:
+  - the `skilled` proxy still loses to the build beeline (P4);
+  - the person-level rating gradient is still a cliff (P5/P6).
+- **soccer-7 (from soccer-5):**
+  - lost is 43.3% of the AI's attack ends (A10 ≤ 30): interceptions 15.8 and won in the air 8.8;
+  - penalties are now rare (1 in 400 AI matches; A12 0.2–0.3 per team per match);
+  - the 11–16.5 m band is 19.7%: the autopilot waits for a clear look;
+  - goals per match are 1.50.
 - **soccer-7 (whole-match fit):** per-shot conversion is now real football's (S1), so goals per match fell to 1.15 (0–0 32.5%) with 5.5 shots a side. The plan's 9–13 shots a side (A5) and the V2 deal are what bring 2.4–2.7 goals back; also the set-piece floors relaxed here (corners, direct free kicks), save% 74.5 → 64–72, blocked 12.4 → 18+, woodwork 1.7 → 2–4.
 
 - **players (soccer-3):** the stale-draw budget at V2 sizes. Every man on the soccer screen is now 30–45 px, where `sprite()`'s LOD gives 16 facings and a clip frame every 2 steps. Stale draws are 11.8% at 4× CPU (7.3% before, when far men were small). A cheaper LOD for men away from the ball (8 facings, every 3rd frame) and pre-warming each attack's sprites before the whistle are yours; V3 fixes only the sizes. `PITCH` in `soccer2/render.ts` is the palette to retune under your venue grant, and the camera passes sprites `spriteScale(s, ART)` (2.5 px/m steps) at `SPRITE_TILT` 0.6.
@@ -885,6 +1049,13 @@ Buttons-only preference: while A is held, C/D become CHIP/FINESSE and B LOW.
 - **players:** a quick throw-in's thrower carries `passKind: 'throw'` and act `'catch'` (arms up) while he holds the ball; route it to a throw clip if you add one (§5.5).
 
 ## Owner device checks
+
+- soccer-5: the dribble's feel under a real thumb:
+  - the knock-on at a sprint (3–5 m: too loose?) against a jog (0.6–1.0 m);
+  - close control with the stick part-way: can a thumb hold 0.5–0.85 on purpose, or does it need its own marking on the ring?
+  - the shield: the stick pulled back toward your own goal with a man on you;
+  - whether the poke's 0.25 s wind-up reads in time to touch the ball away;
+  - the "ON THE RUN" amber when you shoot at a sprint.
 
 - soccer-4: the gold ring under a real thumb: is the ±30–66 ms window fair, and does the 30 ms default display lag feel right on the phone (nba's calibration will set it per device); the ring's closing ticks, the PERFECT chime climbing on a streak, and the double haptic on gold (iPhone plays it only inside the release touch, so a first-time hit still held as the ball arrives gets the word and the chime but no haptic); legibility of the ground ring and the arc in sunlight; whether "TOO FAR" and "PRESSURE" read in time to change your mind.
 

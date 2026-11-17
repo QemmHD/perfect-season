@@ -5,7 +5,7 @@
 //   bash O/heavy.sh npx vite-node scripts/soccer/<name>.ts [n] [part]
 import cardsRaw from '../../src/data/cards-soccer.json';
 import { hashString, rng } from '../../src/engine/rng';
-import { ctrlOf, GX, kickOff, openSide, ownerOf, PL, pressShoot, releaseShoot, setAim, setCurl, setSprint, snapAim, step } from '../../src/game/soccer2/engine';
+import { ctrlOf, dist, GX, kickOff, nearestDefender, offsideLine, openSide, ownerOf, pass, PL, pressShoot, releaseShoot, setAim, setCurl, setSprint, snapAim, step } from '../../src/game/soccer2/engine';
 import { clubSquad, soccerLines, type SoccerCardsFile } from '../../src/game/soccer2/ratings';
 import type { Attack, Pt, SoccerPlayer, SoccerPos, Squad } from '../../src/game/soccer2/types';
 
@@ -119,6 +119,99 @@ export function beeline(a: Attack, st: Strat, r: () => number): Attack {
           setAim(a, aim);
         }
       }
+    } else if (!own) stick = null;
+    if (a.meter && holdUntil > 0 && a.t >= holdUntil) {
+      releaseShoot(a, aim);
+      holdUntil = -2;
+    }
+    step(a, 1 / 60, stick);
+  }
+  return a;
+}
+
+/**
+ * The `skilled` proxy (soccer-5, plan P4): a person who plays the touch model as it's meant. With 12 m
+ * of space in front he sprints at goal; with a defender within 5 m in front he eases the stick part-way
+ * (close control, the ball never off his feet) and angles away from him and off the touchline; pressed
+ * (a man within 3.5 m in front, or 6 m late in the clock) he passes to the most open teammate further
+ * on (a ground pass along the stick, the free pass), or shields if nobody's on. He shoots from 13 m in,
+ * or from 18 m with no defender within 2.1 m (so the ring can be gold), dragging to the open side's low
+ * corner, timing sd `sd`. Set pieces as the beeline takes them. Plays the attack out.
+ */
+export function skilled(a: Attack, r: () => number, sd = 0.06): Attack {
+  kickOff(a);
+  let n = 0;
+  let holdUntil = -1;
+  let aim: Pt | null = null;
+  let nextLook = 0;
+  let run: Pt = { x: 0, y: 1 };
+  let sprint = false;
+  while (!a.end && n++ < 60 * 150) {
+    const c = ctrlOf(a);
+    const own = ownerOf(a);
+    let stick: Pt | null = { x: 0, y: 0 };
+    if (a.setPiece && a.taker === c.id && !a.meter && !a.strike) {
+      if (pressShoot(a)) {
+        holdUntil = a.t + a.meter!.top + gauss(r) * sd;
+        const pen = a.setPiece?.kind === 'penalty';
+        const far = a.setPiece ? (a.setPiece.spot.x < GX ? 1 : -1) : 1;
+        aim = snapAim({ x: (pen ? (r() < 0.5 ? -1 : 1) : far) * 0.9, y: pen ? -0.8 : 0.6 });
+        setAim(a, aim);
+      }
+    } else if (own && own.id === c.id) {
+      const goal = { x: GX, y: PL - 1 };
+      const d = Math.hypot(GX - c.x, PL - c.y);
+      const near = nearestDefender(a, c);
+      // the nearest defender in front of him (between him and the goal, roughly)
+      let front = 99;
+      for (const q of a.bodies) if (q.side === 'D' && q.role !== 'gk' && q.y > c.y - 0.5 && a.t >= q.stunUntil) front = Math.min(front, dist(q, c));
+      if (!a.meter && holdUntil < 0 && (d <= 13 || (d <= 18 && near.d > 2.1)) && pressShoot(a)) {
+        holdUntil = a.t + a.meter!.top + gauss(r) * sd;
+        aim = snapAim({ x: openSide(a, c).side * 0.95, y: -0.85 });
+        setAim(a, aim);
+      } else if (!a.meter && holdUntil < 0 && a.t >= nextLook) {
+        nextLook = a.t + 0.2;
+        const g = norm(goal.x - c.x, goal.y - c.y);
+        let rx = g.x;
+        let ry = g.y;
+        for (const q of a.bodies) {
+          if (q.side !== 'D' || q.role === 'gk' || a.t < q.stunUntil) continue;
+          const e = dist(q, c);
+          if (e > 7 || e < 0.01) continue;
+          const w = (7 - e) / 7;
+          rx += ((c.x - q.x) / e) * w * 1.4;
+          ry += ((c.y - q.y) / e) * w * (q.y > c.y ? 0.8 : 0.2);
+        }
+        // and in off the touchline
+        rx += Math.max(0, 9 - c.x) * 0.35 - Math.max(0, c.x - 59) * 0.35;
+        const dir = norm(rx, Math.max(-0.1, ry));
+        sprint = front > 12 && a.stamina > 0.15;
+        run = front < 5 ? { x: dir.x * 0.7, y: dir.y * 0.7 } : dir;
+        if (front < 3.5 || (a.used > a.clock - 8 && front < 6)) {
+          // pressed: the most open man further on, else hold it up
+          const line = offsideLine(a);
+          let best: { q: (typeof a.bodies)[number]; v: number } | null = null;
+          for (const q of a.bodies) {
+            if (q.side !== 'A' || q === c || q.y < c.y - 3 || (q.y > line && q.y > c.y)) continue;
+            const L = dist(q, c);
+            if (L < 5 || L > 30) continue;
+            const free = nearestDefender(a, q).d;
+            let lane = 99;
+            for (const z of a.bodies) {
+              if (z.side !== 'D' || z.role === 'gk') continue;
+              const k = Math.max(0.1, Math.min(0.9, ((z.x - c.x) * (q.x - c.x) + (z.y - c.y) * (q.y - c.y)) / (L * L)));
+              lane = Math.min(lane, Math.hypot(c.x + (q.x - c.x) * k - z.x, c.y + (q.y - c.y) * k - z.y));
+            }
+            if (free < 2.5 || lane < 1.3) continue;
+            const v = free + (q.y - c.y) / 6;
+            if (!best || v > best.v) best = { q, v };
+          }
+          if (best) pass(a, 'ground', { x: best.q.x - c.x, y: best.q.y - c.y }, true);
+          else if (near.d < 1.4) run = { x: 0, y: -1 };
+        }
+      }
+      stick = run;
+      setSprint(a, sprint && !a.meter);
     } else if (!own) stick = null;
     if (a.meter && holdUntil > 0 && a.t >= holdUntil) {
       releaseShoot(a, aim);

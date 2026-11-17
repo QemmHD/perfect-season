@@ -1,13 +1,13 @@
 // Scripted person strategies on the real engine (studio overhaul soccer-1, ported from the
 // 2026-11-09 audit's soccer_human.ts, same seeds): the no-skill beelines (sprint at goal, SHOOT at
-// 12-30 m, aim assist or a drag), a jog, a weave, against the Pro and Legend autopilot on the same
-// attacks; then penalties and free kicks taken by a person. Finds dominant strategies and exploits.
+// 12-30 m, aim assist or a drag), a jog, a weave, the `skilled` proxy (soccer-5), against the Pro
+// and Legend autopilot on the same attacks; then penalties and free kicks taken by a person. Finds dominant strategies and exploits.
 //   bash O/heavy.sh npx vite-node scripts/soccer/human.ts [n=200]
 import { autoplayAttack } from '../../src/game/soccer2/autopilot';
 import { bendCurl, GX, setupAttack } from '../../src/game/soccer2/engine';
 import { hashString, rng } from '../../src/engine/rng';
 import type { Pt, Scenario } from '../../src/game/soccer2/types';
-import { arg, beeline, pairsOf, realSquads, setPieceHuman, tally, type Strat } from './lib';
+import { arg, beeline, pairsOf, realSquads, setPieceHuman, skilled, tally, type Strat } from './lib';
 
 const N = Number(arg(0, '200'));
 const pairs = pairsOf(realSquads(), N, 'human-pairs');
@@ -26,6 +26,7 @@ for (const dq of [0, 1]) {
   console.log('\n=== defIQ ' + dq + ' (n=' + N + ' per row, random real club-season matchups) ===');
   for (const sc of ['build', 'counter', 'wide'] as Scenario[]) {
     for (const st of STRATS) tally(sc + ' | ' + st.name, N, (i) => beeline(setupAttack(sc, pairs[i][0], pairs[i][1], 'h' + sc + i, { defIQ: dq }), st, rng(hashString('hr' + i + st.name))));
+    tally(sc + ' | skilled (touch model, soccer-5)', N, (i) => skilled(setupAttack(sc, pairs[i][0], pairs[i][1], 'h' + sc + i, { defIQ: dq }), rng(hashString('hs' + i))));
     tally(sc + ' | autopilot 0.68 (Pro AI)', N, (i) => autoplayAttack(setupAttack(sc, pairs[i][0], pairs[i][1], 'h' + sc + i, { defIQ: dq }), 0.68, 'p' + i));
     tally(sc + ' | autopilot 0.88 (Legend AI)', N, (i) => autoplayAttack(setupAttack(sc, pairs[i][0], pairs[i][1], 'h' + sc + i, { defIQ: dq }), 0.88, 'p' + i));
   }

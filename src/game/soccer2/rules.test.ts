@@ -83,9 +83,16 @@ describe('R-1: a dead shot is a loose ball', () => {
     a.ball.vh = 0;
     a.ball.h = 0.11;
     const used0 = a.used;
-    for (let i = 0; i < 60; i++) step(a, DT, { x: 0, y: 0 });
+    // (the clock runs every step until a set piece is won or somebody plays the ball and ends it: with
+    // soccer-5's defending either can come sooner on this seed)
+    let open = 0;
+    for (let i = 0; i < 60; i++) {
+      step(a, DT, { x: 0, y: 0 });
+      if (!a.setPiece && !a.end) open = i + 1;
+    }
     expect(a.ball.flight?.kind).not.toBe('shot');
-    expect(a.used - used0).toBeGreaterThan(0.9);
+    expect(a.used - used0).toBeGreaterThan(Math.min(0.9, open * DT - 0.1));
+    expect(open * DT).toBeGreaterThan(0.5);
     // (a set piece won meanwhile is taken for him after SET_PIECE_WAIT, as the match screen's AUTO KICK
     // does; soccer-4: this seed now wins a free kick on the loose ball)
     const pl = pilot(0.68, 'idle-dead-auto');

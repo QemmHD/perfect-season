@@ -33,3 +33,17 @@ describe('soccerFeedback (soccer-4)', () => {
     expect(fact(atk({ kind: 'S', text: 'SAVED' }, shot({})), 'xG')).toBeUndefined();
   });
 });
+
+describe('soccerFeedback (soccer-5)', () => {
+  const withEv = (a: Attack, o: Partial<Attack>) => ({ ...a, ...o }) as Attack;
+  it('TACKLED BETWEEN TOUCHES, HEAVY TOUCH, SHIELDED and YELLOW', () => {
+    const lost = atk({ kind: 'L', text: 'TACKLED BY X' }, null);
+    expect(soccerFeedback(withEv(lost, { tackled: { by: 3, gap: 2.4, poke: true } })).next).toMatch(/^TACKLED BETWEEN TOUCHES/);
+    expect(fact(withEv(lost, { tackled: { by: 3, gap: 2.4, poke: true } }), 'Won off you')).toBe('Between touches · 2.4 m out');
+    expect(soccerFeedback(withEv(atk({ kind: 'L', text: 'CLEARED BY X' }, null), { lostTouch: true })).next).toMatch(/^HEAVY TOUCH/);
+    expect(soccerFeedback(withEv(atk({ kind: 'S', text: 'SAVED' }, null), { shielded: 1 })).next).toMatch(/^SHIELDED/);
+    const card = withEv(atk({ kind: 'S', text: 'SAVED' }, null), { yellows: ['p1'] });
+    expect(soccerFeedback(card).next).toMatch(/^YELLOW/);
+    expect(fact(card, 'Cards')).toBe('1 yellow');
+  });
+});

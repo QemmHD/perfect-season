@@ -82,8 +82,9 @@ const RING_LINE: Record<RingWhy, string> = {
   first: 'FIRST TIME · across your body',
   header: 'HEADER · too far out for gold',
   angle: 'TIGHT ANGLE · no gold from here',
+  stride: 'ON THE RUN · ball at your feet for gold',
 };
-const RING_WORD: Record<RingWhy, string> = { range: 'TOO FAR', pressure: 'PRESSURE', first: 'ACROSS YOUR BODY', header: 'TOO FAR OUT', angle: 'TIGHT ANGLE' };
+const RING_WORD: Record<RingWhy, string> = { range: 'TOO FAR', pressure: 'PRESSURE', first: 'ACROSS YOUR BODY', header: 'TOO FAR OUT', angle: 'TIGHT ANGLE', stride: 'ON THE RUN' };
 /** How long a release's word stays in the toast line (ms); the ring's closing ticks (s before the gold). */
 const RELEASE_MS = 950;
 const TICKS = { from: 0.2, every: 0.05, n: 4 };
@@ -461,13 +462,16 @@ export function Soccer2({
         sfx.tackle(0.6);
       } else if (e === 'penalty') {
         swell(1);
-        say('PENALTY!', 'big', 1600, 'FOULED IN THE BOX');
+        say('PENALTY!', 'big', 1600, a.events.includes('yellow') ? 'YELLOW CARD' : 'FOULED IN THE BOX');
         clearInput();
       } else if (e === 'freekick') {
-        say('FREE KICK', 'good', 1300, 'FOULED');
+        say('FREE KICK', 'good', 1300, a.events.includes('yellow') ? 'YELLOW CARD' : 'FOULED');
         clearInput();
         tip('fk', TIPS.fk);
-      } else if (e === 'advantage') say('ADVANTAGE', 'plain', 800);
+      } else if (e === 'advantage') say(a.events.includes('yellow') ? 'YELLOW CARD' : 'ADVANTAGE', 'plain', a.events.includes('yellow') ? 1300 : 800, a.events.includes('yellow') ? 'ADVANTAGE PLAYED' : undefined);
+      // the dribble (soccer-5): a shield that held, a touch too heavy to keep
+      else if (e === 'shielded') say('SHIELDED', 'good', 900);
+      else if (e === 'lost-touch' || e === 'heavy-first') say('HEAVY TOUCH', 'plain', 900);
       // restarts earned in play (R-2): a corner off a defender or the keeper, a quick throw-in
       else if (e === 'corner-won') {
         sfx.whistle();

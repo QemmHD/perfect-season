@@ -14,7 +14,10 @@
 // lined up in the same attack, then a ball off a defender over the touchline and the quick throw-in).
 // soccer-4 (2026-11-16): `ring` (the gold ring: gold let go on the gold with the word, chime and
 // haptic frames and the judged offset against the touches' timestamps; amber under pressure; red TOO FAR).
-// Parts: all | smoke | play | buttons | auto | sets | pens | bend | autokick | confetti | restarts | layout | ring.
+// soccer-5 (2026-11-16): `touch` (the dribble: the ball knocked 0.6-1.0 m ahead at a jog and 3-5 m at a
+// sprint through a real thumb on the stick; a defender jockeying, facing the ball, and a poke between
+// touches; a shield with the stick back toward goal; the yellow card's toast, staged through its event).
+// Parts: all | smoke | play | buttons | auto | sets | pens | bend | autokick | confetti | restarts | layout | ring | touch.
 import { launch, base, artifacts } from './browser.mjs';
 import { blocked, blockedLine, computedSat, phone, PRESETS, urlFor } from '../soccer/qa-isolate.mjs';
 import fs from 'node:fs';
@@ -356,6 +359,109 @@ for (const p of [preset('393x852-sat59'), preset('320x568')]) {
     errorsAll.push(...errors);
     if (!theirGoal) errorsAll.push(tag + ': no rival goal in the shootout to check the confetti');
     await context.close();
+  }
+  if (part('touch')) {
+    const look = (page) => page.evaluate(() => { const a = window.__soccer.a; const c = a.bodies[a.ctrl]; const own = a.ball.owner === c.id; return { t: a.t, own, ahead: Math.hypot(a.ball.x - c.x, a.ball.y - c.y), v: Math.hypot(c.vx, c.vy), touchAt: c.touchAt ?? null, act: c.act, defs: a.bodies.filter((b) => b.side === 'D').map((b) => b.act), end: a.end?.text ?? null }; });
+    const away = (page, near) => page.evaluate((near) => { const a = window.__soccer.a; const c = a.bodies[a.ctrl]; let first = true; for (const b of a.bodies) if (b.side === 'D' && b.role !== 'gk') { if (near && first) { b.x = c.x; b.y = c.y + near; b.vx = b.vy = 0; first = false; continue; } b.x = 3; b.y = 40; b.vx = b.vy = 0; b.stunUntil = 1e9; } }, near);
+    // 1. the knock-on at a jog and at a sprint (the defence out of it)
+    {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-touch', scenario: 'counter' });
+      await page.locator('.sc2-ctl.go').tap({ force: true });
+      await page.waitForSelector('.ps-stick-ghost');
+      await away(page, 0);
+      const g = await center(page, '.ps-stick-ghost');
+      const r = g.w / 2;
+      const row = { tag, step: 'touch-knock', ringR: r };
+      for (const [mode, k, shot, lo, hi] of [['jog', 0.95, 'touch-jog', 0.6, 1.05], ['sprint', 1.45, 'touch-sprint', 2.6, 5.2]]) {
+        await touch(cdp, 'touchStart', [{ ...g, id: 1 }]);
+        await touch(cdp, 'touchMove', [{ x: g.x, y: g.y - r * 0.5, id: 1 }]);
+        await touch(cdp, 'touchMove', [{ x: g.x, y: g.y - r * k, id: 1 }]);
+        let max = 0;
+        let touches = 0;
+        let last = null;
+        let shotTaken = false;
+        const t0 = Date.now();
+        while (Date.now() - t0 < 2200) {
+          const s = await look(page);
+          if (s.touchAt !== last) ((touches += last === null ? 0 : 1), (last = s.touchAt));
+          max = Math.max(max, s.ahead);
+          if (!shotTaken && Date.now() - t0 > 700 && s.ahead >= lo && s.ahead <= hi) {
+            await page.screenshot({ path: `${out}/${tag}-${shot}.png` });
+            shotTaken = true;
+          }
+          await page.waitForTimeout(30);
+        }
+        const s = await look(page);
+        row[mode] = { maxAhead: +max.toFixed(2), touches, speed: +s.v.toFixed(2), own: s.own, shot: shotTaken };
+        if (!shotTaken || !s.own) errorsAll.push(tag + ': ' + mode + ' knock ' + JSON.stringify(row[mode]));
+        await touch(cdp, 'touchEnd', []);
+        await page.waitForTimeout(700);
+      }
+      report.push(row);
+      errorsAll.push(...errors);
+      await context.close();
+    }
+    // 2. a defender jockeys (facing the ball) and pokes between touches: a sprint at the back line
+    {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-poke', scenario: 'build' });
+      await page.locator('.sc2-ctl.go').tap({ force: true });
+      await page.waitForSelector('.ps-stick-ghost');
+      const g = await center(page, '.ps-stick-ghost');
+      const r = g.w / 2;
+      await touch(cdp, 'touchStart', [{ ...g, id: 1 }]);
+      await touch(cdp, 'touchMove', [{ x: g.x, y: g.y - r * 0.95, id: 1 }]);
+      const seen = { jockey: false, poke: false };
+      const t0 = Date.now();
+      while (Date.now() - t0 < 9000 && !(seen.jockey && seen.poke)) {
+        const s = await look(page);
+        if (s.end) break;
+        if (!seen.jockey && s.defs.includes('jockey')) ((seen.jockey = true), await page.screenshot({ path: `${out}/${tag}-touch-jockey.png` }));
+        if (!seen.poke && s.defs.includes('poke')) ((seen.poke = true), await page.screenshot({ path: `${out}/${tag}-touch-poke.png` }));
+        // past the ring once he's been contained: the long touch the poke is waiting for
+        if (seen.jockey) await touch(cdp, 'touchMove', [{ x: g.x, y: g.y - r * 1.45, id: 1 }]);
+        await page.waitForTimeout(25);
+      }
+      await touch(cdp, 'touchEnd', []);
+      await page.waitForTimeout(900);
+      const s = await look(page);
+      await page.screenshot({ path: `${out}/${tag}-touch-after-poke.png` });
+      report.push({ tag, step: 'touch-defend', seen, end: s.end });
+      if (!seen.jockey || !seen.poke) errorsAll.push(tag + ': defend ' + JSON.stringify(seen));
+      errorsAll.push(...errors);
+      await context.close();
+    }
+    // 3. a shield: a man a metre goal-side, the stick back toward our own goal (down the screen)
+    {
+      const { context, page, errors, cdp } = await open(p, { seed: 'qa-shield', scenario: 'build' });
+      await page.locator('.sc2-ctl.go').tap({ force: true });
+      await page.waitForSelector('.ps-stick-ghost');
+      await away(page, 1.0);
+      const g = await center(page, '.ps-stick-ghost');
+      const r = g.w / 2;
+      await touch(cdp, 'touchStart', [{ ...g, id: 1 }]);
+      await touch(cdp, 'touchMove', [{ x: g.x, y: g.y + r * 0.9, id: 1 }]);
+      let shield = false;
+      for (let k = 0; k < 40 && !shield; k++) {
+        const s = await look(page);
+        if (s.act === 'shield') {
+          shield = true;
+          await page.waitForTimeout(250);
+          await page.screenshot({ path: `${out}/${tag}-touch-shield.png` });
+        } else await page.waitForTimeout(30);
+      }
+      await touch(cdp, 'touchEnd', []);
+      report.push({ tag, step: 'touch-shield', shield });
+      if (!shield) errorsAll.push(tag + ': no shield');
+      // 4. the yellow card's toast (its event staged on the live attack: a breakaway foul is seeded luck)
+      await page.evaluate(() => window.__soccer.a.events.push('foul', 'yellow', 'advantage'));
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: `${out}/${tag}-touch-yellow.png` });
+      const toast = await page.evaluate(() => document.querySelector('.hg2-pop')?.textContent ?? '');
+      report.push({ tag, step: 'touch-yellow', toast });
+      if (!/YELLOW/.test(toast)) errorsAll.push(tag + ': yellow toast ' + toast);
+      errorsAll.push(...errors);
+      await context.close();
+    }
   }
   if (part('ring')) {
     // soccer-4: the gold ring on SHOOT. A shooter alone 18 m out (the defence moved off him through the

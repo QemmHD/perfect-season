@@ -5,7 +5,7 @@
 // who's onside), crosses from wide and shoots when it has the angle. Its skill (0-1) is how
 // sharp those reads are and how close to the green it lets the meter go.
 import { hashString, rng } from '../../engine/rng';
-import { AIM_X, ctrlOf, dist, GX, inBox, kickOff, nearestDefender, offsideLine, ownerOf, pass, PL, pressShoot, releaseShoot, setCurl, setSprint, step } from './engine';
+import { AIM_X, ctrlOf, dist, GX, inBox, kickOff, nearestDefender, offsideLine, ownerOf, pass, PL, pressShoot, releaseShoot, setCurl, setSprint, step, TOUCH } from './engine';
 import { maxRange, rt } from './ratings';
 import type { Attack, Body, PassKind, Pt } from './types';
 
@@ -58,8 +58,20 @@ function openness(a: Attack, from: Pt, q: Body, to: Pt = q): { man: number; lane
  * to lerp(near, far) m by SHO (never past the ring's range gate, never red), from beyond `long` m only
  * when the lane to goal is clear by `lane` m, and then with `longGo` of the usual willingness. With a
  * body in the lane it still shoots from inside `through` m (a real side's shots are a quarter blocked).
+ * soccer-5: from beyond 11 m with a man within `clear` m (an amber ring) a sharp pilot holds it (its
+ * skill is the chance it waits), unless the clock is nearly up.
  */
-export const SHOOTING = { near: 18, far: 28, long: 20, lane: 1.6, longGo: 0.45, through: 22 };
+export const SHOOTING = { near: 18, far: 28, long: 20, lane: 1.6, longGo: 0.45, through: 22, clear: 2.2 };
+/** Switching play (soccer-5, audit AI-1): with `crowd`+ defenders within `near` m of the man on the ball,
+ * a teammate more than `across` m across with no defender within `free` m is worth `bonus` more, lofted. */
+export const SWITCH = { near: 12, crowd: 4, across: 20, free: 6, bonus: 0.9 };
+/** A through ball into space (soccer-5, AI-1): with more than `room` m behind their line, a forward
+ * within `level` m of it (no run needed) is a through-ball option worth `bonus` more. */
+export const THRU = { room: 12, level: 4, bonus: 0.35 };
+/** Close control (soccer-5): a defender within `near` m in front and the pilot carries it at close
+ * control (the stick at `mag`), no sprint (`skill` at least `minSkill`); it sprints only with `sprint` m of
+ * space in front. */
+export const CLOSE = { near: 5, mag: 0.7, minSkill: 0.3, sprint: 12 };
 
 /** A shot from here is on: close enough for him, an angle, nobody in the way. */
 function shotOn(a: Attack, c: Body): boolean {
@@ -93,7 +105,7 @@ export function decide(a: Attack, pl: Pilot): Pt | null {
     releaseShoot(a, pl.aim);
     pl.releaseAt = null;
   }
-  if (a.meter || a.strike || a.kick) return own === c ? { x: 0, y: 0 } : null;
+  if (a.meter || a.strike || a.kick || a.pending) return own === c ? { x: 0, y: 0 } : null;
   // a set piece: a beat to line it up, then take it
   if (a.setPiece && a.taker === c.id) {
     if (pl.setAt === null) pl.setAt = a.t + 0.6 + r() * 0.6;
@@ -148,7 +160,11 @@ function think(a: Attack, pl: Pilot, c: Body) {
   const noise = (1 - pl.skill) * 0.45;
   // shoot when it's on (a sharper pilot waits for a better look)
   const dGoal = dist(c, goal);
-  if (shotOn(a, c) && (dGoal < 13 || r() < lerp(0.45, 0.8, pl.skill) * (dGoal > SHOOTING.long ? SHOOTING.longGo : 1))) {
+  // (soccer-5: a sharp pilot waits for a man to be off him, when the ring can be gold, unless it's close
+  // in or the clock is going)
+  const late = a.used > a.clock - 6;
+  const crowded = pressure < SHOOTING.clear && dGoal > 11 && !late && r() < pl.skill;
+  if (shotOn(a, c) && !crowded && (dGoal < 13 || r() < lerp(0.45, 0.8, pl.skill) * (dGoal > SHOOTING.long ? SHOOTING.longGo : 1))) {
     const gk = a.bodies.find((b) => b.role === 'gk')!;
     const s = Math.abs(gk.x - GX) > 0.3 ? Math.sign(GX - gk.x) : c.x < GX ? 1 : -1;
     // (x in the old 3.3 m aim scale, so its shots go where they did before the 2026-11-02 aim change)
@@ -160,9 +176,16 @@ function think(a: Attack, pl: Pilot, c: Body) {
   const line = offsideLine(a);
   let best: { q: Body; kind: PassKind; v: number } | null = null;
   const wideCross = Math.abs(c.x - GX) > 14 && c.y > PL - 24;
+  // AI-1 (soccer-5): the near side crowded (SWITCH.crowd defenders within SWITCH.near m of the ball)
+  // with a man free on the far side: switch the play; and room behind their line: a through ball into
+  // it for a forward level with the line, run or no run
+  let crowd = 0;
+  for (const d of a.bodies) if (d.side === 'D' && d.role !== 'gk' && dist(d, c) < SWITCH.near) crowd++;
+  const room = PL - line > THRU.room;
   for (const q of a.bodies) {
     if (q.side !== 'A' || q === c) continue;
-    const through = !!q.run && q.y > c.y - 2;
+    const intoSpace = room && !q.run && q.y > c.y + 3 && q.y > line - THRU.level && /^(LW|RW|ST|BX)/.test(q.slot);
+    const through = (!!q.run && q.y > c.y - 2) || intoSpace;
     const o = openness(a, c, q, through ? { x: q.x + (GX - q.x) * 0.1, y: Math.min(PL - 4, q.y + 8) } : q);
     const offside = q.y > line + 0.1 && q.y > c.y;
     const d = dist(c, q);
@@ -179,8 +202,13 @@ function think(a: Attack, pl: Pilot, c: Body) {
     }
     if (through && !offside && o.lane > 1.4) {
       kind = 'through';
-      v += 0.55;
+      v += q.run ? 0.55 : THRU.bonus;
     } else if (offside) v -= 3;
+    // the switch: across the pitch to a man in space on the far side
+    if (crowd >= SWITCH.crowd && Math.abs(q.x - c.x) > SWITCH.across && o.man > SWITCH.free && !offside) {
+      kind = 'lofted';
+      v += SWITCH.bonus;
+    }
     v += gauss(r) * noise;
     if (!best || v > best.v) best = { q, kind, v };
   }
@@ -189,8 +217,10 @@ function think(a: Attack, pl: Pilot, c: Body) {
   for (const d of a.bodies) if (d.side === 'D' && d.role !== 'gk' && d.y > c.y - 1) space = Math.min(space, dist(d, c));
   const carry = Math.min(space, 10) / 8 + rt(c.p.a.DRI) * 0.25 + (c.y < PL - 30 ? 0.15 : 0) - (pressure < 2 ? 0.6 : 0);
   const urgency = a.used > a.clock - 8 ? 0.4 : 0;
-  if (best && best.v > carry + 0.15 - urgency && (pressure < 3.4 || best.kind === 'through' || r() < 0.25)) {
-    pass(a, best.kind, { x: best.q.x - c.x, y: best.q.y - c.y });
+  // (soccer-5: a pass is read off the ball at his feet: with it out between touches he waits for it)
+  const atFeet = dist(a.ball, c) <= TOUCH.reach;
+  if (atFeet && best && best.v > carry + 0.15 - urgency && (pressure < 3.4 || best.kind === 'through' || r() < 0.25)) {
+    pass(a, best.kind, { x: best.q.x - c.x, y: best.q.y - c.y }, false, best.q.id);
     return;
   }
   // dribble: at goal, away from the men around him, down the wing if he's out wide
@@ -207,8 +237,12 @@ function think(a: Attack, pl: Pilot, c: Body) {
     ry += ((c.y - d.y) / e) * w * (d.y > c.y ? 0.9 : 0.2);
   }
   const n = norm(rx + gauss(r) * noise * 0.4, Math.max(-0.2, ry));
-  pl.run = n;
-  pl.sprint = space > 4.5 && a.stamina > 0.3;
+  // sprint only into real space (a sprint knock runs 3-5 m ahead: into the man, and it's his)
+  pl.sprint = space > CLOSE.sprint && a.stamina > 0.3;
+  // a man close in front: carry it at close control (the ball never off his feet), no sprint
+  const close = pl.skill >= CLOSE.minSkill && space < CLOSE.near;
+  pl.run = close ? { x: n.x * CLOSE.mag, y: n.y * CLOSE.mag } : n;
+  if (close) pl.sprint = false;
 }
 
 /** Play an attack out with the pilot on the ball (tests, sims, the AI's attacks). */

@@ -58,6 +58,10 @@ function oneOnOne(att: Squad, def: Squad, seed: string, i: number): Attack {
     c.x = pin.x;
     c.y = pin.y;
     c.vx = c.vy = 0;
+    // (soccer-5: the ball is no longer glued to his feet, so it's held at them with him)
+    a.ball.x = pin.x;
+    a.ball.y = pin.y + 0.35;
+    a.ball.vx = a.ball.vy = 0;
   }
   const want = Math.hypot(GX - spot.x, PL - spot.y);
   for (let f = 0; f < 240 && Math.hypot(GX - c.x, PL - c.y) > want && !a.end; f++) {
@@ -200,8 +204,10 @@ describe('ratings still decide', () => {
     const weak = finish(squad(75), keeper(52), 'gk-', false);
     const avg = finish(squad(75), keeper(75), 'gk-', false);
     const elite = finish(squad(75), keeper(93), 'gk-', false);
-    expect(weak).toBeGreaterThan(avg + 0.08);
-    expect(avg).toBeGreaterThan(elite + 0.08);
+    // (soccer-5: the sprint in is now on touches, so some of these are struck on the stride onto a ball
+    // knocked ahead, fewer of them gold; the margins were +0.08, keeper.test.ts S5 guards the ratio)
+    expect(weak).toBeGreaterThan(avg + 0.04);
+    expect(avg).toBeGreaterThan(elite + 0.04);
   });
 });
 

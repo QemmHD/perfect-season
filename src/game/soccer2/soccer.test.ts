@@ -137,6 +137,10 @@ function shootingDrill(att: Squad, def: Squad, seed: string, x: number, y: numbe
   c.y = y;
   c.fx = 0;
   c.fy = 1;
+  // (soccer-5: the ball is no longer glued to his feet, so it goes with him to the spot, where the old
+  // glue put it: 0.32 m in front)
+  a.ball.x = x;
+  a.ball.y = y + 0.32;
   for (const b of a.bodies) if (b.side === 'D' && b.role === 'def') ((b.x = b.x < GX ? 2 : 66), (b.y = 40), (b.stunUntil = 1e9));
   for (let i = 0; i < 30; i++) step(a, 1 / 60, { x: 0, y: 0 });
   return a;

@@ -169,6 +169,9 @@ describe('G2: gold never lies', () => {
       const held = a.meter.top + (r() - 0.5) * 1.6 * a.meter.green;
       releaseShoot(a, null, 0, held);
       expect(a.release!.gold).toBe(true);
+      // (soccer-5: with the ball out ahead between touches he strikes it as he gets to it)
+      for (let k = 0; k < 90 && !a.strike && a.pending; k++) step(a, DT, run);
+      if (!a.strike) continue;
       const want = a.strike!.info.aim;
       for (let k = 0; k < 600 && !a.end && a.lastShot?.cross == null; k++) {
         step(a, DT, run);

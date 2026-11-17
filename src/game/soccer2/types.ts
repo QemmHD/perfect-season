@@ -60,7 +60,12 @@ export type Act =
   | 'header'
   | 'celebrate'
   | 'set'
-  | 'wall';
+  | 'wall'
+  /* soccer-5 (§5.5 acts): a defender containing goal-side, facing the ball; his visible wind-up before a
+     poke at a ball exposed between touches; a man on the ball with his back to a defender */
+  | 'jockey'
+  | 'poke'
+  | 'shield';
 
 export type Role = 'att' | 'def' | 'gk';
 
@@ -115,6 +120,35 @@ export interface Body {
   keeperSet?: number;
   /** a block lunge (and, from soccer-8, a slide tackle): when, and which way (unit, pitch metres) */
   slide?: { at: number; dx: number; dy: number };
+  /** the time of his last dribble touch (attack time; soccer-5: a real knock-on) */
+  touchAt?: number;
+  /** where he looks while he jockeys: the ball (pitch metres; sim facing fx/fy stays velocity-based) */
+  look?: Pt;
+  /* ---- engine state (soccer-5) ---- */
+  /** a defender's read of the man on the ball: when he may go in (Infinity: not reading) */
+  readAt?: number;
+  /** the touch (its time) a knock last ran into him on: one go at it a touch */
+  blockAt?: number;
+}
+
+/**
+ * The ball at a dribbler's feet between touches (soccer-5, V2 B.3.4): when the last touch was, when
+ * the next is due, how far it was knocked out beyond the foot (m), and how hard the ball slows while it
+ * rolls (m/s²: the knock is solved so he catches it on the beat). `turnAt`: a touch that turned it more
+ * than 60° (the ball is exposed for a moment after it).
+ */
+export interface Touch {
+  /** the man it's at the feet of */
+  by: number;
+  at: number;
+  next: number;
+  out: number;
+  k: number;
+  turnAt?: number;
+  /** the run he wants (the stick, or the brain's): unit way and how hard (0..1), and on the sprint */
+  want?: { x: number; y: number; mag: number; sprint: boolean };
+  /** a close-control touch (the stick part-way) */
+  close?: boolean;
 }
 
 export type PassKind = 'ground' | 'lofted' | 'through';
@@ -141,8 +175,9 @@ export interface Ball {
 }
 
 /** Why a ring is amber or red (soccer-4): a defender within 2 m, a first-time hit turning the ball
- * more than 90° across the body, a header from beyond 8 m, a tight angle inside 12 m, or out of range. */
-export type RingWhy = 'pressure' | 'first' | 'header' | 'angle' | 'range';
+ * more than 90° across the body, a header from beyond 8 m, a tight angle inside 12 m, or out of range;
+ * soccer-5: a sprint with the ball knocked out ahead (`stride`). */
+export type RingWhy = 'pressure' | 'first' | 'header' | 'angle' | 'range' | 'stride';
 
 /** SHOOT held: the gold ring (V2 B.0.1; the power meter before soccer-4). top is where the gold sits
  * (seconds after the press: the wind-up, 0.35 s at 11 m to 0.62 s at 25 m). */
@@ -275,6 +310,17 @@ export interface Attack {
    * most RESTARTS.max; and the latest one's kind (a corner's marking and headers apply after it) */
   restarts?: number;
   restart?: 'corner' | 'throw';
+  /** the dribble (soccer-5): the ball knocked ahead on touch beats, rolling between them */
+  touch?: Touch | null;
+  /** a pass or shot asked for while the ball was out of his reach: he plays it when he gets to it */
+  pending?: null | { kind: 'pass'; how: PassKind | 'loftedThrough'; dir: Pt | null; free: boolean; at: number; to?: number } | { kind: 'shot'; r: ShotRelease; assisted: boolean; at: number };
+  /** the ball won off the man on it (soccer-5): by whom, and how far the ball was from his feet (m) */
+  tackled?: { by: number; gap: number; poke: boolean };
+  /** yellow cards shown in this attack (players' ids; R-3: a foul from behind on a breakaway) */
+  yellows?: string[];
+  /** a touch he couldn't keep (a loose ball off his own heavy touch), and pokes his shield held off */
+  lostTouch?: boolean;
+  shielded?: number;
 }
 
 /** A release of SHOOT, judged: the offset from the gold (s), whether it was in the window, the power,

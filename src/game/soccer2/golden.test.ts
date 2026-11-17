@@ -29,10 +29,18 @@ import type { Attack, Scenario, Squad } from './types';
  *     narrowed, his range read, one read a shot, the races he goes for, crosses he calls for, setting
  *     for the receiver, the spread once he's out), the assist at 80% and the autopilot's range appetite;
  *     the penalty's gold narrowed (the shootouts).
+ *  4. soccer-5 (2026-11-16): touch dribbling (the ball knocked ahead on touch beats and rolling between
+ *     them, passes and shots played as he gets back to it, the turning circle, close control, the first
+ *     touch, shielding), defenders who contain and poke only at a ball exposed between touches (the read,
+ *     the wind-up, the knock that runs into him, the last-ditch challenge), tackleWin's scale 11 → 20
+ *     bounded 0.15-0.85, the R-3 foul formula and yellows, no gold off a sprint touch, lofted error at a
+ *     sprint and under pressure, and the autopilot (close control, sprinting only into space, the pass
+ *     read at his feet and to the man it was read for, through balls into space, switching play, waiting
+ *     for a clear look). The shootouts are unchanged.
  */
 const GOLDEN = {
-  attacks: '1ef39a4bceedfe',
-  matches: '14489f6955b10b',
+  attacks: '1d7cdc7e039995',
+  matches: '1708a325e6679d',
   shootouts: '1f1b284a6ae4a2',
 };
 
