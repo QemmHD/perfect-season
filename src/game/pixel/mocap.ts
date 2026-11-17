@@ -136,9 +136,9 @@ export function clipMeta(name: string): ClipMeta {
  * (readiness.test.ts).
  */
 export const BUNDLED: Record<SportId, readonly string[]> = {
-  nba: ['backpedal', 'celebrate', 'fall_back', 'getup', 'jog', 'jumpshot', 'layup', 'ready', 'run', 'shuffle', 'slip', 'sprint', 'stumble'],
-  nfl: ['backpedal', 'block', 'catch', 'catch_run', 'celebrate', 'dive', 'fall_back', 'fall_forward', 'jog', 'kick', 'ready', 'run', 'shuffle', 'sprint', 'throw'],
-  soccer: ['backpedal', 'catch', 'celebrate', 'dive', 'fall_back', 'fall_forward', 'jog', 'jump', 'kick', 'ready', 'run', 'shuffle', 'sprint'],
+  nba: ['backpedal', 'celebrate', 'fall_back', 'getup', 'jog', 'jumpshot', 'layup', 'ready', 'run', 'shuffle', 'slip', 'sprint', 'stumble', 'walk'],
+  nfl: ['backpedal', 'block', 'catch', 'catch_run', 'celebrate', 'dive', 'fall_back', 'fall_forward', 'jog', 'kick', 'ready', 'run', 'shuffle', 'sprint', 'throw', 'walk'],
+  soccer: ['backpedal', 'catch', 'celebrate', 'dive', 'fall_back', 'fall_forward', 'jog', 'jump', 'kick', 'ready', 'run', 'shuffle', 'sprint', 'walk'],
 };
 const BUNDLES: Record<SportId, (() => Promise<{ default: Record<string, ClipFile> }>) | null> = {
   nba: () => import('../../data/mocap/clips-nba'),
@@ -151,7 +151,7 @@ const BUNDLES: Record<SportId, (() => Promise<{ default: Record<string, ClipFile
 const FILES = import.meta.glob<{ default: ClipFile }>([
   '../../data/mocap/*.json',
   '!../../data/mocap/index.json',
-  '!../../data/mocap/{backpedal,block,catch,catch_run,celebrate,dive,fall_back,fall_forward,getup,jog,jump,jumpshot,kick,layup,ready,run,shuffle,slip,sprint,stumble,throw}.json',
+  '!../../data/mocap/{backpedal,block,catch,catch_run,celebrate,dive,fall_back,fall_forward,getup,jog,jump,jumpshot,kick,layup,ready,run,shuffle,slip,sprint,stumble,throw,walk}.json',
 ]);
 /** The clips loose in their own files (for the bundle test). */
 export const LOOSE_CLIPS: readonly string[] = Object.keys(FILES).map((k) => k.replace(/^.*\/|\.json$/g, ''));
@@ -548,6 +548,14 @@ function clearTorso(p: V3, parent: V3, len: number, up: V3, fwd: V3, right: V3, 
  * under mocapKey(clip, frame, ground)). */
 export function mocapJoints(clip: Clip | string, frameIndex: number, look: Look, opts: { ground?: Ground } = {}): Joints {
   return retarget(frame(clip, frameIndex), shapeFor(look), opts);
+}
+
+/** A player's joints at a frame position: a stored frame, or (a half frame, players-5's 30 fps for a
+ * slow stride) the joints between two, rasterised fresh. Cache under mocapKey(clip, frame, ground). */
+export function mocapJointsAtFrame(clip: Clip | string, frame: number, look: Look, opts: { ground?: Ground } = {}): Joints {
+  if (Number.isInteger(frame)) return mocapJoints(clip, frame, look, opts);
+  const c = typeof clip === 'string' ? need(clip) : clip;
+  return retarget(sample(c, frame / c.fps), shapeFor(look), opts);
 }
 
 /** The same at any time between frames (smooth, for slow motion; not cacheable per frame). */

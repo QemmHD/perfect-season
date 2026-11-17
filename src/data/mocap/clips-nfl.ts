@@ -8,6 +8,6 @@ import block from './block.json';
 import catch_run from './catch_run.json';
 import throwClip from './throw.json';
 
-const { backpedal, celebrate, dive, fall_back, fall_forward, jog, kick, ready, run, shuffle, sprint } = shared;
-const clips: Record<string, ClipFile> = { backpedal, block, catch: shared.catch, catch_run, celebrate, dive, fall_back, fall_forward, jog, kick, ready, run, shuffle, sprint, throw: throwClip };
+const { backpedal, celebrate, dive, fall_back, fall_forward, jog, kick, ready, run, shuffle, sprint, walk } = shared;
+const clips: Record<string, ClipFile> = { backpedal, block, catch: shared.catch, catch_run, celebrate, dive, fall_back, fall_forward, jog, kick, ready, run, shuffle, sprint, throw: throwClip, walk };
 export default clips;

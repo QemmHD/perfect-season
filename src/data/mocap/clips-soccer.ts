@@ -6,6 +6,6 @@ import type { ClipFile } from '../../game/pixel/mocap';
 import shared from './clips-shared';
 import jump from './jump.json';
 
-const { backpedal, celebrate, dive, fall_back, fall_forward, jog, kick, ready, run, shuffle, sprint } = shared;
-const clips: Record<string, ClipFile> = { backpedal, catch: shared.catch, celebrate, dive, fall_back, fall_forward, jog, jump, kick, ready, run, shuffle, sprint };
+const { backpedal, celebrate, dive, fall_back, fall_forward, jog, kick, ready, run, shuffle, sprint, walk } = shared;
+const clips: Record<string, ClipFile> = { backpedal, catch: shared.catch, celebrate, dive, fall_back, fall_forward, jog, jump, kick, ready, run, shuffle, sprint, walk };
 export default clips;

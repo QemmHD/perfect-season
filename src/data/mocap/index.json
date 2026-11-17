@@ -256,6 +256,41 @@
     "nfl"
    ]
   },
+  "walk": {
+   "src": "035_01",
+   "desc": "walk: an even, unhurried stride (the slowest gait; players-5 fills the dead band below the jog)",
+   "frames": 34,
+   "fps": 29.912,
+   "duration": 1.1367,
+   "loop": true,
+   "yaw": "smooth",
+   "events": {},
+   "beats": {
+    "stepL": [
+     0.775
+    ],
+    "stepR": [
+     0.192
+    ]
+   },
+   "root": {
+    "dx": 1.624,
+    "dz": -0.089,
+    "turn": -0.023,
+    "speed": 1.437,
+    "peak": 0.009
+   },
+   "cycle": {
+    "dx": 1.67,
+    "dz": -0.09,
+    "turn": -0.021
+   },
+   "tags": [
+    "nba",
+    "nfl",
+    "soccer"
+   ]
+  },
   "run": {
    "src": "102_10",
    "desc": "run (a basketball player, no ball)",

@@ -10,6 +10,6 @@ import layup from './layup.json';
 import slip from './slip.json';
 import stumble from './stumble.json';
 
-const { backpedal, celebrate, fall_back, jog, ready, run, shuffle, sprint } = shared;
-const clips: Record<string, ClipFile> = { backpedal, celebrate, fall_back, getup, jog, jumpshot, layup, ready, run, shuffle, slip, sprint, stumble };
+const { backpedal, celebrate, fall_back, jog, ready, run, shuffle, sprint, walk } = shared;
+const clips: Record<string, ClipFile> = { backpedal, celebrate, fall_back, getup, jog, jumpshot, layup, ready, run, shuffle, slip, sprint, stumble, walk };
 export default clips;

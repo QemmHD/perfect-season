@@ -18,6 +18,7 @@ import ready from './ready.json';
 import run from './run.json';
 import shuffle from './shuffle.json';
 import sprint from './sprint.json';
+import walk from './walk.json';
 
-const shared: Record<string, ClipFile> = { backpedal, catch: catchClip, celebrate, dive, fall_back, fall_forward, jog, kick, ready, run, shuffle, sprint };
+const shared: Record<string, ClipFile> = { backpedal, catch: catchClip, celebrate, dive, fall_back, fall_forward, jog, kick, ready, run, shuffle, sprint, walk };
 export default shared;

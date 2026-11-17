@@ -493,7 +493,7 @@ def _argmax(series, sign=1):
     return max(series, key=lambda tv: sign * tv[1])[0]
 
 
-def detect(T: Trial, kind: str, t0: float, t1: float, ev: dict) -> float | list[float]:
+def detect(T: Trial, kind: str, t0: float, t1: float, ev: dict, step_lift: tuple = (0.06, 0.0)) -> float | list[float]:
     """An event's source time (or times), found from the motion. Kinds:
     takeoff / land / apex: the biggest jump in the clip
     dip: the lowest pelvis before takeoff (the load)
@@ -601,13 +601,19 @@ def detect(T: Trial, kind: str, t0: float, t1: float, ev: dict) -> float | list[
         # (from a little before the clip, so a foot already coming down at the start counts)
         series = T.series(lambda p: T.clear(p, s), max(0.0, t0 - 0.4), t1)
         out = []
-        up = series[0][1] > 0.04
+        # a walk lifts its feet less than a run, and its swing can dip toward the floor mid-air: a clip
+        # sets `step_lift` (the swing's clearance; the defaults are the run's 0.06 up, 0.025 down) and
+        # `step_dwell` (how long a foot is up before its footfall counts)
+        hi, dwell = step_lift
+        up = series[0][1] > hi * 2 / 3
+        up_at = -1e9
         for t, v in series:
-            if up and v < 0.025:
+            if up and v < hi * 5 / 12 and t - up_at >= dwell:
                 out.append(t)
                 up = False
-            elif not up and v > 0.06:
+            elif not up and v > hi:
                 up = True
+                up_at = t
         return out
     raise ValueError('unknown event kind %r' % kind)
 
@@ -640,7 +646,7 @@ def build_clip(name: str, spec: dict) -> tuple[dict, dict]:
         if isinstance(v, (int, float)):
             ev[k] = float(v)
         else:
-            r = detect(T, v, t0, t1, ev)
+            r = detect(T, v, t0, t1, ev, (spec.get('step_lift', 0.06), spec.get('step_dwell', 0.0)))
             if isinstance(r, list):
                 beats[k] = r
             else:
@@ -857,6 +863,8 @@ CLIPS['shuffle'] = dict(src='102_27', start=0.45, end=1.4, loop=True, events=STE
 CLIPS['ready'] = dict(src='140_06', start=4.4, end=7.4, loop=True, events={}, tags=['nba', 'nfl'],
                       desc='ready stance: knees bent, hands up, weight shifting (also a two-point stance)')
 CLIPS['jog'] = dict(src='016_35', start=0.2, end=1.3, yaw='smooth', loop=True, events=STEPS, tags=['nba', 'nfl'], desc='jog')
+CLIPS['walk'] = dict(src='035_01', start=0.35, end=1.47, yaw='smooth', sigma=0.2, loop=True, events=STEPS, step_lift=0.035, step_dwell=0.2, tags=['nba', 'nfl', 'soccer'],
+                    desc='walk: an even, unhurried stride (the slowest gait; players-5 fills the dead band below the jog)')
 CLIPS['run'] = dict(src='102_10', start=0.1, end=0.8, yaw='smooth', sigma=0.2, loop=True, events=STEPS, tags=['nba', 'nfl'], desc='run (a basketball player, no ball)')
 CLIPS['sprint'] = dict(src='143_01', start=0.1, end=0.8, yaw='smooth', sigma=0.2, loop=True, events=STEPS, tags=['nba', 'nfl'], desc='sprint')
 CLIPS['cut'] = dict(src='102_18', start=0.4, end=1.4, face=1.2, events={'plant': 0.95, **STEPS}, mirror='cut_l', tags=['nba', 'nfl'],
