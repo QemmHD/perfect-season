@@ -122,7 +122,7 @@ async function run(sport, width, opts = {}) {
   assert.equal((await current()).ut.owned.length, ownedAfterDaily);
   // ---- Rewards inbox: CLAIM ALL ----
   await tab(page, 'HOME');
-  await page.locator('.ut-home-inbox').click();
+  await page.locator('.uh-rewards').click();
   await page.locator('.ut-inbox').waitFor();
   await shot(page, 'utc-' + tag + '-inbox');
   const claimAllBtn = page.locator('.ut-claim-all');

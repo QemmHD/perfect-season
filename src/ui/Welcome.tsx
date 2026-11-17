@@ -200,7 +200,7 @@ export function FirstRunSheet({ plan, onCollect, onStarter, onClose }: { plan: F
           <h2 className="disp">{done ? 'All yours' : 'Your welcome gifts'}</h2>
           <ul className={'fr-gifts' + (done ? ' done' : '')}>
             <li>
-              <span className="fr-art coin" aria-hidden="true">
+              <span className="fr-art fr-coin" aria-hidden="true">
                 <Coin size={34} />
               </span>
               <span className="fr-txt">
@@ -211,7 +211,7 @@ export function FirstRunSheet({ plan, onCollect, onStarter, onClose }: { plan: F
             </li>
             {plan.chest && (
               <li>
-                <span className="fr-art chest" aria-hidden="true">
+                <span className="fr-art fr-chest" aria-hidden="true">
                   <ChestArt />
                 </span>
                 <span className="fr-txt">

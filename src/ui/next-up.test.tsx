@@ -16,7 +16,7 @@ import { poolSig, writePoolCache } from '../ut/claimables';
 import { MemoryStorage, useStorage } from '../ut/compat/memory-storage';
 import { inboxCount, inboxItems, poolRowCount } from '../ut/inbox';
 import { freshForMinutes, minutesExtras, nextRung } from '../ut/minutes';
-import { dailyLeft, nextCtxOf, nextUp, rivalsNext } from '../ut/next-action';
+import { dailyLeft, doneAction, loopDone, nextCtxOf, nextUp, rivalsNext } from '../ut/next-action';
 import { weekKey, hqOf } from '../ut/objectives';
 import { getPool, type Pool } from '../ut/pool';
 import { qaFixtures, type QaFixture, fs, SRC } from '../ut/qa-fixtures.test-util';
@@ -67,7 +67,8 @@ describe('the Home strip says what the engine says (' + SPORT + ')', () => {
         now = Date.parse(f.at);
       const h = homeNext(p, SPORT, now, NO_INPUTS, {});
       const ctx = nextCtxOf(p.ut, S, now, { ...minutesExtras(p.playtime, now, freshForMinutes(p)), elsewhere: [], dailyPlay: null });
-      expect(h.action).toEqual(nextUp(ctx));
+      // the engine's choice, or its calm Done once the day's loop is finished (loopDone)
+      expect(h.action).toEqual(loopDone(ctx) ? doneAction(ctx) : nextUp(ctx));
       const d = statedDistance(p, h.action, now, f.day);
       if (d) {
         distances++;

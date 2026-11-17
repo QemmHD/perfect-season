@@ -224,7 +224,7 @@ for (const sport of sports)
     await page.waitForFunction(() => !document.querySelector('.ut-loading'), null, { timeout: 60000 });
     await closeDialogs();
     await step('ut-home', async () => {}, { tab: 'HOME', back: 'EXIT', title: 'Ultimate Team' }, 4);
-    await step('ut-rewards', () => page.locator('.ut-home-inbox').click(), { tab: 'HOME', back: 'HOME', title: 'Rewards' });
+    await step('ut-rewards', () => page.locator('.uh-rewards').click(), { tab: 'HOME', back: 'HOME', title: 'Rewards' });
     await step('ut-daily', async () => (await back(), page.locator('.ut-home-daily').click()), { tab: 'HOME', back: 'HOME', title: 'Daily' }, 3);
     await step('ut-records', async () => (await back(), page.locator('.uh-form').click()), { tab: 'HOME', back: 'HOME', title: 'Club Records' });
     await back();

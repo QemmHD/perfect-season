@@ -12,7 +12,7 @@ import { SOCCER_ON, type SportId } from '../engine/sport';
 import type { Profile } from '../lib/profile';
 import { openUtAt } from '../ut/go';
 import { freshForMinutes, minutesExtras } from '../ut/minutes';
-import { nextCtxOf, nextUp, plural, type MatchSetupRef, type NextAction, type Target } from '../ut/next-action';
+import { doneAction, loopDone, nextCtxOf, nextUp, plural, type MatchSetupRef, type NextAction, type Target } from '../ut/next-action';
 import type { UtSport } from '../ut/types';
 import type { UtView } from '../ut/UltimateTeam';
 
@@ -88,7 +88,9 @@ export function homeNext(p: Profile, sport: SportId, now: number, inputs: HomeIn
     dailyPlay: inputs.daily.done ? null : { line: 'Daily #' + inputs.daily.no + ' · same spins for everyone · ranked', target: { app: 'draft', mode: 'daily' } },
   });
   const elsewhere = elsewhereOf(device, s, ctx.day);
-  let action: HomeAction = nextUp({ ...ctx, elsewhere });
+  const full = { ...ctx, elsewhere };
+  // a finished day says so, even with a milestone a step away (next-action.ts loopDone)
+  let action: HomeAction = loopDone(full) ? doneAction(full) : nextUp(full);
   // today's Missions are rewards too: after this sport's UT claims, before other sports' and the starter
   if (inputs.missions > 0 && action.id !== 'claim')
     action = { id: 'missions', line: plural(inputs.missions, 'mission') + ' done · claim the coins', cta: 'CLAIM', target: { app: 'missions' } };

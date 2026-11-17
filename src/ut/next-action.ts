@@ -172,7 +172,8 @@ export interface NextCtx {
   recent: { setup: MatchSetupRef; line: string; stake?: string };
   /** Squad Battles this week: rungs cleared on this week's ladder (0–RUNGS) and the saved difficulty (battlesNow) */
   battles: { cleared: number; level: Difficulty };
-  today: { dailiesDone: boolean; paidLeft: number; minutesCapped: boolean };
+  /** ut-4: `dailiesClaimed`, all three of today's objectives claimed (the Done-for-today loop) */
+  today: { dailiesDone: boolean; dailiesClaimed?: boolean; paidLeft: number; minutesCapped: boolean };
   after?: AfterCtx;
 }
 
@@ -398,6 +399,7 @@ export function nextCtxOf(ut: UtState, sport: UtSport, now: number, extras: Next
     battles: { cleared: b.cleared, level: b.level },
     today: {
       dailiesDone: today.length > 0 && today.every((o) => o.claimed || o.progress >= o.target),
+      dailiesClaimed: today.length > 0 && today.every((o) => o.claimed),
       paidLeft,
       minutesCapped: !!extras.minutesCapped,
     },
@@ -464,6 +466,26 @@ function oneMore(c: NextCtx, a: AfterCtx): NextAction {
   return wrap({ id: 'after:recent', line: c.recent.line, cta: 'PLAY', target: { app: 'match', setup: c.recent.setup }, ...(c.recent.stake ? { stake: c.recent.stake } : {}) });
 }
 
+/**
+ * ut-4: the day's loop is finished (today's three objectives claimed, the Daily Drop and the login
+ * calendar claimed) and nothing waits. UT Home and main Home then say "Done for today" even when a
+ * milestone is a step away (V2 D.11: a finished day stops pushing; the Minutes ring still shows its
+ * own count). Never after a match (the One-More bar has its own calm rule).
+ */
+export function loopDone(c: NextCtx): boolean {
+  return !c.after && !!c.today.dailiesClaimed && !c.claim.dropReady && !c.claim.calendarReady && !waiting(c);
+}
+/** The calm action: "Done for today", one tap from the next match without pushing it. */
+export function doneAction(c: NextCtx): NextAction {
+  return {
+    id: 'done',
+    line: LABEL.doneForToday + ' · ' + (c.today.minutesCapped ? MINUTES_DONE_LINE : DONE_LINE),
+    cta: 'KEEP PLAYING',
+    target: { app: 'match', setup: c.recent.setup },
+    done: true,
+  };
+}
+
 /** The single best thing to do next (V2 D.5). */
 export function nextUp(c: NextCtx): NextAction {
   if (c.after) return oneMore(c, c.after);
@@ -520,6 +542,6 @@ export function nextUp(c: NextCtx): NextAction {
     };
   // 11/12. the best next match, or Done for today once the day's goals are met
   const play: NextAction = { id: 'play', line: c.recent.line, cta: 'PLAY', target: { app: 'match', setup: c.recent.setup }, ...(c.recent.stake ? { stake: c.recent.stake } : {}) };
-  if (calmNow(c)) return { id: 'done', line: LABEL.doneForToday + ' · ' + (c.today.minutesCapped ? MINUTES_DONE_LINE : DONE_LINE), cta: 'KEEP PLAYING', target: play.target, done: true };
+  if (calmNow(c)) return doneAction(c);
   return play;
 }

@@ -9,7 +9,6 @@ import {
   IconCrown,
   IconDraft,
   IconLeague,
-  IconPass,
   IconPlay,
   IconRoute,
   IconSquad,
@@ -89,71 +88,6 @@ function ProgressBar({
         }}
       />
     </span>
-  );
-}
-export function SeasonRibbon({
-  ut,
-  day,
-  onOpen,
-}: {
-  ut: UtState;
-  day: string;
-  onOpen: () => void;
-}) {
-  const season = seasonFor(day),
-    s = hqOf(ut).seasons[season.id] ?? { xp: 0, claimed: [] },
-    level = Math.min(SEASON_TIERS, Math.floor(s.xp / SEASON_STEP)),
-    ready = Object.values(hqOf(ut).seasons).reduce(
-      (n, v) =>
-        n +
-        Math.max(
-          0,
-          Math.min(SEASON_TIERS, Math.floor(v.xp / SEASON_STEP)) -
-            v.claimed.length,
-        ),
-      0,
-    );
-  // Claude (UI reorganisation): one name, "Season Pass", for the free reward track everywhere.
-  return (
-    <button
-      className="hq-season-ribbon"
-      onClick={onOpen}
-      aria-label={
-        'Season Pass: level ' +
-        level +
-        ' of ' +
-        SEASON_TIERS +
-        (ready ? ', ' + ready + ' rewards ready' : '')
-      }
-    >
-      <span className="hq-season-icon" aria-hidden="true">
-        <IconPass size={20} />
-      </span>
-      <span>
-        <b>
-          SEASON PASS{' '}
-          <i>
-            LEVEL {level} / {SEASON_TIERS}
-          </i>
-        </b>
-        <ProgressBar
-          label="Season Points toward the next reward"
-          value={level === SEASON_TIERS ? 1 : s.xp % SEASON_STEP}
-          max={level === SEASON_TIERS ? 1 : SEASON_STEP}
-        />
-        <small>
-          {level === SEASON_TIERS
-            ? 'TRACK COMPLETE'
-            : SEASON_STEP -
-              (s.xp % SEASON_STEP) +
-              ' SP TO LEVEL ' +
-              (level + 1)}
-        </small>
-      </span>
-      <span className="hq-ribbon-end">
-        {ready > 0 ? <b className="num">{ready}</b> : <HQArrow />}
-      </span>
-    </button>
   );
 }
 // Codex (OpenAI), 2026-11-07: discovery by session, accurate squad/reward guidance and a useful next action.

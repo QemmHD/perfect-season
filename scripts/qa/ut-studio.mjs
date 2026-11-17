@@ -15,7 +15,8 @@
 //   fixtures    every fixture in scripts/qa/fixtures/ut loads in its sport: Home, then UT Home,
 //               with 0 page errors and the Rewards inbox it was built with; a fixture with a MINUTES
 //               ledger (profile.playtime) must still hold it, unchanged, after the app has saved
-//   deadtaps    the dead-tap walk alone (fresh context per screen), at --size (default 393)
+//   deadtaps    the dead-tap walk alone (fresh context per screen), at --size (default 393);
+//               --screen <id> (repeatable) walks only those screens
 //   minutes     MINUTES on screen (ut-3), per sport x size and MINUTES fixture (default minutes-27,
 //               minutes-week-600, minutes-90; --fixture picks one): Home's ring chip inside the gutters
 //               with Home's scroll and PLAY bar measured; the Minutes screen's metrics (targets, text,
@@ -256,7 +257,8 @@ export const SCREENS = [
   { id: 'challenges-objectives', go: async (p) => (await utTab(p, 'CHALLENGES'), seg(p, 'OBJECTIVES')) },
   { id: 'challenges-season', go: async (p) => (await utTab(p, 'CHALLENGES'), seg(p, 'SEASON PASS')) },
   { id: 'store', go: (p) => utTab(p, 'STORE') },
-  { id: 'inbox', go: async (p) => (await utTab(p, 'HOME'), p.locator('.ut-home-inbox').click(), settle(p, 300)) },
+  // ut-4: the Rewards inbox is the hub's Rewards row (the hero's CLAIM ALL claims in place)
+  { id: 'inbox', go: async (p) => (await utTab(p, 'HOME'), await closeDialogs(p), await p.locator('.uh-rewards').click(), settle(p, 300)) },
 ];
 
 /** Where the app is: the screen title, tab, segment and open dialogs. */
@@ -713,6 +715,7 @@ function args(argv) {
     else if (k === '--clock') a.clock = parseClock(argv[++i]);
     else if (k === '--out') a.out = argv[++i];
     else if (k === '--dead') a.dead = argv[++i];
+    else if (k === '--screen') (a.screen ??= []).push(argv[++i]);
     else a._.push(k);
   }
   if (!a.sport.length) a.sport = [...SPORTS];
@@ -826,7 +829,7 @@ async function fixturesCase(a) {
             await closeDialogs(page);
             await enterUt(page);
             r.steps.push('ut');
-            r.inbox = await page.evaluate(() => document.querySelector('.ut-home-inbox')?.innerText.replace(/\s+/g, ' ').trim() ?? '');
+            r.inbox = await page.evaluate(() => document.querySelector('.uh-rewards')?.innerText.replace(/\s+/g, ' ').trim() ?? '');
           }
           // the MINUTES ledger rides in the basketball profile key (the cross-sport SHARED place):
           // after the app has loaded, migrated and saved, it must be exactly what the fixture held
@@ -879,7 +882,7 @@ async function deadtapsCase(a) {
   try {
     for (const sport of a.sport) {
       const screens = [];
-      for (const s of SCREENS) {
+      for (const s of a.screen ? SCREENS.filter((x) => a.screen.includes(x.id)) : SCREENS) {
         const d = await deadTapScreen(browser, { sport, size, fixture: a.fixture, rm: a.rm, cpu: a.cpu, edge: a.edge, clock: a.clock }, s);
         screens.push(d);
         console.log(sport, 'dead taps', s.id.padEnd(22), 'ok', d.ok, 'dead', d.dead.length, d.dead.join(' | '), 'skipped', d.skipped.length);

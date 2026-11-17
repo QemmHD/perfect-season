@@ -52,7 +52,7 @@ import { newId, saveProfile, type Profile } from '../lib/profile';
 import { reloadForMissingFiles } from '../lib/update';
 import { sfx, vibrate } from '../lib/sound';
 import { NET_ON } from '../net/nostr';
-import { CoinChip } from '../ui/common';
+import { CoinChip, Sheet } from '../ui/common';
 import { Back } from '../ui/icons';
 import { Battles } from './Battles';
 import { CardDetail } from './CardDetail';
@@ -162,11 +162,16 @@ import { FEATURED_STANDOUT } from './packs';
 import { claimSet } from './sets';
 import { drawStandout } from './standouts';
 import { PickSheet } from './PickSheet';
+import { GoatCrown } from './CardArt';
 import { StandoutsView } from './StandoutsView';
 import { SetsView } from './SetsView';
 import { DraftView } from './DraftView';
 import './content-ui.css';
-import { claimNewEra, newEraPickId } from './new-era';
+import { claimNewEra, NEW_ERA_COINS, newEraPickId, newEraReady } from './new-era';
+import { markSeen } from './seen';
+import { markSession, sessionSummary, summaryText } from './session-summary';
+import { useUtModalQueue } from './ut-modal-queue';
+import type { Target } from './next-action';
 import { cancelEvo, claimEvo, playId, startEvo } from './evolutions';
 import { EvolutionsView } from './EvolutionsView';
 import { calendarStatus, claimCalendar, claimDailyBonus } from './daily-hub';
@@ -268,6 +273,8 @@ export default function UltimateTeam(props: {
   onExit: () => void;
   /** ut-3: the Minutes chip on UT Home opens RANKS → MINUTES in the main app */
   onMinutes?: () => void;
+  /** ut-4: a next-best-action target outside this sport's UT (another sport, a draft) */
+  onNext?: (t: Target) => void;
   onToast: (t: string) => void;
   /** play the squad: a Squad Battles rung, or online head to head (App.tsx opens Match.tsx) */
   onPlaySquad?: PlaySquad;
@@ -293,6 +300,8 @@ export default function UltimateTeam(props: {
   const [promoRetry, setPromoRetry] = useState(0);
   const latest = useRef(profile);
   latest.current = profile;
+  // ut-4: what this visit started with, for the two-line summary on EXIT (session-summary.ts)
+  const session = useRef(markSession(profile, Date.now()));
   const [day, setDay] = useState(() => easternDateKey());
   useEffect(() => {
     const refresh = () => setDay(easternDateKey());
@@ -379,8 +388,12 @@ export default function UltimateTeam(props: {
             collection: collectionRewards(pool, ut).filter(
               (g) => g.have >= g.need && !ut.collectionClaims?.includes(g.id),
             ).length,
+            // ut-4: sets one or two cards from complete, for UT Home's near-miss chips
+            near: setsFor(pool, ut)
+              .filter((x) => !x.claimed && x.need - x.have >= 1 && x.need - x.have <= 2)
+              .map((x) => ({ id: x.id, title: x.title, left: x.need - x.have })),
           }
-        : { sets: 0, collection: 0 },
+        : { sets: 0, collection: 0, near: [] },
     [pool, ut.owned, ut.collected, ut.collectionClaims, ut.content?.claims],
   );
   const ready = useMemo(() => startersComplete(SPORT, lineup), [lineup]);
@@ -1291,6 +1304,12 @@ export default function UltimateTeam(props: {
   };
 
   const detailCard = detail ? (byUid.get(detail) ?? null) : null;
+  // ut-4: the sheets that open by themselves, one at a time (ut-modal-queue.ts), only on UT Home and
+  // never over a pack, a pick, a card or the first starter pack
+  const [autoSheet, dismissSheet] = useUtModalQueue(
+    { newEra: !!pool && newEraReady(ut) },
+    !pool || !!opening || !!pickOpen || !!detailCard || !ut.starterClaimed || view !== 'hub',
+  );
 
   let body: React.ReactNode;
   if (failed)
@@ -1919,8 +1938,11 @@ export default function UltimateTeam(props: {
         ut={ut}
         pool={pool}
         onGo={go}
+        profile={profile}
+        onTarget={(t) => props.onNext?.(t)}
+        sets={clubReady.near}
+        onSeen={(k, t) => setUt((u) => markSeen(u, k, t))}
         onStarter={claimStarter}
-        onNewEra={claimNewEraBundle}
         inboxReady={inboxReady}
         onClaimAll={claimEverything}
         calendarReady={calendarStatus(ut, day).ready}
@@ -1989,11 +2011,14 @@ export default function UltimateTeam(props: {
         {view === 'hub' ? (
           <button
             className="icon-btn pill-btn ut-back"
-            onClick={() => (
-              sfx.click(),
-              rememberUtReturn('hub'),
-              props.onExit()
-            )}
+            onClick={() => {
+              sfx.click();
+              rememberUtReturn('hub');
+              // ut-4: what this visit earned and what waits tomorrow, once Home is on screen
+              const sum = sessionSummary(session.current, latest.current, Date.now());
+              props.onExit();
+              if (sum) window.setTimeout(() => onToast(summaryText(sum)), 450);
+            }}
             aria-label="Leave Ultimate Team"
           >
             <IconExit size={16} /> EXIT
@@ -2093,6 +2118,36 @@ export default function UltimateTeam(props: {
           onSquad={() => (setDetail(null), go('squad'))}
           onDevelop={() => (setDetail(null), go('development'))}
         />
+      )}
+      {autoSheet === 'newEra' && (
+        <Sheet label="The New Era" kind="center" onClose={() => dismissSheet('newEra')}>
+          {(close) => (
+            <div className="ut-new-era-sheet">
+              <GoatCrown className="ut-new-era-crown" />
+              <span className="eyebrow">THANK YOU FOR PLAYING</span>
+              <h2 className="disp">The New Era is here.</h2>
+              <p>
+                Ratings are rebuilt and everything you own stays yours. As a thank-you: an Icon pick (1 of 3 Legends) and{' '}
+                {NEW_ERA_COINS.toLocaleString('en-US')} coins.
+              </p>
+              <button
+                className="btn gold"
+                onClick={() =>
+                  close(() => {
+                    dismissSheet('newEra');
+                    claimNewEraBundle();
+                  })
+                }
+              >
+                CLAIM YOUR NEW ERA BUNDLE
+              </button>
+              <button className="btn" onClick={() => close()}>
+                LATER
+              </button>
+              <small>One per player. The coins are paid once across all sports. It also waits in Rewards.</small>
+            </div>
+          )}
+        </Sheet>
       )}
       {pool &&
         pickOpen &&

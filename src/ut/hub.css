@@ -1,9 +1,214 @@
-/* Claude, 2026-11-16 (studio overhaul, team ut, ut-3): UT Home's MINUTES ring chip, full width so the
-   whole line reads ("23 / 30 min · 75 coins + stamp next"). The chip itself is the kit's MinutesRing
-   (ut-system.css). ut-4's Hub rebuild grows this file. */
-.uh-mins {
+/* Claude, 2026-11-16 (studio overhaul, team ut, ut-3 and ut-4): UT Home rebuilt around one hero.
+   The hero (the next best action) is a lit glass card: a 96 px medallion with rays, the eyebrow, an
+   Archivo condensed italic title, the line with the true distance, the stake, and the screen's ONE
+   primary button. Then near-miss chips, the Minutes ring, Live Now (a scroll-snap carousel with
+   countdowns), today's objectives, the Season Pass card, Upcoming. Tokens: ut-system.css (--ps-*).
+   UI motion 120-180 ms; reduced motion: no rays, no sheen, nothing moves. */
+
+.uh > * {
   flex-shrink: 0;
 }
+
+/* ---------- the hero ---------- */
+.uh-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 12px 14px;
+  align-items: center;
+  padding: 16px 14px 14px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(246, 185, 59, 0.75);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 38%),
+    radial-gradient(120% 130% at 0% 0%, rgba(246, 185, 59, 0.3), transparent 55%),
+    radial-gradient(90% 90% at 100% 100%, rgba(79, 227, 193, 0.12), transparent 60%),
+    linear-gradient(165deg, #2a2210, var(--ps-panel) 62%);
+  box-shadow:
+    inset 0 1px rgba(255, 236, 190, 0.22),
+    inset 0 -1px rgba(0, 0, 0, 0.35),
+    0 10px 26px -10px rgba(246, 185, 59, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  isolation: isolate;
+}
+.uh-hero.amber {
+  border-color: rgba(255, 159, 28, 0.9);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 38%),
+    radial-gradient(120% 130% at 0% 0%, rgba(255, 140, 20, 0.36), transparent 55%),
+    linear-gradient(165deg, #2c1a08, var(--ps-panel) 62%);
+}
+.uh-hero.done {
+  border-color: rgba(79, 227, 193, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 38%),
+    radial-gradient(120% 130% at 0% 0%, rgba(79, 227, 193, 0.2), transparent 55%),
+    linear-gradient(165deg, #0d2a2c, var(--ps-panel) 62%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.uh-hero-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+}
+.uh-hero-rays {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 220, 140, 0.2) 0deg 8deg, transparent 8deg 22deg);
+  mask: radial-gradient(circle, #000 30%, transparent 70%);
+  -webkit-mask: radial-gradient(circle, #000 30%, transparent 70%);
+  animation: uh-rays 18s linear infinite;
+}
+.uh-hero-medal {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 230, 160, 0.85);
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 38%),
+    radial-gradient(circle at 50% 60%, #ffcf5a, #d98a12 70%, #8a5206);
+  box-shadow:
+    inset 0 -6px 10px rgba(110, 60, 0, 0.45),
+    inset 0 3px 6px rgba(255, 255, 255, 0.35),
+    0 0 26px rgba(246, 185, 59, 0.55),
+    0 6px 12px rgba(0, 0, 0, 0.45);
+  color: #3a2400;
+}
+.uh-hero.amber .uh-hero-medal {
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 38%),
+    radial-gradient(circle at 50% 60%, #ffb648, #e0700c 70%, #7a3a04);
+}
+.uh-hero.done .uh-hero-rays {
+  display: none;
+}
+.uh-hero.done .uh-hero-medal {
+  border-color: rgba(160, 255, 230, 0.75);
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 38%),
+    radial-gradient(circle at 50% 60%, #7af0d4, #22a98b 70%, #0b5a4a);
+  box-shadow:
+    inset 0 -6px 10px rgba(0, 60, 50, 0.45),
+    0 0 20px rgba(79, 227, 193, 0.35),
+    0 6px 12px rgba(0, 0, 0, 0.45);
+  color: #04261f;
+}
+.uh-hero-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.uh-hero-eye {
+  color: var(--ps-gold);
+  font: normal 900 10px/1.1 var(--body);
+  letter-spacing: 1.8px;
+}
+.uh-hero.amber .uh-hero-eye {
+  color: #ffb648;
+}
+.uh-hero.done .uh-hero-eye {
+  color: var(--ps-teal);
+}
+.uh-hero-title {
+  font: italic 900 28px/0.95 var(--display);
+  font-stretch: 68%;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: var(--ps-text);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+.uh-hero-line {
+  color: #d5e2ea;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.uh-hero-stake {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(246, 185, 59, 0.55);
+  background: rgba(246, 185, 59, 0.14);
+  color: #ffd98a;
+  font: normal 800 11px/1.2 var(--body);
+}
+.uh-hero-cta {
+  grid-column: 1 / -1;
+}
+.uh-hero.done .ut-k-primary {
+  min-height: 48px;
+  background: rgba(79, 227, 193, 0.14);
+  box-shadow: inset 0 0 0 1.5px rgba(79, 227, 193, 0.6);
+  color: var(--ps-teal);
+}
+.uh-hero.done .ut-k-primary::before {
+  display: none;
+}
+@keyframes uh-rays {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- near-miss chips ---------- */
+.uh-near {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 -16px;
+  padding: 0 16px 2px;
+  scrollbar-width: none;
+}
+.uh-near::-webkit-scrollbar {
+  display: none;
+}
+.uh-near-chip {
+  flex: none;
+  display: inline-grid;
+  grid-template-columns: auto 12px;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  align-items: center;
+  min-height: 44px;
+  padding: 5px 10px 5px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(246, 185, 59, 0.5);
+  background: linear-gradient(180deg, rgba(246, 185, 59, 0.14), rgba(14, 34, 51, 0.9));
+  color: var(--ps-text);
+  text-align: left;
+}
+.uh-near-chip b {
+  font: normal 800 13px/1.15 var(--body);
+  white-space: nowrap;
+}
+.uh-near-chip small {
+  grid-row: 2;
+  color: #ffd98a;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.uh-near-chip svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--ps-gold);
+}
+.uh-near-chip:active {
+  transform: scale(0.97);
+}
+
+/* ---------- the Minutes ring (ut-3) ---------- */
 .uh-mins .ut-k-mins {
   display: flex;
   width: 100%;
@@ -21,4 +226,330 @@
   border-top: 2px solid var(--ps-dim);
   border-right: 2px solid var(--ps-dim);
   transform: rotate(45deg);
+}
+
+.uh-sec-aside {
+  color: var(--ps-dim);
+  font: normal 800 11px var(--body);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+/* ---------- Live Now ---------- */
+.uh-live {
+  display: flex;
+  gap: 10px;
+  margin: -4px -16px 0;
+  padding: 2px 16px 4px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
+  scrollbar-width: none;
+  mask: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+  -webkit-mask: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+}
+.uh-live::-webkit-scrollbar {
+  display: none;
+}
+.uh-live-card {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 168px;
+  min-height: 112px;
+  padding: 11px 12px 10px;
+  scroll-snap-align: start;
+  border-radius: 16px;
+  border: 1px solid var(--ps-stroke);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 45%),
+    radial-gradient(120% 90% at 100% 0%, var(--uh-tint, rgba(79, 227, 193, 0.18)), transparent 60%),
+    var(--ps-panel);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+  color: var(--ps-text);
+  text-align: left;
+}
+.uh-live-card:active {
+  transform: scale(0.97);
+}
+.uh-live-card.k-drop {
+  --uh-tint: rgba(246, 185, 59, 0.3);
+  border-color: rgba(246, 185, 59, 0.45);
+}
+.uh-live-card.k-lightning,
+.uh-live-card.k-promo {
+  --uh-tint: rgba(139, 124, 246, 0.32);
+  border-color: rgba(139, 124, 246, 0.5);
+}
+.uh-live-card.k-rivals {
+  --uh-tint: rgba(255, 93, 93, 0.22);
+}
+.uh-live-eye {
+  color: var(--ps-dim);
+  font: normal 900 10px/1.1 var(--body);
+  letter-spacing: 1.2px;
+}
+.uh-live-card.k-drop .uh-live-eye {
+  color: var(--ps-gold);
+}
+.uh-live-title {
+  font: italic 900 18px/1 var(--display);
+  font-stretch: 70%;
+  text-transform: uppercase;
+}
+.uh-live-line {
+  flex: 1;
+  color: #c3d3dd;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.uh-new {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ps-gold);
+  box-shadow: 0 0 0 2px var(--ps-panel), 0 0 8px rgba(246, 185, 59, 0.8);
+}
+
+/* ---------- today's objectives ---------- */
+.uh-today {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--ps-stroke);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 40%),
+    var(--ps-panel);
+  color: var(--ps-text);
+  text-align: left;
+}
+.uh-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.uh-card-head i {
+  flex: 1;
+  color: var(--ps-dim);
+  font: normal 900 11px var(--body);
+  letter-spacing: 1.5px;
+}
+.uh-card-head b {
+  color: var(--ps-gold);
+  font: italic 900 20px/1 var(--display);
+}
+.uh-card-head span {
+  color: var(--ps-dim);
+  font: normal 800 11px var(--body);
+  letter-spacing: 1px;
+}
+.uh-today ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uh-today li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.uh-tick {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ps-stroke);
+}
+.uh-today li.done .uh-tick {
+  border-color: var(--ps-teal);
+  background: var(--ps-teal);
+  color: #04261f;
+}
+.uh-today-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uh-today li.done .uh-today-text {
+  color: var(--ps-dim);
+}
+.uh-today li small {
+  flex: none;
+  color: var(--ps-dim);
+  font-size: 11px;
+  font-weight: 800;
+}
+.uh-today li.done small {
+  color: var(--ps-teal);
+}
+
+/* ---------- the Season Pass card (M10) ---------- */
+.uh-season-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid rgba(139, 124, 246, 0.5);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%),
+    radial-gradient(110% 120% at 0% 50%, rgba(139, 124, 246, 0.26), transparent 60%),
+    var(--ps-panel);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.uh-season-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px 8px;
+  border: 0;
+  background: none;
+  color: var(--ps-text);
+  text-align: left;
+}
+.uh-season-top {
+  flex: none;
+  filter: drop-shadow(0 4px 10px rgba(139, 124, 246, 0.5));
+}
+.uh-season-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.uh-card-eye {
+  color: #b9adff;
+  font: normal 900 10px/1.1 var(--body);
+  letter-spacing: 1.3px;
+}
+.uh-season-txt b {
+  font: italic 900 22px/1 var(--display);
+  font-stretch: 70%;
+  text-transform: uppercase;
+}
+.uh-season-txt b span {
+  color: var(--ps-dim);
+  font-size: 15px;
+}
+.uh-season-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(138, 163, 181, 0.22);
+  overflow: hidden;
+}
+.uh-season-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8b7cf6, #c9bfff);
+}
+.uh-season-txt small {
+  color: #c3d3dd;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.uh-season-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 14px 10px;
+}
+
+/* ---------- Upcoming ---------- */
+.uh-upcoming {
+  display: flex;
+  flex-direction: column;
+  margin: -4px 0 0;
+  padding: 4px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--ps-stroke);
+  background: rgba(14, 34, 51, 0.7);
+  list-style: none;
+}
+.uh-upcoming li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+.uh-upcoming li + li {
+  border-top: 1px solid rgba(29, 58, 80, 0.7);
+}
+.uh-upcoming b {
+  flex: none;
+  min-width: 72px;
+  color: var(--ps-teal);
+  font: normal 900 10.5px var(--body);
+  letter-spacing: 1px;
+}
+.uh-upcoming span {
+  color: #d5e2ea;
+}
+
+/* ---------- the New Era sheet (ut-modal-queue.ts) ---------- */
+.ut-new-era-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.ut-new-era-sheet .ut-new-era-crown {
+  position: static;
+  width: 64px;
+  height: 48px;
+}
+.ut-new-era-sheet h2 {
+  margin: 0;
+  color: #f5d88d;
+  font-size: 30px;
+}
+.ut-new-era-sheet p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ut-new-era-sheet .btn {
+  width: 100%;
+  min-height: 48px;
+}
+.ut-new-era-sheet small {
+  color: var(--sub);
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uh-hero-rays {
+    animation: none;
+  }
+  .uh-near-chip:active,
+  .uh-live-card:active {
+    transform: none;
+  }
 }

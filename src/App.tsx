@@ -939,6 +939,8 @@ export function App() {
     },
     missions: () => setModal('missions'),
   });
+  const nextRoutesRef = useRef(nextRoutes);
+  nextRoutesRef.current = nextRoutes;
   if (tab === 'ranks') page = <RanksPage profile={profile} update={update} dailyKey={todayKey} dailyNo={dailyNo} onName={() => (sfx.click(), setModal('name'))} />;
   else if (tab === 'profile')
     page = (
@@ -1060,6 +1062,11 @@ export function App() {
           update={update}
           onExit={() => goTab('home')}
           onMinutes={openMinutes}
+          onNext={(t) => {
+            // ut-4: leave UT first; the route runs once Home is the screen (a sport switch needs it)
+            goTab('home');
+            window.setTimeout(() => void loadNextUp().then((m) => m.goHome(t, SPORT, nextRoutesRef.current())), 60);
+          }}
           onToast={showToast}
           onPlaySquad={(req) => {
             setUtReq(req);

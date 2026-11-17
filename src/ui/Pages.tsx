@@ -170,17 +170,19 @@ export function HomePage(props: {
   // the rows that give way on shorter screens (styles.css "home")
   const { content } = useLayout();
   // ut-4: with the "Next up" strip in the PLAY bar, a Home whose rows already overflow (Training Camp
-  // on a 393 x 852 iPhone) takes the snug mode tiles rather than hiding the last tiles behind the strip.
-  // Measured once per frame height; it only ever tightens, so it cannot flip back and forth.
+  // on a 393 x 852 iPhone, a 320 x 568 one) tightens instead of hiding the last mode tiles behind the
+  // strip: first the snug tiles, then the compact ones (next-up.css `nu-tight`). Measured per frame
+  // height; it only ever tightens, so it cannot flip back and forth.
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [tight, setTight] = useState<number | null>(null);
+  const [fit, setFit] = useState({ at: content, level: 0 });
+  const level = fit.at === content ? fit.level : 0;
   const hasNext = !!props.nextUp;
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    if (!hasNext || !el || tight === content || content < 620 || content >= 816) return;
-    if (el.scrollHeight - el.clientHeight > 1) setTight(content);
+    if (!hasNext || !el || level >= 2 || content < 620 || content >= 816) return;
+    if (el.scrollHeight - el.clientHeight > 4) setFit({ at: content, level: level + 1 });
   });
-  const snug = content < 730 || tight === content;
+  const snug = content < 730 || level >= 1;
   const playLabel = p.mode === 'daily' ? (props.dailyDone ? 'PRACTICE DAILY' : 'PLAY DAILY #' + props.dailyNo) : p.mode === '1v1' ? (NET_ON ? 'FIND A MATCH' : 'PLAY THE BOT') : 'PLAY';
   // someone to play: another player with this sport open
   const live = props.online && props.online.here > 1;
@@ -199,7 +201,7 @@ export function HomePage(props: {
   // Claude (UI reorganisation): everything above the PLAY button scrolls when it can't fit (320x568
   // with a saved run used to push PLAY off the screen); PLAY itself never moves.
   return (
-    <div className={'page-view home' + (content < 620 ? ' short' : snug ? ' snug' : '') + (content >= 816 ? ' tall' : '')}>
+    <div className={'page-view home' + (content < 620 ? ' short' : snug ? ' snug' : '') + (level >= 2 ? ' nu-tight' : '') + (content >= 816 ? ' tall' : '')}>
       <div className="home-scroll" ref={scrollRef}>
         <h1 className={'logo' + (intro ? ' intro' : '')} aria-label="Perfect Season">
           <span className="disp l1" aria-hidden="true">

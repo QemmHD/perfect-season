@@ -60,7 +60,7 @@
   border-radius: 12px;
   background: radial-gradient(circle at 50% 40%, rgba(255, 211, 107, 0.35), rgba(255, 211, 107, 0) 70%);
 }
-.fr-art.chest svg {
+.fr-art.fr-chest svg {
   width: 52px;
   height: 42px;
 }

@@ -3,8 +3,8 @@
 //   - useHomeNext: loads the engine (next-up-main.ts) with a dynamic import once Home has painted
 //     (requestIdleCallback, 1 s fallback), then computes the action and the badge numbers, memoised
 //     per profile and minute. It records this sport's UT claimables in the device cache so the other
-//     sports' Homes can name them, and it times itself (performance measures `ps-nextup-import` and
-//     `ps-nextup-compute`, read by QA).
+//     sports' Homes can name them, and it times itself (`ps-nextup-import`, `ps-nextup-compute`:
+//     perfNote, read by QA).
 //   - NextUpStrip: the gold "Next up" strip. Before the engine answers it holds its place with a quiet
 //     placeholder, so nothing moves when the line arrives.
 //   - TabBadge: the UT tab's count (#c62828 with white 11 px bold, 5.6:1; an amber clock when the Daily
@@ -18,6 +18,22 @@ import type { UtView } from '../ut/UltimateTeam';
 import type { HomeAction, HomeInputs, HomeNext } from './next-up-main';
 import './next-up.css';
 
+/**
+ * Time a step for QA: a performance measure where the engine records one, and the newest 40 in
+ * `window.__psPerf` (QA's fixtures run on Playwright's fake clock, which records no measures).
+ */
+export function perfNote(name: string, t0: number): void {
+  const end = performance.now();
+  try {
+    performance.measure(name, { start: t0, end });
+  } catch {
+    // an engine without measure options: the list below still has it
+  }
+  const w = window as Window & { __psPerf?: [string, number][] };
+  (w.__psPerf ??= []).push([name, Math.round((end - t0) * 100) / 100]);
+  if (w.__psPerf.length > 40) w.__psPerf.shift();
+}
+
 type Engine = typeof import('./next-up-main');
 let engine: Engine | null = null;
 let loading: Promise<Engine> | null = null;
@@ -28,11 +44,7 @@ export function loadNextUp(): Promise<Engine> {
     const t0 = performance.now();
     loading = import('./next-up-main').then((m) => {
       engine = m;
-      try {
-        performance.measure('ps-nextup-import', { start: t0, end: performance.now() });
-      } catch {
-        // an engine without measure options: QA reads nothing, the strip still works
-      }
+      perfNote('ps-nextup-import', t0);
       return m;
     });
   }
@@ -87,11 +99,7 @@ export function useHomeNext(profile: Profile, sport: SportId, inputs: HomeInputs
     if (!on) return last.current;
     const t0 = performance.now();
     const r = mod.homeNext(profile, sport, minute * 60000 + 30000, inputs);
-    try {
-      performance.measure('ps-nextup-compute', { start: t0, end: performance.now() });
-    } catch {
-      // see loadNextUp
-    }
+    perfNote('ps-nextup-compute', t0);
     last.current = r;
     return r;
     // `profile` only matters while on: off, the last answer stands
@@ -166,7 +174,7 @@ export function NextUpStrip({ action, onGo }: { action: HomeAction | null; onGo:
       </div>
     );
   const tone = action.done ? 'done' : action.amber ? 'amber' : 'gold';
-  const eyebrow = action.done ? 'DONE FOR TODAY' : action.amber ? 'NEXT UP · ENDS TONIGHT' : 'NEXT UP';
+  const eyebrow = action.done ? 'DONE FOR TODAY' : action.amber ? 'ENDS TONIGHT' : 'NEXT UP';
   const line = action.done ? action.line.replace(/^Done for today · /, '') : action.line;
   return (
     <button

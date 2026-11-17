@@ -204,6 +204,41 @@ button.nu-strip:active {
   font-size: 12px;
 }
 
+/* still short of room once snug (a 320 x 568 phone with Training Camp): compact mode tiles, so the
+   last row stays in view above the strip instead of under it */
+.home.nu-tight .modes {
+  gap: 8px;
+  margin-top: 8px;
+}
+.home.nu-tight .mode {
+  height: 48px;
+  padding: 4px 12px;
+}
+.home.nu-tight .mode .disp {
+  font-size: 21px;
+}
+.home.nu-tight .mode small {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ...and the Training Camp row (NBA, NFL) drops its tag line, keeping a 44 px target */
+.home.nu-tight .evo-home-actions {
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+.home.nu-tight .training-entry {
+  min-height: 44px;
+  padding: 5px 13px;
+}
+.home.nu-tight .training-entry small {
+  display: none;
+}
+
 /* ---------- the Ultimate Team tab's badge (L1: #c62828 under white 11 px bold, 5.6:1) ---------- */
 .tabs .tab-badge {
   position: absolute;
