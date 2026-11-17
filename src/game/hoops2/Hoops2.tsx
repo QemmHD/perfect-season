@@ -94,6 +94,8 @@ interface QaProbe {
   skipTo(n: number): void;
   /** the score bug's phase forced, for the captures of phases the format doesn't reach yet (OT: nba-6) */
   phase(ph: 'normal' | 'clutch' | 'ot' | null): void;
+  /** your side's points in this game's box score (the scorer plate reads it; a rematch starts at 0) */
+  boxPoints(): number;
 }
 
 /** The toast line's colours for what the game says. */
@@ -129,8 +131,8 @@ const LOOK_TEXT: Record<Scheme, string> = { man: 'MAN-TO-MAN', sag: 'SAGGING OFF
 const LOOK_TIP: Record<Scheme, string> = { man: 'beat your man', sag: 'shoot over it', switch: 'attack the mismatch', trap: 'move it early' };
 /** The scorer plate's shot word ("CURRY · 3PT · 11 PTS", V2 B.1.7). */
 const SHOT_WORD: Record<ShotKind, string> = { three: '3PT', mid: 'JUMPER', close: 'FLOATER', layup: 'LAYUP', dunk: 'DUNK', contact: 'AND-ONE SLAM', standdunk: 'DUNK', oop: 'ALLEY-OOP' };
-/** the held arena's opponent curtain (plan §4.8): up this long from the rematch call (inside V2's 1.5 s, so the tip-off lands within it on a slow phone), skippable */
-const CURTAIN_MS = 1400;
+/** the held arena's opponent curtain (plan §4.8): up this long from the rematch call: 1.2 s, leaving 0.3 s of V2's 1.5 s for the tip-off on a slow phone (nba-3 review), skippable */
+const CURTAIN_MS = 1200;
 /** A kit's colour for the score bug: the jersey, or its trim when the jersey is white (an away kit). */
 function teamColor(k: Kit): string {
   const hex = /^#[0-9a-f]{3}$/i.test(k.jersey) ? '#' + [...k.jersey.slice(1)].map((c) => c + c).join('') : k.jersey;
@@ -323,7 +325,8 @@ export function Hoops2({
         while (game.marks.length < Math.min(n, game.total - 1)) game.marks.push('X');
         game.done = game.marks.length;
       },
-      phase: (ph) => setQaPhase(ph)
+      phase: (ph) => setQaPhase(ph),
+      boxPoints: () => boxRef.current.lines('us').reduce((a, l) => a + l.pts, 0)
     };
     w.__hg2 = probe;
     return () => {
@@ -431,6 +434,8 @@ export function Hoops2({
     if (round > 0) {
       // a rematch in the held arena: the same renderer and drawings, a clean slate for the play
       renderer.reset(court, [ourKit, theirKit]);
+      // a new game's box score: the scorer plate's points and the final box start again at 0
+      boxRef.current = new BoxTracker();
       possRef.current = null;
       booked.current = null;
       rescued.current = null;
@@ -478,7 +483,7 @@ export function Hoops2({
     const s = stickRef.current;
     if (!s || !s.active || s.mag === 0) return null;
     // up the screen is the camera's forward (it's yawed 12°: camera.ts)
-    return renderer.stickToCourt(s.x, s.y);
+    return renderer.stickToCourt(s.x, s.y, stickYaw.current ?? undefined);
   };
 
   /** Juice (render only): sweat at the rim, confetti, the camera's kick and hit-stop. */
@@ -1048,6 +1053,7 @@ export function Hoops2({
     if (out === 'release') release(p, e.t);
     else {
       if (out === 'wait') say('ONE FAKE AT A TIME', 'plain', 600);
+      boxRef.current.onStep(p, p.handler);
       handleEvents(p);
     }
   };
@@ -1067,6 +1073,7 @@ export function Hoops2({
     if (!p || p.end || replayRef.current || pausedRef.current) return;
     if (callPlay(p, id as 'screen' | 'cut' | 'iso')) {
       haptic('tick', true);
+      boxRef.current.onStep(p, p.handler);
       handleEvents(p);
     } else {
       const wait = Math.ceil(Math.max(0, (p.callReadyAt ?? 0) - p.t));
@@ -1100,11 +1107,17 @@ export function Hoops2({
     if (target !== null) pass(p, target);
   };
   const courtPtr = useRef<{ id: number; x: number; y: number; t: number } | null>(null);
+  /** the camera's yaw when the thumb went down on the stick: the stick keeps that mapping for the
+   * whole touch, so a turn of the camera never turns the court under a held thumb (nba-3 review) */
+  const stickYaw = useRef<number | null>(null);
   const onStick = (o: StickOut) => {
+    if (!o.active) stickYaw.current = null;
+    else if (stickYaw.current === null) stickYaw.current = renderer.yaw;
     stickRef.current = o;
   };
   useInputInterrupt(() => {
     stickRef.current = null;
+    stickYaw.current = null;
     passPend.current = null;
     courtPtr.current = null;
     setCallOpen(false);

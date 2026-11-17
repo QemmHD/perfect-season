@@ -15,6 +15,9 @@ const { GEO, GEO_TOL } = await import('../../src/game/hoops2/targets.ts');
 const RIM = { cx: 41.75, cz: 0, h: 10 };
 const PAD = 40;
 const FRAMES = Number(process.env.NBA_HUD_FRAMES ?? 900);
+// (nba-3 review) the camera rows over several autoplay games at a size, so the medians and the
+// release rows rest on enough: NBA_HUD_SEEDS=6 NBA_HUD_FRAMES=2700 → 16,200 frames, 30+ releases
+const SEEDS = Number(process.env.NBA_HUD_SEEDS ?? 1);
 const AT_RIM = ['layup', 'dunk', 'contact', 'standdunk', 'oop'];
 
 /** every visible HUD element's box (CSS px) */
@@ -37,11 +40,18 @@ const sample = (page, n) =>
         const out = [];
         const releases = [];
         let wasShot = false;
+        let lastT = -1;
+        let held = 0;
         const step = () => {
           const q = window.__hg2;
           const p = q?.possession();
           const c = q?.canvas()?.getBoundingClientRect();
-          if (q && p && c && !p.end) {
+          // (nba-3 review) only frames of play: the game clock moved since the last frame (a possession
+          // waiting for its tip, or a frozen moment, isn't the camera following the play)
+          const moving = !!p && p.t !== lastT;
+          if (p && !moving) held++;
+          lastT = p ? p.t : -1;
+          if (q && p && c && !p.end && moving) {
             const z = q.zoom();
             const at = (cx, cz, h = 0) => {
               const s = q.screenOf(cx, cz, h);
@@ -54,9 +64,11 @@ const sample = (page, n) =>
             const head = hb && at(hb.cx, hb.cz, 7.5);
             const ball = p.ball && 'to' in p.ball ? null : hb;
             const toast = document.querySelector('.arcade-full .ps-toast')?.getBoundingClientRect();
-            out.push({ rimX: rim.x, rimY: rim.y, rimS: rimFloor.s, feetY: feet?.y ?? null, headY: head?.y ?? null, dRim: ball ? Math.hypot(ball.cx - RIM.cx, ball.cz - RIM.cz) : null, toast: toast && toast.width ? { x: toast.x, y: toast.y, w: toast.width, h: toast.height } : null });
+            // the Clutch possessions sit 6% tighter on purpose (V2 B.0.4): left out of the zoom row
+            const clutch = !!q.renderer()?.clutch;
+            out.push({ clutch, rimX: rim.x, rimY: rim.y, rimS: rimFloor.s, feetY: feet?.y ?? null, headY: head?.y ?? null, dRim: ball ? Math.hypot(ball.cx - RIM.cx, ball.cz - RIM.cz) : null, toast: toast && toast.width ? { x: toast.x, y: toast.y, w: toast.width, h: toast.height } : null });
             const isShot = p.ball?.kind === 'shot';
-            if (isShot && !wasShot && !AT_RIM.includes(p.ball.shot)) {
+            if (isShot && !wasShot) {
               const sh = p.bodies[p.ball.who];
               let d = null;
               let best = Infinity;
@@ -76,12 +88,12 @@ const sample = (page, n) =>
               const front = at(d.cx, d.cz, 0).y > at(sh.cx, sh.cz, 0).y;
               const ix = Math.max(0, Math.min(A.x1, B.x1) - Math.max(A.x0, B.x0));
               const iy = Math.max(0, Math.min(A.y1, B.y1) - Math.max(A.y0, B.y0));
-              releases.push(front ? (ix * iy) / ((A.x1 - A.x0) * (A.y1 - A.y0)) : 0);
+              releases.push({ hide: front ? (ix * iy) / ((A.x1 - A.x0) * (A.y1 - A.y0)) : 0, jumper: !AT_RIM.includes(p.ball.shot) });
             }
             wasShot = isShot;
           }
           if (out.length < n) requestAnimationFrame(step);
-          else resolve({ out, releases, geo: window.__hg2.geometry() });
+          else resolve({ out, releases, held, geo: window.__hg2.geometry() });
         };
         requestAnimationFrame(step);
       }),
@@ -103,6 +115,16 @@ const out = {};
 try {
   for (const size of sizes) {
     const { ctx, page, errors } = await context(browser, size);
+    // a phone that has calibrated (since nba-4 the first played match offers the calibrator, which
+    // holds the tip-off): the probe measures the game, not the offer
+    await ctx.addInitScript(() => {
+      try {
+        const key = 'perfect-season:touch-prefs:v1';
+        if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ v: 1, offsetMs: 0 }));
+      } catch {
+        /* private mode */
+      }
+    });
     const H = SIZES[size].h;
     const res = { errors };
     // the HUD with its controls (a played game)
@@ -125,18 +147,25 @@ try {
     }
     await shot(page, `hud-${size}-play`);
     // the camera over an autoplay game
-    const auto = await ctx.newPage();
-    await openLab(auto, { seed: 'hud-cam' + size, auto: '' });
-    const cam = await sample(auto, FRAMES);
-    await shot(auto, `hud-${size}-auto`);
-    await auto.close();
+    const cam = { out: [], releases: [], geo: null };
+    for (let k = 0; k < SEEDS; k++) {
+      const auto = await ctx.newPage();
+      await openLab(auto, { seed: 'hud-cam' + size + (k ? '-' + k : ''), auto: '' });
+      const one = await sample(auto, FRAMES);
+      cam.out.push(...one.out);
+      cam.releases.push(...one.releases);
+      cam.held = (cam.held ?? 0) + one.held;
+      cam.geo = one.geo;
+      if (k === 0) await shot(auto, `hud-${size}-auto`);
+      await auto.close();
+    }
     const geo = cam.geo;
     res.safeBox = geo;
     if (GEO[size]) res.v2.safeBox = near(geo.safeTop, GEO[size].safe.y0) && near(geo.safeBottom, GEO[size].safe.y1);
     const inBox = (y) => y >= geo.safeTop && y <= geo.safeBottom;
     const s = cam.out;
     const withH = s.filter((x) => x.feetY !== null);
-    const nearRim = s.filter((x) => x.dRim !== null && x.dRim <= 15).map((x) => x.rimS);
+    const nearRim = s.filter((x) => x.dRim !== null && x.dRim <= 15 && !x.clutch).map((x) => x.rimS);
     const mean = nearRim.reduce((a, x) => a + x, 0) / Math.max(1, nearRim.length);
     // the DOM against the rim ± 40 px, every frame (the played page's controls, and the toast as shown)
     let domHits = 0;
@@ -150,12 +179,15 @@ try {
     }
     res.camera = {
       frames: s.length,
+      framesHeldOut: cam.held,
       rimRow: r3(median(s.map((x) => x.rimY)) / H),
       handlerRow: r3(median(withH.map((x) => x.feetY)) / H),
       safeHandlerRim: r3(withH.filter((x) => inBox(x.feetY) && inBox(x.headY) && inBox(x.rimY)).length / Math.max(1, withH.length)),
       zoomVarNearRim: nearRim.length ? r3((Math.max(...nearRim) - Math.min(...nearRim)) / mean) : null,
-      jumpReleases: cam.releases.length,
-      overlapOk: cam.releases.length ? r3(cam.releases.filter((x) => x <= 0.35).length / cam.releases.length) : null,
+      releases: cam.releases.length,
+      overlapOkAll: cam.releases.length ? r3(cam.releases.filter((x) => x.hide <= 0.35).length / cam.releases.length) : null,
+      jumpReleases: cam.releases.filter((x) => x.jumper).length,
+      overlapOk: cam.releases.some((x) => x.jumper) ? r3(cam.releases.filter((x) => x.jumper && x.hide <= 0.35).length / cam.releases.filter((x) => x.jumper).length) : null,
       domOnRimFrames: domHits,
       domOnRim: [...hitWho],
     };

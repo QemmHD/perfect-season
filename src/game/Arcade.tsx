@@ -226,10 +226,10 @@ export const Arcade = forwardRef(function Arcade({
     if (round.n === 0 || online || !attrs) return;
     const skill = aiSkill ?? AI_SKILL[botLevel];
     const n = round.n;
-    // basketball: a possession per task, so the curtain and the tip-off never wait on it
+    // basketball: sliced into ≤ 3 ms tasks, so the curtain, the tip-off and the first frames never wait on it
     if (!FOOTBALL && !SOCCER) {
       const [off, def, sub] = teams ? [teams.rivalFive!, teams.five!, teams.rivalBench ?? []] : [fiveOf(rivalLineup!, attrs), fiveOf(lineup!, attrs), []];
-      return aiPossessionsLater(off, def, seed, skill, POSSESSIONS, sub, defenseIQ, (p) => setLaterAi({ n, p }));
+      return aiPossessionsLater(off, def, seed, skill, POSSESSIONS, sub, defenseIQ, (p) => setLaterAi({ n, p }), { now: () => performance.now(), budgetMs: 3 });
     }
     const t = window.setTimeout(() => setLaterAi({ n, p: aiPlay(true, seed, skill, attrs) }), 30);
     return () => clearTimeout(t);
@@ -317,7 +317,7 @@ export const Arcade = forwardRef(function Arcade({
     // the held arena reports at the whistle (its sheet comes up over the dimmed court)
     // the grade's FLAWLESS needs the win (plan §4.8); the grade and the box stay on this phone
     const won = us.score > them.score || (level && !!pens?.won);
-    window.setTimeout(() => onFinish(settleGrade(us, won), them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), hold ? 0 : level ? 2600 : 1600);
+    window.setTimeout(() => onFinish(settleGrade(us, won), them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), hold && !online ? 0 : level ? 2600 : 1600);
   }, [us, them, pens]);
 
   useImperativeHandle(

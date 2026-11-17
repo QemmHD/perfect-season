@@ -87,6 +87,9 @@ export interface Placed extends LabelReq {
 
 const GAP = 2;
 
+/** how far in from the screen's sides a chip's plate stays (px) */
+const EDGE = 4;
+
 /**
  * Place the chips: highest priority first, each at its wanted spot, else nudged up then down in
  * steps of its height (within its slack and the screen), else left out. Nothing placed overlaps.
@@ -98,7 +101,8 @@ export function layoutLabels(reqs: LabelReq[], W: number, H: number): Placed[] {
   for (const { r } of order) {
     const bw = chipWidth(r.text);
     const bh = CHIP_H;
-    const bx = Math.round(Math.min(Math.max(1, r.x - bw / 2), Math.max(1, W - bw - 1)));
+    // the whole plate on screen, 4 px in from either side (nba-3 review: a chip at the edge read as cut)
+    const bx = Math.round(Math.min(Math.max(EDGE, r.x - bw / 2), Math.max(EDGE, W - bw - EDGE)));
     const slack = r.slack ?? 3 * (bh + GAP);
     const tries = [0];
     for (let d = bh + GAP; d <= slack; d += bh + GAP) tries.push(-d, d);

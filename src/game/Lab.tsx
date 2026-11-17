@@ -7,8 +7,10 @@ import type { Lineup, Player } from '../engine/types';
 import type { Progress } from './progress';
 import { fbKitsFor, Football2 } from './football2/Football2';
 import { Hoops2, kitsFor } from './hoops2/Hoops2';
-import { HeldLab } from './hoops2/HeldLab';
 import { rankOf } from './football/model';
+
+// the held arena's stub host (?arcade&hold): the dev server only, never in the shipped bundle
+const HeldLab = import.meta.env.DEV ? React.lazy(() => import('./hoops2/HeldLab').then((m) => ({ default: m.HeldLab }))) : null;
 
 function sample(level: number): { lineup: Lineup; def: Player[] } {
   const by = (pos: string) =>
@@ -40,7 +42,12 @@ export default function Lab() {
   const [prog, setProg] = useState<Progress | null>(null);
   // soccer's bench is ?soccer-lab (dev server only)
   if (pick({ nba: false, nfl: false, soccer: true })) return <div style={{ padding: 20, color: '#fff' }}>Soccer: open ?soccer-lab on the dev server.</div>;
-  if (pick({ nba: q.has('hold'), nfl: false, soccer: false })) return <HeldLab lineup={hoopFive(level)} rivalLineup={hoopFive(Number(q.get('rival') ?? 0.7))} seed={q.get('seed') ?? 'lab'} auto={q.has('auto')} />;
+  if (HeldLab && pick({ nba: q.has('hold'), nfl: false, soccer: false }))
+    return (
+      <React.Suspense fallback={null}>
+        <HeldLab lineup={hoopFive(level)} rivalLineup={hoopFive(Number(q.get('rival') ?? 0.7))} seed={q.get('seed') ?? 'lab'} auto={q.has('auto')} />
+      </React.Suspense>
+    );
   if (pick({ nba: true, nfl: false, soccer: false }))
     return (
       <div className="screen" style={{ paddingTop: 0, paddingBottom: 0 }}>

@@ -204,8 +204,13 @@
   transition: transform 0.35s ease-out;
   background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.28) 0 3px, transparent 3px 7px), linear-gradient(to right, #fbbf24, #f97316 65%, #ef4444);
   background-size: 14px 100%, 100% 100%;
-  animation: ps-heat-run 0.9s linear infinite;
   box-shadow: 0 0 6px rgba(251, 146, 60, 0.55);
+}
+/* the stripes run only once the bar means something (HEATING UP, ON FIRE): a cold bar's running
+   background repainted the layer every frame for nothing (nba-3 review, frame budget) */
+.ps-heat.st-heating .ps-heat-fill,
+.ps-heat.st-fire .ps-heat-fill {
+  animation: ps-heat-run 0.9s linear infinite;
 }
 @keyframes ps-heat-run {
   to {
@@ -247,6 +252,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ps-bug-clock[data-low='1'],
+  .ps-heat.st-heating .ps-heat-fill,
+  .ps-heat.st-fire .ps-heat-fill,
   .ps-heat-fill {
     animation: none;
   }

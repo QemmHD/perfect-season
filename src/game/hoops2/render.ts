@@ -13,7 +13,7 @@ import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import { type Juice, squashStretch } from '../juice';
 import { ballPos, JUMPER_TOP, RIM, RIM_H, topSpeed } from './engine';
 import { HoopsHud, type HudView } from './hud-draw';
-import { type Cam3, CAM, camOf, camStart, camStep, type CamState, depthOf, facingIndex, guardOf, pitchAt, project, type SafeBox, screenToCourt, subjectOf, yawFor } from './camera';
+import { type Cam3, CAM, camFollow, camOf, camStart, type CamState, depthOf, facingIndex, pitchAt, project, type SafeBox, screenToCourt } from './camera';
 import { drawCourtFloor } from './floor';
 import { drawChip, foldName, type LabelReq, layoutLabels } from './labels';
 import type { Body, Possession } from './types';
@@ -396,16 +396,22 @@ export class HoopsRenderer {
    * scratch, the sprite caches kept (the same men keep their drawings). Nothing new is allocated.
    */
   reset(theme?: CourtTheme, kits?: [Kit, Kit]) {
-    if (theme && theme !== this.theme) {
+    // compared by what they say, not by identity: hosts rebuild the same court and kits on every
+    // render, and a rebuilt court texture and every player's drawing cost 0.6 s at 4x CPU right at
+    // the rematch's tip-off (nba-3 review: the first controllable frame came at 1.9-2.2 s)
+    const sameTheme = (a: CourtTheme, b: CourtTheme) => a.c1 === b.c1 && a.c2 === b.c2 && a.abbr === b.abbr;
+    const sameKit = (a: Kit, b: Kit) => a.jersey === b.jersey && a.trim === b.trim && a.shorts === b.shorts && a.socks === b.socks && a.shoes === b.shoes;
+    if (theme && !sameTheme(theme, this.theme)) {
       this.theme = theme;
       this.tex = null;
       if (this.floor) this.floor.at = null;
     }
-    if (kits && (kits[0] !== this.kits[0] || kits[1] !== this.kits[1])) {
+    if (kits && !(sameKit(kits[0], this.kits[0]) && sameKit(kits[1], this.kits[1]))) {
       this.kits = kits;
       this.looks.clear();
     }
     this.cs = camStart();
+    this.followed = null;
     this.lastReal = null;
     this.replay = null;
     this.showOdds = true;
@@ -482,8 +488,15 @@ export class HoopsRenderer {
     return this.c3 ? this.at(cx, cz, h) : null;
   }
   /** The stick (screen right x, down y) as a court direction: up the screen is the camera's forward. */
-  stickToCourt(x: number, y: number): { cx: number; cz: number } {
+  stickToCourt(x: number, y: number, yaw?: number): { cx: number; cz: number } {
+    // `yaw`: the camera's yaw when the thumb went down (Hoops2 latches it), so a turn of the camera
+    // mid-touch never turns the court under a held stick
+    if (yaw !== undefined) return screenToCourt({ fwd: { cx: Math.cos(yaw), cz: Math.sin(yaw) }, across: { cx: -Math.sin(yaw), cz: Math.cos(yaw) } }, x, y);
     return this.c3 ? screenToCourt(this.c3, x, y) : { cx: -y, cz: x };
+  }
+  /** the camera's yaw now (the stick latches it at touch-down) */
+  get yaw(): number {
+    return this.cs.yaw;
   }
 
   /** this frame's chips (names, odds, the meter's words), laid out together at the end */
@@ -499,15 +512,21 @@ export class HoopsRenderer {
   private follow(p: Possession, real: number) {
     const dt = this.lastReal === null ? 0 : Math.max(0, Math.min(0.25, real - this.lastReal));
     this.lastReal = real;
-    const sub = subjectOf(p);
-    const ref = p.ball?.kind === 'shot' ? p.ball.who : p.handler;
-    const man = ref !== null ? p.bodies[ref] : null;
-    const yaw = this.replay ? this.cs.yaw : man ? yawFor(man, guardOf(p, man.idx), this.cs.yaw) : this.cs.yaw;
     const zoom = this.replay ? CAM.replay : this.clutch && !this.reduced ? CAM.clutch : 1;
-    this.cs = camStep(this.cs, { W: this.W, H: this.H, box: this.box, rim: { ...RIM, h: RIM_H }, subject: sub, yaw, zoom, spot: this.replay }, dt, this.reduced);
+    // a new possession re-places every man on the floor: the camera cuts to it (framed at once, the
+    // yaw's sign chosen afresh) rather than panning across a teleport
+    if (!this.replay) {
+      if (p !== this.followed) this.cs = { ...this.cs, ready: false };
+      this.followed = p;
+    }
+    // the subject, the yaw with its hysteresis (held through a replay) and the step: camera.ts camFollow,
+    // the same function camera.test.ts films with
+    this.cs = camFollow(this.cs, p, { W: this.W, H: this.H, box: this.box, rim: { ...RIM, h: RIM_H }, zoom, spot: this.replay }, dt, this.reduced, !!this.replay);
     this.c3 = camOf(this.cs, this.W, this.H, this.box);
   }
   private prevBall: { x: number; y: number; real: number } | null = null;
+  /** the live possession the camera last followed (a new one is a cut) */
+  private followed: Possession | null = null;
 
   /** A body's drawing this frame and whether the jump is drawn into it (then he's placed on the floor). */
   private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number, ball: Possession['ball'], over?: { key: string; pose: Pose }): { spr: Sprite; ownLift: boolean } {

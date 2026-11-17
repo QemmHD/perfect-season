@@ -411,9 +411,10 @@ export function autoplay(g: HoopsGame, skill: number, seed: string): HoopsGame {
 /**
  * The same game a possession at a time (nba-3): yields after each one, so a host can spread an AI
  * side's game over several frames (the held arena works out a rematch's AI side behind its curtain).
- * Draining it is exactly `autoplay`.
+ * With `chunk`, it also yields every `chunk` steps inside a possession (yielding -1), so a host can
+ * slice it by time. Draining it is exactly `autoplay` either way.
  */
-export function* autoplaySteps(g: HoopsGame, skill: number, seed: string): Generator<number, HoopsGame> {
+export function* autoplaySteps(g: HoopsGame, skill: number, seed: string, chunk = 0): Generator<number, HoopsGame> {
   const pl = pilot(skill, seed);
   const dt = 1 / 60;
   while (!g.over) {
@@ -427,6 +428,7 @@ export function* autoplaySteps(g: HoopsGame, skill: number, seed: string): Gener
       const s = decide(p, pl);
       step(p, dt, s);
       p.events.length = 0;
+      if (chunk > 0 && (i + 1) % chunk === 0 && !p.end) yield -1;
     }
     if (!p.end) p.end = { kind: 'clock', points: 0, text: 'SHOT CLOCK', who: -1 };
     afterPossession(g, p);
@@ -436,18 +438,31 @@ export function* autoplaySteps(g: HoopsGame, skill: number, seed: string): Gener
 }
 
 /**
- * The AI side's game exactly as `aiPossessionsOf` (Hoops2.tsx) plays it, a possession per task so it
- * never blocks a frame for long: the held arena works out a rematch's AI side behind its curtain.
- * The same seed, the same result (held.test.ts). Returns a cancel.
+ * The AI side's game exactly as `aiPossessionsOf` (Hoops2.tsx) plays it, sliced so it never blocks a
+ * frame: each task runs 20-step chunks until `budgetMs` of the host's clock `now` has gone (nba-3
+ * review: a whole possession a task was 6-25 ms at 1x, far more on a slow phone). Without a clock,
+ * one chunk a task. The same seed, the same result (held.test.ts). Returns a cancel.
+ * (The clock only decides where a task ends, never what's played: the steps are the same.)
  */
-export function aiPossessionsLater(offense: Hooper[], defense: Hooper[], seed: string, skill: number, possessions: number, bench: Hooper[], defIQ: number, done: (p: Progress) => void): () => void {
+export function aiPossessionsLater(offense: Hooper[], defense: Hooper[], seed: string, skill: number, possessions: number, bench: Hooper[], defIQ: number, done: (p: Progress) => void, slice: { now?: () => number; budgetMs?: number } = {}): () => void {
   const g = newHoopsGame(offense, defense, 'ai:' + seed, possessions, bench, defIQ);
-  const it = autoplaySteps(g, skill, 'ai:' + seed);
+  const it = autoplaySteps(g, skill, 'ai:' + seed, 20);
+  const budget = slice.budgetMs ?? 3;
   let t: ReturnType<typeof setTimeout> | undefined;
-  const slice = () => {
-    if (it.next().done) done({ score: g.score, drive: g.done, done: true, ends: g.marks.slice(), plays: g.done });
-    else t = setTimeout(slice, 0);
+  let over = false;
+  const run = () => {
+    const t0 = slice.now?.() ?? 0;
+    do {
+      if (it.next().done) {
+        over = true;
+        done({ score: g.score, drive: g.done, done: true, ends: g.marks.slice(), plays: g.done });
+        return;
+      }
+    } while (slice.now && slice.now() - t0 < budget);
+    t = setTimeout(run, 0);
   };
-  t = setTimeout(slice, 0);
-  return () => clearTimeout(t);
+  t = setTimeout(run, 0);
+  return () => {
+    if (!over) clearTimeout(t);
+  };
 }
