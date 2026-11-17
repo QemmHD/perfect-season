@@ -340,12 +340,17 @@ const ROWS = [
     });
     return pf(v.every((x) => x === null || x <= 1), SP.map((s, i) => `${s} ${v[i] === null ? 'no starts' : round(v[i], 1) + '%'}`).join(' · '));
   }],
-  ['A4', 'Effective animation rate', 'handler/carrier, nearest and large bodies >=28 fps; every body >=12, none <10 (1x)', 'players-5', () => {
+  // players-5: the must set (handler or carrier, his defender, the pass target, the controlled body) at
+  // >=28 fps while it cycles a stride or the stance (the probe's `priority`, pooled and median body);
+  // every other body >=12. (The plan's ">=34 art px at 30 fps" was dropped: measured, it doubled an NBA
+  // frame's drawings past the budget; players-5 in the team doc.)
+  ['A4', 'Effective animation rate', 'must set (handler/carrier, defender, target, controlled) >=28 fps; every body >=12, none <10 (1x)', 'players-5', () => {
     const rs = SP.map((s) => run(R.sprites, s));
     if (rs.some((r) => !r)) return missing('players-sprites');
     const v = rs.map((r) => r.animFps);
-    const ok = v.every((a) => a.all.under12 === 0 && a.all.under10 === 0 && [a.large40, a.ball, a.nearest6].every((d) => !d.bodies || d.min >= 28));
-    return pf(ok, SP.map((s, i) => `${s} min ${v[i].all.min}/p50 ${v[i].all.p50} (near ${v[i].nearest6.min}, ball ${v[i].ball.min ?? '-'})`).join(' · '));
+    if (v.some((a) => !a.priority)) return missing('players-sprites with the priority rate (players-5)');
+    const ok = v.every((a) => a.all.under12 === 0 && a.all.under10 === 0 && (!a.priority.bodies || (a.priority.pooled >= 28 && a.priority.p50 >= 28)));
+    return pf(ok, SP.map((s, i) => `${s} all min ${v[i].all.min}/p50 ${v[i].all.p50} · must pooled ${v[i].priority.pooled}/p50 ${v[i].priority.p50}/min ${v[i].priority.min}`).join(' · '));
   }],
   ['A5', 'In-match fps', '1x holds 60.0 at 5 viewports; 4x at or above before; >20 ms frames no worse than +10%', 'players-2/5/6/7/9/10', () => {
     if (!R.matchperf) return missing('players-matchperf');

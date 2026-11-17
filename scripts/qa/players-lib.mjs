@@ -619,7 +619,8 @@ export async function installProbe(page, sport, { golden = false, goldenCap = 40
           if (!b) S.bodies.set(who, (b = { frames: 0, px: [], reqAnim: null, shownAnim: null, reqChanges: 0, shownChanges: 0, stale: 0, staleRun: 0, maxStaleRun: 0, ball: 0, prioFrames: 0, prioReq: 0, prioShown: 0 }));
           b.frames++;
           // a priority body in a recorded clip: its frames, and the poses it asked for and was shown
-          const inPrio = prio.has(who) && CYCLES.has(q.e.clip);
+          // (a soccer key's who carries the kit side after the id and team side)
+          const inPrio = prio.has(who.split('|').slice(0, 2).join('|')) && CYCLES.has(q.e.clip);
           if (inPrio) {
             b.prioFrames++;
             if (q.e.anim !== b.reqAnim && b.reqAnim !== null) b.prioReq++;
