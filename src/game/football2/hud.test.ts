@@ -7,7 +7,7 @@ import { hashString, rng } from '../../engine/rng';
 import { chooseCall, decide, fourthDown, pilot } from './autopilot';
 import { afterPlay, kick, newGame, punt, startPlay } from './drive';
 import { ABILITY_ON, snap, step } from './engine';
-import { ABILITY_TEXT, abilityToPop, bugModel, PRIO, STALE_MS, ToastQueue } from './hud';
+import { ABILITY_TEXT, abilityToPop, bugModel, PRIO, STALE_MS, suggestFourth, ToastQueue } from './hud';
 import { fixtureTeams } from './sim-kit';
 
 describe('the toast line (hud.ts ToastQueue)', () => {
@@ -162,5 +162,25 @@ describe('the score bug (bugModel)', () => {
     m = bugModel(g, '');
     expect(m.label).toBe('FINAL');
     expect(m.pips).toEqual(['td', 'lost', 'fg', 'none']);
+  });
+});
+
+describe('the fourth-down suggestion (suggestFourth)', () => {
+  const at = (toGo: number, ballOn: number, clock: number | null = 300) => ({ toGo, ballOn, clock });
+  it('kicks when the kick is the call, the clock is out, or it is the kicking drill', () => {
+    expect(suggestFourth(at(3, 75), 'kick')).toBe('fg');
+    expect(suggestFourth(at(3, 40, 0), 'go')).toBe('fg');
+    expect(suggestFourth(at(3, 40), 'go', true)).toBe('fg');
+  });
+  it('punts a long fourth down just across midfield (4th & 36 at the OPP 44 used to say GO)', () => {
+    expect(suggestFourth(at(36, 56), 'go')).toBe('punt');
+    expect(suggestFourth(at(8, 60), 'go')).toBe('punt');
+    expect(suggestFourth(at(4, 40), 'go')).toBe('punt');
+  });
+  it('goes for it when it is short', () => {
+    expect(suggestFourth(at(1, 40), 'go')).toBe('go');
+    expect(suggestFourth(at(5, 60), 'go')).toBe('go');
+    expect(suggestFourth(at(8, 70), 'go')).toBe('go');
+    expect(suggestFourth(at(12, 70), 'go')).toBe('punt');
   });
 });

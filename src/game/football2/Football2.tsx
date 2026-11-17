@@ -68,7 +68,7 @@ import { BURST_BUTTON, readPref, writePref } from './prefs';
 import { type IconsHandle, ReceiverIcons } from './ReceiverIcons';
 import { calibrationLag, controlGeometry, haptic, HEATING, type Insets, PauseButton, perfectChime, ScoreBug, Stick, type StickHandle, ToastLine, type ToastView, touchTime, usePlaytime, type Vec } from './shared-v2';
 import { AUTO_KICK_AIM, AUTO_PICK, KICK_RESULT, KICK_TO_TRAY, LONG_TD_REPLAY, PUNT_TO_TRAY, REPLAY_LEAD, REPLAY_TAIL, SLOWMO, SLOWMO_RATE, TAP_SKIP, WHISTLE_TO_TRAY } from './pacing';
-import { ABILITY_TEXT, abilityToPop, bugModel, PRIO, type Tone, type ToastIn, ToastQueue } from './hud';
+import { ABILITY_TEXT, abilityToPop, bugModel, PRIO, suggestFourth, type Tone, type ToastIn, ToastQueue } from './hud';
 import { FRAME } from './camera';
 import { type Fourth, kindOf, keyOf, nameOf, PlayArt, PlayTray, type TrayEntry } from './PlayTray';
 import './hud.css';
@@ -293,6 +293,11 @@ export function Football2({
   const [trayDown, setTrayDown] = useState(false);
   const lookRef = useRef<Pt | null>(null);
   const lookFrom = useRef<Pt>({ x: 0, y: 0 });
+  /** The look-around ends: the camera goes back to the play, and the next drag starts from there. */
+  const resetLook = () => {
+    lookRef.current = null;
+    lookFrom.current = { x: 0, y: 0 };
+  };
   // fourth down: the tray's pick (go for it, kick, punt), A does it
   const [fourthPick, setFourthPick] = useState<Fourth['pick']>('go');
   // the camera's frame: the action-safe box (C15), reduced motion, and where the HUD leaves room for the chips
@@ -413,10 +418,10 @@ export function Football2({
     gate.current.reset();
     runKeys.current.clear();
     popShown.current = { done: false };
-    lookRef.current = null;
+    resetLook();
     setTrayDown(false);
-    // fourth down: the tray suggests the kick in range, a punt from deep with a long way to go
-    setFourthPick(practice?.drill === 'kick' || g.clock === 0 ? 'fg' : fourthDown(g) === 'kick' ? 'fg' : g.toGo >= 4 && g.ballOn < 55 ? 'punt' : 'go');
+    // fourth down: the tray suggests the kick in range, a punt when it's a long way to go for the spot
+    setFourthPick(suggestFourth(g, fourthDown(g), practice?.drill === 'kick'));
     setPhase('pre');
     setUi(g.down === 4 ? 'fourth' : 'pre');
     moveOn('pre', true);
@@ -499,7 +504,7 @@ export function Football2({
     p.passType = 'touch';
     snap(p);
     setBook(null);
-    lookRef.current = null;
+    resetLook();
     popShown.current = { done: false };
     setUi('live');
     setPhase(p.phase);
@@ -1561,8 +1566,7 @@ export function Football2({
           onFlip={flipFormation}
           onPlaybook={openBook}
           onExpand={() => {
-            lookRef.current = null;
-            lookFrom.current = { x: 0, y: 0 };
+            resetLook();
             setTrayDown(false);
           }}
           onInput={playtime.input}

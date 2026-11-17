@@ -5,8 +5,9 @@ import { HITSTOP } from '../juice';
 
 /** From the whistle to the next play-call tray: an ordinary play, a first down (its line flashes),
  * a drive that ended, a score (the celebration; a tap cuts it to TAP_SKIP). nfl-3 took the ordinary
- * play from 1.35 s to 0.7 (V2 §D.1: the next snap comes quickly). */
-export const WHISTLE_TO_TRAY = { play: 0.7, first: 0.78, drive: 1.9, score: 2.3 } as const;
+ * play from 1.35 s to 0.7 (V2 §D.1: the next snap comes quickly), and the first down to 0.75 so a
+ * frame of jitter stays inside the 0.8 s acceptance. */
+export const WHISTLE_TO_TRAY = { play: 0.7, first: 0.75, drive: 1.9, score: 2.3 } as const;
 /** A tap during a celebration or a replay's lead-in: the tray this soon after it. */
 export const TAP_SKIP = 0.3;
 

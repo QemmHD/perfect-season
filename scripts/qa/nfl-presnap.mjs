@@ -241,6 +241,12 @@ try {
           }
           check(v + ' ' + kind + ' no HUD overlaps', b.overlaps.length === 0, b.overlaps);
           check(v + ' HUD text >= 10 px', b.minFont >= 10, { min: b.minFont, text: b.minText });
+          // every card's two lines whole, the book's cards past the seam included (nfl-3 review:
+          // "Double P...", "Inside Zo...", "Outside ..." at 393)
+          const cut = await page.evaluate(() =>
+            [...document.querySelectorAll('.fb2-tray .fb2-card b, .fb2-tray .fb2-card small')].filter((el) => el.scrollWidth > el.clientWidth + 0.5).map((el) => el.textContent.trim())
+          );
+          check(v + ' ' + kind + ' no cut-off card labels', cut.length === 0, cut);
         }
         // the playbook fits the screen
         const bookBtn = page.locator('.fb2-tray [data-book], .fb2-cards .fb2-card.more').last();
@@ -262,6 +268,27 @@ try {
             await page.waitForTimeout(200);
           }
         }
+        // a play picked from the book past the seam moves to the front: the strip follows it, so the
+        // gold card is in view (nfl-3 review: the strip stayed at scrollLeft 761, the pick off screen)
+        {
+          const bookCard = page.locator('.fb2-tray .fb2-tray-seam ~ .fb2-card[data-call]').last();
+          if (await bookCard.count()) {
+            await bookCard.scrollIntoViewIfNeeded();
+            await page.waitForTimeout(150);
+            const from = await page.evaluate(() => document.querySelector('.fb2-tray-strip').scrollLeft);
+            await bookCard.click();
+            await page.waitForTimeout(700);
+            const at = await page.evaluate(() => {
+              const strip = document.querySelector('.fb2-tray-strip');
+              const s = strip.getBoundingClientRect();
+              const on = strip.querySelector('.fb2-card.on');
+              const r = on?.getBoundingClientRect();
+              return { scrollLeft: Math.round(strip.scrollLeft), onInView: !!r && r.left >= s.left - 1 && r.right <= s.right + 1, on: on?.textContent.trim() ?? null };
+            });
+            log({ view: v, motion, state: 'book-pick', from: Math.round(from), ...at });
+            check(v + ' a book pick scrolls the strip home with the pick in view', from > 0 && at.scrollLeft === 0 && at.onInView, { from, ...at });
+          }
+        }
         // drag the field to look around: the tray folds to a 44 px bar, a tap brings it back
         {
           const cdp = await context.newCDPSession(page);
@@ -281,6 +308,66 @@ try {
           await page.screenshot({ path: shotPath(TASK, tag + '-collapsed') });
           if (bar) await page.locator('.fb2-tray-bar').click();
           await page.waitForTimeout(250);
+          // look around, then snap straight from the folded tray (no tap on the bar): the next play's
+          // first small drag must start from the play, not from the old look (nfl-3 review: a 14 px
+          // drag used to jump the view 7 yd across and 8 yd downfield)
+          const drag = async (steps, dy) => {
+            await tp('touchStart', [{ x, y, id: 8 }]);
+            for (let i = 1; i <= steps; i++) {
+              await tp('touchMove', [{ x: x + i * 6, y: y + i * dy, id: 8 }]);
+              await page.waitForTimeout(16);
+            }
+            await tp('touchEnd', []);
+            await page.waitForTimeout(120);
+          };
+          await drag(6, 14);
+          const folded = await page.evaluate(() => !!document.querySelector('.fb2-tray.collapsed'));
+          const before = await page.evaluate(() => window.__o?.frame?.look ?? null);
+          await page.locator('[data-ctl="A"]').click();
+          await page.waitForFunction(() => window.__play?.end, null, { timeout: 15000 }).catch(() => {});
+          await page.waitForSelector('.fb2-tray:not(.collapsed)', { timeout: 15000 }).catch(() => {});
+          await page.waitForTimeout(400);
+          await drag(2, 7);
+          const look = await page.evaluate(() => window.__o?.frame?.look ?? null);
+          const moved = look ? Math.hypot(look.x, look.y) : 0;
+          log({ view: v, motion, state: 'look-after-snap', folded, before, look, moved: +moved.toFixed(2) });
+          // (not vacuous: the first look is 2+ yd, and the bug made the small drag land on top of it)
+          const was = before ? Math.hypot(before.x, before.y) : 0;
+          check(v + ' look, snap, then a small drag moves the view < 2 yd', folded && was >= 2 && moved < 2 && moved < was / 2, { before, look });
+          if (await page.locator('.fb2-tray-bar').count()) await page.locator('.fb2-tray-bar').click();
+          await page.waitForTimeout(250);
+        }
+        // LAST PLAY's 44 px touch target, clear of every play card (nfl-3 review)
+        {
+          await page.waitForSelector('.fb2-tray-last', { timeout: 8000 }).catch(() => {});
+          const lp = await page.evaluate(() => {
+            const btn = document.querySelector('.fb2-tray-last');
+            if (!btn) return null;
+            const r = btn.getBoundingClientRect();
+            const cx = Math.round(r.left + r.width / 2);
+            // walk the column through the button: which rows hit it
+            const rows = [];
+            for (let y = Math.floor(r.top) - 40; y <= Math.ceil(r.bottom) + 40; y++) {
+              const el = document.elementFromPoint(cx, y);
+              if (el && el.closest('.fb2-tray-last')) rows.push(y);
+            }
+            // every card pixel row under the header: none may hit the button
+            let stolen = 0;
+            for (const c of document.querySelectorAll('.fb2-tray .fb2-card')) {
+              const q = c.getBoundingClientRect();
+              for (let y = Math.ceil(q.top); y < q.top + 12; y++)
+                for (let xx = Math.ceil(q.left) + 2; xx < q.right - 2; xx += 6) {
+                  const el = document.elementFromPoint(xx, y);
+                  if (el && el.closest('.fb2-tray-last')) stolen++;
+                }
+            }
+            return { tall: rows.length ? rows[rows.length - 1] - rows[0] + 1 : 0, w: Math.round(r.width), stolen };
+          });
+          if (lp) {
+            log({ view: v, motion, state: 'last-play-target', ...lp });
+            check(v + ' LAST PLAY target >= 44 px tall', lp.tall >= 44, lp);
+            check(v + ' LAST PLAY steals no card pixels', lp.stolen === 0, lp);
+          } else console.log('NOTE ' + v + ' no LAST PLAY in the header at this moment (a toast was showing)');
         }
         // live: the pocket, then a carrier
         await pickCall(page, 'PASS');
@@ -310,6 +397,10 @@ try {
           const f = await field(page);
           log({ view: v, motion, state: 'fourth', ...f, overlaps: fourth.overlaps, tray: fourth.boxes.tray });
           check(v + ' fourth down no HUD overlaps', fourth.overlaps.length === 0, fourth.overlaps);
+          const cut4 = await page.evaluate(() =>
+            [...document.querySelectorAll('.fb2-tray .fb2-card b, .fb2-tray .fb2-card small')].filter((el) => el.scrollWidth > el.clientWidth + 0.5).map((el) => el.textContent.trim())
+          );
+          check(v + ' fourth down no cut-off card labels', cut4.length === 0, cut4);
           await page.screenshot({ path: shotPath(TASK, tag + '-fourth') });
         }
         check(v + ' no page errors', errors.length === 0, errors);
@@ -443,15 +534,15 @@ try {
       const live = (c1[1] - c0[1]) / 1000;
       if (live > 0.8) rates.push((c1[0] - c0[0]) / live);
       // the whistle's frame to the next tray (skipped: drives that ended, scores and the game's end)
-      await page.waitForFunction((k) => window.__trays.length > k, trays0, { timeout: 20000 }).catch(() => {});
-      const t = await page.evaluate(() => [window.__trays[window.__trays.length - 1], window.__play]);
-      const g = await page.evaluate(() => ({ drive: document.querySelector('.fb2-bug')?.getAttribute('data-drive') ?? null }));
-      void g;
-      if (t[0]) waits.push(+((t[0] - c1[2]) / 1000).toFixed(2));
+      // (a timed-out wait would leave the previous tray's time: no sample, as for a tray stamped
+      // before this play's whistle)
+      const came = await page.waitForFunction((k) => window.__trays.length > k, trays0, { timeout: 20000 }).then(() => true, () => false);
+      const t = came ? await page.evaluate(() => window.__trays[window.__trays.length - 1]) : null;
+      if (t && t >= c1[2]) waits.push(+((t - c1[2]) / 1000).toFixed(2));
     }
     const plain = waits.filter((w) => w < 1.2);
     log({ mode: 'pace', waits, plain, commitsPerSec: rates.map((r) => +r.toFixed(2)), errors });
-    check('whistle to tray 0.6-0.8 s (ordinary plays)', plain.length >= Math.min(12, n / 2) && plain.every((w) => w >= 0.6 && w <= 0.85), plain);
+    check('whistle to tray 0.6-0.8 s (ordinary plays)', plain.length >= Math.min(12, n / 2) && plain.every((w) => w >= 0.6 && w <= 0.8), plain);
     check('<= 2 commits/s in live play', rates.length > 0 && Math.max(...rates) <= 2, rates);
     check('no page errors', errors.length === 0, errors);
     await context.close();

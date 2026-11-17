@@ -81,9 +81,10 @@
 }
 .fb2 .fb2-tray-last {
   position: relative;
+  align-self: stretch;
   min-width: 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   margin: 0 0 0 auto;
   padding: 0 2px;
@@ -92,11 +93,16 @@
   color: #dbe6ff;
   font-family: inherit;
 }
-/* a 44 px touch area round the one-line header button */
+/* a 44 px touch area for the one-line header button (it fills the 20 px header row): up through
+   the tray's top padding and 20 px into the field above the tray, and down only as far as the
+   strip's top edge, so a tap on a play card's top edge picks the card (nfl-3 review) */
 .fb2 .fb2-tray-last::before {
   content: '';
   position: absolute;
-  inset: -12px -6px;
+  top: -26px;
+  bottom: -4px;
+  left: -6px;
+  right: -6px;
 }
 .fb2 .fb2-tray-last small {
   flex: 0 0 auto;
@@ -218,7 +224,8 @@
   color: #c4b8ff;
 }
 .fb2 .fb2-tray .fb2-card b {
-  font: italic 900 12px/1.05 var(--display);
+  /* 11 px: "Double Post" and "Inside Zone" fit the card's 72 px of text (12 px cut them off) */
+  font: italic 900 11px/1.1 var(--display);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

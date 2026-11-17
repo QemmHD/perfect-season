@@ -7,6 +7,7 @@
 // LAST PLAY (tap it for the breakdown). Dragging the field to look around collapses it to a 44 px
 // bar; a tap brings it back. SNAP and AUDIBLE stay on A and B.
 import React, { useEffect, useRef, useState } from 'react';
+import { reducedMotion } from '../../ui/motion';
 import type { PlayFeedback } from '../play-feedback';
 import { CONCEPT_NAMES, RUN_NAMES } from './engine';
 import type { ToastView } from './shared-v2';
@@ -40,6 +41,12 @@ const DEPTH: Record<Concept, string> = { verts: 'DEEP', posts: 'DEEP', dagger: '
 export const keyOf = (c: CallCard) => (c.call === 'pass' ? 'p:' + c.concept : 'r:' + c.run);
 export const nameOf = (c: CallCard) => (c.call === 'pass' ? CONCEPT_NAMES[c.concept] : RUN_NAMES[c.run]);
 export const kindOf = (c: CallCard) => (c.call === 'pass' ? DEPTH[c.concept] + ' PASS' : c.run.toUpperCase() + ' RUN');
+/** The tray card's two lines, cut to its 72 px of text (measured at 11 / 10 px Archivo): the full
+ * names stay in the playbook and the accessible names ("Four Verticals" and "Outside Zone" ran out
+ * of room; outside zone is also called wide zone, and it is the edge run). */
+const TRAY_NAME: Partial<Record<Concept | RunPlay, string>> = { verts: 'Four Verts', outside: 'Wide Zone' };
+const trayName = (c: CallCard) => TRAY_NAME[c.call === 'pass' ? c.concept : c.run] ?? nameOf(c);
+const trayKind = (c: CallCard) => (c.call === 'run' && c.run === 'outside' ? 'EDGE RUN' : kindOf(c));
 
 export function PlayTray({
   suggested,
@@ -88,6 +95,13 @@ export function PlayTray({
     setOpen(false);
     if (strip.current) strip.current.scrollLeft = 0;
   }, [down]);
+  // the picked book play moves to the front of the strip: follow it there once the strip has
+  // re-rendered, so the gold card is in view (it would otherwise vanish from under the finger; a
+  // scroll before the commit was undone by the strip's snap when the cards changed)
+  const [home, setHome] = useState(0);
+  useEffect(() => {
+    if (home) strip.current?.scrollTo({ left: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }, [home]);
   const stop = (e: React.PointerEvent) => {
     e.stopPropagation();
     onInput();
@@ -108,8 +122,8 @@ export function PlayTray({
   const card = (o: TrayEntry, on: boolean, act: () => void, extra = '') => (
     <button type="button" key={keyOf(o.choice) + extra} className={'fb2-card ' + o.choice.call + (on ? ' on' : '')} data-call={o.choice.call} role="radio" aria-checked={on} onClick={act} aria-label={nameOf(o.choice) + ', ' + kindOf(o.choice).toLowerCase()}>
       <PlayArt play={o.play} />
-      <small>{kindOf(o.choice)}</small>
-      <b>{nameOf(o.choice)}</b>
+      <small>{trayKind(o.choice)}</small>
+      <b>{trayName(o.choice)}</b>
     </button>
   );
   const goPlay = four ? suggested[Math.max(0, suggested.findIndex((o) => keyOf(o.choice) === picked))] ?? suggested[0] : null;
@@ -152,7 +166,7 @@ export function PlayTray({
                 <path d="M34 50V22M66 50V22M34 34h32M50 34v24" fill="none" stroke="#f6c531" strokeWidth="4" strokeLinecap="round" />
                 <path d="M50 58c6-10 10-18 10-28" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="2" strokeDasharray="2 4" />
               </svg>
-              <small>{four.fg.ok ? four.fg.yards + ' YARDS' : 'OUT OF RANGE'}</small>
+              <small>{four.fg.ok ? four.fg.yards + ' YARDS' : 'NO RANGE'}</small>
               <b>Field Goal</b>
             </button>
             {four.punt && !four.kickOnly && (
@@ -186,7 +200,17 @@ export function PlayTray({
               <b>BOOK</b>
               <small>ALL PLAYS</small>
             </button>
-            {book.map((o) => card(o, keyOf(o.choice) === picked, () => onBook(o.choice), ':book'))}
+            {book.map((o) =>
+              card(
+                o,
+                keyOf(o.choice) === picked,
+                () => {
+                  onBook(o.choice);
+                  setHome((n) => n + 1);
+                },
+                ':book'
+              )
+            )}
           </>
         )}
       </div>

@@ -182,3 +182,14 @@ export function bugModel(g: Game, down: string): BugModel {
     pips
   };
 }
+
+/**
+ * The tray's fourth-down suggestion (what A does if you just tap it). The kick when it's in range
+ * (the autopilot's own call, `ai`), else a punt when it's a long way to go for the spot: 4+ on your
+ * own side of midfield, 7+ across it, 10+ from inside the 35. Anything shorter: go for it.
+ */
+export function suggestFourth(g: Pick<Game, 'toGo' | 'ballOn' | 'clock'>, ai: 'kick' | 'go' | 'punt', kickOnly = false): 'fg' | 'punt' | 'go' {
+  if (kickOnly || g.clock === 0 || ai === 'kick') return 'fg';
+  const long = g.ballOn < 55 ? 4 : g.ballOn < 65 ? 7 : 10;
+  return g.toGo >= long ? 'punt' : 'go';
+}
