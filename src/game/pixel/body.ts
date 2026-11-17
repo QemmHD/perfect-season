@@ -122,9 +122,12 @@ export function numberBitmap(n: number, font: NumberFont, gap: number): { w: num
  */
 function number(b: Buf, n: number, cx: number, cy: number, squeeze: number, px: number) {
   if (squeeze < 0.6) return;
+  const { slot, w, h } = b;
+  const jersey = JERSEY,
+    trim = TRIM;
   // the shirt's own pixels before the number goes on
   let shirt = 0;
-  for (let i = 0; i < b.slot.length; i++) if (b.slot[i] === JERSEY) shirt++;
+  for (let i = 0; i < slot.length; i++) if (slot[i] === jersey) shirt++;
   const fonts = numberFonts(px);
   for (const font of fonts)
     for (const gap of squeeze < 0.9 ? [1, 0] : [1]) {
@@ -134,23 +137,29 @@ function number(b: Buf, n: number, cx: number, cy: number, squeeze: number, px: 
       const fits = bm.px.every(([x, y]) => {
         const xx = x0 + x;
         const yy = y0 + y;
-        if (xx < 0 || yy < 0 || xx >= b.w || yy >= b.h) return false;
-        const sl = b.slot[yy * b.w + xx];
-        return sl === JERSEY || sl === TRIM;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) return false;
+        const sl = slot[yy * w + xx];
+        return sl === jersey || sl === trim;
       });
       if (!fits) continue;
-      const lit = new Set(bm.px.map(([x, y]) => (y0 + y) * b.w + x0 + x));
+      const lit = new Set(bm.px.map(([x, y]) => (y0 + y) * w + x0 + x));
       // a one-pixel border in the trim color around the digits, where it lands on the jersey
       const border = new Set<number>();
+      const edge = (k: number) => {
+        if (k >= 0 && k < slot.length && !lit.has(k) && slot[k] === jersey) border.add(k);
+      };
       for (const i of lit) {
-        const x = i % b.w;
-        for (const k of [x + 1 < b.w ? i + 1 : -1, x > 0 ? i - 1 : -1, i + b.w, i - b.w]) if (k >= 0 && k < b.slot.length && !lit.has(k) && b.slot[k] === JERSEY) border.add(k);
+        const x = i % w;
+        if (x + 1 < w) edge(i + 1);
+        if (x > 0) edge(i - 1);
+        edge(i + w);
+        edge(i - w);
       }
-      for (const i of lit) b.slot[i] = NUM;
+      for (const i of lit) slot[i] = NUM;
       // the border only where the chest has room for it: with it the shirt must still show twice as
       // much shirt as number (the arms and the chin land on it after), or its shading goes (a turned
       // or narrow chest; V2 C.7 #8). The number's colour reads on the jersey without it (onColor)
-      if (shirt - lit.size - border.size >= 2 * lit.size) for (const k of border) b.slot[k] = NUMLINE;
+      if (shirt - lit.size - border.size >= 2 * lit.size) for (const k of border) slot[k] = NUMLINE;
       return;
     }
 }
@@ -397,8 +406,18 @@ export function rasterBody(look: Look, pose: Pose | Joints, view: View, px: numb
   const rightS = { x: -fwdW.z, y: -fwdW.x * sp, z: fwdW.x * cp };
 
   // ---- the kit's trim at the collar: jersey round the neck (V2 C.1.6: base, trim, number) ----
-  for (let i = b.w; i < b.slot.length - b.w; i++)
-    if (b.slot[i] === JERSEY && b.part[i] === TORSO && [i - 1, i + 1, i - b.w, i + b.w].some((k) => b.slot[k] === SKIN && b.part[k] === TORSO)) b.slot[i] = TRIM;
+  // (only the rows round the shoulder line, where the neck meets the shirt: the raster is rebuilt
+  // often, so this stays a small scan with no allocation)
+  {
+    const { w, slot, part } = b;
+    const reach = Math.max(2, Math.ceil(shHalf + px * 0.08));
+    const y0 = Math.max(1, Math.floor(oy + shMid.y - reach));
+    const y1 = Math.min(b.h - 2, Math.ceil(oy + shMid.y + reach));
+    const neck = (k: number) => slot[k] === SKIN && part[k] === TORSO;
+    for (let y = y0; y <= y1; y++)
+      for (let i = y * w + 1, end = y * w + w - 1; i < end; i++)
+        if (slot[i] === JERSEY && part[i] === TORSO && (neck(i - 1) || neck(i + 1) || neck(i - w) || neck(i + w))) slot[i] = TRIM;
+  }
 
   // ---- the jersey number, on the chest or back when we see it square enough ----
   const squeeze = Math.abs(front);
@@ -514,7 +533,10 @@ function finish(b: Buf, pal: RGB[][], ox: number, oy: number, hl: P2, hr: P2, to
   const col = pal.map((tones) => (tones ? tones.map(pack) : [0, 0, 0]));
   const line = pack(OUTLINE) >>> 0;
   // hair (volume and hanging) and the head are one shape: no line between them
-  const grp = (p: number) => (p === HAIR_VOL || p === HAIR_HANG ? HEAD : p);
+  const hairVol = HAIR_VOL,
+    hairHang = HAIR_HANG,
+    headPart = HEAD;
+  const grp = (p: number) => (p === hairVol || p === hairHang ? headPart : p);
   const out = new Uint32Array(w * h);
   const T = 1.6;
   for (let y = 0; y < h; y++)
