@@ -12,11 +12,12 @@ Worktree `/home/user/ps-s-ut`, branch `claude/studio-ut` (cut from live main `ac
 | ut-1 progress core and the light next-best-action engine | done | see the ut-1 section |
 | ut-2 MINUTES engine: ticker, profile ledger and cloud merge, ladders and league maths | done | see the ut-2 section |
 | ut-3 MINUTES on screen and healthy play: Home and UT Home ring chips, the Minutes screen, Profile panel, settings, break reminder, Done for today | done | see the ut-3 section |
-| ut-4 … ut-9 | not started | |
+| ut-4 next best action everywhere: Home strip, badges, GO links, first run, the UT Hub, modal queue, session summary | done | `d463e76` Home strip, badges, GO links, first run; `d58a264` Hub, feed, queue, summary; then this doc |
+| ut-5 … ut-9 | not started | |
 
 ## Protocol
 
-**Protocol bump needed: none from team ut** (plan §9). ut-3 is presentation and settings only (chips, the Minutes screen, the panel, a reminder sheet at stoppages, a board-publish switch). ut-0 changes no match physics, rules, ratings, pairing or settlement: labels are display text, the kit and haptics are presentation, the harness and fixtures are QA-only. ut-2 (MINUTES) reads input and time and writes its own ledger only: no match outcome, rating or queue changes.
+**Protocol bump needed: none from team ut** (plan §9). ut-4 is presentation, navigation and first-run collection (same gift and chest receipts). ut-3 is presentation and settings only (chips, the Minutes screen, the panel, a reminder sheet at stoppages, a board-publish switch). ut-0 changes no match physics, rules, ratings, pairing or settlement: labels are display text, the kit and haptics are presentation, the harness and fixtures are QA-only. ut-2 (MINUTES) reads input and time and writes its own ledger only: no match outcome, rating or queue changes.
 
 ## Touched outside my lane
 
@@ -29,10 +30,18 @@ Worktree `/home/user/ps-s-ut`, branch `claude/studio-ut` (cut from live main `ac
 - ut-3, `src/ui/Pages.tsx` (shared): `RanksPage` gains the MINUTES segment (a third `.seg` button, the lazy `MinutesView`, an `update` prop and `showMinutesRanks()`); the Settings sheet gains two rows (Session reminder, Hide me from leaderboards) with a one-line note each, and its `onChange` key type widens to them. The Home chip row and Profile panel are inside ut's Pages grant. `LiveCount` drops its visible "· N in queue" part (Home's Head to Head tile already shows the queue whenever anyone is searching; the chip's label still says both).
 - ut-3, `src/App.tsx` (shared): `<BreakReminder>` mounted next to the toast, and one `useEffect` holding it on the draft `vote`, `gauntlet` and `training` screens; `openMinutes` (RANKS → MINUTES) passed to Home, Profile and Ultimate Team; `update` passed to `RanksPage`; the board flush returns early when `settings.hideBoards` is on (one condition, plus the setting in that effect's deps), and the Results board line says so instead of "Posting…".
 - ut-3, `src/ut/Match.tsx` (shared, ut's vote/result path): one import and one `useEffect` that holds the break reminder during the match handshake (`found`, `vs`, the timed `vote`).
+- ut-4, `src/App.tsx` (shared; the badge and first-run order are in ut's App grant): `useHomeNext` and `useAppBadge` next to the sport switch; the `nextRoutes` map (open UT, another sport's UT across the reload, Minutes, a draft, Missions) and its ref; the strip, Profile's `utNext`/`onDraft`, Results' `utBridge`, the Gauntlet sheet's `go`, Missions' `onGo`, UltimateTeam's `onNext`; the testers' gift sheet replaced by `FirstRunSheet` (same gift id, `rewardDay` and streak receipts). No match, draft or settlement logic changes.
+- ut-4, `src/ui/Pages.tsx` (shared): Home's mode hint line now shows only in Head to Head (its AI chips) or without the strip; the `nextUp` slot in the PLAY bar; a layout effect that tightens Home in two steps when its rows overflow (snug tiles, then `nu-tight`); `Tabs` gains `utBadge`; `ProfilePage` gains `utNext` and `onDraft`; `GauntletSheet` gains `go`. The Home rewards strip, GO links and the Profile page are in ut's Pages grant; the Home tightening touches the Home layout shell owns (the hint/spacer rule is shell's, untouched).
+- ut-4, Training Camp's Home row (`src/evolution/evolution.css`, no listed owner) is restyled only under `.home.nu-tight`, from ut's `src/ui/next-up.css`: its 9 px tag line hides and its padding shrinks to a 44 px row, on phones where Home would otherwise hide the last mode tiles.
+- ut-4, `scripts/qa/ui-reorg.mjs` and `scripts/qa/ut-content.mjs` (older QA scripts): the Rewards inbox is now opened from the hub's Rewards row `.uh-rewards` (the old `.ut-home-inbox` card is gone). One selector each.
 - ut-3, `.ranks-head` gets `flex-wrap: wrap` (in ut's new `src/ui/playtime-ui.css`, not styles.css): with three segments, "SOCCER RANKS" and "NFL RANKS" push the segments under the title instead of off the frame.
 - ut-3, shell's top bar: the `LV` label over the level ring is 8 px (pre-existing; shell's). The ut-3 harness excludes it from its tiny-text count and names it here.
 
 ## Merge stand-ins (for the lead)
+
+- **UT modal queue** (ut-4, `src/ut/ut-modal-queue.ts`): `interrupted` (ut-6's interrupted-match sheet) and `launch` (packs' program launch takeover, C6) are slots in the fixed order; packs passes `launch: <its condition>` in `UltimateTeam.tsx`'s `useUtModalQueue` call and renders its sheet when the queue returns `'launch'`. Only `newEra` is wired on this branch.
+- **Live Now from packs' `promo-hub`** (ut-4, C6): `hub-feed.ts liveNow` builds its program items from the Live Calendar (`promosOn`) and the Lightning window directly. When packs' `liveNow`/`upcomingDrops` land, swap those two sources for them (same `FeedItem` shape).
+- **Perfect Season line on Home** (ut-4 slot, ut-7 fills): not drawn yet. The stat strip has no room for a sixth chip, so ut-7 puts the run on the Next-up strip's eyebrow or replaces the Gauntlet chip while a run is live (decided with the run's screen).
 
 - `src/ut/packs-claimables.ts` (ut-1): returns zero. Packs owns the body: their new claims (calendar check-in and path claims, stamp redemption ready, Program Bag keys), with the same rows added to `inbox.ts` `inboxItems`, and no imports from pool/packs/cards/sbc/rate/squad (`claimables-graph.test.ts`).
 - **MINUTES stamps and the 25-hour Player Pick** (ut-2, `src/ut/minutes.ts`): packs' stamp field and Player Pick API are not on this branch, so a claim records an owed receipt in `playtime.owed` (`stamp:day:<ET day>:30:0`, `pick:life:life:1500`; merged as a union, never lost, never paid twice). At merge, packs (or the lead) converts each receipt once by its id. Until then the 30-minute rung pays its 75 coins and the 25-hour rung pays nothing yet.
@@ -375,6 +384,91 @@ None. Presentation, settings and a reminder at stoppages; nothing in a match, a 
 - CLAIM on a pack rung: one long buzz, never a buzz on a scroll that starts on the button.
 - After an hour of real play, the stretch sheet appears on the next menu or result screen and never mid-possession, mid-vote or in Training Camp; OK closes it at once.
 - Hide me from leaderboards: a finished draft with it on never appears on the boards from another phone.
+
+---
+
+## ut-4 · Next best action everywhere: Home strip, badges, first run and the UT Hub
+
+### What changed
+
+- **Main Home "Next up" strip** (`src/ui/NextUpStrip.tsx`, `src/ui/next-up-main.ts`, `src/ui/next-up.css`). A gold strip in the PLAY bar, directly above PLAY: eyebrow (NEXT UP, ENDS TONIGHT in amber, DONE FOR TODAY in calm teal), one line with the true distance, the action's word on a gold pill. The whole strip is one button with a 44 px touch area (`::before`). It never scrolls away and PLAY never moves.
+  - **Engine.** `next-up-main.ts` is loaded with a dynamic import after first paint (`requestIdleCallback`, 1 s fallback), memoised per profile and minute. It is the ut-1 engine (`nextCtxOf` + `nextUp` with the Minutes extras) plus the main app's own sources: today's Missions ready to claim (right after this sport's UT claims), the draft Daily while unplayed (the engine's Daily Play slot), other sports' UT counts from the device cache (`perfect-season:ut-device:v1`, device-only, today's only, never a pool). Until it answers, a quiet placeholder of the same size holds the place.
+  - **Taps.** `goHome` leads every target where it is done: UT views through `openUtAt`, a match to its mode's UT screen, the Minutes screen, a draft mode (starting it), Missions; another sport's rewards switch sport and open that UT at its inbox after the reload (`requestUtOpen`/`takeUtOpen`, sessionStorage, once, within a minute).
+  - **Room.** The strip takes the place of Home's one-line mode hint (kept in Head to Head for its AI chips) at the same height (40 px, 34 px on snug phones). Where Home's rows already overflowed (Training Camp in NBA/NFL), a layout effect tightens Home in two steps (snug tiles, then `nu-tight`: compact tiles, Training Camp's tag line hidden), measured once per frame height and never loosening, so it cannot oscillate.
+- **Done for today on Home and Hub** (`next-action.ts loopDone`, `doneAction`): when today's three objectives are claimed, the Daily Drop and the login calendar are claimed and nothing waits (no claim, Minutes rung, other sport's rewards, starter, pack or pick), both surfaces show the calm Done, even if a milestone is a step away (V2 D.11). Never after a match (the One-More bar keeps its own rule). Minutes 90 is not required: the day's loop is complete without it, and the Minutes ring says its own "done" at 90.
+- **UT tab badge** (`TabBadge`): UT HOME's Rewards count (`utClaimables`, equal to the inbox's claimable rows) on `#c62828` under white 11 px 800 (5.6:1); an amber ring and a clock when the Daily Drop streak ends tonight with its claim waiting; 99+ past 99; the FREE tag only while nothing is counted. UT's own tab dots move to the same red at 11 px (L1, was `#e2384d` at 10 px, 4.3:1); segment counts go to 10 px (L2).
+- **App icon badge** (`useAppBadge`): `navigator.setAppBadge(total)` (this sport's rewards + other sports' + Minutes rungs), `clearAppBadge()` at 0, in try/catch. The app never asks for notification permission.
+- **GO links in the main app (H5).**
+  - Missions: every mission has `go: 'any' | 'season' | 'daily' | 'blind' | '1v1'` (`engine/missions.ts`; ids, goals and rewards unchanged) and `missionMode(go, current)`; unfinished missions show PLAY (44 px), which starts the draft mode that completes it. The difficulty pill moves next to the title at 10 px (L2) and CLAIM goes to 44 px.
+  - Legends Gauntlet sheet: "CLIMB WITH YOUR 64–18 TEAM" when a draft has just finished (the same climb as Results' button), else "PLAY A DRAFT".
+  - Draft Results: "ULTIMATE TEAM · N rewards waiting" row into the inbox when this sport has any.
+  - Profile: the Ultimate Team card names the next step ("4 rewards to claim") and leads there; a player with no drafts gets PLAY YOUR FIRST DRAFT.
+- **First run (M7).** `firstRunPlan` / `collectFirstRun` / `FirstRunSheet` (`src/ui/Welcome.tsx`, `first-run.css`): one welcoming sheet with the testers' gift and today's chest, COLLECT ALL in one tap (the same receipts as the two old sheets: `testers-2026-10` in `gifts`, `rewardDay`, the streak through `nextStreak`), then OPEN YOUR FREE STARTER PACK → UT Home, where a starter row sits under the hero until the pack is opened. Closing the sheet any other way still collects. The welcome screen's perks name Ultimate Team.
+- **UT Hub rebuilt** (`src/ut/Hub.tsx`, `hub.css`, `hub-feed.ts`):
+  - the **hero**: the next best action (same engine and Done rule as Home) with a 96 px lit medallion, the eyebrow, an Archivo condensed italic title, the line, the stake and the screen's one `PrimaryButton`. CLAIM ALL claims in place; everything else goes where it is done (another sport, a draft and the Minutes screen leave UT through `onNext`);
+  - **near-miss chips** (`nearMisses` with sets one or two cards away from the pool);
+  - the **Minutes ring** (ut-3);
+  - **Live Now**: a scroll-snap carousel of what runs now (Daily Drop, the Lightning window, this week's Squad Battles ladder, Rivals week, Champions Circuit, Weekly Standouts, Live Calendar programs in NBA/NFL), each with its Eastern-midnight clock (the kit's `Countdown`, amber under 24 h) and a dot until seen (`hq.seen`, `live:<id>`);
+  - **Today**: the three daily objectives with ticks and 2 / 3;
+  - the **Season card** (M10 within the 25-level scheme): the top reward's pack art from day 1, level and bar, "N levels to <named pack>" (or levels ready to claim), the season clock and PLAY (Squad Battles, where SP is earned);
+  - **Upcoming**: tomorrow's Daily Drop day, Monday's weekly reset, the next Season Pass season, the Live Calendar's next drops by name (NBA/NFL);
+  - Daily and Standouts tiles, the squad fan, Rewards (the inbox) and Club Records kept.
+  - `SeasonBanner.tsx` and Clubhouse's `SeasonRibbon` had no other user and are deleted; their dead rules in `nav.css` are removed (the shared `uh-sheen` keyframes stay). Shell: `.ut-season-chip` and `.ut-season-banner*` (content-ui.css) are dead CSS now.
+- **Modal queue** (`src/ut/ut-modal-queue.ts`): interrupted match → packs' launch takeover → New Era bundle, one at a time, only on UT Home, never over a pack, pick, card or the first starter pack, each at most once a visit once dismissed. The New Era bundle (an inline card before) is the first user: a sheet with CLAIM and LATER; it also stays in Rewards.
+- **Session summary on EXIT** (`src/ut/session-summary.ts`): after Home is on screen, one toast: "This visit: +350 coins · 2 packs · 14 active min. Tomorrow: Daily Drop Day 3 of 7 · 3 new objectives." A short visit that earned nothing says nothing; spending never shows negative coins.
+- **QA timing hook** `perfNote` (NextUpStrip.tsx): a performance measure plus the newest 40 in `window.__psPerf`, because QA's fixtures run on Playwright's fake clock, which records no measures.
+- **Harness**: `ut-studio.mjs deadtaps --screen <id>` (repeatable); the inbox screen is reached through `.uh-rewards`.
+
+### Numbers
+
+All on the team dev server, isolated phones (touch, iPhone insets 59/34 at 393x852, `--edge`), local relay only: **0 non-local sockets** in every run (Home 28-92, hub 122, flows 84 + 150 + 9, dead taps 106, CPU 42 local).
+
+- **Home, strip above PLAY, scroll** (`.home-scroll` overflow in design px; fixture `audit`; PLAY top y in brackets):
+
+  | Sport | 393x852 before → after | 375x667 | 320x568 | PLAY y (393 / 375 / 320) |
+  |---|---|---|---|---|
+  | NBA | 38 → **2** | 17 → **0** | 26 → **0** | 674 / 564 / 562, unchanged |
+  | NFL | 38 → **2** | 17 → **0** | 26 → **0** | unchanged |
+  | Soccer | 0 → **0** | 0 → **0** | 0 → **0** | unchanged |
+
+  The strip is fully visible above PLAY in every run (y 628-634 at 393, 522-524 at 375/320).
+- **Tap feedback** on the strip: **6–42 ms** (median 9) over 38 taps in 3 sports. Landing: the target screen after 0.6 s (Minutes) to 4.2 s (UT, loading the card pool on the dev server, no throttle); the 2.5 s target at 4× CPU waits for shell's loading work (plan: re-measured at integration).
+- **Import + compute at 4× CPU** (dev server): compute **3–22 ms** for the first answer (cold JIT), 1-3 ms after; the dynamic import **69–219 ms** wall time on the dev server, which serves ~15 unbundled modules. Neither blocks first paint (they run on the first idle moment after it). The ≤ 10 ms target is for the production chunk and is re-measured with the build in ut-9 (follow-up).
+- **The strip's line is true** (`next-up.test.tsx`, every QA fixture × 3 sports, 36 a sport): the strip's action equals the engine's (or its calm Done) in 100%, and the stated distance equals an independent recomputation (claims count, Circuit wins, Rivals wins, Minutes left, daily objective left) in every fixture that states one. In the browser, 38 strip taps (14 fixtures NBA, 12 NFL, 12 soccer) each landed where the action is available: Rewards (claims), Club Cups (a run), the Minutes screen (Minutes), Squad Battles (Done → KEEP PLAYING).
+- **Badges.** Main badge = UT HOME's count in **100%** of fixtures × 3 sports with the UT cache valid (unit test, every fixture) and in the browser after one UT visit (36 of 36: 6/6, 2/2, 1/1, 0/0...). Before UT has been opened once in this build, the badge shows the light count, flagged `approx` (ut-1: pool rows such as Sets cannot be counted without the pool), e.g. 4 where UT shows 6, then exact. Contrast: **5.6:1** (white on `#c62828`, asserted in the test).
+- **First run** (fixture `starter` with the gift and chest unclaimed, 3 sports): stacked modals **2 → 1** ("Welcome gifts" only, sampled for 3 s); COLLECT ALL **1 tap** (was COLLECT, then OPEN and COLLECT: 3 taps over 2 sheets); coins **50 → 9,075** (+9,000 gift + 25 chest), `gifts` holds `testers-2026-10`, `rewardDay` set; OPEN YOUR FREE STARTER PACK → **UT Home** (title "Ultimate Team", the starter row under the hero), 0 dialogs after.
+- **Hub** (fixtures audit, all-done, runs, near-miss, streak-risk × 3 sports × 393/320, 30 runs): exactly **1** `data-primary` in 30/30; hero CTA bottom **361 px** above the tab bar at 320x568 (428 at 393); **Done for today in 6/6 all-done runs and 0/24 others** (unit test: 1 all-done fixture per sport, ≥ 10 claimable fixtures per sport never Done); Live Now 6 items (NBA/NFL), 5 (soccer); 0 horizontal overflow; 0 page errors.
+- **Hub derivations at 4× CPU** (`ps-hub-derive`, every derivation in one memo): **9–28 ms** first, 1–12 ms after (9 runs, 3 sports).
+- **Dead taps** (`deadtaps --size 393 --screen home|profile|ut-home|inbox`, 3 sports): Rewards inbox 0; Home and Profile only the baseline ones (`NBA`/`CLASSIC` already selected, the top bar's level ring: ut-0 had the same). Two new flags are the walker's noise filter, not dead controls: NBA's Gauntlet chip (opens its sheet, checked directly; NFL/soccer ok) and UT Home's Minutes ring (lands on RANKS → MINUTES, checked directly; it leaves UT, and the walker's previous tap left a toast that marks the root as noisy).
+- **Reduced motion** (`rm`, NBA and soccer 320): strip sheen, tab badge pop, hero rays and the primary button's sheen all compute `animation-name: none`.
+- **Session summary** (audit, hero CLAIM ALL, 31 s, EXIT): "This visit: +65,600 coins · 5 packs. Tomorrow: Daily Drop Day 2 of 7 · 3 new objectives." (the New Era coins are in the claim).
+
+Screenshots: `O/shots/ut/ut-4/` (`before/`, `after/`, `hub/`, `flows/`, `cpu4/`, `deadtaps/`, `spot-*`, `rm-*`).
+
+### Tests
+
+- `src/ui/next-up.test.tsx` (87 a sport; `soccer-next-up.test.ts` under soccer's run): the strip says what the engine says and its distance is true (every fixture); the strip renders the line and `data-action`; the badge equals the inbox count (every fixture, cache valid); badge colour, size, 99+, amber, UT's own dots; Missions before everything but UT claims; other sports' counts (today only, integers, never this sport, soccer only where on); the device cache writes only on change; the app-icon total; `goHome` for every target kind incl. another sport; every mission has a GO and the mode it starts can complete it from any Home mode; mission keys unchanged; the first run (plan, collect once with the old receipts, chest already opened, streak carried on).
+- `src/ut/hub-feed.test.ts` (87 NBA/NFL, under soccer via `soccer-hub.test.ts`): Eastern midnights in EDT and EST, 25 h and 23 h DST days, a day ends at the next midnight from any hour, the week ends Monday 00:00; amber at 23:59, calm at 24:01; ≥ 3 live items (NBA/NFL) / ≥ 2 (soccer) at three hours of every day of a year, each live and on a screen the sport has; ≥ 3 Upcoming, all in the future; soccer never shows hidden modes or calendar items; the "new" dot until seen; every next action, Done action, near-miss chip and Live Now item of every fixture leads to a screen the sport has; Done for today in the all-done fixture and never with anything claimable, never after a match; the teaser; the Season card (top reward from day 1, level 4 → 1 level to Gold); today's card; the modal queue (order, blocked, dismissed, none); the session summary (quiet visit, coins/packs/minutes, spending).
+- Existing suites unchanged and green.
+- **Results:** `npm run typecheck` clean. NBA `vitest run src/ut src/ui src/engine src/lib`: 59 files, 850 passed (39 skipped). NFL `vitest run src/ut src/ui src/engine/sport-branches src/lib`: 53 files, 800 passed. Soccer `vitest run soccer sport-branches`: 16 files, 499 passed.
+
+### Protocol
+
+None. Presentation, navigation and first-run collection only; no match physics, rating, queue or settlement changes. Claim ids, gift ids and reward amounts are unchanged.
+
+### Left for later
+
+- The ≤ 10 ms import + compute at 4× CPU is measured on the dev server only (unbundled); re-measure on the production chunk in ut-9, and move the first compute later in the idle period if the cold compute stays above 10 ms.
+- Dead CSS left for ut-9's sweep: `.ut-season-banner*`, `.ut-season-chip*`, `.ut-season-next*`, `.ut-season-store`, the inline `.ut-new-era` card and `.ut-home-inbox*` (content-ui.css), `.hq-season-ribbon*` (clubhouse.css, also inside two shared `:where()` lists).
+- Perfect Season line on Home (ut-7), packs' launch takeover and promo-hub feed (merge), ut-6's interrupted-match sheet: see "Merge stand-ins".
+
+### Owner device checks (ut-4)
+
+- The Next-up strip under the thumb: one tap, the right screen; ENDS TONIGHT in amber the night a Daily Drop streak would end.
+- The UT tab's red count reads at arm's length; the app icon's badge on the home-screen app (iOS may show nothing without a notification permission, which the app never asks for).
+- A fresh install: one welcome sheet, COLLECT ALL, then the starter pack opens from UT Home.
+- UT Home: the hero's art and rays, Live Now's swipe and snap, the clocks, and Done for today after a full day.
+- Leaving UT with EXIT: the summary toast reads well and never covers anything you need.
 
 ---
 
