@@ -114,4 +114,8 @@ describe('the AI side is unchanged (determinism pin)', () => {
   });
 });
 
-const PIN = { plays: 'f3099ed1', drives: 'ade7aadc', rng: ['0.051221', '0.868142'] };
+// Re-pinned by nfl-4 (Protocol bump needed: NFL draft 10->11, UT 11->12): the AI's own JUKE and SPIN
+// are judged on the tackler's gold ring (a PERFECT beats him), its On Fire is Heat's (no longer three
+// straight completions, and no longer a quicker ball or the whole arc), and a play reports its rings.
+// Before: plays 'f3099ed1', drives 'ade7aadc' (nfl-1's pin, from b0277ad).
+const PIN = { plays: '9d4f17f7', drives: 'd7536bc8', rng: ['0.051221', '0.868142'] };

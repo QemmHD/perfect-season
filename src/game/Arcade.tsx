@@ -22,7 +22,7 @@ import type { Defense, Offense } from './football2/types';
 import type { Hooper } from './hoops2/types';
 import { type BasketballKit, type FootballKit, type Kits, kitsFor } from './uniforms';
 
-import type { Progress } from './progress';
+import { gradeResult, type Progress, wireProgress } from './progress';
 
 export type { Progress };
 
@@ -255,13 +255,13 @@ export function Arcade({
   const shown: RivalLive | null = useMemo(() => {
     if (online) {
       const r = takeover ?? rivalLive;
-      const base = r ? { name: rivalName, score: r.score, drive: r.drive, done: r.done } : { name: rivalName, score: 0, drive: 0, done: false };
+      const base = r ? { name: rivalName, score: r.score, drive: r.drive, done: r.done, ends: r.ends } : { name: rivalName, score: 0, drive: 0, done: false };
       return { ...base, deadline: base.done ? null : stallAt };
     }
     if (!ai) return null;
     // the AI's come in as you finish yours, all of them once you're done
     const n = mine?.done ? TOTAL : (mine?.drive ?? 0);
-    return { name: rivalName, score: pointsThrough(ai, n), drive: n, done: n >= TOTAL };
+    return { name: rivalName, score: pointsThrough(ai, n), drive: n, done: n >= TOTAL, ends: ai.ends.slice(0, n) };
   }, [online, rivalLive, takeover, ai, mine, stallAt]);
 
   const us: Progress | null = taken ?? (mine?.done ? mine : null);
@@ -284,13 +284,15 @@ export function Arcade({
     if (sent.current || !us || !them) return;
     if (level && !pens) return;
     sent.current = true;
-    window.setTimeout(() => onFinish(us, them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), level ? 2600 : 1600);
+    // (the match grade's FLAWLESS needs the final score: settled here, nfl-4)
+    window.setTimeout(() => onFinish(gradeResult(us, them), them, how.current, { them: !!takeover, us: !!taken }, level && pens ? pens : undefined), level ? 2600 : 1600);
   }, [us, them, pens]);
 
   const progress = (p: Progress) => {
     if (taken) return;
     setMine(p);
-    onProgress(p);
+    // the wire never carries the match grade (C22)
+    onProgress(wireProgress(p));
   };
 
   // sim: the autopilot plays your drives at a middling level

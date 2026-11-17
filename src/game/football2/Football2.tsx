@@ -9,7 +9,11 @@ import type { Practice } from '../../evolution/training';
 // JUKE, SPIN, POWER and DIVE/SLIDE are A to D. Fourth down: go for it, kick on the meter, or punt.
 // Pause any time; real time between plays runs on the pause-aware clock.ts. The screen (nfl-3): the
 // broadcast camera (camera.ts), the turf overlays (overlay.ts), and the HUD kit: one score bug with
-// the Heat bar under it and one toast line, whose queue is hud.ts.
+// the Heat bar under it and one toast line, whose queue is hud.ts. The gold rings (nfl-4): the sling's
+// on the landing reticle and the JUKE/SPIN ring on a tackler's wind-up, judged by the engine on the
+// touch's own timestamp (shared-v2 touchTime, applied at the next step); PERFECT's word, chime and
+// double haptic; Heat (drive.ts) in place of the old three-completion On Fire; the match grade on
+// the finished Progress.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Lineup, Player } from '../../engine/types';
@@ -30,25 +34,31 @@ import {
   choices,
   clockText,
   downText,
-  fireAtFor,
   type DriveEnd,
   DRIVES,
   fgDistance,
   fgInRange,
+  fireSnapsFor,
   type Game,
+  gradeLevel,
+  gradeOf,
+  heatFromEnds,
   kick,
   kickWindow,
   newGame,
+  onFire,
   type PlayChoice,
   punt,
+  rivalDriveEnd,
   spotText,
   startChoice,
   startPlay
 } from './drive';
-import { CONCEPTS, coverBall, dist, FIELD_W, flipPlay, giveUp, isLine, maxThrow, moveEdge, moveWithBall, outsideBox, receiverLead, scramble, setBurst, snap, step, throwAway, throwTo, throwToReceiver } from './engine';
+import { CONCEPTS, coverBall, dist, FIELD_W, flipPlay, giveUp, haloNeed, isLine, maxThrow, moveEdge, moveWithBall, outsideBox, receiverLead, scramble, separation, setBurst, slingWindow, snap, step, throwAway, throwTo, throwToReceiver } from './engine';
 import { type FbKit, FootballRenderer } from './render';
 import { defenseOf, offenseOf } from './squad';
 import type { Body, Defense, Offense, PassType, Play, Pt, RunInput } from './types';
+import { impact } from './feel';
 import './rushing-controls.css';
 import { audibleTo, CarryGate, callAllowed, screenRunInput } from './controls';
 import { GameClock } from './clock';
@@ -56,7 +66,7 @@ import { burstAtTouch, burstHeld, type Gesture, type GestureState, Gestures, nex
 import { PauseMenu } from './PauseMenu';
 import { BURST_BUTTON, readPref, writePref } from './prefs';
 import { type IconsHandle, ReceiverIcons } from './ReceiverIcons';
-import { controlGeometry, haptic, type Insets, PauseButton, ScoreBug, Stick, type StickHandle, ToastLine, type ToastView, usePlaytime, type Vec } from './shared-v2';
+import { calibrationLag, controlGeometry, haptic, HEATING, type Insets, PauseButton, perfectChime, ScoreBug, Stick, type StickHandle, ToastLine, type ToastView, touchTime, usePlaytime, type Vec } from './shared-v2';
 import { AUTO_KICK_AIM, AUTO_PICK, KICK_RESULT, KICK_TO_TRAY, LONG_TD_REPLAY, PUNT_TO_TRAY, REPLAY_LEAD, REPLAY_TAIL, SLOWMO, SLOWMO_RATE, TAP_SKIP, WHISTLE_TO_TRAY } from './pacing';
 import { ABILITY_TEXT, abilityToPop, bugModel, PRIO, type Tone, type ToastIn, ToastQueue } from './hud';
 import { FRAME } from './camera';
@@ -312,8 +322,22 @@ export function Football2({
   const highlight = useRef<{ t: number; x: number; y: number; before: number } | null>(null);
   const replayRef = useRef<Replay<Snap> | null>(null);
   const [replaying, setReplaying] = useState(false);
-  // On Fire (three completions in a row): the chip under the drive marks
-  const [fire, setFire] = useState(false);
+  // nfl-4: the touch-to-engine-time anchor (refreshed each frame: a performance.now() reading with
+  // the engine time at that moment), and the one timed input waiting for the next step (a sling's
+  // release, a JUKE or SPIN), with the engine time its touch happened at
+  const anchor = useRef({ perf: 0, engine: 0 });
+  type Timed = { kind: 'sling'; aim: Pt; out: boolean; type: PassType; at: number } | { kind: 'move'; move: 'juke' | 'spin'; dir: number; at: number };
+  const timed = useRef<Timed | null>(null);
+  /** when a JUKE press that's waiting to see if it's a swipe went down (its timing is the press's) */
+  const aDownAt = useRef<number | null>(null);
+  // PERFECTs in a row (the chime climbs), the hit-stop budget's log, whether this ON FIRE has had its
+  // first score (it gets the slow-motion replay), and the rival's drive ends already counted for Heat
+  const perfectRun = useRef(0);
+  const rivalRef = useRef(rival);
+  rivalRef.current = rival;
+  const stopLog = useRef<{ at: number; ms: number }[]>([]);
+  const fireScored = useRef(false);
+  const rivalSeen = useRef(0);
   // the two-minute clock on the last drive: written straight into the scoreboard each frame, and
   // run down to the new time between plays rather than jumping
   const clockRef = useRef<HTMLElement>(null);
@@ -339,6 +363,21 @@ export function Football2({
     if (practice || autoplayHook || hinted.current.has(key)) return;
     hinted.current.add(key);
     post({ text, tone: 'plain', prio: PRIO.hint, ms: 4200, key: 'hint', scope: timed ? 'time' : 'phase' });
+  };
+  /** Heat news (nfl-4): HEATING UP lifts the crowd; ON FIRE lights for the next snaps. Each waits
+   * on the toast line behind the play's own result. */
+  const heatNews = (lit: boolean, heating: boolean) => {
+    if (lit && game) {
+      fireScored.current = false;
+      sfx.levelUp();
+      crowd.swell(0.9);
+      haptic('long');
+      post({ text: 'ON FIRE', sub: fireSnapsFor(game) + ' SNAPS · GOLD +25%', tone: 'big', prio: PRIO.momentum, ms: 1800, scope: 'time' });
+      tip('fire', 'ON FIRE · the gold is 25% wider, and the rush no longer turns it amber', true);
+    } else if (heating) {
+      crowd.swell(0.6);
+      post({ text: 'HEATING UP', sub: 'ON FIRE AT 100', tone: 'heat', prio: PRIO.momentum, ms: 1300, scope: 'time' });
+    }
   };
   /** The play moved on: hints from the moment before go (and, at a new play, the last play's results). */
   const moveOn = (phaseKey: string, newPlay = false) => {
@@ -368,6 +407,8 @@ export function Football2({
     setBook(null);
     playRef.current = startChoice(g, cs[0]);
     dragRef.current = null;
+    timed.current = null;
+    aDownAt.current = null;
     // (a thumb resting on the stick stays down: it's live at the next snap)
     gate.current.reset();
     runKeys.current.clear();
@@ -491,7 +532,9 @@ export function Football2({
           counted.current = true;
           if (!practice) countGame();
         }
-        onDone(progress(g));
+        // the match grade rides on the finished Progress only (C22): never onProgress, never the wire
+        const rv = rivalRef.current;
+        onDone({ ...progress(g), grade: gradeOf(g, gradeLevel(defIQ), !!rv?.done && g.score > rv.score) });
         return;
       }
       // (lined up first: a new play clears the last one's toasts)
@@ -531,7 +574,7 @@ export function Football2({
     const at = (b: { x: number; y: number } | null | undefined, h = 1) => (b ? renderer.screenOf(b.x, b.y, h) : null);
     for (const e of p.events) {
       if (e === 'beat:truck') {
-        J.hitStop('truck', nowMs);
+        impact('truck', J, nowMs, stopLog.current);
         J.addTrauma(0.45);
         J.punch(0.03);
         const q = at(p.carrier, 1.2);
@@ -541,13 +584,21 @@ export function Football2({
         J.addTrauma(0.22);
         J.kick(0, -1, 2);
       } else if (e === 'bighit') {
-        J.hitStop('bighit', nowMs);
+        impact('bighit', J, nowMs, stopLog.current);
         J.addTrauma(0.6);
         J.punch(0.04);
         const q = at(p.carrier, 1.2);
         if (q) J.burst('sweat', q.x, q.y, 14, ['#ffffff', '#d8f0ff'], { speed: 110, size: Math.max(1, q.s * 0.1) });
+      } else if (e === 'perfect:juke' || e === 'perfect:spin') {
+        // a PERFECT move: the 50 ms beat as he grabs at air (V2 §B.2.5 #3)
+        impact('juke', J, nowMs, stopLog.current);
+        J.addTrauma(0.18);
+      } else if (e.startsWith('stumble:')) {
+        const d = p.bodies[Number(e.slice(8))];
+        const q = at(d, 0.4);
+        if (q) J.burst('turf', q.x, q.y, 10, ['#5d7f3a', '#3f5f28', '#d8e8c0'], { speed: 70 });
       } else if (e === 'int' || e === 'lane-int') {
-        J.hitStop('int', nowMs);
+        impact('int', J, nowMs, stopLog.current);
         J.addTrauma(0.25);
         const q = renderer.screenOf(p.end?.x ?? 0, p.end?.y ?? 0, 1.5);
         if (q) J.burst('spark', q.x, q.y, 10, ['#ffe9a8', '#ffffff'], { speed: 80 });
@@ -566,6 +617,27 @@ export function Football2({
       post({ text: ABILITY_TEXT[ab.id] ?? ab.id.toUpperCase(), sub: b ? b.p.tag : undefined, tone: 'ability', prio: PRIO.ability, ms: 1300, key: 'ability', scope: 'play' });
     }
     for (const e of p.events) {
+      if (e.startsWith('perfect:')) {
+        // PERFECT (V2 §B.0.5): the word on the toast line, the chime a semitone higher each in a row,
+        // the double haptic
+        const kind = e.slice(8);
+        perfectRun.current++;
+        perfectChime(perfectRun.current);
+        haptic('double');
+        crowd.swell(0.5);
+        post({ text: 'PERFECT', sub: kind === 'sling' ? 'IN STRIDE' : kind === 'juke' ? 'JUKE' : 'SPIN', tone: 'perfect', prio: PRIO.result, ms: 1000, key: 'ring', scope: 'play' });
+        continue;
+      }
+      if (e.startsWith('ring:')) {
+        // a ring that wasn't a PERFECT: the toast names the dial (TIMING, PRESSURE or RANGE)
+        const [, , j, state] = e.split(':');
+        if (j === 'perfect') continue;
+        perfectRun.current = 0;
+        const dial = p.ring?.dial ?? 'TIMING';
+        const sub = j === 'early' ? 'EARLY' : j === 'late' ? 'LATE' : state === 'red' ? 'PAST HIS ARM' : dial === 'PRESSURE' ? (p.ring?.kind === 'sling' && p.pressure < 0.25 ? 'TIGHT COVERAGE' : 'RUSHED') : state === 'amber' ? 'NOT IN STRIDE' : 'CLOSE';
+        post({ text: dial, sub, tone: 'dial', prio: PRIO.momentum, ms: 900, key: 'ring', scope: 'play' });
+        continue;
+      }
       if (e === 'snap') sfx.hit(0.15);
       else if (e === 'handoff') sfx.catch();
       else if (e === 'pancake') sfx.hit(0.6);
@@ -646,13 +718,6 @@ export function Football2({
     setLastReadout(footballFeedback(p, a));
     practice?.onAttempt({ points: a.points, success: practice.drill === 'run' ? e.gain >= 5 : e.caught, yards: Math.round(e.gain), detail: e.text });
     setUi('after');
-    if (a.fire === 'lit') {
-      setFire(true);
-      sfx.levelUp();
-      crowd.swell(0.8);
-      vibrate([20, 20, 40]);
-      tip('fire', 'ON FIRE · full arc, quicker throws', true);
-    } else if (a.fire === 'out') setFire(false);
     const yds = Math.round(e.gain);
     const gain = (yds >= 0 ? '+' : '') + yds + ' YDS';
     if (a.points) {
@@ -701,7 +766,11 @@ export function Football2({
       say(e.text, 'plain', 1100);
     } else if (e.kind === 'sack') say(e.text, 'bad', 1300, gain);
     else say(gain, yds > 0 ? 'good' : 'plain', 1100, e.kind === 'out' ? 'OUT OF BOUNDS' : tackledBy(p, e).slice(3) || undefined);
-    if (a.points && yds >= LONG_TD_REPLAY.yards && !highlight.current) {
+    heatNews(a.fire === 'lit', !!a.heating);
+    // the first score while ON FIRE gets the slow-motion replay (V2 §B.0.2), as a long touchdown does
+    const fireTd = !!a.points && p.fire && !fireScored.current;
+    if (fireTd) fireScored.current = true;
+    if (a.points && (yds >= LONG_TD_REPLAY.yards || fireTd) && !highlight.current) {
       const c = p.carrier ?? p.catcher;
       if (c) highlight.current = { t: p.t, x: c.x, y: c.y - 6, before: LONG_TD_REPLAY.before };
     }
@@ -824,8 +893,9 @@ export function Football2({
     return () => clock.cancel(t);
   }, [ui, autoplayHook, game]);
 
-  /** The slingshot's landing spot right now: pulled back, it flies the other way. */
-  const aimNow = (p: Play): Pt | null => {
+  /** The slingshot's landing spot right now: pulled back, it flies the other way. `out`: the pull
+   * asks for more than his arm (the spot is held at its range, and the ring is red: RANGE). */
+  const slingNow = (p: Play): { aim: Pt; out: boolean } | null => {
     const d = dragRef.current;
     const wrap = wrapRef.current;
     if (!d || !wrap || p.phase !== 'drop' || p.carrier !== p.qb) return null;
@@ -835,8 +905,29 @@ export function Football2({
     const per = max / (Math.min(wrap.clientWidth, wrap.clientHeight) * 0.62);
     const v = renderer.mode === 'side' ? { x: d.dy, y: -d.dx } : { x: -d.dx, y: d.dy };
     let k = per;
+    // (a hair of slack: the edge of the arm's reach is still in range)
+    const out = len * per > max * 1.04;
     if (len * per > max) k = max / len;
-    return { x: p.qb.x + v.x * k, y: p.qb.y + v.y * k };
+    return { aim: { x: p.qb.x + v.x * k, y: p.qb.y + v.y * k }, out };
+  };
+
+  /** A touch's (or key's) moment in engine time (C17): from its own timestamp, not the frame it lands in. */
+  const engineAt = (ts: number) => touchTime({ timeStamp: ts }, anchor.current, calibrationLag());
+  /**
+   * The timed input waiting for this step (nfl-4): applied at the first step its touch time has
+   * reached, and judged by the engine at that exact time.
+   */
+  const applyTimed = (p: Play) => {
+    const q = timed.current;
+    if (!q || q.at > p.t + DT) return;
+    timed.current = null;
+    if (q.kind === 'sling') {
+      p.passType = q.type;
+      if (throwTo(p, q.aim, q.type, { at: q.at, out: q.out })) {
+        tapHaptic(10);
+        setPhase(p.phase);
+      }
+    } else moveWithBall(p, q.move, q.dir, q.at);
   };
 
   /**
@@ -948,6 +1039,7 @@ export function Football2({
             const on = setBurst(p, held);
             if (on !== burstShown) setBursting((burstShown = on));
           }
+          applyTimed(p);
           step(p, DT, steer);
           handleEvents(p);
           if (p.phase !== was) setPhase(p.phase);
@@ -957,6 +1049,9 @@ export function Football2({
           }
         }
       } else acc = 0;
+      // the touch-time anchor (C17): the engine's time now is the play's clock plus what's waiting
+      // in the accumulator; a touch's own timestamp is measured from this
+      anchor.current = { perf: performance.now(), engine: (p && p.phase !== 'pre' && !p.end ? p.t : 0) + acc };
       if (p && p.phase !== 'pre' && !replayRef.current) rec.current.push(p.t, snapOf(p));
       const ck = clockRef.current;
       if (game.clock !== null && ck) {
@@ -994,9 +1089,13 @@ export function Football2({
             };
             renderer.draw(ctx, view, p.los, { aim: null, toGain: null, routes: false, open: false, shake: 0, flash: 0, frame: { safe: null, reduced: frameRef.current.reduced } });
           }
-        } else if (p)
+        } else if (p) {
+          const sl = autoplayHook ? null : slingNow(p);
+          const ring = sl ? slingWindow(p, sl.aim, sl.out, passTypeRef.current) : null;
           renderer.draw(ctx, p, p.los, {
-            aim: aimNow(p),
+            aim: sl?.aim ?? null,
+            sling: ring ? { w: ring.w, aim: sl!.aim } : null,
+            heat: onFire(game) ? 'fire' : game.heat.pts >= HEATING ? 'heating' : null,
             toGain: kickRef.current || p.end || game.ballOn + game.toGo > 100 ? null : p.los + game.toGo,
             routes: p.phase === 'pre' && p.call === 'pass',
             open: openRings && !autoplayHook,
@@ -1006,6 +1105,7 @@ export function Football2({
             chips: !autoplayHook,
             frame: { safe: frameRef.current.safe, reduced: frameRef.current.reduced, look: lookRef.current }
           });
+        }
         if (p && !autoplayHook) frameControls(p);
         // the first frame is on the screen: the shell's curtain can lift (C11)
         if (p && !drawn.current) {
@@ -1026,7 +1126,11 @@ export function Football2({
   }, [game]);
 
   // ---- touch: slingshot passing, then direct two-axis running; skills stay on their buttons ----
-  const move3 = (p: Play, kind: 'juke' | 'spin' | 'power', dir = 0) => {
+  /**
+   * JUKE, SPIN or POWER. JUKE and SPIN are timed (the tackler's gold ring): they're judged at the
+   * touch's own time `ts` and made at the next step; POWER goes at once.
+   */
+  const move3 = (p: Play, kind: 'juke' | 'spin' | 'power', dir = 0, ts = performance.now()) => {
     const c = p.carrier;
     if (!c || p.phase !== 'run') return;
     // POWER: a truck or a stiff arm, whichever beats the nearest man (by the same ratings the
@@ -1034,14 +1138,16 @@ export function Football2({
     if (kind === 'power') {
       const near = p.bodies.filter((b) => b.side === 'D').sort((a, b) => dist(a, c) - dist(b, c))[0];
       moveWithBall(p, near ? (moveEdge('truck', c, near) >= moveEdge('stiff', c, near) ? 'truck' : 'stiff') : (c.p.a.TRK ?? 50) >= (c.p.a.SFA ?? 50) ? 'truck' : 'stiff');
-    } else moveWithBall(p, kind, dir);
+    } else timed.current = { kind: 'move', move: kind, dir, at: engineAt(ts) };
     tapHaptic(10);
   };
-  /** A juke toward a field side (-1 left, 1 right), or 0 to cut away from the nearest man. */
-  const juke = (dir: -1 | 0 | 1) => {
+  /** A juke toward a field side (-1 left, 1 right), or 0 to cut away from the nearest man, timed at `ts`. */
+  const juke = (dir: -1 | 0 | 1, ts?: number) => {
     const p = playRef.current;
-    if (p) move3(p, 'juke', dir);
+    aDownAt.current = null;
+    if (p) move3(p, 'juke', dir, ts);
   };
+
   /** The stick's side across the field, if it's pushed clearly one way (a juke goes that way). */
   const stickSide = (): -1 | 0 | 1 => {
     const v = stickRef.current?.read().vec;
@@ -1069,8 +1175,11 @@ export function Football2({
       setPhase(p.phase);
     }
   };
-  /** Act on what the touches turned into (gestures.ts). Reads refs only: the frame loop calls it too. */
-  const applyGestures = (out: Gesture[]) => {
+  /**
+   * Act on what the touches turned into (gestures.ts). Reads refs only: the frame loop calls it too.
+   * `ts` is the timestamp of the event they came from (performance.now() for the loop's tick).
+   */
+  const applyGestures = (out: Gesture[], ts = performance.now()) => {
     for (const g of out) {
       const p = playRef.current;
       if (g.kind === 'stick-down') {
@@ -1079,22 +1188,17 @@ export function Football2({
         gate.current.touch(p?.phase === 'air');
       } else if (g.kind === 'sling-start') dragRef.current = { id: g.id, x0: g.x0, y0: g.y0, dx: 0, dy: 0 };
       else if (g.kind === 'sling-release') {
-        const aim = p ? aimNow(p) : null;
+        // the release is timed (the ring): judged at the touch's own moment, thrown at the next step
+        const sl = p ? slingNow(p) : null;
         dragRef.current = null;
-        if (p && aim) {
-          p.passType = passTypeRef.current;
-          if (throwTo(p, aim)) {
-            tapHaptic(10);
-            setPhase(p.phase);
-          }
-        }
+        if (p && sl) timed.current = { kind: 'sling', aim: sl.aim, out: sl.out, type: passTypeRef.current, at: engineAt(ts) };
       } else if (g.kind === 'sling-cancel') dragRef.current = null;
       else if (g.kind === 'icon-throw') throwIcon(g.icon);
       else if (g.kind === 'cycle') cycleType();
       else if (g.kind === 'cover') {
         if (p) coverBall(p, g.on);
-      } else if (g.kind === 'swipe') juke(screenSide(g.dir));
-      else if (g.kind === 'a-tap') juke(0);
+      } else if (g.kind === 'swipe') juke(screenSide(g.dir), aDownAt.current ?? ts);
+      else if (g.kind === 'a-tap') juke(0, aDownAt.current ?? ts);
       else if (g.kind === 'look') {
         // drag the field to look around before the snap: the tray gets out of the way
         const wrap = wrapRef.current;
@@ -1131,7 +1235,7 @@ export function Football2({
       }
     }
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, icon }, ctx));
+    applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, icon }, ctx), e.timeStamp);
   };
   const move = (e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -1139,7 +1243,7 @@ export function Football2({
       d.dx = e.clientX - d.x0;
       d.dy = e.clientY - d.y0;
     }
-    applyGestures(gestures.current.move(e.pointerId, e.clientX, e.clientY, e.timeStamp));
+    applyGestures(gestures.current.move(e.pointerId, e.clientX, e.clientY, e.timeStamp), e.timeStamp);
   };
   const up = (e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -1147,10 +1251,10 @@ export function Football2({
       d.dx = e.clientX - d.x0;
       d.dy = e.clientY - d.y0;
     }
-    applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp));
+    applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp), e.timeStamp);
   };
   /** The touch taken away (a system swipe from an edge, a call): let go of it, throw nothing. */
-  const cancel = (e: React.PointerEvent) => applyGestures(gestures.current.cancel(e.pointerId));
+  const cancel = (e: React.PointerEvent) => applyGestures(gestures.current.cancel(e.pointerId), e.timeStamp);
   const keyRun = (e: React.KeyboardEvent, held: boolean) => {
     const key = e.key.toLowerCase();
     if (!['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(key)) return;
@@ -1163,6 +1267,8 @@ export function Football2({
   /** Let go of every touch, key and hold (an interruption, a pause). */
   const letGo = () => {
     dragRef.current = null;
+    timed.current = null;
+    aDownAt.current = null;
     stickRef.current?.release();
     applyGestures(gestures.current.clear());
     runKeys.current.clear();
@@ -1209,13 +1315,16 @@ export function Football2({
     const pocket = st === 'pocket';
     let pick: number | null = null;
     let reticle: { x: number; y: number; rx: number; ry: number } | null = null;
+    const halo: Record<number, boolean> = {};
     if (pocket) {
-      // the most open receiver: the reticle shows where a tap on him lands
+      // each receiver's halo (nfl-4): how open he is where a tap on him would meet him, the same
+      // value the AI reads and the sling's gold needs; the most open one gets the reticle
       let best = -1;
       for (const b of p.bodies) {
-        if (b.side !== 'O' || b === p.qb || isLine(b)) continue;
-        let open = 99;
-        for (const d of p.bodies) if (d.side === 'D' && d.job !== 'rush') open = Math.min(open, dist(d, b));
+        if (b.side !== 'O' || b === p.qb || isLine(b) || b.job === 'block') continue;
+        const lead = receiverLead(p, b, passTypeRef.current);
+        const open = separation(p, b, lead);
+        halo[b.id] = open >= haloNeed(lead.y - p.los);
         if (open > best) {
           best = open;
           pick = b.id;
@@ -1227,7 +1336,7 @@ export function Football2({
         if (q) reticle = { x: q.x, y: q.y, rx: Math.max(12, q.s * 1.1), ry: Math.max(6, q.s * 0.5) };
       }
     }
-    iconsRef.current?.place({ heads: pocket ? renderer.heads : {}, pick, reticle, now: clock.now(), bounds: frameRef.current.chips });
+    iconsRef.current?.place({ heads: pocket ? renderer.heads : {}, pick, reticle, now: clock.now(), bounds: frameRef.current.chips, halo });
     const away = pocket && outsideBox(p);
     let dm: 'dive' | 'slide' | null = null;
     const c = p.carrier;
@@ -1316,6 +1425,24 @@ export function Football2({
   }, [opts, flipped, trayUp, ui, picked]);
   const fourth: Fourth | null = ui === 'fourth' && g ? { pick: fourthPick, fg: { ok: fgOk, yards: fgDistance(g) }, punt: canCall, kickOnly: !canCall } : null;
   const bug = g ? bugModel(g, downText(g)) : null;
+  // the rival's Heat bar: from their drive ends alone (C18), online and solo
+  const rivalEnds = rival?.ends;
+  const rivalHeat = useMemo(() => heatFromEnds(rivalEnds ?? []), [rivalEnds?.length]);
+  // solo, their drives come in as yours end: points they score cost you Heat (-10), a stop or a
+  // takeaway by your defense earns it (+15). Online, Heat is your offense's alone (their timing is the network's).
+  useEffect(() => {
+    if (!g || online || practice || !rivalEnds) return;
+    let lit = false,
+      heating = false;
+    for (let i = rivalSeen.current; i < rivalEnds.length && !g.over; i++) {
+      const n = rivalDriveEnd(g, rivalEnds[i]);
+      lit ||= n.lit;
+      heating ||= n.heating;
+    }
+    rivalSeen.current = rivalEnds.length;
+    heatNews(lit, heating);
+    setTick((n) => n + 1);
+  }, [rivalEnds?.length, g]);
   // the BURST button goes away (the run ended, the preference changed): its hold ends with it
   useEffect(() => {
     if (!rushing || !burstPref) stopBurst();
@@ -1375,10 +1502,10 @@ export function Football2({
           clockRef={clockRef}
           pips={bug!.pips}
           progress={bug!.progress}
-          heatUs={fire ? 100 : Math.round(100 * Math.min(1, g.streak / fireAtFor(g)))}
-          heatThem={0}
-          fireUs={fire}
-          fireThem={false}
+          heatUs={g.heat.pts}
+          heatThem={rivalHeat.pts}
+          fireUs={onFire(g)}
+          fireThem={rivalHeat.fire > 0}
         />
       )}
       {!trayUp && !autoplayHook && <ToastLine toast={toast} />}
@@ -1399,7 +1526,7 @@ export function Football2({
           label={phase === 'air' && ui === 'live' ? 'HOLD TO RUN' : undefined}
           onDown={(e) => {
             playtime.input();
-            applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp }, ctxNow()));
+            applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp }, ctxNow()), e.timeStamp);
           }}
           onMove={(_, sprint) => {
             // the ring takes effect at the touch, not at the next fixed step
@@ -1407,7 +1534,7 @@ export function Football2({
             const now = burstAtTouch(sprint, burstPrefRef.current);
             if (live && now !== null && !autoplayHook) setBurst(live, now);
           }}
-          onUp={(e) => e && applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp))}
+          onUp={(e) => e && applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp), e.timeStamp)}
           onKeyDown={(e) => keyRun(e, true)}
           onKeyUp={(e) => keyRun(e, false)}
         />
@@ -1488,25 +1615,27 @@ export function Football2({
               (e) => {
                 // toward the stick's side; with the stick centred, a swipe off A picks the side (or he cuts away on lift)
                 const side = stickSide();
-                if (side || !('pointerId' in e)) juke(side);
+                if (side || !('pointerId' in e)) juke(side, e.timeStamp);
                 else {
+                  // (the press is the timing: the swipe that follows only picks the side)
+                  aDownAt.current = e.timeStamp;
                   (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
-                  applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, ctl: 'A' }, ctxNow(), { pendingA: true }));
+                  applyGestures(gestures.current.down({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, ctl: 'A' }, ctxNow(), { pendingA: true }), e.timeStamp);
                 }
               },
               {
                 aria: 'Juke toward the stick, or swipe left or right off this button',
                 icon: ICONS.juke,
                 extra: {
-                  onPointerMove: (e) => applyGestures(gestures.current.move(e.pointerId, e.clientX, e.clientY, e.timeStamp)),
-                  onPointerUp: (e) => applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp)),
-                  onPointerCancel: (e) => applyGestures(gestures.current.cancel(e.pointerId))
+                  onPointerMove: (e) => applyGestures(gestures.current.move(e.pointerId, e.clientX, e.clientY, e.timeStamp), e.timeStamp),
+                  onPointerUp: (e) => applyGestures(gestures.current.up(e.pointerId, e.clientX, e.clientY, e.timeStamp), e.timeStamp),
+                  onPointerCancel: (e) => applyGestures(gestures.current.cancel(e.pointerId), e.timeStamp)
                 }
               }
             )}
           {/* B */}
           {calling && canAudible && ctl('b', 'AUDIBLE', audible, { aria: 'Audible: switch the call between run and pass', icon: ICONS.audible })}
-          {running && !(burstPref && dMode) && ctl('b', 'SPIN', () => p && move3(p, 'spin'), { aria: 'Spin: evade a tackle', icon: ICONS.spin })}
+          {running && !(burstPref && dMode) && ctl('b', 'SPIN', (e) => p && move3(p, 'spin', 0, e.timeStamp), { aria: 'Spin: evade a tackle', icon: ICONS.spin })}
           {/* C */}
           {passing && ctl('c', passType.toUpperCase(), cycleType, { cls: 'chip', aria: 'Throw type: ' + passType + '. Tap for the next (touch, bullet, lob)', icon: ICONS[passType], extra: { 'data-type': passType } as Partial<React.ButtonHTMLAttributes<HTMLButtonElement>> })}
           {running && ctl('c', 'POWER', () => p && move3(p, 'power'), { aria: 'Power: a truck or a stiff arm', icon: ICONS.power })}
@@ -1584,11 +1713,39 @@ export function Football2({
           <span className="eyebrow">Your drives</span>
           <b className="num">{g.score}</b>
           <small>{g.ends.map((e) => MARK_TEXT[e]).join(' · ')}</small>
+          {!practice && <GradeLine g={g} defIQ={defIQ} won={!!rival?.done && g.score > rival.score} />}
           {rival && !rival.done && <WaitLine rival={rival} unit="drive" total={drives} />}
         </div>
       )}
     </div>,
     document.body
+  );
+}
+
+/** The match grade on the final card (C22): the letter, PERFECTs of gold chances, best Heat, ON FIRE, FLAWLESS. */
+function GradeLine({ g, defIQ, won }: { g: Game; defIQ: number; won: boolean }) {
+  const gr = gradeOf(g, gradeLevel(defIQ), won);
+  return (
+    <span className="fb2-grade" aria-label={'Grade ' + gr.letter + '. ' + gr.perfects + ' perfect of ' + gr.chances + ' gold chances. Best heat ' + gr.heatBest + (gr.lit ? '. On fire ' + gr.lit + (gr.lit > 1 ? ' times' : ' time') : '') + (gr.flawless ? '. Flawless' : '')}>
+      <b className={'fb2-grade-letter g-' + gr.letter}>{gr.letter}</b>
+      <span>
+        <i>PERFECT</i>
+        <em className="num">
+          {gr.perfects}/{gr.chances}
+        </em>
+      </span>
+      <span>
+        <i>HEAT</i>
+        <em className="num">{gr.heatBest}</em>
+      </span>
+      {gr.lit > 0 && (
+        <span className="lit">
+          <i>ON FIRE</i>
+          <em className="num">×{gr.lit}</em>
+        </span>
+      )}
+      {gr.flawless && <span className="flawless">FLAWLESS</span>}
+    </span>
   );
 }
 

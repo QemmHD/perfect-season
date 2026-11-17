@@ -6,6 +6,9 @@
 // is always on the field in the pocket: the slingshot draws its own while you drag, and otherwise
 // this one marks where a tap on the highlighted (most open) receiver would land.
 //
+// Each chip wears its receiver's separation halo (nfl-4; V2 §B.2.8): green a step open, amber tight,
+// from the same openness the AI reads (engine.ts separation) and the sling's ring needs for gold.
+//
 // Everything moves by ref once a frame (`place`), so the chips never re-render the game. Chips
 // whose 44×44 hit areas overlap fan out when a touch lands in the overlap, so every receiver can be
 // picked even in a stack.
@@ -41,6 +44,8 @@ export interface IconPlace {
   now: number;
   /** the band the chips stay in (css px, their bottom edges): under the score bug, above the toast line (nfl-3) */
   bounds?: { top: number; bottom: number } | null;
+  /** nfl-4: each receiver's halo by body id: true open (green), false tight (amber) */
+  halo?: Record<number, boolean>;
 }
 
 export interface IconsHandle {
@@ -87,7 +92,7 @@ export const ReceiverIcons = forwardRef<IconsHandle, { receivers: Body[]; show: 
   const halves = useRef(new Map<number, number>());
   const fanUntil = useRef(0);
   useImperativeHandle(ref, () => ({
-    place({ heads, pick, reticle: rt, now, bounds }) {
+    place({ heads, pick, reticle: rt, now, bounds, halo }) {
       const ids = receivers.map((b) => b.id).filter((id) => heads[id] && chips.current.get(id));
       const xs = ids.map((id) => heads[id].x);
       // each chip's pointer tip sits 4 px over his head; its 44×44 touch area rises from there
@@ -116,6 +121,9 @@ export const ReceiverIcons = forwardRef<IconsHandle, { receivers: Body[]; show: 
         el.style.visibility = '';
         el.style.transform = 'translate(' + Math.round(fx[i]) + 'px,' + Math.round(ys[i]) + 'px)';
         el.classList.toggle('pick', pick === b.id);
+        const h = halo?.[b.id];
+        el.classList.toggle('open', h === true);
+        el.classList.toggle('tight', h === false);
         el.classList.toggle('fanned', fanned && Math.abs(fx[i] - xs[i]) > 1);
         centres.current.set(b.id, { x: fx[i], y: ys[i] - ICON_HIT / 2 });
         halves.current.set(b.id, half[i] - 4);
@@ -169,7 +177,7 @@ export const ReceiverIcons = forwardRef<IconsHandle, { receivers: Body[]; show: 
           className="fb2-icon"
           data-icon={b.id}
           style={{ '--chip': SLOT_COLOR[b.slot] ?? '#ffffff', visibility: 'hidden' } as React.CSSProperties}
-          aria-label={'Pass to ' + b.slot + ' · ' + b.p.name}
+          aria-label={'Pass to ' + b.slot + ' · ' + b.p.name + ' (green halo: open, amber: tight)'}
           onClick={(e) => {
             // keyboard and assistive presses; touches are read by Football2's gestures on touch-down
             if (e.detail === 0) onThrow(b.id);

@@ -6,10 +6,12 @@
 // summarizes it as bands with their sample sizes and 95% intervals, and it adds up a game's real
 // length from the same pacing constants the screen waits out.
 import fixtures from '../../../docs/studio-overhaul/nfl-calibration/fixtures.json';
-import { chooseCall, decide, fourthDown, pilot, pocketThumb } from './autopilot';
-import { afterPlay, DRIVES, fgDistance, kick, newGame, punt, startPlay } from './drive';
+import { hashString, rng } from '../../engine/rng';
+import { autoplay, chooseCall, decide, fourthDown, pilot, pocketThumb } from './autopilot';
+import { afterPlay, DRIVES, fgDistance, kick, newGame, punt, rivalDriveEnd, startPlay } from './drive';
 import { CarryGate } from './controls';
-import { snap, step, throwAway } from './engine';
+import { dist, FIELD_W, flightTime, projectRoute, slingWindow, snap, step, throwAway, throwTo } from './engine';
+import { HEATING } from './shared-v2';
 import * as pacing from './pacing';
 import { REPLAY_AFTER, REPLAY_SPEED } from '../replay';
 import { depth } from './squad';
@@ -91,6 +93,18 @@ export const LEVELS = {
 } as const;
 export type LevelName = keyof typeof LEVELS;
 export const HUMAN_SKILL = 0.35;
+/**
+ * nfl-4: the human proxy on the gold rings (the same model as nba-4's, so gold rates compare across
+ * sports): his release lands N(ring centre, 50 ms) from where it should, judged at that instant.
+ * On a sling he aims where his man will be HUMAN_SLING_WAIT seconds from now (plus the flight), with
+ * the pilot's own aim error, and lets go on the ring.
+ */
+export const HUMAN_RING_SIGMA = 0.05;
+/** and he goes for this share of the gold JUKE/SPIN rings he's shown (the rest he's steering, or sees too late) */
+export const HUMAN_RING_TRY = 0.7;
+export const HUMAN_SLING_WAIT = 0.3;
+/** how many times he corrects a sling the ring shows him is off (its moment gone, or amber TIMING) */
+export const HUMAN_SLING_FIXES = 2;
 
 /** One play, kick or punt as the wall-clock model needs it. */
 export interface PlayRec {
@@ -194,12 +208,48 @@ function humanStick(mode: PilotMode) {
   };
 }
 
+/** The solo rival's drive ends for a human-proxy game: the AI pilot at the difficulty whose defense
+ * IQ this is (Pro if none matches), the same squads the other way round, as Arcade's aiDrivesOf. */
+function rivalDrives(teams: Teams, mode: PilotMode, seed: string, drives: number): string[] {
+  const level = Object.values(LEVELS).find((l) => l.defIQ === mode.defIQ) ?? LEVELS.pro;
+  const t = JSON.parse(JSON.stringify(teams)) as Teams;
+  const g = newGame(t.off, t.def, 'cal-rival:' + seed, drives, mode.defIQ);
+  return autoplay(g, level.skill, 'cal-rival:' + seed).ends;
+}
+
 /** Play one whole game (`drives` drives) of `teams.off` against `teams.def`, counting into `acc`. */
 export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc, drives = DRIVES): GameResult {
   const g = newGame(teams.off, teams.def, 'cal:' + seed, drives, mode.defIQ);
   const pl = pilot(mode.skill, 'cal-p:' + seed);
   if (mode.pocket) pl.legalOnly = true;
   const human = mode.kind === 'human';
+  // the human proxy's thumb on the rings (nfl-4): a sling held for the ring, then let go
+  let sling: { aim: Pt; at: number } | null = null;
+  if (human) {
+    const ringRand = rng(hashString('cal-ring:' + seed));
+    pl.ringSigma = HUMAN_RING_SIGMA;
+    pl.ringTry = HUMAN_RING_TRY;
+    pl.throwAt = (p, b, lead, spot) => {
+      // he drags onto where his man will be, with his own aim error; the ring shows him the rest:
+      // its moment already gone (lead him further) or amber off the path (TIMING: slide the reticle
+      // half way back onto the path), up to two corrections
+      const ex = spot.x - lead.x,
+        ey = spot.y - lead.y;
+      let ring: ReturnType<typeof slingWindow> = null;
+      let aim: Pt = lead;
+      for (let tries = 0; tries <= HUMAN_SLING_FIXES; tries++) {
+        let at: Pt = lead;
+        for (let i = 0; i < 3; i++) at = projectRoute(b, HUMAN_SLING_WAIT * (1 + tries) + flightTime(p, dist(p.qb, at)));
+        const f = tries ? 0.5 : 1;
+        aim = { x: Math.max(1, Math.min(FIELD_W - 1, at.x + ex * f)), y: Math.min(109, at.y + ey * f) };
+        ring = slingWindow(p, aim);
+        if (!ring || (ring.w.center >= p.t + 0.15 && ring.dial !== 'TIMING')) break;
+      }
+      if (!ring) return false;
+      sling = { aim, at: Math.max(p.t, ring.w.center + gauss(ringRand) * HUMAN_RING_SIGMA) };
+      return true;
+    };
+  }
   const withStick = human && (mode.stickDelay !== undefined || !!mode.neverStick);
   let thumbs: ReturnType<typeof pocketThumb> | null = null;
   const c = acc?.c ?? {};
@@ -208,7 +258,14 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
   let drivePts = 0;
   let drivePlays = 0;
   let redZone = false;
+  // the human proxy plays a solo game: the AI rival's drives (its pilot at this difficulty, its
+  // offense against this defense) land as his own end, as Arcade shows them, and move his Heat
+  // (Football2 does the same with rivalDriveEnd); the AI side has no rival here
+  const rivalEnds = human ? rivalDrives(teams, mode, seed, drives) : [];
+  let driveNo = 0;
   const closeDrive = (end: string) => {
+    if (human && !g.over && driveNo < rivalEnds.length) rivalDriveEnd(g, rivalEnds[driveNo]);
+    driveNo++;
     if (!acc) return;
     acc.drivePts.push(drivePts);
     acc.drivePlays.push(drivePlays);
@@ -258,9 +315,21 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
     const thumb = human && mode.pocket ? (thumbs ??= pocketThumb('cal-t:' + seed)) : null;
     let thrown = false;
     let trucks = 0;
+    sling = null;
     for (let k = 0; k < 1500 && !p.end; k++) {
-      let lane: RunInput = decide(p, g, pl);
-      if (thumb && p.phase === 'drop') {
+      let lane: RunInput = null;
+      const held = sling as { aim: Pt; at: number } | null;
+      if (held && p.phase === 'drop') {
+        // holding the sling for the ring: let go at his moment (judged then, applied this step)
+        if (p.t + DT >= held.at) {
+          throwTo(p, held.aim, undefined, { at: Math.max(held.at, p.t) });
+          sling = null;
+        }
+      } else {
+        sling = null;
+        lane = decide(p, g, pl);
+      }
+      if (thumb && p.phase === 'drop' && !sling) {
         const th = thumb(p);
         if (th.away) throwAway(p);
         else lane = th.steer;
@@ -282,6 +351,8 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
         else if (e === 'fumble-kept') add('fumble-kept');
         else if (e === 'lane-int') add('lane-int');
         else if (e.startsWith('ability:')) add('ability');
+        else if (e.startsWith('gold:') || e.startsWith('perfect:')) add(e);
+        else if (e.startsWith('ring:')) add(e.split(':').slice(0, 3).join(':'));
       }
       p.events.length = 0;
     }
@@ -299,6 +370,10 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
       if (p.qb.job === 'carry' && e.kind !== 'sack') add('scramble');
       if (thrown) {
         const zone = p.aim ? depthOf(p.aim.y - p.los) : '0-9';
+        // (nfl-4: how the sling's ring judged each throw by depth, and how those throws came out)
+        const rj = p.ring?.kind === 'sling' ? p.ring.judge + '-' + p.ring.state : 'tap';
+        add('rz:' + zone + ':' + rj);
+        if (e.caught) add('rzc:' + zone + ':' + rj);
         if (e.caught) {
           add('cmp');
           add('cmp:' + zone);
@@ -339,6 +414,10 @@ export function playGame(teams: Teams, mode: PilotMode, seed: string, acc?: Acc,
   if (acc) {
     acc.games++;
     acc.scores.push(g.score);
+    add('perfects', g.perfects);
+    add('chances', g.chances);
+    if (g.heat.best >= HEATING) add('heatingGames');
+    if (g.heat.lit > 0) add('fireGames');
   }
   return { score: g.score, ends: g.ends.slice(), plays };
 }
@@ -471,6 +550,18 @@ export function summarize(acc: Acc) {
     fumblesLost: share('fumlost', n('plays')),
     flags: share('flag', n('plays')),
     abilityPopsPerPlay: { v: round(n('ability') / Math.max(1, n('plays')), 3), n: n('plays') },
+    // nfl-4: the gold rings and Heat
+    perfectRate: share('perfects', n('chances')),
+    perfectBy: { sling: share('perfect:sling', n('gold:sling')), move: wilson(n('perfect:juke') + n('perfect:spin'), n('gold:move')) },
+    ringsJudged: Object.fromEntries(Object.entries(c).filter(([k]) => k.startsWith('ring:'))),
+    slingByDepth: Object.fromEntries(
+      Object.entries(c)
+        .filter(([k]) => k.startsWith('rz:'))
+        .map(([k, v]) => [k.slice(3), { att: v, cmp: share('rzc:' + k.slice(3), v) }])
+    ),
+    chancesPerGame: { v: round(n('chances') / Math.max(1, acc.games), 2), n: acc.games },
+    heatingGames: share('heatingGames', acc.games),
+    fireGames: share('fireGames', acc.games),
     fieldGoals: { all: share('fgm', n('fga')), ...Object.fromEntries(FG_BINS.map(([b]) => [b, share('fgm:' + b, n('fga:' + b))])), fifty: wilson(n('fga:50-59') + n('fga:60+'), n('fga')) },
     fourthDownTries: { v: round(n('4th-go') / Math.max(1, acc.games), 2), n: acc.games },
     scores: {

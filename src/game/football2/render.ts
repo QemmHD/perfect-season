@@ -8,9 +8,10 @@ import { clipMeta, frameAt, getClip, type Ground, legScale, loadClips, mocapJoin
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pitchAt, project } from '../pixel/persp';
 import * as P from '../pixel/poses';
 import type { Joints, Pose } from '../pixel/rig';
-import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, throwErrorRadius, windupOf } from './engine';
+import { ballNow, dist, FIELD_W, flightTime, isLine, jukeWindow, maxThrow, peakOf, projectRoute, sight, SLING_SWEEP, speedOf, throwErrorRadius, windupOf } from './engine';
+import { drawRing, GOLD_AT, ringDial, type RingWindow } from './shared-v2';
 import { ART, FootballCamera, FRAME, lensFor, type SafeBox } from './camera';
-import { airBall, Bounce, football, groundRing, laneArrow, LineFlash, pressureArc, RING } from './overlay';
+import { airBall, Bounce, football, groundRing, JUKE_RING_R, laneArrow, LineFlash, pressureArc, RING, RING_LW, SLING_RING_R } from './overlay';
 import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
 import type { Juice } from '../juice';
 import type { Body, Play, Pt } from './types';
@@ -44,7 +45,12 @@ export interface FbOverlay {
   /** nfl-3: the camera's frame: the C15 action-safe box, reduced motion, Clutch staging, and the
    * pre-snap look-around (yards to shift the view by while the player drags the field) */
   frame?: { safe: SafeBox | null; reduced: boolean; clutch?: boolean; look?: Pt | null };
+  /** nfl-4: the sling's gold ring at the landing spot while dragging (engine.ts slingWindow) */
+  sling?: { w: RingWindow; aim: Pt } | null;
+  /** nfl-4: Heat: HEATING UP warms the ball's trail, ON FIRE burns the ball */
+  heat?: 'heating' | 'fire' | null;
 }
+
 
 /** What the drawing needs from a camera, either kind. */
 interface Lens {
@@ -614,7 +620,7 @@ export class FootballRenderer {
   }
 
   /** Watch the players for the moments worth a burst, move the bits along and draw them. */
-  private particles(ctx: CanvasRenderingContext2D, p: Play) {
+  private particles(ctx: CanvasRenderingContext2D, p: Play, reduced = false) {
     const now = performance.now() / 1000;
     const dt = this.lastNow ? Math.min(0.05, now - this.lastNow) : 0;
     this.lastNow = now;
@@ -632,12 +638,17 @@ export class FootballRenderer {
         this.acts.set(b.id, b.act);
       }
     }
-    // On Fire: flames lick up off the quarterback while he has it
-    if (p.fire && p.carrier === p.qb && (p.phase === 'pre' || p.phase === 'drop') && dt > 0) {
-      const fire = ['#fff1a0', '#ffd23a', '#ff9a2a', '#ff5a1f'];
+    // On Fire: flames lick up off the quarterback while he has it, and the ball burns in the air
+    // (under reduced motion the bug's static flame says it instead)
+    const fire = ['#fff1a0', '#ffd23a', '#ff9a2a', '#ff5a1f'];
+    if (p.fire && !reduced && p.carrier === p.qb && (p.phase === 'pre' || p.phase === 'drop') && dt > 0) {
       for (let i = 0; i < 2; i++)
         this.bits.push({ x: p.qb.x + (Math.random() - 0.5) * 1.1, y: p.qb.y + (Math.random() - 0.5) * 0.6, h: Math.random() * 1.2, vx: 0, vy: 0, vh: 2.2 + Math.random() * 1.8, life: 0.3 + Math.random() * 0.25, color: fire[Math.floor(Math.random() * 4)], size: 0.15, rise: true });
     }
+    const ball = p.fire && !reduced && dt > 0 && p.ball && !p.ball.away ? ballNow(p) : null;
+    if (ball)
+      for (let i = 0; i < 3; i++)
+        this.bits.push({ x: ball.x + (Math.random() - 0.5) * 0.5, y: ball.y + (Math.random() - 0.5) * 0.5, h: ball.h + Math.random() * 0.3, vx: 0, vy: 0, vh: 1.2 + Math.random() * 1.4, life: 0.18 + Math.random() * 0.18, color: fire[Math.floor(Math.random() * 4)], size: 0.14, rise: true });
     const L = this.lens;
     this.bits = this.bits.filter((q) => (q.life -= dt) > 0);
     for (const q of this.bits) {
@@ -778,18 +789,15 @@ export class FootballRenderer {
     const goingTo = !this.replay && p.phase === 'drop' && o.aim ? this.receiverFor(p, o.aim) : p.phase === 'air' && p.ball && !p.ball.away ? this.receiverFor(p, p.ball.to) : null;
     if (goingTo) groundRing(ctx, L, goingTo.b, 0.55 * art, RING.target);
     if (!this.replay) pressureArc(ctx, L, p);
-    // a tackler gathering to dive: a ring that tightens and reddens as he's about to go
-    if (p.phase === 'run') {
+    // a tackler gathering to dive: his wind-up is the JUKE/SPIN gold ring (nfl-4), its sweep reaching
+    // the window as he commits (gold while a move is ready, amber while it isn't)
+    if (p.phase === 'run' && !this.replay) {
       for (const b of p.bodies) {
-        if (b.side !== 'D' || b.windAt === Infinity) continue;
-        const k = Math.min(1, (p.t - b.windAt) / windupOf(b));
-        const f = L.at(b.x, b.y);
-        const rx = Math.max(5, Math.round(f.s * art * (0.95 - 0.3 * k)));
-        ctx.strokeStyle = 'rgba(255,' + Math.round(170 - 120 * k) + ',40,0.95)';
-        ctx.lineWidth = Math.max(2, Math.round(f.s * 0.14));
-        ctx.beginPath();
-        ctx.ellipse(Math.round(f.x), Math.round(f.y), rx, Math.max(2, Math.round(rx * Math.sin(L.pitch(b.y)))), 0, 0, Math.PI * 2);
-        ctx.stroke();
+        if (b.side !== 'D') continue;
+        const w = jukeWindow(p, b);
+        if (!w || b.stunUntil > p.t) continue;
+        const f = L.at(b.x, b.y, 1);
+        drawRing(ctx, f.x, f.y, JUKE_RING_R, ringDial(p.t, w, windupOf(b) / GOLD_AT), w.state, { lw: RING_LW, glow: !reduced });
       }
     }
     // the runner's stamina, under him, once a move has cost him some
@@ -846,7 +854,7 @@ export class FootballRenderer {
     this.heads = heads;
     // the ball: in the air (its shadow ring on the turf and a trail), bouncing loose after an
     // incompletion, or in his hands (overlay.ts; never under 4×3 px)
-    if (p.ball) airBall(ctx, L, p, art, reduced);
+    if (p.ball) airBall(ctx, L, p, art, reduced, o.heat ?? null);
     else if (hand) football(ctx, hand.x, hand.y, hand.s * art, 0);
     else this.bounce.draw(ctx, L, real, art, reduced);
     // the slingshot: the arc (as much of it as he can see: an accurate passer all of it, a weaker one
@@ -893,7 +901,12 @@ export class FootballRenderer {
         ctx.stroke();
       }
     }
-    this.particles(ctx, p);
+    // the sling's gold ring on the landing spot (nfl-4): release as the sweep crosses the window
+    if (o.sling && o.aim && !this.replay) {
+      const land = L.at(o.sling.aim.x, o.sling.aim.y);
+      drawRing(ctx, land.x, land.y, SLING_RING_R, ringDial(p.t, o.sling.w, SLING_SWEEP), o.sling.w.state, { lw: RING_LW, glow: !reduced });
+    }
+    this.particles(ctx, p, reduced);
     o.juice?.draw(ctx);
     // (ability pops live in the screen's toast line now: one a play, nfl-3 / V-4)
     // names: the receivers before the snap, the man with the ball after

@@ -11,6 +11,7 @@
 // merge step listed in nfl.md); football code does not change. Nothing here reads a clock or a
 // random number, so engine code may call the maths.
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import { pickFor, type PerSport, type SportId } from '../../engine/sport';
 import { sfx, vibrate } from '../../lib/sound';
 
 /** A point or vector in screen or field units. */
@@ -270,7 +271,94 @@ export function calibrationLag(): number {
   return 0;
 }
 
-// ---------- C18: Heat (nba's heat.ts); the NFL table is filled in nfl-4 ----------
+/**
+ * The dial a ring is drawn as (nfl-4; V2 §B.0.1: "its angular size is the real window"). A sweep
+ * goes once round the ring in `sweep` seconds and reaches the middle of the window at GOLD_AT of a
+ * turn (three quarters: the last quarter is the late side). Shares of a turn, clockwise from 12.
+ */
+export const GOLD_AT = 0.75;
+export function ringDial(now: number, w: RingWindow, sweep: number): { at: number; from: number; to: number } {
+  const s = sweep > 0 ? sweep : 1;
+  const k = (t: number) => GOLD_AT - (w.center - t) / s;
+  return { at: k(now), from: k(w.center - w.half), to: k(w.center + w.half) };
+}
+
+/** The window's segment on a ring of radius `r` (px): its arc length, the size a thumb sees. */
+export function goldArcPx(w: Pick<RingWindow, 'half'>, sweep: number, r: number): number {
+  return (2 * Math.PI * r * 2 * w.half) / (sweep > 0 ? sweep : 1);
+}
+
+/** Ring colours by state (gold, amber, red) and the track under them. */
+export const RING_INK: Record<Ring, string> = { gold: '#ffd23a', amber: '#ff9a2a', red: '#ff4a4a' };
+
+/**
+ * Draw a dial ring (the C17 PerfectRing, local version) in canvas pixels: a dark track, the window's
+ * segment in its state's colour (none when red: the whole ring is red), the sweep so far, and an
+ * outer ring that closes onto it as the moment comes (it closes under reduced motion too: it carries
+ * the timing). `lw` is the stroke in canvas px; `glow` adds the soft halo (off under reduced motion).
+ */
+export function drawRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, dial: { at: number; from: number; to: number }, state: Ring, opts: { lw: number; glow: boolean }) {
+  const ang = (k: number) => -Math.PI / 2 + 2 * Math.PI * k;
+  const lw = Math.max(1, opts.lw);
+  ctx.save();
+  ctx.lineCap = 'butt';
+  // the track
+  ctx.lineWidth = lw + 2;
+  ctx.strokeStyle = 'rgba(4,10,16,0.78)';
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = state === 'red' ? 'rgba(255,74,74,0.85)' : 'rgba(255,255,255,0.22)';
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  // the sweep so far (from 12 o'clock to now)
+  const at = Math.max(0, Math.min(1, dial.at));
+  if (at > 0) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, ang(0), ang(at));
+    ctx.stroke();
+  }
+  // the window
+  if (state !== 'red') {
+    ctx.strokeStyle = RING_INK[state];
+    ctx.lineWidth = lw * 1.7;
+    if (opts.glow) {
+      ctx.shadowColor = RING_INK[state];
+      ctx.shadowBlur = lw * 3;
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, r, ang(dial.from), ang(dial.to));
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  // the needle: a bright tick where the sweep is
+  if (dial.at >= 0 && dial.at <= 1.02) {
+    const a = ang(dial.at);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1, lw * 0.8);
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * (r - lw * 1.6), y + Math.sin(a) * (r - lw * 1.6));
+    ctx.lineTo(x + Math.cos(a) * (r + lw * 1.6), y + Math.sin(a) * (r + lw * 1.6));
+    ctx.stroke();
+  }
+  // the closing ring: wide while the moment is far, on the ring as it comes
+  const left = GOLD_AT - dial.at;
+  if (left > 0 && state !== 'red') {
+    const rr = r * (1 + 0.9 * Math.min(1, left / GOLD_AT));
+    ctx.globalAlpha = 0.35 + 0.5 * (1 - Math.min(1, left / GOLD_AT));
+    ctx.strokeStyle = RING_INK[state];
+    ctx.lineWidth = Math.max(1, lw * 0.6);
+    ctx.beginPath();
+    ctx.arc(x, y, rr, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------- C18: Heat (nba's heat.ts) with the V2 tables ----------
 
 export interface Heat {
   /** 0-100 */
@@ -285,6 +373,53 @@ export interface Heat {
 export type HeatEv = 'perfect' | 'score' | 'stop' | 'clean' | 'turnover' | 'conceded' | 'half';
 export const HEATING = 66;
 export const FULL = 100;
+/** A match's Heat before anything has happened. */
+export const COLD: Heat = { pts: 0, fire: 0, best: 0, lit: 0 };
+
+/** What each moment is worth (V2 §B.0.2; NFL's table is nfl-4's, the others V2's numbers for nba and soccer to confirm). */
+const HEAT_TABLE: PerSport<Record<Exclude<HeatEv, 'half'>, number>> = {
+  nba: { perfect: 12, score: 10, stop: 15, clean: 5, turnover: -20, conceded: -10 },
+  nfl: { perfect: 12, score: 25, stop: 15, clean: 5, turnover: -20, conceded: -10 },
+  soccer: { perfect: 12, score: 40, stop: 15, clean: 5, turnover: -20, conceded: -10 }
+};
+/** How long ON FIRE lasts: NBA possessions, NFL snaps, soccer attacks. */
+export const FIRE_UNITS: PerSport<number> = { nba: 2, nfl: 3, soccer: 1 };
+
+/** What a Heat event is worth in a sport (0 for 'half'). */
+export function heatValue(ev: HeatEv, sport: SportId): number {
+  return ev === 'half' ? 0 : pickFor(sport, HEAT_TABLE)[ev];
+}
+
+/**
+ * One Heat event (pure, integer). Gains fill the bar to 100: crossing 66 is HEATING UP, reaching 100
+ * lights ON FIRE for `units` (the sport's FIRE_UNITS unless a card says otherwise); while On Fire the
+ * bar stays full. A loss takes its points off and puts any fire out. 'half' empties the bar and the
+ * fire (best and lit are the match's and stay).
+ */
+export function addHeat(h: Heat, ev: HeatEv, sport: SportId, units = FIRE_UNITS[sport]): { h: Heat; heating: boolean; lit: boolean } {
+  if (ev === 'half') return { h: { ...h, pts: 0, fire: 0 }, heating: false, lit: false };
+  const v = heatValue(ev, sport);
+  if (v < 0) {
+    const pts = Math.max(0, h.pts + v);
+    return { h: { ...h, pts, fire: 0 }, heating: false, lit: false };
+  }
+  if (h.fire > 0) return { h, heating: false, lit: false };
+  const pts = Math.min(FULL, h.pts + v);
+  const lit = pts >= FULL;
+  const heating = !lit && h.pts < HEATING && pts >= HEATING;
+  return {
+    h: { pts, fire: lit ? Math.max(1, Math.round(units)) : 0, best: Math.max(h.best, pts), lit: h.lit + (lit ? 1 : 0) },
+    heating,
+    lit
+  };
+}
+
+/** One On Fire unit used (a snap played On Fire). The last one burns out: the bar empties for the next run at it. */
+export function spendFire(h: Heat): Heat {
+  if (h.fire <= 0) return h;
+  const fire = h.fire - 1;
+  return { ...h, fire, pts: fire > 0 ? h.pts : 0 };
+}
 
 // ---------- C19: the HUD kit (nba's hud/*); football's labels go through these props ----------
 
@@ -328,33 +463,51 @@ export function ScoreBug(props: ScoreBugProps & ScoreBugExtra) {
   const h = React.createElement;
   const pips = props.pips ?? [];
   const live = pips.indexOf('open');
-  const heat = Math.max(0, Math.min(100, props.heatUs));
+  const bar = (who: 'us' | 'them', v: number, fire: boolean, name: string) => {
+    const pts = Math.max(0, Math.min(100, Math.round(v)));
+    return h(
+      'span',
+      {
+        className: 'v2-heat-bar ' + who + (fire ? ' fire' : pts >= HEATING ? ' heating' : ''),
+        role: 'meter',
+        'aria-label': name + (fire ? ': On Fire' : pts >= HEATING ? ': Heating up' : ': Heat'),
+        'aria-valuemin': 0,
+        'aria-valuemax': 100,
+        'aria-valuenow': pts
+      },
+      h('i', { style: { width: pts + '%' } }),
+      h('b', { className: 'v2-heat-mark' })
+    );
+  };
+  // the flame on the bug: still (it says ON FIRE without moving, for reduced motion too), in the
+  // block's top corner so the name keeps its width on a 320 px phone
+  const flame = (on: boolean) =>
+    on
+      ? h('svg', { className: 'v2-bug-flame', viewBox: '0 0 12 14', width: 10, height: 12, 'aria-hidden': true }, h('path', { d: 'M6 0C7 3 10 4.5 10 8.5 10 11.5 8.2 14 6 14S2 11.5 2 8.5C2 6.5 3 5.5 4 4.5 4 6 4.8 7 5.6 7 5.6 4.5 4.6 2.5 6 0Z', fill: 'currentColor' }))
+      : null;
   return h(
     React.Fragment,
     null,
     h(
       'div',
       { className: 'v2-bug' + (props.clutch ? ' clutch' : ''), role: 'group', 'aria-label': 'Score: ' + (props.usName ?? 'You') + ' ' + props.us + ', ' + (props.themName ?? 'Rival') + ' ' + props.them + '. ' + props.label + (props.sub ? ', ' + props.sub : '') },
-      h('span', { className: 'v2-bug-team us' }, h('i', null, props.usName ?? 'YOU'), h('b', { className: 'num' }, props.us)),
+      h('span', { className: 'v2-bug-team us' + (props.fireUs ? ' fire' : '') }, flame(props.fireUs), h('i', null, props.usName ?? 'YOU'), h('b', { className: 'num' }, props.us)),
       h(
         'span',
         { className: 'v2-bug-mid' },
         h('i', null, props.label, props.clock !== undefined ? h('em', { ref: props.clockRef, className: 'v2-bug-clock' }, props.clock) : null),
         props.sub ? h('b', null, props.sub) : null
       ),
-      h('span', { className: 'v2-bug-team them' }, h('b', { className: 'num' }, props.themBlank ? '–' : props.them), h('i', null, props.themName ?? 'RIVAL')),
+      h('span', { className: 'v2-bug-team them' + (props.fireThem ? ' fire' : '') }, h('b', { className: 'num' }, props.themBlank ? '–' : props.them), h('i', null, props.themName ?? 'RIVAL'), flame(props.fireThem)),
       h(
         'span',
         { className: 'v2-bug-line', 'aria-hidden': true },
         pips.map((p, i) => h('i', { key: i, className: 'pip ' + p, style: i === live ? ({ '--fill': Math.round(props.progress * 100) + '%' } as React.CSSProperties) : undefined }))
       )
     ),
-    h(
-      'div',
-      { className: 'v2-heat' + (props.fireUs ? ' fire' : ''), role: 'meter', 'aria-label': props.fireUs ? 'On Fire' : 'Heat', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(heat) },
-      h('i', { style: { width: heat + '%' } }),
-      h('b', { className: 'v2-heat-mark' })
-    )
+    // the two Heat bars under the bug, each under its own side (yours fills toward the middle's left
+    // edge from the left, theirs the same way on the right); a dash of mark at HEATING UP
+    h('div', { className: 'v2-heat' + (props.fireUs ? ' fire' : '') }, bar('us', props.heatUs, props.fireUs, props.usName ?? 'Your heat'), bar('them', props.themBlank ? 0 : props.heatThem, !props.themBlank && props.fireThem, props.themName ?? 'Rival heat'))
   );
 }
 
@@ -415,10 +568,26 @@ export function haptic(kind: HapticKind) {
   vibrate(PATTERNS[kind]);
 }
 
-/** The PERFECT chime for the `streak`-th perfect in a row; today the existing two-note coin cue. */
+/** The semitones a PERFECT streak lifts the chime: 0 for the first in a row, +1 each after, at most +4 (V2 §B.0.5). */
+export function chimeStep(streak: number): number {
+  return Math.max(0, Math.min(4, Math.floor(Number.isFinite(streak) ? streak : 1) - 1));
+}
+
+/**
+ * The PERFECT chime for the `streak`-th perfect in a row: two notes a fourth apart, a semitone higher
+ * for each perfect in a row up to five. The shared cue (sfx.perfect, soccer's, in sound.ts at the
+ * merge) when this build has it; until then the same two notes on the existing pitched tone
+ * (sfx.count steps 2 semitones per unit, so half a unit is one semitone; G5 is 3.5 units over C5).
+ */
 export function perfectChime(streak: number) {
-  void streak;
-  sfx.coin();
+  const shared = (sfx as typeof sfx & { perfect?: (streak: number) => void }).perfect;
+  if (shared) {
+    shared(streak);
+    return;
+  }
+  const base = 3.5 + chimeStep(streak) / 2;
+  sfx.count(base);
+  setTimeout(() => sfx.count(base + 2.5), 70);
 }
 
 // ---------- C21: playtime (ut's lib/playtime.ts) ----------

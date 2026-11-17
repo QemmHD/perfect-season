@@ -1,6 +1,6 @@
-// The drive rules that aren't about a single play: the two-minute clock on the last drive and the
-// On Fire streak.
-import { CLOCK, afterPlay, FIRE_AT, newGame, RUNOFF } from './drive';
+// The drive rules that aren't about a single play: the two-minute clock on the last drive. (The old
+// three-completion On Fire streak tested here is gone: Heat replaced it in nfl-4, see heat.test.ts.)
+import { CLOCK, afterPlay, newGame, RUNOFF } from './drive';
 import type { Defense, FbPlayer, Offense, PlayEnd } from './types';
 
 const man = (pos: string, a: Record<string, number> = {}): FbPlayer => ({ id: pos, name: pos, tag: pos, num: null, ht: 74, wt: 220, pos, ovr: 75, a, abil: [] });
@@ -53,21 +53,5 @@ describe('the two-minute clock', () => {
     const a = afterPlay(g, end('td', 100, 5, true));
     expect(a.points).toBe(7);
     expect(g.ends).toEqual(['TD']);
-  });
-});
-
-describe('On Fire', () => {
-  it('lights after three completions in a row and goes out on an incompletion', () => {
-    const g = newGame(off, def, 'fire');
-    let lit = null;
-    for (let i = 0; i < FIRE_AT; i++) lit = afterPlay(g, end('tackle', g.ballOn + 3, 3, true)).fire;
-    expect(lit).toBe('lit');
-    expect(g.fire).toBe(true);
-    // a run doesn't break the streak
-    expect(afterPlay(g, end('tackle', g.ballOn + 2, 3)).fire).toBeNull();
-    expect(g.fire).toBe(true);
-    expect(afterPlay(g, end('incomplete', 0, 2)).fire).toBe('out');
-    expect(g.fire).toBe(false);
-    expect(g.streak).toBe(0);
   });
 });

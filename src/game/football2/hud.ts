@@ -12,7 +12,8 @@
 // - The score bug's model: its label, the down and distance under it, and the drive pips.
 import type { DriveEnd, Game } from './drive';
 
-export type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green' | 'ability';
+/** nfl-4 adds 'perfect' (the gold PERFECT word), 'dial' (TIMING / PRESSURE / RANGE) and 'heat' (HEATING UP). */
+export type Tone = 'good' | 'bad' | 'big' | 'plain' | 'green' | 'ability' | 'perfect' | 'dial' | 'heat';
 
 /** Priorities, low to high. */
 export const PRIO = { hint: 1, ability: 2, momentum: 2, result: 3, big: 4 } as const;

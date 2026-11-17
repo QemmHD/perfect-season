@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { rng } from '../../engine/rng';
 import { decide, pilot } from './autopilot';
-import { fgMax, fireAtFor, kickWindow, newGame, startPlay } from './drive';
+import { fgMax, fireSnapsFor, kickWindow, newGame, startPlay } from './drive';
 import { ABILITY_ON, byId, lineUp, maxThrow, moveEdge, on, routeWinChance, rushWinAt, snap, step, throwErrorRadius, throwTo } from './engine';
 import type { Body, Defense, FbPlayer, Move, Offense } from './types';
 
@@ -133,8 +133,9 @@ describe('NFL abilities: all sixteen work, in the zone about half the time', () 
     // big leg: four more yards of range
     const k = (abil: string[]) => fgMax(newGame(offense({ k: fb('K', 'k', {}, abil) }), defense(), 'k'));
     expect(k(['big-leg'])).toBe(k([]) + 4);
-    // heat check gets the QB hot a completion sooner
-    expect(fireAtFor(newGame(offense({ wr: fb('WR', 'x', {}, ['heat-check']) }), defense(), 'h'))).toBe(2);
+    // heat check: ON FIRE lasts a snap longer (nfl-4; it used to light the old On Fire a completion sooner)
+    expect(fireSnapsFor(newGame(offense({ wr: fb('WR', 'x', {}, ['heat-check']) }), defense(), 'h'))).toBe(4);
+    expect(fireSnapsFor(newGame(offense(), defense(), 'h'))).toBe(3);
     // the list itself: each id is rolled by lineUp for a carrier of it
     for (const id of ALL) {
       const p = lineUp(offense({ qb: fb('QB', 'q', {}, [id]) }), defense(), 'pass', 'verts', 'inside', 25, 26.67, rng(7));

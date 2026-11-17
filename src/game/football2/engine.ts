@@ -10,7 +10,8 @@
 // bullet/touch/lob trajectory drives the real flight, lane defense, receiver lead and aim preview.
 // On a run the line drives its men away from the play's hole. A tackler winds up before he dives
 // (the runner can see it coming), and a juke as he leaves his feet fakes him out.
-import type { Act, Body, Call, Concept, Defense, FbPlayer, Flag, Job, Move, Offense, PassType, Play, PlayEnd, Pt, RunInput, RunPlay } from './types';
+import { GOLD_AT, type Judgement, judge, type Ring, type RingWindow, windowHalf } from './shared-v2';
+import type { Act, Body, Call, Concept, Defense, Dial, FbPlayer, Flag, Job, Move, Offense, PassType, Play, PlayEnd, Pt, RunInput, RunPlay } from './types';
 
 export const FIELD_W = 53.33;
 const HASH_L = 23.58;
@@ -436,10 +437,11 @@ export const WIN_AT = 3.05;
 /** how close (yards in front of the quarterback) the pocket has closed when a rusher wins */
 const POCKET = 4.2;
 
-/** The ball's speed in the air (yards a second): a strong arm gets it there sooner, On Fire sooner still. */
+/** The ball's speed in the air (yards a second): a strong arm gets it there sooner. (On Fire used to
+ * make it quicker still; since nfl-4 ON FIRE is Heat's wider gold instead.) */
 function throwSpeed(p: Play) {
   // 19 yd/s for a weak arm, 25 for a strong one (the throw power that matters most is the speed)
-  return (lerp(19, 25, rt(p.qb.p.a.THP, 50, 99)) + Math.max(0, Math.min(11, (p.qb.p.a.THP ?? 60) - 99)) * 0.055) * (p.fire ? 1.12 : 1) * (on(p.qb, 'cannon') ? 1.06 : 1);
+  return (lerp(19, 25, rt(p.qb.p.a.THP, 50, 99)) + Math.max(0, Math.min(11, (p.qb.p.a.THP ?? 60) - 99)) * 0.055) * (on(p.qb, 'cannon') ? 1.06 : 1);
 }
 
 /** 0 for a bullet (short and flat), 1 for a lob (long and high), blended between. */
@@ -481,10 +483,10 @@ function accAt(qb: FbPlayer, len: number) {
 /**
  * How much of the slingshot's arc the quarterback sees (0-1 of a throw this long): an accurate passer
  * sees it all the way to where it lands; a weaker one only its start (the rest is his guess), and
- * less with a rusher in his face unless he's poised under pressure. On Fire he sees all of it.
+ * less with a rusher in his face unless he's poised under pressure. (On Fire no longer shows him all
+ * of it: nfl-4's ON FIRE widens the gold instead.)
  */
 export function sight(p: Play, len: number) {
-  if (p.fire) return 1;
   const a = p.qb.p.a;
   const calm = 1 - p.pressure * (1 - 0.6 * rt(a.TUP, 50, 99));
   // on the move in the pocket (nfl-2) he sees less of it: up to a fifth less at full tilt
@@ -509,35 +511,235 @@ export function throwErrorRadius(p: Play, len: number): number {
   return on(p.qb, 'surgeon') && len <= 15 ? r * 0.7 : r;
 }
 
-export function throwTo(p: Play, to: Pt, type = p.passType): boolean {
+// ---------- the gold ring (Claude, studio overhaul nfl-4; V2 §B.0.1, §B.2.5) ----------
+
+/** A rating's gold half-window (s), before On Fire: 22 ms + 33 ms over the rating's 50-99 range,
+ * so it never passes 55 ms (110 ms across) and windowHalf's 30 ms floor holds the low end. A 95
+ * gets about 1.47x the gold of a 70. */
+const RING_LO = 0.022;
+const RING_SPAN = 0.033;
+export function ringBase(rating01: number): number {
+  return RING_LO + RING_SPAN * clamp(Number.isFinite(rating01) ? rating01 : 0, 0, 1);
+}
+/** The sling's dial goes round once in this long (s); see shared-v2 ringDial. */
+export const SLING_SWEEP = 0.8;
+/** A receiver this open (yards, the AI's own openness measure) wears a green halo; less is tight
+ * (amber). A ball 20+ yards in the air hangs, so a deep man needs a step more (G-2). */
+export const HALO_OPEN = 2.4;
+export const HALO_DEEP = 3.4;
+/** The separation a green halo needs for a throw `air` yards downfield. */
+export const haloNeed = (air: number) => (air >= 20 ? HALO_DEEP : HALO_OPEN);
+/** The spot within this of his path (yards): a ball there is in stride. Up to RING_NEAR the ring
+ * still shows (amber: he isn't getting there in stride); farther, there's no ring, only the reticle. */
+export const CATCH_R = 1.2;
+export const RING_NEAR = 3;
+/** Pressure from which the sling can't be gold: deep (20+ air yards) any real pressure. */
+const PRESSURE_AMBER = 0.5;
+const PRESSURE_AMBER_DEEP = 0.25;
+/** Deep throws' gold is this much narrower (G-2). */
+const DEEP_RING = 0.7;
+/** A perfect move leaves the tackler on the turf this long (s). */
+export const STUMBLE = 0.8;
+
+/** The sling's gold half-window (s) for a passer, a throw this long, its air yards and On Fire. */
+export function slingHalf(qb: FbPlayer, len: number, air: number, fire: boolean): number {
+  return windowHalf(ringBase(accAt(qb, len)) * (air >= 20 ? DEEP_RING : 1), 1, fire);
+}
+/** The JUKE/SPIN gold half-window (s) for a carrier, On Fire or not. */
+export function jukeHalf(c: FbPlayer, fire: boolean): number {
+  return windowHalf(ringBase(rt(moveRating(c), 50, 99)), 1, fire);
+}
+
+/**
+ * How open a receiver is at a spot: the nearest man in coverage to him now, or to the spot (with half
+ * a yard of grace). The same value the autopilot reads to pick its man, and the halo on his chip.
+ */
+export function separation(p: Play, b: Body, at: Pt): number {
+  let open = 99;
+  for (const d of p.bodies) {
+    if (d.side !== 'D' || d.job === 'rush') continue;
+    open = Math.min(open, dist(d, b), dist(d, at) + 0.5);
+  }
+  return open;
+}
+
+/** The receiver a sling to `aim` is for: whose route passes closest to the spot (`miss`, yards),
+ * when he gets there (`tau`, seconds from now), and whether he stops there (`stops`: the end of a
+ * curl or a check-down). Null when nobody's route comes within RING_NEAR. */
+export function slingTarget(p: Play, aim: Pt): { b: Body; tau: number; miss: number; stops: boolean } | null {
+  let best: { b: Body; tau: number; miss: number; stops: boolean } | null = null;
+  for (const b of p.bodies) {
+    if (b.side !== 'O' || b === p.qb || isLine(b) || b.job === 'block' || b.job === 'handoff') continue;
+    // coarse along his route; where it comes back near the spot more than once (a curl or a
+    // comeback passes the spot going out), the last time counts; at a stop, his arrival there
+    const ds: number[] = [];
+    for (let k = 0; k <= 64; k++) ds.push(k ? dist(projectRoute(b, k * 0.05), aim) : dist(b, aim));
+    const low = Math.min(...ds);
+    let k0 = ds.length - 1;
+    while (k0 > 0 && ds[k0] > low + 0.15) k0--;
+    while (k0 > 0 && ds[k0 - 1] <= low + 0.15) k0--;
+    let kk = k0;
+    for (let k = k0; k < ds.length && ds[k] <= low + 0.15; k++) if (ds[k] < ds[kk] - 1e-9) kk = k;
+    let tau = kk * 0.05,
+      miss = ds[kk];
+    // then fine around it
+    for (let k = -10; k <= 10; k++) {
+      const t = tau + k * 0.005;
+      if (t < 0 || t < k0 * 0.05 - 0.05) continue;
+      const d = dist(projectRoute(b, t), aim);
+      if (d < miss - 1e-9) {
+        miss = d;
+        tau = t;
+      }
+    }
+    // on the last leg to where he sits (a curl's settle, a check-down), the moment that counts is his
+    // arrival there: a ball after it meets a man standing still
+    const last = b.route[b.route.length - 1];
+    const stops = b.sit && b.route.length <= 1;
+    if (stops && last) tau = Math.max(tau, dist(b, last) / speedOf(b.p));
+    if (miss <= RING_NEAR && (!best || miss < best.miss - 1e-9)) best = { b, tau, miss, stops: stops || dist(projectRoute(b, tau + 0.25), projectRoute(b, tau)) < 0.1 };
+  }
+  return best;
+}
+
+export interface SlingRing {
+  /** the window in engine seconds, and whether gold is on offer */
+  w: RingWindow;
+  /** what a non-PERFECT release names: RANGE (red), PRESSURE (amber: the rush or tight coverage), TIMING */
+  dial: Dial | null;
+  /** the receiver it's for (a body id) */
+  target: number;
+}
+
+/**
+ * The sling's ring for a throw to `aim` now (V2 §6.2): its window is centred on the release that has
+ * the ball arrive as the receiver does (release when his break lines up), half-width by the
+ * passer's accuracy at that distance (x0.7 deep), x1.25 On Fire. Gold is offered only when the
+ * outcome can be guaranteed: the spot within his catch radius, in bounds and in the arm's range, his
+ * halo green (open) and the rush under 0.5 (under 0.25 deep). Otherwise amber (PRESSURE, or TIMING
+ * when he isn't getting there in stride), and red past the arm (RANGE). On Fire an amber that is
+ * only the rush's (an open man, in stride, in range) is gold, short of 20 air yards: a deep ball
+ * under pressure is never gold. `out`: the drag asked for more than the arm has (slingNow clamps
+ * the spot to it). Pure: reads the play, changes nothing.
+ */
+export function slingWindow(p: Play, aim: Pt, out = false, type = p.passType): SlingRing | null {
+  if (p.phase !== 'drop' || p.call !== 'pass' || p.carrier !== p.qb) return null;
+  const qb = p.qb;
+  const max = maxThrow(p);
+  const raw = dist(qb, aim);
+  const len = Math.max(1.5, Math.min(raw, max));
+  const air = aim.y - p.los;
+  // past his arm: the whole ring is red (RANGE) whoever it's for, and there's no moment to time (its
+  // needle rests at the top)
+  if (out || raw > max + 0.01) return { w: { center: p.t + SLING_SWEEP * GOLD_AT, half: slingHalf(qb.p, len, air, p.fire), state: 'red' }, dial: 'RANGE', target: slingTarget(p, aim)?.b.id ?? -1 };
+  const tgt = slingTarget(p, aim);
+  if (!tgt) return null;
+  const deep = air >= 20;
+  const center = p.t + tgt.tau - flightTime(p, len, type);
+  // a man who'll have stopped there (the end of a curl, a check-down) before any throw now could
+  // arrive has no break left to time: a ball to him is just a pass (no ring; a tap's accuracy)
+  if (tgt.stops && center <= p.t) return null;
+  const half = slingHalf(qb.p, len, air, p.fire);
+  const inBounds = aim.x >= 0.5 && aim.x <= FIELD_W - 0.5 && aim.y <= 109.5;
+  const open = separation(p, tgt.b, aim) >= haloNeed(air);
+  const rushed = p.pressure >= (deep ? PRESSURE_AMBER_DEEP : PRESSURE_AMBER);
+  let state: Ring = 'gold';
+  let dial: Dial | null = null;
+  if (!inBounds || tgt.miss > CATCH_R) {
+    state = 'amber';
+    dial = 'TIMING';
+  } else if (!open || (rushed && (deep || !p.fire))) {
+    state = 'amber';
+    dial = 'PRESSURE';
+  }
+  return { w: { center, half, state }, dial, target: tgt.b.id };
+}
+
+/** The rating a carrier's JUKE and SPIN ring is sized by: his better move with his agility. */
+export function moveRating(c: FbPlayer): number {
+  return (Math.max(c.a.JKM ?? 50, c.a.SPM ?? 45) + (c.a.AGI ?? 70)) / 2;
+}
+/** The carrier can make a move right now (the ring is gold only then). */
+export function moveReady(p: Play): boolean {
+  return p.phase === 'run' && !!p.carrier && p.t >= p.moveReady && !p.covered && !p.down;
+}
+
+/**
+ * The JUKE/SPIN ring on a tackler (V2 §B.2.5 #3): his wind-up is the ring, its window centred on
+ * the moment he commits to the dive, half-width by the carrier's moves and agility (x1.25 On Fire).
+ * Gold while the carrier has a move ready, amber otherwise. Null when he isn't winding up (or his
+ * dive is long gone). Pure.
+ */
+export function jukeWindow(p: Play, d: Body): RingWindow | null {
+  const c = p.carrier;
+  if (!c || p.phase !== 'run' || d.side !== 'D' || d.ringAt === undefined) return null;
+  if (d.windAt === Infinity && !d.dive && p.t > d.ringAt + 0.05) return null;
+  if (p.t > d.ringAt + 0.4) return null;
+  return { center: d.ringAt, half: jukeHalf(c.p, p.fire), state: moveReady(p) ? 'gold' : 'amber' };
+}
+
+/** A gold ring the offense was offered (counted once each: a sling release, a tackler's wind-up). */
+function offered(p: Play, kind: 'sling' | 'move') {
+  p.chances = (p.chances ?? 0) + 1;
+  p.events.push('gold:' + kind);
+}
+
+/** A PERFECT moment by `who` (one entry each; Heat and the grade read them off the play's end). */
+function perfect(p: Play, who: Body, kind: 'sling' | 'juke' | 'spin') {
+  (p.pf ??= []).push(who.p.id);
+  p.events.push('perfect:' + kind);
+}
+
+/**
+ * A pass. `sling` is the player's slingshot released at engine time `at` (from the touch's own
+ * timestamp, shared-v2 touchTime): it is judged on the ring (slingWindow). A PERFECT on gold puts the
+ * ball exactly on the spot, and the receiver catches it in stride (no play on it in the lane, no
+ * drop, no interception); early or late throws 1.3x the error; amber and red can't be PERFECT. A
+ * tap on a receiver's chip and the AI's throws (no `sling`) take the 'good' path, today's accuracy,
+ * so a tap never beats a PERFECT sling.
+ */
+export function throwTo(p: Play, to: Pt, type = p.passType, sling?: { at: number; out?: boolean }): boolean {
   if (p.phase !== 'drop' || p.call !== 'pass' || p.carrier !== p.qb || p.t < 0.3) return false;
   const qb = p.qb;
   const r = p.rand;
   const ang = Math.atan2(to.y - qb.y, to.x - qb.x);
   const len = Math.max(1.5, Math.min(Math.hypot(to.x - qb.x, to.y - qb.y), maxThrow(p)));
   const intended = { x: qb.x + Math.cos(ang) * len, y: qb.y + Math.sin(ang) * len };
-  const error = throwErrorRadius(p, len);
-  // Triangular noise favors the intended spot, stays bounded and never aims the ball at a defender.
-  let lateral = (r() - r()) * error,
-    depth = (r() - r()) * error * 0.8;
-  const radius = Math.hypot(lateral, depth);
-  if (radius > error) {
-    lateral *= error / radius;
-    depth *= error / radius;
+  const ring = sling ? slingWindow(p, intended, !!sling.out || Math.hypot(to.x - qb.x, to.y - qb.y) > maxThrow(p) + 0.01, type) : null;
+  // (a red ring has no timing: a ball past his arm is an ordinary throw at the edge of it)
+  const j: Judgement = ring && ring.w.state !== 'red' ? judge(sling!.at, ring.w) : 'good';
+  if (ring) {
+    if (ring.w.state === 'gold') offered(p, 'sling');
+    p.ring = { kind: 'sling', judge: j, state: ring.w.state, dial: j === 'perfect' ? null : ring.dial ?? 'TIMING' };
+    p.events.push('ring:sling:' + j + ':' + ring.w.state);
   }
-  const land = { x: intended.x - Math.sin(ang) * lateral + Math.cos(ang) * depth, y: intended.y + Math.cos(ang) * lateral + Math.sin(ang) * depth };
+  const sure = j === 'perfect' && ring ? ring.target : undefined;
+  let land: Pt = intended;
+  if (sure === undefined) {
+    const error = throwErrorRadius(p, len) * (j === 'early' || j === 'late' ? 1.3 : 1);
+    // Triangular noise favors the intended spot, stays bounded and never aims the ball at a defender.
+    let lateral = (r() - r()) * error,
+      depth = (r() - r()) * error * 0.8;
+    const radius = Math.hypot(lateral, depth);
+    if (radius > error) {
+      lateral *= error / radius;
+      depth *= error / radius;
+    }
+    land = { x: intended.x - Math.sin(ang) * lateral + Math.cos(ang) * depth, y: intended.y + Math.cos(ang) * lateral + Math.sin(ang) * depth };
+  } else perfect(p, qb, 'sling');
   const flight = flightTime(p, len, type);
   p.aim = intended;
-  p.ball = { from: { x: qb.x, y: qb.y + 0.3 }, to: land, t0: p.t, t1: p.t + flight, peak: peakOf(len, type), type };
+  p.ball = { from: { x: qb.x, y: qb.y + 0.3 }, to: land, t0: p.t, t1: p.t + flight, peak: peakOf(len, type), type, sure };
   p.carrier = null;
   p.phase = 'air';
   act(qb, 'throw', p.t);
   p.events.push(p.pressure > 0.3 ? 'throw-pressure' : 'throw');
   if (on(qb, 'cannon') && len > 20) used(p, qb, 'cannon');
   if (on(qb, 'surgeon') && len <= 15) used(p, qb, 'surgeon');
-  // who goes for it: of the receivers who can get there in time, the one whose route takes him closest
+  // who goes for it: of the receivers who can get there in time, the one whose route takes him
+  // closest (a PERFECT sling's is the man the ring was for)
   const eligible = p.bodies.filter((b) => b.side === 'O' && b !== qb && !isLine(b) && dist(b, land) / speedOf(b.p) <= flight + 0.45);
-  const target = eligible.sort((x, y) => dist(projectRoute(x, flight), land) - dist(projectRoute(y, flight), land))[0];
+  const target = sure !== undefined ? p.bodies[sure] : eligible.sort((x, y) => dist(projectRoute(x, flight), land) - dist(projectRoute(y, flight), land))[0];
   if (target) {
     target.job = 'track';
     target.route = [land];
@@ -700,19 +902,55 @@ export function windupOf(b: Body) {
  * A move with the ball: a juke (a cut away from the nearest tackler), a spin, a stiff arm or a
  * truck (lowering the shoulder). Each works by the runner's rating for it, less when he's tired
  * and less each time he makes the same one again.
+ *
+ * A JUKE or SPIN is also judged on the ring of the tackler winding up at him (nfl-4, jukeWindow),
+ * at `at`: the player's touch time (shared-v2 touchTime), or now. PERFECT on gold: that tackler
+ * grabs at air and stumbles for STUMBLE seconds (`stumble:<id>`), and the runner keeps 90% of his
+ * speed. Early, good or late: as before, where the dive's own timing decides it (a cut made well
+ * before he leaves his feet is the slow, easily read one it always was).
  */
-export function moveWithBall(p: Play, kind: Move, dir = 0) {
+export function moveWithBall(p: Play, kind: Move, dir = 0, at = p.t) {
   const c = p.carrier;
   if (!c || p.phase !== 'run' || p.t < p.moveReady || p.covered || p.down) return;
   const near = p.bodies.filter((b) => b.side === 'D').sort((a, b) => dist(a, c) - dist(b, c))[0];
   const away = near ? Math.sign(c.x - near.x) || 1 : 1;
   const eff = (0.35 + 0.65 * p.stamina) * Math.pow(REPEAT, p.used[kind] ?? 0);
+  // the ring it's judged on: the tackler whose commit is nearest the touch
+  let ring: { d: Body; w: RingWindow } | null = null;
+  if (kind === 'juke' || kind === 'spin')
+    for (const d of p.bodies) {
+      const w = d.side === 'D' ? jukeWindow(p, d) : null;
+      if (w && Math.abs(at - w.center) < 0.6 && (!ring || Math.abs(at - w.center) < Math.abs(at - ring.w.center))) ring = { d, w };
+    }
   p.used[kind] = (p.used[kind] ?? 0) + 1;
   p.stamina = Math.max(0, p.stamina - DRAIN[kind]);
   p.move = { kind, at: p.t, until: p.t + (kind === 'juke' ? 0.32 : kind === 'spin' ? 0.42 : 0.5), dir: dir || away, eff, x: c.x, y: c.y, vx: c.vx, vy: c.vy };
   p.moveReady = p.t + (kind === 'juke' ? 1 : 1.3);
   act(c, kind === 'juke' ? 'juke' : kind === 'spin' ? 'spin' : kind === 'stiff' ? 'stiff' : 'truck', p.t);
   p.events.push('move:' + kind);
+  if (ring && (kind === 'juke' || kind === 'spin')) {
+    const j = judge(at, ring.w);
+    if (ring.w.state === 'gold' && !ring.d.ringSeen) {
+      ring.d.ringSeen = true;
+      offered(p, 'move');
+    }
+    p.ring = { kind, judge: j, state: ring.w.state, dial: j === 'perfect' ? null : ring.w.state === 'gold' ? 'TIMING' : 'PRESSURE' };
+    p.events.push('ring:' + kind + ':' + j + ':' + ring.w.state);
+    if (j === 'perfect') {
+      // he grabs at air: off his feet and on the turf, out of this play for a moment
+      const d = ring.d;
+      d.windAt = Infinity;
+      d.dive = null;
+      d.ringAt = undefined;
+      d.stunUntil = p.t + STUMBLE;
+      d.vx *= 0.4;
+      d.vy *= 0.4;
+      act(d, 'down', p.t);
+      p.move.perfect = true;
+      perfect(p, c, kind);
+      p.events.push('stumble:' + d.id);
+    }
+  }
 }
 
 /** The quarterback tucks it and runs (no throwing after): everyone on defense comes for him. */
@@ -783,7 +1021,7 @@ function endPlay(p: Play, kind: PlayEnd['kind'], at: Pt, text: string, flag?: Fl
     text = 'TOUCHDOWN';
   }
   const y = kind === 'td' ? 100 : at.y;
-  p.end = { kind, x: at.x, y, gain: Math.round((y - p.los) * 10) / 10, text, caught: !!p.catcher && kind !== 'int', secs: p.t };
+  p.end = { kind, x: at.x, y, gain: Math.round((y - p.los) * 10) / 10, text, caught: !!p.catcher && kind !== 'int', secs: p.t, perfects: p.pf?.slice() ?? [], chances: p.chances ?? 0 };
   const f = flag ?? flagFor(p, kind);
   if (f) {
     p.end.flag = f;
@@ -888,11 +1126,12 @@ export function step(p: Play, dt: number, steer: RunInput) {
       const landmark = stretching ? { x: p.hole, y: p.los - 0.1 } : null;
       const aim = typeof steer === 'number' ? steer : followingRun ? p.hole : null;
       if (m?.kind === 'juke') {
-        b.vx = m.dir * sp * (0.8 + 0.35 * m.eff);
-        b.vy = sp * 0.45;
+        // (a PERFECT cut keeps 90% of his speed: three quarters of it across, half of it on upfield)
+        b.vx = m.dir * sp * (m.perfect ? 0.75 : 0.8 + 0.35 * m.eff);
+        b.vy = sp * (m.perfect ? 0.5 : 0.45);
       } else if (m?.kind === 'spin') {
         b.vx *= 0.9;
-        b.vy = sp * 0.6;
+        b.vy = sp * (m.perfect ? 0.88 : 0.6);
       } else if (manual) {
         const divisor = Math.max(1, magnitude);
         const wantX = strength ? (steer.x / divisor) * sp : 0,
@@ -1125,6 +1364,7 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
     if (held) {
       // locked up with a blocker (a wind-up he'd started is off): on a run the line drives him off
       // the ball and away from the hole; otherwise he fights to get off it toward the ball
+      if (b.windAt !== Infinity) b.ringAt = undefined;
       b.windAt = Infinity;
       if (p.call === 'run' && b.job === 'rush') steerTo(b, b.x + (Math.sign(b.x - p.hole) || 1) * 1.2, b.y + 0.3, 1.3, dt);
       else steerTo(b, carrier.x, carrier.y, sp, dt);
@@ -1176,12 +1416,21 @@ function defense(p: Play, b: Body, dt: number, seen: (b: Body, by: Body) => Pt, 
       // close and closing: he gathers to dive (the runner can see it)
       if (rel < WIND_R && closing > 1.5 && t > b.stunUntil) {
         b.windAt = t;
+        // the ring (nfl-4): its window is centred on the moment he commits
+        b.ringAt = t + windupOf(b);
+        b.ringSeen = false;
         act(b, 'windup', t);
       } else act(b, 'run', t);
     } else if (rel > WIND_R + 2.5) {
       b.windAt = Infinity;
+      b.ringAt = undefined;
       act(b, 'run', t);
     } else if (t >= b.windAt + windupOf(b)) {
+      // a gold ring the carrier had on offer, whether or not he took it
+      if (!b.ringSeen && moveReady(p)) {
+        b.ringSeen = true;
+        offered(p, 'move');
+      }
       // he dives at where the runner's going; fooled by a juke that's just begun, at where he was going
       b.windAt = Infinity;
       const m = p.move && p.move.kind === 'juke' && t - p.move.at < FAKE ? p.move : null;
@@ -1409,7 +1658,8 @@ export function moveEdge(kind: Move, c: Body, d: Body): number {
  * arm/jump reach. High lobs clear underneath defenders; each player attempts once per pass. */
 function playPassingLane(p: Play, dt: number) {
   const ball = p.ball!;
-  if (ball.away) return;
+  // (a PERFECT sling is a catchable ball in stride: nobody gets a hand on it on the way)
+  if (ball.away || ball.sure !== undefined) return;
   const k = clamp((p.t - ball.t0) / (ball.t1 - ball.t0), 0, 1);
   if (k < 0.12 || k > 0.92) return; // catch-point battles are resolved by arrive()
   const at = ballNow(p)!;
@@ -1453,7 +1703,9 @@ function arrive(p: Play) {
     endPlay(p, 'incomplete', at, 'INCOMPLETE');
     return;
   }
-  const off = p.bodies.filter((b) => b.side === 'O' && b !== p.qb && !isLine(b)).sort((a, b) => dist(a, at) - dist(b, at))[0];
+  // a PERFECT sling's ball is his (gold is offered only when he's getting there in stride)
+  const sure = ball.sure !== undefined ? p.bodies[ball.sure] : undefined;
+  const off = sure ?? p.bodies.filter((b) => b.side === 'O' && b !== p.qb && !isLine(b)).sort((a, b) => dist(a, at) - dist(b, at))[0];
   const def = p.bodies.filter((b) => b.side === 'D' && p.t >= b.stunUntil).sort((a, b) => dist(a, at) - dist(b, at))[0];
   const ro = off ? dist(off, at) : 99;
   const rd = def ? dist(def, at) : 99;
@@ -1462,7 +1714,7 @@ function arrive(p: Play) {
   const high = ball.type === 'lob' || ball.peak > 2.6;
   const reach = 1.2 + 0.45 * hands + (off ? (off.p.ht - 72) * 0.03 : 0) + (off && high ? 0.35 * rt(off.p.a.SPC, 45, 99) : 0);
   const dReach = 0.95 + 0.25 * rt(def?.p.a.CTH ?? def?.p.a.MCV, 40, 99);
-  if (off && ro <= reach) {
+  if (off && (ro <= reach || sure)) {
     // reaching for it costs more the further it is from him
     let pc = 0.78 + 0.19 * hands - clamp((ro - 0.7) * 0.22, 0, 0.3);
     let pi = 0;
@@ -1484,13 +1736,18 @@ function arrive(p: Play) {
       const hawk = on(def, 'ballhawk') ? 0.15 : 0;
       pi = (rd < ro - 0.2 ? 0.05 + 0.15 * rt(def.p.a.CTH, 40, 99) : 0.01 + 0.03 * rt(def.p.a.CTH, 40, 99)) + hawk * (rd < ro ? 1 : 0.3);
     }
+    if (sure) {
+      // in stride: no drop, no pick
+      pc = 1;
+      pi = 0;
+    }
     const roll = r();
     if (roll < pi) {
       if (def && on(def, 'ballhawk')) used(p, def, 'ballhawk');
       endPlay(p, 'int', at, 'PICKED OFF BY ' + (def?.p.tag ?? ''));
       return;
     }
-    if (roll < pi + clamp(pc, 0.08, 0.97 - pi)) {
+    if (roll < pi + (sure ? 1 : clamp(pc, 0.08, 0.97 - pi))) {
       p.carrier = off;
       p.carrierAt = p.t;
       off.job = 'carry';

@@ -207,18 +207,28 @@ export function ballShadow(ctx: CanvasRenderingContext2D, L: Lens, at: Pt, h: nu
   ctx.globalAlpha = a0;
 }
 
+/** nfl-4: the gold rings' size on screen (css px; the canvas is drawn 1:1): the sling's round the
+ * landing spot, the JUKE/SPIN ring round a tackler, and their stroke. With the dial's sweep this
+ * keeps every gold segment 8 px or more (shared-v2 goldArcPx; ring.test.ts). */
+export const SLING_RING_R = 24;
+export const JUKE_RING_R = 22;
+export const RING_LW = 3;
+
 /** The ball in the air: its shadow ring on the turf, a three-dot trail behind it, the ball. */
-export function airBall(ctx: CanvasRenderingContext2D, L: Lens, p: Play, art: number, reduced: boolean) {
+export function airBall(ctx: CanvasRenderingContext2D, L: Lens, p: Play, art: number, reduced: boolean, heat: 'heating' | 'fire' | null = null) {
   const now = ballAt(p, p.t);
   if (!now) return;
   ballShadow(ctx, L, now, now.h);
   if (!reduced) {
-    for (let i = 3; i >= 1; i--) {
+    // the trail: pale, longer and hot orange once the offense is HEATING UP or ON FIRE (nfl-4)
+    const n = heat ? 5 : 3;
+    const ink = heat === 'fire' ? '255,120,40' : heat ? '255,176,72' : '255,240,214';
+    for (let i = n; i >= 1; i--) {
       const q = ballAt(p, p.t - i * 0.045);
       if (!q || p.t - i * 0.045 < p.ball!.t0) continue;
       const a = L.at(q.x, q.y, q.h);
       const d = Math.max(2, Math.round(a.s * art * 0.14));
-      ctx.fillStyle = 'rgba(255,240,214,' + (0.5 - i * 0.13).toFixed(2) + ')';
+      ctx.fillStyle = 'rgba(' + ink + ',' + Math.max(0.08, 0.5 - i * (0.39 / n)).toFixed(2) + ')';
       ctx.fillRect(Math.round(a.x - d / 2), Math.round(a.y - d / 2), d, d);
     }
   }

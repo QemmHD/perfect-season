@@ -2,7 +2,7 @@
 // tests. It reads who's open and throws him the ball in stride, picks the lane with room on a run,
 // uses the runner's best move against a tackler, kicks in range and punts when it must.
 import { hashString, rng } from '../../engine/rng';
-import { BOX_HALF, DROP_TIME, dist, FIELD_W, flightTime, isLine, maxThrow, moveEdge, moveWithBall, outsideBox, projectRoute, rt, sight, snap, step, throwAway, throwTo, windupOf } from './engine';
+import { BOX_HALF, DROP_TIME, dist, FIELD_W, flightTime, isLine, maxThrow, moveEdge, moveReady, moveWithBall, outsideBox, projectRoute, rt, separation, sight, snap, step, throwAway, throwTo, windupOf } from './engine';
 import { afterPlay, fgDistance, fgInRange, type Game, kick, kickWindow, punt, startPlay } from './drive';
 import type { Body, Move, Play, Pt } from './types';
 
@@ -23,6 +23,17 @@ export interface Pilot {
   /** nfl-2: a person in the pocket, who can only throw it away outside the tackle box (the human
    * proxy with `pocket`); the AI keeps its old sideline throw, so its drives are unchanged */
   legalOnly?: boolean;
+  /**
+   * nfl-4, the calibration kit's human proxy only (the AI never sets these, so its drives are
+   * unchanged): `throwAt` takes the pass he's chosen (the man, where a throw now would meet him, and
+   * the spot he'd aim at) and slings it on the ring in its own time; `ringSigma` (s) is how far his
+   * JUKE or SPIN lands from a tackler's commit, a person's timing spread, judged at that instant
+   * rather than at the next step.
+   */
+  throwAt?: (p: Play, b: Body, lead: Pt, spot: Pt) => boolean;
+  ringSigma?: number;
+  /** how often he goes for a gold JUKE/SPIN ring he's shown (0-1); unset, the AI's old reaction */
+  ringTry?: number;
 }
 
 export function pilot(skill: number, seed: string): Pilot {
@@ -58,12 +69,8 @@ function lead(p: Play, b: Body): { at: Pt; open: number } {
   at.x = Math.max(1, Math.min(FIELD_W - 1, at.x));
   // the back of the end zone is the end of the field
   at.y = Math.min(at.y, 109);
-  let open = 99;
-  for (const d of p.bodies) {
-    if (d.side !== 'D' || d.job === 'rush') continue;
-    open = Math.min(open, dist(d, b), dist(d, at) + 0.5);
-  }
-  return { at, open };
+  // (how open he is: the same value as the halo on his chip, engine.ts separation)
+  return { at, open: separation(p, b, at) };
 }
 
 /** One step of decisions. Returns where the runner steers, if anyone's running. */
@@ -120,7 +127,8 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
       const across = gauss(pl.rand) * ((1 - pl.skill) * 1.0 + hidden * 0.03);
       const ux = (choice.at.x - p.qb.x) / len;
       const uy = (choice.at.y - p.qb.y) / len;
-      throwTo(p, { x: choice.at.x + ux * along - uy * across, y: choice.at.y + uy * along + ux * across });
+      const spot = { x: choice.at.x + ux * along - uy * across, y: choice.at.y + uy * along + ux * across };
+      if (!pl.throwAt || !pl.throwAt(p, choice.b, choice.at, spot)) throwTo(p, spot);
       pl.readAt = 0;
     } else if (hurried) {
       // nobody's open and he's about to be hit: throw it away (a person only can from outside the
@@ -155,24 +163,38 @@ export function decide(p: Play, g: Game, pl: Pilot): number | null {
     // a tackler winding up to dive: once, he sizes him up and times a move against the dive (a
     // juke or a spin as he leaves his feet; a stiff arm or a truck for the man who's better at those,
     // at contact). A sharper pilot is closer to the moment.
-    const w = ahead.find((d) => d.windAt < Infinity && !pl.seen.has(d.id));
+    // (a person on the rings sizes up each wind-up, a tackler who winds up again included; the AI
+    // each man once a play)
+    const key = (d: Body) => (pl.ringTry !== undefined ? d.id * 4096 + Math.round((d.ringAt ?? 0) * 60) : d.id);
+    // (a person busy with one ring finishes it before he looks at the next, and sizes one up once
+    // it turns gold: while his last move is still on, its ring is amber and he keeps running)
+    // (and sees the ring on any tackler closing on him, a pursuer from behind included; the AI
+    // watches the men in front)
+    const look = pl.ringTry === undefined || (!pl.plan && moveReady(p));
+    const near = pl.ringTry === undefined ? ahead : p.bodies.filter((b) => b.side === 'D' && p.t >= b.stunUntil && dist(b, c) < 9);
+    const w = look ? near.find((d) => d.windAt < Infinity && !pl.seen.has(key(d))) : undefined;
     if (w) {
-      pl.seen.add(w.id);
-      if (pl.rand() < 0.3 + 0.5 * pl.skill) {
+      pl.seen.add(key(w));
+      // a person goes for a gold ring this often, with his better ring move (JUKE or SPIN)
+      const onRing = pl.ringTry !== undefined && pl.rand() < pl.ringTry;
+      if (onRing || (pl.ringTry === undefined && pl.rand() < 0.3 + 0.5 * pl.skill)) {
         // the move that beats this man: its edge against him plus what timing it right is worth
         // (a juke against the dive the most, a spin, then a stiff arm or a truck at contact)
         const timing: Record<Move, number> = { juke: 0.32, spin: 0.2, stiff: 0.18, truck: 0.18 };
-        const moves = (['juke', 'spin', 'stiff', 'truck'] as Move[]).map((k) => [k, moveEdge(k, c, w) + timing[k] * (0.4 + 0.5 * pl.skill)] as [Move, number]);
+        const moves = ((onRing ? ['juke', 'spin'] : ['juke', 'spin', 'stiff', 'truck']) as Move[]).map((k) => [k, moveEdge(k, c, w) + timing[k] * (0.4 + 0.5 * pl.skill)] as [Move, number]);
         moves.sort((x, y) => y[1] - x[1]);
         const kind = moves[0][0];
         // a juke just before he leaves his feet; a stiff arm or a truck as he leaves them, so it's
         // still on when he arrives (it lasts half a second; 0.15 s after the dive was often too late)
         const due = w.windAt + windupOf(w) + (kind === 'stiff' || kind === 'truck' ? -0.02 : -0.08);
-        pl.plan = { at: due + gauss(pl.rand) * (0.26 - 0.2 * pl.skill), kind, dir: Math.sign(c.x - w.x) || Math.sign(best - c.x) || 1 };
+        // (a person on the ring: a JUKE or SPIN aimed at the commit itself, spread by his timing)
+        const ring = pl.ringSigma !== undefined && (kind === 'juke' || kind === 'spin');
+        pl.plan = { at: ring ? w.windAt + windupOf(w) + gauss(pl.rand) * pl.ringSigma! : due + gauss(pl.rand) * (0.26 - 0.2 * pl.skill), kind, dir: Math.sign(c.x - w.x) || Math.sign(best - c.x) || 1 };
       }
     }
     if (pl.plan && p.t >= pl.plan.at) {
-      moveWithBall(p, pl.plan.kind, pl.plan.dir);
+      // (the human proxy's touch is judged at its own instant; the AI's at the step)
+      moveWithBall(p, pl.plan.kind, pl.plan.dir, pl.ringSigma !== undefined ? pl.plan.at : p.t);
       pl.plan = null;
     }
     return best;

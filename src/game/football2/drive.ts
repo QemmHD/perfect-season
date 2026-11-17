@@ -4,8 +4,16 @@
 // each play and between plays that end in bounds; incompletions and out of bounds stop it. When it
 // hits zero there's one last kick in range, or the drive's over. Only your own points count; the other side plays its drives on
 // its own phone (or the autopilot plays the AI's).
+//
+// Heat (Claude, studio overhaul nfl-4; V2 §B.0.2, contract C18) is the game's own integer state: a
+// PERFECT moment +12, a touchdown +25, a stop or takeaway by your defense +15, a clean first down +5, a
+// turnover -20, points conceded -10 (solo). HEATING UP at 66; ON FIRE at 100 for your next 3 snaps
+// (4 with a Heat Check card), when every gold window is 1.25x wide and an uncontested amber sling
+// is gold. The bar empties after drive 2. It replaced the quarterback's three-completion On Fire.
 import { hashString, rng } from '../../engine/rng';
 import { CONCEPTS, lineUp, rt } from './engine';
+import { addHeat, COLD, FIRE_UNITS, type Heat, type HeatEv, spendFire } from './shared-v2';
+import type { MatchGrade } from '../progress';
 import type { Call, Concept, Defense, Flag, Offense, Play, PlayEnd, RunPlay } from './types';
 
 export const DRIVES = 4;
@@ -39,19 +47,96 @@ export interface Game {
   run: RunPlay;
   /** plays run, for the activity the rival's phone sees */
   plays: number;
-  /** completions in a row, and whether that has the quarterback On Fire */
-  streak: number;
-  fire: boolean;
+  /** Heat (nfl-4): the bar, On Fire snaps left, the match's best and how often it lit */
+  heat: Heat;
+  /** this set of downs has had a sack (its first down isn't clean) */
+  seriesSacked: boolean;
+  /** the match grade's counts (nfl-4, C22): PERFECT moments, gold rings offered, turnovers; and
+   * each player's PERFECT moments (FbPlayer id), for the box score's `pf` (nfl-9) */
+  perfects: number;
+  chances: number;
+  turnovers: number;
+  pf: Record<string, number>;
   /** the two-minute clock on the last drive (seconds left; null before it) */
   clock: number | null;
 }
 
-/** completions in a row that put the quarterback On Fire */
-export const FIRE_AT = 3;
-/** a Heat Check card in the offense gets the quarterback hot a completion sooner */
-export function fireAtFor(g: Game): number {
+/** ON FIRE's snaps: three, and four with a Heat Check card in the offense (it used to light the
+ * old On Fire a completion sooner) */
+export function fireSnapsFor(g: Pick<Game, 'off'>): number {
   const o = g.off;
-  return [o.qb, o.rb, o.te, ...o.wr].some((x) => x.abil.includes('heat-check')) ? FIRE_AT - 1 : FIRE_AT;
+  return FIRE_UNITS.nfl + ([o.qb, o.rb, o.te, ...o.wr].some((x) => x.abil.includes('heat-check')) ? 1 : 0);
+}
+
+/** The offense is ON FIRE for its next snap. */
+export const onFire = (g: Pick<Game, 'heat'>): boolean => g.heat.fire > 0;
+
+/** What a Heat event did: crossed 66 (HEATING UP), lit ON FIRE, or put it out. */
+export interface HeatNews {
+  heating: boolean;
+  lit: boolean;
+  out: boolean;
+}
+const NO_NEWS: HeatNews = { heating: false, lit: false, out: false };
+
+/** One Heat event on the game (pure arithmetic on its integer state); what it did is added to `news`. */
+export function heatEvent(g: Game, ev: HeatEv, news: HeatNews = { ...NO_NEWS }): HeatNews {
+  const was = g.heat.fire > 0;
+  const r = addHeat(g.heat, ev, 'nfl', fireSnapsFor(g));
+  g.heat = r.h;
+  news.heating = news.heating || r.heating;
+  news.lit = news.lit || r.lit;
+  news.out = news.out || (was && r.h.fire === 0);
+  return news;
+}
+
+/** The rival's drive ends your defense earns Heat for: a takeaway, a stop (a punt, a turnover on
+ * downs, a missed kick) or a safety. A drive the clock ran out on is neither. */
+const STOPS = new Set(['INT', 'FUM', 'PUNT', 'DOWNS', 'MISS', 'SAF']);
+const CONCEDED = new Set(['TD', 'FG', 'TD6', 'TD8']);
+
+/** An end of the rival's drive, as your game hears it (solo only; online Heat is your offense's
+ * alone, as the rival's timing is the network's): points conceded -10; a stop or a takeaway +15. */
+export function rivalDriveEnd(g: Game, end: string): HeatNews {
+  if (CONCEDED.has(end)) return heatEvent(g, 'conceded');
+  if (STOPS.has(end)) return heatEvent(g, 'stop');
+  return { ...NO_NEWS };
+}
+
+/**
+ * The rival's Heat bar, from their wire ends only (online and solo; display only): a touchdown +25,
+ * a turnover -20, emptied after their drive 2. Their On Fire shows until their next drive ends.
+ */
+export function heatFromEnds(ends: readonly string[]): Heat {
+  let h = COLD;
+  for (let i = 0; i < ends.length; i++) {
+    const e = ends[i];
+    const wasFire = h.fire > 0;
+    if (e === 'TD' || e === 'TD6' || e === 'TD8') h = addHeat(h, 'score', 'nfl', 1).h;
+    else if (e === 'INT' || e === 'FUM') h = addHeat(h, 'turnover', 'nfl', 1).h;
+    if (wasFire && h.fire > 0) h = spendFire(h);
+    if (i === 1) h = addHeat(h, 'half', 'nfl').h;
+  }
+  return h;
+}
+
+/**
+ * The match grade (C22): your points a drive against par for the difficulty. PAR is provisional
+ * (the human proxy's points a drive at nfl-1's baseline, a little under: Rookie 4.28, Pro 3.66,
+ * Legend 2.20); nfl-10 fits it.
+ */
+export const PAR = { rookie: 4.0, pro: 3.4, legend: 2.1 } as const;
+export type GradeLevel = keyof typeof PAR;
+/** The par level for a defense's difficulty (defIQ: Rookie -0.5, Pro 0, Legend 1). */
+export const gradeLevel = (defIQ: number): GradeLevel => (defIQ <= -0.25 ? 'rookie' : defIQ < 0.5 ? 'pro' : 'legend');
+export function gradeLetter(ppd: number, par: number): 'S' | 'A' | 'B' | 'C' {
+  return ppd >= par + 1.5 ? 'S' : ppd >= par + 0.5 ? 'A' : ppd >= par - 0.5 ? 'B' : 'C';
+}
+
+/** A finished game's grade (flawless is settled with the rival's score: progress.ts gradeResult). */
+export function gradeOf(g: Game, level: GradeLevel, won = false): MatchGrade {
+  const ppd = g.score / Math.max(1, g.ends.length);
+  return { letter: gradeLetter(ppd, PAR[level]), perfects: g.perfects, chances: g.chances, heatBest: g.heat.best, lit: g.heat.lit, flawless: won && g.turnovers === 0, turnovers: g.turnovers };
 }
 
 /** Icon cards on the last drive (the clutch): every attribute +3 (finite above 99). */
@@ -92,7 +177,33 @@ export function startSpot(g: Pick<Game, 'seed' | 'off' | 'def'>, drive: number):
 }
 
 export function newGame(off: Offense, def: Defense, seed: string, drives = DRIVES, defIQ = 0): Game {
-  const g: Game = { off, def, seed, drives, drive: 0, playNo: 0, down: 1, toGo: 10, ballOn: START, ballX: 26.67, score: 0, ends: [], over: false, concept: 'slants', conceptNo: 0, run: 'inside', plays: 0, streak: 0, fire: false, clock: drives <= 1 ? CLOCK : null, defIQ };
+  const g: Game = {
+    off,
+    def,
+    seed,
+    drives,
+    drive: 0,
+    playNo: 0,
+    down: 1,
+    toGo: 10,
+    ballOn: START,
+    ballX: 26.67,
+    score: 0,
+    ends: [],
+    over: false,
+    concept: 'slants',
+    conceptNo: 0,
+    run: 'inside',
+    plays: 0,
+    heat: COLD,
+    seriesSacked: false,
+    perfects: 0,
+    chances: 0,
+    turnovers: 0,
+    pf: {},
+    clock: drives <= 1 ? CLOCK : null,
+    defIQ
+  };
   g.ballOn = startSpot(g, 0);
   g.concept = conceptFor(g, 0);
   g.run = runFor(g);
@@ -147,7 +258,7 @@ export function startPlay(g: Game, call: Call): Play {
   const last = g.drive === g.drives - 1;
   const sides = last ? clutchSides(g.off, g.def) : { off: g.off, def: g.def };
   const p = lineUp(sides.off, sides.def, call, g.concept, g.run, g.ballOn, g.ballX, r, g.defIQ);
-  p.fire = g.fire;
+  p.fire = onFire(g);
   return p;
 }
 
@@ -179,17 +290,26 @@ export interface After {
   points: number;
   driveOver: DriveEnd | null;
   fourth: boolean;
-  /** the quarterback just caught fire, or the fire just went out */
+  /** Heat (nfl-4): the offense just went ON FIRE, or the fire just went out */
   fire: 'lit' | 'out' | null;
+  /** the bar just crossed HEATING UP (66) */
+  heating?: boolean;
   /** the clock ran out with the ball in field goal range: one last kick */
   timeUp: boolean;
   /** an accepted flag (the play didn't count, or it was enforced instead) */
   flag?: Flag;
 }
 
-function endDrive(g: Game, e: DriveEnd) {
+function endDrive(g: Game, e: DriveEnd, news?: HeatNews) {
   g.ends.push(e);
   g.drive++;
+  g.seriesSacked = false;
+  // the bar empties after drive 2 (V2's "each half"), On Fire with it
+  if (g.drive === 2 && g.drives > 2) {
+    const was = g.heat.fire > 0;
+    g.heat = addHeat(g.heat, 'half', 'nfl').h;
+    if (news && was) news.out = true;
+  }
   g.down = 1;
   g.toGo = 10;
   g.ballOn = startSpot(g, g.drive);
@@ -272,19 +392,32 @@ function flagged(g: Game, end: PlayEnd): After | null {
   return { text, firstDown: e.first, points: 0, driveOver: null, fourth: !e.first && g.down === 4, fire: null, timeUp: false, flag: f };
 }
 
+/** What the Heat news says for After. */
+const fireOf = (n: HeatNews): After['fire'] => (n.lit ? 'lit' : n.out ? 'out' : null);
+
 function settle(g: Game, end: PlayEnd): After {
-  const fl = flagged(g, end);
-  if (fl) return fl;
-  // On Fire: three completions in a row; an incompletion, a sack or a pick puts it out
-  const was = g.fire;
-  if (end.caught) {
-    g.streak++;
-    if (g.streak >= fireAtFor(g)) g.fire = true;
-  } else if (end.kind === 'incomplete' || end.kind === 'sack' || end.kind === 'int') {
-    g.streak = 0;
-    g.fire = false;
+  // Heat: a snap played On Fire uses one of its snaps; the play's PERFECT moments count (+12 each)
+  // whatever becomes of the play (a flag takes back the yards, not the moment)
+  const news: HeatNews = { ...NO_NEWS };
+  if (g.heat.fire > 0) {
+    g.heat = spendFire(g.heat);
+    if (g.heat.fire === 0) news.out = true;
   }
-  const fire = !was && g.fire ? 'lit' : was && !g.fire ? 'out' : null;
+  for (const id of end.perfects ?? []) {
+    g.perfects++;
+    g.pf[id] = (g.pf[id] ?? 0) + 1;
+    heatEvent(g, 'perfect', news);
+  }
+  g.chances += end.chances ?? 0;
+  const fl = flagged(g, end);
+  if (fl) return { ...fl, fire: fireOf(news), heating: news.heating };
+  const a = settlePlay(g, end, news);
+  return { ...a, fire: fireOf(news), heating: news.heating };
+}
+
+function settlePlay(g: Game, end: PlayEnd, news: HeatNews): After {
+  const fire = null;
+  if (end.kind === 'sack') g.seriesSacked = true;
   g.playNo++;
   g.plays++;
   g.conceptNo = 0;
@@ -292,15 +425,20 @@ function settle(g: Game, end: PlayEnd): After {
   g.run = runFor(g);
   if (end.kind === 'td') {
     g.score += 7;
-    endDrive(g, 'TD');
+    heatEvent(g, 'score', news);
+    endDrive(g, 'TD', news);
     return { text: 'TOUCHDOWN', firstDown: false, points: 7, driveOver: 'TD', fourth: false, fire, timeUp: false };
   }
   if (end.kind === 'int') {
-    endDrive(g, 'INT');
+    g.turnovers++;
+    heatEvent(g, 'turnover', news);
+    endDrive(g, 'INT', news);
     return { text: end.text, firstDown: false, points: 0, driveOver: 'INT', fourth: false, fire, timeUp: false };
   }
   if (end.kind === 'fumble') {
-    endDrive(g, 'FUM');
+    g.turnovers++;
+    heatEvent(g, 'turnover', news);
+    endDrive(g, 'FUM', news);
     return { text: end.text, firstDown: false, points: 0, driveOver: 'FUM', fourth: false, fire, timeUp: false };
   }
   // the line to gain is fixed before the snap; at or past the goal line it's goal to go (only a
@@ -309,7 +447,7 @@ function settle(g: Game, end: PlayEnd): After {
   const goalToGo = line >= 100;
   if (end.kind !== 'incomplete' && end.y <= 0) {
     // brought down in his own end zone: a safety ends the drive
-    endDrive(g, 'SAF');
+    endDrive(g, 'SAF', news);
     return { text: 'SAFETY', firstDown: false, points: 0, driveOver: 'SAF', fourth: false, fire, timeUp: false };
   }
   if (end.kind !== 'incomplete') {
@@ -319,11 +457,16 @@ function settle(g: Game, end: PlayEnd): After {
   if (!goalToGo && end.kind !== 'incomplete' && end.y >= line) {
     g.down = 1;
     g.toGo = Math.min(10, 100 - g.ballOn);
+    // a clean first down: a set of downs moved on with no sack and no flag (a flagged play never
+    // reaches here). C18's NFL reading of V2's "a clean possession", per series, as a drive is
+    // several possessions' worth of plays; nfl-10 fits it
+    if (!g.seriesSacked) heatEvent(g, 'clean', news);
+    g.seriesSacked = false;
     return { text: 'FIRST DOWN', firstDown: true, points: 0, driveOver: null, fourth: false, fire, timeUp: false };
   }
   g.toGo = goalToGo ? 100 - g.ballOn : Math.max(0.3, line - g.ballOn);
   if (g.down === 4) {
-    endDrive(g, 'DOWNS');
+    endDrive(g, 'DOWNS', news);
     return { text: 'TURNOVER ON DOWNS', firstDown: false, points: 0, driveOver: 'DOWNS', fourth: false, fire, timeUp: false };
   }
   g.down++;

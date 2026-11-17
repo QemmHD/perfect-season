@@ -96,6 +96,10 @@ export interface Body {
   on?: string[];
   /** a man defender beaten on a route break: reacting late and slower until then */
   brokenUntil?: number;
+  /** nfl-4: the moment a tackler's wind-up commits him to his dive (the middle of the JUKE/SPIN
+   * ring's window), kept through the dive; and whether that ring has been counted as a chance */
+  ringAt?: number;
+  ringSeen?: boolean;
 }
 
 export type Call = 'pass' | 'run';
@@ -114,6 +118,9 @@ export interface Ball {
   tried?: number[];
   /** thrown away out of bounds (nfl-2): nobody plays it, and it's never intercepted */
   away?: boolean;
+  /** nfl-4: a PERFECT sling on a gold ring: this receiver (a body id) catches it in stride, with no
+   * play on it in the lane, no drop and no interception ("gold never lies") */
+  sure?: number;
 }
 
 export type EndKind = 'tackle' | 'incomplete' | 'td' | 'int' | 'sack' | 'out' | 'fumble';
@@ -145,6 +152,20 @@ export interface PlayEnd {
   caught: boolean;
   /** how long the play ran (seconds, for the two-minute clock) */
   secs: number;
+  /** nfl-4: the players (FbPlayer ids) who made a PERFECT moment on the play, one entry each, and
+   * the gold rings the offense was offered on it (Heat and the match grade count them) */
+  perfects?: string[];
+  chances?: number;
+}
+
+/** nfl-4: the dial a ring's toast names when it isn't a PERFECT (V2 §B.0.1). */
+export type Dial = 'TIMING' | 'PRESSURE' | 'RANGE';
+/** nfl-4: the last ring judged on a play: what it was for, how it was judged, and its state. */
+export interface RingNote {
+  kind: 'sling' | 'juke' | 'spin';
+  judge: 'perfect' | 'good' | 'early' | 'late';
+  state: 'gold' | 'amber' | 'red';
+  dial: Dial | null;
 }
 
 export interface Play {
@@ -165,7 +186,7 @@ export interface Play {
   rand: () => number;
   /** a move under way (juke, spin, stiff arm, truck): when it started, how well it works (by the
    * runner's stamina and how often he's used it), where he was and how he was heading as it began */
-  move: { kind: Move; at: number; until: number; dir: number; eff: number; x: number; y: number; vx: number; vy: number } | null;
+  move: { kind: Move; at: number; until: number; dir: number; eff: number; x: number; y: number; vx: number; vy: number; perfect?: boolean } | null;
   moveReady: number;
   /** the runner's stamina (0-1): moves drain it, it comes back as he runs */
   stamina: number;
@@ -194,8 +215,14 @@ export interface Play {
   carrierAt?: number;
   /** where the throw lands (the slingshot's aim), for the HUD */
   aim: Pt | null;
-  /** the quarterback is On Fire: he sees the whole arc and throws it quicker */
+  /** the offense is ON FIRE (Heat, nfl-4): every gold window is 1.25x wide and an uncontested amber
+   * sling is gold; the ball burns. (It used to be three completions in a row, and let the
+   * quarterback see the whole arc and throw quicker; Heat's wider gold replaces that.) */
   fire: boolean;
+  /** nfl-4: PERFECT moments this play (FbPlayer ids), gold rings offered, and the last ring judged */
+  pf?: string[];
+  chances?: number;
+  ring?: RingNote;
   /** ability pops already reported this play */
   fired?: string[];
   /** the coverage defender who blew his assignment this play (a seeded roll at the snap), if any */
