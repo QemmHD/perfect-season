@@ -3,7 +3,7 @@
 // host aborted, serialized fixture players); it never taps anything that spends or saves remotely.
 //
 //   node scripts/qa/frames.mjs [--mounts draft,ut,training,moment] [--sports nba,nfl,soccer]
-//        [--runs 5] [--draft-runs 2] [--cpu 1,4] [--curtain on|off] [--motion reduce|no-preference]
+//        [--runs 5] [--draft-runs 2] [--cpu 1,4] [--curtain on|off|ab] [--motion reduce|no-preference]
 //        [--label after] [--part arena|skeleton]
 //
 // arena: a CDP screencast (every frame Chromium paints, with its timestamp) from the tap to 1.2 s after
@@ -25,8 +25,10 @@
 //   engines draw only once their clock runs) and the engine-tick proxy at lift: the engines step
 //   floor(Σ min(0.1 s, frame dt) / (1/60 s)) — the same sum each engine's loop makes — counted from the
 //   arena's first drawn frame to the lift, and over the first second after that frame (ticksFirstSecond:
-//   equal with and without the curtain means it never held the engine back). `--curtain off` (dev server only) runs the same app without the curtain:
-//   the before, and the tick comparison.
+//   equal with and without the curtain means it never held the engine back).
+//   `--curtain off` (dev server only) runs the same app without the curtain: the before, and the tick
+//   comparison. `--curtain ab` alternates off and on run by run in one session, so the before and
+//   the after share the machine's load (use an even --runs).
 // skeleton: the UT tap at --cpu, rAF-logged: the first frame with UT's chrome, whether any frame between
 //   the tap and it is blank, the header and tab bar rects from skeleton to ready (shift), and the
 //   progress label's update gaps.
@@ -48,9 +50,10 @@ const sports = opt('sports', 'nba,nfl,soccer').split(',');
 const runs = +opt('runs', 5);
 const draftRuns = +opt('draft-runs', 2);
 const cpus = opt('cpu', '1,4').split(',').map(Number);
-const curtainOff = opt('curtain', 'on') === 'off';
+const curtainMode = opt('curtain', 'on');
+const curtainOff = curtainMode === 'off';
 const motion = opt('motion', 'reduce');
-const label = opt('label', curtainOff ? 'off' : 'on');
+const label = opt('label', curtainMode);
 const OUT = path.join(process.env.PS_QA_SHOTS || path.join(artifacts, 'shots'), 'shell-6', 'frames');
 fs.mkdirSync(OUT, { recursive: true });
 const ctxOpts = { isMobile: true, hasTouch: true };
@@ -309,6 +312,9 @@ async function measure(browser, f, sport, tapLoc, name) {
     framesPainted: after.length,
     tapToArenaMs: r1(arena0 - tapT),
     tapToGameMs: firstGame ? firstGame.t : null,
+    // the engine's first drawn frame, page time (the same probe with and without the curtain: equal
+    // means the curtain did not slow the engine's start; the rest of tap → game is the curtain's wait)
+    tapToDrawnMs: drawnT === null ? null : r1(drawnT - tapT),
     emptyFrames: empties.length,
     emptyMs: Math.round(emptyMs),
     emptyAfterGame: emptyAfter.length,
@@ -329,13 +335,13 @@ async function measure(browser, f, sport, tapLoc, name) {
   };
 }
 
-async function arenaRun(browser, sport, mount, cpu, runIdx) {
+async function arenaRun(browser, sport, mount, cpu, runIdx, off = curtainOff) {
   const f = await fixture(browser, sport, 'Shell QA', 393, ctxOpts, opts);
-  await f.context.addInitScript(recorder, { off: curtainOff });
+  await f.context.addInitScript(recorder, { off });
   const u = new URL(base);
   u.search = new URLSearchParams({ sport, ns: 'inspect', relay: 'ws://localhost:7777' });
   await f.page.goto(u.href, { waitUntil: 'domcontentloaded' });
-  const out = { sport, mount, cpu, run: runIdx, curtain: curtainOff ? 'off' : 'on', matches: [] };
+  const out = { sport, mount, cpu, run: runIdx, curtain: off ? 'off' : 'on', matches: [] };
   const cdp = await f.context.newCDPSession(f.page);
   try {
     await waitForHome(f.page);
@@ -345,7 +351,7 @@ async function arenaRun(browser, sport, mount, cpu, runIdx) {
       const tap = await get(f.page);
       await tap.waitFor({ timeout: 120000 });
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
-      const r = await measure(browser, f, sport, tap, `${label}-${sport}-${mount}-${cpu}x-r${runIdx}-m${m + 1}`);
+      const r = await measure(browser, f, sport, tap, `${label}-${off ? 'off' : 'on'}-${sport}-${mount}-${cpu}x-r${runIdx}-m${m + 1}`);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       out.matches.push({ match: m + 1, ...r });
       if (twice && m === 0) {
@@ -432,7 +438,7 @@ async function skeletonRun(browser, sport, cpu) {
 const browser = await launch();
 const cal = await calibrate(browser);
 const threshold = cal.threshold;
-const report = { at: new Date().toISOString(), base, part, label, curtain: curtainOff ? 'off' : 'on', motion, calibration: cal, runs: [] };
+const report = { at: new Date().toISOString(), base, part, label, curtain: curtainMode, motion, calibration: cal, runs: [] };
 if (part === 'skeleton') {
   for (const sport of sports) for (const cpu of cpus) report.runs.push(await skeletonRun(browser, sport, cpu));
 } else {
@@ -440,27 +446,31 @@ if (part === 'skeleton') {
     for (const mount of mounts) {
       if ((mount === 'training' || mount === 'moment') && sport === 'soccer') continue;
       for (const cpu of cpus) for (let i = 0; i < (mount === 'draft' ? draftRuns : runs); i++) {
-        const r = await arenaRun(browser, sport, mount, cpu, i + 1);
+        // --curtain ab: off and on alternate run by run in the same session (the fair before/after)
+        const off = curtainMode === 'ab' ? i % 2 === 0 : curtainOff;
+        const r = await arenaRun(browser, sport, mount, cpu, i + 1, off);
         report.runs.push(r);
-        console.log(JSON.stringify({ sport, mount, cpu, run: i + 1, fail: r.fail, m: r.matches.map((m) => [m.tapToGameMs, m.curtainOnScreenMs, m.emptyFrames, m.gameTimeAtLiftS, m.ticksAtLift]) }));
+        console.log(JSON.stringify({ sport, mount, cpu, run: i + 1, curtain: r.curtain, fail: r.fail, m: r.matches.map((m) => [m.tapToGameMs, m.curtainOnScreenMs, m.emptyFrames, m.gameTimeAtLiftS, m.ticksAtLift]) }));
       }
     }
   // summary per sport, mount, cpu and match number
   const groups = {};
   for (const r of report.runs)
     for (const m of r.matches ?? []) {
-      const k = [r.sport, r.mount, r.cpu + 'x', 'm' + m.match].join(' ');
+      const k = [r.sport, r.mount, r.cpu + 'x', 'm' + m.match, r.curtain].join(' ');
       (groups[k] ??= []).push(m);
     }
   report.summary = Object.fromEntries(
     Object.entries(groups).map(([k, list]) => {
       const on = list.map((m) => m.curtainOnScreenMs);
       const tg = list.filter((m) => m.tapToGameMs !== null).map((m) => m.tapToGameMs);
+      const td = list.filter((m) => m.tapToDrawnMs !== null).map((m) => m.tapToDrawnMs);
       return [
         k,
         {
           n: list.length,
           tapToGame: { p50: percentile(tg, 50), p95: percentile(tg, 95) },
+          tapToDrawn: { p50: percentile(td, 50), p95: percentile(td, 95) },
           curtainOn: { p50: percentile(on, 50), p95: percentile(on, 95) },
           cardShown: list.filter((m) => m.cardShown).length,
           emptyFrames: list.reduce((a, m) => a + m.emptyFrames, 0),
