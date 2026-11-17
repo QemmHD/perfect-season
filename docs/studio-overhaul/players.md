@@ -174,6 +174,64 @@ PLAY-to-first-frame is at or under the base everywhere (target ≤ +100 ms; the 
 
 **Verification:** `bash O/heavy.sh npm run typecheck` pass; `npx vitest run src/game/pixel scripts/qa/players-lib.test.ts src/engine/sport-branches.test.ts` 139 tests pass (4 skipped by sport); `PS_SPORT=nfl npx vitest run src/game/pixel` 130 pass; `PS_SPORT=soccer npx vitest run soccer sport-branches` 82 pass; `npx vite-node scripts/build_appearance.ts --check` in sync.
 
+#### players-3 review fixes (on HEAD `fc687b1`)
+
+An independent review of `4b13e67..f5d87be` found two medium and three low issues. All five are fixed. **Protocol bump needed: none.** No simulation step, input rule or result changed. The hold only delays when the first fixed step runs (the same steps run with the same inputs), and the rest is render or static data.
+
+1. **Medium: blank frames during live play.** While `drawGate` held, `draw()` returned before drawing anything, but the screens kept stepping the game. The reviewer saw a dark canvas under a live HUD for up to 1.5 s, with the NBA shot clock running 14 to 12. **Fix:** the gate now holds game time, not the frame.
+   - `ready.ts` exports `holdPlay(sport, now)`. Each sport screen's loop (Hoops2, Football2, Soccer2) has one announced line, `if (holdPlay('<sport>', now)) acc = 0;` (soccer: `const held = holdPlay(...)` plus `if (held) acc = 0;`). So no fixed step runs while the first load of clips and looks is on its way. That is at most `GATE_MS` = 1.5 s, and never after a load has failed.
+   - The renderers no longer return early. `draw()` begins with `wantPixels('<sport>')` and always draws the venue and the players as they are.
+   - Measured with `scratchpad/p3fix/slow.mjs`: dev server 5214, 393×852, clip bundles and looks held back 2.5 s. Every sport draws from its first frame (mean canvas lightness 79–101, against 0 for the reviewer's blank frames). Soccer's attack clock stayed at 0:30 for 1.7 s while the gate held, then ran (0:29, 0:28 …). NBA and NFL showed the court or field at once. Sheet: `O/shots/players/players-3/after-p3fix-slow-sheet.png`.
+   - Tests in `readiness.test.ts`:
+     - the hold opens at `GATE_MS` and once the load arrives;
+     - a loop driven by `holdPlay` adds no game time while held, then runs;
+     - every renderer draws with no early return, and every screen zeroes `acc` while held.
+2. **Medium: "100% of first-run curated" held in letter only.** Several first-run rows and Henry still drew pure seeded defaults while counting as Tier A. **Fix, data:** every first-run row now carries the Tier A minimum (hair, hair colour, facial hair) from a cited photo, with one honest exception. New skin tones came only from photos seen in this pass.
+   - NBA: SGA and Booker clean-shaven; Edwards short hair; Barnes curly top and moustache.
+   - NFL:
+     - Gibbs: box braids out of the helmet, clean-shaven, skin 5 (Commons `JahmyrGibbs (cropped).jpg`; Wikidata has no image).
+     - Nacua: swept-back hair with curls out of the helmet, stubble, skin 5 (`Puka Nacua FanDuel Interview (cropped).png`; the Wikidata photo is helmeted).
+     - Smith-Njigba: curly top, goatee, skin 6.
+     - Derwin James: cornrows and a moustache.
+     - Allen and Roquan Smith: clean-shaven.
+     - Henry: skin 8 and a full beard from `Derrick Henry 2019 12-08.jpg`, next to players-4's locs.
+     - Explicit `helmetHair` on the NFL first-run rows.
+   - Soccer:
+     - Gabriel: found by his full name, since the card's single name defeated the Wikidata search. Short black hair, goatee, skin 7 (`1 Gabriel Magalhães 2026 (cropped).jpg`).
+     - O'Reilly: brown.
+     - Olmo: his natural dark brown. The cited photo's bleached summer-2024 look is not drawn because its seasons are uncertain.
+   - **How the new skin tones were picked:** the swatch nearest the mean colour of a clean cheek patch in the cited photo, checked by eye. A first by-eye pass had JSN 4, Gibbs 6, Nacua 4 and Henry 7. The measurement moved each of them by one or two steps.
+     - Henry's two photos measure 7 and 8, and their average is nearest 8.
+     - Gabriel's slightly grey photo is a near tie, 7 just ahead of 6.
+     - Nacua's photo is under warm studio light. 5 is nearest, by a wide margin.
+     - Henry at 7 had matched Ray Lewis (7) and failed `likeness.test.ts` (NFL Henry/Ray Lewis 5.2% at 34 art px, floor 12%). The measured value separates them, but the tone was set by the measurement, not to pass the test.
+   - **The exception is Derek Stingley.** Every public photo found shows him helmeted: Wikidata's, and the four files a Commons search for "Derek Stingley Jr" returns (all from LSU games). His hair and facial hair stay unknown and are not guessed.
+   - **Fix, code:**
+     - A row with an empty look now reports `src: 'default'` (`appearanceFor`), not `curated`, so Stingley counts as a shortfall.
+     - `appearance-data.test.ts` requires the minimum for every first-run row. The rows short of it must equal a named `SHORTFALL` list (NFL: Stingley), at most 1 in 12 per sport.
+     - The mockup archetypes (Curry, LeBron, Jokić, Mahomes, Henry, Messi, Ronaldinho) must have hair and hair colour, and facial hair except Ronaldinho's.
+   - Tier A today: NBA 15/15, NFL 11/12, soccer 16/16.
+3. **Low: draft cells without `ctx` covered the whole decade.** No era could ever apply, and the players-4 wiring (`select-*.ts lookFor`) calls `refOf` without `ctx`. So `CHI-1980:jordami01` drew bald, `ORL-1990:onealsh01` bald, and `PHI-1990:iversal01` drew cornrows and a headband. **Fix:**
+   - The build writes `cells` into each sport's data file: every curated player with eras, and his own `[from, to]` in each draft cell he plays in (NBA 45 cells, NFL 7, soccer 4; read from the draft datasets' columns, `DRAFT_COLS` in `build_appearance.ts`).
+   - `refOf` takes the span from `ctx`, else from `cells`, else claims no span and uses the decade's middle season.
+   - Tests: Jordan short-haired in CHI-1980 and bald in CHI-1990; Shaq's Orlando fade and bald Lakers; Iverson short-haired with no headband or sleeve in PHI-1990 and cornrows in PHI-2000; Rodman from the id alone.
+4. **Low: one failed fetch left stand-ins for the whole session.** **Fix:** `ready.ts` tracks success (`ok`) apart from "settled". A failed load is forgotten. `wantPixels`, called on every renderer frame, tries again at most every `RETRY_MS` = 5 s until both are in, and costs nothing after that. Test: fail, no retry inside 5 s, retry at 5 s, then ready.
+5. **Low: "≤2 requests" was never measured.** A small isolated Vite build of the clip bundles and looks (`scratchpad/p3fix/chunk/build.mjs`, same Rollup, no app build) confirmed the reviewer: NBA needed 2 clip requests, NFL and soccer 3. Rollup split the shared JSONs into a chunk for all sports (`sprint-*.js`) and an NFL-and-soccer chunk (`kick-*.js`). **Fix:**
+   - `src/data/mocap/clips-shared.ts` holds the 12 clips two or more sports play. Each sport bundle imports it plus only its own clips. Re-measured: **2 clip requests per sport** (`clips-<sport>-*.js` + `clips-shared-*.js`). NBA pays for 4 clips it doesn't play (catch, dive, fall_forward, kick; about 15 KB raw).
+   - The looks now load through `src/data/appearance/looks-<sport>.ts`, so the production chunk is `looks-<sport>-*.js`. Before, it was a bare `<sport>-*.js`, the same name the draft dataset's chunk gets.
+   - `players-readiness.mjs` matches `clips-shared` and `looks-<sport>` (production) in its `CLIP` and `LOOKS` patterns.
+   - Test: `clips-shared` holds exactly the clips in more than one `BUNDLED` list, and no sport bundle imports a shared clip's JSON itself.
+   - Section 5 request 3, shell's on-demand pattern, is updated for the soccer looks wrapper.
+
+**Verification (review fixes):**
+- `bash O/heavy.sh npm run typecheck`: pass.
+- `npx vitest run src/game/pixel scripts/qa/players-lib.test.ts src/engine/sport-branches.test.ts src/game/hoops2`: 226 pass (11 skipped by sport).
+- `PS_SPORT=nfl npx vitest run src/game/pixel src/game/football2`: 250 pass, including `likeness.test.ts` NFL (min pair at 34 art px ≥ 12%).
+- `PS_SPORT=soccer npx vitest run soccer sport-branches`: 83 pass.
+- `npx vite-node scripts/build_appearance.ts --check`: in sync.
+- Browser (`scratchpad/p3fix/slow.mjs`, isolated: `?ns=inspect&relay=ws://localhost:7777`, every non-localhost request aborted, `routeLog.external` 0, no page errors): see item 1.
+- Chunk count: see item 5.
+
 ---
 
 ### players-4 · Looks drawn in all three engines, C.1.6 kits, calmer C.2 venues (done)
@@ -646,7 +704,13 @@ Hit tests and HUD placement use these, never `b.p.ht`, because the drawn height 
 
 ### 4.7 Readiness
 
-`pixelReady(sport): Promise<boolean>` (`src/game/pixel/ready.ts`, players-3) resolves when the sport's clips and appearance data are in (true), or a load failed (false); it never rejects. `select-<sport>.ts` starts it for the page's sport as the game chunk is evaluated, and each renderer's `draw()` begins with `if (!drawGate(sport)) return;`, which holds only the first frame, for at most 1.5 s. A loading gate may still `await pixelReady(sport)` (one line) to show its own spinner instead of an empty canvas, but nothing depends on it. `players-readiness.mjs` and verify row A7 measure it.
+`pixelReady(sport): Promise<boolean>` (`src/game/pixel/ready.ts`, players-3) resolves true when the sport's clips and appearance data are in, and false when a load failed. It never rejects, and a failed load is tried again.
+
+- `select-<sport>.ts` starts the load for the page's sport as the game chunk is evaluated.
+- Each sport screen's loop holds game time with `holdPlay(sport, now)` (one line, `acc = 0`) while the first load is on its way: at most 1.5 s, never after a failure.
+- Each renderer's `draw()` begins with `wantPixels(sport)`. It always draws, and it retries a failed load every 5 s.
+- A loading gate may still `await pixelReady(sport)` to show its own spinner, but nothing depends on it.
+- `players-readiness.mjs` and verify row A7 measure it.
 
 ### 4.8 First-run showcase (ut, packs)
 
@@ -666,8 +730,8 @@ The Collection screen is ut's. Players gives it `PlayerPortrait` with `variant="
 1. **`card-face.ts` ruling.** It holds rating logic used by `rate.ts`; players only reads `faceWeights`. We ask that it move to packs (ratings), with players keeping read access.
 2. **The backing-store hunk** in `Hoops2.tsx`, `Football2.tsx` and `Soccer2.tsx`: players-2 made it (≈4 lines each, section 7). Option C is adopted, so it changes nothing at runtime unless `?artpx=A`; at merge keep it beside the sport teams' resize edits.
 3. **The `vite.config.ts` on-demand diff for shell** (players never edits `vite.config.ts`):
-   `const onDemandModule = /[\\/](?:game[\\/]soccer2[\\/]|game[\\/]pixel[\\/](?:pitch|select-soccer)\.ts|data[\\/](?:cards-(?:nba|nfl|soccer)|soccer)\.json|data[\\/]appearance[\\/]soccer\.json|data[\\/]mocap[\\/](?:clips-soccer\.ts|jump\.json))/;`
-   (players-3: the soccer looks file and the soccer clip bundle, whose chunk holds `clips-soccer.ts` and `jump.json`, the one clip only soccer plays; the clips every sport shares stay in install.) Until shell merges it, about 9 KB gzip of soccer looks and the small soccer clip chunk are precached for every sport.
+   `const onDemandModule = /[\\/](?:game[\\/]soccer2[\\/]|game[\\/]pixel[\\/](?:pitch|select-soccer)\.ts|data[\\/](?:cards-(?:nba|nfl|soccer)|soccer)\.json|data[\\/]appearance[\\/](?:looks-)?soccer\.(?:json|ts)|data[\\/]mocap[\\/](?:clips-soccer\.ts|jump\.json))/;`
+   (players-3: the soccer looks file, which loads through `looks-soccer.ts` since the review fix, and the soccer clip bundle, whose chunk holds `clips-soccer.ts` and `jump.json`, the one clip only soccer plays. `clips-shared.ts`, the clips two or more sports play, stays in install.) Until shell merges it, about 9 KB gzip of soccer looks and the small soccer clip chunk are precached for every sport.
 4. **Reports (players does not edit these):**
    - brand-like badge names in `abilityName`/`ABILITY_HELP` (`hoops2/ratings.ts:200-207`) and `rate.ts:114` "Heat Check", now also a name clash with V2's in-match Heat;
    - missing NFL (26%) and soccer (7.7%) jersey numbers in the data files (L-5 backfill, the lead's data);
@@ -693,9 +757,10 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 | players-2 | same three | `draw(ctx…` first line | `ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);` (identity at today's grain) |
 | players-2 | same three | the player `// shadows` loop | `drawGroundMark(…)` per body |
 | players-2 | same three | player blits `ctx.drawImage(s.canvas…` | `blitSprite(ctx, s, x, y)`; NBA `headOf.right` uses `s.w` |
-| players-3 | same three | top imports | `loadClips` and `CLIPS` imports dropped; `import { drawGate } from '../pixel/ready'` |
+| players-3 | same three | top imports | `loadClips` and `CLIPS` imports dropped; `import { wantPixels } from '../pixel/ready'` (was `drawGate` until the review fix) |
 | players-3 | same three | `constructor(` | the `loadClips(CLIPS)` call removed (the body is now `{}`): `select-*.ts` starts the sport's bundle as the game chunk loads |
-| players-3 | same three | `draw(ctx…` first line | `if (!drawGate('<sport>')) return;` (one line and a comment) |
+| players-3 | same three | `draw(ctx…` first line | `wantPixels('<sport>');` (one line and a comment; the review fix replaced the early-return `drawGate`, so every frame draws) |
+| players-3 fix | `hoops2/Hoops2.tsx`, `football2/Football2.tsx`, `soccer2/Soccer2.tsx` | the loop's `acc += …` line (soccer: also after `const slow = …`) | `if (holdPlay('<sport>', now)) acc = 0;` and its import: no fixed step while the first clips and looks load (≤1.5 s) |
 | players-4 | same three | top imports | `staleLook` from `../pixel/looks`, `drawVignette` from `../pixel/venue` |
 | players-4 | same three | `let look = this.looks.get(who)` in the sprite method | `if (!look \|\| staleLook(look))`: a look made before the appearance data arrived is rebuilt, and the drawings let go (`this.sprites.dispose(this.last.values())`) |
 | players-4 | same three | the floor blit (`ctx.drawImage(fl.canvas, …)`; NFL also its early-return field blit) | `drawVignette(ctx, this.W, this.H)` right after it: one cached canvas, colour only |
@@ -706,6 +771,7 @@ Every players hunk in a sport team's `render.ts` (or venue file), with its line 
 - **players-2, announced backing hunk** (plan §2, request 2 in section 5): `src/game/hoops2/Hoops2.tsx`, `src/game/football2/Football2.tsx`, `src/game/soccer2/Soccer2.tsx`, the resize code in the draw loop: one import of `artScale` plus 4 lines (`renderer.art = artScale(canvas, W, H)`; the backing size `bw`/`bh`; the size check and `canvas.width/height` use it). With the adopted option C the backing is 1, so the canvas is exactly as before; `?artpx=A` turns on the device-resolution backing.
 - players-1 changed only `scripts/qa/players-*` and this doc.
 - **players-4:** `src/game/soccer2/kits.ts` (soccer's), two lines in `soccerKits`: the rival changes whenever the first colours are within CIEDE2000 ΔE 25, to the first of the away set and three change kits that reads (`clearOf`, `CHANGE_COLORS` from `uniforms.ts`); before, he changed only when the away set was "further" by the redmean distance. The `drawVignette` line and the look-rebuild line in each sport's `render.ts` (section 6) sit next to the sport teams' floor and sprite code.
+- **players-3 review fix:** one announced line plus an import in each sport screen's game loop (`Hoops2.tsx`, `Football2.tsx`, `Soccer2.tsx`): `if (holdPlay('<sport>', now)) acc = 0;`, right after the `acc +=` line (soccer: `const held = holdPlay('soccer', now)` beside `slow`, and `if (held) acc = 0;` in the live branch). It holds game time, never inputs or results, while the first load is on its way (section 6).
 - **players-3:** `docs/CREDITS.md`, a new "Player appearance" section (Monk Skin Tone CC BY 4.0, transfermarkt-datasets CC0, Commons photos as references only). The one-line `drawGate` hunks in the three `render.ts` `draw()` methods (section 6) sit at the top of a method the sport teams also edit.
 
 ## 8. Deviations from STREAM, recorded
