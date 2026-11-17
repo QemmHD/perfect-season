@@ -12,7 +12,9 @@ import { artScaleFor, quantPx } from './art-scale';
 import { rasterBody, type Look } from './body';
 import { loadAppearance } from './appearance';
 import { excite } from './crowd';
-import { frameAt, loadClips, mocapJoints } from './mocap';
+import { clipMeta, frameAt, loadClips, mocapJointsAtFrame } from './mocap';
+import { applyTouches, fineStep, headBob, stepFor } from './locomotion';
+import { SpriteBudget } from './sprite-budget';
 import type { Memo as NbaMemo } from './select-nba';
 import type { Memo as NflMemo } from './select-nfl';
 import type { Memo as SoccerMemo } from './select-soccer';
@@ -62,16 +64,24 @@ export const SIM_ENTRIES = {
   soccer: ['game/soccer2/engine.ts', 'game/soccer2/autopilot.ts', 'game/soccer2/match.ts', 'game/soccer2/ratings.ts', 'game/soccer2/shootout.ts'],
 };
 
-/** Everything the drawing does to one body that could touch it: render code reading engine state. */
-function drawPass(look: Look, sel: () => { clip?: string; ct?: number; step?: number; pose: unknown }, heightViewPx: number, raster: boolean) {
-  const an = sel();
+/** Everything the drawing does to one body that could touch it: render code reading engine state
+ * (players-5: the motion, its locomotion touches and the frame's sprite budget too). */
+function drawPass(look: Look, sel: () => { an: { clip?: string; ct?: number; step?: number; pose: unknown; gait?: { rate: number; stride: number } }; dip: boolean; lead: number; mo: { lean: { fwd: number; side: number } } }, heightViewPx: number, raster: boolean, budget: SpriteBudget, who: string) {
+  const fr = sel();
+  const an = fr.an;
   const a = artScaleFor('A', 3, 1, 3);
   const px = quantPx(a.artPxFor(heightViewPx), a.viewPerArt);
   shoulderWidthPx(look.ht, look.wt, px, look.pads ?? 0);
-  // the crowd hook the sport teams call on a score, ON FIRE or Clutch (players-4: a no-op until players-9)
   excite('score', 0);
+  const req = { who, px, must: false, staleFor: 0, near: 0 };
+  budget.order([req]);
+  if (budget.allow(req)) budget.drew(who);
+  else budget.stale(who);
   if (raster) {
-    const pose = an.clip ? mocapJoints(an.clip, frameAt(an.clip, an.ct ?? 0, an.step ?? 2), look, { ground: 'clip' }) : (an.pose as never);
+    const step = an.clip ? fineStep(stepFor(false, an.step ?? 2), an.gait?.rate ?? 1) : 1;
+    const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
+    const touch = { heavy: 0, fwd: fr.mo.lean.fwd, side: fr.mo.lean.side, stride: an.gait?.stride ?? 1, dip: fr.dip, lead: fr.lead, bob: an.clip ? headBob(frame / clipMeta(an.clip).frames, px) : 0 };
+    const pose = an.clip ? applyTouches(mocapJointsAtFrame(an.clip, frame, look, { ground: 'clip' }), touch, px) : (an.pose as never);
     rasterBody(look, pose, { facing: 1.1, pitch: 0.5 }, px);
   }
 }
@@ -95,17 +105,21 @@ export async function stepDigestsNba(withDrawing: boolean): Promise<{ digest: st
   const g = newHoopsGame(A.five, B.five, 'ro0', undefined, [], 0);
   const pl = pilot(0.68, 'ro0');
   const memos = new Map<string, NbaMemo>();
+  const budget = new SpriteBudget();
   for (let n = 0; n < 12 && !g.over; n++) {
     const p = startPossession(g);
     for (let i = 0; i < 2400 && !p.end; i++) {
       step(p, 1 / 60, decide(p, pl));
-      if (withDrawing)
+      if (withDrawing) {
+        budget.begin(1000 / 60);
         for (const b of p.bodies) {
           const who = b.p.id + '|' + b.side;
           if (!memos.has(who)) memos.set(who, { gait: { t: p.t, frac: 0 }, last: null });
           const look = sel.lookFor(b, kit);
-          drawPass(look, () => sel.animOf(b, p.t, p.handler === b.idx, look, memos.get(who)!, null), (drawnHeight('nba', b.p.ht) / 12) * 9, i % 20 === b.idx);
+          drawPass(look, () => sel.motionOf(b, p.t, p.handler === b.idx, look, memos.get(who)!, null), (drawnHeight('nba', b.p.ht) / 12) * 9, i % 20 === b.idx, budget, who);
         }
+        budget.spent(1, 4);
+      }
       d.add(stateOf(p));
       p.events.length = 0;
     }
@@ -141,18 +155,22 @@ export async function stepDigestsNfl(withDrawing: boolean): Promise<{ digest: st
   const pl = pilot(0.68, 'ro0');
   const d = new Digest();
   const memos = new Map<string, NflMemo>();
+  const budget = new SpriteBudget();
   for (let n = 0; n < 10 && !g.over; n++) {
     const p = startPlay(g, chooseCall(g, pl));
     snap(p);
     for (let k = 0; k < 1500 && !p.end; k++) {
       step(p, 1 / 60, decide(p, g, pl));
-      if (withDrawing)
+      if (withDrawing) {
+        budget.begin(1000 / 60);
         for (const b of p.bodies) {
           const who = b.p.id + '|' + b.side;
-          if (!memos.has(who)) memos.set(who, { gait: { t: p.t, frac: 0 }, face: { x: 0, y: 1 }, faceAt: p.t });
+          if (!memos.has(who)) memos.set(who, { gait: { t: p.t, frac: 0 }, face: { x: 0, y: 1 } });
           const look = sel.lookFor(b, kit);
-          drawPass(look, () => sel.animOf(b, p.t, p, look, memos.get(who)!, false), (drawnHeight('nfl', b.p.ht) / 36) * 14, k % 20 === b.id % 20);
+          drawPass(look, () => sel.motionOf(b, p.t, p, look, memos.get(who)!, false), (drawnHeight('nfl', b.p.ht) / 36) * 14, k % 20 === b.id % 20, budget, who);
         }
+        budget.spent(1, 4);
+      }
       d.add(stateOf(p));
       p.events.length = 0;
     }
@@ -193,15 +211,19 @@ export async function stepDigestsSoccer(withDrawing: boolean): Promise<{ digest:
     const pl = pilot(0.68, 'rp' + i);
     kickOff(a);
     const memos = new Map<string, SoccerMemo>();
+    const budget = new SpriteBudget();
     for (let n = 0; !a.end && n < 60 * 90; n++) {
       step(a, 1 / 60, decide(a, pl));
-      if (withDrawing)
+      if (withDrawing) {
+        budget.begin(1000 / 60);
         for (const b of a.bodies) {
           const who = b.p.id + '|' + b.side;
-          if (!memos.has(who)) memos.set(who, { gait: { t: a.t, frac: 0 }, face: { x: b.fx, y: b.fy }, faceAt: a.t });
+          if (!memos.has(who)) memos.set(who, { gait: { t: a.t, frac: 0 }, face: { x: b.fx, y: b.fy } });
           const look = sel.lookFor(b, kit, kit);
-          drawPass(look, () => sel.animOf(b, a.t, look, memos.get(who)!), ((drawnHeight('soccer', b.p.ht / 2.54) * 2.54) / 100) * 12, n % 20 === b.id % 20);
+          drawPass(look, () => sel.motionOf(b, a.t, look, memos.get(who)!, a.ball), ((drawnHeight('soccer', b.p.ht / 2.54) * 2.54) / 100) * 12, n % 20 === b.id % 20, budget, who);
         }
+        budget.spent(1, 4);
+      }
       d.add(stateOf(a));
     }
   }

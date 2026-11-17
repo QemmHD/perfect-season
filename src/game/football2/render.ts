@@ -3,20 +3,23 @@
 // the offense with perspective, the grass drawn a row at a time. On top: twenty-two rigged players
 // in their kits, the ball, the posts, the lines, the routes before the snap and the slingshot's arc.
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-nfl.ts.
-import { drawBody, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
+import { drawBody, SpriteCache, freeCanvas } from '../pixel/body';
 import { drawField, type FieldCam, fieldAt, fieldCam, fieldFacing, type FieldTheme } from '../pixel/field';
-import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
+import { clipMeta, frameAt, mocapJointsAtFrame, mocapKey } from '../pixel/mocap';
 import { wantPixels } from '../pixel/ready';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
-import { drawGroundMark } from '../pixel/ground';
+import { drawGroundMark, groundEllipse } from '../pixel/ground';
 import { drawFloor, type FieldTex, fieldTexture, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import type { Look } from '../pixel/body';
-import { animOf, ballArm, lookFor, type Memo } from '../pixel/select-nfl';
+import { ballArm, type BodyFrame, lookFor, type Memo, motionOf } from '../pixel/select-nfl';
 import { staleLook } from '../pixel/looks';
 import { drawVignette } from '../pixel/venue';
 import { ballNow, dist, FIELD_W, flightTime, isLine, maxThrow, peakOf, projectRoute, sight, speedOf, throwErrorRadius, windupOf } from './engine';
-import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
+import { heaviness, sprintLean } from '../pixel/style';
+import { applyTouches, fineStep, headBob, LEAN_MAX, MAX_DT, nextFrame, stepFor, touchKey, type Touches } from '../pixel/locomotion';
+import { MATCH_AREA, resolveSprites, Steady, SpriteBudget, type SpritePlan } from '../pixel/sprite-budget';
+import { type Anchor, anchorOf, type HudPoint } from '../pixel/anchors';
 import type { Juice } from '../juice';
 import type { Body, Play, Pt } from './types';
 
@@ -70,7 +73,7 @@ export class FootballRenderer {
   private field: { canvas: HTMLCanvasElement; cam: FieldCam } | null = null;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache<ArtSprite>(600);
+  private sprites = new SpriteCache<ArtSprite>(600, MATCH_AREA);
   /** the art pixel (pixel/art-scale.ts), set by the screen from its canvas each frame */
   art: ArtScale = ART_C;
 
@@ -89,9 +92,20 @@ export class FootballRenderer {
   /** the slingshot's drawn back this frame: the quarterback cocks his arm */
   private aiming = false;
   private follow: Pt | null = null;
-  /** each player's drawing last frame, and how many new drawings this frame may still make */
+  /** each player's drawing last frame, and the near-first sprite budget (pixel/sprite-budget.ts) */
   private last = new Map<string, ArtSprite>();
-  private budget = 0;
+  private budget = new SpriteBudget();
+  private steady = new Steady();
+  private frameAt = 0;
+  private lastT = NaN;
+  private lastPlay: Play | null = null;
+  private lastPhase: Play['phase'] | null = null;
+  /** where each body was drawn last frame (the HUD anchors, pixel/anchors.ts), by body id */
+  private anchors = new Map<number, Anchor>();
+  private pinned = new Set<number>();
+  /** the body the player controls when it isn't the ball carrier (defense played by default: the
+   * screen sets it); always drawn fresh */
+  controlled: number | null = null;
   /** turf kicked up, confetti and the On Fire flames: field position and height, speed, life left, color, size */
   private bits: { x: number; y: number; h: number; vx: number; vy: number; vh: number; life: number; color: string; size: number; rise?: boolean }[] = [];
   /** what each player was doing last frame, to see a tackle or a move start */
@@ -211,40 +225,17 @@ export class FootballRenderer {
     return best && bestD < 6 ? best : null;
   }
 
-  private sprite(b: Body, t: number, p: Play, s: number): ArtSprite {
+  /** A body's sprite request this frame (players-5: planned for every body first, then resolved in
+   * budget order): its motion, its cache key, how to draw it, and the next frame of a stride for
+   * pre-warm. */
+  private plan(b: Body, t: number, p: Play, s: number, must: boolean): { plan: SpritePlan<ArtSprite>; fr: BodyFrame } {
     const L = this.lens;
     const who = b.p.id + '|' + b.side;
     let memo = this.memos.get(who);
     if (!memo) {
-      memo = { gait: { t, frac: (b.id * 0.29) % 1 }, face: { x: 0, y: b.side === 'O' ? 1 : -1 }, faceAt: t };
+      memo = { gait: { t, frac: (b.id * 0.29) % 1 }, face: { x: 0, y: b.side === 'O' ? 1 : -1 } };
       this.memos.set(who, memo);
     }
-    const moving = Math.hypot(b.vx, b.vy) > 0.6;
-    const grounded = b.act === 'tackle' || b.act === 'down';
-    // facing: where he's going, or (set) up the field for the offense, down it for the defense; a
-    // man diving or going down keeps the way he faced as it started
-    const assignment = p.bodies.find((o) => o.id === b.mark);
-    const openHips = b.act === 'backpedal' && Math.hypot(b.vx, b.vy) > 4.8 && assignment && assignment.y > b.y - 1;
-    const watch = b.act === 'backpedal' && !openHips ? p.qb : null;
-    let dir = grounded ? memo.face : watch ? { x: watch.x - b.x, y: watch.y - b.y } : moving ? { x: b.vx, y: b.vy } : b.side === 'O' ? { x: 0, y: 1 } : { x: 0, y: -1 };
-    if (!grounded) {
-      const target = Math.atan2(dir.y, dir.x), old = Math.atan2(memo.face.y, memo.face.x);
-      const delta = Math.atan2(Math.sin(target - old), Math.cos(target - old));
-      const facing = old + delta * Math.min(1, Math.max(0, t - memo.faceAt) * 14);
-      memo.face = { x: Math.cos(facing), y: Math.sin(facing) };
-      dir = memo.face;
-    }
-    memo.faceAt = t;
-    // sizes, angles and (for small, far players) facings in steps, so a player moving up the field
-    // reuses his drawings
-    // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
-    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
-    const raw = Math.max(8, this.art.artPxFor((drawnHeight('nfl', b.p.ht) / 36) * s));
-    const px = quantPx(raw, this.art.viewPerArt);
-    const dirs = px < 22 ? 8 : 16;
-    const fb = (Math.round((L.facing(dir.x, dir.y) / (Math.PI * 2)) * dirs) + dirs) % dirs;
-    // seen from high up close: the rig reads best no steeper than this
-    const pitch = Math.round(Math.min(0.9, L.pitch(b.y)) / 0.15) * 0.15;
     let look = this.looks.get(who);
     if (!look || staleLook(look)) {
       // (a look made before the appearance data arrived: the drawings go, redrawn through the budget)
@@ -252,50 +243,108 @@ export class FootballRenderer {
       look = lookFor(b, this.kits[b.side === 'O' ? 0 : 1]);
       this.looks.set(who, look);
     }
-    const an = animOf(b, t, p, look, memo, this.aiming);
-    // far, small players step their clips more coarsely (fewer new drawings as the camera moves)
-    const step = an.clip ? (px < 22 ? Math.max(3, an.step ?? 2) : (an.step ?? 2)) : 1;
+    // the facing turns at 90° per 100 ms toward where he goes or looks (select-nfl.ts faceTarget)
+    const fr = motionOf(b, t, p, look, memo, this.aiming);
+    const an = fr.an;
+    // sizes, angles and (for small, far players) facings in steps, so a player moving up the field
+    // reuses his drawings
+    // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
+    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
+    const raw = Math.max(8, this.art.artPxFor((drawnHeight('nfl', b.p.ht) / 36) * s));
+    // (held through the camera's small moves: sprite-budget.ts Steady)
+    const { px, pitch } = this.steady.at(who, raw, quantPx(raw, this.art.viewPerArt), L.pitch(b.y));
+    const dirs = px < 22 ? 8 : 16;
+    const fb = (Math.round((L.facing(Math.cos(fr.face), Math.sin(fr.face)) / (Math.PI * 2)) * dirs) + dirs) % dirs;
+    // the rate (V2 B.1.6): 30 fps for the must set, 15 for everyone else (far players
+    // too: they were 10); a must body's slow stride at half frames
+    const step = an.clip ? fineStep(stepFor(must, an.step ?? 2), an.gait?.rate ?? 1) : 1;
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
-    // body type on the run: a heavy man's wider base, a burner's sprint lean
-    const striding = !!an.clip && (an.clip === 'jog' || an.clip === 'run' || an.clip === 'sprint');
-    const heavy = striding ? Math.round(heaviness(b.p.wt, b.p.ht) * 4) / 4 : 0;
-    const lean = striding ? sprintLean(b.p.a.SPD ?? 70, Math.hypot(b.vx, b.vy) / Math.max(1, speedOf(b.p))) : 0;
-    const key = (an.clip ? mocapKey(an.clip, frame, an.ground) + (an.ball ?? '') : an.key) + (heavy ? 'w' + heavy : '') + (lean ? 'l' + lean : '');
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
-    let spr = this.sprites.get(k);
-    if (!spr) {
-      // a few new drawings a frame at most (the man with the ball always gets his): past that, he
-      // keeps his last one a frame longer
-      const last = this.last.get(who);
-      if (this.budget <= 0 && last && b !== p.carrier) return last;
-      this.budget--;
-      const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
-      const make = () => {
-        if (!an.clip) return drawBody(look, { ...an.pose, lift: 0 }, view, px);
-        let j = mocapJoints(an.clip, frame, look, { ground: an.ground });
-        if (heavy) j = widen(j, heavy * 0.45, heavy * 0.008);
-        if (lean) j = leanForward(j, lean);
-        if (an.ball) j = ballArm(j, an.ball);
-        return drawBody(look, j, view, px);
-      };
-      try {
-        spr = toView(make(), this.art);
-      } catch (e) {
-        if (!(e instanceof CanvasOut)) throw e;
-        // the phone is out of canvas memory: let go of every old drawing and try once more; failing
-        // that, he keeps last frame's
-        this.sprites.dispose(this.last.values());
-        try {
-          spr = toView(make(), this.art);
-        } catch {
-          if (last) return last;
-          throw e;
-        }
+    // body type and locomotion on the run: a heavy man's wider base, a burner's sprint lean, the lean
+    // into a burst or a turn, short steps, the plant, the head's lead and bob
+    const striding = !!an.gait;
+    const lean = striding ? Math.min(LEAN_MAX, sprintLean(b.p.a.SPD ?? 70, Math.hypot(b.vx, b.vy) / Math.max(1, speedOf(b.p))) + fr.mo.lean.fwd) : 0;
+    const touch: Touches = {
+      heavy: striding ? Math.round(heaviness(b.p.wt, b.p.ht) * 4) / 4 : 0,
+      fwd: lean,
+      side: striding ? fr.mo.lean.side : 0,
+      stride: an.gait?.stride ?? 1,
+      dip: !!an.clip && fr.dip,
+      lead: an.clip ? fr.lead : 0,
+      bob: striding && an.clip ? headBob(frame / clipMeta(an.clip).frames, px) : 0,
+    };
+    const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
+    const keyOf = (fi: number) => (an.clip ? mocapKey(an.clip, fi, an.ground) + (an.ball ?? '') : an.key) + touchKey(touch);
+    const k = (fi: number) => who + '|' + keyOf(fi) + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
+    const make = (fi: number) => () => {
+      if (!an.clip) return toView(drawBody(look, { ...an.pose, lift: 0 }, view, px), this.art);
+      let j = applyTouches(mocapJointsAtFrame(an.clip, fi, look, { ground: an.ground }), touch, px);
+      if (an.ball) j = ballArm(j, an.ball);
+      return toView(drawBody(look, j, view, px), this.art);
+    };
+    const c = an.clip ? clipMeta(an.clip) : null;
+    const nf = c && c.loop ? nextFrame(frame, step, c.frames, true, an.gait?.reverse) : null;
+    const plan: SpritePlan<ArtSprite> = {
+      req: { who, px, must, staleFor: 0, near: L.near(b.x, b.y) },
+      key: k(frame),
+      make: make(frame),
+      next: nf !== null && nf !== frame ? { key: k(nf), make: make(nf) } : undefined,
+    };
+    return { plan, fr };
+  }
+
+  /** The must set (players-5): the ball carrier (the quarterback before the throw), the man the ball is
+   * going to, the carrier's nearest defender and the body the player controls; always drawn fresh. */
+  private mustSet(p: Play): Set<number> {
+    const out = new Set<number>();
+    const c = p.carrier ?? p.qb;
+    out.add(c.id);
+    if (p.catcher) out.add(p.catcher.id);
+    if (this.controlled !== null) out.add(this.controlled);
+    let near = Infinity;
+    let d: Body | null = null;
+    for (const o of p.bodies) {
+      if (o.side === c.side) continue;
+      const r = dist(o, c);
+      if (r < near) {
+        near = r;
+        d = o;
       }
-      this.sprites.set(k, spr, this.last.values());
     }
-    this.last.set(who, spr);
-    return spr;
+    if (d) out.add(d.id);
+    return out;
+  }
+
+  /** HUD anchors (players-5, section 6.3 of the team doc): where a body was drawn this frame, by body
+   * id. Name chips, rings and tap-to-pass use these, never the engine's spot and height. */
+  drawnOffset(id: number): { dx: number; dy: number } | null {
+    const a = this.anchors.get(id);
+    return a ? { dx: a.dx, dy: a.dy } : null;
+  }
+  headTop(id: number): HudPoint | null {
+    return anchorOf(this.anchors.get(id), 'head');
+  }
+  feetAt(id: number): HudPoint | null {
+    return anchorOf(this.anchors.get(id), 'feet');
+  }
+  groundEllipse(id: number): { rx: number; ry: number } | null {
+    const a = this.anchors.get(id);
+    return a ? { rx: a.rx, ry: a.ry } : null;
+  }
+  handAnchor(id: number, side: 'L' | 'R'): HudPoint | null {
+    return anchorOf(this.anchors.get(id), side === 'L' ? 'handL' : 'handR');
+  }
+  /** Force a fresh sprite for this body on the next frame drawn (a HUD ring or chip on him). */
+  pin(id: number) {
+    this.pinned.add(id);
+  }
+  /** A replay starting, a SIM jump, a long pause or a rematch: locomotion starts again from the next
+   * frame and the next frames pre-draw. The drawings and their area cap outlive the rematch. */
+  resetMotion() {
+    this.memos.clear();
+    this.anchors.clear();
+    this.budget.resetStale();
+    this.budget.warmUp();
+    this.lastT = NaN;
   }
 
   private drawGround(ctx: CanvasRenderingContext2D) {
@@ -438,7 +487,34 @@ export class FootballRenderer {
     } else this.persp = this.perspAt(this.follow.x, this.follow.y);
     this.lens = this.makeLens();
     const L = this.lens;
-    this.budget = 4;
+    // the frame's sprite budget from what drawings cost on this phone; a new play, the snap, a replay's
+    // jump or a rematch pre-draws the next frames
+    const nowMs = performance.now();
+    const snapped = this.lastPhase === 'pre' && p.phase !== 'pre';
+    // (a replay hands over a new snapshot every frame on a running clock: only a play that starts its
+    // clock, the snap, or a jump in the clock is a start)
+    if (snapped || (p !== this.lastPlay && p.t < MAX_DT) || !(p.t - this.lastT >= 0 && p.t - this.lastT <= MAX_DT)) this.budget.warmUp();
+    this.budget.begin(this.frameAt ? nowMs - this.frameAt : 1000 / 60);
+    this.frameAt = nowMs;
+    this.lastPlay = p;
+    this.lastPhase = p.phase;
+    this.lastT = p.t;
+    // every on-screen body's sprite planned first, then resolved near-first, then drawn far to near
+    const must = this.mustSet(p);
+    for (const i of this.pinned) must.add(i);
+    this.pinned.clear();
+    const planned = new Map<number, { plan: SpritePlan<ArtSprite>; fr: BodyFrame }>();
+    for (const b of p.bodies) {
+      const f = L.at(b.x, b.y);
+      if (f.y < -40 || f.y > this.H + 80 || f.x < -60 || f.x > this.W + 60) continue;
+      planned.set(b.id, this.plan(b, p.t, p, f.s, must.has(b.id)));
+    }
+    const got = resolveSprites([...planned.values()].map((q) => q.plan), this.sprites, this.last, this.budget, () => performance.now());
+    // the drawn spot: the engine's, plus the planted foot's offset (at most 5% of his height)
+    const drawnAt = (b: Body) => {
+      const mo = planned.get(b.id)?.fr.mo;
+      return { x: b.x + (mo?.ox ?? 0), y: b.y + (mo?.oy ?? 0) };
+    };
     const jv = o.juice?.view() ?? { x: 0, y: 0, scale: 1 };
     const shx = (o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0) + jv.x;
     const shy = (o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0) + jv.y;
@@ -495,9 +571,11 @@ export class FootballRenderer {
         ctx.fill();
       }
     }
-    // shadows (pixel/ground.ts: V2's soft contact shadow, sized to his shoulders and pads)
+    // shadows (pixel/ground.ts: V2's soft contact shadow, sized to his shoulders and pads), under the
+    // drawn feet
     for (const b of p.bodies) {
-      const f = L.at(b.x, b.y);
+      const d = drawnAt(b);
+      const f = L.at(d.x, d.y);
       const tall = (drawnHeight('nfl', b.p.ht) / 36) * f.s;
       drawGroundMark(ctx, { x: f.x, y: f.y, shoulderPx: shoulderWidthPx(b.p.ht, b.p.wt, tall, isLine(b) || b.p.pos === 'DT' || b.p.pos === 'DE' ? 1.25 : 1), pitch: L.pitch(b.y) });
     }
@@ -560,15 +638,21 @@ export class FootballRenderer {
     const heads: Record<number, { x: number; y: number }> = {};
     let hand: { x: number; y: number; s: number } | null = null;
     for (const b of order) {
-      const f = L.at(b.x, b.y);
-      if (f.y < -40 || f.y > this.H + 80 || f.x < -60 || f.x > this.W + 60) continue;
-      const spr = this.sprite(b, p.t, p, f.s);
+      const pl = planned.get(b.id);
+      const r = pl && got.get(pl.plan.req.who);
+      if (!r) continue;
+      const spr = r.spr;
+      const d = drawnAt(b);
+      const f = L.at(d.x, d.y);
       // a spectacular catch: a receiver with the hands for it (SPC 85+) goes up and gets a high ball
       const since = p.t - b.actAt;
       const leap = b.act === 'catch' && b === p.catcher && p.catchInfo?.high && (b.p.a.SPC ?? 0) >= 85 && since < 0.42 ? Math.sin((since / 0.42) * Math.PI) * 0.55 : 0;
-      const g = leap ? L.at(b.x, b.y, leap) : f;
+      const g = leap ? L.at(d.x, d.y, leap) : f;
       const x = Math.round(g.x - spr.ax);
       const y = Math.round(g.y - spr.ay);
+      const sim = L.at(b.x, b.y);
+      const tall = (drawnHeight('nfl', b.p.ht) / 36) * f.s;
+      this.anchors.set(b.id, { x, y, spr, feet: { x: f.x, y: f.y }, dx: f.x - sim.x, dy: f.y - sim.y, ...groundEllipse(shoulderWidthPx(b.p.ht, b.p.wt, tall, isLine(b) || b.p.pos === 'DT' || b.p.pos === 'DE' ? 1.25 : 1), L.pitch(b.y)) });
       // a burner with the ball in the open field (SPD 92+): a short afterimage
       if (b === p.carrier && p.phase === 'run' && (b.p.a.SPD ?? 0) >= 92 && Math.hypot(b.vx, b.vy) > 8.6 && !this.replay) {
         const a0 = ctx.globalAlpha;

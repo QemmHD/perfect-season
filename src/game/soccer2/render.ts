@@ -9,15 +9,18 @@
 // line, the aim reticle and a small goal over the meter (where it's going, past the keeper), a ring
 // that tightens as the meter nears the green, and the release read-out (PERFECT / GOOD / EARLY / LATE).
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-soccer.ts.
-import { drawBody, freeCanvas, type Look, SpriteCache, CanvasOut } from '../pixel/body';
-import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
+import { drawBody, freeCanvas, type Look, SpriteCache } from '../pixel/body';
+import { clipMeta, frameAt, mocapJointsAtFrame, mocapKey } from '../pixel/mocap';
 import { wantPixels } from '../pixel/ready';
 import { drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { pitchTexture, type PitchTheme } from '../pixel/pitch';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
-import { drawGroundMark } from '../pixel/ground';
+import { drawGroundMark, groundEllipse } from '../pixel/ground';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
-import { animOf, heightM, lookFor, type Memo } from '../pixel/select-soccer';
+import { type BodyFrame, heightM, lookFor, type Memo, motionOf } from '../pixel/select-soccer';
+import { applyTouches, fineStep, headBob, MAX_DT, nextFrame, stepFor, touchKey, type Touches } from '../pixel/locomotion';
+import { MATCH_AREA, resolveSprites, Steady, SpriteBudget, type SpritePlan } from '../pixel/sprite-budget';
+import { type Anchor, anchorOf, type HudPoint } from '../pixel/anchors';
 import { staleLook } from '../pixel/looks';
 import { drawVignette } from '../pixel/venue';
 import { aimPoint, coneMult, GH, GHALF, GX, METER, PL, PW, ctrlOf, timingMiss, timingWord, type PassPlan } from './engine';
@@ -58,13 +61,26 @@ export class SoccerRenderer {
   private cam: PCam | null = null;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache<ArtSprite>(700);
+  private sprites = new SpriteCache<ArtSprite>(700, MATCH_AREA);
   /** the art pixel (pixel/art-scale.ts), set by the screen from its canvas each frame */
   art: ArtScale = ART_C;
   private looks = new Map<string, Look>();
   private memos = new Map<string, Memo>();
   private last = new Map<string, ArtSprite>();
-  private budget = 0;
+  /** the near-first sprite budget (pixel/sprite-budget.ts) */
+  private budget = new SpriteBudget();
+  private steady = new Steady();
+  private frameAt = 0;
+  private lastT = NaN;
+  private lastAttack: Attack | null = null;
+  /** where each body was drawn last frame (the HUD anchors, pixel/anchors.ts), by body id */
+  private anchors = new Map<number, Anchor>();
+  private pinned = new Set<number>();
+  /** the owned ball rides with its owner's planted-foot offset (pitch metres) */
+  private ballShift = { x: 0, y: 0 };
+  /** the body the player controls when it isn't the attack's controlled man (defense played by
+   * default: the screen sets it); always drawn fresh */
+  controlled: number | null = null;
   private follow: Pt | null = null;
   private bits: { x: number; y: number; h: number; vx: number; vy: number; vh: number; life: number; color: string; size: number }[] = [];
   private acts = new Map<string, string>();
@@ -128,34 +144,16 @@ export class SoccerRenderer {
     return project(this.cam!, x, y, h);
   }
 
-  private sprite(b: Body, t: number, s: number, kitSide: 'us' | 'them'): ArtSprite {
+  /** A body's sprite request this frame (players-5: planned for every body first, then resolved in
+   * budget order): its motion, its cache key, how to draw it, and the next frame of a stride for
+   * pre-warm. */
+  private plan(b: Body, t: number, s: number, kitSide: 'us' | 'them', ball: { x: number; y: number }, must: boolean): { plan: SpritePlan<ArtSprite>; fr: BodyFrame } {
     const who = b.p.id + '|' + b.side + '|' + kitSide;
     let memo = this.memos.get(who);
     if (!memo) {
-      memo = { gait: { t, frac: (b.id * 0.29) % 1 }, face: { x: b.fx, y: b.fy }, faceAt: t };
+      memo = { gait: { t, frac: (b.id * 0.29) % 1 }, face: { x: b.fx, y: b.fy } };
       this.memos.set(who, memo);
     }
-    const grounded = b.act === 'tackle' || b.act === 'down' || b.act === 'dive';
-    let dir = { x: b.fx, y: b.fy };
-    if (b.role === 'gk' && b.act === 'dive') dir = { x: Math.sign(b.vx) || 1, y: 0 };
-    if (!grounded || b.role === 'gk') {
-      const target = Math.atan2(dir.y, dir.x);
-      const old = Math.atan2(memo.face.y, memo.face.x);
-      const delta = Math.atan2(Math.sin(target - old), Math.cos(target - old));
-      const k = b.act === 'dive' || b.act === 'kick' ? 1 : Math.min(1, Math.max(0, t - memo.faceAt) * 12);
-      const f = old + delta * k;
-      memo.face = { x: Math.cos(f), y: Math.sin(f) };
-    }
-    memo.faceAt = t;
-    dir = memo.face;
-    // drawn with V2's height spread around the game's mean (render only: the engine keeps b.p.ht)
-    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
-    const raw = Math.max(8, this.art.artPxFor(drawnM(b) * s));
-    const px = quantPx(raw, this.art.viewPerArt);
-    const dirs = px < 22 ? 8 : 16;
-    const facing = Math.atan2(-dir.y, dir.x);
-    const fb = (Math.round((facing / (Math.PI * 2)) * dirs) + dirs) % dirs;
-    const pitch = Math.round(Math.min(0.9, pitchAt(this.cam!, b.y)) / 0.15) * 0.15;
     let look = this.looks.get(who);
     if (!look || staleLook(look)) {
       // (a look made before the appearance data arrived: the drawings go, redrawn through the budget)
@@ -165,34 +163,103 @@ export class SoccerRenderer {
       look = lookFor(b, kit, gk);
       this.looks.set(who, look);
     }
-    const an = animOf(b, t, look, memo);
-    const step = an.clip ? (px < 22 ? Math.max(3, an.step ?? 2) : (an.step ?? 2)) : 1;
+    // the facing turns at 90° per 100 ms toward the engine's (a defender getting back faces the ball)
+    const fr = motionOf(b, t, look, memo, ball);
+    const an = fr.an;
+    // drawn with V2's height spread around the game's mean (render only: the engine keeps b.p.ht)
+    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
+    const raw = Math.max(8, this.art.artPxFor(drawnM(b) * s));
+    // (held through the camera's small moves: sprite-budget.ts Steady)
+    const { px, pitch } = this.steady.at(who, raw, quantPx(raw, this.art.viewPerArt), pitchAt(this.cam!, b.y));
+    const dirs = px < 22 ? 8 : 16;
+    const facing = Math.atan2(-Math.sin(fr.face), Math.cos(fr.face));
+    const fb = (Math.round((facing / (Math.PI * 2)) * dirs) + dirs) % dirs;
+    // the rate (V2 B.1.6): 30 fps for the must set, 15 for everyone else (far players
+    // too: they were 10); a must body's slow stride at half frames
+    const step = an.clip ? fineStep(stepFor(must, an.step ?? 2), an.gait?.rate ?? 1) : 1;
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
-    const key = an.clip ? mocapKey(an.clip, frame, 'clip') : an.key;
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
-    let spr = this.sprites.get(k);
-    if (!spr) {
-      const last = this.last.get(who);
-      if (this.budget <= 0 && last) return last;
-      this.budget--;
-      const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
-      const make = () => (an.clip ? drawBody(look!, mocapJoints(an.clip, frame, look!, { ground: 'clip' }), view, px) : drawBody(look!, { ...an.pose, lift: 0 }, view, px));
-      try {
-        spr = toView(make(), this.art);
-      } catch (e) {
-        if (!(e instanceof CanvasOut)) throw e;
-        this.sprites.dispose(this.last.values());
-        try {
-          spr = toView(make(), this.art);
-        } catch {
-          if (last) return last;
-          throw e;
-        }
+    const striding = !!an.gait;
+    const touch: Touches = {
+      heavy: 0,
+      fwd: striding ? fr.mo.lean.fwd : 0,
+      side: striding ? fr.mo.lean.side : 0,
+      stride: an.gait?.stride ?? 1,
+      dip: !!an.clip && fr.dip,
+      lead: an.clip ? fr.lead : 0,
+      bob: striding && an.clip ? headBob(frame / clipMeta(an.clip).frames, px) : 0,
+    };
+    const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
+    const keyOf = (fi: number) => (an.clip ? mocapKey(an.clip, fi, 'clip') : an.key) + touchKey(touch);
+    const k = (fi: number) => who + '|' + keyOf(fi) + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
+    const make = (fi: number) => () =>
+      toView(an.clip ? drawBody(look!, applyTouches(mocapJointsAtFrame(an.clip, fi, look!, { ground: 'clip' }), touch, px), view, px) : drawBody(look!, { ...an.pose, lift: 0 }, view, px), this.art);
+    const c = an.clip ? clipMeta(an.clip) : null;
+    const nf = c && c.loop ? nextFrame(frame, step, c.frames, true, an.gait?.reverse) : null;
+    const plan: SpritePlan<ArtSprite> = {
+      req: { who, px, must, staleFor: 0, near: -b.y },
+      key: k(frame),
+      make: make(frame),
+      next: nf !== null && nf !== frame ? { key: k(nf), make: make(nf) } : undefined,
+    };
+    return { plan, fr };
+  }
+
+  /** The must set (players-5): the man you're on, the ball's owner, the pass target, the owner's nearest
+   * defender and the body the player controls; always drawn fresh. */
+  private mustSet(a: Attack, target: number | null): Set<number> {
+    const out = new Set<number>();
+    const c = ctrlOf(a);
+    out.add(c.id);
+    const owner = a.ball.owner !== null ? a.bodies[a.ball.owner] : null;
+    if (owner) out.add(owner.id);
+    if (target !== null && a.bodies[target]) out.add(a.bodies[target].id);
+    if (this.controlled !== null) out.add(this.controlled);
+    const h = owner ?? c;
+    let near = Infinity;
+    let d: Body | null = null;
+    for (const o of a.bodies) {
+      if (o.side === h.side) continue;
+      const r = Math.hypot(o.x - h.x, o.y - h.y);
+      if (r < near) {
+        near = r;
+        d = o;
       }
-      this.sprites.set(k, spr, this.last.values());
     }
-    this.last.set(who, spr);
-    return spr;
+    if (d) out.add(d.id);
+    return out;
+  }
+
+  /** HUD anchors (players-5, section 6.3 of the team doc): where a body was drawn this frame, by body
+   * id. Name chips, rings and tap-to-pass use these, never the engine's spot and height. */
+  drawnOffset(id: number): { dx: number; dy: number } | null {
+    const an = this.anchors.get(id);
+    return an ? { dx: an.dx, dy: an.dy } : null;
+  }
+  headTop(id: number): HudPoint | null {
+    return anchorOf(this.anchors.get(id), 'head');
+  }
+  feetAt(id: number): HudPoint | null {
+    return anchorOf(this.anchors.get(id), 'feet');
+  }
+  groundEllipse(id: number): { rx: number; ry: number } | null {
+    const an = this.anchors.get(id);
+    return an ? { rx: an.rx, ry: an.ry } : null;
+  }
+  handAnchor(id: number, side: 'L' | 'R'): HudPoint | null {
+    return anchorOf(this.anchors.get(id), side === 'L' ? 'handL' : 'handR');
+  }
+  /** Force a fresh sprite for this body on the next frame drawn (a HUD ring or chip on him). */
+  pin(id: number) {
+    this.pinned.add(id);
+  }
+  /** A replay starting, a SIM jump, a long pause or a rematch: locomotion starts again from the next
+   * frame and the next frames pre-draw. The drawings and their area cap outlive the rematch. */
+  resetMotion() {
+    this.memos.clear();
+    this.anchors.clear();
+    this.budget.resetStale();
+    this.budget.warmUp();
+    this.lastT = NaN;
   }
 
   private drawGround(ctx: CanvasRenderingContext2D) {
@@ -317,7 +384,8 @@ export class SoccerRenderer {
   }
 
   private ball(ctx: CanvasRenderingContext2D, a: Attack) {
-    const b = a.ball;
+    // (at his feet, the ball rides with its owner's planted-foot offset: players-5)
+    const b = a.ball.owner !== null ? { ...a.ball, x: a.ball.x + this.ballShift.x, y: a.ball.y + this.ballShift.y } : a.ball;
     const g = this.lens(b.x, b.y);
     const r = Math.max(2, Math.round(g.s * 0.17));
     // the shadow on the grass, smaller and fainter as it rises
@@ -598,7 +666,35 @@ export class SoccerRenderer {
     this.cam = this.camAt(this.follow.x, this.follow.y);
     if (a.end?.kind === 'G' && this.goalAt === null) this.goalAt = a.t;
     if (!a.end) this.goalAt = null;
-    this.budget = 5;
+    // the frame's sprite budget from what drawings cost on this phone; a kickoff (a new attack), a
+    // replay's jump or a rematch pre-draws the next frames
+    const nowMs = performance.now();
+    // (a replay hands over a new snapshot every frame on a running clock: only an attack that starts its
+    // clock, or a jump in the clock, is a start)
+    if ((a !== this.lastAttack && a.t < MAX_DT) || !(a.t - this.lastT >= 0 && a.t - this.lastT <= MAX_DT)) this.budget.warmUp();
+    this.budget.begin(this.frameAt ? nowMs - this.frameAt : 1000 / 60);
+    this.frameAt = nowMs;
+    this.lastAttack = a;
+    this.lastT = a.t;
+    // every on-screen body's sprite planned first, then resolved near-first, then drawn far to near
+    const must = this.mustSet(a, o.target);
+    for (const i of this.pinned) must.add(i);
+    this.pinned.clear();
+    const planned = new Map<number, { plan: SpritePlan<ArtSprite>; fr: BodyFrame }>();
+    for (const b of a.bodies) {
+      const f = this.lens(b.x, b.y, b.h);
+      if (f.y < -60 || f.y > this.H + 90 || f.x < -60 || f.x > this.W + 60) continue;
+      planned.set(b.id, this.plan(b, a.t, this.lens(b.x, b.y).s, kitOf(b), a.ball, must.has(b.id)));
+    }
+    const got = resolveSprites([...planned.values()].map((q) => q.plan), this.sprites, this.last, this.budget, () => performance.now());
+    // the drawn spot: the engine's, plus the planted foot's offset (at most 5% of his height)
+    const drawnAt = (b: Body) => {
+      const mo = planned.get(b.id)?.fr.mo;
+      return { x: b.x + (mo?.ox ?? 0), y: b.y + (mo?.oy ?? 0) };
+    };
+    const owner = a.ball.owner !== null ? a.bodies[a.ball.owner] : null;
+    const om = owner ? planned.get(owner.id)?.fr.mo : undefined;
+    this.ballShift = { x: om?.ox ?? 0, y: om?.oy ?? 0 };
     const shx = o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0;
     const shy = o.shake ? Math.round((Math.random() - 0.5) * o.shake * 2) : 0;
     ctx.save();
@@ -610,7 +706,8 @@ export class SoccerRenderer {
     this.frame(ctx);
     // shadows (pixel/ground.ts: V2's soft contact shadow, shrinking as he rises)
     for (const b of a.bodies) {
-      const f = this.lens(b.x, b.y);
+      const dw = drawnAt(b);
+      const f = this.lens(dw.x, dw.y);
       const look = this.looks.get(b.p.id + '|' + b.side + '|' + kitOf(b));
       drawGroundMark(ctx, { x: f.x, y: f.y, shoulderPx: shoulderWidthPx(b.p.ht / 2.54, look?.wt ?? Math.round(23 * heightM(b) ** 2 * 2.2046), drawnM(b) * f.s), pitch: pitchAt(this.cam!, b.y), lift: b.h / heightM(b) });
     }
@@ -635,11 +732,17 @@ export class SoccerRenderer {
       items.push({
         y: b.y,
         draw: () => {
-          const f = this.lens(b.x, b.y, b.h);
-          if (f.y < -60 || f.y > this.H + 90 || f.x < -60 || f.x > this.W + 60) return;
-          const spr = this.sprite(b, a.t, this.lens(b.x, b.y).s, kitOf(b));
+          const pl = planned.get(b.id);
+          const r = pl && got.get(pl.plan.req.who);
+          if (!r) return;
+          const spr = r.spr;
+          const dw = drawnAt(b);
+          const f = this.lens(dw.x, dw.y, b.h);
           const x = Math.round(f.x - spr.ax);
           const y = Math.round(f.y - spr.ay);
+          const feet = this.lens(dw.x, dw.y);
+          const sim = this.lens(b.x, b.y);
+          this.anchors.set(b.id, { x, y, spr, feet: { x: feet.x, y: feet.y }, dx: feet.x - sim.x, dy: feet.y - sim.y, ...groundEllipse(shoulderWidthPx(b.p.ht / 2.54, this.looks.get(pl.plan.req.who)?.wt ?? Math.round(23 * heightM(b) ** 2 * 2.2046), drawnM(b) * feet.s), pitchAt(this.cam!, b.y)) });
           blitSprite(ctx, spr, x, y);
           heads[b.id] = { x: Math.round(f.x), y: y + spr.top };
         },

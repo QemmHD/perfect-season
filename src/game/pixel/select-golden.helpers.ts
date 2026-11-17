@@ -45,15 +45,26 @@ interface AnimLike {
   ground?: string;
   dribble?: number;
   ball?: string;
+  gait?: object;
 }
 const animHash = (an: AnimLike) => [an.key, an.clip ?? '', an.clip ? frameAt(an.clip, an.ct ?? 0, an.step ?? 2) : '', an.ct === undefined ? '' : an.ct.toFixed(5), an.step ?? '', an.ground ?? '', an.dribble ?? '', an.ball ?? '', poseHash(an.pose)].join('|');
 
 // ---- NBA ----
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/** players-5: a frame's motion as the renderers take it (select-*.ts `motionOf`) */
+interface FrameLike {
+  an: AnimLike;
+  face: number;
+  dip: boolean;
+  lead: number;
+  mo: { ox: number; oy: number; lean: { fwd: number; side: number } };
+}
+const frameHash = (f: FrameLike) => [animHash(f.an), f.face.toFixed(4), f.dip ? 'd' : '', f.lead.toFixed(4), f.mo.ox.toFixed(4), f.mo.oy.toFixed(4), f.mo.lean.fwd.toFixed(3), f.mo.lean.side.toFixed(3), f.an.gait ? JSON.stringify(f.an.gait) : ''].join('|');
+
 export interface NbaSel {
   CLIPS: string[];
   lookFor(b: any, kit: any): Look;
-  animOf(b: any, t: number, carrying: boolean, look: Look, m: any, shotAt: number | null): AnimLike;
+  motionOf(b: any, t: number, carrying: boolean, look: Look, m: any, shotAt: number | null): FrameLike;
   dunkStyle(b: any): string;
   spins360(b: any): boolean;
 }
@@ -92,8 +103,8 @@ export async function goldenNba(sel: NbaSel, games = 3): Promise<{ digest: strin
           if (!m) memos.set(who, (m = { gait: { t: p.t, frac: (b.idx * 0.29) % 1 }, last: null }));
           const ball = p.ball;
           const shotAt = ball && ball.kind === 'shot' && ball.who === b.idx && !AT_RIM.includes(ball.shot ?? '') ? ball.t0 : null;
-          const an = sel.animOf(b, p.t, p.handler === b.idx, look, m, shotAt);
-          d.add(lookHash(look) + '#' + animHash(an) + '#' + JSON.stringify(m) + '#' + sel.dunkStyle(b) + sel.spins360(b));
+          const fr = sel.motionOf(b, p.t, p.handler === b.idx, look, m, shotAt);
+          d.add(lookHash(look) + '#' + frameHash(fr) + '#' + JSON.stringify(m) + '#' + sel.dunkStyle(b) + sel.spins360(b));
         }
       }
       if (!p.end) p.end = { kind: 'clock', points: 0, text: '', who: -1 };
@@ -107,7 +118,7 @@ export async function goldenNba(sel: NbaSel, games = 3): Promise<{ digest: strin
 export interface NflSel {
   CLIPS: string[];
   lookFor(b: any, kit: any): Look;
-  animOf(b: any, t: number, p: any, look: Look, m: any, aiming: boolean): AnimLike;
+  motionOf(b: any, t: number, p: any, look: Look, m: any, aiming: boolean): FrameLike;
 }
 
 export async function goldenNfl(sel: NflSel, games = 2): Promise<{ digest: string; samples: number }> {
@@ -137,7 +148,7 @@ export async function goldenNfl(sel: NflSel, games = 2): Promise<{ digest: strin
   for (let gi = 0; gi < games; gi++) {
     const g = newGame(offenseOfSquad(SQ[gi % 2] as never, 'gold'), defenseOfSquad(SQ[(gi + 1) % 2] as never, 'gold'), 'gold' + gi);
     const pl = pilot(0.68, 'gold' + gi);
-    const memos = new Map<string, { gait: { t: number; frac: number }; face: { x: number; y: number }; faceAt: number }>();
+    const memos = new Map<string, { gait: { t: number; frac: number }; face: { x: number; y: number } }>();
     let guard = 0;
     while (!g.over && guard++ < 60) {
       if (g.down === 4) {
@@ -160,16 +171,10 @@ export async function goldenNfl(sel: NflSel, games = 2): Promise<{ digest: strin
         for (const b of p.bodies) {
           const who = b.p.id + '|' + b.side;
           let m = memos.get(who);
-          if (!m) memos.set(who, (m = { gait: { t: p.t, frac: (b.id * 0.29) % 1 }, face: { x: 0, y: b.side === 'O' ? 1 : -1 }, faceAt: p.t }));
-          // the renderer turns the memo's facing toward travel before it picks the animation
-          if (Math.hypot(b.vx, b.vy) > 0.6 && b.act !== 'tackle' && b.act !== 'down') {
-            const l = Math.hypot(b.vx, b.vy);
-            m.face = { x: b.vx / l, y: b.vy / l };
-          }
-          m.faceAt = p.t;
+          if (!m) memos.set(who, (m = { gait: { t: p.t, frac: (b.id * 0.29) % 1 }, face: { x: 0, y: b.side === 'O' ? 1 : -1 } }));
           const look = sel.lookFor(b, kit);
-          const an = sel.animOf(b, p.t, p, look, m, b === p.qb && p.phase === 'drop' && k % 120 < 30);
-          d.add(lookHash(look) + '#' + animHash(an) + '#' + JSON.stringify(m.gait));
+          const fr = sel.motionOf(b, p.t, p, look, m, b === p.qb && p.phase === 'drop' && k % 120 < 30);
+          d.add(lookHash(look) + '#' + frameHash(fr) + '#' + JSON.stringify(m.gait));
         }
       }
       if (!p.end) break;
@@ -183,7 +188,7 @@ export async function goldenNfl(sel: NflSel, games = 2): Promise<{ digest: strin
 export interface SoccerSel {
   CLIPS: string[];
   lookFor(b: any, kit: any, keeperKit: any): Look;
-  animOf(b: any, t: number, look: Look, m: any): AnimLike;
+  motionOf(b: any, t: number, look: Look, m: any, ball: { x: number; y: number }): FrameLike;
 }
 
 export async function goldenSoccer(sel: SoccerSel, attacks = 16): Promise<{ digest: string; samples: number }> {
@@ -218,7 +223,7 @@ export async function goldenSoccer(sel: SoccerSel, attacks = 16): Promise<{ dige
     const a = setupAttack(deal[i % deal.length], att, def, 'gd' + i, { clock: CLOCK, stoppage: false, defIQ: 0 });
     const pl = pilot(0.68, 'gp' + i);
     kickOff(a);
-    const memos = new Map<string, { gait: { t: number; frac: number }; face: { x: number; y: number }; faceAt: number }>();
+    const memos = new Map<string, { gait: { t: number; frac: number }; face: { x: number; y: number } }>();
     let n = 0;
     while (!a.end && n++ < 60 * 90) {
       step(a, 1 / 60, decide(a, pl));
@@ -226,12 +231,10 @@ export async function goldenSoccer(sel: SoccerSel, attacks = 16): Promise<{ dige
       for (const b of a.bodies) {
         const who = b.p.id + '|' + b.side;
         let m = memos.get(who);
-        if (!m) memos.set(who, (m = { gait: { t: a.t, frac: (b.id * 0.29) % 1 }, face: { x: b.fx, y: b.fy }, faceAt: a.t }));
-        m.face = { x: b.fx, y: b.fy };
-        m.faceAt = a.t;
+        if (!m) memos.set(who, (m = { gait: { t: a.t, frac: (b.id * 0.29) % 1 }, face: { x: b.fx, y: b.fy } }));
         const look = sel.lookFor(b, kit, gk);
-        const an = sel.animOf(b, a.t, look, m);
-        d.add(lookHash(look) + '#' + animHash(an) + '#' + JSON.stringify(m.gait));
+        const fr = sel.motionOf(b, a.t, look, m, a.ball);
+        d.add(lookHash(look) + '#' + frameHash(fr) + '#' + JSON.stringify(m.gait));
       }
     }
   }

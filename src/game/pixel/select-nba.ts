@@ -1,18 +1,20 @@
-// NBA player selection (studio overhaul players-2, moved verbatim from hoops2/render.ts): the look a
-// body is drawn with, the motion-capture clip or hand-keyed pose it shows each frame, its stride, its
-// dunk style, the rim hang and the dribble arm. Render only: it reads the engine's bodies and never
-// writes them. The renderer keeps the camera, the sprite cache and the drawing; the select-golden test
-// proves every choice here is the one the renderer made before the move.
+// NBA player selection (studio overhaul players-2, moved from hoops2/render.ts): the look a body is
+// drawn with, the motion-capture clip or hand-keyed pose it shows each frame, its stride, its dunk
+// style, the rim hang and the dribble arm. players-5: strides from locomotion.ts (a walk below the jog,
+// rates held to 0.8-1.25x, shorter steps for a slow drift, the defender's slide and backpedal at the
+// speed he moves), turns that take time, the planted foot and the lean (`motionOf`). Render only: it
+// reads the engine's bodies and never writes them. The renderer keeps the camera, the sprite cache
+// and the drawing; the select-golden test pins every choice here.
 import { refOf } from './appearance';
 import type { Look } from './body';
 import { matchLook } from './looks';
+import { bodyMotion, freshLoco, openHips, headingOf, type GaitOption, type GaitPick, type Heading, type Loco, type Motion, pickGait, advancePhase, MAX_DT, stepClock, type StrideNow, turnToward } from './locomotion';
 import { clipMeta, getClip, type Ground, legScale, warp } from './mocap';
 import * as P from './poses';
 import { preloadPixels } from './ready';
 import type { Joints, Pose } from './rig';
 import { NBA_STANDINS, standIn } from './select-family';
-import { heaviness } from './style';
-import { JUMPER_TOP, RIM_H } from '../hoops2/engine';
+import { JUMPER_TOP, RIM_H, topSpeed } from '../hoops2/engine';
 import type { Act, Body, Possession } from '../hoops2/types';
 import type { Kit } from '../hoops2/render';
 
@@ -45,7 +47,7 @@ export function lookFor(b: Body, kit: Kit): Look {
 /** The motion-capture clips the court uses (mocap.ts). They arrive in the NBA bundle before the first frame
  * (ready.ts); if they never do,
  * the hand-keyed poses below stand in. */
-export const CLIPS = ['jumpshot', 'layup', 'ready', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'celebrate', 'stumble', 'stumble_m', 'fall_back', 'fall_back_m', 'slip', 'slip_m', 'getup'];
+export const CLIPS = ['jumpshot', 'layup', 'ready', 'walk', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'celebrate', 'stumble', 'stumble_m', 'fall_back', 'fall_back_m', 'slip', 'slip_m', 'getup'];
 
 /** The jump shot: its recorded release lands at the top of the meter, so a green is let go at the
  * height of his jump. */
@@ -75,44 +77,64 @@ export interface Anim {
   ground?: Ground;
   /** the ball hand dribbling (0 the ball at the floor, 1 in his hand): the run with the ball */
   dribble?: number;
+  /** a stride (locomotion.ts): its rate, stride scale and direction, for the renderer and the anchor */
+  gait?: GaitPick;
+  /** a bump on the run (0-1): the body rocks back over his stride instead of stopping in a pose */
+  bump?: number;
 }
 
 /** What the drawing remembers of a body between frames: the stride it's in, the last shot or fall
  * (so a follow-through and a get-up play out after the engine has moved on). */
 export interface Memo {
-  gait: { t: number; frac: number };
+  /** the stride's phase on game time, and the stride last shown (kept while it still fits) */
+  gait: { t: number; frac: number; clip?: string; stride?: number };
   last: { act: 'shoot' | 'layup' | 'fall' | 'dunk' | 'contact' | 'standdunk'; at: number; kind?: 'posterized' | 'ankles' } | null;
+  /** locomotion's state (players-5): drawn facing, turn, planted foot, lean; made on first use */
+  loco?: Loco;
 }
 
 /** The finishes that aren't jump shots (the rest of a shot's kinds are jumpers). */
 export const AT_RIM = ['layup', 'dunk', 'contact', 'standdunk', 'oop'];
 
 const has = (name: string) => !!getClip(name);
+/** over this (ft/s) a body is moving: his feet stride (players-5: the 1-3 ft/s dead bands are gone) */
+const MOVING = 1;
 const mirrorOf = (b: Body, name: string) => (b.p.id.length % 2 ? name + '_m' : name);
 
-/** A stride on the run: jog, run or sprint by his speed, played at the rate his feet keep up with
- * the floor, the phase carried from frame to frame so a change of speed doesn't skip a step. */
-export function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { clip: string; ct: number } | null {
-  if (!has('jog') || !has('run') || !has('sprint')) return null;
-  // the clip's ground speed in feet a second on this man's sprite legs
-  const ft = (name: string) => clipMeta(name).root.speed * legScale(look) * (b.p.ht / 12);
-  const options = ['jog', 'run', 'sprint'];
-  let clip = options[0];
-  let best = Infinity;
-  for (const c of options) {
-    const d = Math.abs(Math.log(speed / ft(c)));
-    if (d < best) {
-      best = d;
-      clip = c;
-    }
-  }
-  // a heavy man's stride comes round a little slower (the lineman's plod, not the guard's patter)
-  const rate = Math.max(0.65, Math.min(1.5, speed / ft(clip))) * (1.04 - 0.1 * heaviness(b.p.wt, b.p.ht));
-  const dt = t - m.gait.t;
-  if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + (dt * rate) / clipMeta(clip).duration) % 1;
-  m.gait.t = t;
-  return { clip, ct: m.gait.frac * clipMeta(clip).duration };
+/** A recorded stride's ground speed on this man's sprite legs, ft/s at rate 1. */
+const ftOf = (b: Body, look: Look, name: string) => clipMeta(name).root.speed * legScale(look) * (b.p.ht / 12);
+
+/** The strides for each way he travels relative to where he faces (locomotion.ts `pickGait` picks):
+ * forward walk, jog, run, sprint; back the backpedal, then a back-run (walk or jog played backward);
+ * sideways the defensive slide, its steps shortening for a slow drift. */
+export function gaitOptions(b: Body, look: Look, h: Heading): GaitOption[] {
+  const o = (clip: string, more: Partial<GaitOption> = {}): GaitOption => ({ clip, speed: ftOf(b, look, clip), ...more });
+  const list =
+    h === 'fwd'
+      ? ['walk', 'jog', 'run', 'sprint'].map((c) => o(c))
+      : h === 'back'
+        ? [o('backpedal'), o('walk', { reverse: true }), o('jog', { reverse: true })]
+        : [o(h === 'right' ? 'shuffle' : 'shuffle_l', { minStride: 0.15 })];
+  return list.filter((g) => has(g.clip));
 }
+
+/** A stride at his speed: the pick (rate 0.8-1.25x, stride scale), its phase carried from frame to frame
+ * on game time so a change of speed or clip doesn't skip a step. */
+export function stride(t: number, m: Memo, speed: number, options: GaitOption[]): { clip: string; ct: number; pick: GaitPick } | null {
+  if (!options.length) return null;
+  const dt = t - m.gait.t;
+  const fresh = dt > 0 && dt <= MAX_DT;
+  const pick = pickGait(speed, options, fresh && m.gait.clip ? { clip: m.gait.clip, stride: m.gait.stride ?? 1 } : undefined);
+  const meta = clipMeta(pick.clip);
+  if (fresh) m.gait.frac = advancePhase(m.gait.frac, dt, pick.rate, meta.duration, pick.reverse);
+  m.gait.t = t;
+  m.gait.clip = pick.clip;
+  m.gait.stride = pick.stride;
+  return { clip: pick.clip, ct: m.gait.frac * meta.duration, pick };
+}
+
+/** The drawn facing (the turn under way, locomotion.ts), or the engine's before the first frame. */
+const faceOf = (b: Body, m: Memo) => m.loco?.face ?? b.face;
 
 /** Every act the NBA selection animates (hoops2/types.ts `Act`); anything else gets a stand-in. */
 export const KNOWN_ACTS: ReadonlySet<string> = new Set<Act>(['idle', 'screen', 'run', 'dribble', 'shoot', 'layup', 'dunk', 'contact', 'standdunk', 'pass', 'catch', 'defend', 'contest', 'block', 'cross', 'stepback', 'spin', 'stumble', 'fall', 'land', 'celebrate', 'rebound']);
@@ -136,6 +158,11 @@ function animKnown(b: Body, t: number, carrying: boolean, look: Look, m: Memo, s
   const air = b.h > 0.05;
   const clip = (name: string, ct: number, opts: Partial<Anim> = {}): Anim =>
     has(name) ? { key: '', pose: pose.pose, clip: name, ct, step: 2, ground: air ? 'pin' : 'clip', ...opts } : pose;
+  // a stride the way he travels, at the speed he travels
+  const go = (opts: Partial<Anim> = {}): Anim | null => {
+    const g = stride(t, m, speed, gaitOptions(b, look, headingOf(faceOf(b, m), b.vx, b.vz)));
+    return g ? clip(g.clip, g.ct, { gait: g.pick, ...opts }) : null;
+  };
   // remember the moments whose ends play out after the engine moves on
   if (m.last && t < m.last.at) m.last = null;
   if (b.act === 'shoot' || b.act === 'layup' || b.act === 'dunk' || b.act === 'contact' || b.act === 'standdunk') m.last = { act: b.act, at: b.actAt };
@@ -144,6 +171,10 @@ function animKnown(b: Body, t: number, carrying: boolean, look: Look, m: Memo, s
   const since = t - b.actAt;
   if (b.contactAt !== undefined && t >= b.contactAt && t - b.contactAt < 0.18 && !air && !AT_RIM.includes(b.act)) {
     const bump = Math.sin((t - b.contactAt) / 0.18 * Math.PI);
+    // moving: the bump rocks him back over his stride (his feet keep going)
+    const arm = b.act === 'dribble' ? { dribble: Math.round(P.dribbleBall((t * (1.5 + speed / 18)) % 1, 1) * 4) / 4 } : {};
+    const run = speed > MOVING && (b.act === 'run' || b.act === 'dribble' || b.act === 'defend') ? go({ bump: Math.round(bump * 5) / 5, ...arm }) : null;
+    if (run) return run;
     return { key: 'body-up:' + Math.round(bump * 5) + ':' + pose.key, pose: { ...pose.pose, lean: pose.pose.lean - 0.18 * bump, crouch: pose.pose.crouch + 0.035 * bump } };
   }
   // the follow-through and the landing after the ball's gone; the get-up after a fall
@@ -154,7 +185,8 @@ function animKnown(b: Body, t: number, carrying: boolean, look: Look, m: Memo, s
     // a dunker hangs on in his dunk until he's down
     if ((tail.act === 'dunk' || tail.act === 'contact' || tail.act === 'standdunk') && (air || ts < 0.75)) return poseOf({ ...b, act: tail.act, actAt: tail.at }, t, false);
     if (tail.act === 'layup' && ts < 0.95) return clip('layup', LAYUP(ts), { ground: 'pin' });
-    if (tail.act === 'fall') {
+    // (once the engine has him running again, he's up: the get-up gives way to his stride)
+    if (tail.act === 'fall' && speed <= 3) {
       const up = tail.kind === 'posterized' ? POSTER_UP : ANKLES_UP;
       const ct = up.from + (ts - up.at) * up.rate;
       if (ct < GETUP_END) return clip('getup', ct);
@@ -174,44 +206,19 @@ function animKnown(b: Body, t: number, carrying: boolean, look: Look, m: Memo, s
       return clip(mirrorOf(b, 'stumble'), since * 1.3);
     case 'celebrate':
       return clip('celebrate', since);
-    case 'run': {
-      const g = speed > 2.5 ? gait(b, t, look, m, speed) : null;
-      return g ? clip(g.clip, g.ct) : clip('ready', t + b.idx * 0.37, { step: 3 });
-    }
+    case 'run':
     case 'idle':
-      return clip('ready', t + b.idx * 0.37, { step: 3 });
+      // moving at all, a stride (a walk below the jog: no frozen stance while he drifts)
+      return (speed > MOVING ? go() : null) ?? clip('ready', t + b.idx * 0.37);
     case 'dribble': {
       // on the move: a real stride, the ball hand pumping with the bounce (the same beat the ball keeps)
-      if (speed <= 1.8) return pose;
-      const g = gait(b, t, look, m, speed);
-      if (!g) return pose;
+      if (speed <= MOVING) return pose;
       const up = P.dribbleBall((t * (1.5 + speed / 18)) % 1, 1);
-      return clip(g.clip, g.ct, { dribble: Math.round(up * 4) / 4 });
+      return go({ dribble: Math.round(up * 4) / 4 }) ?? pose;
     }
-    case 'defend': {
-      if (speed <= 3) return pose;
-      // sliding with his man: the defensive shuffle to his right or left; going back or up the
-      // floor, a stride
-      const lat = -b.vx * Math.sin(b.face) + b.vz * Math.cos(b.face);
-      const fwd = b.vx * Math.cos(b.face) + b.vz * Math.sin(b.face);
-      if (fwd < -3 && Math.abs(fwd) >= Math.abs(lat) && has('backpedal')) {
-        const name = 'backpedal', ft = clipMeta(name).root.speed * legScale(look) * (b.p.ht / 12);
-        const dt = t - m.gait.t;
-        if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + dt * Math.max(0.7, Math.min(1.6, -fwd / Math.max(0.1, ft))) / clipMeta(name).duration) % 1;
-        m.gait.t = t;
-        return clip(name, m.gait.frac * clipMeta(name).duration);
-      }
-      if (Math.abs(lat) > Math.abs(fwd) && has('shuffle')) {
-        const name = lat > 0 ? 'shuffle' : 'shuffle_l';
-        const ft = clipMeta(name).root.speed * legScale(look) * (b.p.ht / 12);
-        const dt = t - m.gait.t;
-        if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + (dt * Math.max(0.7, Math.min(1.6, Math.abs(lat) / ft))) / clipMeta(name).duration) % 1;
-        m.gait.t = t;
-        return clip(name, m.gait.frac * clipMeta(name).duration);
-      }
-      const g = gait(b, t, look, m, speed);
-      return g ? clip(g.clip, g.ct) : pose;
-    }
+    case 'defend':
+      // sliding with his man at the speed he slides, backpedalling or running back at his speed
+      return (speed > MOVING ? go() : null) ?? pose;
     default:
       return pose;
   }
@@ -325,4 +332,29 @@ export function poseOf(b: Body, t: number, carrying: boolean): { key: string; po
       return { key: 'id' + ph, pose: P.idle(ph) };
     }
   }
+}
+
+/** A frame's motion for one body (players-5): what he shows, the facing to draw him in (turning at
+ * 90° per 100 ms toward the engine's, a plant's dip, the head's lead), and the planted-foot offset
+ * and lean. Spins and falls take the engine's facing at once. */
+export interface BodyFrame {
+  an: Anim;
+  face: number;
+  dip: boolean;
+  lead: number;
+  mo: Motion;
+}
+
+export function motionOf(b: Body, t: number, carrying: boolean, look: Look, m: Memo, shotAt: number | null): BodyFrame {
+  const loco = (m.loco ??= freshLoco(b.face));
+  // where he looks (the engine's facing), unless he slides or backs off faster than his feet can that way
+  const want = openHips(b.face, b.vx, b.vz, (h) => gaitOptions(b, look, h));
+  const { dt } = stepClock(loco, t, want);
+  const exempt = b.act === 'spin' || b.act === 'fall' || b.act === 'stumble' || spins360(b);
+  const tr = turnToward(loco, want, dt, t, exempt);
+  const an = animOf(b, t, carrying, look, m, shotAt);
+  const ft = legScale(look) * (b.p.ht / 12);
+  const stride: StrideNow | null = an.gait && an.clip ? { meta: clipMeta(an.clip), ct: an.ct ?? 0, pick: an.gait, unitsPerLeg: ft } : null;
+  const mo = bodyMotion(loco, { t, dt, vx: b.vx, vy: b.vz, face: tr.face, turnRate: dt > 0 ? tr.lead / dt : 0, top: topSpeed(b, false), height: b.p.ht / 12, airborne: b.h > 0.05, stride });
+  return { an, face: tr.face, dip: tr.dip, lead: tr.lead, mo };
 }

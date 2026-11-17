@@ -190,15 +190,34 @@ export function freeCanvas(c: HTMLCanvasElement | null | undefined) {
   c.height = 0;
 }
 
+/** An area account several caches share (sprite-budget.ts `AreaPool`): art pixels held, and the cap. */
+export interface AreaAccount {
+  cap: number;
+  used: number;
+  add(a: number): void;
+  sub(a: number): void;
+}
+
+/** The art pixels a drawing holds: its canvas over its canvas px per art px (art-scale.ts), squared. */
+const areaOf = (s: Sprite & { cpa?: number }) => {
+  const k = s.cpa && s.cpa > 0 ? s.cpa : 1;
+  return (s.canvas.width * s.canvas.height) / (k * k);
+};
+
 /**
  * The drawings a renderer keeps, the oldest out first once there are `cap` of them. Each is a canvas,
  * and a phone's browser caps the canvas memory a page may hold (iOS freezes the page past it), so a
  * long game mustn't pile them up. `inUse` are drawings still on screen (kept whole). A hit moves a
- * drawing to the back of the line.
+ * drawing to the back of the line. With an `area` account (players-5: every match cache shares one
+ * 6 Mpx cap), the oldest drawings not in use also go while a new one would take the account past it.
  */
 export class SpriteCache<S extends Sprite = Sprite> {
   private map = new Map<string, S>();
-  constructor(private cap: number) {}
+  private areas = new Map<string, number>();
+  constructor(
+    private cap: number,
+    private area?: AreaAccount,
+  ) {}
   get(key: string): S | undefined {
     const s = this.map.get(key);
     if (s) {
@@ -207,27 +226,62 @@ export class SpriteCache<S extends Sprite = Sprite> {
     }
     return s;
   }
+  /** Whether a drawing is kept, without counting as a use (pre-warm asks this). */
+  has(key: string): boolean {
+    return this.map.has(key);
+  }
+  get size() {
+    return this.map.size;
+  }
+  private drop(k: string, s: S, keep: Set<Sprite>) {
+    this.map.delete(k);
+    this.area?.sub(this.areas.get(k) ?? 0);
+    this.areas.delete(k);
+    // let the browser have the memory back now (a zero-size canvas holds none)
+    if (!keep.has(s)) freeCanvas(s.canvas);
+  }
   set(key: string, spr: S, inUse: Iterable<Sprite>) {
+    let keep: Set<Sprite> | null = null;
+    const old = this.map.get(key);
+    if (old) {
+      keep = new Set(inUse);
+      keep.add(spr);
+      this.drop(key, old, keep);
+    }
     if (this.map.size >= this.cap) {
-      const keep = new Set(inUse);
-      let drop = Math.ceil(this.cap / 3);
+      keep ??= new Set(inUse);
+      let n = Math.ceil(this.cap / 3);
       for (const [k, s] of this.map) {
-        if (drop-- <= 0) break;
-        this.map.delete(k);
-        // let the browser have the memory back now (a zero-size canvas holds none)
-        if (!keep.has(s)) freeCanvas(s.canvas);
+        if (n-- <= 0) break;
+        this.drop(k, s, keep);
+      }
+    }
+    const a = this.area ? areaOf(spr) : 0;
+    if (this.area && this.area.used + a > this.area.cap) {
+      keep ??= new Set(inUse);
+      // oldest first, sparing what's on screen now
+      for (const [k, s] of this.map) {
+        if (this.area.used + a <= this.area.cap) break;
+        if (keep.has(s)) continue;
+        this.drop(k, s, keep);
       }
     }
     this.map.set(key, spr);
+    if (this.area) {
+      this.areas.set(key, a);
+      this.area.add(a);
+    }
   }
   clear() {
+    for (const a of this.areas.values()) this.area?.sub(a);
+    this.areas.clear();
     this.map.clear();
   }
   /** Drop every drawing and hand back its memory (the game's over, or the phone is short of it). */
   dispose(keep: Iterable<Sprite> = []) {
     const k = new Set(keep);
     for (const s of this.map.values()) if (!k.has(s)) freeCanvas(s.canvas);
-    this.map.clear();
+    this.clear();
   }
 }
 

@@ -3,20 +3,23 @@
 // row at a time, the arena's stands behind the basket, ten rigged players in their moves, the ball,
 // the backboard, rim and net, the 2K-style shot meter arched over the shooter and the contest grade.
 // What each player looks like and which clip or pose he shows is chosen in pixel/select-nba.ts.
-import { drawBody, type Look, SpriteCache, CanvasOut, freeCanvas } from '../pixel/body';
+import { drawBody, type Look, SpriteCache, freeCanvas } from '../pixel/body';
 import { type CourtTheme, text } from '../pixel/court';
-import { frameAt, mocapJoints, mocapKey } from '../pixel/mocap';
+import { clipMeta, frameAt, mocapJointsAtFrame, mocapKey } from '../pixel/mocap';
 import { wantPixels } from '../pixel/ready';
 import { type ArtScale, ART_C, type ArtSprite, blitSprite, quantPx, toView } from '../pixel/art-scale';
-import { drawGroundMark } from '../pixel/ground';
+import { drawGroundMark, groundEllipse } from '../pixel/ground';
 import { courtTexture, drawFloor, type FieldTex, type PCam, pcam, pitchAt, project } from '../pixel/persp';
 import { drawnHeight, shoulderWidthPx } from '../pixel/proportions';
 import * as P from '../pixel/poses';
 import type { Pose } from '../pixel/rig';
-import { AT_RIM, type Anim, animOf, dribbleArm, hangOf, lookFor, type Memo, spins360 } from '../pixel/select-nba';
+import { AT_RIM, type Anim, type BodyFrame, dribbleArm, hangOf, lookFor, type Memo, motionOf, spins360 } from '../pixel/select-nba';
 import { staleLook } from '../pixel/looks';
 import { drawVignette } from '../pixel/venue';
-import { heaviness, leanForward, sprintLean, widen } from '../pixel/style';
+import { heaviness, sprintLean } from '../pixel/style';
+import { applyTouches, fineStep, headBob, LEAN_MAX, MAX_DT, nextFrame, stepFor, touchKey, type Touches } from '../pixel/locomotion';
+import { MATCH_AREA, resolveSprites, Steady, SpriteBudget, type SpritePlan } from '../pixel/sprite-budget';
+import { type Anchor, anchorOf, type HudPoint } from '../pixel/anchors';
 import { type Juice, squashStretch } from '../juice';
 import { ballPos, contestOf, RIM, RIM_H, shotChance, topSpeed } from './engine';
 import { TIER_NAMES } from './badges';
@@ -61,7 +64,7 @@ export class HoopsRenderer {
   private pc!: PCam;
   private tex: FieldTex | null = null;
   private floor: { canvas: HTMLCanvasElement; img: ImageData; px: Uint32Array } | null = null;
-  private sprites = new SpriteCache<ArtSprite>(360);
+  private sprites = new SpriteCache<ArtSprite>(360, MATCH_AREA);
   private last = new Map<string, ArtSprite>();
   /** the art pixel (pixel/art-scale.ts), set by the screen from its canvas each frame */
   art: ArtScale = ART_C;
@@ -74,7 +77,17 @@ export class HoopsRenderer {
     freeCanvas(this.floor?.canvas);
     this.floor = null;
   }
-  private budget = 0;
+  /** the near-first sprite budget (pixel/sprite-budget.ts) */
+  private budget = new SpriteBudget();
+  private steady = new Steady();
+  private frameAt = 0;
+  private lastT = NaN;
+  private lastP: Possession | null = null;
+  /** where each body was drawn last frame (the HUD anchors, pixel/anchors.ts), by body index */
+  private anchors = new Map<number, Anchor>();
+  /** the body the player controls when it isn't the handler (defense played by default: the screen
+   * sets it); always drawn fresh */
+  controlled: number | null = null;
   private looks = new Map<string, Look>();
   private memos = new Map<string, Memo>();
   private lastLift = new Map<string, boolean>();
@@ -134,20 +147,10 @@ export class HoopsRenderer {
   }
   private prevBall: { x: number; y: number; real: number } | null = null;
 
-  /** A body's drawing this frame and whether the jump is drawn into it (then he's placed on the floor). */
-  private sprite(b: Body, t: number, carrying: boolean, kit: Kit, s: number, ball: Possession['ball'], over?: { key: string; pose: Pose }): { spr: ArtSprite; ownLift: boolean } {
-    // facing on screen: the camera looks up the floor (+cx), across is +cz to the right; a 360
-    // dunk turns him all the way round on the way up
-    const turn = spins360(b) ? Math.PI * 2 * Math.min(1, Math.max(0, (t - b.actAt - 0.12) / 0.42)) : 0;
-    const dcx = Math.cos(b.face + turn);
-    const dcz = Math.sin(b.face + turn);
-    // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
-    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
-    const raw = Math.max(10, this.art.artPxFor((drawnHeight('nba', b.p.ht) / 12) * s));
-    const px = quantPx(raw, this.art.viewPerArt);
-    const dirs = px < 26 ? 8 : 16;
-    const fb = (Math.round((Math.atan2(-dcx, dcz) / (Math.PI * 2)) * dirs) + dirs) % dirs;
-    const pitch = Math.round(Math.min(0.9, pitchAt(this.pc, b.cx)) / 0.15) * 0.15;
+  /** A body's sprite request this frame (players-5: planned for every body first, then resolved in
+   * budget order): its motion, its cache key and how to draw it, whether the jump is drawn into it (then
+   * he's placed on the floor), and the next frame of a stride for pre-warm. */
+  private plan(b: Body, t: number, carrying: boolean, kit: Kit, s: number, ball: Possession['ball'], must: boolean, over?: { key: string; pose: Pose }): { plan: SpritePlan<ArtSprite>; ownLift: boolean; fr: BodyFrame | null } {
     const who = b.p.id + '|' + b.side;
     let look = this.looks.get(who);
     if (!look || staleLook(look)) {
@@ -162,49 +165,122 @@ export class HoopsRenderer {
       this.memos.set(who, memo);
     }
     const shotAt = ball && ball.kind === 'shot' && ball.who === b.idx && !AT_RIM.includes(ball.shot ?? '') ? ball.t0 : null;
-    const an: Anim = over ? { key: over.key, pose: over.pose } : animOf(b, t, carrying, look, memo, shotAt);
-    const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, an.step ?? 2) : 0;
-    // body type on the run: a heavy man's wider base, a fast man's sprint lean
-    const striding = !!an.clip && (an.clip === 'jog' || an.clip === 'run' || an.clip === 'sprint');
-    const heavy = striding ? Math.round(heaviness(b.p.wt, b.p.ht) * 4) / 4 : 0;
-    const lean = striding ? sprintLean(b.p.spd, Math.hypot(b.vx, b.vz) / Math.max(1, topSpeed(b, false))) : 0;
-    const key = (an.clip ? mocapKey(an.clip, frame, an.ground) + (an.dribble !== undefined ? 'd' + an.dribble : '') : an.key) + (heavy ? 'w' + heavy : '') + (lean ? 'l' + lean : '');
+    // the motion (turn, stride, planted foot, lean) runs every frame, a rim hang included
+    const fr = motionOf(b, t, carrying, look, memo, shotAt);
+    const an: Anim = over ? { key: over.key, pose: over.pose } : fr.an;
+    // facing on screen: the camera looks up the floor (+cx), across is +cz to the right; a 360
+    // dunk turns him all the way round on the way up
+    const turn = spins360(b) ? Math.PI * 2 * Math.min(1, Math.max(0, (t - b.actAt - 0.12) / 0.42)) : 0;
+    const dcx = Math.cos(fr.face + turn);
+    const dcz = Math.sin(fr.face + turn);
+    // drawn with V2's height spread around the league mean (render only: the engine keeps b.p.ht)
+    // rasterised at its own art size (far players natively, never scaled down from a bigger drawing)
+    const raw = Math.max(10, this.art.artPxFor((drawnHeight('nba', b.p.ht) / 12) * s));
+    // (held through the camera's small moves: sprite-budget.ts Steady)
+    const { px, pitch } = this.steady.at(who, raw, quantPx(raw, this.art.viewPerArt), pitchAt(this.pc, b.cx));
+    const dirs = px < 26 ? 8 : 16;
+    const fb = (Math.round((Math.atan2(-dcx, dcz) / (Math.PI * 2)) * dirs) + dirs) % dirs;
+    // the rate (V2 B.1.6): 30 fps for the must set, 15 for everyone else; a slow stride of a
+    // must body at half frames so it still shows 30 new frames a second
+    const step = an.clip ? fineStep(stepFor(must, an.step ?? 2), an.gait?.rate ?? 1) : 1;
+    const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
+    // body type and locomotion on the run: a heavy man's wider base, the lean, short steps, the plant,
+    // the head's lead and bob
+    const striding = !!an.gait;
+    // (a bump on the run rocks him back up to 0.18 rad over his stride)
+    const lean = striding ? Math.min(LEAN_MAX, sprintLean(b.p.spd, Math.hypot(b.vx, b.vz) / Math.max(1, topSpeed(b, false))) + fr.mo.lean.fwd) - 0.18 * (an.bump ?? 0) : 0;
+    const touch: Touches = {
+      heavy: striding ? Math.round(heaviness(b.p.wt, b.p.ht) * 4) / 4 : 0,
+      fwd: lean,
+      side: striding ? fr.mo.lean.side : 0,
+      stride: an.gait?.stride ?? 1,
+      dip: !!an.clip && fr.dip,
+      lead: an.clip ? fr.lead : 0,
+      bob: striding && an.clip ? headBob(frame / clipMeta(an.clip).frames, px) : 0,
+    };
     const ownLift = !!an.clip && an.ground === 'clip';
-    const k = who + '|' + key + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
-    let spr = this.sprites.get(k);
-    if (!spr) {
-      // a few new drawings a frame (the man with the ball always gets his): the rest keep last frame's
-      const last = this.last.get(who);
-      if (this.budget <= 0 && last && !carrying) return { spr: last, ownLift: this.lastLift.get(who) ?? false };
-      this.budget--;
-      const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
-      const make = () => {
-        if (!an.clip) return drawBody(look, { ...an.pose, lift: 0 }, view, px);
-        let j = mocapJoints(an.clip, frame, look, { ground: an.ground });
-        if (an.dribble !== undefined) j = dribbleArm(j, an.dribble);
-        if (heavy) j = widen(j, heavy * 0.45, heavy * 0.008);
-        if (lean) j = leanForward(j, lean);
-        return drawBody(look, j, view, px);
-      };
-      try {
-        spr = toView(make(), this.art);
-      } catch (e) {
-        if (!(e instanceof CanvasOut)) throw e;
-        // the phone is out of canvas memory: let go of every old drawing and try once more; failing
-        // that, he keeps last frame's
-        this.sprites.dispose(this.last.values());
-        try {
-          spr = toView(make(), this.art);
-        } catch {
-          if (last) return { spr: last, ownLift: this.lastLift.get(who) ?? false };
-          throw e;
+    const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
+    const keyOf = (fi: number) => (an.clip ? mocapKey(an.clip, fi, an.ground) + (an.dribble !== undefined ? 'd' + an.dribble : '') : an.key) + touchKey(touch);
+    const k = (fi: number) => who + '|' + keyOf(fi) + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
+    const make = (fi: number) => () => {
+      if (!an.clip) return toView(drawBody(look, { ...an.pose, lift: 0 }, view, px), this.art);
+      let j = mocapJointsAtFrame(an.clip, fi, look, { ground: an.ground });
+      if (an.dribble !== undefined) j = dribbleArm(j, an.dribble);
+      return toView(drawBody(look, applyTouches(j, touch, px), view, px), this.art);
+    };
+    const c = an.clip ? clipMeta(an.clip) : null;
+    const nf = c && c.loop ? nextFrame(frame, step, c.frames, true, an.gait?.reverse) : null;
+    const plan: SpritePlan<ArtSprite> = {
+      req: { who, px, must, staleFor: 0, near: -b.cx },
+      key: k(frame),
+      make: make(frame),
+      next: nf !== null && nf !== frame ? { key: k(nf), make: make(nf) } : undefined,
+    };
+    return { plan, ownLift, fr: over ? null : fr };
+  }
+
+  /** The must set (players-5): the handler, his pass target, his nearest defender, the rebounder racing
+   * for the ball and the body the player controls; always drawn fresh. */
+  private mustSet(p: Possession): Set<number> {
+    const out = new Set<number>();
+    const add = (i: number | null | undefined) => {
+      if (i !== null && i !== undefined && p.bodies[i]) out.add(i);
+    };
+    add(p.handler);
+    add(p.target);
+    add(p.rebounder);
+    add(this.controlled);
+    const h = p.handler !== null ? p.bodies[p.handler] : null;
+    if (h) {
+      let near = Infinity;
+      let d: number | null = null;
+      for (const o of p.bodies) {
+        if (o.side === h.side) continue;
+        const r = Math.hypot(o.cx - h.cx, o.cz - h.cz);
+        if (r < near) {
+          near = r;
+          d = o.idx;
         }
       }
-      this.sprites.set(k, spr, this.last.values());
+      add(d);
     }
-    this.last.set(who, spr);
-    this.lastLift.set(who, ownLift);
-    return { spr, ownLift };
+    return out;
+  }
+
+  /** HUD anchors (players-5, section 6.3 of the team doc): where a body was drawn this frame, by body
+   * index. The drawn feet and head, not the engine's spot and height: name chips, rings and tap-to-pass
+   * use these. */
+  drawnOffset(idx: number): { dx: number; dy: number } | null {
+    const a = this.anchors.get(idx);
+    return a ? { dx: a.dx, dy: a.dy } : null;
+  }
+  headTop(idx: number): HudPoint | null {
+    return anchorOf(this.anchors.get(idx), 'head');
+  }
+  feetAt(idx: number): HudPoint | null {
+    return anchorOf(this.anchors.get(idx), 'feet');
+  }
+  groundEllipse(idx: number): { rx: number; ry: number } | null {
+    const a = this.anchors.get(idx);
+    return a ? { rx: a.rx, ry: a.ry } : null;
+  }
+  handAnchor(idx: number, side: 'L' | 'R'): HudPoint | null {
+    return anchorOf(this.anchors.get(idx), side === 'L' ? 'handL' : 'handR');
+  }
+  /** Force a fresh sprite for this body on the next frame drawn (a HUD ring or chip on him). */
+  pin(idx: number) {
+    this.pinned.add(idx);
+  }
+  private pinned = new Set<number>();
+  /** A replay starting, a SIM jump, a long pause or a rematch: locomotion starts again from the next
+   * frame (no turn, planted foot or lean carried over), and the next frames pre-draw. The drawings
+   * stay: the cache and its area cap outlive the rematch. */
+  resetMotion() {
+    this.memos.clear();
+    this.anchors.clear();
+    this.budget.resetStale();
+    this.budget.warmUp();
+    this.lastT = NaN;
   }
 
   private drawFloorNow(ctx: CanvasRenderingContext2D) {
@@ -366,7 +442,16 @@ export class HoopsRenderer {
     // holds game time while the first load is on its way (holdPlay)
     wantPixels('nba');
     ctx.setTransform(this.art.backing, 0, 0, this.art.backing, 0, 0);
-    this.budget = 4;
+    // the frame's sprite budget from what drawings cost on this phone; a new possession (an inbound),
+    // a replay's jump or a rematch pre-draws the next frames
+    const nowMs = performance.now();
+    // (a replay hands over a new snapshot every frame on a running clock: only a state that starts its
+    // clock, or a jump in the clock, is a start)
+    if ((p !== this.lastP && p.t < MAX_DT) || !(p.t - this.lastT >= 0 && p.t - this.lastT <= MAX_DT)) this.budget.warmUp();
+    this.budget.begin(this.frameAt ? nowMs - this.frameAt : 1000 / 60);
+    this.frameAt = nowMs;
+    this.lastP = p;
+    this.lastT = p.t;
     ctx.imageSmoothingEnabled = false;
     // the camera drifts across with the ball and a little up and down the floor with it
     const bp = ballPos(p);
@@ -407,10 +492,26 @@ export class HoopsRenderer {
       ctx.strokeStyle='#19e3c9';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(f.x,f.y,Math.max(6,f.s*1.7),Math.max(2,f.s*.6),0,0,Math.PI*2);ctx.stroke();
       ctx.strokeStyle='#ffd579bb';ctx.setLineDash([3,3]);ctx.beginPath();ctx.ellipse(to.x,to.y,Math.max(6,to.s*2),Math.max(2,to.s*.7),0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
     }
-    // shadows on the floor (pixel/ground.ts: V2's soft contact shadow, shrinking as he rises)
     const t = p.t;
+    // every body's sprite planned first, then resolved near-first (pixel/sprite-budget.ts), then drawn in
+    // depth order below
+    const must = this.mustSet(p);
+    for (const i of this.pinned) must.add(i);
+    this.pinned.clear();
+    const planned = new Map<number, { plan: SpritePlan<ArtSprite>; ownLift: boolean; hangH: number | null; fr: BodyFrame | null }>();
     for (const b of p.bodies) {
-      const f = this.at(b.cx, b.cz);
+      const hang = hangOf(p, b);
+      const hangH = hang !== null ? Math.max(b.h, hang.h) : null;
+      const f0 = this.at(b.cx, b.cz, hangH ?? b.h);
+      const pl = this.plan(b, t, p.handler === b.idx, this.kits[b.side === 'O' ? 0 : 1], f0.s, p.ball, must.has(b.idx), hang ? { key: 'hang' + hang.ph, pose: P.dunk(hang.ph, 'hang') } : undefined);
+      planned.set(b.idx, { ...pl, hangH });
+    }
+    const got = resolveSprites([...planned.values()].map((q) => q.plan), this.sprites, this.last, this.budget, () => performance.now());
+    // shadows on the floor (pixel/ground.ts: V2's soft contact shadow, shrinking as he rises), under
+    // the drawn feet
+    for (const b of p.bodies) {
+      const fr = planned.get(b.idx)?.fr;
+      const f = this.at(b.cx + (fr?.mo.ox ?? 0), b.cz + (fr?.mo.oy ?? 0));
       const tall = (drawnHeight('nba', b.p.ht) / 12) * f.s;
       drawGroundMark(ctx, { x: f.x, y: f.y, shoulderPx: shoulderWidthPx(b.p.ht, b.p.wt, tall), pitch: pitchAt(this.pc, b.cx), lift: b.h / (b.p.ht / 12) });
     }
@@ -428,15 +529,27 @@ export class HoopsRenderer {
       items.push({
         depth: b.cx,
         draw: () => {
+          const pq = planned.get(b.idx)!;
+          const who = pq.plan.req.who;
+          const r = got.get(who);
+          if (!r) return;
+          const s = r.spr;
+          if (r.fresh) this.lastLift.set(who, pq.ownLift);
+          const ownLift = r.fresh ? pq.ownLift : (this.lastLift.get(who) ?? false);
           const carrying = p.handler === b.idx;
-          // a rim hang after a big slam: render only, the engine's man is already coming down
-          const hang = hangOf(p, b);
-          const f0 = this.at(b.cx, b.cz, hang !== null ? Math.max(b.h, hang.h) : b.h);
-          const { spr: s, ownLift } = this.sprite(b, t, carrying, this.kits[b.side === 'O' ? 0 : 1], f0.s, p.ball, hang ? { key: 'hang' + hang.ph, pose: P.dunk(hang.ph, 'hang') } : undefined);
+          // the planted foot (pixel/locomotion.ts): the drawn body may trail or lead the engine's by up
+          // to 5% of his height while a foot holds its spot
+          const ox = pq.fr?.mo.ox ?? 0;
+          const oz = pq.fr?.mo.oy ?? 0;
+          const f0 = this.at(b.cx + ox, b.cz + oz, pq.hangH ?? b.h);
           // a recorded jump is in the drawing itself: then he stands on the floor spot
-          const f = ownLift ? this.at(b.cx, b.cz) : f0;
+          const f = ownLift ? this.at(b.cx + ox, b.cz + oz) : f0;
           const x = Math.round(f.x - s.ax);
           const y = Math.round(f.y - s.ay);
+          const sim = this.at(b.cx, b.cz);
+          const feet = this.at(b.cx + ox, b.cz + oz);
+          const tall = (drawnHeight('nba', b.p.ht) / 12) * feet.s;
+          this.anchors.set(b.idx, { x, y, spr: s, feet: { x: feet.x, y: feet.y }, dx: feet.x - sim.x, dy: feet.y - sim.y, ...groundEllipse(shoulderWidthPx(b.p.ht, b.p.wt, tall), pitchAt(this.pc, b.cx)) });
           // a burner at full stride (SPD 92+): a short afterimage behind him
           const v = Math.hypot(b.vx, b.vz);
           if (b.p.spd >= 92 && v > 16 && b.h < 0.2 && b.act !== 'shoot' && !this.replay) {
@@ -469,14 +582,15 @@ export class HoopsRenderer {
       if (h.act === 'dribble' && !p.meter && !p.finish) {
         const speed = Math.hypot(h.vx, h.vz);
         const up = P.dribbleBall((t * (speed > 1.8 ? 1.5 + speed / 18 : 1.6)) % 1, speed > 1.8 ? 1 : 0);
-        const floor = this.at(h.cx, h.cz).y;
+        // (the floor under his drawn feet: the planted foot may hold him off the engine's spot)
+        const floor = this.anchors.get(h.idx)?.feet.y ?? this.at(h.cx, h.cz).y;
         ball = { x: hs.x, y: floor + (hs.y + 2 - floor) * up, s: hs.s };
       } else ball = { x: hs.x, y: hs.y - 1, s: hs.s };
     } else ball = this.at(bp.cx, bp.cz, bp.h);
     // squash as it meets the floor on the dribble, stretch along a fast flight
     let squash = 0;
     if (!p.ball && hs && p.handler !== null && p.bodies[p.handler].act === 'dribble' && !p.meter && !p.finish) {
-      const floorY = this.at(p.bodies[p.handler].cx, p.bodies[p.handler].cz).y;
+      const floorY = this.anchors.get(p.handler)?.feet.y ?? this.at(p.bodies[p.handler].cx, p.bodies[p.handler].cz).y;
       squash = Math.max(0, 1 - Math.abs(floorY - ball.y) / Math.max(2, ball.s * 0.6));
     }
     const pb = this.prevBall;

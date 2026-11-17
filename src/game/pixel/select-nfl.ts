@@ -1,17 +1,20 @@
-// NFL player selection (studio overhaul players-2, moved verbatim from football2/render.ts): the look
-// a body is drawn with (helmet, pads), the motion-capture clip or hand-keyed pose it shows each frame,
-// its stride and the ball arm. Render only: it reads the engine's bodies and never writes them. The
-// select-golden test proves every choice here is the one the renderer made before the move.
+// NFL player selection (studio overhaul players-2, moved from football2/render.ts): the look a body is
+// drawn with (helmet, pads), the motion-capture clip or hand-keyed pose it shows each frame, its stride
+// and the ball arm. players-5: the facing (it was the renderer's) turns at 90° per 100 ms, defenders
+// retreating face the ball, the quarterback takes the snap and drops facing downfield at the speed he
+// drops (never the idle clip while he moves), blockers and rushers step with their feet, and every
+// stride comes from locomotion.ts (`motionOf`). Render only: it reads the engine's bodies and never
+// writes them. The select-golden test pins every choice here.
 import { refOf } from './appearance';
 import type { Look } from './body';
 import { matchLook } from './looks';
+import { advancePhase, bodyMotion, freshLoco, openHips, type GaitOption, type GaitPick, type Heading, headingOf, type Loco, MAX_DT, type Motion, pickGait, stepClock, type StrideNow, turnToward } from './locomotion';
 import { clipMeta, getClip, type Ground, legScale, warp } from './mocap';
 import * as P from './poses';
 import { preloadPixels } from './ready';
 import type { Joints, Pose } from './rig';
 import { NFL_STANDINS, standIn } from './select-family';
-import { heaviness } from './style';
-import { isLine, speedOf } from '../football2/engine';
+import { ballNow, isLine, speedOf } from '../football2/engine';
 import type { Act, Body, Play } from '../football2/types';
 import type { FbKit } from '../football2/render';
 
@@ -110,7 +113,7 @@ export function poseOf(b: Body, t: number, p: Play): { key: string; pose: Pose }
 /** The motion-capture clips the field uses (mocap.ts). They arrive in the NFL bundle before the first frame
  * (ready.ts); if they never do,
  * the hand-keyed poses stand in (and keep the stances, the backpedal and the moves with the ball). */
-export const CLIPS = ['ready', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'block', 'throw', 'catch', 'catch_run', 'dive', 'fall_back', 'fall_back_m', 'fall_forward', 'fall_forward_m', 'kick', 'celebrate'];
+export const CLIPS = ['ready', 'walk', 'jog', 'run', 'sprint', 'backpedal', 'shuffle', 'shuffle_l', 'block', 'throw', 'catch', 'catch_run', 'dive', 'fall_back', 'fall_back_m', 'fall_forward', 'fall_forward_m', 'kick', 'celebrate'];
 
 /** The throw: the arm comes through from the cocked frame (held while he aims) and the ball's off
  * as the engine lets it go, then the follow-through. */
@@ -133,40 +136,62 @@ export interface Anim {
   ground?: Ground;
   /** an arm on the ball over the recorded body: tucked to run with it, or held up in both hands */
   ball?: 'tuck' | 'hold';
+  /** a stride (locomotion.ts): its rate, stride scale and direction */
+  gait?: GaitPick;
 }
 
 /** What the drawing remembers of a body: his stride's phase, and the way he faced when he went
  * down (a man on the ground doesn't turn with his slide). */
 export interface Memo {
-  gait: { t: number; frac: number };
+  /** the stride's phase on game time, and the stride last shown (kept while it still fits) */
+  gait: { t: number; frac: number; clip?: string; stride?: number };
+  /** the drawn facing as a unit vector (kept with `loco.face`) */
   face: { x: number; y: number };
-  faceAt: number;
+  /** locomotion's state (players-5): drawn facing, turn, planted foot, lean; made on first use */
+  loco?: Loco;
+  /** the quarterback: whether the play was still before the snap last frame, and when the snap came */
+  pre?: boolean;
+  snapAt?: number;
 }
 
 const has = (name: string) => !!getClip(name);
+/** over this (yd/s) a body is moving: his feet stride (players-5: no idle clip while he moves) */
+const MOVING = 1 / 3;
 const mirrorOf = (b: Body, name: string) => (b.id % 2 ? name + '_m' : name);
 
-/** A stride: jog, run or sprint by his speed, at the rate his feet keep up with the turf. */
-export function gait(b: Body, t: number, look: Look, m: Memo, speed: number): { clip: string; ct: number } | null {
-  if (!has('jog') || !has('run') || !has('sprint')) return null;
-  // the clip's ground speed in yards a second on this man's sprite legs
-  const yd = (name: string) => clipMeta(name).root.speed * legScale(look) * (b.p.ht / 36);
-  let clip = 'jog';
-  let best = Infinity;
-  for (const c of ['jog', 'run', 'sprint']) {
-    const d = Math.abs(Math.log(speed / yd(c)));
-    if (d < best) {
-      best = d;
-      clip = c;
-    }
-  }
-  // a heavy man's stride comes round a little slower (the lineman's plod)
-  const rate = Math.max(0.65, Math.min(1.7, speed / yd(clip))) * (1.04 - 0.1 * heaviness(b.p.wt, b.p.ht));
-  const dt = t - m.gait.t;
-  if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + (dt * rate) / clipMeta(clip).duration) % 1;
-  m.gait.t = t;
-  return { clip, ct: m.gait.frac * clipMeta(clip).duration };
+/** A recorded stride's ground speed on this man's sprite legs, yd/s at rate 1. */
+const ydOf = (b: Body, look: Look, name: string) => clipMeta(name).root.speed * legScale(look) * (b.p.ht / 36);
+
+/** The strides for each way he travels relative to where he faces (locomotion.ts `pickGait` picks):
+ * forward walk, jog, run, sprint (a blocker drives with his block steps first); back the backpedal,
+ * then a back-run; sideways the shuffle (a pass set's slide), its steps shortening for a slow drift. */
+export function gaitOptions(b: Body, look: Look, h: Heading, blocking = false): GaitOption[] {
+  const o = (clip: string, more: Partial<GaitOption> = {}): GaitOption => ({ clip, speed: ydOf(b, look, clip), ...more });
+  const list =
+    h === 'fwd'
+      ? [...(blocking ? [o('block')] : []), ...['walk', 'jog', 'run', 'sprint'].map((c) => o(c))]
+      : h === 'back'
+        ? [o('backpedal'), o('walk', { reverse: true }), o('jog', { reverse: true })]
+        : [o(h === 'right' ? 'shuffle' : 'shuffle_l', { minStride: 0.15 })];
+  return list.filter((g) => has(g.clip));
 }
+
+/** A stride at his speed, its phase carried from frame to frame on game time. */
+export function stride(t: number, m: Memo, speed: number, options: GaitOption[]): { clip: string; ct: number; pick: GaitPick } | null {
+  if (!options.length) return null;
+  const dt = t - m.gait.t;
+  const fresh = dt > 0 && dt <= MAX_DT;
+  const pick = pickGait(speed, options, fresh && m.gait.clip ? { clip: m.gait.clip, stride: m.gait.stride ?? 1 } : undefined);
+  const meta = clipMeta(pick.clip);
+  if (fresh) m.gait.frac = advancePhase(m.gait.frac, dt, pick.rate, meta.duration, pick.reverse);
+  m.gait.t = t;
+  m.gait.clip = pick.clip;
+  m.gait.stride = pick.stride;
+  return { clip: pick.clip, ct: m.gait.frac * meta.duration, pick };
+}
+
+/** the quarterback takes the snap for this long (6 frames) */
+const SNAP_CATCH = 0.1;
 
 /** Every act the NFL selection animates (football2/types.ts `Act`); anything else gets a stand-in. */
 export const KNOWN_ACTS: ReadonlySet<string> = new Set<Act>(['stance', 'run', 'block', 'throw', 'catch', 'carry', 'juke', 'spin', 'stiff', 'truck', 'windup', 'tackle', 'down', 'rush', 'backpedal', 'celebrate', 'kick']);
@@ -187,43 +212,39 @@ export function animOf(b: Body, t: number, p: Play, look: Look, m: Memo, aiming:
 
 function animKnown(b: Body, t: number, p: Play, look: Look, m: Memo, aiming: boolean): Anim {
   const pose: Anim = poseOf(b, t, p);
-  if (p.phase === 'pre' || (b.act === 'stance' && Math.hypot(b.vx, b.vy) < 0.6)) return pose;
+  if (p.phase === 'pre' || (b.act === 'stance' && Math.hypot(b.vx, b.vy) <= MOVING)) return pose;
   const speed = Math.hypot(b.vx, b.vy);
   const since = t - b.actAt;
   const clip = (name: string, ct: number, opts: Partial<Anim> = {}): Anim =>
     has(name) ? { key: '', pose: pose.pose, clip: name, ct, step: 2, ground: 'clip', ...opts } : pose;
+  // a stride the way he travels (relative to the drawn facing), at the speed he travels
+  const go = (opts: Partial<Anim> = {}, blocking = false): Anim | null => {
+    const g = stride(t, m, speed, gaitOptions(b, look, headingOf(Math.atan2(m.face.y, m.face.x), b.vx, b.vy), blocking));
+    return g ? clip(g.clip, g.ct, { gait: g.pick, ...opts }) : null;
+  };
+  const ready = () => clip('ready', t + b.id * 0.37);
+  const qbBall = b === p.carrier ? { ball: p.phase === 'drop' ? ('hold' as const) : ('tuck' as const) } : {};
   // the quarterback with the slingshot drawn back: arm cocked, ready to let it go
   if (aiming && b === p.qb && b === p.carrier) return clip('throw', THROW_COCKED, { step: 1 });
+  // the snap: the ball into his hands (6 frames), then his drop at the speed he drops, facing downfield
+  if (b === p.qb && p.phase === 'drop' && b.act !== 'throw') {
+    if (m.snapAt !== undefined && t - m.snapAt < SNAP_CATCH && has('catch')) return clip('catch', clipMeta('catch').events.catch - SNAP_CATCH + (t - m.snapAt), { step: 1 });
+    if (speed > MOVING) return go(qbBall) ?? ready();
+    if (b.act === 'stance' || b.act === 'run') return ready();
+  }
   switch (b.act) {
-    case 'backpedal': {
-      if (speed < 0.7) return clip('ready', t + b.id * 0.37, { step: 3 });
-      const forward = b.vx * m.face.x + b.vy * m.face.y;
-      const lateral = -b.vx * m.face.y + b.vy * m.face.x;
-      const name = Math.abs(lateral) > Math.abs(forward) ? (lateral > 0 ? 'shuffle' : 'shuffle_l') : forward < -0.4 ? 'backpedal' : null;
-      if (!name || !has(name)) {
-        const g = gait(b, t, look, m, speed);
-        return g ? clip(g.clip, g.ct) : pose;
-      }
-      const groundSpeed = clipMeta(name).root.speed * legScale(look) * (b.p.ht / 36);
-      const dt = t - m.gait.t;
-      if (dt > 0 && dt < 0.3) m.gait.frac = (m.gait.frac + dt * Math.max(0.65, Math.min(1.8, speed / Math.max(0.1, groundSpeed))) / clipMeta(name).duration) % 1;
-      m.gait.t = t;
-      return clip(name, m.gait.frac * clipMeta(name).duration);
-    }
+    case 'backpedal':
+      return (speed > MOVING ? go() : null) ?? ready();
     case 'run':
-    case 'rush': {
-      // a rusher locked up with his blocker: driving into him
-      if (b.act === 'rush' && speed < 2) return clip('block', t + b.id * 0.31);
-      const g = speed > 1 ? gait(b, t, look, m, speed) : null;
-      if (!g) return clip('ready', t + b.id * 0.37, { step: 3 });
-      return clip(g.clip, g.ct, b === p.carrier ? { ball: p.phase === 'drop' ? 'hold' : 'tuck' } : {});
-    }
-    case 'carry': {
-      const g = speed > 1.2 ? gait(b, t, look, m, speed) : null;
-      return g ? clip(g.clip, g.ct, { ball: 'tuck' }) : pose;
-    }
+    case 'rush':
+      // a rusher locked up with his blocker: driving into him, stepping as he's moved
+      if (b.act === 'rush' && speed < 2) return (speed > MOVING ? go({}, true) : null) ?? clip('block', t + b.id * 0.31);
+      return (speed > MOVING ? go(qbBall) : null) ?? ready();
+    case 'carry':
+      return (speed > MOVING ? go({ ball: 'tuck' }) : null) ?? pose;
     case 'block':
-      return clip('block', t + b.id * 0.31);
+      // a blocker's feet: the drive step forward, the pass set's slide, the kick-slide back
+      return (speed > MOVING ? go({}, true) : null) ?? clip('block', t + b.id * 0.31);
     case 'throw':
       return clip('throw', THROW(since), { step: 1 });
     case 'catch': {
@@ -245,7 +266,8 @@ function animKnown(b: Body, t: number, p: Play, look: Look, m: Memo, aiming: boo
     case 'celebrate':
       return clip('celebrate', since);
     case 'stance':
-      return clip('ready', t + b.id * 0.37, { step: 3 });
+      // moving out of his stance (motion, a release): a stride, never the idle clip
+      return (speed > MOVING ? go() : null) ?? ready();
     default:
       return pose;
   }
@@ -266,4 +288,62 @@ export function ballArm(j: Joints, how: 'tuck' | 'hold'): Joints {
   const hand = { x: j.chest.x + 0.1, y: j.chest.y + 0.01, z: sh.z * 0.3 };
   const el = { x: sh.x + 0.02, y: j.chest.y - 0.1, z: sh.z * 1.15 };
   return { ...j, elR: el, wrR: mix(el, hand, 0.85), handR: hand };
+}
+
+/** Where a body wants to face (the drawn facing turns toward it): null keeps the facing (a man diving or
+ * going down keeps the way he faced). The quarterback in his drop faces downfield; a backpedalling
+ * defender watches the quarterback unless he has opened his hips to run with his man; any defender
+ * retreating from the ball faces it; anyone else faces the way he moves, or set, up the field
+ * (offense) or down it (defense). Angles are atan2(y, x) on the field. */
+export function faceTarget(b: Body, p: Play): number | null {
+  if (b.act === 'tackle' || b.act === 'down') return null;
+  const speed = Math.hypot(b.vx, b.vy);
+  const at = (q: { x: number; y: number }) => Math.atan2(q.y - b.y, q.x - b.x);
+  if (b === p.qb && p.phase === 'drop' && p.carrier === b) return Math.PI / 2;
+  if (b.act === 'backpedal') {
+    const mark = p.bodies.find((o) => o.id === b.mark);
+    const openHips = speed > 4.8 && mark && mark.y > b.y - 1;
+    if (!openHips) return at(p.qb);
+  }
+  const ball = ballNow(p) ?? p.carrier ?? p.qb;
+  if (b.side === 'D' && speed > 0.6 && speed < 6 && ball !== b) {
+    const bx = ball.x - b.x;
+    const by = ball.y - b.y;
+    if (b.vx * bx + b.vy * by < 0) return Math.atan2(by, bx);
+  }
+  if (speed > 0.6) return Math.atan2(b.vy, b.vx);
+  return b.side === 'O' ? Math.PI / 2 : -Math.PI / 2;
+}
+
+/** A frame's motion for one body (players-5): what he shows, the facing to draw him in, a plant's dip,
+ * the head's lead, the planted-foot offset and the lean. */
+export interface BodyFrame {
+  an: Anim;
+  face: number;
+  dip: boolean;
+  lead: number;
+  mo: Motion;
+}
+
+export function motionOf(b: Body, t: number, p: Play, look: Look, m: Memo, aiming: boolean): BodyFrame {
+  const loco = (m.loco ??= freshLoco(Math.atan2(m.face.y, m.face.x)));
+  // where he looks, unless he slides or backs off faster than his feet can that way (he opens his hips)
+  const blocking = b.act === 'block' || (b.act === 'rush' && Math.hypot(b.vx, b.vy) < 2);
+  const look0 = faceTarget(b, p);
+  const want = look0 === null ? null : openHips(look0, b.vx, b.vy, (h) => gaitOptions(b, look, h, blocking));
+  const { dt } = stepClock(loco, t, want ?? loco.face);
+  // the snap, as this body sees it
+  if (p.phase === 'pre') m.pre = true;
+  else if (m.pre) {
+    m.pre = false;
+    m.snapAt = t;
+  }
+  const exempt = b.act === 'spin' || b.act === 'windup';
+  const tr = want === null ? { face: loco.face, dip: false, lead: 0 } : turnToward(loco, want, dt, t, exempt);
+  m.face = { x: Math.cos(tr.face), y: Math.sin(tr.face) };
+  const an = animOf(b, t, p, look, m, aiming);
+  const yd = legScale(look) * (b.p.ht / 36);
+  const stride: StrideNow | null = an.gait && an.clip ? { meta: clipMeta(an.clip), ct: an.ct ?? 0, pick: an.gait, unitsPerLeg: yd } : null;
+  const mo = bodyMotion(loco, { t, dt, vx: b.vx, vy: b.vy, face: tr.face, turnRate: dt > 0 ? tr.lead / dt : 0, top: speedOf(b.p), height: b.p.ht / 36, airborne: b.act === 'tackle' || b.act === 'down', stride });
+  return { an, face: tr.face, dip: tr.dip, lead: tr.lead, mo };
 }
