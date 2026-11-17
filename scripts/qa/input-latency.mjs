@@ -11,7 +11,9 @@
 //   nba     pass (PASS), shoot (SHOOT press), juke (CROSS), sprint (the stick pushed to its edge)
 //   nfl     snap (SNAP), throw (a PASS TO receiver), scramble (RUN IT), juke (JUKE), burst (BURST press),
 //           stiff-arm (POWER)
-//   soccer  pass (PASS), shoot (SHOOT press), through (THRU), sprint (SPRINT press)
+//   soccer  pass (PASS), shoot (SHOOT press), through (THRU), sprint (SPRINT press); KICK OFF before each
+//           attack is tapped to move on, not measured
+// NFL plays alternate between a pass (throw) and a scramble (RUN IT, then the rush moves).
 // Each input gets three numbers:
 //   paint     Event Timing: the touch's pointerdown/touchstart `duration`, from the input to the next
 //             paint after its handlers ran. The engines take input in the handler and draw in their
@@ -71,6 +73,12 @@ const ACTIONS = {
     { name: 'shoot', sel: 'button[aria-label^="Shoot:"]', kind: 'hold', ms: 420 },
   ],
 };
+
+/** Buttons that only move the match on (not measured): soccer's KICK OFF before each attack. */
+const ADVANCE = { soccer: '.sc2-go' };
+/** NFL plays alternate: a passing play (throw), then a scramble with the rush moves (RUN IT, then JUKE, BURST, POWER). */
+const NFL_PASS = new Set(['throw']);
+const NFL_RUN = new Set(['scramble', 'juke', 'burst', 'stiff-arm']);
 
 function recorder() {
   const lat = (window.__lat = { frames: [], events: [] });
@@ -189,11 +197,23 @@ async function run(browser, sport, cpu) {
     const samples = Object.fromEntries(acts.map((a) => [a.name, []]));
     const end = Date.now() + matchS * 1000;
     let strip = {};
+    let plays = 0;
     while (Date.now() < end && acts.some((a) => counts[a.name] < N)) {
       if (!(await page.locator('body > .arcade-full').count())) break;
       let did = false;
+      const go = ADVANCE[sport] && page.locator('body > .arcade-full ' + ADVANCE[sport]).first();
+      if (go && (await go.isVisible().catch(() => false))) {
+        await go.click({ timeout: 3000 }).catch(() => {});
+        await page.waitForTimeout(400);
+        continue;
+      }
+      // the inputs of one pass go back to back (an NFL scramble lasts about a second: RUN IT, then
+      // JUKE, BURST and POWER must land inside it); each is measured afterwards from the recorded
+      // frames, events and screencast, once 560 ms have passed after the last
+      const pending = [];
       for (const a of acts) {
         if (counts[a.name] >= N) continue;
+        if (sport === 'nfl' && ((plays % 2 === 0 && NFL_RUN.has(a.name)) || (plays % 2 === 1 && NFL_PASS.has(a.name)))) continue;
         const at = await find(page, a);
         if (!at) continue;
         did = true;
@@ -207,32 +227,44 @@ async function run(browser, sport, cpu) {
         else await touch(cdp, 'touchStart', at.x, at.y);
         await page.waitForTimeout(a.kind === 'hold' ? a.ms : a.kind === 'push' ? 450 : 60);
         await touch(cdp, 'touchEnd', at.x, at.y);
-        await page.waitForTimeout(500);
-        const { events, rafs } = await page.evaluate((t) => ({ events: window.__lat.events.filter((e) => e.start >= t - 5), rafs: window.__lat.frames.filter((x) => x >= t - 400) }), a.kind === 'push' ? tIn : t0);
-        // Event Timing: the first press-type entry at or after the input
-        const ev = events.find((e) => (a.kind === 'push' ? /pointermove|touchmove|pointerdown|touchstart/ : /pointerdown|touchstart/).test(e.name));
-        const handled = ev ? ev.pe : null;
-        const frameAfter = handled !== null ? rafs.find((x) => x >= handled) : null;
-        // the screencast around the input
-        const win = frames.filter((x) => x.wall - origin >= tIn - 320 && x.wall - origin <= tIn + 520);
-        let visible = null;
-        if (win.length > 3) {
-          const ds = await diffs(browser, win.map((x) => 'data:image/jpeg;base64,' + x.data));
-          const before = ds.filter((_, i) => i > 0 && win[i].wall - origin < tIn);
-          const bar = Math.max(6, (before.length ? Math.max(...before) : 0) * 1.5);
-          const k = win.findIndex((x, i) => x.wall - origin >= tIn && ds[i] > bar);
-          if (k >= 0) {
-            visible = win[k].wall - origin - tIn;
-            if (!strip[a.name]) {
-              strip[a.name] = true;
-              fs.writeFileSync(path.join(OUT, `${label}-${sport}-${cpu}x-${a.name}-before.jpg`), Buffer.from(win[Math.max(0, k - 1)].data, 'base64'));
-              fs.writeFileSync(path.join(OUT, `${label}-${sport}-${cpu}x-${a.name}-answer-${Math.round(visible)}ms.jpg`), Buffer.from(win[k].data, 'base64'));
+        pending.push({ a, t0: a.kind === 'push' ? tIn : t0, tIn });
+        counts[a.name]++;
+        if (a.name === 'snap') {
+          plays++;
+          await page.waitForTimeout(350);
+        } else await page.waitForTimeout(90);
+      }
+      if (pending.length) {
+        await page.waitForTimeout(560);
+        const from = pending[0].t0;
+        const { events, rafs } = await page.evaluate((t) => ({ events: window.__lat.events.filter((e) => e.start >= t - 5), rafs: window.__lat.frames.filter((x) => x >= t - 400) }), from);
+        for (let i = 0; i < pending.length; i++) {
+          const { a, t0, tIn } = pending[i];
+          const until = pending[i + 1]?.t0 ?? Infinity;
+          // Event Timing: the first press-type entry at or after this input and before the next one
+          const ev = events.find((e) => e.start >= t0 - 5 && e.start < until && (a.kind === 'push' ? /pointermove|touchmove|pointerdown|touchstart/ : /pointerdown|touchstart/).test(e.name));
+          const handled = ev ? ev.pe : null;
+          const frameAfter = handled !== null ? rafs.find((x) => x >= handled) : null;
+          // the screencast around the input, up to the next input
+          const win = frames.filter((x) => x.wall - origin >= tIn - 320 && x.wall - origin <= Math.min(tIn + 520, until));
+          let visible = null;
+          if (win.length > 3) {
+            const ds = await diffs(browser, win.map((x) => 'data:image/jpeg;base64,' + x.data));
+            const before = ds.filter((_, j) => j > 0 && win[j].wall - origin < tIn);
+            const bar = Math.max(6, (before.length ? Math.max(...before) : 0) * 1.5);
+            const k = win.findIndex((x, j) => x.wall - origin >= tIn && ds[j] > bar);
+            if (k >= 0) {
+              visible = win[k].wall - origin - tIn;
+              if (!strip[a.name]) {
+                strip[a.name] = true;
+                fs.writeFileSync(path.join(OUT, `${label}-${sport}-${cpu}x-${a.name}-before.jpg`), Buffer.from(win[Math.max(0, k - 1)].data, 'base64'));
+                fs.writeFileSync(path.join(OUT, `${label}-${sport}-${cpu}x-${a.name}-answer-${Math.round(visible)}ms.jpg`), Buffer.from(win[k].data, 'base64'));
+              }
             }
           }
+          samples[a.name].push({ paint: ev ? r1(ev.dur) : null, frame: frameAfter !== null && frameAfter !== undefined ? r1(frameAfter - tIn) : null, visible: r1(visible) });
         }
-        samples[a.name].push({ paint: ev ? r1(ev.dur) : null, frame: frameAfter !== null && frameAfter !== undefined ? r1(frameAfter - tIn) : null, visible: r1(visible) });
-        counts[a.name]++;
-        await page.waitForTimeout(250);
+        await page.waitForTimeout(200);
       }
       if (!did) await page.waitForTimeout(300);
     }

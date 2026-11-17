@@ -31,6 +31,12 @@ describe('curtainPhase', () => {
     expect(curtainPhase(at({ elapsed: 900, drawn: true }), true)).toBe('card');
     expect(curtainPhase(at({ elapsed: 900, drawn: true, motion: true, settled: SETTLE_FRAMES }), true)).toBe('lifting');
   });
+  it('a drawn arena waiting only on its clips keeps the backdrop 150 ms more (no flash of a title card)', () => {
+    expect(curtainPhase(at({ elapsed: 320, drawn: true, drawnMs: 0 }), false)).toBe('cover');
+    expect(curtainPhase(at({ elapsed: 420, drawn: true, drawnMs: 100 }), false)).toBe('cover');
+    expect(curtainPhase(at({ elapsed: 470, drawn: true, drawnMs: SHOW_AFTER_MS }), false)).toBe('card');
+    expect(curtainPhase(at({ elapsed: 360, drawn: true, drawnMs: 40, motion: true, settled: SETTLE_FRAMES }), false)).toBe('off');
+  });
   it('never holds a match past the 2.5 s cap, ready or not', () => {
     expect(curtainPhase(at({ elapsed: CAP_MS }), true)).toBe('lifting');
     expect(curtainPhase(at({ elapsed: CAP_MS - 1 }), true)).toBe('card');

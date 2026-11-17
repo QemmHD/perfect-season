@@ -8,7 +8,8 @@
 //  - From the arena's insertion until it is ready, the curtain's backdrop (the lit arena, no words)
 //    is up, so no frame is ever an empty court.
 //  - The title card itself (matchup, crests, tip) joins only when the arena still isn't ready 150 ms
-//    after insertion. An arena that is ready sooner lifts the backdrop and never shows a title card.
+//    after insertion (or, once drawn, 150 ms after its first picture while its clips are still on the
+//    way). An arena that is ready sooner lifts the backdrop and never shows a title card.
 //  - Ready = the arena said so (`ps:arena-ready`, which the engines may dispatch after their first
 //    real frame) or the motion clips are in, AND the canvas is drawn, then 2 more frames.
 //  - Hard cap 2,500 ms from insertion: the curtain never holds a playable match back longer.
@@ -37,6 +38,8 @@ export interface CurtainInput {
   motion: boolean;
   /** frames counted since drawn && motion first held (0 until then) */
   settled: number;
+  /** ms since the canvas first held a picture (0 until then) */
+  drawnMs?: number;
   /** a curtain was already on screen when the arena arrived (the match's files were loading under it) */
   handover: boolean;
 }
@@ -49,8 +52,12 @@ export interface CurtainInput {
 export function curtainPhase(i: CurtainInput, shown: boolean): CurtainPhase {
   const ready = (i.drawn && i.motion && i.settled >= SETTLE_FRAMES) || i.elapsed >= CAP_MS;
   if (ready) return shown || i.handover ? 'lifting' : 'off';
-  if (shown || i.handover || i.elapsed >= SHOW_AFTER_MS) return 'card';
-  // the first 150 ms: the backdrop only, so neither an empty court nor a half-ready one is ever seen
+  if (shown || i.handover) return 'card';
+  // the first 150 ms: the backdrop only, so neither an empty court nor a half-ready one is ever seen.
+  // An arena that has drawn and only waits on its motion clips gets 150 ms more before the card: a
+  // long task (the engine's first draw) can put that moment past 150 ms, and the clips usually land
+  // within a few frames of it, so a card would only flash.
+  if (i.elapsed >= SHOW_AFTER_MS && (!i.drawn || (i.drawnMs ?? 0) >= SHOW_AFTER_MS)) return 'card';
   return 'cover';
 }
 

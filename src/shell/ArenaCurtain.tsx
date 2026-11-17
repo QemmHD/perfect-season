@@ -43,29 +43,36 @@ let standaloneUp = 0;
 let standaloneDownAt = -Infinity;
 
 // ---------- motion clips: players' mocapReady() when it exists, else the shared 'ready' clip ----------
-type MocapModule = { mocapReady?: () => boolean; loadClip?: (name: string) => Promise<unknown> };
+type MocapModule = { mocapReady?: () => boolean; getClip?: (name: string) => unknown; loadClip?: (name: string) => Promise<unknown> };
+/** The mocap module, once the first match has loaded it (its chunk comes with the engines). */
+let mocap: MocapModule | null = null;
 function watchMotion(onReady: (by: 'mocapReady' | 'clip' | 'none') => void): () => void {
   let live = true;
   let poll = 0;
-  import('../game/pixel/mocap')
-    .then((m: MocapModule) => {
-      if (!live) return;
-      if (typeof m.mocapReady === 'function') {
-        const check = () => {
-          if (!live) return;
-          if (m.mocapReady!()) onReady('mocapReady');
-          else poll = requestAnimationFrame(check);
-        };
-        check();
-      } else if (typeof m.loadClip === 'function') {
-        // the renderers already asked for 'ready' (every sport's set has it): this joins that download
-        m.loadClip('ready').then(
-          () => live && onReady('clip'),
-          () => live && onReady('none')
-        );
-      } else onReady('none');
-    })
-    .catch(() => live && onReady('none'));
+  const use = (m: MocapModule) => {
+    if (!live) return;
+    if (typeof m.mocapReady === 'function') {
+      const check = () => {
+        if (!live) return;
+        if (m.mocapReady!()) onReady('mocapReady');
+        else poll = requestAnimationFrame(check);
+      };
+      check();
+    } else if (typeof m.getClip === 'function' && m.getClip('ready')) onReady('clip');
+    else if (typeof m.loadClip === 'function') {
+      // the renderers already asked for 'ready' (every sport's set has it): this joins that download
+      m.loadClip('ready').then(
+        () => live && onReady('clip'),
+        () => live && onReady('none')
+      );
+    } else onReady('none');
+  };
+  // a second match reads the clips at once (no import to wait for behind the engine's first draw)
+  if (mocap) use(mocap);
+  else
+    import('../game/pixel/mocap')
+      .then((m: MocapModule) => use((mocap = m)))
+      .catch(() => live && onReady('none'));
   return () => {
     live = false;
     cancelAnimationFrame(poll);
@@ -158,27 +165,26 @@ export function ArenaCurtainHost({ info, seed }: { info?: ArenaInfo | null; seed
         }
         if (drawn && motion) settled++;
         const elapsed = now - t0;
-        const next = curtainPhase({ elapsed, drawn, motion, settled, handover: rec.handover }, shown);
+        const next = curtainPhase({ elapsed, drawn, motion, settled, handover: rec.handover, drawnMs: drawn ? elapsed - rec.drawnAt! : 0 }, shown);
         if (next === 'card' && !shown) {
           shown = true;
           rec.cardAt = elapsed;
         }
         if ((next === 'cover' || next === 'card') && rec.coverAt === undefined) rec.coverAt = elapsed;
-        if (next !== last) {
-          last = next;
+        // reduced motion: no fade, the curtain simply goes
+        const shownNext = next === 'lifting' && reducedMotion() ? 'off' : next;
+        if (shownNext !== last) {
+          last = shownNext;
           // the first look runs in the observer's microtask, before the arena's first paint: commit
-          // the cover now so that paint already has it (a scheduled render would land a frame late)
-          if (first) flushSync(() => setPhase(next));
-          else setPhase(next);
+          // the cover now so that paint already has it (a scheduled render would land a frame late).
+          // The lift commits at once too, in this frame, so the game shows in the frame it is ready.
+          if (first || shownNext === 'off' || shownNext === 'lifting') flushSync(() => setPhase(shownNext));
+          else setPhase(shownNext);
         }
-        if (next === 'off') {
-          rec.liftAt ??= elapsed;
-          return finish(elapsed >= CAP_MS ? 'cap' : 'ready');
-        }
-        if (next === 'lifting') {
+        if (next === 'off' || next === 'lifting') {
           rec.liftAt = elapsed;
           finish(elapsed >= CAP_MS && !(drawn && motion) ? 'cap' : 'ready');
-          fade = window.setTimeout(() => setPhase('off'), reducedMotion() ? 0 : FADE_MS);
+          if (shownNext === 'lifting') fade = window.setTimeout(() => setPhase('off'), FADE_MS);
           return;
         }
         raf = requestAnimationFrame(tick);

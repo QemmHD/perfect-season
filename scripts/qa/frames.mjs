@@ -10,9 +10,11 @@
 //   the first game frame. A page-side rAF log says, per frame, whether the arena is in <body> and what
 //   the curtain shows. Each painted frame is classed:
 //     curtain  the curtain (backdrop, title card, or its fade) covers the screen
-//     empty    an arena is up, no curtain, and the stage is flat: its luminance spread (rows 30–85%) is
+//     empty    an arena is up, no curtain, and its canvas holds no picture yet (the page samples 4
+//              pixels of it every frame), or the stage is flat: its luminance spread (rows 30–85%) is
 //              under the threshold calibrated on the audit's empty-arena shot (match-nba-393-01-pre.png;
-//              the soccer one already shows the pitch, so it is reported and left out)
+//              the soccer one already shows the pitch, so it is reported and left out). The canvas test
+//              is the one that matters: an empty court still has the HUD and controls on it
 //     game     an arena is up and the stage has a picture
 //     app      no arena yet (the screen the tap was on)
 //   Mount points: draft (Head to Head vs the AI: draft → Vote → PLAY → kickoff → PLAY), ut (Squad
@@ -22,7 +24,8 @@
 //   screen, empty frames, game time at lift (lift − the arena's first drawn frame, an upper bound: the
 //   engines draw only once their clock runs) and the engine-tick proxy at lift: the engines step
 //   floor(Σ min(0.1 s, frame dt) / (1/60 s)) — the same sum each engine's loop makes — counted from the
-//   arena's first drawn frame. `--curtain off` (dev server only) runs the same app without the curtain:
+//   arena's first drawn frame to the lift, and over the first second after that frame (ticksFirstSecond:
+//   equal with and without the curtain means it never held the engine back). `--curtain off` (dev server only) runs the same app without the curtain:
 //   the before, and the tick comparison.
 // skeleton: the UT tap at --cpu, rAF-logged: the first frame with UT's chrome, whether any frame between
 //   the tap and it is blank, the header and tab bar rects from skeleton to ready (shift), and the
@@ -56,7 +59,7 @@ const r1 = (n) => (n === null || n === undefined ? null : Math.round(n * 10) / 1
 const AUDIT = '/tmp/claude-0/-home-user/8d80c188-0981-544b-8b2d-c9de04f0705c/scratchpad/overhaul/audit-shots/ut-ui';
 
 // ---------- the page side: one record per animation frame ----------
-function recorder(off) {
+function recorder({ off }) {
   if (off) window.__psCurtainOff = true;
   const fr = (window.__fr = { on: false, log: [], arenaAt: [], uiAt: [] });
   const rect = (el) => {
@@ -73,12 +76,27 @@ function recorder(off) {
   addEventListener('click', () => fr.on && (fr.clickAt = performance.now()), true);
   if (document.body) watch();
   else document.addEventListener('DOMContentLoaded', watch);
+  // has this arena's (largest) canvas got a picture yet? Four pixels copied into a scratch canvas
+  let probe = null;
+  let drawnFor = null;
+  const drawn = (arena) => {
+    if (drawnFor === arena) return true;
+    let c = null;
+    for (const x of arena.querySelectorAll('canvas')) if (!c || x.width * x.height > c.width * c.height) c = x;
+    if (!c || c.width < 4 || c.height < 4) return false;
+    probe ??= Object.assign(document.createElement('canvas'), { width: 4, height: 1 }).getContext('2d', { willReadFrequently: true });
+    probe.clearRect(0, 0, 4, 1);
+    [[0.5, 0.5], [0.3, 0.62], [0.7, 0.62], [0.5, 0.8]].forEach(([x, y], i) => probe.drawImage(c, Math.floor(c.width * x), Math.floor(c.height * y), 1, 1, i, 0, 1, 1));
+    const d = probe.getImageData(0, 0, 4, 1).data;
+    if (d[3] || d[7] || d[11] || d[15]) drawnFor = arena;
+    return drawnFor === arena;
+  };
   const loop = (t) => {
     requestAnimationFrame(loop);
     if (!fr.on) return;
     const arena = document.querySelector('body > .arcade-full');
     const c = document.querySelector('.arena-curtain');
-    const rec = { t, a: arena ? 1 : 0, c: c ? (c.classList.contains('ac-is-lifting') ? 'L' : c.classList.contains('ac-is-cover') ? 'B' : 'C') : '' };
+    const rec = { t, a: arena ? 1 : 0, d: arena && drawn(arena) ? 1 : 0, c: c ? (c.classList.contains('ac-is-lifting') ? 'L' : c.classList.contains('ac-is-cover') ? 'B' : 'C') : '' };
     if (arena) rec.clock = arena.querySelector('.hg2-bug .mid em')?.textContent ?? null;
     if (fr.ut) {
       const scr = document.querySelector('.screen.ut');
@@ -235,26 +253,45 @@ async function measure(browser, f, sport, tapLoc, name) {
     frames.map((x) => 'data:image/jpeg;base64,' + x.data)
   );
   // each painted frame against the rAF record just before it (page time)
+  // The log is taken at the start of each frame's rAF callbacks, before the app's own (the curtain
+  // lifts inside its rAF tick): what frame k painted is what the log says at the start of frame k+1.
   const classed = frames.map((x, i) => {
     const t = x.wall - origin;
-    let rec = null;
-    for (const r of log) if (r.t <= t + 1) rec = r;
-    const kind = !rec || !rec.a ? 'app' : rec.c ? 'curtain' : sds[i] >= threshold ? 'game' : 'empty';
+    let at = -1;
+    for (let j = 0; j < log.length; j++) if (log[j].t <= t + 1) at = j;
+    const rec = at < 0 ? null : (log[at + 1] && log[at + 1].t - log[at].t < 40 ? log[at + 1] : log[at]);
+    // an arena with no curtain is a game frame once its canvas holds a picture and its stage is not flat
+    const kind = !rec || !rec.a ? 'app' : rec.c ? 'curtain' : rec.d && sds[i] >= threshold ? 'game' : 'empty';
     return { t: Math.round(t - tapT), sd: sds[i], kind, c: rec?.c ?? '' };
   });
   const after = classed.filter((x) => x.t >= 0);
   const firstGame = after.find((x) => x.kind === 'game');
   const empties = after.filter((x) => x.kind === 'empty' && (!firstGame || x.t < firstGame.t));
+  // the same in time, from the page's own frames (a still screen paints few screencast frames): every
+  // rAF frame from the tap to the first game frame with an arena up, no curtain and an undrawn canvas
+  let emptyMs = 0;
+  for (let i = 1; i < log.length; i++) {
+    const r = log[i - 1];
+    if (r.t >= tapT && (!firstGame || r.t < firstGame.t + tapT) && r.a && !r.c && !r.d) emptyMs += log[i].t - r.t;
+  }
   const emptyAfter = firstGame ? after.filter((x) => x.kind === 'empty' && x.t > firstGame.t) : [];
   const cur = after.filter((x) => x.kind === 'curtain');
   const arena0 = arenaAt[0];
   const run = curtain.at(-1) ?? null;
   // the first frame the canvas held a picture: the curtain's own probe when on; else the first game frame
-  const drawnT = run?.drawnAt !== undefined ? arena0 + run.drawnAt : firstGame ? firstGame.t + tapT : null;
+  // the first frame the canvas held a picture, from the page's own probe (the same test with and without the curtain)
+  const drawnT = log.find((r) => r.d && r.t >= tapT)?.t ?? (firstGame ? firstGame.t + tapT : null);
   const liftT = run?.liftAt !== undefined ? arena0 + run.liftAt : firstGame ? firstGame.t + tapT : null;
   let acc = 0;
   for (let i = 1; i < log.length; i++) if (drawnT !== null && log[i].t > drawnT && log[i].t <= liftT) acc += Math.min(0.1, (log[i].t - log[i - 1].t) / 1000);
   const ticks = drawnT === null || liftT === null ? null : Math.floor(acc * 60 + 1e-6);
+  // the engines' steps in the first second after their first drawn frame: each loop adds min(0.1 s,
+  // frame dt) and steps every 1/60 s, so a frame the curtain made longer than 100 ms would lose steps.
+  // Equal with and without the curtain (±1) means the curtain never held the match back.
+  let acc1 = 0;
+  for (let i = 1; i < log.length; i++) if (drawnT !== null && log[i].t > drawnT && log[i].t <= drawnT + 1000) acc1 += Math.min(0.1, (log[i].t - log[i - 1].t) / 1000);
+  const ticks1s = drawnT === null ? null : Math.floor(acc1 * 60 + 1e-6);
+  const longFrames = log.filter((r, i) => i > 0 && drawnT !== null && r.t > arena0 && r.t <= drawnT + 1000 && r.t - log[i - 1].t > 100).length;
   // evidence frames: the first curtain frame, every empty frame, the first game frame
   const keep = (x, tag) => {
     const i = classed.indexOf(x);
@@ -273,13 +310,19 @@ async function measure(browser, f, sport, tapLoc, name) {
     tapToArenaMs: r1(arena0 - tapT),
     tapToGameMs: firstGame ? firstGame.t : null,
     emptyFrames: empties.length,
+    emptyMs: Math.round(emptyMs),
     emptyAfterGame: emptyAfter.length,
     curtainFrames: cur.length,
-    curtainOnScreenMs: cur.length ? cur.at(-1).t - cur[0].t + 16 : 0,
+    // on screen: from the cover's first frame to the end of its fade (the page's own record; a still
+    // curtain paints few screencast frames, so counting frames would undercount it)
+    curtainOnScreenMs: run && run.liftAt !== undefined && run.coverAt !== undefined ? Math.round(run.liftAt - run.coverAt + (run.cardAt !== undefined && motion !== 'reduce' ? 150 : 0)) : cur.length ? cur.at(-1).t - cur[0].t + 16 : 0,
+    curtainFramesSpanMs: cur.length ? cur.at(-1).t - cur[0].t + 16 : 0,
     cardShown: run?.cardAt !== undefined,
     curtain: run && { cover: r1(run.coverAt), card: r1(run.cardAt), drawn: r1(run.drawnAt), motion: r1(run.motionAt), motionBy: run.motionBy, lift: r1(run.liftAt), reason: run.reason, handover: run.handover },
     gameTimeAtLiftS: drawnT === null ? null : Math.round(((liftT - drawnT) / 1000) * 1000) / 1000,
     ticksAtLift: ticks,
+    ticksFirstSecond: ticks1s,
+    framesOver100ms: longFrames,
     clockAtLift: log.find((r) => r.t >= liftT)?.clock ?? null,
     sd: { emptyMax: empties.length ? Math.max(...empties.map((x) => x.sd)) : null, gameMin: Math.min(...after.filter((x) => x.kind === 'game').map((x) => x.sd)) },
     evidence,
@@ -288,7 +331,7 @@ async function measure(browser, f, sport, tapLoc, name) {
 
 async function arenaRun(browser, sport, mount, cpu, runIdx) {
   const f = await fixture(browser, sport, 'Shell QA', 393, ctxOpts, opts);
-  await f.context.addInitScript(recorder, curtainOff);
+  await f.context.addInitScript(recorder, { off: curtainOff });
   const u = new URL(base);
   u.search = new URLSearchParams({ sport, ns: 'inspect', relay: 'ws://localhost:7777' });
   await f.page.goto(u.href, { waitUntil: 'domcontentloaded' });
@@ -325,7 +368,7 @@ async function arenaRun(browser, sport, mount, cpu, runIdx) {
 // ---------- the UT skeleton ----------
 async function skeletonRun(browser, sport, cpu) {
   const f = await fixture(browser, sport, 'Shell QA', 393, ctxOpts, opts);
-  await f.context.addInitScript(recorder, false);
+  await f.context.addInitScript(recorder, { off: false });
   const u = new URL(base);
   u.search = new URLSearchParams({ sport, ns: 'inspect', relay: 'ws://localhost:7777' });
   await f.page.goto(u.href, { waitUntil: 'domcontentloaded' });
@@ -421,8 +464,10 @@ if (part === 'skeleton') {
           curtainOn: { p50: percentile(on, 50), p95: percentile(on, 95) },
           cardShown: list.filter((m) => m.cardShown).length,
           emptyFrames: list.reduce((a, m) => a + m.emptyFrames, 0),
+          emptyMsMax: Math.max(...list.map((m) => m.emptyMs ?? 0)),
           gameTimeAtLiftS: { max: Math.max(...list.map((m) => m.gameTimeAtLiftS ?? 0)) },
           ticksAtLift: list.map((m) => m.ticksAtLift),
+          ticksFirstSecond: list.map((m) => m.ticksFirstSecond),
         },
       ];
     })
