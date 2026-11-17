@@ -10,9 +10,13 @@
 //      stale 2 frames is forced.
 // The number of new drawings a frame comes from what drawings cost on this phone: an EWMA of the
 // per-draw cost (each frame's drawing time over its draws, robust to iOS's 1 ms timer clamp),
-// floor(3 ms / cost) clamped to [3, 14] (2 ms after a frame over 20 ms). After a snap, kickoff,
-// inbound or rematch the budget's leftover draws (2 at most a frame) pre-draw the next frames of the
-// six nearest bodies. All sprite caches of a match share one area cap (6 Mpx of art pixels) that
+// floor(5 ms / cost) clamped to [3, 14] (3 ms after a frame over 20 ms). After a snap, kickoff,
+// inbound or rematch the first frame may draw 14 and the next 30 spend 10 ms (the camera re-frames
+// the play then, so every body changes size and pitch each frame), and the budget's leftover draws (2
+// at most a frame) pre-draw the next frames of the six nearest bodies. A phone that can't keep up
+// (`tight`: the 5 ms buys fewer than 3 drawings, or a slow frame outside a start) gets none of the
+// extras: no start budget, the must set at 15 fps and inside the draw count, big bodies forced only
+// after 4 stale frames. All sprite caches of a match share one area cap (6 Mpx of art pixels) that
 // outlives a rematch. Render only: nothing here reads or writes the simulation.
 import { type AreaAccount, CanvasOut, type Sprite, SpriteCache } from './body';
 
@@ -29,6 +33,8 @@ export const MAX_DRAWS = 14;
 export const STALE_WEIGHT = 24;
 export const FORCE_PX = 32;
 export const FORCE_FRAMES = 2;
+/** on a phone that can't keep up (see `tight`), a big body is forced after this many stale frames */
+export const FORCE_FRAMES_TIGHT = 4;
 export const PREWARM_DRAWS = 2;
 export const PREWARM_FRAMES = 30;
 export const PREWARM_BODIES = 6;
@@ -78,16 +84,24 @@ export class SpriteBudget {
   private staleRun = new Map<string, number>();
   private pins = new Set<string>();
   private pinsNext = new Set<string>();
+  private tightNow = false;
 
   /** Start a frame. `frameMs` is the time since the last frame began (a slow frame tightens the budget). */
   begin(frameMs: number) {
-    const start = this.warmLeft > 0;
-    const budgetMs = frameMs > SLOW_FRAME_MS ? (start ? BUDGET_MS : BUDGET_MS_SLOW) : start ? BUDGET_MS_START : BUDGET_MS;
     const cost = this.costMs();
+    const slow = frameMs > SLOW_FRAME_MS;
+    // a phone that can't keep up: the normal budget buys fewer than 3 drawings, or (outside the 30
+    // frames after a start, which are heavy on purpose) the last frame ran long. It draws what it must
+    // and no more (no start budget, the must set at 15 fps and in the count, big bodies forced after 4
+    // stale frames), so the frame rate holds first.
+    const warm = this.warmLeft > 0;
+    this.tightNow = Math.floor(BUDGET_MS / cost) < MIN_DRAWS || (slow && !warm);
+    const start = warm && !this.tightNow;
+    const budgetMs = start ? BUDGET_MS_START : slow ? BUDGET_MS_SLOW : BUDGET_MS;
     this.limitNow = Math.max(MIN_DRAWS, Math.min(MAX_DRAWS, Math.floor(budgetMs / cost)));
     // the first frame of a snap, kickoff, inbound or rematch: every body is somewhere new, so it may
-    // draw the most a frame ever does (one heavier frame, then the pre-warm keeps up)
-    if (this.warmLeft === PREWARM_FRAMES) this.limitNow = MAX_DRAWS;
+    // draw the most a frame ever does (one heavier frame, then the start budget keeps up)
+    if (start && this.warmLeft === PREWARM_FRAMES) this.limitNow = MAX_DRAWS;
     this.made = 0;
     this.forcedMade = 0;
     this.warmMade = 0;
@@ -99,6 +113,10 @@ export class SpriteBudget {
   /** The measured cost of one new drawing (ms). */
   costMs(): number {
     return this.ewmaDraws > 0 ? Math.max(0.05, this.ewmaMs / this.ewmaDraws) : FIRST_COST_MS;
+  }
+  /** Whether this phone is short of time this frame (see `begin`): renderers drop the extras. */
+  get tight() {
+    return this.tightNow;
   }
   /** How many non-must drawings this frame may make. */
   get limit() {
@@ -117,7 +135,7 @@ export class SpriteBudget {
 
   /** Whether a request must be fresh: the must set, a pin, or a big body stale too long. */
   forced(r: DrawReq) {
-    return r.must || this.pins.has(r.who) || (r.px >= FORCE_PX && this.staleFor(r.who) >= FORCE_FRAMES);
+    return r.must || this.pins.has(r.who) || (r.px >= FORCE_PX && this.staleFor(r.who) >= (this.tightNow ? FORCE_FRAMES_TIGHT : FORCE_FRAMES));
   }
 
   /** The requests in the order the budget spends on them. */
@@ -133,7 +151,9 @@ export class SpriteBudget {
     return this.forced(r) || this.made < this.limitNow;
   }
   drew(who: string, forced = false) {
-    if (!forced) this.made++;
+    // (on a tight frame the must set's drawings count too: the frame draws the larger of the count
+    // and what it must)
+    if (!forced || this.tightNow) this.made++;
     this.forcedMade += forced ? 1 : 0;
     this.staleRun.set(who, 0);
   }

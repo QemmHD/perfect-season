@@ -3,7 +3,7 @@
 // size of the old 4 draws, the EWMA reads the true per-draw cost through a 1 ms timer within 30
 // frames, the draw count stays in [3, 14], and the shared area cap is never exceeded, rematches
 // included. Pure: no canvas (fake sprites with a size), no engine.
-import { AreaPool, AREA_CAP, BUDGET_MS, BUDGET_MS_SLOW, BUDGET_MS_START, FORCE_FRAMES, MAX_DRAWS, MIN_DRAWS, PREWARM_DRAWS, PREWARM_FRAMES, resolveSprites, SpriteBudget, type SpritePlan } from './sprite-budget';
+import { AreaPool, AREA_CAP, BUDGET_MS, BUDGET_MS_SLOW, BUDGET_MS_START, FORCE_FRAMES, FORCE_FRAMES_TIGHT, MAX_DRAWS, MIN_DRAWS, PREWARM_DRAWS, PREWARM_FRAMES, resolveSprites, SpriteBudget, type SpritePlan } from './sprite-budget';
 import { SpriteCache, type Sprite } from './body';
 
 const fake = (w: number, h: number): Sprite => ({ canvas: { width: w, height: h } as HTMLCanvasElement, ax: 0, ay: 0, top: 0, handL: { x: 0, y: 0 }, handR: { x: 0, y: 0 } });
@@ -44,7 +44,7 @@ describe('the near-first sprite budget', () => {
     const run = new Map<string, number>();
     let maxBigRun = 0;
     let t = 0;
-    // the old budget's size: a draw costs a quarter of the budget, so it buys 4 (+ the must set and the
+    // the old budget's size: a draw costs 2/9 of the budget, so it buys 4 (+ the must set and the
     // forced)
     const now = () => t;
     for (let f = 0; f < 400; f++) {
@@ -52,7 +52,7 @@ describe('the near-first sprite budget', () => {
       budget.begin(16.7);
       const plans = plansFor(bs, must, f);
       const got = resolveSprites(plans, cache, last, budget, () => {
-        t += BUDGET_MS / 4;
+        t += BUDGET_MS / 4.5;
         return now();
       });
       for (const b of bs) {
@@ -146,6 +146,50 @@ describe('the near-first sprite budget', () => {
     }
     budget.begin(16.7);
     expect(budget.limit).toBe(Math.floor(BUDGET_MS / 1));
+  });
+
+  it('on a phone that cannot keep up, drops the extras: no start budget, big bodies forced after 4 stale frames', () => {
+    const budget = new SpriteBudget();
+    // a drawing costs 2 ms: the 5 ms budget buys 2, under 3
+    budget.begin(16.7);
+    budget.spent(8, 4);
+    budget.warmUp();
+    budget.begin(16.7);
+    expect(budget.tight).toBe(true);
+    expect(budget.limit).toBe(MIN_DRAWS);
+    const big = { who: 'b', px: 60, must: false, staleFor: 0, near: 0 };
+    for (let i = 0; i < FORCE_FRAMES_TIGHT; i++) {
+      expect(budget.forced(big)).toBe(false);
+      budget.stale('b');
+    }
+    expect(budget.forced(big)).toBe(true);
+    expect(FORCE_FRAMES_TIGHT).toBeGreaterThan(FORCE_FRAMES);
+    // the must set is drawn regardless, and on a tight frame it counts: once it has used the count,
+    // nobody else draws
+    for (let i = 0; i < MIN_DRAWS; i++) {
+      expect(budget.allow({ ...big, who: 'm' + i, must: true })).toBe(true);
+      budget.drew('m' + i, true);
+    }
+    expect(budget.allow({ ...big, who: 'x', px: 20 })).toBe(false);
+    budget.spent(8, 4);
+    // a cheap phone after a slow frame is tight for that frame only
+    const quick = new SpriteBudget();
+    quick.begin(16.7);
+    quick.spent(1, 4);
+    quick.begin(40);
+    expect(quick.tight).toBe(true);
+    quick.spent(1, 4);
+    quick.begin(16.7);
+    expect(quick.tight).toBe(false);
+    quick.spent(1, 4);
+    // ... but inside the 30 frames after a start, which are heavy on purpose, a slow frame keeps the
+    // start budget
+    quick.warmUp();
+    quick.begin(16.7);
+    quick.spent(1, 4);
+    quick.begin(40);
+    expect(quick.tight).toBe(false);
+    expect(quick.limit).toBe(Math.min(MAX_DRAWS, Math.floor(BUDGET_MS_START / quick.costMs())));
   });
 
   it('never lets the shared area pass the cap, across 3 rematches', () => {

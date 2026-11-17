@@ -379,12 +379,12 @@ export function stepFor(priority: boolean, clipStep = 2): number {
 }
 
 /**
- * The frame step for a priority body's stride: at rates under 0.95 a 30 fps clip shows fewer than 28
- * new frames a second, so it is sampled at half frames (the joints between two recorded frames,
+ * The frame step for a priority body's stride: under rate 1 a 30 fps clip shows fewer than 30 new
+ * frames a second, so it is sampled at half frames (the joints between two recorded frames,
  * rasterised fresh; never two drawings blended).
  */
 export function fineStep(step: number, rate: number): number {
-  return step === 1 && rate < 0.95 ? 0.5 : step;
+  return step === 1 && rate < 1 ? 0.5 : step;
 }
 
 /** The next distinct frame after `frame` at `step` (pre-warm): loops wrap, other clips hold their last. */

@@ -256,8 +256,9 @@ export class FootballRenderer {
     const dirs = px < 22 ? 8 : 16;
     const fb = (Math.round((L.facing(Math.cos(fr.face), Math.sin(fr.face)) / (Math.PI * 2)) * dirs) + dirs) % dirs;
     // the rate (V2 B.1.6): 30 fps for the must set, 15 for everyone else (far players
-    // too: they were 10); a must body's slow stride at half frames
-    const step = an.clip ? fineStep(stepFor(must, an.step ?? 2), an.gait?.rate ?? 1) : 1;
+    // too: they were 10); a must body's slow stride at half frames; on a phone short of time
+    // (budget.tight) everyone at 15
+    const step = an.clip ? fineStep(stepFor(must && !this.budget.tight, an.step ?? 2), an.gait?.rate ?? 1) : 1;
     const frame = an.clip ? frameAt(an.clip, an.ct ?? 0, step) : 0;
     // body type and locomotion on the run: a heavy man's wider base, a burner's sprint lean, the lean
     // into a burst or a turn, short steps, the plant, the head's lead and bob
@@ -272,6 +273,9 @@ export class FootballRenderer {
       lead: an.clip ? fr.lead : 0,
       bob: striding && an.clip ? headBob(frame / clipMeta(an.clip).frames, px) : 0,
     };
+    // on a phone short of time, fewer variants of each frame (each is its own drawing): no side lean,
+    // head lead or plant dip, and the forward lean in coarser steps
+    if (this.budget.tight) Object.assign(touch, { side: 0, lead: 0, dip: false, fwd: Math.round(touch.fwd * 10) / 10 });
     const view = { facing: (fb / dirs) * Math.PI * 2, pitch };
     const keyOf = (fi: number) => (an.clip ? mocapKey(an.clip, fi, an.ground) + (an.ball ?? '') : an.key) + touchKey(touch);
     const k = (fi: number) => who + '|' + keyOf(fi) + '|' + fb + '/' + dirs + '|' + px + '|' + pitch + this.art.keySuffix;
